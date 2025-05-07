@@ -1,0 +1,45 @@
+﻿<UserControl
+	x:Class="Dotnet.Streaming.UI.Views.AiStreamingView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:gui="clr-namespace:Dotnet.Streaming.UI"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Dotnet.Streaming.UI.Views"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:view="clr-namespace:Dotnet.Streaming.UI.Views"
+	d:DesignHeight="450"
+	d:DesignWidth="800"
+	mc:Ignorable="d">
+
+	<UserControl.Resources>
+		<ControlTemplate x:Key="ValidationTemplate">
+			<DockPanel>
+				<TextBlock FontSize="20" Foreground="Red">!</TextBlock>
+				<AdornedElementPlaceholder />
+			</DockPanel>
+		</ControlTemplate>
+		<Style x:Key="TextBoxInError" TargetType="{x:Type TextBox}">
+			<Style.Triggers>
+				<Trigger Property="Validation.HasError" Value="true">
+					<Setter Property="ToolTip" Value="{Binding RelativeSource={x:Static RelativeSource.Self}, Path=(Validation.Errors)[0].ErrorContent}" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+	</UserControl.Resources>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<view:AiVideoView Grid.Row="0" VideoSource="{Binding VideoSource}" />
+		<TextBlock
+			Grid.Row="3"
+			Margin="2"
+			Background="LightGray"
+			Text="{Binding Status}"
+			ToolTip="{Binding Status}" />
+	</Grid>
+</UserControl>

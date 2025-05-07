@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironwall.Dotnet.Framework\Ironwall.Dotnet.Framework.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Dotnet.OnvifSolution.Base">
+      <HintPath>Exts\Dotnet.OnvifSolution.Base.dll</HintPath>
+    </Reference>
+    <Reference Include="Ironwall.Message.Base">
+      <HintPath>Exts\Ironwall.Message.Base.dll</HintPath>
+    </Reference>
+    <Reference Include="Ironwall.Middleware.Message.Framework">
+      <HintPath>Exts\Ironwall.Middleware.Message.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="Ironwall.Redis.Message.Framework">
+      <HintPath>Exts\Ironwall.Redis.Message.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="Sensorway.Accounts.Base">
+      <HintPath>Exts\Sensorway.Accounts.Base.dll</HintPath>
+    </Reference>
+    <Reference Include="Sensorway.Events.Base">
+      <HintPath>Exts\Sensorway.Events.Base.dll</HintPath>
+    </Reference>
+    <Reference Include="Sensorway.Framework.Models">
+      <HintPath>Exts\Sensorway.Framework.Models.dll</HintPath>
+    </Reference>
+    <Reference Include="Sensorway.VMS.Messages">
+      <HintPath>Exts\Sensorway.VMS.Messages.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
