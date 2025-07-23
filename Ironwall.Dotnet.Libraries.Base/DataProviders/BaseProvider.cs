@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using System;
+using System.Diagnostics;
 
 namespace Ironwall.Dotnet.Libraries.Base.DataProviders;
 /****************************************************************************
@@ -9,11 +11,32 @@ namespace Ironwall.Dotnet.Libraries.Base.DataProviders;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class BaseProvider
+public abstract class BaseProvider<T> : EntityCollectionProvider<T>
 {
     #region - Ctors -
+    protected BaseProvider() {}
+
+    protected BaseProvider(ILogService log) =>  _log = log;
+
     #endregion
     #region - Implementation of Interface -
+    public virtual void Add(T item, int index)
+    {
+        try
+        {
+            DispatcherService.Invoke((System.Action)(() =>
+            {
+                lock (_locker)
+                {
+                    CollectionEntity.Insert(index, item);
+                }
+            }));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Failed to add an item for the reason({ex.Message}).");
+        }
+    }
     #endregion
     #region - Overrides -
     #endregion
@@ -26,5 +49,6 @@ public class BaseProvider
     #region - Properties -
     #endregion
     #region - Attributes -
+    protected ILogService? _log;
     #endregion
 }

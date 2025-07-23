@@ -34,7 +34,11 @@
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
-		<view:AiVideoView Grid.Row="0" VideoSource="{Binding VideoSource}" />
+		<!--<view:AiVideoView Grid.Row="0" VideoSource="{Binding VideoSource}" />-->
+		<view:AiScreenView
+			Grid.Row="0"
+			FillColor="Black"
+			VideoSource="{Binding VideoSource}" />
 		<TextBlock
 			Grid.Row="3"
 			Margin="2"

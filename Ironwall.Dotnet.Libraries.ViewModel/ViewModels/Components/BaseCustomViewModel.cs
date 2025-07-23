@@ -17,6 +17,10 @@ public abstract class BaseCustomViewModel<T> : SelectableBaseViewModel, IBaseCus
 {
 
     #region - Ctors -
+    protected BaseCustomViewModel(T model)
+    {
+        _model = model;
+    }
     protected BaseCustomViewModel(T model, IEventAggregator eventAggregator, ILogService log)
         : base(eventAggregator, log)
     {
@@ -52,7 +56,11 @@ public abstract class BaseCustomViewModel<T> : SelectableBaseViewModel, IBaseCus
         }
     }
 
-    public T Model => _model;
+    public T Model
+    {
+        get => _model;
+        set { _model = value; NotifyOfPropertyChange(() => Model); }
+    }
 
     #endregion
     #region - Attributes -

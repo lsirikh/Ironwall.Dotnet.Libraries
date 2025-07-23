@@ -34,7 +34,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\source\repos\Dotnet.Gym.Manager\Dotnet.Gym.Message\Dotnet.Gym.Message.csproj" />
-    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
   </ItemGroup>
 
   <ItemGroup>

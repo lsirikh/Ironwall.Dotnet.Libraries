@@ -1,0 +1,207 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Dashboards.EventDashboardView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<UserControl.Resources>
+		<Style
+			x:Key="NameText"
+			BasedOn="{StaticResource MaterialDesignTextBlock}"
+			TargetType="TextBlock">
+			<Setter Property="FontSize" Value="15" />
+			<Setter Property="Foreground" Value="#E1E1E1" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextAlignment" Value="Center" />
+			<Setter Property="HorizontalAlignment" Value="Center" />
+			<Setter Property="Margin" Value="10,4" />
+		</Style>
+
+		<Style x:Key="NameCard" TargetType="{x:Type md:Card}">
+			<Setter Property="Background" Value="#FF8E00" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="8" />
+		</Style>
+
+	</UserControl.Resources>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<Border
+			Grid.Row="0"
+			Height="200"
+			Margin="5,0,-5,0"
+			BorderThickness="2"
+			CornerRadius="10">
+			<Border.Resources>
+				<Style TargetType="Border">
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsSelected}" Value="True">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding IsSelected}" Value="False">
+							<Setter Property="Visibility" Value="Visible" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Resources>
+			<Grid Margin="20">
+				<ContentControl x:Name="EventInfoViewModel" />
+			</Grid>
+		</Border>
+		<Border
+			Grid.Row="0"
+			Height="200"
+			Margin="5,0,10,0"
+			md:ThemeAssist.Theme="Inherit"
+			BorderThickness="2"
+			CornerRadius="10">
+			<Border.Resources>
+				<Style TargetType="Border">
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsSelected}" Value="True">
+							<Setter Property="Visibility" Value="Visible" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding IsSelected}" Value="False">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Resources>
+			<ContentControl x:Name="SelectedItemEditor" />
+		</Border>
+
+		<TabControl
+			Grid.Row="1"
+			Height="400"
+			Margin="-15,0,15,0"
+			HorizontalAlignment="Stretch"
+			cal:Message.Attach="[Event SelectionChanged] = [Action OnActiveTab($source, $eventArgs)]"
+			md:NavigationRailAssist.ShowSelectionBackground="True"
+			Background="{Binding Path=Background, RelativeSource={RelativeSource AncestorType=UserControl}}"
+			Style="{StaticResource MaterialDesignNavigationRailTabControl}"
+			TabStripPlacement="Left">
+			<TabControl.Template>
+				<ControlTemplate TargetType="TabControl">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition />
+						</Grid.ColumnDefinitions>
+						<ScrollViewer
+							FlowDirection="LeftToRight"
+							HorizontalScrollBarVisibility="Auto"
+							VerticalScrollBarVisibility="Auto">
+							<TabPanel
+								x:Name="HeaderPanel"
+								Width="80"
+								Margin="25,0,-5,0"
+								VerticalAlignment="Stretch"
+								Panel.ZIndex="0"
+								IsItemsHost="true"
+								KeyboardNavigation.TabIndex="1" />
+						</ScrollViewer>
+						<ContentPresenter
+							x:Name="PART_SelectedContentHost"
+							Grid.Column="1"
+							ContentSource="SelectedContent"
+							SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+					</Grid>
+				</ControlTemplate>
+			</TabControl.Template>
+			<!--  ControllerPanel  -->
+			<TabControl.ContentTemplate>
+				<DataTemplate>
+					<!--  여기서의 DataContext == 선택된 TabItem.Content (혹은 그 TabItem 자신)  -->
+					<!--  예: SetupControl 하나만 고정으로 보여주고 싶다면  -->
+					<ContentControl cal:View.Model="{Binding DataContext.TabControlViewModel, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+				</DataTemplate>
+			</TabControl.ContentTemplate>
+
+			<TabItem
+				Content=""
+				IsEnabled="{Binding IsButtonEnable}"
+				Tag="DataChartPanelViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="BarChart" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="차트보기" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem
+				Content=""
+				IsEnabled="{Binding IsButtonEnable}"
+				Tag="DetectionEventViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="MotionDetector" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="탐지내역" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem
+				Content=""
+				IsEnabled="{Binding IsButtonEnable}"
+				Tag="MalfunctionEventViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="ErrorOutline" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="장애내역" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem
+				Content=""
+				IsEnabled="{Binding IsButtonEnable}"
+				Tag="ConnectionEventViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Connection" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="연결내역" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem
+				Content=""
+				IsEnabled="{Binding IsButtonEnable}"
+				Tag="ActionEventViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Clipboard" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="조치내역" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+		</TabControl>
+
+
+
+	</Grid>
+</UserControl>

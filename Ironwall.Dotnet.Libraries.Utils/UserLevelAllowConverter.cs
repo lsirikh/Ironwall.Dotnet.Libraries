@@ -1,0 +1,25 @@
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using System.Globalization;
+using System.Windows.Data;
+
+namespace Ironwall.Dotnet.Libraries.Utils;
+
+public sealed class UserLevelAllowConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if ((int)value == (int)EnumLevelType.USER)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}

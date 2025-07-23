@@ -13,8 +13,7 @@ namespace Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
 public abstract class BasePanelViewModel : Conductor<IScreen>
-                                        , IHandle<CloseAllMessageModel>
-                                        , IBasePanelViewModel
+                                        , IHandle<CloseAllMessageModel>, IBasePanelViewModel
 {
     #region - Ctors -
 
@@ -34,7 +33,6 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
     #region - Implementation of Interface -
     #endregion
     #region - Overrides -
-
     protected override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         try
@@ -88,6 +86,7 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
     protected ILogService? _log;
     protected CancellationTokenSource? _cancellationTokenSource;
     public const int ACTION_TOKEN_TIMEOUT = 5000;
+    public const int PREPARING_TIME_MS = 500;
     #endregion
 
 }

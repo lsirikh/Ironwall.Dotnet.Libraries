@@ -76,7 +76,7 @@ public abstract class BaseDataGridPanelViewModel<T> : BaseDataGridViewModel<T> w
                 {
                     item.IsSelected = isSelected;
                 }
-
+                
                 await CheckSelectState();
             }
             catch (Exception ex)

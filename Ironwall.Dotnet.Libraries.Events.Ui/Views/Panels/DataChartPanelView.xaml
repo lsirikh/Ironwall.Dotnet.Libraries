@@ -1,0 +1,119 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.DataChartPanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels"
+	xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<UserControl.Resources>
+		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+	</UserControl.Resources>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<StackPanel Grid.Row="0" Orientation="Vertical">
+			<Grid Grid.Row="0" Margin="10,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="50" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="50" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+				</Grid.ColumnDefinitions>
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="0"
+					Style="{StaticResource TextBlockTitle}"
+					Text="From" />
+				<mah:DateTimePicker
+					Grid.Row="0"
+					Grid.Column="1"
+					Margin="5"
+					FontSize="15"
+					FontWeight="Bold"
+					SelectedDateTime="{Binding StartDate, Mode=TwoWay, StringFormat={}{yyyy-MM-dd HH:mm:ss}, UpdateSourceTrigger=PropertyChanged}" />
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="2"
+					Style="{StaticResource TextBlockTitle}"
+					Text="To" />
+				<mah:DateTimePicker
+					Grid.Row="0"
+					Grid.Column="3"
+					Margin="5"
+					DisplayDateStart="{Binding EndDateDisplay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					FontSize="15"
+					FontWeight="Bold"
+					SelectedDateTime="{Binding EndDate, Mode=TwoWay, StringFormat={}{yyyy-MM-dd HH:mm:ss}, UpdateSourceTrigger=PropertyChanged}" />
+
+				<Button
+					x:Name="ClickSearch"
+					Grid.Row="0"
+					Grid.Column="4"
+					Style="{StaticResource IconButtonStyle}">
+					<Button.Content>
+						<md:PackIcon
+							Width="30"
+							Height="30"
+							Kind="Search" />
+					</Button.Content>
+				</Button>
+				<Button
+					x:Name="ClickCancel"
+					Grid.Row="0"
+					Grid.Column="6"
+					Style="{StaticResource IconButtonStyle}">
+					<Button.Content>
+						<md:PackIcon
+							Width="30"
+							Height="30"
+							Kind="Cancel" />
+					</Button.Content>
+				</Button>
+
+
+
+			</Grid>
+		</StackPanel>
+		<Grid Grid.Row="1" Margin="10">
+			<lvc:CartesianChart
+				LegendPosition="Right"
+				Series="{Binding Series}"
+				TooltipTextSize="12"
+				XAxes="{Binding XAxes}"
+				YAxes="{Binding YAxes}"
+				ZoomMode="X" />
+		</Grid>
+
+	</Grid>
+</UserControl>
+
+

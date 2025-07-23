@@ -14,10 +14,12 @@ namespace Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 public class SelectableBaseViewModel : BasePanelViewModel, ISelectableBaseViewModel
 {
     #region - Ctors -
+    public SelectableBaseViewModel()
+    {
+    }
     public SelectableBaseViewModel(IEventAggregator eventAggregator
                                     , ILogService log) : base(eventAggregator, log)
     {
-
     }
     #endregion
     #region - Implementation of Interface -

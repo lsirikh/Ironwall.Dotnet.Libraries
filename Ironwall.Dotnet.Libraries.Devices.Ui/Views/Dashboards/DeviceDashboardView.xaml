@@ -1,0 +1,627 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards.DeviceDashboardView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dashboards"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<UserControl.Resources>
+
+		<Style
+			x:Key="NameText"
+			BasedOn="{StaticResource MaterialDesignTextBlock}"
+			TargetType="TextBlock">
+			<Setter Property="FontSize" Value="15" />
+			<Setter Property="Foreground" Value="#E1E1E1" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextAlignment" Value="Center" />
+			<Setter Property="HorizontalAlignment" Value="Center" />
+			<Setter Property="Margin" Value="10,4" />
+		</Style>
+
+		<Style x:Key="NameCard" TargetType="{x:Type md:Card}">
+			<Setter Property="Background" Value="#FF8E00" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="8" />
+		</Style>
+
+	</UserControl.Resources>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<Border
+			Grid.Row="0"
+			Margin="5"
+			Background="{DynamicResource MaterialDesignBackground}"
+			BorderThickness="2"
+			CornerRadius="5">
+			<Border.Resources>
+				<Style TargetType="Border">
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsSelected}" Value="True">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding IsSelected}" Value="False">
+							<Setter Property="Visibility" Value="Visible" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Resources>
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="1*" />
+				</Grid.ColumnDefinitions>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="1*" />
+					<RowDefinition Height="1*" />
+				</Grid.RowDefinitions>
+				<Grid.Resources />
+
+				<GroupBox
+					Grid.Row="0"
+					Grid.Column="0"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="AudioVideo" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="제어기" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding Controller, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="0"
+					Grid.Column="0"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="Controller" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding Controller}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="0"
+					Grid.Column="1"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="ProximitySensor" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="멀티센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding MultiSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="0"
+					Grid.Column="1"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="Multi-Sensor" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding MultiSensor}" />
+					</Grid>
+				</md:Card>-->
+				<!--<md:Card
+					Grid.Row="0"
+					Grid.Column="2"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="Fense Sensor" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding FenseSensor}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="0"
+					Grid.Column="2"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="Vibrate" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="펜스센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding FenseSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="0"
+					Grid.Column="3"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="Underground Sensor" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding UndergroundSensor}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="0"
+					Grid.Column="3"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="Brain" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="스마트센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding SmartSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+
+				<GroupBox
+					Grid.Row="0"
+					Grid.Column="4"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="DownloadNetwork" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="지중센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding UndergroundSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="0"
+					Grid.Column="4"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="Contact Sensor" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding ContactSensor}" />
+					</Grid>
+				</md:Card>-->
+
+				<GroupBox
+					Grid.Row="1"
+					Grid.Column="0"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="Connection" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="접점센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding ContactSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="1"
+					Grid.Column="0"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="PIR Sensor" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding PIRSensor}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="1"
+					Grid.Column="1"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="DownloadNetwork" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="PIR 센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding PIRSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="1"
+					Grid.Column="1"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="IO Controller" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding IOController}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="1"
+					Grid.Column="2"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="AudioInputRca" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="IO 제어기" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding PIRSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="1"
+					Grid.Column="2"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="Laser Sensor" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding LaserSensor}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="1"
+					Grid.Column="3"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="LaserPointer" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="레이저센서" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding LaserSensor, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="1"
+					Grid.Column="3"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="IP Camera" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{Binding IPCamera}" />
+					</Grid>
+				</md:Card>-->
+				<GroupBox
+					Grid.Row="1"
+					Grid.Column="4"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="Cctv" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="IP 카메라" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding IPCamera, FallbackValue=10}"
+						TextAlignment="Center" />
+				</GroupBox>
+				<!--<md:Card
+					Grid.Row="1"
+					Grid.Column="4"
+					Style="{StaticResource NameCard}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="1*" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="1*" />
+						</Grid.RowDefinitions>
+						<TextBlock
+							Grid.Row="0"
+							Style="{StaticResource NameText}"
+							Text="N/A" />
+						<GridSplitter
+							Grid.Row="1"
+							Height="1"
+							ResizeDirection="Rows" />
+						<TextBlock
+							Grid.Row="3"
+							Style="{StaticResource NameText}"
+							Text="{x:Null}" />
+					</Grid>
+				</md:Card>-->
+
+			</Grid>
+		</Border>
+		<Border
+			Grid.Row="0"
+			Margin="5"
+			md:ThemeAssist.Theme="Inherit"
+			BorderThickness="2"
+			CornerRadius="10">
+			<Border.Resources>
+				<Style TargetType="Border">
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsSelected}" Value="True">
+							<Setter Property="Visibility" Value="Visible" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding IsSelected}" Value="False">
+							<Setter Property="Visibility" Value="Collapsed" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Resources>
+			<ContentControl x:Name="SelectedItemEditor" />
+		</Border>
+
+
+		<TabControl
+			Grid.Row="1"
+			Height="400"
+			Margin="-15,0,15,0"
+			HorizontalAlignment="Stretch"
+			cal:Message.Attach="[Event SelectionChanged] = [Action OnActiveTab($source, $eventArgs)]"
+			md:NavigationRailAssist.ShowSelectionBackground="True"
+			Background="{Binding Path=Background, RelativeSource={RelativeSource AncestorType=UserControl}}"
+			Style="{StaticResource MaterialDesignNavigationRailTabControl}"
+			TabStripPlacement="Left">
+			<TabControl.Template>
+				<ControlTemplate TargetType="TabControl">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition />
+						</Grid.ColumnDefinitions>
+						<ScrollViewer
+							FlowDirection="LeftToRight"
+							HorizontalScrollBarVisibility="Auto"
+							VerticalScrollBarVisibility="Auto">
+							<TabPanel
+								x:Name="HeaderPanel"
+								Width="80"
+								Margin="25,0,-5,0"
+								VerticalAlignment="Stretch"
+								Panel.ZIndex="0"
+								IsItemsHost="true"
+								KeyboardNavigation.TabIndex="1" />
+						</ScrollViewer>
+						<ContentPresenter
+							x:Name="PART_SelectedContentHost"
+							Grid.Column="1"
+							ContentSource="SelectedContent"
+							SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+					</Grid>
+				</ControlTemplate>
+			</TabControl.Template>
+			<!--  ControllerPanel  -->
+			<TabControl.ContentTemplate>
+				<DataTemplate>
+					<!--  여기서의 DataContext == 선택된 TabItem.Content (혹은 그 TabItem 자신)  -->
+					<!--  예: SetupControl 하나만 고정으로 보여주고 싶다면  -->
+					<ContentControl cal:View.Model="{Binding DataContext.TabControlViewModel, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+				</DataTemplate>
+			</TabControl.ContentTemplate>
+
+			<TabItem Content="" Tag="ControllerDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="AudioVideo" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="제어기 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem Content="" Tag="SensorDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Vibrate" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="센서 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem Content="" Tag="CameraDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Video" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="카메라 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+		</TabControl>
+
+
+
+	</Grid>
+</UserControl>
+

@@ -24,7 +24,6 @@ public abstract class BaseDataGridViewModel<T> : BasePanelViewModel
     }
     #endregion
     #region - Implementation of Interface -
-
     #endregion
     #region - Overrides -
     #endregion

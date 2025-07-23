@@ -1,0 +1,447 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Panels.SensorDevicePanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Behaviors"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views.Panels"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<UserControl.Resources>
+		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+	</UserControl.Resources>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<StackPanel Grid.Row="0" Orientation="Vertical">
+			<Grid Grid.Row="0" Margin="10,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="250" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="70" />
+				</Grid.ColumnDefinitions>
+				<!--  Add Button  -->
+				<Button
+					Grid.Column="7"
+					IsEnabled="{Binding IsButtonEnable}"
+					Style="{StaticResource IconButtonStyle}"
+					ToolTip="추가하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
+					</i:Interaction.Behaviors>
+					<md:PackIcon
+						Width="30"
+						Height="30"
+						Kind="AddBox" />
+				</Button>
+
+				<!--  Remove Button  -->
+				<Button
+					Grid.Column="9"
+					IsEnabled="{Binding IsButtonEnable}"
+					Style="{StaticResource IconButtonStyle}"
+					ToolTip="삭제하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
+					</i:Interaction.Behaviors>
+					<md:PackIcon
+						Width="30"
+						Height="30"
+						Kind="MinusBox" />
+				</Button>
+
+				<!--  Refresh Button  -->
+				<Button
+					Grid.Column="11"
+					IsEnabled="{Binding IsButtonEnable}"
+					Style="{StaticResource IconButtonStyle}"
+					ToolTip="갱신하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickReloadButton" />
+					</i:Interaction.Behaviors>
+					<Button.Content>
+						<Grid>
+							<ProgressBar
+								Width="100"
+								Height="20"
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+							<md:PackIcon
+								Width="30"
+								Height="30"
+								Kind="CircleArrows"
+								ToolTip="갱신하기"
+								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						</Grid>
+					</Button.Content>
+
+				</Button>
+
+				<!--  Save Button  -->
+				<Button
+					Grid.Column="13"
+					Margin="2,2"
+					VerticalAlignment="Center"
+					md:RippleAssist.IsCentered="True"
+					IsEnabled="{Binding IsButtonEnable}"
+					Style="{StaticResource MaterialDesignIconButton}"
+					ToolTip="저장하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+					</i:Interaction.Behaviors>
+					<Button.Content>
+						<Grid>
+							<ProgressBar
+								Width="100"
+								Height="20"
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+							<md:PackIcon
+								Width="30"
+								Height="30"
+								Kind="Floppy"
+								ToolTip="저장하기"
+								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						</Grid>
+					</Button.Content>
+				</Button>
+			</Grid>
+		</StackPanel>
+		<Grid
+			Grid.Row="1"
+			Width="800"
+			Height="310">
+			<ProgressBar
+				Width="100"
+				Height="20"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignLinearProgressBar}"
+				Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+		</Grid>
+		<DataGrid
+			x:Name="DataGridUsers"
+			Grid.Row="1"
+			Height="310"
+			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
+			AutoGenerateColumns="False"
+			ItemsSource="{Binding ViewModelProvider}"
+			SelectionMode="Extended"
+			Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<i:Interaction.Behaviors>
+				<behavior:ClearSelectionOnEscBehavior />
+				<behavior_inner:SensorDeviceSelectedItemsBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
+			</i:Interaction.Behaviors>
+			<DataGrid.Columns>
+
+				<!--  No  -->
+				<DataGridTextColumn
+					Binding="{Binding Index}"
+					Header="No"
+					IsReadOnly="True">
+					<DataGridTextColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridTextColumn.HeaderStyle>
+					<DataGridTextColumn.ElementStyle>
+						<Style TargetType="{x:Type TextBlock}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridTextColumn.ElementStyle>
+				</DataGridTextColumn>
+
+
+				<!--  DeviceNumber  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Device Number"
+					SortMemberPath="DeviceNumber">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  DeviceGroup  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Device Group"
+					SortMemberPath="DeviceGroup">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  DeviceName  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Device Name"
+					SortMemberPath="DeviceNumber">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  Controller  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Controller"
+					SortMemberPath="Controller">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Controller.DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<ComboBox
+								VerticalAlignment="Center"
+								HorizontalContentAlignment="Center"
+								IsEditable="False"
+								ItemsSource="{Binding Data.Controllers, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
+								SelectedItem="{Binding Controller, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+								<ComboBox.ItemsPanel>
+									<ItemsPanelTemplate>
+										<VirtualizingStackPanel />
+									</ItemsPanelTemplate>
+								</ComboBox.ItemsPanel>
+								<ComboBox.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding DeviceName}" TextAlignment="Center" />
+									</DataTemplate>
+								</ComboBox.ItemTemplate>
+								<ComboBox.ItemContainerStyle>
+									<Style TargetType="{x:Type ComboBoxItem}" />
+								</ComboBox.ItemContainerStyle>
+							</ComboBox>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  DeviceType  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Type"
+					SortMemberPath="DeviceType">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding DeviceType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<ComboBox
+								VerticalAlignment="Center"
+								HorizontalContentAlignment="Center"
+								IsEditable="False"
+								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceType}}}"
+								SelectedItem="{Binding DeviceType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+								<ComboBox.ItemsPanel>
+									<ItemsPanelTemplate>
+										<VirtualizingStackPanel />
+									</ItemsPanelTemplate>
+								</ComboBox.ItemsPanel>
+								<ComboBox.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding}" TextAlignment="Center" />
+									</DataTemplate>
+								</ComboBox.ItemTemplate>
+								<ComboBox.ItemContainerStyle>
+									<Style TargetType="{x:Type ComboBoxItem}" />
+								</ComboBox.ItemContainerStyle>
+							</ComboBox>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  Version  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Device Version"
+					SortMemberPath="Version">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  Status  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Status"
+					SortMemberPath="Status">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<ComboBox
+								VerticalAlignment="Center"
+								HorizontalContentAlignment="Center"
+								IsEditable="False"
+								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
+								SelectedItem="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+								<ComboBox.ItemsPanel>
+									<ItemsPanelTemplate>
+										<VirtualizingStackPanel />
+									</ItemsPanelTemplate>
+								</ComboBox.ItemsPanel>
+								<ComboBox.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding}" TextAlignment="Center" />
+									</DataTemplate>
+								</ComboBox.ItemTemplate>
+								<ComboBox.ItemContainerStyle>
+									<Style TargetType="{x:Type ComboBoxItem}" />
+								</ComboBox.ItemContainerStyle>
+							</ComboBox>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+
+
+			</DataGrid.Columns>
+		</DataGrid>
+		<StackPanel
+			Grid.Row="2"
+			Margin="0,10,0,0"
+			Orientation="Horizontal">
+
+			<TextBlock Text="선택된 항목 : " />
+			<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
+		</StackPanel>
+	</Grid>
+</UserControl>
