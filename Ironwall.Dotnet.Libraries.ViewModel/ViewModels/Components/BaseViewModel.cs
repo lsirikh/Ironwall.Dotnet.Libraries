@@ -96,7 +96,7 @@ public abstract class BaseViewModel<T> : Conductor<IScreen>
     protected string? _className = string.Empty;
     protected T _model;
     protected IEventAggregator? _eventAggregator;
-    private ILogService? _log;
+    protected ILogService? _log;
     protected CancellationTokenSource? _cancellationTokenSource;
     public const int ACTION_TOKEN_TIMEOUT = 5000;
     #endregion

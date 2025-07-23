@@ -1,0 +1,362 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils">
+
+	<Color x:Key="SystemChromeAltMediumHighColor">#CCFFFFFF</Color>
+	<Color x:Key="SystemChromeAltHighColor">#FFFFFFFF</Color>
+	<FontFamily x:Key="NotoSansCJKkRRegular">NotoSansCJKkRRegular, pack://application:,,,/Resources/#Noto Sans CJK KR Regular</FontFamily>
+	<FontFamily x:Key="NotoSansCJKkRMedium">NotoSansCJKkRMedium, pack://application:,,,/Resources/#Noto Sans CJK KR Medium</FontFamily>
+
+	<sys:Double x:Key="HeightIconLarge">28</sys:Double>
+	<sys:Double x:Key="WidthIconLarge">28</sys:Double>
+	<sys:Double x:Key="HeightIconSmall">24</sys:Double>
+	<sys:Double x:Key="WidthIconSmall">24</sys:Double>
+
+	<Style BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" TargetType="{x:Type ScrollBar}">
+		<Style.Triggers>
+			<Trigger Property="Orientation" Value="Vertical">
+				<Setter Property="Width" Value="8" />
+				<Setter Property="MinWidth" Value="8" />
+				<Setter Property="Height" Value="Auto" />
+				<Setter Property="MinHeight" Value="0" />
+			</Trigger>
+			<Trigger Property="Orientation" Value="Horizontal">
+				<Setter Property="Height" Value="8" />
+				<Setter Property="MinHeight" Value="8" />
+				<Setter Property="Width" Value="Auto" />
+				<Setter Property="MinWidth" Value="0" />
+			</Trigger>
+		</Style.Triggers>
+		<Setter Property="Opacity" Value="0.6" />
+	</Style>
+
+	<Style BasedOn="{StaticResource MaterialDesignListBoxItem}" TargetType="{x:Type ListBoxItem}" />
+
+	<Style
+		x:Key="MaterialDesignCardFlipper"
+		BasedOn="{StaticResource {x:Type md:Flipper}}"
+		TargetType="{x:Type md:Flipper}" />
+
+	<Style
+		x:Key="SeparatorVerticalStyle"
+		BasedOn="{StaticResource MaterialDesignSeparator}"
+		TargetType="{x:Type Separator}">
+		<Style.Setters>
+			<Setter Property="LayoutTransform">
+				<Setter.Value>
+					<RotateTransform Angle="-90" />
+				</Setter.Value>
+			</Setter>
+		</Style.Setters>
+	</Style>
+
+	<!--  Font Size and Text Styles  -->
+	<Style
+		x:Key="DialogTitle"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="20" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="15,5,0,5" />
+	</Style>
+	<Style x:Key="DialogTitleIcon" TargetType="{x:Type md:PackIcon}">
+		<Setter Property="Width" Value="{StaticResource WidthIconLarge}" />
+		<Setter Property="Height" Value="{StaticResource HeightIconLarge}" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style x:Key="SetupContentIcon" TargetType="{x:Type md:PackIcon}">
+		<Setter Property="Width" Value="30" />
+		<Setter Property="Height" Value="30" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="HorizontalAlignment" Value="Center" />
+	</Style>
+	<Style
+		x:Key="SetupTextBlockTitle"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="13" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="TextAlignment" Value="Center" />
+		<Setter Property="Width" Value="80" />
+		<Setter Property="Height" Value="50" />
+		<Setter Property="Margin" Value="-8,-5,0,0" />
+	</Style>
+
+	<Style
+		x:Key="SetupEventTextBlockTitle"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+		<Setter Property="FontSize" Value="16" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+
+		<Style.Triggers>
+			<Trigger Property="TextBlock.IsEnabled" Value="False">
+				<Setter Property="TextBlock.Foreground" Value="Gray" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
+	<Style x:Key="ContentIcon" TargetType="{x:Type md:PackIcon}">
+		<Setter Property="Width" Value="{StaticResource WidthIconSmall}" />
+		<Setter Property="Height" Value="{StaticResource HeightIconSmall}" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style
+		x:Key="TextBlockTitle"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="10,5,0,5" />
+	</Style>
+	<Style
+		x:Key="TextBoxInput"
+		BasedOn="{StaticResource MaterialDesignTextBox}"
+		TargetType="{x:Type TextBox}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="Margin" Value="10,5,0,5" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style
+		x:Key="TextBlockImage"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="Margin" Value="3,0,0,0" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style
+		x:Key="TextBlockContent"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="Margin" Value="10,5,0,5" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style
+		x:Key="DatePickerContent"
+		BasedOn="{StaticResource MaterialDesignDatePicker}"
+		TargetType="{x:Type DatePicker}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="Margin" Value="10,5,0,5" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style
+		x:Key="ComboBoxContent"
+		BasedOn="{StaticResource MaterialDesignComboBox}"
+		TargetType="{x:Type ComboBox}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="Margin" Value="10,5,0,5" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+
+	<Style
+		x:Key="ComboBoxItemContent"
+		BasedOn="{StaticResource MaterialDesignComboBoxItemStyle}"
+		TargetType="{x:Type ComboBoxItem}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+
+	<Style
+		x:Key="PasswordBoxInput"
+		BasedOn="{StaticResource MaterialDesignPasswordBox}"
+		TargetType="{x:Type PasswordBox}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="15" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="Margin" Value="10,5,0,5" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+
+	<Style x:Key="ButtonIcon" TargetType="{x:Type md:PackIcon}">
+		<Setter Property="Width" Value="{StaticResource WidthIconSmall}" />
+		<Setter Property="Height" Value="{StaticResource HeightIconSmall}" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="HorizontalAlignment" Value="Left" />
+		<Setter Property="Margin" Value="0,0,0,0" />
+	</Style>
+	<Style
+		x:Key="ButtonTextBlock"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="14" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="10,0,0,0" />
+	</Style>
+
+	<Style
+		x:Key="CustomedTabItem"
+		BasedOn="{StaticResource MaterialDesignNavigationRailTabItem}"
+		TargetType="{x:Type TabItem}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="14" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="10,0,0,0" />
+
+	</Style>
+
+	<Style x:Key="SubDialogIcon" TargetType="{x:Type md:PackIcon}">
+		<Setter Property="Width" Value="{StaticResource WidthIconLarge}" />
+		<Setter Property="Height" Value="{StaticResource HeightIconLarge}" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="10,0,10,0" />
+	</Style>
+	<Style
+		x:Key="SubDialogText"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="16" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="10,0,0,0" />
+	</Style>
+
+	<Style
+		x:Key="InnerText"
+		BasedOn="{StaticResource MaterialDesignTextBlock}"
+		TargetType="{x:Type TextBlock}">
+		<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+		<Setter Property="FontSize" Value="13" />
+		<Setter Property="Opacity" Value="0.75" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="10,0,0,0" />
+	</Style>
+
+	<!--  Material Design 스타일 기반 버튼  -->
+	<Style
+		x:Key="IconButtonStyle"
+		BasedOn="{StaticResource MaterialDesignIconButton}"
+		TargetType="Button">
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="2,2" />
+		<Setter Property="md:RippleAssist.IsCentered" Value="True" />
+	</Style>
+
+	<!--  Material Design 스타일 기반 DataGrid  -->
+	<Style
+		x:Key="CustomDataGridStyle"
+		BasedOn="{StaticResource MaterialDesignDataGrid}"
+		TargetType="DataGrid">
+		<!--  읽기 전용 설정  -->
+		<!--<Setter Property="IsReadOnly" Value="True" />-->
+
+		<!--  자동 컬럼 생성 막기  -->
+		<Setter Property="AutoGenerateColumns" Value="False" />
+
+		<!--  가상화, 정렬, 열 재배치/크기조정 설정  -->
+		<Setter Property="EnableRowVirtualization" Value="True" />
+		<Setter Property="CanUserSortColumns" Value="True" />
+		<Setter Property="CanUserReorderColumns" Value="False" />
+		<Setter Property="CanUserResizeColumns" Value="True" />
+
+		<!--  선택 관련 설정: 행 단위로만 선택  -->
+		<!--<Setter Property="SelectionMode" Value="Single" />
+		<Setter Property="SelectionUnit" Value="FullRow" />-->
+
+		<!--  새 행 추가 금지  -->
+		<Setter Property="CanUserAddRows" Value="False" />
+
+		<!--  DataGrid 포커스 점선 제거  -->
+		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+
+
+		<!--  ScrollViewer 설정 등  -->
+		<Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+
+		<!--  초기에 숨겨두었다가 바인딩값으로 Visible  -->
+		<Setter Property="Visibility" Value="Collapsed" />
+
+		<!--  트리거: IsVisible 값이 True면 Visibility=Visible  -->
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding IsVisible}" Value="True">
+				<Setter Property="Visibility" Value="Visible" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
+	<!--  Material Design 스타일 기반 DataGrid Column Header  -->
+	<Style
+		x:Key="CustomDataGridColumnHeaderStyle"
+		BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}"
+		TargetType="{x:Type DataGridColumnHeader}">
+		<Setter Property="HorizontalAlignment" Value="Center" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="BorderThickness" Value="0" />
+	</Style>
+
+
+	<!--  Converters  -->
+	<utils:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+	<utils:BoolToInverseVisibleConverter x:Key="BoolToInverseVisibleConverter" />
+	<utils:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+	<utils:StringToDateConverter x:Key="StringToDateConverter" />
+	<utils:LevelStringToIntConverter x:Key="LevelStringToIntConverter" />
+	<utils:LevelIndexConverter x:Key="LevelIndexConverter" />
+	<utils:UsedStringToIntConverter x:Key="UsedStringToIntConverter" />
+	<utils:UsedIndexConverter x:Key="UsedIndexConverter" />
+	<utils:ImageConverter x:Key="ImageConverter" />
+	<utils:MapImageConverter x:Key="MapImageConverter" />
+	<utils:TimeFormatConverter x:Key="TimeFormatConverter" />
+	<utils:AdminLevelAllowConverter x:Key="AdminLevelAllowConverter" />
+	<utils:UserLevelAllowConverter x:Key="UserLevelAllowConverter" />
+	<utils:NoImageNameConverter x:Key="NoImageNameConverter" />
+	<utils:IsDeletableAccountConverter x:Key="IsDeletableAccountConverter" />
+	<utils:AccountIndexNumberingConverter x:Key="AccountIndexNumberingConverter" />
+	<utils:AdminAllowedWIthIsItemExistMutliValueConverter x:Key="AdminAllowedWIthIsItemExistMutliValueConverter" />
+	<utils:PassConfirmValidationParameters x:Key="PassConfirmValidationParameters" />
+	<utils:RowIndexConverter x:Key="RowIndexConverter" />
+	<utils:CountToBooleanConverter x:Key="CountToBooleanConverter" />
+	<utils:BindingProxy x:Key="BindingProxy" />
+	<utilPass:PasswordBoxAssistant x:Key="PasswordBoxAssistant" />
+	<utilPass:PasswordMaskConverter x:Key="PasswordMaskConverter" />
+
+	<!--  Validation Rules  -->
+	<utils:IdValidationRule x:Key="IdValidationRule" />
+	<utils:NotEmptyValidationRule x:Key="NotEmptyValidationRule" />
+	<utils:PassConfirmValidationRule x:Key="PassConfirmValidationRule" />
+	<utils:StringLengthValidationRule x:Key="StringLengthValidationRule" />
+
+</ResourceDictionary>

@@ -22,6 +22,8 @@ using Dotnet.Streaming.UI.RawFramesDecoding;
 using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Caliburn.Micro;
 
 
 namespace Dotnet.Streaming.UI.Views;
@@ -41,7 +43,7 @@ public partial class AiVideoView : UserControl
     private Int32Rect _dirtyRect;
     private TransformParameters _transformParameters;
     private readonly Action<IDecodedVideoFrame> _invalidateAction;
-
+    private readonly ILogService _log;
     private Task _handleSizeChangedTask = Task.CompletedTask;
     private CancellationTokenSource _resizeCancellationTokenSource = new CancellationTokenSource();
 
@@ -76,7 +78,7 @@ public partial class AiVideoView : UserControl
     private DateTime _initialDelayTime = DateTime.Now;
 
     // 2) 1초에 1번만 디텍션
-    private static readonly TimeSpan DetectionInterval = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan DetectionInterval = TimeSpan.FromMilliseconds(100);
 
     // 바운딩 박스 결과를 저장해두는 리스트
     // -> 1초에 한 번 갱신, 그 외에는 이전 값을 그대로 사용
@@ -87,7 +89,7 @@ public partial class AiVideoView : UserControl
     {
         InitializeComponent();
         _invalidateAction = Invalidate;
-
+        _log = IoC.Get<ILogService>();
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
         var darknet_dir = System.IO.Path.Combine(baseDir, "darknet_model");
         if (!System.IO.Directory.Exists(darknet_dir))
@@ -199,118 +201,19 @@ public partial class AiVideoView : UserControl
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[AiVideoView] Invalidate Error: {ex}");
+            _log.Error($"[AiVideoView] Invalidate Error: {ex}");
         }
         finally
         {
             _writeableBitmap?.Unlock();
         }
 
-        if(DateTime.Now - _initialDelayTime > TimeSpan.FromSeconds(10))
+        if(DateTime.Now - _initialDelayTime > TimeSpan.FromMilliseconds(3000))
         {
             // YOLO는 별도 Task에서 처리 (렌더와 분리)
             _ = RunYoloDetectionAsync();
         }
     }
-
-    //private void RunYoloDetectionAsync()
-    //{
-    //    // 탐지 주기 제어
-    //    var now = DateTime.Now;
-    //    if (now - _lastDetection < DetectionInterval)
-    //        return;
-
-    //    _lastDetection = now;
-
-    //    // 1. UI 스레드에서 WriteableBitmap → byte[] 복사
-    //    byte[] buffer = null;
-    //    int stride = 0;
-    //    int height = 0;
-    //    Application.Current.Dispatcher.Invoke(() =>
-    //    {
-    //        try
-    //        {
-    //            _writeableBitmap.Lock();
-
-    //            stride = _writeableBitmap.BackBufferStride;
-    //            height = _writeableBitmap.PixelHeight;
-    //            int bytes = stride * height;
-
-    //            buffer = new byte[bytes];
-    //            Marshal.Copy(_writeableBitmap.BackBuffer, buffer, 0, bytes);
-    //        }
-    //        finally
-    //        {
-    //            _writeableBitmap.Unlock();
-    //        }
-    //    });
-
-    //    // 2. YOLO 처리 Task
-    //    Task.Run(() =>
-    //    {
-    //        try
-    //        {
-    //            using var matBGRA = Mat.FromPixelData(_height, _width, MatType.CV_8UC4, buffer, stride);
-    //            using var matBGR = new Mat();
-    //            Cv2.CvtColor(matBGRA, matBGR, ColorConversionCodes.BGRA2BGR);
-
-    //            yoloDetector.Clear();
-    //            var detectedObject = yoloDetector.Detect(matBGR);
-
-    //            _lastBboxes.Clear();
-    //            _lastBboxes.AddRange(yoloDetector.Bboxes);
-
-    //            _lastLabels.Clear();
-    //            _lastLabels.AddRange(yoloDetector.Labels);
-
-    //            // Draw box
-    //            for (int i = 0; i < _lastBboxes.Count; i++)
-    //            {
-    //                var rc = _lastBboxes[i];
-    //                Cv2.Rectangle(matBGR, rc, Scalar.Red, 2);
-
-    //                string label = (i < _lastLabels.Count) ? _lastLabels[i] : "";
-    //                Cv2.PutText(matBGR, label, new OpenCvSharp.Point(rc.X, rc.Y - 5), HersheyFonts.HersheySimplex, 0.8, Scalar.Yellow, 2);
-    //            }
-
-    //            Application.Current?.Dispatcher.Invoke(() =>
-    //            {
-    //                OverlayCanvas.Children.Clear();
-
-    //                foreach (var (bbox, label) in _lastBboxes.Zip(_lastLabels))
-    //                {
-    //                    var rect = new System.Windows.Shapes.Rectangle
-    //                    {
-    //                        Width = bbox.Width,
-    //                        Height = bbox.Height,
-    //                        Stroke = System.Windows.Media.Brushes.Red,
-    //                        StrokeThickness = 2
-    //                    };
-    //                    Canvas.SetLeft(rect, bbox.X);
-    //                    Canvas.SetTop(rect, bbox.Y);
-    //                    OverlayCanvas.Children.Add(rect);
-
-    //                    var text = new TextBlock
-    //                    {
-    //                        Text = label,
-    //                        Foreground = System.Windows.Media.Brushes.Yellow,
-    //                        FontWeight = FontWeights.Bold,
-    //                        Background = System.Windows.Media.Brushes.Black,
-    //                        Opacity = 0.7
-    //                    };
-    //                    Canvas.SetLeft(text, bbox.X);
-    //                    Canvas.SetTop(text, bbox.Y - 20);
-    //                    OverlayCanvas.Children.Add(text);
-    //                }
-    //            });
-
-    //        }
-    //        catch (Exception ex)
-    //        {
-    //            Debug.WriteLine($"[YOLO] Detection Failed: {ex}");
-    //        }
-    //    });
-    //}
 
     private async Task RunYoloDetectionAsync()
     {
@@ -374,7 +277,7 @@ public partial class AiVideoView : UserControl
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[YOLO] Detection Failed: {ex}");
+                _log.Error($"[YOLO] Detection Failed: {ex}");
             }
         });
 
@@ -414,7 +317,7 @@ public partial class AiVideoView : UserControl
                     Text = $"{label}({display})",
                     Foreground = System.Windows.Media.Brushes.Yellow,
                     FontWeight = FontWeights.Bold,
-                    Background = System.Windows.Media.Brushes.Black,
+                    Background = System.Windows.Media.Brushes.Gray,
                     Opacity = 0.7
                 };
                 Canvas.SetLeft(text, bbox.X);

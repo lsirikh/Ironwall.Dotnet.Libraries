@@ -10,12 +10,11 @@ namespace Ironwall.Dotnet.Libraries.Base.Models;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public abstract class CommonMessageModel
-        : INotifyPropertyChanged, ICommonMessageModel
+public abstract class CommonMessageModel : INotifyPropertyChanged, ICommonMessageModel
 {
-    private string _title;
-    private string _content;
-    private IMessageModel _messageModel;
+    private string _title = string.Empty;
+    private string _content = string.Empty;
+    private IMessageModel? _messageModel;
 
     public string Title
     {
@@ -37,7 +36,7 @@ public abstract class CommonMessageModel
         }
     }
 
-    public IMessageModel MessageModel
+    public IMessageModel? MessageModel
     {
         get { return _messageModel; }
         set
@@ -56,6 +55,6 @@ public abstract class CommonMessageModel
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    public event PropertyChangedEventHandler PropertyChanged;
+    public event PropertyChangedEventHandler? PropertyChanged;
 
 }

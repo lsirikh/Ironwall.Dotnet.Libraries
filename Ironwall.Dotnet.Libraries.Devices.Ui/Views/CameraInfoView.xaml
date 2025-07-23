@@ -1,0 +1,173 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraInfoView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	d:DesignHeight="450"
+	d:DesignWidth="800"
+	mc:Ignorable="d">
+	<Grid Height="440" Margin="16">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="3*" />
+			<ColumnDefinition Width="7*" />
+		</Grid.ColumnDefinitions>
+
+		<Grid.RowDefinitions>
+			<!--  10개 필드 + 가변 확장  -->
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<!--  Name  -->
+		<TextBlock
+			Grid.Row="0"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="이름" />
+		<TextBox
+			Grid.Row="0"
+			Grid.Column="1"
+			md:HintAssist.Hint="장비 명칭"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Name}" />
+
+		<!--  Location  -->
+		<TextBlock
+			Grid.Row="1"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="설치 위치" />
+		<TextBox
+			Grid.Row="1"
+			Grid.Column="1"
+			md:HintAssist.Hint="현재 설치 지역"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Location}" />
+
+		<!--  Manufacturer  -->
+		<TextBlock
+			Grid.Row="2"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="제조사" />
+		<TextBox
+			Grid.Row="2"
+			Grid.Column="1"
+			md:HintAssist.Hint="제조사"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Manufacturer}" />
+
+		<!--  Model  -->
+		<TextBlock
+			Grid.Row="3"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="모델" />
+		<TextBox
+			Grid.Row="3"
+			Grid.Column="1"
+			md:HintAssist.Hint="모델명"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Model}" />
+
+		<!--  Hardware  -->
+		<TextBlock
+			Grid.Row="4"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="하드웨어 ID" />
+		<TextBox
+			Grid.Row="4"
+			Grid.Column="1"
+			md:HintAssist.Hint="HW 식별자"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Hardware}" />
+
+		<!--  Firmware  -->
+		<TextBlock
+			Grid.Row="5"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="펌웨어" />
+		<TextBox
+			Grid.Row="5"
+			Grid.Column="1"
+			md:HintAssist.Hint="FW 버전"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Firmware}" />
+
+		<!--  Device-ID  -->
+		<TextBlock
+			Grid.Row="6"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Device ID" />
+		<TextBox
+			Grid.Row="6"
+			Grid.Column="1"
+			md:HintAssist.Hint="시리얼/식별자"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding DeviceId}" />
+
+		<!--  MAC  -->
+		<TextBlock
+			Grid.Row="7"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="MAC 주소" />
+		<TextBox
+			Grid.Row="7"
+			Grid.Column="1"
+			md:HintAssist.Hint="MAC Address"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MacAddress}" />
+
+		<!--  ONVIF Ver  -->
+		<TextBlock
+			Grid.Row="8"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="ONVIF Version" />
+		<TextBox
+			Grid.Row="8"
+			Grid.Column="1"
+			md:HintAssist.Hint="ONVIF 규격 버전"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding OnvifVersion}" />
+
+		<!--  Service URI  -->
+		<TextBlock
+			Grid.Row="9"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Device Service URI" />
+		<TextBox
+			Grid.Row="9"
+			Grid.Column="1"
+			md:HintAssist.Hint="SOAP 서비스 엔드포인트"
+			IsReadOnly="True"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Uri}"
+			TextWrapping="Wrap" />
+	</Grid>
+</UserControl>

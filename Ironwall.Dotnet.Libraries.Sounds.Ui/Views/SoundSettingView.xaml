@@ -1,0 +1,563 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Sounds.Ui.Views.SoundSettingView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	d:Background="WhiteSmoke"
+	d:Height="400"
+	d:Width="500"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<UserControl.Resources>
+		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+	</UserControl.Resources>
+
+
+	<StackPanel>
+		<!--  음원파일 폴더 설정  -->
+		<Grid Margin="16,24,24,0">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="16" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<Grid.Resources>
+				<Style TargetType="TextBlock">
+					<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+					<Setter Property="FontSize" Value="16" />
+					<Setter Property="Opacity" Value="0.75" />
+				</Style>
+			</Grid.Resources>
+
+			<md:PackIcon
+				Grid.Column="0"
+				Width="18"
+				Height="18"
+				VerticalAlignment="Center"
+				Kind="Folder" />
+
+			<TextBlock
+				x:Name="TextBlockSoundFolder"
+				Grid.Column="2"
+				Text="음원 폴더 설정">
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<TextBox
+				x:Name="TextBoxSoundFolder"
+				Grid.Column="3"
+				VerticalAlignment="Center"
+				HorizontalContentAlignment="Right"
+				md:HintAssist.FloatingScale="1"
+				md:HintAssist.Hint="이벤트 탐지 자동 해제"
+				md:HintAssist.IsFloating="True"
+				IsEnabled="False"
+				Style="{StaticResource MaterialDesignTextBox}"
+				Text="{Binding DirectoryUri, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<Button
+				x:Name="ButtonSoundFolder"
+				Grid.Column="4"
+				VerticalAlignment="Center"
+				HorizontalContentAlignment="Right">
+				<Button.Content>
+					<md:PackIcon Kind="FolderOpen" />
+				</Button.Content>
+			</Button>
+		</Grid>
+		<!--  탐지경보 자동해제  -->
+		<Grid Margin="16,24,24,0">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="10" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="16" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+
+			<Grid.Resources>
+				<Style TargetType="TextBlock">
+					<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+					<Setter Property="FontSize" Value="16" />
+					<Setter Property="Opacity" Value="0.75" />
+				</Style>
+			</Grid.Resources>
+
+			<md:PackIcon
+				Grid.Row="0"
+				Grid.Column="0"
+				Kind="MusicNoteEighth"
+				Style="{StaticResource ContentIcon}" />
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="2"
+				Text="탐지알람 설정">
+
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+						<Setter Property="VerticalAlignment" Value="Center" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="3"
+				ItemsSource="{Binding Data.SoundSourceProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
+				SelectedItem="{Binding DetectionSound, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextAlignment="Center" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+				<ComboBox.ItemContainerStyle>
+					<Style TargetType="{x:Type ComboBoxItem}" />
+				</ComboBox.ItemContainerStyle>
+			</ComboBox>
+			<Button
+				x:Name="ButtonDetectionPlay"
+				Grid.Row="0"
+				Grid.Column="4"
+				VerticalAlignment="Center"
+				HorizontalContentAlignment="Right">
+				<Button.Content>
+					<md:PackIcon Kind="Play" />
+				</Button.Content>
+			</Button>
+
+
+			<md:PackIcon
+				Grid.Row="2"
+				Grid.Column="0"
+				VerticalAlignment="Center"
+				Foreground="{Binding ElementName=TextBlockDetectionTimerSound, Path=Foreground}"
+				Kind="VolumeHigh"
+				Style="{StaticResource ContentIcon}" />
+
+			<TextBlock
+				x:Name="TextBlockDetectionTimerSound"
+				Grid.Row="2"
+				Grid.Column="2"
+				IsEnabled="{Binding ElementName=ToggleButtonDetecionTimerSound, Path=IsChecked}"
+				Text="탐지알람 자동해제">
+
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+						<Setter Property="VerticalAlignment" Value="Center" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<ToggleButton
+				x:Name="ToggleButtonDetecionTimerSound"
+				Grid.Row="2"
+				Grid.Column="4"
+				IsChecked="{Binding IsDetectionAutoSoundStop, Mode=TwoWay}"
+				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+
+			<Grid
+				Grid.Row="3"
+				Grid.Column="2"
+				Grid.ColumnSpan="9"
+				Margin="0,16,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="16" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+
+				<md:PackIcon
+					Foreground="{Binding ElementName=TextBoxDetectionTimerSound, Path=BorderBrush}"
+					Kind="BellOffOutline"
+					Style="{StaticResource ContentIcon}" />
+
+				<TextBox
+					x:Name="TextBoxDetectionTimerSound"
+					Grid.Column="2"
+					VerticalAlignment="Center"
+					HorizontalContentAlignment="Right"
+					md:HintAssist.FloatingScale="1"
+					md:HintAssist.Hint="이벤트 탐지 자동 해제"
+					md:HintAssist.IsFloating="True"
+					IsEnabled="{Binding ElementName=ToggleButtonDetecionTimerEvent, Path=IsChecked}"
+					Style="{StaticResource MaterialDesignTextBox}"
+					Text="{Binding DetectionSoundDuration, Mode=TwoWay, UpdateSourceTrigger=LostFocus}">
+
+					<i:Interaction.Behaviors>
+						<behavior:NumericOnlyBehavior />
+					</i:Interaction.Behaviors>
+				</TextBox>
+			</Grid>
+		</Grid>
+
+		<!--  장애경보 자동해제  -->
+		<Grid Margin="16,24,24,0">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="10" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="16" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+
+			<Grid.Resources>
+				<Style TargetType="TextBlock">
+					<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+					<Setter Property="FontSize" Value="16" />
+					<Setter Property="Opacity" Value="0.75" />
+				</Style>
+			</Grid.Resources>
+
+			<md:PackIcon
+				Grid.Row="0"
+				Grid.Column="0"
+				Kind="MusicNoteEighth"
+				Style="{StaticResource ContentIcon}" />
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="2"
+				Text="장애알람 설정">
+
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+						<Setter Property="VerticalAlignment" Value="Center" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="3"
+				ItemsSource="{Binding Data.SoundSourceProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
+				SelectedItem="{Binding MalfunctionSound, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextAlignment="Center" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+				<ComboBox.ItemContainerStyle>
+					<Style TargetType="{x:Type ComboBoxItem}" />
+				</ComboBox.ItemContainerStyle>
+			</ComboBox>
+			<Button
+				x:Name="ButtonMalfunctionPlay"
+				Grid.Row="0"
+				Grid.Column="4"
+				VerticalAlignment="Center"
+				HorizontalContentAlignment="Right">
+				<Button.Content>
+					<md:PackIcon Kind="Play" />
+				</Button.Content>
+			</Button>
+
+			<md:PackIcon
+				Grid.Row="2"
+				VerticalAlignment="Center"
+				Foreground="{Binding ElementName=TextBlockMalfunctionTimerSound, Path=Foreground}"
+				Kind="VolumeHigh"
+				Style="{StaticResource ContentIcon}" />
+
+			<TextBlock
+				x:Name="TextBlockMalfunctionTimerSound"
+				Grid.Row="2"
+				Grid.Column="2"
+				Grid.ColumnSpan="2"
+				IsEnabled="{Binding ElementName=ToggleButtonMalfunctionTimerSound, Path=IsChecked}"
+				Text="장애알람 자동해제">
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+						<Setter Property="VerticalAlignment" Value="Center" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<ToggleButton
+				x:Name="ToggleButtonMalfunctionTimerSound"
+				Grid.Row="2"
+				Grid.Column="4"
+				IsChecked="{Binding IsMalfunctionAutoSoundStop, Mode=TwoWay}"
+				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+
+			<Grid
+				Grid.Row="3"
+				Grid.Column="2"
+				Grid.ColumnSpan="9"
+				Margin="0,16,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="16" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+
+				<md:PackIcon
+					Foreground="{Binding ElementName=TextBoxTimerMalfunctionSound, Path=BorderBrush}"
+					Kind="BellOffOutline"
+					Style="{StaticResource ContentIcon}" />
+
+				<TextBox
+					x:Name="TextBoxTimerMalfunctionSound"
+					Grid.Column="2"
+					VerticalAlignment="Center"
+					HorizontalContentAlignment="Right"
+					md:HintAssist.FloatingScale="1"
+					md:HintAssist.Hint="탐지경보 자동해제"
+					md:HintAssist.IsFloating="True"
+					IsEnabled="{Binding ElementName=ToggleButtonMalfunctionTimerSound, Path=IsChecked}"
+					Style="{StaticResource MaterialDesignTextBox}"
+					Text="{Binding MalfunctionSoundDuration, Mode=TwoWay, UpdateSourceTrigger=LostFocus}">
+					<i:Interaction.Behaviors>
+						<behavior:NumericOnlyBehavior />
+					</i:Interaction.Behaviors>
+				</TextBox>
+			</Grid>
+		</Grid>
+
+
+		<!--  조치경보 자동해제  -->
+		<Grid Margin="16,24,24,24">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="10" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="16" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+
+			<Grid.Resources>
+				<Style TargetType="TextBlock">
+					<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+					<Setter Property="FontSize" Value="16" />
+					<Setter Property="Opacity" Value="0.75" />
+				</Style>
+			</Grid.Resources>
+
+			<md:PackIcon
+				Grid.Row="0"
+				Grid.Column="0"
+				Kind="MusicNoteEighth"
+				Style="{StaticResource ContentIcon}" />
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="2"
+				Text="조치알람 설정">
+
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+						<Setter Property="VerticalAlignment" Value="Center" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="3"
+				ItemsSource="{Binding Data.SoundSourceProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
+				SelectedItem="{Binding ActionReportSound, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextAlignment="Center" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+				<ComboBox.ItemContainerStyle>
+					<Style TargetType="{x:Type ComboBoxItem}" />
+				</ComboBox.ItemContainerStyle>
+			</ComboBox>
+			<Button
+				x:Name="ButtonActionPlay"
+				Grid.Row="0"
+				Grid.Column="4"
+				VerticalAlignment="Center"
+				HorizontalContentAlignment="Right">
+				<Button.Content>
+					<md:PackIcon Kind="Play" />
+				</Button.Content>
+			</Button>
+
+			<md:PackIcon
+				Grid.Row="2"
+				Grid.Column="0"
+				Width="18"
+				Height="18"
+				VerticalAlignment="Center"
+				Foreground="{Binding ElementName=TextBlockActionTimeSound, Path=Foreground}"
+				Kind="VolumeHigh" />
+
+			<!--  TextBlockPopupEvent  -->
+			<TextBlock
+				x:Name="TextBlockActionTimeSound"
+				Grid.Row="2"
+				Grid.Column="2"
+				IsEnabled="{Binding ElementName=ToggleButtonActionTimerSound, Path=IsChecked}"
+				Text="보고알람 자동해제">
+
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
+						<Setter Property="FontSize" Value="16" />
+						<Setter Property="Opacity" Value="0.75" />
+
+						<Style.Triggers>
+							<Trigger Property="TextBlock.IsEnabled" Value="False">
+								<Setter Property="TextBlock.Foreground" Value="Gray" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+			</TextBlock>
+
+			<ToggleButton
+				x:Name="ToggleButtonActionTimerSound"
+				Grid.Row="2"
+				Grid.Column="4"
+				IsChecked="{Binding IsActionReportAutoSoundStop, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+
+			<Grid
+				Grid.Row="3"
+				Grid.Column="2"
+				Grid.ColumnSpan="9"
+				Margin="0,16,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="16" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+
+				<md:PackIcon
+					Width="16"
+					Height="16"
+					VerticalAlignment="Center"
+					Foreground="{Binding ElementName=TextBoxActionTimeSound, Path=BorderBrush}"
+					Kind="BellOffOutline" />
+
+				<TextBox
+					x:Name="TextBoxActionTimeSound"
+					Grid.Column="2"
+					VerticalAlignment="Center"
+					HorizontalContentAlignment="Right"
+					md:HintAssist.FloatingScale="1"
+					md:HintAssist.Hint="{DynamicResource Camera_PopupAutoRelease_Hint}"
+					md:HintAssist.IsFloating="True"
+					IsEnabled="{Binding ElementName=ToggleButtonActionTimerSound, Path=IsChecked}"
+					Style="{StaticResource MaterialDesignTextBox}"
+					Text="{Binding ActionReportSoundDuration, Mode=TwoWay, UpdateSourceTrigger=LostFocus}">
+
+					<i:Interaction.Behaviors>
+						<behavior:NumericOnlyBehavior />
+					</i:Interaction.Behaviors>
+				</TextBox>
+			</Grid>
+		</Grid>
+	</StackPanel>
+</UserControl>

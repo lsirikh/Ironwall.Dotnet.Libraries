@@ -23,7 +23,7 @@ public class TestDbServiceForGym
 {
     private const string TEST_DB_SERVER = "192.168.202.180";  // 실제 환경에 맞게 변경
     private const int TEST_DB_PORT = 3306;             // MariaDB 기본 포트
-    private const string TEST_DB_NAME = "GymDB";   // 테스트용 DB
+    private const string TEST_DB_NAME = "gymdb";   // 테스트용 DB
     private const string TEST_DB_USER = "root";        // 예시
     private const string TEST_DB_PASS = "root";            // 예시
     private DbSetupModel _setupModel;

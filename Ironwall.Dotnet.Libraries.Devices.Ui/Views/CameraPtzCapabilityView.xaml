@@ -1,0 +1,137 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraPtzCapabilityView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="450"
+	d:DesignWidth="800"
+	mc:Ignorable="d">
+	<Grid Height="440" Margin="16">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="4*" />
+			<ColumnDefinition Width="2*" />
+			<ColumnDefinition Width="4*" />
+			<ColumnDefinition Width="2*" />
+		</Grid.ColumnDefinitions>
+
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<!--  Min / Max Pan  -->
+		<TextBlock
+			Grid.Row="0"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Pan Min (°)" />
+		<TextBox
+			Grid.Row="0"
+			Grid.Column="1"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MinPan, Mode=TwoWay}" />
+		<TextBlock
+			Grid.Row="0"
+			Grid.Column="2"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Pan Max (°)" />
+		<TextBox
+			Grid.Row="0"
+			Grid.Column="3"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MaxPan, Mode=TwoWay}" />
+
+		<!--  Min / Max Tilt  -->
+		<TextBlock
+			Grid.Row="1"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Tilt Min (°)" />
+		<TextBox
+			Grid.Row="1"
+			Grid.Column="1"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MinTilt, Mode=TwoWay}" />
+		<TextBlock
+			Grid.Row="1"
+			Grid.Column="2"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Tilt Max (°)" />
+		<TextBox
+			Grid.Row="1"
+			Grid.Column="3"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MaxTilt, Mode=TwoWay}" />
+
+		<!--  Min / Max Zoom  -->
+		<TextBlock
+			Grid.Row="2"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Zoom Min (×)" />
+		<TextBox
+			Grid.Row="2"
+			Grid.Column="1"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MinZoom, Mode=TwoWay}" />
+		<TextBlock
+			Grid.Row="2"
+			Grid.Column="2"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Zoom Max (×)" />
+		<TextBox
+			Grid.Row="2"
+			Grid.Column="3"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MaxZoom, Mode=TwoWay}" />
+
+		<!--  FOV  -->
+		<TextBlock
+			Grid.Row="3"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="수평 FOV (°)" />
+		<TextBox
+			Grid.Row="3"
+			Grid.Column="1"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding HorizontalFov, Mode=TwoWay}" />
+		<TextBlock
+			Grid.Row="3"
+			Grid.Column="2"
+			Style="{StaticResource TextBlockTitle}"
+			Text="수직 FOV (°)" />
+		<TextBox
+			Grid.Row="3"
+			Grid.Column="3"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding VerticalFov, Mode=TwoWay}" />
+
+		<!--  기타  -->
+		<TextBlock
+			Grid.Row="4"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="최대 가시거리 (m)" />
+		<TextBox
+			Grid.Row="4"
+			Grid.Column="1"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding MaxVisibleDistance, Mode=TwoWay}" />
+		<TextBlock
+			Grid.Row="4"
+			Grid.Column="2"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Zoom Level(단수)" />
+		<TextBox
+			Grid.Row="4"
+			Grid.Column="3"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding ZoomLevel, Mode=TwoWay}" />
+	</Grid>
+</UserControl>

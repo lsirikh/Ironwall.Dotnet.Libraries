@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
 
 namespace Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Conductors;
@@ -13,7 +14,8 @@ namespace Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Conductors;
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
 public class ConductorOneViewModel : Conductor<Screen>.Collection.OneActive
-                                    , IHandle<CloseAllMessageModel>, IConductorViewModel
+                                    , IConductorViewModel
+                                    , IHandle<CloseAllMessageModel>
 {
 
     #region - Ctors -
@@ -34,7 +36,7 @@ public class ConductorOneViewModel : Conductor<Screen>.Collection.OneActive
         base.OnActivateAsync(cancellationToken);
         _eventAggregator?.SubscribeOnUIThread(this);
         _log?.Info($"######### {_className} OnActivate!! #########");
-        IsVisible = false;
+        IsVisible = true;
 
         return Task.CompletedTask;
     }
@@ -49,25 +51,47 @@ public class ConductorOneViewModel : Conductor<Screen>.Collection.OneActive
         return Task.CompletedTask;
     }
 
-    public override async Task ActivateItemAsync(Screen item, CancellationToken cancellationToken = default)
+
+    /// <summary>
+    /// 기존의 Item이 삭제되고 새로운 아이템이 있으면 IsVisible을 이양하고, 
+    /// 없는 경우 IsVisible을 false로 하여 View Panel의 계층은 유지하고, 제어는 가능하게 만든다.
+    /// </summary>
+    /// <param name="newItem"></param>
+    /// <param name="closePrevious"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    protected override Task ChangeActiveItemAsync(Screen newItem, bool closePrevious, CancellationToken cancellationToken)
     {
-        /// BaseViewModel을 상속받는  
-        /// ViewModel만 ActivateItem이 가능
-        if (!(item is IConductorViewModel))
-            return;
+        if (newItem == null)
+        {
+            IsVisible = false;
+        }
+        else
+        {
+            IsVisible = true;
+        }
 
-        await base.ActivateItemAsync(item, cancellationToken);
-
-        /// 해당 ShellViewModel을 Visible 하게 
-        /// 관리하기 위해서 Dialog와 Popup Dialog의
-        /// ShellViewModel의 ActiveItem이 Blank Item 인지
-        /// 확인하는 과정이 필요하다.
-        var viewModel = item as IConductorViewModel;
-
-        viewModel.IsVisible = false;
-
+        return base.ChangeActiveItemAsync(newItem, closePrevious, cancellationToken);
     }
 
+    //public override Task ActivateItemAsync(Screen item, CancellationToken cancellationToken = default)
+    //{
+    //    /// BaseViewModel을 상속받는  
+    //    /// ViewModel만 ActivateItem이 가능
+    //    if (!(item is IBasePanelViewModel)) return Task.CompletedTask;
+        
+    //    base.ActivateItemAsync(item, cancellationToken);
+
+    //    /// 해당 ShellViewModel을 Visible 하게 
+    //    /// 관리하기 위해서 Dialog와 Popup Dialog의
+    //    /// ShellViewModel의 ActiveItem이 Blank Item 인지
+    //    /// 확인하는 과정이 필요하다.
+    //    var viewModel = item as IBasePanelViewModel;
+
+    //    IsVisible = true;
+
+    //    return Task.CompletedTask;
+    //}
     #endregion
     #region - Binding Methods -
     #endregion
@@ -78,11 +102,23 @@ public class ConductorOneViewModel : Conductor<Screen>.Collection.OneActive
     {
         try
         {
-            if (Items != null && Items.Count > 0)
+            //if (Items != null && Items.Count > 0)
+            //{
+            //    await ActivateItemAsync(item: Items.FirstOrDefault() ?? throw new NullReferenceException("참조할 ViewModel이 등록되지 않았습니다."), cancellationToken);
+            //    IsVisible = false;
+            //}
+            if (IsActive)
             {
-                await ActivateItemAsync(item: Items.FirstOrDefault() ?? throw new NullReferenceException("참조할 ViewModel이 등록되지 않았습니다."), cancellationToken);
-                IsVisible = false;
+                //이전에 담긴 Item은 무시한다.
+                Items.Clear();
+                //현재 Conductor에 담긴 Item은 Deactivate 시킨다.
+                await DeactivateItemAsync(ActiveItem, true, cancellationToken);
+                //결론적으로 Conductor를 Deactivate 시킨다.
+                await TryCloseAsync();
             }
+            else
+                await Task.CompletedTask;
+
         }
         catch (Exception ex)
         {

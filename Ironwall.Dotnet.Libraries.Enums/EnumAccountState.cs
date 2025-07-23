@@ -8,7 +8,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
 {
     public enum EnumAccountState
     {
-        DEACTIVATED = 0,
-        ACTIVATED = 1,
+        DEACTIVATED,
+        ACTIVATED,
     }
 }

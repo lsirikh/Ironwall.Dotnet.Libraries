@@ -1,0 +1,219 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.MalfunctionSelectionView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	d:Background="WhiteSmoke"
+	mc:Ignorable="d">
+
+	<!--  View-model proxy (전역 DataContext 바인딩용)  -->
+	<UserControl.Resources>
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+	</UserControl.Resources>
+
+
+
+	<GroupBox
+		Margin="5"
+		Style="{StaticResource MaterialDesignGroupBox}"
+		UseLayoutRounding="True">
+		<GroupBox.Header>
+			<StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal">
+				<md:PackIcon Kind="Settings" />
+				<TextBlock
+					Margin="5,0"
+					VerticalAlignment="Center"
+					Text="장애보고 속성" />
+			</StackPanel>
+		</GroupBox.Header>
+
+
+		<!--  ─────────────────────────────  INPUT GRID  ─────────────────────────────  -->
+		<Grid Margin="5">
+			<!--  2 행 × 6 쌍(label + editor) = 12 열  -->
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="80" />
+				<ColumnDefinition Width="2*" MinWidth="60" />
+				<ColumnDefinition Width="80" />
+				<ColumnDefinition Width="2*" MinWidth="60" />
+				<ColumnDefinition Width="100" />
+				<ColumnDefinition Width="2*" MinWidth="60" />
+				<ColumnDefinition Width="100" />
+				<ColumnDefinition Width="2*" MinWidth="60" />
+				<ColumnDefinition Width="80" />
+				<ColumnDefinition Width="2*" MinWidth="60" />
+			</Grid.ColumnDefinitions>
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Type" />
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="1"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
+				SelectedItem="{Binding MessageType, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+			</ComboBox>
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Group" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="3"
+				md:HintAssist.Hint="G1 / Alarm-A"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding EventGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Device" />
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="5"
+				Grid.ColumnSpan="3"
+				ItemsSource="{Binding Data.DeviceProvider, Source={StaticResource proxy}}"
+				SelectedItem="{Binding Device, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}"
+				ToolTip="{Binding Device, Mode=TwoWay}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<!--  실제 아이템 모양  -->
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock Width="35" Text="{Binding DeviceGroup, StringFormat={}{0:D3}}" />
+							<TextBlock Width="60" Text="{Binding DeviceType}" />
+							<TextBlock Width="140" Text="{Binding DeviceName}" />
+						</StackPanel>
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
+
+
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="8"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Status" />
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="9"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
+				SelectedItem="{Binding Status, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+			</ComboBox>
+
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Reason" />
+			<ComboBox
+				Grid.Row="1"
+				Grid.Column="1"
+				Grid.ColumnSpan="2"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumFaultType}}}"
+				SelectedItem="{Binding Reason, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+			</ComboBox>
+
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="FirstStart" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="1"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding FirstStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="FirstEnd" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="3"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding FirstEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="SecondStart" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="5"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding SecondStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="6"
+				Style="{StaticResource TextBlockTitle}"
+				Text="SecondEnd" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="7"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding SecondEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<!--  ───────────────────────────  APPLY BUTTON  ───────────────────────────  -->
+			<Button
+				x:Name="ApplyButton"
+				Grid.Row="2"
+				Grid.Column="8"
+				Grid.ColumnSpan="2"
+				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+				Style="{StaticResource MaterialDesignFlatButton}">
+				<Button.Content>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
+						<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
+					</StackPanel>
+				</Button.Content>
+			</Button>
+		</Grid>
+	</GroupBox>
+
+</UserControl>

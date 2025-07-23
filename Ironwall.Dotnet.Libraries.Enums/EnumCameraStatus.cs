@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.Enums
 {
-    public enum  EnumCameraStatus : int
+    public enum  EnumCameraStatus
     {
-        NONE = 0,
-        ACTIVE = 1,
-        INACTIVE = 2,
-        NO_RESPONSE = 3,
+        NONE,
+        ACTIVE,
+        INACTIVE,
+        NO_RESPONSE,
     }
 }

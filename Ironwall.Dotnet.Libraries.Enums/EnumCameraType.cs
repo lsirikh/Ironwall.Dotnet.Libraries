@@ -8,9 +8,10 @@ namespace Ironwall.Dotnet.Libraries.Enums
 {
     public enum EnumCameraType
     {
-        NONE = 0,
-        FIXED = 1,
-        PTZ = 2,
-        SPEED_DOM = 3
+        NONE,
+        FIXED,
+        PTZ,
+        FISHEYES,
+        THERMAL
     }
 }

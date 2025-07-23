@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.Enums
 {
-    public enum EnumCameraMode : int
+    public enum EnumCameraMode
     {
-        NONE = 0,
-        ONVIF = 1,
-        INNODEP_API = 2,
-        ETC = 9,
+        NONE,
+        ONVIF,
+        INNODEP_API,
+        ETC,
     }
 }
