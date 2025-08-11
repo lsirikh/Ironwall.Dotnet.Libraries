@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.DataProviders;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Diagnostics;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Providers;
 /****************************************************************************
@@ -11,6 +12,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Providers;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
+[DebuggerDisplay("Count = {CollectionEntity.Count}")]
 public class DeviceProvider : BaseProvider<IBaseDeviceModel>
 {
     #region - Ctors -

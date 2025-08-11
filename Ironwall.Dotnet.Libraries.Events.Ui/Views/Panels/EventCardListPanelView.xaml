@@ -19,21 +19,24 @@
 	mc:Ignorable="d">
 	<Grid>
 		<Grid.RowDefinitions>
-			<RowDefinition Height="0" />
+			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 		</Grid.RowDefinitions>
 
+		<GridSplitter
+			Grid.Row="0"
+			Height="1"
+			Foreground="#88000000" />
 		<Grid Grid.Row="1" VerticalAlignment="Center">
 			<Border
-				Margin="0,2,0,0"
+				Margin="0,0,0,0"
 				HorizontalAlignment="Stretch"
-				Background="{StaticResource MaterialDesignDarkSeparatorBackground}"
-				BorderBrush="#88000000"
-				BorderThickness="0"
+				Background="DodgerBlue"
 				CornerRadius="2.5"
-				Opacity="0.95">
+				Opacity="0.95"
+				Style="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
 
 				<Grid>
 					<Grid.ColumnDefinitions>
@@ -53,6 +56,7 @@
 						<Button
 							x:Name="ButtonActionAll"
 							md:RippleAssist.IsCentered="True"
+							Foreground="WhiteSmoke"
 							IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
 							Style="{StaticResource MaterialDesignIconForegroundButton}"
 							ToolTip="전체지우기">
@@ -76,6 +80,7 @@
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="15"
+							Foreground="WhiteSmoke"
 							Opacity="0.80"
 							Text="이벤트 수" />
 						<TextBlock

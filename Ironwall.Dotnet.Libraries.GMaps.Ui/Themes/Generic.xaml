@@ -5,6 +5,19 @@
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
 
 
+	<ResourceDictionary.MergedDictionaries>
+		<!--  GMap Adorner Style  -->
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/GMapDesignerItemStyle.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/GMapResizeRotateChrome.xaml" />
+		<!--  Ui Style  -->
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+
+		<!--  AdornerDecorator Library Style  -->
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.AdornerDecorator;component/Resources/SizeChrome.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.AdornerDecorator;component/Resources/ResizeRotateChrome.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.AdornerDecorator;component/Styles/DesignerItemStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
 	<Style TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
 		<Setter Property="Template">
 			<Setter.Value>

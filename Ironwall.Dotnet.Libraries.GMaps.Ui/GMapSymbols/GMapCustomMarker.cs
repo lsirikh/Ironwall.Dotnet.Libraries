@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using System.Net.NetworkInformation;
 using System.Buffers;
 using Autofac.Core;
+using Ironwall.Dotnet.Libraries.Base.Models;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -259,7 +260,7 @@ public class GMapCustomMarker : GMapMarker, IDisposable
     /// <summary>
     /// 객체 고유 ID
     /// </summary>
-    public uint Id
+    public int Id
     {
         get { return _model.Id; }
         set
@@ -272,7 +273,7 @@ public class GMapCustomMarker : GMapMarker, IDisposable
     /// <summary>
     /// 부모 객체 ID
     /// </summary>
-    public uint Pid
+    public int Pid
     {
         get { return _model.Pid; }
         set
@@ -428,6 +429,16 @@ public class GMapCustomMarker : GMapMarker, IDisposable
         }
     }
 
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            _isSelected = value;
+            OnPropertyChanged(nameof(IsSelected)); ;
+        }
+    }
+
     #endregion
 
     #region - 이벤트 및 명령 -
@@ -469,14 +480,8 @@ public class GMapCustomMarker : GMapMarker, IDisposable
     private PointLatLng _previousPosition;
 
     private CancellationTokenSource? _eventToken;
-
+    private bool _isSelected;
     private const double PITCH_MAX = 90d;
     private const double ROLL_MAX = 90d;
-    private const double MINIMUM_APPLIED_VEHICLE_DISTANCE = 15d;
-    private const double MAXIMUM_SNAPED_VEHICLE_DISTANCE = 25d;
-    private const double MINIMUM_APPLIED_SENSOR_DISTANCE = 50d;
-    private const double MINIMUM_APPLIED_MISSION_DISTANCE = 15d;
-    //private const double MINIMUM_APPLIED_VEHICLE_DISTANCE = 15d;
-    //private const double MAXIMUM_SNAPED_VEHICLE_DISTANCE = 25d;
     #endregion
 }

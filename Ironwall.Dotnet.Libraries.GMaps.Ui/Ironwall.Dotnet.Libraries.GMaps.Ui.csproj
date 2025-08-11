@@ -5,29 +5,33 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- WPF 테마 정보 설정 (이 부분만 추가) -->
+	
   <ItemGroup>
 	<PackageReference Include="Autofac" Version="8.3.0" />
+	<PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
 	<PackageReference Include="Caliburn.Micro" Version="4.0.230" />
+	<PackageReference Include="CoordinateSharp" Version="3.2.1.1" />
 	<PackageReference Include="MaterialDesignColors" Version="5.2.1" />
 	<PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
 	<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+	<PackageReference Include="System.Drawing.Common" Version="9.0.7" />
   </ItemGroup>
 
   <ItemGroup>
 	<ProjectReference Include="..\GMap.NET\GMap.NET\GMap.NET.Core\GMap.NET.Core.csproj" />
 	<ProjectReference Include="..\GMap.NET\GMap.NET\GMap.NET.WindowsPresentation\GMap.NET.WindowsPresentation.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.AdornerDecorator\Ironwall.Dotnet.Libraries.AdornerDecorator.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps.Db\Ironwall.Dotnet.Libraries.GMaps.Db.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps\Ironwall.Dotnet.Libraries.GMaps.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
-  </ItemGroup>
-
-	<ItemGroup>
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>
