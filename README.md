@@ -329,17 +329,3 @@
   2. TestExcelImporter 단위테스터 구현 및 동작 확인
 
 <hr>
-
-### Update Date: 2025/05/07
-
-> 업데이트된 라이브러리 목록
-
-* Dotnet.Streaming.UI
-* Version : v1.1.0
-
-  1. CUDA GPU 파일을 적용한 AI RTSP 적용
-  2. Darknet Yolo7을 적용한 AI
-  3. OpenCV GPU용 직접 빌드한 파일을 적용
-  4. OpenCVSharp GPU용 직접 빌드한 파일 적용
-
-<hr>

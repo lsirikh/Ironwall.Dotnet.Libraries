@@ -14,7 +14,7 @@
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	d:Background="WhiteSmoke"
 	d:DesignHeight="450"
-	d:DesignWidth="800"
+	d:DesignWidth="1200"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
@@ -143,7 +143,7 @@
 					Command="{Binding ToggleMGRSCommand}"
 					Header="MGRS 좌표계"
 					IsCheckable="True"
-					IsChecked="{Binding IsShowMGRS, UpdateSourceTrigger=PropertyChanged}">
+					IsChecked="{Binding IsShowMGRS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 					<MenuItem.InputBindings>
 						<KeyBinding Command="{Binding ToggleMGRSCommand}" />
 					</MenuItem.InputBindings>
@@ -177,7 +177,7 @@
 
 				<Button Command="{Binding SetHomeLocationCommand}" ToolTip="홈 위치 설정">
 					<Button.InputBindings>
-						<KeyBinding Key="Home" />
+						<KeyBinding Key="Home" Modifiers="Ctrl" />
 					</Button.InputBindings>
 					<md:PackIcon Kind="HomeEdit" />
 				</Button>
@@ -297,14 +297,6 @@
 					<md:PackIcon Kind="Draw" />
 				</ToggleButton>
 
-				<!--  선택된 항목 편집 버튼  -->
-				<Button
-					Command="{Binding EditSelectedItemsCommand}"
-					IsEnabled="{Binding IsEditModeEnabled}"
-					ToolTip="객체 선택/편집 (클릭)">
-					<md:PackIcon Kind="VectorSquareEdit" />
-				</Button>
-
 				<!--  선택 해제 버튼  -->
 				<Button
 					Command="{Binding ClearSelectionCommand}"
@@ -329,6 +321,78 @@
 
 				<Separator />
 
+				<!--  마커 관리 섹션  -->
+				<TextBlock
+					Margin="5,0"
+					VerticalAlignment="Center"
+					FontSize="10"
+					FontWeight="Bold"
+					Foreground="DarkBlue"
+					Text="마커" />
+
+				<!--  마커 추가 버튼  -->
+				<Button Command="{Binding AddMarkerCommand}" ToolTip="새 마커 추가 (Ctrl+M)">
+					<Button.InputBindings>
+						<KeyBinding Key="M" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="MapMarkerPlus" />
+				</Button>
+
+				<!--  마커 복제 버튼  -->
+				<Button Command="{Binding DuplicateMarkerCommand}" ToolTip="선택된 마커 복제 (Ctrl+D)">
+					<Button.InputBindings>
+						<KeyBinding Key="D" Modifiers="Ctrl+Shift" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="ContentDuplicate" />
+				</Button>
+
+				<!--  마커 격자 스냅 버튼  -->
+				<Button
+					Command="{Binding SnapMarkerToGridCommand}"
+					IsEnabled="{Binding CanEditMarker}"
+					ToolTip="마커를 격자에 맞춤 (Ctrl+G)">
+					<Button.InputBindings>
+						<KeyBinding Key="G" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="GridLarge" />
+				</Button>
+
+				<!--  마커 회전 초기화 버튼  -->
+				<Button
+					Command="{Binding ResetMarkerRotationCommand}"
+					IsEnabled="{Binding CanEditMarker}"
+					ToolTip="마커 회전 초기화">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Kind="MapMarker" />
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Restore" />
+					</StackPanel>
+				</Button>
+
+				<!--  마커 크기 초기화 버튼  -->
+				<Button
+					Command="{Binding ResetMarkerSizeCommand}"
+					IsEnabled="{Binding CanEditMarker}"
+					ToolTip="마커 크기 초기화">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Kind="MapMarker" />
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Resize" />
+					</StackPanel>
+				</Button>
+
+				<Separator />
+
 				<!--  상태 표시  -->
 				<TextBlock Margin="10,0" VerticalAlignment="Center">
 					<TextBlock.Style>
@@ -344,21 +408,40 @@
 						</Style>
 					</TextBlock.Style>
 				</TextBlock>
+
+				<!--  선택된 마커 정보 표시  -->
+				<TextBlock
+					Margin="10,0"
+					VerticalAlignment="Center"
+					FontSize="10">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Foreground" Value="DarkGreen" />
+							<Setter Property="Text" Value="{Binding SelectedMarker.Title, StringFormat='선택: {0}'}" />
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
 			</ToolBar>
 		</ToolBarTray>
 
 
 		<gmap:GMapCustomControl
 			x:Name="MainMap"
-			Grid.Row="3"
+			Grid.Row="2"
 			Grid.ColumnSpan="2"
+			IsEditMode="{Binding IsEditModeEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+			MapRotation="{Binding MapRotation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 			MaxZoom="19"
 			MinZoom="2"
-			ShowMGRSGrid="{Binding IsShowMGRSGrid, UpdateSourceTrigger=PropertyChanged}">
+			RotationSnapAngle="{Binding RotationSnapAngle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+			ShowMGRSGrid="{Binding IsShowMGRSGrid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 			<!--<b:Interaction.Behaviors>
 				<behavior:MousePointerChangeBehavior CursorImagePath="{Binding CurrentCursorImagePath}" />
 			</b:Interaction.Behaviors>-->
 		</gmap:GMapCustomControl>
+
+
 
 		<Border
 			x:Name="MapView_Scale"
