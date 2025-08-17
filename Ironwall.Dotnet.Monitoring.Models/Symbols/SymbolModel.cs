@@ -14,7 +14,7 @@ namespace Ironwall.Dotnet.Monitoring.Models.Symbols;
 /// <summary>
 /// 지도의 GMap 심볼용 기본 모델
 /// </summary>
-public class SymbolModel : BaseModel
+public class SymbolModel : BaseModel, ISymbolModel
 {
     #region - Ctors -
     public SymbolModel()
@@ -36,7 +36,7 @@ public class SymbolModel : BaseModel
         Visibility = true;
     }
 
-    public SymbolModel(uint id, string title, double latitude, double longitude)
+    public SymbolModel(int id, string title, double latitude, double longitude)
     {
         Id = id;
         Title = title;
@@ -58,8 +58,7 @@ public class SymbolModel : BaseModel
     #endregion
 
     #region - 기본 식별 속성 -
-    public uint Id { get; set; }
-    public uint Pid { get; set; }
+    public int Pid { get; set; }
     public string Title { get; set; }
     #endregion
 
@@ -92,114 +91,5 @@ public class SymbolModel : BaseModel
     #endregion
 
 
-    #region - 유틸리티 메서드 -
 
-    /// <summary>
-    /// 위치 유효성 검사
-    /// </summary>
-    /// <returns>위치가 유효하면 true</returns>
-    public bool IsValidLocation()
-    {
-        return Latitude >= -90.0 && Latitude <= 90.0 &&
-                Longitude >= -180.0 && Longitude <= 180.0;
-    }
-
-    /// <summary>
-    /// 두 지점 간의 거리 계산 (Haversine formula)
-    /// </summary>
-    public double DistanceTo(SymbolModel other)
-    {
-        if (other == null)
-            return double.MaxValue;
-
-        const double R = 6371000; // 지구 반지름 (미터)
-
-        double lat1Rad = Latitude * Math.PI / 180.0;
-        double lat2Rad = other.Latitude * Math.PI / 180.0;
-        double deltaLatRad = (other.Latitude - Latitude) * Math.PI / 180.0;
-        double deltaLngRad = (other.Longitude - Longitude) * Math.PI / 180.0;
-
-        double a = Math.Sin(deltaLatRad / 2) * Math.Sin(deltaLatRad / 2) +
-                    Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
-                    Math.Sin(deltaLngRad / 2) * Math.Sin(deltaLngRad / 2);
-
-        double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-        return R * c; // 미터 단위로 반환
-    }
-
-    /// <summary>
-    /// 방향각 계산 (다른 심볼로의)
-    /// </summary>
-    public double BearingTo(SymbolModel other)
-    {
-        if (other == null)
-            return 0.0;
-
-        double lat1Rad = Latitude * Math.PI / 180.0;
-        double lat2Rad = other.Latitude * Math.PI / 180.0;
-        double deltaLngRad = (other.Longitude - Longitude) * Math.PI / 180.0;
-
-        double y = Math.Sin(deltaLngRad) * Math.Cos(lat2Rad);
-        double x = Math.Cos(lat1Rad) * Math.Sin(lat2Rad) -
-                    Math.Sin(lat1Rad) * Math.Cos(lat2Rad) * Math.Cos(deltaLngRad);
-
-        double bearingRad = Math.Atan2(y, x);
-        double bearingDeg = bearingRad * 180.0 / Math.PI;
-
-        return (bearingDeg + 360.0) % 360.0; // 0-360도 범위로 정규화
-    }
-
-    /// <summary>
-    /// 위치 설정 (편의 메서드)
-    /// </summary>
-    public void SetLocation(double latitude, double longitude)
-    {
-        Latitude = latitude;
-        Longitude = longitude;
-    }
-
-    /// <summary>
-    /// 위치 오프셋 적용
-    /// </summary>
-    public void OffsetLocation(double latOffset, double lngOffset)
-    {
-        Latitude += latOffset;
-        Longitude += lngOffset;
-    }
-
-    public SymbolModel Clone()
-    {
-        return new SymbolModel
-        {
-            Id = this.Id,
-            Pid = this.Pid,
-            Title = this.Title,
-            Latitude = this.Latitude,
-            Longitude = this.Longitude,
-            Altitude = this.Altitude,
-            Pitch = this.Pitch,
-            Roll = this.Roll,
-            Bearing = this.Bearing,
-            OperationState = this.OperationState,
-            Width = this.Width,
-            Height = this.Height,
-            Category = this.Category,
-            Visibility = this.Visibility,
-        };
-    }
-
-    public override bool Equals(object obj)
-    {
-        if (obj is SymbolModel other)
-            return Id == other.Id && Category == other.Category;
-        return false;
-    }
-
-    public override string ToString()
-    {
-        var locationStr = $"({Latitude:F6}, {Longitude:F6})";
-        return $"Symbol[{Id}] {Title} ({Category}) - {OperationState} at {locationStr}";
-    }
-    #endregion
 }

@@ -12,8 +12,9 @@
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	d:Background="WhiteSmoke"
 	d:DesignHeight="450"
-	d:DesignWidth="800"
+	d:DesignWidth="1200"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
@@ -55,6 +56,7 @@
 	<Grid x:Name="MapView_OuterGrid">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<!--<RowDefinition Height="50"/>-->
 		</Grid.RowDefinitions>
@@ -63,35 +65,362 @@
 			<ColumnDefinition Width="*" />
 		</Grid.ColumnDefinitions>
 
-		<ToolBarTray
+		<Menu
 			Grid.Row="0"
 			Grid.ColumnSpan="2"
-			md:ThemeAssist.Theme="Dark">
+			Margin="50,0,0,0"
+			Background="{DynamicResource MaterialDesignPaper}"
+			IsMainMenu="True"
+			Style="{StaticResource MaterialDesignMenu}">
+
+			<!--  File 메뉴  -->
+			<MenuItem Header="_File">
+				<MenuItem
+					Command="{Binding LoadMapImageCommand}"
+					Header="맵 불러오기"
+					Icon="{md:PackIcon Kind=Map}"
+					InputGestureText="Ctrl+L">
+					<MenuItem.InputBindings>
+						<KeyBinding
+							Key="L"
+							Command="{Binding LoadCustomMapCommand}"
+							Modifiers="Ctrl" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+
+				<MenuItem
+					Command="{Binding CreateCustomMapCommand}"
+					Header="새 커스텀 맵 생성"
+					Icon="{md:PackIcon Kind=MapPlus}"
+					InputGestureText="Ctrl+N">
+					<MenuItem.InputBindings>
+						<KeyBinding
+							Key="N"
+							Command="{Binding CreateCustomMapCommand}"
+							Modifiers="Ctrl" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+
+				<MenuItem
+					Command="{Binding SetMapTileFolderCommand}"
+					Header="맵 타일 폴더 설정"
+					Icon="{md:PackIcon Kind=Mapbox}"
+					InputGestureText="Ctrl+D">
+					<MenuItem.InputBindings>
+						<KeyBinding
+							Key="D"
+							Command="{Binding SetMapTileFolderCommand}"
+							Modifiers="Ctrl" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+
+				<Separator />
+
+				<MenuItem
+					Command="{Binding ExitApplicationCommand}"
+					Header="Exit"
+					Icon="{md:PackIcon Kind=ExitToApp}"
+					InputGestureText="Ctrl+E">
+					<MenuItem.InputBindings>
+						<KeyBinding
+							Key="E"
+							Command="{Binding ExitApplicationCommand}"
+							Modifiers="Ctrl" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+			</MenuItem>
+			<MenuItem Header="_Maps">
+				<MenuItem
+					Command="{Binding ToggleWGS84Command}"
+					Header="WGS-84 좌표계"
+					IsCheckable="True"
+					IsChecked="{Binding IsShowWSG84, UpdateSourceTrigger=PropertyChanged}">
+					<MenuItem.InputBindings>
+						<KeyBinding Command="{Binding ToggleWGS84Command}" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+				<MenuItem
+					Command="{Binding ToggleMGRSCommand}"
+					Header="MGRS 좌표계"
+					IsCheckable="True"
+					IsChecked="{Binding IsShowMGRS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+					<MenuItem.InputBindings>
+						<KeyBinding Command="{Binding ToggleMGRSCommand}" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+				<MenuItem
+					Command="{Binding ToggleUTMCommand}"
+					Header="UTM 좌표계"
+					IsCheckable="True"
+					IsChecked="{Binding IsShowUTM, UpdateSourceTrigger=PropertyChanged}">
+					<MenuItem.InputBindings>
+						<KeyBinding Command="{Binding ToggleUTMCommand}" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+			</MenuItem>
+		</Menu>
+
+		<ToolBarTray
+			Grid.Row="1"
+			Grid.Column="0"
+			Grid.ColumnSpan="2"
+			Margin="50,0,0,0"
+			md:ThemeAssist.Theme="Inherit">
 			<ToolBar ClipToBounds="True" Style="{StaticResource MaterialDesignToolBar}">
-				<ItemsControl ItemsSource="{Binding Buttons}">
-					<ItemsControl.ItemsPanel>
-						<!--  StackPanel을 사용하여 수평으로 버튼을 배치  -->
-						<ItemsPanelTemplate>
-							<StackPanel Orientation="Horizontal" />
-						</ItemsPanelTemplate>
-					</ItemsControl.ItemsPanel>
-					<ItemsControl.ItemTemplate>
-						<DataTemplate>
-							<Button
-								Height="60"
-								Command="{Binding Command}"
-								CommandParameter="{Binding}"
-								Foreground="WhiteSmoke"
-								IsEnabled="{Binding IsEnabled}"
-								Style="{StaticResource MaterialDesignFlatButton}"
-								ToolTip="{Binding ToolTip}">
-								<Button.Content>
-									<md:PackIcon Kind="{Binding Icon}" />
-								</Button.Content>
-							</Button>
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
+				<!--  기존 버튼들  -->
+				<Button Command="{Binding MoveHomeLocationCommand}" ToolTip="홈 위치 이동">
+					<Button.InputBindings>
+						<KeyBinding Key="Home" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="Home" />
+				</Button>
+
+				<Button Command="{Binding SetHomeLocationCommand}" ToolTip="홈 위치 설정">
+					<Button.InputBindings>
+						<KeyBinding Key="Home" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="HomeEdit" />
+				</Button>
+
+				<Button
+					Command="{Binding FineRotateCommand}"
+					CommandParameter="-5"
+					ToolTip="5도 반시계방향 회전 (Ctrl+←)">
+					<Button.InputBindings>
+						<KeyBinding Key="Left" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Kind="RotateLeft" />
+						<TextBlock
+							Margin="2,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="8"
+							Text="5°" />
+					</StackPanel>
+				</Button>
+
+				<Button
+					Command="{Binding FineRotateCommand}"
+					CommandParameter="0.1"
+					ToolTip="1도 반시계방향 회전">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Kind="RotateLeft" />
+						<TextBlock
+							Margin="2,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="8"
+							Text="0.1°" />
+					</StackPanel>
+				</Button>
+
+				<Button
+					Command="{Binding FineRotateCommand}"
+					CommandParameter="-0.1"
+					ToolTip="1도 시계방향 회전">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Kind="RotateRight" />
+						<TextBlock
+							Margin="2,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="8"
+							Text="0.1°" />
+					</StackPanel>
+				</Button>
+
+				<Button
+					Command="{Binding FineRotateCommand}"
+					CommandParameter="5"
+					ToolTip="5도 시계방향 회전 (Ctrl+→)">
+					<Button.InputBindings>
+						<KeyBinding Key="Right" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Kind="RotateRight" />
+						<TextBlock
+							Margin="2,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="8"
+							Text="5°" />
+					</StackPanel>
+				</Button>
+
+				<Button Command="{Binding ResetRotationCommand}" ToolTip="회전 초기화 (Ctrl+R)">
+					<Button.InputBindings>
+						<KeyBinding Key="R" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="Restore" />
+				</Button>
+
+				<!--  회전 상태 표시  -->
+				<TextBlock
+					Margin="10,0"
+					VerticalAlignment="Center"
+					FontSize="11"
+					Text="{Binding CurrentRotation, StringFormat='회전: {0:F1}°'}">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Foreground" Value="Gray" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsRotated}" Value="True">
+									<Setter Property="Foreground" Value="Orange" />
+									<Setter Property="FontWeight" Value="Bold" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+
+
+				<Separator />
+
+				<!--  편집 모드 섹션  -->
+				<ToggleButton
+					x:Name="EditModeToggle"
+					IsChecked="{Binding IsEditModeEnabled}"
+					Style="{StaticResource MaterialDesignSwitchToggleButton}"
+					ToolTip="편집 모드 전환 (E)">
+					<ToggleButton.InputBindings>
+						<KeyBinding Key="E" Modifiers="Ctrl" />
+					</ToggleButton.InputBindings>
+					<md:PackIcon Kind="Draw" />
+				</ToggleButton>
+
+				<!--  선택 해제 버튼  -->
+				<Button
+					Command="{Binding ClearSelectionCommand}"
+					IsEnabled="{Binding HasSelectedItem}"
+					ToolTip="선택 해제 (Esc)">
+					<Button.InputBindings>
+						<KeyBinding Key="Escape" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="SelectionOff" />
+				</Button>
+
+				<!--  삭제 버튼  -->
+				<Button
+					Command="{Binding DeleteSelectedCommand}"
+					IsEnabled="{Binding HasSelectedItem}"
+					ToolTip="선택 항목 삭제 (Del)">
+					<Button.InputBindings>
+						<KeyBinding Key="Delete" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="Delete" />
+				</Button>
+
+				<Separator />
+
+				<!--  마커 관리 섹션  -->
+				<TextBlock
+					Margin="5,0"
+					VerticalAlignment="Center"
+					FontSize="10"
+					FontWeight="Bold"
+					Foreground="DarkBlue"
+					Text="마커" />
+
+				<!--  마커 추가 버튼  -->
+				<Button Command="{Binding AddMarkerCommand}" ToolTip="새 마커 추가 (Ctrl+M)">
+					<Button.InputBindings>
+						<KeyBinding Key="M" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="MapMarkerPlus" />
+				</Button>
+
+				<!--  마커 복제 버튼  -->
+				<Button Command="{Binding DuplicateMarkerCommand}" ToolTip="선택된 마커 복제 (Ctrl+D)">
+					<Button.InputBindings>
+						<KeyBinding Key="D" Modifiers="Ctrl+Shift" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="ContentDuplicate" />
+				</Button>
+
+				<!--  마커 격자 스냅 버튼  -->
+				<Button
+					Command="{Binding SnapMarkerToGridCommand}"
+					IsEnabled="{Binding CanEditMarker}"
+					ToolTip="마커를 격자에 맞춤 (Ctrl+G)">
+					<Button.InputBindings>
+						<KeyBinding Key="G" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="GridLarge" />
+				</Button>
+
+				<!--  마커 회전 초기화 버튼  -->
+				<Button
+					Command="{Binding ResetMarkerRotationCommand}"
+					IsEnabled="{Binding CanEditMarker}"
+					ToolTip="마커 회전 초기화">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Kind="MapMarker" />
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Restore" />
+					</StackPanel>
+				</Button>
+
+				<!--  마커 크기 초기화 버튼  -->
+				<Button
+					Command="{Binding ResetMarkerSizeCommand}"
+					IsEnabled="{Binding CanEditMarker}"
+					ToolTip="마커 크기 초기화">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							Kind="MapMarker" />
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Resize" />
+					</StackPanel>
+				</Button>
+
+				<Separator />
+
+				<!--  상태 표시  -->
+				<TextBlock Margin="10,0" VerticalAlignment="Center">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Text" Value="일반 모드" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsEditModeEnabled}" Value="True">
+									<Setter Property="Text" Value="편집 모드" />
+									<Setter Property="Foreground" Value="Orange" />
+									<Setter Property="FontWeight" Value="Bold" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+
+				<!--  선택된 마커 정보 표시  -->
+				<TextBlock
+					Margin="10,0"
+					VerticalAlignment="Center"
+					FontSize="10">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Foreground" Value="DarkGreen" />
+							<Setter Property="Text" Value="{Binding SelectedMarker.Title, StringFormat='선택: {0}'}" />
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
 			</ToolBar>
 		</ToolBarTray>
 
@@ -100,21 +429,30 @@
 			x:Name="MainMap"
 			Grid.Row="2"
 			Grid.ColumnSpan="2"
+			IsEditMode="{Binding IsEditModeEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+			MapRotation="{Binding MapRotation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 			MaxZoom="19"
-			MinZoom="2">
+			MinZoom="2"
+			RotationSnapAngle="{Binding RotationSnapAngle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+			ShowMGRSGrid="{Binding IsShowMGRSGrid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 			<!--<b:Interaction.Behaviors>
 				<behavior:MousePointerChangeBehavior CursorImagePath="{Binding CurrentCursorImagePath}" />
 			</b:Interaction.Behaviors>-->
 		</gmap:GMapCustomControl>
 
+
+
 		<Border
 			x:Name="MapView_Scale"
-			Grid.Row="1"
+			Grid.Row="2"
 			Margin="50,5,5,5"
 			Padding="5"
 			HorizontalAlignment="Left"
 			VerticalAlignment="Bottom"
-			Background="#88888888"
+			Background="#88FFFFFF"
+			BorderBrush="Gray"
+			BorderThickness="1"
 			CornerRadius="5">
 
 			<Grid
@@ -144,111 +482,143 @@
 
 		<Border
 			x:Name="MapView_GeoInformation"
-			Grid.Row="1"
+			Grid.Row="2"
 			Grid.ColumnSpan="2"
 			Margin="50,5,5,5"
 			Padding="5"
 			HorizontalAlignment="Left"
 			VerticalAlignment="Top"
-			Background="#88888888"
+			Background="#88FFFFFF"
+			BorderBrush="Gray"
+			BorderThickness="1"
 			CornerRadius="5">
 
 			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="5*" />
 					<ColumnDefinition Width="2*" />
 					<ColumnDefinition Width="2*" />
-					<ColumnDefinition Width="auto" />
 				</Grid.ColumnDefinitions>
-				<!--  Latitude, Longitude, Zoom Information  -->
+				<!--  WSG-84  -->
 				<Grid
-					Grid.Column="0"
+					Grid.Row="0"
 					Margin="5"
-					VerticalAlignment="Center">
+					VerticalAlignment="Center"
+					Visibility="{Binding IsShowWSG84, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="60" />
-						<ColumnDefinition Width="110" />
-						<ColumnDefinition Width="15" />
-						<ColumnDefinition Width="70" />
-						<ColumnDefinition Width="110" />
+						<ColumnDefinition Width="80" />
+						<ColumnDefinition Width="10" />
+						<ColumnDefinition Width="80" />
 					</Grid.ColumnDefinitions>
 					<TextBlock
 						Grid.Column="0"
 						FontSize="12"
 						FontWeight="Bold"
-						Foreground="#8FFF"
-						Text="Latitude : " />
+						Text="WSG-84: " />
 					<TextBlock
 						Grid.Column="1"
 						FontSize="12"
 						FontWeight="Bold"
-						Foreground="#8FFF"
-						Text="{Binding CurrentPosition.Lat, StringFormat=F8}" />
+						Text="{Binding CurrentCoordinatePosition.Latitude, StringFormat=F8}" />
+					<TextBlock
+						Grid.Column="2"
+						HorizontalAlignment="Left"
+						FontSize="12"
+						FontWeight="Bold"
+						Text="," />
 					<TextBlock
 						Grid.Column="3"
 						FontSize="12"
 						FontWeight="Bold"
-						Foreground="#8FFF"
-						Text="Longitude : " />
-					<TextBlock
-						Grid.Column="4"
-						FontSize="12"
-						FontWeight="Bold"
-						Foreground="#8FFF"
-						Text="{Binding CurrentPosition.Lng, StringFormat=F8}" />
+						Text="{Binding CurrentCoordinatePosition.Longitude, StringFormat=F8}" />
 				</Grid>
-
 				<Grid
-					Grid.Column="3"
+					Grid.Row="1"
 					Margin="5"
-					VerticalAlignment="Center">
+					VerticalAlignment="Center"
+					Visibility="{Binding IsShowMGRS, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="40" />
-						<ColumnDefinition Width="20" />
+						<ColumnDefinition Width="60" />
+						<ColumnDefinition Width="235" />
 					</Grid.ColumnDefinitions>
 					<TextBlock
 						Grid.Column="0"
 						FontSize="12"
 						FontWeight="Bold"
-						Foreground="#8FFF"
-						Text="Zoom : " />
+						Text="MGRS: " />
 					<TextBlock
 						Grid.Column="1"
-						HorizontalAlignment="Center"
 						FontSize="12"
 						FontWeight="Bold"
-						Foreground="#8FFF"
-						Text="{Binding MainMap.Zoom, FallbackValue=11}" />
+						Text="{Binding CurrentMGRS}" />
 				</Grid>
+
+				<Grid
+					Grid.Row="2"
+					Margin="5"
+					VerticalAlignment="Center"
+					Visibility="{Binding IsShowUTM, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="60" />
+						<ColumnDefinition Width="235" />
+					</Grid.ColumnDefinitions>
+					<TextBlock
+						Grid.Column="0"
+						FontSize="12"
+						FontWeight="Bold"
+						Text="UTM: " />
+					<TextBlock
+						Grid.Column="1"
+						FontSize="12"
+						FontWeight="Bold"
+						Text="{Binding CurrentUTM}" />
+				</Grid>
+
 			</Grid>
 		</Border>
 
 		<Border
 			x:Name="MapView_ZoomAndRotateController"
-			Grid.Row="1"
+			Grid.Row="2"
 			Grid.ColumnSpan="2"
 			Width="250"
 			Margin="5,5,300,5"
 			Padding="5"
 			HorizontalAlignment="Right"
 			VerticalAlignment="Bottom"
-			Background="#88888888"
+			Background="#88FFFFFF"
+			BorderBrush="Gray"
+			BorderThickness="1"
 			CornerRadius="5">
 
 			<Grid>
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="45" />
+					<ColumnDefinition Width="45" />
 					<ColumnDefinition Width="*" />
 					<ColumnDefinition Width="45" />
 				</Grid.ColumnDefinitions>
+				<TextBlock
+					Grid.Column="0"
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center"
+					FontSize="15"
+					FontWeight="Bold"
+					Text="{Binding MainMap.Zoom, FallbackValue=11}" />
 				<Button
 					x:Name="ZoomUp"
-					Grid.Column="2"
+					Grid.Column="3"
 					cal:Message.Attach="[Event Click] = [Action OnClickZoomUp($source, $eventArgs)]"
 					Content="{md:PackIcon Kind=MagnifyPlus}" />
 				<Slider
 					x:Name="SliderZoom"
-					Grid.Column="1"
+					Grid.Column="2"
 					Maximum="{Binding MainMap.MaxZoom, UpdateSourceTrigger=PropertyChanged}"
 					Minimum="{Binding MainMap.MinZoom, UpdateSourceTrigger=PropertyChanged}"
 					SmallChange="1"
@@ -257,7 +627,7 @@
 					Value="{Binding MainMap.Zoom, UpdateSourceTrigger=PropertyChanged}" />
 				<Button
 					x:Name="ZoomDown"
-					Grid.Column="0"
+					Grid.Column="1"
 					cal:Message.Attach="[Event Click] = [Action OnClickZoomDown($source, $eventArgs)]"
 					Content="{md:PackIcon Kind=MagnifyMinus}" />
 			</Grid>

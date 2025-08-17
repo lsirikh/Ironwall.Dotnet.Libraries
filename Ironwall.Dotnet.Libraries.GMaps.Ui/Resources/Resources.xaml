@@ -344,6 +344,15 @@
 	<utils:PassConfirmValidationParameters x:Key="PassConfirmValidationParameters" />
 	<utils:RowIndexConverter x:Key="RowIndexConverter" />
 	<utils:BindingProxy x:Key="BindingProxy" />
+	<utils:CountToBooleanConverter x:Key="CountToBooleanConverter" />
+	<utils:NullToBooleanConverter x:Key="NullToBooleanConverter" />
+	<utils:NullToInverseBooleanConverter x:Key="NullToInverseBooleanConverter" />
+	<utils:StringNullOrEmptyToBooleanConverter x:Key="StringNullOrEmptyToBooleanConverter" />
+	<utils:AddValueConverter x:Key="AddValueConverter" />
+	<utils:NegativeHalfConverter x:Key="NegativeHalfConverter" />
+	<utils:PositiveHalfConverter x:Key="PositiveHalfConverter" />
+	<utils:MultiAddValueConverter x:Key="MultiAddValueConverter" />
+	<utils:HalfAndAddConverter x:Key="HalfAndAddConverter" />
 	<utilPass:PasswordBoxAssistant x:Key="PasswordBoxAssistant" />
 	<utilPass:PasswordMaskConverter x:Key="PasswordMaskConverter" />
 

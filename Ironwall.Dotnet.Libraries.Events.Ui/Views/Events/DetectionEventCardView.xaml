@@ -21,7 +21,7 @@
 
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
-		Background="Transparent"
+		Background="#88FFFFFF"
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border

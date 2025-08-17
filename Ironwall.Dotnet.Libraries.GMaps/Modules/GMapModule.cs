@@ -1,4 +1,9 @@
-﻿using System;
+﻿using Autofac;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Models;
+using Ironwall.Dotnet.Libraries.GMaps.Providers;
+using Ironwall.Dotnet.Monitoring.Models.Helpers;
+using System;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Modules;
 /****************************************************************************
@@ -9,11 +14,36 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Modules;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class GMapModule
+public class GMapModule : Module
 {
     #region - Ctors -
+    public GMapModule(IGMapSetupModel model, ILogService? log = default, int count = default)
+    {
+        _log = log;
+        _count = count;
+        _model = model;
+    }
     #endregion
     #region - Implementation of Interface -
+    protected override void Load(ContainerBuilder builder)
+    {
+        try
+        {
+            var setupModel = new GMapSetupModel(_model);
+            builder.RegisterInstance(setupModel);
+
+            builder.RegisterType<MapProvider>().SingleInstance();
+            builder.RegisterType<CustomMapProvider>().As<CustomMapProvider>()
+                .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<DefinedMapProvider>().As<DefinedMapProvider>()
+                .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+
+        }
+        catch
+        {
+            throw;
+        }
+    }
     #endregion
     #region - Overrides -
     #endregion
@@ -26,5 +56,8 @@ public class GMapModule
     #region - Properties -
     #endregion
     #region - Attributes -
+    private ILogService? _log;
+    private int _count;
+    private IGMapSetupModel _model;
     #endregion
 }

@@ -11,6 +11,9 @@ using Ironwall.Dotnet.Libraries.Enums;
 using System.Net.NetworkInformation;
 using System.Buffers;
 using Autofac.Core;
+using Ironwall.Dotnet.Libraries.Base.Models;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -24,20 +27,26 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 public class GMapCustomMarker : GMapMarker, IDisposable
 {
     #region - Ctors -
-    public GMapCustomMarker(ILogService log, SymbolModel symbolModel) : base(new PointLatLng(symbolModel.Latitude, symbolModel.Longitude))
+    /// <summary>
+    /// 생성자
+    /// </summary>
+    public GMapCustomMarker(ILogService log, SymbolModel symbolModel)
+        : base(new PointLatLng(symbolModel.Latitude, symbolModel.Longitude))
     {
         _log = log;
         _model = symbolModel;
 
-        // Shape 할당
-        Offset = new Point(-(_model.Width / 2.0), -(_model.Height / 2.0));
+        // 기본 설정
+        ZIndex = 10;
+        UpdateOffset(); // 중심 기준 오프셋 설정
 
-        // Command 초기화
-        PropertyCommand = new RelayCommand(ShowProperties);
-        DeleteCommand = new RelayCommand(DeleteMarker);
-        EraseCommand = new RelayCommand(EraseMarker);
+        // Shape 설정 추가
+        CreateMarkerShape();
 
+        // 명령어 초기화
+        InitializeCommands();
         Initializer();
+        _log?.Info($"마커 생성: {symbolModel.Title} ({symbolModel.Latitude:F6}, {symbolModel.Longitude:F6})");
     }
     #endregion
     #region - Dispose Pattern -
@@ -71,7 +80,8 @@ public class GMapCustomMarker : GMapMarker, IDisposable
                     _eventToken = null;
                 }
 
-                //Shape Framework element can be disposable...
+                // 관리 리소스 정리
+                _model = null;
                 Clear();
             }
 
@@ -94,70 +104,6 @@ public class GMapCustomMarker : GMapMarker, IDisposable
     #region - Overrides -
     #endregion
     #region - Binding Methods -
-    #endregion
-    #region - Processes -
-    /// <summary>
-    /// Offset 업데이트
-    /// </summary>
-    private void UpdateOffset()
-    {
-        Offset = new Point(-(_model.Width / 2.0), -(_model.Height / 2.0));
-    }
-
-    /// <summary>
-    /// 상태 변경 처리
-    /// </summary>
-    private void OnStatusChanged(EnumOperationState status)
-    {
-        // 상태별 추가 처리
-        switch (status)
-        {
-            case EnumOperationState.ACTIVE:
-                StartTimer();
-                break;
-            case EnumOperationState.DEACTIVE:
-                StopTimer();
-                break;
-        }
-    }
-
-    /// <summary>
-    /// 위치 업데이트 시 Position과 Model 동기화
-    /// </summary>
-    public void UpdateLocation(PointLatLng newLocation)
-    {
-        Position = newLocation;              // GMapMarker.Position 업데이트
-        _model.Latitude = newLocation.Lat;   // Model 동기화
-        _model.Longitude = newLocation.Lng;  // Model 동기화
-
-        OnPropertyChanged(nameof(Position));
-    }
-
-    /// <summary>
-    /// Model의 위치를 GMapMarker Position으로 동기화
-    /// </summary>
-    public void SyncPositionFromModel()
-    {
-        var newPosition = new PointLatLng(_model.Latitude, _model.Longitude);
-        if (Position != newPosition)
-        {
-            Position = newPosition;
-            OnPropertyChanged(nameof(Position));
-        }
-    }
-
-    /// <summary>
-    /// GMapMarker Position을 Model로 동기화
-    /// </summary>
-    public void SyncPositionToModel()
-    {
-        if (_model.Latitude != Position.Lat || _model.Longitude != Position.Lng)
-        {
-            _model.Latitude = Position.Lat;
-            _model.Longitude = Position.Lng;
-        }
-    }
-
     private void Initializer()
     {
         if (Category == EnumMarkerCategory.PIDS_EQUIPMENT)
@@ -193,62 +139,288 @@ public class GMapCustomMarker : GMapMarker, IDisposable
         {
             OperationState = EnumOperationState.DEACTIVE;
         }
-
-        //Debug.WriteLine($"Object({Id}) Current Status : {Status}");
     }
-
-
-    // Command method implementations
-    private void ShowProperties()
+    #endregion
+    #region - Processes -
+    /// <summary>
+    /// 마커 Shape 생성
+    /// </summary>
+    private void CreateMarkerShape()
     {
-        DispatcherService.Invoke((System.Action)(() =>
+        try
         {
-            //var windowManager = IoC.Get<IWindowManager>();
-            //if (DType == EnumDType.SENSOR)
-            //{
-            //    var property = IoC.Get<PropertySensorViewModel>();
-            //    if (property.IsActive == true) return;
+            // 기본 마커 UI 컨트롤 생성
+            var markerControl = new GMapMarkerBasicCustomControl(this);
 
-            //    property.UpdateProperty(this);
-            //    await property.ActivateAsync();
-            //    await windowManager.ShowWindowAsync(property);
-            //}
-            //else
-            //{
-            //    var property = IoC.Get<PropertyViewModel>();
-            //    if (property.IsActive == true) return;
+            // 마커 모양 설정
+            markerControl.Width = _model.Width;
+            markerControl.Height = _model.Height;
+            markerControl.MarkerTitle = _model.Title;
 
-            //    property.UpdateProperty(this);
-            //    await property.ActivateAsync();
-            //    await windowManager.ShowWindowAsync(property);
-            //}
-        }));
+            // Shape 속성에 할당
+            Shape = markerControl;
+
+            _log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 Shape 생성 실패: {ex.Message}");
+
+            // 대체 Shape (기본 Rectangle)
+            CreateFallbackShape();
+        }
     }
 
+    /// <summary>
+    /// 대체 Shape 생성 (기본 사각형)
+    /// </summary>
+    private void CreateFallbackShape()
+    {
+        try
+        {
+            var rect = new System.Windows.Shapes.Rectangle
+            {
+                Width = _model.Width,
+                Height = _model.Height,
+                Fill = System.Windows.Media.Brushes.Red,
+                Stroke = System.Windows.Media.Brushes.White,
+                StrokeThickness = 2
+            };
+
+            Shape = rect;
+            _log?.Info($"마커 '{_model.Title}' 대체 Shape 생성 완료");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"대체 Shape 생성도 실패: {ex.Message}");
+        }
+    }
+    /// <summary>
+    /// 상태 변경 처리
+    /// </summary>
+    private void OnStatusChanged(EnumOperationState status)
+    {
+        // 상태별 추가 처리
+        switch (status)
+        {
+            case EnumOperationState.ACTIVE:
+                StartTimer();
+                break;
+            case EnumOperationState.DEACTIVE:
+                StopTimer();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 마커 위치 업데이트
+    /// </summary>
+    public void UpdateLocation(PointLatLng newPosition)
+    {
+        try
+        {
+            Position = newPosition;
+            _model.UpdatePosition(newPosition);
+
+            OnPropertyChanged(nameof(Position));
+            _log?.Info($"마커 '{Title}' 위치 업데이트: ({newPosition.Lat:F6}, {newPosition.Lng:F6})");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 위치 업데이트 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 마커 크기 업데이트
+    /// </summary>
+    public void UpdateSize(double width, double height)
+    {
+        try
+        {
+            _model.SetSize(width, height);
+
+            // 🔧 UI 컨트롤 크기도 즉시 업데이트
+            if (Shape is GMapMarkerBasicCustomControl markerControl)
+            {
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    markerControl.Width = width;
+                    markerControl.Height = height;
+                    //markerControl.MarkerSize = Math.Max(width, height);
+                });
+            }
+
+            // 오프셋 재계산 (중심 기준)
+            UpdateOffset();
+
+            OnPropertyChanged(nameof(Width));
+            OnPropertyChanged(nameof(Height));
+
+            _log?.Info($"마커 '{Title}' 크기 업데이트: {Width:F0}x{Height:F0}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 크기 업데이트 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 마커 회전 업데이트
+    /// </summary>
+    public void UpdateRotation(double newBearing)
+    {
+        try
+        {
+            _model.SetBearing(newBearing);
+
+            OnPropertyChanged(nameof(Bearing));
+            _log?.Info($"마커 '{Title}' 회전 업데이트: {Bearing:F1}°");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 회전 업데이트 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// GMapControl과 위치 강제 동기화
+    /// </summary>
+    public override void ForceUpdateLocalPosition(GMapControl mapControl)
+    {
+        if (mapControl == null) return;
+        base.ForceUpdateLocalPosition(mapControl);
+        _log?.Info($"마커 '{Title}' 화면좌표 동기화: ({LocalPositionX}, {LocalPositionY})");
+    }
+
+    /// <summary>
+    /// Model의 위치를 GMapMarker Position으로 동기화
+    /// </summary>
+    public void SyncPositionFromModel()
+    {
+        var newPosition = new PointLatLng(_model.Latitude, _model.Longitude);
+        if (Position != newPosition)
+        {
+            Position = newPosition;
+            OnPropertyChanged(nameof(Position));
+        }
+    }
+
+    /// <summary>
+    /// GMapMarker Position을 Model로 동기화
+    /// </summary>
+    public void SyncPositionToModel()
+    {
+        if (_model.Latitude != Position.Lat || _model.Longitude != Position.Lng)
+        {
+            _model.Latitude = Position.Lat;
+            _model.Longitude = Position.Lng;
+        }
+    }
+
+    #endregion
+    #region Adorner Support Methods
+
+    /// <summary>
+    /// 편집 핸들 위치 계산 (간단 버전)
+    /// </summary>
+    public Point[] GetEditHandlePositions(GMapControl mapControl)
+    {
+        if (mapControl == null) return Array.Empty<Point>();
+
+        try
+        {
+            var screenPos = mapControl.FromLatLngToLocal(Position);
+            double editRadius = Math.Max(Width, Height) / 2 + MarkerEditSettings.EditAreaOffset;
+
+            return new Point[]
+            {
+                new Point(screenPos.X, screenPos.Y),                                    // Move (중심)
+                new Point(screenPos.X, screenPos.Y - editRadius - MarkerEditSettings.RotateHandleDistance), // Rotate (북쪽)
+                new Point(screenPos.X + editRadius, screenPos.Y),                      // ResizeEast
+                new Point(screenPos.X - editRadius, screenPos.Y),                      // ResizeWest  
+                new Point(screenPos.X, screenPos.Y + editRadius),                      // ResizeSouth
+                new Point(screenPos.X, screenPos.Y - editRadius)                       // ResizeNorth
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"편집 핸들 위치 계산 실패: {ex.Message}");
+            return new Point[0];
+        }
+    }
+
+    /// <summary>
+    /// 특정 화면 좌표가 어떤 핸들에 해당하는지 확인
+    /// </summary>
+    public MarkerHandle GetHandleAtPoint(Point screenPoint, GMapControl mapControl)
+    {
+        if (mapControl == null) return MarkerHandle.None;
+
+        try
+        {
+            var handles = GetEditHandlePositions(mapControl);
+            if (handles.Length < 6) return MarkerHandle.None;
+
+            double tolerance = MarkerEditSettings.HandleTolerance;
+
+            // 핸들 순서: Move, Rotate, ResizeEast, ResizeWest, ResizeSouth, ResizeNorth
+            for (int i = 0; i < handles.Length; i++)
+            {
+                if (MarkerEditUtils.IsPointNear(screenPoint, handles[i], tolerance))
+                {
+                    return (MarkerHandle)(i + 1);
+                }
+            }
+
+            return MarkerHandle.None;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"핸들 감지 실패: {ex.Message}");
+            return MarkerHandle.None;
+        }
+    }
+    #endregion
+    #region Helper Methods
+
+    /// <summary>
+    /// 오프셋 업데이트 (중심 기준)
+    /// </summary>
+    private void UpdateOffset()
+    {
+        Offset = new Point(-(_model.Width / 2.0), -(_model.Height / 2.0));
+    }
+
+    /// <summary>
+    /// 명령어 초기화
+    /// </summary>
+    private void InitializeCommands()
+    {
+        ShowPropertyCommand = new RelayCommand(ExecuteShowProperties, CanExecuteShowProperties);
+        DeleteMarkerCommand = new RelayCommand(ExecuteDeleteMarker, CanExecuteDeleteMarker);
+    }
+
+    private bool CanExecuteShowProperties(object arg) => true;
+    private void ExecuteShowProperties(object obj)
+    {
+        throw new NotImplementedException();
+    }
+    
+    private bool CanExecuteDeleteMarker(object arg) => true;
+    private void ExecuteDeleteMarker(object obj)
+    {
+        throw new NotImplementedException();
+    }
+
+
+    /// <summary>
+    /// 마커 삭제
+    /// </summary>
     private void DeleteMarker()
     {
-        DispatcherService.Invoke((System.Action)(() =>
-        {
-            //var target = Map.Markers.OfType<GMapCustomMarker>().Where(entity => entity.Id == Id
-            //                            && entity.IconEnum == IconEnum).FirstOrDefault();
-            //Map.Markers.Remove(target);
-        }));
-        Dispose();
-    }
-
-    private void EraseMarker(object obj)
-    {
-        DispatcherService.Invoke((System.Action)(() =>
-        {
-            //var windowManager = IoC.Get<IWindowManager>();
-            //var confirm = IoC.Get<ConfirmViewModel>();
-            //if (confirm.IsActive == true) return;
-
-            //var message = new EraseRequestMessage((int)Id);
-            //confirm.Update(message);
-            //await confirm.ActivateAsync();
-            //await windowManager.ShowWindowAsync(confirm);
-        }));
+        // TODO: 삭제 로직 구현
+        _log?.Info($"마커 삭제: {Title}");
     }
 
     #endregion
@@ -259,7 +431,7 @@ public class GMapCustomMarker : GMapMarker, IDisposable
     /// <summary>
     /// 객체 고유 ID
     /// </summary>
-    public uint Id
+    public int Id
     {
         get { return _model.Id; }
         set
@@ -272,7 +444,7 @@ public class GMapCustomMarker : GMapMarker, IDisposable
     /// <summary>
     /// 부모 객체 ID
     /// </summary>
-    public uint Pid
+    public int Pid
     {
         get { return _model.Pid; }
         set
@@ -428,55 +600,42 @@ public class GMapCustomMarker : GMapMarker, IDisposable
         }
     }
 
-    #endregion
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            _isSelected = value;
+            OnPropertyChanged(nameof(IsSelected)); ;
+        }
+    }
 
+    #endregion
     #region - 이벤트 및 명령 -
 
     /// <summary>
     /// 상태 변경 이벤트
     /// </summary>
     public event System.Action? StatusChanged;
+    public RelayCommand ShowPropertyCommand { get; private set; }
+    public RelayCommand DeleteMarkerCommand { get; private set; }
 
-    /// <summary>
-    /// 속성 보기 명령
-    /// </summary>
-    public ICommand PropertyCommand { get; }
-
-    /// <summary>
-    /// 삭제 명령
-    /// </summary>
-    public ICommand DeleteCommand { get; }
-
-    /// <summary>
-    /// 지우기 명령
-    /// </summary>
-    public ICommand EraseCommand { get; }
     #endregion
     #region - Attributes -
     private ILogService? _log;
     private SymbolModel _model;
-    private double _width;
-    private double _height;
-    private double _bearing;
 
     private DispatcherTimer? _monitorTimer;
     private const int TIMEOUT = 60 * 60;
     private const int MAX_BLINK = 11;
     private DateTime _refreshTime;
     private bool _disposed = false;
-    private bool _visibility;
 
     private PointLatLng _previousPosition;
 
     private CancellationTokenSource? _eventToken;
-
+    private bool _isSelected;
     private const double PITCH_MAX = 90d;
     private const double ROLL_MAX = 90d;
-    private const double MINIMUM_APPLIED_VEHICLE_DISTANCE = 15d;
-    private const double MAXIMUM_SNAPED_VEHICLE_DISTANCE = 25d;
-    private const double MINIMUM_APPLIED_SENSOR_DISTANCE = 50d;
-    private const double MINIMUM_APPLIED_MISSION_DISTANCE = 15d;
-    //private const double MINIMUM_APPLIED_VEHICLE_DISTANCE = 15d;
-    //private const double MAXIMUM_SNAPED_VEHICLE_DISTANCE = 25d;
     #endregion
 }

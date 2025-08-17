@@ -33,7 +33,7 @@ public sealed class EventDbFixture : IAsyncLifetime
     public MalfunctionEventProvider MalfunctionProvider = null!;
     public ConnectionEventProvider ConnectionProvider = null!;
     public ActionEventProvider ActionProvider = null!;
-    public DeviceProvider DeviceProvider = null;
+    public DeviceProvider DeviceProvider = null!;
     internal CancellationTokenSource Cts { get; } = new();
 
     private const int CtrlCount = 5;

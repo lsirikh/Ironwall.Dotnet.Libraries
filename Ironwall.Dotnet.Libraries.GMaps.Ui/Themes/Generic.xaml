@@ -4,17 +4,175 @@
 	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
 
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+	</ResourceDictionary.MergedDictionaries>
 
-	<Style TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
+	<Style x:Key="BaseMarkerStyle" TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
-					<Border
-						Background="{TemplateBinding Background}"
-						BorderBrush="{TemplateBinding BorderBrush}"
-						BorderThickness="{TemplateBinding BorderThickness}" />
+					<Grid Name="PART_MarkerContainer">
+						<Ellipse
+							Name="PART_MarkerBody"
+							Fill="{TemplateBinding MarkerFill}"
+							Stroke="{TemplateBinding MarkerStroke}"
+							StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
+							<Ellipse.Effect>
+								<DropShadowEffect
+									BlurRadius="6"
+									Opacity="0.4"
+									ShadowDepth="3"
+									Color="Black" />
+							</Ellipse.Effect>
+						</Ellipse>
+
+						<Ellipse
+							Name="PART_CenterPoint"
+							Width="6"
+							Height="6"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="White"
+							Opacity="0.9" />
+
+						<Ellipse
+							Name="PART_StatusIndicator"
+							Width="8"
+							Height="8"
+							Margin="0,-2,-2,0"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Top"
+							Fill="Lime" />
+
+						<Border
+							Name="PART_LabelContainer"
+							Margin="0,0,0,-30"
+							Padding="6,3"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Bottom"
+							Background="White"
+							BorderBrush="Gray"
+							BorderThickness="1"
+							CornerRadius="4"
+							Visibility="Collapsed">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="3"
+									Opacity="0.3"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+							<TextBlock
+								Name="PART_LabelText"
+								FontSize="10"
+								FontWeight="SemiBold"
+								Foreground="Black"
+								Text="{TemplateBinding MarkerTitle}"
+								TextAlignment="Center" />
+						</Border>
+
+						<Ellipse
+							Name="PART_HoverHighlight"
+							Width="{TemplateBinding Width}"
+							Height="{TemplateBinding Height}"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="White"
+							Opacity="0" />
+					</Grid>
+
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="PART_MarkerBody" Property="StrokeThickness" Value="4" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="ShowLabel" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MarkerBody" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+						</Trigger>
+
+						<Trigger Property="MarkerState" Value="ACTIVE">
+							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#4CAF50" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="DEACTIVE">
+							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#9E9E9E" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="FAULT">
+							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#F44336" />
+						</Trigger>
+
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter TargetName="PART_MarkerBody" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_StatusIndicator" Property="Opacity" Value="0.5" />
+						</Trigger>
+					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>
 		</Setter>
+
+		<Setter Property="MarkerFill" Value="#2196F3" />
+		<Setter Property="MarkerStroke" Value="White" />
+		<Setter Property="MarkerStrokeThickness" Value="2" />
+		<Setter Property="MarkerTitle" Value="Marker" />
+		<Setter Property="ShowLabel" Value="False" />
+		<Setter Property="IsHitTestVisible" Value="True" />
+		<Setter Property="Focusable" Value="True" />
 	</Style>
+
+	<Style BasedOn="{StaticResource BaseMarkerStyle}" TargetType="{x:Type control:GMapMarkerBasicCustomControl}" />
+
+	<Style
+		x:Key="LargeMarkerStyle"
+		BasedOn="{StaticResource BaseMarkerStyle}"
+		TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
+		<Setter Property="MarkerStrokeThickness" Value="3" />
+	</Style>
+
+	<Style
+		x:Key="SmallMarkerStyle"
+		BasedOn="{StaticResource BaseMarkerStyle}"
+		TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
+		<Setter Property="MarkerStrokeThickness" Value="1.5" />
+	</Style>
+
+	<Style
+		x:Key="SensorMarkerStyle"
+		BasedOn="{StaticResource BaseMarkerStyle}"
+		TargetType="{x:Type control:SensorMarkerControl}">
+		<Setter Property="MarkerFill" Value="#FF9800" />
+		<Setter Property="ShowLabel" Value="True" />
+	</Style>
+
+	<Style
+		x:Key="WarningMarkerStyle"
+		BasedOn="{StaticResource BaseMarkerStyle}"
+		TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
+		<Setter Property="MarkerFill" Value="#FF5722" />
+		<Setter Property="MarkerStroke" Value="#FFEB3B" />
+		<Setter Property="MarkerStrokeThickness" Value="3" />
+	</Style>
+
+	<Style
+		x:Key="SuccessMarkerStyle"
+		BasedOn="{StaticResource BaseMarkerStyle}"
+		TargetType="{x:Type control:GMapMarkerBasicCustomControl}">
+		<Setter Property="MarkerFill" Value="#4CAF50" />
+		<Setter Property="MarkerStroke" Value="White" />
+	</Style>
+
 </ResourceDictionary>
