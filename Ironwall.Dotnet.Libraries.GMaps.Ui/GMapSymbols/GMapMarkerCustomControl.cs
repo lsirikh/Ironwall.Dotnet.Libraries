@@ -1,0 +1,115 @@
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
+using System;
+using System.Windows;
+using System.Windows.Input;
+
+namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+
+/// <summary>
+/// GMapCustomMarker 전용 마커 컨트롤 (기존 호환성 유지)
+/// - GMapMarkerBaseControl<T>를 상속받아 타입 안전성 확보
+/// - 기존 코드와 완전 호환
+/// </summary>
+public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
+{
+    #region Static Constructor
+    static GMapMarkerCustomControl()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(GMapMarkerCustomControl),
+            new FrameworkPropertyMetadata(typeof(GMapMarkerCustomControl)));
+    }
+    #endregion
+
+    #region Constructors
+
+    /// <summary>
+    /// 기본 생성자
+    /// </summary>
+    public GMapMarkerCustomControl()
+    {
+        // 기본 클래스에서 InitializeControl() 호출됨
+    }
+
+    /// <summary>
+    /// 마커와 함께 생성하는 생성자
+    /// </summary>
+    /// <param name="marker">연결할 마커</param>
+    public GMapMarkerCustomControl(GMapCustomMarker marker) : base(marker)
+    {
+        // 기본 클래스에서 UpdateFromMarker(), SetupDataBindings() 호출됨
+    }
+
+    #endregion
+
+    #region Abstract Methods Implementation
+
+    /// <summary>
+    /// GMapCustomMarker 전용 UI 업데이트 구현
+    /// </summary>
+    protected override void UpdateFromSpecificMarker()
+    {
+        // GMapCustomMarker는 기본 속성만 있으므로 추가 처리 없음
+        // 모든 속성은 이미 기본 클래스에서 처리됨
+
+        // 필요시 GMapCustomMarker 전용 로직 추가
+        if (Marker == null) return;
+
+        // 예: 특별한 상태 처리
+        // if (Marker.SomeSpecialProperty != null) { ... }
+    }
+
+    /// <summary>
+    /// GMapCustomMarker 전용 바인딩 설정 구현
+    /// </summary>
+    protected override void SetupSpecificBindings()
+    {
+        // GMapCustomMarker는 기본 바인딩만 있으므로 추가 바인딩 없음
+        // 모든 바인딩은 이미 기본 클래스에서 처리됨
+
+        // 필요시 GMapCustomMarker 전용 바인딩 추가
+        if (Marker == null) return;
+
+        // 예: 특별한 속성 바인딩
+        // SetupPropertyBinding(SomeProperty, nameof(Marker.SomeProperty));
+    }
+
+    #endregion
+
+    #region Override Methods (기존 동작 유지)
+
+    /// <summary>
+    /// 컨트롤 초기화 완료 후 호출 (필요시 오버라이드)
+    /// </summary>
+    protected override void OnControlInitialized()
+    {
+        // GMapCustomMarker 전용 초기화 로직
+        System.Diagnostics.Debug.WriteLine("GMapMarkerCustomControl 초기화 완료");
+    }
+
+    /// <summary>
+    /// 단일 클릭 처리 (기존 동작 유지)
+    /// </summary>
+    protected override void HandleSingleClick(MouseButtonEventArgs e)
+    {
+        base.HandleSingleClick(e);
+
+        // GMapCustomMarker 전용 클릭 처리
+        // 예: 특별한 효과, 로깅 등
+    }
+
+    /// <summary>
+    /// 더블클릭 처리 (기존 동작 유지)
+    /// </summary>
+    protected override void OnMarkerDoubleClicked(MouseButtonEventArgs e)
+    {
+        base.OnMarkerDoubleClicked(e);
+
+        // GMapCustomMarker 전용 더블클릭 처리
+        // 예: 속성 창 열기, 편집 모드 진입 등
+    }
+
+    #endregion
+    
+}

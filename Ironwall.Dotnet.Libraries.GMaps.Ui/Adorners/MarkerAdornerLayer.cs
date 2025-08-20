@@ -30,7 +30,7 @@ public class MarkerAdornerLayer : IDisposable
 
     private readonly ILogService _log;
     private readonly GMapControl _mapControl;
-    private readonly Dictionary<GMapCustomMarker, MarkerEditAdorner> _activeAdorners;
+    private readonly Dictionary<IEditableMarker, MarkerEditAdorner> _activeAdorners;
     private readonly object _lock = new object();
     private bool _disposed = false;
 
@@ -76,7 +76,7 @@ public class MarkerAdornerLayer : IDisposable
     {
         _mapControl = mapControl ?? throw new ArgumentNullException(nameof(mapControl));
         _log = log;
-        _activeAdorners = new Dictionary<GMapCustomMarker, MarkerEditAdorner>();
+        _activeAdorners = new Dictionary<IEditableMarker, MarkerEditAdorner>();
 
         _log?.Info("MarkerAdornerLayer 초기화 완료");
     }
@@ -91,7 +91,7 @@ public class MarkerAdornerLayer : IDisposable
     /// <param name="marker">대상 마커</param>
     /// <param name="markerControl">마커 UI 컨트롤</param>
     /// <returns>생성된 Adorner (이미 존재하면 기존 것 반환)</returns>
-    public MarkerEditAdorner CreateAdorner(GMapCustomMarker marker, GMapMarkerBasicCustomControl markerControl)
+    public MarkerEditAdorner CreateAdorner(IEditableMarker marker, IMarkerControl markerControl)
     {
         if (marker == null) throw new ArgumentNullException(nameof(marker));
         if (markerControl == null) throw new ArgumentNullException(nameof(markerControl));
@@ -108,13 +108,13 @@ public class MarkerAdornerLayer : IDisposable
                 }
 
                 // 새 Adorner 생성
-                var adorner = new MarkerEditAdorner(markerControl, marker, _mapControl, _log);
+                var adorner = new MarkerEditAdorner(markerControl.VisualElement, marker, _mapControl, _log);
 
                 // 이벤트 구독
                 SubscribeToAdornerEvents(adorner);
 
                 // AdornerLayer에 추가
-                var adornerLayer = AdornerLayer.GetAdornerLayer(markerControl);
+                var adornerLayer = AdornerLayer.GetAdornerLayer(markerControl.VisualElement);
                 if (adornerLayer != null)
                 {
                     adornerLayer.Add(adorner);
@@ -147,7 +147,7 @@ public class MarkerAdornerLayer : IDisposable
     /// </summary>
     /// <param name="marker">대상 마커</param>
     /// <returns>제거 성공 여부</returns>
-    public bool RemoveAdorner(GMapCustomMarker marker)
+    public bool RemoveAdorner(IEditableMarker marker)
     {
         if (marker == null) return false;
 
@@ -199,7 +199,7 @@ public class MarkerAdornerLayer : IDisposable
     /// </summary>
     /// <param name="marker">대상 마커</param>
     /// <returns>Adorner (없으면 null)</returns>
-    public MarkerEditAdorner GetAdorner(GMapCustomMarker marker)
+    public MarkerEditAdorner GetAdorner(IEditableMarker marker)
     {
         if (marker == null) return null;
 
@@ -215,7 +215,7 @@ public class MarkerAdornerLayer : IDisposable
     /// </summary>
     /// <param name="marker">대상 마커</param>
     /// <returns>Adorner 존재 여부</returns>
-    public bool HasAdorner(GMapCustomMarker marker)
+    public bool HasAdorner(IEditableMarker marker)
     {
         if (marker == null) return false;
 
@@ -229,7 +229,7 @@ public class MarkerAdornerLayer : IDisposable
     /// 현재 편집 중인 마커들 반환
     /// </summary>
     /// <returns>편집 중인 마커 목록</returns>
-    public IList<GMapCustomMarker> GetEditingMarkers()
+    public IList<IEditableMarker> GetEditingMarkers()
     {
         lock (_lock)
         {
@@ -303,7 +303,7 @@ public class MarkerAdornerLayer : IDisposable
     /// 특정 마커 외 모든 Adorner 제거 (단일 선택 모드)
     /// </summary>
     /// <param name="keepMarker">유지할 마커</param>
-    public void RemoveAllExcept(GMapCustomMarker keepMarker)
+    public void RemoveAllExcept(IEditableMarker keepMarker)
     {
         if (keepMarker == null)
         {
@@ -337,7 +337,7 @@ public class MarkerAdornerLayer : IDisposable
     /// <summary>
     /// Adorner 제거 내부 로직
     /// </summary>
-    private bool RemoveAdornerInternal(GMapCustomMarker marker, MarkerEditAdorner adorner)
+    private bool RemoveAdornerInternal(IEditableMarker marker, MarkerEditAdorner adorner)
     {
         try
         {
@@ -345,10 +345,10 @@ public class MarkerAdornerLayer : IDisposable
             UnsubscribeFromAdornerEvents(adorner);
 
             // AdornerLayer에서 제거
-            var markerControl = adorner.AdornedElement as GMapMarkerBasicCustomControl;
+            var markerControl = adorner.AdornedElement as IMarkerControl;
             if (markerControl != null)
             {
-                var adornerLayer = AdornerLayer.GetAdornerLayer(markerControl);
+                var adornerLayer = AdornerLayer.GetAdornerLayer(markerControl.VisualElement);
                 adornerLayer?.Remove(adorner);
             }
 
@@ -402,7 +402,7 @@ public class MarkerAdornerLayer : IDisposable
     /// <summary>
     /// Adorner 편집 시작 이벤트 핸들러
     /// </summary>
-    private void OnAdornerEditStarted(object sender, MarkerEditStartedEventArgs e)
+    private void OnAdornerEditStarted(object? sender, MarkerEditStartedEventArgs e)
     {
         _log?.Info($"마커 편집 시작: {e.Marker.Title}, 핸들: {e.Handle}");
         EditStarted?.Invoke(this, e);
@@ -411,7 +411,7 @@ public class MarkerAdornerLayer : IDisposable
     /// <summary>
     /// Adorner 편집 완료 이벤트 핸들러
     /// </summary>
-    private void OnAdornerEditCompleted(object sender, MarkerEditCompletedEventArgs e)
+    private void OnAdornerEditCompleted(object? sender, MarkerEditCompletedEventArgs e)
     {
         _log?.Info($"마커 편집 완료: {e.Marker.Title}, 변경사항: {e.GetChangesSummary()}");
         EditCompleted?.Invoke(this, e);
@@ -420,7 +420,7 @@ public class MarkerAdornerLayer : IDisposable
     /// <summary>
     /// Adorner 편집 취소 이벤트 핸들러
     /// </summary>
-    private void OnAdornerEditCancelled(object sender, MarkerEditCancelledEventArgs e)
+    private void OnAdornerEditCancelled(object? sender, MarkerEditCancelledEventArgs e)
     {
         _log?.Info($"마커 편집 취소: {e.Marker.Title}, 이유: {e.Reason}");
         EditCancelled?.Invoke(this, e);

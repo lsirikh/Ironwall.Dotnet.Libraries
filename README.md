@@ -4,7 +4,6 @@
 > 다양한 SW를 개발하기 위한 Sensorway SW의 라이브러리 모음 Sensorway Framework이다.
 
 ### Site : Common
-### Lisence : MIT
 <hr>
 
 ## 1. Ironwall.Dotnet.Libraries.Base 소개

@@ -233,4 +233,217 @@ public static class MarkerEditUtils
 
         return positions;
     }
+
+    #region 벡터 기반 회전 계산 메서드들
+
+    /// <summary>
+    /// 벡터 기반 회전 각도 계산 (Vector.AngleBetween 사용)
+    /// </summary>
+    /// <param name="centerPoint">회전 중심점</param>
+    /// <param name="startPoint">시작점 (드래그 시작)</param>
+    /// <param name="currentPoint">현재점 (드래그 중)</param>
+    /// <returns>회전 각도 (-180 ~ +180도)</returns>
+    public static double CalculateVectorRotationAngle(Point centerPoint, Point startPoint, Point currentPoint)
+    {
+        try
+        {
+            // 중심점에서 각 점까지의 벡터 계산
+            var startVector = Point.Subtract(startPoint, centerPoint);
+            var currentVector = Point.Subtract(currentPoint, centerPoint);
+
+            // 벡터 길이가 0에 가까우면 각도 계산 불가
+            if (startVector.Length < 0.001 || currentVector.Length < 0.001)
+                return 0.0;
+
+            // 두 벡터 간의 각도 계산 (WPF Vector.AngleBetween 사용)
+            return Vector.AngleBetween(startVector, currentVector);
+        }
+        catch
+        {
+            return 0.0; // 예외 발생 시 회전 없음
+        }
+    }
+
+    /// <summary>
+    /// 각도를 0-360도 범위로 정규화
+    /// </summary>
+    /// <param name="angle">정규화할 각도</param>
+    /// <returns>0-360도 범위의 각도</returns>
+    public static double NormalizeAngle(double angle)
+    {
+        while (angle < 0) angle += 360;
+        while (angle >= 360) angle -= 360;
+        return angle;
+    }
+
+    /// <summary>
+    /// 회전 스냅 적용
+    /// </summary>
+    /// <param name="angle">원본 각도</param>
+    /// <param name="snapDegree">스냅 단위 (기본 5도)</param>
+    /// <param name="enableSnap">스냅 활성화 여부</param>
+    /// <returns>스냅된 각도</returns>
+    public static double ApplyRotationSnap(double angle, double snapDegree = 5.0, bool enableSnap = true)
+    {
+        if (!enableSnap)
+            return Math.Round(angle); // 스냅 비활성화 시 1도 단위
+
+        return Math.Round(angle / snapDegree) * snapDegree;
+    }
+
+    /// <summary>
+    /// 회전 변화량이 의미있는 크기인지 확인
+    /// </summary>
+    /// <param name="currentAngle">현재 각도</param>
+    /// <param name="newAngle">새로운 각도</param>
+    /// <param name="threshold">최소 변화량 임계값 (기본 0.5도)</param>
+    /// <returns>의미있는 변화인지 여부</returns>
+    public static bool IsSignificantRotationChange(double currentAngle, double newAngle, double threshold = 0.5)
+    {
+        var delta = Math.Abs(AngleDifference(currentAngle, newAngle));
+        return delta >= threshold;
+    }
+
+    /// <summary>
+    /// 두 각도 간의 차이 계산 (최단 경로)
+    /// </summary>
+    /// <param name="angle1">첫 번째 각도</param>
+    /// <param name="angle2">두 번째 각도</param>
+    /// <returns>각도 차이 (-180 ~ +180도)</returns>
+    public static double AngleDifference(double angle1, double angle2)
+    {
+        var diff = angle2 - angle1;
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+        return diff;
+    }
+
+    /// <summary>
+    /// 벡터 기반 완전한 회전 처리 (RotateThumb 방식)
+    /// </summary>
+    /// <param name="centerPoint">회전 중심점</param>
+    /// <param name="startPoint">시작점</param>
+    /// <param name="currentPoint">현재점</param>
+    /// <param name="initialBearing">초기 마커 회전값</param>
+    /// <param name="enableSnap">스냅 활성화</param>
+    /// <param name="snapDegree">스냅 단위</param>
+    /// <param name="threshold">변화량 임계값</param>
+    /// <returns>벡터 기반 회전 결과</returns>
+    public static VectorRotationResult ProcessVectorRotation(
+        Point centerPoint,
+        Point startPoint,
+        Point currentPoint,
+        double initialBearing,
+        bool enableSnap = true,
+        double snapDegree = 5.0,
+        double threshold = 0.5)
+    {
+        // 1. 벡터 기반 회전 각도 계산
+        var rotationAngle = CalculateVectorRotationAngle(centerPoint, startPoint, currentPoint);
+
+        // 2. 새로운 마커 회전값 계산 (RotateThumb 방식)
+        var newBearing = initialBearing + rotationAngle;
+
+        // 3. 0-360도 범위로 정규화
+        newBearing = NormalizeAngle(newBearing);
+
+        // 4. 스냅 적용
+        var snappedBearing = ApplyRotationSnap(newBearing, snapDegree, enableSnap);
+
+        // 5. 변화량 확인
+        var isSignificant = IsSignificantRotationChange(initialBearing, snappedBearing, threshold);
+
+        return new VectorRotationResult
+        {
+            RotationAngle = rotationAngle,
+            NewBearing = newBearing,
+            SnappedBearing = snappedBearing,
+            InitialBearing = initialBearing,
+            IsSignificantChange = isSignificant,
+            EnableSnap = enableSnap,
+            SnapDegree = snapDegree
+        };
+    }
+
+    /// <summary>
+    /// 회전 핸들 위치 계산 (회전 핸들만)
+    /// </summary>
+    /// <param name="bounds">마커 경계</param>
+    /// <returns>회전 핸들 위치</returns>
+    public static Point GetRotateHandlePosition(Rect bounds)
+    {
+        var centerX = bounds.Left + bounds.Width / 2;
+        var top = bounds.Top;
+        return new Point(centerX, top - MarkerEditSettings.RotateHandleDistance);
+    }
+
+    /// <summary>
+    /// 마커 중심점 계산
+    /// </summary>
+    /// <param name="bounds">마커 경계</param>
+    /// <returns>마커 중심점</returns>
+    public static Point GetMarkerCenter(Rect bounds)
+    {
+        return new Point(
+            bounds.Left + bounds.Width / 2,
+            bounds.Top + bounds.Height / 2
+        );
+    }
+
+    #endregion
+
+    #region 회전 결과 구조체
+
+    /// <summary>
+    /// 벡터 기반 회전 결과
+    /// </summary>
+    public struct VectorRotationResult
+    {
+        /// <summary>
+        /// 회전 각도 (-180 ~ +180도)
+        /// </summary>
+        public double RotationAngle { get; set; }
+
+        /// <summary>
+        /// 새로운 마커 방향각 (0-360도)
+        /// </summary>
+        public double NewBearing { get; set; }
+
+        /// <summary>
+        /// 스냅이 적용된 방향각 (0-360도)
+        /// </summary>
+        public double SnappedBearing { get; set; }
+
+        /// <summary>
+        /// 초기 마커 방향각 (0-360도)
+        /// </summary>
+        public double InitialBearing { get; set; }
+
+        /// <summary>
+        /// 의미있는 변화인지 여부
+        /// </summary>
+        public bool IsSignificantChange { get; set; }
+
+        /// <summary>
+        /// 스냅 활성화 여부
+        /// </summary>
+        public bool EnableSnap { get; set; }
+
+        /// <summary>
+        /// 스냅 단위 (도)
+        /// </summary>
+        public double SnapDegree { get; set; }
+
+        /// <summary>
+        /// 로깅용 정보 문자열
+        /// </summary>
+        /// <returns>회전 정보 문자열</returns>
+        public readonly string GetLogInfo()
+        {
+            return $"벡터회전: {SnappedBearing:F1}° (회전량: {RotationAngle:F1}°, " +
+                   $"초기: {InitialBearing:F1}°, 스냅: {(EnableSnap ? $"{SnapDegree}도" : "1도")})";
+        }
+    }
+
+    #endregion
 }

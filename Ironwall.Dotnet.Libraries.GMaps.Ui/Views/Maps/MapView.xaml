@@ -331,11 +331,21 @@
 					Text="마커" />
 
 				<!--  마커 추가 버튼  -->
-				<Button Command="{Binding AddMarkerCommand}" ToolTip="새 마커 추가 (Ctrl+M)">
+				<Button Command="{Binding AddCustomMarkerCommand}" ToolTip="새 마커 추가 (Ctrl+M)">
 					<Button.InputBindings>
 						<KeyBinding Key="M" Modifiers="Ctrl" />
 					</Button.InputBindings>
 					<md:PackIcon Kind="MapMarkerPlus" />
+				</Button>
+
+				<Button
+					Command="{Binding AddGeometricMarkerCommand}"
+					CommandParameter="Triangle"
+					ToolTip="삼각형 마커 추가">
+					<!--<Button.InputBindings>
+						<KeyBinding Key="M" Modifiers="Ctrl" />
+					</Button.InputBindings>-->
+					<md:PackIcon Kind="Triangle" />
 				</Button>
 
 				<!--  마커 복제 버튼  -->

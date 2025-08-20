@@ -17,7 +17,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /// <summary>
 /// 센서 데이터를 표시하는 커스텀 마커
 /// </summary>
-public class SensorMarkerControl : GMapMarkerBasicCustomControl
+public class SensorMarkerControl : GMapMarkerCustomControl
 {
     #region Dependency Properties
 

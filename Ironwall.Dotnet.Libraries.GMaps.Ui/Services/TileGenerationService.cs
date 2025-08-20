@@ -568,7 +568,7 @@ public class TileGenerationService
         }
     }
 
-    private async Task<Bitmap> CreateTileFromTifAsync(
+    private async Task<Bitmap?> CreateTileFromTifAsync(
      string tifFilePath, TifFileInfo tifInfo, GeoTransformInfo geoTransform,
      GPoint tilePoint, int zoom, int tileSize, PureProjection projection)
     {
@@ -624,7 +624,7 @@ public class TileGenerationService
         });
     }
 
-    private Bitmap ExtractTileFromTifImproved(string tifFilePath, TifFileInfo tifInfo,
+    private Bitmap? ExtractTileFromTifImproved(string tifFilePath, TifFileInfo tifInfo,
     int imgLeft, int imgTop, int imgWidth, int imgHeight,
     PointLatLng tileGeoTopLeft, PointLatLng tileGeoBottomRight,
     double intersectLeft, double intersectTop, double intersectRight, double intersectBottom,
@@ -692,7 +692,7 @@ public class TileGenerationService
         }
     }
 
-    private Bitmap ExtractRegionFromTif(Tiff tif, TifFileInfo tifInfo,
+    private Bitmap? ExtractRegionFromTif(Tiff tif, TifFileInfo tifInfo,
     int imgLeft, int imgTop, int imgWidth, int imgHeight)
     {
         var regionBitmap = new Bitmap(imgWidth, imgHeight, PixelFormat.Format24bppRgb);
@@ -781,7 +781,7 @@ public class TileGenerationService
         }
     }
 
-    private Bitmap ExtractTileFromTif(string tifFilePath, TifFileInfo tifInfo,
+    private Bitmap? ExtractTileFromTif(string tifFilePath, TifFileInfo tifInfo,
         int imgLeft, int imgTop, int imgWidth, int imgHeight,
         PointLatLng tileGeoTopLeft, PointLatLng tileGeoBottomRight,
         double intersectLeft, double intersectTop, double intersectRight, double intersectBottom,

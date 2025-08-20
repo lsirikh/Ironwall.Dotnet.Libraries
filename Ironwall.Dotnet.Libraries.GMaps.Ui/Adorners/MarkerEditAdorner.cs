@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 
@@ -35,7 +36,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     private readonly ILogService _log;
     private bool _disposed = false;
     private readonly GMapControl _mapControl;
-    private readonly GMapCustomMarker _targetMarker;
+    private readonly IEditableMarker _targetMarker;
 
     // 편집 상태
     private MarkerEditState _editState;
@@ -48,6 +49,14 @@ public class MarkerEditAdorner : Adorner, IDisposable
     private double _originalWidth;
     private double _originalHeight;
     private double _originalBearing;
+
+    // 회전 관련 필드
+    private Point _markerCenterPoint;
+    private Point _rotationStartPoint;
+    private double _initialMarkerBearing;
+
+    private int _frameCount = 0;  // 로깅 빈도 제어용
+
 
     // 시각적 요소들
     private Pen _handlePen;
@@ -88,11 +97,11 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// <summary>
     /// MarkerEditAdorner 생성자
     /// </summary>
-    /// <param name="adornedElement">장식할 UI 요소 (GMapMarkerBasicCustomControl)</param>
+    /// <param name="adornedElement">장식할 UI 요소 (GMapMarkerCustomControl)</param>
     /// <param name="targetMarker">편집 대상 마커</param>
     /// <param name="mapControl">지도 컨트롤</param>
     /// <param name="log">로깅 서비스</param>
-    public MarkerEditAdorner(UIElement adornedElement, GMapCustomMarker targetMarker,
+    public MarkerEditAdorner(UIElement adornedElement, IEditableMarker targetMarker,
         GMapControl mapControl, ILogService log = null)
         : base(adornedElement)
     {
@@ -341,7 +350,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         var infoText = CreateInfoText();
         var textPos = new Point(markerScreenPos.X - infoText.Width / 2,
-            markerScreenPos.Y + editRadius + 20);
+            markerScreenPos.Y + editRadius + 30);
 
         // 배경 사각형
         var textBackground = new Rect(textPos.X - 4, textPos.Y - 2,
@@ -360,7 +369,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         // 드래그 중 실시간 좌표/크기/각도 표시
         var feedbackText = CreateDragFeedbackText();
-        var feedbackPos = new Point(markerScreenPos.X + 30, markerScreenPos.Y - 30);
+        var feedbackPos = new Point(markerScreenPos.X + 40, markerScreenPos.Y - 40);
 
         var feedbackBackground = new Rect(feedbackPos.X - 2, feedbackPos.Y - 2,
             feedbackText.Width + 4, feedbackText.Height + 4);
@@ -514,6 +523,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
         // 원본 데이터 백업
         BackupOriginalData();
 
+        // 회전 핸들인 경우 회전 초기화
+        if (_activeHandle == MarkerHandle.Rotate)
+        {
+            StartRotation(mousePos);
+        }
+
         // 마우스 캡처
         this.CaptureMouse();
 
@@ -590,6 +605,11 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 break;
 
             case MarkerHandle.Rotate:
+                // 회전 처리 전에 초기화 확인
+                if (_markerCenterPoint == default(Point) || _rotationStartPoint == default(Point))
+                {
+                    StartRotation(_dragStartPoint);  // 초기 드래그 포인트로 초기화
+                }
                 ProcessRotateOperation(currentPos);
                 break;
 
@@ -646,31 +666,71 @@ public class MarkerEditAdorner : Adorner, IDisposable
     }
 
     /// <summary>
-    /// 회전 처리
+    /// 회전 시작 (RotateThumb 방식)
+    /// </summary>
+    private void StartRotation(Point mousePos)
+    {
+        if (_targetMarker == null) return;
+
+        _markerCenterPoint = CalculateMarkerScreenCenter();
+        _rotationStartPoint = mousePos;
+        _initialMarkerBearing = _targetMarker.Bearing;
+
+        _log?.Info($"벡터 회전 시작: 중심({_markerCenterPoint.X:F1}, {_markerCenterPoint.Y:F1}), " +
+                  $"마커회전: {_initialMarkerBearing:F1}°");
+    }
+
+    /// <summary>
+    /// 회전 처리 (벡터 방식 - 가장 안정적)
     /// </summary>
     private void ProcessRotateOperation(Point currentPos)
     {
         try
         {
-            // AdornedElement 기준으로 마커 중심 계산
-            var elementBounds = new Rect(AdornedElement.RenderSize);
-            var markerCenter = new Point(elementBounds.Width / 2, elementBounds.Height / 2);
+            if (_targetMarker == null) return;
 
-            var angle = MarkerEditUtils.CalculateAngle(markerCenter, currentPos);
+            // 1. 스냅 설정
+            bool enableSnap = !Keyboard.IsKeyDown(Key.LeftShift);
 
-            // 15도 단위로 스냅 (Shift 키를 누르지 않은 경우)
-            if (!Keyboard.IsKeyDown(Key.LeftShift) && !Keyboard.IsKeyDown(Key.RightShift))
+            // 2. 벡터 기반 회전 계산 (RotateThumb 방식)
+            var result = MarkerEditUtils.ProcessVectorRotation(
+                _markerCenterPoint,
+                _rotationStartPoint,
+                currentPos,
+                _initialMarkerBearing,
+                enableSnap,
+                5.0   // 5도 스냅
+            );
+
+            // 3. 의미있는 변화만 적용
+            if (!result.IsSignificantChange) return;
+
+            // 4. 마커 업데이트
+            _targetMarker.UpdateRotation(result.SnappedBearing);
+
+            // 5. 로깅 (간헐적)
+            if (_frameCount++ % 10 == 0)
             {
-                angle = Math.Round(angle / 15.0) * 15.0;
+                _log?.Info(result.GetLogInfo());
             }
-
-            _targetMarker.UpdateRotation(angle);
-            _log?.Info($"회전 조정: {angle:F1}°");
         }
         catch (Exception ex)
         {
-            _log?.Error($"회전 처리 실패: {ex.Message}");
+            _log?.Error($"벡터 회전 처리 실패: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 마커 화면 중심점 계산
+    /// </summary>
+    private Point CalculateMarkerScreenCenter()
+    {
+        if (AdornedElement?.RenderSize != null)
+        {
+            var size = AdornedElement.RenderSize;
+            return new Point(size.Width / 2.0, size.Height / 2.0);
+        }
+        return new Point(25, 25); // 기본값
     }
 
     /// <summary>
@@ -745,7 +805,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
             _targetMarker.UpdateSize(_targetMarker.Width, newHeight);
 
-            if (AdornedElement is GMapMarkerBasicCustomControl markerControl)
+            if (AdornedElement is GMapMarkerCustomControl markerControl)
             {
                 markerControl.Width = _targetMarker.Width;
                 markerControl.Height = newHeight;
@@ -782,7 +842,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
             _targetMarker.UpdateSize(newWidth, _targetMarker.Height);
 
-            if (AdornedElement is GMapMarkerBasicCustomControl markerControl)
+            if (AdornedElement is GMapMarkerCustomControl markerControl)
             {
                 markerControl.Width = newWidth;
                 markerControl.Height = _targetMarker.Height;
@@ -965,7 +1025,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// </summary>
     private FormattedText CreateInfoText()
     {
-        var infoString = $"{_targetMarker.Title}\n" +
+        var infoString = $"제목: {_targetMarker.Title}\n" +
                         $"크기: {_targetMarker.Width:F0}×{_targetMarker.Height:F0}\n" +
                         $"회전: {_targetMarker.Bearing:F0}°\n" +
                         $"위치: ({_targetMarker.Position.Lat:F6}, {_targetMarker.Position.Lng:F6})";
@@ -985,7 +1045,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             MarkerHandle.Move => $"위치: ({_targetMarker.Position.Lat:F6}, {_targetMarker.Position.Lng:F6})",
             MarkerHandle.Rotate => $"회전: {_targetMarker.Bearing:F0}°",
 
-            // 🔧 새로운 핸들 타입들 추가
+            // 새로운 핸들 타입들 추가
             MarkerHandle.ResizeLeft or MarkerHandle.ResizeRight => $"너비: {_targetMarker.Width:F0}px",
             MarkerHandle.ResizeTop or MarkerHandle.ResizeBottom => $"높이: {_targetMarker.Height:F0}px",
             MarkerHandle.ResizeTopLeft or MarkerHandle.ResizeTopRight or
@@ -1021,7 +1081,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// <summary>
     /// 대상 마커
     /// </summary>
-    public GMapCustomMarker TargetMarker => _targetMarker;
+    public IEditableMarker TargetMarker => _targetMarker;
 
     /// <summary>
     /// 정보 표시 여부

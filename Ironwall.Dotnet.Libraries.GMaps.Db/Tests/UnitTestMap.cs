@@ -504,12 +504,12 @@ public class GMapDb_DefinedMapCrudTests
     {
         await _fx.SeedDefinedMapsAsync();
 
-        /* ② FetchAll */
+        /* FetchAll */
         var all = await _fx.Svc.FetchDefinedMapsAsync();
         Assert.NotNull(all);
         Assert.True(all!.Count >= _fx.DefinedMapCount);
 
-        /* ③ FetchSingle & 검증 */
+        /* FetchSingle & 검증 */
         foreach (var id in _fx.InsertedDefinedMapIds)
         {
             var one = await _fx.Svc.FetchDefinedMapAsync(id);

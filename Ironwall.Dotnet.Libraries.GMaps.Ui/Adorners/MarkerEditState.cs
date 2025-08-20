@@ -57,7 +57,7 @@ public class MarkerEditState
     /// <summary>
     /// 편집 대상 마커
     /// </summary>
-    public GMapCustomMarker TargetMarker { get; set; }
+    public IEditableMarker TargetMarker { get; set; }
 
     /// <summary>
     /// 편집 시작 시간

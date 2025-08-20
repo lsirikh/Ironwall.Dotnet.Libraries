@@ -27,6 +27,10 @@ using CoordinateSharp;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Org.BouncyCastle.Crypto.Macs;
+using Ironwall.Dotnet.Libraries.GMaps.Db.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
+using System.Windows;
+
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 
@@ -60,17 +64,23 @@ public class MapViewModel : BasePanelViewModel
                         , DefinedMapProvider definedMapProvider
                         , Providers.CustomMapProvider customMapProvider
                         , CustomMapService customMapService
+                        , IGMapDbSymbolService gMapDbSymbolService
+                        , SymbolProvider symbolProvider
+                        , GeometricSymbolProvider geoSymbolProvider
                         , ImageOverlayService imageOverlayService
+                        , MarkerFactory markerFactory
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
         _mapProvider = mapProvider;
         _definedMapProvider = definedMapProvider;
         _customMapProvider = customMapProvider;
+        _gMapDbSymbolService = gMapDbSymbolService;
+        _symbolProvider = symbolProvider;
         _setupModel = setupModel;
         _customMapService = customMapService;
         _imageOverlayService = imageOverlayService;
-
+        _markerFactory = markerFactory;
         InitializeCommands();
     }
     #endregion
@@ -109,12 +119,18 @@ public class MapViewModel : BasePanelViewModel
 
             // 2. 지도 설정
             await MapConfigureAsync();
+
+            // 3. 심볼 설정
+            await SymbolConfigureAsync();
+
         }
         catch (Exception ex)
         {
             _log?.Error(ex.Message);
         }
     }
+
+    
 
     /// <summary>
     /// ViewModel 비활성화 시 리소스 정리
@@ -213,7 +229,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 지도 마커 클릭 이벤트 핸들러
     /// </summary>
-    private void OnMapMarkerClicked(GMapCustomMarker marker)
+    private void OnMapMarkerClicked(IEditableMarker marker)
     {
         try
         {
@@ -289,7 +305,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 편집 시작 이벤트 핸들러
     /// </summary>
-    private void OnMarkerEditStarted(object sender, MarkerEditStartedEventArgs e)
+    private void OnMarkerEditStarted(object? sender, MarkerEditStartedEventArgs e)
     {
         _log?.Info($"마커 편집 시작: {e.Marker.Title}, 핸들: {e.Handle}");
 
@@ -301,10 +317,12 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 편집 완료 이벤트 핸들러
     /// </summary>
-    private void OnMarkerEditCompleted(object sender, MarkerEditCompletedEventArgs e)
+    private void OnMarkerEditCompleted(object? sender, MarkerEditCompletedEventArgs e)
     {
         _log?.Info($"마커 편집 완료: {e.Marker.Title}");
         _log?.Info($"변경사항: {e.GetChangesSummary()}");
+
+        DbUpdateProcess(e.Marker);
 
         // UI 상태 업데이트
         IsMarkerEditing = false;
@@ -319,10 +337,12 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
+    
+
     /// <summary>
     /// 마커 편집 취소 이벤트 핸들러
     /// </summary>
-    private void OnMarkerEditCancelled(object sender, MarkerEditCancelledEventArgs e)
+    private void OnMarkerEditCancelled(object? sender, MarkerEditCancelledEventArgs e)
     {
         _log?.Info($"마커 편집 취소: {e.Marker.Title}, 이유: {e.Reason}");
 
@@ -334,7 +354,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// Adorner 생성 이벤트 핸들러
     /// </summary>
-    private void OnAdornerCreated(object sender, AdornerLifecycleEventArgs e)
+    private void OnAdornerCreated(object? sender, AdornerLifecycleEventArgs e)
     {
         _log?.Info($"Adorner 생성됨: {e.Marker.Title}");
         AdornerCount++;
@@ -343,7 +363,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// Adorner 제거 이벤트 핸들러
     /// </summary>
-    private void OnAdornerRemoved(object sender, AdornerLifecycleEventArgs e)
+    private void OnAdornerRemoved(object? sender, AdornerLifecycleEventArgs e)
     {
         _log?.Info($"Adorner 제거됨: {e.Marker.Title}");
         AdornerCount = Math.Max(0, AdornerCount - 1);
@@ -353,7 +373,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 편집을 위한 마커 선택
     /// </summary>
-    private void SelectMarkerForEditing(GMapCustomMarker marker)
+    private void SelectMarkerForEditing(IEditableMarker marker)
     {
         try
         {
@@ -409,7 +429,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 선택된 마커 업데이트
     /// </summary>
-    private void UpdateSelectedMarker(GMapCustomMarker marker)
+    private void UpdateSelectedMarker(IEditableMarker marker)
     {
         SelectedMarker = marker;
         SelectedImage = null; // 이미지 선택 해제
@@ -535,12 +555,15 @@ public class MapViewModel : BasePanelViewModel
     /// </summary>
     private void InitializeMarkerEditCommands()
     {
-        AddMarkerCommand = new RelayCommand(ExecuteAddMarker, CanExecuteAddMarker);
+        AddCustomMarkerCommand = new RelayCommand(ExecuteAddMarker, CanExecuteAddMarker);
+        AddGeometricMarkerCommand = new RelayCommand(ExecuteAddGeometricMarker, CanExecuteAddGeometricMarker);
         DuplicateMarkerCommand = new RelayCommand(ExecuteDuplicateMarker, CanExecuteDuplicateMarker);
         SnapMarkerToGridCommand = new RelayCommand(ExecuteSnapMarkerToGrid, CanExecuteSnapMarkerToGrid);
         ResetMarkerRotationCommand = new RelayCommand(ExecuteResetMarkerRotation, CanExecuteResetMarkerRotation);
         ResetMarkerSizeCommand = new RelayCommand(ExecuteResetMarkerSize, CanExecuteResetMarkerSize);
     }
+
+    
 
     /// <summary>
     /// Adorner 관련 명령어 초기화
@@ -600,7 +623,7 @@ public class MapViewModel : BasePanelViewModel
 
                 if (image != null)
                 {
-                    // 이미지가 표시되도록 Visibility 확인
+                    // 이미지가 표시되도록 ShowShape 확인
                     image.Visibility = true;
 
                     // GMapCustomControl에 이미지 추가
@@ -818,7 +841,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 선택된 항목 삭제 실행
     /// </summary>
-    private void ExecuteDeleteSelected(object obj)
+    private async void ExecuteDeleteSelected(object obj)
     {
         try
         {
@@ -834,8 +857,16 @@ public class MapViewModel : BasePanelViewModel
                 // Adorner 먼저 제거
                 MainMap.DeselectMarker(SelectedMarker);
 
-                // GMap.NET 마커 컬렉션에서 제거
-                MainMap.Markers.Remove(SelectedMarker);
+
+                if(SelectedMarker is GMapMarker marker)
+                    // GMap.NET 마커 컬렉션에서 제거
+                    MainMap.Markers.Remove(marker);
+
+                var ret = await DbDeleteProcess(SelectedMarker);
+                if(ret)
+                    _log?.Info($"선택한 마커({SelectedMarker.Id})를 DB에서 성공적으로 삭제했습니다.");
+                else
+                    _log?.Info($"선택한 마커({SelectedMarker.Id})를 DB에서 삭제하지 못했습니다.");
 
                 // 마커 리소스 정리
                 SelectedMarker.Dispose();
@@ -999,7 +1030,25 @@ public class MapViewModel : BasePanelViewModel
         try
         {
             var position = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
-            AddTestMarker(position, "Test");
+            AddCustomMarker(position, "Test");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 추가 실행 실패: {ex.Message}");
+        }
+    }
+
+    private bool CanExecuteAddGeometricMarker(object arg) => true;
+    private void ExecuteAddGeometricMarker(object obj)
+    {
+        try
+        {
+            var position = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
+            EnumShapeType shapeType = EnumShapeType.Circle;
+            if (obj is string shape)
+                shapeType = Enum.Parse<EnumShapeType>(shape);
+
+            AddGeometricMarker(position, shapeType, "Geometric");
         }
         catch (Exception ex)
         {
@@ -1268,6 +1317,26 @@ public class MapViewModel : BasePanelViewModel
             _ => GMapProviders.BingMap
         };
     }
+
+    private Task SymbolConfigureAsync()
+    {
+        try
+        {
+            _log?.Info("SymbolConfigureAsync를 이용하여 심볼 불러오고 초기화.");
+
+            foreach (var item in _symbolProvider)
+            {
+                //AddCustomMarkerProcess(item);
+                AddMarkerFromSymbol(item);
+            }
+
+            return Task.CompletedTask;
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+    }
     #endregion
 
     #region - 지도 전환 및 관리 -
@@ -1401,51 +1470,67 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 추가 (테스트용) - 지정된 위치에 새 마커 생성
     /// </summary>
-    public void AddTestMarker(PointLatLng position, string title = "Test Marker")
+    public async Task AddCustomMarker(PointLatLng position, string title = "CustomMarker")
     {
         try
         {
-            // SymbolModel 생성 (실제 구현에 맞게 조정 필요)
+            // 1. SymbolModel 생성
             var symbolModel = new SymbolModel
             {
-                Id = GenerateNewMarkerId(),
                 Title = title,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
                 Width = 50,
                 Height = 50,
                 Bearing = 0,
-                Category = EnumMarkerCategory.PIDS_EQUIPMENT, // 적절한 카테고리로 수정
-                Visibility = true,
+                Category = EnumMarkerCategory.BASIC_SHAPES,
+                ShowShape = true,
+                ShowTitle = false,
                 OperationState = EnumOperationState.ACTIVE
             };
 
-            var customMarker = new GMapCustomMarker(_log!, symbolModel);
+            var symbolId = await _gMapDbSymbolService.InsertSymbolAsync(symbolModel);
+            var savedSymbol = await _gMapDbSymbolService.FetchSymbolAsync(symbolId);
+            if (savedSymbol == null) throw new NullReferenceException($"SymbolId({symbolId})를 이용하여 FetchSymbolAsync 수행을 실패 했습니다.");
+            AddMarkerFromSymbol(savedSymbol);
 
-            // 마커에 UI Shape 설정 확인
-            if (customMarker.Shape == null)
+            // 강제 새로고침
+            MainMap.InvalidateVisual();
+            
+            _log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
+            _log?.Info($"현재 총 마커 수: {MainMap.Markers.Count}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"테스트 마커 추가 실패: {ex.Message}");
+        }
+    }
+
+    public async Task AddGeometricMarker(PointLatLng position, EnumShapeType shapeType, string title = "GeometricMarker")
+    {
+        try
+        {
+            // 1. SymbolModel 생성
+            var symbolModel = new GeometricSymbolModel
             {
-                _log?.Error($"마커 '{title}'의 Shape가 여전히 null입니다!");
-                return; // 마커 추가 중단
-            }
-            else
-            {
-                _log?.Info($"마커 '{title}' Shape 확인됨: {customMarker.Shape.GetType().Name}");
-            }
+                Title = title,
+                Latitude = position.Lat,
+                Longitude = position.Lng,
+                Width = 50,
+                Height = 50,
+                Bearing = 0,
+                Category = EnumMarkerCategory.GEOMETRICS,
+                ShowShape = true,
+                ShowTitle = false,
+                OperationState = EnumOperationState.ACTIVE,
+                Opacity = 0.7,
+                ShapeType = shapeType
+            };
 
-            // GMap에 마커 추가
-            MainMap.Markers.Add(customMarker);
-
-            // CustomMarkers 동기화 확인
-            _log?.Info($"GMap.Markers 총 개수: {MainMap.Markers.Count}");
-            _log?.Info($"CustomMarkers 총 개수: {MainMap.CustomMarkers?.Count ?? 0}");
-
-            // 강제 동기화 (필요한 경우)
-            if (MainMap.CustomMarkers != null && !MainMap.CustomMarkers.Contains(customMarker))
-            {
-                _log?.Warning("CustomMarkers에 마커가 없어서 강제 추가 중...");
-                MainMap.CustomMarkers.Add(customMarker);
-            }
+            var symbolId = await _gMapDbSymbolService.InsertGeometrySymbolAsync(symbolModel);
+            var savedSymbol = await _gMapDbSymbolService.FetchGeometrySymbolAsync(symbolId);
+            if (savedSymbol == null) throw new NullReferenceException($"SymbolId({symbolId})를 이용하여 FetchGeometrySymbolAsync 수행을 실패 했습니다.");
+            AddMarkerFromSymbol(savedSymbol);
 
             // 강제 새로고침
             MainMap.InvalidateVisual();
@@ -1459,15 +1544,92 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-    /// <summary>
-    /// 새 마커 ID 생성 - 기존 마커들의 최대 ID + 1
+    // <summary>
+    /// 심볼로부터 마커 추가 - 매우 간단!
     /// </summary>
-    private int GenerateNewMarkerId()
+    private void AddMarkerFromSymbol(ISymbolModel symbolModel)
     {
-        return MainMap.CustomMarkers.Any() ?
-               MainMap.CustomMarkers.Max(m => m.Id) + 1 :
-               1;
+        try
+        {
+            // 1. Factory로 마커 생성
+            var marker = _markerFactory.CreateMarker(symbolModel);
+
+            // 2. 지도에 추가
+            AddMarkerToMap(marker);
+
+            _log?.Info($"마커 추가 완료: {symbolModel.Title}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 추가 실패: {ex.Message}");
+        }
     }
+
+    /// <summary>
+    /// 지도에 마커 추가 - 단순화
+    /// </summary>
+    private void AddMarkerToMap(IEditableMarker marker)
+    {
+        if (marker is not GMapMarker gMapMarker)
+        {
+            _log?.Error($"마커가 GMapMarker가 아닙니다: {marker.GetType().Name}");
+            return;
+        }
+
+        // GMap에 추가
+        MainMap.Markers.Add(gMapMarker);
+
+        // CustomMarkers에도 추가 (중복 체크)
+        if (!MainMap.CustomMarkers.Contains(marker))
+        {
+            MainMap.CustomMarkers.Add(marker);
+        }
+
+        // Shape 확인 로그
+        var shapeType = gMapMarker.Shape?.GetType().Name ?? "null";
+        _log?.Info($"마커 '{marker.Title}' 추가됨, Shape: {shapeType}");
+    }
+
+
+    //private void AddCustomMarkerProcess(ISymbolModel? symbol)
+    //{
+    //    try
+    //    {
+    //        if (symbol is ISymbolModel)
+
+    //            var obj = _markerFactory.CreateMarker<GMapCustomMarker>(symbol);
+
+    //        // UI요소를 생성한다.
+    //        var customMarker = new GMapCustomMarker(_log!, symbol
+    //            ?? throw new NullReferenceException("FetchSymbolAsync를 통해 가져온 Symbol데이터가 유효하지 않습니다."));
+
+    //        // Shape 타입 확인
+    //        _log?.Info($"생성된 Shape 타입: {customMarker.Shape?.GetType().Name}");
+
+    //        if (customMarker.Shape is System.Windows.Shapes.Rectangle)
+    //        {
+    //            _log?.Error("대체 Shape(빨간 사각형)가 생성됨 - GMapMarkerCustomControl 생성 실패");
+    //        }
+    //        else if (customMarker.Shape is GMapMarkerCustomControl)
+    //        {
+    //            _log?.Info("정상적인 GMapMarkerCustomControl 생성됨");
+    //        }
+
+    //        // GMap에 마커 추가
+    //        MainMap.Markers.Add(customMarker);
+
+    //        // 강제 동기화 (필요한 경우)
+    //        if (MainMap.CustomMarkers != null && !MainMap.CustomMarkers.Contains(customMarker))
+    //        {
+    //            _log?.Warning("CustomMarkers에 마커가 없어서 강제 추가 중...");
+    //            MainMap.CustomMarkers.Add(customMarker);
+    //        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _log?.Error(ex.Message);
+    //    }
+    //}
 
     /// <summary>
     /// 마커 위치 업데이트
@@ -1493,7 +1655,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 회전 업데이트
     /// </summary>
-    public void UpdateMarkerRotation(GMapCustomMarker marker, double bearing)
+    public void UpdateMarkerRotation(IEditableMarker marker, double bearing)
     {
         try
         {
@@ -1514,7 +1676,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 크기 업데이트
     /// </summary>
-    public void UpdateMarkerSize(GMapCustomMarker marker, double width, double height)
+    public void UpdateMarkerSize(IEditableMarker marker, double width, double height)
     {
         try
         {
@@ -1537,7 +1699,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 선택된 마커 복제
     /// </summary>
-    public void DuplicateSelectedMarker()
+    public async void DuplicateSelectedMarker()
     {
         try
         {
@@ -1550,7 +1712,7 @@ public class MapViewModel : BasePanelViewModel
             var originalPos = SelectedMarker.Position;
             var newPos = new PointLatLng(originalPos.Lat + 0.0001, originalPos.Lng + 0.0001); // 약간 이동된 위치
 
-            AddTestMarker(newPos, $"{SelectedMarker.Title}_Copy");
+            await AddCustomMarker(newPos, $"{SelectedMarker.Title}_Copy");
 
             _log?.Info($"마커 복제 완료: {SelectedMarker.Title}");
         }
@@ -1563,7 +1725,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 우클릭 메뉴 생성 (향후 확장용)
     /// </summary>
-    public void ShowMarkerContextMenu(GMapCustomMarker marker, Point screenPosition)
+    public void ShowMarkerContextMenu(IEditableMarker marker, Point screenPosition)
     {
         try
         {
@@ -1587,7 +1749,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 마커 스냅 기능 (격자에 맞춤)
     /// </summary>
-    public void SnapMarkerToGrid(GMapCustomMarker marker, double gridSize = 0.0001)
+    public void SnapMarkerToGrid(IEditableMarker marker, double gridSize = 0.0001)
     {
         try
         {
@@ -1825,7 +1987,7 @@ public class MapViewModel : BasePanelViewModel
 
                         if (ret)
                         {
-                            _log?.Info($"Reload Map from cashed data : {file.Name}");
+                            _log?.Info($"Reload Map from cashed data : {file?.Name}");
                             MainMap.ReloadMap();
                         }
                     }
@@ -2006,6 +2168,64 @@ public class MapViewModel : BasePanelViewModel
     }
     #endregion
 
+    #region -DB Related Logic 모음 -
+    private async Task DbSaveProcess(IEditableMarker marker)
+    {
+        switch (marker)
+        {
+            case GMapCustomMarker customMarker:
+                // GMapCustomMarker 전용 로직
+                await _gMapDbSymbolService.InsertSymbolAsync(customMarker.Model);
+                break;
+
+            case GMapGeometricMarker geometricMarker:
+                // GMapGeometricMarker 전용 로직
+                await _gMapDbSymbolService.InsertGeometrySymbolAsync(geometricMarker.Model);
+                break;
+
+            default:
+                // 공통 로직
+                break;
+        }
+    }
+    private async Task DbUpdateProcess(IEditableMarker marker)
+    {
+        switch (marker)
+        {
+            case GMapCustomMarker customMarker:
+                // GMapCustomMarker 전용 로직
+                await _gMapDbSymbolService.UpdateSymbolAsync(customMarker.Model);
+                break;
+
+            case GMapGeometricMarker geometricMarker:
+                // GMapGeometricMarker 전용 로직
+                await _gMapDbSymbolService.UpdateGeometrySymbolAsync(geometricMarker.Model);
+                break;
+
+            default:
+                // 공통 로직
+                break;
+        }
+    }
+    private async Task<bool> DbDeleteProcess(IEditableMarker marker)
+    {
+        switch (marker)
+        {
+            case GMapCustomMarker customMarker:
+                // GMapCustomMarker 전용 로직
+                return await _gMapDbSymbolService.DeleteSymbolAsync(customMarker.Model);
+
+            case GMapGeometricMarker geometricMarker:
+                // GMapGeometricMarker 전용 로직
+                return await _gMapDbSymbolService.DeleteGeometrySymbolAsync(geometricMarker.Model);
+
+            default:
+                // 공통 로직
+                return false;
+        }
+    }
+    #endregion
+
     #region - 속성 (Properties) -
 
     #region - 줌 관련 속성 -
@@ -2066,7 +2286,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 현재 위치의 MGRS 좌표
     /// </summary>
-    public string CurrentMGRS
+    public string? CurrentMGRS
     {
         get { return _currentMGRS; }
         set { _currentMGRS = value; NotifyOfPropertyChange(nameof(CurrentMGRS)); }
@@ -2075,7 +2295,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 현재 위치의 UTM 좌표
     /// </summary>
-    public string CurrentUTM
+    public string? CurrentUTM
     {
         get { return _currentUTM; }
         set { _currentUTM = value; NotifyOfPropertyChange(nameof(CurrentUTM)); }
@@ -2226,11 +2446,6 @@ public class MapViewModel : BasePanelViewModel
     public bool HasActiveAdorners => AdornerCount > 0;
 
     /// <summary>
-    /// Adorner 통계 정보
-    /// </summary>
-    public string AdornerStatistics => MainMap?.LogAdornerStatistics() ?? "통계 없음";
-
-    /// <summary>
     /// 선택된 이미지
     /// </summary>
     public GMapCustomImage? SelectedImage
@@ -2247,7 +2462,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 선택된 마커
     /// </summary>
-    public GMapCustomMarker? SelectedMarker
+    public IEditableMarker? SelectedMarker
     {
         get => _selectedMarker;
         set
@@ -2445,41 +2660,42 @@ public class MapViewModel : BasePanelViewModel
 
     #region - 명령어 속성 -
     // 파일 관련 명령어
-    public RelayCommand LoadMapImageCommand { get; private set; }
-    public RelayCommand CreateCustomMapCommand { get; private set; }
-    public RelayCommand SetMapTileFolderCommand { get; private set; }
-    public RelayCommand ExitApplicationCommand { get; private set; }
+    public RelayCommand? LoadMapImageCommand { get; private set; }
+    public RelayCommand? CreateCustomMapCommand { get; private set; }
+    public RelayCommand? SetMapTileFolderCommand { get; private set; }
+    public RelayCommand? ExitApplicationCommand { get; private set; }
 
     // 지도 표시 관련 명령어
-    public RelayCommand ToggleWGS84Command { get; private set; }
-    public RelayCommand ToggleMGRSCommand { get; private set; }
-    public RelayCommand ToggleUTMCommand { get; private set; }
+    public RelayCommand? ToggleWGS84Command { get; private set; }
+    public RelayCommand? ToggleMGRSCommand { get; private set; }
+    public RelayCommand? ToggleUTMCommand { get; private set; }
 
     // 네비게이션 관련 명령어
-    public RelayCommand MoveHomeLocationCommand { get; private set; }
-    public RelayCommand SetHomeLocationCommand { get; private set; }
+    public RelayCommand? MoveHomeLocationCommand { get; private set; }
+    public RelayCommand? SetHomeLocationCommand { get; private set; }
 
     // 편집 관련 명령어
-    public RelayCommand ClearSelectionCommand { get; private set; }
-    public RelayCommand DeleteSelectedCommand { get; private set; }
+    public RelayCommand? ClearSelectionCommand { get; private set; }
+    public RelayCommand? DeleteSelectedCommand { get; private set; }
 
     // 회전 관련 명령어
-    public RelayCommand RotateCommand { get; private set; }
-    public RelayCommand FineRotateCommand { get; private set; }
-    public RelayCommand ResetRotationCommand { get; private set; }
-    public RelayCommand AlignToMGRSCommand { get; private set; } // TODO: 구현 필요
+    public RelayCommand? RotateCommand { get; private set; }
+    public RelayCommand? FineRotateCommand { get; private set; }
+    public RelayCommand? ResetRotationCommand { get; private set; }
+    public RelayCommand? AlignToMGRSCommand { get; private set; } // TODO: 구현 필요
 
     // 마커 편집 관련 명령어
-    public RelayCommand AddMarkerCommand { get; private set; }
-    public RelayCommand DuplicateMarkerCommand { get; private set; }
-    public RelayCommand SnapMarkerToGridCommand { get; private set; }
-    public RelayCommand ResetMarkerRotationCommand { get; private set; }
-    public RelayCommand ResetMarkerSizeCommand { get; private set; }
+    public RelayCommand? AddCustomMarkerCommand { get; private set; }
+    public RelayCommand? AddGeometricMarkerCommand { get; private set; }
+    public RelayCommand? DuplicateMarkerCommand { get; private set; }
+    public RelayCommand? SnapMarkerToGridCommand { get; private set; }
+    public RelayCommand? ResetMarkerRotationCommand { get; private set; }
+    public RelayCommand? ResetMarkerSizeCommand { get; private set; }
 
-    public RelayCommand ToggleEditModeCommand { get; private set; }
-    public RelayCommand ToggleMultiSelectCommand { get; private set; }
-    public RelayCommand CancelAllEditingCommand { get; private set; }
-    public RelayCommand LogAdornerStatsCommand { get; private set; }
+    public RelayCommand? ToggleEditModeCommand { get; private set; }
+    public RelayCommand? ToggleMultiSelectCommand { get; private set; }
+    public RelayCommand? CancelAllEditingCommand { get; private set; }
+    public RelayCommand? LogAdornerStatsCommand { get; private set; }
     #endregion
 
     #endregion
@@ -2490,9 +2706,12 @@ public class MapViewModel : BasePanelViewModel
     private MapProvider _mapProvider;
     private DefinedMapProvider _definedMapProvider;
     private Providers.CustomMapProvider _customMapProvider;
+    private IGMapDbSymbolService _gMapDbSymbolService;
+    private SymbolProvider _symbolProvider;
     private GMapSetupModel _setupModel;
     private CustomMapService _customMapService;
     private ImageOverlayService _imageOverlayService;
+    private MarkerFactory _markerFactory;
 
     // UI 상태 필드
     private string? _scale;
@@ -2520,6 +2739,6 @@ public class MapViewModel : BasePanelViewModel
 
     // 선택 상태 필드
     private GMapCustomImage? _selectedImage;
-    private GMapCustomMarker? _selectedMarker;
+    private IEditableMarker? _selectedMarker;
     #endregion
 }

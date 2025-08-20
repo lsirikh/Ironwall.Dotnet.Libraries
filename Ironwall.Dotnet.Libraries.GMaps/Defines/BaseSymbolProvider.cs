@@ -1,7 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.DataProviders;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Providers;
-using Ironwall.Dotnet.Monitoring.Models.Maps;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Collections.Specialized;
 
@@ -9,16 +9,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Defines;
 /****************************************************************************
    Purpose      :                                                          
    Created By   : GHLee                                                
-   Created On   : 7/25/2025 9:58:09 AM                                                    
+   Created On   : 8/19/2025 10:09:09 AM                                                    
    Department   : SW Team                                                   
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public abstract class BaseMapProdiver<T> : BaseProvider<T>, ILoadable where T : IMapModel
+public abstract class BaseSymbolProvider<T> : BaseProvider<T>, ILoadable where T : ISymbolModel
 {
 
     #region - Ctors -
-    protected BaseMapProdiver(ILogService log, MapProvider provider) : base(log)
+    protected BaseSymbolProvider(ILogService log, SymbolProvider provider) : base(log)
     {
         _provider = provider;
         _provider.CollectionEntity.CollectionChanged += CollectionEntity_CollectionChanged;
@@ -115,7 +115,6 @@ public abstract class BaseMapProdiver<T> : BaseProvider<T>, ILoadable where T : 
     #region - Properties -
     #endregion
     #region - Attributes -
-    private MapProvider _provider;
+    private SymbolProvider _provider;
     #endregion
-
 }

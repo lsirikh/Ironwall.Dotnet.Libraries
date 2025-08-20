@@ -27,18 +27,15 @@ public class SymbolModel : BaseModel, ISymbolModel
         Latitude = 0.0;       // 순수 double 타입
         Longitude = 0.0;      // 순수 double 타입
         Altitude = 0;
-        Pitch = 0;
-        Roll = 0;
         Width = 30;
         Height = 30;
         Bearing = 0;
         Category = EnumMarkerCategory.BASIC_SHAPES;
-        Visibility = true;
+        ShowShape = true;
     }
 
-    public SymbolModel(int id, string title, double latitude, double longitude)
+    public SymbolModel(string title, double latitude, double longitude)
     {
-        Id = id;
         Title = title;
         Latitude = latitude;
         Longitude = longitude;
@@ -47,13 +44,11 @@ public class SymbolModel : BaseModel, ISymbolModel
         Pid = 0;
         OperationState = EnumOperationState.NONE;
         Altitude = 0;
-        Pitch = 0;
-        Roll = 0;
         Width = 30;
         Height = 30;
         Bearing = 0;
         Category = EnumMarkerCategory.BASIC_SHAPES;
-        Visibility = true;
+        ShowShape = true;
     }
     #endregion
 
@@ -78,8 +73,6 @@ public class SymbolModel : BaseModel, ISymbolModel
     public double Longitude { get; set; }
 
     public float Altitude { get; set; }
-    public float Pitch { get; set; }
-    public float Roll { get; set; }
     public double Bearing { get; set; }
     #endregion
 
@@ -87,9 +80,7 @@ public class SymbolModel : BaseModel, ISymbolModel
     public double Width { get; set; }
     public double Height { get; set; }
     public EnumMarkerCategory Category { get; set; }
-    public bool Visibility { get; set; }
+    public bool ShowShape { get; set; }
+    public bool ShowTitle { get; set; }
     #endregion
-
-
-
 }

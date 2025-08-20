@@ -17,6 +17,11 @@ public enum EnumMarkerCategory
     BASIC_SHAPES,
 
     /// <summary>
+    /// 기하 도형 (범용)
+    /// </summary>
+    GEOMETRICS,
+
+    /// <summary>
     /// 차량 및 교통수단 (민간)
     /// </summary>
     VEHICLES,
