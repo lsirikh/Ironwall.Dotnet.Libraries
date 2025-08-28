@@ -2,6 +2,7 @@
 using System;
 using System.Windows.Input;
 using GMap.NET;
+using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
@@ -18,10 +19,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 /// </summary>
 public class MarkerClickEventArgs : EventArgs
 {
-    public GMapMarkerBasicCustomControl Marker { get; }
+    public IEditableMarker Marker { get; }
     public MouseButtonEventArgs MouseEventArgs { get; }
 
-    public MarkerClickEventArgs(GMapMarkerBasicCustomControl marker, MouseButtonEventArgs mouseEventArgs)
+    public MarkerClickEventArgs(IEditableMarker marker, MouseButtonEventArgs mouseEventArgs)
     {
         Marker = marker;
         MouseEventArgs = mouseEventArgs;
@@ -53,7 +54,7 @@ public class MarkerEditStartedEventArgs : EventArgs
     /// <summary>
     /// 편집 대상 마커
     /// </summary>
-    public GMapCustomMarker Marker { get; }
+    public IEditableMarker Marker { get; }
 
     /// <summary>
     /// 시작된 편집 핸들
@@ -80,7 +81,7 @@ public class MarkerEditStartedEventArgs : EventArgs
     /// </summary>
     public double InitialBearing { get; }
 
-    public MarkerEditStartedEventArgs(GMapCustomMarker marker, MarkerHandle handle)
+    public MarkerEditStartedEventArgs(IEditableMarker marker, MarkerHandle handle)
     {
         Marker = marker ?? throw new ArgumentNullException(nameof(marker));
         Handle = handle;
@@ -99,7 +100,7 @@ public class MarkerEditingEventArgs : EventArgs
     /// <summary>
     /// 편집 중인 마커
     /// </summary>
-    public GMapCustomMarker Marker { get; }
+    public IEditableMarker Marker { get; }
 
     /// <summary>
     /// 현재 편집 중인 핸들
@@ -136,7 +137,7 @@ public class MarkerEditingEventArgs : EventArgs
     /// </summary>
     public DateTime EventTime { get; }
 
-    public MarkerEditingEventArgs(GMapCustomMarker marker, MarkerHandle handle, double deltaX, double deltaY)
+    public MarkerEditingEventArgs(IEditableMarker marker, MarkerHandle handle, double deltaX, double deltaY)
     {
         Marker = marker ?? throw new ArgumentNullException(nameof(marker));
         Handle = handle;
@@ -157,7 +158,7 @@ public class MarkerEditCompletedEventArgs : EventArgs
     /// <summary>
     /// 편집 완료된 마커
     /// </summary>
-    public GMapCustomMarker Marker { get; }
+    public IEditableMarker Marker { get; }
 
     /// <summary>
     /// 편집 시작 시 위치
@@ -220,7 +221,7 @@ public class MarkerEditCompletedEventArgs : EventArgs
     /// </summary>
     public bool HasChanges => PositionChanged || SizeChanged || BearingChanged;
 
-    public MarkerEditCompletedEventArgs(GMapCustomMarker marker,
+    public MarkerEditCompletedEventArgs(IEditableMarker marker,
         PointLatLng originalPosition, double originalWidth, double originalHeight, double originalBearing)
     {
         Marker = marker ?? throw new ArgumentNullException(nameof(marker));
@@ -269,7 +270,7 @@ public class MarkerEditCancelledEventArgs : EventArgs
     /// <summary>
     /// 편집이 취소된 마커
     /// </summary>
-    public GMapCustomMarker Marker { get; }
+    public IEditableMarker Marker { get; }
 
     /// <summary>
     /// 취소 시간
@@ -281,7 +282,7 @@ public class MarkerEditCancelledEventArgs : EventArgs
     /// </summary>
     public string Reason { get; }
 
-    public MarkerEditCancelledEventArgs(GMapCustomMarker marker, string reason = "사용자 취소")
+    public MarkerEditCancelledEventArgs(IEditableMarker marker, string reason = "사용자 취소")
     {
         Marker = marker ?? throw new ArgumentNullException(nameof(marker));
         Reason = reason ?? "알 수 없음";
@@ -297,7 +298,7 @@ public class MarkerSelectionChangedEventArgs : EventArgs
     /// <summary>
     /// 선택 상태가 변경된 마커 컨트롤
     /// </summary>
-    public GMapMarkerBasicCustomControl MarkerControl { get; }
+    public IEditableMarker MarkerControl { get; }
 
     /// <summary>
     /// 새로운 선택 상태
@@ -309,7 +310,7 @@ public class MarkerSelectionChangedEventArgs : EventArgs
     /// </summary>
     public DateTime ChangeTime { get; }
 
-    public MarkerSelectionChangedEventArgs(GMapMarkerBasicCustomControl markerControl, bool isSelected)
+    public MarkerSelectionChangedEventArgs(IEditableMarker markerControl, bool isSelected)
     {
         MarkerControl = markerControl ?? throw new ArgumentNullException(nameof(markerControl));
         IsSelected = isSelected;
@@ -325,7 +326,7 @@ public class AdornerLifecycleEventArgs : EventArgs
     /// <summary>
     /// 대상 마커
     /// </summary>
-    public GMapCustomMarker Marker { get; }
+    public IEditableMarker Marker { get; }
 
     /// <summary>
     /// 이벤트 유형
@@ -337,7 +338,7 @@ public class AdornerLifecycleEventArgs : EventArgs
     /// </summary>
     public DateTime EventTime { get; }
 
-    public AdornerLifecycleEventArgs(GMapCustomMarker marker, AdornerLifecycleEventType eventType)
+    public AdornerLifecycleEventArgs(IEditableMarker marker, AdornerLifecycleEventType eventType)
     {
         Marker = marker ?? throw new ArgumentNullException(nameof(marker));
         EventType = eventType;

@@ -1,0 +1,337 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  Basic Geometric Marker Style  -->
+	<Style x:Key="BaseGeometricMarkerStyle" TargetType="{x:Type control:GMapGeometricMarkerControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type control:GMapGeometricMarkerControl}">
+					<!--  Viewbox로 감싸서 비례 크기 조정 (CustomMarker와 동일 패턴)  -->
+					<Viewbox
+						Name="PART_ViewboxContainer"
+						Width="{TemplateBinding Width}"
+						Height="{TemplateBinding Height}"
+						Stretch="Fill"
+						ToolTip="{TemplateBinding MarkerTitle}">
+
+						<Grid
+							Name="PART_MarkerContainer"
+							Width="30"
+							Height="30"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center">
+
+							<!--  Circle Shape  -->
+							<Ellipse
+								Name="PART_CircleShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Square Shape  -->
+							<Rectangle
+								Name="PART_SquareShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Triangle Shape  -->
+							<Polygon
+								Name="PART_TriangleShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Points="0.5,0 0,1 1,1"
+								Stretch="Fill"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Diamond Shape  -->
+							<Polygon
+								Name="PART_DiamondShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Points="0.5,0 1,0.5 0.5,1 0,0.5"
+								Stretch="Fill"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Pentagon Shape  -->
+							<Polygon
+								Name="PART_PentagonShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Points="0.5,0 0.975,0.375 0.794,0.975 0.206,0.975 0.025,0.375"
+								Stretch="Fill"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Hexagon Shape  -->
+							<Polygon
+								Name="PART_HexagonShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Points="0.5,0 0.933,0.25 0.933,0.75 0.5,1 0.067,0.75 0.067,0.25"
+								Stretch="Fill"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Star Shape  -->
+							<Polygon
+								Name="PART_StarShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Points="0.5,0 0.62,0.35 1,0.35 0.69,0.57 0.81,1 0.5,0.72 0.19,1 0.31,0.57 0,0.35 0.38,0.35"
+								Stretch="Fill"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Arrow Shape  -->
+							<Polygon
+								Name="PART_ArrowShape"
+								Fill="{TemplateBinding MarkerFill}"
+								Points="0.5,0 1,0.5 0.7,0.5 0.7,1 0.3,1 0.3,0.5 0,0.5"
+								Stretch="Fill"
+								Stroke="{TemplateBinding MarkerStroke}"
+								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+								Visibility="Collapsed" />
+
+							<!--  Center Point (Common UI Element)  -->
+							<Ellipse
+								Name="PART_CenterPoint"
+								Width="6"
+								Height="6"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								Fill="White"
+								Opacity="0.9" />
+
+							<!--  Status Indicator (Common UI Element)  -->
+							<Ellipse
+								Name="PART_StatusIndicator"
+								Width="8"
+								Height="8"
+								Margin="0,-2,-2,0"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Top"
+								Fill="Lime" />
+
+							<!--  Label Container (Common UI Element) - CustomMarker와 동일한 위치  -->
+							<Border
+								Name="PART_LabelContainer"
+								Margin="0,0,0,-20"
+								Padding="2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_LabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center" />
+							</Border>
+
+							<!--  Mouse Over Highlight (Common UI Element)  -->
+							<Ellipse
+								Name="PART_HoverHighlight"
+								Width="10"
+								Height="10"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								Fill="White"
+								Opacity="0" />
+
+						</Grid>
+					</Viewbox>
+
+					<ControlTemplate.Triggers>
+						<!--  ShowShape=False일 때만 숨김 (CustomMarker와 동일 패턴)  -->
+						<Trigger Property="ShowShape" Value="False">
+							<Setter TargetName="PART_ViewboxContainer" Property="Visibility" Value="Collapsed" />
+							<Setter Property="IsHitTestVisible" Value="False" />
+						</Trigger>
+
+						<!--  Shape Type Display Control  -->
+						<Trigger Property="ShapeType" Value="Circle">
+							<Setter TargetName="PART_CircleShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Square">
+							<Setter TargetName="PART_SquareShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Triangle">
+							<Setter TargetName="PART_TriangleShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Diamond">
+							<Setter TargetName="PART_DiamondShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Pentagon">
+							<Setter TargetName="PART_PentagonShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Hexagon">
+							<Setter TargetName="PART_HexagonShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Star">
+							<Setter TargetName="PART_StarShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="ShapeType" Value="Arrow">
+							<Setter TargetName="PART_ArrowShape" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  라벨 표시 조건들 (CustomMarker와 동일 OR 로직)  -->
+
+						<!--  IsSelected=True일 때 라벨 표시  -->
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  ShowTitle=True일 때 라벨 표시  -->
+						<Trigger Property="ShowTitle" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  IsMouseOver=True일 때 라벨 표시 + 기타 효과  -->
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+
+							<!--  Mouse Over Effects for All Shapes  -->
+							<Setter TargetName="PART_CircleShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_SquareShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_TriangleShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_DiamondShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_PentagonShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_HexagonShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_StarShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_ArrowShape" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+						</Trigger>
+
+						<!--  Status Indicator Colors (Common Behavior)  -->
+						<Trigger Property="MarkerState" Value="ACTIVE">
+							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#4CAF50" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="DEACTIVE">
+							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#9E9E9E" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="FAULT">
+							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#F44336" />
+						</Trigger>
+
+						<!--  Disabled State (Common Behavior)  -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter TargetName="PART_CircleShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_SquareShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_TriangleShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_DiamondShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_PentagonShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_HexagonShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_StarShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_ArrowShape" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_StatusIndicator" Property="Opacity" Value="0.5" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+
+		<!--  Default Property Values (CustomMarker와 일관성 유지)  -->
+		<Setter Property="MarkerFill" Value="#FF6F00" />
+		<Setter Property="MarkerStroke" Value="White" />
+		<Setter Property="MarkerStrokeThickness" Value="2" />
+		<Setter Property="MarkerTitle" Value="Geometric" />
+		<Setter Property="ShowTitle" Value="False" />
+		<Setter Property="ShowShape" Value="True" />
+		<Setter Property="TitleSize" Value="10" />
+		<Setter Property="Width" Value="30" />
+		<Setter Property="Height" Value="30" />
+		<Setter Property="IsHitTestVisible" Value="True" />
+		<Setter Property="Focusable" Value="True" />
+	</Style>
+
+	<!--  Apply Default Style  -->
+	<Style BasedOn="{StaticResource BaseGeometricMarkerStyle}" TargetType="{x:Type control:GMapGeometricMarkerControl}" />
+
+</ResourceDictionary>

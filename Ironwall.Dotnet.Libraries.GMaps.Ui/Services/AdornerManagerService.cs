@@ -199,7 +199,7 @@ public class AdornerManagerService : IDisposable
     /// <param name="markerControl">마커 UI 컨트롤</param>
     /// <param name="mapControl">지도 컨트롤 (null이면 기본 사용)</param>
     /// <returns>성공 여부</returns>
-    public bool SelectMarker(GMapCustomMarker marker, GMapMarkerBasicCustomControl markerControl, GMapControl mapControl = null)
+    public bool SelectMarker(IEditableMarker marker, IMarkerControl markerControl, GMapControl mapControl = null)
     {
         if (marker == null || markerControl == null) return false;
 
@@ -229,7 +229,7 @@ public class AdornerManagerService : IDisposable
                     _log?.Info($"마커 선택 및 Adorner 생성: {marker.Title}");
 
                     // 이벤트 발생
-                    MarkerSelectionChanged?.Invoke(this, new MarkerSelectionChangedEventArgs(markerControl, true));
+                    MarkerSelectionChanged?.Invoke(this, new MarkerSelectionChangedEventArgs(marker, true));
 
                     return true;
                 }
@@ -250,7 +250,7 @@ public class AdornerManagerService : IDisposable
     /// <param name="marker">선택 해제할 마커</param>
     /// <param name="mapControl">지도 컨트롤 (null이면 기본 사용)</param>
     /// <returns>성공 여부</returns>
-    public bool DeselectMarker(GMapCustomMarker marker, GMapControl mapControl = null)
+    public bool DeselectMarker(IEditableMarker marker, GMapControl mapControl = null)
     {
         if (marker == null) return false;
 
@@ -323,7 +323,7 @@ public class AdornerManagerService : IDisposable
     /// </summary>
     /// <param name="keepMarker">유지할 마커</param>
     /// <param name="mapControl">지도 컨트롤</param>
-    private void DeselectAllExcept(GMapCustomMarker keepMarker, GMapControl mapControl)
+    private void DeselectAllExcept(IEditableMarker keepMarker, GMapControl mapControl)
     {
         var adornerLayer = GetAdornerLayer(mapControl);
         adornerLayer?.RemoveAllExcept(keepMarker);
@@ -370,11 +370,11 @@ public class AdornerManagerService : IDisposable
     /// </summary>
     /// <param name="mapControl">지도 컨트롤 (null이면 모든 컨트롤)</param>
     /// <returns>편집 중인 마커 목록</returns>
-    public List<GMapCustomMarker> GetEditingMarkers(GMapControl mapControl = null)
+    public List<IEditableMarker> GetEditingMarkers(GMapControl mapControl = null)
     {
         lock (_lock)
         {
-            var editingMarkers = new List<GMapCustomMarker>();
+            var editingMarkers = new List<IEditableMarker>();
 
             try
             {

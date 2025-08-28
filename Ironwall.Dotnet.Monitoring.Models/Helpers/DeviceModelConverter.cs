@@ -61,8 +61,8 @@ namespace Ironwall.Dotnet.Monitoring.Models.Helpers
                         break;
                     case EnumDeviceType.IpSpeaker:
                         break;
-                    case EnumDeviceType.Fence_Line:
-                        break;
+                    //case EnumDeviceType.Fence_Line:
+                    //    break;
                     default:
                         throw new Exception($"Unknown device type: {deviceType}");
                 }

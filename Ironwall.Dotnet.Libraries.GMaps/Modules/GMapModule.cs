@@ -33,9 +33,13 @@ public class GMapModule : Module
             builder.RegisterInstance(setupModel);
 
             builder.RegisterType<MapProvider>().SingleInstance();
+            builder.RegisterType<SymbolProvider>().SingleInstance();
             builder.RegisterType<CustomMapProvider>().As<CustomMapProvider>()
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
             builder.RegisterType<DefinedMapProvider>().As<DefinedMapProvider>()
+                .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+
+            builder.RegisterType<GeometricSymbolProvider>().As<GeometricSymbolProvider>()
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
 
         }

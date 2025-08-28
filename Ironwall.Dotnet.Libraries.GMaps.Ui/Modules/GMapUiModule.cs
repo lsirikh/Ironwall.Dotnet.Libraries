@@ -8,6 +8,8 @@ using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Db.Modules;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Events;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 /****************************************************************************
@@ -38,12 +40,15 @@ public class GMapUiModule: Module
 
         builder.RegisterModule(new GMapDbModule(_gMapSetup, _gMapDbSetup, _log, _count)); // 4
 
+        builder.RegisterType<MarkerFactory>().SingleInstance();
         builder.RegisterType<GMapControl>().SingleInstance();
         builder.RegisterType<GMapCustomControl>().SingleInstance();
         builder.RegisterType<MapViewModel>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<ImageOverlayService>().SingleInstance();
+
+        builder.RegisterType<SymbolEventManager>().SingleInstance();
         //builder.RegisterType<MGRSGridOverlayService>().SingleInstance();
     }
     #endregion

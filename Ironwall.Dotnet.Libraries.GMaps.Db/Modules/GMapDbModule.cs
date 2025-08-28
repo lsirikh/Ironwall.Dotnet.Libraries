@@ -37,7 +37,9 @@ public class GMapDbModule : Module
             var setupModel = new GMapDbSetupModel(_gMapDbSetupModel);
             builder.RegisterInstance(setupModel).AsSelf().SingleInstance();
             builder.RegisterType<GMapDbService>().As<IGMapDbService>().As<IService>()
-                .SingleInstance().WithMetadata("Order", _count++);
+                .SingleInstance().WithMetadata("Order", _count+5);
+            builder.RegisterType<GMapDbSymbolService>().As<IGMapDbSymbolService>().As<IService>()
+                .SingleInstance().WithMetadata("Order", _count+6);
         }
         catch
         {

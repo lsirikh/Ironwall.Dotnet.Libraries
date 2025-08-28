@@ -30,7 +30,7 @@ public enum EnumDeviceType
     Radar, //15
     OpticalCable, //16
 
-    Fence_Line, //17
+    //Fence_Line, //17
 
     
 }

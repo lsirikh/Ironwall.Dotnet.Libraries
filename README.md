@@ -4,7 +4,6 @@
 > 다양한 SW를 개발하기 위한 Sensorway SW의 라이브러리 모음 Sensorway Framework이다.
 
 ### Site : Common
-### Lisence : MIT
 <hr>
 
 ## 1. Ironwall.Dotnet.Libraries.Base 소개
@@ -161,171 +160,35 @@
 - **테스트 프레임워크**: `xUnit`
 
 ---
+## v1.2.4 (2025-08-28)
 
-## 5. Ironwall.Dotnet.Libraries.Api.Aligo 소개
+### 추가된 파일
+- `Ironwall.Dotnet.Libraries.Enums/EnumColorType.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Providers/PidsSymbolProvider.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/ColorHelper.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/SymbolTypeHelper.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Models/DeviceSymbolLookupModel.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/controller01.png`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/fence01.png`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PidsMarkerStyle.xaml`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/IPidsSymbolModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/PidsSymbolModel.cs`
 
-### 5.1 개요
-`Ironwall.Dotnet.Libraries.Api.Aligo`는 **Aligo 문자/EMS API**를 사용하여 **단문(SMS), 장문(LMS), 멀티미디어 문자(MMS)** 등을 전송할 수 있는 서비스 라이브러리입니다.  
-이 라이브러리는 **Autofac 기반의 의존성 주입(DI)** 구조를 사용하며,  
-단위 테스트를 위해 `xUnit`을 사용하여 API 기능을 검증할 수 있도록 설계되었습니다.
-
-### 5.2 주요 기능
-- **Aligo SMS API를 이용한 단일/대량 문자 전송**
-- **예약 문자 발송 기능 지원**
-- **문자 전송 내역 조회**
-- **발송 취소 기능(지원예정)**
-- **잔여 포인트 확인 기능(지원예정)**
-- **첨부 이미지 (최대 3개) 지원**
-
-
-#### 5.3 프로젝트 구성
-
-#### **📂 Models**
-> Aligo 문자 전송 및 응답 모델 정의
-
-- `ResponseModel.cs`  
-  - API 응답 데이터를 저장하는 모델
-- `SendAvailableModel.cs`  
-  - 문자 전송 가능 여부를 확인하는 모델
-- `SenderModel.cs`  
-  - 발신자 정보 모델
-- `SenderSpecModel.cs`  
-  - 발신자 상세 정보 모델
-- `SendListResponseModel.cs`  
-  - 문자 전송 내역 조회 모델
-- `SendMessageResponseModel.cs`  
-  - 개별 문자 전송 응답 모델
-- `SendResponseModel.cs`  
-  - 전송 결과 모델
-
-#### **📂 Modules**
-> API 모듈 등록을 위한 클래스
-
-- `AligoModule.cs`  
-  - `Autofac`을 활용한 **의존성 주입(DI) 컨테이너 등록**을 수행하는 모듈 클래스
-
-#### **📂 Providers**
-> Aligo 문자 메시지 관련 데이터 제공자
-
-- `EmsMessageProvider.cs`  
-  - EMS 메시지 생성 및 관리
-
-#### **📂 Services**
-> Aligo API 연동 및 문자 전송 기능 제공
-
-- `AligoService.cs`  
-  - Aligo API를 활용하여 SMS/LMS/MMS를 전송하는 핵심 서비스 클래스
-- `IAligoService.cs`  
-  - Aligo 문자 전송 인터페이스 정의
-
-#### **📂 Tests**
-> Aligo API 서비스 테스트 관련 파일
-
-- `TestAligoService.cs`  
-  - 단위 테스트 코드 포함
-- `sample1.jpg`, `sample2.jpg`  
-  - MMS 테스트를 위한 샘플 이미지
-
-#### 개발 환경
-- **.NET Version**: `net8.0-windows`
-- **언어**: `C#`
-- **DI Framework**: `Autofac`
-- **테스트 프레임워크**: `xUnit`
-
----
-
-## 6. Ironwall.Dotnet.Libraries.Db 소개
-
-### 6.1 개요
-`Ironwall.Dotnet.Libraries.Db`는 **MariaDB/MySQL 기반의 데이터베이스 서비스**를 제공하는 라이브러리입니다.  
-이 라이브러리는 `Dapper`, `EntityFramework`, `MySql.Data` 등의 ORM 및 DB 관리 패키지를 사용하여  
-**DB 연결, 테이블 생성, 데이터 삽입/조회/수정/삭제** 기능을 제공합니다.  
-
-또한, `ExcelDataReader`와 `ClosedXML`을 활용하여 **엑셀 데이터를 DB로 변환 및 등록**할 수 있습니다.
-
-
-#### 6.2. 프로젝트 구성
-
-#### **📂 Models**
-> DB 설정 및 모델 정의
-
-- `DbSetupModel.cs`  
-  - DB 연결 정보(IP, 포트, 계정 정보 등)를 저장하는 설정 모델
-
-#### **📂 Modules**
-> DB 모듈 등록을 위한 클래스
-
-- `DbModule.cs`  
-  - `Autofac`을 활용한 **의존성 주입(DI) 컨테이너 등록**을 수행하는 모듈 클래스
-
-#### **📂 Services**
-> DB 연동 및 데이터 관리 서비스 제공
-
-- `DbServiceForGym.cs`  
-  - Gym Manager 시스템을 위한 **DB 관리 서비스**
-- `IDbServiceForGym.cs`  
-  - DB 서비스 인터페이스 정의
-
-#### **📂 Tests**
-> DB 서비스 테스트 관련 파일
-
-- `TestDbServiceForGym.cs`  
-  - `DbServiceForGym`에 대한 **단위 테스트 코드**
-- `TestExcelImporter.cs`  
-  - `ExcelImporter`를 활용한 **엑셀 데이터 DB 등록 테스트**
-- `sample1.jpg`, `sample2.jpg`  
-  - 테스트용 샘플 이미지
-
-#### **📂 Utils**
-> 엑셀 데이터를 읽어와 DB에 등록하는 유틸리티
-
-- `ExcelImporter.cs`  
-  - `ClosedXML`, `ExcelDataReader`를 활용한 **엑셀 데이터 파싱 및 DB 등록**
-- `IExcelImporter.cs`  
-  - 엑셀 데이터 등록 인터페이스 정의
-
-#### 개발 환경
-- **.NET Version**: `net8.0-windows`
-- **언어**: `C#`
-- **DBMS**: `MariaDB` / `MySQL`
-- **ORM 및 SQL 매핑**: `Dapper`, `EntityFramework`
-- **테스트 프레임워크**: `xUnit`
-
----
-
-### Update Date: 2025/03/16
-### Version : v1.0.0
-
-> 현재 등록된 라이브러리 목록
-
-* Ironwall.Dotnet.Libraries.Base
-* Ironwall.Dotnet.Libraries.ViewModel
-* Ironwall.Dotnet.Framework.Models
-* Ironwall.Dotnet.Libraries.Api
-* Ironwall.Dotnet.Libraries.Api.Aligo
-* Ironwall.Dotnet.Libraries.Db
-* Ironwall.Dotnet.Libraries.Utils
-
-<hr>
-
-### Update Date: 2025/03/30
-
-> 업데이트된 라이브러리 목록
-
-* Ironwall.Dotnet.Libraries.Base
-* Version : v1.1.0
-
-  1. SplashScreen 연동을 위한 Caliburn.micro 이벤트 메시지 추가
-
-* Ironwall.Dotnet.Libraries.Api.Aligo
-* Version : v1.0.0
-
-  1. 단위 테스트 코드 일부 수정
-
-* Ironwall.Dotnet.Libraries.Db
-* Version : v1.1.0
-
-  1. ExcelImporter 적용 가능 기능 구현 및 동작 확인
-  2. TestExcelImporter 단위테스터 구현 및 동작 확인
-
-<hr>
+### 수정된 파일
+- `Ironwall.Dotnet.Libraries.Devices.Db/Services/DeviceDbService.cs`
+- `Ironwall.Dotnet.Libraries.Enums/EnumDeviceType.cs`
+- `Ironwall.Dotnet.Libraries.Enums/EnumEventStatus.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Db/Services/GMapDbSymbolService.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapBaseMarker.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerBaseControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerCustomControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerGeometricControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/SensorMarkerControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/CustomMarkerStyle.xaml`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/Generic.xaml`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/GeometricMarkerStyle.xaml`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/GMapViewModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/GeometricSymbolModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/ISymbolModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/SymbolModel.cs`

@@ -1,7 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.DataProviders;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Providers;
-using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using System;
 using System.Collections.Specialized;
