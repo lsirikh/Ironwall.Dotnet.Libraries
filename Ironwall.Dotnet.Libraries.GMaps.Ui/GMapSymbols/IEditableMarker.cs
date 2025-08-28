@@ -15,10 +15,14 @@ public interface IEditableMarker : IDisposable
     PointLatLng Position { get; set; }
     double Width { get; set; }
     double Height { get; set; }
+    double Zoom { get; set; }
     double Bearing { get; set; }
     bool IsSelected { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
+    EnumColorType FillColor { get; set; }
+    EnumColorType StrokeColor { get; set; }
+    double StrokeThickness { get; set; }
     EnumOperationState OperationState { get; set; }
 
     // Adorner 시스템이 필요한 메서드들

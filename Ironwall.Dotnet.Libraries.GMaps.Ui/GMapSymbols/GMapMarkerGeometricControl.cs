@@ -54,18 +54,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
         DependencyProperty.Register("Opacity", typeof(double), typeof(GMapGeometricMarkerControl),
             new PropertyMetadata(1.0, OnOpacityChanged));
 
-    /// <summary>
-    /// 형태 변경 애니메이션 활성화 여부
-    /// </summary>
-    public bool EnableShapeAnimation
-    {
-        get { return (bool)GetValue(EnableShapeAnimationProperty); }
-        set { SetValue(EnableShapeAnimationProperty, value); }
-    }
-
-    public static readonly DependencyProperty EnableShapeAnimationProperty =
-        DependencyProperty.Register("EnableShapeAnimation", typeof(bool), typeof(GMapGeometricMarkerControl),
-            new PropertyMetadata(true));
+    
 
     #endregion
 
@@ -141,18 +130,19 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
         base.UpdateMarkerAppearance();
 
         // 기하 심볼 전용 모양 업데이트
-        //UpdateGeometricAppearance();
+        UpdateGeometricAppearance();
     }
 
     /// <summary>
     /// 단일 클릭 처리 오버라이드 (기하 심볼 전용 로직)
     /// </summary>
-    protected override void HandleSingleClick(MouseButtonEventArgs e)
+    protected override void OnMarkerSingleClicked(MouseButtonEventArgs e)
     {
-        base.HandleSingleClick(e);
-
-        // 기하 심볼 전용 클릭 처리
-        OnGeometryMarkerClicked(e);
+        base.OnMarkerSingleClicked(e);
+        if (EnableShapeAnimation)
+        {
+            TriggerClickAnimation();
+        }
     }
 
     /// <summary>
@@ -161,30 +151,20 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     protected override void OnMarkerDoubleClicked(MouseButtonEventArgs e)
     {
         base.OnMarkerDoubleClicked(e);
-
-        // 더블클릭 시 형태 순환 변경 (타입 안전)
-        if (Marker != null)
-        {
-            CycleShapeType();
-        }
     }
 
+    /// <summary>
+    /// 클릭으로 선택과 비선택에 따른 이벤트 콜백
+    /// </summary>
+    /// <param name="isSelected"></param>
+    protected override void OnSelectionChanged(bool isSelected)
+    {
+        base.OnSelectionChanged(isSelected);
+    }
     #endregion
 
     #region Geometric Control Specific Methods
 
-    /// <summary>
-    /// 기하 컨트롤 전용 초기화
-    /// </summary>
-    private void InitializeGeometricControl()
-    {
-        // 기하 심볼 기본값
-        ShapeType = EnumShapeType.Circle;
-        Opacity = 1.0;
-        EnableShapeAnimation = true;
-
-        OnGeometricControlInitialized();
-    }
 
     /// <summary>
     /// 기하 컨트롤 초기화 완료 후 호출 (가상 메서드)
@@ -201,70 +181,36 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     {
         if (Marker == null || _isUpdatingFromMarker) return;
 
-        // ShapeType에 따른 색상 조정 (선택사항)
-        switch (ShapeType)
-        {
-            case EnumShapeType.Circle:
-                // 원형은 기본 색상 유지
-                break;
-            case EnumShapeType.Square:
-                // 사각형은 약간 다른 색조
-                var squareBrush = MarkerFill.Clone();
-                if (squareBrush is SolidColorBrush solidBrush)
-                {
-                    var color = solidBrush.Color;
-                    color.B = Math.Min((byte)(color.B + 20), (byte)255);
-                    MarkerFill = new SolidColorBrush(color);
-                }
-                break;
-            case EnumShapeType.Triangle:
-                // 삼각형은 또 다른 색조
-                var triangleBrush = MarkerFill.Clone();
-                if (triangleBrush is SolidColorBrush triangleSolid)
-                {
-                    var color = triangleSolid.Color;
-                    color.R = Math.Min((byte)(color.R + 20), (byte)255);
-                    MarkerFill = new SolidColorBrush(color);
-                }
-                break;
-        }
+        //// ShapeType에 따른 색상 조정 (선택사항)
+        //switch (ShapeType)
+        //{
+        //    case EnumShapeType.Circle:
+        //        // 원형은 기본 색상 유지
+        //        break;
+        //    case EnumShapeType.Square:
+        //        // 사각형은 약간 다른 색조
+        //        var squareBrush = MarkerFill.Clone();
+        //        if (squareBrush is SolidColorBrush solidBrush)
+        //        {
+        //            var color = solidBrush.Color;
+        //            color.B = Math.Min((byte)(color.B + 20), (byte)255);
+        //            MarkerFill = new SolidColorBrush(color);
+        //        }
+        //        break;
+        //    case EnumShapeType.Triangle:
+        //        // 삼각형은 또 다른 색조
+        //        var triangleBrush = MarkerFill.Clone();
+        //        if (triangleBrush is SolidColorBrush triangleSolid)
+        //        {
+        //            var color = triangleSolid.Color;
+        //            color.R = Math.Min((byte)(color.R + 20), (byte)255);
+        //            MarkerFill = new SolidColorBrush(color);
+        //        }
+        //        break;
+        //}
 
     }
-
-
-    /// <summary>
-    /// 기하 심볼 클릭 처리 (가상 메서드)
-    /// </summary>
-    protected virtual void OnGeometryMarkerClicked(MouseButtonEventArgs e)
-    {
-        // 기하 심볼 전용 클릭 효과 (예: 깜빡임)
-        if (EnableShapeAnimation)
-        {
-            TriggerClickAnimation();
-        }
-    }
-
-    /// <summary>
-    /// 형태 순환 변경
-    /// </summary>
-    protected virtual void CycleShapeType()
-    {
-        var currentType = ShapeType;
-        var nextType = currentType switch
-        {
-            EnumShapeType.Circle => EnumShapeType.Square,
-            EnumShapeType.Square => EnumShapeType.Triangle,
-            EnumShapeType.Triangle => EnumShapeType.Circle,
-            _ => EnumShapeType.Circle
-        };
-
-        // 타입 안전한 메서드 호출
-        if (Marker != null)
-        {
-            Marker.ChangeShapeType(nextType);
-        }
-    }
-
+  
     /// <summary>
     /// 투명도 적용
     /// </summary>
@@ -286,7 +232,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
             ScaleTransform scaleTransform;
             RotateTransform existingRotate = null;
 
-            // ✅ 기존 Transform 구조 분석
+            // 기존 Transform 구조 분석
             if (RenderTransform is TransformGroup existingGroup)
             {
                 // 기존 TransformGroup 사용
@@ -309,14 +255,14 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
                 scaleTransform = null;
             }
 
-            // ✅ ScaleTransform 추가/수정
+            // ScaleTransform 추가/수정
             if (scaleTransform == null)
             {
                 scaleTransform = new ScaleTransform(1.0, 1.0);
                 transformGroup.Children.Add(scaleTransform);
             }
 
-            // ✅ TransformGroup 적용 (기존 회전 유지됨)
+            // TransformGroup 적용 (기존 회전 유지됨)
             RenderTransform = transformGroup;
             RenderTransformOrigin = new Point(0.5, 0.5);
 
@@ -378,112 +324,19 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
 
     #endregion
 
-    #region Public Methods
+    //#region Public Methods
 
-    /// <summary>
-    /// 형태 변경 (애니메이션 포함)
-    /// </summary>
-    /// <param name="newShapeType">새로운 형태</param>
-    /// <param name="animate">애니메이션 여부</param>
-    public void ChangeShapeType(EnumShapeType newShapeType, bool animate = true)
-    {
-        if (ShapeType == newShapeType) return;
+    ///// <summary>
+    ///// 기하 심볼 상태 초기화
+    ///// </summary>
+    //public void ResetGeometryState()
+    //{
+    //    ShapeType = EnumShapeType.Circle;
+    //    Opacity = 1.0;
+    //    EnableShapeAnimation = true;
+    //}
 
-        if (animate && EnableShapeAnimation)
-        {
-            // 형태 변경 애니메이션 실행
-            TriggerShapeChangeAnimation(() => ShapeType = newShapeType);
-        }
-        else
-        {
-            ShapeType = newShapeType;
-        }
-    }
-
-    /// <summary>
-    /// 투명도 변경 (애니메이션 포함)
-    /// </summary>
-    /// <param name="newOpacity">새로운 투명도</param>
-    /// <param name="animate">애니메이션 여부</param>
-    public void ChangeOpacity(double newOpacity, bool animate = true)
-    {
-        newOpacity = Math.Clamp(newOpacity, 0.0, 1.0);
-
-        if (Math.Abs(Opacity - newOpacity) < 0.01) return;
-
-        if (animate && EnableShapeAnimation)
-        {
-            // 투명도 변경 애니메이션
-            var animation = new System.Windows.Media.Animation.DoubleAnimation
-            {
-                From = Opacity,
-                To = newOpacity,
-                Duration = TimeSpan.FromMilliseconds(300)
-            };
-
-            BeginAnimation(OpacityProperty, animation);
-        }
-        else
-        {
-            Opacity = newOpacity;
-        }
-    }
-
-    /// <summary>
-    /// 형태 변경 애니메이션 트리거
-    /// </summary>
-    private void TriggerShapeChangeAnimation(Action changeAction)
-    {
-        try
-        {
-            // 페이드 아웃 → 형태 변경 → 페이드 인
-            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation
-            {
-                From = Opacity,
-                To = 0.0,
-                Duration = TimeSpan.FromMilliseconds(150)
-            };
-
-            fadeOut.Completed += (s, e) =>
-            {
-                changeAction?.Invoke();
-
-                var fadeIn = new System.Windows.Media.Animation.DoubleAnimation
-                {
-                    From = 0.0,
-                    To = Opacity,
-                    Duration = TimeSpan.FromMilliseconds(150)
-                };
-
-                BeginAnimation(OpacityProperty, fadeIn);
-            };
-
-            BeginAnimation(OpacityProperty, fadeOut);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"형태 변경 애니메이션 실행 실패: {ex.Message}");
-            // 애니메이션 실패 시 바로 변경
-            changeAction?.Invoke();
-        }
-    }
-
-    /// <summary>
-    /// 기하 심볼 상태 초기화
-    /// </summary>
-    public void ResetGeometryState()
-    {
-        ShapeType = EnumShapeType.Circle;
-        Opacity = 1.0;
-        EnableShapeAnimation = true;
-    }
-
-    private string GetDebuggerDisplay()
-    {
-        return ToString();
-    }
-
-    #endregion
+    //#endregion
 
     private bool _isUpdatingFromMarker = false;  // 순환 방지 플래그
 

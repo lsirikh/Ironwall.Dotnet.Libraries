@@ -57,7 +57,7 @@ public class SensorMarkerControl : GMapMarkerCustomControl
     }
 
     public static readonly DependencyProperty SensorTypeProperty =
-        DependencyProperty.Register("SensorType", typeof(string), typeof(SensorMarkerControl),
+        DependencyProperty.Register("DeviceType", typeof(string), typeof(SensorMarkerControl),
             new PropertyMetadata("Unknown"));
 
     #endregion
@@ -123,9 +123,9 @@ public class SensorMarkerControl : GMapMarkerCustomControl
         }
     }
 
-    protected override void HandleSingleClick(MouseButtonEventArgs e)
+    protected override void OnMarkerSingleClicked(MouseButtonEventArgs e)
     {
-        base.HandleSingleClick(e);
+        base.OnMarkerSingleClicked(e);
 
         // 센서 상세 정보 표시
         ShowSensorDetails();

@@ -133,10 +133,12 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
                 Bearing = random.NextDouble() * 360,
                 Width = 25 + random.NextDouble() * 25,
                 Height = 25 + random.NextDouble() * 25,
-                Category = EnumMarkerCategory.BASIC_SHAPES, // 기하 심볼은 BASIC_SHAPES
+                Category = EnumMarkerCategory.GEOMETRICS, // 기하 심볼은 BASIC_SHAPES
                 ShowShape = random.Next(2) == 0,
                 ShowTitle = random.Next(2) == 0,
-
+                FillColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeThickness = 1.0 + random.NextDouble() * 3.0,  // 1.0 ~ 4.0
                 // GeometrySymbol 전용 속성
                 ShapeType = shapeTypes[random.Next(shapeTypes.Length)],
                 Opacity = 0.5 + random.NextDouble() * 0.5 // 0.5 ~ 1.0
@@ -153,7 +155,7 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
     /// <param name="shapeType">생성할 Shape 타입</param>
     /// <param name="count">생성 개수</param>
     /// <returns>생성된 GeometrySymbol ID 목록</returns>
-    public async Task<List<int>> SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType shapeType, int count = 3)
+    public async Task<List<int>> SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType shapeType, int count = 15)
     {
         var random = new Random();
         var createdIds = new List<int>();
@@ -171,16 +173,19 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
                 Bearing = i * 45, // 45도씩 회전
                 Width = 30,
                 Height = 30,
-                Category = EnumMarkerCategory.BASIC_SHAPES,
+                Category = EnumMarkerCategory.GEOMETRICS,
                 ShowShape = true,
                 ShowTitle = true,
-
+                FillColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeThickness = 1.0 + random.NextDouble() * 3.0,  // 1.0 ~ 4.0
                 // GeometrySymbol 전용 속성
                 ShapeType = shapeType,
                 Opacity = 0.8
             };
 
             int id = await Svc.InsertGeometrySymbolAsync(geometrySymbol);
+            InsertedGeometrySymbolIds.Add(id);
             createdIds.Add(id);
         }
 
@@ -215,10 +220,10 @@ public class GMapDbGeometrySymbol_BasicCrudTests
     [Fact(DisplayName = "GeometrySymbols – Insert & Fetch")]
     public async Task Insert_And_Fetch_GeometrySymbols()
     {
-        await _fx.SeedGeometrySymbolsAsync();
+        await _fx.SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
 
         /* 1) FetchGeometrySymbolsAsync → 전체 개수 일치 */
-        var all = await _fx.Svc.FetchGeometrySymbolsAsync();
+        var all = await _fx.Svc.FetchGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
         Assert.NotNull(all);
         Assert.True(all!.Count >= _fx.GeometrySymbolCount);
 
@@ -231,7 +236,7 @@ public class GMapDbGeometrySymbol_BasicCrudTests
             Assert.True(one.Pid > 0);
             Assert.NotEmpty(one.Title);
             Assert.True(Enum.IsDefined(typeof(EnumOperationState), one.OperationState));
-            Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, one.Category);
+            Assert.Equal(EnumMarkerCategory.GEOMETRICS, one.Category);
 
             // GeometrySymbol 전용 속성 검증
             Assert.True(Enum.IsDefined(typeof(EnumShapeType), one.ShapeType));
@@ -251,7 +256,8 @@ public class GMapDbGeometrySymbol_BasicCrudTests
     [Fact(DisplayName = "GeometrySymbols – Update")]
     public async Task Update_GeometrySymbol_Works()
     {
-        await _fx.SeedGeometrySymbolsAsync();
+        await _fx.SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
+        await _fx.Svc.FetchGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
         var geometrySymbol = await _fx.Svc.FetchGeometrySymbolAsync(_fx.InsertedGeometrySymbolIds.First());
 
         /* 수정 */
@@ -264,7 +270,9 @@ public class GMapDbGeometrySymbol_BasicCrudTests
         geometrySymbol.Height = 45;
         geometrySymbol.ShowShape = false;
         geometrySymbol.ShowTitle = true;
-
+        geometrySymbol.FillColor = EnumColorType.Yellow;
+        geometrySymbol.StrokeColor = EnumColorType.Black;
+        geometrySymbol.StrokeThickness = 2.5;
         // GeometrySymbol 전용 속성 수정
         geometrySymbol.ShapeType = EnumShapeType.Square;
         geometrySymbol.Opacity = 0.3;
@@ -408,9 +416,12 @@ public class GMapDbGeometrySymbol_SpecializedTests
                 Bearing = 0,
                 Width = 30,
                 Height = 30,
-                Category = EnumMarkerCategory.BASIC_SHAPES,
+                Category = EnumMarkerCategory.GEOMETRICS,
                 ShowShape = true,
                 ShowTitle = false,
+                FillColor = EnumColorType.Yellow,
+                StrokeColor = EnumColorType.Black,
+                StrokeThickness = 2.5,
                 ShapeType = EnumShapeType.Circle,
                 Opacity = opacityValues[i]
             };
@@ -486,6 +497,9 @@ public class GMapDbGeometrySymbol_IntegrationTests
             Category = EnumMarkerCategory.BASIC_SHAPES,
             ShowShape = true,
             ShowTitle = false,
+            FillColor = EnumColorType.Yellow,
+            StrokeColor = EnumColorType.Black,
+            StrokeThickness = 2.5,
             ShapeType = EnumShapeType.Circle,
             Opacity = 0.7
         };
@@ -544,10 +558,11 @@ public class GMapDbGeometrySymbol_IntegrationTests
         _fx.SymbolProvider.Clear();
 
         // DB에 GeometrySymbol 데이터 삽입
-        await _fx.SeedGeometrySymbolsAsync();
+        await _fx.SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle, _fx.GeometrySymbolCount);
 
         // FetchInstance로 Provider에 로드 (GeometrySymbol 포함)
         await _fx.Svc.FetchInstanceAsync();
+        await _fx.Svc.FetchGeometrySymbolsAsync();
 
         // Provider 검증
         Assert.True(_fx.SymbolProvider.Count >= _fx.GeometrySymbolCount);
@@ -563,7 +578,7 @@ public class GMapDbGeometrySymbol_IntegrationTests
             Assert.True(s.Id > 0);
             Assert.True(s.Pid > 0);
             Assert.NotEmpty(s.Title);
-            Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, s.Category);
+            Assert.Equal(EnumMarkerCategory.GEOMETRICS, s.Category);
             Assert.True(Enum.IsDefined(typeof(EnumShapeType), s.ShapeType));
             Assert.True(s.Opacity >= 0.0 && s.Opacity <= 1.0);
         });
@@ -582,7 +597,7 @@ public class GMapDbGeometrySymbol_IntegrationTests
             Title = "", // 빈 제목
             Latitude = 200, // 유효하지 않은 위도
             Longitude = 400, // 유효하지 않은 경도
-            Category = EnumMarkerCategory.BASIC_SHAPES,
+            Category = EnumMarkerCategory.GEOMETRICS,
             ShapeType = EnumShapeType.Circle,
             Opacity = 0.5
         };

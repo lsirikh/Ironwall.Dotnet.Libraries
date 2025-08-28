@@ -44,8 +44,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
 
     #region - Constants -
     /// <summary>테스트용 Symbol 테이블 목록</summary>
-    private static readonly string[] _symbolTables = { "Symbols" };
-
+    private static readonly string[] _symbolTables = { "Symbols", "GeometrySymbols" };
     /// <summary>DB 설정</summary>
     private readonly GMapDbSetupModel _setup = new()
     {
@@ -118,9 +117,11 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
         await using var conn = new MySqlConnection(csb.ToString());
         await conn.OpenAsync();
 
-        // 테이블 삭제
-        foreach (var t in _symbolTables)
-            await conn.ExecuteAsync($"DROP TABLE IF EXISTS `{t}`;");
+        // 1. 자식 테이블(GeometrySymbols) 먼저 삭제
+        await conn.ExecuteAsync("DROP TABLE IF EXISTS `GeometrySymbols`;");
+
+        // 2. 부모 테이블(Symbols) 나중에 삭제
+        await conn.ExecuteAsync("DROP TABLE IF EXISTS `Symbols`;");
     }
     #endregion
 
@@ -146,12 +147,16 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
                 Latitude = 37.0 + random.NextDouble() * 0.6, // 서울 근처
                 Longitude = 126.0 + random.NextDouble() * 1.0, // 서울 근처
                 Altitude = random.Next(0, 1000),
+                Zoom = random.Next(11, 19),
                 Bearing = random.NextDouble() * 360,
                 Width = 20 + random.NextDouble() * 40,
                 Height = 20 + random.NextDouble() * 40,
                 Category = categories[random.Next(categories.Length)],
                 ShowShape = random.Next(2) == 0,
-                ShowTitle = random.Next(2) == 0
+                ShowTitle = random.Next(2) == 0,
+                FillColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeThickness = 1.0 + random.NextDouble() * 3.0  // 1.0 ~ 4.0
             };
 
             int id = await Svc.InsertSymbolAsync(symbol);
@@ -180,12 +185,16 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
                 Latitude = 37.5 + random.NextDouble() * 0.1,
                 Longitude = 126.9 + random.NextDouble() * 0.1,
                 Altitude = 0,
+                Zoom = 17,
                 Bearing = 0,
                 Width = 30,
                 Height = 30,
                 Category = category,
                 ShowShape = true,
-                ShowTitle = true
+                ShowTitle = true,
+                FillColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeColor = Enum.GetValues<EnumColorType>()[random.Next(Enum.GetValues<EnumColorType>().Length)],
+                StrokeThickness = 1.0 + random.NextDouble() * 3.0  // 1.0 ~ 4.0
             };
 
             int id = await Svc.InsertSymbolAsync(symbol);
@@ -224,7 +233,7 @@ public class GMapDbSymbol_BasicCrudTests
     [Fact(DisplayName = "Symbols – Insert & Fetch")]
     public async Task Insert_And_Fetch_Symbols()
     {
-        await _fx.SeedSymbolsAsync();
+        await _fx.SeedSymbolsByCategoryAsync(EnumMarkerCategory.BASIC_SHAPES, _fx.SymbolCount);
 
         /* 1) FetchSymbolsAsync → 전체 개수 일치 */
         var all = await _fx.Svc.FetchSymbolsAsync();
@@ -245,8 +254,16 @@ public class GMapDbSymbol_BasicCrudTests
             // 위치 범위 검증
             Assert.True(one.Latitude >= -90 && one.Latitude <= 90);
             Assert.True(one.Longitude >= -180 && one.Longitude <= 180);
+            Assert.True(one.Longitude >= -180 && one.Longitude <= 180);
+            Assert.True(one.Zoom >= 11 && one.Zoom <= 20);
             Assert.True(one.Width > 0);
             Assert.True(one.Height > 0);
+
+            // 추가: 색상 관련 속성 검증
+            Assert.True(Enum.IsDefined(typeof(EnumColorType), one.FillColor));
+            Assert.True(Enum.IsDefined(typeof(EnumColorType), one.StrokeColor));
+            Assert.True(one.StrokeThickness > 0);
+            Assert.True(one.StrokeThickness <= 10); // 합리적인 범위
         }
     }
 
@@ -271,6 +288,9 @@ public class GMapDbSymbol_BasicCrudTests
         symbol.Category = EnumMarkerCategory.MILITARY_SYMBOLS;
         symbol.ShowShape = false;
         symbol.ShowTitle = true;
+        symbol.FillColor = EnumColorType.Yellow;
+        symbol.StrokeColor = EnumColorType.Black;
+        symbol.StrokeThickness = 2.5;
 
         var updated = await _fx.Svc.UpdateSymbolAsync(symbol);
 
@@ -286,6 +306,9 @@ public class GMapDbSymbol_BasicCrudTests
         Assert.Equal(EnumMarkerCategory.MILITARY_SYMBOLS, updated.Category);
         Assert.False(updated.ShowShape);
         Assert.True(updated.ShowTitle);
+        Assert.Equal(EnumColorType.Yellow, updated.FillColor);
+        Assert.Equal(EnumColorType.Black, updated.StrokeColor);
+        Assert.Equal(2.5, updated.StrokeThickness);
     }
 
     /// <summary>
@@ -465,7 +488,10 @@ public class GMapDbSymbol_IntegrationTests
             Height = 25,
             Category = EnumMarkerCategory.ANALYSIS,
             ShowShape = true,
-            ShowTitle = false
+            ShowTitle = false,
+            FillColor = EnumColorType.Blue,
+            StrokeColor = EnumColorType.White,
+            StrokeThickness = 1.5
         };
 
         int symbolId = await _fx.Svc.InsertSymbolAsync(symbol);
@@ -514,7 +540,7 @@ public class GMapDbSymbol_IntegrationTests
         _fx.SymbolProvider.Clear();
 
         // DB에 Symbol 데이터 삽입
-        await _fx.SeedSymbolsAsync();
+        await _fx.SeedSymbolsByCategoryAsync(EnumMarkerCategory.BASIC_SHAPES, _fx.SymbolCount);
 
         // FetchInstance로 Provider에 로드
         await _fx.Svc.FetchInstanceAsync();
@@ -563,7 +589,10 @@ public class GMapDbSymbol_IntegrationTests
                 Height = 30,
                 Category = EnumMarkerCategory.BASIC_SHAPES,
                 ShowShape = true,
-                ShowTitle = false
+                ShowTitle = false,
+                FillColor = EnumColorType.Green,
+                StrokeColor = EnumColorType.Red,
+                StrokeThickness = 2.0
             };
 
             int id = await _fx.Svc.InsertSymbolAsync(symbol);

@@ -11,6 +11,7 @@
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:symbolUtils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	d:Background="WhiteSmoke"
 	d:DesignHeight="450"
@@ -18,6 +19,11 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
+		<symbolUtils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
+		<symbolUtils:MarkerCategoryToDisplayNameConverter x:Key="MarkerCategoryToDisplayNameConverter" />
+		<symbolUtils:MarkerCategoryToIconConverter x:Key="MarkerCategoryToIconConverter" />
+		<symbolUtils:SymbolTypeToDisplayNameConverter x:Key="SymbolTypeToDisplayNameConverter" />
+		<symbolUtils:SymbolTypeToIconConverter x:Key="SymbolTypeToIconConverter" />
 		<Style
 			x:Name="CustomIconButton"
 			BasedOn="{StaticResource MaterialDesignIconButton}"
@@ -52,6 +58,24 @@
 				</Setter.Value>
 			</Setter>
 		</Style>
+		<Style
+			x:Key="CompactComboBox"
+			BasedOn="{StaticResource MaterialDesignComboBox}"
+			TargetType="ComboBox">
+			<Setter Property="Margin" Value="2" />
+			<Setter Property="Padding" Value="4,2" />
+			<Setter Property="FontSize" Value="10" />
+			<Setter Property="MinHeight" Value="24" />
+		</Style>
+
+		<Style
+			x:Key="CompactSlider"
+			BasedOn="{StaticResource MaterialDesignDiscreteSlider}"
+			TargetType="Slider">
+			<Setter Property="Margin" Value="2" />
+			<Setter Property="Height" Value="20" />
+		</Style>
+
 	</UserControl.Resources>
 	<Grid x:Name="MapView_OuterGrid">
 		<Grid.RowDefinitions>
@@ -184,7 +208,7 @@
 
 				<Button
 					Command="{Binding FineRotateCommand}"
-					CommandParameter="-5"
+					CommandParameter="5"
 					ToolTip="5도 반시계방향 회전 (Ctrl+←)">
 					<Button.InputBindings>
 						<KeyBinding Key="Left" Modifiers="Ctrl" />
@@ -204,41 +228,7 @@
 
 				<Button
 					Command="{Binding FineRotateCommand}"
-					CommandParameter="0.1"
-					ToolTip="1도 반시계방향 회전">
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon
-							Width="14"
-							Height="14"
-							Kind="RotateLeft" />
-						<TextBlock
-							Margin="2,0,0,0"
-							VerticalAlignment="Center"
-							FontSize="8"
-							Text="0.1°" />
-					</StackPanel>
-				</Button>
-
-				<Button
-					Command="{Binding FineRotateCommand}"
-					CommandParameter="-0.1"
-					ToolTip="1도 시계방향 회전">
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon
-							Width="14"
-							Height="14"
-							Kind="RotateRight" />
-						<TextBlock
-							Margin="2,0,0,0"
-							VerticalAlignment="Center"
-							FontSize="8"
-							Text="0.1°" />
-					</StackPanel>
-				</Button>
-
-				<Button
-					Command="{Binding FineRotateCommand}"
-					CommandParameter="5"
+					CommandParameter="-5"
 					ToolTip="5도 시계방향 회전 (Ctrl+→)">
 					<Button.InputBindings>
 						<KeyBinding Key="Right" Modifiers="Ctrl" />
@@ -322,31 +312,77 @@
 				<Separator />
 
 				<!--  마커 관리 섹션  -->
-				<TextBlock
-					Margin="5,0"
-					VerticalAlignment="Center"
-					FontSize="10"
-					FontWeight="Bold"
-					Foreground="DarkBlue"
-					Text="마커" />
 
-				<!--  마커 추가 버튼  -->
-				<Button Command="{Binding AddCustomMarkerCommand}" ToolTip="새 마커 추가 (Ctrl+M)">
-					<Button.InputBindings>
-						<KeyBinding Key="M" Modifiers="Ctrl" />
-					</Button.InputBindings>
-					<md:PackIcon Kind="MapMarkerPlus" />
-				</Button>
+				<!--  카테고리 선택  -->
+				<ComboBox
+					Width="120"
+					ItemsSource="{Binding AvailableMarkerCategories}"
+					SelectedItem="{Binding SelectedMarkerCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					Style="{StaticResource CompactComboBox}"
+					ToolTip="마커 카테고리 선택">
+					<ComboBox.ItemTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="14"
+									Height="14"
+									Margin="0,0,5,0"
+									Kind="{Binding Converter={StaticResource MarkerCategoryToIconConverter}}" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="11"
+									Text="{Binding Converter={StaticResource MarkerCategoryToDisplayNameConverter}}" />
+							</StackPanel>
+						</DataTemplate>
+					</ComboBox.ItemTemplate>
+				</ComboBox>
 
+				<!--  심볼 타입 선택  -->
+				<ComboBox
+					Width="100"
+					ItemsSource="{Binding AvailableSymbolTypes}"
+					SelectedItem="{Binding SelectedSymbolType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					Style="{StaticResource CompactComboBox}"
+					ToolTip="심볼 타입 선택">
+					<ComboBox.ItemTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="14"
+									Height="14"
+									Margin="0,0,5,0"
+									Kind="{Binding Converter={StaticResource SymbolTypeToIconConverter}}" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="11"
+									Text="{Binding Converter={StaticResource SymbolTypeToDisplayNameConverter}}" />
+							</StackPanel>
+						</DataTemplate>
+					</ComboBox.ItemTemplate>
+				</ComboBox>
+
+				<!--  심볼 추가 버튼  -->
 				<Button
-					Command="{Binding AddGeometricMarkerCommand}"
-					CommandParameter="Triangle"
-					ToolTip="삼각형 마커 추가">
-					<!--<Button.InputBindings>
-						<KeyBinding Key="M" Modifiers="Ctrl" />
-					</Button.InputBindings>-->
-					<md:PackIcon Kind="Triangle" />
+					Command="{Binding AddSelectedSymbolCommand}"
+					IsEnabled="{Binding CanAddSymbol}"
+					Style="{StaticResource MaterialDesignToolButton}"
+					ToolTip="선택된 심볼 추가 (Ctrl+Shift+A)">
+					<Button.InputBindings>
+						<KeyBinding Key="A" Modifiers="Ctrl+Shift" />
+					</Button.InputBindings>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Kind="Plus" />
+						<TextBlock
+							Margin="3,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="10"
+							Text="추가" />
+					</StackPanel>
 				</Button>
+
 
 				<!--  마커 복제 버튼  -->
 				<Button Command="{Binding DuplicateMarkerCommand}" ToolTip="선택된 마커 복제 (Ctrl+D)">
@@ -366,42 +402,126 @@
 					</Button.InputBindings>
 					<md:PackIcon Kind="GridLarge" />
 				</Button>
-
-				<!--  마커 회전 초기화 버튼  -->
-				<Button
-					Command="{Binding ResetMarkerRotationCommand}"
-					IsEnabled="{Binding CanEditMarker}"
-					ToolTip="마커 회전 초기화">
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon
-							Width="14"
-							Height="14"
-							Kind="MapMarker" />
-						<md:PackIcon
-							Width="12"
-							Height="12"
-							Kind="Restore" />
-					</StackPanel>
-				</Button>
-
-				<!--  마커 크기 초기화 버튼  -->
-				<Button
-					Command="{Binding ResetMarkerSizeCommand}"
-					IsEnabled="{Binding CanEditMarker}"
-					ToolTip="마커 크기 초기화">
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon
-							Width="14"
-							Height="14"
-							Kind="MapMarker" />
-						<md:PackIcon
-							Width="12"
-							Height="12"
-							Kind="Resize" />
-					</StackPanel>
-				</Button>
-
 				<Separator />
+
+				<StackPanel Orientation="Horizontal" Visibility="{Binding CanEditMarker, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<!--  색상 편집 섹션 (컴팩트)  -->
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						VerticalAlignment="Center"
+						Kind="Resize"
+						ToolTip="색상 편집" />
+
+					<TextBox
+						Width="50"
+						Margin="3,0"
+						VerticalAlignment="Center"
+						HorizontalContentAlignment="Center"
+						IsEnabled="{Binding HasSelectedItem}"
+						Text="{Binding SelectedMarkerWidth}" />
+
+					<md:PackIcon
+						Width="10"
+						Height="10"
+						Margin="3,0"
+						VerticalAlignment="Center"
+						HorizontalContentAlignment="Center"
+						Kind="WindowClose" />
+
+					<TextBox
+						Width="50"
+						Margin="3,0"
+						VerticalAlignment="Center"
+						HorizontalContentAlignment="Center"
+						IsEnabled="{Binding HasSelectedItem}"
+						Text="{Binding SelectedMarkerHeight}" />
+
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Margin="3,0"
+						VerticalAlignment="Center"
+						HorizontalContentAlignment="Center"
+						Kind="AngleAcute" />
+
+
+					<TextBox
+						Width="50"
+						Margin="3,0"
+						VerticalAlignment="Center"
+						HorizontalContentAlignment="Center"
+						IsEnabled="{Binding HasSelectedItem}"
+						Text="{Binding SelectedMarkerBearing}" />
+
+					<!--  색상 편집 섹션 (컴팩트)  -->
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						Margin="3,0"
+						VerticalAlignment="Center"
+						Kind="Palette"
+						ToolTip="색상 편집" />
+
+
+					<!--  Fill Color  -->
+					<ComboBox
+						Width="70"
+						Margin="3,0"
+						IsEnabled="{Binding HasSelectedItem}"
+						ItemsSource="{Binding AvailableColors}"
+						SelectedItem="{Binding SelectedMarkerFillColor}"
+						Style="{StaticResource CompactComboBox}"
+						ToolTip="Fill 색상">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<Rectangle
+									Width="40"
+									Height="12"
+									Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+									Stroke="Gray"
+									StrokeThickness="0.5" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<!--  Stroke Color  -->
+					<ComboBox
+						Width="70"
+						Margin="3,0"
+						IsEnabled="{Binding HasSelectedItem}"
+						ItemsSource="{Binding AvailableColors}"
+						SelectedItem="{Binding SelectedMarkerStrokeColor}"
+						Style="{StaticResource CompactComboBox}"
+						ToolTip="Stroke 색상">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<Rectangle
+									Width="40"
+									Height="12"
+									Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+									Stroke="Gray"
+									StrokeThickness="0.5" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<ComboBox
+						Width="50"
+						Margin="3,0"
+						IsEnabled="{Binding HasSelectedItem}"
+						ItemsSource="{Binding AvailableSize}"
+						SelectedItem="{Binding SelectedMarkerStrokeSize}"
+						Style="{StaticResource CompactComboBox}"
+						ToolTip="Stroke 색상">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock HorizontalAlignment="Center" Text="{Binding}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+					<Separator />
+				</StackPanel>
 
 				<!--  상태 표시  -->
 				<TextBlock Margin="10,0" VerticalAlignment="Center">
@@ -420,7 +540,7 @@
 				</TextBlock>
 
 				<!--  선택된 마커 정보 표시  -->
-				<TextBlock
+				<!--<TextBlock
 					Margin="10,0"
 					VerticalAlignment="Center"
 					FontSize="10">
@@ -430,7 +550,7 @@
 							<Setter Property="Text" Value="{Binding SelectedMarker.Title, StringFormat='선택: {0}'}" />
 						</Style>
 					</TextBlock.Style>
-				</TextBlock>
+				</TextBlock>-->
 			</ToolBar>
 		</ToolBarTray>
 

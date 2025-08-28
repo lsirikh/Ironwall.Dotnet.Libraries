@@ -246,36 +246,41 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         {
             await using var conn = await OpenConnectionAsync(token);
 
-            // ─────────────────── Symbols 테이블 ───────────────────────────────
+            // ── Symbols 테이블 ──
             var createSymbolsSql = @"
                 CREATE TABLE IF NOT EXISTS `Symbols` (
                     `Id`                INT AUTO_INCREMENT PRIMARY KEY,
                     `Pid`               INT NOT NULL DEFAULT 0,
-                    `Title`             VARCHAR(200) NOT NULL,
-                    `OperationState`    VARCHAR(20) NOT NULL DEFAULT 'NONE',
-                    `Latitude`          DECIMAL(10,8) NOT NULL,
-                    `Longitude`         DECIMAL(11,8) NOT NULL,
-                    `Altitude`          FLOAT DEFAULT 0,
-                    `Bearing`           DECIMAL(6,3) DEFAULT 0,
-                    `Width`             DECIMAL(8,3) DEFAULT 30,
-                    `Height`            DECIMAL(8,3) DEFAULT 30,
-                    `Category`          VARCHAR(30) NOT NULL DEFAULT 'BASIC_SHAPES',
-                    `ShowShape`         BOOLEAN DEFAULT TRUE,
-                    `ShowTitle`         BOOLEAN DEFAULT FALSE,
+                    `Title`             VARCHAR(200) NOT NULL,                          -- 심볼제목
+                    `OperationState`    VARCHAR(20) NOT NULL DEFAULT 'NONE',            -- 운영상태
+                    `Latitude`          DECIMAL(10,8) NOT NULL,                         -- 위도
+                    `Longitude`         DECIMAL(11,8) NOT NULL,                         -- 경도
+                    `Altitude`          FLOAT DEFAULT 0,                                -- 고도
+                    `Zoom`              DECIMAL(3, 1) DEFAULT 17,                       -- 디스플레이용(Zoom)
+                    `Bearing`           DECIMAL(6,3) DEFAULT 0,                         -- 심볼각도
+                    `Width`             DECIMAL(8,3) DEFAULT 30,                        -- 넓이
+                    `Height`            DECIMAL(8,3) DEFAULT 30,                        -- 크기
+                    `Category`          VARCHAR(30) NOT NULL DEFAULT 'BASIC_SHAPES',    -- 심볼 카테고리
+                    `ShowShape`         BOOLEAN DEFAULT TRUE,                           -- 심볼 Visibility
+                    `ShowTitle`         BOOLEAN DEFAULT FALSE,                          -- 타이틀 Visibility
+                    `FillColor`         VARCHAR(20) NOT NULL DEFAULT 'Blue',            -- 내부 색상
+                    `StrokeColor`       VARCHAR(20) NOT NULL DEFAULT 'White',           -- 외부 선 라인 색상
+                    `StrokeThickness`   DECIMAL(4,2) DEFAULT 1.0,                       -- 외부 선 라인 두께
                     `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     `CreatedBy`         VARCHAR(100),
                     INDEX `IX_Symbols_Pid` (`Pid`),
                     INDEX `IX_Symbols_Category` (`Category`),
                     INDEX `IX_Symbols_State` (`OperationState`),
-                    INDEX `IX_Symbols_Location` (`Latitude`, `Longitude`)
+                    INDEX `IX_Symbols_Location` (`Latitude`, `Longitude`),
+                    INDEX `IX_Symbols_Colors` (`FillColor`, `StrokeColor`)
                 );";
 
-            // ─────────────────── GeometrySymbols 테이블 (간소화) ──────────────────────
+            // ── GeometrySymbols 테이블 (간소화) ──
             var createGeometrySymbolsSql = @"
             CREATE TABLE IF NOT EXISTS `GeometrySymbols` (
                 `SymbolId`          INT PRIMARY KEY,
-                `ShapeType`         VARCHAR(20) NOT NULL DEFAULT 'Circle',
+                `ShapeType`         VARCHAR(20) NOT NULL DEFAULT 'Circle',              -- Geometric 타입
                 `Opacity`           DECIMAL(3,2) DEFAULT 1.0,
                 `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -395,8 +400,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, 
+                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
+                        FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = 'BASIC_SHAPES'
@@ -426,8 +432,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(id));
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, 
+                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom,
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
+                        FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Id = @Id;";
@@ -458,8 +465,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(pid));
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, 
+                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
+                        FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Pid = @Pid;";
@@ -487,8 +495,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, 
+                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
+                        FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = @Category
@@ -516,11 +525,13 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                 INSERT INTO Symbols
-                (Pid, Title, OperationState, Latitude, Longitude, Altitude, Bearing,
-                 Width, Height, Category, ShowShape, ShowTitle, CreatedBy)
-                VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Bearing,
-                        @Width, @Height, @Category, @ShowShape, @ShowTitle, @CreatedBy);
-                SELECT LAST_INSERT_ID();";
+                    (Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+                     Width, Height, Category, ShowShape, ShowTitle, 
+                     FillColor, StrokeColor, StrokeThickness, CreatedBy)
+                    VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                            @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                            @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+                    SELECT LAST_INSERT_ID();";
 
             var id = await conn.ExecuteScalarAsync<int>(sql, new
             {
@@ -530,12 +541,16 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Latitude,
                 model.Longitude,
                 model.Altitude,
+                model.Zoom,  //추가
                 model.Bearing,
                 model.Width,
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
                 model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
                 CreatedBy = "System" // 또는 현재 사용자 정보
             });
 
@@ -559,13 +574,14 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
 
             const string sql = @"
-                UPDATE Symbols SET
-                    Pid = @Pid, Title = @Title, OperationState = @OperationState,
-                    Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude,
-                    Bearing = @Bearing, Width = @Width, Height = @Height,
-                    Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                    CreatedBy = @CreatedBy
-                WHERE Id = @Id;";
+               UPDATE Symbols SET
+                Pid = @Pid, Title = @Title, OperationState = @OperationState,
+                Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+                Bearing = @Bearing, Width = @Width, Height = @Height,
+                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+                CreatedBy = @CreatedBy
+               WHERE Id = @Id;";
 
             var affected = await conn.ExecuteAsync(sql, new
             {
@@ -576,12 +592,16 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Latitude,
                 model.Longitude,
                 model.Altitude,
+                model.Zoom,  //추가
                 model.Bearing,
                 model.Width,
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
                 model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
                 CreatedBy = "System" // 또는 현재 사용자 정보
             });
 
@@ -675,8 +695,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, 
+            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -711,8 +732,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(id));
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, 
+            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -748,10 +770,12 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 1. Symbols 테이블에 기본 정보 삽입
             const string symbolSql = @"
             INSERT INTO Symbols
-            (Pid, Title, OperationState, Latitude, Longitude, Altitude, Bearing,
-             Width, Height, Category, ShowShape, ShowTitle, CreatedBy)
-            VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Bearing,
-                    @Width, @Height, @Category, @ShowShape, @ShowTitle, @CreatedBy);
+            (Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+             Width, Height, Category, ShowShape, ShowTitle, 
+             FillColor, StrokeColor, StrokeThickness, CreatedBy)
+            VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                    @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                    @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
             SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -762,12 +786,16 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Latitude,
                 model.Longitude,
                 model.Altitude,
+                model.Zoom,  //추가
                 model.Bearing,
                 model.Width,
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
                 model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
                 CreatedBy = "System"
             }, transaction);
 
@@ -813,9 +841,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string symbolSql = @"
             UPDATE Symbols SET
                 Pid = @Pid, Title = @Title, OperationState = @OperationState,
-                Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude,
+                Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
                 CreatedBy = @CreatedBy
             WHERE Id = @Id;";
 
@@ -828,12 +857,16 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Latitude,
                 model.Longitude,
                 model.Altitude,
+                model.Zoom,  //추가
                 model.Bearing,
                 model.Width,
                 model.Height,
                 Category = model.Category.ToString(),
                 model.ShowShape,
                 model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
                 CreatedBy = "System"
             }, transaction);
 
@@ -903,8 +936,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, 
+            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -984,7 +1018,11 @@ internal class SymbolSQL
 
     /// <summary>동작 상태 (NONE, DEACTIVE, ACTIVE, FAULT)</summary>
     public string OperationState { get; set; } = string.Empty;
-
+    //`Latitude`          DECIMAL(10,8) NOT NULL,                 --위도
+    //`Longitude`         DECIMAL(11,8) NOT NULL,                 --경도
+    //`Altitude`          FLOAT DEFAULT 0,                        --고도
+    //`Zoom`              DECIMAL(4, 3) DEFAULT 17,               --디스플레이용(Zoom)
+    //`Bearing`           DECIMAL(6,3) DEFAULT 0,                 --심볼각도
     /// <summary>위도 좌표 (DECIMAL(10,8))</summary>
     public decimal Latitude { get; set; }
 
@@ -993,6 +1031,8 @@ internal class SymbolSQL
 
     /// <summary>고도 (FLOAT)</summary>
     public float Altitude { get; set; }
+    /// <summary>줌 (DECIMAL(3,1))</summary>
+    public decimal Zoom { get; set; }
 
     /// <summary>방위각 (DECIMAL(6,3))</summary>
     public decimal Bearing { get; set; }
@@ -1011,6 +1051,10 @@ internal class SymbolSQL
 
     /// <summary>Title 표시 여부</summary>
     public bool ShowTitle { get; set; }
+
+    public string FillColor { get; set; } = "Blue";
+    public string StrokeColor { get; set; } = "White";
+    public decimal StrokeThickness { get; set; } = 1.0m;
 
     /// <summary>생성 일시</summary>
     public DateTime CreatedAt { get; set; }
@@ -1035,12 +1079,17 @@ internal class SymbolSQL
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
+        Zoom = (double)Zoom,
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
         Category = Enum.Parse<EnumMarkerCategory>(Category),
         ShowShape = ShowShape,
-        ShowTitle = ShowTitle
+        ShowTitle = ShowTitle,
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
+
     };
 }
 
@@ -1070,12 +1119,17 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
+        Zoom = (double)Zoom,
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
         Category = Enum.Parse<EnumMarkerCategory>(Category),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
+
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
 
         // GeometrySymbol 전용 속성들 (간소화)
         ShapeType = Enum.Parse<EnumShapeType>(GeometryShapeType),

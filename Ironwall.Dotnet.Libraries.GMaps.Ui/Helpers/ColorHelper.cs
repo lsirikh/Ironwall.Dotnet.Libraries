@@ -1,0 +1,140 @@
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using System;
+using System.ComponentModel;
+
+namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+/****************************************************************************
+   Purpose      :                                                          
+   Created By   : GHLee                                                
+   Created On   : 8/21/2025 4:23:53 PM                                                    
+   Department   : SW Team                                                   
+   Company      : Sensorway Co., Ltd.                                       
+   Email        : lsirikh@naver.com                                         
+****************************************************************************/
+/// <summary>
+/// EnumColorType을 실제 색상값으로 변환하는 헬퍼 클래스
+/// </summary>
+public static class ColorHelper
+{
+    /// <summary>
+    /// EnumColorType을 Hex 색상 문자열로 변환
+    /// </summary>
+    /// <param name="colorType">색상 타입</param>
+    /// <returns>Hex 색상 문자열 (#RRGGBB)</returns>
+    public static string ToHexString(this EnumColorType colorType)
+    {
+        return colorType switch
+        {
+            EnumColorType.Blue => "#2196F3",           // Material Blue
+            EnumColorType.Red => "#F44336",            // Material Red
+            EnumColorType.Green => "#4CAF50",          // Material Green
+            EnumColorType.Orange => "#FF9800",         // Material Orange
+            EnumColorType.Purple => "#9C27B0",         // Material Purple
+            EnumColorType.Yellow => "#FFEB3B",         // Material Yellow
+            EnumColorType.Pink => "#E91E63",           // Material Pink
+            EnumColorType.Teal => "#009688",           // Material Teal
+            EnumColorType.Indigo => "#3F51B5",         // Material Indigo
+            EnumColorType.Lime => "#CDDC39",           // Material Lime
+            EnumColorType.Brown => "#795548",          // Material Brown
+            EnumColorType.Gray => "#9E9E9E",           // Material Gray
+            EnumColorType.Black => "#212121",          // Material Dark
+            EnumColorType.White => "#FFFFFF",          // White
+            EnumColorType.DarkBlue => "#1976D2",       // Material Blue 700
+            EnumColorType.DarkRed => "#D32F2F",        // Material Red 700
+            EnumColorType.DarkGreen => "#388E3C",      // Material Green 700
+            EnumColorType.DarkOrange => "#F57C00",     // Material Orange 700
+            EnumColorType.DarkPurple => "#7B1FA2",     // Material Purple 700
+            EnumColorType.Gold => "#FFD700",           // Gold
+            EnumColorType.Silver => "#C0C0C0",         // Silver
+            EnumColorType.Magenta => "#FF00FF",        // Magenta
+            EnumColorType.Cyan => "#00FFFF",           // Cyan
+            EnumColorType.Beige => "#F5F5DC",          // Beige
+            EnumColorType.Olive => "#808000",          // Olive
+            _ => "#2196F3"                             // Default Blue
+        };
+    }
+
+    /// <summary>
+    /// EnumColorType을 WPF Brush로 변환
+    /// </summary>
+    /// <param name="colorType">색상 타입</param>
+    /// <returns>SolidColorBrush 객체</returns>
+    public static System.Windows.Media.SolidColorBrush ToBrush(this EnumColorType colorType)
+    {
+        var hexColor = colorType.ToHexString();
+        var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hexColor);
+        return new System.Windows.Media.SolidColorBrush(color);
+    }
+
+    /// <summary>
+    /// EnumColorType을 System.Drawing.Color로 변환
+    /// </summary>
+    /// <param name="colorType">색상 타입</param>
+    /// <returns>System.Drawing.Color 객체</returns>
+    public static System.Drawing.Color ToDrawingColor(this EnumColorType colorType)
+    {
+        var hexColor = colorType.ToHexString();
+        return System.Drawing.ColorTranslator.FromHtml(hexColor);
+    }
+
+    /// <summary>
+    /// 색상 이름 가져오기 (Description 어트리뷰트 사용)
+    /// </summary>
+    /// <param name="colorType">색상 타입</param>
+    /// <returns>색상 이름</returns>
+    public static string GetDisplayName(this EnumColorType colorType)
+    {
+        var type = typeof(EnumColorType);
+        var member = type.GetMember(colorType.ToString());
+        if (member.Length > 0)
+        {
+            var attributes = member[0].GetCustomAttributes(typeof(DescriptionAttribute), false);
+            if (attributes.Length > 0)
+            {
+                return ((DescriptionAttribute)attributes[0]).Description;
+            }
+        }
+        return colorType.ToString();
+    }
+
+    /// <summary>
+    /// 모든 색상 타입과 이름 가져오기 (UI 바인딩용)
+    /// </summary>
+    /// <returns>색상 타입과 이름의 딕셔너리</returns>
+    public static Dictionary<EnumColorType, string> GetAllColors()
+    {
+        var colors = new Dictionary<EnumColorType, string>();
+        foreach (EnumColorType colorType in Enum.GetValues<EnumColorType>())
+        {
+            colors[colorType] = colorType.GetDisplayName();
+        }
+        return colors;
+    }
+
+    /// <summary>
+    /// UI에서 사용할 색상 목록 (자주 사용되는 색상 우선)
+    /// </summary>
+    /// <returns>UI용 색상 목록</returns>
+    public static EnumColorType[] GetCommonColors()
+    {
+        return new[]
+        {
+                EnumColorType.Blue,       // 기본
+                EnumColorType.Red,        // 경고/선택
+                EnumColorType.Green,      // 정상/성공
+                EnumColorType.Orange,     // 주의
+                EnumColorType.Purple,     // 특별
+                EnumColorType.Yellow,     // 알림
+                EnumColorType.Pink,       // 강조
+                EnumColorType.Teal,       // 정보
+                EnumColorType.Gray,       // 비활성
+                EnumColorType.Black,      // 중요
+                EnumColorType.White,      // 배경
+                EnumColorType.DarkBlue,   // 진한 기본
+                EnumColorType.DarkRed,    // 진한 경고
+                EnumColorType.DarkGreen,  // 진한 성공
+                EnumColorType.Gold,       // 프리미엄
+                EnumColorType.Silver      // 일반
+            };
+    }
+}

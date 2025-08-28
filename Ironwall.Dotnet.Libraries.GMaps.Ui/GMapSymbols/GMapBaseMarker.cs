@@ -406,6 +406,16 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    public double Zoom
+    {
+        get => _model.Zoom;
+        set
+        {
+            _model.Zoom = value;
+            OnPropertyChanged(nameof(Zoom));
+        }
+    }
+
     public double Width
     {
         get => _model.Width;
@@ -427,7 +437,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             UpdateOffset();
         }
     }
-
     
 
     public double Bearing
@@ -470,6 +479,36 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         {
             _model.ShowTitle = value;
             OnPropertyChanged(nameof(ShowTitle));
+        }
+    }
+
+    public EnumColorType FillColor
+    {
+        get => _model.FillColor;
+        set
+        {
+            _model.FillColor = value;
+            OnPropertyChanged(nameof(FillColor));
+        }
+    }
+
+    public EnumColorType StrokeColor
+    {
+        get => _model.StrokeColor;
+        set
+        {
+            _model.StrokeColor = value;
+            OnPropertyChanged(nameof(StrokeColor));
+        }
+    }
+
+    public double StrokeThickness
+    {
+        get => _model.StrokeThickness;
+        set
+        {
+            _model.StrokeThickness = value;
+            OnPropertyChanged(nameof(StrokeThickness));
         }
     }
 

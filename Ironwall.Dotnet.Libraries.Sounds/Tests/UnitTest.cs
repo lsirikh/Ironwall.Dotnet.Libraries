@@ -1064,14 +1064,14 @@ public class SoundService_AudioDeviceTests
             try
             {
                 // 첫 번째 장치에서 재생 시작
-                _fx.SoundSvc.SelectAudioDevice(device1);
+                await _fx.SoundSvc.SelectAudioDevice(device1);
                 result.InitialDevice = device1.Name;
 
                 var playTask = _fx.SoundSvc.DetectionSoundPlayAsync();
                 await Task.Delay(300); // 재생 시작 대기
 
                 // 재생 중 두 번째 장치로 전환
-                _fx.SoundSvc.SelectAudioDevice(device2);
+                await _fx.SoundSvc.SelectAudioDevice(device2);
                 result.SwitchedDevice = device2.Name;
                 result.SwitchTime = DateTime.UtcNow;
 
@@ -1489,7 +1489,7 @@ public class SoundService_RuntimeDeviceSwitchTests
             Debug.WriteLine($"📊 Queue before switch: {statusBefore.QueueCount} items, Processing: {statusBefore.IsProcessing}");
 
             // 2. 큐 처리 중 장치 변경 → 모든 큐 중지되어야 함
-            _fx.SoundSvc.SelectAudioDevice(device2);
+            await _fx.SoundSvc.SelectAudioDevice(device2);
             Debug.WriteLine($"🔄 Switched to {device2.Name} during queue processing");
 
             await Task.Delay(500);

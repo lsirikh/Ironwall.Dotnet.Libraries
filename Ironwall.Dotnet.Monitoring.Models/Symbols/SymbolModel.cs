@@ -34,11 +34,12 @@ public class SymbolModel : BaseModel, ISymbolModel
         ShowShape = true;
     }
 
-    public SymbolModel(string title, double latitude, double longitude)
+    public SymbolModel(string title, double latitude, double longitude, double zoom)
     {
         Title = title;
         Latitude = latitude;
         Longitude = longitude;
+        Zoom = zoom;
 
         // 기본값
         Pid = 0;
@@ -71,6 +72,10 @@ public class SymbolModel : BaseModel, ISymbolModel
     /// 경도 (편의 속성)
     /// </summary>
     public double Longitude { get; set; }
+    /// <summary>
+    /// 심볼 생성 유효 줌
+    /// </summary>
+    public double Zoom { get; set; }
 
     public float Altitude { get; set; }
     public double Bearing { get; set; }
@@ -82,5 +87,8 @@ public class SymbolModel : BaseModel, ISymbolModel
     public EnumMarkerCategory Category { get; set; }
     public bool ShowShape { get; set; }
     public bool ShowTitle { get; set; }
+    public EnumColorType FillColor { get; set; } = EnumColorType.Blue;
+    public EnumColorType StrokeColor { get; set; } = EnumColorType.White;
+    public double StrokeThickness { get; set; } = 1.0;
     #endregion
 }

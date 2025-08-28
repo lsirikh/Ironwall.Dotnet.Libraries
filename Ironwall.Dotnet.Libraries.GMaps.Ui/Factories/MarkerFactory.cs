@@ -32,6 +32,7 @@ public class MarkerFactory : IMarkerFactory
             return symbolModel switch
             {
                 IGeometricSymbolModel geometricSymbol => CreateGeometricMarker(geometricSymbol),
+                IPidsSymbolModel pidsSymbol => CreatePidsMarker(pidsSymbol),
                 _ => CreateCustomMarker(symbolModel)
             };
         }
@@ -43,15 +44,21 @@ public class MarkerFactory : IMarkerFactory
         }
     }
 
-    private GMapGeometricMarker CreateGeometricMarker(IGeometricSymbolModel geometricSymbol)
+    private GMapPidsMarker CreatePidsMarker(IPidsSymbolModel symbol)
     {
-        _log?.Info($"GMapGeometricMarker 생성: {geometricSymbol.Title}, ShapeType: {geometricSymbol.ShapeType}");
-        return new GMapGeometricMarker(_log!, geometricSymbol);
+        _log?.Info($"GMapGeometricMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}");
+        return new GMapPidsMarker(_log!, symbol);
     }
 
-    private GMapCustomMarker CreateCustomMarker(ISymbolModel symbolModel)
+    private GMapGeometricMarker CreateGeometricMarker(IGeometricSymbolModel symbol)
     {
-        _log?.Info($"GMapCustomMarker 생성: {symbolModel.Title}");
-        return new GMapCustomMarker(_log!, symbolModel);
+        _log?.Info($"GMapGeometricMarker 생성: {symbol.Title}, ShapeType: {symbol.ShapeType}");
+        return new GMapGeometricMarker(_log!, symbol);
+    }
+
+    private GMapCustomMarker CreateCustomMarker(ISymbolModel symbol)
+    {
+        _log?.Info($"GMapCustomMarker 생성: {symbol.Title}");
+        return new GMapCustomMarker(_log!, symbol);
     }
 }

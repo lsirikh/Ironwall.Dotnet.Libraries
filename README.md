@@ -160,3 +160,35 @@
 - **테스트 프레임워크**: `xUnit`
 
 ---
+## v1.2.4 (2025-08-28)
+
+### 추가된 파일
+- `Ironwall.Dotnet.Libraries.Enums/EnumColorType.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Providers/PidsSymbolProvider.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/ColorHelper.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/SymbolTypeHelper.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Models/DeviceSymbolLookupModel.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/controller01.png`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/fence01.png`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PidsMarkerStyle.xaml`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/IPidsSymbolModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/PidsSymbolModel.cs`
+
+### 수정된 파일
+- `Ironwall.Dotnet.Libraries.Devices.Db/Services/DeviceDbService.cs`
+- `Ironwall.Dotnet.Libraries.Enums/EnumDeviceType.cs`
+- `Ironwall.Dotnet.Libraries.Enums/EnumEventStatus.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Db/Services/GMapDbSymbolService.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapBaseMarker.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerBaseControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerCustomControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerGeometricControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/SensorMarkerControl.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/CustomMarkerStyle.xaml`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/Generic.xaml`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/GeometricMarkerStyle.xaml`
+- `Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/GMapViewModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/GeometricSymbolModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/ISymbolModel.cs`
+- `Ironwall.Dotnet.Monitoring.Models/Symbols/SymbolModel.cs`

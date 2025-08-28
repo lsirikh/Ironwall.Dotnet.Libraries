@@ -9,6 +9,9 @@ using System.Windows.Input;
 using System.Windows.Media.Media3D;
 using System.Windows.Media;
 using System.Windows;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Utils;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -75,7 +78,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     public static readonly DependencyProperty TitleSizeProperty =
         DependencyProperty.Register("TitleSize", typeof(double), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(10.0));
+            new PropertyMetadata(8.0));
 
     /// <summary>
     /// 마커 메인 색상
@@ -181,6 +184,19 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         DependencyProperty.Register("RotationAngle", typeof(double), typeof(GMapMarkerBaseControl<T>),
             new PropertyMetadata(0.0, OnRotationAngleChanged));
 
+
+    /// <summary>
+    /// 형태 변경 애니메이션 활성화 여부
+    /// </summary>
+    public bool EnableShapeAnimation
+    {
+        get { return (bool)GetValue(EnableShapeAnimationProperty); }
+        set { SetValue(EnableShapeAnimationProperty, value); }
+    }
+
+    public static readonly DependencyProperty EnableShapeAnimationProperty =
+        DependencyProperty.Register("EnableShapeAnimation", typeof(bool), typeof(GMapMarkerBaseControl<T>),
+            new PropertyMetadata(true));
     #endregion
 
     #region Events
@@ -265,11 +281,12 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         // 기본값 설정
         Width = 32;
         Height = 32;
+        TitleSize = 8.0;
         MarkerFill = Brushes.Red;
         MarkerStroke = Brushes.White;
         MarkerStrokeThickness = 2;
         MarkerTitle = "Marker";
-
+        EnableShapeAnimation = true;
         // 마우스 이벤트 활성화
         IsHitTestVisible = true;
 
@@ -281,8 +298,19 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// </summary>
     protected virtual void OnControlInitialized()
     {
-        
-        // 상속 클래스에서 구현
+        MarkerTitle = Marker.Title ?? "Unnamed Marker";
+        Width = Marker.Width;
+        Height = Marker.Height;
+        IsSelected = Marker.IsSelected;
+        MarkerState = Marker.OperationState;
+        RotationAngle = Marker.Bearing;
+        ShowShape = Marker.ShowShape;
+        ShowTitle = Marker.ShowTitle;
+        TitleSize = 8.0;
+        MarkerFill = ColorHelper.ToBrush(Marker.FillColor);
+        MarkerStroke = ColorHelper.ToBrush(Marker.StrokeColor);
+        MarkerStrokeThickness = Marker.StrokeThickness;
+        EnableShapeAnimation = true;
     }
 
     /// <summary>
@@ -295,14 +323,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         try
         {
             // 공통 속성 동기화 (GMapCustomMarker 기본 속성)
-            MarkerTitle = Marker.Title ?? "Unnamed Marker";
-            Width = Marker.Width;
-            Height = Marker.Height;
-            IsSelected = Marker.IsSelected;
-            MarkerState = Marker.OperationState;
-            RotationAngle = Marker.Bearing;
-            ShowShape = Marker.ShowShape;
-            ShowTitle = Marker.ShowTitle;
+            OnControlInitialized();
 
             // 마커별 전용 업데이트 (추상 메서드 호출)
             UpdateFromSpecificMarker();
@@ -331,6 +352,28 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         SetupPropertyBinding(RotationAngleProperty, nameof(Marker.Bearing));
         SetupPropertyBinding(ShowShapeProperty, nameof(Marker.ShowShape));
         SetupPropertyBinding(ShowTitleProperty, nameof(Marker.ShowTitle));
+
+
+        var colorConverter = new ColorTypeToBrushConverter();
+
+        // 색상은 단방향 바인딩 (Marker → Control)
+        var fillBinding = new Binding(nameof(Marker.FillColor))
+        {
+            Source = Marker,
+            Mode = BindingMode.OneWay,
+            Converter = colorConverter
+        };
+        SetBinding(MarkerFillProperty, fillBinding);
+
+        var strokeBinding = new Binding(nameof(Marker.StrokeColor))
+        {
+            Source = Marker,
+            Mode = BindingMode.OneWay,
+            Converter = colorConverter
+        };
+        SetBinding(MarkerStrokeProperty, strokeBinding);
+
+        SetupPropertyBinding(MarkerStrokeThicknessProperty, nameof(Marker.StrokeThickness));
 
         // 마커별 전용 바인딩 (추상 메서드 호출)
         SetupSpecificBindings();
@@ -365,7 +408,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         }
         else
         {
-            HandleSingleClick(e);
+            OnMarkerSingleClicked(e);
         }
 
         LastClickTime = now;
@@ -374,7 +417,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// <summary>
     /// 단일 클릭 처리 (Generic 이벤트 발생)
     /// </summary>
-    protected virtual void HandleSingleClick(MouseButtonEventArgs e)
+    protected virtual void OnMarkerSingleClicked(MouseButtonEventArgs e)
     {
         ToggleSelection();
         MarkerClick?.Invoke(this, new MarkerClickEventArgs(Marker, e));
@@ -388,6 +431,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         MarkerDoubleClick?.Invoke(this, new MarkerClickEventArgs(Marker, e));
     }
 
+    
     /// <summary>
     /// 선택 상태 변경 처리 (Generic 이벤트 발생)
     /// </summary>

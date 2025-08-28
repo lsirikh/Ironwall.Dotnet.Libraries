@@ -21,9 +21,9 @@ public class GeometricSymbolModel : SymbolModel, IGeometricSymbolModel
         Width = 30;
         Height = 30;
     }
-    public GeometricSymbolModel(string title, double latitude, double longitude,
+    public GeometricSymbolModel(string title, double latitude, double longitude, double zoom,
         EnumShapeType shapeType = EnumShapeType.Circle)
-        : base(title, latitude, longitude)
+        : base(title, latitude, longitude, zoom)
     {
         Category = EnumMarkerCategory.GEOMETRICS;
         ShapeType = shapeType;

@@ -74,8 +74,17 @@ public class GMapCustomControl : GMapControl
     private void InitializeEvents()
     {
         Markers.CollectionChanged += Markers_CollectionChanged;
+
         OnAreaChange += GMapCustomControl_OnAreaChange;
+
+        // 기존 GMapControl의 줌 이벤트 활용
+        OnMapZoomChanged += GMapCustomControl_OnMapZoomChanged;
+
+        // 위치 변경도 함께 연결
+        OnPositionChanged += GMapCustomControl_OnPositionChanged;
     }
+
+    
 
     /// <summary>
     /// AdornerManager 초기화
@@ -89,6 +98,8 @@ public class GMapCustomControl : GMapControl
 
         _log?.Info("AdornerManager 초기화 및 이벤트 구독 완료");
     }
+
+   
     #endregion
     #region Integration Events
     /// <summary>
@@ -197,19 +208,116 @@ public class GMapCustomControl : GMapControl
 
     #endregion
     #region Event Handlers
+    /// <summary>
+    /// 줌 변경 이벤트 핸들러
+    /// </summary>
+    private void GMapCustomControl_OnMapZoomChanged()
+    {
+        try
+        {
+            _log?.Info($"줌 변경됨: {Zoom}");
 
+            // ViewArea 계산하여 OnAreaChange 이벤트 발생
+            var viewArea = ViewArea;
+            var zoom = Zoom;
+
+            // OnAreaChange 이벤트 발생 (MapViewModel이 구독)
+            TriggerSelectionChange(viewArea, zoom, false);
+
+            DeselectAllMarkers();
+
+            _log?.Info($"OnAreaChange 이벤트 발생: Zoom={zoom}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"줌 변경 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 위치 변경 이벤트 핸들러
+    /// </summary>
+    private void GMapCustomControl_OnPositionChanged(PointLatLng point)
+    {
+        try
+        {
+            // 위치 변경 시에도 OnAreaChange 이벤트 발생
+            var viewArea = ViewArea;
+            var zoom = Zoom;
+
+            TriggerSelectionChange(viewArea, zoom, false);
+
+            _log?.Info($"위치 변경됨: ({point.Lat:F6}, {point.Lng:F6})");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"위치 변경 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 줌 레벨에 따른 마커 가시성 업데이트
+    /// </summary>
+    private void UpdateMarkersVisibilityByZoom()
+    {
+        try
+        {
+            if (CustomMarkers == null) return;
+
+            foreach (var marker in CustomMarkers.OfType<IEditableMarker>())
+            {
+                if (SetMarkerVisibility(marker))
+                {
+                    marker.ShowShape = true;
+                    marker.ShowTitle = false;
+                }
+                else
+                {
+                    marker.ShowShape = false;
+                    marker.ShowTitle = false;
+                }
+            }
+
+            _log?.Info($"마커 가시성 업데이트 완료: Zoom={Zoom}, 마커 수={CustomMarkers?.Count}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 가시성 업데이트 실패: {ex.Message}");
+        }
+    }
+
+    private bool SetMarkerVisibility(IEditableMarker marker)
+    {
+        // 마커의 설정된 줌 레벨보다 현재 줌이 크거나 같으면 표시
+        if (Zoom >= marker.Zoom)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
     /// <summary>
     /// 지도 영역 변경 이벤트
     /// </summary>
     private void GMapCustomControl_OnAreaChange(RectLatLng selection, double zoom, bool zoomToFit)
     {
-        _log?.Info($"지도 영역 변경: Zoom={zoom}");
+       try
+       {
+            //_log?.Info($"지도 영역 변경: Zoom={zoom}, ZoomToFit={zoomToFit}");
+            //_log?.Info($"영역: Lat={selection.Lat:F6}, Lng={selection.Lng:F6}, W={selection.WidthLng:F6}, H={selection.HeightLat:F6}");
 
-        // 줌 레벨에 따른 마커 가시성 처리
-        Markers.OfType<GMapCustomMarker>().ToList().ForEach(marker =>
+            // 줌 레벨에 따른 마커 가시성 처리
+            UpdateMarkersVisibilityByZoom();
+
+            // 화면 갱신
+            InvalidateVisual();
+        }
+        catch (Exception ex)
         {
-            marker.ShowShape = Zoom >= VISIBILITY_ZOOM;
-        });
+            _log?.Error($"지도 영역 변경 처리 실패: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -434,37 +542,6 @@ public class GMapCustomControl : GMapControl
     #endregion
     #region Object Detection Methods
     /// <summary>
-    /// 특정 위치의 마커 찾기
-    /// </summary>
-    private IEditableMarker? GetMarkerAt(PointLatLng position)
-    {
-        _log?.Info($"GetMarkerAt 호출: 위치({position.Lat:F6}, {position.Lng:F6})");
-        _log?.Info($"총 커스텀 마커 수: {CustomMarkers?.Count ?? 0}");
-
-        if (CustomMarkers == null || !CustomMarkers.Any())
-        {
-            _log?.Info("커스텀 마커가 없음");
-            return null;
-        }
-
-        foreach (var marker in CustomMarkers)
-        {
-            var distance = CalculateDistance(marker.Position, position);
-            _log?.Info($"마커 '{marker.Title}': 위치({marker.Position.Lat:F6}, {marker.Position.Lng:F6}), 거리: {distance:F8}");
-
-            // 허용 범위를 0.001 -> 0.005로 늘림 (더 관대하게)
-            if (distance < 0.005)
-            {
-                _log?.Info($"마커 '{marker.Title}' 선택됨 (거리: {distance:F8})");
-                return marker;
-            }
-        }
-
-        _log?.Info("클릭 위치에서 마커를 찾을 수 없음");
-        return null;
-    }
-
-    /// <summary>
     /// 두 지점 간의 거리 계산 (간단한 유클리드 거리)
     /// </summary>
     private double CalculateDistance(PointLatLng pos1, PointLatLng pos2)
@@ -490,6 +567,7 @@ public class GMapCustomControl : GMapControl
         {
             try
             {
+                if(!SetMarkerVisibility(marker)) continue;
                 // 마커의 화면 좌표 계산
                 var markerScreenPos = FromLatLngToLocal(marker.Position);
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);
