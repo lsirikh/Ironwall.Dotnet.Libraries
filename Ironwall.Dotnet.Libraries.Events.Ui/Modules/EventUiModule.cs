@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Devices.Modules;
 using Ironwall.Dotnet.Libraries.Events.Db.Modules;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Modules;
+using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
@@ -48,6 +49,7 @@ public class EventUiModule : Module
             builder.RegisterType<EventInfoViewModel>().SingleInstance();
             builder.RegisterType<DataChartPanelViewModel>().SingleInstance();
             builder.RegisterType<EventCardListPanelViewModel>().SingleInstance();
+            builder.RegisterType<SymbolEventManager>().SingleInstance();
          
             builder.RegisterType<DetectionReportDialogViewModel>().AsSelf()                       //  new DetectionReportDialogViewModel() 로도 해결 가능
                                                                    .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환

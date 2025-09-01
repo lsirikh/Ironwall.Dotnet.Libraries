@@ -192,3 +192,47 @@
 - `Ironwall.Dotnet.Monitoring.Models/Symbols/GeometricSymbolModel.cs`
 - `Ironwall.Dotnet.Monitoring.Models/Symbols/ISymbolModel.cs`
 - `Ironwall.Dotnet.Monitoring.Models/Symbols/SymbolModel.cs`
+
+
+---
+**일자:** 2025-09-01  
+**작업자:** GH.LEE  
+
+## 작업내용
+
+### 1. 문제 상황 분석
+- 마커 선택 시 이전 Property Panel의 바인딩이 새 마커 속성을 오염시키는 현상 발견
+- 두 번째, 세 번째 마커 선택 시 Title이 빈 문자열로, Size가 32x32로 변경되는 문제 확인
+- XAML 바인딩(`SelectedMarker="{Binding SelectedMarker}"`)이 자동으로 `OnSelectedMarkerChanged` 트리거하여 발생
+
+### 2. 근본 원인 파악
+- `GMapPropertyBaseControl`의 `OnSelectedMarkerChanged`에서 중복된 `SetupMarkerBindings()` 호출 발견
+- XAML에서 SelectedMarker 변경 시 기존 Property Panel의 기본값(Title="", Width=32)이 새 마커에 즉시 적용
+- WPF 바인딩 타이밍 문제: PropertyChanged 콜백이 Behavior보다 먼저 실행되는 구조적 한계
+
+### 3. 시도한 해결방안들
+- `OnSelectedMarkerChanged`에서 `e.NewValue` 직접 활용하여 원본 데이터 보존 시도
+- `_isInitializing` 플래그 제거 (바인딩 없는 상태에서 의미 없음 확인)
+- `CoerceValueCallback` 활용한 바인딩 정리 시도
+- `ClearAllBindings()` 전후 속성값 로깅을 통한 문제점 추적
+
+### 4. WPF Property Panel 설계 패턴 조사
+- Visual Studio Properties Window, Extended WPF Toolkit PropertyGrid 등의 구현 방식 분석
+- DataContext Null 패턴, 명시적 바인딩 정리, Dispatcher 동기화 등의 해결책 연구
+- PropertyDescriptor 메모리 누수 방지 및 Helper 객체 패턴 학습
+
+### 5. 최종 해결 방향 결정
+- 이전 마커와의 연결을 완전히 차단하는 방식 채택
+- Property Panel 완전 재생성을 통한 바인딩 오염 근본 차단
+- `DisconnectFromMarker()` 메서드로 이전 마커 참조 무효화
+- 새 Property Panel 인스턴스 생성으로 깨끗한 상태 보장
+
+### 6. 향후 개선사항
+- WeakEventManager를 활용한 메모리 누수 방지 구현 검토
+- Behavior 기반의 바인딩 정리 자동화 검토
+- 대량 마커 처리 시 성능 최적화 방안 검토
+
+## 주요 학습내용
+- WPF 바인딩 시스템의 내부 동작 원리와 타이밍 이슈
+- PropertyChanged 콜백과 Behavior의 실행 순서
+- 바인딩 오염 문제의 근본적 해결을 위한 설계 패턴들

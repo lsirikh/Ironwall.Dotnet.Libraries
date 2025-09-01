@@ -1,0 +1,375 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+	<utils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
+
+	<!--  컴팩트 스타일들 (MapView에서 가져옴)  -->
+	<!--<Style
+		x:Key="CompactTextBox"
+		BasedOn="{StaticResource MaterialDesignTextBox}"
+		TargetType="TextBox">
+		<Setter Property="Margin" Value="2" />
+		<Setter Property="Padding" Value="4,2" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="MinHeight" Value="24" />
+		<Setter Property="Background" Value="White" />
+	</Style>
+
+	<Style
+		x:Key="CompactComboBox"
+		BasedOn="{StaticResource MaterialDesignComboBox}"
+		TargetType="ComboBox">
+		<Setter Property="Margin" Value="2" />
+		<Setter Property="Padding" Value="4,2" />
+		<Setter Property="FontSize" Value="10" />
+		<Setter Property="MinHeight" Value="24" />
+	</Style>-->
+	<Style x:Key="CompactTextBox" TargetType="TextBox">
+		<Setter Property="Margin" Value="2" />
+		<Setter Property="Padding" Value="4,2" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="MinHeight" Value="24" />
+		<Setter Property="Background" Value="White" />
+		<Setter Property="BorderBrush" Value="Gray" />
+		<Setter Property="BorderThickness" Value="1" />
+	</Style>
+
+	<Style x:Key="CompactComboBox" TargetType="ComboBox">
+		<Setter Property="Margin" Value="2" />
+		<Setter Property="Padding" Value="4,2" />
+		<Setter Property="FontSize" Value="10" />
+		<Setter Property="MinHeight" Value="24" />
+	</Style>
+
+	<Style x:Key="PropertyLabel" TargetType="TextBlock">
+		<Setter Property="Foreground" Value="White" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+	</Style>
+
+	<!--  기본 속성 컨트롤 스타일  -->
+	<Style x:Key="CustomPropertyStyle" TargetType="{x:Type properties:GMapPropertyCustomControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type properties:GMapPropertyCustomControl}">
+					<Border
+						x:Name="PART_MainBorder"
+						MinWidth="280"
+						MaxWidth="300"
+						Background="#7DB0E8"
+						BorderBrush="#5A9BD8"
+						BorderThickness="2"
+						CornerRadius="10">
+
+						<!--  드롭 섀도우 효과  -->
+						<Border.Effect>
+							<DropShadowEffect
+								BlurRadius="10"
+								Opacity="0.3"
+								ShadowDepth="5"
+								Color="Black" />
+						</Border.Effect>
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="45" />
+								<!--  헤더  -->
+								<RowDefinition Height="*" />
+								<!--  내용  -->
+							</Grid.RowDefinitions>
+
+							<!--  헤더 (드래그 영역)  -->
+							<Border
+								x:Name="PART_HeaderArea"
+								Grid.Row="0"
+								Background="#5A9BD8"
+								CornerRadius="8,8,0,0"
+								Cursor="SizeAll">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="35" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="35" />
+									</Grid.ColumnDefinitions>
+
+									<!--  아이콘  -->
+									<md:PackIcon
+										Grid.Column="0"
+										Width="18"
+										Height="18"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Foreground="White"
+										Kind="MapMarker" />
+
+									<!--  제목  -->
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="12"
+										FontWeight="Bold"
+										Foreground="White"
+										Text="마커 속성" />
+
+									<!--  닫기 버튼  -->
+									<Button
+										x:Name="PART_CloseButton"
+										Grid.Column="2"
+										Width="25"
+										Height="25"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Background="Transparent"
+										BorderThickness="0"
+										Cursor="Hand">
+										<md:PackIcon
+											Width="16"
+											Height="16"
+											Foreground="White"
+											Kind="Close" />
+										<Button.Style>
+											<Style TargetType="Button">
+												<Setter Property="Background" Value="Transparent" />
+												<Setter Property="Template">
+													<Setter.Value>
+														<ControlTemplate TargetType="Button">
+															<Border Background="{TemplateBinding Background}" CornerRadius="3">
+																<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+															</Border>
+														</ControlTemplate>
+													</Setter.Value>
+												</Setter>
+												<Style.Triggers>
+													<Trigger Property="IsMouseOver" Value="True">
+														<Setter Property="Background" Value="#AA5A9BD8" />
+													</Trigger>
+													<Trigger Property="IsPressed" Value="True">
+														<Setter Property="Background" Value="#DD4A8BC8" />
+													</Trigger>
+												</Style.Triggers>
+											</Style>
+										</Button.Style>
+									</Button>
+								</Grid>
+							</Border>
+
+							<ScrollViewer
+								Grid.Row="1"
+								HorizontalScrollBarVisibility="Disabled"
+								VerticalScrollBarVisibility="Auto">
+								<!--  내용 영역  -->
+								<StackPanel Margin="15">
+									<!--  헤더  -->
+									<Border
+										Margin="0,0,0,10"
+										Padding="8,4"
+										Background="#5A9BD8"
+										CornerRadius="5">
+										<TextBlock
+											HorizontalAlignment="Center"
+											FontSize="14"
+											FontWeight="Bold"
+											Foreground="White"
+											Text="속성" />
+									</Border>
+
+									<!--  제목  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="제목" />
+										<TextBox
+											Grid.Column="1"
+											Style="{StaticResource CompactTextBox}"
+											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									</Grid>
+
+									<!--  크기  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="50" />
+											<ColumnDefinition Width="15" />
+											<ColumnDefinition Width="50" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="크기" />
+										<TextBox
+											Grid.Column="1"
+											Style="{StaticResource CompactTextBox}"
+											Text="{Binding MarkerWidth, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+										<md:PackIcon
+											Grid.Column="2"
+											Width="10"
+											Height="10"
+											HorizontalAlignment="Center"
+											VerticalAlignment="Center"
+											Foreground="White"
+											Kind="WindowClose" />
+										<TextBox
+											Grid.Column="3"
+											Style="{StaticResource CompactTextBox}"
+											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+									</Grid>
+
+									<!--  회전  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="80" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="회전" />
+										<TextBox
+											Grid.Column="1"
+											Style="{StaticResource CompactTextBox}"
+											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+										<TextBlock
+											Grid.Column="2"
+											Margin="5,0,0,0"
+											VerticalAlignment="Center"
+											Foreground="White"
+											Text="°" />
+									</Grid>
+
+									<!--  색상  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="색상" />
+										<ComboBox
+											Grid.Column="1"
+											ItemsSource="{Binding AvailableColors, RelativeSource={RelativeSource TemplatedParent}}"
+											SelectedItem="{Binding MarkerFillColor, RelativeSource={RelativeSource TemplatedParent}}"
+											Style="{StaticResource CompactComboBox}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate>
+													<Rectangle
+														Width="40"
+														Height="12"
+														Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+														Stroke="Gray"
+														StrokeThickness="0.5" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</Grid>
+
+									<!--  선 색상  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="선색상" />
+										<ComboBox
+											Grid.Column="1"
+											ItemsSource="{Binding AvailableColors, RelativeSource={RelativeSource TemplatedParent}}"
+											SelectedItem="{Binding MarkerStrokeColor, RelativeSource={RelativeSource TemplatedParent}}"
+											Style="{StaticResource CompactComboBox}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate>
+													<Rectangle
+														Width="40"
+														Height="12"
+														Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+														Stroke="Gray"
+														StrokeThickness="0.5" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</Grid>
+
+									<!--  선두께  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="선두께" />
+										<ComboBox
+											Grid.Column="1"
+											ItemsSource="{Binding AvailableSizes, RelativeSource={RelativeSource TemplatedParent}}"
+											SelectedItem="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+											Style="{StaticResource CompactComboBox}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate>
+													<TextBlock HorizontalAlignment="Center" Text="{Binding}" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</Grid>
+
+									<!--  표시 옵션  -->
+									<Grid Margin="0,10,0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="*" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+
+										<CheckBox
+											Grid.Column="0"
+											Content="모양"
+											Foreground="White"
+											IsChecked="{Binding ShowShape, RelativeSource={RelativeSource TemplatedParent}}" />
+
+										<CheckBox
+											Grid.Column="1"
+											Content="제목"
+											Foreground="White"
+											IsChecked="{Binding ShowTitle, RelativeSource={RelativeSource TemplatedParent}}" />
+									</Grid>
+
+								</StackPanel>
+							</ScrollViewer>
+						</Grid>
+					</Border>
+
+					<!--  드래그 불가능할 때 커서 변경  -->
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsDraggable" Value="False">
+							<Setter TargetName="PART_HeaderArea" Property="Cursor" Value="Arrow" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+
+
+	<!--  기본 스타일 적용  -->
+	<Style BasedOn="{StaticResource CustomPropertyStyle}" TargetType="{x:Type properties:GMapPropertyCustomControl}" />
+
+</ResourceDictionary>

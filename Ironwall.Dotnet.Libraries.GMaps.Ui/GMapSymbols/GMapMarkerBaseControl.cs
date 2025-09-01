@@ -12,6 +12,8 @@ using System.Windows;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Utils;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Caliburn.Micro;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -167,23 +169,12 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         set { SetValue(ShowShapeProperty, value); }
     }
 
-    public static readonly DependencyProperty ShowShapeProperty =
-        DependencyProperty.Register("ShowShape", typeof(bool), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(true));
-
-    /// <summary>
-    /// 회전 각도
-    /// </summary>
+    // RotationAngle -> Bearing에 Dp연결 및 Callback연결
     public double RotationAngle
     {
         get { return (double)GetValue(RotationAngleProperty); }
         set { SetValue(RotationAngleProperty, value); }
     }
-
-    public static readonly DependencyProperty RotationAngleProperty =
-        DependencyProperty.Register("RotationAngle", typeof(double), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(0.0, OnRotationAngleChanged));
-
 
     /// <summary>
     /// 형태 변경 애니메이션 활성화 여부
@@ -193,6 +184,17 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         get { return (bool)GetValue(EnableShapeAnimationProperty); }
         set { SetValue(EnableShapeAnimationProperty, value); }
     }
+
+
+    public static readonly DependencyProperty ShowShapeProperty =
+        DependencyProperty.Register("ShowShape", typeof(bool), typeof(GMapMarkerBaseControl<T>),
+            new PropertyMetadata(true));
+
+    // RotationAngle Property
+    public static readonly DependencyProperty RotationAngleProperty =
+        DependencyProperty.Register("RotationAngle", typeof(double), typeof(GMapMarkerBaseControl<T>),
+            new PropertyMetadata(0.0, OnRotationAngleChanged, CoerceDoubleValue));
+
 
     public static readonly DependencyProperty EnableShapeAnimationProperty =
         DependencyProperty.Register("EnableShapeAnimation", typeof(bool), typeof(GMapMarkerBaseControl<T>),
@@ -240,7 +242,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// </summary>
     protected GMapMarkerBaseControl()
     {
-        InitializeControl();
+        //InitializeControl();
+        _log = IoC.Get<ILogService>();
     }
 
     /// <summary>
@@ -253,6 +256,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         OnControlInitialized();
         UpdateFromMarker();
         SetupDataBindings();
+
     }
 
     #endregion
@@ -276,28 +280,30 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// <summary>
     /// 컨트롤 초기화 (가상 메서드)
     /// </summary>
-    protected virtual void InitializeControl()
-    {
-        // 기본값 설정
-        Width = 32;
-        Height = 32;
-        TitleSize = 8.0;
-        MarkerFill = Brushes.Red;
-        MarkerStroke = Brushes.White;
-        MarkerStrokeThickness = 2;
-        MarkerTitle = "Marker";
-        EnableShapeAnimation = true;
-        // 마우스 이벤트 활성화
-        IsHitTestVisible = true;
+    //protected virtual void InitializeControl()
+    //{
+    //    // 기본값 설정
+    //    MarkerWidth = 32;
+    //    MarkerHeight = 32;
+    //    TitleSize = 8.0;
+    //    MarkerFill = Brushes.Red;
+    //    MarkerStroke = Brushes.White;
+    //    MarkerStrokeThickness = 2;
+    //    MarkerTitle = "Marker";
+    //    EnableShapeAnimation = true;
+    //    // 마우스 이벤트 활성화
+    //    IsHitTestVisible = true;
 
         
-    }
+    //}
 
     /// <summary>
     /// 컨트롤 초기화 완료 후 호출 (가상 메서드)
     /// </summary>
     protected virtual void OnControlInitialized()
     {
+        if (Marker == null) return;
+
         MarkerTitle = Marker.Title ?? "Unnamed Marker";
         Width = Marker.Width;
         Height = Marker.Height;
@@ -311,6 +317,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         MarkerStroke = ColorHelper.ToBrush(Marker.StrokeColor);
         MarkerStrokeThickness = Marker.StrokeThickness;
         EnableShapeAnimation = true;
+
     }
 
     /// <summary>
@@ -318,11 +325,13 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// </summary>
     protected virtual void UpdateFromMarker()
     {
-        if (Marker == null) return;
+        if (Marker == null || _isUpdatingFromMarker) return;
+
+        _isUpdatingFromMarker = true;
 
         try
         {
-            // 공통 속성 동기화 (GMapCustomMarker 기본 속성)
+            //다음 초기값 설정 (바인딩이 덮어쓰지 않음)
             OnControlInitialized();
 
             // 마커별 전용 업데이트 (추상 메서드 호출)
@@ -330,11 +339,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
             // 상태에 따른 색상 설정
             UpdateMarkerAppearance();
-
         }
-        catch (Exception ex)
+        finally
         {
-            System.Diagnostics.Debug.WriteLine(ex);
+            _isUpdatingFromMarker = false;
         }
     }
 
@@ -346,6 +354,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         if (Marker == null) return;
 
         // 공통 바인딩 (GMapCustomMarker 기본 속성)
+        SetupPropertyBinding(MarkerTitleProperty, nameof(Marker.Title));
         SetupPropertyBinding(WidthProperty, nameof(Marker.Width));
         SetupPropertyBinding(HeightProperty, nameof(Marker.Height));
         SetupPropertyBinding(IsSelectedProperty, nameof(Marker.IsSelected));
@@ -353,17 +362,15 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         SetupPropertyBinding(ShowShapeProperty, nameof(Marker.ShowShape));
         SetupPropertyBinding(ShowTitleProperty, nameof(Marker.ShowTitle));
 
-
         var colorConverter = new ColorTypeToBrushConverter();
 
-        // 색상은 단방향 바인딩 (Marker → Control)
+        // 색상은 단방향 바인딩 (Marker -> Control)
         var fillBinding = new Binding(nameof(Marker.FillColor))
         {
             Source = Marker,
             Mode = BindingMode.OneWay,
             Converter = colorConverter
         };
-        SetBinding(MarkerFillProperty, fillBinding);
 
         var strokeBinding = new Binding(nameof(Marker.StrokeColor))
         {
@@ -371,9 +378,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             Mode = BindingMode.OneWay,
             Converter = colorConverter
         };
+        SetBinding(MarkerFillProperty, fillBinding);
         SetBinding(MarkerStrokeProperty, strokeBinding);
-
         SetupPropertyBinding(MarkerStrokeThicknessProperty, nameof(Marker.StrokeThickness));
+
 
         // 마커별 전용 바인딩 (추상 메서드 호출)
         SetupSpecificBindings();
@@ -510,7 +518,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             var mapControl = FindParentMapControl();
             if (mapControl != null && Marker != null)
             {
-                System.Diagnostics.Debug.WriteLine($"마커 컨트롤에서 부모에게 클릭 이벤트 전달: {Marker.Title}");
+                _log?.Info($"마커 컨트롤에서 부모에게 클릭 이벤트 전달: {Marker.Title} ({Marker.Width} x {Marker.Height})");
                 mapControl.TriggerMarkerClicked(Marker);
             }
 
@@ -518,7 +526,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"마커 클릭 처리 중 오류: {ex.Message}");
+            _log?.Error($"마커 클릭 처리 중 오류: {ex.Message}");
         }
     }
 
@@ -550,9 +558,17 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     protected static void OnMarkerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerBaseControl<T> control)
+        if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
         {
-            control.UpdateFromMarker();
+            control._isUpdatingFromMarker = true;
+            try
+            {
+                control.UpdateFromMarker();
+            }
+            finally
+            {
+                control._isUpdatingFromMarker = false;
+            }
         }
     }
 
@@ -576,12 +592,19 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         if (d is GMapMarkerBaseControl<T> control)
         {
-            var angle = (double)e.NewValue;
+            var angle = (double)e.NewValue; // 이미 CoerceValueCallback에서 반올림됨
             var rotateTransform = new RotateTransform(angle);
             control.RenderTransform = rotateTransform;
             control.RenderTransformOrigin = new Point(0.5, 0.5);
         }
     }
 
+    // 공통 값 강제 변환 메서드
+    private static object CoerceDoubleValue(DependencyObject d, object value)
+    {
+        return Math.Round((double)value, 2);
+    }
     #endregion
+    private bool _isUpdatingFromMarker = false;  // 필드 추가
+    protected ILogService? _log;
 }

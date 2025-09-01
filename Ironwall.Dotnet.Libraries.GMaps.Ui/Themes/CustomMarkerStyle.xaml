@@ -119,13 +119,13 @@
 					</Viewbox>
 
 					<ControlTemplate.Triggers>
-						<!--  🔧 ShowShape=False일 때만 숨김 (단일 트리거)  -->
+						<!--  ShowShape=False일 때만 숨김 (단일 트리거)  -->
 						<Trigger Property="ShowShape" Value="False">
 							<Setter TargetName="PART_ViewboxContainer" Property="Visibility" Value="Collapsed" />
 							<Setter Property="IsHitTestVisible" Value="False" />
 						</Trigger>
 
-						<!--  🔧 라벨 표시 조건들 (OR 로직)  -->
+						<!--  라벨 표시 조건들 (OR 로직)  -->
 
 						<!--  IsSelected=True일 때 라벨 표시  -->
 						<Trigger Property="IsSelected" Value="True">

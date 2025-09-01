@@ -11,7 +11,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 public interface IEditableMarker : IDisposable
 {
     int Id { get; }
-    string Title { get; }
+    string Title { get; set; }
     PointLatLng Position { get; set; }
     double Width { get; set; }
     double Height { get; set; }

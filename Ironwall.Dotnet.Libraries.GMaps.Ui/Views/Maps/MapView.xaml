@@ -3,10 +3,11 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
-	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:gmap="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms"
+	xmlns:gproperty="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -404,8 +405,7 @@
 				</Button>
 				<Separator />
 
-				<StackPanel Orientation="Horizontal" Visibility="{Binding CanEditMarker, Converter={StaticResource BooleanToVisibilityConverter}}">
-					<!--  색상 편집 섹션 (컴팩트)  -->
+				<!--<StackPanel Orientation="Horizontal" Visibility="{Binding CanEditMarker, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<md:PackIcon
 						Width="16"
 						Height="16"
@@ -454,7 +454,6 @@
 						IsEnabled="{Binding HasSelectedItem}"
 						Text="{Binding SelectedMarkerBearing}" />
 
-					<!--  색상 편집 섹션 (컴팩트)  -->
 					<md:PackIcon
 						Width="16"
 						Height="16"
@@ -463,8 +462,6 @@
 						Kind="Palette"
 						ToolTip="색상 편집" />
 
-
-					<!--  Fill Color  -->
 					<ComboBox
 						Width="70"
 						Margin="3,0"
@@ -485,7 +482,6 @@
 						</ComboBox.ItemTemplate>
 					</ComboBox>
 
-					<!--  Stroke Color  -->
 					<ComboBox
 						Width="70"
 						Margin="3,0"
@@ -520,11 +516,26 @@
 							</DataTemplate>
 						</ComboBox.ItemTemplate>
 					</ComboBox>
+
+					<ComboBox
+						Width="50"
+						Margin="3,0"
+						IsEnabled="{Binding HasSelectedItem}"
+						ItemsSource="{Binding DeviceList}"
+						SelectedItem="{Binding SelectedLinkDevice}"
+						Style="{StaticResource CompactComboBox}"
+						ToolTip="Stroke 색상">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock HorizontalAlignment="Center" Text="{Binding}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
 					<Separator />
-				</StackPanel>
+				</StackPanel>-->
 
 				<!--  상태 표시  -->
-				<TextBlock Margin="10,0" VerticalAlignment="Center">
+				<!--<TextBlock Margin="10,0" VerticalAlignment="Center">
 					<TextBlock.Style>
 						<Style TargetType="TextBlock">
 							<Setter Property="Text" Value="일반 모드" />
@@ -537,7 +548,7 @@
 							</Style.Triggers>
 						</Style>
 					</TextBlock.Style>
-				</TextBlock>
+				</TextBlock>-->
 
 				<!--  선택된 마커 정보 표시  -->
 				<!--<TextBlock
@@ -554,7 +565,6 @@
 			</ToolBar>
 		</ToolBarTray>
 
-
 		<gmap:GMapCustomControl
 			x:Name="MainMap"
 			Grid.Row="2"
@@ -565,13 +575,7 @@
 			MinZoom="2"
 			RotationSnapAngle="{Binding RotationSnapAngle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 			ShowMGRSGrid="{Binding IsShowMGRSGrid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-			<!--<b:Interaction.Behaviors>
-				<behavior:MousePointerChangeBehavior CursorImagePath="{Binding CurrentCursorImagePath}" />
-			</b:Interaction.Behaviors>-->
-		</gmap:GMapCustomControl>
-
-
+			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 		<Border
 			x:Name="MapView_Scale"
@@ -762,5 +766,34 @@
 					Content="{md:PackIcon Kind=MagnifyMinus}" />
 			</Grid>
 		</Border>
+
+
+		<Canvas
+			x:Name="PropertyPanelCanvas"
+			Grid.Row="2"
+			Grid.ColumnSpan="2"
+			Panel.ZIndex="1000">
+
+			<gproperty:GMapPropertyCustomControl
+				x:Name="PropertyPanelControl"
+				Canvas.Left="300"
+				Canvas.Top="100"
+				Width="280"
+				Height="400"
+				AvailableColors="{Binding AvailableColors}"
+				AvailableSizes="{Binding AvailableSize}"
+				Background="LightBlue"
+				BorderBrush="Red"
+				BorderThickness="2"
+				IsDraggable="True"
+				SelectedMarker="{Binding SelectedMarker, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+				<i:Interaction.Behaviors>
+					<behavior:PropertyPanelEventBehavior />
+					<!--<behavior:PreventBindingContaminationBehavior />-->
+				</i:Interaction.Behaviors>
+			</gproperty:GMapPropertyCustomControl>
+		</Canvas>
 	</Grid>
 </UserControl>

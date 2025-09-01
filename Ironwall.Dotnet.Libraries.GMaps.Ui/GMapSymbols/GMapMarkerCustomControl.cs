@@ -142,7 +142,7 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
                 // 기존 RotateTransform만 있는 경우
                 existingRotate = rotateOnly;
                 transformGroup = new TransformGroup();
-                transformGroup.Children.Add(existingRotate); // ✅ 기존 회전 보존
+                transformGroup.Children.Add(existingRotate); // 기존 회전 보존
                 scaleTransform = null;
             }
             else

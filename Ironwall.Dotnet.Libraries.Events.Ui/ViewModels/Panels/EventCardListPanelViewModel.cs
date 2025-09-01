@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Db.Services;
 using Ironwall.Dotnet.Libraries.Events.Modules;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
@@ -34,11 +35,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public EventCardListPanelViewModel(IEventAggregator ea
                                           , ILogService log
                                           , IEventDbService dbService
-                                          , IAccountModel userModel)
+                                          , IAccountModel userModel
+                                          , SymbolEventManager symbolEventManager)
                                         : base(ea, log)
         {
             _dbService = dbService;
             _userModel = userModel;
+            _symbolEventManager = symbolEventManager;
         }
         #endregion
         #region - Implementation of Interface -
@@ -156,8 +159,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var vm = message.ViewModel;
                     var eventModel = vm.Model;
                     if (eventModel == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
-                    
-                                        
+
+                    if (eventModel.Device != null)
+                    {
+                        _symbolEventManager.ProcessEventReport(eventModel.Device.Id);
+                    }
+
                     var action = new ActionEventModel()
                     {
                         Content = message.Content,
@@ -192,6 +199,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var eventModel = vm.Model;
                     if (eventModel == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
 
+                    if (eventModel.Device != null)
+                    {
+                        _symbolEventManager.ProcessEventReport(eventModel.Device.Id);
+                    }
+
 
                     var action = new ActionEventModel()
                     {
@@ -224,10 +236,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 foreach (var item in ViewModelProvider.ToList())
                 {
                     ActionEventModel action;
+                    int? deviceId = null;
+
 
                     if (item is DetectionEventCardViewModel dEventCardViewModel)
                     {
                         var vm = dEventCardViewModel.Model;
+                        deviceId = vm.Device?.Id; // Device ID 추출
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
@@ -240,6 +255,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     else if(item is MalfunctionEventCardViewModel mEventCardViewModel)
                     {
                         var vm = mEventCardViewModel.Model;
+                        deviceId = vm.Device?.Id; // Device ID 추출
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
@@ -252,6 +268,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     else
                     {
                         continue;
+                    }
+                    
+                    
+                    if (deviceId.HasValue)
+                    {
+                        _symbolEventManager.ProcessEventReport(deviceId.Value);
                     }
 
                     DispatcherService.Invoke(() =>
@@ -308,6 +330,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Attributes -
         private IEventDbService _dbService;
         private IAccountModel _userModel;
+        private SymbolEventManager _symbolEventManager;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         #endregion
     }

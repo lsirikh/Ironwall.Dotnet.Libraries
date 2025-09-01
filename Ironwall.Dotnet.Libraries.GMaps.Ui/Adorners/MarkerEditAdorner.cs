@@ -233,9 +233,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
             var markerCenter = new Point(elementBounds.Width / 2, elementBounds.Height / 2);
             _log?.Info($"Adorner 렌더링 - 요소크기: {elementBounds.Width}x{elementBounds.Height}, 중심: ({markerCenter.X}, {markerCenter.Y})");
 
-
-            _log?.Info($"Adorner 렌더링 - 요소크기: {elementBounds.Width}x{elementBounds.Height}, 중심: ({markerCenter.X}, {markerCenter.Y})");
-
             var editRadius = CalculateEditRadius();
 
             // 편집 영역 및 핸들 렌더링
@@ -244,12 +241,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
             if (_editState.ShowInfo)
             {
-                RenderMarkerInfo(drawingContext, markerCenter, editRadius);
+                //RenderMarkerInfo(drawingContext, markerCenter, editRadius);
             }
 
             if (_isDragging)
             {
-                RenderDragFeedback(drawingContext, markerCenter);
+                //RenderDragFeedback(drawingContext, markerCenter);
             }
         }
         catch (Exception ex)
@@ -867,7 +864,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         var tolerance = MarkerEditSettings.HandleTolerance;
 
-        // 🔧 실제 마커 크기를 기준으로 사각형 계산 (편집 영역과 동일)
+        // 실제 마커 크기를 기준으로 사각형 계산 (편집 영역과 동일)
         var markerWidth = _targetMarker.Width;
         var markerHeight = _targetMarker.Height;
        

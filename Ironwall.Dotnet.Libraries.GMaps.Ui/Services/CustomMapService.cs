@@ -117,14 +117,14 @@ public class CustomMapService {
             _log?.Info($"TIF 파일 처리 및 DB 저장 완료: {customMap.Name}, ID: {customMap.Id}");
 
             // 6. 완료 이벤트 발행
-            //await _eventAggregator.PublishOnUIThreadAsync(new TileGenerationCompletedEvent(customMap));
+            //await _ea.PublishOnUIThreadAsync(new TileGenerationCompletedEvent(customMap));
 
             return customMap;
         }
         catch (Exception ex)
         {
             _log?.Error($"TIF 파일 처리 실패: {ex.Message}");
-            //await _eventAggregator.PublishOnUIThreadAsync(new TileGenerationFailedEvent(ex.Message));
+            //await _ea.PublishOnUIThreadAsync(new TileGenerationFailedEvent(ex.Message));
             throw;
         }
     }

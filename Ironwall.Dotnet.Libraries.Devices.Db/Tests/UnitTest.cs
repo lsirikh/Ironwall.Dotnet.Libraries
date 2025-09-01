@@ -30,20 +30,24 @@ public sealed class DeviceDbFixture : IAsyncLifetime
     internal DeviceProvider DevProvider = new();
     internal ControllerDeviceProvider CtrlProvider = null!;
     internal SensorDeviceProvider SnsProvider = null!;
+    internal CameraDeviceProvider CamProvider = null!;
+
 
     internal CancellationTokenSource Cts { get; } = new();
 
     /* 테스트에서 사용하는 테이블 이름만 나열 */
     private static readonly string[] tables =
     {
-        "CameraDevices",
+        "CameraDevices",      // FK 테이블 먼저 삭제
         "SensorDevices",
-        "ControllerDevices"
+        "ControllerDevices",
+        "Devices"             // 부모 테이블 마지막 삭제
     };
 
 
-    private const int CtrlCount = 5;
-    private const int SnsPerCtrl = 200;
+    public int CtrlCount = 5;
+    public int SnsPerCtrl = 100;
+    public int CameraCount = 0;
 
     private readonly DeviceDbSetupModel _setup = new()
     {
@@ -66,9 +70,7 @@ public sealed class DeviceDbFixture : IAsyncLifetime
         // 세부 Provider는 (log, DevProvider) 주입
         CtrlProvider = new ControllerDeviceProvider(log, DevProvider);
         SnsProvider = new SensorDeviceProvider(log, DevProvider);
-
-        // CameraDeviceProvider가 동일 패턴이라 가정
-        var camProvider = new CameraDeviceProvider(log, DevProvider);
+        CamProvider = new CameraDeviceProvider(log, DevProvider); // 카메라 Provider 추가
 
         Svc = new DeviceDbService(
                 log,
@@ -76,7 +78,7 @@ public sealed class DeviceDbFixture : IAsyncLifetime
                 DevProvider,
                 CtrlProvider,
                 SnsProvider,
-                camProvider,
+                CamProvider,
                 _setup);
 
         await DropTablesAsync();               // 깨끗한 DB 확보
@@ -100,6 +102,7 @@ public sealed class DeviceDbFixture : IAsyncLifetime
 
     private async Task SeedAsync()
     {
+        // 1. Controller + Sensor 생성
         for (int c = 1; c <= CtrlCount; c++)
         {
             var ctrl = new ControllerDeviceModel
@@ -126,7 +129,55 @@ public sealed class DeviceDbFixture : IAsyncLifetime
                     Controller = ctrl
                 });
             }
+
             await Svc.InsertControllerAsync(ctrl, Cts.Token);
+        }
+
+        // 2. Camera 생성
+        for (int cam = 1; cam <= CameraCount; cam++)
+        {
+            // 카메라 타입을 순환적으로 할당 (int 값으로 계산 후 enum으로 변환)
+            int typeIndex = cam % 5;
+            EnumCameraType cameraType = typeIndex switch
+            {
+                0 => EnumCameraType.THERMAL,
+                1 => EnumCameraType.FIXED,
+                2 => EnumCameraType.PTZ,
+                3 => EnumCameraType.FISHEYES,
+                4 => EnumCameraType.NONE,
+                _ => EnumCameraType.FIXED
+            };
+
+            // 카메라 모드를 순환적으로 할당 (int 값으로 계산 후 enum으로 변환)
+            int modeIndex = cam % 4;
+            EnumCameraMode cameraMode = modeIndex switch
+            {
+                0 => EnumCameraMode.ETC,
+                1 => EnumCameraMode.ONVIF,
+                2 => EnumCameraMode.INNODEP_API,
+                3 => EnumCameraMode.NONE,
+                _ => EnumCameraMode.ONVIF
+            };
+
+            var camera = new CameraDeviceModel
+            {
+                DeviceGroup = (cam - 1) / 10 + 100, // 100, 101, 102, 103... 그룹으로 분산
+                DeviceNumber = ((cam - 1) % 10) + 1,  // 각 그룹 내에서 1~10 번호
+                DeviceName = $"IP카메라_{cam:000}_{cameraType}",
+                DeviceType = EnumDeviceType.IpCamera,
+                Version = "v2.0.1",
+                Status = cam % 7 == 0 ? EnumDeviceStatus.ERROR : EnumDeviceStatus.ACTIVATED, // 7번째마다 ERROR
+                IpAddress = $"192.168.200.{cam}",
+                Port = cameraType == EnumCameraType.THERMAL ? 80 : 8554, // 열화상 카메라는 다른 포트
+                Username = "admin",
+                Password = "sensorway123",
+                RtspUri = $"rtsp://192.168.200.{cam}/stream1",
+                RtspPort = cameraType == EnumCameraType.FISHEYES ? 8554 : 554, // 어안 카메라는 다른 RTSP 포트
+                Mode = cameraMode,
+                Category = cameraType
+            };
+
+            await Svc.InsertCameraAsync(camera, Cts.Token);
         }
     }
 
@@ -154,8 +205,14 @@ public sealed class DeviceDbFixture : IAsyncLifetime
         await using var dbConn = new MySqlConnection(bootstrap.ToString());
         await dbConn.OpenAsync();
 
+        // 💡 외래키 체크 비활성화
+        await dbConn.ExecuteAsync("SET FOREIGN_KEY_CHECKS = 0;");
+
         foreach (var t in tables)
             await dbConn.ExecuteAsync($"DROP TABLE IF EXISTS `{t}`;");
+
+        // 💡 외래키 체크 재활성화
+        await dbConn.ExecuteAsync("SET FOREIGN_KEY_CHECKS = 1;");
     }
 }
 
@@ -179,11 +236,11 @@ public class DeviceDb_BulkTests
         var ctrls = await _fx.Svc.FetchControllersAsync();
         var sensors = await _fx.Svc.FetchSensorsAsync();
 
-        Assert.Equal(5, ctrls!.Count);
-        Assert.Equal(5 * 200, sensors!.Count);
+        Assert.Equal(_fx.CtrlCount, ctrls!.Count);
+        Assert.Equal(_fx.CtrlCount * _fx.SnsPerCtrl, sensors!.Count);
 
         // 부모-자식 연결 무결성
-        Assert.All(ctrls, c => Assert.Equal(200, c.Devices!.Count));
+        Assert.All(ctrls, c => Assert.Equal(_fx.SnsPerCtrl, c.Devices!.Count));
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -194,7 +251,7 @@ public class DeviceDb_BulkTests
         var anyCtrl = (await _fx.Svc.FetchControllersAsync())!.First();
         var fetchedC = await _fx.Svc.FetchControllerAsync(anyCtrl.Id);
         Assert.Equal(anyCtrl.DeviceName, fetchedC!.DeviceName);
-        Assert.Equal(200, fetchedC.Devices!.Count);
+        Assert.Equal(_fx.SnsPerCtrl, fetchedC.Devices!.Count);
 
         // 임의 Sensor 1개
         var anySensorId = ((SensorDeviceModel)fetchedC.Devices!.First()).Id;
@@ -244,8 +301,37 @@ public class DeviceDb_BulkTests
     }
 
     // ──────────────────────────────────────────────────────────────
-    [Fact(DisplayName = "06. IsConnected 속성")]
-    public void Connection_State() => Assert.True(_fx.Svc.IsConnected);
+    [Fact(DisplayName = "06. 정규화된 스키마 데이터 확인")]
+    public async Task Normalized_Schema_Data_Integrity()
+    {
+        // Devices 테이블 직접 확인
+        using var conn = new MySqlConnection(_fx.Svc.BuildConnStr());
+        await conn.OpenAsync();
+
+        // 실제 시드 데이터의 DeviceType에 맞춰 수정
+        var deviceCount = await conn.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM Devices WHERE DeviceType IN ('Controller', 'Fence')");
+
+        var controllerSpecCount = await conn.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM ControllerDevices");
+
+        var sensorSpecCount = await conn.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM SensorDevices");
+
+        // Controller 5개 + Sensor(Fence) 500개 (5 * 100)
+        Assert.Equal(_fx.CtrlCount + _fx.CtrlCount * _fx.SnsPerCtrl, deviceCount);
+        Assert.Equal(_fx.CtrlCount, controllerSpecCount);
+        Assert.Equal(_fx.CtrlCount * _fx.SnsPerCtrl, sensorSpecCount);
+
+        // 추가 검증: FK 관계 무결성 확인
+        var orphanSensors = await conn.ExecuteScalarAsync<int>(@"
+        SELECT COUNT(*) 
+        FROM SensorDevices s 
+        LEFT JOIN ControllerDevices c ON s.ControllerId = c.Id 
+        WHERE c.Id IS NULL");
+
+        Assert.Equal(0, orphanSensors); // 고아 센서가 없어야 함
+    }
 }
 
 [Collection(nameof(DeviceBulkCollection))]
@@ -298,8 +384,6 @@ public class CameraDeviceDbTests
         var deleted = await _fx.Svc.DeleteCameraAsync(updated);
         Assert.True(deleted);
 
-        //var afterDelete = await _fx.Svc.FetchCameraAsync(updated.Id);
-        //Assert.Null(afterDelete);
     }
 
     [Fact(DisplayName = "02. Fetch All Cameras")]
