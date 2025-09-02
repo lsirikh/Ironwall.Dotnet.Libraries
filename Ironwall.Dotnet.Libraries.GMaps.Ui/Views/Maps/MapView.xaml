@@ -774,7 +774,7 @@
 			Grid.ColumnSpan="2"
 			Panel.ZIndex="1000">
 
-			<gproperty:GMapPropertyCustomControl
+			<!--<gproperty:GMapPropertyCustomControl
 				x:Name="PropertyPanelControl"
 				Canvas.Left="300"
 				Canvas.Top="100"
@@ -791,9 +791,18 @@
 
 				<i:Interaction.Behaviors>
 					<behavior:PropertyPanelEventBehavior />
-					<!--<behavior:PreventBindingContaminationBehavior />-->
 				</i:Interaction.Behaviors>
-			</gproperty:GMapPropertyCustomControl>
+			</gproperty:GMapPropertyCustomControl>-->
+
+			<ContentPresenter
+				Canvas.Left="300"
+				Canvas.Top="100"
+				Content="{Binding PropertyPanel}"
+				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<i:Interaction.Behaviors>
+					<behavior:PropertyPanelEventBehavior />
+				</i:Interaction.Behaviors>
+			</ContentPresenter>
 		</Canvas>
 	</Grid>
 </UserControl>

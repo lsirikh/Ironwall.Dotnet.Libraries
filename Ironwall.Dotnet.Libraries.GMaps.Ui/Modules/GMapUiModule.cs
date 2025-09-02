@@ -40,6 +40,7 @@ public class GMapUiModule: Module
         builder.RegisterModule(new GMapDbModule(_gMapSetup, _gMapDbSetup, _log, _count)); // 4
 
         builder.RegisterType<MarkerFactory>().SingleInstance();
+        builder.RegisterType<PropertyPanelFactory>().SingleInstance();
         builder.RegisterType<GMapControl>().SingleInstance();
         builder.RegisterType<GMapCustomControl>().SingleInstance();
         builder.RegisterType<MapViewModel>().SingleInstance();

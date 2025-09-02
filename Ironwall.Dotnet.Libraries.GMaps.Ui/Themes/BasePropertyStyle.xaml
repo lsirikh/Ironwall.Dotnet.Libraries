@@ -1,4 +1,4 @@
-﻿<!--<ResourceDictionary
+﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
@@ -9,7 +9,6 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 	<utils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
-
 
 	<Style x:Key="CompactTextBox" TargetType="TextBox">
 		<Setter Property="Margin" Value="2" />
@@ -35,13 +34,12 @@
 		<Setter Property="FontWeight" Value="SemiBold" />
 	</Style>
 
-	-->
-<!--  기본 속성 컨트롤 스타일  -->
-<!--
-	<Style x:Key="CustomPropertyStyle" TargetType="{x:Type properties:GMapPropertyCustomControl}">
+
+	<!--  기본 속성 컨트롤 스타일  -->
+	<Style x:Key="BasePropertyStyle" TargetType="{x:Type properties:GMapPropertyBaseControl}">
 		<Setter Property="Template">
 			<Setter.Value>
-				<ControlTemplate TargetType="{x:Type properties:GMapPropertyCustomControl}">
+				<ControlTemplate TargetType="{x:Type properties:GMapPropertyBaseControl}">
 					<Border
 						x:Name="PART_MainBorder"
 						MinWidth="280"
@@ -51,9 +49,7 @@
 						BorderThickness="2"
 						CornerRadius="10">
 
-						-->
-<!--  드롭 섀도우 효과  -->
-<!--
+						<!--  드롭 섀도우 효과  -->
 						<Border.Effect>
 							<DropShadowEffect
 								BlurRadius="10"
@@ -65,18 +61,12 @@
 						<Grid>
 							<Grid.RowDefinitions>
 								<RowDefinition Height="45" />
-								-->
-<!--  헤더  -->
-<!--
+								<!--  헤더  -->
 								<RowDefinition Height="*" />
-								-->
-<!--  내용  -->
-<!--
+								<!--  내용  -->
 							</Grid.RowDefinitions>
 
-							-->
-<!--  헤더 (드래그 영역)  -->
-<!--
+							<!--  헤더 (드래그 영역)  -->
 							<Border
 								x:Name="PART_HeaderArea"
 								Grid.Row="0"
@@ -90,9 +80,7 @@
 										<ColumnDefinition Width="35" />
 									</Grid.ColumnDefinitions>
 
-									-->
-<!--  아이콘  -->
-<!--
+									<!--  아이콘  -->
 									<md:PackIcon
 										Grid.Column="0"
 										Width="18"
@@ -102,9 +90,7 @@
 										Foreground="White"
 										Kind="MapMarker" />
 
-									-->
-<!--  제목  -->
-<!--
+									<!--  제목  -->
 									<TextBlock
 										Grid.Column="1"
 										HorizontalAlignment="Center"
@@ -114,9 +100,7 @@
 										Foreground="White"
 										Text="마커 속성" />
 
-									-->
-<!--  닫기 버튼  -->
-<!--
+									<!--  닫기 버튼  -->
 									<Button
 										x:Name="PART_CloseButton"
 										Grid.Column="2"
@@ -158,17 +142,14 @@
 								</Grid>
 							</Border>
 
+							<!--  스크롤 가능한 내용 영역  -->
 							<ScrollViewer
 								Grid.Row="1"
 								HorizontalScrollBarVisibility="Disabled"
 								VerticalScrollBarVisibility="Auto">
-								-->
-<!--  내용 영역  -->
-<!--
+								<!--  공통 속성 섹션  -->
 								<StackPanel Margin="15">
-									-->
-<!--  헤더  -->
-<!--
+									<!--  헤더  -->
 									<Border
 										Margin="0,0,0,10"
 										Padding="8,4"
@@ -179,12 +160,10 @@
 											FontSize="14"
 											FontWeight="Bold"
 											Foreground="White"
-											Text="속성" />
+											Text="공통 속성" />
 									</Border>
 
-									-->
-<!--  제목  -->
-<!--
+									<!--  제목  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -200,9 +179,7 @@
 											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 									</Grid>
 
-									-->
-<!--  크기  -->
-<!--
+									<!--  크기  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -233,9 +210,7 @@
 											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 									</Grid>
 
-									-->
-<!--  회전  -->
-<!--
+									<!--  회전  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -258,9 +233,7 @@
 											Text="°" />
 									</Grid>
 
-									-->
-<!--  색상  -->
-<!--
+									<!--  색상  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -288,9 +261,7 @@
 										</ComboBox>
 									</Grid>
 
-									-->
-<!--  선 색상  -->
-<!--
+									<!--  선 색상  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -318,9 +289,7 @@
 										</ComboBox>
 									</Grid>
 
-									-->
-<!--  선두께  -->
-<!--
+									<!--  선두께  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -343,9 +312,7 @@
 										</ComboBox>
 									</Grid>
 
-									-->
-<!--  표시 옵션  -->
-<!--
+									<!--  표시 옵션  -->
 									<Grid Margin="0,10,0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="*" />
@@ -365,14 +332,39 @@
 											IsChecked="{Binding ShowTitle, RelativeSource={RelativeSource TemplatedParent}}" />
 									</Grid>
 
+									<!--  특화 속성 영역 (ContentPresenter)  -->
+									<Border
+										x:Name="PART_SpecificPropertiesContainer"
+										Margin="0,10,0,0"
+										Visibility="{TemplateBinding HasSpecificProperties,
+										                             Converter={StaticResource BooleanToVisibilityConverter}}">
+
+										<!--  특화 속성 헤더  -->
+										<StackPanel>
+											<Border
+												Margin="0,0,0,10"
+												Padding="8,4"
+												Background="#5A9BD8"
+												CornerRadius="5">
+												<TextBlock
+													HorizontalAlignment="Center"
+													FontSize="14"
+													FontWeight="Bold"
+													Foreground="White"
+													Text="{TemplateBinding SpecificPropertiesTitle}" />
+											</Border>
+
+											<!--  특화 속성 내용  -->
+											<ContentPresenter x:Name="PART_SpecificProperties" Content="{TemplateBinding SpecificContent}" />
+										</StackPanel>
+									</Border>
+
 								</StackPanel>
 							</ScrollViewer>
 						</Grid>
 					</Border>
 
-					-->
-<!--  드래그 불가능할 때 커서 변경  -->
-<!--
+					<!--  드래그 불가능할 때 커서 변경  -->
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsDraggable" Value="False">
 							<Setter TargetName="PART_HeaderArea" Property="Cursor" Value="Arrow" />
@@ -385,25 +377,4 @@
 
 
 
-	-->
-<!--  기본 스타일 적용  -->
-<!--
-	<Style BasedOn="{StaticResource CustomPropertyStyle}" TargetType="{x:Type properties:GMapPropertyCustomControl}" />
-
-</ResourceDictionary>-->
-
-<ResourceDictionary
-	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
-
-	<ResourceDictionary.MergedDictionaries>
-		<ResourceDictionary Source="BasePropertyStyle.xaml" />
-	</ResourceDictionary.MergedDictionaries>
-
-	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyCustomControl}">
-
-		<!--  Custom 마커는 추가 속성이 없으므로 특화 컨텐츠 없음  -->
-		<Setter Property="HasSpecificProperties" Value="False" />
-	</Style>
 </ResourceDictionary>

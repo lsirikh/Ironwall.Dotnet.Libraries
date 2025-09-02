@@ -33,7 +33,29 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             // 기본 클래스 초기화는 자동으로 수행됨
         }
+        //protected override FrameworkElement CreateSpecificPropertiesPanel()
+        //{
+        //}
+        protected override void SetupSpecificBindings()
+        {
+        }
 
+        protected override void ClearSpecificBindings()
+        {
+        }
+
+        protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)
+        {
+        }
+
+        protected override void UpdateSpecificProperties()
+        {
+        }
+
+        public override Type GetSupportedMarkerType()
+        {
+            return typeof(GMapPropertyCustomControl);
+        }
         #endregion
 
         #region Override Methods

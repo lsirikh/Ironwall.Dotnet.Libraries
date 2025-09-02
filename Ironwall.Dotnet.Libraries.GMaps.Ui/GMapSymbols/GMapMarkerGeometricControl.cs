@@ -14,7 +14,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /// 기하학적 심볼 전용 마커 컨트롤
 /// - GMapMarkerBaseControl<GMapGeometryMarker>를 상속받아 기하 심볼 특화 기능 제공
 /// - ShapeType에 따른 동적 Shape 렌더링
-/// - Opacity 및 기하 심볼 전용 속성 지원
+/// - MarkerOpacity 및 기하 심볼 전용 속성 지원
 /// </summary>
 public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMarker>
 {
@@ -44,15 +44,15 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     /// <summary>
     /// 투명도 (0.0 ~ 1.0) - Control.Opacity를 오버라이드
     /// </summary>
-    public new double Opacity
+    public double MarkerOpacity
     {
-        get { return (double)GetValue(OpacityProperty); }
-        set { SetValue(OpacityProperty, value); }
+        get { return (double)GetValue(MarkerOpacityProperty); }
+        set { SetValue(MarkerOpacityProperty, value); }
     }
 
-    public static readonly DependencyProperty OpacityProperty =
-        DependencyProperty.Register("Opacity", typeof(double), typeof(GMapGeometricMarkerControl),
-            new PropertyMetadata(1.0, OnOpacityChanged));
+    public static readonly DependencyProperty MarkerOpacityProperty =
+        DependencyProperty.Register("MarkerOpacity", typeof(double), typeof(GMapGeometricMarkerControl),
+            new PropertyMetadata(1.0, OnMarkerOpacityChanged));
 
     
 
@@ -91,7 +91,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
 
         // GMapGeometryMarker 전용 속성 동기화 (타입 안전)
         ShapeType = Marker.ShapeType;
-        Opacity = Marker.Opacity;
+        MarkerOpacity = Marker.Opacity;
 
         // 기하 심볼 전용 모양 업데이트
         //UpdateGeometricAppearance();
@@ -106,7 +106,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
 
         // GMapGeometryMarker 전용 바인딩 (타입 안전)
         SetupPropertyBinding(ShapeTypeProperty, nameof(Marker.ShapeType));
-        SetupPropertyBinding(OpacityProperty, nameof(Marker.Opacity));
+        SetupPropertyBinding(MarkerOpacityProperty, nameof(Marker.Opacity));
     }
 
     #endregion
@@ -216,7 +216,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     /// </summary>
     private void ApplyOpacity()
     {
-        base.Opacity = Opacity; // 기본 Control의 Opacity에 적용
+        base.Opacity = MarkerOpacity; // 기본 Control의 Opacity에 적용
     }
 
     /// <summary>
@@ -309,7 +309,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     /// <summary>
     /// 투명도 변경 시 호출
     /// </summary>
-    protected static void OnOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    protected static void OnMarkerOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is GMapGeometricMarkerControl control && control.Marker != null)
         {
@@ -332,7 +332,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     //public void ResetGeometryState()
     //{
     //    ShapeType = EnumShapeType.Circle;
-    //    Opacity = 1.0;
+    //    MarkerOpacity = 1.0;
     //    EnableShapeAnimation = true;
     //}
 

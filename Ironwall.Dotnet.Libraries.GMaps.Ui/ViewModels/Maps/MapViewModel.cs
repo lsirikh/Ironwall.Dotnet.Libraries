@@ -79,6 +79,7 @@ public class MapViewModel : BasePanelViewModel
                         , DeviceProvider deviceProvider
                         , ImageOverlayService imageOverlayService
                         , MarkerFactory markerFactory
+                        , PropertyPanelFactory propertyPanelFactory
                         , SymbolEventManager symbolEventManager
                         ) : base(eventAggregator, log)
     {
@@ -92,6 +93,7 @@ public class MapViewModel : BasePanelViewModel
         _customMapService = customMapService;
         _imageOverlayService = imageOverlayService;
         _markerFactory = markerFactory;
+        _propertyPanelFactory = propertyPanelFactory;
         _symbolEventManager = symbolEventManager;
         DeviceProvider = deviceProvider;
         InitializeCommands();
@@ -502,32 +504,6 @@ public class MapViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(CanEditMarker));
         _log?.Info($"UpdateSelectedMarker 완료 - {GetMarkerInfo(marker)}");
     }
-
-    //private void UpdateSelectedMarker(IEditableMarker marker)
-    //{
-    //    // 기존 Panel 완전 제거
-    //    if (CustomPropertyPanel != null)
-    //    {
-    //        CustomPropertyPanel = null;
-    //    }
-
-    //    SelectedMarker = marker;
-
-    //    // 새 Panel 생성
-    //    if (marker != null && IsEditModeEnabled)
-    //    {
-    //        CustomPropertyPanel = new GMapPropertyCustomControl
-    //        {
-    //            SelectedMarker = marker,
-    //            // 다른 속성들...
-    //        };
-    //    }
-
-    //    SelectedImage = null; // 이미지 선택 해제
-
-    //    NotifyOfPropertyChange(nameof(CanEditMarker));
-    //    _log?.Info($"UpdateSelectedMarker 완료 - {GetMarkerInfo(marker)}");
-    //}
 
     /// <summary>
     /// 선택된 이미지 업데이트
@@ -2617,19 +2593,11 @@ public class MapViewModel : BasePanelViewModel
         {
 
             _selectedMarker = value;
-            ClearPropertyPanel();
-            
             NotifyOfPropertyChange(nameof(SelectedMarker));
             NotifyOfPropertyChange(nameof(HasSelectedItem));
             NotifyOfPropertyChange(nameof(IsEditModeEnabled));
         }
     }
-
-    private void ClearPropertyPanel()
-    {
-        CustomPropertyPanel?.ClearAllBindings();
-    }
-
     /// <summary>
     /// 선택된 항목이 있는지 여부
     /// </summary>
@@ -2808,19 +2776,18 @@ public class MapViewModel : BasePanelViewModel
         // 기존 패널 정리
         HidePropertyPanel();
 
-        // 마커 타입별 패널 생성
-        if (SelectedMarker is GMapCustomMarker)
+        PropertyPanel = _propertyPanelFactory.CreatePropertyPanel(SelectedMarker);
+
+        if (PropertyPanel != null)
         {
-            CustomPropertyPanel = new GMapPropertyCustomControl
-            {
-                SelectedMarker = SelectedMarker,
-                AvailableColors = AvailableColors,
-                AvailableSizes = AvailableSize,
-                IsDraggable = true
-            };
-            _log?.Info($"GMapCustomMarker용 ShowPropertyPanel이 수행되었습니다.");
+            // 공통 속성 설정
+            PropertyPanel.AvailableColors = AvailableColors;
+            PropertyPanel.AvailableSizes = AvailableSize;
+            PropertyPanel.IsDraggable = true;
+
+            IsPropertyPanelVisible = true;
+            _log?.Info($"PropertyPanel 생성 완료: {PropertyPanel.GetType().Name}");
         }
-        // 다른 마커 타입들도 여기에 추가...
 
         _log?.Info($"Property Panel 생성 후 - {GetMarkerInfo(SelectedMarker)}");
         IsPropertyPanelVisible = true;
@@ -2828,10 +2795,17 @@ public class MapViewModel : BasePanelViewModel
 
     private void HidePropertyPanel()
     {
-        if (CustomPropertyPanel != null)
+        //if (CustomPropertyPanel != null)
+        //{
+        //    CustomPropertyPanel = null;
+        //    _log?.Info($"GMapCustomMarker용 HidePropertyPanel이 수행되었습니다.");
+        //}
+
+        if (PropertyPanel != null)
         {
-            CustomPropertyPanel = null;
-            _log?.Info($"GMapCustomMarker용 HidePropertyPanel이 수행되었습니다.");
+            // 바인딩 정리
+            PropertyPanel.ClearAllBindings();
+            PropertyPanel = null;
         }
 
         IsPropertyPanelVisible = false;
@@ -3074,13 +3048,24 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-    public GMapPropertyCustomControl? CustomPropertyPanel
+    //public GMapPropertyCustomControl? CustomPropertyPanel
+    //{
+    //    get => _customPropertyPanel;
+    //    set
+    //    {
+    //        _customPropertyPanel = value;
+    //        NotifyOfPropertyChange(nameof(CustomPropertyPanel));
+    //    }
+    //}
+
+
+    public GMapPropertyBaseControl? PropertyPanel
     {
-        get => _customPropertyPanel;
+        get => _propertyPanel;
         set
         {
-            _customPropertyPanel = value;
-            NotifyOfPropertyChange(nameof(CustomPropertyPanel));
+            _propertyPanel = value;
+            NotifyOfPropertyChange(nameof(PropertyPanel));
         }
     }
 
@@ -3100,7 +3085,9 @@ public class MapViewModel : BasePanelViewModel
     private ImageOverlayService _imageOverlayService;
     private MarkerFactory _markerFactory;
 
-    private GMapPropertyCustomControl? _customPropertyPanel;
+    private PropertyPanelFactory _propertyPanelFactory;
+    private GMapPropertyBaseControl? _propertyPanel;
+    //private GMapPropertyCustomControl? _customPropertyPanel;
     private bool _isPropertyPanelVisible;
     private SymbolEventManager _symbolEventManager;
 

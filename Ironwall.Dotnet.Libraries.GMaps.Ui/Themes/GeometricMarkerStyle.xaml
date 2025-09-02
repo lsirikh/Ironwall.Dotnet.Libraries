@@ -31,6 +31,7 @@
 							<Ellipse
 								Name="PART_CircleShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Stroke="{TemplateBinding MarkerStroke}"
 								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 								Visibility="Collapsed" />
@@ -39,6 +40,7 @@
 							<Rectangle
 								Name="PART_SquareShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Stroke="{TemplateBinding MarkerStroke}"
 								StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 								Visibility="Collapsed" />
@@ -47,6 +49,7 @@
 							<Polygon
 								Name="PART_TriangleShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Points="0.5,0 0,1 1,1"
 								Stretch="Fill"
 								Stroke="{TemplateBinding MarkerStroke}"
@@ -57,6 +60,7 @@
 							<Polygon
 								Name="PART_DiamondShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Points="0.5,0 1,0.5 0.5,1 0,0.5"
 								Stretch="Fill"
 								Stroke="{TemplateBinding MarkerStroke}"
@@ -67,6 +71,7 @@
 							<Polygon
 								Name="PART_PentagonShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Points="0.5,0 0.975,0.375 0.794,0.975 0.206,0.975 0.025,0.375"
 								Stretch="Fill"
 								Stroke="{TemplateBinding MarkerStroke}"
@@ -77,6 +82,7 @@
 							<Polygon
 								Name="PART_HexagonShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Points="0.5,0 0.933,0.25 0.933,0.75 0.5,1 0.067,0.75 0.067,0.25"
 								Stretch="Fill"
 								Stroke="{TemplateBinding MarkerStroke}"
@@ -87,6 +93,7 @@
 							<Polygon
 								Name="PART_StarShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Points="0.5,0 0.62,0.35 1,0.35 0.69,0.57 0.81,1 0.5,0.72 0.19,1 0.31,0.57 0,0.35 0.38,0.35"
 								Stretch="Fill"
 								Stroke="{TemplateBinding MarkerStroke}"
@@ -97,6 +104,7 @@
 							<Polygon
 								Name="PART_ArrowShape"
 								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding MarkerOpacity}"
 								Points="0.5,0 1,0.5 0.7,0.5 0.7,1 0.3,1 0.3,0.5 0,0.5"
 								Stretch="Fill"
 								Stroke="{TemplateBinding MarkerStroke}"

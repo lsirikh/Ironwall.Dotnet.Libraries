@@ -15,7 +15,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
   Company      : Sensorway Co., Ltd.                                       
   Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
+public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMarker
 {
     #region - Ctors -
     public GMapPidsMarker(ILogService log, IPidsSymbolModel pidsModel)
@@ -24,7 +24,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         pidsModel.Update += PidsModel_Update;
     }
 
-    
+
     #endregion
 
     #region - Animation System -
@@ -320,6 +320,8 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     /// 애니메이션 실행 중 여부
     /// </summary>
     public bool IsAnimating => _isAnimating;
+
+    EnumDeviceType IPidsEditableMarker.DeviceType { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     #endregion
 }

@@ -13,7 +13,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>
+public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>, IGeoEditableMarker
 {
     #region - Ctors -
     /// <summary>
@@ -45,7 +45,7 @@ public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>
         //if (markerControl is GMapGeometricMarkerControl geometricControl)
         //{
         //    geometricControl.ShapeType = Model.ShapeType;
-        //    geometricControl.Opacity = Model.Opacity;
+        //    geometricControl.MarkerOpacity = Model.MarkerOpacity;
         //}
     }
 
@@ -65,28 +65,28 @@ public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>
     #region - Processes -/// <summary>
     /// 형태 변경
     /// </summary>
-    public void ChangeShapeType(EnumShapeType newShapeType)
-    {
-        if (ShapeType != newShapeType)
-        {
-            ShapeType = newShapeType;
-            _log?.Info($"마커 '{Title}' 형태 변경: {newShapeType}");
-        }
-    }
+    //public void ChangeShapeType(EnumShapeType newShapeType)
+    //{
+    //    if (ShapeType != newShapeType)
+    //    {
+    //        ShapeType = newShapeType;
+    //        _log?.Info($"마커 '{Title}' 형태 변경: {newShapeType}");
+    //    }
+    //}
 
     /// <summary>
     /// 투명도 업데이트
     /// </summary>
-    private void UpdateOpacity()
-    {
-        //if (Shape is GMapGeometricMarkerControl geometricControl)
-        //{
-        //    DispatcherService.Invoke(() =>
-        //    {
-        //        geometricControl.Opacity = Model.Opacity;
-        //    });
-        //}
-    }
+    //private void UpdateOpacity()
+    //{
+    //    if (Shape is GMapGeometricMarkerControl geometricControl)
+    //    {
+    //        DispatcherService.Invoke(() =>
+    //        {
+    //            geometricControl.MarkerOpacity = Model.Opacity;
+    //        });
+    //    }
+    //}
     #endregion
     #region - IHanldes -
     #endregion
@@ -101,7 +101,7 @@ public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>
         {
             _model.ShapeType = value;
             OnPropertyChanged(nameof(ShapeType));
-            CreateMarkerShape(); // Shape 재생성
+            //CreateMarkerShape(); // Shape 재생성
         }
     }
 
@@ -115,7 +115,7 @@ public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>
         {
             _model.Opacity = value;
             OnPropertyChanged(nameof(Opacity));
-            UpdateOpacity();
+            //UpdateOpacity();
         }
     }
     #endregion

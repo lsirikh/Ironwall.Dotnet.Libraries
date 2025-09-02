@@ -275,28 +275,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     #endregion
 
-    #region Virtual Methods (기존 패턴 유지)
-
-    /// <summary>
-    /// 컨트롤 초기화 (가상 메서드)
-    /// </summary>
-    //protected virtual void InitializeControl()
-    //{
-    //    // 기본값 설정
-    //    MarkerWidth = 32;
-    //    MarkerHeight = 32;
-    //    TitleSize = 8.0;
-    //    MarkerFill = Brushes.Red;
-    //    MarkerStroke = Brushes.White;
-    //    MarkerStrokeThickness = 2;
-    //    MarkerTitle = "Marker";
-    //    EnableShapeAnimation = true;
-    //    // 마우스 이벤트 활성화
-    //    IsHitTestVisible = true;
-
-        
-    //}
-
+    #region Virtual Methods 
     /// <summary>
     /// 컨트롤 초기화 완료 후 호출 (가상 메서드)
     /// </summary>

@@ -18,7 +18,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMarker where T : ISymbolModel
+public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISymbolModel
 {
     #region - Ctors -
     /// <summary>
