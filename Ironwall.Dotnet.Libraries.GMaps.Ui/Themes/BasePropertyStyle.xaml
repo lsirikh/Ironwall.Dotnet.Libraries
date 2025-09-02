@@ -358,7 +358,7 @@
 											</Border>
 
 											<!--  특화 속성 내용  -->
-											<!--<ContentPresenter x:Name="PART_SpecificProperties" Content="{TemplateBinding SpecificContent}" />-->
+											<!--  DataContext="{Binding RelativeSource={RelativeSource TemplatedParent}}" 상속을 위해서 필요한 바인딩  -->
 											<ContentPresenter
 												x:Name="PART_SpecificProperties"
 												Content="{TemplateBinding SpecificContent}"
