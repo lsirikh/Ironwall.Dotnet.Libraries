@@ -361,6 +361,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         get => _model.Title;
         set
         {
+            _log?.Info($"[GMapCustomMarker] Title 변경: '{Title}' -> '{value}'");
+            _log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Title = value;
             OnPropertyChanged(nameof(Title));
         }
@@ -421,6 +423,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         get => _model.Width;
         set
         {
+            _log?.Info($"[GMapCustomMarker] Width 변경: {Width} -> {value}");
+            _log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Width = value;
             OnPropertyChanged(nameof(Width));
             UpdateOffset();
@@ -432,6 +436,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         get => _model.Height;
         set
         {
+            _log?.Info($"[GMapCustomMarker] Width 변경: {Height} -> {value}");
+            _log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Height = value;
             OnPropertyChanged(nameof(Height));
             UpdateOffset();

@@ -41,7 +41,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public static readonly DependencyProperty SelectedMarkerProperty =
             DependencyProperty.Register("SelectedMarker", typeof(IEditableMarker),
                 typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(null, OnSelectedMarkerChanged, CoerceSelectedMarkerValue));
+                new PropertyMetadata(null, OnSelectedMarkerChanged
+                    //, CoerceSelectedMarkerValue
+                    ));
 
         /// <summary>
         /// 사용 가능한 색상 목록
@@ -316,38 +318,31 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         }
         #endregion
         #region Property Changed Callbacks
-        // CoerceValueCallback이 PropertyChangedCallback보다 먼저 실행됨
-        private static object CoerceSelectedMarkerValue(DependencyObject d, object value)
-        {
-            if (d is GMapPropertyBaseControl control)
-            {
-                var newMarker = value as IEditableMarker;
-                var oldMarker = control.SelectedMarker;
-
-                System.Diagnostics.Debug.WriteLine("CoerceValue: 바인딩 정리 실행");
-
-                // 새 값이 설정되기 전에 바인딩 정리
-                if (oldMarker != null && newMarker != null && oldMarker != newMarker)
-                {
-                    control.ClearAllBindings();
-                }
-            }
-
-            return value; // 원래 값 그대로 반환
-        }
-
-
         private static void OnSelectedMarkerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is GMapPropertyBaseControl control)
             {
-                // 핵심 수정: e.NewValue에서 직접 원본 값 추출
-                if (!(e.NewValue is IEditableMarker newMarker)) return;
+                var oldMarker = e.OldValue as IEditableMarker;
+                var newMarker = e.NewValue as IEditableMarker;
 
-                // 바인딩 설정 전에 DP 값을 마커 값으로 초기화
-                if (control.SelectedMarker != null)
+                //// 1단계: 바인딩 정리 전에 Source를 먼저 차단
+                //if (oldMarker != null)
+                //{
+                //    // 기존 바인딩의 Source를 null로 변경 (TwoWay 전파 방지)
+                //    SetBindingSourcesToNull(control);
+                //}
+
+                // 중요: ClearAllBindings 전에 플래그 설정!
+                control._isInitializing = true;
+
+                // 2단계: 이제 안전하게 바인딩 정리
+                control.ClearAllBindings();
+
+
+                // 3단계: 새 마커 설정
+                if (newMarker != null)
                 {
-                    control._isInitializing = true; // 플래그 설정
+                    
 
                     // 저장된 원본 값으로 설정 (변경되지 않은 값들)
                     control.MarkerTitle = newMarker.Title;
@@ -360,17 +355,79 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                     control.ShowShape = newMarker.ShowShape;
                     control.ShowTitle = newMarker.ShowTitle;
 
-                    control._isInitializing = false; // 플래그 해제
                 }
-
                 control.SetupMarkerBindings();
+                
+                control._isInitializing = false; // 플래그 해제
             }
         }
 
+        //private static void OnSelectedMarkerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        //{
+        //    if (d is GMapPropertyBaseControl control)
+        //    {
+        //        var oldMarker = e.OldValue as IEditableMarker;
+        //        var newMarker = e.NewValue as IEditableMarker;
+
+        //        System.Diagnostics.Debug.WriteLine("=== OnSelectedMarkerChanged 시작 ===");
+        //        System.Diagnostics.Debug.WriteLine($"Old Marker: {oldMarker?.Title ?? "null"}");
+        //        System.Diagnostics.Debug.WriteLine($"New Marker: {newMarker?.Title ?? "null"}");
+
+        //        if (newMarker != null)
+        //        {
+        //            System.Diagnostics.Debug.WriteLine($"[변경 전] 마커 상태:");
+        //            System.Diagnostics.Debug.WriteLine($"  - Title: '{newMarker.Title}'");
+        //            System.Diagnostics.Debug.WriteLine($"  - Width: {newMarker.Width}");
+        //            System.Diagnostics.Debug.WriteLine($"  - Height: {newMarker.Height}");
+        //        }
+
+        //        // 바인딩 정리
+        //        System.Diagnostics.Debug.WriteLine("ClearAllBindings 호출 전");
+        //        control.ClearAllBindings();
+        //        System.Diagnostics.Debug.WriteLine("ClearAllBindings 호출 후");
+
+        //        if (newMarker != null)
+        //        {
+        //            System.Diagnostics.Debug.WriteLine("속성 설정 시작");
+        //            control._isInitializing = true;
+
+        //            System.Diagnostics.Debug.WriteLine($"MarkerTitle 설정 전: '{control.MarkerTitle}'");
+        //            control.MarkerTitle = newMarker.Title;
+        //            System.Diagnostics.Debug.WriteLine($"MarkerTitle 설정 후: '{control.MarkerTitle}'");
+
+        //            System.Diagnostics.Debug.WriteLine($"MarkerWidth 설정 전: {control.MarkerWidth}");
+        //            control.MarkerWidth = newMarker.Width;
+        //            System.Diagnostics.Debug.WriteLine($"MarkerWidth 설정 후: {control.MarkerWidth}");
+
+        //            System.Diagnostics.Debug.WriteLine($"MarkerHeight 설정 전: {control.MarkerHeight}");
+        //            control.MarkerHeight = newMarker.Height;
+        //            System.Diagnostics.Debug.WriteLine($"MarkerHeight 설정 후: {control.MarkerHeight}");
+
+        //            control._isInitializing = false;
+        //            System.Diagnostics.Debug.WriteLine("속성 설정 완료");
+        //        }
+
+        //        System.Diagnostics.Debug.WriteLine("SetupMarkerBindings 호출 전");
+        //        control.SetupMarkerBindings();
+        //        System.Diagnostics.Debug.WriteLine("SetupMarkerBindings 호출 후");
+
+        //        if (newMarker != null)
+        //        {
+        //            System.Diagnostics.Debug.WriteLine($"[변경 후] 마커 상태:");
+        //            System.Diagnostics.Debug.WriteLine($"  - Title: '{newMarker.Title}'");
+        //            System.Diagnostics.Debug.WriteLine($"  - Width: {newMarker.Width}");
+        //            System.Diagnostics.Debug.WriteLine($"  - Height: {newMarker.Height}");
+        //        }
+        //        System.Diagnostics.Debug.WriteLine("=== OnSelectedMarkerChanged 종료 ===\n");
+        //    }
+        //}
+
         private static void OnMarkerTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            System.Diagnostics.Debug.WriteLine($"OnMarkerTitleChanged: '{e.OldValue}' -> '{e.NewValue}'");
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
+                System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Title = '{e.NewValue}'");
                 control.SelectedMarker.Title = (string)e.NewValue;
                 control.OnMarkerPropertyChanged("Title", e.OldValue, e.NewValue);
             }
@@ -378,8 +435,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerHeightSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            System.Diagnostics.Debug.WriteLine($"OnMarkerHeightSizeChanged: {e.OldValue} -> {e.NewValue}");
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
+                System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Height = {control.MarkerHeight}");
                 control.SelectedMarker.Height = control.MarkerHeight;
                 control.OnMarkerPropertyChanged("Size", null, new { Width = control.MarkerWidth, Height = control.MarkerHeight });
             }
@@ -387,8 +446,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerWidthSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            System.Diagnostics.Debug.WriteLine($"OnMarkerWidthSizeChanged: {e.OldValue} -> {e.NewValue}");
+
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
+                System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Width = {control.MarkerWidth}");
                 control.SelectedMarker.Width = control.MarkerWidth;
                 control.OnMarkerPropertyChanged("Size", null, new { Width = control.MarkerWidth, Height = control.MarkerHeight });
             }
@@ -396,7 +458,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerBearingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.Bearing = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("Bearing", e.OldValue, e.NewValue);
@@ -405,7 +467,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerFillColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.FillColor = (EnumColorType)e.NewValue;
                 control.OnMarkerPropertyChanged("FillColor", e.OldValue, e.NewValue);
@@ -414,7 +476,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerStrokeColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.StrokeColor = (EnumColorType)e.NewValue;
                 control.OnMarkerPropertyChanged("StrokeColor", e.OldValue, e.NewValue);
@@ -423,7 +485,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerStrokeThicknessChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.StrokeThickness = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("StrokeThickness", e.OldValue, e.NewValue);
@@ -432,7 +494,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnShowShapeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.ShowShape = (bool)e.NewValue;
                 control.OnMarkerPropertyChanged("ShowShape", e.OldValue, e.NewValue);
@@ -441,7 +503,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnShowTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing)
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.ShowTitle = (bool)e.NewValue;
                 control.OnMarkerPropertyChanged("ShowTitle", e.OldValue, e.NewValue);
@@ -510,15 +572,18 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             System.Diagnostics.Debug.WriteLine("ClearAllBindings 시작");
 
             // 바인딩 해제 전 속성값들 출력
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerTitle: '{MarkerTitle}'");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerWidth: {MarkerWidth}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerHeight: {MarkerHeight}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerBearing: {MarkerBearing}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerFillColor: {MarkerFillColor}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerStrokeColor: {MarkerStrokeColor}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] MarkerStrokeThickness: {MarkerStrokeThickness}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] ShowShape: {ShowShape}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 전] ShowTitle: {ShowTitle}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerTitle: '{MarkerTitle}'");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerWidth: {MarkerWidth}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerHeight: {MarkerHeight}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerBearing: {MarkerBearing}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerFillColor: {MarkerFillColor}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerStrokeColor: {MarkerStrokeColor}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerStrokeThickness: {MarkerStrokeThickness}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] ShowShape: {ShowShape}");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] ShowTitle: {ShowTitle}");
+
+            // 임시로 PropertyChanged 콜백 차단
+            _isClearingBindings = true;
 
             // 바인딩 해제
             BindingOperations.ClearBinding(this, MarkerTitleProperty);
@@ -531,16 +596,18 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, ShowShapeProperty);
             BindingOperations.ClearBinding(this, ShowTitleProperty);
 
+            _isClearingBindings = false;
+            
             // 바인딩 해제 후 속성값들 출력
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerTitle: '{MarkerTitle}'");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerWidth: {MarkerWidth}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerHeight: {MarkerHeight}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerBearing: {MarkerBearing}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerFillColor: {MarkerFillColor}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerStrokeColor: {MarkerStrokeColor}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] MarkerStrokeThickness: {MarkerStrokeThickness}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] ShowShape: {ShowShape}");
-            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후] ShowTitle: {ShowTitle}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerTitle: '{MarkerTitle}'");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerWidth: {MarkerWidth}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerHeight: {MarkerHeight}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerBearing: {MarkerBearing}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerFillColor: {MarkerFillColor}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerStrokeColor: {MarkerStrokeColor}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerStrokeThickness: {MarkerStrokeThickness}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] ShowShape: {ShowShape}");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] ShowTitle: {ShowTitle}");
 
             System.Diagnostics.Debug.WriteLine("ClearAllBindings 완료");
         }
@@ -591,6 +658,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private bool _isDragging;
         private Point _lastMousePosition;
         private bool _isInitializing;
+        private bool _isClearingBindings;
         #endregion
     }
 

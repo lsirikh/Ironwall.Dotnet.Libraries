@@ -288,12 +288,11 @@ public class MapViewModel : BasePanelViewModel
         {
             _log?.Info($"=== 마커 클릭 시작 ===");
             _log?.Info($"클릭 전 - {GetMarkerInfo(marker)}");
-
             _log?.Info($"OnMapMarkerClicked 호출됨: {marker.Title}, 편집모드: {IsEditModeEnabled}");
 
             if (IsEditModeEnabled)
             {
-                _log?.Info($"편집 모드에서 마커 선택 시도: {marker.Title}");
+                _log?.Info($"편집 모드에서 마커 선택 시도");
                 SelectMarkerForEditing(marker);
                 ShowPropertyPanel();
             }
@@ -489,82 +488,46 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 선택된 마커 업데이트
     /// </summary>
+    private void UpdateSelectedMarker(IEditableMarker marker)
+    {
+
+        _log?.Info($"UpdateSelectedMarker 시작(marker) - {GetMarkerInfo(marker)}");
+
+        SelectedMarker = marker;  
+        _log?.Info($"SelectedMarker 설정 후(Selectedmarker) - {GetMarkerInfo(SelectedMarker)}");
+
+
+        SelectedImage = null; // 이미지 선택 해제
+
+        NotifyOfPropertyChange(nameof(CanEditMarker));
+        _log?.Info($"UpdateSelectedMarker 완료 - {GetMarkerInfo(marker)}");
+    }
+
     //private void UpdateSelectedMarker(IEditableMarker marker)
     //{
-    //    //SelectedMarker = marker;
-    //    //SelectedImage = null; // 이미지 선택 해제
+    //    // 기존 Panel 완전 제거
+    //    if (CustomPropertyPanel != null)
+    //    {
+    //        CustomPropertyPanel = null;
+    //    }
 
-    //    // 마커 관련 속성들 갱신
-    //    //NotifyOfPropertyChange(nameof(SelectedMarkerBearing));
-    //    //NotifyOfPropertyChange(nameof(SelectedMarkerWidth));
-    //    //NotifyOfPropertyChange(nameof(SelectedMarkerHeight));
-    //    //NotifyOfPropertyChange(nameof(SelectedMarkerFillColor));
-    //    //NotifyOfPropertyChange(nameof(SelectedMarkerStrokeColor));
-    //    //NotifyOfPropertyChange(nameof(SelectedMarkerStrokeSize));
-    //    //NotifyOfPropertyChange(nameof(CanEditMarker));
+    //    SelectedMarker = marker;
 
-
-    //    _log?.Info($"UpdateSelectedMarker 시작(marker) - {GetMarkerInfo(marker)}");
-
-    //    // 기존 Property Panel 바인딩 먼저 해제
-    //    //if (CustomPropertyPanel != null)
-    //    //{
-    //    //    CustomPropertyPanel.SelectedMarker = null;
-    //    //}
-
-    //    UpdateMarkerSize(SelectedMarker, marker.Width, marker.Height);
-    //    UpdateMarkerRotation(SelectedMarker, marker.Bearing);
-    //    SelectedMarker = marker;  // ← 여기서 문제 발생 가능성
-    //    _log?.Info($"SelectedMarker 설정 후(Selectedmarker) - {GetMarkerInfo(SelectedMarker)}");
-
+    //    // 새 Panel 생성
+    //    if (marker != null && IsEditModeEnabled)
+    //    {
+    //        CustomPropertyPanel = new GMapPropertyCustomControl
+    //        {
+    //            SelectedMarker = marker,
+    //            // 다른 속성들...
+    //        };
+    //    }
 
     //    SelectedImage = null; // 이미지 선택 해제
 
     //    NotifyOfPropertyChange(nameof(CanEditMarker));
     //    _log?.Info($"UpdateSelectedMarker 완료 - {GetMarkerInfo(marker)}");
     //}
-
-    // MapViewModel에서
-    private void UpdateSelectedMarker(IEditableMarker marker)
-    {
-        // ✅ 기존 Property Panel 완전 제거
-        if (CustomPropertyPanel != null)
-        {
-            var oldPanel = CustomPropertyPanel;
-            CustomPropertyPanel = null;
-            IsPropertyPanelVisible = false;
-
-            // 이전 패널의 모든 바인딩 해제
-            oldPanel.SelectedMarker = null;
-            BindingOperations.ClearAllBindings(oldPanel);
-
-            // GC가 정리하도록 명시적 null 설정
-            oldPanel = null;
-        }
-
-        // ViewModel 속성 업데이트
-        SelectedMarker = marker;
-
-        // ✅ 새 Property Panel 생성 (깨끗한 상태)
-        if (marker != null && IsEditModeEnabled)
-        {
-            CreateNewPropertyPanel(marker);
-        }
-    }
-
-    private void CreateNewPropertyPanel(IEditableMarker marker)
-    {
-        // 완전히 새로운 인스턴스 생성
-        CustomPropertyPanel = new GMapPropertyCustomControl
-        {
-            SelectedMarker = marker,  // 직접 할당 (바인딩 없이)
-            AvailableColors = AvailableColors,
-            AvailableSizes = AvailableSize,
-            IsDraggable = true
-        };
-
-        IsPropertyPanelVisible = true;
-    }
 
     /// <summary>
     /// 선택된 이미지 업데이트

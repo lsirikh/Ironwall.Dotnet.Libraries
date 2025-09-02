@@ -351,40 +351,50 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// </summary>
     protected virtual void SetupDataBindings()
     {
-        if (Marker == null) return;
+        if (Marker == null || _isUpdatingFromMarker) return;
 
-        // 공통 바인딩 (GMapCustomMarker 기본 속성)
-        SetupPropertyBinding(MarkerTitleProperty, nameof(Marker.Title));
-        SetupPropertyBinding(WidthProperty, nameof(Marker.Width));
-        SetupPropertyBinding(HeightProperty, nameof(Marker.Height));
-        SetupPropertyBinding(IsSelectedProperty, nameof(Marker.IsSelected));
-        SetupPropertyBinding(RotationAngleProperty, nameof(Marker.Bearing));
-        SetupPropertyBinding(ShowShapeProperty, nameof(Marker.ShowShape));
-        SetupPropertyBinding(ShowTitleProperty, nameof(Marker.ShowTitle));
+        _isUpdatingFromMarker = true;
 
-        var colorConverter = new ColorTypeToBrushConverter();
-
-        // 색상은 단방향 바인딩 (Marker -> Control)
-        var fillBinding = new Binding(nameof(Marker.FillColor))
+        try
         {
-            Source = Marker,
-            Mode = BindingMode.OneWay,
-            Converter = colorConverter
-        };
+            // 공통 바인딩 (GMapCustomMarker 기본 속성)
+            SetupPropertyBinding(MarkerTitleProperty, nameof(Marker.Title));
+            SetupPropertyBinding(WidthProperty, nameof(Marker.Width));
+            SetupPropertyBinding(HeightProperty, nameof(Marker.Height));
+            SetupPropertyBinding(IsSelectedProperty, nameof(Marker.IsSelected));
+            SetupPropertyBinding(RotationAngleProperty, nameof(Marker.Bearing));
+            SetupPropertyBinding(ShowShapeProperty, nameof(Marker.ShowShape));
+            SetupPropertyBinding(ShowTitleProperty, nameof(Marker.ShowTitle));
 
-        var strokeBinding = new Binding(nameof(Marker.StrokeColor))
+            var colorConverter = new ColorTypeToBrushConverter();
+
+            // 색상은 단방향 바인딩 (Marker -> Control)
+            var fillBinding = new Binding(nameof(Marker.FillColor))
+            {
+                Source = Marker,
+                Mode = BindingMode.OneWay,
+                Converter = colorConverter
+            };
+
+            var strokeBinding = new Binding(nameof(Marker.StrokeColor))
+            {
+                Source = Marker,
+                Mode = BindingMode.OneWay,
+                Converter = colorConverter
+            };
+            SetBinding(MarkerFillProperty, fillBinding);
+            SetBinding(MarkerStrokeProperty, strokeBinding);
+            SetupPropertyBinding(MarkerStrokeThicknessProperty, nameof(Marker.StrokeThickness));
+
+            // 마커별 전용 바인딩 (추상 메서드 호출)
+            SetupSpecificBindings();
+        }
+        finally
         {
-            Source = Marker,
-            Mode = BindingMode.OneWay,
-            Converter = colorConverter
-        };
-        SetBinding(MarkerFillProperty, fillBinding);
-        SetBinding(MarkerStrokeProperty, strokeBinding);
-        SetupPropertyBinding(MarkerStrokeThicknessProperty, nameof(Marker.StrokeThickness));
+            _isUpdatingFromMarker = false;
+        }
 
-
-        // 마커별 전용 바인딩 (추상 메서드 호출)
-        SetupSpecificBindings();
+        
     }
 
     /// <summary>

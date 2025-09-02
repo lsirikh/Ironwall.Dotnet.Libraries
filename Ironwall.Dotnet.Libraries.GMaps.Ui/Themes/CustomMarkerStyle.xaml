@@ -57,25 +57,15 @@
 								StrokeThickness="1" />
 
 							<!--  Center Point (기준 크기: 6x6)  -->
-							<Ellipse
+							<!--<Ellipse
 								Name="PART_CenterPoint"
 								Width="6"
 								Height="6"
 								Margin="0,13,0,0"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Top"
-								Fill="{TemplateBinding MarkerFill}"
-								Opacity="0.8" />
-
-							<!--  Status Indicator (기준 크기: 8x8)  -->
-							<Ellipse
-								Name="PART_StatusIndicator"
-								Width="8"
-								Height="8"
-								Margin="0,-2,-2,0"
-								HorizontalAlignment="Right"
-								VerticalAlignment="Top"
-								Fill="Lime" />
+								Fill="White"
+								Opacity="0.8" />-->
 
 							<!--  Label Container - 기본값 Collapsed  -->
 							<Border
@@ -152,27 +142,11 @@
 							</Setter>
 						</Trigger>
 
-						<!--  Marker State Colors  -->
-						<Trigger Property="MarkerState" Value="ACTIVE">
-							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#4CAF50" />
-							<Setter TargetName="PART_PinShape" Property="Fill" Value="#2196F3" />
-						</Trigger>
-
-						<Trigger Property="MarkerState" Value="DEACTIVE">
-							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#9E9E9E" />
-							<Setter TargetName="PART_PinShape" Property="Fill" Value="#9E9E9E" />
-						</Trigger>
-
-						<Trigger Property="MarkerState" Value="FAULT">
-							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#F44336" />
-							<Setter TargetName="PART_PinShape" Property="Fill" Value="#F44336" />
-						</Trigger>
 
 						<!--  Disabled State  -->
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter TargetName="PART_PinShape" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_InnerCircle" Property="Opacity" Value="0.5" />
-							<Setter TargetName="PART_StatusIndicator" Property="Opacity" Value="0.5" />
 						</Trigger>
 
 					</ControlTemplate.Triggers>

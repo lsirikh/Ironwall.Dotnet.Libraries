@@ -290,7 +290,7 @@
 						</Trigger>
 
 						<!--  Status Indicator Colors (Common Behavior)  -->
-						<Trigger Property="MarkerState" Value="ACTIVE">
+						<!--<Trigger Property="MarkerState" Value="ACTIVE">
 							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#4CAF50" />
 						</Trigger>
 						<Trigger Property="MarkerState" Value="DEACTIVE">
@@ -298,7 +298,7 @@
 						</Trigger>
 						<Trigger Property="MarkerState" Value="FAULT">
 							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#F44336" />
-						</Trigger>
+						</Trigger>-->
 
 						<!--  Disabled State (Common Behavior)  -->
 						<Trigger Property="IsEnabled" Value="False">
