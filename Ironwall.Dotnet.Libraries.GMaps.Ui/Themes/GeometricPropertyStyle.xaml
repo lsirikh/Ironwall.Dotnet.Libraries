@@ -50,8 +50,7 @@
 							Maximum="1"
 							Minimum="0"
 							TickFrequency="0.1"
-							Value ="{Binding MarkerOpacity, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type properties:GMapPropertyGeometricControl}}}"
-							/>
+							Value="{Binding MarkerOpacity}" />
 						<TextBlock
 							Grid.Column="2"
 							Foreground="White"

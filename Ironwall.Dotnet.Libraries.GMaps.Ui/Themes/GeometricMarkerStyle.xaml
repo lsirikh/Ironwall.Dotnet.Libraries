@@ -122,14 +122,14 @@
 								Opacity="0.9" />
 
 							<!--  Status Indicator (Common UI Element)  -->
-							<Ellipse
+							<!--<Ellipse
 								Name="PART_StatusIndicator"
 								Width="8"
 								Height="8"
 								Margin="0,-2,-2,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Top"
-								Fill="Lime" />
+								Fill="Lime" />-->
 
 							<!--  Label Container (Common UI Element) - CustomMarker와 동일한 위치  -->
 							<Border
@@ -318,7 +318,7 @@
 							<Setter TargetName="PART_HexagonShape" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_StarShape" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_ArrowShape" Property="Opacity" Value="0.5" />
-							<Setter TargetName="PART_StatusIndicator" Property="Opacity" Value="0.5" />
+							<!--<Setter TargetName="PART_StatusIndicator" Property="Opacity" Value="0.5" />-->
 						</Trigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>

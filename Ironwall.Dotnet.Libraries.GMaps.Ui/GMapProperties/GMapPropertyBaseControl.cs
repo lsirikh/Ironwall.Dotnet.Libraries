@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
@@ -287,13 +288,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         /// <summary>
         /// 마커 속성 변경 이벤트
         /// </summary>
-        public event EventHandler<MarkerPropertyChangedEventArgs> MarkerPropertyChanged;
+        public event EventHandler<MarkerPropertyChangedEventArgs>? MarkerPropertyChanged;
 
 
         /// <summary>
         /// 닫기 버튼 클릭 이벤트
         /// </summary>
-        public event EventHandler CloseRequested;
+        public event EventHandler? CloseRequested;
         #endregion
 
         #region Constructor
@@ -323,14 +324,34 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         #region PropertyWindow Control Method
         private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine($"=== MouseLeftButtonDown 이벤트 ===");
+            System.Diagnostics.Debug.WriteLine($"IsDraggable: {IsDraggable}");
+
             if (!IsDraggable) return;
 
-            // 헤더 영역에서만 드래그 허용 (Y < 45)
             var position = e.GetPosition(this);
-            if (position.Y > 45) return;
+            System.Diagnostics.Debug.WriteLine($"마우스 위치: ({position.X}, {position.Y})");
+
+            if (position.Y > 45)
+            {
+                System.Diagnostics.Debug.WriteLine("헤더 영역 밖 클릭");
+                return;
+            }
+
+            // ContentPresenter와 Canvas 찾기
+            var contentPresenter = FindParentOfType<ContentPresenter>(this);
+            var canvas = contentPresenter?.Parent as Canvas;
+
+            if (canvas == null)
+            {
+                System.Diagnostics.Debug.WriteLine("Canvas를 찾을 수 없어서 드래그 시작 불가");
+                return;
+            }
 
             _isDragging = true;
-            _lastMousePosition = e.GetPosition(Parent as UIElement);
+            _lastMousePosition = e.GetPosition(canvas);
+            System.Diagnostics.Debug.WriteLine($"드래그 시작: ({_lastMousePosition.X}, {_lastMousePosition.Y})");
+
             CaptureMouse();
             e.Handled = true;
         }
@@ -339,33 +360,49 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (!_isDragging || !IsDraggable) return;
 
-            var currentPosition = e.GetPosition(Parent as UIElement);
+            System.Diagnostics.Debug.WriteLine("=== MouseMove 드래그 중 ===");
+            System.Diagnostics.Debug.WriteLine($"this.Parent: {this.Parent?.GetType().Name}");
+
+            // Visual Tree를 따라 올라가면서 ContentPresenter 찾기
+            var contentPresenter = FindParentOfType<ContentPresenter>(this);
+            if (contentPresenter == null)
+            {
+                System.Diagnostics.Debug.WriteLine("ContentPresenter를 찾을 수 없음");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"ContentPresenter 발견: {contentPresenter.GetType().Name}");
+
+            // Canvas 찾기
+            var canvas = contentPresenter.Parent as Canvas;
+            if (canvas == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Canvas를 찾을 수 없음. ContentPresenter.Parent: {contentPresenter.Parent?.GetType().Name}");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Canvas 발견: {canvas.GetType().Name}");
+
+            var currentPosition = e.GetPosition(canvas);
             var deltaX = currentPosition.X - _lastMousePosition.X;
             var deltaY = currentPosition.Y - _lastMousePosition.Y;
 
-            // Canvas 또는 Grid에서 위치 업데이트
-            if (Parent is Canvas canvas)
-            {
-                var currentLeft = Canvas.GetLeft(this);
-                var currentTop = Canvas.GetTop(this);
+            System.Diagnostics.Debug.WriteLine($"이동량: ({deltaX}, {deltaY})");
 
-                // NaN 체크
-                if (double.IsNaN(currentLeft)) currentLeft = 0;
-                if (double.IsNaN(currentTop)) currentTop = 0;
+            // ContentPresenter의 Canvas 위치 업데이트
+            var currentLeft = Canvas.GetLeft(contentPresenter);
+            var currentTop = Canvas.GetTop(contentPresenter);
 
-                Canvas.SetLeft(this, currentLeft + deltaX);
-                Canvas.SetTop(this, currentTop + deltaY);
-            }
-            else if (Parent is Grid grid)
-            {
-                // Grid의 Margin을 이용한 위치 조정
-                var currentMargin = Margin;
-                Margin = new Thickness(
-                    currentMargin.Left + deltaX,
-                    currentMargin.Top + deltaY,
-                    currentMargin.Right,
-                    currentMargin.Bottom);
-            }
+            if (double.IsNaN(currentLeft)) currentLeft = 0;
+            if (double.IsNaN(currentTop)) currentTop = 0;
+
+            var newLeft = currentLeft + deltaX;
+            var newTop = currentTop + deltaY;
+
+            Canvas.SetLeft(contentPresenter, newLeft);
+            Canvas.SetTop(contentPresenter, newTop);
+
+            System.Diagnostics.Debug.WriteLine($"ContentPresenter 새 위치: ({newLeft}, {newTop})");
 
             _lastMousePosition = currentPosition;
         }
@@ -381,6 +418,19 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private void OnCloseButtonClick(object sender, RoutedEventArgs e)
         {
             CloseRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        // 헬퍼 메서드 추가
+        private T? FindParentOfType<T>(DependencyObject child) where T : DependencyObject
+        {
+            DependencyObject parent = VisualTreeHelper.GetParent(child);
+
+            while (parent != null && !(parent is T))
+            {
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+
+            return parent as T;
         }
         #endregion
 
@@ -671,22 +721,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             base.OnApplyTemplate();
 
-            //var container = GetTemplateChild("PART_SpecificPropertiesContainer") as Border;
-            //var presenter = GetTemplateChild("PART_SpecificProperties") as ContentPresenter;
-
-            //// SpecificContent는 XAML 스타일에서 설정됨
-            //if (container != null && presenter != null && SpecificContent != null)
-            //{
-            //    presenter.Content = SpecificContent;
-            //    container.Visibility = Visibility.Visible;
-            //}
-
             // 닫기 버튼 이벤트 연결
             if (GetTemplateChild("PART_CloseButton") is Button closeButton)
             {
                 closeButton.Click += OnCloseButtonClick;
                 System.Diagnostics.Debug.WriteLine("닫기 버튼 이벤트 연결 완료");
-
             }
 
             // 헤더 커서 설정
@@ -701,7 +740,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private Point _lastMousePosition;
         protected bool _isInitializing;
         protected bool _isClearingBindings;
-
         #endregion
     }
 

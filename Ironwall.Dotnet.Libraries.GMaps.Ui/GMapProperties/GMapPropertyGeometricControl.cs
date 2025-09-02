@@ -22,11 +22,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DefaultStyleKeyProperty.OverrideMetadata(typeof(GMapPropertyGeometricControl),
                 new FrameworkPropertyMetadata(typeof(GMapPropertyGeometricControl)));
         }
+
+        public GMapPropertyGeometricControl()
+        {
+        }
         #endregion
         #region - Implementation of Interface -
         #endregion
         #region - Overrides -
-       
+
         protected override void ClearSpecificBindings()
         {
             System.Diagnostics.Debug.WriteLine("=== ClearSpecificBindings 시작 ===");
