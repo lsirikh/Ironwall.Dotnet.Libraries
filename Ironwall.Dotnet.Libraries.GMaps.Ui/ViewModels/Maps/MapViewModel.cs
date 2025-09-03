@@ -184,7 +184,7 @@ public class MapViewModel : BasePanelViewModel
         {
             var devices = DeviceProvider.ToList();
             var symbols = MainMap?.Markers.ToList();
-
+            _symbolEventManager.Dispose();
             foreach (var device in devices)
             {
                 var symbol = symbols?.OfType<GMapPidsMarker>()
@@ -921,29 +921,66 @@ public class MapViewModel : BasePanelViewModel
 
             if (SelectedMarker != null)
             {
-                // Adorner 먼저 제거
-                MainMap.DeselectMarker(SelectedMarker);
+                var markerTitle = SelectedMarker.Title ?? "Unknown";
+                var markerId = SelectedMarker.Id;
 
+                _log?.Info($"마커 삭제 시작: {markerTitle} (ID: {markerId})");
 
-                if (SelectedMarker is GMapMarker marker)
-                    // GMap.NET 마커 컬렉션에서 제거
-                    MainMap.Markers.Remove(marker);
+                try
+                {
+                    // 1. Adorner 먼저 제거
+                    MainMap?.DeselectMarker(SelectedMarker);
 
-                var ret = await DbDeleteProcess(SelectedMarker);
-                if (ret)
-                    _log?.Info($"선택한 마커({SelectedMarker.Id})를 DB에서 성공적으로 삭제했습니다.");
-                else
-                    _log?.Info($"선택한 마커({SelectedMarker.Id})를 DB에서 삭제하지 못했습니다.");
+                    // 2. GMap.NET 마커 컬렉션에서 제거
+                    if (SelectedMarker is GMapMarker gMapMarker)
+                    {
+                        MainMap?.Markers?.Remove(gMapMarker);
+                    }
 
-                // 마커 리소스 정리
-                SelectedMarker.Dispose();
-                SelectedMarker = null;
+                    // 3. CustomMarkers 컬렉션에서 제거
+                    if (MainMap?.CustomMarkers?.Contains(SelectedMarker) == true)
+                    {
+                        MainMap.CustomMarkers.Remove(SelectedMarker);
+                    }
 
-                _log?.Info("선택된 마커 삭제 완료");
+                    // 4. DB에서 삭제
+                    var dbResult = await DbDeleteProcess(SelectedMarker);
+                    if (dbResult)
+                        _log?.Info($"마커({markerId}) DB 삭제 성공");
+                    else
+                        _log?.Warning($"마커({markerId}) DB 삭제 실패");
+
+                    // 5. 마커 리소스 정리
+                    try
+                    {
+                        SelectedMarker.Dispose();
+                    }
+                    catch (Exception disposeEx)
+                    {
+                        _log?.Warning($"마커 Dispose 실패: {disposeEx.Message}");
+                    }
+
+                    // 6. SelectedMarker null로 설정
+                    SelectedMarker = null;
+
+                    _log?.Info($"마커 '{markerTitle}' 삭제 완료");
+
+                }
+                catch (Exception markerEx)
+                {
+                    _log?.Error($"마커 삭제 중 오류: {markerEx.Message}");
+                    // 에러가 발생해도 SelectedMarker는 null로 설정
+                    SelectedMarker = null;
+                }
+
             }
+            // 7. 화면 갱신
+            MainMap?.InvalidateVisual();
 
-            // 화면 갱신
-            MainMap.InvalidateVisual();
+            // 8. PropertyPanel 정리
+            HidePropertyPanel();
+
+            _log?.Info("선택 항목 삭제 처리 완료");
         }
         catch (Exception ex)
         {
@@ -955,9 +992,13 @@ public class MapViewModel : BasePanelViewModel
     /// 편집 모드 토글 명령어
     /// </summary>
     private bool CanExecuteToggleEditMode(object arg) => true;
-    private void ExecuteToggleEditMode(object obj)
+    private async void ExecuteToggleEditMode(object obj)
     {
         IsEditModeEnabled = !IsEditModeEnabled;
+        if (!IsEditModeEnabled)
+        {
+            await InitializeDeviceSymbolIntegration();
+        }
     }
 
     /// <summary>
@@ -1160,8 +1201,6 @@ public class MapViewModel : BasePanelViewModel
                     {
                         await AddPidsMarker(position, deviceType, symbolTitle);
                     }
-                    await InitializeDeviceSymbolIntegration();
-
                     break;
 
                 case EnumMarkerCategory.AREA_BOUNDARY:
@@ -1639,6 +1678,7 @@ public class MapViewModel : BasePanelViewModel
             var symbolModel = new SymbolModel
             {
                 Title = title,
+                TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
                 Zoom = Zoom,
@@ -1676,6 +1716,7 @@ public class MapViewModel : BasePanelViewModel
             var symbolModel = new GeometricSymbolModel
             {
                 Title = title,
+                TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
                 Zoom = Zoom,
@@ -2941,102 +2982,6 @@ public class MapViewModel : BasePanelViewModel
     }
 
     
-    ///// <summary>
-    ///// 선택된 마커의 방향각
-    ///// </summary>
-    //public double SelectedMarkerBearing
-    //{
-    //    get => SelectedMarker?.Bearing ?? 0;
-    //    set
-    //    {
-    //        if (SelectedMarker != null && Math.Abs(SelectedMarker.Bearing - value) > 0.1)
-    //        {
-    //            UpdateMarkerRotation(SelectedMarker, value);
-    //            NotifyOfPropertyChange(nameof(SelectedMarkerBearing));
-    //        }
-    //    }
-    //}
-
-    ///// <summary>
-    ///// 선택된 마커의 너비
-    ///// </summary>
-    //public double SelectedMarkerWidth
-    //{
-    //    get => SelectedMarker?.Width ?? 0;
-    //    set
-    //    {
-    //        if (SelectedMarker != null && Math.Abs(SelectedMarker.Width - value) > 0.1)
-    //        {
-    //            UpdateMarkerSize(SelectedMarker, value, SelectedMarker.Height);
-    //            NotifyOfPropertyChange(nameof(SelectedMarkerWidth));
-    //        }
-    //    }
-    //}
-
-    ///// <summary>
-    ///// 선택된 마커의 높이
-    ///// </summary>
-    //public double SelectedMarkerHeight
-    //{
-    //    get => SelectedMarker?.Height ?? 0;
-    //    set
-    //    {
-    //        if (SelectedMarker != null && Math.Abs(SelectedMarker.Height - value) > 0.1)
-    //        {
-    //            UpdateMarkerSize(SelectedMarker, SelectedMarker.Width, value);
-    //            NotifyOfPropertyChange(nameof(SelectedMarkerHeight));
-    //        }
-    //    }
-    //}
-
-
-    ///// <summary>
-    ///// 선택된 마커의 Fill 색상
-    ///// </summary>
-    //public EnumColorType SelectedMarkerFillColor
-    //{
-    //    get => SelectedMarker?.FillColor ?? EnumColorType.Blue;
-    //    set
-    //    {
-    //        if (SelectedMarker != null && SelectedMarker.FillColor != value)
-    //        {
-    //            SelectedMarker.FillColor = value;
-    //            _ = DbUpdateProcess(SelectedMarker); // DB 업데이트
-    //            NotifyOfPropertyChange(nameof(SelectedMarkerFillColor));
-    //        }
-    //    }
-    //}
-
-    ///// <summary>
-    ///// 선택된 마커의 Stroke 색상
-    ///// </summary>
-    //public EnumColorType SelectedMarkerStrokeColor
-    //{
-    //    get => SelectedMarker?.StrokeColor ?? EnumColorType.White;
-    //    set
-    //    {
-    //        if (SelectedMarker != null && SelectedMarker.StrokeColor != value)
-    //        {
-    //            SelectedMarker.StrokeColor = value;
-    //            _ = DbUpdateProcess(SelectedMarker); // DB 업데이트
-    //            NotifyOfPropertyChange(nameof(SelectedMarkerStrokeColor));
-    //        }
-    //    }
-    //}
-
-    //public double SelectedMarkerStrokeSize
-    //{
-    //    get => SelectedMarker?.StrokeThickness ??1.0;
-    //    set
-    //    {
-    //        if (SelectedMarker != null && SelectedMarker.StrokeThickness != value)
-    //        {
-    //            SelectedMarker.StrokeThickness = value;
-    //            _ = DbUpdateProcess(SelectedMarker); // DB 업데이트
-    //            NotifyOfPropertyChange(nameof(SelectedMarkerStrokeSize));
-    //        }
-    //    }
-    //}
 
     public bool IsPropertyPanelVisible
     {
@@ -3047,17 +2992,6 @@ public class MapViewModel : BasePanelViewModel
             NotifyOfPropertyChange(nameof(IsPropertyPanelVisible));
         }
     }
-
-    //public GMapPropertyCustomControl? CustomPropertyPanel
-    //{
-    //    get => _customPropertyPanel;
-    //    set
-    //    {
-    //        _customPropertyPanel = value;
-    //        NotifyOfPropertyChange(nameof(CustomPropertyPanel));
-    //    }
-    //}
-
 
     public GMapPropertyBaseControl? PropertyPanel
     {

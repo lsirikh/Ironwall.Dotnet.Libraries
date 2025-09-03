@@ -23,7 +23,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
         {
             { typeof(GMapCustomMarker), typeof(GMapPropertyCustomControl) },
             { typeof(GMapGeometricMarker), typeof(GMapPropertyGeometricControl) },
-            //{ typeof(GMapPidsMarker), typeof(GMapPropertyPidsControl) }
+            { typeof(GMapPidsMarker), typeof(GMapPropertyPidsControl) }
         };
         }
         #endregion

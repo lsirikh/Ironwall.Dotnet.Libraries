@@ -252,6 +252,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     `Id`                INT AUTO_INCREMENT PRIMARY KEY,
                     `Pid`               INT NOT NULL DEFAULT 0,
                     `Title`             VARCHAR(200) NOT NULL,                          -- 심볼제목
+                    `TitleSize`         DECIMAL(4,2) DEFAULT 10.0,                      -- 제목크기
                     `OperationState`    VARCHAR(20) NOT NULL DEFAULT 'NONE',            -- 운영상태
                     `Latitude`          DECIMAL(10,8) NOT NULL,                         -- 위도
                     `Longitude`         DECIMAL(11,8) NOT NULL,                         -- 경도
@@ -400,7 +401,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
                         FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
@@ -432,7 +433,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(id));
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom,
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom,
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
                         FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
@@ -465,7 +466,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(pid));
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
                         FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
@@ -495,7 +496,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-                SELECT  Id, Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, 
+                SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
                         FillColor, StrokeColor, StrokeThickness,
                         CreatedAt, UpdatedAt, CreatedBy
@@ -525,10 +526,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                 INSERT INTO Symbols
-                    (Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+                    (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
                      Width, Height, Category, ShowShape, ShowTitle, 
                      FillColor, StrokeColor, StrokeThickness, CreatedBy)
-                    VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                    VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                             @Width, @Height, @Category, @ShowShape, @ShowTitle, 
                             @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
                     SELECT LAST_INSERT_ID();";
@@ -537,6 +538,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             {
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -575,7 +577,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                UPDATE Symbols SET
-                Pid = @Pid, Title = @Title, OperationState = @OperationState,
+                Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
@@ -588,6 +590,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Id,
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -695,7 +698,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
                     s.FillColor, s.StrokeColor, s.StrokeThickness,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
@@ -732,7 +735,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 throw new ArgumentOutOfRangeException(nameof(id));
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
                     s.FillColor, s.StrokeColor, s.StrokeThickness,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
@@ -770,10 +773,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 1. Symbols 테이블에 기본 정보 삽입
             const string symbolSql = @"
             INSERT INTO Symbols
-            (Pid, Title, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+            (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
              Width, Height, Category, ShowShape, ShowTitle, 
              FillColor, StrokeColor, StrokeThickness, CreatedBy)
-            VALUES (@Pid, @Title, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+            VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                     @Width, @Height, @Category, @ShowShape, @ShowTitle, 
                     @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
             SELECT LAST_INSERT_ID();";
@@ -782,6 +785,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             {
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -840,7 +844,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 1. Symbols 테이블 업데이트
             const string symbolSql = @"
             UPDATE Symbols SET
-                Pid = @Pid, Title = @Title, OperationState = @OperationState,
+                Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
@@ -853,6 +857,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Id,
                 model.Pid,
                 model.Title,
+                model.TitleSize,
                 OperationState = model.OperationState.ToString(),
                 model.Latitude,
                 model.Longitude,
@@ -936,7 +941,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
 
             const string sql = @"
-            SELECT  s.Id, s.Pid, s.Title, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
                     s.FillColor, s.StrokeColor, s.StrokeThickness,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
@@ -1016,6 +1021,9 @@ internal class SymbolSQL
     /// <summary>Symbol 제목/이름</summary>
     public string Title { get; set; } = string.Empty;
 
+    /// <summary>Title 크기</summary>
+    public double TitleSize { get; set; }
+
     /// <summary>동작 상태 (NONE, DEACTIVE, ACTIVE, FAULT)</summary>
     public string OperationState { get; set; } = string.Empty;
     //`Latitude`          DECIMAL(10,8) NOT NULL,                 --위도
@@ -1075,6 +1083,7 @@ internal class SymbolSQL
         Id = Id,
         Pid = Pid,
         Title = Title,
+        TitleSize = TitleSize,
         OperationState = Enum.Parse<EnumOperationState>(OperationState),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
@@ -1115,6 +1124,7 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         Id = Id,
         Pid = Pid,
         Title = Title,
+        TitleSize = TitleSize,
         OperationState = Enum.Parse<EnumOperationState>(OperationState),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,

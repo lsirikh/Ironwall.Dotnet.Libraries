@@ -60,13 +60,42 @@
 											ShadowDepth="3"
 											Color="Black" />
 									</Border.Effect>
-									<md:PackIcon
-										Width="20"
-										Height="20"
-										HorizontalAlignment="Center"
-										VerticalAlignment="Center"
-										Foreground="{TemplateBinding MarkerFill}"
-										Kind="Network" />
+									<Grid>
+
+										<md:PackIcon
+											Width="20"
+											Height="20"
+											HorizontalAlignment="Center"
+											VerticalAlignment="Center"
+											Foreground="{TemplateBinding MarkerFill}"
+											Kind="Network"
+											ToolTip="{TemplateBinding MarkerTitle}" />
+
+										<Border
+											Name="PART_LabelContainer"
+											Margin="0,0,0,5"
+											VerticalAlignment="Bottom"
+											Background="White"
+											CornerRadius="4"
+											Opacity="0.8"
+											Visibility="{TemplateBinding ShowTitle,
+											                             Converter={StaticResource BooleanToVisibilityConverter}}">
+											<Border.Effect>
+												<DropShadowEffect
+													BlurRadius="3"
+													Opacity="0.3"
+													ShadowDepth="2"
+													Color="Black" />
+											</Border.Effect>
+											<TextBlock
+												Name="PART_LabelText"
+												FontSize="10"
+												FontWeight="SemiBold"
+												Foreground="Black"
+												Text="{TemplateBinding MarkerTitle}"
+												TextAlignment="Center" />
+										</Border>
+									</Grid>
 								</Border>
 
 								<!--  Multi Container  -->
@@ -95,7 +124,7 @@
 										Kind="SquareCircle" />
 								</Border>
 
-								<!--  Fence Line Container (스케일링되는 라인 부분만)  -->
+								<!--  Fence Line Container  -->
 								<Border
 									Name="PART_FenceLineContainer"
 									Width="70"
@@ -107,7 +136,9 @@
 									<Rectangle
 										Name="PART_FenceHorizontalLine"
 										Height="10"
-										Fill="{TemplateBinding MarkerFill}">
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
 										<Rectangle.RenderTransform>
 											<ScaleTransform ScaleX="1" ScaleY="1" />
 										</Rectangle.RenderTransform>
@@ -167,7 +198,6 @@
 
 							</Grid>
 						</Viewbox>
-
 						<!--  ViewBox 외부 - 고정 크기 요소들  -->
 
 						<!--  Fence Icon (고정 크기)  -->
@@ -227,32 +257,7 @@
 							Visibility="Collapsed" />
 
 						<!--  Label Container (고정 크기)  -->
-						<Border
-							Name="PART_LabelContainer"
-							Margin="0,0,0,-5"
-							Padding="4,2"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Bottom"
-							Background="White"
-							BorderBrush="Gray"
-							BorderThickness="1"
-							CornerRadius="4"
-							Visibility="Collapsed">
-							<Border.Effect>
-								<DropShadowEffect
-									BlurRadius="3"
-									Opacity="0.3"
-									ShadowDepth="2"
-									Color="Black" />
-							</Border.Effect>
-							<TextBlock
-								Name="PART_LabelText"
-								FontSize="{TemplateBinding TitleSize}"
-								FontWeight="SemiBold"
-								Foreground="Black"
-								Text="{TemplateBinding MarkerTitle}"
-								TextAlignment="Center" />
-						</Border>
+
 
 						<!--  Hover Highlight (고정 크기)  -->
 						<Ellipse

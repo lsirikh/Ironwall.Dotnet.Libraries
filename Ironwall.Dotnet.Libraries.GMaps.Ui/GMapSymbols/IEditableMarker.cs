@@ -12,12 +12,14 @@ public interface IEditableMarker : IDisposable
 {
     int Id { get; }
     string Title { get; set; }
+    double TitleSize { get; set; }
     PointLatLng Position { get; set; }
     double Width { get; set; }
     double Height { get; set; }
     double Zoom { get; set; }
     double Bearing { get; set; }
     bool IsSelected { get; set; }
+    bool IsVisible { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
     EnumColorType FillColor { get; set; }
@@ -29,5 +31,6 @@ public interface IEditableMarker : IDisposable
     void UpdateLocation(PointLatLng newPosition);
     void UpdateSize(double width, double height);
     void UpdateRotation(double bearing);
+    bool IsDisposed { get; }
 
 }

@@ -23,6 +23,7 @@ public class SymbolModel : BaseModel, ISymbolModel
         Id = 0;
         Pid = 0;
         Title = "Unknown";
+        TitleSize = 15;
         OperationState = EnumOperationState.NONE;
         Latitude = 0.0;       // 순수 double 타입
         Longitude = 0.0;      // 순수 double 타입
@@ -56,6 +57,7 @@ public class SymbolModel : BaseModel, ISymbolModel
     #region - 기본 식별 속성 -
     public int Pid { get; set; }
     public string Title { get; set; }
+    public double TitleSize { get; set; }
     #endregion
 
     #region - 타입 및 상태 속성 -

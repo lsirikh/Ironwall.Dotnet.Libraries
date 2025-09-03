@@ -129,7 +129,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
 
             ConfigureMarkerControl(markerControl);
             Shape = markerControl;
-
+            //기본적으로 시현하는 것을 기본으로 한다.
+            IsVisible = true;
             _log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
         }
         catch (Exception ex)
@@ -144,8 +145,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     /// </summary>
     protected virtual void ConfigureMarkerControl(UIElement marker)
     {
-        if (!(marker is GMapMarkerCustomControl control)) return;
-
         // 마커 모양 설정
         //control.Width = _model.Width;
         //control.Height = _model.Height;
@@ -361,10 +360,19 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         get => _model.Title;
         set
         {
-            _log?.Info($"[GMapCustomMarker] Title 변경: '{Title}' -> '{value}'");
-            _log?.Info($"  호출 스택: {Environment.StackTrace}");
+            //_log?.Info($"[GMapCustomMarker] Title 변경: '{Title}' -> '{value}'");
+            //_log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Title = value;
             OnPropertyChanged(nameof(Title));
+        }
+    }
+    public double TitleSize
+    {
+        get => _model.TitleSize;
+        set
+        {
+            _model.TitleSize = value;
+            OnPropertyChanged(nameof(TitleSize));
         }
     }
 
@@ -423,8 +431,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         get => _model.Width;
         set
         {
-            _log?.Info($"[GMapCustomMarker] Width 변경: {Width} -> {value}");
-            _log?.Info($"  호출 스택: {Environment.StackTrace}");
+            //_log?.Info($"[GMapCustomMarker] Width 변경: {Width} -> {value}");
+            //_log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Width = value;
             OnPropertyChanged(nameof(Width));
             UpdateOffset();
@@ -436,8 +444,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         get => _model.Height;
         set
         {
-            _log?.Info($"[GMapCustomMarker] Width 변경: {Height} -> {value}");
-            _log?.Info($"  호출 스택: {Environment.StackTrace}");
+            //_log?.Info($"[GMapCustomMarker] Width 변경: {Height} -> {value}");
+            //_log?.Info($"  호출 스택: {Environment.StackTrace}");
             _model.Height = value;
             OnPropertyChanged(nameof(Height));
             UpdateOffset();
@@ -528,13 +536,23 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         }
     }
 
+    public bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            _isVisible = value;
+            OnPropertyChanged(nameof(IsVisible));
+        }
+    }
+
 
     /// <summary>
     /// 강타입 모델 속성
     /// </summary>
     public T Model => _model;
     public RelayCommand? ShowPropertyCommand { get; protected set; }
-    
+    public bool IsDisposed => _disposed;
     #endregion
     #region - Attributes -
     public event System.Action? StatusChanged;
@@ -549,5 +567,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
 
     protected CancellationTokenSource? _eventToken;
     protected bool _isSelected;
+    private bool _isVisible;
     #endregion
 }

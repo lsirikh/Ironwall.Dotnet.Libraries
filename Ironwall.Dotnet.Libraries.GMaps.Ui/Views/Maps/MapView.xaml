@@ -279,7 +279,8 @@
 				<!--  편집 모드 섹션  -->
 				<ToggleButton
 					x:Name="EditModeToggle"
-					IsChecked="{Binding IsEditModeEnabled}"
+					Command="{Binding ToggleEditModeCommand}"
+					IsChecked="{Binding IsEditModeEnabled, Mode=OneWay}"
 					Style="{StaticResource MaterialDesignSwitchToggleButton}"
 					ToolTip="편집 모드 전환 (E)">
 					<ToggleButton.InputBindings>

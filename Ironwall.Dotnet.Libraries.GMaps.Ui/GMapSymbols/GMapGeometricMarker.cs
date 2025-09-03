@@ -41,12 +41,6 @@ public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>, IGeoEd
     protected override void ConfigureMarkerControl(UIElement markerControl)
     {
         base.ConfigureMarkerControl(markerControl);
-
-        //if (markerControl is GMapGeometricMarkerControl geometricControl)
-        //{
-        //    geometricControl.ShapeType = Model.ShapeType;
-        //    geometricControl.MarkerOpacity = Model.MarkerOpacity;
-        //}
     }
 
     protected override void UpdateShapeSize(double width, double height)

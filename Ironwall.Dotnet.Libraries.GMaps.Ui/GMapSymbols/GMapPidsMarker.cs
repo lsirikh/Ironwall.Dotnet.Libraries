@@ -23,8 +23,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     {
         pidsModel.Update += PidsModel_Update;
     }
-
-
     #endregion
 
     #region - Animation System -
@@ -153,6 +151,11 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         var markerControl = new GMapMarkerPidsControl(this);
         _log?.Info($"GMapMarkerPidsControl 생성: {_model.Title}");
         return markerControl;
+    }
+
+    protected override void ConfigureMarkerControl(UIElement marker)
+    {
+        base.ConfigureMarkerControl(marker);
     }
 
     /// <summary>

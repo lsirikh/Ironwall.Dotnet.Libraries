@@ -262,19 +262,21 @@ public class GMapCustomControl : GMapControl
     {
         try
         {
-            if (CustomMarkers == null) return;
+            if (Markers == null) return;
 
-            foreach (var marker in CustomMarkers.OfType<IEditableMarker>())
+            foreach (var marker in Markers.OfType<IEditableMarker>())
             {
                 if (SetMarkerVisibility(marker))
                 {
-                    marker.ShowShape = true;
-                    marker.ShowTitle = false;
+
+                    marker.IsVisible = true;
+                    //marker.ShowTitle = false;
                 }
                 else
                 {
-                    marker.ShowShape = false;
-                    marker.ShowTitle = false;
+                    marker.IsVisible = false;
+                    //marker.ShowShape = false;
+                    //marker.ShowTitle = false;
                 }
             }
 
@@ -552,7 +554,7 @@ public class GMapCustomControl : GMapControl
     }
 
     // GMapCustomControl.cs - GetMarkerAt 메서드를 화면 좌표 기반으로 수정
-    private IEditableMarker GetMarkerAtScreen(Point screenPosition)
+    private IEditableMarker? GetMarkerAtScreen(Point screenPosition)
     {
         _log?.Info($"GetMarkerAtScreen 호출: 화면위치({screenPosition.X:F2}, {screenPosition.Y:F2})");
         _log?.Info($"총 커스텀 마커 수: {CustomMarkers?.Count ?? 0}");
@@ -563,11 +565,17 @@ public class GMapCustomControl : GMapControl
             return null;
         }
 
-        foreach (var marker in CustomMarkers)
+        // 안전한 마커 리스트 생성 (null 제거)
+        var validMarkers = CustomMarkers.Where(m => m != null && !string.IsNullOrEmpty(m.Title)).ToList();
+
+        foreach (var marker in validMarkers)
         {
             try
             {
-                if(!SetMarkerVisibility(marker)) continue;
+                // 마커 상태 확인
+                if (marker.IsDisposed) continue; // Dispose된 마커 건너뛰기
+                if (!SetMarkerVisibility(marker)) continue;
+
                 // 마커의 화면 좌표 계산
                 var markerScreenPos = FromLatLngToLocal(marker.Position);
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);

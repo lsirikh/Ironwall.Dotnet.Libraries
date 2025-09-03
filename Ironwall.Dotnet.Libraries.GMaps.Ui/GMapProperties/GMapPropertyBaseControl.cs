@@ -87,6 +87,22 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 new PropertyMetadata("", OnMarkerTitleChanged));
 
         /// <summary>
+        /// 제목 사이즈
+        /// </summary>
+        public double TitleSize
+        {
+            get { return (double)GetValue(TitleSizeProperty); }
+            set { SetValue(TitleSizeProperty, value); }
+        }
+
+        public static readonly DependencyProperty TitleSizeProperty =
+            DependencyProperty.Register("TitleSize", typeof(double), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(10.0, OnTitleSizeChanged));
+
+        
+
+
+        /// <summary>
         /// 마커 너비
         /// </summary>
         public double MarkerWidth
@@ -324,13 +340,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         #region PropertyWindow Control Method
         private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"=== MouseLeftButtonDown 이벤트 ===");
-            System.Diagnostics.Debug.WriteLine($"IsDraggable: {IsDraggable}");
+            //System.Diagnostics.Debug.WriteLine($"=== MouseLeftButtonDown 이벤트 ===");
+            //System.Diagnostics.Debug.WriteLine($"IsDraggable: {IsDraggable}");
 
             if (!IsDraggable) return;
 
             var position = e.GetPosition(this);
-            System.Diagnostics.Debug.WriteLine($"마우스 위치: ({position.X}, {position.Y})");
+            //System.Diagnostics.Debug.WriteLine($"마우스 위치: ({position.X}, {position.Y})");
 
             if (position.Y > 45)
             {
@@ -350,7 +366,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
             _isDragging = true;
             _lastMousePosition = e.GetPosition(canvas);
-            System.Diagnostics.Debug.WriteLine($"드래그 시작: ({_lastMousePosition.X}, {_lastMousePosition.Y})");
+            //System.Diagnostics.Debug.WriteLine($"드래그 시작: ({_lastMousePosition.X}, {_lastMousePosition.Y})");
 
             CaptureMouse();
             e.Handled = true;
@@ -360,8 +376,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (!_isDragging || !IsDraggable) return;
 
-            System.Diagnostics.Debug.WriteLine("=== MouseMove 드래그 중 ===");
-            System.Diagnostics.Debug.WriteLine($"this.Parent: {this.Parent?.GetType().Name}");
+            //System.Diagnostics.Debug.WriteLine("=== MouseMove 드래그 중 ===");
+            //System.Diagnostics.Debug.WriteLine($"this.Parent: {this.Parent?.GetType().Name}");
 
             // Visual Tree를 따라 올라가면서 ContentPresenter 찾기
             var contentPresenter = FindParentOfType<ContentPresenter>(this);
@@ -371,7 +387,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 return;
             }
 
-            System.Diagnostics.Debug.WriteLine($"ContentPresenter 발견: {contentPresenter.GetType().Name}");
+            //System.Diagnostics.Debug.WriteLine($"ContentPresenter 발견: {contentPresenter.GetType().Name}");
 
             // Canvas 찾기
             var canvas = contentPresenter.Parent as Canvas;
@@ -381,13 +397,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 return;
             }
 
-            System.Diagnostics.Debug.WriteLine($"Canvas 발견: {canvas.GetType().Name}");
+            //System.Diagnostics.Debug.WriteLine($"Canvas 발견: {canvas.GetType().Name}");
 
             var currentPosition = e.GetPosition(canvas);
             var deltaX = currentPosition.X - _lastMousePosition.X;
             var deltaY = currentPosition.Y - _lastMousePosition.Y;
 
-            System.Diagnostics.Debug.WriteLine($"이동량: ({deltaX}, {deltaY})");
+            //System.Diagnostics.Debug.WriteLine($"이동량: ({deltaX}, {deltaY})");
 
             // ContentPresenter의 Canvas 위치 업데이트
             var currentLeft = Canvas.GetLeft(contentPresenter);
@@ -402,7 +418,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             Canvas.SetLeft(contentPresenter, newLeft);
             Canvas.SetTop(contentPresenter, newTop);
 
-            System.Diagnostics.Debug.WriteLine($"ContentPresenter 새 위치: ({newLeft}, {newTop})");
+            //System.Diagnostics.Debug.WriteLine($"ContentPresenter 새 위치: ({newLeft}, {newTop})");
 
             _lastMousePosition = currentPosition;
         }
@@ -465,6 +481,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 {
                     System.Diagnostics.Debug.WriteLine("새 마커 속성 설정 시작");
                     control.MarkerTitle = newMarker.Title;
+                    control.TitleSize = newMarker.TitleSize;
                     control.MarkerWidth = newMarker.Width;
                     control.MarkerHeight = newMarker.Height;
                     control.MarkerBearing = newMarker.Bearing;
@@ -497,6 +514,17 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Title = '{e.NewValue}'");
                 control.SelectedMarker.Title = (string)e.NewValue;
                 control.OnMarkerPropertyChanged("Title", e.OldValue, e.NewValue);
+            }
+        }
+
+        private static void OnTitleSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnTitleSizeChanged: '{e.OldValue}' -> '{e.NewValue}'");
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.TitleSize = '{e.NewValue}'");
+                control.SelectedMarker.TitleSize = (double)e.NewValue;
+                control.OnMarkerPropertyChanged("TitleSize", e.OldValue, e.NewValue);
             }
         }
 
@@ -604,6 +632,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             // 기본 속성 바인딩
             SetBinding(MarkerTitleProperty, CreateTwoWayBinding(nameof(SelectedMarker.Title)));
+            SetBinding(TitleSizeProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleSize)));
             SetBinding(MarkerWidthProperty, CreateTwoWayBinding(nameof(SelectedMarker.Width)));
             SetBinding(MarkerHeightProperty, CreateTwoWayBinding(nameof(SelectedMarker.Height)));
             SetBinding(MarkerBearingProperty, CreateTwoWayBinding(nameof(SelectedMarker.Bearing)));
@@ -648,6 +677,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
             // 바인딩 해제 전 속성값들 출력
             System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerTitle: '{MarkerTitle}'");
+            System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] TitleSize: '{TitleSize}'");
             System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerWidth: {MarkerWidth}");
             System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerHeight: {MarkerHeight}");
             System.Diagnostics.Debug.WriteLine($"[*바인딩 해제 전] MarkerBearing: {MarkerBearing}");
@@ -668,6 +698,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             
             // 바인딩 해제 후 속성값들 출력
             System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerTitle: '{MarkerTitle}'");
+            System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] TitleSize: '{TitleSize}'");
             System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerWidth: {MarkerWidth}");
             System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerHeight: {MarkerHeight}");
             System.Diagnostics.Debug.WriteLine($"[바인딩 해제 후*] MarkerBearing: {MarkerBearing}");
@@ -684,6 +715,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             // 바인딩 해제
             BindingOperations.ClearBinding(this, MarkerTitleProperty);
+            BindingOperations.ClearBinding(this, TitleSizeProperty);
             BindingOperations.ClearBinding(this, MarkerWidthProperty);
             BindingOperations.ClearBinding(this, MarkerHeightProperty);
             BindingOperations.ClearBinding(this, MarkerBearingProperty);

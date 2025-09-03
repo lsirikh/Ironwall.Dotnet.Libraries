@@ -143,6 +143,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
             {
                 Pid = 1000 + i,
                 Title = $"테스트_심볼_{i:00}",
+                TitleSize = 13,
                 OperationState = operationStates[random.Next(operationStates.Length)],
                 Latitude = 37.0 + random.NextDouble() * 0.6, // 서울 근처
                 Longitude = 126.0 + random.NextDouble() * 1.0, // 서울 근처
@@ -181,6 +182,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
             {
                 Pid = 2000 + i,
                 Title = $"{category}_심볼_{i:00}",
+                TitleSize = 13,
                 OperationState = EnumOperationState.ACTIVE,
                 Latitude = 37.5 + random.NextDouble() * 0.1,
                 Longitude = 126.9 + random.NextDouble() * 0.1,
@@ -239,6 +241,11 @@ public class GMapDbSymbol_BasicCrudTests
         var all = await _fx.Svc.FetchSymbolsAsync();
         Assert.NotNull(all);
         Assert.True(all!.Count >= _fx.SymbolCount);
+
+        foreach (var item in all)
+        {
+            _fx.InsertedSymbolIds.Add(item.Id);
+        }
 
         /* 2) 각각 FetchSymbolAsync로 필드 검증 */
         foreach (var id in _fx.InsertedSymbolIds)
