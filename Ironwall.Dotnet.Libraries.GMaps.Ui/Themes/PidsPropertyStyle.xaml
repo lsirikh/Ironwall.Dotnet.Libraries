@@ -1,0 +1,184 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="BasePropertyStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  PIDS 속성 컨트롤 스타일  -->
+	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsControl}">
+		<Setter Property="SpecificPropertiesTitle" Value="PIDS 속성" />
+		<Setter Property="HasSpecificProperties" Value="True" />
+		<Setter Property="SpecificContent">
+			<Setter.Value>
+				<StackPanel>
+					<!--  연결된 디바이스 ID  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="디바이스ID" />
+						<TextBox
+							Grid.Column="1"
+							Style="{StaticResource CompactTextBox}"
+							Text="{Binding LinkedDeviceId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					</Grid>
+
+					<!--  FOV 표시  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 표시" />
+						<CheckBox
+							Grid.Column="1"
+							VerticalAlignment="Center"
+							Content="FOV 영역 표시"
+							Foreground="White"
+							IsChecked="{Binding ShowFOV, Mode=TwoWay}" />
+					</Grid>
+
+					<!--  FOV 색상  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 색상" />
+						<ComboBox
+							Grid.Column="1"
+							ItemsSource="{Binding AvailableColors, RelativeSource={RelativeSource TemplatedParent}}"
+							SelectedItem="{Binding FOV, RelativeSource={RelativeSource TemplatedParent}}"
+							Style="{StaticResource CompactComboBox}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<Rectangle
+										Width="40"
+										Height="12"
+										Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+										Stroke="Gray"
+										StrokeThickness="0.5" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
+					<!--  FOV 투명도  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="30" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 투명도" />
+						<Slider
+							x:Name="OpacitySlider"
+							Grid.Column="1"
+							Margin="5,0"
+							VerticalAlignment="Center"
+							Maximum="1.0"
+							Minimum="0.1"
+							TickFrequency="0.1"
+							Value="{Binding FOVOpacity, Mode=TwoWay}" />
+						<TextBlock
+							Grid.Column="2"
+							VerticalAlignment="Center"
+							Foreground="White"
+							Text="{Binding ElementName=OpacitySlider, Path=Value, StringFormat='{}{0:P2}'}" />
+					</Grid>
+
+					<!--  카메라 전용 속성 (ShowFOV가 True일 때만 표시)  -->
+					<Border
+						Margin="0,10,0,0"
+						Padding="8,4"
+						Background="#4A8BC8"
+						CornerRadius="5"
+						Visibility="{Binding ShowFOV, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<StackPanel>
+							<TextBlock
+								HorizontalAlignment="Center"
+								FontSize="12"
+								FontWeight="Bold"
+								Foreground="White"
+								Text="카메라 FOV 설정" />
+
+							<!--  FOV 각도  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="20" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="FOV 각도" />
+								<Slider
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="180"
+									Minimum="10"
+									TickFrequency="5"
+									Value="60" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="60°" />
+							</Grid>
+
+							<!--  FOV 거리  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="20" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="FOV 거리" />
+								<Slider
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="500"
+									Minimum="10"
+									TickFrequency="10"
+									Value="100" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="100m" />
+							</Grid>
+						</StackPanel>
+					</Border>
+
+				</StackPanel>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!--  Apply Default Style  -->
+	<Style BasedOn="{StaticResource PidsPropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsControl}" />
+
+</ResourceDictionary>

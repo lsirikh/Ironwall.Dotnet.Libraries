@@ -48,7 +48,7 @@
 									Name="PART_ControllerContainer"
 									Width="25"
 									Height="25"
-									Background="{TemplateBinding MarkerFill}"
+									Background="Transparent"
 									BorderBrush="{TemplateBinding MarkerStroke}"
 									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
 									CornerRadius="4"
@@ -65,7 +65,7 @@
 										Height="20"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{TemplateBinding MarkerFill}"
 										Kind="Network" />
 								</Border>
 
@@ -74,7 +74,7 @@
 									Name="PART_MultiContainer"
 									Width="25"
 									Height="25"
-									Background="{TemplateBinding MarkerFill}"
+									Background="Transparent"
 									BorderBrush="{TemplateBinding MarkerStroke}"
 									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
 									CornerRadius="4"
@@ -91,7 +91,7 @@
 										Height="20"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{TemplateBinding MarkerFill}"
 										Kind="SquareCircle" />
 								</Border>
 
@@ -119,7 +119,7 @@
 									Name="PART_IpCameraContainer"
 									Width="25"
 									Height="25"
-									Background="{TemplateBinding MarkerFill}"
+									Background="Transparent"
 									BorderBrush="{TemplateBinding MarkerStroke}"
 									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
 									CornerRadius="4"
@@ -136,7 +136,7 @@
 										Height="20"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{TemplateBinding MarkerFill}"
 										Kind="VideoOutline" />
 								</Border>
 
@@ -145,7 +145,7 @@
 									Name="PART_DefaultContainer"
 									Width="32"
 									Height="32"
-									Background="{TemplateBinding MarkerFill}"
+									Background="Transparent"
 									BorderBrush="{TemplateBinding MarkerStroke}"
 									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
 									CornerRadius="4">
@@ -161,7 +161,7 @@
 										Height="20"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{TemplateBinding MarkerFill}"
 										Kind="EmoticonDead" />
 								</Border>
 
@@ -177,7 +177,7 @@
 							Height="25"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
-							Background="{TemplateBinding MarkerFill}"
+							Background="Transparent"
 							BorderBrush="{TemplateBinding MarkerStroke}"
 							BorderThickness="{TemplateBinding MarkerStrokeThickness}"
 							CornerRadius="3"
@@ -194,7 +194,7 @@
 								Height="20"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
-								Foreground="Black"
+								Foreground="{TemplateBinding MarkerFill}"
 								Kind="Gate" />
 						</Border>
 
