@@ -184,7 +184,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
 
         private async void OnMarkerPropertyChanged(object sender, MarkerPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"마커 속성 변경: {e.PropertyName} = {e.OldValue} → {e.NewValue}");
+            System.Diagnostics.Debug.WriteLine($"(Behavior)마커 속성 변경: {e.PropertyName} = {e.OldValue} → {e.NewValue}");
 
             // EventAggregator 사용
             var eventAggregator = IoC.Get<IEventAggregator>();

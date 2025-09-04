@@ -553,6 +553,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnMarkerBearingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine($"OnMarkerBearingChanged: {e.OldValue} -> {e.NewValue}");
+
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 control.SelectedMarker.Bearing = (double)e.NewValue;

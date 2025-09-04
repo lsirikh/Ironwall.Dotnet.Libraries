@@ -336,7 +336,7 @@ public static class MarkerEditUtils
         double initialBearing,
         bool enableSnap = true,
         double snapDegree = 5.0,
-        double threshold = 0.5)
+        double threshold = 3.0)
     {
         // 1. 벡터 기반 회전 각도 계산
         var rotationAngle = CalculateVectorRotationAngle(centerPoint, startPoint, currentPoint);

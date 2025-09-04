@@ -607,10 +607,13 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     protected static void OnRotationAngleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"OnRotationAngleChanged: {e.OldValue} -> {e.NewValue}");
+
         if (d is GMapMarkerBaseControl<T> control)
         {
-            var angle = (double)e.NewValue; // 이미 CoerceValueCallback에서 반올림됨
-            var rotateTransform = new RotateTransform(angle);
+            control.RotationAngle = (double)e.NewValue;
+            //var angle = (double)e.NewValue; // 이미 CoerceValueCallback에서 반올림됨
+            var rotateTransform = new RotateTransform(control.RotationAngle);
             control.RenderTransform = rotateTransform;
             control.RenderTransformOrigin = new Point(0.5, 0.5);
         }

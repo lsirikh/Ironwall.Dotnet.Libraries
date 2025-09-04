@@ -31,64 +31,29 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 /// </summary>
 public class MarkerEditAdorner : Adorner, IDisposable
 {
-    #region Fields
-
-    private readonly ILogService _log;
-    private bool _disposed = false;
-    private readonly GMapControl _mapControl;
-    private readonly IEditableMarker _targetMarker;
-
-    // 편집 상태
-    private MarkerEditState _editState;
-    private bool _isDragging;
-    private Point _dragStartPoint;
-    private MarkerHandle _activeHandle = MarkerHandle.None;
-
-    // 원본 데이터 백업 (Undo용)
-    private PointLatLng _originalPosition;
-    private double _originalWidth;
-    private double _originalHeight;
-    private double _originalBearing;
-
-    // 회전 관련 필드
-    private Point _markerCenterPoint;
-    private Point _rotationStartPoint;
-    private double _initialMarkerBearing;
-
-    private int _frameCount = 0;  // 로깅 빈도 제어용
-
-
-    // 시각적 요소들
-    private Pen _handlePen;
-    private Pen _editAreaPen;
-    private Brush _moveHandleBrush;
-    private Brush _rotateHandleBrush;
-    private Brush _resizeHandleBrush;
-    private Brush _infoBackgroundBrush;
-
-    #endregion
+    
 
     #region Events
 
     /// <summary>
     /// 편집 시작 이벤트
     /// </summary>
-    public event EventHandler<MarkerEditStartedEventArgs> EditStarted;
+    public event EventHandler<MarkerEditStartedEventArgs>? EditStarted;
 
     /// <summary>
     /// 편집 중 이벤트 (실시간)
     /// </summary>
-    public event EventHandler<MarkerEditingEventArgs> Editing;
+    public event EventHandler<MarkerEditingEventArgs>? Editing;
 
     /// <summary>
     /// 편집 완료 이벤트
     /// </summary>
-    public event EventHandler<MarkerEditCompletedEventArgs> EditCompleted;
+    public event EventHandler<MarkerEditCompletedEventArgs>? EditCompleted;
 
     /// <summary>
     /// 편집 취소 이벤트
     /// </summary>
-    public event EventHandler<MarkerEditCancelledEventArgs> EditCancelled;
+    public event EventHandler<MarkerEditCancelledEventArgs>? EditCancelled;
 
     #endregion
 
@@ -231,7 +196,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             // AdornedElement의 실제 렌더 영역 사용
             var elementBounds = new Rect(AdornedElement.RenderSize);
             var markerCenter = new Point(elementBounds.Width / 2, elementBounds.Height / 2);
-            _log?.Info($"Adorner 렌더링 - 요소크기: {elementBounds.Width}x{elementBounds.Height}, 중심: ({markerCenter.X}, {markerCenter.Y})");
+            //_log?.Info($"Adorner 렌더링 - 요소크기: {elementBounds.Width}x{elementBounds.Height}, 중심: ({markerCenter.X}, {markerCenter.Y})");
 
             var editRadius = CalculateEditRadius();
 
@@ -239,15 +204,16 @@ public class MarkerEditAdorner : Adorner, IDisposable
             RenderEditArea(drawingContext, markerCenter, editRadius);
             RenderEditHandles(drawingContext, markerCenter, editRadius);
 
-            if (_editState.ShowInfo)
-            {
-                //RenderMarkerInfo(drawingContext, markerCenter, editRadius);
-            }
+            /// 디버깅용 Adorner Control Info
+            //if (_editState.ShowInfo)
+            //{
+            //    RenderMarkerInfo(drawingContext, markerCenter, editRadius);
+            //}
 
-            if (_isDragging)
-            {
-                //RenderDragFeedback(drawingContext, markerCenter);
-            }
+            //if (_isDragging)
+            //{
+            //    RenderDragFeedback(drawingContext, markerCenter);
+            //}
         }
         catch (Exception ex)
         {
@@ -340,43 +306,45 @@ public class MarkerEditAdorner : Adorner, IDisposable
         }
     }
 
+    #region For Debug
     /// <summary>
     /// 마커 정보 표시
     /// </summary>
-    private void RenderMarkerInfo(DrawingContext drawingContext, Point markerScreenPos, double editRadius)
-    {
-        var infoText = CreateInfoText();
-        var textPos = new Point(markerScreenPos.X - infoText.Width / 2,
-            markerScreenPos.Y + editRadius + 30);
+    //private void RenderMarkerInfo(DrawingContext drawingContext, Point markerScreenPos, double editRadius)
+    //{
+    //    var infoText = CreateInfoText();
+    //    var textPos = new Point(markerScreenPos.X - infoText.Width / 2,
+    //        markerScreenPos.Y + editRadius + 30);
 
-        // 배경 사각형
-        var textBackground = new Rect(textPos.X - 4, textPos.Y - 2,
-            infoText.Width + 8, infoText.Height + 4);
-        drawingContext.DrawRectangle(_infoBackgroundBrush,
-            new Pen(Brushes.Gray, 1), textBackground);
+    //    // 배경 사각형
+    //    var textBackground = new Rect(textPos.X - 4, textPos.Y - 2,
+    //        infoText.Width + 8, infoText.Height + 4);
+    //    drawingContext.DrawRectangle(_infoBackgroundBrush,
+    //        new Pen(Brushes.Gray, 1), textBackground);
 
-        // 텍스트
-        drawingContext.DrawText(infoText, textPos);
-    }
+    //    // 텍스트
+    //    drawingContext.DrawText(infoText, textPos);
+    //}
 
     /// <summary>
     /// 드래그 피드백 렌더링
     /// </summary>
-    private void RenderDragFeedback(DrawingContext drawingContext, Point markerScreenPos)
-    {
-        // 드래그 중 실시간 좌표/크기/각도 표시
-        var feedbackText = CreateDragFeedbackText();
-        var feedbackPos = new Point(markerScreenPos.X + 40, markerScreenPos.Y - 40);
+    //private void RenderDragFeedback(DrawingContext drawingContext, Point markerScreenPos)
+    //{
+    //    // 드래그 중 실시간 좌표/크기/각도 표시
+    //    var feedbackText = CreateDragFeedbackText();
+    //    var feedbackPos = new Point(markerScreenPos.X + 40, markerScreenPos.Y - 40);
 
-        var feedbackBackground = new Rect(feedbackPos.X - 2, feedbackPos.Y - 2,
-            feedbackText.Width + 4, feedbackText.Height + 4);
+    //    var feedbackBackground = new Rect(feedbackPos.X - 2, feedbackPos.Y - 2,
+    //        feedbackText.Width + 4, feedbackText.Height + 4);
 
-        drawingContext.DrawRectangle(
-            new SolidColorBrush(Color.FromArgb(200, 255, 255, 0)), // 노란 배경
-            new Pen(Brushes.Orange, 1), feedbackBackground);
+    //    drawingContext.DrawRectangle(
+    //        new SolidColorBrush(Color.FromArgb(200, 255, 255, 0)), // 노란 배경
+    //        new Pen(Brushes.Orange, 1), feedbackBackground);
 
-        drawingContext.DrawText(feedbackText, feedbackPos);
-    }
+    //    drawingContext.DrawText(feedbackText, feedbackPos);
+    //}
+    #endregion
 
     #endregion
 
@@ -395,7 +363,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             var elementBounds = new Rect(AdornedElement.RenderSize);
             var markerCenter = new Point(elementBounds.Width / 2, elementBounds.Height / 2);
 
-            _log?.Info($"마우스 클릭 - 위치: ({mousePos.X:F1}, {mousePos.Y:F1}), 마커중심: ({markerCenter.X:F1}, {markerCenter.Y:F1})");
+            //_log?.Info($"마우스 클릭 - 위치: ({mousePos.X:F1}, {mousePos.Y:F1}), 마커중심: ({markerCenter.X:F1}, {markerCenter.Y:F1})");
 
             // 클릭된 핸들 감지
             _activeHandle = DetectClickedHandle(mousePos, markerCenter);
@@ -647,12 +615,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
             var elementToMap = AdornedElement.TransformToAncestor(_mapControl);
             var mapRelativePos = elementToMap.Transform(currentPos);
 
-            _log?.Info($"좌표 변환: Adorner({currentPos.X:F1}, {currentPos.Y:F1}) -> Map({mapRelativePos.X:F1}, {mapRelativePos.Y:F1})");
+            //_log?.Info($"좌표 변환: Adorner({currentPos.X:F1}, {currentPos.Y:F1}) -> Map({mapRelativePos.X:F1}, {mapRelativePos.Y:F1})");
 
             // 지리 좌표로 변환
             var newGeoPos = _mapControl.FromLocalToLatLng((int)mapRelativePos.X, (int)mapRelativePos.Y);
 
-            _log?.Info($"지리 좌표: ({newGeoPos.Lat:F6}, {newGeoPos.Lng:F6})");
+            //_log?.Info($"지리 좌표: ({newGeoPos.Lat:F6}, {newGeoPos.Lng:F6})");
 
             _targetMarker.UpdateLocation(newGeoPos);
         }
@@ -662,60 +630,66 @@ public class MarkerEditAdorner : Adorner, IDisposable
         }
     }
 
-    /// <summary>
-    /// 회전 시작 (RotateThumb 방식)
-    /// </summary>
-    private void StartRotation(Point mousePos)
-    {
-        if (_targetMarker == null) return;
+    ///// <summary>
+    ///// 회전 시작 (RotateThumb 방식)
+    ///// </summary>
+    //private void StartRotation(Point mousePos)
+    //{
+    //    if (_targetMarker == null) return;
 
-        _markerCenterPoint = CalculateMarkerScreenCenter();
-        _rotationStartPoint = mousePos;
-        _initialMarkerBearing = _targetMarker.Bearing;
+    //    _markerCenterPoint = CalculateMarkerScreenCenter();
+    //    _rotationStartPoint = mousePos;
+    //    _initialMarkerBearing = _targetMarker.Bearing;
 
-        _log?.Info($"벡터 회전 시작: 중심({_markerCenterPoint.X:F1}, {_markerCenterPoint.Y:F1}), " +
-                  $"마커회전: {_initialMarkerBearing:F1}°");
-    }
+    //    _log?.Info($"벡터 회전 시작: 중심({_markerCenterPoint.X:F1}, {_markerCenterPoint.Y:F1}), " +
+    //              $"마커회전: {_initialMarkerBearing:F1}°");
+    //}
 
-    /// <summary>
-    /// 회전 처리 (벡터 방식 - 가장 안정적)
-    /// </summary>
-    private void ProcessRotateOperation(Point currentPos)
-    {
-        try
-        {
-            if (_targetMarker == null) return;
+    ///// <summary>
+    ///// 회전 처리 (벡터 방식 - 가장 안정적)
+    ///// </summary>
+    //private async void ProcessRotateOperation(Point currentPos)
+    //{
+    //    try
+    //    {
+    //        if (_targetMarker == null) return;
 
-            // 1. 스냅 설정
-            bool enableSnap = !Keyboard.IsKeyDown(Key.LeftShift);
+    //        // 1. 스냅 설정
+    //        bool enableSnap = !Keyboard.IsKeyDown(Key.LeftShift);
 
-            // 2. 벡터 기반 회전 계산 (RotateThumb 방식)
-            var result = MarkerEditUtils.ProcessVectorRotation(
-                _markerCenterPoint,
-                _rotationStartPoint,
-                currentPos,
-                _initialMarkerBearing,
-                enableSnap,
-                5.0   // 5도 스냅
-            );
+    //        // 2. 벡터 기반 회전 계산 (RotateThumb 방식)
+    //        var result = MarkerEditUtils.ProcessVectorRotation(
+    //            _markerCenterPoint,
+    //            _rotationStartPoint,
+    //            currentPos,
+    //            _initialMarkerBearing,
+    //            enableSnap,
+    //            5.0   // 5도 스냅
+    //        );
 
-            // 3. 의미있는 변화만 적용
-            if (!result.IsSignificantChange) return;
+    //        // 3. 의미있는 변화만 적용
+    //        if (!result.IsSignificantChange) return;
 
-            // 4. 마커 업데이트
-            _targetMarker.UpdateRotation(result.SnappedBearing);
+    //        // 4. 마커 업데이트
+    //        _targetMarker.UpdateRotation(result.SnappedBearing);
 
-            // 5. 로깅 (간헐적)
-            if (_frameCount++ % 10 == 0)
-            {
-                _log?.Info(result.GetLogInfo());
-            }
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"벡터 회전 처리 실패: {ex.Message}");
-        }
-    }
+    //        // 중요: 시작점과 초기 회전각 업데이트
+    //        _rotationStartPoint = currentPos;
+    //        _initialMarkerBearing = result.SnappedBearing;
+    //        _log.Info($"시작점 및 초기 회전각 업데이트 : {_rotationStartPoint}, {_initialMarkerBearing}");
+
+    //        // 5. 로깅 (간헐적)
+    //        if (_frameCount++ % 10 == 0)
+    //        {
+    //            _log?.Info(result.GetLogInfo());
+    //        }
+
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _log?.Error($"벡터 회전 처리 실패: {ex.Message}");
+    //    }
+    //}
 
     /// <summary>
     /// 마커 화면 중심점 계산
@@ -728,6 +702,290 @@ public class MarkerEditAdorner : Adorner, IDisposable
             return new Point(size.Width / 2.0, size.Height / 2.0);
         }
         return new Point(25, 25); // 기본값
+    }
+
+    /// <summary>
+    /// 단방향 회전 처리 - 0도/360도 경계 지원
+    /// </summary>
+    private void ProcessRotateOperation(Point currentPos)
+    {
+        try
+        {
+            if (_targetMarker == null) return;
+
+            // 1. 현재 드래그 방향 계산
+            var rotationDirection = CalculateRotationDirection(_rotationStartPoint, currentPos);
+            if (rotationDirection == 0) return; // 움직임 없음
+
+            // 2. 방향 변경 감지
+            if (_lastRotationDirection != 0 && _lastRotationDirection != rotationDirection)
+            {
+                _rotationStartPoint = _lastMousePosition;
+                _initialMarkerBearing = _targetMarker.Bearing;
+                ResetBoundaryTracking(); // 경계 추적 리셋
+                _log?.Info($"회전 방향 변경: {(rotationDirection > 0 ? "시계방향" : "반시계방향")}");
+            }
+
+            // 3. 경계를 고려한 각도 계산
+            var targetBearing = CalculateUnidirectionalBearingWithBoundary(currentPos, rotationDirection);
+
+            // 4. 1도 이상 변화 확인 (경계 고려)
+            var angleDifference = CalculateAngleDifferenceWithBoundary(_targetMarker.Bearing, targetBearing);
+            if (angleDifference < 1.0) return;
+
+            // 5. 단방향 제약 적용 (경계 고려)
+            var finalBearing = ApplyUnidirectionalConstraintWithBoundary(targetBearing, rotationDirection);
+
+            // 6. 마커 업데이트
+            _targetMarker.UpdateRotation(finalBearing);
+
+            // 7. 상태 업데이트
+            UpdateRotationState(finalBearing, rotationDirection, currentPos);
+
+            _log?.Info($"경계 지원 회전: {finalBearing:F1}° (방향: {(rotationDirection > 0 ? "+" : "-")})");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"경계 지원 회전 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 회전 방향 계산 (+1: 시계방향, -1: 반시계방향, 0: 움직임 없음)
+    /// </summary>
+    private int CalculateRotationDirection(Point startPoint, Point currentPoint)
+    {
+        // 중심점에서 각 점까지의 벡터
+        var startVector = Point.Subtract(startPoint, _markerCenterPoint);
+        var currentVector = Point.Subtract(currentPoint, _markerCenterPoint);
+
+        // 외적으로 회전 방향 계산
+        var crossProduct = startVector.X * currentVector.Y - startVector.Y * currentVector.X;
+
+        // 최소 움직임 임계값
+        if (Math.Abs(crossProduct) < 10.0) return 0; // 너무 작은 움직임 무시
+
+        return crossProduct > 0 ? 1 : -1; // 1: 시계방향, -1: 반시계방향
+    }
+
+    /// <summary>
+    /// 경계를 고려한 단방향 각도 계산
+    /// </summary>
+    private double CalculateUnidirectionalBearingWithBoundary(Point currentPos, int direction)
+    {
+        var deltaAngle = MarkerEditUtils.CalculateVectorRotationAngle(
+            _markerCenterPoint,
+            _rotationStartPoint,
+            currentPos
+        );
+
+        var adjustedDelta = Math.Abs(deltaAngle) * direction;
+        var newBearing = _initialMarkerBearing + adjustedDelta;
+
+        // 경계 처리
+        if (newBearing >= 360.0)
+        {
+            _hasCrossed360Boundary = true;
+            return newBearing - 360.0; // 0도로 순환
+        }
+        else if (newBearing < 0.0)
+        {
+            _hasCrossed0Boundary = true;
+            return newBearing + 360.0; // 359도로 순환
+        }
+
+        return newBearing;
+    }
+
+    /// <summary>
+    /// 경계를 고려한 각도 차이 계산
+    /// </summary>
+    private double CalculateAngleDifferenceWithBoundary(double currentBearing, double targetBearing)
+    {
+        // 기본 차이 계산
+        var directDiff = Math.Abs(targetBearing - currentBearing);
+
+        // 경계를 넘나드는 경우의 차이도 계산
+        var crossBoundaryDiff1 = Math.Abs((targetBearing + 360) - currentBearing);
+        var crossBoundaryDiff2 = Math.Abs(targetBearing - (currentBearing + 360));
+
+        // 가장 작은 차이 반환 (최단 경로)
+        return Math.Min(directDiff, Math.Min(crossBoundaryDiff1, crossBoundaryDiff2));
+    }
+
+    /// <summary>
+    /// 경계를 고려한 단방향 제약 적용
+    /// </summary>
+    private double ApplyUnidirectionalConstraintWithBoundary(double targetBearing, int direction)
+    {
+        var currentBearing = _targetMarker.Bearing;
+
+        if (direction > 0) // 시계방향 (증가)
+        {
+            // 경계 횡단 확인
+            if (_hasCrossed360Boundary)
+            {
+                // 0도 근처에서 359도로 가는 것을 허용
+                if (currentBearing > 350 && targetBearing < 10)
+                {
+                    return targetBearing;
+                }
+            }
+
+            // 일반적인 증가 방향 제약
+            if (IsDecreasingInDirection(currentBearing, targetBearing, direction))
+            {
+                _log?.Info($"시계방향 역행 방지: {targetBearing:F1}° → {currentBearing:F1}°");
+                return currentBearing;
+            }
+
+            // 최대값 추적 업데이트
+            if (!_hasCrossed360Boundary)
+            {
+                _maxReachedBearing = Math.Max(_maxReachedBearing, targetBearing);
+            }
+        }
+        else // 반시계방향 (감소)
+        {
+            // 경계 횡단 확인
+            if (_hasCrossed0Boundary)
+            {
+                // 0도 근처에서 359도로 가는 것을 허용
+                if (currentBearing < 10 && targetBearing > 350)
+                {
+                    return targetBearing;
+                }
+            }
+
+            // 일반적인 감소 방향 제약
+            if (IsIncreasingInDirection(currentBearing, targetBearing, direction))
+            {
+                _log?.Info($"반시계방향 역행 방지: {targetBearing:F1}° → {currentBearing:F1}°");
+                return currentBearing;
+            }
+
+            // 최소값 추적 업데이트
+            if (!_hasCrossed0Boundary)
+            {
+                _minReachedBearing = Math.Min(_minReachedBearing, targetBearing);
+            }
+        }
+
+        return targetBearing;
+    }
+
+    /// <summary>
+    /// 방향성을 고려한 감소 여부 확인
+    /// </summary>
+    private bool IsDecreasingInDirection(double current, double target, int direction)
+    {
+        if (direction > 0) // 시계방향
+        {
+            // 경계를 고려한 감소 확인
+            if (current > 350 && target < 10) // 359° → 1° (경계 횡단)
+            {
+                return false; // 실제로는 증가
+            }
+
+            return target < current;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 방향성을 고려한 증가 여부 확인
+    /// </summary>
+    private bool IsIncreasingInDirection(double current, double target, int direction)
+    {
+        if (direction < 0) // 반시계방향
+        {
+            // 경계를 고려한 증가 확인
+            if (current < 10 && target > 350) // 1° → 359° (경계 횡단)
+            {
+                return false; // 실제로는 감소
+            }
+
+            return target > current;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 회전 상태 업데이트
+    /// </summary>
+    private void UpdateRotationState(double finalBearing, int rotationDirection, Point currentPos)
+    {
+        _lastRotationDirection = rotationDirection;
+        _lastMousePosition = currentPos;
+
+        // 경계 횡단 후 추적 범위 업데이트
+        if (_hasCrossed360Boundary || _hasCrossed0Boundary)
+        {
+            UpdateBoundaryTracking(finalBearing);
+        }
+        else
+        {
+            _maxReachedBearing = Math.Max(_maxReachedBearing, finalBearing);
+            _minReachedBearing = Math.Min(_minReachedBearing, finalBearing);
+        }
+    }
+
+    /// <summary>
+    /// 경계 횡단 후 추적 범위 업데이트
+    /// </summary>
+    private void UpdateBoundaryTracking(double bearing)
+    {
+        if (_hasCrossed360Boundary)
+        {
+            // 0도 근처에서의 새로운 범위 설정
+            if (bearing < 180)
+            {
+                _maxReachedBearing = bearing;
+                _minReachedBearing = 0;
+            }
+        }
+
+        if (_hasCrossed0Boundary)
+        {
+            // 359도 근처에서의 새로운 범위 설정
+            if (bearing > 180)
+            {
+                _minReachedBearing = bearing;
+                _maxReachedBearing = 359;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 경계 추적 리셋
+    /// </summary>
+    private void ResetBoundaryTracking()
+    {
+        _hasCrossed0Boundary = false;
+        _hasCrossed360Boundary = false;
+        _maxReachedBearing = _targetMarker.Bearing;
+        _minReachedBearing = _targetMarker.Bearing;
+    }
+
+    /// <summary>
+    /// 회전 시작 시 초기화
+    /// </summary>
+    private void StartRotation(Point mousePos)
+    {
+        if (_targetMarker == null) return;
+
+        _markerCenterPoint = CalculateMarkerScreenCenter();
+        _rotationStartPoint = mousePos;
+        _lastMousePosition = mousePos;
+        _initialMarkerBearing = _targetMarker.Bearing;
+
+        // 단방향 회전 및 경계 추적 초기화
+        _lastRotationDirection = 0;
+        ResetBoundaryTracking();
+
+        _log?.Info($"경계 지원 회전 시작: 중심({_markerCenterPoint.X:F1}, {_markerCenterPoint.Y:F1}), 초기각도: {_initialMarkerBearing:F1}°");
     }
 
     /// <summary>
@@ -874,12 +1132,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
             markerWidth + PADDING * 2,
             markerHeight + PADDING * 2);
 
-        _log?.Info($"핸들 감지 - 마우스: ({mousePos.X:F1}, {mousePos.Y:F1}), 마커중심: ({markerCenter.X:F1}, {markerCenter.Y:F1})");
+        //_log?.Info($"핸들 감지 - 마우스: ({mousePos.X:F1}, {mousePos.Y:F1}), 마커중심: ({markerCenter.X:F1}, {markerCenter.Y:F1})");
 
         // 1. 이동 핸들 (중심)
         if (IsPointNear(mousePos, markerCenter, tolerance))
         {
-            _log?.Info("이동 핸들 감지됨");
+            //_log?.Info("이동 핸들 감지됨");
             return MarkerHandle.Move;
         }
 
@@ -887,7 +1145,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
         var rotateHandlePos = new Point(markerCenter.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
         if (IsPointNear(mousePos, rotateHandlePos, tolerance))
         {
-            _log?.Info("회전 핸들 감지됨");
+            //_log?.Info("회전 핸들 감지됨");
             return MarkerHandle.Rotate;
         }
 
@@ -904,7 +1162,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
         {
             if (IsPointNear(mousePos, handlePos, tolerance))
             {
-                _log?.Info($"{handleType} 핸들 감지됨 (비율 유지)");
+                //_log?.Info($"{handleType} 핸들 감지됨 (비율 유지)");
                 return handleType;
             }
         }
@@ -922,7 +1180,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
         {
             if (IsPointNear(mousePos, handlePos, tolerance))
             {
-                _log?.Info($"{handleType} 핸들 감지됨 (자유 조정)");
+                //_log?.Info($"{handleType} 핸들 감지됨 (자유 조정)");
                 return handleType;
             }
         }
@@ -1017,44 +1275,47 @@ public class MarkerEditAdorner : Adorner, IDisposable
         };
     }
 
+
+    #region For Debug
     /// <summary>
     /// 정보 텍스트 생성
     /// </summary>
-    private FormattedText CreateInfoText()
-    {
-        var infoString = $"제목: {_targetMarker.Title}\n" +
-                        $"크기: {_targetMarker.Width:F0}×{_targetMarker.Height:F0}\n" +
-                        $"회전: {_targetMarker.Bearing:F0}°\n" +
-                        $"위치: ({_targetMarker.Position.Lat:F6}, {_targetMarker.Position.Lng:F6})";
+    //private FormattedText CreateInfoText()
+    //{
+    //    var infoString = $"제목: {_targetMarker.Title}\n" +
+    //                    $"크기: {_targetMarker.Width:F0}×{_targetMarker.Height:F0}\n" +
+    //                    $"회전: {_targetMarker.Bearing:F0}°\n" +
+    //                    $"위치: ({_targetMarker.Position.Lat:F6}, {_targetMarker.Position.Lng:F6})";
 
-        return new FormattedText(infoString,
-            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface("Arial"), 10, Brushes.Black, 96);
-    }
+    //    return new FormattedText(infoString,
+    //        CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+    //        new Typeface("Arial"), 10, Brushes.Black, 96);
+    //}
 
     /// <summary>
     /// 드래그 피드백 텍스트 생성
     /// </summary>
-    private FormattedText CreateDragFeedbackText()
-    {
-        var feedbackString = _activeHandle switch
-        {
-            MarkerHandle.Move => $"위치: ({_targetMarker.Position.Lat:F6}, {_targetMarker.Position.Lng:F6})",
-            MarkerHandle.Rotate => $"회전: {_targetMarker.Bearing:F0}°",
+    //private FormattedText CreateDragFeedbackText()
+    //{
+    //    var feedbackString = _activeHandle switch
+    //    {
+    //        MarkerHandle.Move => $"위치: ({_targetMarker.Position.Lat:F6}, {_targetMarker.Position.Lng:F6})",
+    //        MarkerHandle.Rotate => $"회전: {_targetMarker.Bearing:F0}°",
 
-            // 새로운 핸들 타입들 추가
-            MarkerHandle.ResizeLeft or MarkerHandle.ResizeRight => $"너비: {_targetMarker.Width:F0}px",
-            MarkerHandle.ResizeTop or MarkerHandle.ResizeBottom => $"높이: {_targetMarker.Height:F0}px",
-            MarkerHandle.ResizeTopLeft or MarkerHandle.ResizeTopRight or
-            MarkerHandle.ResizeBottomLeft or MarkerHandle.ResizeBottomRight => $"크기: {_targetMarker.Width:F0}×{_targetMarker.Height:F0}",
+    //        // 새로운 핸들 타입들 추가
+    //        MarkerHandle.ResizeLeft or MarkerHandle.ResizeRight => $"너비: {_targetMarker.Width:F0}px",
+    //        MarkerHandle.ResizeTop or MarkerHandle.ResizeBottom => $"높이: {_targetMarker.Height:F0}px",
+    //        MarkerHandle.ResizeTopLeft or MarkerHandle.ResizeTopRight or
+    //        MarkerHandle.ResizeBottomLeft or MarkerHandle.ResizeBottomRight => $"크기: {_targetMarker.Width:F0}×{_targetMarker.Height:F0}",
 
-            _ => "편집 중..."
-        };
+    //        _ => "편집 중..."
+    //    };
 
-        return new FormattedText(feedbackString,
-            CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface("Arial"), 9, Brushes.Black, 96);
-    }
+    //    return new FormattedText(feedbackString,
+    //        CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+    //        new Typeface("Arial"), 9, Brushes.Black, 96);
+    //}
+    #endregion
 
     /// <summary>
     /// 마커 삭제 요청
@@ -1063,7 +1324,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         // 마커 삭제는 외부에서 처리하도록 이벤트 발생
         // TODO: MarkerDeletionRequested 이벤트 추가 고려
-        _log?.Info($"마커 삭제 요청: {_targetMarker.Title}");
+        _log?.Info($"마커 삭제 요청: {_targetMarker?.Title}");
     }
 
     #endregion
@@ -1073,12 +1334,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// <summary>
     /// 편집 상태
     /// </summary>
-    public MarkerEditState EditState => _editState;
+    public MarkerEditState? EditState => _editState;
 
     /// <summary>
     /// 대상 마커
     /// </summary>
-    public IEditableMarker TargetMarker => _targetMarker;
+    public IEditableMarker? TargetMarker => _targetMarker;
 
     /// <summary>
     /// 정보 표시 여부
@@ -1094,6 +1355,53 @@ public class MarkerEditAdorner : Adorner, IDisposable
     }
 
     public const int PADDING = 5;
+
+    
+
+    #endregion
+    #region Fields
+
+    private readonly ILogService? _log;
+    private bool _disposed = false;
+    private readonly GMapControl _mapControl;
+    private readonly IEditableMarker _targetMarker;
+
+    // 편집 상태
+    private MarkerEditState _editState;
+    private bool _isDragging;
+    private Point _dragStartPoint;
+    private MarkerHandle _activeHandle = MarkerHandle.None;
+
+    // 원본 데이터 백업 (Undo용)
+    private PointLatLng _originalPosition;
+    private double _originalWidth;
+    private double _originalHeight;
+    private double _originalBearing;
+
+    // 회전 관련 필드
+    private Point _markerCenterPoint;
+    private Point _rotationStartPoint;
+    private double _initialMarkerBearing;
+
+    // 필드 추가
+    private int _lastRotationDirection = 0; // 마지막 회전 방향
+    private Point _lastMousePosition;       // 이전 마우스 위치
+    private double _maxReachedBearing = 0;  // 도달한 최대 각도
+    private double _minReachedBearing = 360; // 도달한 최소 각도
+                                             // 추가 필드
+    private bool _hasCrossed0Boundary = false;    // 0도 경계 횡단 여부
+    private bool _hasCrossed360Boundary = false;  // 360도 경계 횡단 여부
+
+    private int _frameCount = 0;  // 로깅 빈도 제어용
+
+
+    // 시각적 요소들
+    private Pen? _handlePen;
+    private Pen? _editAreaPen;
+    private Brush? _moveHandleBrush;
+    private Brush? _rotateHandleBrush;
+    private Brush? _resizeHandleBrush;
+    private Brush? _infoBackgroundBrush;
 
     #endregion
 }

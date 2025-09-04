@@ -298,13 +298,13 @@ public class MapViewModel : BasePanelViewModel
                 SelectMarkerForEditing(marker);
                 ShowPropertyPanel();
             }
-            else
-            {
-                _log?.Info($"일반 모드에서 마커 클릭: {marker.Title}");
-                _log?.Info($"UpdateSelectedMarker 호출 전 - {GetMarkerInfo(marker)}");
-                UpdateSelectedMarker(marker);
-                _log?.Info($"UpdateSelectedMarker 호출 후 - {GetMarkerInfo(marker)}");
-            }
+            //else
+            //{
+            //    _log?.Info($"일반 모드에서 마커 클릭: {marker.Title}");
+            //    _log?.Info($"UpdateSelectedMarker 호출 전 - {GetMarkerInfo(marker)}");
+            //    UpdateSelectedMarker(marker);
+            //    _log?.Info($"UpdateSelectedMarker 호출 후 - {GetMarkerInfo(marker)}");
+            //}
 
             _log?.Info($"클릭 완료 후 - {GetMarkerInfo(marker)}");
             _log?.Info($"=== 마커 클릭 종료 ===");
@@ -432,11 +432,14 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 편집을 위한 마커 선택
     /// </summary>
-    private void SelectMarkerForEditing(IEditableMarker marker)
+    private async void SelectMarkerForEditing(IEditableMarker marker)
     {
         try
         {
             _log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
+
+            if(SelectedMarker != null)
+                await DbUpdateProcess(SelectedMarker);
 
             // 이전 선택 해제
             ClearAllSelections();
@@ -444,6 +447,7 @@ public class MapViewModel : BasePanelViewModel
 
             if (MainMap == null) return;
 
+            
             // 새 마커 선택 및 Adorner 생성
             _log?.Info($"MainMap.SelectMarker 호출 중...");
             bool success = MainMap.SelectMarker(marker);
@@ -2862,11 +2866,11 @@ public class MapViewModel : BasePanelViewModel
 
     public async Task HandleAsync(MarkerPropertyChangedEventArgs message, CancellationToken cancellationToken)
     {
-        if (IsEditModeEnabled)
+        if (IsEditModeEnabled && !_isMarkerEditing)
         {
+            _log?.Info($"속성창 변경에 의한 마커 속성 변경: {message.PropertyName} = {message.NewValue}");
             // DB 업데이트
             await DbUpdateProcess(message.Marker);
-            _log?.Info($"마커 속성 변경: {message.PropertyName} = {message.NewValue}");
         }
     }
 
