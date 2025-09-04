@@ -1924,12 +1924,140 @@ public class MapViewModel : BasePanelViewModel
                 return;
             }
 
+            _log?.Info($"마커 복제 시작: {SelectedMarker.Title}");
+
+            // 1. 복제할 위치 계산 (원본에서 약간 이동)
             var originalPos = SelectedMarker.Position;
-            var newPos = new PointLatLng(originalPos.Lat + 0.0001, originalPos.Lng + 0.0001); // 약간 이동된 위치
+            var newPos = new PointLatLng(originalPos.Lat + 0.0001, originalPos.Lng + 0.0001);
 
-            await AddCustomMarker(newPos, $"{SelectedMarker.Title}_Copy");
+            // 2. 마커 타입별로 SymbolModel 생성 및 복제
+            ISymbolModel? duplicatedSymbol = null;
+            int newSymbolId = 0;
 
-            _log?.Info($"마커 복제 완료: {SelectedMarker.Title}");
+            switch (SelectedMarker)
+            {
+                case GMapCustomMarker customMarker:
+                    // SymbolModel 복제
+                    var originalCustomModel = customMarker.Model as SymbolModel;
+                    if (originalCustomModel != null)
+                    {
+                        var customSymbol = new SymbolModel
+                        {
+                            Title = $"{originalCustomModel.Title}_Copy",
+                            TitleSize = originalCustomModel.TitleSize,
+                            Latitude = newPos.Lat,
+                            Longitude = newPos.Lng,
+                            Zoom = originalCustomModel.Zoom,
+                            Width = originalCustomModel.Width,
+                            Height = originalCustomModel.Height,
+                            Bearing = originalCustomModel.Bearing,
+                            Category = originalCustomModel.Category,
+                            ShowShape = originalCustomModel.ShowShape,
+                            ShowTitle = originalCustomModel.ShowTitle,
+                            OperationState = originalCustomModel.OperationState,
+                            FillColor = originalCustomModel.FillColor,
+                            StrokeColor = originalCustomModel.StrokeColor,
+                            StrokeThickness = originalCustomModel.StrokeThickness
+                        };
+
+                        newSymbolId = await _gMapDbSymbolService.InsertSymbolAsync(customSymbol);
+                        duplicatedSymbol = await _gMapDbSymbolService.FetchSymbolAsync(newSymbolId);
+                    }
+                    break;
+
+                case GMapGeometricMarker geometricMarker:
+                    // GeometricSymbolModel 복제
+                    var originalGeoModel = geometricMarker.Model as GeometricSymbolModel;
+                    if (originalGeoModel != null)
+                    {
+                        var geoSymbol = new GeometricSymbolModel
+                        {
+                            Title = $"{originalGeoModel.Title}_Copy",
+                            TitleSize = originalGeoModel.TitleSize,
+                            Latitude = newPos.Lat,
+                            Longitude = newPos.Lng,
+                            Zoom = originalGeoModel.Zoom,
+                            Width = originalGeoModel.Width,
+                            Height = originalGeoModel.Height,
+                            Bearing = originalGeoModel.Bearing,
+                            Category = originalGeoModel.Category,
+                            ShowShape = originalGeoModel.ShowShape,
+                            ShowTitle = originalGeoModel.ShowTitle,
+                            OperationState = originalGeoModel.OperationState,
+                            FillColor = originalGeoModel.FillColor,
+                            StrokeColor = originalGeoModel.StrokeColor,
+                            StrokeThickness = originalGeoModel.StrokeThickness,
+                            Opacity = originalGeoModel.Opacity,
+                            ShapeType = originalGeoModel.ShapeType
+                        };
+
+                        newSymbolId = await _gMapDbSymbolService.InsertGeometrySymbolAsync(geoSymbol);
+                        duplicatedSymbol = await _gMapDbSymbolService.FetchGeometrySymbolAsync(newSymbolId);
+                    }
+                    break;
+
+                case GMapPidsMarker pidsMarker:
+                    // PidsSymbolModel 복제
+                    var originalPidsModel = pidsMarker.Model as PidsSymbolModel;
+                    if (originalPidsModel != null)
+                    {
+                        var pidsSymbol = new PidsSymbolModel
+                        {
+                            Title = $"{originalPidsModel.Title}_Copy",
+                            TitleSize = originalPidsModel.TitleSize,
+                            Latitude = newPos.Lat,
+                            Longitude = newPos.Lng,
+                            Zoom = originalPidsModel.Zoom,
+                            Width = originalPidsModel.Width,
+                            Height = originalPidsModel.Height,
+                            Bearing = originalPidsModel.Bearing,
+                            Category = originalPidsModel.Category,
+                            ShowShape = originalPidsModel.ShowShape,
+                            ShowTitle = originalPidsModel.ShowTitle,
+                            OperationState = originalPidsModel.OperationState,
+                            FillColor = originalPidsModel.FillColor,
+                            StrokeColor = originalPidsModel.StrokeColor,
+                            StrokeThickness = originalPidsModel.StrokeThickness,
+                            LinkedDeviceId = originalPidsModel.LinkedDeviceId + 1000, // 중복 방지
+                            DeviceType = originalPidsModel.DeviceType,
+                            DetectionRange = originalPidsModel.DetectionRange,
+                            DetectionAngle = originalPidsModel.DetectionAngle,
+                            DetectionBearing = originalPidsModel.DetectionBearing,
+                            ShowFOV = originalPidsModel.ShowFOV,
+                            EventStatus = originalPidsModel.EventStatus,
+                            FOVColor = originalPidsModel.FOVColor,
+                            FOVOpacity = originalPidsModel.FOVOpacity
+                        };
+
+                        // TODO: PidsSymbol DB 저장 구현 후 활성화
+                        // newSymbolId = await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsSymbol);
+                        // duplicatedSymbol = await _gMapDbSymbolService.FetchPidsSymbolAsync(newSymbolId);
+
+                        // 임시로 직접 추가 (DB 저장 미구현)
+                        duplicatedSymbol = pidsSymbol;
+                    }
+                    break;
+
+                default:
+                    _log?.Warning($"지원되지 않는 마커 타입: {SelectedMarker.GetType().Name}");
+                    return;
+            }
+
+            // 3. 복제된 심볼로 마커 생성 및 지도에 추가
+            if (duplicatedSymbol != null)
+            {
+                AddMarkerFromSymbol(duplicatedSymbol);
+
+                // 강제 새로고침
+                MainMap?.InvalidateVisual();
+
+                _log?.Info($"마커 복제 완료: {duplicatedSymbol.Title} at ({newPos.Lat:F6}, {newPos.Lng:F6})");
+                _log?.Info($"현재 총 마커 수: {MainMap?.Markers.Count}");
+            }
+            else
+            {
+                _log?.Error("복제된 심볼 생성 실패");
+            }
         }
         catch (Exception ex)
         {

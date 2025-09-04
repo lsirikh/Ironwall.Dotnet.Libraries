@@ -134,9 +134,9 @@
 									Grid.Column="1"
 									Margin="5,0"
 									VerticalAlignment="Center"
-									Maximum="500"
+									Maximum="10000"
 									Minimum="10"
-									TickFrequency="10"
+									TickFrequency="5"
 									Value="{Binding DetectionRange}" />
 								<TextBlock
 									Grid.Column="2"
@@ -162,7 +162,7 @@
 									Margin="5,0"
 									VerticalAlignment="Center"
 									Maximum="180"
-									Minimum="10"
+									Minimum="5"
 									TickFrequency="5"
 									Value="{Binding DetectionAngle}" />
 								<TextBlock
@@ -188,9 +188,9 @@
 									Grid.Column="1"
 									Margin="5,0"
 									VerticalAlignment="Center"
-									Maximum="360"
-									Minimum="0"
-									TickFrequency="15"
+									Maximum="180"
+									Minimum="-180"
+									TickFrequency="5"
 									Value="{Binding DetectionBearing}" />
 								<TextBlock
 									Grid.Column="2"

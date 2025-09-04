@@ -9,6 +9,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using GMap.NET;
 using System.Windows.Media.Media3D;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using System.Windows.Data;
+using System.Windows.Shapes;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -89,6 +93,23 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DependencyProperty.Register("FOVColor", typeof(Brush), typeof(GMapMarkerPidsControl),
             new PropertyMetadata(Brushes.Blue));
 
+
+    /// <summary>
+    /// 감지 영역 투명도
+    /// </summary>
+    public double FOVOpacity
+    {
+        get { return (double)GetValue(FOVOpacityProperty); }
+        set { SetValue(FOVOpacityProperty, value); }
+    }
+    
+    public static readonly DependencyProperty FOVOpacityProperty =
+        DependencyProperty.Register("FOVOpacity", typeof(double), typeof(GMapMarkerPidsControl), new PropertyMetadata(0.0, OnFOVOpacityChanged));
+
+   
+
+
+
     /// <summary>
     /// 감지 범위 (미터)
     /// </summary>
@@ -137,7 +158,6 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     public GMapMarkerPidsControl()
     {
-        InitializeFOVSystem();
     }
 
     /// <summary>
@@ -146,72 +166,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// <param name="pidsMarker">연결할 PIDS 마커</param>
     public GMapMarkerPidsControl(GMapPidsMarker pidsMarker) : base(pidsMarker)
     {
-        InitializeFOVSystem();
     }
 
-    #endregion
-
-    #region FOV System
-    private List<PointLatLng>? _fovPoints;
-    private readonly object _fovLock = new();
-
-    /// <summary>
-    /// FOV 시스템 초기화
-    /// </summary>
-    private void InitializeFOVSystem()
-    {
-        _fovPoints = new List<PointLatLng>();
-    }
-
-    /// <summary>
-    /// FOV 점들 계산
-    /// </summary>
-    private void CalculateFOVPoints()
-    {
-        lock (_fovLock)
-        {
-            try
-            {
-                if (Marker == null) return;
-
-                //_fovPoints = PidsFOVHelper.CalculateFOVPoints(
-                //    Marker.Position,
-                //    DetectionRange,
-                //    DetectionAngle,
-                //    DetectionBearing + RotationAngle, // 마커 회전 + FOV 방향
-                //    GetFOVPointCount(DeviceType)
-                //);
-
-                // TODO: GMapCustomControl에 FOV 업데이트 신호 전달
-                NotifyFOVChanged();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"FOV 계산 실패: {ex.Message}");
-            }
-        }
-    }
-
-    
-    /// <summary>
-    /// FOV 변경 알림 (부모 컨트롤에 전달)
-    /// </summary>
-    private void NotifyFOVChanged()
-    {
-        // TODO: 부모 GMapCustomControl에 FOV 변경 이벤트 전달
-        System.Diagnostics.Debug.WriteLine($"FOV 변경됨: 점 개수={_fovPoints.Count}");
-    }
-
-    /// <summary>
-    /// 현재 FOV 점들 반환 (읽기 전용)
-    /// </summary>
-    public IReadOnlyList<PointLatLng>? GetFOVPoints()
-    {
-        lock (_fovLock)
-        {
-            return _fovPoints?.AsReadOnly();
-        }
-    }
     #endregion
 
     #region Abstract Methods Implementation
@@ -226,10 +182,19 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         // PIDS 마커 전용 속성 동기화
         DeviceType = Marker.DeviceType;
         EventStatus = Marker.EventStatus;
+
         ShowFOV = Marker.ShowFOV;
+        FOVOpacity = Marker.FOVOpacity;
+        FOVColor = ColorHelper.ToBrush(Marker.FOVColor);
         DetectionRange = Marker.Model.DetectionRange;
         DetectionAngle = Marker.Model.DetectionAngle;
         DetectionBearing = Marker.Model.DetectionBearing;
+
+        // FOV 업데이트
+        if (ShowFOV)
+        {
+            UpdateFOVPath(); // 추가
+        }
 
         // 장비 타입별 기본 설정
         ApplyDeviceTypeDefaults();
@@ -246,9 +211,21 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         SetupPropertyBinding(DeviceTypeProperty, nameof(Marker.DeviceType));
         SetupPropertyBinding(EventStatusProperty, nameof(Marker.EventStatus));
         SetupPropertyBinding(ShowFOVProperty, nameof(Marker.ShowFOV));
+        SetupPropertyBinding(FOVOpacityProperty, nameof(Marker.FOVOpacity));
         SetupPropertyBinding(DetectionRangeProperty, nameof(Marker.DetectionRange));
         SetupPropertyBinding(DetectionAngleProperty, nameof(Marker.DetectionAngle));
         SetupPropertyBinding(DetectionBearingProperty, nameof(Marker.DetectionBearing));
+
+        var colorConverter = new ColorTypeToBrushConverter();
+        var visibilityConverter = new System.Windows.Controls.BooleanToVisibilityConverter();
+
+        var fovColorBinding = new Binding(nameof(Marker.FOVColor))
+        {
+            Source = Marker,
+            Mode = BindingMode.OneWay,
+            Converter = colorConverter
+        };
+        SetBinding(FOVColorProperty, fovColorBinding);
     }
 
     #endregion
@@ -270,11 +247,13 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     protected override void UpdateMarkerAppearance()
     {
-        // 이벤트 상태에 따른 색상 설정 (기본 상태 색상 무시)
-        MarkerFill = GetEventStatusBrush(EventStatus);
+        //// 이벤트 상태에 따른 색상 설정 (기본 상태 색상 무시)
+        //MarkerFill = GetEventStatusBrush(EventStatus);
 
-        // 장비 타입별 테두리 색상
-        MarkerStroke = GetDeviceTypeBorderBrush(DeviceType);
+        //// 장비 타입별 테두리 색상
+        //MarkerStroke = GetDeviceTypeBorderBrush(DeviceType);
+
+        UpdateFOVPath();
     }
 
     /// <summary>
@@ -301,6 +280,30 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     protected override void OnSelectionChanged(bool isSelected)
     {
         base.OnSelectionChanged(isSelected);
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+
+        if (Marker != null)
+        {
+            Marker.Width = ActualWidth;
+            Marker.Height = ActualHeight;
+
+            UpdateFOVPath();
+        }
+    }
+
+    /// <summary>
+    /// 컨트롤 템플릿 적용후
+    /// </summary>
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+
+        // 템플릿 요소들이 로드된 후 FOV 업데이트
+        UpdateFOVPath();
     }
     #endregion
 
@@ -383,6 +386,93 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     }
 
     /// <summary>
+    /// FOV Path 업데이트 (핵심 메서드)
+    /// </summary>
+    private void UpdateFOVPath()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => UpdateFOVPath());
+            return;
+        }
+
+        try
+        {
+            if (GetTemplateChild("PART_FOVFigure") is PathFigure figure &&
+                GetTemplateChild("PART_FOVLine1") is LineSegment line1 &&
+                GetTemplateChild("PART_FOVArc") is ArcSegment arc &&
+                GetTemplateChild("PART_FOVCenter") is Ellipse centerEllipse)
+            {
+                // 카메라 아이콘의 실제 크기 기준으로 중심점 계산
+                var centerX = ActualWidth;        // 카메라 렌즈는 오른쪽 끝
+                var centerY = ActualHeight / 2.0; // 카메라 중심은 세로 중앙
+
+                // 각도를 라디안으로 변환 (0도 = 동쪽, 시계방향 양수)
+                var bearingRad = DetectionBearing * Math.PI / 180.0;
+                var halfAngleRad = DetectionAngle / 2.0 * Math.PI / 180.0;
+
+                // 시작각과 끝각 계산
+                var startAngleRad = bearingRad - halfAngleRad;
+                var endAngleRad = bearingRad + halfAngleRad;
+
+                // 반지름 (픽셀 단위로 스케일)
+                var radius = Math.Max(DetectionRange * 0.2, 20);
+
+                // 첫 번째 경계점 (시작각)
+                var startX = centerX + radius * Math.Cos(startAngleRad);
+                var startY = centerY + radius * Math.Sin(startAngleRad);
+
+                // 두 번째 경계점 (끝각)
+                var endX = centerX + radius * Math.Cos(endAngleRad);
+                var endY = centerY + radius * Math.Sin(endAngleRad);
+
+                // PathFigure 업데이트 (중심점에서 시작)
+                figure.StartPoint = new Point(centerX, centerY);
+
+                // 첫 번째 LineSegment: 중심 → 첫 번째 경계점
+                line1.Point = new Point(startX, startY);
+
+                // ArcSegment: 첫 번째 경계점 → 두 번째 경계점 (호로 연결)
+                arc.Point = new Point(endX, endY);
+                arc.Size = new Size(radius, radius);
+                arc.IsLargeArc = DetectionAngle > 180;
+                arc.SweepDirection = SweepDirection.Clockwise;
+
+                // 마지막 LineSegment는 XAML에 하드코딩되어 있어서 자동으로 중심점으로 돌아감
+
+                // 중심점 Ellipse 위치 업데이트
+                Canvas.SetLeft(centerEllipse, centerX - 2);
+                Canvas.SetTop(centerEllipse, centerY - 2);
+
+                System.Diagnostics.Debug.WriteLine($"FOV 업데이트:");
+                System.Diagnostics.Debug.WriteLine($"  중심점: ({centerX:F1}, {centerY:F1})");
+                System.Diagnostics.Debug.WriteLine($"  시작각: {DetectionBearing - DetectionAngle / 2:F1}° → ({startX:F1}, {startY:F1})");
+                System.Diagnostics.Debug.WriteLine($"  끝각: {DetectionBearing + DetectionAngle / 2:F1}° → ({endX:F1}, {endY:F1})");
+                System.Diagnostics.Debug.WriteLine($"  반지름: {radius:F1}px");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("FOV 템플릿 요소를 찾을 수 없음");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"FOV Path 업데이트 실패: {ex.Message}");
+        }
+    }
+
+    private void DebugFOVProperties()
+    {
+        System.Diagnostics.Debug.WriteLine($"=== FOV Debug Info ===");
+        System.Diagnostics.Debug.WriteLine($"ShowFOV: {ShowFOV}");
+        System.Diagnostics.Debug.WriteLine($"FOVColor: {FOVColor}");
+        System.Diagnostics.Debug.WriteLine($"FOVOpacity: {FOVOpacity}");
+        System.Diagnostics.Debug.WriteLine($"DetectionRange: {DetectionRange}");
+        System.Diagnostics.Debug.WriteLine($"DetectionAngle: {DetectionAngle}");
+        System.Diagnostics.Debug.WriteLine($"DetectionBearing: {DetectionBearing}");
+    }
+
+    /// <summary>
     /// 장비 클릭 애니메이션
     /// </summary>
     private void TriggerClickAnimation()
@@ -458,7 +548,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     protected static void OnDeviceTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerPidsControl control)
+        if (d is GMapMarkerPidsControl control && control.Marker != null)
         {
             control.ApplyDeviceTypeDefaults();
             control.UpdateMarkerAppearance();
@@ -476,7 +566,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     protected static void OnEventStatusChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerPidsControl control)
+        if (d is GMapMarkerPidsControl control && control.Marker != null)
         {
             // UI 색상 즉시 업데이트
             control.UpdateMarkerAppearance();
@@ -496,22 +586,13 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     protected static void OnShowFOVChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerPidsControl control)
+        if (d is GMapMarkerPidsControl control && control.Marker != null)
         {
             bool isVisible = (bool)e.NewValue;
 
             if (isVisible)
             {
-                control.CalculateFOVPoints();
-            }
-            else
-            {
-                // FOV 숨김
-                lock (control._fovLock)
-                {
-                    control._fovPoints?.Clear();
-                    control.NotifyFOVChanged();
-                }
+                control.UpdateFOVPath(); // 추가
             }
 
             // 마커 데이터와 동기화
@@ -523,13 +604,28 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     }
 
     /// <summary>
+    /// Opacity 변경 시 
+    /// </summary>
+    /// <param name="d"></param>
+    /// <param name="e"></param>
+    /// <exception cref="NotImplementedException"></exception>
+    protected static void OnFOVOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is GMapMarkerPidsControl control && control.Marker != null)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnFOVOpacityChanged: {e.OldValue} → {e.NewValue}");
+            control.Marker.FOVOpacity = (double)e.NewValue;
+        }
+    }
+
+    /// <summary>
     /// FOV 매개변수 변경 시 호출
     /// </summary>
     protected static void OnFOVParameterChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerPidsControl control && control.ShowFOV)
+        if (d is GMapMarkerPidsControl control && control.Marker != null && control.ShowFOV)
         {
-            control.CalculateFOVPoints();
+            control.UpdateFOVPath(); // 추가
         }
     }
 
@@ -548,7 +644,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
 
         if (ShowFOV)
         {
-            CalculateFOVPoints();
+            UpdateFOVPath(); // 추가
         }
     }
 

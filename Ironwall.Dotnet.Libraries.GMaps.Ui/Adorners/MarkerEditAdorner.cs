@@ -630,80 +630,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
         }
     }
 
-    ///// <summary>
-    ///// 회전 시작 (RotateThumb 방식)
-    ///// </summary>
-    //private void StartRotation(Point mousePos)
-    //{
-    //    if (_targetMarker == null) return;
-
-    //    _markerCenterPoint = CalculateMarkerScreenCenter();
-    //    _rotationStartPoint = mousePos;
-    //    _initialMarkerBearing = _targetMarker.Bearing;
-
-    //    _log?.Info($"벡터 회전 시작: 중심({_markerCenterPoint.X:F1}, {_markerCenterPoint.Y:F1}), " +
-    //              $"마커회전: {_initialMarkerBearing:F1}°");
-    //}
-
-    ///// <summary>
-    ///// 회전 처리 (벡터 방식 - 가장 안정적)
-    ///// </summary>
-    //private async void ProcessRotateOperation(Point currentPos)
-    //{
-    //    try
-    //    {
-    //        if (_targetMarker == null) return;
-
-    //        // 1. 스냅 설정
-    //        bool enableSnap = !Keyboard.IsKeyDown(Key.LeftShift);
-
-    //        // 2. 벡터 기반 회전 계산 (RotateThumb 방식)
-    //        var result = MarkerEditUtils.ProcessVectorRotation(
-    //            _markerCenterPoint,
-    //            _rotationStartPoint,
-    //            currentPos,
-    //            _initialMarkerBearing,
-    //            enableSnap,
-    //            5.0   // 5도 스냅
-    //        );
-
-    //        // 3. 의미있는 변화만 적용
-    //        if (!result.IsSignificantChange) return;
-
-    //        // 4. 마커 업데이트
-    //        _targetMarker.UpdateRotation(result.SnappedBearing);
-
-    //        // 중요: 시작점과 초기 회전각 업데이트
-    //        _rotationStartPoint = currentPos;
-    //        _initialMarkerBearing = result.SnappedBearing;
-    //        _log.Info($"시작점 및 초기 회전각 업데이트 : {_rotationStartPoint}, {_initialMarkerBearing}");
-
-    //        // 5. 로깅 (간헐적)
-    //        if (_frameCount++ % 10 == 0)
-    //        {
-    //            _log?.Info(result.GetLogInfo());
-    //        }
-
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        _log?.Error($"벡터 회전 처리 실패: {ex.Message}");
-    //    }
-    //}
-
-    /// <summary>
-    /// 마커 화면 중심점 계산
-    /// </summary>
-    private Point CalculateMarkerScreenCenter()
-    {
-        if (AdornedElement?.RenderSize != null)
-        {
-            var size = AdornedElement.RenderSize;
-            return new Point(size.Width / 2.0, size.Height / 2.0);
-        }
-        return new Point(25, 25); // 기본값
-    }
-
     /// <summary>
     /// 단방향 회전 처리 - 0도/360도 경계 지원
     /// </summary>
@@ -714,7 +640,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             if (_targetMarker == null) return;
 
             // 1. 현재 드래그 방향 계산
-            var rotationDirection = CalculateRotationDirection(_rotationStartPoint, currentPos);
+            var rotationDirection = MarkerEditUtils.CalculateRotationDirection(_rotationStartPoint, currentPos, _markerCenterPoint);
             if (rotationDirection == 0) return; // 움직임 없음
 
             // 2. 방향 변경 감지
@@ -730,7 +656,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             var targetBearing = CalculateUnidirectionalBearingWithBoundary(currentPos, rotationDirection);
 
             // 4. 1도 이상 변화 확인 (경계 고려)
-            var angleDifference = CalculateAngleDifferenceWithBoundary(_targetMarker.Bearing, targetBearing);
+            var angleDifference = MarkerEditUtils.CalculateAngleDifferenceWithBoundary(_targetMarker.Bearing, targetBearing);
             if (angleDifference < 1.0) return;
 
             // 5. 단방향 제약 적용 (경계 고려)
@@ -748,24 +674,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
         {
             _log?.Error($"경계 지원 회전 처리 실패: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// 회전 방향 계산 (+1: 시계방향, -1: 반시계방향, 0: 움직임 없음)
-    /// </summary>
-    private int CalculateRotationDirection(Point startPoint, Point currentPoint)
-    {
-        // 중심점에서 각 점까지의 벡터
-        var startVector = Point.Subtract(startPoint, _markerCenterPoint);
-        var currentVector = Point.Subtract(currentPoint, _markerCenterPoint);
-
-        // 외적으로 회전 방향 계산
-        var crossProduct = startVector.X * currentVector.Y - startVector.Y * currentVector.X;
-
-        // 최소 움직임 임계값
-        if (Math.Abs(crossProduct) < 10.0) return 0; // 너무 작은 움직임 무시
-
-        return crossProduct > 0 ? 1 : -1; // 1: 시계방향, -1: 반시계방향
     }
 
     /// <summary>
@@ -798,22 +706,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
     }
 
     /// <summary>
-    /// 경계를 고려한 각도 차이 계산
-    /// </summary>
-    private double CalculateAngleDifferenceWithBoundary(double currentBearing, double targetBearing)
-    {
-        // 기본 차이 계산
-        var directDiff = Math.Abs(targetBearing - currentBearing);
-
-        // 경계를 넘나드는 경우의 차이도 계산
-        var crossBoundaryDiff1 = Math.Abs((targetBearing + 360) - currentBearing);
-        var crossBoundaryDiff2 = Math.Abs(targetBearing - (currentBearing + 360));
-
-        // 가장 작은 차이 반환 (최단 경로)
-        return Math.Min(directDiff, Math.Min(crossBoundaryDiff1, crossBoundaryDiff2));
-    }
-
-    /// <summary>
     /// 경계를 고려한 단방향 제약 적용
     /// </summary>
     private double ApplyUnidirectionalConstraintWithBoundary(double targetBearing, int direction)
@@ -833,7 +725,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             }
 
             // 일반적인 증가 방향 제약
-            if (IsDecreasingInDirection(currentBearing, targetBearing, direction))
+            if (MarkerEditUtils.IsDecreasingInDirection(currentBearing, targetBearing, direction))
             {
                 _log?.Info($"시계방향 역행 방지: {targetBearing:F1}° → {currentBearing:F1}°");
                 return currentBearing;
@@ -858,7 +750,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             }
 
             // 일반적인 감소 방향 제약
-            if (IsIncreasingInDirection(currentBearing, targetBearing, direction))
+            if (MarkerEditUtils.IsIncreasingInDirection(currentBearing, targetBearing, direction))
             {
                 _log?.Info($"반시계방향 역행 방지: {targetBearing:F1}° → {currentBearing:F1}°");
                 return currentBearing;
@@ -872,44 +764,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
         }
 
         return targetBearing;
-    }
-
-    /// <summary>
-    /// 방향성을 고려한 감소 여부 확인
-    /// </summary>
-    private bool IsDecreasingInDirection(double current, double target, int direction)
-    {
-        if (direction > 0) // 시계방향
-        {
-            // 경계를 고려한 감소 확인
-            if (current > 350 && target < 10) // 359° → 1° (경계 횡단)
-            {
-                return false; // 실제로는 증가
-            }
-
-            return target < current;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// 방향성을 고려한 증가 여부 확인
-    /// </summary>
-    private bool IsIncreasingInDirection(double current, double target, int direction)
-    {
-        if (direction < 0) // 반시계방향
-        {
-            // 경계를 고려한 증가 확인
-            if (current < 10 && target > 350) // 1° → 359° (경계 횡단)
-            {
-                return false; // 실제로는 감소
-            }
-
-            return target > current;
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -976,7 +830,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         if (_targetMarker == null) return;
 
-        _markerCenterPoint = CalculateMarkerScreenCenter();
+        _markerCenterPoint = MarkerEditUtils.CalculateMarkerScreenCenter(AdornedElement.RenderSize);
         _rotationStartPoint = mousePos;
         _lastMousePosition = mousePos;
         _initialMarkerBearing = _targetMarker.Bearing;

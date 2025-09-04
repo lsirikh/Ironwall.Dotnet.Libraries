@@ -390,6 +390,86 @@ public static class MarkerEditUtils
         );
     }
 
+    /// <summary>
+    /// 마커 화면 중심점 계산
+    /// </summary>
+    public static Point CalculateMarkerScreenCenter(Size size)
+    {
+        return new Point(size.Width / 2.0, size.Height / 2.0);
+    }
+
+    /// <summary>
+    /// 회전 방향 계산 (+1: 시계방향, -1: 반시계방향, 0: 움직임 없음)
+    /// </summary>
+    public static int CalculateRotationDirection(Point startPoint, Point currentPoint, Point markerCenterPoint)
+    {
+        // 중심점에서 각 점까지의 벡터
+        var startVector = Point.Subtract(startPoint, markerCenterPoint);
+        var currentVector = Point.Subtract(currentPoint, markerCenterPoint);
+
+        // 외적으로 회전 방향 계산
+        var crossProduct = startVector.X * currentVector.Y - startVector.Y * currentVector.X;
+
+        // 최소 움직임 임계값
+        if (Math.Abs(crossProduct) < 10.0) return 0; // 너무 작은 움직임 무시
+
+        return crossProduct > 0 ? 1 : -1; // 1: 시계방향, -1: 반시계방향
+    }
+
+    /// <summary>
+    /// 경계를 고려한 각도 차이 계산
+    /// </summary>
+    public static double CalculateAngleDifferenceWithBoundary(double currentBearing, double targetBearing)
+    {
+        // 기본 차이 계산
+        var directDiff = Math.Abs(targetBearing - currentBearing);
+
+        // 경계를 넘나드는 경우의 차이도 계산
+        var crossBoundaryDiff1 = Math.Abs((targetBearing + 360) - currentBearing);
+        var crossBoundaryDiff2 = Math.Abs(targetBearing - (currentBearing + 360));
+
+        // 가장 작은 차이 반환 (최단 경로)
+        return Math.Min(directDiff, Math.Min(crossBoundaryDiff1, crossBoundaryDiff2));
+    }
+
+    /// <summary>
+    /// 방향성을 고려한 감소 여부 확인
+    /// </summary>
+    public static bool IsDecreasingInDirection(double current, double target, int direction)
+    {
+        if (direction > 0) // 시계방향
+        {
+            // 경계를 고려한 감소 확인
+            if (current > 350 && target < 10) // 359° → 1° (경계 횡단)
+            {
+                return false; // 실제로는 증가
+            }
+
+            return target < current;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 방향성을 고려한 증가 여부 확인
+    /// </summary>
+    public static bool IsIncreasingInDirection(double current, double target, int direction)
+    {
+        if (direction < 0) // 반시계방향
+        {
+            // 경계를 고려한 증가 확인
+            if (current < 10 && target > 350) // 1° → 359° (경계 횡단)
+            {
+                return false; // 실제로는 감소
+            }
+
+            return target > current;
+        }
+
+        return false;
+    }
+
     #endregion
 
     #region 회전 결과 구조체

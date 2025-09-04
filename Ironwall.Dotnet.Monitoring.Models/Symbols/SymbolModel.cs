@@ -93,4 +93,5 @@ public class SymbolModel : BaseModel, ISymbolModel
     public EnumColorType StrokeColor { get; set; } = EnumColorType.White;
     public double StrokeThickness { get; set; } = 1.0;
     #endregion
+
 }

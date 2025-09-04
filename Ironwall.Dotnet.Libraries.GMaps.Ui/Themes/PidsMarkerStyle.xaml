@@ -14,221 +14,513 @@
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type control:GMapMarkerPidsControl}">
-					<Grid>
-						<!--  ViewBox 내부 - 크기에 따라 스케일링되는 부분  -->
-						<Viewbox
-							Name="PART_ViewboxContainer"
-							Width="{TemplateBinding Width}"
-							Height="{TemplateBinding Height}"
-							Stretch="Fill"
-							ToolTip="{TemplateBinding MarkerTitle}">
 
-							<Grid
-								Name="PART_MarkerContainer"
-								Width="40"
-								Height="40">
+					<!--  메인 컨테이너: 아이콘 + 라벨 수직 배치  -->
+					<Grid Name="PART_MainContainer" HorizontalAlignment="Center">
 
-								<Ellipse
-									x:Name="PulseEllipse"
-									Width="20"
-									Height="20"
-									HorizontalAlignment="Center"
-									VerticalAlignment="Center"
-									Fill="Red"
-									Opacity="0"
-									RenderTransformOrigin="0.5,0.5">
-									<Ellipse.RenderTransform>
-										<ScaleTransform x:Name="PulseScaleTransform" ScaleX="1" ScaleY="1" />
-									</Ellipse.RenderTransform>
-								</Ellipse>
+						<!--  === Controller Section ===  -->
+						<Grid Name="PART_ControllerSection" Visibility="Collapsed">
+							<!--  Controller 아이콘 (크기 조절됨)  -->
+							<Viewbox
+								Name="PART_ViewboxControllerContainer"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								Stretch="Fill"
+								ToolTip="{TemplateBinding MarkerTitle}">
 
-
-								<!--  Controller Container  -->
-								<Border
-									Name="PART_ControllerContainer"
-									Width="25"
-									Height="25"
-									Background="Transparent"
-									BorderBrush="{TemplateBinding MarkerStroke}"
-									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
-									CornerRadius="4"
-									Visibility="Collapsed">
-									<Border.Effect>
-										<DropShadowEffect
-											BlurRadius="6"
-											Opacity="0.4"
-											ShadowDepth="3"
-											Color="Black" />
-									</Border.Effect>
-									<Grid>
-
-										<md:PackIcon
-											Width="20"
-											Height="20"
+								<Grid
+									Name="PART_ControllerIconContainer"
+									Width="40"
+									Height="40">
+									<!--  Controller Icon Content  -->
+									<Border
+										Background="{TemplateBinding MarkerFill}"
+										BorderBrush="{TemplateBinding MarkerStroke}"
+										BorderThickness="2"
+										CornerRadius="4">
+										<Border.Effect>
+											<DropShadowEffect
+												BlurRadius="8"
+												Opacity="0.5"
+												ShadowDepth="4"
+												Color="Black" />
+										</Border.Effect>
+										<TextBlock
 											HorizontalAlignment="Center"
 											VerticalAlignment="Center"
-											Foreground="{TemplateBinding MarkerFill}"
-											Kind="Network"
-											ToolTip="{TemplateBinding MarkerTitle}" />
+											FontSize="12"
+											FontWeight="Bold"
+											Foreground="White"
+											Text="CTRL" />
+									</Border>
+								</Grid>
+							</Viewbox>
 
+							<!--  Controller Label (독립적 크기)  -->
+							<Border
+								Name="PART_ControllerLabelContainer"
+								MinWidth="40"
+								MaxWidth="150"
+								Margin="0,0,0,-25"
+								Padding="2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_ControllerLabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+							</Border>
+						</Grid>
+
+						<!--  === Multi Section ===  -->
+						<Grid Name="PART_MultiSection" Visibility="Collapsed">
+							<!--  Multi 아이콘 (크기 조절됨)  -->
+							<Viewbox
+								Name="PART_ViewboxMultiContainer"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								Stretch="Fill"
+								ToolTip="{TemplateBinding MarkerTitle}">
+
+								<Grid
+									Name="PART_MultiIconContainer"
+									Width="40"
+									Height="40">
+									<!--  Multi Icon Content  -->
+									<Border
+										Background="{TemplateBinding MarkerFill}"
+										BorderBrush="{TemplateBinding MarkerStroke}"
+										BorderThickness="2"
+										CornerRadius="20">
+										<Border.Effect>
+											<DropShadowEffect
+												BlurRadius="8"
+												Opacity="0.5"
+												ShadowDepth="4"
+												Color="Black" />
+										</Border.Effect>
+										<Grid>
+											<!--  Multiple circles inside  -->
+											<Ellipse
+												Width="12"
+												Height="12"
+												Margin="4,4,0,0"
+												HorizontalAlignment="Left"
+												VerticalAlignment="Top"
+												Fill="White" />
+											<Ellipse
+												Width="12"
+												Height="12"
+												Margin="0,4,4,0"
+												HorizontalAlignment="Right"
+												VerticalAlignment="Top"
+												Fill="White" />
+											<Ellipse
+												Width="12"
+												Height="12"
+												Margin="4,0,0,4"
+												HorizontalAlignment="Left"
+												VerticalAlignment="Bottom"
+												Fill="White" />
+											<Ellipse
+												Width="12"
+												Height="12"
+												Margin="0,0,4,4"
+												HorizontalAlignment="Right"
+												VerticalAlignment="Bottom"
+												Fill="White" />
+										</Grid>
+									</Border>
+								</Grid>
+							</Viewbox>
+
+							<!--  Multi Label (독립적 크기)  -->
+							<Border
+								Name="PART_MultiLabelContainer"
+								MinWidth="40"
+								MaxWidth="150"
+								Margin="0,0,0,-25"
+								Padding="2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_MultiLabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+							</Border>
+						</Grid>
+
+						<!--  === Fence/Sensor Section ===  -->
+						<Grid Name="PART_FenceSection" Visibility="Collapsed">
+							<!--  Fence/Sensor 아이콘 (크기 조절됨)  -->
+							<Viewbox
+								Name="PART_ViewboxFenceContainer"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								Stretch="Fill"
+								ToolTip="{TemplateBinding MarkerTitle}">
+
+								<Grid
+									Name="PART_FenceIconContainer"
+									Width="40"
+									Height="12">
+									<!--  Fence Icon Content - 가로형 담장 디자인  -->
+									<Border
+										Background="{TemplateBinding MarkerFill}"
+										BorderBrush="{TemplateBinding MarkerStroke}"
+										BorderThickness="{TemplateBinding MarkerStrokeThickness}"
+										CornerRadius="2">
+										<Border.Effect>
+											<DropShadowEffect
+												BlurRadius="8"
+												Opacity="0.5"
+												ShadowDepth="4"
+												Color="Black" />
+										</Border.Effect>
+
+										<!--  벽돌 담장 패턴 (가로형)  -->
+										<Grid Name="PART_FenceBrickGrid" Margin="1">
+											<Grid.Resources>
+												<SolidColorBrush x:Key="BrickBrush" Color="White" />
+											</Grid.Resources>
+											<Grid.RowDefinitions>
+												<RowDefinition Height="*" />
+												<RowDefinition Height="*" />
+												<RowDefinition Height="*" />
+											</Grid.RowDefinitions>
+
+											<!--  첫 번째 줄 벽돌  -->
+											<StackPanel Grid.Row="0" Orientation="Horizontal">
+												<Rectangle
+													Width="10"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="12"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="8"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="6"
+													Height="3"
+													Fill="White" />
+											</StackPanel>
+
+											<!--  두 번째 줄 벽돌 (어긋난 패턴)  -->
+											<StackPanel
+												Grid.Row="1"
+												Margin="0,0.5,0,0"
+												Orientation="Horizontal">
+												<Rectangle
+													Width="6"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="11"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="9"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="9"
+													Height="3"
+													Fill="White" />
+											</StackPanel>
+
+											<!--  세 번째 줄 벽돌  -->
+											<StackPanel
+												Grid.Row="2"
+												Margin="0,0.5,0,0"
+												Orientation="Horizontal">
+												<Rectangle
+													Width="10"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="12"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="8"
+													Height="3"
+													Margin="0,0,0.5,0"
+													Fill="White" />
+												<Rectangle
+													Width="6"
+													Height="3"
+													Fill="White" />
+											</StackPanel>
+										</Grid>
+									</Border>
+								</Grid>
+							</Viewbox>
+
+							<!--  Fence Label (독립적 크기)  -->
+							<Border
+								Name="PART_FenceLabelContainer"
+								MinWidth="40"
+								MaxWidth="150"
+								Margin="0,0,0,-25"
+								Padding="2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_FenceLabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+							</Border>
+						</Grid>
+
+						<!--  === Camera Section ===  -->
+						<Grid Name="PART_CameraSection" Visibility="Collapsed">
+
+
+							<!--  Camera 아이콘 (크기 조절됨)  -->
+							<Viewbox
+								Name="PART_ViewboxCameraContainer"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								Stretch="Fill"
+								ToolTip="{TemplateBinding MarkerTitle}">
+
+								<Grid
+									Name="PART_CameraIconContainer"
+									Width="50"
+									Height="30">
+									<!--  카메라 본체 (브라켓 포함)  -->
+									<Grid Name="PART_CameraBody">
+										<!--  카메라 브라켓 (벽면 연결부)  -->
+										<Rectangle
+											Width="8"
+											Height="25"
+											HorizontalAlignment="Left"
+											VerticalAlignment="Center"
+											Fill="{TemplateBinding MarkerFill}"
+											RadiusX="2"
+											RadiusY="2"
+											Stroke="{TemplateBinding MarkerStroke}"
+											StrokeThickness="1" />
+
+										<!--  브라켓 조인트  -->
+										<Ellipse
+											Width="10"
+											Height="10"
+											Margin="8,0,0,0"
+											HorizontalAlignment="Left"
+											VerticalAlignment="Center"
+											Fill="{TemplateBinding MarkerFill}"
+											Stroke="{TemplateBinding MarkerStroke}"
+											StrokeThickness="1" />
+
+										<!--  카메라 헤드 (메인 몸체)  -->
 										<Border
-											Name="PART_LabelContainer"
-											Margin="0,0,0,5"
-											VerticalAlignment="Bottom"
-											Background="White"
-											CornerRadius="4"
-											Opacity="0.8"
-											Visibility="{TemplateBinding ShowTitle,
-											                             Converter={StaticResource BooleanToVisibilityConverter}}">
+											Width="35"
+											Height="20"
+											Margin="15,0,0,0"
+											HorizontalAlignment="Left"
+											VerticalAlignment="Center"
+											Background="{TemplateBinding MarkerFill}"
+											BorderBrush="{TemplateBinding MarkerStroke}"
+											BorderThickness="2"
+											CornerRadius="4">
 											<Border.Effect>
 												<DropShadowEffect
-													BlurRadius="3"
-													Opacity="0.3"
-													ShadowDepth="2"
+													BlurRadius="8"
+													Opacity="0.5"
+													ShadowDepth="4"
 													Color="Black" />
 											</Border.Effect>
-											<TextBlock
-												Name="PART_LabelText"
-												FontSize="10"
-												FontWeight="SemiBold"
-												Foreground="Black"
-												Text="{TemplateBinding MarkerTitle}"
-												TextAlignment="Center" />
+
+											<Grid>
+												<!--  카메라 렌즈  -->
+												<Ellipse
+													Width="12"
+													Height="12"
+													Margin="0,0,3,0"
+													HorizontalAlignment="Right"
+													VerticalAlignment="Center"
+													Fill="Black"
+													Stroke="DarkGray"
+													StrokeThickness="1" />
+
+												<!--  렌즈 내부 반사  -->
+												<Ellipse
+													Width="8"
+													Height="8"
+													Margin="0,0,5,0"
+													HorizontalAlignment="Right"
+													VerticalAlignment="Center"
+													Fill="DarkBlue"
+													Opacity="0.7" />
+
+												<!--  렌즈 하이라이트  -->
+												<Ellipse
+													Width="3"
+													Height="3"
+													Margin="0,0,7,-2"
+													HorizontalAlignment="Right"
+													VerticalAlignment="Center"
+													Fill="White"
+													Opacity="0.8" />
+
+												<!--  상태 LED  -->
+												<Ellipse
+													Width="4"
+													Height="4"
+													Margin="5,3,0,0"
+													HorizontalAlignment="Left"
+													VerticalAlignment="Top"
+													Fill="Lime" />
+
+												<!--  브랜드 로고 영역  -->
+												<Rectangle
+													Width="8"
+													Height="3"
+													Margin="5,0,0,0"
+													HorizontalAlignment="Left"
+													VerticalAlignment="Center"
+													Fill="White"
+													Opacity="0.3" />
+											</Grid>
 										</Border>
 									</Grid>
-								</Border>
+								</Grid>
+							</Viewbox>
 
-								<!--  Multi Container  -->
-								<Border
-									Name="PART_MultiContainer"
-									Width="25"
-									Height="25"
-									Background="Transparent"
-									BorderBrush="{TemplateBinding MarkerStroke}"
-									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
-									CornerRadius="4"
-									Visibility="Collapsed">
-									<Border.Effect>
-										<DropShadowEffect
-											BlurRadius="6"
-											Opacity="0.4"
-											ShadowDepth="3"
-											Color="Black" />
-									</Border.Effect>
-									<md:PackIcon
-										Width="20"
-										Height="20"
-										HorizontalAlignment="Center"
-										VerticalAlignment="Center"
-										Foreground="{TemplateBinding MarkerFill}"
-										Kind="SquareCircle" />
-								</Border>
+							<!--  FOV 부채꼴 영역 (ViewBox 밖, 독립적 크기)  -->
+							<Canvas Name="PART_FOVCanvas" ClipToBounds="False">
+								<Path
+									Name="PART_FOVSector"
+									Fill="{TemplateBinding FOVColor}"
+									Opacity="{TemplateBinding FOVOpacity}"
+									Visibility="{TemplateBinding ShowFOV,
+									                             Converter={StaticResource BooleanToVisibilityConverter}}">
+									<Path.Data>
+										<PathGeometry>
+											<PathFigure x:Name="PART_FOVFigure" StartPoint="40,15">
+												<LineSegment x:Name="PART_FOVLine1" Point="60,15" />
+												<ArcSegment
+													x:Name="PART_FOVArc"
+													IsLargeArc="False"
+													Point="50,35"
+													Size="20,20"
+													SweepDirection="Clockwise" />
+												<LineSegment Point="50,25" />
+											</PathFigure>
+										</PathGeometry>
+									</Path.Data>
+								</Path>
 
-								<!--  Fence Line Container  -->
-								<Border
-									Name="PART_FenceLineContainer"
-									Width="70"
-									Height="6"
-									HorizontalAlignment="Center"
-									VerticalAlignment="Center"
-									Background="Transparent"
-									Visibility="Collapsed">
-									<Rectangle
-										Name="PART_FenceHorizontalLine"
-										Height="10"
-										Fill="{TemplateBinding MarkerFill}"
-										Stroke="{TemplateBinding MarkerStroke}"
-										StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
-										<Rectangle.RenderTransform>
-											<ScaleTransform ScaleX="1" ScaleY="1" />
-										</Rectangle.RenderTransform>
-									</Rectangle>
-								</Border>
+								<!--  중심점도 해당 위치에  -->
+								<Ellipse
+									Name="PART_FOVCenter"
+									Canvas.Left="38"
+									Canvas.Top="13"
+									Width="4"
+									Height="4"
+									Fill="Black"
+									Stroke="White"
+									StrokeThickness="1" />
+							</Canvas>
 
-								<!--  IpCamera Container  -->
-								<Border
-									Name="PART_IpCameraContainer"
-									Width="25"
-									Height="25"
-									Background="Transparent"
-									BorderBrush="{TemplateBinding MarkerStroke}"
-									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
-									CornerRadius="4"
-									Visibility="Collapsed">
-									<Border.Effect>
-										<DropShadowEffect
-											BlurRadius="6"
-											Opacity="0.4"
-											ShadowDepth="3"
-											Color="Black" />
-									</Border.Effect>
-									<md:PackIcon
-										Width="20"
-										Height="20"
-										HorizontalAlignment="Center"
-										VerticalAlignment="Center"
-										Foreground="{TemplateBinding MarkerFill}"
-										Kind="VideoOutline" />
-								</Border>
-
-								<!--  Default Container  -->
-								<Border
-									Name="PART_DefaultContainer"
-									Width="32"
-									Height="32"
-									Background="Transparent"
-									BorderBrush="{TemplateBinding MarkerStroke}"
-									BorderThickness="{TemplateBinding MarkerStrokeThickness}"
-									CornerRadius="4">
-									<Border.Effect>
-										<DropShadowEffect
-											BlurRadius="6"
-											Opacity="0.4"
-											ShadowDepth="3"
-											Color="Black" />
-									</Border.Effect>
-									<md:PackIcon
-										Width="20"
-										Height="20"
-										HorizontalAlignment="Center"
-										VerticalAlignment="Center"
-										Foreground="{TemplateBinding MarkerFill}"
-										Kind="EmoticonDead" />
-								</Border>
-
-							</Grid>
-						</Viewbox>
-						<!--  ViewBox 외부 - 고정 크기 요소들  -->
-
-						<!--  Fence Icon (고정 크기)  -->
-						<Border
-							Name="PART_FenceIcon"
-							Width="25"
-							Height="25"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center"
-							Background="Transparent"
-							BorderBrush="{TemplateBinding MarkerStroke}"
-							BorderThickness="{TemplateBinding MarkerStrokeThickness}"
-							CornerRadius="3"
-							Visibility="Collapsed">
-							<Border.Effect>
-								<DropShadowEffect
-									BlurRadius="4"
-									Opacity="0.3"
-									ShadowDepth="2"
-									Color="Black" />
-							</Border.Effect>
-							<md:PackIcon
-								Width="20"
-								Height="20"
+							<!--  Camera Label (독립적 크기)  -->
+							<Border
+								Name="PART_CameraLabelContainer"
+								MinWidth="40"
+								MaxWidth="150"
+								Margin="0,0,0,-25"
+								Padding="2"
 								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								Foreground="{TemplateBinding MarkerFill}"
-								Kind="Gate" />
-						</Border>
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_CameraLabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+							</Border>
+						</Grid>
 
-						<!--  Event Status Indicator (고정 크기)  -->
+						<!--  Event Status Indicator (모든 타입 공통)  -->
 						<Border
 							Name="PART_EventStatusIndicator"
 							Width="12"
@@ -236,30 +528,35 @@
 							Margin="0,-6,-6,0"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Top"
-							Background="Lime"
+							Background="#4CAF50"
 							BorderBrush="White"
 							BorderThickness="2"
-							CornerRadius="6" />
+							CornerRadius="6">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="4"
+									Opacity="0.6"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+						</Border>
 
-						<!--  FOV Indicator (고정 크기)  -->
-						<Path
-							Name="PART_FOVIndicator"
-							Width="16"
-							Height="16"
-							Margin="0,0,-8,-8"
-							HorizontalAlignment="Right"
-							VerticalAlignment="Bottom"
-							Data="M8,2 L14,8 L8,14 L2,8 Z"
-							Fill="Yellow"
-							Opacity="0.8"
-							Stroke="Orange"
-							StrokeThickness="1"
-							Visibility="Collapsed" />
+						<!--  Pulse Animation Element (Detecting 상태용)  -->
+						<Ellipse
+							Name="PulseEllipse"
+							Width="20"
+							Height="20"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="Red"
+							Opacity="0"
+							RenderTransformOrigin="0.5,0.5">
+							<Ellipse.RenderTransform>
+								<ScaleTransform x:Name="PulseScaleTransform" ScaleX="1" ScaleY="1" />
+							</Ellipse.RenderTransform>
+						</Ellipse>
 
-						<!--  Label Container (고정 크기)  -->
-
-
-						<!--  Hover Highlight (고정 크기)  -->
+						<!--  Mouse Over Highlight  -->
 						<Ellipse
 							Name="PART_HoverHighlight"
 							Width="10"
@@ -268,34 +565,33 @@
 							VerticalAlignment="Center"
 							Fill="White"
 							Opacity="0" />
-
 					</Grid>
 
+
+
+
 					<ControlTemplate.Triggers>
-						<!--  ShowShape=False일 때 숨김  -->
+						<!--  ShowShape=False일 때 모든 아이콘 숨김  -->
 						<Trigger Property="ShowShape" Value="False">
-							<Setter TargetName="PART_ViewboxContainer" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_ControllerSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_MultiSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_FenceSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Collapsed" />
 							<Setter Property="IsHitTestVisible" Value="False" />
 						</Trigger>
 
-						<!--  Device Type Container Display  -->
+						<!--  Device Type별 Section 표시  -->
 						<Trigger Property="DeviceType" Value="Controller">
-							<Setter TargetName="PART_ControllerContainer" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_DefaultContainer" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_ControllerSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<Trigger Property="DeviceType" Value="Multi">
-							<Setter TargetName="PART_MultiContainer" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_DefaultContainer" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_MultiSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<Trigger Property="DeviceType" Value="Fence">
-							<Setter TargetName="PART_FenceLineContainer" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_FenceIcon" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_DefaultContainer" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_FenceSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 						<Trigger Property="DeviceType" Value="IpCamera">
-							<Setter TargetName="PART_IpCameraContainer" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_DefaultContainer" Property="Visibility" Value="Collapsed" />
-							<Setter TargetName="PART_FOVIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 
 						<!--  Event Status Colors  -->
@@ -313,59 +609,143 @@
 						</Trigger>
 
 						<!--  Event Status에 따른 Fence Line 색상 변경  -->
-						<MultiTrigger>
+						<!--<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="EventStatus" Value="Normal" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceHorizontalLine" Property="Fill" Value="#4CAF50" />
+							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#4CAF50" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="EventStatus" Value="Detecting" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceHorizontalLine" Property="Fill" Value="#2196F3" />
+							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#2196F3" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="EventStatus" Value="Fault" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceHorizontalLine" Property="Fill" Value="#F44336" />
+							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#F44336" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="EventStatus" Value="Connection" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceHorizontalLine" Property="Fill" Value="#00BCD4" />
+							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#00BCD4" />
+						</MultiTrigger>-->
+
+						<!--  라벨 표시 조건들 (각 타입별)  -->
+
+						<!--  Controller 라벨  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Controller" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Controller" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Controller" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Visible" />
 						</MultiTrigger>
 
-						<!--  FOV Display Control  -->
-						<Trigger Property="ShowFOV" Value="True">
-							<Setter TargetName="PART_FOVIndicator" Property="Opacity" Value="1.0" />
-						</Trigger>
+						<!--  Multi 라벨  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Multi" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Multi" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Multi" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
 
-						<!--  라벨 표시 조건들  -->
-						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
-						</Trigger>
+						<!--  Fence 라벨  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Fence" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Fence" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="Fence" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+
+						<!--  Camera 라벨  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="IpCamera" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="IpCamera" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="IpCamera" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
 
 						<!--  Mouse Over Effects  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
 						</Trigger>
 
 						<!--  Disabled State  -->
 						<Trigger Property="IsEnabled" Value="False">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_ControllerSection" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_MultiSection" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_FenceSection" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_CameraSection" Property="Opacity" Value="0.5" />
 						</Trigger>
 
+						<!--  Pulse Animation for Detecting State  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="PulseStoryboard_Begin">
@@ -397,26 +777,12 @@
 								<StopStoryboard BeginStoryboardName="PulseStoryboard_Begin" />
 							</DataTrigger.ExitActions>
 						</DataTrigger>
-
-
-
-
-
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>
 		</Setter>
 
 		<!--  Default Property Values  -->
-		<Setter Property="MarkerFill" Value="#607D8B" />
-		<Setter Property="MarkerStroke" Value="White" />
-		<Setter Property="MarkerStrokeThickness" Value="2" />
-		<Setter Property="MarkerTitle" Value="PIDS Device" />
-		<Setter Property="ShowTitle" Value="False" />
-		<Setter Property="ShowShape" Value="True" />
-		<Setter Property="TitleSize" Value="10" />
-		<Setter Property="Width" Value="40" />
-		<Setter Property="Height" Value="40" />
 		<Setter Property="IsHitTestVisible" Value="True" />
 		<Setter Property="Focusable" Value="True" />
 	</Style>
