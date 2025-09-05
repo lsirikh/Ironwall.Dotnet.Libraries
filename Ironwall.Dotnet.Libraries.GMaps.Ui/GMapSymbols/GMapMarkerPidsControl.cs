@@ -166,6 +166,24 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// <param name="pidsMarker">연결할 PIDS 마커</param>
     public GMapMarkerPidsControl(GMapPidsMarker pidsMarker) : base(pidsMarker)
     {
+        this.Loaded += GMapMarkerPidsControl_Loaded;
+    }
+
+    private void GMapMarkerPidsControl_Loaded(object sender, RoutedEventArgs e)
+    {
+        var mapControl = FindParentMapControl();
+        if (mapControl != null)
+        {
+            mapControl.OnMapZoomChanged += OnMapZoomChanged;
+        }
+    }
+
+    private void OnMapZoomChanged()
+    {
+        if (ShowFOV && DeviceType == EnumDeviceType.IpCamera)
+        {
+            UpdateFOVPath();
+        }
     }
 
     #endregion
@@ -385,9 +403,93 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         }
     }
 
-    /// <summary>
-    /// FOV Path 업데이트 (핵심 메서드)
-    /// </summary>
+    ///// <summary>
+    ///// FOV Path 업데이트 (핵심 메서드)
+    ///// </summary>
+    //private void UpdateFOVPath()
+    //{
+    //    if (!Dispatcher.CheckAccess())
+    //    {
+    //        Dispatcher.BeginInvoke(() => UpdateFOVPath());
+    //        return;
+    //    }
+
+    //    try
+    //    {
+    //        if (GetTemplateChild("PART_FOVFigure") is PathFigure figure &&
+    //            GetTemplateChild("PART_FOVLine1") is LineSegment line1 &&
+    //            GetTemplateChild("PART_FOVArc") is ArcSegment arc &&
+    //            GetTemplateChild("PART_FOVCenter") is Ellipse centerEllipse)
+    //        {
+    //            // 카메라 아이콘의 실제 크기 기준으로 중심점 계산
+    //            var centerX = ActualWidth;        // 카메라 렌즈는 오른쪽 끝
+    //            var centerY = ActualHeight / 2.0; // 카메라 중심은 세로 중앙
+
+    //            // 각도를 라디안으로 변환 (0도 = 동쪽, 시계방향 양수)
+    //            var bearingRad = DetectionBearing * Math.PI / 180.0;
+    //            var halfAngleRad = DetectionAngle / 2.0 * Math.PI / 180.0;
+
+    //            // 시작각과 끝각 계산
+    //            var startAngleRad = bearingRad - halfAngleRad;
+    //            var endAngleRad = bearingRad + halfAngleRad;
+
+    //            // 반지름 (픽셀 단위로 스케일)
+    //            var radius = Math.Max(DetectionRange * 0.2, 20);
+
+    //            // 첫 번째 경계점 (시작각)
+    //            var startX = centerX + radius * Math.Cos(startAngleRad);
+    //            var startY = centerY + radius * Math.Sin(startAngleRad);
+
+    //            // 두 번째 경계점 (끝각)
+    //            var endX = centerX + radius * Math.Cos(endAngleRad);
+    //            var endY = centerY + radius * Math.Sin(endAngleRad);
+
+    //            // PathFigure 업데이트 (중심점에서 시작)
+    //            figure.StartPoint = new Point(centerX, centerY);
+
+    //            // 첫 번째 LineSegment: 중심 → 첫 번째 경계점
+    //            line1.Point = new Point(startX, startY);
+
+    //            // ArcSegment: 첫 번째 경계점 → 두 번째 경계점 (호로 연결)
+    //            arc.Point = new Point(endX, endY);
+    //            arc.Size = new Size(radius, radius);
+    //            arc.IsLargeArc = DetectionAngle > 180;
+    //            arc.SweepDirection = SweepDirection.Clockwise;
+
+    //            // 마지막 LineSegment는 XAML에 하드코딩되어 있어서 자동으로 중심점으로 돌아감
+
+    //            // 중심점 Ellipse 위치 업데이트
+    //            Canvas.SetLeft(centerEllipse, centerX - 2);
+    //            Canvas.SetTop(centerEllipse, centerY - 2);
+
+    //            System.Diagnostics.Debug.WriteLine($"FOV 업데이트:");
+    //            System.Diagnostics.Debug.WriteLine($"  중심점: ({centerX:F1}, {centerY:F1})");
+    //            System.Diagnostics.Debug.WriteLine($"  시작각: {DetectionBearing - DetectionAngle / 2:F1}° → ({startX:F1}, {startY:F1})");
+    //            System.Diagnostics.Debug.WriteLine($"  끝각: {DetectionBearing + DetectionAngle / 2:F1}° → ({endX:F1}, {endY:F1})");
+    //            System.Diagnostics.Debug.WriteLine($"  반지름: {radius:F1}px");
+    //        }
+    //        else
+    //        {
+    //            System.Diagnostics.Debug.WriteLine("FOV 템플릿 요소를 찾을 수 없음");
+    //        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        System.Diagnostics.Debug.WriteLine($"FOV Path 업데이트 실패: {ex.Message}");
+    //    }
+    //}
+
+    //private void DebugFOVProperties()
+    //{
+    //    System.Diagnostics.Debug.WriteLine($"=== FOV Debug Info ===");
+    //    System.Diagnostics.Debug.WriteLine($"ShowFOV: {ShowFOV}");
+    //    System.Diagnostics.Debug.WriteLine($"FOVColor: {FOVColor}");
+    //    System.Diagnostics.Debug.WriteLine($"FOVOpacity: {FOVOpacity}");
+    //    System.Diagnostics.Debug.WriteLine($"DetectionRange: {DetectionRange}");
+    //    System.Diagnostics.Debug.WriteLine($"DetectionAngle: {DetectionAngle}");
+    //    System.Diagnostics.Debug.WriteLine($"DetectionBearing: {DetectionBearing}");
+    //}
+
     private void UpdateFOVPath()
     {
         if (!Dispatcher.CheckAccess())
@@ -404,10 +506,30 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 GetTemplateChild("PART_FOVCenter") is Ellipse centerEllipse)
             {
                 // 카메라 아이콘의 실제 크기 기준으로 중심점 계산
-                var centerX = ActualWidth;        // 카메라 렌즈는 오른쪽 끝
-                var centerY = ActualHeight / 2.0; // 카메라 중심은 세로 중앙
+                var centerX = ActualWidth;
+                var centerY = ActualHeight / 2.0;
 
-                // 각도를 라디안으로 변환 (0도 = 동쪽, 시계방향 양수)
+                // GMap 컨트롤 찾기
+                var mapControl = FindParentMapControl();
+                if (mapControl == null || Marker?.Position == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("GMap 컨트롤 또는 마커 위치를 찾을 수 없음");
+                    return;
+                }
+
+                // 실제 거리를 픽셀로 변환
+                var radiusInPixels = ConvertMetersToPixels(
+                    DetectionRange,
+                    Marker.Position,
+                    mapControl);
+
+                // 거리 제한 (10m ~ 5km)
+                radiusInPixels = ConvertMetersToPixels(DetectionRange, Marker.Position, mapControl);
+
+                // 최소/최대 픽셀 크기 제한
+                //radiusInPixels = Math.Max(20, Math.Min(500, radiusInPixels));
+
+                // 각도를 라디안으로 변환
                 var bearingRad = DetectionBearing * Math.PI / 180.0;
                 var halfAngleRad = DetectionAngle / 2.0 * Math.PI / 180.0;
 
@@ -415,44 +537,30 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 var startAngleRad = bearingRad - halfAngleRad;
                 var endAngleRad = bearingRad + halfAngleRad;
 
-                // 반지름 (픽셀 단위로 스케일)
-                var radius = Math.Max(DetectionRange * 0.2, 20);
-
                 // 첫 번째 경계점 (시작각)
-                var startX = centerX + radius * Math.Cos(startAngleRad);
-                var startY = centerY + radius * Math.Sin(startAngleRad);
+                var startX = centerX + radiusInPixels * Math.Cos(startAngleRad);
+                var startY = centerY + radiusInPixels * Math.Sin(startAngleRad);
 
                 // 두 번째 경계점 (끝각)
-                var endX = centerX + radius * Math.Cos(endAngleRad);
-                var endY = centerY + radius * Math.Sin(endAngleRad);
+                var endX = centerX + radiusInPixels * Math.Cos(endAngleRad);
+                var endY = centerY + radiusInPixels * Math.Sin(endAngleRad);
 
-                // PathFigure 업데이트 (중심점에서 시작)
+                // PathFigure 업데이트
                 figure.StartPoint = new Point(centerX, centerY);
-
-                // 첫 번째 LineSegment: 중심 → 첫 번째 경계점
                 line1.Point = new Point(startX, startY);
-
-                // ArcSegment: 첫 번째 경계점 → 두 번째 경계점 (호로 연결)
                 arc.Point = new Point(endX, endY);
-                arc.Size = new Size(radius, radius);
+                arc.Size = new Size(radiusInPixels, radiusInPixels);
                 arc.IsLargeArc = DetectionAngle > 180;
                 arc.SweepDirection = SweepDirection.Clockwise;
-
-                // 마지막 LineSegment는 XAML에 하드코딩되어 있어서 자동으로 중심점으로 돌아감
 
                 // 중심점 Ellipse 위치 업데이트
                 Canvas.SetLeft(centerEllipse, centerX - 2);
                 Canvas.SetTop(centerEllipse, centerY - 2);
 
                 System.Diagnostics.Debug.WriteLine($"FOV 업데이트:");
+                System.Diagnostics.Debug.WriteLine($"  실제 거리: {DetectionRange:F0}m → 픽셀: {radiusInPixels:F1}px");
                 System.Diagnostics.Debug.WriteLine($"  중심점: ({centerX:F1}, {centerY:F1})");
-                System.Diagnostics.Debug.WriteLine($"  시작각: {DetectionBearing - DetectionAngle / 2:F1}° → ({startX:F1}, {startY:F1})");
-                System.Diagnostics.Debug.WriteLine($"  끝각: {DetectionBearing + DetectionAngle / 2:F1}° → ({endX:F1}, {endY:F1})");
-                System.Diagnostics.Debug.WriteLine($"  반지름: {radius:F1}px");
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("FOV 템플릿 요소를 찾을 수 없음");
+                System.Diagnostics.Debug.WriteLine($"  줌 레벨: {mapControl.Zoom}");
             }
         }
         catch (Exception ex)
@@ -461,16 +569,39 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         }
     }
 
-    private void DebugFOVProperties()
+    /// <summary>
+    /// 미터 단위 거리를 현재 줌 레벨에서의 픽셀로 변환
+    /// </summary>
+    private double ConvertMetersToPixels(double meters, PointLatLng position, GMapCustomControl mapControl)
     {
-        System.Diagnostics.Debug.WriteLine($"=== FOV Debug Info ===");
-        System.Diagnostics.Debug.WriteLine($"ShowFOV: {ShowFOV}");
-        System.Diagnostics.Debug.WriteLine($"FOVColor: {FOVColor}");
-        System.Diagnostics.Debug.WriteLine($"FOVOpacity: {FOVOpacity}");
-        System.Diagnostics.Debug.WriteLine($"DetectionRange: {DetectionRange}");
-        System.Diagnostics.Debug.WriteLine($"DetectionAngle: {DetectionAngle}");
-        System.Diagnostics.Debug.WriteLine($"DetectionBearing: {DetectionBearing}");
+        try
+        {
+            // 현재 위치에서 동쪽으로 meters만큼 떨어진 지점 계산
+            var earthRadius = 6371000; // 지구 반지름 (미터)
+            var lat1Rad = position.Lat * Math.PI / 180.0;
+            var deltaLon = meters / (earthRadius * Math.Cos(lat1Rad)) * 180.0 / Math.PI;
+
+            var targetPoint = new PointLatLng(position.Lat, position.Lng + deltaLon);
+
+            // 두 지점을 화면 좌표로 변환
+            var centerPixel = mapControl.FromLatLngToLocal(position);
+            var targetPixel = mapControl.FromLatLngToLocal(targetPoint);
+
+            // 픽셀 거리 계산
+            var pixelDistance = Math.Sqrt(
+                Math.Pow(targetPixel.X - centerPixel.X, 2) +
+                Math.Pow(targetPixel.Y - centerPixel.Y, 2));
+
+            return pixelDistance;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"거리 변환 실패: {ex.Message}");
+            // 폴백: 간단한 스케일 사용
+            return meters * 0.1; // 대략적인 스케일
+        }
     }
+
 
     /// <summary>
     /// 장비 클릭 애니메이션
@@ -589,17 +720,18 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         if (d is GMapMarkerPidsControl control && control.Marker != null)
         {
             bool isVisible = (bool)e.NewValue;
+            
+            // 마커 데이터와 동기화
+            if (control.Marker != null && control.Marker.ShowFOV != isVisible)
+            {
+                control.Marker.ShowFOV = isVisible;
+            }
 
             if (isVisible)
             {
                 control.UpdateFOVPath(); // 추가
             }
 
-            // 마커 데이터와 동기화
-            if (control.Marker != null && control.Marker.ShowFOV != isVisible)
-            {
-                control.Marker.ShowFOV = isVisible;
-            }
         }
     }
 

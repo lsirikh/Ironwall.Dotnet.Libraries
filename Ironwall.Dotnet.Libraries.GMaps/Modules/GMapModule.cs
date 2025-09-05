@@ -41,7 +41,8 @@ public class GMapModule : Module
 
             builder.RegisterType<GeometricSymbolProvider>().As<GeometricSymbolProvider>()
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
-
+            builder.RegisterType<PidsSymbolProvider>().As<PidsSymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
         }
         catch
         {

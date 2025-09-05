@@ -25,6 +25,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Tests;
 public sealed class GMapDbSymbolFixture : IAsyncLifetime
 {
     public GeometricSymbolProvider GeometrySymbolProvider { get; private set; }
+    public PidsSymbolProvider PidsSymbolProvider { get; private set; }
     #region - Properties -
     /// <summary>Symbol DB 서비스 인스턴스</summary>
     public IGMapDbSymbolService Svc { get; private set; } = null!;
@@ -67,12 +68,8 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
         var log = new LogService();
         var ea = new EventAggregator();
         GeometrySymbolProvider = new GeometricSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(
-            log,
-            ea,
-            SymbolProvider,
-            GeometrySymbolProvider,
-            _setup);
+        PidsSymbolProvider = new PidsSymbolProvider(log, SymbolProvider);
+        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, _setup);
 
         await DropTablesAsync();               // 깨끗한 DB 확보
         await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance

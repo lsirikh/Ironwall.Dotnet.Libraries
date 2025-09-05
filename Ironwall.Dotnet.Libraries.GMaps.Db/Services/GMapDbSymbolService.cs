@@ -11,8 +11,6 @@ using System;
 using System.Buffers;
 using System.Data;
 using System.Security.Cryptography;
-using System.Threading;
-using System.Windows.Media.Media3D;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Db.Services;
 /****************************************************************************
@@ -38,12 +36,14 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                                IEventAggregator eventAggregator,
                                SymbolProvider symbolProvider,
                                GeometricSymbolProvider geometrySymbolProvider,
+                               PidsSymbolProvider pidsSymbolProvider,
                                GMapDbSetupModel setupModel)
     {
         _log = log;
         _eventAggregator = eventAggregator;
         _symbolProvider = symbolProvider;
         _geometrySymbolProvider = geometrySymbolProvider;
+        _pidsSymbolProvider = pidsSymbolProvider;
         _setup = setupModel;
     }
     #endregion
@@ -291,6 +291,26 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INDEX `IX_GeometrySymbols_ShapeType` (`ShapeType`)
             );";
 
+            // ── PidsSymbols 테이블 (새로 추가) ──
+            var createPidsSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `PidsSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `LinkedDeviceId`    INT NOT NULL DEFAULT 0,
+                `DeviceType`        VARCHAR(20) NOT NULL DEFAULT 'Fence',
+                `ShowFOV`           BOOLEAN DEFAULT FALSE,
+                `FOVColor`          VARCHAR(20) NOT NULL DEFAULT 'Red',
+                `FOVOpacity`        DECIMAL(3,2) DEFAULT 0.3,
+                `EventStatus`       VARCHAR(20) NOT NULL DEFAULT 'Normal',
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_PidsSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_PidsSymbols_DeviceType` (`DeviceType`),
+                INDEX `IX_PidsSymbols_LinkedDeviceId` (`LinkedDeviceId`),
+                INDEX `IX_PidsSymbols_EventStatus` (`EventStatus`)
+            );";
+
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
             if (_eventAggregator != null)
@@ -301,6 +321,12 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "GeometrySymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createPidsSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "PidsSymbols 테이블 생성…" });
+
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
@@ -353,6 +379,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 2. GeometrySymbols 로드
             var geometrySymbols = await FetchGeometrySymbolsAsync(token: token);
 
+            // 3. PidsSymbols 로드 (새로 추가)
+            var pidsSymbols = await FetchPidsSymbolsAsync(token: token);
+
             _symbolProvider.Clear();
 
             // 3. 일반 심볼 추가 (BASIC_SHAPES가 아닌 것만)
@@ -373,6 +402,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 foreach (var geometrySymbol in geometrySymbols)
                 {
                     _symbolProvider.Add(geometrySymbol);
+                }
+            }
+
+            _pidsSymbolProvider.Clear();
+            if (pidsSymbols?.Any() == true)
+            {
+                foreach (var pidsSymbol in pidsSymbols)
+                {
+                    _symbolProvider.Add(pidsSymbol);
                 }
             }
 
@@ -966,6 +1004,411 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     }
 
     #endregion
+
+    #region - PidsSymbol CRUD -
+
+    /// <summary>
+    /// 모든 PIDS 심볼 조회 (JOIN 쿼리)
+    /// </summary>
+    public async Task<List<IPidsSymbolModel>?> FetchPidsSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   s.Category = 'PIDS_EQUIPMENT'
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsSymbolSQL>(sql))
+                .Select(p => p.ToPidsDomain())
+                .ToList();
+
+            _log?.Info($"FetchPidsSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IPidsSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 PIDS 심볼 조회
+    /// </summary>
+    public async Task<IPidsSymbolModel?> FetchPidsSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<PidsSymbolSQL>(sql, new { Id = id });
+            var pidsSymbol = joinResult?.ToPidsDomain();
+
+            _log?.Info(pidsSymbol != null
+                ? $"FetchPidsSymbolAsync 완료 - Id={pidsSymbol.Id}, DeviceType={pidsSymbol.DeviceType}"
+                : $"FetchPidsSymbolAsync 대상 없음 - Id={id}");
+
+            return pidsSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// LinkedDeviceId로 PIDS 심볼 조회
+    /// </summary>
+    public async Task<IPidsSymbolModel?> FetchPidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (deviceId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(deviceId));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   p.LinkedDeviceId = @DeviceId;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<PidsSymbolSQL>(sql, new { DeviceId = deviceId });
+            var pidsSymbol = joinResult?.ToPidsDomain();
+
+            _log?.Info(pidsSymbol != null
+                ? $"FetchPidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}, Id={pidsSymbol.Id}"
+                : $"FetchPidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
+
+            return pidsSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol DeviceId 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// DeviceType별 PIDS 심볼 조회
+    /// </summary>
+    public async Task<List<IPidsSymbolModel>?> FetchPidsSymbolsByDeviceTypeAsync(EnumDeviceType deviceType, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   p.DeviceType = @DeviceType
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsSymbolSQL>(sql, new { DeviceType = deviceType.ToString() }))
+                .Select(p => p.ToPidsDomain())
+                .ToList();
+
+            _log?.Info($"FetchPidsSymbolsByDeviceTypeAsync 완료 - DeviceType={deviceType}, {list.Count}건");
+            return list.OfType<IPidsSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbols DeviceType별 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertPidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+        INSERT INTO Symbols
+        (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+         Width, Height, Category, ShowShape, ShowTitle, 
+         FillColor, StrokeColor, StrokeThickness, CreatedBy)
+        VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+        SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsSymbols 테이블에 PIDS 전용 정보 삽입
+            const string pidsSql = @"
+        INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus)
+        VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus);";
+
+            await conn.ExecuteAsync(pidsSql, new
+            {
+                SymbolId = symbolId,
+                model.LinkedDeviceId,
+                DeviceType = model.DeviceType.ToString(),
+                model.ShowFOV,
+                FOVColor = model.FOVColor.ToString(),
+                model.FOVOpacity,
+                EventStatus = model.EventStatus.ToString()
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"PidsSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, DeviceType={model.DeviceType}");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IPidsSymbolModel?> UpdatePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. 먼저 레코드 존재 여부 확인
+            const string checkSql = @"
+        SELECT COUNT(*) FROM Symbols s 
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId 
+        WHERE s.Id = @Id;";
+
+            var exists = await conn.ExecuteScalarAsync<int>(checkSql, new { Id = model.Id }, transaction);
+            if (exists == 0)
+            {
+                _log?.Warning($"PidsSymbol 업데이트 대상 없음: Id={model.Id}");
+                return null; // 예외 대신 null 반환
+            }
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+        UPDATE Symbols SET
+            Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+            Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+            Bearing = @Bearing, Width = @Width, Height = @Height,
+            Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+            CreatedBy = @CreatedBy
+        WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsSymbols 테이블 업데이트
+            const string pidsSql = @"
+        UPDATE PidsSymbols SET
+            LinkedDeviceId = @LinkedDeviceId, DeviceType = @DeviceType, ShowFOV = @ShowFOV,
+            FOVColor = @FOVColor, FOVOpacity = @FOVOpacity, EventStatus = @EventStatus
+        WHERE SymbolId = @SymbolId;";
+
+            var pidsAffected = await conn.ExecuteAsync(pidsSql, new
+            {
+                SymbolId = model.Id,
+                model.LinkedDeviceId,
+                DeviceType = model.DeviceType.ToString(),
+                model.ShowFOV,
+                FOVColor = model.FOVColor.ToString(),
+                model.FOVOpacity,
+                EventStatus = model.EventStatus.ToString()
+            }, transaction);
+
+            if (symbolAffected == 0 || pidsAffected == 0)
+                throw new KeyNotFoundException($"PidsSymbol not found. Id={model.Id}");
+
+            await transaction.CommitAsync(token);
+
+            _log?.Info($"PidsSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchPidsSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 심볼 삭제 (CASCADE로 PidsSymbols도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeletePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 PidsSymbols는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            _log?.Info(ret > 0
+                ? $"DeletePidsSymbolAsync 완료 - Id={model.Id}"
+                : $"DeletePidsSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// LinkedDeviceId로 PIDS 심볼 삭제
+    /// </summary>
+    public async Task<bool> DeletePidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (deviceId <= 0) throw new ArgumentException(nameof(deviceId));
+
+            const string sql = @"
+        DELETE s FROM Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE p.LinkedDeviceId = @DeviceId;";
+
+            int ret = await conn.ExecuteAsync(sql, new { DeviceId = deviceId });
+
+            _log?.Info(ret > 0
+                ? $"DeletePidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}"
+                : $"DeletePidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbol DeviceId 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// EventStatus별 PIDS 심볼 조회
+    /// </summary>
+    public async Task<List<IPidsSymbolModel>?> FetchPidsSymbolsByEventStatusAsync(EnumEventStatus eventStatus, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+        FROM    Symbols s
+        INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
+        WHERE   p.EventStatus = @EventStatus
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsSymbolSQL>(sql, new { EventStatus = eventStatus.ToString() }))
+                .Select(p => p.ToPidsDomain())
+                .ToList();
+
+            _log?.Info($"FetchPidsSymbolsByEventStatusAsync 완료 - EventStatus={eventStatus}, {list.Count}건");
+            return list.OfType<IPidsSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsSymbols EventStatus별 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
     #endregion
     #region - IHanldes -
     #endregion
@@ -987,6 +1430,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     /// <summary>Symbol 데이터 제공자</summary>
     private SymbolProvider _symbolProvider;
     private GeometricSymbolProvider _geometrySymbolProvider;
+    private PidsSymbolProvider _pidsSymbolProvider;
 
     /// <summary>데이터베이스 설정 모델</summary>
     private GMapDbSetupModel _setup;
@@ -1144,6 +1588,69 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         // GeometrySymbol 전용 속성들 (간소화)
         ShapeType = Enum.Parse<EnumShapeType>(GeometryShapeType),
         Opacity = (double)GeometryOpacity
+    };
+}
+
+/// <summary>
+/// Symbols와 PidsSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class PidsSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 PIDS 전용 속성들
+
+    /// <summary>연결된 디바이스 ID</summary>
+    public int LinkedDeviceId { get; set; }
+
+    /// <summary>장비 타입</summary>
+    public string DeviceType { get; set; } = "Fence";
+
+    /// <summary>FOV 표시 여부</summary>
+    public bool ShowFOV { get; set; }
+
+    /// <summary>FOV 색상</summary>
+    public string FOVColor { get; set; } = "Red";
+
+    /// <summary>FOV 투명도</summary>
+    public decimal FOVOpacity { get; set; } = 0.3m;
+
+    /// <summary>이벤트 상태</summary>
+    public string EventStatus { get; set; } = "Normal";
+
+    /// <summary>
+    /// JOIN 결과를 PidsSymbolModel로 변환
+    /// </summary>
+    public PidsSymbolModel ToPidsDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        ShowShape = ShowShape,
+        ShowTitle = ShowTitle,
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
+
+        // PidsSymbol 전용 속성들
+        LinkedDeviceId = LinkedDeviceId,
+        DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
+        ShowFOV = ShowFOV,
+        FOVColor = Enum.Parse<EnumColorType>(FOVColor),
+        FOVOpacity = (double)FOVOpacity,
+        EventStatus = Enum.Parse<EnumEventStatus>(EventStatus)
+
+        // DetectionRange, DetectionAngle, DetectionBearing는 
+        // 실시간 데이터이므로 DB에서 로드하지 않음 (기본값 사용)
     };
 }
 #endregion

@@ -611,16 +611,33 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         try
         {
-            // AdornedElement를 기준으로 상대 좌표 계산
+            //// AdornedElement를 기준으로 상대 좌표 계산
+            //var elementToMap = AdornedElement.TransformToAncestor(_mapControl);
+            //var mapRelativePos = elementToMap.Transform(currentPos);
+
+            ////_log?.Info($"좌표 변환: Adorner({currentPos.X:F1}, {currentPos.Y:F1}) -> Map({mapRelativePos.X:F1}, {mapRelativePos.Y:F1})");
+
+            //// 지리 좌표로 변환
+            //var newGeoPos = _mapControl.FromLocalToLatLng((int)mapRelativePos.X, (int)mapRelativePos.Y);
+
+            ////_log?.Info($"지리 좌표: ({newGeoPos.Lat:F6}, {newGeoPos.Lng:F6})");
+
+            //_targetMarker.UpdateLocation(newGeoPos);
+
+            // 마우스 이동량이 충분한지 확인
+            var distance = Math.Sqrt(
+                Math.Pow(currentPos.X - _dragStartPoint.X, 2) +
+                Math.Pow(currentPos.Y - _dragStartPoint.Y, 2));
+
+            if (distance < 1.0) return; // 3픽셀 미만 이동 무시
+
             var elementToMap = AdornedElement.TransformToAncestor(_mapControl);
             var mapRelativePos = elementToMap.Transform(currentPos);
 
-            //_log?.Info($"좌표 변환: Adorner({currentPos.X:F1}, {currentPos.Y:F1}) -> Map({mapRelativePos.X:F1}, {mapRelativePos.Y:F1})");
-
-            // 지리 좌표로 변환
-            var newGeoPos = _mapControl.FromLocalToLatLng((int)mapRelativePos.X, (int)mapRelativePos.Y);
-
-            //_log?.Info($"지리 좌표: ({newGeoPos.Lat:F6}, {newGeoPos.Lng:F6})");
+            // 반올림으로 정밀도 개선
+            var newGeoPos = _mapControl.FromLocalToLatLng(
+                (int)Math.Round(mapRelativePos.X),
+                (int)Math.Round(mapRelativePos.Y));
 
             _targetMarker.UpdateLocation(newGeoPos);
         }

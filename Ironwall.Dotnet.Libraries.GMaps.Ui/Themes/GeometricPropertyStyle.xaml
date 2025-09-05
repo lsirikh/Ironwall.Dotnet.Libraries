@@ -54,7 +54,7 @@
 						<TextBlock
 							Grid.Column="2"
 							Foreground="White"
-							Text="{Binding ElementName=OpacitySlider, Path=Value, StringFormat='{}{0:P2}'}" />
+							Text="{Binding MarkerOpacity, StringFormat='{}{0:P2}'}" />
 					</Grid>
 				</StackPanel>
 			</Setter.Value>

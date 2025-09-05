@@ -46,7 +46,7 @@
 							VerticalAlignment="Center"
 							Content="FOV 영역 표시"
 							Foreground="White"
-							IsChecked="{Binding ShowFOV, Mode=TwoWay}" />
+							IsChecked="{Binding ShowFOV}" />
 					</Grid>
 
 					<!--  FOV 색상  -->
@@ -101,7 +101,7 @@
 							Grid.Column="2"
 							VerticalAlignment="Center"
 							Foreground="White"
-							Text="{Binding ElementName=FOVOpacitySlider, Path=Value, StringFormat='{}{0:P2}'}" />
+							Text="{Binding FOVOpacity, StringFormat='{}{0:P0}'}" />
 					</Grid>
 
 					<!--  탐지 설정 섹션  -->
@@ -134,7 +134,7 @@
 									Grid.Column="1"
 									Margin="5,0"
 									VerticalAlignment="Center"
-									Maximum="10000"
+									Maximum="1000"
 									Minimum="10"
 									TickFrequency="5"
 									Value="{Binding DetectionRange}" />
@@ -142,7 +142,7 @@
 									Grid.Column="2"
 									VerticalAlignment="Center"
 									Foreground="White"
-									Text="{Binding ElementName=DetectionRangeSlider, Path=Value, StringFormat='{}{0:F0}m'}" />
+									Text="{Binding DetectionRange, StringFormat='{}{0:F0}m'}" />
 							</Grid>
 
 							<!--  탐지 각도  -->
@@ -169,7 +169,7 @@
 									Grid.Column="2"
 									VerticalAlignment="Center"
 									Foreground="White"
-									Text="{Binding ElementName=DetectionAngleSlider, Path=Value, StringFormat='{}{0:F0}°'}" />
+									Text="{Binding DetectionAngle, StringFormat='{}{0:F0}°'}" />
 							</Grid>
 
 							<!--  탐지 방향  -->
@@ -196,7 +196,7 @@
 									Grid.Column="2"
 									VerticalAlignment="Center"
 									Foreground="White"
-									Text="{Binding ElementName=DetectionBearingSlider, Path=Value, StringFormat='{}{0:F0}°'}" />
+									Text="{Binding DetectionBearing, StringFormat='{}{0:F0}°'}" />
 							</Grid>
 						</StackPanel>
 					</Border>

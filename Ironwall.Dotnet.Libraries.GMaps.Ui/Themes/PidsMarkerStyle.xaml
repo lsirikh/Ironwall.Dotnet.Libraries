@@ -336,7 +336,10 @@
 						</Grid>
 
 						<!--  === Camera Section ===  -->
-						<Grid Name="PART_CameraSection" Visibility="Collapsed">
+						<Grid
+							Name="PART_CameraSection"
+							Panel.ZIndex="-2"
+							Visibility="Collapsed">
 
 
 							<!--  Camera 아이콘 (크기 조절됨)  -->
@@ -452,7 +455,10 @@
 							</Viewbox>
 
 							<!--  FOV 부채꼴 영역 (ViewBox 밖, 독립적 크기)  -->
-							<Canvas Name="PART_FOVCanvas" ClipToBounds="False">
+							<Canvas
+								Name="PART_FOVCanvas"
+								ClipToBounds="False"
+								IsHitTestVisible="False">
 								<Path
 									Name="PART_FOVSector"
 									Fill="{TemplateBinding FOVColor}"
@@ -544,8 +550,8 @@
 						<!--  Pulse Animation Element (Detecting 상태용)  -->
 						<Ellipse
 							Name="PulseEllipse"
-							Width="20"
-							Height="20"
+							Width="10"
+							Height="10"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
 							Fill="Red"
@@ -571,14 +577,7 @@
 
 
 					<ControlTemplate.Triggers>
-						<!--  ShowShape=False일 때 모든 아이콘 숨김  -->
-						<Trigger Property="ShowShape" Value="False">
-							<Setter TargetName="PART_ControllerSection" Property="Visibility" Value="Collapsed" />
-							<Setter TargetName="PART_MultiSection" Property="Visibility" Value="Collapsed" />
-							<Setter TargetName="PART_FenceSection" Property="Visibility" Value="Collapsed" />
-							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Collapsed" />
-							<Setter Property="IsHitTestVisible" Value="False" />
-						</Trigger>
+
 
 						<!--  Device Type별 Section 표시  -->
 						<Trigger Property="DeviceType" Value="Controller">
@@ -737,6 +736,16 @@
 							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
 						</Trigger>
 
+						<!--  ShowShape=False일 때 모든 아이콘 숨김  -->
+						<Trigger Property="ShowShape" Value="False">
+							<Setter TargetName="PART_ControllerSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_MultiSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_FenceSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Collapsed" />
+							<Setter Property="IsHitTestVisible" Value="False" />
+						</Trigger>
+
+
 						<!--  Disabled State  -->
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter TargetName="PART_ControllerSection" Property="Opacity" Value="0.5" />
@@ -762,13 +771,13 @@
 											Storyboard.TargetName="PulseScaleTransform"
 											Storyboard.TargetProperty="ScaleX"
 											From="1"
-											To="10"
+											To="30"
 											Duration="0:0:1" />
 										<DoubleAnimation
 											Storyboard.TargetName="PulseScaleTransform"
 											Storyboard.TargetProperty="ScaleY"
 											From="1"
-											To="10"
+											To="30"
 											Duration="0:0:1" />
 									</Storyboard>
 								</BeginStoryboard>

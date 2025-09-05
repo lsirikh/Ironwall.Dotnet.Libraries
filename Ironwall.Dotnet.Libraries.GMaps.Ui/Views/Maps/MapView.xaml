@@ -108,7 +108,7 @@
 					<MenuItem.InputBindings>
 						<KeyBinding
 							Key="L"
-							Command="{Binding LoadCustomMapCommand}"
+							Command="{Binding LoadMapImageCommand}"
 							Modifiers="Ctrl" />
 					</MenuItem.InputBindings>
 				</MenuItem>

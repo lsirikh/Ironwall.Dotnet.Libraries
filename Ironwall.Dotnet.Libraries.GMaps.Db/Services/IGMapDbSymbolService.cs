@@ -164,6 +164,98 @@ public interface IGMapDbSymbolService
     Task<bool> DeleteGeometrySymbolAsync(IGeometricSymbolModel model, CancellationToken token = default);
     #endregion
 
+    #region - PidsSymbol CRUD Operations -
+    /// <summary>모든 PIDS 심볼을 조회합니다 (JOIN 쿼리)</summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsSymbol 목록</returns>
+    /// <remarks>
+    /// Symbols와 PidsSymbols 테이블을 조인하여 완전한 PIDS 심볼 정보를 반환합니다.
+    /// PIDS_EQUIPMENT 카테고리의 Symbol만 조회합니다.
+    /// </remarks>
+    Task<List<IPidsSymbolModel>?> FetchPidsSymbolsAsync(CancellationToken token = default);
+
+    /// <summary>ID로 단일 PIDS 심볼을 조회합니다</summary>
+    /// <param name="id">Symbol ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsSymbol 모델</returns>
+    /// <remarks>
+    /// Symbols와 PidsSymbols 테이블을 조인하여 완전한 PIDS 심볼 정보를 반환합니다.
+    /// </remarks>
+    Task<IPidsSymbolModel?> FetchPidsSymbolAsync(int id, CancellationToken token = default);
+
+    /// <summary>LinkedDeviceId로 PIDS 심볼을 조회합니다</summary>
+    /// <param name="deviceId">연결된 디바이스 ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsSymbol 모델</returns>
+    /// <remarks>
+    /// 특정 디바이스에 연결된 PIDS 심볼을 조회합니다.
+    /// 1:1 관계를 가정하므로 단일 결과만 반환합니다.
+    /// </remarks>
+    Task<IPidsSymbolModel?> FetchPidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default);
+
+    /// <summary>DeviceType별로 PIDS 심볼을 조회합니다</summary>
+    /// <param name="deviceType">장비 타입 (Fence, IpCamera, PIR 등)</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsSymbol 목록</returns>
+    /// <remarks>
+    /// 특정 장비 타입에 해당하는 모든 PIDS 심볼을 조회합니다.
+    /// 장비별 관리 및 필터링에 사용됩니다.
+    /// </remarks>
+    Task<List<IPidsSymbolModel>?> FetchPidsSymbolsByDeviceTypeAsync(EnumDeviceType deviceType, CancellationToken token = default);
+
+    /// <summary>EventStatus별로 PIDS 심볼을 조회합니다</summary>
+    /// <param name="eventStatus">이벤트 상태 (Normal, Detecting, Fault, Connection)</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsSymbol 목록</returns>
+    /// <remarks>
+    /// 특정 이벤트 상태에 해당하는 모든 PIDS 심볼을 조회합니다.
+    /// 모니터링 및 알람 관리에 사용됩니다.
+    /// </remarks>
+    Task<List<IPidsSymbolModel>?> FetchPidsSymbolsByEventStatusAsync(EnumEventStatus eventStatus, CancellationToken token = default);
+
+    /// <summary>새로운 PIDS 심볼을 삽입합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">PidsSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Symbol ID</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols와 PidsSymbols 테이블에 동시 삽입합니다.
+    /// DetectionRange, DetectionAngle, DetectionBearing은 실시간 데이터이므로 저장하지 않습니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<int> InsertPidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default);
+
+    /// <summary>PIDS 심볼을 업데이트합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">PidsSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 PidsSymbol 모델</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols와 PidsSymbols 테이블을 동시 업데이트합니다.
+    /// DetectionRange, DetectionAngle, DetectionBearing은 실시간 데이터이므로 업데이트하지 않습니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<IPidsSymbolModel?> UpdatePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default);
+
+    /// <summary>PIDS 심볼을 삭제합니다 (CASCADE 삭제)</summary>
+    /// <param name="model">PidsSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// Symbols 테이블에서 삭제하면 PidsSymbols 테이블의 관련 레코드는 
+    /// CASCADE 제약조건에 의해 자동으로 삭제됩니다.
+    /// </remarks>
+    Task<bool> DeletePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default);
+
+    /// <summary>LinkedDeviceId로 PIDS 심볼을 삭제합니다</summary>
+    /// <param name="deviceId">연결된 디바이스 ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// 특정 디바이스에 연결된 PIDS 심볼을 삭제합니다.
+    /// 디바이스 해제 시 사용됩니다.
+    /// </remarks>
+    Task<bool> DeletePidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default);
+    #endregion
+
     #region - Properties -
     /// <summary>데이터베이스 연결 상태</summary>
     /// <value>연결되어 있으면 true, 그렇지 않으면 false</value>

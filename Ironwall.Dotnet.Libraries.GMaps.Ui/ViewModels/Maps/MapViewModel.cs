@@ -296,7 +296,7 @@ public class MapViewModel : BasePanelViewModel
             {
                 _log?.Info($"편집 모드에서 마커 선택 시도");
                 SelectMarkerForEditing(marker);
-                ShowPropertyPanel();
+                
             }
             //else
             //{
@@ -456,6 +456,7 @@ public class MapViewModel : BasePanelViewModel
             if (success)
             {
                 UpdateSelectedMarker(marker);
+                ShowPropertyPanel();
                 _log?.Info($"마커 편집 모드 활성화 완료: {marker.Title}");
             }
             else
@@ -757,7 +758,7 @@ public class MapViewModel : BasePanelViewModel
             _log?.Info($"지리참조 좌표:");
             _log?.Info($"  - 좌상단: ({geoOptions.ManualMinLongitude:F6}, {geoOptions.ManualMaxLatitude:F6})");
             _log?.Info($"  - 우하단: ({geoOptions.ManualMaxLongitude:F6}, {geoOptions.ManualMinLatitude:F6})");
-            geoOptions.MaxZoom = 19;
+            geoOptions.MaxZoom = (int)Zoom;
 
             // 4단계: 사용자 확인
             var userConfirmed = await ShowCustomMapConfirmationAsync(SelectedImage, geoOptions);
@@ -941,11 +942,11 @@ public class MapViewModel : BasePanelViewModel
                         MainMap?.Markers?.Remove(gMapMarker);
                     }
 
-                    // 3. CustomMarkers 컬렉션에서 제거
-                    if (MainMap?.CustomMarkers?.Contains(SelectedMarker) == true)
-                    {
-                        MainMap.CustomMarkers.Remove(SelectedMarker);
-                    }
+                    //// 3. CustomMarkers 컬렉션에서 제거
+                    //if (MainMap?.CustomMarkers?.Contains(SelectedMarker) == true)
+                    //{
+                    //    MainMap.CustomMarkers.Remove(SelectedMarker);
+                    //}
 
                     // 4. DB에서 삭제
                     var dbResult = await DbDeleteProcess(SelectedMarker);
@@ -954,7 +955,10 @@ public class MapViewModel : BasePanelViewModel
                     else
                         _log?.Warning($"마커({markerId}) DB 삭제 실패");
 
-                    // 5. 마커 리소스 정리
+                    // 5. PropertyPanel 정리
+                    HidePropertyPanel();
+
+                    // 6. 마커 리소스 정리
                     try
                     {
                         SelectedMarker.Dispose();
@@ -964,7 +968,7 @@ public class MapViewModel : BasePanelViewModel
                         _log?.Warning($"마커 Dispose 실패: {disposeEx.Message}");
                     }
 
-                    // 6. SelectedMarker null로 설정
+                    // 7. SelectedMarker null로 설정
                     SelectedMarker = null;
 
                     _log?.Info($"마커 '{markerTitle}' 삭제 완료");
@@ -976,13 +980,9 @@ public class MapViewModel : BasePanelViewModel
                     // 에러가 발생해도 SelectedMarker는 null로 설정
                     SelectedMarker = null;
                 }
-
             }
-            // 7. 화면 갱신
+            // 8. 화면 갱신
             MainMap?.InvalidateVisual();
-
-            // 8. PropertyPanel 정리
-            HidePropertyPanel();
 
             _log?.Info("선택 항목 삭제 처리 완료");
         }
@@ -1522,24 +1522,44 @@ public class MapViewModel : BasePanelViewModel
         };
     }
 
-    private Task SymbolConfigureAsync()
+    private async Task SymbolConfigureAsync()
     {
         try
         {
             _log?.Info("SymbolConfigureAsync를 이용하여 심볼 불러오고 초기화.");
 
-            foreach (var item in _symbolProvider)
+            // 우선순위에 따라 정렬된 심볼 목록 생성
+            var sortedSymbols = _symbolProvider
+                .OrderBy(item => GetSymbolPriority(item)) //1차 DeviceType별로 우선순위 카테고리화
+                .ThenBy(item => item is PidsSymbolModel pids ? (int)pids.DeviceType : 0) // 단일 카테고리 내에서 IP 카메라를 
+                .ToList();
+
+            foreach (var item in sortedSymbols)
             {
-                //AddCustomMarkerProcess(item);
                 AddMarkerFromSymbol(item);
             }
 
-            return Task.CompletedTask;
+            _log?.Info($"심볼 추가 완료 - 총 {sortedSymbols.Count}개");
+
+            await InitializeDeviceSymbolIntegration();
         }
         catch (Exception)
         {
             throw;
         }
+    }
+
+    /// <summary>
+    /// 심볼 추가 우선순위 결정
+    /// </summary>
+    private int GetSymbolPriority(ISymbolModel symbol)
+    {
+        return symbol switch
+        {
+            PidsSymbolModel pids when pids.DeviceType == EnumDeviceType.IpCamera => 3, // 가장 늦게
+            PidsSymbolModel => 2, // 두 번째
+            _ => 1 // 가장 먼저
+        };
     }
     #endregion
 
@@ -1752,7 +1772,7 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-    private Task AddPidsMarker(PointLatLng position, EnumDeviceType deviceType, string title)
+    private async Task AddPidsMarker(PointLatLng position, EnumDeviceType deviceType, string title)
     {
         try
         {
@@ -1772,16 +1792,17 @@ public class MapViewModel : BasePanelViewModel
                 OperationState = EnumOperationState.ACTIVE,
                 LinkedDeviceId = 2,
                 DeviceType = deviceType,
-                DetectionRange = 10,
-                DetectionAngle = 360,
-                DetectionBearing = 360,
+                FOVOpacity = 0.7,
+                FOVColor = EnumColorType.Red,
+                DetectionRange = 30,
+                DetectionAngle = 80,
+                DetectionBearing = 0,
                 ShowFOV = false,
                 EventStatus = EnumEventStatus.Normal
             };
 
-            //var symbolId = await _gMapDbSymbolService.InsertGeometrySymbolAsync(symbolModel);
-            //var savedSymbol = await _gMapDbSymbolService.FetchGeometrySymbolAsync(symbolId);
-            symbolModel.Id = 1;
+            var symbolId = await _gMapDbSymbolService.InsertPidsSymbolAsync(symbolModel);
+            var savedSymbol = await _gMapDbSymbolService.FetchPidsSymbolAsync(symbolId);
             AddMarkerFromSymbol(symbolModel);
 
             // 강제 새로고침
@@ -1795,7 +1816,6 @@ public class MapViewModel : BasePanelViewModel
             _log?.Error($"테스트 마커 추가 실패: {ex.Message}");
         }
 
-        return Task.CompletedTask;
     }
 
 
@@ -1835,11 +1855,11 @@ public class MapViewModel : BasePanelViewModel
         // GMap에 추가
         MainMap.Markers.Add(gMapMarker);
 
-        // CustomMarkers에도 추가 (중복 체크)
-        if (!MainMap.CustomMarkers.Contains(marker))
-        {
-            MainMap.CustomMarkers.Add(marker);
-        }
+        //// CustomMarkers에도 추가 (중복 체크)
+        //if (!MainMap.CustomMarkers.Contains(marker))
+        //{
+        //    MainMap.CustomMarkers.Add(marker);
+        //}
 
         // Shape 확인 로그
         var shapeType = gMapMarker.Shape?.GetType().Name ?? "null";
@@ -2030,8 +2050,8 @@ public class MapViewModel : BasePanelViewModel
                         };
 
                         // TODO: PidsSymbol DB 저장 구현 후 활성화
-                        // newSymbolId = await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsSymbol);
-                        // duplicatedSymbol = await _gMapDbSymbolService.FetchPidsSymbolAsync(newSymbolId);
+                        newSymbolId = await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsSymbol);
+                        duplicatedSymbol = await _gMapDbSymbolService.FetchPidsSymbolAsync(newSymbolId);
 
                         // 임시로 직접 추가 (DB 저장 미구현)
                         duplicatedSymbol = pidsSymbol;
@@ -2197,6 +2217,7 @@ public class MapViewModel : BasePanelViewModel
     private void MainMap_OnMapZoomChanged()
     {
         CreateScaleBar();
+        ClearAllSelections();
     }
     #endregion
 
@@ -2476,8 +2497,8 @@ public class MapViewModel : BasePanelViewModel
 
             case GMapPidsMarker pidsMarker:
                 // GMapGeometricMarker 전용 로직
-                return 0;
-                //return await _gMapDbSymbolService.InsertGeometrySymbolAsync(pidsMarker.Model);
+                return await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsMarker.Model);
+
             default:
                 // 공통 로직
                 return 0;
@@ -2497,6 +2518,11 @@ public class MapViewModel : BasePanelViewModel
                 await _gMapDbSymbolService.UpdateGeometrySymbolAsync(geometricMarker.Model);
                 break;
 
+            case GMapPidsMarker pidsMarker:
+                // GMapGeometricMarker 전용 로직
+                await _gMapDbSymbolService.UpdatePidsSymbolAsync(pidsMarker.Model);
+                break;
+
             default:
                 // 공통 로직
                 break;
@@ -2513,7 +2539,11 @@ public class MapViewModel : BasePanelViewModel
             case GMapGeometricMarker geometricMarker:
                 // GMapGeometricMarker 전용 로직
                 return await _gMapDbSymbolService.DeleteGeometrySymbolAsync(geometricMarker.Model);
-
+       
+            case GMapPidsMarker pidsMarker:
+                // GMapGeometricMarker 전용 로직
+                return await _gMapDbSymbolService.DeletePidsSymbolAsync(pidsMarker.Model);
+       
             default:
                 // 공통 로직
                 return false;

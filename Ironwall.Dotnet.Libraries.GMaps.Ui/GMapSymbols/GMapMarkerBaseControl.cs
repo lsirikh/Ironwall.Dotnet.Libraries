@@ -547,15 +547,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         }
     }
 
-
-    #endregion
-
-    #region Private Methods
-
     /// <summary>
     /// 부모 GMapCustomControl 찾기
     /// </summary>
-    private GMapCustomControl? FindParentMapControl()
+    protected GMapCustomControl? FindParentMapControl()
     {
         DependencyObject parent = this;
         while (parent != null)
@@ -568,7 +563,6 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         }
         return null;
     }
-
     #endregion
 
     #region Static Property Changed Callbacks

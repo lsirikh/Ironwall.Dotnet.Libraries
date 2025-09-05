@@ -24,6 +24,7 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
     /// <summary>Symbol 데이터 제공자</summary>
     public SymbolProvider SymbolProvider = new();
     public GeometricSymbolProvider GeometrySymbolProvider { get; private set; }
+    public PidsSymbolProvider PidsSymbolProvider { get; private set; }
 
     /// <summary>취소 토큰 소스</summary>
     internal CancellationTokenSource Cts { get; } = new();
@@ -60,7 +61,8 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
         var log = new LogService();
         var ea = new EventAggregator();
         GeometrySymbolProvider  =new GeometricSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, _setup);
+        PidsSymbolProvider = new PidsSymbolProvider(log, SymbolProvider);
+        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, _setup);
 
         await DropTablesAsync();               // 깨끗한 DB 확보
         await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance

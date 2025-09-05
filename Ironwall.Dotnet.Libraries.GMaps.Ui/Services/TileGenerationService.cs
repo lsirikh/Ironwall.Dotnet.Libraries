@@ -725,7 +725,7 @@ public class TileGenerationService
 
                                 if (srcOffset < scanlineBuffer.Length)
                                 {
-                                    // 🔧 색상 처리 개선
+                                    //색상 처리 개선
                                     ExtractPixelColor(scanlineBuffer, srcOffset, destPtr + destOffset, tifInfo);
                                 }
                             }
