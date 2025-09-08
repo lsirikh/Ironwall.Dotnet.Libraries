@@ -59,7 +59,7 @@
 							<!--  Controller Label (독립적 크기)  -->
 							<Border
 								Name="PART_ControllerLabelContainer"
-								MinWidth="40"
+								MinWidth="20"
 								MaxWidth="150"
 								Margin="0,0,0,-25"
 								Padding="2"
@@ -154,7 +154,7 @@
 							<!--  Multi Label (독립적 크기)  -->
 							<Border
 								Name="PART_MultiLabelContainer"
-								MinWidth="40"
+								MinWidth="20"
 								MaxWidth="150"
 								Margin="0,0,0,-25"
 								Padding="2"
@@ -305,7 +305,7 @@
 							<!--  Fence Label (독립적 크기)  -->
 							<Border
 								Name="PART_FenceLabelContainer"
-								MinWidth="40"
+								MinWidth="20"
 								MaxWidth="150"
 								Margin="0,0,0,-25"
 								Padding="2"

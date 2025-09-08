@@ -354,6 +354,7 @@
 	<utils:MultiAddValueConverter x:Key="MultiAddValueConverter" />
 	<utils:HalfAndAddConverter x:Key="HalfAndAddConverter" />
 
+
 	<utilPass:PasswordBoxAssistant x:Key="PasswordBoxAssistant" />
 	<utilPass:PasswordMaskConverter x:Key="PasswordMaskConverter" />
 

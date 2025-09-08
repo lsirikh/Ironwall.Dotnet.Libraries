@@ -1530,9 +1530,11 @@ public class MapViewModel : BasePanelViewModel
 
             // 우선순위에 따라 정렬된 심볼 목록 생성
             var sortedSymbols = _symbolProvider
-                .OrderBy(item => GetSymbolPriority(item)) //1차 DeviceType별로 우선순위 카테고리화
-                .ThenBy(item => item is PidsSymbolModel pids ? (int)pids.DeviceType : 0) // 단일 카테고리 내에서 IP 카메라를 
+                .OrderBy(item => GetSymbolPriority(item))
+                .ThenBy(item => item is PidsSymbolModel pids ? (int)pids.DeviceType : 0)
+                .ThenBy(item => item is PidsSymbolModel pids ? pids.LinkedDeviceId : 0)
                 .ToList();
+
 
             foreach (var item in sortedSymbols)
             {
