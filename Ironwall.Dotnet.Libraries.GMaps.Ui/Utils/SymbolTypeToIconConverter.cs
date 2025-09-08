@@ -34,7 +34,7 @@ public class SymbolTypeToIconConverter : IValueConverter
         //{ "Helicopter", PackIconKind.Helicopter },
         
         // MILITARY_SYMBOLS
-        { "Infantry", PackIconKind.AccountGroup },
+        { "Register", PackIconKind.WindowOpen },
         //{ "Armor", PackIconKind.Tank },
         //{ "Air_Defense", PackIconKind.Shield },
         //{ "Command", PackIconKind.AccountTie },

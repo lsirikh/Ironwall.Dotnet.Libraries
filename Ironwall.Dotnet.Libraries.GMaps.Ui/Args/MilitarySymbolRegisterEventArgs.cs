@@ -1,25 +1,29 @@
-﻿using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+﻿using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 
-namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Models{
+namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Args{
     /****************************************************************************
        Purpose      :                                                          
        Created By   : GHLee                                                
-       Created On   : 9/1/2025 11:32:36 AM                                                    
+       Created On   : 9/8/2025 3:35:15 PM                                                    
        Department   : SW Team                                                   
        Company      : Sensorway Co., Ltd.                                       
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
+    #region Event Args
+
     /// <summary>
-    /// 마커 속성 변경 이벤트 아규먼트
+    /// 군사 심볼 등록 이벤트 인자
     /// </summary>
-    public class MarkerPropertyChangedEventArgs : EventArgs
+    public class MilitarySymbolRegisterEventArgs : EventArgs
     {
-        public string PropertyName { get; set; }
-        public object OldValue { get; set; }
-        public object NewValue { get; set; }
-        public IEditableMarker Marker { get; set; }
+        public MilitarySymbolModel MilitarySymbolModel { get; }
+
+        public MilitarySymbolRegisterEventArgs(MilitarySymbolModel militarySymbolModel)
+        {
+            MilitarySymbolModel = militarySymbolModel;
+        }
     }
 
-    public class PropertyPanelCloseRequestedEvent {}
+    #endregion
 }

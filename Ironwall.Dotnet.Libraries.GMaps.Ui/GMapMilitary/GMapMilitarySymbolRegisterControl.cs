@@ -1,10 +1,13 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
     /****************************************************************************
@@ -39,7 +42,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
         public static readonly DependencyProperty AffiliationProperty =
             DependencyProperty.Register("Affiliation", typeof(EnumMilitaryAffiliation),
                 typeof(GMapMilitarySymbolRegisterControl),
-                new PropertyMetadata(EnumMilitaryAffiliation.Friend));
+                new PropertyMetadata(EnumMilitaryAffiliation.Friend, OnAffiliationChangedRegister));
 
         /// <summary>
         /// 전투 차원 (공중성)
@@ -53,7 +56,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
         public static readonly DependencyProperty BattleDimensionProperty =
             DependencyProperty.Register("BattleDimension", typeof(EnumMilitaryBattleDimension),
                 typeof(GMapMilitarySymbolRegisterControl),
-                new PropertyMetadata(EnumMilitaryBattleDimension.Land));
+                new PropertyMetadata(EnumMilitaryBattleDimension.Land, OnBattleDimensionChangedRegister));
+
+       
 
         /// <summary>
         /// 표준 정체성 (계획 속성)
@@ -247,7 +252,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
         {
             InitializeAvailableValues();
             InitializeCommands();
+            InitializeDragSupport();
+
         }
+
+       
 
         #endregion
 
@@ -288,6 +297,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
             RegisterCommand = new RelayCommand(_ => OnRegisterRequested(), _ => CanRegister());
         }
 
+
+        
         #endregion
 
         #region Command Methods
@@ -311,7 +322,80 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
         }
 
         #endregion
+        #region Drag Support Methods
 
+        private void InitializeDragSupport()
+        {
+            MouseLeftButtonDown += OnMouseLeftButtonDown;
+            MouseMove += OnMouseMove;
+            MouseLeftButtonUp += OnMouseLeftButtonUp;
+        }
+
+        private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var position = e.GetPosition(this);
+
+            // 헤더 영역만 드래그 가능 (상단 45px)
+            if (position.Y > 45) return;
+
+            // Canvas 찾기
+            var contentPresenter = FindParentOfType<ContentPresenter>(this);
+            var canvas = contentPresenter?.Parent as Canvas;
+
+            if (canvas == null) return;
+
+            _isDragging = true;
+            _lastMousePosition = e.GetPosition(canvas);
+            CaptureMouse();
+            e.Handled = true;
+        }
+
+        private void OnMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isDragging) return;
+
+            var contentPresenter = FindParentOfType<ContentPresenter>(this);
+            var canvas = contentPresenter?.Parent as Canvas;
+
+            if (canvas == null) return;
+
+            var currentPosition = e.GetPosition(canvas);
+            var deltaX = currentPosition.X - _lastMousePosition.X;
+            var deltaY = currentPosition.Y - _lastMousePosition.Y;
+
+            var currentLeft = Canvas.GetLeft(contentPresenter);
+            var currentTop = Canvas.GetTop(contentPresenter);
+
+            if (double.IsNaN(currentLeft)) currentLeft = 0;
+            if (double.IsNaN(currentTop)) currentTop = 0;
+
+            Canvas.SetLeft(contentPresenter, currentLeft + deltaX);
+            Canvas.SetTop(contentPresenter, currentTop + deltaY);
+
+            _lastMousePosition = currentPosition;
+        }
+
+        private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isDragging) return;
+
+            _isDragging = false;
+            ReleaseMouseCapture();
+        }
+
+        private T FindParentOfType<T>(DependencyObject child) where T : DependencyObject
+        {
+            DependencyObject parent = VisualTreeHelper.GetParent(child);
+
+            while (parent != null && !(parent is T))
+            {
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+
+            return parent as T;
+        }
+
+        #endregion
         #region Public Methods
 
         /// <summary>
@@ -354,12 +438,61 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
 
         #region Property Changed Callbacks
 
+        private static void OnAffiliationChangedRegister(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapMilitarySymbolRegisterControl control)
+            {
+                // UnitType 변경 시 미리보기 업데이트 등 추가 로직
+                System.Diagnostics.Debug.WriteLine($"[Register] Affiliation 변경: {e.OldValue} → {e.NewValue}");
+                // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
+                if (control.Template != null)
+                {
+                    var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
+                    if (preview != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        preview.Affiliation = (EnumMilitaryAffiliation)e.NewValue;
+                    }
+                }
+            }
+            
+        }
+
+        private static void OnBattleDimensionChangedRegister(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapMilitarySymbolRegisterControl control)
+            {
+                // BattleDimension 변경 시 미리보기 업데이트 등 추가 로직
+                System.Diagnostics.Debug.WriteLine($"[Register] BattleDimension 변경: {e.OldValue} → {e.NewValue}");
+                // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
+                if (control.Template != null)
+                {
+                    var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
+                    if (preview != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        preview.BattleDimension = (EnumMilitaryBattleDimension)e.NewValue;
+                    }
+                }
+            }
+        }
+
         private static void OnUnitTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is GMapMilitarySymbolRegisterControl control)
             {
                 // UnitType 변경 시 미리보기 업데이트 등 추가 로직
-                System.Diagnostics.Debug.WriteLine($"UnitType 변경: {e.OldValue} → {e.NewValue}");
+                System.Diagnostics.Debug.WriteLine($"[Register] UnitType 변경: {e.OldValue} → {e.NewValue}");
+                // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
+                if (control.Template != null)
+                {
+                    var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
+                    if (preview != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        preview.UnitType = (EnumMilitaryUnitType)e.NewValue;
+                    }
+                }
             }
         }
 
@@ -373,22 +506,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
         }
 
         #endregion
+
+        #region Fields
+        private bool _isDragging;
+        private Point _lastMousePosition;
+        #endregion
     }
 
-    #region Event Args
 
-    /// <summary>
-    /// 군사 심볼 등록 이벤트 인자
-    /// </summary>
-    public class MilitarySymbolRegisterEventArgs : EventArgs
-    {
-        public MilitarySymbolModel MilitarySymbolModel { get; }
-
-        public MilitarySymbolRegisterEventArgs(MilitarySymbolModel militarySymbolModel)
-        {
-            MilitarySymbolModel = militarySymbolModel;
-        }
-    }
-
-    #endregion
 }

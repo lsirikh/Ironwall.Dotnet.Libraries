@@ -1,0 +1,577 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols"
+	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  컨버터들  -->
+	<!--  모든 컨버터 등록  -->
+	<utils:AffiliationToColorConverter x:Key="AffiliationToColorConverter" />
+	<utils:BattleDimensionToShapeConverter x:Key="BattleDimensionToShapeConverter" />
+	<utils:UnitTypeToIconConverter x:Key="UnitTypeToIconConverter" />
+	<utils:UnitSizeToSymbolConverter x:Key="UnitSizeToSymbolConverter" />
+	<utils:StandardIdentityToStrokeConverter x:Key="StandardIdentityToStrokeConverter" />
+	<utils:StandardIdentityToOpacityConverter x:Key="StandardIdentityToOpacityConverter" />
+	<utils:EnumToDescriptionConverter x:Key="EnumToDescriptionConverter" />
+	<utils:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />
+	<utils:UnitTypeGroupFilterConverter x:Key="UnitTypeGroupFilterConverter" />
+
+	<!--  군사 심볼 마커 스타일  -->
+	<Style x:Key="BaseMilitaryMarkerStyle" TargetType="{x:Type control:GMapMilitarySymbolMarkerControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type control:GMapMilitarySymbolMarkerControl}">
+
+					<!--  메인 컨테이너: Frame + Icon + Label 구조  -->
+					<Grid Name="PART_MainContainer" HorizontalAlignment="Center">
+
+						<!--  Frame + Icon 영역 (크기 조절됨)  -->
+						<Viewbox
+							Name="PART_ViewboxContainer"
+							Width="{TemplateBinding Width}"
+							Height="{TemplateBinding Height}"
+							Stretch="Fill"
+							ToolTip="{TemplateBinding MarkerTitle}">
+
+							<Grid
+								Name="PART_SymbolContainer"
+								Width="60"
+								Height="60"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center">
+
+								<!--  === Frame Layer (Background) ===  -->
+
+								<!--  Air Frame (둥근 상단)  -->
+								<Path
+									Name="PART_AirFrame"
+									Fill="{Binding Affiliation, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource AffiliationToColorConverter}}"
+									Stroke="Black"
+									StrokeThickness="2"
+									Visibility="Collapsed">
+									<Path.Data>
+										<PathGeometry>
+											<PathFigure StartPoint="10,50">
+												<ArcSegment
+													IsLargeArc="False"
+													Point="50,50"
+													Size="20,20"
+													SweepDirection="Clockwise" />
+												<LineSegment Point="50,50" />
+												<LineSegment Point="10,50" />
+											</PathFigure>
+										</PathGeometry>
+									</Path.Data>
+								</Path>
+
+								<!--  Ground Frame (사각형)  -->
+								<Rectangle
+									Name="PART_GroundFrame"
+									Width="40"
+									Height="40"
+									Fill="{Binding Affiliation, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource AffiliationToColorConverter}}"
+									Stroke="Black"
+									StrokeThickness="2"
+									Visibility="Collapsed" />
+
+								<!--  Sea Frame (원형)  -->
+								<Ellipse
+									Name="PART_SeaFrame"
+									Width="40"
+									Height="40"
+									Fill="{Binding Affiliation, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource AffiliationToColorConverter}}"
+									Stroke="Black"
+									StrokeThickness="2"
+									Visibility="Collapsed" />
+
+								<!--  Subsurface Frame (역삼각형)  -->
+								<Polygon
+									Name="PART_SubsurfaceFrame"
+									Fill="{Binding Affiliation, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource AffiliationToColorConverter}}"
+									Points="30,10 50,50 10,50"
+									Stroke="Black"
+									StrokeThickness="2"
+									Visibility="Collapsed" />
+
+								<!--  === Icon Layer (Foreground) ===  -->
+								<Grid
+									Name="PART_IconLayer"
+									Width="30"
+									Height="30"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center">
+
+									<!--  Infantry Icon  -->
+									<Path
+										Name="PART_InfantryIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  사람 모양 아이콘  -->
+											<PathGeometry>
+												<!--  머리 (원을 ArcSegment로 근사)  -->
+												<PathFigure IsClosed="True" StartPoint="18,8">
+													<ArcSegment
+														IsLargeArc="True"
+														Point="12,8"
+														Size="3,3"
+														SweepDirection="Clockwise" />
+													<ArcSegment
+														IsLargeArc="True"
+														Point="18,8"
+														Size="3,3"
+														SweepDirection="Clockwise" />
+												</PathFigure>
+												<!--  몸체  -->
+												<PathFigure IsClosed="True" StartPoint="12,12">
+													<LineSegment Point="18,12" />
+													<LineSegment Point="18,20" />
+													<LineSegment Point="16,20" />
+													<LineSegment Point="16,25" />
+													<LineSegment Point="14,25" />
+													<LineSegment Point="14,20" />
+													<LineSegment Point="12,20" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Armor Icon  -->
+									<Path
+										Name="PART_ArmorIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  탱크 모양  -->
+											<RectangleGeometry Rect="8,12,14,8" />
+										</Path.Data>
+									</Path>
+
+									<!--  Artillery Icon  -->
+									<Ellipse
+										Name="PART_ArtilleryIcon"
+										Width="8"
+										Height="8"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed" />
+
+									<!--  Engineer Icon  -->
+									<Path
+										Name="PART_EngineerIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  삽 모양  -->
+											<PathGeometry>
+												<PathFigure StartPoint="10,8">
+													<LineSegment Point="20,8" />
+													<LineSegment Point="20,12" />
+													<LineSegment Point="10,12" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Signal Icon  -->
+									<Path
+										Name="PART_SignalIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  번개 모양  -->
+											<PathGeometry>
+												<PathFigure StartPoint="12,6">
+													<LineSegment Point="18,6" />
+													<LineSegment Point="14,15" />
+													<LineSegment Point="18,15" />
+													<LineSegment Point="12,24" />
+													<LineSegment Point="16,15" />
+													<LineSegment Point="12,15" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Intelligence Icon  -->
+									<Path
+										Name="PART_IntelligenceIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  눈 모양  -->
+											<EllipseGeometry
+												Center="15,15"
+												RadiusX="8"
+												RadiusY="4" />
+										</Path.Data>
+									</Path>
+
+									<!--  Logistics Icon  -->
+									<Rectangle
+										Name="PART_LogisticsIcon"
+										Width="12"
+										Height="8"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed" />
+
+									<!--  Medical Icon  -->
+									<Path
+										Name="PART_MedicalIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  십자가 모양  -->
+											<PathGeometry>
+												<PathFigure StartPoint="13,8">
+													<LineSegment Point="17,8" />
+													<LineSegment Point="17,12" />
+													<LineSegment Point="20,12" />
+													<LineSegment Point="20,16" />
+													<LineSegment Point="17,16" />
+													<LineSegment Point="17,20" />
+													<LineSegment Point="13,20" />
+													<LineSegment Point="13,16" />
+													<LineSegment Point="10,16" />
+													<LineSegment Point="10,12" />
+													<LineSegment Point="13,12" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Fighter Icon  -->
+									<Path
+										Name="PART_FighterIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  전투기 모양  -->
+											<PathGeometry>
+												<PathFigure StartPoint="15,6">
+													<LineSegment Point="12,15" />
+													<LineSegment Point="18,15" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Helicopter Icon  -->
+									<Path
+										Name="PART_HelicopterIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  헬기 날개  -->
+											<PathGeometry>
+												<PathFigure StartPoint="5,15">
+													<LineSegment Point="25,15" />
+												</PathFigure>
+												<PathFigure StartPoint="15,10">
+													<LineSegment Point="15,20" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Command Icon  -->
+									<Path
+										Name="PART_CommandIcon"
+										Fill="Black"
+										Stroke="White"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<!--  별 모양  -->
+											<PathGeometry>
+												<PathFigure StartPoint="15,6">
+													<LineSegment Point="16,12" />
+													<LineSegment Point="22,12" />
+													<LineSegment Point="17,16" />
+													<LineSegment Point="19,22" />
+													<LineSegment Point="15,18" />
+													<LineSegment Point="11,22" />
+													<LineSegment Point="13,16" />
+													<LineSegment Point="8,12" />
+													<LineSegment Point="14,12" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+								</Grid>
+
+								<!--  부대 규모 표시 (상단)  -->
+								<TextBlock
+									Name="PART_UnitSizeIndicator"
+									Margin="0,-8,0,0"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Top"
+									FontSize="12"
+									FontWeight="Bold"
+									Foreground="Black"
+									Text="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitSizeToSymbolConverter}}" />
+
+								<!--  부대 지시자 (하단)  -->
+								<TextBlock
+									Name="PART_UnitDesignator"
+									Margin="0,0,0,-8"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Bottom"
+									FontSize="8"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding UnitDesignator}" />
+
+								<!--  상급 부대명 (좌측)  -->
+								<TextBlock
+									Name="PART_HigherFormation"
+									Margin="-15,0,0,0"
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									FontSize="6"
+									Foreground="Black"
+									Text="{TemplateBinding HigherFormation}" />
+
+								<!--  콜사인 (우측)  -->
+								<TextBlock
+									Name="PART_CallSign"
+									Margin="0,0,-15,0"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Center"
+									FontSize="6"
+									Foreground="Black"
+									Text="{TemplateBinding CallSign}" />
+							</Grid>
+						</Viewbox>
+
+						<!--  Label Container (아이콘 아래)  -->
+						<Border
+							Name="PART_LabelContainer"
+							MinWidth="40"
+							MaxWidth="150"
+							Margin="0,0,0,-25"
+							Padding="2"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Bottom"
+							Background="White"
+							BorderBrush="Gray"
+							BorderThickness="1"
+							CornerRadius="4"
+							Visibility="Collapsed">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="3"
+									Opacity="0.3"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+							<TextBlock
+								Name="PART_LabelText"
+								FontSize="{TemplateBinding TitleSize}"
+								FontWeight="SemiBold"
+								Foreground="Black"
+								Text="{TemplateBinding MarkerTitle}"
+								TextAlignment="Center"
+								TextTrimming="CharacterEllipsis"
+								TextWrapping="NoWrap" />
+						</Border>
+					</Grid>
+
+					<ControlTemplate.Triggers>
+
+						<!--  === Affiliation 색상 ===  -->
+						<!--  Friend (우군) - 파랑  -->
+						<Trigger Property="Affiliation" Value="Friend">
+							<Setter TargetName="PART_AirFrame" Property="Fill" Value="#4A90E2" />
+							<Setter TargetName="PART_GroundFrame" Property="Fill" Value="#4A90E2" />
+							<Setter TargetName="PART_SeaFrame" Property="Fill" Value="#4A90E2" />
+							<Setter TargetName="PART_SubsurfaceFrame" Property="Fill" Value="#4A90E2" />
+						</Trigger>
+
+						<!--  Hostile (적군) - 빨강  -->
+						<Trigger Property="Affiliation" Value="Hostile">
+							<Setter TargetName="PART_AirFrame" Property="Fill" Value="#E74C3C" />
+							<Setter TargetName="PART_GroundFrame" Property="Fill" Value="#E74C3C" />
+							<Setter TargetName="PART_SeaFrame" Property="Fill" Value="#E74C3C" />
+							<Setter TargetName="PART_SubsurfaceFrame" Property="Fill" Value="#E74C3C" />
+						</Trigger>
+
+						<!--  Neutral (중립) - 초록  -->
+						<Trigger Property="Affiliation" Value="Neutral">
+							<Setter TargetName="PART_AirFrame" Property="Fill" Value="#27AE60" />
+							<Setter TargetName="PART_GroundFrame" Property="Fill" Value="#27AE60" />
+							<Setter TargetName="PART_SeaFrame" Property="Fill" Value="#27AE60" />
+							<Setter TargetName="PART_SubsurfaceFrame" Property="Fill" Value="#27AE60" />
+						</Trigger>
+
+						<!--  Unknown (알 수 없음) - 노랑  -->
+						<Trigger Property="Affiliation" Value="Unknown">
+							<Setter TargetName="PART_AirFrame" Property="Fill" Value="#F1C40F" />
+							<Setter TargetName="PART_GroundFrame" Property="Fill" Value="#F1C40F" />
+							<Setter TargetName="PART_SeaFrame" Property="Fill" Value="#F1C40F" />
+							<Setter TargetName="PART_SubsurfaceFrame" Property="Fill" Value="#F1C40F" />
+						</Trigger>
+
+						<!--  === BattleDimension Frame 표시 ===  -->
+						<Trigger Property="BattleDimension" Value="Air">
+							<Setter TargetName="PART_AirFrame" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="BattleDimension" Value="Land">
+							<Setter TargetName="PART_GroundFrame" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="BattleDimension" Value="Sea">
+							<Setter TargetName="PART_SeaFrame" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="BattleDimension" Value="Subsurface">
+							<Setter TargetName="PART_SubsurfaceFrame" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  === UnitType Icon 표시 ===  -->
+						<Trigger Property="UnitType" Value="Infantry">
+							<Setter TargetName="PART_InfantryIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Armor">
+							<Setter TargetName="PART_ArmorIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Artillery">
+							<Setter TargetName="PART_ArtilleryIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Engineer">
+							<Setter TargetName="PART_EngineerIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Signal">
+							<Setter TargetName="PART_SignalIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Intelligence">
+							<Setter TargetName="PART_IntelligenceIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Logistics">
+							<Setter TargetName="PART_LogisticsIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Medical">
+							<Setter TargetName="PART_MedicalIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Fighter">
+							<Setter TargetName="PART_FighterIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Helicopter">
+							<Setter TargetName="PART_HelicopterIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="UnitType" Value="Command">
+							<Setter TargetName="PART_CommandIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  === 표시 옵션 ===  -->
+						<Trigger Property="ShowShape" Value="False">
+							<Setter TargetName="PART_ViewboxContainer" Property="Visibility" Value="Collapsed" />
+							<Setter Property="IsHitTestVisible" Value="False" />
+							<Setter TargetName="PART_LabelContainer" Property="Margin" Value="0,0,0,0" />
+						</Trigger>
+
+						<Trigger Property="ShowTitle" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  === Mouse Over 효과 ===  -->
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+
+							<!--  Frame에 그림자 효과  -->
+							<Setter TargetName="PART_AirFrame" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_GroundFrame" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_SeaFrame" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+							<Setter TargetName="PART_SubsurfaceFrame" Property="Effect">
+								<Setter.Value>
+									<DropShadowEffect
+										BlurRadius="12"
+										Opacity="0.7"
+										ShadowDepth="6"
+										Color="Black" />
+								</Setter.Value>
+							</Setter>
+						</Trigger>
+
+						<!--  === Disabled State ===  -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter TargetName="PART_SymbolContainer" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_LabelContainer" Property="Opacity" Value="0.5" />
+						</Trigger>
+
+						<!--  === 미리보기 모드 ===  -->
+						<Trigger Property="IsPreviewMode" Value="True">
+							<Setter Property="IsHitTestVisible" Value="False" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+
+		<!--  Default Property Values  -->
+		<Setter Property="TitleSize" Value="9" />
+		<Setter Property="IsHitTestVisible" Value="True" />
+		<Setter Property="Focusable" Value="True" />
+		<Setter Property="Width" Value="50" />
+		<Setter Property="Height" Value="50" />
+		<Setter Property="IsPreviewMode" Value="False" />
+	</Style>
+
+	<!--  Apply Default Style  -->
+	<Style BasedOn="{StaticResource BaseMilitaryMarkerStyle}" TargetType="{x:Type control:GMapMilitarySymbolMarkerControl}" />
+
+
+
+</ResourceDictionary>

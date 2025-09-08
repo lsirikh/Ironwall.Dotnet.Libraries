@@ -37,6 +37,8 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 using Newtonsoft.Json.Linq;
 using System.Windows.Data;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -644,8 +646,9 @@ public class MapViewModel : BasePanelViewModel
     {
         ToggleMultiSelectCommand = new RelayCommand(ExecuteToggleMultiSelect, CanExecuteToggleMultiSelect);
         CancelAllEditingCommand = new RelayCommand(ExecuteCancelAllEditing, CanExecuteCancelAllEditing);
-        LogAdornerStatsCommand = new RelayCommand(ExecuteLogAdornerStats, CanExecuteLogAdornerStats);
     }
+
+    
     #endregion
 
     #region - 파일 명령어 구현 -
@@ -1040,21 +1043,7 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-    /// <summary>
-    /// Adorner 통계 로그 출력 명령어
-    /// </summary>
-    private bool CanExecuteLogAdornerStats(object arg) => true;
-    private void ExecuteLogAdornerStats(object obj)
-    {
-        try
-        {
-            MainMap?.LogAdornerStatistics();
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"Adorner 통계 출력 실패: {ex.Message}");
-        }
-    }
+   
     #endregion
 
     #region - 회전 명령어 구현 -
@@ -1197,7 +1186,7 @@ public class MapViewModel : BasePanelViewModel
                     break;
 
                 case EnumMarkerCategory.MILITARY_SYMBOLS:
-                    //await AddMilitarySymbolMarker(position, SelectedSymbolType.ToString(), symbolTitle);
+                    ShowMilitarySymbolRegisterPanel();
                     break;
 
                 case EnumMarkerCategory.PIDS_EQUIPMENT:
@@ -2136,6 +2125,101 @@ public class MapViewModel : BasePanelViewModel
             _log?.Error($"마커 격자 스냅 실패: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// 군사 심볼 등록창 표시
+    /// </summary>
+    private void ShowMilitarySymbolRegisterPanel()
+    {
+        if (IsMilitarySymbolRegisterVisible) return;
+
+        _log?.Info("군사 심볼 등록창 표시");
+
+        // 기존 패널이 있으면 정리
+        HideMilitarySymbolRegisterPanel();
+
+        // 새 등록창 생성
+        MilitarySymbolRegisterPanel = new GMapMilitarySymbolRegisterControl();
+
+        // 이벤트 구독
+        MilitarySymbolRegisterPanel.MilitarySymbolRegisterRequested += OnMilitarySymbolRegisterRequested;
+        MilitarySymbolRegisterPanel.CancelRequested += OnMilitarySymbolRegisterCancelled;
+
+        IsMilitarySymbolRegisterVisible = true;
+        _log?.Info("군사 심볼 등록창 표시 완료");
+    }
+
+    
+
+    /// <summary>
+    /// 군사 심볼 등록 요청 처리
+    /// </summary>
+    private void OnMilitarySymbolRegisterRequested(object? sender, MilitarySymbolRegisterEventArgs e)
+    {
+        try
+        {
+            var militaryModel = e.MilitarySymbolModel;
+            var position = ClickedCurrentPosition.IsEmpty ? MainMap!.CenterPosition : ClickedCurrentPosition;
+
+            // 위치 설정
+            militaryModel.Latitude = position.Lat;
+            militaryModel.Longitude = position.Lng;
+            militaryModel.Zoom = Zoom;
+
+            _log?.Info($"군사 심볼 등록: {militaryModel.Title}");
+            _log?.Info($"소속: {militaryModel.Affiliation}, 공중성: {militaryModel.BattleDimension}");
+            _log?.Info($"부대타입: {militaryModel.UnitType}, 규모: {militaryModel.UnitSize}");
+
+            // DB에 저장
+            //var symbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(militaryModel);
+            //var savedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(symbolId);
+
+            //if (savedSymbol != null)
+            //{
+            //    // 지도에 마커 추가
+            //    AddMarkerFromSymbol(savedSymbol);
+
+            //    // 강제 새로고침
+            //    MainMap?.InvalidateVisual();
+
+            //    _log?.Info($"군사 심볼 추가 완료: {savedSymbol.Title}");
+            //}
+
+            // 등록창 닫기
+            HideMilitarySymbolRegisterPanel();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"군사 심볼 등록 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 등록 취소 처리
+    /// </summary>
+    private void OnMilitarySymbolRegisterCancelled(object? sender, EventArgs e)
+    {
+        _log?.Info("군사 심볼 등록 취소됨");
+        HideMilitarySymbolRegisterPanel();
+    }
+
+    /// <summary>
+    /// 군사 심볼 등록창 숨김
+    /// </summary>
+    private void HideMilitarySymbolRegisterPanel()
+    {
+        if (MilitarySymbolRegisterPanel != null)
+        {
+            // 이벤트 구독 해제
+            MilitarySymbolRegisterPanel.MilitarySymbolRegisterRequested -= OnMilitarySymbolRegisterRequested;
+            MilitarySymbolRegisterPanel.CancelRequested -= OnMilitarySymbolRegisterCancelled;
+
+            MilitarySymbolRegisterPanel = null;
+        }
+
+        IsMilitarySymbolRegisterVisible = false;
+        _log?.Info("군사 심볼 등록창 숨김 완료");
+    }
     #endregion
 
 
@@ -2553,7 +2637,6 @@ public class MapViewModel : BasePanelViewModel
     }
     #endregion
 
-    #region - 속성 (Properties) -
 
     #region - 줌 관련 속성 -
     /// <summary>
@@ -2965,6 +3048,11 @@ public class MapViewModel : BasePanelViewModel
     public RelayCommand? ToggleMultiSelectCommand { get; private set; }
     public RelayCommand? CancelAllEditingCommand { get; private set; }
     public RelayCommand? LogAdornerStatsCommand { get; private set; }
+
+    /// <summary>
+    /// 군사 심볼 등록창 열기 명령어
+    /// </summary>
+    public RelayCommand? ShowMilitarySymbolRegisterCommand { get; private set; }
     #endregion
 
     #region Property Panel Methods
@@ -2985,6 +3073,10 @@ public class MapViewModel : BasePanelViewModel
 
         if (PropertyPanel != null)
         {
+            // 이벤트 구독 추가
+            PropertyPanel.CloseRequested += OnPropertyPanelCloseRequested;
+            PropertyPanel.MarkerPropertyChanged += OnMarkerPropertyChanged;
+
             // 공통 속성 설정
             PropertyPanel.AvailableColors = AvailableColors;
             PropertyPanel.AvailableSizes = AvailableSize;
@@ -2998,16 +3090,30 @@ public class MapViewModel : BasePanelViewModel
         IsPropertyPanelVisible = true;
     }
 
+    private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
+    {
+        if (IsEditModeEnabled && !_isMarkerEditing)
+        {
+            _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
+            // DB 업데이트
+            await DbUpdateProcess(e.Marker);
+        }
+    }
+
+    private void OnPropertyPanelCloseRequested(object? sender, EventArgs e)
+    {
+        ClearAllSelections();
+        HidePropertyPanel();
+    }
+
     private void HidePropertyPanel()
     {
-        //if (CustomPropertyPanel != null)
-        //{
-        //    CustomPropertyPanel = null;
-        //    _log?.Info($"GMapCustomMarker용 HidePropertyPanel이 수행되었습니다.");
-        //}
-
         if (PropertyPanel != null)
         {
+            // 이벤트 구독 해제
+            PropertyPanel.CloseRequested -= OnPropertyPanelCloseRequested;
+            PropertyPanel.MarkerPropertyChanged -= OnMarkerPropertyChanged;
+
             // 바인딩 정리
             PropertyPanel.ClearAllBindings();
             PropertyPanel = null;
@@ -3112,7 +3218,7 @@ public class MapViewModel : BasePanelViewModel
                 EnumMarkerCategory.BASIC_SHAPES => new[] { "Pin" },
                 EnumMarkerCategory.GEOMETRICS => System.Enum.GetValues<EnumShapeType>().Cast<object>(),
                 EnumMarkerCategory.VEHICLES => new[] { "Car" },
-                EnumMarkerCategory.MILITARY_SYMBOLS => new[] { "Infantry" },
+                EnumMarkerCategory.MILITARY_SYMBOLS => new[] { "Register" },
                 EnumMarkerCategory.PIDS_EQUIPMENT => new[] {"Controller","Multi","Fence", "IpCamera" },
                 EnumMarkerCategory.AREA_BOUNDARY => new[] { "Zone" },
                 EnumMarkerCategory.ANALYSIS => new[] { "Predicted_Path" },
@@ -3168,9 +3274,37 @@ public class MapViewModel : BasePanelViewModel
     }
 
     public DeviceProvider DeviceProvider { get; }
+
+    /// <summary>
+    /// 군사 심볼 등록창 표시 여부
+    /// </summary>
+    public bool IsMilitarySymbolRegisterVisible
+    {
+        get => _isMilitarySymbolRegisterVisible;
+        set
+        {
+            _isMilitarySymbolRegisterVisible = value;
+            NotifyOfPropertyChange(nameof(IsMilitarySymbolRegisterVisible));
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 등록 패널
+    /// </summary>
+    public GMapMilitarySymbolRegisterControl? MilitarySymbolRegisterPanel
+    {
+        get => _militarySymbolRegisterPanel;
+        set
+        {
+            _militarySymbolRegisterPanel = value;
+            NotifyOfPropertyChange(nameof(MilitarySymbolRegisterPanel));
+        }
+    }
+
+   
     #endregion
 
-    #region - 필드 (Private Fields) -
+    #region - 필드 (Private Fields) -ㄷ
     // 서비스 및 의존성
     private CancellationTokenSource _cts;
     private MapProvider _mapProvider;
@@ -3220,6 +3354,9 @@ public class MapViewModel : BasePanelViewModel
     // 심볼 선택 관련 필드
     private EnumMarkerCategory _selectedMarkerCategory = EnumMarkerCategory.GEOMETRICS;
     private object _selectedSymbolType = EnumShapeType.Circle;
-    #endregion
+
+    // 필드 추가
+    private bool _isMilitarySymbolRegisterVisible;
+    private GMapMilitarySymbolRegisterControl? _militarySymbolRegisterPanel;
     #endregion
 }

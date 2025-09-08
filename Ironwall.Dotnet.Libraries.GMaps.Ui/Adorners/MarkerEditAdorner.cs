@@ -1263,9 +1263,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
     private bool _hasCrossed0Boundary = false;    // 0도 경계 횡단 여부
     private bool _hasCrossed360Boundary = false;  // 360도 경계 횡단 여부
 
-    private int _frameCount = 0;  // 로깅 빈도 제어용
-
-
     // 시각적 요소들
     private Pen? _handlePen;
     private Pen? _editAreaPen;

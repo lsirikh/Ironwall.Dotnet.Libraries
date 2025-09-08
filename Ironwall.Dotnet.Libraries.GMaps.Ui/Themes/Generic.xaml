@@ -10,11 +10,14 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/CustomMarkerStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/GeometricMarkerStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/PidsMarkerStyle.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MilitaryMarkerStyle.xaml" />
 
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/BasePropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/CustomPropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/GeometricPropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/PidsPropertyStyle.xaml" />
+
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MilitarySymbolRegisterStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
 

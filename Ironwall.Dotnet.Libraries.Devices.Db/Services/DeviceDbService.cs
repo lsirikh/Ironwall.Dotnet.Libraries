@@ -1047,7 +1047,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
     private SensorDeviceProvider _sensorProvider;
     private ControllerDeviceProvider _controllerProvider;
     private CameraDeviceProvider _cameraProvider;
-    private MySqlConnection _conn;
+    private MySqlConnection? _conn;
     #endregion
 
 }

@@ -795,14 +795,27 @@
 				</i:Interaction.Behaviors>
 			</gproperty:GMapPropertyCustomControl>-->
 
+			<!--  심볼 속성 창  -->
 			<ContentPresenter
 				Canvas.Left="300"
 				Canvas.Top="100"
 				Content="{Binding PropertyPanel}"
 				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-				<i:Interaction.Behaviors>
+				<!--<i:Interaction.Behaviors>
 					<behavior:PropertyPanelEventBehavior />
-				</i:Interaction.Behaviors>
+				</i:Interaction.Behaviors>-->
+			</ContentPresenter>
+
+			<!--  군사 심볼 등록창  -->
+			<ContentPresenter
+				x:Name="MilitarySymbolRegisterPresenter"
+				Canvas.Left="400"
+				Canvas.Top="50"
+				Content="{Binding MilitarySymbolRegisterPanel}"
+				Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<!--<i:Interaction.Behaviors>
+					<behavior:PropertyPanelEventBehavior />
+				</i:Interaction.Behaviors>-->
 			</ContentPresenter>
 		</Canvas>
 	</Grid>

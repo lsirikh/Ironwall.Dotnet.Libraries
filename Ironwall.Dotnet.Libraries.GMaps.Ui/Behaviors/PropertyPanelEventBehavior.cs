@@ -6,6 +6,7 @@ using System;
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
     /****************************************************************************

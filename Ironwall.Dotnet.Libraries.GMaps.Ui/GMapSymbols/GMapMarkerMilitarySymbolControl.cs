@@ -3,6 +3,7 @@ using System;
 using System.Windows.Media;
 using System.Windows;
 using System.Windows.Input;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -147,6 +148,16 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         DependencyProperty.Register("CountryCode", typeof(string), typeof(GMapMilitarySymbolMarkerControl),
             new PropertyMetadata(string.Empty));
 
+
+    public bool IsPreviewMode
+    {
+        get { return (bool)GetValue(IsPreviewModeProperty); }
+        set { SetValue(IsPreviewModeProperty, value); }
+    }
+
+    public static readonly DependencyProperty IsPreviewModeProperty =
+    DependencyProperty.Register("IsPreviewMode", typeof(bool), typeof(GMapMilitarySymbolMarkerControl), 
+        new PropertyMetadata(false));
     #endregion
 
     #region Constructors
@@ -156,7 +167,16 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     /// </summary>
     public GMapMilitarySymbolMarkerControl()
     {
-        // 기본 클래스에서 InitializeControl() 호출됨
+        System.Diagnostics.Debug.WriteLine("GMapMilitarySymbolMarkerControl() 생성자 호출됨");
+
+        // 미리보기용 기본값 설정
+        Affiliation = EnumMilitaryAffiliation.Friend;
+        BattleDimension = EnumMilitaryBattleDimension.Land;
+        UnitType = EnumMilitaryUnitType.Infantry;
+        UnitSize = EnumMilitaryUnitSize.Company;
+        ShowShape = true;
+
+        System.Diagnostics.Debug.WriteLine($"기본값 설정 완료: {Affiliation}, {BattleDimension}, {UnitType}");
     }
 
     /// <summary>
@@ -224,6 +244,14 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     {
         base.OnControlInitialized();
         System.Diagnostics.Debug.WriteLine("GMapMilitarySymbolMarkerControl 초기화 완료");
+        // 미리보기 모드일 때 기본값으로 초기화
+        if (Marker == null)
+        {
+            ShowShape = true;
+            ShowTitle = false;
+            Width = 80;
+            Height = 80;
+        }
     }
 
     /// <summary>
@@ -267,6 +295,21 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         base.OnSelectionChanged(isSelected);
     }
 
+    #endregion
+
+    #region Public Methods
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        System.Diagnostics.Debug.WriteLine("GMapMilitarySymbolMarkerControl OnApplyTemplate 호출됨");
+
+        // 템플릿 요소들 확인
+        var mainContainer = GetTemplateChild("PART_MainContainer");
+        var symbolContainer = GetTemplateChild("PART_SymbolContainer");
+        var groundFrame = GetTemplateChild("PART_GroundFrame");
+
+        System.Diagnostics.Debug.WriteLine($"템플릿 요소들: MainContainer={mainContainer != null}, SymbolContainer={symbolContainer != null}, GroundFrame={groundFrame != null}");
+    }
     #endregion
 
     #region Military Symbol Specific Methods
@@ -394,23 +437,37 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     /// </summary>
     protected static void OnAffiliationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMilitarySymbolMarkerControl control && control.Marker != null)
+        System.Diagnostics.Debug.WriteLine($"OnAffiliationChanged 호출: {e.OldValue} → {e.NewValue}");
+
+        if (d is GMapMilitarySymbolMarkerControl control)
         {
-            // 마커 데이터와 동기화 (타입 안전)
-            if (control.Marker.Affiliation != (EnumMilitaryAffiliation)e.NewValue)
-                control.Marker.Affiliation = (EnumMilitaryAffiliation)e.NewValue;
+            // 마커가 있을 때만 동기화
+            if (control.Marker != null)
+            {
+                if (control.Marker.Affiliation != (EnumMilitaryAffiliation)e.NewValue)
+                    control.Marker.Affiliation = (EnumMilitaryAffiliation)e.NewValue;
+            }
+
+            // 미리보기 모드든 아니든 UI 업데이트는 항상 실행
+            System.Diagnostics.Debug.WriteLine($"Affiliation UI 업데이트 실행됨");
         }
     }
+
 
     /// <summary>
     /// BattleDimension 변경 시 호출
     /// </summary>
     protected static void OnBattleDimensionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMilitarySymbolMarkerControl control && control.Marker != null)
+        System.Diagnostics.Debug.WriteLine($"OnBattleDimensionChanged 호출: {e.OldValue} → {e.NewValue}");
+
+        if (d is GMapMilitarySymbolMarkerControl control)
         {
-            if (control.Marker.BattleDimension != (EnumMilitaryBattleDimension)e.NewValue)
-                control.Marker.BattleDimension = (EnumMilitaryBattleDimension)e.NewValue;
+            if (control.Marker != null)
+            {
+                if (control.Marker.BattleDimension != (EnumMilitaryBattleDimension)e.NewValue)
+                    control.Marker.BattleDimension = (EnumMilitaryBattleDimension)e.NewValue;
+            }
         }
     }
 
@@ -431,10 +488,15 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     /// </summary>
     protected static void OnUnitTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMilitarySymbolMarkerControl control && control.Marker != null)
+        System.Diagnostics.Debug.WriteLine($"OnUnitTypeChanged 호출: {e.OldValue} → {e.NewValue}");
+
+        if (d is GMapMilitarySymbolMarkerControl control)
         {
-            if (control.Marker.UnitType != (EnumMilitaryUnitType)e.NewValue)
-                control.Marker.UnitType = (EnumMilitaryUnitType)e.NewValue;
+            if (control.Marker != null)
+            {
+                if (control.Marker.UnitType != (EnumMilitaryUnitType)e.NewValue)
+                    control.Marker.UnitType = (EnumMilitaryUnitType)e.NewValue;
+            }
         }
     }
 

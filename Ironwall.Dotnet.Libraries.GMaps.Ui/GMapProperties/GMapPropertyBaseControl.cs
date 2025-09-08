@@ -5,6 +5,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
@@ -326,7 +327,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             };
 
             AvailableSizes = new double[] { 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0 };
-            
+
+            InitializeDragSupport();
+
             MouseLeftButtonDown += OnMouseLeftButtonDown;
             MouseMove += OnMouseMove;
             MouseLeftButtonUp += OnMouseLeftButtonUp;
@@ -338,6 +341,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         #endregion
 
         #region PropertyWindow Control Method
+        private void InitializeDragSupport()
+        {
+            MouseLeftButtonDown += OnMouseLeftButtonDown;
+            MouseMove += OnMouseMove;
+            MouseLeftButtonUp += OnMouseLeftButtonUp;
+        }
+
         private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             //System.Diagnostics.Debug.WriteLine($"=== MouseLeftButtonDown 이벤트 ===");

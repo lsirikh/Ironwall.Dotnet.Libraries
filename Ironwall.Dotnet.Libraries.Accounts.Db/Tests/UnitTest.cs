@@ -23,7 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Db.Tests;
 public sealed class DbTestFixture : IAsyncLifetime
 {
     // ── 공용 객체 ─────────────────────────────
-    public IAccountDbService Svc { get; private set; }
+    public IAccountDbService? Svc { get; private set; }
     public CancellationTokenSource Cts = new();
     public AccountProvider AccProvider = new();
     public LoginProvider LogProvider = new();
