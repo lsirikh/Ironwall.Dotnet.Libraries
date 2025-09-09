@@ -2185,6 +2185,11 @@ public class MapViewModel : BasePanelViewModel
             //    _log?.Info($"군사 심볼 추가 완료: {savedSymbol.Title}");
             //}
 
+
+            AddMarkerFromSymbol(militaryModel);
+
+            MainMap?.InvalidateVisual();
+
             // 등록창 닫기
             HideMilitarySymbolRegisterPanel();
         }

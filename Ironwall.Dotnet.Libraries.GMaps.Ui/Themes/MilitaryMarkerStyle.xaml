@@ -423,42 +423,32 @@
 									Name="PART_Frame_Unknown_Air"
 									Fill="#F1C40F"
 									Stroke="Black"
-									StrokeThickness="2"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="15,25">
-												<!--  좌측 작은 원  -->
+											<PathFigure IsClosed="True" StartPoint="20,25">
+												<!--  북 작은 원  -->
 												<ArcSegment
-													Point="20,20"
-													Size="5,5"
+													Point="40,25"
+													Size="8,10"
 													SweepDirection="Clockwise" />
-												<!--  중앙 큰 원 (상단)  -->
+												<!--  동 큰 원 (상단)  -->
 												<ArcSegment
-													Point="35,15"
-													Size="8,8"
+													Point="40,45"
+													Size="10,8"
 													SweepDirection="Clockwise" />
-												<!--  우측 중간 원  -->
+												<!--  남 중간 원  -->
+												<LineSegment Point="20,45" />
+												<!--  서 원 연결  -->
 												<ArcSegment
-													Point="45,20"
-													Size="6,6"
-													SweepDirection="Clockwise" />
-												<!--  우하단 연결  -->
-												<ArcSegment
-													Point="40,30"
-													Size="4,4"
-													SweepDirection="Clockwise" />
-												<!--  하단 평평한 부분  -->
-												<LineSegment Point="20,30" />
-												<!--  좌하단 연결  -->
-												<ArcSegment
-													Point="15,25"
-													Size="3,3"
+													Point="20,25"
+													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
 										</PathGeometry>
 									</Path.Data>
 								</Path>
+
 
 								<!--  Unknown + Ground: 클로버 모양 (노랑) - Air와 동일  -->
 								<Path
@@ -469,38 +459,26 @@
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="30,10">
-												<ArcSegment
-													Point="35,15"
-													Size="5,5"
-													SweepDirection="Clockwise" />
+											<PathFigure IsClosed="True" StartPoint="20,25">
+												<!--  좌측 작은 원  -->
 												<ArcSegment
 													Point="40,25"
-													Size="5,5"
+													Size="8,10"
 													SweepDirection="Clockwise" />
+												<!--  중앙 큰 원 (상단)  -->
 												<ArcSegment
-													Point="35,35"
-													Size="5,5"
+													Point="40,45"
+													Size="10,8"
 													SweepDirection="Clockwise" />
+												<!--  우측 중간 원  -->
 												<ArcSegment
-													Point="25,40"
-													Size="5,5"
+													Point="20,45"
+													Size="8,10"
 													SweepDirection="Clockwise" />
+												<!--  우하단 연결  -->
 												<ArcSegment
-													Point="20,35"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="15,25"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="20,15"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="25,10"
-													Size="5,5"
+													Point="20,25"
+													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
 										</PathGeometry>
@@ -516,38 +494,26 @@
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="30,10">
-												<ArcSegment
-													Point="35,15"
-													Size="5,5"
-													SweepDirection="Clockwise" />
+											<PathFigure IsClosed="True" StartPoint="20,25">
+												<!--  좌측 작은 원  -->
 												<ArcSegment
 													Point="40,25"
-													Size="5,5"
+													Size="8,10"
 													SweepDirection="Clockwise" />
+												<!--  중앙 큰 원 (상단)  -->
 												<ArcSegment
-													Point="35,35"
-													Size="5,5"
+													Point="40,45"
+													Size="10,8"
 													SweepDirection="Clockwise" />
+												<!--  우측 중간 원  -->
 												<ArcSegment
-													Point="25,40"
-													Size="5,5"
+													Point="20,45"
+													Size="8,10"
 													SweepDirection="Clockwise" />
+												<!--  우하단 연결  -->
 												<ArcSegment
-													Point="20,35"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="15,25"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="20,15"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="25,10"
-													Size="5,5"
+													Point="20,25"
+													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
 										</PathGeometry>
@@ -559,42 +525,29 @@
 									Name="PART_Frame_Unknown_Subsurface"
 									Fill="#F1C40F"
 									Stroke="Black"
-									StrokeThickness="2"
+									StrokeThickness="1"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="30,10">
+											<PathFigure IsClosed="True" StartPoint="20,15">
+
+												<LineSegment Point="40,15" />
+												<!--  좌측 작은 원  -->
+
+												<!--  중앙 큰 원 (상단)  -->
 												<ArcSegment
-													Point="35,15"
-													Size="5,5"
+													Point="40,35"
+													Size="10,8"
 													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="40,25"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="35,35"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="25,40"
-													Size="5,5"
-													SweepDirection="Clockwise" />
+												<!--  우측 중간 원  -->
 												<ArcSegment
 													Point="20,35"
-													Size="5,5"
+													Size="8,10"
 													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="15,25"
-													Size="5,5"
-													SweepDirection="Clockwise" />
+												<!--  우하단 연결  -->
 												<ArcSegment
 													Point="20,15"
-													Size="5,5"
-													SweepDirection="Clockwise" />
-												<ArcSegment
-													Point="25,10"
-													Size="5,5"
+													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
 										</PathGeometry>
@@ -602,8 +555,8 @@
 								</Path>
 
 
-
 								<!--  === Icon Layer (Foreground) ===  -->
+								<!--  === NATO Standard Military Unit Type Icons (이미지 기준) ===  -->
 								<Grid
 									Name="PART_IconLayer"
 									Width="30"
@@ -611,228 +564,342 @@
 									HorizontalAlignment="Center"
 									VerticalAlignment="Center">
 
-									<!--  Infantry Icon  -->
+									<!--  Air Defence Icon - 방공 (반원형 돔)  -->
 									<Path
-										Name="PART_InfantryIcon"
+										Name="PART_AirDefenceIcon"
 										Fill="Black"
 										Stroke="White"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
-											<!--  사람 모양 아이콘  -->
 											<PathGeometry>
-												<!--  머리 (원을 ArcSegment로 근사)  -->
-												<PathFigure IsClosed="True" StartPoint="18,8">
+												<PathFigure StartPoint="8,20">
+													<LineSegment Point="22,20" />
 													<ArcSegment
-														IsLargeArc="True"
-														Point="12,8"
-														Size="3,3"
-														SweepDirection="Clockwise" />
-													<ArcSegment
-														IsLargeArc="True"
-														Point="18,8"
-														Size="3,3"
-														SweepDirection="Clockwise" />
-												</PathFigure>
-												<!--  몸체  -->
-												<PathFigure IsClosed="True" StartPoint="12,12">
-													<LineSegment Point="18,12" />
-													<LineSegment Point="18,20" />
-													<LineSegment Point="16,20" />
-													<LineSegment Point="16,25" />
-													<LineSegment Point="14,25" />
-													<LineSegment Point="14,20" />
-													<LineSegment Point="12,20" />
+														IsLargeArc="False"
+														Point="8,20"
+														Size="7,7"
+														SweepDirection="CounterClockwise" />
 												</PathFigure>
 											</PathGeometry>
 										</Path.Data>
 									</Path>
 
-									<!--  Armor Icon  -->
+									<!--  Ammunition Icon - 탄약 (포탄 모양)  -->
 									<Path
-										Name="PART_ArmorIcon"
+										Name="PART_AmmunitionIcon"
+										Fill="Transparent"
+										Stroke="Black"
+										StrokeThickness="0.8"
+										Visibility="Collapsed">
+										<Path.Data>
+											<PathGeometry>
+												<PathFigure IsClosed="True" StartPoint="13,8">
+													<!--  둥근 탄두  -->
+													<ArcSegment
+														Point="17,8"
+														Size="2,4"
+														SweepDirection="Clockwise" />
+													<!--  직선 몸체  -->
+													<LineSegment Point="17,20" />
+													<LineSegment Point="19,20" />
+													<LineSegment Point="11,20" />
+													<LineSegment Point="13,20" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Anti-Tank Icon - 대전차 (삼각형)  -->
+									<Path
+										Name="PART_AntiTankIcon"
 										Fill="Black"
 										Stroke="White"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
-											<!--  탱크 모양  -->
-											<RectangleGeometry Rect="8,12,14,8" />
+											<PathGeometry>
+												<PathFigure IsClosed="True" StartPoint="15,8">
+													<LineSegment Point="10,20" />
+													<LineSegment Point="20,20" />
+												</PathFigure>
+											</PathGeometry>
 										</Path.Data>
 									</Path>
 
-									<!--  Artillery Icon  -->
+									<!--  Armour Icon - 기갑 (타원형)  -->
+									<Path
+										Name="PART_ArmourIcon"
+										Fill="Transparent"
+										Stroke="Black"
+										StrokeThickness="0.8"
+										Visibility="Collapsed">
+										<Path.Data>
+											<EllipseGeometry
+												Center="15,12"
+												RadiusX="9"
+												RadiusY="5" />
+										</Path.Data>
+									</Path>
+
+									<!--  Artillery Icon - 포병 (채워진 원)  -->
 									<Ellipse
 										Name="PART_ArtilleryIcon"
-										Width="8"
-										Height="8"
+										Width="10"
+										Height="10"
+										Fill="Black"
+										StrokeThickness="0.8"
+										Visibility="Collapsed" />
+
+									<!--  Rotary Wing Aviation Icon - 회전익항공 (나비넥타이 모양)  -->
+									<Path
+										Name="PART_RotaryWingAviationIcon"
+										Fill="Black"
+										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<PathGeometry>
+												<!--  나비넥타이 모양 (두 개의 삼각형이 중앙에서 만남)  -->
+												<PathFigure IsClosed="True" StartPoint="8,12">
+													<LineSegment Point="15,15" />
+													<LineSegment Point="8,18" />
+												</PathFigure>
+												<PathFigure IsClosed="True" StartPoint="22,12">
+													<LineSegment Point="15,15" />
+													<LineSegment Point="22,18" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Fixed Wing Aviation Icon - 고정익항공 (무한대 기호)  -->
+									<Path
+										Name="PART_FixedWingAviationIcon"
 										Fill="Black"
 										Stroke="White"
 										StrokeThickness="0.5"
+										Visibility="Collapsed">
+										<Path.Data>
+											<PathGeometry>
+												<!--  무한대 기호 (∞)  -->
+												<PathFigure IsClosed="True" StartPoint="15,15">
+													<!--  왼쪽 루프  -->
+													<ArcSegment
+														Point="12,12"
+														Size="3,3"
+														SweepDirection="CounterClockwise" />
+													<ArcSegment
+														Point="9,15"
+														Size="3,3"
+														SweepDirection="CounterClockwise" />
+													<ArcSegment
+														Point="12,18"
+														Size="3,3"
+														SweepDirection="CounterClockwise" />
+													<ArcSegment
+														Point="15,15"
+														Size="3,3"
+														SweepDirection="CounterClockwise" />
+													<!--  오른쪽 루프  -->
+													<ArcSegment
+														Point="18,12"
+														Size="3,3"
+														SweepDirection="Clockwise" />
+													<ArcSegment
+														Point="21,15"
+														Size="3,3"
+														SweepDirection="Clockwise" />
+													<ArcSegment
+														Point="18,18"
+														Size="3,3"
+														SweepDirection="Clockwise" />
+													<ArcSegment
+														Point="15,15"
+														Size="3,3"
+														SweepDirection="Clockwise" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+									<!--  Bridging Icon - 교량 (아치형 다리)  -->
+									<Path
+										Name="PART_BridgingIcon"
+										Stroke="Black"
+										StrokeThickness="1"
+										Visibility="Collapsed">
+										<Path.Data>
+											<PathGeometry>
+												<!--  상단 V자 (위로 열린 형태)  -->
+												<PathFigure StartPoint="5,10">
+													<LineSegment Point="10,15" />
+													<LineSegment Point="20,15" />
+													<LineSegment Point="25,10" />
+												</PathFigure>
+												<!--  하단 V자 (아래로 열린 형태)  -->
+												<PathFigure StartPoint="5,25">
+													<LineSegment Point="10,20" />
+													<LineSegment Point="20,20" />
+													<LineSegment Point="25,25" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Combat Service Support Icon - 전투근무지원 (CSS 텍스트)  -->
+									<TextBlock
+										Name="PART_CombatServiceSupportIcon"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="8"
+										FontWeight="Bold"
+										Foreground="Black"
+										Text="CSS"
 										Visibility="Collapsed" />
 
-									<!--  Engineer Icon  -->
+									<!--  Combined Manoeuvre Arms Icon - 연합기동부대 (타원 + X자)  -->
+									<Path
+										Name="PART_CombinedManoeuvreArmsIcon"
+										Fill="Transparent"
+										Stroke="Black"
+										StrokeThickness="0.8"
+										Visibility="Collapsed">
+										<Path.Data>
+											<PathGeometry>
+												<!--  타원형 외곽  -->
+												<PathFigure IsClosed="True" StartPoint="8,15">
+													<ArcSegment
+														Point="22,15"
+														Size="7,4"
+														SweepDirection="Clockwise" />
+													<ArcSegment
+														Point="8,15"
+														Size="7,4"
+														SweepDirection="Clockwise" />
+												</PathFigure>
+												<!--  X자 - 첫 번째 대각선  -->
+												<PathFigure StartPoint="10,12">
+													<LineSegment Point="20,18" />
+												</PathFigure>
+												<!--  X자 - 두 번째 대각선  -->
+												<PathFigure StartPoint="20,12">
+													<LineSegment Point="10,18" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+									<!--  Engineer Icon - 공병 (ㅁ자/П 모양)  -->
 									<Path
 										Name="PART_EngineerIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
+										Fill="Transparent"
+										Stroke="Black"
+										StrokeThickness="1"
 										Visibility="Collapsed">
 										<Path.Data>
-											<!--  삽 모양  -->
 											<PathGeometry>
-												<PathFigure StartPoint="10,8">
-													<LineSegment Point="20,8" />
-													<LineSegment Point="20,12" />
-													<LineSegment Point="10,12" />
+												<!--  ㅁ자 모양 (상단 가로 + 좌우 세로)  -->
+												<!--  상단 가로선  -->
+												<PathFigure StartPoint="8,10">
+													<LineSegment Point="22,10" />
 												</PathFigure>
-											</PathGeometry>
-										</Path.Data>
-									</Path>
-
-									<!--  Signal Icon  -->
-									<Path
-										Name="PART_SignalIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
-										Visibility="Collapsed">
-										<Path.Data>
-											<!--  번개 모양  -->
-											<PathGeometry>
-												<PathFigure StartPoint="12,6">
-													<LineSegment Point="18,6" />
-													<LineSegment Point="14,15" />
-													<LineSegment Point="18,15" />
-													<LineSegment Point="12,24" />
-													<LineSegment Point="16,15" />
-													<LineSegment Point="12,15" />
+												<!--  좌측 세로선  -->
+												<PathFigure StartPoint="8,10">
+													<LineSegment Point="8,20" />
 												</PathFigure>
-											</PathGeometry>
-										</Path.Data>
-									</Path>
 
-									<!--  Intelligence Icon  -->
-									<Path
-										Name="PART_IntelligenceIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
-										Visibility="Collapsed">
-										<Path.Data>
-											<!--  눈 모양  -->
-											<EllipseGeometry
-												Center="15,15"
-												RadiusX="8"
-												RadiusY="4" />
-										</Path.Data>
-									</Path>
-
-									<!--  Logistics Icon  -->
-									<Rectangle
-										Name="PART_LogisticsIcon"
-										Width="12"
-										Height="8"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
-										Visibility="Collapsed" />
-
-									<!--  Medical Icon  -->
-									<Path
-										Name="PART_MedicalIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
-										Visibility="Collapsed">
-										<Path.Data>
-											<!--  십자가 모양  -->
-											<PathGeometry>
-												<PathFigure StartPoint="13,8">
-													<LineSegment Point="17,8" />
-													<LineSegment Point="17,12" />
-													<LineSegment Point="20,12" />
-													<LineSegment Point="20,16" />
-													<LineSegment Point="17,16" />
-													<LineSegment Point="17,20" />
-													<LineSegment Point="13,20" />
-													<LineSegment Point="13,16" />
-													<LineSegment Point="10,16" />
-													<LineSegment Point="10,12" />
-													<LineSegment Point="13,12" />
-												</PathFigure>
-											</PathGeometry>
-										</Path.Data>
-									</Path>
-
-									<!--  Fighter Icon  -->
-									<Path
-										Name="PART_FighterIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
-										Visibility="Collapsed">
-										<Path.Data>
-											<!--  전투기 모양  -->
-											<PathGeometry>
-												<PathFigure StartPoint="15,6">
-													<LineSegment Point="12,15" />
-													<LineSegment Point="18,15" />
-												</PathFigure>
-											</PathGeometry>
-										</Path.Data>
-									</Path>
-
-									<!--  Helicopter Icon  -->
-									<Path
-										Name="PART_HelicopterIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
-										Visibility="Collapsed">
-										<Path.Data>
-											<!--  헬기 날개  -->
-											<PathGeometry>
-												<PathFigure StartPoint="5,15">
-													<LineSegment Point="25,15" />
-												</PathFigure>
+												<!--  좌측 세로선  -->
 												<PathFigure StartPoint="15,10">
 													<LineSegment Point="15,20" />
 												</PathFigure>
+												<!--  우측 세로선  -->
+												<PathFigure StartPoint="22,10">
+													<LineSegment Point="22,20" />
+												</PathFigure>
 											</PathGeometry>
 										</Path.Data>
 									</Path>
 
-									<!--  Command Icon  -->
+									<!--  Electronic Ranging Icon - 전자측거 (곡선 호)  -->
 									<Path
-										Name="PART_CommandIcon"
+										Name="PART_ElectronicRangingIcon"
 										Fill="Black"
 										Stroke="White"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
-											<!--  별 모양  -->
 											<PathGeometry>
-												<PathFigure StartPoint="15,6">
-													<LineSegment Point="16,12" />
-													<LineSegment Point="22,12" />
-													<LineSegment Point="17,16" />
-													<LineSegment Point="19,22" />
-													<LineSegment Point="15,18" />
-													<LineSegment Point="11,22" />
-													<LineSegment Point="13,16" />
-													<LineSegment Point="8,12" />
-													<LineSegment Point="14,12" />
+												<!--  측정 호선  -->
+												<PathFigure StartPoint="10,18">
+													<ArcSegment
+														IsLargeArc="False"
+														Point="20,18"
+														Size="8,8"
+														SweepDirection="CounterClockwise" />
+												</PathFigure>
+												<!--  중심점  -->
+												<PathFigure StartPoint="15,12">
+													<LineSegment Point="15,14" />
 												</PathFigure>
 											</PathGeometry>
 										</Path.Data>
 									</Path>
+
+									<!--  Electronic Warfare Icon - 전자전 (EW 텍스트)  -->
+									<TextBlock
+										Name="PART_ElectronicWarfareIcon"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="8"
+										FontWeight="Bold"
+										Foreground="Black"
+										Text="EW"
+										Visibility="Collapsed" />
+
+									<!--  Explosive Ordnance Disposal Icon - 폭발물처리 (EOD 텍스트)  -->
+									<TextBlock
+										Name="PART_ExplosiveOrdnanceDisposalIcon"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="7"
+										FontWeight="Bold"
+										Foreground="Black"
+										Text="EOD"
+										Visibility="Collapsed" />
+
+									<!--  Fuel POL Icon - 연료보급 (Y 모양 파이프)  -->
+									<Path
+										Name="PART_FuelPOLIcon"
+										Fill="Transparent"
+										Stroke="Black"
+										StrokeThickness="1"
+										Visibility="Collapsed">
+										<Path.Data>
+											<PathGeometry>
+												<!--  Y자 파이프  -->
+												<PathFigure StartPoint="15,22">
+													<LineSegment Point="15,15" />
+												</PathFigure>
+												<PathFigure StartPoint="15,15">
+													<LineSegment Point="10,8" />
+												</PathFigure>
+												<PathFigure StartPoint="15,15">
+													<LineSegment Point="20,8" />
+												</PathFigure>
+												<PathFigure StartPoint="10,8">
+													<LineSegment Point="20,8" />
+												</PathFigure>
+											</PathGeometry>
+										</Path.Data>
+									</Path>
+
+
+
 								</Grid>
 
 								<!--  부대 규모 표시 (상단)  -->
 								<TextBlock
 									Name="PART_UnitSizeIndicator"
-									Margin="0,-10,0,0"
+									Margin="0,-5,0,0"
 									HorizontalAlignment="Center"
 									VerticalAlignment="Top"
 									FontSize="12"
@@ -843,10 +910,10 @@
 								<!--  부대 지시자 (하단)  -->
 								<TextBlock
 									Name="PART_UnitDesignator"
-									Margin="0,0,0,-8"
+									Margin="0,0,0,-5"
 									HorizontalAlignment="Center"
 									VerticalAlignment="Bottom"
-									FontSize="8"
+									FontSize="10"
 									FontWeight="SemiBold"
 									Foreground="Black"
 									Text="{TemplateBinding UnitDesignator}" />
@@ -854,20 +921,22 @@
 								<!--  상급 부대명 (좌측)  -->
 								<TextBlock
 									Name="PART_HigherFormation"
-									Margin="-15,0,0,0"
+									Margin="-10,0,0,0"
 									HorizontalAlignment="Left"
 									VerticalAlignment="Center"
-									FontSize="6"
+									FontSize="8"
+									FontWeight="Bold"
 									Foreground="Black"
 									Text="{TemplateBinding HigherFormation}" />
 
 								<!--  콜사인 (우측)  -->
 								<TextBlock
 									Name="PART_CallSign"
-									Margin="0,0,-15,0"
+									Margin="0,0,-10,0"
 									HorizontalAlignment="Right"
 									VerticalAlignment="Center"
-									FontSize="6"
+									FontSize="8"
+									FontWeight="Bold"
 									Foreground="Black"
 									Text="{TemplateBinding CallSign}" />
 							</Grid>
@@ -1044,39 +1113,57 @@
 						<!--  === UnitType Icon 표시 (기존 유지) ===  -->
 						<!--  ===============================================  -->
 
-						<Trigger Property="UnitType" Value="Infantry">
-							<Setter TargetName="PART_InfantryIcon" Property="Visibility" Value="Visible" />
+						<!--  14개 NATO 표준 UnitType에 대한 Icon 표시 Triggers (XAML 아이콘명 맞춤)  -->
+
+						<Trigger Property="UnitType" Value="Ammunition">
+							<Setter TargetName="PART_AmmunitionIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<Trigger Property="UnitType" Value="Armor">
-							<Setter TargetName="PART_ArmorIcon" Property="Visibility" Value="Visible" />
+
+						<Trigger Property="UnitType" Value="Armour">
+							<Setter TargetName="PART_ArmourIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
+
 						<Trigger Property="UnitType" Value="Artillery">
 							<Setter TargetName="PART_ArtilleryIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
+
+						<Trigger Property="UnitType" Value="RotaryWingAviation">
+							<Setter TargetName="PART_RotaryWingAviationIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="UnitType" Value="FixedWingAviation">
+							<Setter TargetName="PART_FixedWingAviationIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="UnitType" Value="Bridging">
+							<Setter TargetName="PART_BridgingIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="UnitType" Value="CombatServiceSupport">
+							<Setter TargetName="PART_CombatServiceSupportIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<Trigger Property="UnitType" Value="CombinedManoeuvreArms">
+							<Setter TargetName="PART_CombinedManoeuvreArmsIcon" Property="Visibility" Value="Visible" />
+						</Trigger>
+
 						<Trigger Property="UnitType" Value="Engineer">
 							<Setter TargetName="PART_EngineerIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<Trigger Property="UnitType" Value="Signal">
-							<Setter TargetName="PART_SignalIcon" Property="Visibility" Value="Visible" />
+
+						<Trigger Property="UnitType" Value="ElectronicWarfare">
+							<Setter TargetName="PART_ElectronicWarfareIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<Trigger Property="UnitType" Value="Intelligence">
-							<Setter TargetName="PART_IntelligenceIcon" Property="Visibility" Value="Visible" />
+
+						<Trigger Property="UnitType" Value="ExplosiveOrdnanceDisposal">
+							<Setter TargetName="PART_ExplosiveOrdnanceDisposalIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<Trigger Property="UnitType" Value="Logistics">
-							<Setter TargetName="PART_LogisticsIcon" Property="Visibility" Value="Visible" />
+
+						<Trigger Property="UnitType" Value="FuelPOL">
+							<Setter TargetName="PART_FuelPOLIcon" Property="Visibility" Value="Visible" />
 						</Trigger>
-						<Trigger Property="UnitType" Value="Medical">
-							<Setter TargetName="PART_MedicalIcon" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="UnitType" Value="Fighter">
-							<Setter TargetName="PART_FighterIcon" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="UnitType" Value="Helicopter">
-							<Setter TargetName="PART_HelicopterIcon" Property="Visibility" Value="Visible" />
-						</Trigger>
-						<Trigger Property="UnitType" Value="Command">
-							<Setter TargetName="PART_CommandIcon" Property="Visibility" Value="Visible" />
-						</Trigger>
+
+
 
 						<!--  ===============================================  -->
 						<!--  === 표시 옵션 (기존 유지) ===  -->

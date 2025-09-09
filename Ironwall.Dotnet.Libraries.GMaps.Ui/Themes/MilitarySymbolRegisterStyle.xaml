@@ -312,12 +312,14 @@
 										<ScrollViewer
 											Grid.Row="1"
 											Margin="5"
+											Focusable="True"
 											HorizontalScrollBarVisibility="Disabled"
 											VerticalScrollBarVisibility="Auto">
 											<ListBox
 												Name="PART_UnitTypeList"
 												Background="Transparent"
 												BorderThickness="0"
+												Focusable="True"
 												Foreground="White"
 												ItemsSource="{TemplateBinding AvailableUnitTypes}"
 												SelectedItem="{Binding UnitType, RelativeSource={RelativeSource TemplatedParent}}">
@@ -354,7 +356,7 @@
 										UnitDesignator="{Binding UnitDesignator, RelativeSource={RelativeSource TemplatedParent}}"
 										UnitSize="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}}"
 										UnitType="{Binding UnitType, RelativeSource={RelativeSource TemplatedParent}}" />
-									
+
 								</Border>
 
 								<!--  우측: 스크롤 가능한 속성 입력  -->

@@ -33,6 +33,7 @@ public class MarkerFactory : IMarkerFactory
             {
                 IGeometricSymbolModel geometricSymbol => CreateGeometricMarker(geometricSymbol),
                 IPidsSymbolModel pidsSymbol => CreatePidsMarker(pidsSymbol),
+                IMilitarySymbolModel militarySymbol => CreateMilitaryMarker(militarySymbol),
                 _ => CreateCustomMarker(symbolModel)
             };
         }
@@ -44,9 +45,15 @@ public class MarkerFactory : IMarkerFactory
         }
     }
 
+    private GMapMilitarySymbolMarker CreateMilitaryMarker(IMilitarySymbolModel symbol)
+    {
+        _log?.Info($"GMapMilitarySymbolMarker 생성: {symbol.Title}, UnitType: {symbol.UnitType}");
+        return new GMapMilitarySymbolMarker(_log!, symbol);
+    }
+
     private GMapPidsMarker CreatePidsMarker(IPidsSymbolModel symbol)
     {
-        _log?.Info($"GMapGeometricMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}");
+        _log?.Info($"GMapPidsMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}");
         return new GMapPidsMarker(_log!, symbol);
     }
 

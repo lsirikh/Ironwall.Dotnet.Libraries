@@ -264,24 +264,23 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
 
         private void InitializeAvailableValues()
         {
-            // 사용 가능한 부대 종류 (주요 항목들)
+            // 사용 가능한 부대 종류 (15개 NATO 표준 항목들)
             AvailableUnitTypes = new[]
             {
-                EnumMilitaryUnitType.Infantry,
-                EnumMilitaryUnitType.Armor,
-                EnumMilitaryUnitType.Artillery,
-                EnumMilitaryUnitType.Engineer,
-                EnumMilitaryUnitType.Signal,
-                EnumMilitaryUnitType.Intelligence,
-                EnumMilitaryUnitType.Logistics,
-                EnumMilitaryUnitType.Medical,
-                EnumMilitaryUnitType.MilitaryPolice,
-                EnumMilitaryUnitType.Fighter,
-                EnumMilitaryUnitType.Helicopter,
-                EnumMilitaryUnitType.Surface,
-                EnumMilitaryUnitType.Submarine,
-                EnumMilitaryUnitType.Command,
-                EnumMilitaryUnitType.Headquarters
+                EnumMilitaryUnitType.Ammunition,                // 탄약
+                EnumMilitaryUnitType.Armour,                   // 기갑
+                EnumMilitaryUnitType.Artillery,                // 포병
+                EnumMilitaryUnitType.RotaryWingAviation,       // 회전익항공
+                EnumMilitaryUnitType.FixedWingAviation,        // 고정익항공
+                EnumMilitaryUnitType.Bridging,                 // 교량
+                EnumMilitaryUnitType.CombatServiceSupport,     // 전투근무지원
+                EnumMilitaryUnitType.CombinedManoeuvreArms,    // 연합기동부대
+                EnumMilitaryUnitType.Engineer,                 // 공병
+                EnumMilitaryUnitType.ElectronicWarfare,        // 전자전
+                EnumMilitaryUnitType.ExplosiveOrdnanceDisposal,// 폭발물처리
+                EnumMilitaryUnitType.FuelPOL,                  // 연료보급
+                //EnumMilitaryUnitType.Maintenance,              // 정비
+                //EnumMilitaryUnitType.Meteorological            // 기상
             };
 
             // 사용 가능한 부대 규모
