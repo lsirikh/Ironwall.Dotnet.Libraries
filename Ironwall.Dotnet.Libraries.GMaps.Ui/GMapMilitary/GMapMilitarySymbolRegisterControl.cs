@@ -502,6 +502,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
             {
                 // UnitSize 변경 시 미리보기 업데이트 등 추가 로직
                 System.Diagnostics.Debug.WriteLine($"UnitSize 변경: {e.OldValue} → {e.NewValue}");
+                // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
+                if (control.Template != null)
+                {
+                    var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
+                    if (preview != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        preview.UnitSize = (EnumMilitaryUnitSize)e.NewValue;
+                    }
+                }
             }
         }
 
