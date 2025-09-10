@@ -222,23 +222,42 @@ public class MarkerEditAdorner : Adorner, IDisposable
     }
 
     /// <summary>
+    /// 일관된 Adorner 사이즈를 계산한다.
+    /// </summary>
+    /// <param name="markerCenter"></param>
+    /// <returns></returns>
+    private Rect CalculateEditBounds(Point markerCenter)
+    {
+        // 일관된 크기 참조 - AdornedElement의 실제 크기 사용
+        var elementSize = AdornedElement.RenderSize;
+
+        return new Rect(
+            markerCenter.X - elementSize.Width / 2 - PADDING,
+            markerCenter.Y - elementSize.Height / 2 - PADDING,
+            elementSize.Width + PADDING * 2,
+            elementSize.Height + PADDING * 2);
+    }
+
+    /// <summary>
     /// 편집 영역 배경 렌더링 (마커 크기에 맞춤)
     /// </summary>
     private void RenderEditArea(DrawingContext drawingContext, Point markerCenter, double editRadius)
     {
+        var editBounds = CalculateEditBounds(markerCenter);
+
         var editBrush = new SolidColorBrush(Colors.Blue) { Opacity = 0.1 };
 
-        // 실제 마커 크기를 반영한 사각형
-        var markerWidth = _targetMarker.Width;
-        var markerHeight = _targetMarker.Height;
+        //// 실제 마커 크기를 반영한 사각형
+        //var markerWidth = _targetMarker.Width;
+        //var markerHeight = _targetMarker.Height;
 
-        var editRect = new Rect(
-            markerCenter.X - markerWidth / 2 - PADDING,
-            markerCenter.Y - markerHeight / 2 - PADDING,
-            markerWidth + PADDING * 2,
-            markerHeight + PADDING * 2);
+        //var editRect = new Rect(
+        //    markerCenter.X - markerWidth / 2 - PADDING,
+        //    markerCenter.Y - markerHeight / 2 - PADDING,
+        //    markerWidth + PADDING * 2,
+        //    markerHeight + PADDING * 2);
 
-        drawingContext.DrawRectangle(editBrush, _editAreaPen, editRect);
+        drawingContext.DrawRectangle(editBrush, _editAreaPen, editBounds);
     }
 
     /// <summary>
@@ -991,17 +1010,20 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// </summary>
     private MarkerHandle DetectClickedHandle(Point mousePos, Point markerCenter)
     {
+
         var tolerance = MarkerEditSettings.HandleTolerance;
+
+        var markerBounds = CalculateEditBounds(markerCenter);
 
         // 실제 마커 크기를 기준으로 사각형 계산 (편집 영역과 동일)
         var markerWidth = _targetMarker.Width;
         var markerHeight = _targetMarker.Height;
        
-        var markerBounds = new Rect(
-            markerCenter.X - markerWidth / 2 - PADDING,
-            markerCenter.Y - markerHeight / 2 - PADDING,
-            markerWidth + PADDING * 2,
-            markerHeight + PADDING * 2);
+        //var markerBounds = new Rect(
+        //    markerCenter.X - markerWidth / 2 - PADDING,
+        //    markerCenter.Y - markerHeight / 2 - PADDING,
+        //    markerWidth + PADDING * 2,
+        //    markerHeight + PADDING * 2);
 
         //_log?.Info($"핸들 감지 - 마우스: ({mousePos.X:F1}, {mousePos.Y:F1}), 마커중심: ({markerCenter.X:F1}, {markerCenter.Y:F1})");
 

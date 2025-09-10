@@ -40,8 +40,8 @@
 
 							<Grid
 								Name="PART_SymbolContainer"
-								Width="60"
-								Height="60"
+								Width="50"
+								Height="50"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center">
 
@@ -55,11 +55,11 @@
 										Stroke="Transparent">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure StartPoint="10,50">
+												<PathFigure StartPoint="5,40">
 													<!--  상단 호만 테두리 (하단 직선은 테두리 없음)  -->
 													<ArcSegment
 														IsLargeArc="False"
-														Point="50,50"
+														Point="45,40"
 														Size="20,35"
 														SweepDirection="Clockwise" />
 												</PathFigure>
@@ -69,15 +69,15 @@
 									<Path
 										Name="PART_Frame_Friendly_Air_Stroke"
 										Fill="Transparent"
-										Stroke="Black"
-										StrokeThickness="2">
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure StartPoint="10,50">
+												<PathFigure StartPoint="5,40">
 													<!--  상단 호만 테두리 (하단 직선은 테두리 없음)  -->
 													<ArcSegment
 														IsLargeArc="False"
-														Point="50,50"
+														Point="45,40"
 														Size="20,35"
 														SweepDirection="Clockwise" />
 												</PathFigure>
@@ -92,8 +92,8 @@
 									Width="35"
 									Height="30"
 									Fill="#4A90E2"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed" />
 
 								<!--  Friendly + Sea: 원형 (파랑)  -->
@@ -102,8 +102,8 @@
 									Width="40"
 									Height="40"
 									Fill="#4A90E2"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed" />
 
 								<!--  Friendly + Subsurface: 둥근 하단 (파랑)  -->
@@ -114,11 +114,11 @@
 										Stroke="Transparent">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure IsClosed="True" StartPoint="10,10">
-													<LineSegment Point="50,10" />
+												<PathFigure IsClosed="True" StartPoint="5,5">
+													<LineSegment Point="45,5" />
 													<ArcSegment
 														IsLargeArc="False"
-														Point="10,10"
+														Point="5,5"
 														Size="20,35"
 														SweepDirection="Clockwise" />
 												</PathFigure>
@@ -128,14 +128,14 @@
 									<Path
 										Name="PART_Frame_Friendly_Subsurface_Stroke"
 										Fill="Transparent"
-										Stroke="Black"
-										StrokeThickness="2">
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure StartPoint="50,10">
+												<PathFigure StartPoint="45,5">
 													<ArcSegment
 														IsLargeArc="False"
-														Point="10,10"
+														Point="5,5"
 														Size="20,35"
 														SweepDirection="Clockwise" />
 												</PathFigure>
@@ -154,11 +154,11 @@
 										Stroke="Transparent">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure IsClosed="True" StartPoint="30,10">
-													<LineSegment Point="45,25" />
-													<LineSegment Point="45,40" />
-													<LineSegment Point="15,40" />
-													<LineSegment Point="15,25" />
+												<PathFigure IsClosed="True" StartPoint="25,5">
+													<LineSegment Point="40,20" />
+													<LineSegment Point="40,40" />
+													<LineSegment Point="10,40" />
+													<LineSegment Point="10,20" />
 												</PathFigure>
 											</PathGeometry>
 										</Path.Data>
@@ -167,41 +167,41 @@
 									<!--  상단 지붕선 (좌측)  -->
 									<Line
 										Name="PART_Frame_Hostile_Air_RoofLeft"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="30"
-										X2="15"
-										Y1="10"
-										Y2="25" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="25"
+										X2="10"
+										Y1="5"
+										Y2="20" />
 
 									<!--  상단 지붕선 (우측)  -->
 									<Line
 										Name="PART_Frame_Hostile_Air_RoofRight"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="30"
-										X2="45"
-										Y1="10"
-										Y2="25" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="25"
+										X2="40"
+										Y1="5"
+										Y2="20" />
 
 									<!--  좌측 세로선  -->
 									<Line
 										Name="PART_Frame_Hostile_Air_Left"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="15"
-										Y1="25"
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="10"
+										Y1="20"
 										Y2="40" />
 
 									<!--  우측 세로선  -->
 									<Line
 										Name="PART_Frame_Hostile_Air_Right"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="45"
-										X2="45"
-										Y1="25"
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="40"
+										X2="40"
+										Y1="20"
 										Y2="40" />
 
 									<!--  하단 가로선은 제거됨 (Line 요소 없음)  -->
@@ -211,15 +211,15 @@
 								<Path
 									Name="PART_Frame_Hostile_Ground"
 									Fill="#E74C3C"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="30,10">
-												<LineSegment Point="50,30" />
-												<LineSegment Point="30,50" />
-												<LineSegment Point="10,30" />
+											<PathFigure IsClosed="True" StartPoint="25,5">
+												<LineSegment Point="45,25" />
+												<LineSegment Point="25,45" />
+												<LineSegment Point="5,25" />
 											</PathFigure>
 										</PathGeometry>
 									</Path.Data>
@@ -229,15 +229,15 @@
 								<Path
 									Name="PART_Frame_Hostile_Sea"
 									Fill="#E74C3C"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="30,10">
-												<LineSegment Point="50,30" />
-												<LineSegment Point="30,50" />
-												<LineSegment Point="10,30" />
+											<PathFigure IsClosed="True" StartPoint="25,5">
+												<LineSegment Point="45,25" />
+												<LineSegment Point="25,45" />
+												<LineSegment Point="5,25" />
 											</PathFigure>
 										</PathGeometry>
 									</Path.Data>
@@ -253,11 +253,11 @@
 										Stroke="Transparent">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure IsClosed="True" StartPoint="15,15">
-													<LineSegment Point="15,35" />
-													<LineSegment Point="30,50" />
-													<LineSegment Point="45,35" />
-													<LineSegment Point="45,15" />
+												<PathFigure IsClosed="True" StartPoint="10,5">
+													<LineSegment Point="10,25" />
+													<LineSegment Point="25,40" />
+													<LineSegment Point="40,25" />
+													<LineSegment Point="40,5" />
 												</PathFigure>
 											</PathGeometry>
 										</Path.Data>
@@ -266,42 +266,42 @@
 									<!--  좌측 지붕선  -->
 									<Line
 										Name="PART_Frame_Hostile_Subsurface_RoofLeft"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="30"
-										Y1="35"
-										Y2="50" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="25"
+										Y1="25"
+										Y2="40" />
 
 									<!--  우측 지붕선  -->
 									<Line
 										Name="PART_Frame_Hostile_Subsurface_RoofRight"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="45"
-										X2="30"
-										Y1="35"
-										Y2="50" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="40"
+										X2="25"
+										Y1="25"
+										Y2="40" />
 
 									<!--  좌측 세로선  -->
 									<Line
 										Name="PART_Frame_Hostile_Subsurface_Left"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="15"
-										Y1="15"
-										Y2="35" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="10"
+										Y1="5"
+										Y2="25" />
 
 									<!--  우측 세로선  -->
 									<Line
 										Name="PART_Frame_Hostile_Subsurface_Right"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="45"
-										X2="45"
-										Y1="15"
-										Y2="35" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="40"
+										X2="40"
+										Y1="5"
+										Y2="25" />
 
 									<!--  상단 가로선은 제거됨 (Line 요소 없음)  -->
 								</Grid>
@@ -322,32 +322,32 @@
 									<!--  상단 테두리  -->
 									<Line
 										Name="PART_Frame_Neutral_Air_Top"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="45"
-										Y1="15"
-										Y2="15" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="40"
+										Y1="10"
+										Y2="10" />
 
 									<!--  좌측 테두리  -->
 									<Line
 										Name="PART_Frame_Neutral_Air_Left"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="15"
-										Y1="15"
-										Y2="45" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="10"
+										Y1="10"
+										Y2="40" />
 
 									<!--  우측 테두리  -->
 									<Line
 										Name="PART_Frame_Neutral_Air_Right"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="45"
-										X2="45"
-										Y1="15"
-										Y2="45" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="40"
+										X2="40"
+										Y1="10"
+										Y2="40" />
 
 									<!--  하단 테두리는 제거됨 (Line 요소 없음)  -->
 								</Grid>
@@ -355,21 +355,21 @@
 								<!--  Neutral + Ground: 정사각형 (초록)  -->
 								<Rectangle
 									Name="PART_Frame_Neutral_Ground"
-									Width="35"
-									Height="35"
+									Width="33"
+									Height="33"
 									Fill="#27AE60"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed" />
 
 								<!--  Neutral + Sea: 사각형 (초록)  -->
 								<Rectangle
 									Name="PART_Frame_Neutral_Sea"
-									Width="35"
-									Height="35"
+									Width="33"
+									Height="33"
 									Fill="#27AE60"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed" />
 
 								<!--  Neutral + Subsurface: 사각형 (상단 테두리 없음) - 초록  -->
@@ -377,8 +377,8 @@
 									<!--  배경 채우기  -->
 									<Rectangle
 										Name="PART_Frame_Neutral_Subsurface_Fill"
-										Width="30"
-										Height="30"
+										Width="31"
+										Height="31"
 										Fill="#27AE60"
 										Stroke="Transparent"
 										StrokeThickness="0" />
@@ -386,62 +386,63 @@
 									<!--  좌측 테두리  -->
 									<Line
 										Name="PART_Frame_Neutral_Subsurface_Left"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="15"
-										Y1="15"
-										Y2="45" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="10"
+										Y1="10"
+										Y2="40" />
 
 									<!--  우측 테두리  -->
 									<Line
 										Name="PART_Frame_Neutral_Subsurface_Right"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="45"
-										X2="45"
-										Y1="15"
-										Y2="45" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="40"
+										X2="40"
+										Y1="10"
+										Y2="40" />
 
 									<!--  하단 테두리  -->
 									<Line
 										Name="PART_Frame_Neutral_Subsurface_Bottom"
-										Stroke="Black"
-										StrokeThickness="2"
-										X1="15"
-										X2="45"
-										Y1="45"
-										Y2="45" />
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
+										X1="10"
+										X2="40"
+										Y1="40"
+										Y2="40" />
 
 									<!--  상단 테두리는 제거됨 (Line 요소 없음)  -->
 								</Grid>
 
 								<!--  === UNKNOWN 그룹 ===  -->
 
-								<!--  Unknown + Air: 구름 모양 (노랑)  -->
+								<!--  Unknown + Air: 크로바 모양 (노랑)  -->
 								<Path
 									Name="PART_Frame_Unknown_Air"
 									Fill="#F1C40F"
-									Stroke="Black"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="20,25">
+											<PathFigure IsClosed="True" StartPoint="15,20">
 												<!--  북 작은 원  -->
 												<ArcSegment
-													Point="40,25"
+													Point="35,20"
 													Size="8,10"
 													SweepDirection="Clockwise" />
 												<!--  동 큰 원 (상단)  -->
 												<ArcSegment
-													Point="40,45"
+													Point="35,40"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 												<!--  남 중간 원  -->
-												<LineSegment Point="20,45" />
+												<LineSegment Point="15,40" />
 												<!--  서 원 연결  -->
 												<ArcSegment
-													Point="20,25"
+													Point="15,20"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
@@ -454,30 +455,30 @@
 								<Path
 									Name="PART_Frame_Unknown_Ground"
 									Fill="#F1C40F"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="20,25">
+											<PathFigure IsClosed="True" StartPoint="15,15">
 												<!--  좌측 작은 원  -->
 												<ArcSegment
-													Point="40,25"
+													Point="35,15"
 													Size="8,10"
 													SweepDirection="Clockwise" />
 												<!--  중앙 큰 원 (상단)  -->
 												<ArcSegment
-													Point="40,45"
+													Point="35,35"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 												<!--  우측 중간 원  -->
 												<ArcSegment
-													Point="20,45"
+													Point="15,35"
 													Size="8,10"
 													SweepDirection="Clockwise" />
 												<!--  우하단 연결  -->
 												<ArcSegment
-													Point="20,25"
+													Point="15,15"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
@@ -489,30 +490,30 @@
 								<Path
 									Name="PART_Frame_Unknown_Sea"
 									Fill="#F1C40F"
-									Stroke="Black"
-									StrokeThickness="2"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="20,25">
+											<PathFigure IsClosed="True" StartPoint="15,15">
 												<!--  좌측 작은 원  -->
 												<ArcSegment
-													Point="40,25"
+													Point="35,15"
 													Size="8,10"
 													SweepDirection="Clockwise" />
 												<!--  중앙 큰 원 (상단)  -->
 												<ArcSegment
-													Point="40,45"
+													Point="35,35"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 												<!--  우측 중간 원  -->
 												<ArcSegment
-													Point="20,45"
+													Point="15,35"
 													Size="8,10"
 													SweepDirection="Clockwise" />
 												<!--  우하단 연결  -->
 												<ArcSegment
-													Point="20,25"
+													Point="15,15"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
@@ -524,29 +525,29 @@
 								<Path
 									Name="PART_Frame_Unknown_Subsurface"
 									Fill="#F1C40F"
-									Stroke="Black"
-									StrokeThickness="1"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}"
 									Visibility="Collapsed">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure IsClosed="True" StartPoint="20,15">
+											<PathFigure IsClosed="True" StartPoint="15,10">
 
-												<LineSegment Point="40,15" />
+												<LineSegment Point="35,10" />
 												<!--  좌측 작은 원  -->
 
 												<!--  중앙 큰 원 (상단)  -->
 												<ArcSegment
-													Point="40,35"
+													Point="35,30"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 												<!--  우측 중간 원  -->
 												<ArcSegment
-													Point="20,35"
+													Point="15,30"
 													Size="8,10"
 													SweepDirection="Clockwise" />
 												<!--  우하단 연결  -->
 												<ArcSegment
-													Point="20,15"
+													Point="15,10"
 													Size="10,8"
 													SweepDirection="Clockwise" />
 											</PathFigure>
@@ -567,9 +568,9 @@
 									<!--  Air Defence Icon - 방공 (반원형 돔)  -->
 									<Path
 										Name="PART_AirDefenceIcon"
-										Fill="Black"
-										Stroke="White"
-										StrokeThickness="0.5"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="0.8"
 										Visibility="Collapsed">
 										<Path.Data>
 											<PathGeometry>
@@ -588,8 +589,8 @@
 									<!--  Ammunition Icon - 탄약 (포탄 모양)  -->
 									<Path
 										Name="PART_AmmunitionIcon"
-										Fill="Transparent"
-										Stroke="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.8"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -613,8 +614,8 @@
 									<!--  Anti-Tank Icon - 대전차 (삼각형)  -->
 									<Path
 										Name="PART_AntiTankIcon"
-										Fill="Black"
-										Stroke="White"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -630,8 +631,8 @@
 									<!--  Armour Icon - 기갑 (타원형)  -->
 									<Path
 										Name="PART_ArmourIcon"
-										Fill="Transparent"
-										Stroke="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.8"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -647,14 +648,16 @@
 										Name="PART_ArtilleryIcon"
 										Width="10"
 										Height="10"
-										Fill="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.8"
 										Visibility="Collapsed" />
 
 									<!--  Rotary Wing Aviation Icon - 회전익항공 (나비넥타이 모양)  -->
 									<Path
 										Name="PART_RotaryWingAviationIcon"
-										Fill="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -675,8 +678,8 @@
 									<!--  Fixed Wing Aviation Icon - 고정익항공 (무한대 기호)  -->
 									<Path
 										Name="PART_FixedWingAviationIcon"
-										Fill="Black"
-										Stroke="White"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -724,7 +727,8 @@
 									<!--  Bridging Icon - 교량 (아치형 다리)  -->
 									<Path
 										Name="PART_BridgingIcon"
-										Stroke="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="1"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -752,15 +756,15 @@
 										VerticalAlignment="Center"
 										FontSize="8"
 										FontWeight="Bold"
-										Foreground="Black"
+										Foreground="{TemplateBinding MarkerStroke}"
 										Text="CSS"
 										Visibility="Collapsed" />
 
 									<!--  Combined Manoeuvre Arms Icon - 연합기동부대 (타원 + X자)  -->
 									<Path
 										Name="PART_CombinedManoeuvreArmsIcon"
-										Fill="Transparent"
-										Stroke="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.8"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -791,8 +795,8 @@
 									<!--  Engineer Icon - 공병 (ㅁ자/П 모양)  -->
 									<Path
 										Name="PART_EngineerIcon"
-										Fill="Transparent"
-										Stroke="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="1"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -822,8 +826,8 @@
 									<!--  Electronic Ranging Icon - 전자측거 (곡선 호)  -->
 									<Path
 										Name="PART_ElectronicRangingIcon"
-										Fill="Black"
-										Stroke="White"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="0.5"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -851,7 +855,7 @@
 										VerticalAlignment="Center"
 										FontSize="8"
 										FontWeight="Bold"
-										Foreground="Black"
+										Foreground="{TemplateBinding MarkerStroke}"
 										Text="EW"
 										Visibility="Collapsed" />
 
@@ -862,15 +866,15 @@
 										VerticalAlignment="Center"
 										FontSize="7"
 										FontWeight="Bold"
-										Foreground="Black"
+										Foreground="{TemplateBinding MarkerStroke}"
 										Text="EOD"
 										Visibility="Collapsed" />
 
 									<!--  Fuel POL Icon - 연료보급 (Y 모양 파이프)  -->
 									<Path
 										Name="PART_FuelPOLIcon"
-										Fill="Transparent"
-										Stroke="Black"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
 										StrokeThickness="1"
 										Visibility="Collapsed">
 										<Path.Data>
@@ -896,51 +900,57 @@
 
 								</Grid>
 
-								<!--  부대 규모 표시 (상단)  -->
-								<TextBlock
-									Name="PART_UnitSizeIndicator"
-									Margin="0,-5,0,0"
-									HorizontalAlignment="Center"
-									VerticalAlignment="Top"
-									FontSize="12"
-									FontWeight="Bold"
-									Foreground="Black"
-									Text="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitSizeToSymbolConverter}}" />
 
-								<!--  부대 지시자 (하단)  -->
-								<TextBlock
-									Name="PART_UnitDesignator"
-									Margin="0,0,0,-5"
-									HorizontalAlignment="Center"
-									VerticalAlignment="Bottom"
-									FontSize="10"
-									FontWeight="SemiBold"
-									Foreground="Black"
-									Text="{TemplateBinding UnitDesignator}" />
-
-								<!--  상급 부대명 (좌측)  -->
-								<TextBlock
-									Name="PART_HigherFormation"
-									Margin="-10,0,0,0"
-									HorizontalAlignment="Left"
-									VerticalAlignment="Center"
-									FontSize="8"
-									FontWeight="Bold"
-									Foreground="Black"
-									Text="{TemplateBinding HigherFormation}" />
-
-								<!--  콜사인 (우측)  -->
-								<TextBlock
-									Name="PART_CallSign"
-									Margin="0,0,-10,0"
-									HorizontalAlignment="Right"
-									VerticalAlignment="Center"
-									FontSize="8"
-									FontWeight="Bold"
-									Foreground="Black"
-									Text="{TemplateBinding CallSign}" />
 							</Grid>
 						</Viewbox>
+
+						<!--  텍스트 레이어 (고정 크기) - ViewBox 밖으로 이동  -->
+						<Grid Name="PART_TextLayer">
+
+							<!--  부대 규모 표시 (상단)  -->
+							<TextBlock
+								Name="PART_UnitSizeIndicator"
+								Margin="0,-15,0,0"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Top"
+								FontSize="15"
+								FontWeight="Bold"
+								Foreground="Black"
+								Text="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitSizeToSymbolConverter}}" />
+
+							<!--  부대 지시자 (하단)  -->
+							<TextBlock
+								Name="PART_UnitDesignator"
+								Margin="0,0,0,-15"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								FontSize="13"
+								FontWeight="SemiBold"
+								Foreground="Black"
+								Text="{TemplateBinding UnitDesignator}" />
+
+							<!--  상급 부대명 (좌측)  -->
+							<TextBlock
+								Name="PART_HigherFormation"
+								Margin="-35,0,0,0"
+								HorizontalAlignment="Left"
+								VerticalAlignment="Center"
+								FontSize="10"
+								FontWeight="Bold"
+								Foreground="Black"
+								Text="{TemplateBinding HigherFormation}" />
+
+							<!--  콜사인 (우측)  -->
+							<TextBlock
+								Name="PART_CallSign"
+								Margin="0,0,-35,0"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								FontSize="10"
+								FontWeight="Bold"
+								Foreground="Black"
+								Text="{TemplateBinding CallSign}" />
+						</Grid>
 
 						<!--  Label Container (아이콘 아래)  -->
 						<Border

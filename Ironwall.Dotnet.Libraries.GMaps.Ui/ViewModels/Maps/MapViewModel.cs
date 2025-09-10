@@ -1844,7 +1844,7 @@ public class MapViewModel : BasePanelViewModel
         }
 
         // GMap에 추가
-        MainMap.Markers.Add(gMapMarker);
+        MainMap?.Markers.Add(gMapMarker);
 
         //// CustomMarkers에도 추가 (중복 체크)
         //if (!MainMap.CustomMarkers.Contains(marker))
@@ -2118,7 +2118,7 @@ public class MapViewModel : BasePanelViewModel
 
             _log?.Info($"마커 '{marker.Title}' 격자 스냅 완료: ({snappedLat:F6}, {snappedLng:F6})");
 
-            MainMap.InvalidateVisual();
+            MainMap?.InvalidateVisual();
         }
         catch (Exception ex)
         {
@@ -2590,6 +2590,9 @@ public class MapViewModel : BasePanelViewModel
                 // GMapGeometricMarker 전용 로직
                 return await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsMarker.Model);
 
+            case GMapMilitarySymbolMarker militaryMarker:
+                return 0;
+
             default:
                 // 공통 로직
                 return 0;
@@ -2614,6 +2617,9 @@ public class MapViewModel : BasePanelViewModel
                 await _gMapDbSymbolService.UpdatePidsSymbolAsync(pidsMarker.Model);
                 break;
 
+            case GMapMilitarySymbolMarker militaryMarker:
+                break;
+
             default:
                 // 공통 로직
                 break;
@@ -2634,7 +2640,10 @@ public class MapViewModel : BasePanelViewModel
             case GMapPidsMarker pidsMarker:
                 // GMapGeometricMarker 전용 로직
                 return await _gMapDbSymbolService.DeletePidsSymbolAsync(pidsMarker.Model);
-       
+
+            case GMapMilitarySymbolMarker militaryMarker:
+                return true;
+
             default:
                 // 공통 로직
                 return false;
@@ -3041,9 +3050,6 @@ public class MapViewModel : BasePanelViewModel
 
     // 마커 편집 관련 명령어
     public RelayCommand? AddSelectedSymbolCommand { get; private set; }
-    //public RelayCommand? AddCustomMarkerCommand { get; private set; }
-    //public RelayCommand? AddGeometricMarkerCommand { get; private set; }
-    //public RelayCommand? AddPidsMarkerCommand { get; private set; }
     public RelayCommand? DuplicateMarkerCommand { get; private set; }
     public RelayCommand? SnapMarkerToGridCommand { get; private set; }
     public RelayCommand? ResetMarkerRotationCommand { get; private set; }

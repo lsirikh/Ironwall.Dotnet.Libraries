@@ -32,22 +32,6 @@ namespace Ironwall.Dotnet.Libraries.Enums
         [Description("공중")]
         Air = 3,
 
-        /// <summary>
-        /// 우주 - 별 모양
-        /// </summary>
-        [Description("우주")]
-        Space = 4,
-
-        /// <summary>
-        /// 전자전 - 육각형
-        /// </summary>
-        [Description("전자전")]
-        ElectronicWarfare = 5,
-
-        /// <summary>
-        /// 사이버 - 다이아몬드
-        /// </summary>
-        [Description("사이버")]
-        Cyber = 6
+     
     }
 }

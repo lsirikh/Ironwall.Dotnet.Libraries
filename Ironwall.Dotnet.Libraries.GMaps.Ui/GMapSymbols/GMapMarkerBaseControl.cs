@@ -93,7 +93,9 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     public static readonly DependencyProperty MarkerFillProperty =
         DependencyProperty.Register("MarkerFill", typeof(Brush), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(Brushes.Red));
+            new PropertyMetadata(Brushes.Red, OnMarkerFillChanged));
+
+    
 
     /// <summary>
     /// 마커 테두리 색상
@@ -106,7 +108,9 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     public static readonly DependencyProperty MarkerStrokeProperty =
         DependencyProperty.Register("MarkerStroke", typeof(Brush), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(Brushes.White));
+            new PropertyMetadata(Brushes.White, OnMarkerStrokeChanged));
+
+    
 
     /// <summary>
     /// 마커 테두리 두께
@@ -295,7 +299,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         MarkerFill = ColorHelper.ToBrush(Marker.FillColor);
         MarkerStroke = ColorHelper.ToBrush(Marker.StrokeColor);
         MarkerStrokeThickness = Marker.StrokeThickness;
-        EnableShapeAnimation = true;
+        EnableShapeAnimation = Marker.EnableShapeAnimation;
         _log?.Info($"[OnControlInitialized] 설정 후 ShowTitle: {ShowTitle}");
 
 
@@ -435,6 +439,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     protected virtual void OnMarkerSingleClicked(MouseButtonEventArgs e)
     {
         ToggleSelection();
+        if (EnableShapeAnimation)
+        {
+            TriggerClickAnimation();
+        }
         MarkerClick?.Invoke(this, new MarkerClickEventArgs(Marker, e));
     }
 
@@ -547,6 +555,71 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         }
     }
 
+    protected void TriggerClickAnimation()
+    {
+
+        if (!EnableShapeAnimation) return;
+
+        try
+        {
+            TransformGroup transformGroup;
+            ScaleTransform scaleTransform;
+            RotateTransform existingRotate = null;
+
+            // 기존 Transform 구조 분석
+            if (RenderTransform is TransformGroup existingGroup)
+            {
+                // 기존 TransformGroup 사용
+                transformGroup = existingGroup;
+                existingRotate = transformGroup.Children.OfType<RotateTransform>().FirstOrDefault();
+                scaleTransform = transformGroup.Children.OfType<ScaleTransform>().FirstOrDefault();
+            }
+            else if (RenderTransform is RotateTransform rotateOnly)
+            {
+                // 기존 RotateTransform만 있는 경우
+                existingRotate = rotateOnly;
+                transformGroup = new TransformGroup();
+                transformGroup.Children.Add(existingRotate); // 기존 회전 보존
+                scaleTransform = null;
+            }
+            else
+            {
+                // Transform이 없는 경우
+                transformGroup = new TransformGroup();
+                scaleTransform = null;
+            }
+
+            // ScaleTransform 추가/수정
+            if (scaleTransform == null)
+            {
+                scaleTransform = new ScaleTransform(1.0, 1.0);
+                transformGroup.Children.Add(scaleTransform);
+            }
+
+            // TransformGroup 적용 (기존 회전 유지됨)
+            RenderTransform = transformGroup;
+            RenderTransformOrigin = new Point(0.5, 0.5);
+
+            // 애니메이션 실행
+            var animation = new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = 1.0,
+                To = 1.2,
+                Duration = TimeSpan.FromMilliseconds(100),
+                AutoReverse = true
+            };
+
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
+
+            System.Diagnostics.Debug.WriteLine($"애니메이션 실행 - 기존 회전 보존: {existingRotate?.Angle ?? 0:F1}°");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"클릭 애니메이션 실행 실패: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// 부모 GMapCustomControl 찾기
     /// </summary>
@@ -580,6 +653,21 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             {
                 control._isUpdatingFromMarker = false;
             }
+        }
+    }
+
+    private static void OnMarkerFillChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is GMapMarkerBaseControl<T> control)
+        {
+
+        }
+    }
+    private static void OnMarkerStrokeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is GMapMarkerBaseControl<T> control)
+        {
+
         }
     }
 

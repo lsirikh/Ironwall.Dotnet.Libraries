@@ -27,9 +27,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils{
                     "sea" => battleDimension == EnumMilitaryBattleDimension.Sea ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     "subsurface" => battleDimension == EnumMilitaryBattleDimension.Subsurface ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     "air" => battleDimension == EnumMilitaryBattleDimension.Air ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
-                    "space" => battleDimension == EnumMilitaryBattleDimension.Space ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
-                    "electronicwarfare" or "ew" => battleDimension == EnumMilitaryBattleDimension.ElectronicWarfare ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
-                    "cyber" => battleDimension == EnumMilitaryBattleDimension.Cyber ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     _ => System.Windows.Visibility.Collapsed
                 };
             }

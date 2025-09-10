@@ -90,5 +90,8 @@ public enum EnumColorType
     Beige,
 
     [Description("올리브색")]
-    Olive
+    Olive,
+
+    [Description("투명")]
+    Transparent,
 }

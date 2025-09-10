@@ -131,6 +131,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
             Shape = markerControl;
             //기본적으로 시현하는 것을 기본으로 한다.
             IsVisible = true;
+            EnableShapeAnimation = false;
             _log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
         }
         catch (Exception ex)
@@ -547,6 +548,18 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     }
 
 
+
+    public bool EnableShapeAnimation
+    {
+        get => _enableShapeAnimation;
+        set 
+        {
+            _enableShapeAnimation = value;
+            OnPropertyChanged(nameof(EnableShapeAnimation));
+        }
+    }
+
+
     /// <summary>
     /// 강타입 모델 속성
     /// </summary>
@@ -567,6 +580,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
 
     protected CancellationTokenSource? _eventToken;
     protected bool _isSelected;
+    private bool _enableShapeAnimation;
     private bool _isVisible;
     #endregion
 }

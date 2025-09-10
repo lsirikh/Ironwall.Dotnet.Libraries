@@ -34,8 +34,8 @@
 								<Path
 									Name="PART_PinShape"
 									Data="M16,0 C24.8,0 32,7.2 32,16 C32,24 22,32 16,46 C10,32 0,24 0,16 C0,7.2 7.2,0 16,0 Z"
-									Fill="{TemplateBinding MarkerFill}"
 									Stretch="Fill"
+									Fill="{TemplateBinding MarkerFill}"
 									Stroke="{TemplateBinding MarkerStroke}"
 									StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
 									<Path.Effect>

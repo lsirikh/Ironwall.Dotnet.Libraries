@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -48,6 +49,9 @@ public class MarkerFactory : IMarkerFactory
     private GMapMilitarySymbolMarker CreateMilitaryMarker(IMilitarySymbolModel symbol)
     {
         _log?.Info($"GMapMilitarySymbolMarker 생성: {symbol.Title}, UnitType: {symbol.UnitType}");
+        symbol.StrokeColor = EnumColorType.Black;
+        symbol.FillColor = EnumColorType.Transparent;
+        symbol.ShowTitle = false;
         return new GMapMilitarySymbolMarker(_log!, symbol);
     }
 

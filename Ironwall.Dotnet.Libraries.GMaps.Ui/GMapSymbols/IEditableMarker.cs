@@ -32,5 +32,5 @@ public interface IEditableMarker : IDisposable
     void UpdateSize(double width, double height);
     void UpdateRotation(double bearing);
     bool IsDisposed { get; }
-
+    bool EnableShapeAnimation { get; set; }
 }

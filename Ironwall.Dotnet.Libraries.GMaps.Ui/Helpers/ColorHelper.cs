@@ -49,7 +49,8 @@ public static class ColorHelper
             EnumColorType.Magenta => "#FF00FF",        // Magenta
             EnumColorType.Cyan => "#00FFFF",           // Cyan
             EnumColorType.Beige => "#F5F5DC",          // Beige
-            EnumColorType.Olive => "#808000",          // Olive
+            EnumColorType.Olive => "#808000",            // Olive
+            EnumColorType.Transparent => "#00000000",    // Transparent
             _ => "#2196F3"                             // Default Blue
         };
     }
@@ -134,7 +135,8 @@ public static class ColorHelper
                 EnumColorType.DarkRed,    // 진한 경고
                 EnumColorType.DarkGreen,  // 진한 성공
                 EnumColorType.Gold,       // 프리미엄
-                EnumColorType.Silver      // 일반
+                EnumColorType.Silver,     // 일반
+                EnumColorType.Transparent // 투명
             };
     }
 }

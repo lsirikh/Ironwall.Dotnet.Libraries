@@ -22,6 +22,8 @@ public class GMapMilitarySymbolMarker : GMapBaseMarker<IMilitarySymbolModel>, IM
     public GMapMilitarySymbolMarker(ILogService log, IMilitarySymbolModel militaryModel)
         : base(log, militaryModel)
     {
+        Width = 60;
+        Height = 60;
     }
     #endregion
 

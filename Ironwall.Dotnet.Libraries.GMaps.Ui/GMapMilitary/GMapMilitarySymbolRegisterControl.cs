@@ -1,6 +1,8 @@
-﻿using Ironwall.Dotnet.Libraries.Enums;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -490,6 +492,112 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
                     {
                         System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
                         preview.UnitType = (EnumMilitaryUnitType)e.NewValue;
+
+                        switch (preview.UnitType)
+                        {
+                            case EnumMilitaryUnitType.Infantry:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.AirDefence:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Ammunition:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.AntiTank:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Armour:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Artillery:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Black);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Bridging:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.CombatServiceSupport:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.CombinedManoeuvreArms:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Engineer:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.ElectronicRanging:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.ElectronicWarfare:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.ExplosiveOrdnanceDisposal:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.FuelPOL:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Hospital:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.HQUnit:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Maintenance:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Medical:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.Meteorological:
+                            case EnumMilitaryUnitType.Missile:
+                            case EnumMilitaryUnitType.Mortar:
+                            case EnumMilitaryUnitType.MilitaryPolice:
+                            case EnumMilitaryUnitType.CBRNDefence:
+                            case EnumMilitaryUnitType.Ordnance:
+                            case EnumMilitaryUnitType.PsychologicalOperations:
+                            case EnumMilitaryUnitType.ReconnaissanceCavalry:
+                            case EnumMilitaryUnitType.Signals:
+                            case EnumMilitaryUnitType.SpecialForces:
+                            case EnumMilitaryUnitType.SpecialOperationsForces:
+                            case EnumMilitaryUnitType.Supply:
+                            case EnumMilitaryUnitType.Topographical:
+                            case EnumMilitaryUnitType.Transportation:
+                            case EnumMilitaryUnitType.RotaryWingAviation:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Black);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.FixedWingAviation:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Black);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            case EnumMilitaryUnitType.UnmannedAirVehicle:
+                            case EnumMilitaryUnitType.Radar:
+                            case EnumMilitaryUnitType.Navy:
+                                preview.MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                                preview.MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                                break;
+                            default:
+                                break;
+                        }
                     }
                 }
             }

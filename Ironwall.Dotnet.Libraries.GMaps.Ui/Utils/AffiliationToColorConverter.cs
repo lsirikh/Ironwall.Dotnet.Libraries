@@ -26,13 +26,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Utils{
                 return affiliation switch
                 {
                     EnumMilitaryAffiliation.Unknown => new SolidColorBrush(Color.FromRgb(128, 128, 128)),      // 회색 (미확인)
-                    EnumMilitaryAffiliation.AssumedFriend => new SolidColorBrush(Color.FromRgb(173, 216, 230)), // 연한 파란색 (가정 아군)
                     EnumMilitaryAffiliation.Friend => new SolidColorBrush(Color.FromRgb(74, 144, 226)),        // 파란색 (아군)
                     EnumMilitaryAffiliation.Neutral => new SolidColorBrush(Color.FromRgb(39, 174, 96)),        // 녹색 (중립)
                     EnumMilitaryAffiliation.Hostile => new SolidColorBrush(Color.FromRgb(231, 76, 60)),        // 빨간색 (적군)
-                    EnumMilitaryAffiliation.AssumedHostile => new SolidColorBrush(Color.FromRgb(240, 128, 128)), // 연한 빨간색 (가정 적군)
-                    EnumMilitaryAffiliation.Suspect => new SolidColorBrush(Color.FromRgb(241, 196, 15)),       // 노란색 (의심)
-                    EnumMilitaryAffiliation.Civilian => new SolidColorBrush(Color.FromRgb(128, 0, 128)),       // 보라색 (민간)
                     _ => new SolidColorBrush(Colors.Gray)
                 };
             }

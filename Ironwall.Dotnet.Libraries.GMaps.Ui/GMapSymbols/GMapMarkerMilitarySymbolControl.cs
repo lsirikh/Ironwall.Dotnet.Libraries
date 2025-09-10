@@ -4,6 +4,8 @@ using System.Windows.Media;
 using System.Windows;
 using System.Windows.Input;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
+using System.Windows.Controls;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -272,10 +274,6 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     protected override void OnMarkerSingleClicked(MouseButtonEventArgs e)
     {
         base.OnMarkerSingleClicked(e);
-        if (EnableShapeAnimation)
-        {
-            TriggerClickAnimation();
-        }
     }
 
     /// <summary>
@@ -307,6 +305,9 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         var mainContainer = GetTemplateChild("PART_MainContainer");
         var symbolContainer = GetTemplateChild("PART_SymbolContainer");
         var groundFrame = GetTemplateChild("PART_GroundFrame");
+
+        MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+        MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
 
         System.Diagnostics.Debug.WriteLine($"템플릿 요소들: MainContainer={mainContainer != null}, SymbolContainer={symbolContainer != null}, GroundFrame={groundFrame != null}");
     }
@@ -347,10 +348,6 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
             EnumMilitaryAffiliation.Hostile => Brushes.Red,
             EnumMilitaryAffiliation.Neutral => Brushes.Green,
             EnumMilitaryAffiliation.Unknown => Brushes.Yellow,
-            EnumMilitaryAffiliation.AssumedFriend => Brushes.LightBlue,
-            EnumMilitaryAffiliation.AssumedHostile => Brushes.LightCoral,
-            EnumMilitaryAffiliation.Suspect => Brushes.Orange,
-            EnumMilitaryAffiliation.Civilian => Brushes.Purple,
             _ => Brushes.Gray
         };
     }
@@ -362,70 +359,8 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     {
         // Present: 실선, Planned: 점선, Anticipated: 일점쇄선 등
         // 현재는 기본 구현, 향후 XAML 템플릿에서 처리
-    }
 
-    /// <summary>
-    /// 클릭 애니메이션 트리거
-    /// </summary>
-    private void TriggerClickAnimation()
-    {
-        if (!EnableShapeAnimation) return;
-
-        try
-        {
-            TransformGroup transformGroup;
-            ScaleTransform scaleTransform;
-            RotateTransform existingRotate = null;
-
-            // 기존 Transform 구조 분석
-            if (RenderTransform is TransformGroup existingGroup)
-            {
-                transformGroup = existingGroup;
-                existingRotate = transformGroup.Children.OfType<RotateTransform>().FirstOrDefault();
-                scaleTransform = transformGroup.Children.OfType<ScaleTransform>().FirstOrDefault();
-            }
-            else if (RenderTransform is RotateTransform rotateOnly)
-            {
-                existingRotate = rotateOnly;
-                transformGroup = new TransformGroup();
-                transformGroup.Children.Add(existingRotate);
-                scaleTransform = null;
-            }
-            else
-            {
-                transformGroup = new TransformGroup();
-                scaleTransform = null;
-            }
-
-            // ScaleTransform 추가/수정
-            if (scaleTransform == null)
-            {
-                scaleTransform = new ScaleTransform(1.0, 1.0);
-                transformGroup.Children.Add(scaleTransform);
-            }
-
-            // TransformGroup 적용 (기존 회전 유지됨)
-            RenderTransform = transformGroup;
-            RenderTransformOrigin = new Point(0.5, 0.5);
-
-            // 애니메이션 실행
-            var animation = new System.Windows.Media.Animation.DoubleAnimation
-            {
-                From = 1.0,
-                To = 1.2,
-                Duration = TimeSpan.FromMilliseconds(100),
-                AutoReverse = true
-            };
-
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-
-            System.Diagnostics.Debug.WriteLine($"군사 심볼 애니메이션 실행 - 기존 회전 보존: {existingRotate?.Angle ?? 0:F1}°");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"군사 심볼 클릭 애니메이션 실행 실패: {ex.Message}");
-        }
+      
     }
 
     #endregion
