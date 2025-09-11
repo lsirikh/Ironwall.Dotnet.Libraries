@@ -595,16 +595,16 @@
 										Visibility="Collapsed">
 										<Path.Data>
 											<PathGeometry>
-												<PathFigure IsClosed="True" StartPoint="13,8">
+												<PathFigure IsClosed="True" StartPoint="13,10">
 													<!--  둥근 탄두  -->
 													<ArcSegment
-														Point="17,8"
+														Point="17,10"
 														Size="2,4"
 														SweepDirection="Clockwise" />
 													<!--  직선 몸체  -->
 													<LineSegment Point="17,20" />
-													<LineSegment Point="19,20" />
-													<LineSegment Point="11,20" />
+													<LineSegment Point="18,20" />
+													<LineSegment Point="12,20" />
 													<LineSegment Point="13,20" />
 												</PathFigure>
 											</PathGeometry>
@@ -637,7 +637,7 @@
 										Visibility="Collapsed">
 										<Path.Data>
 											<EllipseGeometry
-												Center="15,12"
+												Center="15,15"
 												RadiusX="9"
 												RadiusY="5" />
 										</Path.Data>
@@ -734,16 +734,16 @@
 										<Path.Data>
 											<PathGeometry>
 												<!--  상단 V자 (위로 열린 형태)  -->
-												<PathFigure StartPoint="5,10">
-													<LineSegment Point="10,15" />
-													<LineSegment Point="20,15" />
-													<LineSegment Point="25,10" />
+												<PathFigure StartPoint="5,7.5">
+													<LineSegment Point="10,12.5" />
+													<LineSegment Point="20,12.5" />
+													<LineSegment Point="25,7.5" />
 												</PathFigure>
 												<!--  하단 V자 (아래로 열린 형태)  -->
-												<PathFigure StartPoint="5,25">
-													<LineSegment Point="10,20" />
-													<LineSegment Point="20,20" />
-													<LineSegment Point="25,25" />
+												<PathFigure StartPoint="5,22.5">
+													<LineSegment Point="10,17.5" />
+													<LineSegment Point="20,17.5" />
+													<LineSegment Point="25,22.5" />
 												</PathFigure>
 											</PathGeometry>
 										</Path.Data>
@@ -913,43 +913,85 @@
 								Margin="0,-15,0,0"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Top"
+								FontSize="17"
+								FontWeight="ExtraBold"
+								Foreground="Black"
+								Text="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitSizeToSymbolConverter}}">
+								<TextBlock.Effect>
+									<DropShadowEffect
+										BlurRadius="1"
+										Direction="310"
+										Opacity="1"
+										ShadowDepth="1"
+										Color="White" />
+								</TextBlock.Effect>
+							</TextBlock>
+
+							<!--  콜사인 (우측 상단)  -->
+							<TextBlock
+								Name="PART_UnitDesignator"
+								MinWidth="50"
+								Margin="0,-30,-50,0"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
 								FontSize="15"
 								FontWeight="Bold"
 								Foreground="Black"
-								Text="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource UnitSizeToSymbolConverter}}" />
+								Text="{TemplateBinding CallSign}"
+								TextAlignment="Left">
+								<TextBlock.Effect>
+									<DropShadowEffect
+										BlurRadius="1"
+										Direction="310"
+										Opacity="1"
+										ShadowDepth="1"
+										Color="White" />
+								</TextBlock.Effect>
+							</TextBlock>
 
-							<!--  부대 지시자 (하단)  -->
-							<TextBlock
-								Name="PART_UnitDesignator"
-								Margin="0,0,0,-15"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Bottom"
-								FontSize="13"
-								FontWeight="SemiBold"
-								Foreground="Black"
-								Text="{TemplateBinding UnitDesignator}" />
-
-							<!--  상급 부대명 (좌측)  -->
+							<!--  소대명 (좌측)  -->
 							<TextBlock
 								Name="PART_HigherFormation"
-								Margin="-35,0,0,0"
+								MinWidth="80"
+								Margin="-80,25,0,0"
 								HorizontalAlignment="Left"
 								VerticalAlignment="Center"
-								FontSize="10"
+								FontSize="15"
 								FontWeight="Bold"
 								Foreground="Black"
-								Text="{TemplateBinding HigherFormation}" />
+								Text="{TemplateBinding UnitDesignator}"
+								TextAlignment="Right">
+								<TextBlock.Effect>
+									<DropShadowEffect
+										BlurRadius="1"
+										Direction="310"
+										Opacity="1"
+										ShadowDepth="1"
+										Color="White" />
+								</TextBlock.Effect>
+							</TextBlock>
 
-							<!--  콜사인 (우측)  -->
+							<!--  상급 부대명 (우측)  -->
 							<TextBlock
 								Name="PART_CallSign"
-								Margin="0,0,-35,0"
+								MinWidth="80"
+								Margin="0,25,-80,0"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
-								FontSize="10"
+								FontSize="15"
 								FontWeight="Bold"
 								Foreground="Black"
-								Text="{TemplateBinding CallSign}" />
+								Text="{TemplateBinding HigherFormation}"
+								TextAlignment="Left">
+								<TextBlock.Effect>
+									<DropShadowEffect
+										BlurRadius="1"
+										Direction="310"
+										Opacity="1"
+										ShadowDepth="1"
+										Color="White" />
+								</TextBlock.Effect>
+							</TextBlock>
 						</Grid>
 
 						<!--  Label Container (아이콘 아래)  -->
@@ -957,7 +999,7 @@
 							Name="PART_LabelContainer"
 							MinWidth="40"
 							MaxWidth="150"
-							Margin="0,0,0,-25"
+							Margin="0,0,0,-35"
 							Padding="2"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Bottom"

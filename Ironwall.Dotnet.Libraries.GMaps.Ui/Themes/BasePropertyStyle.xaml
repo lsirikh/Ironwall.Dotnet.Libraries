@@ -270,12 +270,18 @@
 											Style="{StaticResource CompactComboBox}">
 											<ComboBox.ItemTemplate>
 												<DataTemplate>
-													<Rectangle
-														Width="40"
-														Height="12"
-														Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
-														Stroke="Gray"
-														StrokeThickness="0.5" />
+													<StackPanel Orientation="Horizontal">
+														<Rectangle
+															Width="40"
+															Height="12"
+															Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+															Stroke="Gray"
+															StrokeThickness="0.5" />
+														<TextBlock
+															Margin="10,0"
+															FontSize="10"
+															Text="{Binding}" />
+													</StackPanel>
 												</DataTemplate>
 											</ComboBox.ItemTemplate>
 										</ComboBox>
@@ -298,12 +304,18 @@
 											Style="{StaticResource CompactComboBox}">
 											<ComboBox.ItemTemplate>
 												<DataTemplate>
-													<Rectangle
-														Width="40"
-														Height="12"
-														Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
-														Stroke="Gray"
-														StrokeThickness="0.5" />
+													<StackPanel Orientation="Horizontal">
+														<Rectangle
+															Width="40"
+															Height="12"
+															Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+															Stroke="Gray"
+															StrokeThickness="0.5" />
+														<TextBlock
+															Margin="10,0"
+															FontSize="10"
+															Text="{Binding}" />
+													</StackPanel>
 												</DataTemplate>
 											</ComboBox.ItemTemplate>
 										</ComboBox>

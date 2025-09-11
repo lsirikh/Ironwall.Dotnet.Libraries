@@ -123,7 +123,9 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     public static readonly DependencyProperty MarkerStrokeThicknessProperty =
         DependencyProperty.Register("MarkerStrokeThickness", typeof(double), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(2.0));
+            new PropertyMetadata(1.0, OnMarkerStrokeThicknessChanged));
+
+    
 
     /// <summary>
     /// 선택 상태
@@ -477,6 +479,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             _log?.Info($"ShowTitle=true, PART_LabelContainer Visibility: {labelContainer?.Visibility}");
             _log?.Info($"MarkerTitle: '{MarkerTitle}'");
         }
+
+        InvalidateVisual();
     }
     #endregion
 
@@ -658,16 +662,42 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     private static void OnMarkerFillChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerBaseControl<T> control)
+        if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
         {
-
+            //if (e.NewValue is SolidColorBrush brush)
+            //{
+            //    var brush_string = brush.ToString();
+            //    control.Marker.FillColor = ColorHelper.HexToColorType(brush_string);
+            //}
         }
     }
     private static void OnMarkerStrokeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
+        if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
+        {
+            //if (e.NewValue is SolidColorBrush brush)
+            //{
+            //    var brush_string = brush.ToString();
+            //    control.Marker.StrokeColor = ColorHelper.HexToColorType(brush_string);
+            //}
+        }
+    }
+
+    private static void OnMarkerStrokeThicknessChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
         if (d is GMapMarkerBaseControl<T> control)
         {
+            System.Diagnostics.Debug.WriteLine($"OnMarkerStrokeThicknessChanged: {e.OldValue} → {e.NewValue}");
 
+            // 마커 객체가 있으면 동기화
+            if (control.Marker != null && !control._isUpdatingFromMarker)
+            {
+                control.Marker.StrokeThickness = (double)e.NewValue;
+                System.Diagnostics.Debug.WriteLine($"마커 StrokeThickness 업데이트: {control.Marker.StrokeThickness}");
+            }
+
+            // UI 강제 새로고침
+            control.InvalidateVisual();
         }
     }
 

@@ -27,6 +27,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
             
         }
         #endregion
+
         #region - Implementation of Interface -
 
         protected override void ClearSpecificBindings()
@@ -392,7 +393,4 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         #region - Attributes -
         #endregion
-        #region - Attributes -
-        #endregion
-
     }

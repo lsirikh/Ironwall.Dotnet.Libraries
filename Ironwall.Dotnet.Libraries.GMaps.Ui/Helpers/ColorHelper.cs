@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using System;
 using System.ComponentModel;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 /****************************************************************************
@@ -56,15 +57,57 @@ public static class ColorHelper
     }
 
     /// <summary>
+    /// Hex 색상 문자열을 EnumColorType으로 변환 (직접 매핑)
+    /// </summary>
+    /// <param name="hexColor">Hex 색상 문자열 (#RRGGBB)</param>
+    /// <returns>일치하는 EnumColorType, 없으면 Blue 반환</returns>
+    public static EnumColorType HexToColorType(string hexColor)
+    {
+        if (string.IsNullOrEmpty(hexColor))
+            return EnumColorType.Blue;
+
+        return hexColor.ToUpperInvariant() switch
+        {
+            "#2196F3" => EnumColorType.Blue,           // Material Blue
+            "#F44336" => EnumColorType.Red,            // Material Red
+            "#4CAF50" => EnumColorType.Green,          // Material Green
+            "#FF9800" => EnumColorType.Orange,         // Material Orange
+            "#9C27B0" => EnumColorType.Purple,         // Material Purple
+            "#FFEB3B" => EnumColorType.Yellow,         // Material Yellow
+            "#E91E63" => EnumColorType.Pink,           // Material Pink
+            "#009688" => EnumColorType.Teal,           // Material Teal
+            "#3F51B5" => EnumColorType.Indigo,         // Material Indigo
+            "#CDDC39" => EnumColorType.Lime,           // Material Lime
+            "#795548" => EnumColorType.Brown,          // Material Brown
+            "#9E9E9E" => EnumColorType.Gray,           // Material Gray
+            "#212121" => EnumColorType.Black,          // Material Dark
+            "#FFFFFF" => EnumColorType.White,          // White
+            "#1976D2" => EnumColorType.DarkBlue,       // Material Blue 700
+            "#D32F2F" => EnumColorType.DarkRed,        // Material Red 700
+            "#388E3C" => EnumColorType.DarkGreen,      // Material Green 700
+            "#F57C00" => EnumColorType.DarkOrange,     // Material Orange 700
+            "#7B1FA2" => EnumColorType.DarkPurple,     // Material Purple 700
+            "#FFD700" => EnumColorType.Gold,           // Gold
+            "#C0C0C0" => EnumColorType.Silver,         // Silver
+            "#FF00FF" => EnumColorType.Magenta,        // Magenta
+            "#00FFFF" => EnumColorType.Cyan,           // Cyan
+            "#F5F5DC" => EnumColorType.Beige,          // Beige
+            "#808000" => EnumColorType.Olive,          // Olive
+            "#00000000" => EnumColorType.Transparent,  // Transparent
+            _ => EnumColorType.Blue                    // Default
+        };
+    }
+
+    /// <summary>
     /// EnumColorType을 WPF Brush로 변환
     /// </summary>
     /// <param name="colorType">색상 타입</param>
     /// <returns>SolidColorBrush 객체</returns>
-    public static System.Windows.Media.SolidColorBrush ToBrush(this EnumColorType colorType)
+    public static SolidColorBrush ToBrush(this EnumColorType colorType)
     {
         var hexColor = colorType.ToHexString();
-        var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hexColor);
-        return new System.Windows.Media.SolidColorBrush(color);
+        var color = (Color)ColorConverter.ConvertFromString(hexColor);
+        return new SolidColorBrush(color);
     }
 
     /// <summary>

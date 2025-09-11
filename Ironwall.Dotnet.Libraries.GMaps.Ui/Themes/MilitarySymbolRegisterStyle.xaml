@@ -348,7 +348,7 @@
 										Height="80"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Affiliation="{Binding Affiliation, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}"
+										Affiliation="{Binding Affiliation, RelativeSource={RelativeSource TemplatedParent}}"
 										BattleDimension="{Binding BattleDimension, RelativeSource={RelativeSource TemplatedParent}}"
 										CallSign="{Binding CallSign, RelativeSource={RelativeSource TemplatedParent}}"
 										HigherFormation="{Binding HigherFormation, RelativeSource={RelativeSource TemplatedParent}}"
@@ -356,7 +356,6 @@
 										UnitDesignator="{Binding UnitDesignator, RelativeSource={RelativeSource TemplatedParent}}"
 										UnitSize="{Binding UnitSize, RelativeSource={RelativeSource TemplatedParent}}"
 										UnitType="{Binding UnitType, RelativeSource={RelativeSource TemplatedParent}}" />
-
 								</Border>
 
 								<!--  우측: 스크롤 가능한 속성 입력  -->

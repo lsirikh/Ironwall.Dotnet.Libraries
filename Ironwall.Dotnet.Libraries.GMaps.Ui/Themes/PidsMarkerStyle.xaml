@@ -36,7 +36,7 @@
 									<Border
 										Background="{TemplateBinding MarkerFill}"
 										BorderBrush="{TemplateBinding MarkerStroke}"
-										BorderThickness="2"
+										BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
 										CornerRadius="4">
 										<Border.Effect>
 											<DropShadowEffect
@@ -48,10 +48,10 @@
 										<TextBlock
 											HorizontalAlignment="Center"
 											VerticalAlignment="Center"
-											FontSize="12"
+											FontSize="20"
 											FontWeight="Bold"
 											Foreground="White"
-											Text="CTRL" />
+											Text="C" />
 									</Border>
 								</Grid>
 							</Viewbox>
@@ -103,12 +103,13 @@
 									Name="PART_MultiIconContainer"
 									Width="40"
 									Height="40">
-									<!--  Multi Icon Content  -->
+
+									<!--  Multi Icon Content - 사각형 배경  -->
 									<Border
 										Background="{TemplateBinding MarkerFill}"
 										BorderBrush="{TemplateBinding MarkerStroke}"
-										BorderThickness="2"
-										CornerRadius="20">
+										BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+										CornerRadius="4">
 										<Border.Effect>
 											<DropShadowEffect
 												BlurRadius="8"
@@ -116,36 +117,29 @@
 												ShadowDepth="4"
 												Color="Black" />
 										</Border.Effect>
+
 										<Grid>
-											<!--  Multiple circles inside  -->
+											<!--  왼쪽 작은 검은 원  -->
 											<Ellipse
-												Width="12"
-												Height="12"
-												Margin="4,4,0,0"
+												Width="10"
+												Height="10"
+												Margin="4,0,0,0"
 												HorizontalAlignment="Left"
-												VerticalAlignment="Top"
-												Fill="White" />
+												VerticalAlignment="Center"
+												Fill="Black"
+												Stroke="{TemplateBinding MarkerStroke}"
+												StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
+
+											<!--  오른쪽 큰 흰 원  -->
 											<Ellipse
-												Width="12"
-												Height="12"
-												Margin="0,4,4,0"
+												Width="16"
+												Height="16"
+												Margin="0,0,4,0"
 												HorizontalAlignment="Right"
-												VerticalAlignment="Top"
-												Fill="White" />
-											<Ellipse
-												Width="12"
-												Height="12"
-												Margin="4,0,0,4"
-												HorizontalAlignment="Left"
-												VerticalAlignment="Bottom"
-												Fill="White" />
-											<Ellipse
-												Width="12"
-												Height="12"
-												Margin="0,0,4,4"
-												HorizontalAlignment="Right"
-												VerticalAlignment="Bottom"
-												Fill="White" />
+												VerticalAlignment="Center"
+												Fill="White"
+												Stroke="{TemplateBinding MarkerStroke}"
+												StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
 										</Grid>
 									</Border>
 								</Grid>
@@ -202,7 +196,7 @@
 									<Border
 										Background="{TemplateBinding MarkerFill}"
 										BorderBrush="{TemplateBinding MarkerStroke}"
-										BorderThickness="{TemplateBinding MarkerStrokeThickness}"
+										BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
 										CornerRadius="2">
 										<Border.Effect>
 											<DropShadowEffect
@@ -366,7 +360,7 @@
 											RadiusX="2"
 											RadiusY="2"
 											Stroke="{TemplateBinding MarkerStroke}"
-											StrokeThickness="1" />
+											StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
 
 										<!--  브라켓 조인트  -->
 										<Ellipse
@@ -377,7 +371,7 @@
 											VerticalAlignment="Center"
 											Fill="{TemplateBinding MarkerFill}"
 											Stroke="{TemplateBinding MarkerStroke}"
-											StrokeThickness="1" />
+											StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
 
 										<!--  카메라 헤드 (메인 몸체)  -->
 										<Border
@@ -388,15 +382,15 @@
 											VerticalAlignment="Center"
 											Background="{TemplateBinding MarkerFill}"
 											BorderBrush="{TemplateBinding MarkerStroke}"
-											BorderThickness="2"
+											BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
 											CornerRadius="4">
-											<Border.Effect>
+											<!--<Border.Effect>
 												<DropShadowEffect
 													BlurRadius="8"
 													Opacity="0.5"
 													ShadowDepth="4"
 													Color="Black" />
-											</Border.Effect>
+											</Border.Effect>-->
 
 											<Grid>
 												<!--  카메라 렌즈  -->

@@ -79,7 +79,6 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     #endregion
 
     #region Override Methods (기존 동작 유지)
-
     /// <summary>
     /// 컨트롤 초기화 완료 후 호출 (필요시 오버라이드)
     /// </summary>
@@ -105,9 +104,6 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     {
         base.OnMarkerDoubleClicked(e);
     }
-
-
-
     #endregion
     #region Public Methods
     #endregion

@@ -24,14 +24,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Tests;
 /// </summary>
 public sealed class GMapDbSymbolFixture : IAsyncLifetime
 {
-    public GeometricSymbolProvider GeometrySymbolProvider { get; private set; }
-    public PidsSymbolProvider PidsSymbolProvider { get; private set; }
     #region - Properties -
     /// <summary>Symbol DB 서비스 인스턴스</summary>
     public IGMapDbSymbolService Svc { get; private set; } = null!;
 
     /// <summary>Symbol 데이터 제공자</summary>
     public SymbolProvider SymbolProvider = new();
+    public GeometricSymbolProvider GeometrySymbolProvider { get; private set; } = null!;
+    public PidsSymbolProvider PidsSymbolProvider { get; private set; } = null!;
+    public MilitarySymbolProvider MilitarySymbolProvider { get; private set; } = null!;
 
     /// <summary>취소 토큰 소스</summary>
     internal CancellationTokenSource Cts { get; } = new();
@@ -45,7 +46,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
 
     #region - Constants -
     /// <summary>테스트용 Symbol 테이블 목록</summary>
-    private static readonly string[] _symbolTables = { "Symbols", "GeometrySymbols" };
+    private static readonly string[] _tables = { "PidsSymbols", "GeometrySymbols", "Symbols", "MilitarySymbols" };
     /// <summary>DB 설정</summary>
     private readonly GMapDbSetupModel _setup = new()
     {
@@ -69,7 +70,8 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
         var ea = new EventAggregator();
         GeometrySymbolProvider = new GeometricSymbolProvider(log, SymbolProvider);
         PidsSymbolProvider = new PidsSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, _setup);
+        MilitarySymbolProvider = new MilitarySymbolProvider(log, SymbolProvider);
+        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, MilitarySymbolProvider, _setup);
 
         await DropTablesAsync();               // 깨끗한 DB 확보
         await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance

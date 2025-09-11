@@ -6,6 +6,7 @@ using System.Windows.Input;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
 using System.Windows.Controls;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -174,11 +175,14 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         // 미리보기용 기본값 설정
         Affiliation = EnumMilitaryAffiliation.Friend;
         BattleDimension = EnumMilitaryBattleDimension.Land;
-        UnitType = EnumMilitaryUnitType.Infantry;
+        UnitType = EnumMilitaryUnitType.Artillery;
         UnitSize = EnumMilitaryUnitSize.Company;
         ShowShape = true;
 
         System.Diagnostics.Debug.WriteLine($"기본값 설정 완료: {Affiliation}, {BattleDimension}, {UnitType}");
+
+        // Loaded 이벤트에서 추가 초기화
+        this.Loaded += OnControlLoaded;
     }
 
     /// <summary>
@@ -187,7 +191,31 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     /// <param name="militaryMarker">연결할 군사 심볼 마커</param>
     public GMapMilitarySymbolMarkerControl(GMapMilitarySymbolMarker militaryMarker) : base(militaryMarker)
     {
-        // 기본 클래스에서 UpdateFromMarker(), SetupDataBindings() 호출됨
+        IsPreviewMode = false;
+        System.Diagnostics.Debug.WriteLine("GMapMilitarySymbolMarkerControl() 생성자 호출됨");
+        System.Diagnostics.Debug.WriteLine($"기본값 설정 완료: {Affiliation}, {BattleDimension}, {UnitType}");
+
+        // Loaded 이벤트에서 추가 초기화
+        this.Loaded += OnControlLoaded;
+    }
+
+    /// <summary>
+    /// 컨트롤이 완전히 로드된 후 호출
+    /// </summary>
+    private void OnControlLoaded(object sender, RoutedEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine("OnControlLoaded 호출됨");
+
+        // Loaded 이벤트는 한 번만 처리
+        this.Loaded -= OnControlLoaded;
+
+        // 미리보기 모드에서 최종 업데이트
+        if (IsPreviewMode)
+        {
+            System.Diagnostics.Debug.WriteLine("미리보기 모드 최종 업데이트 실행");
+            UpdateMilitarySymbolAppearance();
+            InvalidateVisual();
+        }
     }
 
     #endregion
@@ -251,8 +279,8 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         {
             ShowShape = true;
             ShowTitle = false;
-            Width = 80;
-            Height = 80;
+            Width = 60;
+            Height = 60;
         }
     }
 
@@ -306,10 +334,20 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         var symbolContainer = GetTemplateChild("PART_SymbolContainer");
         var groundFrame = GetTemplateChild("PART_GroundFrame");
 
-        MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
-        MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
-
         System.Diagnostics.Debug.WriteLine($"템플릿 요소들: MainContainer={mainContainer != null}, SymbolContainer={symbolContainer != null}, GroundFrame={groundFrame != null}");
+
+        // 템플릿 적용 후 지연된 업데이트 실행
+        if (IsPreviewMode)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                System.Diagnostics.Debug.WriteLine("지연된 미리보기 업데이트 실행");
+                MarkerFill = ColorHelper.ToBrush(EnumColorType.Transparent);
+                MarkerStroke = ColorHelper.ToBrush(EnumColorType.Black);
+                UpdateMilitarySymbolAppearance();
+                InvalidateVisual(); // 강제 화면 갱신
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
     }
     #endregion
 
@@ -328,6 +366,8 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     /// </summary>
     protected virtual void UpdateMilitarySymbolAppearance()
     {
+        System.Diagnostics.Debug.WriteLine($"UpdateMilitarySymbolAppearance 호출 - UnitType: {UnitType}, IsPreviewMode: {IsPreviewMode}");
+
         if (Marker == null || _isUpdatingFromMarker) return;
 
         // 소속에 따른 색상 설정
@@ -335,6 +375,9 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
 
         // 프레임 스타일 업데이트 (표준 정체성에 따른)
         UpdateFrameStyle();
+
+        System.Diagnostics.Debug.WriteLine("UpdateMilitarySymbolAppearance 완료");
+
     }
 
     /// <summary>
@@ -362,11 +405,9 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
 
       
     }
-
     #endregion
 
     #region Static Property Changed Callbacks
-
     /// <summary>
     /// Affiliation 변경 시 호출
     /// </summary>
@@ -406,6 +447,7 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         }
     }
 
+
     /// <summary>
     /// StandardIdentity 변경 시 호출
     /// </summary>
@@ -418,6 +460,7 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
         }
     }
 
+
     /// <summary>
     /// UnitType 변경 시 호출
     /// </summary>
@@ -427,11 +470,16 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
 
         if (d is GMapMilitarySymbolMarkerControl control)
         {
+            // 마커가 있을 때만 동기화
             if (control.Marker != null)
             {
                 if (control.Marker.UnitType != (EnumMilitaryUnitType)e.NewValue)
                     control.Marker.UnitType = (EnumMilitaryUnitType)e.NewValue;
             }
+
+            // UI 업데이트 강제 실행 (미리보기 모드에서도)
+            control.UpdateMilitarySymbolAppearance();
+            System.Diagnostics.Debug.WriteLine($"UnitType UI 업데이트 실행됨: {e.NewValue}");
         }
     }
 
@@ -440,10 +488,16 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     /// </summary>
     protected static void OnUnitSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"OnUnitSizeChanged 호출: {e.OldValue} → {e.NewValue}");
+
         if (d is GMapMilitarySymbolMarkerControl control && control.Marker != null)
         {
             if (control.Marker.UnitSize != (EnumMilitaryUnitSize)e.NewValue)
                 control.Marker.UnitSize = (EnumMilitaryUnitSize)e.NewValue;
+
+            // UI 업데이트 강제 실행
+            control.UpdateMilitarySymbolAppearance();
+            System.Diagnostics.Debug.WriteLine($"UnitSize UI 업데이트 실행됨: {e.NewValue}");
         }
     }
 

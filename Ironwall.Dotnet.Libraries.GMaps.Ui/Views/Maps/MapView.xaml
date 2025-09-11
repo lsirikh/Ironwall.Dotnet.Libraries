@@ -71,7 +71,7 @@
 
 		<Style
 			x:Key="CompactSlider"
-			BasedOn="{StaticResource MaterialDesignDiscreteSlider}"
+			BasedOn="{StaticResource MaterialDesign3.MaterialDesignDiscreteSlider}"
 			TargetType="Slider">
 			<Setter Property="Margin" Value="2" />
 			<Setter Property="Height" Value="20" />

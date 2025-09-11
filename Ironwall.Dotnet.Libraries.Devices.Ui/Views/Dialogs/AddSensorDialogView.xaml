@@ -85,7 +85,7 @@
 					cal:Message.Attach="[Event ValueChanged]=[Action OnChangeValue($source, $eventArgs)]"
 					Maximum="{Binding Maximum, UpdateSourceTrigger=PropertyChanged}"
 					Minimum="0"
-					Style="{StaticResource MaterialDesignDiscreteSlider}"
+					Style="{StaticResource MaterialDesign3.MaterialDesignSlider}"
 					TickFrequency="{Binding TickFrequency, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					TickPlacement="BottomRight"
 					Value="{Binding ItemCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

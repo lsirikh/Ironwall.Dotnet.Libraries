@@ -37,6 +37,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                                SymbolProvider symbolProvider,
                                GeometricSymbolProvider geometrySymbolProvider,
                                PidsSymbolProvider pidsSymbolProvider,
+                               MilitarySymbolProvider militarySymbolProvider,
                                GMapDbSetupModel setupModel)
     {
         _log = log;
@@ -44,6 +45,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         _symbolProvider = symbolProvider;
         _geometrySymbolProvider = geometrySymbolProvider;
         _pidsSymbolProvider = pidsSymbolProvider;
+        _militarySymbolProvider = militarySymbolProvider;
         _setup = setupModel;
     }
     #endregion
@@ -277,7 +279,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     INDEX `IX_Symbols_Colors` (`FillColor`, `StrokeColor`)
                 );";
 
-            // ── GeometrySymbols 테이블 (간소화) ──
+            // ── GeometrySymbols 테이블  ──
             var createGeometrySymbolsSql = @"
             CREATE TABLE IF NOT EXISTS `GeometrySymbols` (
                 `SymbolId`          INT PRIMARY KEY,
@@ -291,7 +293,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INDEX `IX_GeometrySymbols_ShapeType` (`ShapeType`)
             );";
 
-            // ── PidsSymbols 테이블 (새로 추가) ──
+            // ── PidsSymbols 테이블 ──
             var createPidsSymbolsSql = @"
             CREATE TABLE IF NOT EXISTS `PidsSymbols` (
                 `SymbolId`          INT PRIMARY KEY,
@@ -311,6 +313,33 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INDEX `IX_PidsSymbols_EventStatus` (`EventStatus`)
             );";
 
+            // ── MilitarySymbols 테이블 ──
+            var createMilitarySymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `MilitarySymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `Affiliation`       VARCHAR(20) NOT NULL DEFAULT 'Friend',              -- 소속구분 (Friend, Hostile, Neutral, Unknown)
+                `BattleDimension`   VARCHAR(20) NOT NULL DEFAULT 'Land',                -- 전투차원 (Land, Sea, Air, Subsurface)
+                `StandardIdentity`  VARCHAR(20) NOT NULL DEFAULT 'Present',             -- 표준정체성 (Present, Planned, Anticipated)
+                `UnitType`          VARCHAR(50) NOT NULL DEFAULT 'Artillery',            -- 부대종류 (Infantry, Artillery, Armour 등)
+                `UnitSize`          VARCHAR(20) NOT NULL DEFAULT 'Company',             -- 부대규모 (Squad, Platoon, Company 등)
+                `UnitDesignator`    VARCHAR(100),                                       -- 부대지시자 (부대명)
+                `HigherFormation`   VARCHAR(100),                                       -- 상급부대명
+                `CallSign`          VARCHAR(50),                                        -- 콜사인
+                `CountryCode`       VARCHAR(10),                                        -- 국가코드 (KR, US 등)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_MilitarySymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_MilitarySymbols_Affiliation` (`Affiliation`),
+                INDEX `IX_MilitarySymbols_BattleDimension` (`BattleDimension`),
+                INDEX `IX_MilitarySymbols_UnitType` (`UnitType`),
+                INDEX `IX_MilitarySymbols_UnitSize` (`UnitSize`),
+                INDEX `IX_MilitarySymbols_StandardIdentity` (`StandardIdentity`)
+            );";
+
+            
+
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
             if (_eventAggregator != null)
@@ -326,6 +355,12 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "PidsSymbols 테이블 생성…" });
+
+            // BuildSchemeAsync 메서드에서 실행
+            await conn.ExecuteAsync(createMilitarySymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MilitarySymbols 테이블 생성…" });
 
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
@@ -382,6 +417,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 3. PidsSymbols 로드 (새로 추가)
             var pidsSymbols = await FetchPidsSymbolsAsync(token: token);
 
+            // 3. PidsSymbols 로드 (새로 추가)
+            var militarySymbols = await FetchMilitarySymbolsAsync(token: token);
+
             _symbolProvider.Clear();
 
             // 3. 일반 심볼 추가 (BASIC_SHAPES가 아닌 것만)
@@ -411,6 +449,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 foreach (var pidsSymbol in pidsSymbols)
                 {
                     _symbolProvider.Add(pidsSymbol);
+                }
+            }
+
+            _militarySymbolProvider.Clear();
+            if (militarySymbols?.Any() == true)
+            {
+                foreach (var militarySymbol in militarySymbols)
+                {
+                    _symbolProvider.Add(militarySymbol);
                 }
             }
 
@@ -1409,6 +1456,274 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     }
 
     #endregion
+
+    #region - MilitarySymbol CRUD -
+
+    /// <summary>
+    /// 모든 군사 심볼 조회 (JOIN 쿼리)
+    /// </summary>
+    public async Task<List<IMilitarySymbolModel>?> FetchMilitarySymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness,
+                    s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                    m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
+                    m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
+            FROM    Symbols s
+            INNER JOIN MilitarySymbols m ON s.Id = m.SymbolId
+            WHERE   s.Category = 'MILITARY_SYMBOLS'
+            ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<MilitarySymbolSQL>(sql))
+                .Select(m => m.ToMilitaryDomain())
+                .ToList();
+
+            _log?.Info($"FetchMilitarySymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IMilitarySymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MilitarySymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 군사 심볼 조회
+    /// </summary>
+    public async Task<IMilitarySymbolModel?> FetchMilitarySymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+            SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                    s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                    s.FillColor, s.StrokeColor, s.StrokeThickness,
+                    s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                    m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
+                    m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
+            FROM    Symbols s
+            INNER JOIN MilitarySymbols m ON s.Id = m.SymbolId
+            WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<MilitarySymbolSQL>(sql, new { Id = id });
+            var militarySymbol = joinResult?.ToMilitaryDomain();
+
+            _log?.Info(militarySymbol != null
+                ? $"FetchMilitarySymbolAsync 완료 - Id={militarySymbol.Id}, UnitType={militarySymbol.UnitType}"
+                : $"FetchMilitarySymbolAsync 대상 없음 - Id={id}");
+
+            return militarySymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MilitarySymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+            INSERT INTO Symbols
+            (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+             Width, Height, Category, ShowShape, ShowTitle, 
+             FillColor, StrokeColor, StrokeThickness, CreatedBy)
+            VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                    @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                    @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+            SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. MilitarySymbols 테이블에 군사 심볼 전용 정보 삽입
+            const string militarySql = @"
+            INSERT INTO MilitarySymbols 
+            (SymbolId, Affiliation, BattleDimension, StandardIdentity, UnitType, UnitSize,
+             UnitDesignator, HigherFormation, CallSign, CountryCode)
+            VALUES (@SymbolId, @Affiliation, @BattleDimension, @StandardIdentity, @UnitType, @UnitSize,
+                    @UnitDesignator, @HigherFormation, @CallSign, @CountryCode);";
+
+            await conn.ExecuteAsync(militarySql, new
+            {
+                SymbolId = symbolId,
+                Affiliation = model.Affiliation.ToString(),
+                BattleDimension = model.BattleDimension.ToString(),
+                StandardIdentity = model.StandardIdentity.ToString(),
+                UnitType = model.UnitType.ToString(),
+                UnitSize = model.UnitSize.ToString(),
+                model.UnitDesignator,
+                model.HigherFormation,
+                model.CallSign,
+                model.CountryCode
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"MilitarySymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, UnitType={model.UnitType}");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"MilitarySymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IMilitarySymbolModel?> UpdateMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+            UPDATE Symbols SET
+                Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+                Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+                Bearing = @Bearing, Width = @Width, Height = @Height,
+                Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+                CreatedBy = @CreatedBy
+            WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. MilitarySymbols 테이블 업데이트
+            const string militarySql = @"
+            UPDATE MilitarySymbols SET
+                Affiliation = @Affiliation, BattleDimension = @BattleDimension, StandardIdentity = @StandardIdentity,
+                UnitType = @UnitType, UnitSize = @UnitSize, UnitDesignator = @UnitDesignator,
+                HigherFormation = @HigherFormation, CallSign = @CallSign, CountryCode = @CountryCode
+            WHERE SymbolId = @SymbolId;";
+
+            var militaryAffected = await conn.ExecuteAsync(militarySql, new
+            {
+                SymbolId = model.Id,
+                Affiliation = model.Affiliation.ToString(),
+                BattleDimension = model.BattleDimension.ToString(),
+                StandardIdentity = model.StandardIdentity.ToString(),
+                UnitType = model.UnitType.ToString(),
+                UnitSize = model.UnitSize.ToString(),
+                model.UnitDesignator,
+                model.HigherFormation,
+                model.CallSign,
+                model.CountryCode
+            }, transaction);
+
+            if (symbolAffected == 0 || militaryAffected == 0)
+                throw new KeyNotFoundException($"MilitarySymbol not found. Id={model.Id}");
+
+            await transaction.CommitAsync(token);
+
+            _log?.Info($"MilitarySymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchMilitarySymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"MilitarySymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 군사 심볼 삭제 (CASCADE로 MilitarySymbols도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeleteMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 MilitarySymbols는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            _log?.Info(ret > 0
+                ? $"DeleteMilitarySymbolAsync 완료 - Id={model.Id}"
+                : $"DeleteMilitarySymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MilitarySymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
     #endregion
     #region - IHanldes -
     #endregion
@@ -1431,6 +1746,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     private SymbolProvider _symbolProvider;
     private GeometricSymbolProvider _geometrySymbolProvider;
     private PidsSymbolProvider _pidsSymbolProvider;
+    private MilitarySymbolProvider _militarySymbolProvider;
 
     /// <summary>데이터베이스 설정 모델</summary>
     private GMapDbSetupModel _setup;
@@ -1651,6 +1967,78 @@ internal sealed class PidsSymbolSQL : SymbolSQL
 
         // DetectionRange, DetectionAngle, DetectionBearing는 
         // 실시간 데이터이므로 DB에서 로드하지 않음 (기본값 사용)
+    };
+}
+
+/// <summary>
+/// Symbols와 MilitarySymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class MilitarySymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 군사 심볼 전용 속성들
+
+    /// <summary>소속 구분</summary>
+    public string Affiliation { get; set; } = "Friend";
+
+    /// <summary>전투 차원 (공중성)</summary>
+    public string BattleDimension { get; set; } = "Land";
+
+    /// <summary>표준 정체성 (계획 속성)</summary>
+    public string StandardIdentity { get; set; } = "Present";
+
+    /// <summary>부대 종류</summary>
+    public string UnitType { get; set; } = "Artillery";
+
+    /// <summary>부대 규모</summary>
+    public string UnitSize { get; set; } = "Company";
+
+    /// <summary>부대 지시자 (부대명)</summary>
+    public string? UnitDesignator { get; set; }
+
+    /// <summary>상급 부대명</summary>
+    public string? HigherFormation { get; set; }
+
+    /// <summary>콜사인</summary>
+    public string? CallSign { get; set; }
+
+    /// <summary>국가 코드</summary>
+    public string? CountryCode { get; set; }
+
+    /// <summary>
+    /// JOIN 결과를 MilitarySymbolModel로 변환
+    /// </summary>
+    public MilitarySymbolModel ToMilitaryDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        ShowShape = ShowShape,
+        ShowTitle = ShowTitle,
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
+
+        // MilitarySymbol 전용 속성들
+        Affiliation = Enum.Parse<EnumMilitaryAffiliation>(Affiliation),
+        BattleDimension = Enum.Parse<EnumMilitaryBattleDimension>(BattleDimension),
+        StandardIdentity = Enum.Parse<EnumMilitaryStandardIdentity>(StandardIdentity),
+        UnitType = Enum.Parse<EnumMilitaryUnitType>(UnitType),
+        UnitSize = Enum.Parse<EnumMilitaryUnitSize>(UnitSize),
+        UnitDesignator = UnitDesignator,
+        HigherFormation = HigherFormation,
+        CallSign = CallSign,
+        CountryCode = CountryCode
     };
 }
 #endregion

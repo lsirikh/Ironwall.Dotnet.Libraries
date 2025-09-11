@@ -52,8 +52,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
 public class MapViewModel : BasePanelViewModel
-                            , IHandle<PropertyPanelCloseRequestedEvent>
-                            , IHandle<MarkerPropertyChangedEventArgs>
+                            //, IHandle<PropertyPanelCloseRequestedEvent>
+                            //, IHandle<MarkerPropertyChangedEventArgs>
 {
     #region - 상수 정의 -
     public const int ZOOM_MAX = 19;
@@ -210,6 +210,7 @@ public class MapViewModel : BasePanelViewModel
         return Task.CompletedTask;
     }
     #endregion
+
     #region - Adorner 시스템 통합 -
     /// <summary>
     /// Adorner 시스템 통합 설정
@@ -1771,6 +1772,7 @@ public class MapViewModel : BasePanelViewModel
             var symbolModel = new PidsSymbolModel
             {
                 Title = title,
+                TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
                 Zoom = Zoom,
@@ -1809,6 +1811,61 @@ public class MapViewModel : BasePanelViewModel
 
     }
 
+    ///// <summary>
+    ///// 군사 심볼 마커 추가 - 상세 설정 버전
+    ///// </summary>
+    ///// <param name="position">마커 위치</param>
+    ///// <param name="militaryConfig">군사 심볼 설정</param>
+    ///// <param name="title">마커 제목</param>
+    //public async Task AddMilitaryMarker(PointLatLng position, string title = "MilitaryMarker")
+    //{
+    //    try
+    //    {
+    //        // 1. MilitarySymbolModel 생성
+    //        var symbolModel = new MilitarySymbolModel
+    //        {
+    //            Title = title,
+    //            TitleSize = 12,
+    //            Latitude = position.Lat,
+    //            Longitude = position.Lng,
+    //            Zoom = Zoom,
+    //            Width = 60,
+    //            Height = 60,
+    //            Bearing = 0,
+    //            Category = EnumMarkerCategory.MILITARY_SYMBOLS,
+    //            ShowShape = true,
+    //            ShowTitle = false,
+    //            OperationState = EnumOperationState.ACTIVE,
+
+    //            // 군사 심볼 전용 속성
+    //            Affiliation = EnumMilitaryAffiliation.Unknown,
+    //            BattleDimension = EnumMilitaryBattleDimension.Land,
+    //            StandardIdentity = EnumMilitaryStandardIdentity.Present,
+    //            UnitType = EnumMilitaryUnitType.Artillery,
+    //            UnitSize = EnumMilitaryUnitSize.Company,
+    //        };
+
+    //        // 2. DB에 저장
+    //        var symbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(symbolModel);
+    //        var savedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(symbolId);
+
+    //        if (savedSymbol == null)
+    //            throw new NullReferenceException($"SymbolId({symbolId})를 이용하여 FetchMilitarySymbolAsync 수행을 실패했습니다.");
+
+    //        // 3. 지도에 마커 추가
+    //        AddMarkerFromSymbol(savedSymbol);
+
+    //        // 4. 강제 새로고침
+    //        MainMap?.InvalidateVisual();
+
+    //        _log?.Info($"군사 심볼 마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
+    //        _log?.Info($"현재 총 마커 수: {MainMap?.Markers.Count}");
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _log?.Error($"군사 심볼 마커 추가 실패: {ex.Message}");
+    //    }
+    //}
 
 
     // <summary>
@@ -2048,7 +2105,45 @@ public class MapViewModel : BasePanelViewModel
                         duplicatedSymbol = pidsSymbol;
                     }
                     break;
+                case GMapMilitarySymbolMarker militaryMarker:
+                    // MilitarySymbolModel 복제
+                    var originalMilitaryModel = militaryMarker.Model as MilitarySymbolModel;
+                    if (originalMilitaryModel != null)
+                    {
+                        var militarySymbol = new MilitarySymbolModel
+                        {
+                            Title = $"{originalMilitaryModel.Title}_Copy",
+                            TitleSize = originalMilitaryModel.TitleSize,
+                            Latitude = newPos.Lat,
+                            Longitude = newPos.Lng,
+                            Zoom = originalMilitaryModel.Zoom,
+                            Width = originalMilitaryModel.Width,
+                            Height = originalMilitaryModel.Height,
+                            Bearing = originalMilitaryModel.Bearing,
+                            Category = originalMilitaryModel.Category,
+                            ShowShape = originalMilitaryModel.ShowShape,
+                            ShowTitle = originalMilitaryModel.ShowTitle,
+                            OperationState = originalMilitaryModel.OperationState,
+                            FillColor = originalMilitaryModel.FillColor,
+                            StrokeColor = originalMilitaryModel.StrokeColor,
+                            StrokeThickness = originalMilitaryModel.StrokeThickness,
 
+                            // MilitarySymbol 전용 속성들
+                            Affiliation = originalMilitaryModel.Affiliation,
+                            BattleDimension = originalMilitaryModel.BattleDimension,
+                            StandardIdentity = originalMilitaryModel.StandardIdentity,
+                            UnitType = originalMilitaryModel.UnitType,
+                            UnitSize = originalMilitaryModel.UnitSize,
+                            UnitDesignator = originalMilitaryModel.UnitDesignator,
+                            HigherFormation = originalMilitaryModel.HigherFormation,
+                            CallSign = originalMilitaryModel.CallSign,
+                            CountryCode = originalMilitaryModel.CountryCode
+                        };
+
+                        newSymbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(militarySymbol);
+                        duplicatedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(newSymbolId);
+                    }
+                    break;
                 default:
                     _log?.Warning($"지원되지 않는 마커 타입: {SelectedMarker.GetType().Name}");
                     return;
@@ -2154,7 +2249,7 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 군사 심볼 등록 요청 처리
     /// </summary>
-    private void OnMilitarySymbolRegisterRequested(object? sender, MilitarySymbolRegisterEventArgs e)
+    private async void OnMilitarySymbolRegisterRequested(object? sender, MilitarySymbolRegisterEventArgs e)
     {
         try
         {
@@ -2171,24 +2266,19 @@ public class MapViewModel : BasePanelViewModel
             _log?.Info($"부대타입: {militaryModel.UnitType}, 규모: {militaryModel.UnitSize}");
 
             // DB에 저장
-            //var symbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(militaryModel);
-            //var savedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(symbolId);
+            var symbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(militaryModel);
+            var savedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(symbolId);
 
-            //if (savedSymbol != null)
-            //{
-            //    // 지도에 마커 추가
-            //    AddMarkerFromSymbol(savedSymbol);
+            if (savedSymbol != null)
+            {
+                // 지도에 마커 추가
+                AddMarkerFromSymbol(savedSymbol);
 
-            //    // 강제 새로고침
-            //    MainMap?.InvalidateVisual();
+                // 강제 새로고침
+                MainMap?.InvalidateVisual();
 
-            //    _log?.Info($"군사 심볼 추가 완료: {savedSymbol.Title}");
-            //}
-
-
-            AddMarkerFromSymbol(militaryModel);
-
-            MainMap?.InvalidateVisual();
+                _log?.Info($"군사 심볼 추가 완료: {savedSymbol.Title}");
+            }
 
             // 등록창 닫기
             HideMilitarySymbolRegisterPanel();
@@ -2591,7 +2681,7 @@ public class MapViewModel : BasePanelViewModel
                 return await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsMarker.Model);
 
             case GMapMilitarySymbolMarker militaryMarker:
-                return 0;
+                return await _gMapDbSymbolService.InsertMilitarySymbolAsync(militaryMarker.Model); ;
 
             default:
                 // 공통 로직
@@ -2618,6 +2708,8 @@ public class MapViewModel : BasePanelViewModel
                 break;
 
             case GMapMilitarySymbolMarker militaryMarker:
+                // GMapMilitarySymbolMarker 전용 로직
+                await _gMapDbSymbolService.UpdateMilitarySymbolAsync(militaryMarker.Model);
                 break;
 
             default:
@@ -2642,7 +2734,8 @@ public class MapViewModel : BasePanelViewModel
                 return await _gMapDbSymbolService.DeletePidsSymbolAsync(pidsMarker.Model);
 
             case GMapMilitarySymbolMarker militaryMarker:
-                return true;
+                // GMapMilitarySymbolMarker 전용 로직
+                return await _gMapDbSymbolService.DeleteMilitarySymbolAsync(militaryMarker.Model);
 
             default:
                 // 공통 로직
@@ -2650,7 +2743,6 @@ public class MapViewModel : BasePanelViewModel
         }
     }
     #endregion
-
 
     #region - 줌 관련 속성 -
     /// <summary>
@@ -3133,23 +3225,23 @@ public class MapViewModel : BasePanelViewModel
         IsPropertyPanelVisible = false;
     }
 
-    public Task HandleAsync(PropertyPanelCloseRequestedEvent message, CancellationToken cancellationToken)
-    {
-        ClearAllSelections();
-        HidePropertyPanel();
+    //public Task HandleAsync(PropertyPanelCloseRequestedEvent message, CancellationToken cancellationToken)
+    //{
+    //    ClearAllSelections();
+    //    HidePropertyPanel();
         
-        return Task.CompletedTask;
-    }
+    //    return Task.CompletedTask;
+    //}
 
-    public async Task HandleAsync(MarkerPropertyChangedEventArgs message, CancellationToken cancellationToken)
-    {
-        if (IsEditModeEnabled && !_isMarkerEditing)
-        {
-            _log?.Info($"속성창 변경에 의한 마커 속성 변경: {message.PropertyName} = {message.NewValue}");
-            // DB 업데이트
-            await DbUpdateProcess(message.Marker);
-        }
-    }
+    //public async Task HandleAsync(MarkerPropertyChangedEventArgs message, CancellationToken cancellationToken)
+    //{
+    //    if (IsEditModeEnabled && !_isMarkerEditing)
+    //    {
+    //        _log?.Info($"속성창 변경에 의한 마커 속성 변경: {message.PropertyName} = {message.NewValue}");
+    //        // DB 업데이트
+    //        await DbUpdateProcess(message.Marker);
+    //    }
+    //}
 
     private void UpdateMarkerControlProperty(IEditableMarker marker, string propertyName, object value)
     {

@@ -26,11 +26,14 @@ public class MilitarySymbolModel : SymbolModel, IMilitarySymbolModel
         UnitSize = EnumMilitaryUnitSize.Company;
 
         // 군사 심볼 기본 설정
-        Width = 80;
-        Height = 80;
+        Width = 60;
+        Height = 60;
         ShowShape = true;
-        ShowTitle = true;
+        ShowTitle = false;
+        StrokeColor = EnumColorType.Black;
+        FillColor = EnumColorType.Transparent;
         TitleSize = 10;
+        OperationState = EnumOperationState.NONE;
     }
     #endregion
 

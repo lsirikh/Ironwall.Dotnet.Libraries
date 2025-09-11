@@ -255,7 +255,58 @@ public interface IGMapDbSymbolService
     /// </remarks>
     Task<bool> DeletePidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default);
     #endregion
+    #region - MilitarySymbol CRUD Operations -
+    /// <summary>모든 군사 심볼을 조회합니다 (JOIN 쿼리)</summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>MilitarySymbol 목록</returns>
+    /// <remarks>
+    /// Symbols와 MilitarySymbols 테이블을 조인하여 완전한 군사 심볼 정보를 반환합니다.
+    /// MILITARY_SYMBOLS 카테고리의 Symbol만 조회합니다.
+    /// </remarks>
+    Task<List<IMilitarySymbolModel>?> FetchMilitarySymbolsAsync(CancellationToken token = default);
 
+    /// <summary>ID로 단일 군사 심볼을 조회합니다</summary>
+    /// <param name="id">Symbol ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>MilitarySymbol 모델</returns>
+    /// <remarks>
+    /// Symbols와 MilitarySymbols 테이블을 조인하여 완전한 군사 심볼 정보를 반환합니다.
+    /// </remarks>
+    Task<IMilitarySymbolModel?> FetchMilitarySymbolAsync(int id, CancellationToken token = default);
+
+    /// <summary>새로운 군사 심볼을 삽입합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">MilitarySymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Symbol ID</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols와 MilitarySymbols 테이블에 동시 삽입합니다.
+    /// NATO APP-6D 표준에 따른 군사 심볼 속성을 모두 저장합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<int> InsertMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default);
+
+    /// <summary>군사 심볼을 업데이트합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">MilitarySymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 MilitarySymbol 모델</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols와 MilitarySymbols 테이블을 동시 업데이트합니다.
+    /// 부대 이동, 소속 변경, 편제 개편 등의 상황을 반영합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<IMilitarySymbolModel?> UpdateMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default);
+
+    /// <summary>군사 심볼을 삭제합니다 (CASCADE 삭제)</summary>
+    /// <param name="model">MilitarySymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// Symbols 테이블에서 삭제하면 MilitarySymbols 테이블의 관련 레코드는 
+    /// CASCADE 제약조건에 의해 자동으로 삭제됩니다.
+    /// 부대 해체, 작전 종료 등의 상황에서 사용됩니다.
+    /// </remarks>
+    Task<bool> DeleteMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default);
+    #endregion
     #region - Properties -
     /// <summary>데이터베이스 연결 상태</summary>
     /// <value>연결되어 있으면 true, 그렇지 않으면 false</value>
