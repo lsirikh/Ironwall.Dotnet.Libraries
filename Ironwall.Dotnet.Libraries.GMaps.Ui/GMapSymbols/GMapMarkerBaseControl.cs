@@ -664,22 +664,14 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
         {
-            //if (e.NewValue is SolidColorBrush brush)
-            //{
-            //    var brush_string = brush.ToString();
-            //    control.Marker.FillColor = ColorHelper.HexToColorType(brush_string);
-            //}
+            
         }
     }
     private static void OnMarkerStrokeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
         {
-            //if (e.NewValue is SolidColorBrush brush)
-            //{
-            //    var brush_string = brush.ToString();
-            //    control.Marker.StrokeColor = ColorHelper.HexToColorType(brush_string);
-            //}
+            
         }
     }
 

@@ -253,20 +253,6 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
 
     #endregion
 
-    //#region Public Methods
-
-    ///// <summary>
-    ///// 기하 심볼 상태 초기화
-    ///// </summary>
-    //public void ResetGeometryState()
-    //{
-    //    ShapeType = EnumShapeType.Circle;
-    //    MarkerOpacity = 1.0;
-    //    EnableShapeAnimation = true;
-    //}
-
-    //#endregion
-
     private bool _isUpdatingFromMarker = false;  // 순환 방지 플래그
 
 }

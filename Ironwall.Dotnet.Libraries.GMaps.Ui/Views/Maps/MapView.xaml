@@ -25,6 +25,7 @@
 		<symbolUtils:MarkerCategoryToIconConverter x:Key="MarkerCategoryToIconConverter" />
 		<symbolUtils:SymbolTypeToDisplayNameConverter x:Key="SymbolTypeToDisplayNameConverter" />
 		<symbolUtils:SymbolTypeToIconConverter x:Key="SymbolTypeToIconConverter" />
+		<utils:EnumToVisibilityConverter x:Key="EnumToVisibilityConverter" />
 		<Style
 			x:Name="CustomIconButton"
 			BasedOn="{StaticResource MaterialDesignIconButton}"
@@ -382,6 +383,29 @@
 							VerticalAlignment="Center"
 							FontSize="10"
 							Text="추가" />
+					</StackPanel>
+				</Button>
+
+				<!--  라인 드로잉 전용 버튼 추가 (AREA_BOUNDARY 카테고리일 때만 표시)  -->
+				<Button
+					Command="{Binding StartLineDrawingCommand}"
+					IsEnabled="{Binding CanStartLineDrawing}"
+					Style="{StaticResource MaterialDesignToolButton}"
+					ToolTip="라인 그리기 시작 (Ctrl+L)"
+					Visibility="{Binding SelectedMarkerCategory, Converter={StaticResource EnumToVisibilityConverter}, ConverterParameter=AREA_BOUNDARY}">
+					<Button.InputBindings>
+						<KeyBinding Key="L" Modifiers="Ctrl" />
+					</Button.InputBindings>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Kind="VectorLine" />
+						<TextBlock
+							Margin="3,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="10"
+							Text="라인" />
 					</StackPanel>
 				</Button>
 
@@ -775,36 +799,88 @@
 			Grid.ColumnSpan="2"
 			Panel.ZIndex="1000">
 
-			<!--<gproperty:GMapPropertyCustomControl
-				x:Name="PropertyPanelControl"
-				Canvas.Left="300"
-				Canvas.Top="100"
-				Width="280"
-				Height="400"
-				AvailableColors="{Binding AvailableColors}"
-				AvailableSizes="{Binding AvailableSize}"
-				Background="LightBlue"
-				BorderBrush="Red"
-				BorderThickness="2"
-				IsDraggable="True"
-				SelectedMarker="{Binding SelectedMarker, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 
-				<i:Interaction.Behaviors>
-					<behavior:PropertyPanelEventBehavior />
-				</i:Interaction.Behaviors>
-			</gproperty:GMapPropertyCustomControl>-->
+			<!--  라인 드로잉 상태 패널  -->
+			<Border
+				x:Name="LineDrawingStatusPanel"
+				Canvas.Left="10"
+				Canvas.Bottom="80"
+				Padding="8"
+				Background="{DynamicResource MaterialDesignPaper}"
+				BorderBrush="{DynamicResource MaterialDesignDivider}"
+				BorderThickness="1"
+				CornerRadius="4"
+				Visibility="{Binding IsLineDrawing, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+				<StackPanel Orientation="Horizontal">
+					<md:PackIcon
+						Width="16"
+						Height="16"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource MaterialDesignBody}"
+						Kind="VectorLine" />
+
+					<TextBlock
+						Margin="8,0"
+						VerticalAlignment="Center"
+						FontSize="12"
+						Text="라인 그리기 중" />
+
+					<TextBlock
+						VerticalAlignment="Center"
+						FontSize="11"
+						Foreground="{DynamicResource MaterialDesignBodyLight}"
+						Text="{Binding LineDrawingPointCount, StringFormat='{}{0}개 점'}" />
+
+					<!--  간단한 제어 버튼들  -->
+					<Button
+						Width="24"
+						Height="24"
+						Margin="8,0,0,0"
+						Command="{Binding UndoLastPointCommand}"
+						Style="{StaticResource MaterialDesignToolButton}"
+						ToolTip="마지막 점 제거 (Backspace)">
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Undo" />
+					</Button>
+
+					<Button
+						Width="24"
+						Height="24"
+						Margin="4,0,0,0"
+						Command="{Binding CompleteLineDrawingCommand}"
+						Style="{StaticResource MaterialDesignToolButton}"
+						ToolTip="라인 완료 (Enter)">
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Check" />
+					</Button>
+
+					<Button
+						Width="24"
+						Height="24"
+						Margin="4,0,0,0"
+						Command="{Binding CancelLineDrawingCommand}"
+						Style="{StaticResource MaterialDesignToolButton}"
+						ToolTip="라인 취소 (ESC)">
+						<md:PackIcon
+							Width="12"
+							Height="12"
+							Kind="Close" />
+					</Button>
+				</StackPanel>
+			</Border>
+
 
 			<!--  심볼 속성 창  -->
 			<ContentPresenter
 				Canvas.Left="300"
 				Canvas.Top="100"
 				Content="{Binding PropertyPanel}"
-				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-				<!--<i:Interaction.Behaviors>
-					<behavior:PropertyPanelEventBehavior />
-				</i:Interaction.Behaviors>-->
-			</ContentPresenter>
+				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 			<!--  군사 심볼 등록창  -->
 			<ContentPresenter
@@ -812,11 +888,7 @@
 				Canvas.Left="400"
 				Canvas.Top="50"
 				Content="{Binding MilitarySymbolRegisterPanel}"
-				Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-				<!--<i:Interaction.Behaviors>
-					<behavior:PropertyPanelEventBehavior />
-				</i:Interaction.Behaviors>-->
-			</ContentPresenter>
+				Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 		</Canvas>
 	</Grid>
 </UserControl>

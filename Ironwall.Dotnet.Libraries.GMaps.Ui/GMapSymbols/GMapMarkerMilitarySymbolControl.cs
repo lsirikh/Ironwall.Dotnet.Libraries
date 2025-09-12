@@ -370,41 +370,12 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
 
         if (Marker == null || _isUpdatingFromMarker) return;
 
-        // 소속에 따른 색상 설정
-        UpdateAffiliationColor();
-
-        // 프레임 스타일 업데이트 (표준 정체성에 따른)
-        UpdateFrameStyle();
-
+      
         System.Diagnostics.Debug.WriteLine("UpdateMilitarySymbolAppearance 완료");
 
     }
 
-    /// <summary>
-    /// 소속에 따른 색상 업데이트
-    /// </summary>
-    private void UpdateAffiliationColor()
-    {
-        MarkerFill = Affiliation switch
-        {
-            EnumMilitaryAffiliation.Friend => Brushes.Blue,
-            EnumMilitaryAffiliation.Hostile => Brushes.Red,
-            EnumMilitaryAffiliation.Neutral => Brushes.Green,
-            EnumMilitaryAffiliation.Unknown => Brushes.Yellow,
-            _ => Brushes.Gray
-        };
-    }
-
-    /// <summary>
-    /// 표준 정체성에 따른 프레임 스타일 업데이트
-    /// </summary>
-    private void UpdateFrameStyle()
-    {
-        // Present: 실선, Planned: 점선, Anticipated: 일점쇄선 등
-        // 현재는 기본 구현, 향후 XAML 템플릿에서 처리
-
-      
-    }
+    
     #endregion
 
     #region Static Property Changed Callbacks

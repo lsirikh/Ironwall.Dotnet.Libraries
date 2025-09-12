@@ -18,7 +18,6 @@ public class MilitarySymbolModel : SymbolModel, IMilitarySymbolModel
     public MilitarySymbolModel() : base()
     {
         // 기본값 설정
-        Category = EnumMarkerCategory.MILITARY_SYMBOLS;
         Affiliation = EnumMilitaryAffiliation.Friend;
         BattleDimension = EnumMilitaryBattleDimension.Land;
         StandardIdentity = EnumMilitaryStandardIdentity.Present;
@@ -33,6 +32,7 @@ public class MilitarySymbolModel : SymbolModel, IMilitarySymbolModel
         StrokeColor = EnumColorType.Black;
         FillColor = EnumColorType.Transparent;
         TitleSize = 10;
+        Category = EnumMarkerCategory.MILITARY_SYMBOLS;
         OperationState = EnumOperationState.NONE;
     }
     #endregion

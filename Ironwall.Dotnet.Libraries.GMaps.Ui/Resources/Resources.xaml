@@ -353,6 +353,7 @@
 	<utils:PositiveHalfConverter x:Key="PositiveHalfConverter" />
 	<utils:MultiAddValueConverter x:Key="MultiAddValueConverter" />
 	<utils:HalfAndAddConverter x:Key="HalfAndAddConverter" />
+	<utils:EnumToVisibilityConverter x:Key="EnumToVisibilityConverter" />
 
 
 	<utilPass:PasswordBoxAssistant x:Key="PasswordBoxAssistant" />

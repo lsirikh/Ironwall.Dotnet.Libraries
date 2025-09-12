@@ -57,30 +57,6 @@ public class GMapGeometricMarker : GMapBaseMarker<IGeometricSymbolModel>, IGeoEd
     #region - Binding Methods -
     #endregion
     #region - Processes -/// <summary>
-    /// 형태 변경
-    /// </summary>
-    //public void ChangeShapeType(EnumShapeType newShapeType)
-    //{
-    //    if (ShapeType != newShapeType)
-    //    {
-    //        ShapeType = newShapeType;
-    //        _log?.Info($"마커 '{Title}' 형태 변경: {newShapeType}");
-    //    }
-    //}
-
-    /// <summary>
-    /// 투명도 업데이트
-    /// </summary>
-    //private void UpdateOpacity()
-    //{
-    //    if (Shape is GMapGeometricMarkerControl geometricControl)
-    //    {
-    //        DispatcherService.Invoke(() =>
-    //        {
-    //            geometricControl.MarkerOpacity = Model.Opacity;
-    //        });
-    //    }
-    //}
     #endregion
     #region - IHanldes -
     #endregion

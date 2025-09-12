@@ -39,6 +39,7 @@ using Newtonsoft.Json.Linq;
 using System.Windows.Data;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
 using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.LineModules;
 
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -120,13 +121,10 @@ public class MapViewModel : BasePanelViewModel
             // 회전 속성 동기화
             SyncRotationProperties();
 
-            // OnAreaChange 이벤트 구독 (올바른 방법)
-            //MainMap.OnAreaChange += MapViewModel_OnAreaChange;
+            // 라인 드로잉 시스템 초기화 (새로 추가)
+            SetupLineDrawingSystem();
 
             _log?.Info("MapViewModel과 뷰 연결 완료");
-
-            // 디버깅 정보 출력
-            //LogGMapControlInfo();
         }
     }
 
@@ -168,6 +166,10 @@ public class MapViewModel : BasePanelViewModel
         {
             // Adorner 시스템 정리
             CleanupAdornerIntegration();
+
+            // 라인 드로잉 시스템 정리 (새로 추가)
+            CleanupLineDrawingSystem();
+
 
             // 모든 커스텀 맵 비활성화
             _customMapService.DeactivateAllCustomMaps();
@@ -211,6 +213,77 @@ public class MapViewModel : BasePanelViewModel
     }
     #endregion
 
+    #region - LineRegistrationService 시스템 통합 -
+    // <summary>
+    /// 라인 드로잉 시스템 설정
+    /// </summary>
+    private void SetupLineDrawingSystem()
+    {
+        if (MainMap == null)
+        {
+            _log?.Error("MainMap이 null입니다! 라인 드로잉 시스템 초기화 실패");
+            return;
+        }
+
+        try
+        {
+            _log?.Info("라인 드로잉 시스템 초기화 시작");
+
+            // LineSymbolRegistrationService 생성
+            _lineRegistrationService = new LineRegistrationService(
+                MainMap,
+                _markerFactory,
+                _log);
+
+            // 이벤트 구독
+            _lineRegistrationService.LineSymbolRegistered += OnLineSymbolRegistered;
+            _lineRegistrationService.DrawingStateChanged += OnLineDrawingStateChanged;
+            _lineRegistrationService.RegistrationFailed += OnLineRegistrationFailed; // 새로 추가
+
+
+            _log?.Info("라인 드로잉 시스템 초기화 완료");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 시스템 초기화 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 시스템 정리
+    /// </summary>
+    private async void CleanupLineDrawingSystem()
+    {
+        if (_lineRegistrationService != null)
+        {
+            try
+            {
+                // 진행 중인 드로잉 취소
+                if (_lineRegistrationService.IsDrawing)
+                {
+                    await _lineRegistrationService.CancelLineRegistrationAsync();
+                }
+
+                // 이벤트 구독 해제
+                _lineRegistrationService.LineSymbolRegistered -= OnLineSymbolRegistered;
+                _lineRegistrationService.DrawingStateChanged -= OnLineDrawingStateChanged;
+
+                // 리소스 해제
+                _lineRegistrationService.Dispose();
+                _lineRegistrationService = null;
+
+                _log?.Info("라인 드로잉 시스템 정리 완료");
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"라인 드로잉 시스템 정리 실패: {ex.Message}");
+            }
+        }
+    }
+
+    
+
+    #endregion
     #region - Adorner 시스템 통합 -
     /// <summary>
     /// Adorner 시스템 통합 설정
@@ -570,7 +643,8 @@ public class MapViewModel : BasePanelViewModel
         InitializeEditCommands();
         InitializeRotationCommands();
         InitializeMarkerEditCommands();
-        InitializeAdornerCommands(); // 새로 추가
+        InitializeAdornerCommands();
+        InitializeLineCommands();
     }
 
     /// <summary>
@@ -630,8 +704,6 @@ public class MapViewModel : BasePanelViewModel
     private void InitializeMarkerEditCommands()
     {
         AddSelectedSymbolCommand = new RelayCommand(ExecuteAddSelectedSymbol, CanExecuteAddSelectedSymbol);
-        //AddCustomMarkerCommand = new RelayCommand(ExecuteAddMarker, CanExecuteAddMarker);
-        //AddGeometricMarkerCommand = new RelayCommand(ExecuteAddGeometricMarker, CanExecuteAddGeometricMarker);
         DuplicateMarkerCommand = new RelayCommand(ExecuteDuplicateMarker, CanExecuteDuplicateMarker);
         SnapMarkerToGridCommand = new RelayCommand(ExecuteSnapMarkerToGrid, CanExecuteSnapMarkerToGrid);
         ResetMarkerRotationCommand = new RelayCommand(ExecuteResetMarkerRotation, CanExecuteResetMarkerRotation);
@@ -649,7 +721,17 @@ public class MapViewModel : BasePanelViewModel
         CancelAllEditingCommand = new RelayCommand(ExecuteCancelAllEditing, CanExecuteCancelAllEditing);
     }
 
-    
+    /// <summary>
+    /// InitializeCommands 메서드에 추가할 라인 명령어 초기화
+    /// </summary>
+    private void InitializeLineCommands()
+    {
+        StartLineDrawingCommand = new RelayCommand(ExecuteStartLineDrawing, CanExecuteStartLineDrawing);
+        CancelLineDrawingCommand = new RelayCommand(ExecuteCancelLineDrawing, CanExecuteCancelLineDrawing);
+        CompleteLineDrawingCommand = new RelayCommand(ExecuteCompleteLineDrawing, CanExecuteCompleteLineDrawing);
+        UndoLastPointCommand = new RelayCommand(ExecuteUndoLastPoint, CanExecuteUndoLastPoint);
+    }
+
     #endregion
 
     #region - 파일 명령어 구현 -
@@ -1118,39 +1200,115 @@ public class MapViewModel : BasePanelViewModel
     }
     #endregion
 
+    #region - 라인 드로잉 이벤트 핸들러 -
+    /// <summary>
+    /// 라인 심볼 등록 완료 이벤트 핸들러
+    /// </summary>
+    private void OnLineSymbolRegistered(object? sender, LineSymbolRegisteredEventArgs e)
+    {
+        try
+        {
+            _log?.Info($"라인 심볼 등록 완료: {e.LineModel.Title}");
+            _log?.Info($"포인트 수: {e.LineModel.LinePoints.Count}, 총 거리: {e.LineMarker.TotalDistance:F1}m");
+
+            // UI 상태 업데이트
+            IsLineDrawing = false;
+
+            // 필요시 새로 등록된 마커를 선택 상태로 변경
+            if (IsEditModeEnabled)
+            {
+                SelectMarkerForEditing(e.LineMarker);
+            }
+
+            // 화면 갱신
+            MainMap?.InvalidateVisual();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 심볼 등록 완료 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 라인 등록 실패 이벤트 핸들러 (새로 추가)
+    /// </summary>
+    private void OnLineRegistrationFailed(object? sender, LineRegistrationFailedEventArgs e)
+    {
+        try
+        {
+            _log?.Error($"라인 등록 실패: {e.LineTitle} - {e.Exception.Message}");
+
+            // UI 상태 복원
+            IsLineDrawing = false;
+            LineDrawingPointCount = 0;
+
+            // 필요시 사용자에게 오류 메시지 표시
+            // TODO: 실제 UI 오류 메시지 구현
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 등록 실패 처리 중 오류: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 상태 변경 이벤트 핸들러 (기존 유지)
+    /// </summary>
+    private void OnLineDrawingStateChanged(object? sender, LineDrawingEventArgs e)
+    {
+        try
+        {
+            // UI 상태 업데이트
+            IsLineDrawing = e.State != LineDrawingState.None && e.State != LineDrawingState.Cancelled;
+            LineDrawingPointCount = e.Points?.Count ?? 0;
+
+            //_log?.Info($"라인 드로잉 상태 변경: {e.State}, 포인트 수: {LineDrawingPointCount}");
+
+            // 상태별 처리
+            switch (e.State)
+            {
+                case LineDrawingState.FirstClick:
+                    _log?.Info("첫 번째 클릭 대기 중...");
+                    break;
+
+                case LineDrawingState.Drawing:
+                    //_log?.Info($"라인 드로잉 중... ({LineDrawingPointCount}개 포인트)");
+                    break;
+
+                case LineDrawingState.Completed:
+                    _log?.Info("라인 드로잉 완료");
+                    break;
+
+                case LineDrawingState.Cancelled:
+                    _log?.Info("라인 드로잉 취소");
+                    IsLineDrawing = false;
+                    LineDrawingPointCount = 0;
+                    break;
+
+                case LineDrawingState.None:
+                    _log?.Info("라인 드로잉 종료");
+                    IsLineDrawing = false;
+                    LineDrawingPointCount = 0;
+                    break;
+            }
+
+            // UI 갱신 알림
+            NotifyOfPropertyChange(nameof(IsLineDrawing));
+            NotifyOfPropertyChange(nameof(LineDrawingPointCount));
+            NotifyOfPropertyChange(nameof(CanCancelLineDrawing));
+            NotifyOfPropertyChange(nameof(CanCompleteLineDrawing));
+            NotifyOfPropertyChange(nameof(CanUndoLastPoint));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 상태 변경 처리 실패: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+
     #region - 마커 편집 명령어 구현 -
-    //private bool CanExecuteAddMarker(object arg) => true;
-    //private async void ExecuteAddMarker(object obj)
-    //{
-    //    try
-    //    {
-    //        var position = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
-    //        await AddCustomMarker(position, "Test");
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        _log?.Error($"마커 추가 실행 실패: {ex.Message}");
-    //    }
-    //}
-
-    //private bool CanExecuteAddGeometricMarker(object arg) => true;
-    //private async void ExecuteAddGeometricMarker(object obj)
-    //{
-    //    try
-    //    {
-    //        var position = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
-    //        EnumShapeType shapeType = EnumShapeType.Circle;
-    //        if (obj is string shape)
-    //            shapeType = Enum.Parse<EnumShapeType>(shape);
-
-    //        await AddGeometricMarker(position, shapeType, "Geometric");
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        _log?.Error($"마커 추가 실행 실패: {ex.Message}");
-    //    }
-    //}
-
     /// <summary>
     /// 선택된 심볼 추가 명령어 실행 가능 여부
     /// </summary>
@@ -1198,7 +1356,10 @@ public class MapViewModel : BasePanelViewModel
                     break;
 
                 case EnumMarkerCategory.AREA_BOUNDARY:
-                    //await AddAreaBoundaryMarker(position, SelectedSymbolType.ToString(), symbolTitle);
+                    if (SelectedSymbolType is string areaType)
+                    {
+                        await AddAreaBoundaryMarker(position, areaType, symbolTitle);
+                    }
                     break;
 
                 case EnumMarkerCategory.ANALYSIS:
@@ -1333,6 +1494,115 @@ public class MapViewModel : BasePanelViewModel
         catch (Exception ex)
         {
             _log?.Error($"마커 크기 초기화 실행 실패: {ex.Message}");
+        }
+    }
+
+
+    /// <summary>
+    /// 라인 드로잉 시작 명령어
+    /// </summary>
+    private bool CanExecuteStartLineDrawing(object arg) => !IsLineDrawing && IsEditModeEnabled;
+
+    private async void ExecuteStartLineDrawing(object obj)
+    {
+        try
+        {
+            string lineTitle = "New Line";
+            EnumLinePattern pattern = EnumLinePattern.Solid;
+            double opacity = 1.0;
+
+            // 매개변수에서 설정 추출 (필요시)
+            if (obj is LineDrawingParameters parameters)
+            {
+                lineTitle = parameters.Title ?? lineTitle;
+                pattern = parameters.Pattern;
+                opacity = parameters.Opacity;
+            }
+
+            _log?.Info($"라인 드로잉 시작: {lineTitle}");
+
+            bool success = await _lineRegistrationService.StartLineRegistrationAsync(lineTitle, pattern, opacity);
+
+            if (success)
+            {
+                IsLineDrawing = true;
+                _log?.Info("라인 드로잉 모드 활성화");
+            }
+            else
+            {
+                _log?.Error("라인 드로잉 시작 실패");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 시작 실행 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 취소 명령어
+    /// </summary>
+    private bool CanExecuteCancelLineDrawing(object arg) => IsLineDrawing;
+
+    private async void ExecuteCancelLineDrawing(object obj)
+    {
+        try
+        {
+            bool success = await _lineRegistrationService.CancelLineRegistrationAsync();
+
+            if (success)
+            {
+                _log?.Info("라인 드로잉 취소됨");
+                IsLineDrawing = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 취소 실행 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 완료 명령어
+    /// </summary>
+    private bool CanExecuteCompleteLineDrawing(object arg) => IsLineDrawing && LineDrawingPointCount >= 2;
+
+    private async void ExecuteCompleteLineDrawing(object obj)
+    {
+        try
+        {
+            bool success = await _lineRegistrationService.CompleteLineRegistrationAsync();
+
+            if (success)
+            {
+                _log?.Info("라인 드로잉 강제 완료");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 완료 실행 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 마지막 포인트 제거 명령어
+    /// </summary>
+    private bool CanExecuteUndoLastPoint(object arg) => IsLineDrawing && LineDrawingPointCount > 0;
+
+    private void ExecuteUndoLastPoint(object obj)
+    {
+        try
+        {
+            bool success = _lineRegistrationService?.UndoLastPoint() ?? false;
+
+            if (success)
+            {
+                _log?.Info("마지막 포인트 제거됨");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마지막 포인트 제거 실행 실패: {ex.Message}");
         }
     }
     #endregion
@@ -1811,62 +2081,48 @@ public class MapViewModel : BasePanelViewModel
 
     }
 
-    ///// <summary>
-    ///// 군사 심볼 마커 추가 - 상세 설정 버전
-    ///// </summary>
-    ///// <param name="position">마커 위치</param>
-    ///// <param name="militaryConfig">군사 심볼 설정</param>
-    ///// <param name="title">마커 제목</param>
-    //public async Task AddMilitaryMarker(PointLatLng position, string title = "MilitaryMarker")
-    //{
-    //    try
-    //    {
-    //        // 1. MilitarySymbolModel 생성
-    //        var symbolModel = new MilitarySymbolModel
-    //        {
-    //            Title = title,
-    //            TitleSize = 12,
-    //            Latitude = position.Lat,
-    //            Longitude = position.Lng,
-    //            Zoom = Zoom,
-    //            Width = 60,
-    //            Height = 60,
-    //            Bearing = 0,
-    //            Category = EnumMarkerCategory.MILITARY_SYMBOLS,
-    //            ShowShape = true,
-    //            ShowTitle = false,
-    //            OperationState = EnumOperationState.ACTIVE,
+    /// <summary>
+    /// 구역 경계선 마커 추가 (라인 드로잉 모드 시작)
+    /// </summary>
+    private async Task AddAreaBoundaryMarker(PointLatLng position, string areaType, string title)
+    {
+        try
+        {
+            _log?.Info($"구역 경계선 마커 추가 시작: {areaType}");
 
-    //            // 군사 심볼 전용 속성
-    //            Affiliation = EnumMilitaryAffiliation.Unknown,
-    //            BattleDimension = EnumMilitaryBattleDimension.Land,
-    //            StandardIdentity = EnumMilitaryStandardIdentity.Present,
-    //            UnitType = EnumMilitaryUnitType.Artillery,
-    //            UnitSize = EnumMilitaryUnitSize.Company,
-    //        };
+            // 라인 드로잉 파라미터 설정
+            var parameters = new LineDrawingParameters
+            {
+                Title = title,
+                Pattern = EnumLinePattern.Solid,
+                Opacity = 1.0
+            };
 
-    //        // 2. DB에 저장
-    //        var symbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(symbolModel);
-    //        var savedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(symbolId);
+            // 라인 타입에 따른 설정 조정
+            switch (areaType.ToLower())
+            {
+                case "zone":
+                    parameters.Pattern = EnumLinePattern.Solid;
+                    parameters.Opacity = 0.8;
+                    break;
+                case "boundary":
+                    parameters.Pattern = EnumLinePattern.Dashed;
+                    parameters.Opacity = 1.0;
+                    break;
+                case "fence":
+                    parameters.Pattern = EnumLinePattern.DoubleLine;
+                    parameters.Opacity = 1.0;
+                    break;
+            }
 
-    //        if (savedSymbol == null)
-    //            throw new NullReferenceException($"SymbolId({symbolId})를 이용하여 FetchMilitarySymbolAsync 수행을 실패했습니다.");
-
-    //        // 3. 지도에 마커 추가
-    //        AddMarkerFromSymbol(savedSymbol);
-
-    //        // 4. 강제 새로고침
-    //        MainMap?.InvalidateVisual();
-
-    //        _log?.Info($"군사 심볼 마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
-    //        _log?.Info($"현재 총 마커 수: {MainMap?.Markers.Count}");
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        _log?.Error($"군사 심볼 마커 추가 실패: {ex.Message}");
-    //    }
-    //}
-
+            // 라인 드로잉 시작
+            ExecuteStartLineDrawing(parameters);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"구역 경계선 마커 추가 실패: {ex.Message}");
+        }
+    }
 
     // <summary>
     /// 심볼로부터 마커 추가
@@ -3152,6 +3408,17 @@ public class MapViewModel : BasePanelViewModel
     public RelayCommand? CancelAllEditingCommand { get; private set; }
     public RelayCommand? LogAdornerStatsCommand { get; private set; }
 
+
+    /// <summary>
+    /// 라인 드로잉 관련 명령어들
+    /// </summary>
+    public RelayCommand StartLineDrawingCommand { get; private set; }
+    public RelayCommand CancelLineDrawingCommand { get; private set; }
+    public RelayCommand CompleteLineDrawingCommand { get; private set; }
+    public RelayCommand UndoLastPointCommand { get; private set; }
+
+
+
     /// <summary>
     /// 군사 심볼 등록창 열기 명령어
     /// </summary>
@@ -3404,7 +3671,63 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-   
+
+    #endregion
+
+
+
+    #region - 라인 드로잉 관련 속성 -
+
+    /// <summary>
+    /// 라인 드로잉 중 여부
+    /// </summary>
+    public bool IsLineDrawing
+    {
+        get => _isLineDrawing;
+        set
+        {
+            _isLineDrawing = value;
+            NotifyOfPropertyChange(nameof(IsLineDrawing));
+            NotifyOfPropertyChange(nameof(CanStartLineDrawing));
+            NotifyOfPropertyChange(nameof(CanCancelLineDrawing));
+        }
+    }
+
+    /// <summary>
+    /// 현재 드로잉 중인 라인의 포인트 수
+    /// </summary>
+    public int LineDrawingPointCount
+    {
+        get => _lineDrawingPointCount;
+        set
+        {
+            _lineDrawingPointCount = value;
+            NotifyOfPropertyChange(nameof(LineDrawingPointCount));
+            NotifyOfPropertyChange(nameof(CanCompleteLineDrawing));
+            NotifyOfPropertyChange(nameof(CanUndoLastPoint));
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 시작 가능 여부
+    /// </summary>
+    public bool CanStartLineDrawing => !IsLineDrawing && IsEditModeEnabled;
+
+    /// <summary>
+    /// 라인 드로잉 취소 가능 여부
+    /// </summary>
+    public bool CanCancelLineDrawing => IsLineDrawing;
+
+    /// <summary>
+    /// 라인 드로잉 완료 가능 여부
+    /// </summary>
+    public bool CanCompleteLineDrawing => IsLineDrawing && LineDrawingPointCount >= 2;
+
+    /// <summary>
+    /// 마지막 포인트 제거 가능 여부
+    /// </summary>
+    public bool CanUndoLastPoint => IsLineDrawing && LineDrawingPointCount > 0;
+
     #endregion
 
     #region - 필드 (Private Fields) -ㄷ
@@ -3461,5 +3784,27 @@ public class MapViewModel : BasePanelViewModel
     // 필드 추가
     private bool _isMilitarySymbolRegisterVisible;
     private GMapMilitarySymbolRegisterControl? _militarySymbolRegisterPanel;
+
     #endregion
+    #region - 라인 드로잉 관련 필드 -
+
+    // 라인 심볼 등록 서비스
+    private LineRegistrationService _lineRegistrationService;
+
+
+    /// <summary>
+    /// 라인 드로잉 상태 필드들
+    /// </summary>
+    private bool _isLineDrawing = false;
+    private int _lineDrawingPointCount = 0;
+
+    #endregion
+
+    // 라인 드로잉 파라미터 클래스
+    public class LineDrawingParameters
+    {
+        public string Title { get; set; } = "New Line";
+        public EnumLinePattern Pattern { get; set; } = EnumLinePattern.Solid;
+        public double Opacity { get; set; } = 1.0;
+    }
 }

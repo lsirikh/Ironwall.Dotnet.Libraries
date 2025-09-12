@@ -30,6 +30,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
         Radar = 15, //15
         OpticalCable = 16, //16
 
+        Fence_Group = 17,
         //Fence_Line = 17, //17
     }
     

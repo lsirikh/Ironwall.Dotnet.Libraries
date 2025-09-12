@@ -619,7 +619,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// Adorner 생성 이벤트 핸들러
     /// </summary>
-    private void OnAdornerCreated(object sender, AdornerLifecycleEventArgs e)
+    private void OnAdornerCreated(object? sender, AdornerLifecycleEventArgs e)
     {
         _log?.Info($"Adorner 생성됨: {e.Marker.Title}");
         AdornerCreated?.Invoke(this, e);
@@ -628,7 +628,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// Adorner 제거 이벤트 핸들러
     /// </summary>
-    private void OnAdornerRemoved(object sender, AdornerLifecycleEventArgs e)
+    private void OnAdornerRemoved(object? sender, AdornerLifecycleEventArgs e)
     {
         _log?.Info($"Adorner 제거됨: {e.Marker.Title}");
         AdornerRemoved?.Invoke(this, e);
@@ -637,7 +637,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// 편집 시작 이벤트 핸들러
     /// </summary>
-    private void OnEditStarted(object sender, MarkerEditStartedEventArgs e)
+    private void OnEditStarted(object? sender, MarkerEditStartedEventArgs e)
     {
         _log?.Info($"편집 시작: {e.Marker.Title}, 핸들: {e.Handle}");
         MarkerEditStarted?.Invoke(this, e);
@@ -646,7 +646,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// 편집 완료 이벤트 핸들러
     /// </summary>
-    private void OnEditCompleted(object sender, MarkerEditCompletedEventArgs e)
+    private void OnEditCompleted(object? sender, MarkerEditCompletedEventArgs e)
     {
         _log?.Info($"편집 완료: {e.Marker.Title}, 변경: {e.GetChangesSummary()}");
         MarkerEditCompleted?.Invoke(this, e);
@@ -655,7 +655,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// 편집 취소 이벤트 핸들러
     /// </summary>
-    private void OnEditCancelled(object sender, MarkerEditCancelledEventArgs e)
+    private void OnEditCancelled(object? sender, MarkerEditCancelledEventArgs e)
     {
         _log?.Info($"편집 취소: {e.Marker.Title}, 이유: {e.Reason}");
         MarkerEditCancelled?.Invoke(this, e);
