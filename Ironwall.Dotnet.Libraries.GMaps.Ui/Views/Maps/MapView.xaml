@@ -389,6 +389,7 @@
 				<!--  라인 드로잉 전용 버튼 추가 (AREA_BOUNDARY 카테고리일 때만 표시)  -->
 				<Button
 					Command="{Binding StartLineDrawingCommand}"
+					CommandParameter="boundary"
 					IsEnabled="{Binding CanStartLineDrawing}"
 					Style="{StaticResource MaterialDesignToolButton}"
 					ToolTip="라인 그리기 시작 (Ctrl+L)"
@@ -801,7 +802,7 @@
 
 
 			<!--  라인 드로잉 상태 패널  -->
-			<Border
+			<!--<Border
 				x:Name="LineDrawingStatusPanel"
 				Canvas.Left="10"
 				Canvas.Bottom="80"
@@ -832,7 +833,9 @@
 						Foreground="{DynamicResource MaterialDesignBodyLight}"
 						Text="{Binding LineDrawingPointCount, StringFormat='{}{0}개 점'}" />
 
-					<!--  간단한 제어 버튼들  -->
+					-->
+			<!--  간단한 제어 버튼들  -->
+			<!--
 					<Button
 						Width="24"
 						Height="24"
@@ -872,7 +875,7 @@
 							Kind="Close" />
 					</Button>
 				</StackPanel>
-			</Border>
+			</Border>-->
 
 
 			<!--  심볼 속성 창  -->

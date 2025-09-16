@@ -489,12 +489,12 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     /// <summary>
     /// 속성 바인딩 설정
     /// </summary>
-    protected void SetupPropertyBinding(DependencyProperty targetProperty, string sourcePropertyName)
+    protected void SetupPropertyBinding(DependencyProperty targetProperty, string sourcePropertyName, BindingMode mode = BindingMode.TwoWay)
     {
         var binding = new Binding(sourcePropertyName)
         {
             Source = Marker,
-            Mode = BindingMode.TwoWay,
+            Mode = mode,
             UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
         };
         SetBinding(targetProperty, binding);
@@ -741,6 +741,6 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         return Math.Round((double)value, 2);
     }
     #endregion
-    private bool _isUpdatingFromMarker = false;  // 필드 추가
+    protected bool _isUpdatingFromMarker = false;  // 필드 추가
     protected ILogService? _log;
 }

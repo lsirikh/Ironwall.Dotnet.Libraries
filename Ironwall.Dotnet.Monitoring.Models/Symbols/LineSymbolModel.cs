@@ -16,8 +16,8 @@ public class LineSymbolModel : SymbolModel, ILineSymbolModel
     public LineSymbolModel()
     {
 
-        Width = 60;
-        Height = 60;
+        Width = 2000;
+        Height = 2000;
         ShowShape = true;
         ShowTitle = false;
         StrokeColor = EnumColorType.Black;

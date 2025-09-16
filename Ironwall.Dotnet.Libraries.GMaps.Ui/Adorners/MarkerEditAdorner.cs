@@ -31,8 +31,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 /// </summary>
 public class MarkerEditAdorner : Adorner, IDisposable
 {
-    
-
     #region Events
 
     /// <summary>
@@ -204,7 +202,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
             RenderEditArea(drawingContext, markerCenter, editRadius);
             RenderEditHandles(drawingContext, markerCenter, editRadius);
 
-            /// 디버깅용 Adorner Control Info
+            // 디버깅용 Adorner Control Info
             //if (_editState.ShowInfo)
             //{
             //    RenderMarkerInfo(drawingContext, markerCenter, editRadius);
@@ -1252,6 +1250,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     
 
     #endregion
+
     #region Fields
 
     private readonly ILogService? _log;

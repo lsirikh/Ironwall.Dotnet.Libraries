@@ -30,26 +30,39 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         public GMapLineMarker(ILogService log, LineSymbolModel symbolModel)
             : base(log, symbolModel)
         {
+
+            _log?.Info($"[GMapLineMarker 생성자] 시작 - Title: {symbolModel.Title}");
+
             // 모델의 GeoPoint를 런타임 PointLatLng로 변환
             _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
+            _log?.Info($"[GMapLineMarker 생성자] 초기 포인트 변환 완료 - 개수: {_runtimePoints.Count}");
+
             _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
 
             // 시작점이 있으면 마커 위치 설정
             if (_runtimePoints.Count > 0)
             {
                 Position = _runtimePoints[0];
+                _log?.Info($"[GMapLineMarker 생성자] 시작 위치 설정: ({Position.Lat}, {Position.Lng})");
             }
 
             // 카테고리 설정 (라인은 기본적으로 AREA_BOUNDARY 카테고리)
             Category = EnumMarkerCategory.AREA_BOUNDARY;
+
+            _isDrawing = false;
+
+            _log?.Info($"[GMapLineMarker 생성자] 완료 - Category: {Category}");
         }
 
-        #region IEditableLineMarker 구현
+        #region ILineEditableMarker 구현 (편집 기능용)
 
-        
-
+        /// <summary>
+        /// 포인트 추가 (편집 모드에서 사용)
+        /// </summary>
         public void AddPoint(PointLatLng point)
         {
+            _log?.Info($"[AddPoint] 포인트 추가: ({point.Lat}, {point.Lng})");
+
             _runtimePoints.Add(point);
 
             // 첫 번째 점이면 마커 위치 설정
@@ -61,85 +74,98 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             }
 
             // 모델 동기화
-            _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
-            _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
-            OnPropertyChanged(nameof(RuntimePoints));
-            OnPropertyChanged(nameof(LinePoints));
-            OnPropertyChanged(nameof(TotalDistance));
+            SyncModelPoints();
+
+            // 속성 변경 알림
+            NotifyPointsChanged();
         }
 
+        /// <summary>
+        /// 포인트 업데이트 (편집 모드에서 사용)
+        /// </summary>
         public void UpdatePoint(int index, PointLatLng newPoint)
         {
-            if (index >= 0 && index < _runtimePoints.Count)
+            if (index < 0 || index >= _runtimePoints.Count)
             {
-                _runtimePoints[index] = newPoint;
-
-                // 첫 번째 점 업데이트시 마커 위치도 업데이트
-                if (index == 0)
-                {
-                    Position = newPoint;
-                    _model.Latitude = newPoint.Lat;
-                    _model.Longitude = newPoint.Lng;
-                }
-
-                // 모델 동기화
-                _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
-                _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
-                OnPropertyChanged(nameof(RuntimePoints));
-                OnPropertyChanged(nameof(LinePoints));
-                OnPropertyChanged(nameof(TotalDistance));
+                _log?.Warning($"[UpdatePoint] 잘못된 인덱스: {index}");
+                return;
             }
+
+            _log?.Info($"[UpdatePoint] 인덱스 {index} 포인트 업데이트");
+
+            _runtimePoints[index] = newPoint;
+
+            // 첫 번째 점 업데이트시 마커 위치도 업데이트
+            if (index == 0)
+            {
+                Position = newPoint;
+                _model.Latitude = newPoint.Lat;
+                _model.Longitude = newPoint.Lng;
+            }
+
+            // 모델 동기화
+            SyncModelPoints();
+
+            // 속성 변경 알림
+            NotifyPointsChanged();
         }
 
+        /// <summary>
+        /// 마지막 포인트 제거 (편집 모드에서 사용)
+        /// </summary>
         public void RemoveLastPoint()
         {
             if (_runtimePoints.Count > 0)
             {
+                var removed = _runtimePoints.Last();
                 _runtimePoints.RemoveAt(_runtimePoints.Count - 1);
-                _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
-                _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
-                OnPropertyChanged(nameof(RuntimePoints));
-                OnPropertyChanged(nameof(LinePoints));
-                OnPropertyChanged(nameof(TotalDistance));
+
+                _log?.Info($"[RemoveLastPoint] 포인트 제거: ({removed.Lat}, {removed.Lng})");
+
+                // 모델 동기화
+                SyncModelPoints();
+
+                // 속성 변경 알림
+                NotifyPointsChanged();
             }
         }
 
+        /// <summary>
+        /// 드로잉 시작 (Adorner 방식에서는 사용 안 함)
+        /// </summary>
         public void StartDrawing()
         {
-            _isDrawing = true;
-            _runtimePoints.Clear();
-            _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
-            _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
-            OnPropertyChanged(nameof(IsDrawing));
-            OnPropertyChanged(nameof(RuntimePoints));
+            // Adorner 방식에서는 이 메서드를 사용하지 않음
+            _log?.Info("[StartDrawing] Adorner 방식에서는 사용하지 않음");
         }
 
+        /// <summary>
+        /// 드로잉 완료 (Adorner 방식에서는 사용 안 함)
+        /// </summary>
         public void FinishDrawing()
         {
-            _isDrawing = false;
-            OnPropertyChanged(nameof(IsDrawing));
-            _log?.Info($"라인 그리기 완료: {_model.Title}, {_runtimePoints.Count}개 포인트, 총 거리: {TotalDistance:F1}m");
+            // Adorner 방식에서는 이 메서드를 사용하지 않음
+            _log?.Info("[FinishDrawing] Adorner 방식에서는 사용하지 않음");
         }
 
+        /// <summary>
+        /// 드로잉 취소 (Adorner 방식에서는 사용 안 함)
+        /// </summary>
         public void CancelDrawing()
         {
-            _isDrawing = false;
-            _runtimePoints.Clear();
-            _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
-            _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
-            OnPropertyChanged(nameof(IsDrawing));
-            OnPropertyChanged(nameof(RuntimePoints));
-            OnPropertyChanged(nameof(LinePoints));
-            _log?.Info($"라인 그리기 취소됨: {_model.Title}");
+            // Adorner 방식에서는 이 메서드를 사용하지 않음
+            _log?.Info("[CancelDrawing] Adorner 방식에서는 사용하지 않음");
         }
 
         #endregion
-
         #region 오버라이드 메서드
 
         protected override UIElement CreateMarkerControl()
         {
-            return new GMapMarkerLineControl(this);
+            _log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 시작");
+            var control = new GMapMarkerLineControl(this);
+            _log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 완료 - Type: {control.GetType().Name}");
+            return control;
         }
 
         /// <summary>
@@ -160,7 +186,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         /// </summary>
         protected override void InitializeCommands()
         {
-            base.InitializeCommands();
+            _log?.Info($"[InitializeMarker] 시작 - Title: {_model.Title}");
+            base.InitializeMarker();
+
+            EnableShapeAnimation = false;
+            _log?.Info($"[InitializeMarker] 완료 - EnableShapeAnimation: {EnableShapeAnimation}");
+            _log?.Info($"[InitializeMarker] 초기 LinePoints 개수: {_model.LinePoints.Count}");
 
             // 라인 전용 명령어 추가 가능
             // AddPointCommand = new RelayCommand<PointLatLng>(ExecuteAddPoint);
@@ -177,48 +208,44 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             return _runtimePoints.Count >= 2;
         }
 
+        #region Private Methods
+
         /// <summary>
-        /// 특정 포인트에서 가장 가까운 라인 세그먼트 찾기
+        /// 모델 포인트 동기화
         /// </summary>
-        public int FindClosestSegment(PointLatLng point, out double distance)
+        private void SyncModelPoints()
         {
-            distance = double.MaxValue;
-            int closestSegment = -1;
-
-            if (_runtimePoints.Count < 2)
-                return closestSegment;
-
-            for (int i = 0; i < _runtimePoints.Count - 1; i++)
-            {
-                var segmentDistance = CalculatePointToSegmentDistance(point, _runtimePoints[i], _runtimePoints[i + 1]);
-                if (segmentDistance < distance)
-                {
-                    distance = segmentDistance;
-                    closestSegment = i;
-                }
-            }
-
-            return closestSegment;
+            _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
         }
 
         /// <summary>
-        /// 점과 선분 사이의 최단 거리 계산
+        /// 포인트 변경 알림
         /// </summary>
-        private double CalculatePointToSegmentDistance(PointLatLng point, PointLatLng segmentStart, PointLatLng segmentEnd)
+        private void NotifyPointsChanged()
         {
-            // 간단한 유클리드 거리 계산 (실제로는 대원 거리 사용 권장)
+            OnPropertyChanged(nameof(RuntimePoints));
+            OnPropertyChanged(nameof(LinePoints));
+            OnPropertyChanged(nameof(TotalDistance));
+        }
+
+        /// <summary>
+        /// 점과 선분 사이의 거리 계산
+        /// </summary>
+        private double CalculatePointToSegmentDistance(
+            PointLatLng point, PointLatLng segmentStart, PointLatLng segmentEnd)
+        {
             var dx = segmentEnd.Lng - segmentStart.Lng;
             var dy = segmentEnd.Lat - segmentStart.Lat;
 
             if (dx == 0 && dy == 0)
             {
-                // 선분의 시작점과 끝점이 같음
                 dx = point.Lng - segmentStart.Lng;
                 dy = point.Lat - segmentStart.Lat;
                 return Math.Sqrt(dx * dx + dy * dy);
             }
 
-            var t = ((point.Lng - segmentStart.Lng) * dx + (point.Lat - segmentStart.Lat) * dy) / (dx * dx + dy * dy);
+            var t = ((point.Lng - segmentStart.Lng) * dx +
+                    (point.Lat - segmentStart.Lat) * dy) / (dx * dx + dy * dy);
             t = Math.Max(0, Math.Min(1, t));
 
             var projection = new PointLatLng(
@@ -231,12 +258,25 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
+        #endregion
+
 
         public List<PointLatLng> RuntimePoints => _runtimePoints.ToList();
 
         public List<GeoPoint> LinePoints => _model.LinePoints.ToList();
 
-        public bool IsDrawing => _isDrawing;
+        public bool IsDrawing
+        {
+            get => _isDrawing;
+            set 
+            {
+                if (_isDrawing != value)
+                {
+                    _isDrawing = value;
+                    OnPropertyChanged(nameof(IsDrawing));
+                }
+            }
+        }
 
         public bool IsClosedPath
         {

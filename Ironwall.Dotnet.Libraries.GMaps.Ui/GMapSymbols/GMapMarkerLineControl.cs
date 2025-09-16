@@ -8,6 +8,9 @@ using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.Enums;
 using System.Windows.Input;
+using System.Windows.Data;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
+using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
@@ -31,9 +34,13 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
 {
     private Canvas _lineCanvas;
     private Polyline _mainPolyline;
-    private Polyline _previewPolyline;
-    private Point? _currentMousePosition = null;  // 추가 필드
-    private bool _isUpdatingFromMarker = false;  // 순환 방지 플래그
+    private GMapCustomControl _mapControl;
+
+    // 실제 라인 경계 영역
+    private Rect _actualLineBounds = Rect.Empty;
+
+    // IEditableMarker 인터페이스에 추가해야 할 속성
+    public Rect ActualBounds => _actualLineBounds;
 
     #region Static Constructor
     static GMapMarkerLineControl()
@@ -100,15 +107,15 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
     /// <summary>
     /// 드로잉 중 여부
     /// </summary>
-    public bool IsDrawing
-    {
-        get { return (bool)GetValue(IsDrawingProperty); }
-        set { SetValue(IsDrawingProperty, value); }
-    }
+    //public bool IsDrawing
+    //{
+    //    get { return (bool)GetValue(IsDrawingProperty); }
+    //    set { SetValue(IsDrawingProperty, value); }
+    //}
 
-    public static readonly DependencyProperty IsDrawingProperty =
-        DependencyProperty.Register("IsDrawing", typeof(bool), typeof(GMapMarkerLineControl),
-            new PropertyMetadata(false, OnIsDrawingChanged));
+    //public static readonly DependencyProperty IsDrawingProperty =
+    //    DependencyProperty.Register("IsDrawing", typeof(bool), typeof(GMapMarkerLineControl),
+    //        new PropertyMetadata(false, OnIsDrawingChanged));
 
     #endregion
 
@@ -120,6 +127,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
     public GMapMarkerLineControl()
     {
         // 기본 클래스에서 InitializeControl() 호출됨
+
     }
 
     /// <summary>
@@ -129,10 +137,59 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
     public GMapMarkerLineControl(GMapLineMarker lineMarker) : base(lineMarker)
     {
         // 기본 클래스에서 UpdateFromMarker(), SetupDataBindings() 호출됨
+
+        Loaded += OnControlLoaded;
+        Unloaded += OnControlUnloaded;
     }
 
     #endregion
+    #region Lifecycle Events
+    private void OnControlLoaded(object sender, RoutedEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine("=== GMapMarkerLineControl Loaded ===");
 
+        // Visual Tree가 완성된 후 MapControl 찾기
+        _mapControl = FindParentMapControl();
+
+        if (_mapControl != null)
+        {
+            System.Diagnostics.Debug.WriteLine($"MapControl 찾음: {_mapControl.GetType().Name}");
+
+            // 지도 이벤트 구독
+            _mapControl.OnMapZoomChanged += OnMapChanged;
+            _mapControl.OnMapDrag += OnMapChanged;
+            _mapControl.OnPositionChanged += OnMapPositionChanged;
+
+            // 초기 라인 그리기
+            UpdateLineGeometry();
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("MapControl을 찾을 수 없음!");
+        }
+    }
+
+    private void OnControlUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_mapControl != null)
+        {
+            _mapControl.OnMapZoomChanged -= OnMapChanged;
+            _mapControl.OnMapDrag -= OnMapChanged;
+            _mapControl.OnPositionChanged -= OnMapPositionChanged;
+        }
+    }
+
+    private void OnMapChanged()
+    {
+        System.Diagnostics.Debug.WriteLine("지도 변경 감지 - 라인 업데이트");
+        UpdateLineGeometry();
+    }
+
+    private void OnMapPositionChanged(PointLatLng point)
+    {
+        UpdateLineGeometry();
+    }
+    #endregion
     #region Abstract Methods Implementation
 
     /// <summary>
@@ -147,7 +204,6 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         LineOpacity = Marker.LineOpacity;
         IsClosedPath = Marker.IsClosedPath;
         ShowArrowHead = Marker.ShowArrowHead;
-        IsDrawing = Marker.IsDrawing;
 
         // 라인 심볼 전용 모양 업데이트
         UpdateLineGeometry();
@@ -165,7 +221,6 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         SetupPropertyBinding(LineOpacityProperty, nameof(Marker.LineOpacity));
         SetupPropertyBinding(IsClosedPathProperty, nameof(Marker.IsClosedPath));
         SetupPropertyBinding(ShowArrowHeadProperty, nameof(Marker.ShowArrowHead));
-        SetupPropertyBinding(IsDrawingProperty, nameof(Marker.IsDrawing));
     }
 
     #endregion
@@ -203,9 +258,9 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         // 템플릿에서 UI 요소 찾기
         _lineCanvas = GetTemplateChild("PART_LineCanvas") as Canvas;
         _mainPolyline = GetTemplateChild("PART_MainPolyline") as Polyline;
-        _previewPolyline = GetTemplateChild("PART_PreviewPolyline") as Polyline;
 
-        UpdateLineGeometry();
+        System.Diagnostics.Debug.WriteLine($"Template 적용: Canvas={_lineCanvas != null}, Polyline={_mainPolyline != null}");
+
     }
 
     /// <summary>
@@ -259,57 +314,174 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         }
     }
 
+
     /// <summary>
     /// 라인 기하학 업데이트 (개선된 버전)
     /// </summary>
     private void UpdateLineGeometry()
     {
-        if (Marker == null || _mainPolyline == null) return;
+        if (Marker == null || _mainPolyline == null || _mapControl == null)
+            return;
 
         try
         {
-            var mapControl = FindParent<GMapControl>(this);
-            if (mapControl == null) return;
-
-            // 1. 확정된 라인 포인트들 렌더링
-            UpdateMainPolyline(mapControl);
-
-            // 2. 드로잉 중인 경우 미리보기 라인 렌더링
-            if (Marker.IsDrawing && _previewPolyline != null)
+            var points = Marker.RuntimePoints;
+            if (points == null || points.Count < 2)
             {
-                UpdatePreviewPolyline(mapControl);
+                _mainPolyline.Points = new PointCollection();
+                _actualLineBounds = Rect.Empty;
+                return;
             }
-            else if (_previewPolyline != null)
+
+            var pointCollection = new PointCollection();
+            // 라인의 실제 경계 계산을 위한 변수
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+
+
+            // 마커의 Position이 이제 중심점이므로, 각 포인트를 중심 기준으로 변환
+            var centerScreenPos = _mapControl.FromLatLngToLocal(Marker.Position);
+
+            foreach (var geoPoint in points)
             {
-                _previewPolyline.Visibility = Visibility.Collapsed;
+                var screenPoint = _mapControl.FromLatLngToLocal(geoPoint);
+
+                // 컨트롤의 중심(Width/2, Height/2)을 기준으로 상대 좌표 계산
+                var relativePoint = new Point(
+                    (screenPoint.X - centerScreenPos.X) + Width / 2,
+                    (screenPoint.Y - centerScreenPos.Y) + Height / 2
+                );
+
+                pointCollection.Add(relativePoint);
+
+                // 실제 경계 업데이트
+                minX = Math.Min(minX, relativePoint.X);
+                minY = Math.Min(minY, relativePoint.Y);
+                maxX = Math.Max(maxX, relativePoint.X);
+                maxY = Math.Max(maxY, relativePoint.Y);
             }
+
+            // 닫힌 경로 처리
+            if (IsClosedPath && pointCollection.Count > 2)
+            {
+                pointCollection.Add(pointCollection[0]);
+            }
+
+            _mainPolyline.Points = pointCollection;
+
+            //_mainPolyline.Stroke = MarkerStroke;
+            //_mainPolyline.StrokeThickness = MarkerStrokeThickness;
+            //_mainPolyline.Opacity = LineOpacity;
+
+            // 실제 라인 경계 저장 (StrokeThickness 고려)
+            var strokePadding = MarkerStrokeThickness / 2;
+            _actualLineBounds = new Rect(
+                minX - strokePadding,
+                minY - strokePadding,
+                maxX - minX + MarkerStrokeThickness,
+                maxY - minY + MarkerStrokeThickness
+            );
+
+            // Control 크기를 실제 라인 크기에 맞게 조정
+            Width = _actualLineBounds.Width + 20;  // 여백 추가
+            Height = _actualLineBounds.Height + 20;
+
+            // Canvas 크기도 조정
+            if (_lineCanvas != null)
+            {
+                _lineCanvas.Width = Width;
+                _lineCanvas.Height = Height;
+            }
+
+            // 디버깅 로그
+            System.Diagnostics.Debug.WriteLine($"라인 실제 경계: {_actualLineBounds}");
+            System.Diagnostics.Debug.WriteLine($"컨트롤 크기: {Width}x{Height}");
+
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"라인 기하학 업데이트 오류: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"라인 업데이트 오류: {ex.Message}");
         }
     }
 
-    /// <summary>
-    /// 확정된 라인 업데이트
-    /// </summary>
-    private void UpdateMainPolyline(GMapControl mapControl)
+    private void UpdateCanvasSize()
     {
+        if (_lineCanvas == null || _mainPolyline?.Points == null || _mainPolyline.Points.Count < 2)
+            return;
+
+        // 바운딩 박스 계산
+        double minX = double.MaxValue, minY = double.MaxValue;
+        double maxX = double.MinValue, maxY = double.MinValue;
+
+        foreach (var point in _mainPolyline.Points)
+        {
+            minX = Math.Min(minX, point.X);
+            minY = Math.Min(minY, point.Y);
+            maxX = Math.Max(maxX, point.X);
+            maxY = Math.Max(maxY, point.Y);
+        }
+
+        // Canvas 크기와 위치 조정 (여유 공간 추가)
+        double padding = 50;
+        _lineCanvas.Width = Math.Max(200, maxX - minX + padding * 2);
+        _lineCanvas.Height = Math.Max(200, maxY - minY + padding * 2);
+
+        // Canvas를 중앙에 배치하기 위한 마진 조정
+        Canvas.SetLeft(_lineCanvas, minX - padding);
+        Canvas.SetTop(_lineCanvas, minY - padding);
+
+        System.Diagnostics.Debug.WriteLine($"Canvas 크기 조정: {_lineCanvas.Width}x{_lineCanvas.Height}, 위치: ({minX - padding}, {minY - padding})");
+    }
+
+    private void UpdateMainPolyline(GMapCustomControl mapControl)
+    {
+        System.Diagnostics.Debug.WriteLine($"=== UpdateMainPolyline 시작 ===");
+
         var points = Marker.RuntimePoints;
+        System.Diagnostics.Debug.WriteLine($"RuntimePoints 개수: {points?.Count ?? 0}");
+
+        if (points == null || points.Count < 2)
+        {
+            _mainPolyline.Points = new PointCollection();
+            return;
+        }
+
         var pointCollection = new PointCollection();
+
+        // 첫 번째 포인트를 기준으로 상대 좌표 계산
+        var firstPoint = points[0];
+        var firstScreenPoint = mapControl.FromLatLngToLocal(firstPoint);
 
         foreach (var geoPoint in points)
         {
-            var localPoint = mapControl.FromLatLngToLocal(geoPoint);
-            pointCollection.Add(new Point(localPoint.X, localPoint.Y));
+            var screenPoint = mapControl.FromLatLngToLocal(geoPoint);
+            var relativePoint = new Point(
+                screenPoint.X - firstScreenPoint.X,
+                screenPoint.Y - firstScreenPoint.Y
+            );
+            pointCollection.Add(relativePoint);
+        }
+
+        // 닫힌 경로 처리
+        if (IsClosedPath && pointCollection.Count > 2)
+        {
+            pointCollection.Add(pointCollection[0]);
         }
 
         _mainPolyline.Points = pointCollection;
         _mainPolyline.Stroke = MarkerStroke;
         _mainPolyline.StrokeThickness = MarkerStrokeThickness;
-        _mainPolyline.Opacity = Marker.IsDrawing ? 0.7 : LineOpacity;
+        _mainPolyline.Opacity = LineOpacity;
+
         ApplyLinePattern(_mainPolyline, LinePattern);
+
+        // 화살표 처리 (필요시)
+        if (ShowArrowHead && pointCollection.Count >= 2)
+        {
+            ApplyArrowHead();
+        }
     }
+
 
     /// <summary>
     /// 라인 패턴 적용
@@ -340,75 +512,20 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
     }
 
     /// <summary>
-    /// 미리보기 라인 업데이트 (마우스 이동시 호출)
+    /// 화살표 머리 적용
     /// </summary>
-    public void UpdatePreviewLine(Point mousePosition)
+    private void ApplyArrowHead()
     {
-        _currentMousePosition = mousePosition;
-
-        if (Marker?.IsDrawing == true && _previewPolyline != null)
+        // 화살표 구현 (필요시)
+        if (_mainPolyline?.Points?.Count >= 2)
         {
-            var mapControl = FindParent<GMapControl>(this);
-            if (mapControl != null)
-            {
-                UpdatePreviewPolyline(mapControl);
-            }
+            var lastIndex = _mainPolyline.Points.Count - 1;
+            var endPoint = _mainPolyline.Points[lastIndex];
+            var prevPoint = _mainPolyline.Points[lastIndex - 1];
+
+            // 화살표 그리기 로직
+            // TODO: 구현 필요
         }
-    }
-
-    /// <summary>
-    /// 미리보기 라인 업데이트
-    /// </summary>
-    private void UpdatePreviewPolyline(GMapControl mapControl)
-    {
-        var points = Marker.RuntimePoints;
-        if (points.Count == 0 || _currentMousePosition == null)
-        {
-            _previewPolyline.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        // 마지막 확정 포인트에서 현재 마우스 위치까지 미리보기 라인
-        var lastPoint = mapControl.FromLatLngToLocal(points.Last());
-        var previewPoints = new PointCollection
-        {
-            new Point(lastPoint.X, lastPoint.Y),
-            _currentMousePosition.Value
-        };
-
-        _previewPolyline.Points = previewPoints;
-        _previewPolyline.Stroke = new SolidColorBrush(Colors.Gray);
-        _previewPolyline.StrokeThickness = MarkerStrokeThickness;
-        _previewPolyline.Opacity = 0.5;
-        _previewPolyline.StrokeDashArray = new DoubleCollection { 5, 3 };
-        _previewPolyline.Visibility = Visibility.Visible;
-    }
-
-    /// <summary>
-    /// 드로잉 시작 시 초기화
-    /// </summary>
-    public void StartDrawingMode()
-    {
-        _currentMousePosition = null;
-        if (_previewPolyline != null)
-        {
-            _previewPolyline.Visibility = Visibility.Collapsed;
-        }
-    }
-
-    /// <summary>
-    /// 드로잉 종료 시 정리
-    /// </summary>
-    public void EndDrawingMode()
-    {
-        _currentMousePosition = null;
-        if (_previewPolyline != null)
-        {
-            _previewPolyline.Visibility = Visibility.Collapsed;
-        }
-
-        // 최종 라인 렌더링
-        UpdateLineGeometry();
     }
 
 
@@ -422,21 +539,6 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             _mainPolyline.Opacity = LineOpacity;
         }
     }
-
-    /// <summary>
-    /// 부모 컨트롤 찾기 헬퍼
-    /// </summary>
-    private T FindParent<T>(DependencyObject child) where T : DependencyObject
-    {
-        DependencyObject parentObject = VisualTreeHelper.GetParent(child);
-        if (parentObject == null) return null;
-
-        if (parentObject is T parent)
-            return parent;
-
-        return FindParent<T>(parentObject);
-    }
-
     #endregion
 
     #region Static Property Changed Callbacks
@@ -451,9 +553,6 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             // UI 업데이트
             control.UpdateLineAppearance();
 
-            // 마커 데이터와 동기화 (타입 안전)
-            if (control.Marker.LinePattern != (EnumLinePattern)e.NewValue)
-                control.Marker.LinePattern = (EnumLinePattern)e.NewValue;
         }
     }
 
@@ -465,11 +564,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         if (d is GMapMarkerLineControl control && control.Marker != null)
         {
             // UI 투명도 적용
-            control.ApplyLineOpacity();
-
-            // 마커 데이터와 동기화 (타입 안전)
-            if (control.Marker.LineOpacity != (double)e.NewValue)
-                control.Marker.LineOpacity = (double)e.NewValue;
+            control._mainPolyline.Opacity = (double)e.NewValue;
         }
     }
 
@@ -482,10 +577,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         {
             // UI 업데이트
             control.UpdateLineGeometry();
-
-            // 마커 데이터와 동기화 (타입 안전)
-            if (control.Marker.IsClosedPath != (bool)e.NewValue)
-                control.Marker.IsClosedPath = (bool)e.NewValue;
+            
         }
     }
 
@@ -498,10 +590,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         {
             // UI 업데이트
             control.UpdateLineAppearance();
-
-            // 마커 데이터와 동기화 (타입 안전)
-            if (control.Marker.ShowArrowHead != (bool)e.NewValue)
-                control.Marker.ShowArrowHead = (bool)e.NewValue;
+           
         }
     }
 

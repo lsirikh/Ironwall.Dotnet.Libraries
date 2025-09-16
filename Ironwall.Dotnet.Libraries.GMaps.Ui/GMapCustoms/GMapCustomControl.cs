@@ -43,7 +43,8 @@ public class GMapCustomControl : GMapControl
         InitializeCollections();
         InitializeEvents();
         InitializeAdornerManager();
-
+        // 라인 드로잉 서비스 초기화
+        InitializeLineDrawingService();
 
         _mgrsOverlay = new MGRSGridOverlayService(_log);
         _log?.Info("GMapCustomControl 초기화 완료");
@@ -99,8 +100,28 @@ public class GMapCustomControl : GMapControl
         _log?.Info("AdornerManager 초기화 및 이벤트 구독 완료");
     }
 
-   
+
     #endregion
+    #region Line Drawing Fields
+
+    private LineDrawingService _lineDrawingService;
+
+    #endregion
+
+    #region Line Drawing Properties
+
+    /// <summary>
+    /// 라인 드로잉 서비스
+    /// </summary>
+    public LineDrawingService LineDrawingService => _lineDrawingService;
+
+    /// <summary>
+    /// 라인 드로잉 중 여부
+    /// </summary>
+    public bool IsLineDrawing => _lineDrawingService?.IsDrawing ?? false;
+
+    #endregion
+
     #region Integration Events
     /// <summary>
     /// 지도 클릭 이벤트 - ViewModel에 클릭 위치 전달
@@ -177,6 +198,108 @@ public class GMapCustomControl : GMapControl
         AdornerManager.AdornerCreated -= OnAdornerCreated;
         AdornerManager.AdornerRemoved -= OnAdornerRemoved;
     }
+    #endregion
+    #region Line Drawing Methods
+
+    /// <summary>
+    /// 라인 드로잉 서비스 초기화
+    /// </summary>
+    private void InitializeLineDrawingService()
+    {
+        _lineDrawingService = new LineDrawingService(this, _log);
+
+        // 이벤트 구독
+        _lineDrawingService.StateChanged += OnLineDrawingStateChanged;
+        _lineDrawingService.PointAdded += OnLinePointAdded;
+        _lineDrawingService.LineCompleted += OnLineCompleted;
+        _lineDrawingService.DrawingCancelled += OnLineDrawingCancelled;
+
+        _log?.Info("라인 드로잉 서비스 초기화 완료");
+    }
+
+    /// <summary>
+    /// 라인 드로잉 시작
+    /// </summary>
+    public async Task<bool> StartLineDrawingAsync(LineDrawingParameters parameters = null)
+    {
+        try
+        {
+            // 편집 모드 활성화
+            //IsEditMode = true;
+
+            // 라인 드로잉 시작
+            return await _lineDrawingService.StartLineDrawingAsync(parameters);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 시작 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 완료
+    /// </summary>
+    public async Task<bool> CompleteLineDrawingAsync()
+    {
+        return await _lineDrawingService?.CompleteDrawingAsync();
+    }
+
+    /// <summary>
+    /// 라인 드로잉 취소
+    /// </summary>
+    public async Task<bool> CancelLineDrawingAsync()
+    {
+        return await _lineDrawingService?.CancelDrawingAsync();
+    }
+
+    #endregion
+
+    #region Line Drawing Event Handlers
+
+    /// <summary>
+    /// 라인 드로잉 상태 변경 이벤트 핸들러
+    /// </summary>
+    private void OnLineDrawingStateChanged(object? sender, LineDrawingState state)
+    {
+        _log?.Info($"라인 드로잉 상태 변경: {state}");
+
+        // 완료/취소 시 편집 모드 해제 고려
+        if (state == LineDrawingState.Completed || state == LineDrawingState.Cancelled)
+        {
+            // 필요시 편집 모드 해제
+            // IsEditingMode = false;
+        }
+    }
+
+    /// <summary>
+    /// 라인 포인트 추가 이벤트 핸들러
+    /// </summary>
+    private void OnLinePointAdded(object? sender, PointLatLng point)
+    {
+        _log?.Info($"라인 포인트 추가: {point}");
+    }
+
+    /// <summary>
+    /// 라인 완성 이벤트 핸들러
+    /// </summary>
+    private void OnLineCompleted(object? sender, ILineEditableMarker lineMarker)
+    {
+        _log?.Info($"라인 완성: {lineMarker.Title}");
+
+        // 완성된 라인 마커 이벤트 발생
+        //OnMarkerCreated?.Invoke(lineMarker);
+
+    }
+
+    /// <summary>
+    /// 라인 드로잉 취소 이벤트 핸들러
+    /// </summary>
+    private void OnLineDrawingCancelled(object? sender, EventArgs e)
+    {
+        _log?.Info("라인 드로잉 취소됨");
+    }
+
     #endregion
     #region Override Methods
 
@@ -445,6 +568,15 @@ public class GMapCustomControl : GMapControl
         var geoPos = FromLocalToLatLng((int)mousePos.X, (int)mousePos.Y);
 
         _log?.Info($"마우스 위치: 화면({mousePos.X:F2}, {mousePos.Y:F2}) -> 지리({geoPos.Lat:F6}, {geoPos.Lng:F6})");
+
+        if (IsLineDrawing)
+        {
+            // OnMapClicked 이벤트 발생
+            OnMapClicked?.Invoke(geoPos, mousePos);
+
+            e.Handled = true;
+            return;
+        }
 
         // 편집 모드일 때만 편집 처리
         if (IsEditMode)

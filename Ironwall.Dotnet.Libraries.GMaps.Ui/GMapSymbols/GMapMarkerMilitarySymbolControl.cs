@@ -474,5 +474,4 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
 
     #endregion
 
-    private bool _isUpdatingFromMarker = false;  // 순환 방지 플래그
 }
