@@ -39,6 +39,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                                PidsSymbolProvider pidsSymbolProvider,
                                MilitarySymbolProvider militarySymbolProvider,
                                LineSymbolProvider lineSymbolProvider,
+                               InfraSymbolProvider infraSymbolProvider,
                                GMapDbSetupModel setupModel)
     {
         _log = log;
@@ -48,6 +49,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         _pidsSymbolProvider = pidsSymbolProvider;
         _militarySymbolProvider = militarySymbolProvider;
         _lineSymbolProvider = lineSymbolProvider;
+        _infraSymbolProvider = infraSymbolProvider;
         _setup = setupModel;
     }
     #endregion
@@ -375,7 +377,24 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 UNIQUE KEY `UQ_LinePoints_Symbol_Sequence` (`LineSymbolId`, `SequenceOrder`)
             );";
 
+            // ── InfraSymbols 테이블 ──
+            var createInfraSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `InfraSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `BuildingType`      VARCHAR(20) NOT NULL DEFAULT 'Factory',
+                `BuildingUsage`     VARCHAR(20) NOT NULL DEFAULT 'Office',
+                `FloorCount`        INT NOT NULL DEFAULT 1,
+                `BasementFloorCount` INT NOT NULL DEFAULT 0,
+                `BuildingArea`      DECIMAL(10,2) DEFAULT 100.0,
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_InfraSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE
+            );";
+
            
+
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
             if (_eventAggregator != null)
@@ -407,6 +426,11 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "LinePoints 테이블 생성…" });
+
+            await conn.ExecuteAsync(createInfraSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "InfraSymbols 테이블 생성…" });
 
 
 
@@ -470,6 +494,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 5. LineSymbol 로드 (새로 추가)
             var lineSymbols = await FetchLineSymbolsAsync(token: token);
 
+            // 6. InfraSymbol 로드 (새로 추가)
+            var infraSymbols = await FetchInfraSymbolsAsync(token: token);
+
             _symbolProvider.Clear();
 
             // 3. 일반 심볼 추가 (BASIC_SHAPES가 아닌 것만)
@@ -517,6 +544,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 foreach (var lineSymbol in lineSymbols)
                 {
                     _symbolProvider.Add(lineSymbol);
+                }
+            }
+
+            _infraSymbolProvider.Clear();
+            if (infraSymbols?.Any() == true)
+            {
+                foreach (var infraSymbol in infraSymbols)
+                {
+                    _symbolProvider.Add(infraSymbol);
                 }
             }
 
@@ -2127,6 +2163,275 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     }
 
     #endregion
+
+    #region - InfraSymbol CRUD -
+
+    /// <summary>
+    /// 모든 인프라 심볼 조회 (JOIN 쿼리)
+    /// </summary>
+    public async Task<List<IInfraSymbolModel>?> FetchInfraSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
+        FROM    Symbols s
+        INNER JOIN InfraSymbols i ON s.Id = i.SymbolId
+        WHERE   s.Category = 'INFRASTRUCTURE'
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<InfraSymbolSQL>(sql))
+                .Select(i => i.ToInfraDomain())
+                .ToList();
+
+            _log?.Info($"FetchInfraSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IInfraSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"InfraSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 인프라 심볼 조회
+    /// </summary>
+    public async Task<IInfraSymbolModel?> FetchInfraSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
+        FROM    Symbols s
+        INNER JOIN InfraSymbols i ON s.Id = i.SymbolId
+        WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<InfraSymbolSQL>(sql, new { Id = id });
+            var infraSymbol = joinResult?.ToInfraDomain();
+
+            _log?.Info(infraSymbol != null
+                ? $"FetchInfraSymbolAsync 완료 - Id={infraSymbol.Id}, BuildingType={infraSymbol.BuildingType}"
+                : $"FetchInfraSymbolAsync 대상 없음 - Id={id}");
+
+            return infraSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"InfraSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 인프라 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+        INSERT INTO Symbols
+        (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+         Width, Height, Category, ShowShape, ShowTitle, 
+         FillColor, StrokeColor, StrokeThickness, CreatedBy)
+        VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+        SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. InfraSymbols 테이블에 인프라 정보 삽입 (현재는 Factory/Office 고정)
+            const string infraSql = @"
+        INSERT INTO InfraSymbols 
+        (SymbolId, BuildingType, BuildingUsage, FloorCount, BasementFloorCount, BuildingArea)
+        VALUES (@SymbolId, @BuildingType, @BuildingUsage, @FloorCount, @BasementFloorCount, @BuildingArea);";
+
+            await conn.ExecuteAsync(infraSql, new
+            {
+                SymbolId = symbolId,
+                BuildingType = model.BuildingType.ToString(),    // Enum → String
+                BuildingUsage = model.BuildingUsage.ToString(),  // Enum → String
+                model.FloorCount,
+                model.BasementFloorCount,
+                model.BuildingArea
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"InfraSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"InfraSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 인프라 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IInfraSymbolModel?> UpdateInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default)
+    {
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. 존재 여부 확인
+            const string checkSql = @"
+        SELECT COUNT(*) FROM Symbols s 
+        INNER JOIN InfraSymbols i ON s.Id = i.SymbolId 
+        WHERE s.Id = @Id;";
+
+            var exists = await conn.ExecuteScalarAsync<int>(checkSql, new { Id = model.Id }, transaction);
+            if (exists == 0)
+            {
+                _log?.Warning($"InfraSymbol 업데이트 대상 없음: Id={model.Id}");
+                return null;
+            }
+
+            // 2. Symbols 테이블 업데이트
+            const string symbolSql = @"
+        UPDATE Symbols SET
+            Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+            Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+            Bearing = @Bearing, Width = @Width, Height = @Height,
+            Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+            CreatedBy = @CreatedBy
+        WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 3. InfraSymbols 테이블 업데이트
+            const string infraSql = @"
+        UPDATE InfraSymbols SET
+            BuildingType = @BuildingType, BuildingUsage = @BuildingUsage,
+            FloorCount = @FloorCount, BasementFloorCount = @BasementFloorCount,
+            BuildingArea = @BuildingArea
+        WHERE SymbolId = @SymbolId;";
+
+            var infraAffected = await conn.ExecuteAsync(infraSql, new
+            {
+                SymbolId = model.Id,
+                BuildingType = model.BuildingType.ToString(),    // Enum → String
+                BuildingUsage = model.BuildingUsage.ToString(),  // Enum → String
+                model.FloorCount,
+                model.BasementFloorCount,
+                model.BuildingArea
+            }, transaction);
+
+            if (symbolAffected == 0 || infraAffected == 0)
+                throw new KeyNotFoundException($"InfraSymbol not found. Id={model.Id}");
+
+            await transaction.CommitAsync(token);
+
+            _log?.Info($"InfraSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchInfraSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"InfraSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 인프라 심볼 삭제 (CASCADE로 InfraSymbols도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeleteInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 InfraSymbols는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            _log?.Info(ret > 0
+                ? $"DeleteInfraSymbolAsync 완료 - Id={model.Id}"
+                : $"DeleteInfraSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"InfraSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
     #endregion
     #region - IHanldes -
     #endregion
@@ -2150,6 +2455,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     private PidsSymbolProvider _pidsSymbolProvider;
     private MilitarySymbolProvider _militarySymbolProvider;
     private LineSymbolProvider _lineSymbolProvider;
+    private InfraSymbolProvider _infraSymbolProvider;
 
     /// <summary>데이터베이스 설정 모델</summary>
     private GMapDbSetupModel _setup;
@@ -2446,8 +2752,6 @@ internal sealed class MilitarySymbolSQL : SymbolSQL
 }
 
 
-#region - LineSymbol DTO Classes -
-
 /// <summary>
 /// Symbols와 LineSymbols를 조인한 결과를 담는 DTO
 /// </summary>
@@ -2523,5 +2827,59 @@ internal sealed class LinePointSQL
     );
 }
 
-#endregion
+/// <summary>
+/// Symbols와 InfraSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class InfraSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 인프라 전용 속성들
+
+    /// <summary>건물 종류 (Factory만)</summary>
+    public string BuildingType { get; set; } = "Factory";
+
+    /// <summary>건물 용도 (Office만)</summary>
+    public string BuildingUsage { get; set; } = "Office";
+
+    /// <summary>지상 층수</summary>
+    public int FloorCount { get; set; } = 1;
+
+    /// <summary>지하 층수</summary>
+    public int BasementFloorCount { get; set; } = 0;
+
+    /// <summary>건물 면적 (㎡)</summary>
+    public decimal BuildingArea { get; set; } = 100.0m;
+
+    /// <summary>
+    /// JOIN 결과를 InfraSymbolModel로 변환
+    /// </summary>
+    public InfraSymbolModel ToInfraDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        ShowShape = ShowShape,
+        ShowTitle = ShowTitle,
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
+
+        // InfraSymbol 전용 속성들
+        BuildingType = EnumBuildingType.Factory,  // 하나뿐이므로 하드코딩
+        BuildingUsage = EnumBuildingUsage.Office, // 하나뿐이므로 하드코딩
+        FloorCount = FloorCount,
+        BasementFloorCount = BasementFloorCount,
+        BuildingArea = (double)BuildingArea
+    };
+}
 #endregion

@@ -366,6 +366,65 @@ public interface IGMapDbSymbolService
     /// </remarks>
     Task<bool> DeleteLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default);
     #endregion
+
+    #region - InfraSymbol CRUD Operations -
+
+    /// <summary>모든 인프라 심볼을 조회합니다 (JOIN 쿼리)</summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>InfraSymbol 목록</returns>
+    /// <remarks>
+    /// Symbols와 InfraSymbols 테이블을 조인하여 완전한 인프라 심볼 정보를 반환합니다.
+    /// INFRASTRUCTURE 카테고리의 Symbol만 조회합니다.
+    /// 건물 타입, 용도, 층수, 면적 정보를 포함합니다.
+    /// </remarks>
+    Task<List<IInfraSymbolModel>?> FetchInfraSymbolsAsync(CancellationToken token = default);
+
+    /// <summary>ID로 단일 인프라 심볼을 조회합니다</summary>
+    /// <param name="id">Symbol ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>InfraSymbol 모델</returns>
+    /// <remarks>
+    /// Symbols와 InfraSymbols 테이블을 조인하여 완전한 인프라 심볼 정보를 반환합니다.
+    /// 건물 종류(BuildingType), 용도(BuildingUsage), 층수 등의 상세 정보를 포함합니다.
+    /// </remarks>
+    Task<IInfraSymbolModel?> FetchInfraSymbolAsync(int id, CancellationToken token = default);
+
+    /// <summary>새로운 인프라 심볼을 삽입합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">InfraSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Symbol ID</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols와 InfraSymbols 테이블에 동시 삽입합니다.
+    /// 건물 타입, 용도, 지상/지하 층수, 건물 면적 정보를 저장합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<int> InsertInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default);
+
+    /// <summary>인프라 심볼을 업데이트합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">InfraSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 InfraSymbol 모델</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols와 InfraSymbols 테이블을 동시 업데이트합니다.
+    /// 건물 리모델링, 용도 변경, 증축 등의 변경사항을 반영합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<IInfraSymbolModel?> UpdateInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default);
+
+    /// <summary>인프라 심볼을 삭제합니다 (CASCADE 삭제)</summary>
+    /// <param name="model">InfraSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// Symbols 테이블에서 삭제하면 InfraSymbols 테이블의 관련 레코드는 
+    /// CASCADE 제약조건에 의해 자동으로 삭제됩니다.
+    /// 건물 철거, 시설 폐쇄 등의 상황에서 사용됩니다.
+    /// </remarks>
+    Task<bool> DeleteInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default);
+
+    #endregion
+
+
     #region - Properties -
     /// <summary>데이터베이스 연결 상태</summary>
     /// <value>연결되어 있으면 true, 그렇지 않으면 false</value>

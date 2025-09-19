@@ -366,10 +366,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
         public double TotalDistance => GeoPointConverter.CalculateTotalDistance(_model.LinePoints);
 
-        //public Rect ActualLineBounds => throw new NotImplementedException();
-
         private bool _isDrawing = false;
-        private List<GeoPoint> _linePoints;
 
         private List<PointLatLng> _runtimePoints = new List<PointLatLng>();
     }

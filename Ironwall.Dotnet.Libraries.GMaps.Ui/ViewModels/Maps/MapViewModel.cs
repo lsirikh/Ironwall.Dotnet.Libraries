@@ -1208,10 +1208,11 @@ public class MapViewModel : BasePanelViewModel
                     }
                     break;
 
-              
-
                 case EnumMarkerCategory.INFRASTRUCTURE:
-                    //await AddInfrastructureMarker(position, SelectedSymbolType.ToString(), symbolTitle);
+                    if (SelectedSymbolType is string infraType)
+                    {
+                        await AddInfraMarker(position, infraType, symbolTitle);
+                    }
                     break;
 
              
@@ -1225,7 +1226,9 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-   
+    
+
+
     /// <summary>
     /// 심볼 제목 생성
     /// </summary>
@@ -1868,6 +1871,104 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
+    /// <summary>
+    /// 건물 심볼 추가하는 메소드
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="infraType"></param>
+    /// <param name="symbolTitle"></param>
+    /// <returns></returns>
+    /// <exception cref="NotImplementedException"></exception>
+    private async Task AddInfraMarker(PointLatLng position, string infraType, string symbolTitle)
+    {
+        try
+        {
+            // 1. 인프라 타입에 따른 기본값 설정
+            EnumBuildingType buildingType = EnumBuildingType.Factory;
+            EnumBuildingUsage buildingUsage = EnumBuildingUsage.Office;
+            int floorCount = 1;
+            int basementFloorCount = 0;
+            double buildingArea = 100.0;
+            string title = string.Empty;
+            // infraType에 따른 설정
+            switch (infraType.ToLower())
+            {
+                case "factory":
+                    buildingType = EnumBuildingType.Factory;
+                    buildingUsage = EnumBuildingUsage.Office;
+                    floorCount = 2;
+                    basementFloorCount = 1;
+                    buildingArea = 500.0;
+                    title = $"공장_{DateTime.Now:HHmmss}";
+                    break;
+
+                default:
+                    buildingType = EnumBuildingType.Factory;
+                    buildingUsage = EnumBuildingUsage.Office;
+                    floorCount = 3;
+                    basementFloorCount = 0;
+                    buildingArea = 300.0;
+                    title = $"건물_{DateTime.Now:HHmmss}";
+                    break;
+            }
+
+            // 2. InfraSymbolModel 생성
+            var infraSymbol = new InfraSymbolModel
+            {
+                Title = title,
+                TitleSize = 12,
+                Latitude = position.Lat,
+                Longitude = position.Lng,
+                Zoom = Zoom,
+                Width = 40,
+                Height = 50,
+                Bearing = 0,
+                Category = EnumMarkerCategory.INFRASTRUCTURE,
+                ShowShape = true,
+                ShowTitle = false,
+                OperationState = EnumOperationState.ACTIVE,
+                FillColor = EnumColorType.Brown,
+                StrokeColor = EnumColorType.Gray,
+                StrokeThickness = 2,
+
+                // Infrastructure 전용 속성
+                BuildingType = buildingType,
+                BuildingUsage = buildingUsage,
+                FloorCount = floorCount,
+                BasementFloorCount = basementFloorCount,
+                BuildingArea = buildingArea
+            };
+
+            // 3. DB에 저장
+            var symbolId = await _gMapDbSymbolService.InsertInfraSymbolAsync(infraSymbol);
+
+            // 4. 저장된 심볼 가져오기
+            var savedSymbol = await _gMapDbSymbolService.FetchInfraSymbolAsync(symbolId);
+
+            if (savedSymbol != null)
+            {
+                // 5. 마커로 변환하여 지도에 추가
+                AddMarkerFromSymbol(savedSymbol);
+
+                // 6. 화면 갱신
+                MainMap?.InvalidateVisual();
+
+                _log?.Info($"인프라 마커 추가 완료: {title}");
+                _log?.Info($"  건물타입: {buildingType}, 용도: {buildingUsage}");
+                _log?.Info($"  층수: B{basementFloorCount}/F{floorCount}, 면적: {buildingArea:N0}㎡");
+                _log?.Info($"  위치: ({position.Lat:F6}, {position.Lng:F6})");
+            }
+            else
+            {
+                _log?.Error($"인프라 심볼 DB 저장 후 가져오기 실패");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"인프라 마커 추가 실패: {ex.Message}");
+        }
+    }
+
     // <summary>
     /// 심볼로부터 마커 추가
     /// </summary>
@@ -2182,6 +2283,41 @@ public class MapViewModel : BasePanelViewModel
 
                         newSymbolId = await _gMapDbSymbolService.InsertLineSymbolAsync(lineSymbol);
                         duplicatedSymbol = await _gMapDbSymbolService.FetchLineSymbolAsync(newSymbolId);
+                    }
+                    break;
+                case GMapInfraMarker infraMarker:
+                    // InfraSymbolModel 복제
+                    var originalInfraModel = infraMarker.Model as InfraSymbolModel;
+                    if (originalInfraModel != null)
+                    {
+                        var infraSymbol = new InfraSymbolModel
+                        {
+                            Title = $"{originalInfraModel.Title}_Copy",
+                            TitleSize = originalInfraModel.TitleSize,
+                            Latitude = newPos.Lat,
+                            Longitude = newPos.Lng,
+                            Zoom = originalInfraModel.Zoom,
+                            Width = originalInfraModel.Width,
+                            Height = originalInfraModel.Height,
+                            Bearing = originalInfraModel.Bearing,
+                            Category = originalInfraModel.Category,
+                            ShowShape = originalInfraModel.ShowShape,
+                            ShowTitle = originalInfraModel.ShowTitle,
+                            OperationState = originalInfraModel.OperationState,
+                            FillColor = originalInfraModel.FillColor,
+                            StrokeColor = originalInfraModel.StrokeColor,
+                            StrokeThickness = originalInfraModel.StrokeThickness,
+
+                            // InfraSymbol 전용 속성들
+                            BuildingType = originalInfraModel.BuildingType,
+                            BuildingUsage = originalInfraModel.BuildingUsage,
+                            FloorCount = originalInfraModel.FloorCount,
+                            BasementFloorCount = originalInfraModel.BasementFloorCount,
+                            BuildingArea = originalInfraModel.BuildingArea
+                        };
+
+                        newSymbolId = await _gMapDbSymbolService.InsertInfraSymbolAsync(infraSymbol);
+                        duplicatedSymbol = await _gMapDbSymbolService.FetchInfraSymbolAsync(newSymbolId);
                     }
                     break;
                 default:
@@ -3039,6 +3175,9 @@ public class MapViewModel : BasePanelViewModel
             case GMapLineMarker lineMarker:
                 // GMapLineMarker 전용 로직
                 return await _gMapDbSymbolService.InsertLineSymbolAsync(lineMarker.Model);
+            case GMapInfraMarker infraMarker:
+                // GMapInfraMarker 전용 로직
+                return await _gMapDbSymbolService.InsertInfraSymbolAsync(infraMarker.Model);
             default:
                 // 공통 로직
                 return 0;
@@ -3069,6 +3208,10 @@ public class MapViewModel : BasePanelViewModel
                 // GMapLineMarker 전용 로직
                 await _gMapDbSymbolService.UpdateLineSymbolAsync(lineMarker.Model);
                 break;
+            case GMapInfraMarker infraMarker:
+                // GMapInfraMarker 전용 로직
+                await _gMapDbSymbolService.UpdateInfraSymbolAsync(infraMarker.Model);
+                break;
             default:
                 // 공통 로직
                 break;
@@ -3094,6 +3237,9 @@ public class MapViewModel : BasePanelViewModel
             case GMapLineMarker lineMarker:
                 // GMapLineMarker 전용 로직
                 return await _gMapDbSymbolService.DeleteLineSymbolAsync(lineMarker.Model);
+            case GMapInfraMarker infraMarker:
+                // GMapInfraMarker 전용 로직
+                return await _gMapDbSymbolService.DeleteInfraSymbolAsync(infraMarker.Model);
             default:
                 // 공통 로직
                 return false;

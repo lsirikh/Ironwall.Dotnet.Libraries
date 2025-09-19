@@ -567,12 +567,7 @@
 							Opacity="0" />
 					</Grid>
 
-
-
-
 					<ControlTemplate.Triggers>
-
-
 						<!--  Device Type별 Section 표시  -->
 						<Trigger Property="DeviceType" Value="Controller">
 							<Setter TargetName="PART_ControllerSection" Property="Visibility" Value="Visible" />

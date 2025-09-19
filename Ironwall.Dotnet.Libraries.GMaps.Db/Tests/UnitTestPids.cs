@@ -27,6 +27,8 @@ public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
     public PidsSymbolProvider PidsSymbolProvider { get; private set; } = null!;
     public MilitarySymbolProvider MilitarySymbolProvider { get; private set; } = null!;
     public LineSymbolProvider LineSymbolProvider { get; private set; } = null!;
+    public InfraSymbolProvider InfraSymbolProvider { get; private set; } = null!;
+
 
 
     /// <summary>취소 토큰 소스</summary>
@@ -41,7 +43,7 @@ public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
 
     #region - Constants -
     /// <summary>테스트용 테이블 목록</summary>
-    private static readonly string[] _tables = { "LinePoints", "LineSymbols", "PidsSymbols", "GeometrySymbols", "MilitarySymbols", "Symbols" };
+    private static readonly string[] _tables = { "LinePoints", "LineSymbols", "PidsSymbols", "GeometrySymbols", "MilitarySymbols", "InfraSymbols", "Symbols" };
 
     /// <summary>DB 설정</summary>
     private readonly GMapDbSetupModel _setup = new()
@@ -67,8 +69,8 @@ public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
         PidsSymbolProvider = new PidsSymbolProvider(log, SymbolProvider);
         MilitarySymbolProvider = new MilitarySymbolProvider(log, SymbolProvider);
         LineSymbolProvider = new LineSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, MilitarySymbolProvider, LineSymbolProvider, _setup);
-
+        InfraSymbolProvider = new InfraSymbolProvider(log, SymbolProvider);
+        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, MilitarySymbolProvider, LineSymbolProvider, InfraSymbolProvider, _setup);
         await DropTablesAsync();               // 깨끗한 DB 확보
         await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance
 

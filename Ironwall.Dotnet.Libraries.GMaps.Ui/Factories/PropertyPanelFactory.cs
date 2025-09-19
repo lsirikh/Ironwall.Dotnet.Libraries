@@ -25,7 +25,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             { typeof(GMapGeometricMarker), typeof(GMapPropertyGeometricControl) },
             { typeof(GMapPidsMarker), typeof(GMapPropertyPidsControl) },
             { typeof(GMapMilitarySymbolMarker), typeof(GMapPropertyMilitaryControl) },
-            { typeof(GMapLineMarker), typeof(GMapPropertyLineControl) }
+            { typeof(GMapLineMarker), typeof(GMapPropertyLineControl) },
+            { typeof(GMapInfraMarker), typeof(GMapPropertyInfraControl) }
         };
         }
         #endregion
