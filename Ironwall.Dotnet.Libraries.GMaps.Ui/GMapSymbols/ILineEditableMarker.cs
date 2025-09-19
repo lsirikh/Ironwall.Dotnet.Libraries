@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Windows;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
@@ -76,4 +77,6 @@ public interface ILineEditableMarker : IEditableMarker
     /// 총 라인 길이 (미터)
     /// </summary>
     double TotalDistance { get; }
+
+   
 }

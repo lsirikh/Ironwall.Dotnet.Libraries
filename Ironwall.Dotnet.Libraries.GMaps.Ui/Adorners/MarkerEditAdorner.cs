@@ -12,6 +12,8 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using System.Windows.Threading;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using System.Windows.Shapes;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 
@@ -236,26 +238,39 @@ public class MarkerEditAdorner : Adorner, IDisposable
             elementSize.Height + PADDING * 2);
     }
 
+    private Rect CalculateLineEditBounds(Rect bounds)
+    {
+        return new Rect(
+                    bounds.X - PADDING,
+                    bounds.Y - PADDING,
+                    bounds.Width + PADDING * 2,
+                    bounds.Height + PADDING * 2
+                );
+    }
+
     /// <summary>
     /// 편집 영역 배경 렌더링 (마커 크기에 맞춤)
     /// </summary>
     private void RenderEditArea(DrawingContext drawingContext, Point markerCenter, double editRadius)
     {
-        var editBounds = CalculateEditBounds(markerCenter);
+        if(_targetMarker is GMapLineMarker marker && AdornedElement is GMapMarkerLineControl lineControl) 
+        {
+            var lineBounds = lineControl.ActualLineBounds;
+            if (!lineBounds.IsEmpty)
+            {
+                var adjustedBounds = CalculateLineEditBounds(lineBounds);
+                var editBrush = new SolidColorBrush(Colors.Blue) { Opacity = 0.1 };
+                drawingContext.DrawRectangle(editBrush, _editAreaPen, adjustedBounds);
+            }
+        }
+        else
+        {
+            var editBounds = CalculateEditBounds(markerCenter);
 
-        var editBrush = new SolidColorBrush(Colors.Blue) { Opacity = 0.1 };
+            var editBrush = new SolidColorBrush(Colors.Blue) { Opacity = 0.1 };
 
-        //// 실제 마커 크기를 반영한 사각형
-        //var markerWidth = _targetMarker.Width;
-        //var markerHeight = _targetMarker.Height;
-
-        //var editRect = new Rect(
-        //    markerCenter.X - markerWidth / 2 - PADDING,
-        //    markerCenter.Y - markerHeight / 2 - PADDING,
-        //    markerWidth + PADDING * 2,
-        //    markerHeight + PADDING * 2);
-
-        drawingContext.DrawRectangle(editBrush, _editAreaPen, editBounds);
+            drawingContext.DrawRectangle(editBrush, _editAreaPen, editBounds);
+        }
     }
 
     /// <summary>
@@ -275,6 +290,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
             markerWidth + PADDING * 2,
             markerHeight + PADDING * 2);
 
+        // 라인 마커 체크
+        bool isLineMarker = _targetMarker is GMapLineMarker;
+
         // 1. 이동 핸들 (중심, 원형, 파란색)
         drawingContext.DrawEllipse(_moveHandleBrush, _handlePen, markerCenter, handleSize, handleSize);
 
@@ -288,38 +306,76 @@ public class MarkerEditAdorner : Adorner, IDisposable
             new Point(markerCenter.X, markerBounds.Top),
             new Point(rotateHandlePos.X, rotateHandlePos.Y + handleSize * 0.75));
 
-        // 3. 모서리 핸들들 (사각형, 파란색 - 비율 유지)
-        var cornerHandleBrush = Brushes.Blue;
-        var cornerHandles = new[]
-        {
-        new Point(markerBounds.Left, markerBounds.Top),      // 좌상단
-        new Point(markerBounds.Right, markerBounds.Top),     // 우상단
-        new Point(markerBounds.Right, markerBounds.Bottom),  // 우하단
-        new Point(markerBounds.Left, markerBounds.Bottom)    // 좌하단
-    };
+        //    // 3. 모서리 핸들들 (사각형, 파란색 - 비율 유지)
+        //    var cornerHandleBrush = Brushes.Blue;
+        //    var cornerHandles = new[]
+        //    {
+        //    new Point(markerBounds.Left, markerBounds.Top),      // 좌상단
+        //    new Point(markerBounds.Right, markerBounds.Top),     // 우상단
+        //    new Point(markerBounds.Right, markerBounds.Bottom),  // 우하단
+        //    new Point(markerBounds.Left, markerBounds.Bottom)    // 좌하단
+        //};
 
-        foreach (var handlePos in cornerHandles)
-        {
-            var handleRect = new Rect(
-                handlePos.X - handleSize / 2,
-                handlePos.Y - handleSize / 2,
-                handleSize, handleSize);
-            drawingContext.DrawRectangle(cornerHandleBrush, _handlePen, handleRect);
-        }
+        //    foreach (var handlePos in cornerHandles)
+        //    {
+        //        var handleRect = new Rect(
+        //            handlePos.X - handleSize / 2,
+        //            handlePos.Y - handleSize / 2,
+        //            handleSize, handleSize);
+        //        drawingContext.DrawRectangle(cornerHandleBrush, _handlePen, handleRect);
+        //    }
 
-        // 4. 변 중앙 핸들들 (원형, 주황색 - 자유 조정)
-        var edgeHandleBrush = Brushes.Orange;
-        var edgeHandles = new[]
-        {
-        new Point(markerCenter.X, markerBounds.Top),         // 상단 중점
-        new Point(markerBounds.Right, markerCenter.Y),       // 우측 중점
-        new Point(markerCenter.X, markerBounds.Bottom),      // 하단 중점
-        new Point(markerBounds.Left, markerCenter.Y)         // 좌측 중점
-    };
+        //    // 4. 변 중앙 핸들들 (원형, 주황색 - 자유 조정)
+        //    var edgeHandleBrush = Brushes.Orange;
+        //    var edgeHandles = new[]
+        //                    {
+        //                        new Point(markerCenter.X, markerBounds.Top),         // 상단 중점
+        //                        new Point(markerBounds.Right, markerCenter.Y),       // 우측 중점
+        //                        new Point(markerCenter.X, markerBounds.Bottom),      // 하단 중점
+        //                        new Point(markerBounds.Left, markerCenter.Y)         // 좌측 중점
+        //                    };
 
-        foreach (var handlePos in edgeHandles)
+        //    foreach (var handlePos in edgeHandles)
+        //    {
+        //        drawingContext.DrawEllipse(edgeHandleBrush, _handlePen, handlePos, handleSize / 2, handleSize / 2);
+        //    }
+
+        // 라인 마커가 아닐 때만 크기 조절 핸들 표시
+        if (!isLineMarker)
         {
-            drawingContext.DrawEllipse(edgeHandleBrush, _handlePen, handlePos, handleSize / 2, handleSize / 2);
+            // 3. 모서리 핸들들
+            var cornerHandleBrush = Brushes.Blue;
+            var cornerHandles = new[]
+            {
+            new Point(markerBounds.Left, markerBounds.Top),
+            new Point(markerBounds.Right, markerBounds.Top),
+            new Point(markerBounds.Right, markerBounds.Bottom),
+            new Point(markerBounds.Left, markerBounds.Bottom)
+        };
+
+            foreach (var handlePos in cornerHandles)
+            {
+                var handleRect = new Rect(
+                    handlePos.X - handleSize / 2,
+                    handlePos.Y - handleSize / 2,
+                    handleSize, handleSize);
+                drawingContext.DrawRectangle(cornerHandleBrush, _handlePen, handleRect);
+            }
+
+            // 4. 변 중앙 핸들들
+            var edgeHandleBrush = Brushes.Orange;
+            var edgeHandles = new[]
+                            {
+                                new Point(markerCenter.X, markerBounds.Top),
+                                new Point(markerBounds.Right, markerCenter.Y),
+                                new Point(markerCenter.X, markerBounds.Bottom),
+                                new Point(markerBounds.Left, markerCenter.Y)
+                            };
+
+            foreach (var handlePos in edgeHandles)
+            {
+                drawingContext.DrawEllipse(edgeHandleBrush, _handlePen, handlePos, handleSize / 2, handleSize / 2);
+            }
         }
     }
 

@@ -33,6 +33,8 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
     public GeometricSymbolProvider GeometrySymbolProvider { get; private set; } = null!;
     public PidsSymbolProvider PidsSymbolProvider { get; private set; } = null!;
     public MilitarySymbolProvider MilitarySymbolProvider { get; private set; } = null!;
+    public LineSymbolProvider LineSymbolProvider { get; private set; } = null!;
+
 
     /// <summary>취소 토큰 소스</summary>
     internal CancellationTokenSource Cts { get; } = new();
@@ -46,7 +48,7 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
 
     #region - Constants -
     /// <summary>테스트용 Symbol 테이블 목록</summary>
-    private static readonly string[] _tables = { "PidsSymbols", "GeometrySymbols", "Symbols", "MilitarySymbols" };
+    private static readonly string[] _tables = { "LinePoints", "LineSymbols", "PidsSymbols", "GeometrySymbols", "MilitarySymbols", "Symbols" };
     /// <summary>DB 설정</summary>
     private readonly GMapDbSetupModel _setup = new()
     {
@@ -71,7 +73,8 @@ public sealed class GMapDbSymbolFixture : IAsyncLifetime
         GeometrySymbolProvider = new GeometricSymbolProvider(log, SymbolProvider);
         PidsSymbolProvider = new PidsSymbolProvider(log, SymbolProvider);
         MilitarySymbolProvider = new MilitarySymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, MilitarySymbolProvider, _setup);
+        LineSymbolProvider = new LineSymbolProvider(log, SymbolProvider);
+        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, MilitarySymbolProvider, LineSymbolProvider, _setup);
 
         await DropTablesAsync();               // 깨끗한 DB 확보
         await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance
@@ -492,7 +495,7 @@ public class GMapDbSymbol_IntegrationTests
             Bearing = 45.5,
             Width = 25,
             Height = 25,
-            Category = EnumMarkerCategory.ANALYSIS,
+            Category = EnumMarkerCategory.BASIC_SHAPES,
             ShowShape = true,
             ShowTitle = false,
             FillColor = EnumColorType.Blue,
@@ -509,7 +512,7 @@ public class GMapDbSymbol_IntegrationTests
         Assert.Equal("통합테스트_심볼", fetchedSymbol!.Title);
         Assert.Equal(9999, fetchedSymbol.Pid);
         Assert.Equal(EnumOperationState.DEACTIVE, fetchedSymbol.OperationState);
-        Assert.Equal(EnumMarkerCategory.ANALYSIS, fetchedSymbol.Category);
+        Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, fetchedSymbol.Category);
 
         // 3. Symbol 상태 변경 (DEACTIVE → ACTIVE)
         fetchedSymbol.OperationState = EnumOperationState.ACTIVE;

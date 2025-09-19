@@ -200,7 +200,7 @@
 									</Grid>
 
 									<!--  크기  -->
-									<Grid Margin="0,5">
+									<Grid Margin="0,5" IsEnabled="{Binding MarkerSizeEnabled, RelativeSource={RelativeSource TemplatedParent}}">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
 											<ColumnDefinition Width="50" />

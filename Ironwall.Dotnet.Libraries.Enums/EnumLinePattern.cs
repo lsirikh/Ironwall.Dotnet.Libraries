@@ -20,8 +20,8 @@ public enum EnumLinePattern
     Dotted = 2,         // 점점선 ● ● ● ●
     [Description("점-선 패턴")]
     DashDot = 3,        // 점-선 패턴 —●—●—●
-    [Description("이중선")]
-    DoubleLine = 4,     // 이중선 ══════
-    [Description("화살표 패턴")]
-    Arrow = 5           // 화살표 패턴 →→→→
+    //[Description("이중선")]
+    //DoubleLine = 4,     // 이중선 ══════
+    //[Description("화살표 패턴")]
+    //Arrow = 5           // 화살표 패턴 →→→→
 }

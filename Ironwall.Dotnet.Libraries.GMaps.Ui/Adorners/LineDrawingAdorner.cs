@@ -49,6 +49,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
         private Brush _pointFill = Brushes.White;
         private double _pointRadius = 5;
 
+
+        // 드래그 관련 필드 추가
+        private bool _isDraggingControl = false;
+        private Point _dragOffset;
+        private Point _controlPosition = new Point(20, -50); // 컨트롤 위치 저장
         #endregion
         #region Events
 
@@ -105,7 +110,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             // 컨트롤 Canvas
             _controlCanvas = new Canvas
             {
-                IsHitTestVisible = true  // 명시적으로 설정
+                IsHitTestVisible = true
             };
 
             // 테두리 추가
@@ -116,25 +121,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                 CornerRadius = new CornerRadius(5),
                 Padding = new Thickness(5),
                 Background = new SolidColorBrush(Color.FromArgb(240, 255, 255, 255)),
-                IsHitTestVisible = true,  // 명시적으로 설정
-                Focusable = true,  // 추가
+                IsHitTestVisible = true,
+                Focusable = true,
                 Visibility = Visibility.Collapsed,
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    BlurRadius = 10,
-                    ShadowDepth = 3,
-                    Opacity = 0.5,
-                    Color = Colors.Black
-                }
-            };
-
-            // 테두리 추가
-            var border = new Border
-            {
-                BorderBrush = Brushes.Gray,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(5),
-                Padding = new Thickness(5),
+                Cursor = Cursors.SizeAll, // 드래그 가능함을 나타내는 커서
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
                     BlurRadius = 10,
@@ -151,6 +141,30 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                 Margin = new Thickness(5)
             };
 
+            // 드래그 핸들 (타이틀 바 역할) 추가
+            var dragHandle = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(100, 200, 200, 200)),
+                Height = 20,
+                CornerRadius = new CornerRadius(3, 3, 0, 0),
+                Cursor = Cursors.SizeAll
+            };
+
+            var handleText = new TextBlock
+            {
+                Text = "≡", // 드래그 아이콘
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 14,
+                Foreground = Brushes.DarkGray
+            };
+
+            dragHandle.Child = handleText;
+
+            // 전체 구성을 위한 StackPanel
+            var mainPanel = new StackPanel();
+            mainPanel.Children.Add(dragHandle); // 드래그 핸들을 상단에 추가
+
             // 상태 텍스트
             _statusText = new TextBlock
             {
@@ -161,19 +175,24 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                 Foreground = Brushes.DarkBlue
             };
 
-            // 완료 버튼
+            // 버튼들 생성
             _completeButton = CreateButton("✓", "완료 (Enter)", Brushes.Green);
-            _completeButton.Click += (s, e) => CompleteRequested?.Invoke(this, EventArgs.Empty);
+            _completeButton.Click += (s, e) => {
+                e.Handled = true; // 이벤트 버블링 중지
+                CompleteRequested?.Invoke(this, EventArgs.Empty);
+            };
 
-            // 취소(Undo) 버튼
             _undoButton = CreateButton("↶", "마지막 점 취소 (Backspace)", Brushes.Orange);
-            _undoButton.Click += (s, e) => UndoRequested?.Invoke(this, EventArgs.Empty);
+            _undoButton.Click += (s, e) => {
+                e.Handled = true;
+                UndoRequested?.Invoke(this, EventArgs.Empty);
+            };
 
-            // 전체 취소 버튼
             _cancelButton = CreateButton("✕", "취소 (Esc)", Brushes.Red);
-            _cancelButton.Click += (s, e) => CancelRequested?.Invoke(this, EventArgs.Empty);
-
-            
+            _cancelButton.Click += (s, e) => {
+                e.Handled = true;
+                CancelRequested?.Invoke(this, EventArgs.Empty);
+            };
 
             // 컨트롤 구성
             buttonPanel.Children.Add(_statusText);
@@ -181,8 +200,22 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             buttonPanel.Children.Add(_undoButton);
             buttonPanel.Children.Add(_cancelButton);
 
-            _controlBorder.Child = buttonPanel;
+            mainPanel.Children.Add(buttonPanel);
+
+            _controlBorder.Child = mainPanel;
             _controlCanvas.Children.Add(_controlBorder);
+
+            // 드래그 이벤트 연결
+            dragHandle.MouseLeftButtonDown += OnDragHandleMouseDown;
+            dragHandle.MouseMove += OnDragHandleMouseMove;
+            dragHandle.MouseLeftButtonUp += OnDragHandleMouseUp;
+            dragHandle.MouseLeave += OnDragHandleMouseLeave;
+
+            // Border 자체에도 드래그 가능하게 (버튼 영역 제외)
+            _controlBorder.MouseLeftButtonDown += OnControlBorderMouseDown;
+            _controlBorder.MouseMove += OnControlBorderMouseMove;
+            _controlBorder.MouseLeftButtonUp += OnControlBorderMouseUp;
+            _controlBorder.MouseLeave += OnControlBorderMouseLeave;
 
             // Visual 자식으로 추가
             AddVisualChild(_controlCanvas);
@@ -265,6 +298,113 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             e.Handled = true;
         }
         #endregion
+
+        #region Drag Event Handlers (새로 추가)
+
+        private void OnDragHandleMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                _isDraggingControl = true;
+                _dragOffset = e.GetPosition(_controlBorder);
+
+                // 마우스 캡처
+                (sender as UIElement)?.CaptureMouse();
+                e.Handled = true;
+
+                _log?.Info("컨트롤 드래그 시작");
+            }
+        }
+
+        private void OnDragHandleMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingControl && e.LeftButton == MouseButtonState.Pressed)
+            {
+                var currentPosition = e.GetPosition(_controlCanvas);
+                var newLeft = currentPosition.X - _dragOffset.X;
+                var newTop = currentPosition.Y - _dragOffset.Y;
+
+                // 화면 경계 체크
+                newLeft = Math.Max(0, Math.Min(newLeft, _controlCanvas.ActualWidth - _controlBorder.ActualWidth));
+                newTop = Math.Max(0, Math.Min(newTop, _controlCanvas.ActualHeight - _controlBorder.ActualHeight));
+
+                // 위치 업데이트
+                Canvas.SetLeft(_controlBorder, newLeft);
+                Canvas.SetTop(_controlBorder, newTop);
+
+                // 상대 위치 저장 (첫 번째 포인트 기준)
+                if (_geoPoints.Count > 0)
+                {
+                    var firstScreenPoint = ConvertToScreenPoint(_geoPoints[0]);
+                    _controlPosition = new Point(newLeft - firstScreenPoint.X, newTop - firstScreenPoint.Y);
+                }
+
+                e.Handled = true;
+            }
+        }
+
+        private void OnDragHandleMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingControl)
+            {
+                _isDraggingControl = false;
+                (sender as UIElement)?.ReleaseMouseCapture();
+                e.Handled = true;
+
+                _log?.Info("컨트롤 드래그 종료");
+            }
+        }
+
+        private void OnDragHandleMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingControl)
+            {
+                _isDraggingControl = false;
+                (sender as UIElement)?.ReleaseMouseCapture();
+            }
+        }
+
+        // Border에 대한 드래그 이벤트 (버튼이 아닌 영역)
+        private void OnControlBorderMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // 클릭한 위치가 버튼이 아닌 경우에만 드래그 시작
+            var hitTest = e.OriginalSource as DependencyObject;
+            if (!IsButtonOrChild(hitTest))
+            {
+                OnDragHandleMouseDown(sender, e);
+            }
+        }
+
+        private void OnControlBorderMouseMove(object sender, MouseEventArgs e)
+        {
+            OnDragHandleMouseMove(sender, e);
+        }
+
+        private void OnControlBorderMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            OnDragHandleMouseUp(sender, e);
+        }
+
+        private void OnControlBorderMouseLeave(object sender, MouseEventArgs e)
+        {
+            OnDragHandleMouseLeave(sender, e);
+        }
+
+        // 버튼이나 버튼의 자식 요소인지 확인
+        private bool IsButtonOrChild(DependencyObject element)
+        {
+            while (element != null)
+            {
+                if (element == _completeButton || element == _undoButton || element == _cancelButton)
+                    return true;
+
+                element = VisualTreeHelper.GetParent(element);
+            }
+            return false;
+        }
+
+        #endregion
+
         #region Public Methods
 
         /// <summary>
@@ -481,22 +621,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                     }
                 }
 
-                // 5. 거리 정보 표시 (옵션)
-                //if (screenPoints.Count >= 2)
-                //{
-                //    var distance = TotalDistance;
-                //    var text = new FormattedText(
-                //        $"{distance:F1}m",
-                //        System.Globalization.CultureInfo.CurrentCulture,
-                //        FlowDirection.LeftToRight,
-                //        new Typeface("Arial"),
-                //        12,
-                //        Brushes.Red,
-                //        1.0);
-
-                //    var lastPoint = screenPoints[screenPoints.Count - 1];
-                //    drawingContext.DrawText(text, new Point(lastPoint.X + 10, lastPoint.Y - 20));
-                //}
+             
             }
             catch (Exception ex)
             {
@@ -590,6 +715,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
         /// </summary>
         public void Cleanup()
         {
+            // 드래그 이벤트 핸들러 해제 추가
+            if (_controlBorder != null)
+            {
+                _controlBorder.MouseLeftButtonDown -= OnControlBorderMouseDown;
+                _controlBorder.MouseMove -= OnControlBorderMouseMove;
+                _controlBorder.MouseLeftButtonUp -= OnControlBorderMouseUp;
+                _controlBorder.MouseLeave -= OnControlBorderMouseLeave;
+            }
+
             // 버튼 이벤트 핸들러 해제
             if (_completeButton != null)
             {

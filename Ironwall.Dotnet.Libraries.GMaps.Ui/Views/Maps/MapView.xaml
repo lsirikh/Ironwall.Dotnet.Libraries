@@ -193,6 +193,32 @@
 			Margin="50,0,0,0"
 			md:ThemeAssist.Theme="Inherit">
 			<ToolBar ClipToBounds="True" Style="{StaticResource MaterialDesignToolBar}">
+				<!--  지도 선택 ComboBox (맨 앞에 추가)  -->
+				<ComboBox
+					Width="150"
+					Margin="5,0"
+					ItemsSource="{Binding AvailableMaps}"
+					SelectedItem="{Binding SelectedMapItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					Style="{StaticResource CompactComboBox}"
+					ToolTip="지도 선택">
+					<ComboBox.ItemTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="14"
+									Height="14"
+									Margin="0,0,5,0"
+									VerticalAlignment="Center"
+									Kind="Map" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="11"
+									Text="{Binding Name}" />
+							</StackPanel>
+						</DataTemplate>
+					</ComboBox.ItemTemplate>
+				</ComboBox>
+
 				<!--  기존 버튼들  -->
 				<Button Command="{Binding MoveHomeLocationCommand}" ToolTip="홈 위치 이동">
 					<Button.InputBindings>
@@ -387,7 +413,7 @@
 				</Button>
 
 				<!--  라인 드로잉 전용 버튼 추가 (AREA_BOUNDARY 카테고리일 때만 표시)  -->
-				<Button
+				<!--<Button
 					Command="{Binding StartLineDrawingCommand}"
 					CommandParameter="boundary"
 					IsEnabled="{Binding CanStartLineDrawing}"
@@ -408,7 +434,7 @@
 							FontSize="10"
 							Text="라인" />
 					</StackPanel>
-				</Button>
+				</Button>-->
 
 
 				<!--  마커 복제 버튼  -->

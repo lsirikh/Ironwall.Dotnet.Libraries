@@ -16,8 +16,8 @@ public class LineSymbolModel : SymbolModel, ILineSymbolModel
     public LineSymbolModel()
     {
 
-        Width = 2000;
-        Height = 2000;
+        Width = 60;
+        Height = 60;
         ShowShape = true;
         ShowTitle = false;
         StrokeColor = EnumColorType.Black;
@@ -51,14 +51,4 @@ public class LineSymbolModel : SymbolModel, ILineSymbolModel
     /// 라인 패턴 타입 (실선, 점선, 이중선 등)
     /// </summary>
     public EnumLinePattern LinePattern { get; set; } = EnumLinePattern.Solid;
-
-    /// <summary>
-    /// 시작점 마커 표시 여부
-    /// </summary>
-    public bool ShowStartPoint { get; set; } = false;
-
-    /// <summary>
-    /// 끝점 마커 표시 여부
-    /// </summary>
-    public bool ShowEndPoint { get; set; } = false;
 }

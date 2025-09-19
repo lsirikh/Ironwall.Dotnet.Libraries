@@ -30,12 +30,13 @@
 							<!--  Main Polyline - 완성된 라인  -->
 							<Polyline
 								Name="PART_MainPolyline"
+								Fill="{TemplateBinding MarkerFill}"
 								Opacity="{TemplateBinding LineOpacity}"
-								Stroke="{TemplateBinding MarkerStroke}"
+								Stroke="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}"
 								StrokeEndLineCap="Round"
 								StrokeLineJoin="Round"
 								StrokeStartLineCap="Round"
-								StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
 
 							<!--  Arrow Head (화살표) - ShowArrowHead=True일 때  -->
 							<Polygon
@@ -109,22 +110,6 @@
 									</Ellipse.Effect>
 								</Ellipse>
 
-								<!--  End Point Marker  -->
-								<Rectangle
-									Name="PART_EndPointMarker"
-									Width="10"
-									Height="10"
-									Fill="Orange"
-									Stroke="DarkOrange"
-									StrokeThickness="2">
-									<Rectangle.Effect>
-										<DropShadowEffect
-											BlurRadius="4"
-											Opacity="0.6"
-											ShadowDepth="2"
-											Color="Black" />
-									</Rectangle.Effect>
-								</Rectangle>
 							</Grid>
 						</Canvas>
 
@@ -133,8 +118,8 @@
 							Name="PART_HitTestCanvas"
 							Width="{TemplateBinding Width}"
 							Height="{TemplateBinding Height}"
-							HorizontalAlignment="Left"
-							VerticalAlignment="Top"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
 							ClipToBounds="False">
 							<Polyline
 								Name="PART_HitTestPolyline"
@@ -261,16 +246,7 @@
 							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="10,3,2,3" />
 						</Trigger>
 
-						<Trigger Property="LinePattern" Value="DoubleLine">
-							<Setter TargetName="PART_MainPolyline" Property="StrokeThickness">
-								<Setter.Value>
-									<MultiBinding Converter="{StaticResource MultiplyValueConverter}">
-										<Binding Path="MarkerStrokeThickness" RelativeSource="{RelativeSource TemplatedParent}" />
-										<Binding Source="1.5" />
-									</MultiBinding>
-								</Setter.Value>
-							</Setter>
-						</Trigger>
+
 
 						<!--  Disabled State  -->
 						<Trigger Property="IsEnabled" Value="False">
@@ -303,9 +279,9 @@
 		<!--  Default Property Values  -->
 		<Setter Property="IsHitTestVisible" Value="True" />
 		<Setter Property="Focusable" Value="True" />
+		<Setter Property="TitleSize" Value="11" />
 		<Setter Property="Width" Value="200" />
 		<Setter Property="Height" Value="200" />
-		<Setter Property="TitleSize" Value="11" />
 		<Setter Property="MarkerStrokeThickness" Value="2" />
 		<Setter Property="LineOpacity" Value="1.0" />
 	</Style>

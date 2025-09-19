@@ -100,8 +100,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DependencyProperty.Register("TitleSize", typeof(double), typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(10.0, OnTitleSizeChanged));
 
-        
 
+        /// <summary>
+        /// MarkerSize 활성화
+        /// </summary>
+        public bool MarkerSizeEnabled
+        {
+            get { return (bool)GetValue(MarkerSizeEnabledProperty); }
+            set { SetValue(MarkerSizeEnabledProperty, value); }
+        }
+
+        public static readonly DependencyProperty MarkerSizeEnabledProperty =
+            DependencyProperty.Register("MarkerSizeEnabled", typeof(bool),
+                typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(true)); // 기본값은 true (활성화)
 
         /// <summary>
         /// 마커 너비

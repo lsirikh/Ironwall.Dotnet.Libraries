@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Db.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Providers;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 using MySql.Data.MySqlClient;
 using System;
 using System.Buffers;
@@ -23,7 +24,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Services;
 ****************************************************************************/
 internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 {
-
     #region - Ctors -
     /// <summary>
     /// GMapDbSymbolService 생성자
@@ -38,6 +38,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                                GeometricSymbolProvider geometrySymbolProvider,
                                PidsSymbolProvider pidsSymbolProvider,
                                MilitarySymbolProvider militarySymbolProvider,
+                               LineSymbolProvider lineSymbolProvider,
                                GMapDbSetupModel setupModel)
     {
         _log = log;
@@ -46,6 +47,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         _geometrySymbolProvider = geometrySymbolProvider;
         _pidsSymbolProvider = pidsSymbolProvider;
         _militarySymbolProvider = militarySymbolProvider;
+        _lineSymbolProvider = lineSymbolProvider;
         _setup = setupModel;
     }
     #endregion
@@ -338,8 +340,42 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INDEX `IX_MilitarySymbols_StandardIdentity` (`StandardIdentity`)
             );";
 
-            
+            // ── LineSymbols 테이블 ──
+            var createLineSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `LineSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `LineOpacity`       DECIMAL(3,2) DEFAULT 1.0,
+                `IsClosedPath`      BOOLEAN DEFAULT FALSE,
+                `ShowArrowHead`     BOOLEAN DEFAULT FALSE,
+                `LinePattern`       VARCHAR(20) NOT NULL DEFAULT 'Solid',
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_LineSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_LineSymbols_LinePattern` (`LinePattern`)
+            );";
 
+            // ── LinePoints 테이블 ──
+            var createLinePointsSql = @"
+            CREATE TABLE IF NOT EXISTS `LinePoints` (
+                `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+                `LineSymbolId`      INT NOT NULL,
+                `SequenceOrder`     INT NOT NULL,
+                `Latitude`          DECIMAL(10,8) NOT NULL,
+                `Longitude`         DECIMAL(11,8) NOT NULL,
+                `Altitude`          FLOAT DEFAULT 0,
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_LinePoints_LineSymbols`
+                    FOREIGN KEY (`LineSymbolId`) REFERENCES `LineSymbols` (`SymbolId`)
+                    ON DELETE CASCADE,
+                INDEX `IX_LinePoints_LineSymbolId` (`LineSymbolId`),
+                INDEX `IX_LinePoints_Sequence` (`LineSymbolId`, `SequenceOrder`),
+                UNIQUE KEY `UQ_LinePoints_Symbol_Sequence` (`LineSymbolId`, `SequenceOrder`)
+            );";
+
+           
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
             if (_eventAggregator != null)
@@ -361,6 +397,17 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "MilitarySymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createLineSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "LineSymbols 테이블 생성…" });
+
+            await conn.ExecuteAsync(createLinePointsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "LinePoints 테이블 생성…" });
+
 
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
@@ -417,8 +464,11 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 3. PidsSymbols 로드 (새로 추가)
             var pidsSymbols = await FetchPidsSymbolsAsync(token: token);
 
-            // 3. PidsSymbols 로드 (새로 추가)
+            // 4. MilitarySymbols 로드 (새로 추가)
             var militarySymbols = await FetchMilitarySymbolsAsync(token: token);
+
+            // 5. LineSymbol 로드 (새로 추가)
+            var lineSymbols = await FetchLineSymbolsAsync(token: token);
 
             _symbolProvider.Clear();
 
@@ -458,6 +508,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 foreach (var militarySymbol in militarySymbols)
                 {
                     _symbolProvider.Add(militarySymbol);
+                }
+            }
+
+            _lineSymbolProvider.Clear();
+            if (lineSymbols?.Any() == true)
+            {
+                foreach (var lineSymbol in lineSymbols)
+                {
+                    _symbolProvider.Add(lineSymbol);
                 }
             }
 
@@ -1724,6 +1783,350 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     }
 
     #endregion
+
+    #region - LineSymbol CRUD -
+
+    /// <summary>
+    /// 모든 라인 심볼 조회 (JOIN 쿼리 및 포인트 포함)
+    /// </summary>
+    public async Task<List<ILineSymbolModel>?> FetchLineSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
+        FROM    Symbols s
+        INNER JOIN LineSymbols l ON s.Id = l.SymbolId
+        WHERE   s.Category = 'AREA_BOUNDARY'
+        ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<LineSymbolSQL>(sql))
+                .Select(l => l.ToLineDomain())
+                .ToList();
+
+            // 포인트 로드
+            if (list.Any())
+            {
+                var symbolIds = list.Select(ls => ls.Id).ToList();
+                const string pointsSql = @"
+            SELECT LineSymbolId, SequenceOrder, Latitude, Longitude, Altitude
+            FROM LinePoints
+            WHERE LineSymbolId IN @SymbolIds
+            ORDER BY LineSymbolId, SequenceOrder;";
+
+                var allPoints = await conn.QueryAsync<LinePointSQL>(pointsSql, new { SymbolIds = symbolIds });
+
+                var pointsLookup = allPoints
+                    .GroupBy(p => p.LineSymbolId)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(p => p.SequenceOrder).Select(p => p.ToGeoPoint()).ToList());
+
+                foreach (var lineSymbol in list)
+                {
+                    if (pointsLookup.TryGetValue(lineSymbol.Id, out var points))
+                    {
+                        lineSymbol.LinePoints = points;
+                    }
+                }
+            }
+
+            _log?.Info($"FetchLineSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<ILineSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"LineSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 라인 심볼 조회
+    /// </summary>
+    public async Task<ILineSymbolModel?> FetchLineSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+        SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.FillColor, s.StrokeColor, s.StrokeThickness,
+                s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
+        FROM    Symbols s
+        INNER JOIN LineSymbols l ON s.Id = l.SymbolId
+        WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<LineSymbolSQL>(sql, new { Id = id });
+            var lineSymbol = joinResult?.ToLineDomain();
+
+            if (lineSymbol != null)
+            {
+                // 포인트 로드
+                const string pointsSql = @"
+            SELECT SequenceOrder, Latitude, Longitude, Altitude
+            FROM LinePoints
+            WHERE LineSymbolId = @LineSymbolId
+            ORDER BY SequenceOrder;";
+
+                var points = await conn.QueryAsync<LinePointSQL>(pointsSql, new { LineSymbolId = id });
+                lineSymbol.LinePoints = points.Select(p => p.ToGeoPoint()).ToList();
+            }
+
+            _log?.Info(lineSymbol != null
+                ? $"FetchLineSymbolAsync 완료 - Id={lineSymbol.Id}, Points={lineSymbol.LinePoints.Count}개"
+                : $"FetchLineSymbolAsync 대상 없음 - Id={id}");
+
+            return lineSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"LineSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 라인 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default)
+    {
+        // null 체크 추가
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+        INSERT INTO Symbols
+        (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+         Width, Height, Category, ShowShape, ShowTitle, 
+         FillColor, StrokeColor, StrokeThickness, CreatedBy)
+        VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+        SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. LineSymbols 테이블에 라인 심볼 전용 정보 삽입
+            const string lineSql = @"
+        INSERT INTO LineSymbols 
+        (SymbolId, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+        VALUES (@SymbolId, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);";
+
+            await conn.ExecuteAsync(lineSql, new
+            {
+                SymbolId = symbolId,
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString()
+            }, transaction);
+
+            // 3. LinePoints 삽입
+            if (model.LinePoints?.Any() == true)
+            {
+                const string pointSql = @"
+            INSERT INTO LinePoints (LineSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+            VALUES (@LineSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    LineSymbolId = symbolId,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(pointSql, pointParams, transaction);
+            }
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"LineSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, Points={model.LinePoints?.Count ?? 0}개");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"LineSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 라인 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<ILineSymbolModel?> UpdateLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default)
+    {
+        // null 체크 추가
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+        UPDATE Symbols SET
+            Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+            Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+            Bearing = @Bearing, Width = @Width, Height = @Height,
+            Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+            CreatedBy = @CreatedBy
+        WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = model.Category.ToString(),
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. LineSymbols 테이블 업데이트
+            const string lineSql = @"
+        UPDATE LineSymbols SET
+            LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath, 
+            ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern
+        WHERE SymbolId = @SymbolId;";
+
+            var lineAffected = await conn.ExecuteAsync(lineSql, new
+            {
+                SymbolId = model.Id,
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString()
+            }, transaction);
+
+            // 3. 기존 포인트 삭제 후 새로 삽입
+            const string deletePointsSql = "DELETE FROM LinePoints WHERE LineSymbolId = @LineSymbolId;";
+            await conn.ExecuteAsync(deletePointsSql, new { LineSymbolId = model.Id }, transaction);
+
+            if (model.LinePoints?.Any() == true)
+            {
+                const string insertPointSql = @"
+            INSERT INTO LinePoints (LineSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+            VALUES (@LineSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    LineSymbolId = model.Id,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(insertPointSql, pointParams, transaction);
+            }
+
+            if (symbolAffected == 0 || lineAffected == 0)
+                throw new KeyNotFoundException($"LineSymbol not found. Id={model.Id}");
+
+            await transaction.CommitAsync(token);
+
+            _log?.Info($"LineSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchLineSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"LineSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 라인 심볼 삭제 (CASCADE로 LineSymbols와 LinePoints도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeleteLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default)
+    {
+        // null 체크 추가
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 LineSymbols와 LinePoints는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            _log?.Info(ret > 0
+                ? $"DeleteLineSymbolAsync 완료 - Id={model.Id}"
+                : $"DeleteLineSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"LineSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
     #endregion
     #region - IHanldes -
     #endregion
@@ -1734,7 +2137,6 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     /// <value>연결되어 있으면 true, 그렇지 않으면 false</value>
     public bool IsConnected => _conn != null && _conn.State == ConnectionState.Open;
     #endregion
-
     #region - Attributes -
     /// <summary>로깅 서비스</summary>
     private ILogService _log;
@@ -1747,6 +2149,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     private GeometricSymbolProvider _geometrySymbolProvider;
     private PidsSymbolProvider _pidsSymbolProvider;
     private MilitarySymbolProvider _militarySymbolProvider;
+    private LineSymbolProvider _lineSymbolProvider;
 
     /// <summary>데이터베이스 설정 모델</summary>
     private GMapDbSetupModel _setup;
@@ -2041,4 +2444,84 @@ internal sealed class MilitarySymbolSQL : SymbolSQL
         CountryCode = CountryCode
     };
 }
+
+
+#region - LineSymbol DTO Classes -
+
+/// <summary>
+/// Symbols와 LineSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class LineSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 라인 심볼 전용 속성들
+
+    /// <summary>라인 투명도</summary>
+    public decimal LineOpacity { get; set; } = 1.0m;
+
+    /// <summary>닫힌 경로 여부</summary>
+    public bool IsClosedPath { get; set; }
+
+    /// <summary>화살표 머리 표시 여부</summary>
+    public bool ShowArrowHead { get; set; }
+
+    /// <summary>라인 패턴 타입</summary>
+    public string LinePattern { get; set; } = "Solid";
+
+    /// <summary>
+    /// JOIN 결과를 LineSymbolModel로 변환 (포인트는 별도 로드 필요)
+    /// </summary>
+    public LineSymbolModel ToLineDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        ShowShape = ShowShape,
+        ShowTitle = ShowTitle,
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
+
+        // LineSymbol 전용 속성들
+        LineOpacity = (double)LineOpacity,
+        IsClosedPath = IsClosedPath,
+        ShowArrowHead = ShowArrowHead,
+        LinePattern = Enum.Parse<EnumLinePattern>(LinePattern),
+        LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
+    };
+}
+
+/// <summary>
+/// LinePoints 테이블과 매핑되는 DTO
+/// </summary>
+internal sealed class LinePointSQL
+{
+    public int Id { get; set; }
+    public int LineSymbolId { get; set; }
+    public int SequenceOrder { get; set; }
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public float Altitude { get; set; }
+
+    /// <summary>
+    /// DTO를 GeoPoint로 변환
+    /// </summary>
+    public GeoPoint ToGeoPoint() => new(
+        latitude: (double)Latitude,
+        longitude: (double)Longitude,
+        altitude: (double)Altitude
+    );
+}
+
+#endregion
 #endregion

@@ -24,7 +24,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             { typeof(GMapCustomMarker), typeof(GMapPropertyCustomControl) },
             { typeof(GMapGeometricMarker), typeof(GMapPropertyGeometricControl) },
             { typeof(GMapPidsMarker), typeof(GMapPropertyPidsControl) },
-            { typeof(GMapMilitarySymbolMarker), typeof(GMapPropertyMilitaryControl) }
+            { typeof(GMapMilitarySymbolMarker), typeof(GMapPropertyMilitaryControl) },
+            { typeof(GMapLineMarker), typeof(GMapPropertyLineControl) }
         };
         }
         #endregion
@@ -63,4 +64,5 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
         private Dictionary<Type, Type> _markerToPanelMap;
         #endregion
     }
+       
 }

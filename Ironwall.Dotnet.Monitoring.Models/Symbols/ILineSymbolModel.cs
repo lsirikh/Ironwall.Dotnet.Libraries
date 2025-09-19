@@ -9,6 +9,4 @@ public interface ILineSymbolModel : ISymbolModel
     EnumLinePattern LinePattern { get; set; }
     List<GeoPoint> LinePoints { get; set; }
     bool ShowArrowHead { get; set; }
-    bool ShowEndPoint { get; set; }
-    bool ShowStartPoint { get; set; }
 }

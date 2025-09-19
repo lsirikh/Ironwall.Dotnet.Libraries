@@ -669,9 +669,22 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     }
     private static void OnMarkerStrokeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
+        //if (d is GMapMarkerBaseControl<T> control && !control._isUpdatingFromMarker)
+        //{
+        //    // 마커에 값 전파
+        //    if (control.Marker != null)
+        //    {
+        //        // ColorHelper로 Brush를 EnumColorType으로 변환
+        //        control.Marker.StrokeColor = ColorHelper.HexToColorType(((Brush)e.NewValue).ToString());
+        //    }
+
+        //    // UI 강제 새로고침
+        //    control.InvalidateVisual();
+        //}
+
+        if (d is GMapMarkerLineControl lineControl && lineControl.MainPolyline != null)
         {
-            
+            lineControl.MainPolyline.Stroke = e.NewValue as Brush;
         }
     }
 
@@ -686,6 +699,14 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             {
                 control.Marker.StrokeThickness = (double)e.NewValue;
                 System.Diagnostics.Debug.WriteLine($"마커 StrokeThickness 업데이트: {control.Marker.StrokeThickness}");
+            }
+
+
+            // LineControl인 경우 Polyline 직접 업데이트
+            if (control is GMapMarkerLineControl lineControl && lineControl.MainPolyline != null)
+            {
+                lineControl.MainPolyline.StrokeThickness = (double)e.NewValue;
+                System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
             }
 
             // UI 강제 새로고침

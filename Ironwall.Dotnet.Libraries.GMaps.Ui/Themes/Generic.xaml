@@ -18,6 +18,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/GeometricPropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/PidsPropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MilitaryPropertyStyle.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/LinePropertyStyle.xaml" />
 
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MilitarySymbolRegisterStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>

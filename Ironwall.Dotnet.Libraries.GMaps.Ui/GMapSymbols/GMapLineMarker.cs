@@ -27,7 +27,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
     {
        
 
-        public GMapLineMarker(ILogService log, LineSymbolModel symbolModel)
+        public GMapLineMarker(ILogService log, ILineSymbolModel symbolModel)
             : base(log, symbolModel)
         {
 
@@ -39,12 +39,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
             _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
 
-            // 시작점이 있으면 마커 위치 설정
-            if (_runtimePoints.Count > 0)
-            {
-                Position = _runtimePoints[0];
-                _log?.Info($"[GMapLineMarker 생성자] 시작 위치 설정: ({Position.Lat}, {Position.Lng})");
-            }
+            // Position은 symbolModel의 Latitude/Longitude 사용 (중심점)
+            Position = new PointLatLng(symbolModel.Latitude, symbolModel.Longitude);
+            _log?.Info($"[GMapLineMarker 생성자] 중심 위치 유지: ({Position.Lat}, {Position.Lng})");
 
             // 카테고리 설정 (라인은 기본적으로 AREA_BOUNDARY 카테고리)
             Category = EnumMarkerCategory.AREA_BOUNDARY;
@@ -52,6 +49,46 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             _isDrawing = false;
 
             _log?.Info($"[GMapLineMarker 생성자] 완료 - Category: {Category}");
+        }
+
+        /// <summary>
+        /// 위치 업데이트 오버라이드 - 라인의 모든 포인트도 함께 이동
+        /// </summary>
+        public override void UpdateLocation(PointLatLng newPosition)
+        {
+            // 이동 거리 계산
+            var deltaLat = newPosition.Lat - Position.Lat;
+            var deltaLng = newPosition.Lng - Position.Lng;
+
+            _log?.Info($"[UpdateLocation] 이동 거리: deltaLat={deltaLat}, deltaLng={deltaLng}");
+
+            // 기본 위치 업데이트
+            base.UpdateLocation(newPosition);
+
+            // 모든 포인트를 동일한 거리만큼 이동
+            for (int i = 0; i < _runtimePoints.Count; i++)
+            {
+                var oldPoint = _runtimePoints[i];
+                _runtimePoints[i] = new PointLatLng(
+                    oldPoint.Lat + deltaLat,
+                    oldPoint.Lng + deltaLng
+                );
+            }
+
+            // 모델 동기화
+            SyncModelPoints();
+
+            // UI 업데이트 알림
+            NotifyPointsChanged();
+
+            // Shape가 GMapMarkerLineControl이면 강제 업데이트
+            if (Shape is GMapMarkerLineControl lineControl)
+            {
+                // UpdateLineGeometry를 다시 호출하도록 트리거
+                lineControl.InvalidateVisual();
+            }
+
+            _log?.Info($"[UpdateLocation] 라인 포인트 {_runtimePoints.Count}개 이동 완료");
         }
 
         #region ILineEditableMarker 구현 (편집 기능용)
@@ -259,11 +296,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         }
 
         #endregion
-
-
         public List<PointLatLng> RuntimePoints => _runtimePoints.ToList();
 
-        public List<GeoPoint> LinePoints => _model.LinePoints.ToList();
+        public List<GeoPoint> LinePoints
+        {
+            get { return _model.LinePoints.ToList(); }
+            set 
+            {
+                _model.LinePoints = value;
+                _runtimePoints = GeoPointConverter.ToPointLatLngList(value);
+                OnPropertyChanged(nameof(LinePoints));
+                OnPropertyChanged(nameof(RuntimePoints));
+            }
+        }
+
 
         public bool IsDrawing
         {
@@ -320,9 +366,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
         public double TotalDistance => GeoPointConverter.CalculateTotalDistance(_model.LinePoints);
 
-
+        //public Rect ActualLineBounds => throw new NotImplementedException();
 
         private bool _isDrawing = false;
+        private List<GeoPoint> _linePoints;
+
         private List<PointLatLng> _runtimePoints = new List<PointLatLng>();
     }
 }

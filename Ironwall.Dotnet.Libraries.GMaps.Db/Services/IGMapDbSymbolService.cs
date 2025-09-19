@@ -255,6 +255,7 @@ public interface IGMapDbSymbolService
     /// </remarks>
     Task<bool> DeletePidsSymbolByDeviceIdAsync(int deviceId, CancellationToken token = default);
     #endregion
+
     #region - MilitarySymbol CRUD Operations -
     /// <summary>모든 군사 심볼을 조회합니다 (JOIN 쿼리)</summary>
     /// <param name="token">취소 토큰</param>
@@ -306,6 +307,64 @@ public interface IGMapDbSymbolService
     /// 부대 해체, 작전 종료 등의 상황에서 사용됩니다.
     /// </remarks>
     Task<bool> DeleteMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default);
+    #endregion
+
+    #region - LineSymbol CRUD Operations -
+    /// <summary>모든 라인 심볼을 조회합니다 (JOIN 쿼리 및 포인트 포함)</summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>LineSymbol 목록</returns>
+    /// <remarks>
+    /// Symbols, LineSymbols, LinePoints 테이블을 조인하여 완전한 라인 심볼 정보를 반환합니다.
+    /// AREA_BOUNDARY 카테고리의 Symbol만 조회합니다.
+    /// 각 라인의 포인트들은 SequenceOrder 순서대로 정렬되어 반환됩니다.
+    /// </remarks>
+    Task<List<ILineSymbolModel>?> FetchLineSymbolsAsync(CancellationToken token = default);
+
+    /// <summary>ID로 단일 라인 심볼을 조회합니다</summary>
+    /// <param name="id">Symbol ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>LineSymbol 모델</returns>
+    /// <remarks>
+    /// Symbols와 LineSymbols 테이블을 조인하고, LinePoints를 별도 조회하여 
+    /// 완전한 라인 심볼 정보를 반환합니다.
+    /// 포인트들은 SequenceOrder에 따라 순서가 보장됩니다.
+    /// </remarks>
+    Task<ILineSymbolModel?> FetchLineSymbolAsync(int id, CancellationToken token = default);
+
+    /// <summary>새로운 라인 심볼을 삽입합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">LineSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Symbol ID</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols, LineSymbols, LinePoints 테이블에 동시 삽입합니다.
+    /// LinePoints는 제공된 순서대로 SequenceOrder가 부여되어 저장됩니다.
+    /// 빈 포인트 리스트도 허용되며, 나중에 업데이트 가능합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<int> InsertLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default);
+
+    /// <summary>라인 심볼을 업데이트합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">LineSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 LineSymbol 모델</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols, LineSymbols 테이블을 업데이트하고,
+    /// LinePoints는 기존 데이터를 삭제 후 새로 삽입하는 방식으로 처리합니다.
+    /// 포인트 순서 변경, 추가, 삭제가 모두 가능합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<ILineSymbolModel?> UpdateLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default);
+
+    /// <summary>라인 심볼을 삭제합니다 (CASCADE 삭제)</summary>
+    /// <param name="model">LineSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// Symbols 테이블에서 삭제하면 LineSymbols와 LinePoints 테이블의 관련 레코드는 
+    /// CASCADE 제약조건에 의해 자동으로 삭제됩니다.
+    /// 경로 제거, 영역 해제 등의 상황에서 사용됩니다.
+    /// </remarks>
+    Task<bool> DeleteLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default);
     #endregion
     #region - Properties -
     /// <summary>데이터베이스 연결 상태</summary>
