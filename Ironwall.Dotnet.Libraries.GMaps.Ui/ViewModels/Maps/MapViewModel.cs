@@ -2774,7 +2774,9 @@ public class MapViewModel : BasePanelViewModel
                 if (lineMarker is GMapLineMarker gMapLineMarker)
                 {
 
-                    var savedId = await DbSaveProcess(gMapLineMarker);
+                    //var savedId = await DbSaveProcess(gMapLineMarker);
+                    var savedId = await _gMapDbSymbolService.InsertLineSymbolAsync(gMapLineMarker.Model);
+                    var fetchedLineMarker = await _gMapDbSymbolService.FetchLineSymbolAsync(savedId);
                     if (savedId > 0)
                     {
                         _log?.Info($"라인 DB 저장 완료: ID={savedId}");
@@ -2786,7 +2788,7 @@ public class MapViewModel : BasePanelViewModel
                         //속성 패널 표시
                         //ShowPropertyPanel();
                     }
-                    AddMarkerToMap(gMapLineMarker);
+                    AddMarkerFromSymbol(fetchedLineMarker);
                 }
 
                 // UI 상태 업데이트

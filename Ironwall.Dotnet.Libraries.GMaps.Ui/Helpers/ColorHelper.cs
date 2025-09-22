@@ -163,23 +163,41 @@ public static class ColorHelper
     {
         return new[]
         {
-                EnumColorType.Blue,       // 기본
-                EnumColorType.Red,        // 경고/선택
-                EnumColorType.Green,      // 정상/성공
-                EnumColorType.Orange,     // 주의
-                EnumColorType.Purple,     // 특별
-                EnumColorType.Yellow,     // 알림
-                EnumColorType.Pink,       // 강조
-                EnumColorType.Teal,       // 정보
-                EnumColorType.Gray,       // 비활성
-                EnumColorType.Black,      // 중요
-                EnumColorType.White,      // 배경
-                EnumColorType.DarkBlue,   // 진한 기본
-                EnumColorType.DarkRed,    // 진한 경고
-                EnumColorType.DarkGreen,  // 진한 성공
-                EnumColorType.Gold,       // 프리미엄
-                EnumColorType.Silver,     // 일반
-                EnumColorType.Transparent // 투명
+                // 기본 색상 (자주 사용)
+        EnumColorType.Blue,         // Material Blue
+        EnumColorType.Red,          // Material Red
+        EnumColorType.Green,        // Material Green
+        EnumColorType.Yellow,       // Material Yellow
+        EnumColorType.Orange,       // Material Orange
+        EnumColorType.Purple,       // Material Purple
+        EnumColorType.Pink,         // Material Pink
+        EnumColorType.Brown,        // Material Brown - 인프라/건물에 필수
+        
+        // 보조 색상
+        EnumColorType.Teal,         // Material Teal
+        EnumColorType.Indigo,       // Material Indigo
+        EnumColorType.Lime,         // Material Lime
+        EnumColorType.Cyan,         // Cyan
+        EnumColorType.Magenta,      // Magenta
+        
+        // 중성 색상
+        EnumColorType.Gray,         // Material Gray
+        EnumColorType.Black,        // Material Dark
+        EnumColorType.White,        // White
+        EnumColorType.Beige,        // Beige
+        EnumColorType.Olive,        // Olive
+        
+        // 진한 색상 변형
+        EnumColorType.DarkBlue,     // Material Blue 700
+        EnumColorType.DarkRed,      // Material Red 700
+        EnumColorType.DarkGreen,    // Material Green 700
+        EnumColorType.DarkOrange,   // Material Orange 700
+        EnumColorType.DarkPurple,   // Material Purple 700
+        
+        // 특수 색상
+        EnumColorType.Gold,         // Gold
+        EnumColorType.Silver,       // Silver
+        EnumColorType.Transparent   // Transparent (필요시)
             };
     }
 }

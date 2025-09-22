@@ -57,12 +57,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
             {
                 // 건물 타입에 따른 초기 설정
                 ApplyBuildingTypeDefaults();
-
-                // 층수에 따른 크기 조정
-                if (FloorCount > 1)
-                {
-                    AdjustSizeByFloorCount();
-                }
             }
         }
 
@@ -72,19 +66,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         protected override void UpdateShapeSize(double width, double height)
         {
             base.UpdateShapeSize(width, height);
-
-            // 층수에 비례한 높이 조정
-            if (Shape is GMapMarkerInfraControl infraControl && FloorCount > 1)
-            {
-                var adjustedHeight = CalculateHeightByFloorCount(height);
-                infraControl.Height = adjustedHeight;
-
-                // 지하층이 있으면 추가 표시
-                if (BasementFloorCount > 0)
-                {
-                    infraControl.Margin = new Thickness(0, 0, 0, -5); // 지하 표시를 위한 여백
-                }
-            }
         }
         #endregion
 
@@ -127,24 +108,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
                     break;
             }
         }
-
-        /// <summary>
-        /// 층수에 따른 크기 조정
-        /// </summary>
-        private void AdjustSizeByFloorCount()
-        {
-            if (FloorCount <= 1) return;
-
-            var baseHeight = Height;
-            var adjustedHeight = CalculateHeightByFloorCount(baseHeight);
-
-            if (Math.Abs(Height - adjustedHeight) > 0.01)
-            {
-                Height = adjustedHeight;
-                UpdateShapeSize(Width, Height);
-            }
-        }
-
+       
         /// <summary>
         /// 층수에 따른 높이 계산
         /// </summary>
@@ -155,25 +119,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
             return Math.Min(baseHeight * multiplier, baseHeight * 2);
         }
 
-        /// <summary>
-        /// 건물 면적에 따른 크기 계산
-        /// </summary>
-        private void AdjustSizeByBuildingArea()
-        {
-            if (BuildingArea <= 0) return;
-
-            // 면적에 따른 크기 조정 (√면적 비례)
-            var scale = Math.Sqrt(BuildingArea / 100); // 100㎡ 기준
-            var newWidth = Math.Max(20, Math.Min(100, 35 * scale));
-            var newHeight = Math.Max(20, Math.Min(100, 35 * scale));
-
-            if (Math.Abs(Width - newWidth) > 0.01 || Math.Abs(Height - newHeight) > 0.01)
-            {
-                Width = newWidth;
-                Height = newHeight;
-                UpdateShapeSize(Width, Height);
-            }
-        }
+      
         #endregion
 
         #region - IHandles -
@@ -236,13 +182,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
 
                 _model.FloorCount = value;
                 OnPropertyChanged(nameof(FloorCount));
-                AdjustSizeByFloorCount();
-
-                // UI 업데이트
-                if (Shape is GMapMarkerInfraControl infraControl)
-                {
-                    infraControl.FloorCount = value;
-                }
             }
         }
 
@@ -258,12 +197,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
 
                 _model.BasementFloorCount = value;
                 OnPropertyChanged(nameof(BasementFloorCount));
-
-                // UI 업데이트
-                if (Shape is GMapMarkerInfraControl infraControl)
-                {
-                    infraControl.BasementFloorCount = value;
-                }
             }
         }
 
@@ -275,17 +208,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
             get => _model.BuildingArea;
             set
             {
-                if (Math.Abs(_model.BuildingArea - value) < 0.01) return;
-
                 _model.BuildingArea = value;
                 OnPropertyChanged(nameof(BuildingArea));
-                AdjustSizeByBuildingArea();
-
-                // UI 업데이트
-                if (Shape is GMapMarkerInfraControl infraControl)
-                {
-                    infraControl.BuildingArea = value;
-                }
             }
         }
 

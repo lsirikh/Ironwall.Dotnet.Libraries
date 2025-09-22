@@ -137,6 +137,7 @@
 										Stroke="Black"
 										StrokeThickness="1" />
 								</Grid>
+
 								<!--  === Office Building ===  -->
 								<Grid Name="PART_OfficeBuilding" Visibility="Collapsed">
 									<!--  빌딩 본체  -->

@@ -192,7 +192,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
 
     private void OnMapChanged()
     {
-        System.Diagnostics.Debug.WriteLine("지도 변경 감지 - 라인 업데이트");
+        //System.Diagnostics.Debug.WriteLine("지도 변경 감지 - 라인 업데이트");
         UpdateLineGeometry();
     }
 
@@ -452,10 +452,10 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             }
 
             // 디버깅 로그
-            System.Diagnostics.Debug.WriteLine($"라인 경계: ({minX:F0},{minY:F0})-({maxX:F0},{maxY:F0})");
-            System.Diagnostics.Debug.WriteLine($"실제 크기: {actualWidth:F0}x{actualHeight:F0}");
-            System.Diagnostics.Debug.WriteLine($"컨트롤 크기: {Width:F0}x{Height:F0}");
-            System.Diagnostics.Debug.WriteLine($"중심점: ({centerScreenPos.X:F0},{centerScreenPos.Y:F0})");
+            //System.Diagnostics.Debug.WriteLine($"라인 경계: ({minX:F0},{minY:F0})-({maxX:F0},{maxY:F0})");
+            //System.Diagnostics.Debug.WriteLine($"실제 크기: {actualWidth:F0}x{actualHeight:F0}");
+            //System.Diagnostics.Debug.WriteLine($"컨트롤 크기: {Width:F0}x{Height:F0}");
+            //System.Diagnostics.Debug.WriteLine($"중심점: ({centerScreenPos.X:F0},{centerScreenPos.Y:F0})");
 
         }
         catch (Exception ex)

@@ -349,7 +349,7 @@ public class GMapCustomControl : GMapControl
 
             DeselectAllMarkers();
 
-            _log?.Info($"OnAreaChange 이벤트 발생: Zoom={zoom}");
+            //_log?.Info($"OnAreaChange 이벤트 발생: Zoom={zoom}");
         }
         catch (Exception ex)
         {
@@ -370,7 +370,7 @@ public class GMapCustomControl : GMapControl
 
             TriggerSelectionChange(viewArea, zoom, false);
 
-            _log?.Info($"위치 변경됨: ({point.Lat:F6}, {point.Lng:F6})");
+            //_log?.Info($"위치 변경됨: ({point.Lat:F6}, {point.Lng:F6})");
         }
         catch (Exception ex)
         {
@@ -391,19 +391,15 @@ public class GMapCustomControl : GMapControl
             {
                 if (SetMarkerVisibility(marker))
                 {
-
                     marker.IsVisible = true;
-                    //marker.ShowTitle = false;
                 }
                 else
                 {
                     marker.IsVisible = false;
-                    //marker.ShowShape = false;
-                    //marker.ShowTitle = false;
                 }
             }
 
-            _log?.Info($"마커 가시성 업데이트 완료: Zoom={Zoom}, 마커 수={Markers?.Count}");
+            //_log?.Info($"마커 가시성 업데이트 완료: Zoom={Zoom}, 마커 수={Markers?.Count}");
         }
         catch (Exception ex)
         {
