@@ -41,6 +41,7 @@ public class DeviceSymbolLookupModel : BaseModel
     {
         try
         {
+            
             // 1. 기존 비즈니스 상태 업데이트 (기존 로직 유지)
             UpdateDeviceAndSymbolState(eventType, severity);
 
@@ -131,7 +132,7 @@ public class DeviceSymbolLookupModel : BaseModel
     #endregion
     #region - Properties -
     public IBaseDeviceModel? DeviceModel { get; set; }
-    public IPidsSymbolModel? SymbolModel { get; set; }
+    public ISymbolModel? SymbolModel { get; set; }
     #endregion
     #region - Attributes -
     private ILogService _log;

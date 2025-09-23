@@ -35,7 +35,7 @@ public class SymbolEventManager : IDisposable
     }
 
     // 센서 장비-심볼 매핑 등록
-    public void RegisterDeviceSymbol(IBaseDeviceModel deviceModel, IPidsSymbolModel symbolModel)
+    public void RegisterDeviceSymbol(IBaseDeviceModel deviceModel, ISymbolModel symbolModel)
     {
         var lookup = new DeviceSymbolLookupModel(_log, _ea, _eventSetupModel)
         {

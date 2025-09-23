@@ -20,9 +20,12 @@ public class LineSymbolModel : SymbolModel, ILineSymbolModel
         Height = 60;
         ShowShape = true;
         ShowTitle = false;
+
+        StrokeThickness = 3.0;
         StrokeColor = EnumColorType.Black;
         FillColor = EnumColorType.Transparent;
         Category = EnumMarkerCategory.AREA_BOUNDARY;
+        Title = "New Line";
         TitleSize = 10;
         OperationState = EnumOperationState.NONE;
     }

@@ -358,7 +358,7 @@
 							Name="PART_LabelContainer"
 							MinWidth="40"
 							MaxWidth="150"
-							Margin="0,0,0,-40"
+							Margin="0,0,0,-30"
 							Padding="3,2"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Bottom"
@@ -384,13 +384,7 @@
 									TextAlignment="Center"
 									TextTrimming="CharacterEllipsis"
 									TextWrapping="NoWrap" />
-								<TextBlock
-									Name="PART_LabelFloors"
-									FontSize="{TemplateBinding TitleSize}"
-									Foreground="DarkGray"
-									Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=GetFloorDisplayText}"
-									TextAlignment="Center"
-									Visibility="Collapsed" />
+
 							</StackPanel>
 						</Border>
 
@@ -420,7 +414,6 @@
 						<!--  층수 표시  -->
 						<Trigger Property="ShowFloorCount" Value="True">
 							<Setter TargetName="PART_FloorText" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_LabelFloors" Property="Visibility" Value="Visible" />
 						</Trigger>
 
 						<!--  라벨 표시 조건  -->

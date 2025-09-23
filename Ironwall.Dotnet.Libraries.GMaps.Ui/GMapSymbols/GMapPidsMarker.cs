@@ -245,6 +245,20 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         }
     }
 
+    /// <summary>
+    /// 이벤트 상태 (애니메이션 트리거)
+    /// </summary>
+    public EnumEventStatus EventStatus
+    {
+        get => _model.EventStatus;
+        set
+        {
+            _model.EventStatus = value;
+            OnPropertyChanged(nameof(EventStatus));
+            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
+        }
+    }
+
     public double DetectionRange
     {
         get => _model.DetectionRange;
@@ -306,25 +320,9 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     }
 
     /// <summary>
-    /// 이벤트 상태 (애니메이션 트리거)
-    /// </summary>
-    public EnumEventStatus EventStatus
-    {
-        get => _model.EventStatus;
-        set
-        {
-            _model.EventStatus = value;
-            OnPropertyChanged(nameof(EventStatus));
-            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
-        }
-    }
-
-    /// <summary>
     /// 애니메이션 실행 중 여부
     /// </summary>
     public bool IsAnimating => _isAnimating;
-
-    EnumDeviceType IPidsEditableMarker.DeviceType { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     #endregion
 }

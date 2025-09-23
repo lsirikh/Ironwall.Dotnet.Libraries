@@ -489,25 +489,6 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         }
     }
 
-    /// <summary>
-    /// 화살표 머리 적용
-    /// </summary>
-    private void ApplyArrowHead()
-    {
-        // 화살표 구현 (필요시)
-        if (MainPolyline?.Points?.Count >= 2)
-        {
-            var lastIndex = MainPolyline.Points.Count - 1;
-            var endPoint = MainPolyline.Points[lastIndex];
-            var prevPoint = MainPolyline.Points[lastIndex - 1];
-
-            // 화살표 그리기 로직
-            // TODO: 구현 필요
-        }
-    }
-
-
-  
     #endregion
 
     #region Static Property Changed Callbacks

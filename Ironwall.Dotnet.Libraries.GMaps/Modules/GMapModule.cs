@@ -49,6 +49,8 @@ public class GMapModule : Module
                .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
             builder.RegisterType<InfraSymbolProvider>().As<InfraSymbolProvider>()
                .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<PidsGroupSymbolProvider>().As<PidsGroupSymbolProvider>()
+               .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
         }
         catch
         {

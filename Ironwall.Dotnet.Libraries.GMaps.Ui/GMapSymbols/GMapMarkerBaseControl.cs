@@ -686,6 +686,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         {
             lineControl.MainPolyline.Stroke = e.NewValue as Brush;
         }
+        else if(d is GMapMarkerPidsGroupControl pGroupControl && pGroupControl.MainPolyline != null)
+        {
+            pGroupControl.MainPolyline.Stroke = e.NewValue as Brush;
+        }
     }
 
     private static void OnMarkerStrokeThicknessChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -706,6 +710,11 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             if (control is GMapMarkerLineControl lineControl && lineControl.MainPolyline != null)
             {
                 lineControl.MainPolyline.StrokeThickness = (double)e.NewValue;
+                System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
+            }
+            else if (d is GMapMarkerPidsGroupControl pGroupControl && pGroupControl.MainPolyline != null)
+            {
+                pGroupControl.MainPolyline.StrokeThickness = (double)e.NewValue;
                 System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
             }
 

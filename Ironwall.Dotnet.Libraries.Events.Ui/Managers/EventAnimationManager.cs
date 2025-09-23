@@ -111,7 +111,7 @@ public class EventAnimationManager
     private EventState _currentEventState;
     private EventSetupModel _eventSetupModel;
     private ILogService _log;
-    private IEventAggregator _ea;
+    private IEventAggregator? _ea;
     public event System.Action OnEventRestored;
     #endregion
 }

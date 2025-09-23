@@ -15,89 +15,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Tests;
 /// <summary>
 /// GMapDbSymbolService PidsSymbol 전용 Fixture
 /// </summary>
-public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
+public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
 {
-    #region - Properties -
-    /// <summary>Symbol DB 서비스 인스턴스</summary>
-    public IGMapDbSymbolService Svc { get; private set; } = null!;
-
-    /// <summary>Symbol 데이터 제공자</summary>
-    public SymbolProvider SymbolProvider = new();
-    public GeometricSymbolProvider GeometrySymbolProvider { get; private set; } = null!;
-    public PidsSymbolProvider PidsSymbolProvider { get; private set; } = null!;
-    public MilitarySymbolProvider MilitarySymbolProvider { get; private set; } = null!;
-    public LineSymbolProvider LineSymbolProvider { get; private set; } = null!;
-    public InfraSymbolProvider InfraSymbolProvider { get; private set; } = null!;
-
-
-
-    /// <summary>취소 토큰 소스</summary>
-    internal CancellationTokenSource Cts { get; } = new();
-
-    /// <summary>테스트용 PidsSymbol 생성 개수</summary>
-    public int PidsSymbolCount = 15;
-
-    /// <summary>삽입된 PidsSymbol ID 목록</summary>
-    public List<int> InsertedPidsSymbolIds = new List<int>();
-    #endregion
-
-    #region - Constants -
-    /// <summary>테스트용 테이블 목록</summary>
-    private static readonly string[] _tables = { "LinePoints", "LineSymbols", "PidsSymbols", "GeometrySymbols", "MilitarySymbols", "InfraSymbols", "Symbols" };
-
-    /// <summary>DB 설정</summary>
-    private readonly GMapDbSetupModel _setup = new()
-    {
-        IpDbServer = "127.0.0.1",
-        PortDbServer = 3306,
-        DbDatabase = "monitor_db",
-        UidDbServer = "root",
-        PasswordDbServer = "root"
-    };
-    #endregion
-
-    #region - IAsyncLifetime Implementation -
-    /// <summary>
-    /// 테스트 픽스처 초기화 - DB 서비스 시작
-    /// </summary>
-    [Fact(DisplayName = "Initialize PidsSymbol DB Service")]
-    public async Task InitializeAsync()
-    {
-        var log = new LogService();
-        var ea = new EventAggregator();
-        GeometrySymbolProvider = new GeometricSymbolProvider(log, SymbolProvider);
-        PidsSymbolProvider = new PidsSymbolProvider(log, SymbolProvider);
-        MilitarySymbolProvider = new MilitarySymbolProvider(log, SymbolProvider);
-        LineSymbolProvider = new LineSymbolProvider(log, SymbolProvider);
-        InfraSymbolProvider = new InfraSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, PidsSymbolProvider, MilitarySymbolProvider, LineSymbolProvider, InfraSymbolProvider, _setup);
-        await DropTablesAsync();               // 깨끗한 DB 확보
-        await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance
-
-        Assert.True(Svc.IsConnected);
-    }
-
-    /// <summary>
-    /// 테스트 픽스처 정리 - DB 서비스 중지
-    /// </summary>
-    [Fact(DisplayName = "Dispose PidsSymbol DB Service")]
-    public async Task DisposeAsync()
-    {
-        await Svc.StopService(Cts.Token);
-        await DropTablesAsync();
-
-        if (!Cts.IsCancellationRequested)
-            Cts.Cancel();
-
-        Assert.False(Svc.IsConnected);
-    }
-    #endregion
-
     #region - Private Methods -
     /// <summary>
     /// DB 내부 테이블 삭제 (CASCADE 순서 고려)
     /// </summary>
-    private async Task DropTablesAsync()
+    protected override async Task DropTablesAsync()
     {
         var csb = new MySqlConnectionStringBuilder
         {
@@ -131,7 +55,7 @@ public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
         var eventStatuses = Enum.GetValues<EnumEventStatus>();
         var colorTypes = Enum.GetValues<EnumColorType>();
 
-        for (int i = 1; i <= PidsSymbolCount; i++)
+        for (int i = 1; i <= SymbolCount; i++)
         {
             var pidsSymbol = new PidsSymbolModel
             {
@@ -161,7 +85,7 @@ public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
             };
 
             int id = await Svc.InsertPidsSymbolAsync(pidsSymbol);
-            InsertedPidsSymbolIds.Add(id);
+            InsertedSymbolIds.Add(id);
         }
     }
 
@@ -205,7 +129,7 @@ public sealed class GMapDbPidsSymbolFixture : IAsyncLifetime
             };
 
             int id = await Svc.InsertPidsSymbolAsync(pidsSymbol);
-            InsertedPidsSymbolIds.Add(id);
+            InsertedSymbolIds.Add(id);
             createdIds.Add(id);
         }
 
@@ -245,10 +169,10 @@ public class GMapDbPidsSymbol_BasicCrudTests
         /* 1) FetchPidsSymbolsAsync → 전체 개수 일치 */
         var all = await _fx.Svc.FetchPidsSymbolsAsync();
         Assert.NotNull(all);
-        Assert.True(all!.Count >= _fx.PidsSymbolCount);
+        Assert.True(all!.Count >= _fx.SymbolCount);
 
         /* 2) 각각 FetchPidsSymbolAsync로 필드 검증 */
-        foreach (var id in _fx.InsertedPidsSymbolIds)
+        foreach (var id in _fx.InsertedSymbolIds)
         {
             var one = await _fx.Svc.FetchPidsSymbolAsync(id);
             Assert.NotNull(one);
@@ -279,7 +203,7 @@ public class GMapDbPidsSymbol_BasicCrudTests
     public async Task Update_PidsSymbol_Works()
     {
         await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.Fence);
-        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(_fx.InsertedPidsSymbolIds.First());
+        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(_fx.InsertedSymbolIds.First());
 
         /* 수정 */
         pidsSymbol!.Title = "업데이트된_PIDS장비";
@@ -332,7 +256,7 @@ public class GMapDbPidsSymbol_BasicCrudTests
     public async Task Delete_PidsSymbol_Works()
     {
         await _fx.SeedPidsSymbolsAsync();
-        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(_fx.InsertedPidsSymbolIds.First());
+        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(_fx.InsertedSymbolIds.First());
 
         /* 삭제 */
         bool ok = await _fx.Svc.DeletePidsSymbolAsync(pidsSymbol!);
@@ -697,20 +621,20 @@ public class GMapDbPidsSymbol_IntegrationTests
         _fx.SymbolProvider.Clear();
 
         // DB에 PidsSymbol 데이터 삽입
-        await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.IpCamera, _fx.PidsSymbolCount);
+        await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.IpCamera, _fx.SymbolCount);
 
         // FetchInstance로 Provider에 로드 (PidsSymbol 포함)
         await _fx.Svc.FetchInstanceAsync();
 
         // Provider 검증
-        Assert.True(_fx.SymbolProvider.Count >= _fx.PidsSymbolCount);
+        Assert.True(_fx.SymbolProvider.Count >= _fx.SymbolCount);
 
         // Provider 내 PidsSymbol 데이터 검증
         var pidsSymbols = _fx.SymbolProvider.CollectionEntity
             .OfType<PidsSymbolModel>()
             .ToList();
 
-        Assert.True(pidsSymbols.Count >= _fx.PidsSymbolCount);
+        Assert.True(pidsSymbols.Count >= _fx.SymbolCount);
         Assert.All(pidsSymbols, s =>
         {
             Assert.True(s.Id > 0);

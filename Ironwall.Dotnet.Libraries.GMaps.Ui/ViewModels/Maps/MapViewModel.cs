@@ -201,6 +201,15 @@ public class MapViewModel : BasePanelViewModel
 
                     _log?.Info($"장비-심볼 매핑: {device.DeviceName} <-> {symbol.Title}");
                 }
+
+                var groupSymbol = symbols?.OfType<GMapPidsGroupMarker>()
+                    .FirstOrDefault(s => s.LinkedDeviceGroup == device.DeviceGroup);
+                if (groupSymbol != null)
+                {
+                    _symbolEventManager.RegisterDeviceSymbol(device, groupSymbol.Model);
+
+                    _log?.Info($"장비-심볼 매핑: {device.DeviceName} <-> {groupSymbol.Title}");
+                }
             }
 
             _log?.Info($"장비-심볼 매핑 완료: {devices.Count}개 장비");
@@ -1772,7 +1781,52 @@ public class MapViewModel : BasePanelViewModel
         }
     }
 
-    private async Task AddPidsMarker(PointLatLng position, EnumDeviceType deviceType, string title)
+    private Task AddPidsMarker(PointLatLng position, EnumDeviceType deviceType, string title)
+    {
+        try
+        {
+
+            switch (deviceType)
+            {
+                case EnumDeviceType.NONE:
+                    break;
+                case EnumDeviceType.Controller:
+                case EnumDeviceType.Multi:
+                case EnumDeviceType.Fence:
+                case EnumDeviceType.Underground:
+                case EnumDeviceType.Contact:
+                case EnumDeviceType.PIR:
+                case EnumDeviceType.IoController:
+                case EnumDeviceType.Laser:
+                case EnumDeviceType.Cable:
+                case EnumDeviceType.IpCamera:
+                case EnumDeviceType.SmartSensor:
+                case EnumDeviceType.SmartSensor2:
+                case EnumDeviceType.SmartCompound:
+                case EnumDeviceType.IpSpeaker:
+                case EnumDeviceType.Radar:
+                case EnumDeviceType.OpticalCable:
+                    AddPidsSingleMarker(position, deviceType, title);
+                    break;
+                case EnumDeviceType.Fence_Group:
+                    AddPidsGroupMarker(position, deviceType, title);
+                    break;
+                default:
+                    break;
+            }
+
+            
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"테스트 마커 추가 실패: {ex.Message}");
+        }
+        return Task.CompletedTask;
+    }
+
+    
+
+    private async void AddPidsSingleMarker(PointLatLng position, EnumDeviceType deviceType, string title)
     {
         try
         {
@@ -1814,10 +1868,39 @@ public class MapViewModel : BasePanelViewModel
         }
         catch (Exception ex)
         {
-            _log?.Error($"테스트 마커 추가 실패: {ex.Message}");
+            _log.Error(ex.Message);
         }
-
     }
+
+    private async void AddPidsGroupMarker(PointLatLng position, EnumDeviceType deviceType, string title)
+    {
+        try
+        {
+
+            // 라인 드로잉 파라미터 설정
+            var parameters = new LineDrawingParameters
+            {
+                Title = title,
+                Model = new PidsGroupSymbolModel(),
+            };
+
+            // 라인 드로잉 시작
+            var result = await MainMap.StartLineDrawingAsync(parameters);
+
+            if (result)
+            {
+                IsLineDrawing = true;
+                LineDrawingStatus = "경계선 그리기: 첫 번째 포인트를 클릭하세요";
+
+                _log?.Info("라인 드로잉 모드 시작됨");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"구역 경계선 마커 추가 실패: {ex.Message}");
+        }
+    }
+
 
     /// <summary>
     /// 구역 경계선 마커 추가 (라인 드로잉 모드 시작)
@@ -1832,25 +1915,22 @@ public class MapViewModel : BasePanelViewModel
             var parameters = new LineDrawingParameters
             {
                 Title = title,
-                Category = EnumMarkerCategory.AREA_BOUNDARY,
-                ShowShape = true,
-                ShowTitle = false,
-                StrokeThickness = 3,
-                Opacity = 1.0
+                Model = new LineSymbolModel(),
             };
 
             // 라인 타입에 따른 설정
             switch (areaType.ToLower())
             {
                 case "area":
-                    parameters.StrokeColor = EnumColorType.Blue;
-                    parameters.Pattern = EnumLinePattern.Solid;
-                    parameters.IsClosedPath = true;
+                    parameters.Model.StrokeColor = EnumColorType.Blue;
+                    parameters.Model.LinePattern = EnumLinePattern.Solid;
+                    parameters.Model.IsClosedPath = true;
                     break;
 
                 case "line":
-                    parameters.StrokeColor = EnumColorType.Yellow;
-                    parameters.Pattern = EnumLinePattern.Dashed;
+                    parameters.Model.StrokeColor = EnumColorType.Yellow;
+                    parameters.Model.LinePattern = EnumLinePattern.Dashed;
+                    parameters.Model.IsClosedPath = false;
                     break;
             }
 
@@ -2320,6 +2400,54 @@ public class MapViewModel : BasePanelViewModel
                         duplicatedSymbol = await _gMapDbSymbolService.FetchInfraSymbolAsync(newSymbolId);
                     }
                     break;
+
+                case GMapPidsGroupMarker pidGroupMarker:
+                    // PidGroupSymbolModel 복제
+                    var originalPidsGroupModel = pidGroupMarker.Model as PidsGroupSymbolModel;
+                    if (originalPidsGroupModel != null)
+                    {
+                        var pidsGroupSymbol = new PidsGroupSymbolModel
+                        {
+                            Title = $"{originalPidsGroupModel.Title}_Copy",
+                            TitleSize = originalPidsGroupModel.TitleSize,
+                            Latitude = newPos.Lat,
+                            Longitude = newPos.Lng,
+                            Zoom = originalPidsGroupModel.Zoom,
+                            Width = originalPidsGroupModel.Width,
+                            Height = originalPidsGroupModel.Height,
+                            Bearing = originalPidsGroupModel.Bearing,
+                            Category = originalPidsGroupModel.Category,
+                            ShowShape = originalPidsGroupModel.ShowShape,
+                            ShowTitle = originalPidsGroupModel.ShowTitle,
+                            OperationState = originalPidsGroupModel.OperationState,
+                            FillColor = originalPidsGroupModel.FillColor,
+                            StrokeColor = originalPidsGroupModel.StrokeColor,
+                            StrokeThickness = originalPidsGroupModel.StrokeThickness,
+
+                            LinkedDeviceGroup = originalPidsGroupModel.LinkedDeviceGroup,
+                            EventStatus = originalPidsGroupModel.EventStatus,
+
+                            // LineSymbol 전용 속성들
+                            LineOpacity = originalPidsGroupModel.LineOpacity,
+                            IsClosedPath = originalPidsGroupModel.IsClosedPath,
+                            ShowArrowHead = originalPidsGroupModel.ShowArrowHead,
+                            LinePattern = originalPidsGroupModel.LinePattern,
+
+                            // LinePoints 복제 (각 포인트도 약간 이동)
+                            LinePoints = originalPidsGroupModel.LinePoints?.Select(p =>
+                                new GeoPoint(
+                                    p.Latitude + 0.0001,
+                                    p.Longitude + 0.0001,
+                                    p.Altitude
+                                )).ToList() ?? new List<GeoPoint>()
+
+                        };
+
+                        // DB 저장
+                        newSymbolId = await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(pidsGroupSymbol);
+                        duplicatedSymbol = await _gMapDbSymbolService.FetchPidsGroupSymbolAsync(newSymbolId);
+                    }
+                    break;
                 default:
                     _log?.Warning($"지원되지 않는 마커 타입: {SelectedMarker.GetType().Name}");
                     return;
@@ -2658,22 +2786,10 @@ public class MapViewModel : BasePanelViewModel
     /// </summary>
     private LineDrawingParameters CreateLineDrawingParameters()
     {
+
         var parameters = new LineDrawingParameters
         {
-            Title = GetLineTitle(),
-            TitleSize = 12,
-            Width = 60,
-            Height = 60,
-            ShowShape = true,
-            ShowTitle = false,
-            Category = EnumMarkerCategory.AREA_BOUNDARY,
-            StrokeColor = EnumColorType.Red,
-            StrokeThickness = 3,
-            FillColor = EnumColorType.Transparent,
-            Pattern = EnumLinePattern.Solid,
-            Opacity = 1.0,
-            IsClosedPath = false,
-            ShowArrowHead = false
+            Model = new LineSymbolModel(),
         };
 
         // 선택된 타입에 따른 세부 설정
@@ -2681,34 +2797,24 @@ public class MapViewModel : BasePanelViewModel
         {
             switch (SelectedSymbolType?.ToString()?.ToLower())
             {
-                case "Area":
+                case "area":
                     parameters.Title = "구역";
-                    parameters.StrokeColor = EnumColorType.Blue;
-                    parameters.Pattern = EnumLinePattern.Solid;
-                    parameters.IsClosedPath = true;
+                    parameters.Model.StrokeColor = EnumColorType.Blue;
+                    parameters.Model.LinePattern = EnumLinePattern.Solid;
+                    parameters.Model.IsClosedPath = true;
                     break;
 
-                case "Line":
+                case "line":
                     parameters.Title = "경계선";
-                    parameters.StrokeColor = EnumColorType.Yellow;
-                    parameters.Pattern = EnumLinePattern.Dashed;
+                    parameters.Model.StrokeColor = EnumColorType.Yellow;
+                    parameters.Model.LinePattern = EnumLinePattern.Dashed;
+                    parameters.Model.IsClosedPath = false;
                     break;
             }
         }
 
         return parameters;
     }
-    /// <summary>
-    /// 라인 제목 생성 (새로 추가)
-    /// </summary>
-    private string GetLineTitle()
-    {
-        var timestamp = DateTime.Now.ToString("HHmmss");
-        var typeName = SelectedSymbolType?.ToString() ?? "Line";
-        return $"{typeName}_{timestamp}";
-    }
-
-
     #endregion
 
     #region Line Drawing Event Handlers
@@ -2776,19 +2882,24 @@ public class MapViewModel : BasePanelViewModel
 
                     //var savedId = await DbSaveProcess(gMapLineMarker);
                     var savedId = await _gMapDbSymbolService.InsertLineSymbolAsync(gMapLineMarker.Model);
-                    var fetchedLineMarker = await _gMapDbSymbolService.FetchLineSymbolAsync(savedId);
+                    var fetchedMarker = await _gMapDbSymbolService.FetchLineSymbolAsync(savedId);
                     if (savedId > 0)
                     {
                         _log?.Info($"라인 DB 저장 완료: ID={savedId}");
-
-                        //저장 후 선택 상태로 만들기
-                        //MainMap.SelectMarker(gMapLineMarker);
-                        //UpdateSelectedMarker(gMapLineMarker);
-
-                        //속성 패널 표시
-                        //ShowPropertyPanel();
                     }
-                    AddMarkerFromSymbol(fetchedLineMarker);
+                    AddMarkerFromSymbol(fetchedMarker);
+                }
+                else if(lineMarker is GMapPidsGroupMarker gMapPidsGroupMarker)
+                {
+
+                    //var savedId = await DbSaveProcess(gMapLineMarker);
+                    var savedId = await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(gMapPidsGroupMarker.Model);
+                    var fetchedMarker = await _gMapDbSymbolService.FetchPidsGroupSymbolAsync(savedId);
+                    if (savedId > 0)
+                    {
+                        _log?.Info($"라인 DB 저장 완료: ID={savedId}");
+                    }
+                    AddMarkerFromSymbol(fetchedMarker);
                 }
 
                 // UI 상태 업데이트
@@ -3027,7 +3138,7 @@ public class MapViewModel : BasePanelViewModel
         {
             UseManualCoordinates = true,
 
-            // 📌 이미지 경계의 4개 모서리 좌표 사용
+            // 이미지 경계의 4개 모서리 좌표 사용
             ManualMinLatitude = bounds.LocationRightBottom.Lat,  // 남쪽 (하단)
             ManualMaxLatitude = bounds.LocationTopLeft.Lat,      // 북쪽 (상단)
             ManualMinLongitude = bounds.LocationTopLeft.Lng,     // 서쪽 (좌측)
@@ -3180,6 +3291,9 @@ public class MapViewModel : BasePanelViewModel
             case GMapInfraMarker infraMarker:
                 // GMapInfraMarker 전용 로직
                 return await _gMapDbSymbolService.InsertInfraSymbolAsync(infraMarker.Model);
+            case GMapPidsGroupMarker pidsGroupMarker:
+                // GMapPidsGroupMarker 전용 로직
+                return await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(pidsGroupMarker.Model);
             default:
                 // 공통 로직
                 return 0;
@@ -3214,6 +3328,10 @@ public class MapViewModel : BasePanelViewModel
                 // GMapInfraMarker 전용 로직
                 await _gMapDbSymbolService.UpdateInfraSymbolAsync(infraMarker.Model);
                 break;
+            case GMapPidsGroupMarker pidsGroupMarker:
+                // GMapPidsGroupMarker 전용 로직
+                await _gMapDbSymbolService.UpdatePidsGroupSymbolAsync(pidsGroupMarker.Model);
+                break;
             default:
                 // 공통 로직
                 break;
@@ -3242,6 +3360,9 @@ public class MapViewModel : BasePanelViewModel
             case GMapInfraMarker infraMarker:
                 // GMapInfraMarker 전용 로직
                 return await _gMapDbSymbolService.DeleteInfraSymbolAsync(infraMarker.Model);
+            case GMapPidsGroupMarker pidsGroupMarker:
+                // GMapPidsGroupMarker 전용 로직
+                return await _gMapDbSymbolService.DeletePidsGroupSymbolAsync(pidsGroupMarker.Model);
             default:
                 // 공통 로직
                 return false;
@@ -3874,7 +3995,7 @@ public class MapViewModel : BasePanelViewModel
                 EnumMarkerCategory.GEOMETRICS => System.Enum.GetValues<EnumShapeType>().Cast<object>(),
                 EnumMarkerCategory.VEHICLES => new[] { "Car" },
                 EnumMarkerCategory.MILITARY_SYMBOLS => new[] { "Register" },
-                EnumMarkerCategory.PIDS_EQUIPMENT => new[] {"Controller","Multi","Fence", "IpCamera" },
+                EnumMarkerCategory.PIDS_EQUIPMENT => new[] {"Controller","Multi", "Fence", "IpCamera", "Fence_Group" },
                 EnumMarkerCategory.AREA_BOUNDARY => new[] { "Area","Line" },
                 EnumMarkerCategory.INFRASTRUCTURE => new[] { "Factory" },
                 _ => Array.Empty<object>()

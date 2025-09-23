@@ -49,6 +49,7 @@ public class SymbolTypeToIconConverter : IValueConverter
         { "Multi", PackIconKind.DoorbellVideo },
         { "Fence", PackIconKind.Fence },
         { "IpCamera", PackIconKind.Camera },
+        { "Fence_Group", PackIconKind.Fence },
         //{ "Radar", PackIconKind.Radar },
         //{ "Control_Box", PackIconKind.Cube },
         //{ "Gate", PackIconKind.Gate },

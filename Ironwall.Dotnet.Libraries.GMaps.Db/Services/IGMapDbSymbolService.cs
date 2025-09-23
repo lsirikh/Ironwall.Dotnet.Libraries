@@ -424,6 +424,75 @@ public interface IGMapDbSymbolService
 
     #endregion
 
+    #region - PidsGroupSymbol CRUD Operations -
+    /// <summary>모든 PIDS 그룹 심볼을 조회합니다 (JOIN 쿼리 및 포인트 포함)</summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsGroupSymbol 목록</returns>
+    /// <remarks>
+    /// Symbols, PidsGroupSymbols, PidsGroupPoints 테이블을 조인하여 완전한 PIDS 그룹 심볼 정보를 반환합니다.
+    /// PIDS_GROUP 카테고리의 Symbol만 조회합니다.
+    /// 각 그룹의 경계선 포인트들은 SequenceOrder 순서대로 정렬되어 반환됩니다.
+    /// </remarks>
+    Task<List<IPidsGroupSymbolModel>?> FetchPidsGroupSymbolsAsync(CancellationToken token = default);
+
+    /// <summary>ID로 단일 PIDS 그룹 심볼을 조회합니다</summary>
+    /// <param name="id">Symbol ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>PidsGroupSymbol 모델</returns>
+    /// <remarks>
+    /// Symbols와 PidsGroupSymbols 테이블을 조인하고, PidsGroupPoints를 별도 조회하여 
+    /// 완전한 PIDS 그룹 심볼 정보를 반환합니다.
+    /// 경계선 포인트들은 SequenceOrder에 따라 순서가 보장됩니다.
+    /// </remarks>
+    Task<IPidsGroupSymbolModel?> FetchPidsGroupSymbolAsync(int id, CancellationToken token = default);
+
+   
+    /// <summary>새로운 PIDS 그룹 심볼을 삽입합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">PidsGroupSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Symbol ID</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols, PidsGroupSymbols, PidsGroupPoints 테이블에 동시 삽입합니다.
+    /// LineSymbol 기능(LineOpacity, LinePattern 등)과 PIDS 그룹 속성(LinkedDeviceGroup, EventStatus)을 모두 저장합니다.
+    /// 경계선 포인트들은 제공된 순서대로 SequenceOrder가 부여되어 저장됩니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<int> InsertPidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default);
+
+    /// <summary>PIDS 그룹 심볼을 업데이트합니다 (트랜잭션 사용)</summary>
+    /// <param name="model">PidsGroupSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 PidsGroupSymbol 모델</returns>
+    /// <remarks>
+    /// 트랜잭션을 사용하여 Symbols, PidsGroupSymbols 테이블을 업데이트하고,
+    /// PidsGroupPoints는 기존 데이터를 삭제 후 새로 삽입하는 방식으로 처리합니다.
+    /// 그룹 경계 변경, 이벤트 상태 변경, 포인트 추가/삭제가 모두 가능합니다.
+    /// 실패 시 자동으로 롤백됩니다.
+    /// </remarks>
+    Task<IPidsGroupSymbolModel?> UpdatePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default);
+
+    /// <summary>PIDS 그룹 심볼을 삭제합니다 (CASCADE 삭제)</summary>
+    /// <param name="model">PidsGroupSymbol 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// Symbols 테이블에서 삭제하면 PidsGroupSymbols와 PidsGroupPoints 테이블의 관련 레코드는 
+    /// CASCADE 제약조건에 의해 자동으로 삭제됩니다.
+    /// 감시 구역 해제, 그룹 재구성 등의 상황에서 사용됩니다.
+    /// </remarks>
+    Task<bool> DeletePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default);
+
+    /// <summary>LinkedDeviceGroup으로 PIDS 그룹 심볼을 삭제합니다</summary>
+    /// <param name="deviceGroup">연결된 디바이스 그룹 ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// 특정 디바이스 그룹에 연결된 PIDS 그룹 심볼을 삭제합니다.
+    /// 그룹 전체 해제 또는 재배치 시 사용됩니다.
+    /// </remarks>
+    Task<bool> DeletePidsGroupSymbolByDeviceGroupAsync(int deviceGroup, CancellationToken token = default);
+    #endregion
+
 
     #region - Properties -
     /// <summary>데이터베이스 연결 상태</summary>

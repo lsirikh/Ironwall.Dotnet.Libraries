@@ -587,8 +587,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 GetTemplateChild("PART_FOVTransform") is TranslateTransform transform)
             {
 
-                Marker.Width = ActualWidth;
-                Marker.Height = ActualHeight;
+                //Marker.Width = ActualWidth;
+                //Marker.Height = ActualHeight;
 
                 // Transform 설정
                 transform.X = ActualWidth / 2.0;

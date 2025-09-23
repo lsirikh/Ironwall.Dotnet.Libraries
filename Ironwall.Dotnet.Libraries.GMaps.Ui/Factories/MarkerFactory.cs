@@ -35,8 +35,9 @@ public class MarkerFactory : IMarkerFactory
                 IGeometricSymbolModel geometricSymbol => CreateGeometricMarker(geometricSymbol),
                 IPidsSymbolModel pidsSymbol => CreatePidsMarker(pidsSymbol),
                 IMilitarySymbolModel militarySymbol => CreateMilitaryMarker(militarySymbol),
-                ILineSymbolModel lineSymbol => CreateLineMarker(lineSymbol),
                 IInfraSymbolModel infraSymbol => CreateInfraMarker(infraSymbol),
+                IPidsGroupSymbolModel pidsGroupSymbol => CreatePidsGroupMarker(pidsGroupSymbol),
+                ILineSymbolModel lineSymbol => CreateLineMarker(lineSymbol),
                 _ => CreateCustomMarker(symbolModel)
             };
         }
@@ -46,6 +47,12 @@ public class MarkerFactory : IMarkerFactory
             // 폴백으로 기본 마커 생성
             return new GMapCustomMarker(_log!, symbolModel);
         }
+    }
+
+    private GMapPidsGroupMarker CreatePidsGroupMarker(IPidsGroupSymbolModel pidsGroupSymbol)
+    {
+        _log?.Info($"GMapPidsGroupMarker 생성: {pidsGroupSymbol.Title}");
+        return new GMapPidsGroupMarker(_log!, pidsGroupSymbol);
     }
 
     private GMapInfraMarker CreateInfraMarker(IInfraSymbolModel symbol)

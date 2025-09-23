@@ -1,56 +1,51 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using GMap.NET;
-using GMap.NET.WindowsPresentation;
-using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Enums;
-using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using System;
+using System.Windows;
+using GMap.NET;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
+
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
     /****************************************************************************
        Purpose      :                                                          
        Created By   : GHLee                                                
-       Created On   : 9/12/2025 11:22:03 AM                                                    
+       Created On   : 9/23/2025 10:07:33 AM                                                    
        Department   : SW Team                                                   
        Company      : Sensorway Co., Ltd.                                       
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
-    /// <summary>
-    /// GMap 라인 마커 구현
-    /// </summary>
-    public class GMapLineMarker : GMapBaseMarker<ILineSymbolModel>, ILineEditableMarker
+    public class GMapPidsGroupMarker: GMapBaseMarker<IPidsGroupSymbolModel>, IPidsGroupEditableMarker
     {
-       
-
-        public GMapLineMarker(ILogService log, ILineSymbolModel symbolModel)
+        #region - Ctors -
+        public GMapPidsGroupMarker(ILogService log, IPidsGroupSymbolModel symbolModel)
             : base(log, symbolModel)
         {
-
-            _log?.Info($"[GMapLineMarker 생성자] 시작 - Title: {symbolModel.Title}");
+            _log?.Info($"[GMapPidsGroupMarker 생성자] 시작 - Title: {symbolModel.Title}");
 
             // 모델의 GeoPoint를 런타임 PointLatLng로 변환
             _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
-            _log?.Info($"[GMapLineMarker 생성자] 초기 포인트 변환 완료 - 개수: {_runtimePoints.Count}");
+            _log?.Info($"[GMapPidsGroupMarker 생성자] 초기 포인트 변환 완료 - 개수: {_runtimePoints.Count}");
 
             _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
 
             // Position은 symbolModel의 Latitude/Longitude 사용 (중심점)
             Position = new PointLatLng(symbolModel.Latitude, symbolModel.Longitude);
-            _log?.Info($"[GMapLineMarker 생성자] 중심 위치 유지: ({Position.Lat}, {Position.Lng})");
+            _log?.Info($"[GMapPidsGroupMarker 생성자] 중심 위치 유지: ({Position.Lat}, {Position.Lng})");
 
             // 카테고리 설정 (라인은 기본적으로 AREA_BOUNDARY 카테고리)
             Category = EnumMarkerCategory.AREA_BOUNDARY;
 
             _isDrawing = false;
 
-            _log?.Info($"[GMapLineMarker 생성자] 완료 - Category: {Category}");
+            _log?.Info($"[GMapPidsGroupMarker 생성자] 완료 - Category: {Category}");
         }
-
+        #endregion
+        #region - Implementation of Interface -
+        #endregion
+        #region - Overrides -
         /// <summary>
         /// 위치 업데이트 오버라이드 - 라인의 모든 포인트도 함께 이동
         /// </summary>
@@ -91,8 +86,48 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             _log?.Info($"[UpdateLocation] 라인 포인트 {_runtimePoints.Count}개 이동 완료");
         }
 
-        #region ILineEditableMarker 구현 (편집 기능용)
 
+        protected override UIElement CreateMarkerControl()
+        {
+            _log?.Info($"[CreateMarkerControl] GMapPidsGroupMarker 생성 시작");
+            var control = new GMapMarkerPidsGroupControl(this);
+            _log?.Info($"[CreateMarkerControl] GMapPidsGroupMarker 생성 완료 - Type: {control.GetType().Name}");
+            return control;
+        }
+
+        /// <summary>
+        /// 마커 초기화 오버라이드
+        /// </summary>
+        protected override void InitializeMarker()
+        {
+            base.InitializeMarker();
+
+            // 라인은 기본적으로 편집 모드 활성화
+            EnableShapeAnimation = false;
+
+            _log?.Info($"라인 마커 초기화: {_model.Title}, {_model.LinePoints.Count}개 포인트");
+        }
+
+        /// <summary>
+        /// 명령어 초기화 오버라이드
+        /// </summary>
+        protected override void InitializeCommands()
+        {
+            _log?.Info($"[InitializeMarker] 시작 - Title: {_model.Title}");
+            base.InitializeMarker();
+
+            EnableShapeAnimation = false;
+            _log?.Info($"[InitializeMarker] 완료 - EnableShapeAnimation: {EnableShapeAnimation}");
+            _log?.Info($"[InitializeMarker] 초기 LinePoints 개수: {_model.LinePoints.Count}");
+
+            // 라인 전용 명령어 추가 가능
+            // AddPointCommand = new RelayCommand<PointLatLng>(ExecuteAddPoint);
+            // RemovePointCommand = new RelayCommand<int>(ExecuteRemovePoint);
+        }
+        #endregion
+        #region - Binding Methods -
+        #endregion
+        #region - Processes -
         /// <summary>
         /// 포인트 추가 (편집 모드에서 사용)
         /// </summary>
@@ -194,49 +229,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             _log?.Info("[CancelDrawing] Adorner 방식에서는 사용하지 않음");
         }
 
-        #endregion
-        #region 오버라이드 메서드
-
-        protected override UIElement CreateMarkerControl()
-        {
-            _log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 시작");
-            var control = new GMapMarkerLineControl(this);
-            _log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 완료 - Type: {control.GetType().Name}");
-            return control;
-        }
-
-        /// <summary>
-        /// 마커 초기화 오버라이드
-        /// </summary>
-        protected override void InitializeMarker()
-        {
-            base.InitializeMarker();
-
-            // 라인은 기본적으로 편집 모드 활성화
-            EnableShapeAnimation = false;
-
-            _log?.Info($"라인 마커 초기화: {_model.Title}, {_model.LinePoints.Count}개 포인트");
-        }
-
-        /// <summary>
-        /// 명령어 초기화 오버라이드
-        /// </summary>
-        protected override void InitializeCommands()
-        {
-            _log?.Info($"[InitializeMarker] 시작 - Title: {_model.Title}");
-            base.InitializeMarker();
-
-            EnableShapeAnimation = false;
-            _log?.Info($"[InitializeMarker] 완료 - EnableShapeAnimation: {EnableShapeAnimation}");
-            _log?.Info($"[InitializeMarker] 초기 LinePoints 개수: {_model.LinePoints.Count}");
-
-            // 라인 전용 명령어 추가 가능
-            // AddPointCommand = new RelayCommand<PointLatLng>(ExecuteAddPoint);
-            // RemovePointCommand = new RelayCommand<int>(ExecuteRemovePoint);
-        }
-
-        #endregion
-
         /// <summary>
         /// 라인 검증 (최소 2개 포인트 필요)
         /// </summary>
@@ -244,8 +236,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         {
             return _runtimePoints.Count >= 2;
         }
-
-        #region Private Methods
 
         /// <summary>
         /// 모델 포인트 동기화
@@ -265,12 +255,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             OnPropertyChanged(nameof(TotalDistance));
         }
         #endregion
+        #region - IHanldes -
+        #endregion
+        #region - Properties -
         public List<PointLatLng> RuntimePoints => _runtimePoints.ToList();
 
         public List<GeoPoint> LinePoints
         {
             get { return _model.LinePoints.ToList(); }
-            set 
+            set
             {
                 _model.LinePoints = value;
                 _runtimePoints = GeoPointConverter.ToPointLatLngList(value);
@@ -283,7 +276,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         public bool IsDrawing
         {
             get => _isDrawing;
-            set 
+            set
             {
                 if (_isDrawing != value)
                 {
@@ -333,10 +326,40 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             }
         }
 
+        /// <summary>
+        /// 연결된 장치 ID
+        /// </summary>
+        public int LinkedDeviceGroup
+        {
+            get => _model.LinkedDeviceGroup;
+            set
+            {
+                _model.LinkedDeviceGroup = value;
+                OnPropertyChanged(nameof(LinkedDeviceGroup));
+            }
+        }
+
+        /// <summary>
+        /// 이벤트 상태 (애니메이션 트리거)
+        /// </summary>
+        public EnumEventStatus EventStatus
+        {
+            get => _model.EventStatus;
+            set
+            {
+                _model.EventStatus = value;
+                OnPropertyChanged(nameof(EventStatus));
+            }
+        }
+
+
         public double TotalDistance => GeoPointConverter.CalculateTotalDistance(_model.LinePoints);
 
         private bool _isDrawing = false;
 
         private List<PointLatLng> _runtimePoints = new List<PointLatLng>();
+        #endregion
+        #region - Attributes -
+        #endregion
     }
 }

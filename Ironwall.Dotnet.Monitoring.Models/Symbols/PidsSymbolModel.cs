@@ -34,17 +34,17 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
     [JsonProperty("device_type", Order = 21)]
     public EnumDeviceType DeviceType { get; set; }
 
-    [JsonProperty("show_fov", Order = 22)]
+    [JsonProperty("event_status", Order = 22)]
+    public EnumEventStatus EventStatus { get; set; } = EnumEventStatus.Normal;
+
+    [JsonProperty("show_fov", Order = 23)]
     public bool ShowFOV { get; set; } = false;
 
-    [JsonProperty("fov_color", Order = 23)]
+    [JsonProperty("fov_color", Order = 24)]
     public EnumColorType FOVColor { get; set; } = EnumColorType.Red;
 
-    [JsonProperty("fov_opacity", Order = 24)]
+    [JsonProperty("fov_opacity", Order = 25)]
     public double FOVOpacity { get; set; } = 0.3;
-
-    [JsonProperty("event_status", Order = 25)]
-    public EnumEventStatus EventStatus { get; set; } = EnumEventStatus.Normal;
 
     // 모든 PIDS 장비에 공통으로 사용되는 FOV 속성
     [JsonProperty("detection_range", Order = 26)]

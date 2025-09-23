@@ -128,9 +128,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
 
                 // Adorner 스타일 설정
                 _currentAdorner.SetLineStyle(
-                    ColorHelper.ToBrush(_parameters.StrokeColor),
-                    _parameters.StrokeThickness,
-                    GetDashStyle(_parameters.Pattern));
+                    ColorHelper.ToBrush(_parameters.Model.StrokeColor),
+                    _parameters.Model.StrokeThickness,
+                    GetDashStyle(_parameters.Model.LinePattern));
 
                 _adornerLayer.Add(_currentAdorner);
 
@@ -141,7 +141,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                 SetState(LineDrawingState.FirstClick);
                 _mapControl.Cursor = Cursors.Cross;
 
-                _log?.Info($"라인 드로잉 시작: {_parameters.Title}");
+                _log?.Info($"라인 드로잉 시작: {_parameters.Model.Title}");
                 return true;
             }
             catch (Exception ex)
@@ -173,20 +173,29 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                 var totalDistance = _currentAdorner.TotalDistance;
 
                 // 실제 라인 마커 생성
-                var lineMarker = CreateFinalLineMarker(geoPoints);
-                if (lineMarker != null)
-                {
-                    //// 지도에 추가
-                    //if (lineMarker is GMapLineMarker gMapMarker)
-                    //{
-                    //    _mapControl.Markers.Add(gMapMarker);
-                    //}
+                if (_parameters.Model == null) throw new NullReferenceException("LineParameter has no model.");
 
-                    _log?.Info($"라인 완성: {_parameters.Title}, {geoPoints.Count}개 포인트, 거리: {totalDistance:F1}m");
+                if(_parameters.Model is PidsGroupSymbolModel pGroup)
+                {
+                    var pGroupMarker = CreateFinalPidsGroupMarker(geoPoints);
+                    if (pGroupMarker == null) throw new NullReferenceException("lineMarker was failed to create a Model.");
+
+                    _log?.Info($"라인 완성: {_parameters.Model.Title}, {geoPoints.Count}개 포인트, 거리: {totalDistance:F1}m");
+
+                    // 완료 이벤트 발생
+                    LineCompleted?.Invoke(this, pGroupMarker);
+                }
+                else if (_parameters.Model is LineSymbolModel line)
+                {
+                    var lineMarker = CreateFinalLineMarker(geoPoints);
+                    if (lineMarker == null) throw new NullReferenceException("lineMarker was failed to create a Model.");
+
+                    _log?.Info($"라인 완성: {_parameters.Model.Title}, {geoPoints.Count}개 포인트, 거리: {totalDistance:F1}m");
 
                     // 완료 이벤트 발생
                     LineCompleted?.Invoke(this, lineMarker);
                 }
+
 
                 // 정리
                 CleanupDrawing();
@@ -440,32 +449,32 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
         /// <summary>
         /// 최종 라인 마커 생성
         /// </summary>
-        private ILineEditableMarker CreateFinalLineMarker(List<PointLatLng> geoPoints)
+        private ILineEditableMarker? CreateFinalLineMarker(List<PointLatLng> geoPoints)
         {
             try
             {
                 var (width, height, centerPoint) = CalculateBoundingBoxWithCenter(geoPoints);
                 var lineModel = new LineSymbolModel
                 {
-                    Title = _parameters.Title,
-                    TitleSize = _parameters.TitleSize,
+                    Title = _parameters.Model.Title,
+                    TitleSize = 10,
                     Latitude = centerPoint.Lat,
                     Longitude = centerPoint.Lng,
                     Width = width,
                     Height = height,
                     Zoom = _mapControl.Zoom,
                     Bearing = 0,
-                    Category = _parameters.Category,
-                    ShowShape = _parameters.ShowShape,
-                    ShowTitle = _parameters.ShowTitle,
+                    Category = _parameters.Model.Category,
+                    ShowShape = true,
+                    ShowTitle = false,
                     OperationState = EnumOperationState.ACTIVE,
-                    StrokeColor = _parameters.StrokeColor,
-                    StrokeThickness = _parameters.StrokeThickness,
-                    FillColor = _parameters.FillColor,
-                    LinePattern = _parameters.Pattern,
-                    LineOpacity = _parameters.Opacity,
-                    IsClosedPath = _parameters.IsClosedPath,
-                    ShowArrowHead = _parameters.ShowArrowHead,
+                    StrokeColor = _parameters.Model.StrokeColor,
+                    StrokeThickness = _parameters.Model.StrokeThickness,
+                    FillColor = _parameters.Model.FillColor,
+                    LinePattern = _parameters.Model.LinePattern,
+                    LineOpacity = _parameters.Model.LineOpacity,
+                    IsClosedPath = _parameters.Model.IsClosedPath,
+                    ShowArrowHead = _parameters.Model.ShowArrowHead,
                     LinePoints = geoPoints.Select(p => new GeoPoint
                     {
                         Latitude = p.Lat,
@@ -481,6 +490,62 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                 return null;
             }
         }
+
+        /// <summary>
+        /// 최종 PIDS 그룹 마커 생성
+        /// </summary>
+        private IPidsGroupEditableMarker? CreateFinalPidsGroupMarker(List<PointLatLng> geoPoints)
+        {
+            try
+            {
+                var (width, height, centerPoint) = CalculateBoundingBoxWithCenter(geoPoints);
+
+                var pidsGroupModel = new PidsGroupSymbolModel
+                {
+                    // SymbolModel 기본 속성
+                    Title = _parameters.Model.Title,
+                    TitleSize = _parameters.Model.TitleSize,
+                    Latitude = centerPoint.Lat,
+                    Longitude = centerPoint.Lng,
+                    Width = width,
+                    Height = height,
+                    Zoom = _mapControl.Zoom,
+                    Bearing = 0,
+                    Category = EnumMarkerCategory.AREA_BOUNDARY,
+                    ShowShape = true,
+                    ShowTitle = _parameters.Model.ShowTitle,
+                    OperationState = EnumOperationState.ACTIVE,
+
+                    // 스타일 속성
+                    StrokeColor = _parameters.Model.StrokeColor,
+                    StrokeThickness = _parameters.Model.StrokeThickness,
+                    FillColor = _parameters.Model.FillColor,
+
+                    // LineSymbolModel 속성
+                    LinePattern = _parameters.Model.LinePattern,
+                    LineOpacity = _parameters.Model.LineOpacity,
+                    IsClosedPath = false,  // 그룹은 항상 닫힌 영역
+                    ShowArrowHead = false, // 그룹에서는 화살표 불필요
+                    LinePoints = geoPoints.Select(p => new GeoPoint
+                    {
+                        Latitude = p.Lat,
+                        Longitude = p.Lng
+                    }).ToList(),
+
+                    // PidsGroupSymbolModel 전용 속성
+                    LinkedDeviceGroup = 0,  // 나중에 실제 그룹 ID로 설정
+                    EventStatus = EnumEventStatus.Normal
+                };
+
+                return new GMapPidsGroupMarker(_log, pidsGroupModel);
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"PIDS 그룹 마커 생성 실패: {ex.Message}");
+                return null;
+            }
+        }
+
 
         /// <summary>
         /// 바운딩 박스와 중심점 계산 (수정된 메서드)
@@ -621,18 +686,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
     public class LineDrawingParameters
     {
         public string Title { get; set; } = "New Line";
-        public double TitleSize { get; set; } = 12;
-        public double Width { get; set; } = 60;
-        public double Height { get; set; } = 60;
-        public bool ShowShape { get; set; } = true;
-        public bool ShowTitle { get; set; } = false;
-        public EnumMarkerCategory Category { get; set; } = EnumMarkerCategory.AREA_BOUNDARY;
-        public EnumColorType StrokeColor { get; set; } = EnumColorType.Red;
-        public double StrokeThickness { get; set; } = 2;
-        public EnumColorType FillColor { get; set; } = EnumColorType.Transparent;
-        public EnumLinePattern Pattern { get; set; } = EnumLinePattern.Solid;
-        public double Opacity { get; set; } = 1.0;
-        public bool IsClosedPath { get; set; } = false;
-        public bool ShowArrowHead { get; set; } = false;
+        //public EnumMarkerCategory Category { get; set; } = EnumMarkerCategory.AREA_BOUNDARY;
+        //public EnumColorType StrokeColor { get; set; } = EnumColorType.Red;
+        //public double StrokeThickness { get; set; } = 2;
+        //public EnumColorType FillColor { get; set; } = EnumColorType.Transparent;
+        //public EnumLinePattern Pattern { get; set; } = EnumLinePattern.Solid;
+        //public double Opacity { get; set; } = 1.0;
+        //public bool IsClosedPath { get; set; } = false;
+        //public bool ShowArrowHead { get; set; } = false;
+        public ILineSymbolModel Model { get; set; }
+        
     }
 }

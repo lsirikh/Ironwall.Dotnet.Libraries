@@ -40,6 +40,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                                MilitarySymbolProvider militarySymbolProvider,
                                LineSymbolProvider lineSymbolProvider,
                                InfraSymbolProvider infraSymbolProvider,
+                               PidsGroupSymbolProvider pidsGroupSymbolProvider,
                                GMapDbSetupModel setupModel)
     {
         _log = log;
@@ -50,6 +51,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         _militarySymbolProvider = militarySymbolProvider;
         _lineSymbolProvider = lineSymbolProvider;
         _infraSymbolProvider = infraSymbolProvider;
+        _pidsGroupSymbolProvider = pidsGroupSymbolProvider;
         _setup = setupModel;
     }
     #endregion
@@ -393,7 +395,44 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     ON DELETE CASCADE
             );";
 
-           
+            // ── PidsGroupSymbols 테이블 ──
+            var createPidsGroupSymbolsSql = @"
+            CREATE TABLE IF NOT EXISTS `PidsGroupSymbols` (
+                `SymbolId`          INT PRIMARY KEY,
+                `LinkedDeviceGroup` INT NOT NULL DEFAULT 0,                         -- 연결된 디바이스 그룹 ID
+                `EventStatus`       VARCHAR(20) NOT NULL DEFAULT 'Normal',          -- 이벤트 상태 (Normal, Detecting, Fault, Connection)
+                `LineOpacity`       DECIMAL(3,2) DEFAULT 1.0,                       -- 라인 투명도
+                `IsClosedPath`      BOOLEAN DEFAULT TRUE,                           -- 닫힌 경로 여부 (그룹은 대부분 닫힌 경로)
+                `ShowArrowHead`     BOOLEAN DEFAULT FALSE,                          -- 화살표 표시 여부
+                `LinePattern`       VARCHAR(20) NOT NULL DEFAULT 'Solid',           -- 라인 패턴 (Solid, Dash, Dot 등)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_PidsGroupSymbols_Symbols`
+                    FOREIGN KEY (`SymbolId`) REFERENCES `Symbols` (`Id`)
+                    ON DELETE CASCADE,
+                INDEX `IX_PidsGroupSymbols_DeviceGroup` (`LinkedDeviceGroup`),
+                INDEX `IX_PidsGroupSymbols_EventStatus` (`EventStatus`)
+            );";
+
+            // ── PidsGroupPoints 테이블 (라인 포인트 저장용) ──
+            var createPidsGroupPointsSql = @"
+            CREATE TABLE IF NOT EXISTS `PidsGroupPoints` (
+                `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+                `GroupSymbolId`     INT NOT NULL,
+                `SequenceOrder`     INT NOT NULL,
+                `Latitude`          DECIMAL(10,8) NOT NULL,
+                `Longitude`         DECIMAL(11,8) NOT NULL,
+                `Altitude`          FLOAT DEFAULT 0,
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT `FK_PidsGroupPoints_PidsGroupSymbols`
+                    FOREIGN KEY (`GroupSymbolId`) REFERENCES `PidsGroupSymbols` (`SymbolId`)
+                    ON DELETE CASCADE,
+                INDEX `IX_PidsGroupPoints_GroupSymbolId` (`GroupSymbolId`),
+                INDEX `IX_PidsGroupPoints_Sequence` (`GroupSymbolId`, `SequenceOrder`),
+                UNIQUE KEY `UQ_PidsGroupPoints_Symbol_Sequence` (`GroupSymbolId`, `SequenceOrder`)
+            );";
+
 
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
@@ -432,7 +471,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "InfraSymbols 테이블 생성…" });
 
+            await conn.ExecuteAsync(createPidsGroupSymbolsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "PidsGroupSymbols 테이블 생성…" });
 
+            await conn.ExecuteAsync(createPidsGroupPointsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "PidsGroupPoints 테이블 생성…" });
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
@@ -497,6 +544,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 6. InfraSymbol 로드 (새로 추가)
             var infraSymbols = await FetchInfraSymbolsAsync(token: token);
 
+            // 7. PidsGroupSymbol 로드 (새로 추가)
+            var pidsGroupSymbols = await FetchPidsGroupSymbolsAsync(token: token);
+
             _symbolProvider.Clear();
 
             // 3. 일반 심볼 추가 (BASIC_SHAPES가 아닌 것만)
@@ -553,6 +603,15 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 foreach (var infraSymbol in infraSymbols)
                 {
                     _symbolProvider.Add(infraSymbol);
+                }
+            }
+
+            _pidsGroupSymbolProvider.Clear();
+            if (pidsGroupSymbols?.Any() == true)
+            {
+                foreach (var pidsGroupSymbol in pidsGroupSymbols)
+                {
+                    _symbolProvider.Add(pidsGroupSymbol);
                 }
             }
 
@@ -866,6 +925,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         }
     }
     #endregion
+
     #region - GeometrySymbol CRUD -
 
     /// <summary>
@@ -2432,6 +2492,388 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     }
 
     #endregion
+
+    #region - PidsGroupSymbol CRUD -
+
+    /// <summary>
+    /// 모든 PIDS 그룹 심볼 조회 (JOIN 쿼리 및 포인트 포함)
+    /// </summary>
+    public async Task<List<IPidsGroupSymbolModel>?> FetchPidsGroupSymbolsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                        s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                        s.FillColor, s.StrokeColor, s.StrokeThickness,
+                        s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                        pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
+                        pg.ShowArrowHead, pg.LinePattern
+                FROM    Symbols s
+                INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
+                WHERE   s.Category = 'PIDS_GROUP'
+                ORDER BY s.CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<PidsGroupSymbolSQL>(sql))
+                .Select(pg => pg.ToPidsGroupDomain())
+                .ToList();
+
+            // 포인트 로드
+            if (list.Any())
+            {
+                var symbolIds = list.Select(pgs => pgs.Id).ToList();
+                const string pointsSql = @"
+                    SELECT GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude
+                    FROM PidsGroupPoints
+                    WHERE GroupSymbolId IN @SymbolIds
+                    ORDER BY GroupSymbolId, SequenceOrder;";
+
+                var allPoints = await conn.QueryAsync<PidsGroupPointSQL>(pointsSql, new { SymbolIds = symbolIds });
+
+                var pointsLookup = allPoints
+                    .GroupBy(p => p.GroupSymbolId)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(p => p.SequenceOrder).Select(p => p.ToGeoPoint()).ToList());
+
+                foreach (var pidsGroupSymbol in list)
+                {
+                    if (pointsLookup.TryGetValue(pidsGroupSymbol.Id, out var points))
+                    {
+                        pidsGroupSymbol.LinePoints = points;
+                    }
+                }
+            }
+
+            _log?.Info($"FetchPidsGroupSymbolsAsync 완료 - {list.Count}건");
+            return list.OfType<IPidsGroupSymbolModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbols 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 단일 PIDS 그룹 심볼 조회
+    /// </summary>
+    public async Task<IPidsGroupSymbolModel?> FetchPidsGroupSymbolAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+                SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
+                        s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                        s.FillColor, s.StrokeColor, s.StrokeThickness,
+                        s.CreatedAt, s.UpdatedAt, s.CreatedBy,
+                        pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
+                        pg.ShowArrowHead, pg.LinePattern
+                FROM    Symbols s
+                INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
+                WHERE   s.Id = @Id;";
+
+            var joinResult = await conn.QuerySingleOrDefaultAsync<PidsGroupSymbolSQL>(sql, new { Id = id });
+            var pidsGroupSymbol = joinResult?.ToPidsGroupDomain();
+
+            if (pidsGroupSymbol != null)
+            {
+                // 포인트 로드
+                const string pointsSql = @"
+            SELECT SequenceOrder, Latitude, Longitude, Altitude
+            FROM PidsGroupPoints
+            WHERE GroupSymbolId = @GroupSymbolId
+            ORDER BY SequenceOrder;";
+
+                var points = await conn.QueryAsync<PidsGroupPointSQL>(pointsSql, new { GroupSymbolId = id });
+                pidsGroupSymbol.LinePoints = points.Select(p => p.ToGeoPoint()).ToList();
+            }
+
+            _log?.Info(pidsGroupSymbol != null
+                ? $"FetchPidsGroupSymbolAsync 완료 - Id={pidsGroupSymbol.Id}, Points={pidsGroupSymbol.LinePoints.Count}개"
+                : $"FetchPidsGroupSymbolAsync 대상 없음 - Id={id}");
+
+            return pidsGroupSymbol;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbol 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    
+
+    /// <summary>
+    /// PIDS 그룹 심볼 삽입 (트랜잭션 사용)
+    /// </summary>
+    public async Task<int> InsertPidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            // 1. Symbols 테이블에 기본 정보 삽입
+            const string symbolSql = @"
+                INSERT INTO Symbols
+                (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
+                 Width, Height, Category, ShowShape, ShowTitle, 
+                 FillColor, StrokeColor, StrokeThickness, CreatedBy)
+                VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
+                        @Width, @Height, @Category, @ShowShape, @ShowTitle, 
+                        @FillColor, @StrokeColor, @StrokeThickness, @CreatedBy);
+                SELECT LAST_INSERT_ID();";
+
+            var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
+            {
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = "PIDS_GROUP",  // PIDS 그룹 카테고리
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsGroupSymbols 테이블에 PIDS 그룹 전용 정보 삽입
+            const string pidsGroupSql = @"
+                INSERT INTO PidsGroupSymbols 
+                (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+                VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);";
+
+            await conn.ExecuteAsync(pidsGroupSql, new
+            {
+                SymbolId = symbolId,
+                model.LinkedDeviceGroup,
+                EventStatus = model.EventStatus.ToString(),
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString()
+            }, transaction);
+
+            // 3. PidsGroupPoints 삽입
+            if (model.LinePoints?.Any() == true)
+            {
+                const string pointSql = @"
+                    INSERT INTO PidsGroupPoints (GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+                    VALUES (@GroupSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    GroupSymbolId = symbolId,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(pointSql, pointParams, transaction);
+            }
+
+            await transaction.CommitAsync(token);
+
+            model.Id = symbolId;
+            _log?.Info($"PidsGroupSymbol 삽입 완료 - Id={symbolId}, Title={model.Title}, Points={model.LinePoints?.Count ?? 0}개");
+            return symbolId;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsGroupSymbol 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 그룹 심볼 업데이트 (트랜잭션 사용)
+    /// </summary>
+    public async Task<IPidsGroupSymbolModel?> UpdatePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        await using var conn = await OpenConnectionAsync(token);
+        await using var transaction = await conn.BeginTransactionAsync(token);
+
+        try
+        {
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // 1. Symbols 테이블 업데이트
+            const string symbolSql = @"
+                UPDATE Symbols SET
+                    Pid = @Pid, Title = @Title, TitleSize = @TitleSize, OperationState = @OperationState,
+                    Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
+                    Bearing = @Bearing, Width = @Width, Height = @Height,
+                    Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
+                    FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness,
+                    CreatedBy = @CreatedBy
+                WHERE Id = @Id;";
+
+            var symbolAffected = await conn.ExecuteAsync(symbolSql, new
+            {
+                model.Id,
+                model.Pid,
+                model.Title,
+                model.TitleSize,
+                OperationState = model.OperationState.ToString(),
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.Bearing,
+                model.Width,
+                model.Height,
+                Category = "PIDS_GROUP",
+                model.ShowShape,
+                model.ShowTitle,
+                FillColor = model.FillColor.ToString(),
+                StrokeColor = model.StrokeColor.ToString(),
+                model.StrokeThickness,
+                CreatedBy = "System"
+            }, transaction);
+
+            // 2. PidsGroupSymbols 테이블 업데이트
+            const string pidsGroupSql = @"
+                UPDATE PidsGroupSymbols SET
+                    LinkedDeviceGroup = @LinkedDeviceGroup, EventStatus = @EventStatus,
+                    LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath, 
+                    ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern
+                WHERE SymbolId = @SymbolId;";
+
+            var pidsGroupAffected = await conn.ExecuteAsync(pidsGroupSql, new
+            {
+                SymbolId = model.Id,
+                model.LinkedDeviceGroup,
+                EventStatus = model.EventStatus.ToString(),
+                model.LineOpacity,
+                model.IsClosedPath,
+                model.ShowArrowHead,
+                LinePattern = model.LinePattern.ToString()
+            }, transaction);
+
+            // 3. 기존 포인트 삭제 후 새로 삽입
+            const string deletePointsSql = "DELETE FROM PidsGroupPoints WHERE GroupSymbolId = @GroupSymbolId;";
+            await conn.ExecuteAsync(deletePointsSql, new { GroupSymbolId = model.Id }, transaction);
+
+            if (model.LinePoints?.Any() == true)
+            {
+                const string insertPointSql = @"
+                    INSERT INTO PidsGroupPoints (GroupSymbolId, SequenceOrder, Latitude, Longitude, Altitude)
+                    VALUES (@GroupSymbolId, @SequenceOrder, @Latitude, @Longitude, @Altitude);";
+
+                var pointParams = model.LinePoints.Select((point, index) => new
+                {
+                    GroupSymbolId = model.Id,
+                    SequenceOrder = index,
+                    Latitude = (decimal)point.Latitude,
+                    Longitude = (decimal)point.Longitude,
+                    Altitude = (float)point.Altitude
+                });
+
+                await conn.ExecuteAsync(insertPointSql, pointParams, transaction);
+            }
+
+            if (symbolAffected == 0 || pidsGroupAffected == 0)
+                throw new KeyNotFoundException($"PidsGroupSymbol not found. Id={model.Id}");
+
+            await transaction.CommitAsync(token);
+
+            _log?.Info($"PidsGroupSymbol 업데이트 완료 - Id={model.Id}");
+            return await FetchPidsGroupSymbolAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Error($"PidsGroupSymbol 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// PIDS 그룹 심볼 삭제 (CASCADE로 PidsGroupSymbols와 PidsGroupPoints도 자동 삭제됨)
+    /// </summary>
+    public async Task<bool> DeletePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default)
+    {
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            // Symbols만 삭제하면 PidsGroupSymbols와 PidsGroupPoints는 CASCADE로 자동 삭제
+            const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
+
+            _log?.Info(ret > 0
+                ? $"DeletePidsGroupSymbolAsync 완료 - Id={model.Id}"
+                : $"DeletePidsGroupSymbolAsync 대상 없음 - Id={model.Id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbol 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// LinkedDeviceGroup으로 PIDS 그룹 심볼 삭제
+    /// </summary>
+    public async Task<bool> DeletePidsGroupSymbolByDeviceGroupAsync(int deviceGroup, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (deviceGroup <= 0) throw new ArgumentException(nameof(deviceGroup));
+
+            const string sql = @"
+        DELETE s FROM Symbols s
+        INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
+        WHERE pg.LinkedDeviceGroup = @DeviceGroup;";
+
+            int ret = await conn.ExecuteAsync(sql, new { DeviceGroup = deviceGroup });
+
+            _log?.Info(ret > 0
+                ? $"DeletePidsGroupSymbolByDeviceGroupAsync 완료 - DeviceGroup={deviceGroup}"
+                : $"DeletePidsGroupSymbolByDeviceGroupAsync 대상 없음 - DeviceGroup={deviceGroup}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PidsGroupSymbol DeviceGroup 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    
     #endregion
     #region - IHanldes -
     #endregion
@@ -2456,6 +2898,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     private MilitarySymbolProvider _militarySymbolProvider;
     private LineSymbolProvider _lineSymbolProvider;
     private InfraSymbolProvider _infraSymbolProvider;
+    private PidsGroupSymbolProvider _pidsGroupSymbolProvider;
 
     /// <summary>데이터베이스 설정 모델</summary>
     private GMapDbSetupModel _setup;
@@ -2882,4 +3325,90 @@ internal sealed class InfraSymbolSQL : SymbolSQL
         BuildingArea = (double)BuildingArea
     };
 }
+#endregion
+#region - DTO Classes for PidsGroupSymbol -
+
+/// <summary>
+/// Symbols와 PidsGroupSymbols를 조인한 결과를 담는 DTO
+/// </summary>
+internal sealed class PidsGroupSymbolSQL : SymbolSQL
+{
+    // SymbolSQL의 모든 속성 + 아래 PIDS 그룹 전용 속성들
+
+    /// <summary>연결된 디바이스 그룹 ID</summary>
+    public int LinkedDeviceGroup { get; set; }
+
+    /// <summary>이벤트 상태</summary>
+    public string EventStatus { get; set; } = "Normal";
+
+    /// <summary>라인 투명도</summary>
+    public decimal LineOpacity { get; set; } = 1.0m;
+
+    /// <summary>닫힌 경로 여부</summary>
+    public bool IsClosedPath { get; set; } = true;
+
+    /// <summary>화살표 머리 표시 여부</summary>
+    public bool ShowArrowHead { get; set; }
+
+    /// <summary>라인 패턴 타입</summary>
+    public string LinePattern { get; set; } = "Solid";
+
+    /// <summary>
+    /// JOIN 결과를 PidsGroupSymbolModel로 변환 (포인트는 별도 로드 필요)
+    /// </summary>
+    public PidsGroupSymbolModel ToPidsGroupDomain() => new()
+    {
+        // SymbolSQL 기본 속성들
+        Id = Id,
+        Pid = Pid,
+        Title = Title,
+        TitleSize = TitleSize,
+        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Zoom = (double)Zoom,
+        Bearing = (double)Bearing,
+        Width = (double)Width,
+        Height = (double)Height,
+        Category = EnumMarkerCategory.AREA_BOUNDARY,  // 또는 Enum.Parse
+        ShowShape = ShowShape,
+        ShowTitle = ShowTitle,
+        FillColor = Enum.Parse<EnumColorType>(FillColor),
+        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        StrokeThickness = (double)StrokeThickness,
+
+        // PidsGroupSymbol 전용 속성들
+        LinkedDeviceGroup = LinkedDeviceGroup,
+        EventStatus = Enum.Parse<EnumEventStatus>(EventStatus),
+        LineOpacity = (double)LineOpacity,
+        IsClosedPath = IsClosedPath,
+        ShowArrowHead = ShowArrowHead,
+        LinePattern = Enum.Parse<EnumLinePattern>(LinePattern),
+        LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
+    };
+}
+
+/// <summary>
+/// PidsGroupPoints 테이블과 매핑되는 DTO
+/// </summary>
+internal sealed class PidsGroupPointSQL
+{
+    public int Id { get; set; }
+    public int GroupSymbolId { get; set; }
+    public int SequenceOrder { get; set; }
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public float Altitude { get; set; }
+
+    /// <summary>
+    /// DTO를 GeoPoint로 변환
+    /// </summary>
+    public GeoPoint ToGeoPoint() => new(
+        latitude: (double)Latitude,
+        longitude: (double)Longitude,
+        altitude: (double)Altitude
+    );
+}
+
 #endregion
