@@ -95,6 +95,7 @@
 			Grid.Row="0"
 			Grid.ColumnSpan="2"
 			Margin="50,0,0,0"
+			Panel.ZIndex="10"
 			Background="{DynamicResource MaterialDesignPaper}"
 			IsMainMenu="True"
 			Style="{StaticResource MaterialDesignMenu}">
@@ -191,6 +192,7 @@
 			Grid.Column="0"
 			Grid.ColumnSpan="2"
 			Margin="50,0,0,0"
+			Panel.ZIndex="10"
 			md:ThemeAssist.Theme="Inherit">
 			<ToolBar ClipToBounds="True" Style="{StaticResource MaterialDesignToolBar}">
 				<!--  지도 선택 ComboBox (맨 앞에 추가)  -->
@@ -617,7 +619,7 @@
 			</ToolBar>
 		</ToolBarTray>
 
-		<gmap:GMapCustomControl
+		<!--<gmap:GMapCustomControl
 			x:Name="MainMap"
 			Grid.Row="2"
 			Grid.ColumnSpan="2"
@@ -627,297 +629,234 @@
 			MinZoom="2"
 			RotationSnapAngle="{Binding RotationSnapAngle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 			ShowMGRSGrid="{Binding IsShowMGRSGrid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />-->
+		<Grid Grid.Row="2" Grid.ColumnSpan="2">
 
-		<Border
-			x:Name="MapView_Scale"
-			Grid.Row="2"
-			Margin="50,5,5,5"
-			Padding="5"
-			HorizontalAlignment="Left"
-			VerticalAlignment="Bottom"
-			Background="#88FFFFFF"
-			BorderBrush="Gray"
-			BorderThickness="1"
-			CornerRadius="5">
+			<AdornerDecorator Panel.ZIndex="0">
+				<gmap:GMapCustomControl
+					x:Name="MainMap"
+					IsEditMode="{Binding IsEditModeEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					MapRotation="{Binding MapRotation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					MaxZoom="19"
+					MinZoom="2"
+					RotationSnapAngle="{Binding RotationSnapAngle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					ShowMGRSGrid="{Binding IsShowMGRSGrid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			</AdornerDecorator>
 
-			<Grid
-				Grid.Column="3"
-				Margin="5"
-				HorizontalAlignment="Center"
-				VerticalAlignment="Center">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="40" />
-					<ColumnDefinition Width="100" />
-				</Grid.ColumnDefinitions>
-				<TextBlock
-					Grid.Column="0"
-					FontSize="12"
-					FontWeight="Bold"
-					Foreground="Black"
-					Text="{Binding Scale, FallbackValue=100m}" />
-				<Polyline
-					Grid.Column="1"
-					HorizontalAlignment="Center"
-					VerticalAlignment="Center"
-					Points="{Binding ScalePoints}"
-					Stroke="Black"
-					StrokeThickness="2" />
-			</Grid>
-		</Border>
-
-		<Border
-			x:Name="MapView_GeoInformation"
-			Grid.Row="2"
-			Grid.ColumnSpan="2"
-			Margin="50,5,5,5"
-			Padding="5"
-			HorizontalAlignment="Left"
-			VerticalAlignment="Top"
-			Background="#88FFFFFF"
-			BorderBrush="Gray"
-			BorderThickness="1"
-			CornerRadius="5">
-
-			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="5*" />
-					<ColumnDefinition Width="2*" />
-					<ColumnDefinition Width="2*" />
-				</Grid.ColumnDefinitions>
-				<!--  WSG-84  -->
-				<Grid
-					Grid.Row="0"
-					Margin="5"
-					VerticalAlignment="Center"
-					Visibility="{Binding IsShowWSG84, Converter={StaticResource BooleanToVisibilityConverter}}">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="60" />
-						<ColumnDefinition Width="80" />
-						<ColumnDefinition Width="10" />
-						<ColumnDefinition Width="80" />
-					</Grid.ColumnDefinitions>
-					<TextBlock
-						Grid.Column="0"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="WSG-84: " />
-					<TextBlock
-						Grid.Column="1"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="{Binding CurrentCoordinatePosition.Latitude, StringFormat=F8}" />
-					<TextBlock
-						Grid.Column="2"
-						HorizontalAlignment="Left"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="," />
-					<TextBlock
-						Grid.Column="3"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="{Binding CurrentCoordinatePosition.Longitude, StringFormat=F8}" />
-				</Grid>
-				<Grid
-					Grid.Row="1"
-					Margin="5"
-					VerticalAlignment="Center"
-					Visibility="{Binding IsShowMGRS, Converter={StaticResource BooleanToVisibilityConverter}}">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="60" />
-						<ColumnDefinition Width="235" />
-					</Grid.ColumnDefinitions>
-					<TextBlock
-						Grid.Column="0"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="MGRS: " />
-					<TextBlock
-						Grid.Column="1"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="{Binding CurrentMGRS}" />
-				</Grid>
-
-				<Grid
-					Grid.Row="2"
-					Margin="5"
-					VerticalAlignment="Center"
-					Visibility="{Binding IsShowUTM, Converter={StaticResource BooleanToVisibilityConverter}}">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="60" />
-						<ColumnDefinition Width="235" />
-					</Grid.ColumnDefinitions>
-					<TextBlock
-						Grid.Column="0"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="UTM: " />
-					<TextBlock
-						Grid.Column="1"
-						FontSize="12"
-						FontWeight="Bold"
-						Text="{Binding CurrentUTM}" />
-				</Grid>
-
-			</Grid>
-		</Border>
-
-		<Border
-			x:Name="MapView_ZoomAndRotateController"
-			Grid.Row="2"
-			Grid.ColumnSpan="2"
-			Width="250"
-			Margin="5,5,300,5"
-			Padding="5"
-			HorizontalAlignment="Right"
-			VerticalAlignment="Bottom"
-			Background="#88FFFFFF"
-			BorderBrush="Gray"
-			BorderThickness="1"
-			CornerRadius="5">
-
-			<Grid>
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="45" />
-					<ColumnDefinition Width="45" />
-					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="45" />
-				</Grid.ColumnDefinitions>
-				<TextBlock
-					Grid.Column="0"
-					HorizontalAlignment="Center"
-					VerticalAlignment="Center"
-					FontSize="15"
-					FontWeight="Bold"
-					Text="{Binding MainMap.Zoom, FallbackValue=11}" />
-				<Button
-					x:Name="ZoomUp"
-					Grid.Column="3"
-					cal:Message.Attach="[Event Click] = [Action OnClickZoomUp($source, $eventArgs)]"
-					Content="{md:PackIcon Kind=MagnifyPlus}" />
-				<Slider
-					x:Name="SliderZoom"
-					Grid.Column="2"
-					Maximum="{Binding MainMap.MaxZoom, UpdateSourceTrigger=PropertyChanged}"
-					Minimum="{Binding MainMap.MinZoom, UpdateSourceTrigger=PropertyChanged}"
-					SmallChange="1"
-					TickPlacement="Both"
-					ToolTip="{Binding MainMap.Zoom, UpdateSourceTrigger=PropertyChanged}"
-					Value="{Binding MainMap.Zoom, UpdateSourceTrigger=PropertyChanged}" />
-				<Button
-					x:Name="ZoomDown"
-					Grid.Column="1"
-					cal:Message.Attach="[Event Click] = [Action OnClickZoomDown($source, $eventArgs)]"
-					Content="{md:PackIcon Kind=MagnifyMinus}" />
-			</Grid>
-		</Border>
-
-
-		<Canvas
-			x:Name="PropertyPanelCanvas"
-			Grid.Row="2"
-			Grid.ColumnSpan="2"
-			Panel.ZIndex="1000">
-
-
-			<!--  라인 드로잉 상태 패널  -->
-			<!--<Border
-				x:Name="LineDrawingStatusPanel"
-				Canvas.Left="10"
-				Canvas.Bottom="80"
-				Padding="8"
-				Background="{DynamicResource MaterialDesignPaper}"
-				BorderBrush="{DynamicResource MaterialDesignDivider}"
+			<Border
+				x:Name="MapView_Scale"
+				Grid.Row="2"
+				Margin="50,5,5,5"
+				Padding="5"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Bottom"
+				Background="#88FFFFFF"
+				BorderBrush="Gray"
 				BorderThickness="1"
-				CornerRadius="4"
-				Visibility="{Binding IsLineDrawing, Converter={StaticResource BooleanToVisibilityConverter}}">
+				CornerRadius="5">
 
-				<StackPanel Orientation="Horizontal">
-					<md:PackIcon
-						Width="16"
-						Height="16"
-						VerticalAlignment="Center"
-						Foreground="{DynamicResource MaterialDesignBody}"
-						Kind="VectorLine" />
-
+				<Grid
+					Grid.Column="3"
+					Margin="5"
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="40" />
+						<ColumnDefinition Width="100" />
+					</Grid.ColumnDefinitions>
 					<TextBlock
-						Margin="8,0"
-						VerticalAlignment="Center"
+						Grid.Column="0"
 						FontSize="12"
-						Text="라인 그리기 중" />
-
-					<TextBlock
+						FontWeight="Bold"
+						Foreground="Black"
+						Text="{Binding Scale, FallbackValue=100m}" />
+					<Polyline
+						Grid.Column="1"
+						HorizontalAlignment="Center"
 						VerticalAlignment="Center"
-						FontSize="11"
-						Foreground="{DynamicResource MaterialDesignBodyLight}"
-						Text="{Binding LineDrawingPointCount, StringFormat='{}{0}개 점'}" />
+						Points="{Binding ScalePoints}"
+						Stroke="Black"
+						StrokeThickness="2" />
+				</Grid>
+			</Border>
 
-					-->
-			<!--  간단한 제어 버튼들  -->
-			<!--
+			<Border
+				x:Name="MapView_GeoInformation"
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Margin="50,5,5,5"
+				Padding="5"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Background="#88FFFFFF"
+				BorderBrush="Gray"
+				BorderThickness="1"
+				CornerRadius="5">
+
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="5*" />
+						<ColumnDefinition Width="2*" />
+						<ColumnDefinition Width="2*" />
+					</Grid.ColumnDefinitions>
+					<!--  WSG-84  -->
+					<Grid
+						Grid.Row="0"
+						Margin="5"
+						VerticalAlignment="Center"
+						Visibility="{Binding IsShowWSG84, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="10" />
+							<ColumnDefinition Width="80" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="WSG-84: " />
+						<TextBlock
+							Grid.Column="1"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="{Binding CurrentCoordinatePosition.Latitude, StringFormat=F8}" />
+						<TextBlock
+							Grid.Column="2"
+							HorizontalAlignment="Left"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="," />
+						<TextBlock
+							Grid.Column="3"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="{Binding CurrentCoordinatePosition.Longitude, StringFormat=F8}" />
+					</Grid>
+					<Grid
+						Grid.Row="1"
+						Margin="5"
+						VerticalAlignment="Center"
+						Visibility="{Binding IsShowMGRS, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="235" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="MGRS: " />
+						<TextBlock
+							Grid.Column="1"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="{Binding CurrentMGRS}" />
+					</Grid>
+
+					<Grid
+						Grid.Row="2"
+						Margin="5"
+						VerticalAlignment="Center"
+						Visibility="{Binding IsShowUTM, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="235" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="UTM: " />
+						<TextBlock
+							Grid.Column="1"
+							FontSize="12"
+							FontWeight="Bold"
+							Text="{Binding CurrentUTM}" />
+					</Grid>
+
+				</Grid>
+			</Border>
+
+			<Border
+				x:Name="MapView_ZoomAndRotateController"
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Width="250"
+				Margin="5,5,300,5"
+				Padding="5"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Bottom"
+				Background="#88FFFFFF"
+				BorderBrush="Gray"
+				BorderThickness="1"
+				CornerRadius="5">
+
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="45" />
+						<ColumnDefinition Width="45" />
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="45" />
+					</Grid.ColumnDefinitions>
+					<TextBlock
+						Grid.Column="0"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="15"
+						FontWeight="Bold"
+						Text="{Binding MainMap.Zoom, FallbackValue=11}" />
 					<Button
-						Width="24"
-						Height="24"
-						Margin="8,0,0,0"
-						Command="{Binding UndoLastPointCommand}"
-						Style="{StaticResource MaterialDesignToolButton}"
-						ToolTip="마지막 점 제거 (Backspace)">
-						<md:PackIcon
-							Width="12"
-							Height="12"
-							Kind="Undo" />
-					</Button>
-
+						x:Name="ZoomUp"
+						Grid.Column="3"
+						cal:Message.Attach="[Event Click] = [Action OnClickZoomUp($source, $eventArgs)]"
+						Content="{md:PackIcon Kind=MagnifyPlus}" />
+					<Slider
+						x:Name="SliderZoom"
+						Grid.Column="2"
+						Maximum="{Binding MainMap.MaxZoom, UpdateSourceTrigger=PropertyChanged}"
+						Minimum="{Binding MainMap.MinZoom, UpdateSourceTrigger=PropertyChanged}"
+						SmallChange="1"
+						TickPlacement="Both"
+						ToolTip="{Binding MainMap.Zoom, UpdateSourceTrigger=PropertyChanged}"
+						Value="{Binding MainMap.Zoom, UpdateSourceTrigger=PropertyChanged}" />
 					<Button
-						Width="24"
-						Height="24"
-						Margin="4,0,0,0"
-						Command="{Binding CompleteLineDrawingCommand}"
-						Style="{StaticResource MaterialDesignToolButton}"
-						ToolTip="라인 완료 (Enter)">
-						<md:PackIcon
-							Width="12"
-							Height="12"
-							Kind="Check" />
-					</Button>
-
-					<Button
-						Width="24"
-						Height="24"
-						Margin="4,0,0,0"
-						Command="{Binding CancelLineDrawingCommand}"
-						Style="{StaticResource MaterialDesignToolButton}"
-						ToolTip="라인 취소 (ESC)">
-						<md:PackIcon
-							Width="12"
-							Height="12"
-							Kind="Close" />
-					</Button>
-				</StackPanel>
-			</Border>-->
+						x:Name="ZoomDown"
+						Grid.Column="1"
+						cal:Message.Attach="[Event Click] = [Action OnClickZoomDown($source, $eventArgs)]"
+						Content="{md:PackIcon Kind=MagnifyMinus}" />
+				</Grid>
+			</Border>
 
 
-			<!--  심볼 속성 창  -->
-			<ContentPresenter
-				Canvas.Left="300"
-				Canvas.Top="100"
-				Content="{Binding PropertyPanel}"
-				Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+			<Canvas
+				x:Name="PropertyPanelCanvas"
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Panel.ZIndex="200">
 
-			<!--  군사 심볼 등록창  -->
-			<ContentPresenter
-				x:Name="MilitarySymbolRegisterPresenter"
-				Canvas.Left="400"
-				Canvas.Top="50"
-				Content="{Binding MilitarySymbolRegisterPanel}"
-				Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
-		</Canvas>
+
+				<!--  심볼 속성 창  -->
+				<ContentPresenter
+					Canvas.Left="300"
+					Canvas.Top="100"
+					Content="{Binding PropertyPanel}"
+					Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  군사 심볼 등록창  -->
+				<ContentPresenter
+					x:Name="MilitarySymbolRegisterPresenter"
+					Canvas.Left="400"
+					Canvas.Top="50"
+					Content="{Binding MilitarySymbolRegisterPanel}"
+					Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+			</Canvas>
+		</Grid>
 	</Grid>
 </UserControl>

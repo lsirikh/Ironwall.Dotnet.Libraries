@@ -108,10 +108,10 @@ public class EventAnimationManager
     #region - Properties -
     #endregion
     #region - Attributes -
-    private EventState _currentEventState;
+    private EventState? _currentEventState;
     private EventSetupModel _eventSetupModel;
-    private ILogService _log;
+    private ILogService? _log;
     private IEventAggregator? _ea;
-    public event System.Action OnEventRestored;
+    public event System.Action? OnEventRestored;
     #endregion
 }

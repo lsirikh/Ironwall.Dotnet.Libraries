@@ -132,11 +132,10 @@ public class DeviceSymbolLookupModel : BaseModel
     #endregion
     #region - Properties -
     public IBaseDeviceModel? DeviceModel { get; set; }
-    public ISymbolModel? SymbolModel { get; set; }
+    public IPidsEventCapable? SymbolModel { get; set; }
     #endregion
     #region - Attributes -
     private ILogService _log;
     private EventAnimationManager _animationManager;
-
     #endregion
 }

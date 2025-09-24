@@ -20,10 +20,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
     public class GMapPidsGroupMarker: GMapBaseMarker<IPidsGroupSymbolModel>, IPidsGroupEditableMarker
     {
         #region - Ctors -
-        public GMapPidsGroupMarker(ILogService log, IPidsGroupSymbolModel symbolModel)
-            : base(log, symbolModel)
+        public GMapPidsGroupMarker(ILogService log, IPidsGroupSymbolModel pidsGroupModel)
+            : base(log, pidsGroupModel)
         {
-            _log?.Info($"[GMapPidsGroupMarker 생성자] 시작 - Title: {symbolModel.Title}");
+            _log?.Info($"[GMapPidsGroupMarker 생성자] 시작 - Title: {pidsGroupModel.Title}");
 
             // 모델의 GeoPoint를 런타임 PointLatLng로 변환
             _runtimePoints = GeoPointConverter.ToPointLatLngList(_model.LinePoints);
@@ -32,7 +32,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             _model.LinePoints = GeoPointConverter.ToGeoPointList(_runtimePoints);
 
             // Position은 symbolModel의 Latitude/Longitude 사용 (중심점)
-            Position = new PointLatLng(symbolModel.Latitude, symbolModel.Longitude);
+            Position = new PointLatLng(pidsGroupModel.Latitude, pidsGroupModel.Longitude);
             _log?.Info($"[GMapPidsGroupMarker 생성자] 중심 위치 유지: ({Position.Lat}, {Position.Lng})");
 
             // 카테고리 설정 (라인은 기본적으로 AREA_BOUNDARY 카테고리)
@@ -40,8 +40,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
             _isDrawing = false;
 
+
+            pidsGroupModel.Update += PidsGroupModel_Update;
+
             _log?.Info($"[GMapPidsGroupMarker 생성자] 완료 - Category: {Category}");
         }
+
+        
         #endregion
         #region - Implementation of Interface -
         #endregion
@@ -126,6 +131,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         }
         #endregion
         #region - Binding Methods -
+
+        private void PidsGroupModel_Update(object? sender, EventArgs e)
+        {
+            OnPropertyChanged(nameof(EventStatus));
+            OnPropertyChanged(nameof(OperationState));
+        }
         #endregion
         #region - Processes -
         /// <summary>
