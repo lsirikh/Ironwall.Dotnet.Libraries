@@ -37,18 +37,25 @@ public class RtspPlayer : Control, IDisposable
     private const string PART_ErrorPanel = "PART_ErrorPanel";
     private const string PART_StatusText = "PART_StatusText";
 
-    private VideoView _videoView;
-    private ProgressBar _loadingIndicator;
-    private StackPanel _errorPanel;
-    private TextBlock _statusText;
-    private IRtspStreamingService _streamingService;
+    private VideoView? _videoView;
+    private ProgressBar? _loadingIndicator;
+    private StackPanel? _errorPanel;
+    private TextBlock? _statusText;
+    private IRtspStreamingService? _streamingService;
     private ILogService? _log;
-    private string? _contextId;
-    private DispatcherTimer _statusTimer;
+    private DispatcherTimer? _statusTimer;
     private CancellationTokenSource? _cancellationTokenSource;
-    private WeakReference<IRtspStreamingService> _weakStreamingService;
+    private WeakReference<IRtspStreamingService>? _weakStreamingService;
     private bool _disposed;
+    private readonly object _disposeLock = new object();
+
     private readonly object _lockObject = new object();
+    private readonly SemaphoreSlim _connectionSemaphore = new(1, 1);
+
+    private int _connectionRetryCount = 0;
+
+    // ContextId 캐시 필드 추가
+    private string? _cachedContextId;
 
     static RtspPlayer()
     {
@@ -59,8 +66,12 @@ public class RtspPlayer : Control, IDisposable
 
     public RtspPlayer()
     {
-        _contextId = Guid.NewGuid().ToString();
         _cancellationTokenSource = new CancellationTokenSource();
+
+        // 기본 ContextId 생성 및 캐시
+        var defaultId = Guid.NewGuid().ToString();
+        _cachedContextId = defaultId;  // 먼저 캐시에 저장
+
 
         // DI Container에서 서비스 획득
         try
@@ -80,10 +91,26 @@ public class RtspPlayer : Control, IDisposable
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
 
-        _log?.Info($"[RtspPlayer] Control created: {_contextId}");
+        // 캐시된 값 사용
+        _log?.Info($"[RtspPlayer] Control created with default ID: {_cachedContextId}");
+
     }
 
     #region - Dependency Properties -
+    // 새로운 DP 추가
+    public static readonly DependencyProperty ContextIdProperty =
+        DependencyProperty.Register(
+            nameof(ContextId),
+            typeof(string),
+            typeof(RtspPlayer),
+            new PropertyMetadata(null, OnContextIdChanged));
+
+    
+    public string ContextId
+    {
+        get => (string)GetValue(ContextIdProperty);
+        set => SetValue(ContextIdProperty, value);
+    }
 
     public static readonly DependencyProperty ConnectionInfoProperty =
         DependencyProperty.Register(
@@ -196,23 +223,23 @@ public class RtspPlayer : Control, IDisposable
 
     #region - Commands -
 
-    private ICommand _playCommand;
+    private ICommand? _playCommand;
     public ICommand PlayCommand =>
     _playCommand ??= new AsyncRelayCommand(PlayOrConnectAsync, CanPlayOrConnect);
 
-    private ICommand _stopCommand;
+    private ICommand? _stopCommand;
     public ICommand StopCommand =>
     _stopCommand ??= new AsyncRelayCommand(DisconnectAsync, CanDisconnect);
 
-    private ICommand _pauseCommand;
+    private ICommand? _pauseCommand;
     public ICommand PauseCommand =>
         _pauseCommand ??= new RelayCommand(Pause, () => PlaybackState == PlaybackState.Playing);
 
-    private ICommand _resumeCommand;
+    private ICommand? _resumeCommand;
     public ICommand ResumeCommand =>
         _resumeCommand ??= new RelayCommand(Resume, () => PlaybackState == PlaybackState.Paused);
 
-    private ICommand _snapshotCommand;
+    private ICommand? _snapshotCommand;
     public ICommand SnapshotCommand =>
         _snapshotCommand ??= new AsyncRelayCommand(() => TakeSnapshotAsync(), () => PlaybackState == PlaybackState.Playing);
 
@@ -220,9 +247,9 @@ public class RtspPlayer : Control, IDisposable
 
     #region - Events -
 
-    public event EventHandler<StreamingStateChangedEventArgs> StateChanged;
-    public event EventHandler<StreamingErrorEventArgs> ErrorOccurred;
-    public event EventHandler<StreamingProgressEventArgs> ProgressUpdated;
+    public event EventHandler<StreamingStateChangedEventArgs>? StateChanged;
+    public event EventHandler<StreamingErrorEventArgs>? ErrorOccurred;
+    public event EventHandler<StreamingProgressEventArgs>? ProgressUpdated;
 
     #endregion
 
@@ -287,7 +314,7 @@ public class RtspPlayer : Control, IDisposable
 
     private void OnServiceStateChanged(object? sender, StreamingStateChangedEventArgs e)
     {
-        if (e.ContextId == _contextId)
+        if (e.ContextId == _cachedContextId)
         {
             Dispatcher.BeginInvoke(() =>
             {
@@ -300,7 +327,7 @@ public class RtspPlayer : Control, IDisposable
 
     private void OnServiceErrorOccurred(object? sender, StreamingErrorEventArgs e)
     {
-        if (e.ContextId == _contextId || string.IsNullOrEmpty(e.ContextId))
+        if (e.ContextId == _cachedContextId || string.IsNullOrEmpty(e.ContextId))
         {
             Dispatcher.BeginInvoke(() =>
             {
@@ -313,7 +340,7 @@ public class RtspPlayer : Control, IDisposable
 
     private void OnServiceProgressUpdated(object? sender, StreamingProgressEventArgs e)
     {
-        if (e.ContextId == _contextId)
+        if (e.ContextId == _cachedContextId)
         {
             Dispatcher.BeginInvoke(() =>
             {
@@ -324,20 +351,67 @@ public class RtspPlayer : Control, IDisposable
 
     private async void OnLoaded(object? sender, RoutedEventArgs e)
     {
-        _log?.Info($"[RtspPlayer] Control loaded: {_contextId}");
+        // XAML에서 설정된 ContextId가 있다면 캐시 업데이트
+        if (!string.IsNullOrEmpty(ContextId) && ContextId != _cachedContextId)
+        {
+            _cachedContextId = ContextId;
+            _log?.Info($"[RtspPlayer] Updated cached ContextId on load: {_cachedContextId}");
+        }
+
+        _log?.Info($"[RtspPlayer] Control loaded: {_cachedContextId}");
+
 
         if (AutoPlay && ConnectionInfo != null)
         {
-            await ConnectAsync();
+            // 로드 직후가 아닌 약간의 지연 후 연결
+            // _contextId를 사용하여 각기 다른 지연 시간 적용
+            var randomDelay = Math.Abs(_cachedContextId.GetHashCode() % 1500) + 500; // 500-2000ms
+            await Task.Delay(randomDelay);
+
+            // 이미 Unload되지 않았는지 확인
+            if (!_disposed && IsLoaded)
+            {
+                await ConnectAsync();
+            }
         }
     }
 
     private async void OnUnloaded(object? sender, RoutedEventArgs e)
     {
-        _log?.Info($"[RtspPlayer] Control unloading: {_contextId}");
+        _log?.Info($"[RtspPlayer] Unloading: {_cachedContextId}");
+
+        // 이벤트 핸들러 즉시 해제
+        Loaded -= OnLoaded;
+        Unloaded -= OnUnloaded;
 
         await CleanupAsync();
+
+        // 강한 참조 해제
+        _streamingService = null;
     }
+
+    private static void OnContextIdChanged(DependencyObject? d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is RtspPlayer player)
+        {
+            var newId = e.NewValue as string;
+            var oldId = e.OldValue as string;
+
+            // 캐시 업데이트
+            player._cachedContextId = newId;
+
+            player._log?.Info($"[RtspPlayer] ContextId changed from '{oldId}' to '{newId}'");
+
+            // 이미 서비스에 연결된 상태라면 경고
+            if (!string.IsNullOrEmpty(oldId) && player.PlaybackState != PlaybackState.None)
+            {
+                player._log?.Warning($"[RtspPlayer] ContextId changed while active! Old: {oldId}, New: {newId}");
+            }
+
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
 
     private static async void OnConnectionInfoChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -353,7 +427,7 @@ public class RtspPlayer : Control, IDisposable
         {
             if (player._weakStreamingService?.TryGetTarget(out var service) == true)
             {
-                service.SetVolume(player._contextId, volume);
+                service.SetVolume(player._cachedContextId, volume);
             }
         }
     }
@@ -373,7 +447,7 @@ public class RtspPlayer : Control, IDisposable
         {
             if (player._weakStreamingService?.TryGetTarget(out var service) == true)
             {
-                service.ToggleMute(player._contextId);
+                service.ToggleMute(player._cachedContextId);
             }
         }
     }
@@ -386,101 +460,136 @@ public class RtspPlayer : Control, IDisposable
         }
     }
 
+    //public async Task<bool> ConnectAsync()
+    //{
+    //    if (_disposed) return false;
+    //    if (string.IsNullOrEmpty(_cachedContextId)) return false;
+
+    //    await _connectionSemaphore.WaitAsync();
+
+    //    try
+    //    {
+    //        // 현재 상태 확인
+    //        var currentState = PlaybackState;
+    //        if (currentState == PlaybackState.Connecting ||
+    //            currentState == PlaybackState.Playing ||
+    //            currentState == PlaybackState.Buffering ||
+    //            currentState == PlaybackState.Reconnecting)
+    //        {
+    //            _log?.Warning($"[RtspPlayer] Already in progress: {_cachedContextId}, State: {currentState}");
+    //            return false;
+    //        }
+
+    //        // 연결 상태로 변경
+    //        PlaybackState = PlaybackState.Connecting;
+    //        StatusMessage = "Connecting...";
+    //        UpdateUI(PlaybackState.Connecting);
+
+    //        // 각 플레이어별로 약간의 지연
+    //        var delay = Random.Shared.Next(100, 300);
+    //        await Task.Delay(delay);
+
+    //        // VideoView 준비 확인
+    //        if (_videoView == null)
+    //        {
+    //            _log?.Error($"[RtspPlayer] VideoView not ready for {_cachedContextId}");
+    //            PlaybackState = PlaybackState.Error;
+    //            StatusMessage = "VideoView not ready";
+    //            return false;
+    //        }
+
+    //        // UI 스레드에서 이전 MediaPlayer 정리
+    //        var tcs = new TaskCompletionSource<bool>();
+    //        await Dispatcher.BeginInvoke(() =>
+    //        {
+    //            try
+    //            {
+    //                if (_videoView.MediaPlayer != null)
+    //                {
+    //                    _log?.Info($"[RtspPlayer] Clearing existing MediaPlayer for {_cachedContextId}");
+    //                    _videoView.MediaPlayer = null;
+    //                }
+    //                tcs.SetResult(true);
+    //            }
+    //            catch (Exception ex)
+    //            {
+    //                tcs.SetException(ex);
+    //            }
+    //        });
+    //        await tcs.Task;
+
+    //        if (ConnectionInfo == null)
+    //        {
+    //            _log?.Warning("[RtspPlayer] No connection info provided");
+    //            PlaybackState = PlaybackState.Error;
+    //            StatusMessage = "No connection info";
+    //            return false;
+    //        }
+
+    //        _log?.Info($"[RtspPlayer] Starting connection: {_cachedContextId} to {ConnectionInfo.GetFullUrl()}");
+    //        _statusTimer?.Start();
+
+    //        if (_weakStreamingService?.TryGetTarget(out var service) == true)
+    //        {
+    //            var success = await service.ConnectAsync(
+    //                _cachedContextId,
+    //                ConnectionInfo,
+    //                StreamingOptions,
+    //                _videoView);
+
+    //            if (!success)
+    //            {
+    //                PlaybackState = PlaybackState.Error;
+    //                StatusMessage = "Connection failed";
+    //                UpdateUI(PlaybackState.Error);
+    //                _log?.Error($"[RtspPlayer] Connection failed: {_cachedContextId}");
+    //            }
+
+    //            return success;
+    //        }
+
+    //        return false;
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _log?.Error($"[RtspPlayer] Connect error: {ex.Message}");
+    //        PlaybackState = PlaybackState.Error;
+    //        StatusMessage = $"Error: {ex.Message}";
+    //        UpdateUI(PlaybackState.Error);
+    //        return false;
+    //    }
+    //    finally
+    //    {
+    //        _connectionSemaphore.Release();
+    //    }
+    //}
+
+
     public async Task<bool> ConnectAsync()
     {
         if (_disposed) return false;
+        if (string.IsNullOrEmpty(_cachedContextId)) return false;
 
-        lock (_lockObject)
-        {
-            if (PlaybackState == PlaybackState.Connecting ||
-                PlaybackState == PlaybackState.Playing)
-            {
-                return false;
-            }
-        }
+        await _connectionSemaphore.WaitAsync();
 
         try
         {
-            if (ConnectionInfo == null)
+            // 현재 상태 확인
+            var currentState = PlaybackState;
+            if (currentState == PlaybackState.Connecting ||
+                currentState == PlaybackState.Playing ||
+                currentState == PlaybackState.Buffering ||
+                currentState == PlaybackState.Reconnecting)
             {
-                _log?.Warning("[RtspPlayer] No connection info provided");
-                StatusMessage = "No connection info";
+                _log?.Warning($"[RtspPlayer] Already in progress: {_cachedContextId}, State: {currentState}");
                 return false;
             }
 
-            _log?.Info($"[RtspPlayer] Connecting: {_contextId} to {ConnectionInfo.GetFullUrl()}");
+            // 재시도 카운트 초기화
+            _connectionRetryCount = 0;
 
-            PlaybackState = PlaybackState.Connecting;
-            StatusMessage = "Connecting...";
-            UpdateUI(PlaybackState.Connecting);
-            _statusTimer?.Start();
-
-            if (_weakStreamingService?.TryGetTarget(out var service) == true)
-            {
-                //// 1. 스트리밍 서비스로부터 MediaPlayer 인스턴스를 먼저 가져옵니다.
-                //// (이 시점에는 아직 스트림이 시작되지 않았습니다.)
-                //var mediaPlayer = service.GetMediaPlayer(_contextId);
-
-                //if (_videoView != null && mediaPlayer != null)
-                //{
-                //    // 2. MediaPlayer를 VideoView에 할당하여, 비디오를 렌더링할 캔버스를 미리 지정합니다.
-                //    _videoView.MediaPlayer = mediaPlayer;
-                //}
-
-                //_videoView = GetTemplateChild("PART_VideoView") as VideoView;
-
-
-                //// 3. 이제 스트리밍 서비스에 연결을 시작하도록 명령합니다.
-                //// 이때 VLC는 이미 VideoView와 연결되어 있으므로, 영상은 컨트롤 내부에 표시됩니다.
-                //var success = await service.ConnectAsync(
-                //                                _contextId,
-                //                                ConnectionInfo,
-                //                                StreamingOptions,
-                //                                _videoView);
-
-                //if (success)
-                //{
-                //    StatusMessage = "Connected";
-                //    _log?.Info($"[RtspPlayer] Connected successfully: {_contextId}");
-                //}
-                //else
-                //{
-                //    PlaybackState = PlaybackState.Error;
-                //    StatusMessage = "Connection failed";
-                //    UpdateUI(PlaybackState.Error);
-                //    _log?.Error($"[RtspPlayer] Connection failed: {_contextId}");
-                //}
-
-                // videoView 파라미터 없이 호출 (인터페이스 수정됨)
-                var success = await service.ConnectAsync(
-                    _contextId,
-                    ConnectionInfo,
-                    StreamingOptions);
-
-                if (success)
-                {
-                    // 연결 성공 후 MediaPlayer를 VideoView에 연결
-                    var mediaPlayer = service.GetMediaPlayer(_contextId);
-                    if (_videoView != null && mediaPlayer != null)
-                    {
-                        _videoView.MediaPlayer = mediaPlayer;
-                    }
-
-                    StatusMessage = "Connected";
-                    _log?.Info($"[RtspPlayer] Connected successfully: {_contextId}");
-                }
-                else
-                {
-                    PlaybackState = PlaybackState.Error;
-                    StatusMessage = "Connection failed";
-                    UpdateUI(PlaybackState.Error);
-                    _log?.Error($"[RtspPlayer] Connection failed: {_contextId}");
-                }
-
-                return success;
-            }
-
-            return false;
+            // 재시도 로직으로 연결 시도
+            return await ConnectWithRetryAsync();
         }
         catch (Exception ex)
         {
@@ -490,26 +599,193 @@ public class RtspPlayer : Control, IDisposable
             UpdateUI(PlaybackState.Error);
             return false;
         }
+        finally
+        {
+            _connectionSemaphore.Release();
+        }
     }
+
+    private async Task<bool> ConnectWithRetryAsync()
+    {
+        const int MAX_ATTEMPTS = 3;
+
+        while (_connectionRetryCount < MAX_ATTEMPTS)
+        {
+            _connectionRetryCount++;
+
+            _log?.Info($"[RtspPlayer] Connection attempt {_connectionRetryCount}/{MAX_ATTEMPTS} for {_cachedContextId}");
+
+            // 재시도 시 상태 메시지 업데이트
+            StatusMessage = _connectionRetryCount > 1
+                ? $"Connecting... (Attempt {_connectionRetryCount}/{MAX_ATTEMPTS})"
+                : "Connecting...";
+
+            PlaybackState = PlaybackState.Connecting;
+            UpdateUI(PlaybackState.Connecting);
+
+            // 실제 연결 시도
+            var success = await AttemptConnectionAsync();
+
+            if (success)
+            {
+                _log?.Info($"[RtspPlayer] Successfully connected on attempt {_connectionRetryCount} for {_cachedContextId}");
+                _connectionRetryCount = 0; // 성공 시 카운터 리셋
+                return true;
+            }
+
+            // 마지막 시도가 아니면 대기 후 재시도
+            if (_connectionRetryCount < MAX_ATTEMPTS)
+            {
+                var delay = CalculateRetryDelay(_connectionRetryCount);
+                _log?.Warning($"[RtspPlayer] Connection attempt {_connectionRetryCount} failed, retrying in {delay}ms for {_cachedContextId}");
+
+                StatusMessage = $"Connection failed, retrying in {delay / 1000}s...";
+                // Error가 아닌 Reconnecting 상태 사용
+                PlaybackState = PlaybackState.Reconnecting;
+                UpdateUI(PlaybackState.Reconnecting);
+
+                await Task.Delay(delay);
+            }
+        }
+
+        // 모든 재시도 실패
+        _log?.Error($"[RtspPlayer] All {MAX_ATTEMPTS} connection attempts failed for {_cachedContextId}");
+        PlaybackState = PlaybackState.Error;
+        StatusMessage = $"Connection failed after {MAX_ATTEMPTS} attempts";
+        UpdateUI(PlaybackState.Error);
+        _connectionRetryCount = 0;
+
+        return false;
+    }
+
+    private async Task<bool> AttemptConnectionAsync()
+    {
+        try
+        {
+            // VideoView 준비 확인
+            if (_videoView == null)
+            {
+                _log?.Error($"[RtspPlayer] VideoView not ready for {_cachedContextId}");
+
+                // VideoView가 아직 준비되지 않았다면 잠시 대기
+                var delay = Random.Shared.Next(100, 300);
+                await Task.Delay(delay);
+                // 재확인
+                if (_videoView == null)
+                {
+                    StatusMessage = "VideoView not ready";
+                    return false;
+                }
+            }
+
+            // UI 스레드에서 이전 MediaPlayer 정리
+            var tcs = new TaskCompletionSource<bool>();
+            await Dispatcher.BeginInvoke(() =>
+            {
+                try
+                {
+                    if (_videoView.MediaPlayer != null)
+                    {
+                        _log?.Info($"[RtspPlayer] Clearing existing MediaPlayer for {_cachedContextId}");
+                        _videoView.MediaPlayer = null;
+                    }
+                    tcs.SetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            await tcs.Task;
+
+            if (ConnectionInfo == null)
+            {
+                _log?.Warning("[RtspPlayer] No connection info provided");
+                StatusMessage = "No connection info";
+                return false;
+            }
+
+            _log?.Info($"[RtspPlayer] Starting connection: {_cachedContextId} to {ConnectionInfo.GetFullUrl()}");
+            _statusTimer?.Start();
+
+            if (_weakStreamingService?.TryGetTarget(out var service) == true)
+            {
+                var success = await service.ConnectAsync(
+                    _cachedContextId,
+                    ConnectionInfo,
+                    StreamingOptions,
+                    _videoView);
+
+                if (!success)
+                {
+                    // 실패하더라도 여기서는 에러 상태로 설정하지 않음 (재시도 로직에서 처리)
+                    _log?.Warning($"[RtspPlayer] Service connection failed for {_cachedContextId}");
+                    StatusMessage = "Stream connection failed";
+                }
+
+                return success;
+            }
+
+            _log?.Warning("[RtspPlayer] Streaming service not available");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[RtspPlayer] Connection attempt error: {ex.Message}");
+            return false;
+        }
+    }
+
+    private int CalculateRetryDelay(int attemptNumber)
+    {
+        // 고정 2초 지연
+        return 2000;
+
+        // 또는 점진적 증가
+        // return attemptNumber * 1000;  // 1초, 2초, 3초...
+
+        // 또는 지수 백오프
+        // return (int)Math.Pow(2, attemptNumber - 1) * 1000;  // 1초, 2초, 4초...
+    }
+
+
 
     public async Task DisconnectAsync()
     {
         if (_disposed) return;
 
+        await _connectionSemaphore.WaitAsync();
+
         try
         {
-            _log?.Info($"[RtspPlayer] Disconnecting: {_contextId}");
+            if (_cachedContextId == null) return;
+
+            _log?.Info($"[RtspPlayer] Disconnecting: {_cachedContextId} - {ConnectionInfo?.Description}");
 
             _statusTimer?.Stop();
 
-            if (_videoView != null)
+            // UI 스레드에서 VideoView 정리
+            var tcs = new TaskCompletionSource<bool>();
+            await Dispatcher.BeginInvoke(() =>
             {
-                _videoView.MediaPlayer = null;
-            }
+                try
+                {
+                    if (_videoView != null)
+                    {
+                        _videoView.MediaPlayer = null;
+                    }
+                    tcs.SetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            await tcs.Task;
 
             if (_weakStreamingService?.TryGetTarget(out var service) == true)
             {
-                await service.DisconnectAsync(_contextId);
+                await service.DisconnectAsync(_cachedContextId);
             }
 
             PlaybackState = PlaybackState.Stopped;
@@ -519,6 +795,10 @@ public class RtspPlayer : Control, IDisposable
         catch (Exception ex)
         {
             _log?.Error($"[RtspPlayer] Disconnect error: {ex.Message}");
+        }
+        finally
+        {
+            _connectionSemaphore.Release();
         }
     }
 
@@ -551,12 +831,12 @@ public class RtspPlayer : Control, IDisposable
                PlaybackState != PlaybackState.Buffering &&
                PlaybackState != PlaybackState.Reconnecting;
     }
+
     public void Pause()
     {
         if (_weakStreamingService?.TryGetTarget(out var service) == true)
         {
-            service.Pause(_contextId);
-            PlaybackState = PlaybackState.Paused;  // 상태 직접 업데이트
+            service.Pause(_cachedContextId);
             StatusMessage = "Paused";
         }
     }
@@ -565,8 +845,7 @@ public class RtspPlayer : Control, IDisposable
     {
         if (_weakStreamingService?.TryGetTarget(out var service) == true)
         {
-            service.Play(_contextId);
-            PlaybackState = PlaybackState.Playing;  // 상태 직접 업데이트
+            service.Play(_cachedContextId);
             StatusMessage = "Playing";
         }
     }
@@ -575,8 +854,8 @@ public class RtspPlayer : Control, IDisposable
     {
         if (_weakStreamingService?.TryGetTarget(out var service) == true)
         {
-            filePath ??= $"snapshot_{_contextId}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            var result = await service.TakeSnapshotAsync(_contextId, filePath);
+            filePath ??= $"snapshot_{_cachedContextId}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+            var result = await service.TakeSnapshotAsync(_cachedContextId, filePath);
 
             if (result)
             {
@@ -593,7 +872,7 @@ public class RtspPlayer : Control, IDisposable
     {
         if (_weakStreamingService?.TryGetTarget(out var service) == true)
         {
-            service.SetFrameSkip(_contextId, skipFrames);
+            service.SetFrameSkip(_cachedContextId, skipFrames);
         }
     }
 
@@ -601,7 +880,7 @@ public class RtspPlayer : Control, IDisposable
     {
         if (_weakStreamingService?.TryGetTarget(out var service) == true)
         {
-            return service.GetStatistics(_contextId);
+            return service.GetStatistics(_cachedContextId);
         }
         return null;
     }
@@ -610,7 +889,7 @@ public class RtspPlayer : Control, IDisposable
     {
         if (_weakStreamingService?.TryGetTarget(out var service) == true)
         {
-            var state = service.GetPlaybackState(_contextId);
+            var state = service.GetPlaybackState(_cachedContextId);
             if (state != PlaybackState)
             {
                 PlaybackState = state;
@@ -618,7 +897,7 @@ public class RtspPlayer : Control, IDisposable
             }
 
             // 통계 업데이트
-            var stats = service.GetStatistics(_contextId);
+            var stats = service.GetStatistics(_cachedContextId);
             if (stats != null && _statusText != null)
             {
                 _statusText.Text = $"{stats.GetFormattedBitrate()} | {stats.TotalPlayTime:hh\\:mm\\:ss}";
@@ -723,27 +1002,70 @@ public class RtspPlayer : Control, IDisposable
     public void Dispose()
     {
         Dispose(true);
-        GC.SuppressFinalize(this);
+        GC.SuppressFinalize(this);  // 소멸자 호출 방지
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (_disposed)
-            return;
-
-        if (disposing)
+        lock (_disposeLock)  // 동시 Dispose 방지
         {
-            _log?.Info($"[RtspPlayer] Disposing control: {_contextId}");
+            if (_disposed)
+                return;
 
-            var cleanupTask = CleanupAsync();
-            cleanupTask.Wait(TimeSpan.FromSeconds(5));
+            if (disposing)
+            {
+                // 관리 리소스 정리 (순서 중요!)
+                DisposeInOrder();
+            }
 
-            _log?.Info($"[RtspPlayer] Control disposed: {_contextId}");
+            // 비관리 리소스 정리 (있다면)
+            _disposed = true;
         }
-
-        _disposed = true;
     }
 
+    private void DisposeInOrder()
+    {
+        try
+        {
+            // 1. 타이머 먼저 정지
+            _statusTimer?.Stop();
+            _statusTimer = null;
+
+            // 2. 진행 중인 작업 취소
+            _cancellationTokenSource?.Cancel();
+
+            // 3. 이벤트 구독 해제 (메모리 누수 방지)
+            UnsubscribeFromServiceEvents();
+
+            // 4. 비동기 정리 작업 (동기 대기 with timeout)
+            var cleanupTask = CleanupAsync();
+            if (!cleanupTask.Wait(TimeSpan.FromSeconds(3)))
+            {
+                _log?.Warning($"[RtspPlayer] Cleanup timeout for {_cachedContextId}");
+            }
+
+            // 5. 동기화 객체 해제
+            try
+            {
+                _connectionSemaphore?.Dispose();
+            }
+            catch { }
+
+            // 6. CancellationTokenSource 해제
+            _cancellationTokenSource?.Dispose();
+
+            // 7. WeakReference 정리
+            _weakStreamingService = null;
+
+            _log?.Info($"[RtspPlayer] Disposed: {_cachedContextId}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[RtspPlayer] Dispose error: {ex.Message}");
+        }
+    }
+
+    // 소멸자는 비관리 리소스만 처리
     ~RtspPlayer()
     {
         Dispose(false);

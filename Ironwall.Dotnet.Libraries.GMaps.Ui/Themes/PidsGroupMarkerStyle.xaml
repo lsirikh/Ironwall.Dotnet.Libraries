@@ -46,7 +46,7 @@
 							Height="10"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
-							Fill="OrangeRed"
+							Fill="Red"
 							Opacity="0"
 							RenderTransformOrigin="0.5,0.5">
 							<Ellipse.RenderTransform>
@@ -56,7 +56,7 @@
 
 						<!--  Event Status Indicator Badge  -->
 						<Border
-							Name="PART_EventStatusBadge"
+							Name="PART_EventStatusIndicator"
 							Width="16"
 							Height="16"
 							Margin="0,-8,-8,0"
@@ -138,16 +138,16 @@
 
 						<!--  Normal 상태 (정상)  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Normal}">
-							<Setter TargetName="PART_EventStatusBadge" Property="Background" Value="#4CAF50" />
-							<Setter TargetName="PART_EventStatusBadge" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#4CAF50" />
 						</DataTrigger>
 
 						<!--  Pulse Animation for Detecting State  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
-							<Setter TargetName="PART_EventStatusBadge" Property="Background" Value="#FF9800" />
-							<Setter TargetName="PART_EventStatusBadge" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#FF9800" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#F44336" />
 
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="PulseStoryboard_Begin">
@@ -182,9 +182,9 @@
 
 						<!--  Fault 상태 (장애 - 빠른 깜빡임)  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Fault}">
-							<Setter TargetName="PART_EventStatusBadge" Property="Background" Value="#F44336" />
-							<Setter TargetName="PART_EventStatusBadge" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#F44336" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#FF9800" />
 
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="FaultBlinkStoryboard">
@@ -199,7 +199,7 @@
 											Duration="0:0:0.3" />
 										<ColorAnimation
 											AutoReverse="True"
-											Storyboard.TargetName="PART_EventStatusBadge"
+											Storyboard.TargetName="PART_EventStatusIndicator"
 											Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
 											From="#F44336"
 											To="#FF8A80"
@@ -214,9 +214,9 @@
 
 						<!--  Connection 상태 (연결중)  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Connection}">
-							<Setter TargetName="PART_EventStatusBadge" Property="Background" Value="#2196F3" />
-							<Setter TargetName="PART_EventStatusBadge" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#2196F3" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#00BCD4" />
 
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="ConnectionPulseStoryboard">
@@ -224,7 +224,7 @@
 										<!--  느린 펄스 애니메이션  -->
 										<DoubleAnimation
 											AutoReverse="True"
-											Storyboard.TargetName="PART_EventStatusBadge"
+											Storyboard.TargetName="PART_EventStatusIndicator"
 											Storyboard.TargetProperty="Opacity"
 											From="1"
 											To="0.5"
@@ -240,8 +240,8 @@
 						<!--  Mouse Over Effect  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_MainPolyline" Property="StrokeThickness" Value="4" />
-							<Setter TargetName="PART_EventStatusBadge" Property="Width" Value="18" />
-							<Setter TargetName="PART_EventStatusBadge" Property="Height" Value="18" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Width" Value="18" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Height" Value="18" />
 						</Trigger>
 
 						<!--  Disabled State  -->

@@ -10,8 +10,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces;
 public interface IRtspStreamingService : IService, IDisposable
 {
     // 연결 관리
-    Task<bool> ConnectAsync(string contextId, RtspConnectionInfo connectionInfo, StreamingOptions options = null,
-        LibVLCSharp.WPF.VideoView videoView = null);
+    Task<bool> ConnectAsync(string contextId, RtspConnectionInfo connectionInfo, StreamingOptions? options = null,
+        LibVLCSharp.WPF.VideoView? videoView = null);
     Task DisconnectAsync(string contextId);
     Task DisconnectAllAsync();
 

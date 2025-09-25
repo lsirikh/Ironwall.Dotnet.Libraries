@@ -13,42 +13,71 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Commands;
 public class AsyncRelayCommand : ICommand
 {
     private readonly Func<Task> _execute;
-    private readonly Func<bool> _canExecute;
+    private readonly Func<bool>? _canExecute;
     private bool _isExecuting;
 
-    public AsyncRelayCommand(Func<Task> execute, Func<bool> canExecute = null)
+    public AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null)
     {
-        _execute = execute;
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
         _canExecute = canExecute;
     }
 
-    public event EventHandler CanExecuteChanged
+    // Hybrid approach: CommandManager + 개별 이벤트
+    public event EventHandler? CanExecuteChanged
     {
-        add => CommandManager.RequerySuggested += value;
-        remove => CommandManager.RequerySuggested -= value;
+        add
+        {
+            CommandManager.RequerySuggested += value;
+            _canExecuteChanged += value;
+        }
+        remove
+        {
+            CommandManager.RequerySuggested -= value;
+            _canExecuteChanged -= value;
+        }
     }
 
-    public bool CanExecute(object parameter)
+    private event EventHandler? _canExecuteChanged;
+
+    public void RaiseCanExecuteChanged()
     {
-        return !_isExecuting && (_canExecute?.Invoke() ?? true);
+        _canExecuteChanged?.Invoke(this, EventArgs.Empty);
+        CommandManager.InvalidateRequerySuggested();
     }
 
-    public async void Execute(object parameter)
+    public bool CanExecute(object? parameter)
+    {
+        try
+        {
+            return !_isExecuting && (_canExecute?.Invoke() ?? true);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async void Execute(object? parameter)
     {
         if (_isExecuting)
             return;
 
         _isExecuting = true;
-        CommandManager.InvalidateRequerySuggested();
 
         try
         {
+            RaiseCanExecuteChanged();
             await _execute();
+        }
+        catch (Exception ex)
+        {
+            // 로그 처리 (옵션)
+            System.Diagnostics.Debug.WriteLine($"AsyncRelayCommand Execute failed: {ex.Message}");
         }
         finally
         {
             _isExecuting = false;
-            CommandManager.InvalidateRequerySuggested();
+            RaiseCanExecuteChanged();
         }
     }
 }

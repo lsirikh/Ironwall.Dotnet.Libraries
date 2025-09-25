@@ -13,20 +13,22 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Commands;
 public class RelayCommand : ICommand
 {
     private readonly Action _execute;
-    private readonly Func<bool> _canExecute;
+    private readonly Func<bool>? _canExecute;
 
-    public RelayCommand(Action execute, Func<bool> canExecute = null)
+    public RelayCommand(Action execute, Func<bool>? canExecute = null)
     {
         _execute = execute;
         _canExecute = canExecute;
     }
 
-    public event EventHandler CanExecuteChanged
+    // 전역 CommandManager 대신 개별 이벤트 사용
+    public event EventHandler? CanExecuteChanged;
+
+    public void RaiseCanExecuteChanged()
     {
-        add => CommandManager.RequerySuggested += value;
-        remove => CommandManager.RequerySuggested -= value;
+        CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
-    public void Execute(object parameter) => _execute();
+    public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
+    public void Execute(object? parameter) => _execute();
 }

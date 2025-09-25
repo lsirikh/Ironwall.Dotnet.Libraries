@@ -39,9 +39,30 @@ public class PlaybackStateToVisibilityConverter : IValueConverter
                     return state == PlaybackState.Playing
                         ? Visibility.Visible : Visibility.Collapsed;
 
+                case "canplay":
+                    return (state != PlaybackState.Playing &&
+                            state != PlaybackState.Connecting &&
+                            state != PlaybackState.Buffering &&
+                            state != PlaybackState.Reconnecting &&
+                            state != PlaybackState.ImageDisplay)  // 이미지 표시 중에는 Play 버튼 숨김
+                        ? Visibility.Visible : Visibility.Collapsed;
+
                 case "controls":
                     return (state == PlaybackState.Playing ||
-                            state == PlaybackState.Paused)
+                            state == PlaybackState.Paused ||
+                            state == PlaybackState.ImageDisplay)  // 이미지 표시 중에도 컨트롤 표시
+                        ? Visibility.Visible : Visibility.Collapsed;
+
+                case "none":
+                    return state == PlaybackState.None
+                        ? Visibility.Visible : Visibility.Collapsed;
+
+                case "imagedisplay":
+                    return state == PlaybackState.ImageDisplay
+                        ? Visibility.Visible : Visibility.Collapsed;
+
+                case "videocontent":  // 비디오 재생 중이거나 일시정지 상태
+                    return (state == PlaybackState.Playing || state == PlaybackState.Paused)
                         ? Visibility.Visible : Visibility.Collapsed;
 
                 default:

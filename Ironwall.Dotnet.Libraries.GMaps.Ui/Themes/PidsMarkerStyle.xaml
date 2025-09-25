@@ -593,44 +593,14 @@
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
 						</Trigger>
 						<Trigger Property="EventStatus" Value="Detecting">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#2196F3" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 						</Trigger>
 						<Trigger Property="EventStatus" Value="Fault">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 						</Trigger>
 						<Trigger Property="EventStatus" Value="Connection">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
 						</Trigger>
-
-						<!--  Event Status에 따른 Fence Line 색상 변경  -->
-						<!--<MultiTrigger>
-							<MultiTrigger.Conditions>
-								<Condition Property="DeviceType" Value="Fence" />
-								<Condition Property="EventStatus" Value="Normal" />
-							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#4CAF50" />
-						</MultiTrigger>
-						<MultiTrigger>
-							<MultiTrigger.Conditions>
-								<Condition Property="DeviceType" Value="Fence" />
-								<Condition Property="EventStatus" Value="Detecting" />
-							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#2196F3" />
-						</MultiTrigger>
-						<MultiTrigger>
-							<MultiTrigger.Conditions>
-								<Condition Property="DeviceType" Value="Fence" />
-								<Condition Property="EventStatus" Value="Fault" />
-							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#F44336" />
-						</MultiTrigger>
-						<MultiTrigger>
-							<MultiTrigger.Conditions>
-								<Condition Property="DeviceType" Value="Fence" />
-								<Condition Property="EventStatus" Value="Connection" />
-							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceBrickGrid" Property="Fill" Value="#00BCD4" />
-						</MultiTrigger>-->
 
 						<!--  라벨 표시 조건들 (각 타입별)  -->
 

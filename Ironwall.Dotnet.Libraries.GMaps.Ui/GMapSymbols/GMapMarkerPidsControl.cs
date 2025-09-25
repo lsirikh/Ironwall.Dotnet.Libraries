@@ -350,35 +350,6 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     }
 
     /// <summary>
-    /// 이벤트 상태별 색상 브러시 반환
-    /// </summary>
-    private Brush GetEventStatusBrush(EnumEventStatus eventStatus)
-    {
-        return eventStatus switch
-        {
-            EnumEventStatus.Normal => Brushes.Blue,
-            EnumEventStatus.Detecting => Brushes.Red,
-            EnumEventStatus.Fault => Brushes.Orange,
-            EnumEventStatus.Connection => Brushes.Blue,
-            _ => Brushes.Gray
-        };
-    }
-
-    /// <summary>
-    /// 장비 타입별 테두리 색상 브러시 반환
-    /// </summary>
-    private Brush GetDeviceTypeBorderBrush(EnumDeviceType deviceType)
-    {
-        return deviceType switch
-        {
-            EnumDeviceType.IpCamera => Brushes.Yellow,
-            EnumDeviceType.PIR => Brushes.Orange,
-            EnumDeviceType.Fence => Brushes.White,
-            _ => Brushes.White
-        };
-    }
-
-    /// <summary>
     /// PIDS 마커 클릭 처리
     /// </summary>
     protected virtual void OnPidsMarkerClicked(MouseButtonEventArgs e)

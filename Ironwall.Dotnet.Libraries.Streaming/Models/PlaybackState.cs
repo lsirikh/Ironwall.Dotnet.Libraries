@@ -57,5 +57,10 @@ public enum PlaybackState
     /// <summary>
     /// 연결 끊김
     /// </summary>
-    Disconnected = 8
+    Disconnected = 8,
+
+    /// <summary>
+    /// 이미지 표시 모드
+    /// </summary>
+    ImageDisplay = 9
 }
