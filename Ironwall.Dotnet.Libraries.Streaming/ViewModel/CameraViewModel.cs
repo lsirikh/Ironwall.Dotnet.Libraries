@@ -55,8 +55,16 @@ public class CameraViewModel : PropertyChangedBase
         set => Set(ref _slotIndex, value);
     }
 
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => Set(ref _isSelected, value);
+    }
+
     public StreamingOptions? StreamingOptions { get; set; }
     public bool AutoPlay { get; set; } = false;
     public bool ShowControls { get; set; } = true;
     private int _slotIndex = -1;
+    private bool _isSelected;
+
 }
