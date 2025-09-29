@@ -50,26 +50,34 @@ public class StreamingModule : Module
                     _log?.Info("[StreamingModule] StreamingContextPool activated");
                 });
 
-            // RtspStreamingService 등록 (Autofac DI 사용)
-            builder.RegisterType<RtspStreamingService>()
-                .As<IRtspStreamingService>()
+            // ImprovedRtspStreamingService 등록 (IRtspStreamingService와 IPlayerRegistry 인터페이스로)
+            builder.RegisterType<ImprovedRtspStreamingService>()
+                .As<IImprovedRtspStreamingService>()
+                .As<IPlayerRegistry>()
                 .As<IService>()
                 .SingleInstance()
                 .WithMetadata("Order", _count)
                 .OnActivated(e =>
                 {
-                    _log?.Info("[StreamingModule] RtspStreamingService activated");
+                    _log?.Info("[ImprovedStreamingModule] ImprovedRtspStreamingService activated");
+
+                    // Service 초기화 확인
+                    var service = e.Instance as ImprovedRtspStreamingService;
+                    if (service != null)
+                    {
+                        _log?.Info($"[ImprovedStreamingModule] Service ready - Type: {service.GetType().Name}");
+                    }
                 })
                 .OnRelease(e =>
                 {
-                    _log?.Info("[StreamingModule] RtspStreamingService releasing...");
+                    _log?.Info("[ImprovedStreamingModule] ImprovedRtspStreamingService releasing...");
                     try
                     {
                         e?.Dispose();
                     }
                     catch (Exception ex)
                     {
-                        _log?.Error($"[StreamingModule] Error disposing service: {ex.Message}");
+                        _log?.Error($"[ImprovedStreamingModule] Error disposing service: {ex.Message}");
                     }
                 });
 
@@ -84,25 +92,6 @@ public class StreamingModule : Module
     #endregion
 
     #region - Overrides -
-    //protected override void AttachToComponentRegistration(
-    //    IComponentRegistryBuilder componentRegistry,
-    //    IComponentRegistration registration)
-    //{
-    //    base.AttachToComponentRegistration(componentRegistry, registration);
-
-    //    // 컴포넌트 생성/해제 로깅
-    //    registration.Activated += (sender, e) =>
-    //    {
-    //        var typeName = e.Instance.GetType().Name;
-    //        _log?.Debug($"[StreamingModule] Component activated: {typeName}");
-    //    };
-
-    //    registration.Deactivating += (sender, e) =>
-    //    {
-    //        var typeName = e.Instance.GetType().Name;
-    //        _log?.Debug($"[StreamingModule] Component deactivating: {typeName}");
-    //    };
-    //}
     #endregion
 
     #region - Attributes -
