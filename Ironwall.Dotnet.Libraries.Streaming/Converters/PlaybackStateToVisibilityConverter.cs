@@ -44,6 +44,7 @@ public class PlaybackStateToVisibilityConverter : IValueConverter
                             state != PlaybackState.Connecting &&
                             state != PlaybackState.Buffering &&
                             state != PlaybackState.Reconnecting &&
+                            state != PlaybackState.Restricted &&
                             state != PlaybackState.ImageDisplay)  // 이미지 표시 중에는 Play 버튼 숨김
                         ? Visibility.Visible : Visibility.Collapsed;
 
@@ -63,6 +64,10 @@ public class PlaybackStateToVisibilityConverter : IValueConverter
 
                 case "videocontent":  // 비디오 재생 중이거나 일시정지 상태
                     return (state == PlaybackState.Playing || state == PlaybackState.Paused)
+                        ? Visibility.Visible : Visibility.Collapsed;
+
+                case "restricted":  // 제한구역
+                    return state == PlaybackState.Restricted
                         ? Visibility.Visible : Visibility.Collapsed;
 
                 default:

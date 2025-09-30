@@ -81,6 +81,16 @@ public class StreamingModule : Module
                     }
                 });
 
+            // PopupViewerService 등록
+            builder.RegisterType<PopupViewerService>()
+                .As<IPopupViewerService>()
+                .SingleInstance()
+                .OnActivated(e =>
+                {
+                    _log?.Info("[StreamingModule] PopupViewerService activated");
+                });
+
+
             _log?.Info($"[StreamingModule] Module loaded successfully with order: {_count}");
         }
         catch (Exception ex)

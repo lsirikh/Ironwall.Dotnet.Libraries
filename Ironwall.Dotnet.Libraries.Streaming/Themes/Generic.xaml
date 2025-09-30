@@ -9,6 +9,7 @@
 	<ResourceDictionary.MergedDictionaries>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Streaming;component/Themes/CameraItem.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Streaming;component/Themes/ImprovedCameraItem.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.Streaming;component/Themes/PopupViewer.xaml" />
 
 	</ResourceDictionary.MergedDictionaries>
 

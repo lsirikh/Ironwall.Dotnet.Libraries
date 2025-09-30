@@ -21,14 +21,81 @@ public class RelayCommand : ICommand
         _canExecute = canExecute;
     }
 
-    // 전역 CommandManager 대신 개별 이벤트 사용
-    public event EventHandler? CanExecuteChanged;
+    // CommandManager와 연결
+    public event EventHandler? CanExecuteChanged
+    {
+        add { CommandManager.RequerySuggested += value; }
+        remove { CommandManager.RequerySuggested -= value; }
+    }
 
     public void RaiseCanExecuteChanged()
     {
-        CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        CommandManager.InvalidateRequerySuggested();
     }
 
     public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
     public void Execute(object? parameter) => _execute();
+}
+
+/// <summary>
+/// 파라미터를 받는 제네릭 RelayCommand
+/// </summary>
+/// <typeparam name="T">커맨드 파라미터 타입</typeparam>
+public class RelayCommand<T> : ICommand
+{
+    private readonly Action<T> _execute;
+    private readonly Predicate<T>? _canExecute;
+
+    public RelayCommand(Action<T> execute, Predicate<T>? canExecute = null)
+    {
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+        _canExecute = canExecute;
+    }
+
+    public event EventHandler? CanExecuteChanged
+    {
+        add { CommandManager.RequerySuggested += value; }
+        remove { CommandManager.RequerySuggested -= value; }
+    }
+
+    public bool CanExecute(object? parameter)
+    {
+        if (_canExecute == null)
+            return true;
+
+        // null 처리
+        if (parameter == null && typeof(T).IsValueType)
+            return false;
+
+        // 타입 체크 및 변환
+        if (parameter is T typedParameter)
+            return _canExecute(typedParameter);
+
+        // null 허용 타입 처리
+        if (parameter == null && !typeof(T).IsValueType)
+            return _canExecute(default(T));
+
+        return false;
+    }
+
+    public void Execute(object? parameter)
+    {
+        // 타입 안전한 실행
+        if (parameter is T typedParameter)
+        {
+            _execute(typedParameter);
+        }
+        else if (parameter == null && !typeof(T).IsValueType)
+        {
+            _execute(default(T));
+        }
+    }
+
+    /// <summary>
+    /// CanExecute 상태 강제 업데이트
+    /// </summary>
+    public void RaiseCanExecuteChanged()
+    {
+        CommandManager.InvalidateRequerySuggested();
+    }
 }

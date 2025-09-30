@@ -35,6 +35,7 @@ public class ImprovedStreamingContext : IPooledObject
     private ILogService? _log;
     private readonly object _lock = new object();
 
+
     // Properties
     public string? Id { get; private set; }
     public RtspConnectionInfo? ConnectionInfo { get; private set; }
@@ -48,6 +49,14 @@ public class ImprovedStreamingContext : IPooledObject
     public StreamingStatistics? Statistics { get; private set; }
     public Dictionary<string, Delegate>? EventHandlers { get; set; }
     public bool IsInUse { get; private set; }
+
+    // 재연결 상태 플래그 추가
+    private volatile bool _isReconnecting = false;
+    public bool IsReconnecting
+    {
+        get => _isReconnecting;
+        set => _isReconnecting = value;
+    }
 
     /// <summary>
     /// Context 초기화 - RtspPlayer 포함
@@ -365,6 +374,7 @@ public class ImprovedStreamingContext : IPooledObject
                 EventHandlers = null;
                 State = PlaybackState.None;
                 IsInUse = false;
+                _isReconnecting = false;
             }
             catch (Exception ex)
             {

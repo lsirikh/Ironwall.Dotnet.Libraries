@@ -93,8 +93,6 @@ public class CameraViewModel : PropertyChangedBase
     }
     #endregion
 
-
-
     #region Properties
     public string? ContextId
     {
@@ -175,6 +173,4 @@ public class CameraViewModel : PropertyChangedBase
     /// </summary>
     public string GridPosition => $"Row {GridRow + 1}, Col {GridColumn + 1}";
     #endregion
-
-
 }

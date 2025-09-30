@@ -39,4 +39,8 @@ public interface IImprovedRtspStreamingService: IService, IDisposable
     Task<bool> TakeSnapshotAsync(string contextId, string filePath);
     void ToggleMute(string contextId);
     bool UnregisterPlayer(string contextId);
+
+    void RestrictStream(string contextId, string message = "Surveillance Not Allowed");
+    Task UnrestrictStreamAsync(string contextId);
+
 }

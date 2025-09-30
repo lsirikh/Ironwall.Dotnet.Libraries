@@ -26,11 +26,12 @@ public class PlaybackStateToColorConverter : IValueConverter
             {
                 PlaybackState.Playing => new SolidColorBrush(Colors.LimeGreen),
                 PlaybackState.Connecting => new SolidColorBrush(Colors.Orange),
-                PlaybackState.Buffering => new SolidColorBrush(Colors.Yellow),
+                PlaybackState.Buffering => new SolidColorBrush(Colors.Orange),
+                PlaybackState.Reconnecting => new SolidColorBrush(Colors.Orange),
                 PlaybackState.Paused => new SolidColorBrush(Colors.Gray),
+                PlaybackState.Disconnected => new SolidColorBrush(Colors.Gray),
                 PlaybackState.Error => new SolidColorBrush(Colors.Red),
-                PlaybackState.Disconnected => new SolidColorBrush(Colors.DarkRed),
-                PlaybackState.Reconnecting => new SolidColorBrush(Colors.DarkOrange),
+                PlaybackState.Restricted => new SolidColorBrush(Colors.Red),
                 _ => new SolidColorBrush(Colors.Gray)
             };
         }

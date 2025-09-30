@@ -203,6 +203,20 @@ public class ImprovedRtspPlayer : Control, IDisposable
         set => SetValue(StatusMessageProperty, value);
     }
 
+    // 타임아웃 표시용 DependencyProperty 추가
+    public static readonly DependencyProperty TimeoutDisplayProperty =
+        DependencyProperty.Register(
+            nameof(TimeoutDisplay),
+            typeof(string),
+            typeof(ImprovedRtspPlayer),
+            new PropertyMetadata(string.Empty));
+
+    public string TimeoutDisplay
+    {
+        get => (string)GetValue(TimeoutDisplayProperty);
+        set => SetValue(TimeoutDisplayProperty, value);
+    }
+
     #endregion
 
     #region - Commands -

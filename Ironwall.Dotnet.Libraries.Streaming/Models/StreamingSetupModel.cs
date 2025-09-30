@@ -24,6 +24,8 @@ public interface IStreamingSetupModel
     int ContextPoolSize { get; set; }
     bool EnableFrameSkipping { get; set; }
     int MaxFrameSkip { get; set; }
+    bool IsAutoDiscard { get; set; } 
+    int TimeoutSeconds { get; set; }
 }
 
 /// <summary>
@@ -49,6 +51,9 @@ public class StreamingSetupModel : IStreamingSetupModel
     public bool AutoCleanupInactiveStreams { get; set; } = true;
     public int InactiveStreamTimeoutMinutes { get; set; } = 30;
 
+    public bool IsAutoDiscard { get; set; } = true;
+    public int TimeoutSeconds { get; set; } = 10;
+
     /// <summary>
     /// 기본 생성자
     /// </summary>
@@ -73,6 +78,8 @@ public class StreamingSetupModel : IStreamingSetupModel
             ContextPoolSize = model.ContextPoolSize;
             EnableFrameSkipping = model.EnableFrameSkipping;
             MaxFrameSkip = model.MaxFrameSkip;
+            IsAutoDiscard = model.IsAutoDiscard;
+            TimeoutSeconds = model.TimeoutSeconds;
         }
     }
 

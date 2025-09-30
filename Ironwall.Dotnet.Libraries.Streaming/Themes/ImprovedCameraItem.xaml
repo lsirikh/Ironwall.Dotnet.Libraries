@@ -9,6 +9,8 @@
 	<!--  공통 리소스 (기존과 동일)  -->
 	<converters:PlaybackStateToColorConverter x:Key="StateToColorConverter" />
 	<converters:PlaybackStateToVisibilityConverter x:Key="StateToVisibilityConverter" />
+
+
 	<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
 	<!--  Button Style (기존과 동일)  -->
@@ -183,17 +185,63 @@
 						CornerRadius="4">
 						<Grid>
 							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto" />
 								<RowDefinition Height="*" />
 								<RowDefinition Height="Auto" />
 							</Grid.RowDefinitions>
+							<!--  Camera Header  -->
+							<Border
+								Grid.Row="0"
+								Padding="8,4"
+								Background="#FF3F3F46">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+
+									<!--  Camera Name  -->
+									<!--<TextBlock
+										Grid.Column="0"
+										VerticalAlignment="Center"
+										FontWeight="Medium"
+										Foreground="White"
+										Text="{Binding ContextId, RelativeSource={RelativeSource TemplatedParent}}" />-->
+									<TextBlock
+										Grid.Column="0"
+										VerticalAlignment="Center"
+										FontWeight="Medium"
+										Foreground="White"
+										Text="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}" />
+
+									<!--  Status Text  -->
+									<TextBlock
+										Grid.Column="1"
+										Margin="0,0,10,0"
+										VerticalAlignment="Center"
+										FontSize="10"
+										Foreground="#FFB0B0B0"
+										Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}}" />
+
+									<!--  Status Indicator  -->
+									<Ellipse
+										Grid.Column="2"
+										Width="8"
+										Height="8"
+										Margin="0,0,6,0"
+										Fill="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToColorConverter}}" />
+								</Grid>
+							</Border>
 
 							<!--  Video Display Area  -->
-							<Grid Grid.Row="0" MinHeight="200">
+							<Grid Grid.Row="1" MinHeight="200">
 								<!--  Layer 1: Background  -->
 								<Rectangle Fill="Black" />
 
 								<!--  Layer 2: Video Container (PART_VideoView는 필수)  -->
-								<Grid x:Name="VideoContainer">
+								<Grid x:Name="VideoContainer" Grid.RowSpan="2">
+									<Rectangle Fill="Black" />
 									<vlc:VideoView x:Name="PART_VideoView" />
 								</Grid>
 
@@ -253,6 +301,36 @@
 										</StackPanel>
 									</Grid>
 
+									<!--  Restricted 상태 표시  -->
+									<Grid Visibility="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToVisibilityConverter}, ConverterParameter=restricted}">
+										<Rectangle Fill="#FF2D2D30" />
+										<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+											<!--  금지 아이콘  -->
+											<TextBlock
+												HorizontalAlignment="Center"
+												VerticalAlignment="Center"
+												FontSize="60"
+												Text="🚫" />
+
+											<!--  메시지  -->
+											<TextBlock
+												Margin="0,15,0,0"
+												HorizontalAlignment="Center"
+												FontSize="16"
+												FontWeight="Medium"
+												Foreground="#FFFF5252"
+												Text="{Binding StatusMessage, RelativeSource={RelativeSource TemplatedParent}, FallbackValue='Surveillance Not Allowed'}" />
+
+											<TextBlock
+												Margin="0,5,0,0"
+												HorizontalAlignment="Center"
+												FontSize="12"
+												Foreground="#FFA0A0A0"
+												Text="This camera is restricted" />
+										</StackPanel>
+									</Grid>
+
+
 									<!--  Error Panel (중앙)  -->
 									<Grid x:Name="ErrorPanel" Visibility="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToVisibilityConverter}, ConverterParameter=error}">
 										<Rectangle Fill="Black" Opacity="0.8" />
@@ -286,6 +364,7 @@
 												Style="{StaticResource ImprovedStreamingButtonStyle}" />
 										</StackPanel>
 									</Grid>
+
 
 
 
@@ -344,7 +423,7 @@
 
 							<!--  Control Bar  -->
 							<Border
-								Grid.Row="1"
+								Grid.Row="2"
 								Height="48"
 								Background="#FF424242"
 								Visibility="{Binding ShowControls, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BoolToVisibility}}">

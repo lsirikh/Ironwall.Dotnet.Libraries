@@ -62,5 +62,10 @@ public enum PlaybackState
     /// <summary>
     /// 이미지 표시 모드
     /// </summary>
-    ImageDisplay = 9
+    ImageDisplay = 9,
+
+    /// <summary>
+    /// 감시 제한 상태
+    /// </summary>
+    Restricted = 10
 }
