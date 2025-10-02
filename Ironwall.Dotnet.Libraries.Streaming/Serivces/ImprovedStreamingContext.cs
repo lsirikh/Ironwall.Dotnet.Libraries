@@ -166,14 +166,24 @@ public class ImprovedStreamingContext : IPooledObject
     /// <summary>
     /// Player 상태 업데이트
     /// </summary>
-    public void UpdatePlayerState(PlaybackState state, string statusMessage = null)
+    public void UpdatePlayerState(PlaybackState state, string? statusMessage = null)
     {
-        if (_rtspPlayer != null)
+
+        // NULL 체크 추가
+        if (_rtspPlayer == null)
         {
-            // UI 스레드에서 실행
-            DispatcherService.Invoke(() =>
+            _log?.Warning($"[ImprovedStreamingContext] Player is null, skipping update for {Id}");
+            State = state;  // 상태만 업데이트
+            return;
+        }
+
+        // UI 스레드에서 실행
+        DispatcherService.Invoke(() =>
+        {
+            try
             {
-                try
+                // Player가 여전히 유효한지 재확인
+                if (_rtspPlayer != null)
                 {
                     _rtspPlayer.SetValue(ImprovedRtspPlayer.PlaybackStateProperty, state);
 
@@ -182,12 +192,12 @@ public class ImprovedStreamingContext : IPooledObject
                         _rtspPlayer.SetValue(ImprovedRtspPlayer.StatusMessageProperty, statusMessage);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _log?.Error($"[ImprovedStreamingContext] Failed to update player state: {ex.Message}");
-                }
-            });
-        }
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"[ImprovedStreamingContext] Failed to update player state: {ex.Message}");
+            }
+        });
 
         State = state;
     }

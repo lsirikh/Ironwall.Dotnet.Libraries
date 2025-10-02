@@ -235,7 +235,7 @@
 							</Border>
 
 							<!--  Video Display Area  -->
-							<Grid Grid.Row="1" MinHeight="200">
+							<Grid Grid.Row="1" MinHeight="150">
 								<!--  Layer 1: Background  -->
 								<Rectangle Fill="Black" />
 
@@ -454,7 +454,7 @@
 															<Style TargetType="TextBlock">
 																<Setter Property="Text" Value="Play" />
 																<Style.Triggers>
-																	<DataTrigger Binding="{Binding PlaybackState, RelativeSource={RelativeSource AncestorType=local:ImprovedRtspPlayer}}" Value="Playing">
+																	<DataTrigger Binding="{Binding PlacementTarget.TemplatedParent.PlaybackState, RelativeSource={RelativeSource AncestorType=ToolTip}}" Value="Playing">
 																		<Setter Property="Text" Value="Pause" />
 																	</DataTrigger>
 																</Style.Triggers>
@@ -469,9 +469,8 @@
 														<Setter Property="Text" Value="&#xE768;" />
 														<!--  Play Icon  -->
 														<Style.Triggers>
-															<DataTrigger Binding="{Binding PlaybackState, RelativeSource={RelativeSource AncestorType=local:ImprovedRtspPlayer}}" Value="Playing">
+															<DataTrigger Binding="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}}" Value="Playing">
 																<Setter Property="Text" Value="&#xE769;" />
-																<!--  Pause Icon  -->
 															</DataTrigger>
 														</Style.Triggers>
 													</Style>

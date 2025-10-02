@@ -19,6 +19,7 @@ public interface IStreamingSetupModel
     long MaxMemoryUsageBytes { get; set; }
     bool EnableDebugLogging { get; set; }
     string LogPath { get; set; }
+    string SnapshotPath { get; set; }
     bool UseHardwareAcceleration { get; set; }
     int DefaultNetworkCaching { get; set; }
     int ContextPoolSize { get; set; }
@@ -33,11 +34,12 @@ public interface IStreamingSetupModel
 /// </summary>
 public class StreamingSetupModel : IStreamingSetupModel
 {
-    public int MaxConnections { get; set; } = 16;
-    public int MaxRetryAttempts { get; set; } = 3;
+    public int MaxConnections { get; set; } = 17;
+    public int MaxRetryAttempts { get; set; } = 5;
     public long MaxMemoryUsageBytes { get; set; } = 1024L * 1024 * 1024; // 1GB
     public bool EnableDebugLogging { get; set; } = false;
     public string LogPath { get; set; } = "logs/streaming";
+    public string SnapshotPath { get; set; } = "snapshots/";
     public bool UseHardwareAcceleration { get; set; } = true;
     public int DefaultNetworkCaching { get; set; } = 300;
     public int ContextPoolSize { get; set; } = 32;
@@ -73,6 +75,7 @@ public class StreamingSetupModel : IStreamingSetupModel
             MaxMemoryUsageBytes = model.MaxMemoryUsageBytes;
             EnableDebugLogging = model.EnableDebugLogging;
             LogPath = model.LogPath;
+            SnapshotPath = model.SnapshotPath;
             UseHardwareAcceleration = model.UseHardwareAcceleration;
             DefaultNetworkCaching = model.DefaultNetworkCaching;
             ContextPoolSize = model.ContextPoolSize;

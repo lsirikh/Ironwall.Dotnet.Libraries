@@ -17,30 +17,47 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
        Company      : Sensorway Co., Ltd.                                       
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
-    public class PopupWindowViewModel : PropertyChangedBase
+    
+
+    public class PopupWindowViewModel : PropertyChangedBase, IDisposable
     {
         private readonly ILogService? _log;
-        private readonly IImprovedRtspStreamingService _streamingService;
+        private readonly IImprovedRtspStreamingService? _streamingService;
         private readonly object _lockObject = new object();
-        private Timer? _autoDiscardTimer;
+
+        // Row 관리
+        private const int MAX_ROWS = 5; // 최대 Row의 갯수
+
+        private const int MAX_CAMERAS_PER_ROW = 3; // 1개 Row 당 최대 시현 카메라
+
+        private readonly Dictionary<string, CameraViewModel> _cameraLookup
+        = new Dictionary<string, CameraViewModel>();
 
         public PopupWindowViewModel()
         {
             _log = IoC.Get<ILogService>();
             _streamingService = IoC.Get<IImprovedRtspStreamingService>();
 
-            Cameras = new ObservableCollection<CameraItemViewModel>();
             CloseCommand = new RelayCommand(Close);
-            ClearCameraCommand = new RelayCommand<CameraItemViewModel>(ClearCamera);
+            ClearCameraCommand = new RelayCommand<CameraViewModel>(ClearCamera);
+
+            _streamingService.StateChanged += OnStreamingStateChanged;
         }
 
         #region Properties
-
-        private ObservableCollection<CameraItemViewModel>? _cameras;
-        public ObservableCollection<CameraItemViewModel>? Cameras
+        private ObservableCollection<CameraRowViewModel> _cameraRows = new ObservableCollection<CameraRowViewModel>();
+        public ObservableCollection<CameraRowViewModel> CameraRows
         {
-            get => _cameras;
-            set => Set(ref _cameras, value);
+            get => _cameraRows;
+            set
+            {
+                if (Set(ref _cameraRows, value))
+                {
+                    NotifyOfPropertyChange(nameof(CurrentCount));
+                    NotifyOfPropertyChange(nameof(RowCount));
+                    NotifyOfPropertyChange(nameof(IsEmpty));
+                }
+            }
         }
 
         private string _title = "이벤트 영상 팝업";
@@ -50,74 +67,122 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             set => Set(ref _title, value);
         }
 
-        private int _maxCameras = 6;
+        private int _maxCameras = 15;
         public int MaxCameras
         {
             get => _maxCameras;
             set => Set(ref _maxCameras, value);
         }
 
-        public int CurrentCount => Cameras?.Count ?? 0;
-
+        // Row들의 모든 카메라 수 합계
+        public int CurrentCount => CameraRows?.Sum(row => row.Cameras?.Count ?? 0) ?? 0;
+        public int RowCount => CameraRows?.Count ?? 0;
         public bool IsEmpty => CurrentCount == 0;
 
         #endregion
 
         #region Commands
 
-        public ICommand CloseCommand { get; }
-        public ICommand ClearCameraCommand { get; }
+        public ICommand? CloseCommand { get; }
+        public ICommand? ClearCameraCommand { get; }
 
         #endregion
 
         #region Methods
 
-        public void AddCameras(params RtspConnectionInfo[] connections)
+        public string? AddCameras(params ICameraModel[] cameras)
         {
             lock (_lockObject)
             {
-                // FIFO 로직: 최대 개수 초과시 오래된 것부터 제거
-                while (Cameras.Count + connections.Length > MaxCameras)
+                if (cameras == null || cameras.Length == 0)
+                    return null;
+
+                _log?.Info($"[PopupWindowViewModel] Adding {cameras.Length} cameras as new row");
+
+                // 새로운 Row 생성
+                var newRow = new CameraRowViewModel();
+
+                // 연결 정보를 CameraItemViewModel로 변환 (최대 2개까지)
+                var camerasToAdd = cameras.Take(MAX_CAMERAS_PER_ROW).Select(conn =>
                 {
-                    var oldest = Cameras.First();
-                    RemoveCamera(oldest);
+                    return new CameraViewModel(conn);
+                }).ToList();
+
+                // Row에 카메라 추가
+                foreach (var camera in camerasToAdd)
+                {
+                    newRow.Cameras.Add(camera);
+
+                    //Dictionary에 추가
+                    _cameraLookup[camera.Guid] = camera;
                 }
 
-                // 새 카메라 추가 (상단에 추가)
-                foreach (var conn in connections)
+                // FIFO 처리 - 3줄을 넘으면 맨 아래 줄 제거
+                if (CameraRows.Count >= MAX_ROWS)
                 {
-                    var cameraVm = new CameraItemViewModel
-                    {
-                        Id = $"popup_cam_{Guid.NewGuid():N}",
-                        ConnectionInfo = conn,
-                        StartTime = DateTime.Now,
-                        DisplayName = conn.Description ?? conn.CameraName
-                    };
-
-                    Cameras.Insert(0, cameraVm);  // 최신을 맨 위로
-
-                    // 스트리밍 서비스 상태 변경 이벤트 구독
-                    SubscribeToStreamingEvents(cameraVm.Id);
+                    RemoveBottomRow();
                 }
 
+                // 맨 위에 새 Row 추가
+                CameraRows.Insert(0, newRow);
+
+                // UI 업데이트
                 NotifyOfPropertyChange(nameof(CurrentCount));
+                NotifyOfPropertyChange(nameof(RowCount));
                 NotifyOfPropertyChange(nameof(IsEmpty));
+
+                _log?.Info($"[PopupWindowViewModel] Added new row({newRow.RowId}) with {camerasToAdd.Count} cameras. Total rows: {RowCount}");
+
+                return newRow.RowId;
             }
         }
 
-        private void RemoveCamera(CameraItemViewModel camera)
+        private void RemoveBottomRow()
+        {
+            if (CameraRows.Count == 0)
+                return;
+
+            var bottomRow = CameraRows[CameraRows.Count - 1];
+
+            _log?.Info($"[PopupWindowViewModel] Removing bottom row with {bottomRow.Cameras.Count} cameras");
+
+            //Dictionary에서도 제거
+            foreach (var camera in bottomRow.Cameras)
+            {
+                _cameraLookup.Remove(camera.Guid);
+            }
+
+
+            // Row 제거
+            CameraRows.RemoveAt(CameraRows.Count - 1);
+
+            RemoveCameraRow?.Invoke(this, bottomRow.RowId);
+        }
+
+        private void RemoveCamera(CameraViewModel camera)
         {
             if (camera == null) return;
 
-            // 이벤트 구독 해제
-            UnsubscribeFromStreamingEvents(camera.Id);
+            //Dictionary에서도 제거
+            _cameraLookup.Remove(camera.Guid);
 
-            // 목록에서 제거
-            Cameras.Remove(camera);
+            // Row에서 카메라 찾아서 제거
+            var row = CameraRows.FirstOrDefault(r => r.Cameras.Contains(camera));
+            if (row != null)
+            {
+                row.Cameras.Remove(camera);
+
+                // Row가 비었으면 Row도 제거
+                if (row.Cameras.Count == 0)
+                {
+                    CameraRows.Remove(row);
+                }
+            }
 
             // 카운트 업데이트
             NotifyOfPropertyChange(nameof(CurrentCount));
             NotifyOfPropertyChange(nameof(IsEmpty));
+            NotifyOfPropertyChange(nameof(RowCount));
 
             // 비어있으면 닫기 요청
             if (IsEmpty)
@@ -126,51 +191,51 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             }
         }
 
-        private void ClearCamera(CameraItemViewModel camera)
+
+        private CameraViewModel? FindCameraById(string contextId)
+        {
+            _cameraLookup.TryGetValue(contextId, out var camera);
+            return camera;
+        }
+
+        private void ClearCamera(CameraViewModel camera)
         {
             RemoveCamera(camera);
         }
 
         private void Close()
         {
-            // 모든 카메라 정리
-            var camerasToRemove = Cameras.ToList();
-            foreach (var camera in camerasToRemove)
-            {
-                RemoveCamera(camera);
-            }
+            if(_streamingService != null)
+                _streamingService.StateChanged -= OnStreamingStateChanged;
 
+            CameraRows.Clear();
             RequestClose?.Invoke(this, EventArgs.Empty);
         }
 
-        private void SubscribeToStreamingEvents(string contextId)
-        {
-            // IsAutoDiscard 처리를 위한 이벤트 구독
-            if (_streamingService != null)
-            {
-                // StateChanged 이벤트로 Disconnected 감지
-                _streamingService.StateChanged += OnStreamingStateChanged;
-            }
-        }
 
-        private void UnsubscribeFromStreamingEvents(string contextId)
-        {
-            if (_streamingService != null)
-            {
-                _streamingService.StateChanged -= OnStreamingStateChanged;
-            }
-        }
-
-        private void OnStreamingStateChanged(object sender, StreamingStateChangedEventArgs e)
+        private void OnStreamingStateChanged(object? sender, StreamingStateChangedEventArgs e)
         {
             // Disconnected 상태면 해당 카메라 제거
-            if (e.NewState == PlaybackState.Disconnected)
+            if (e.NewState == PlaybackState.Disconnected || e.NewState == PlaybackState.Stopped)
             {
-                var camera = Cameras.FirstOrDefault(c => c.Id == e.ContextId);
-                if (camera != null)
+                Execute.OnUIThread(() =>
                 {
-                    Execute.OnUIThread(() => RemoveCamera(camera));
-                }
+                    var camera = FindCameraById(e.ContextId);
+                    if (camera != null)
+                    {
+                        RemoveCamera(camera);
+                    }
+                });
+            }
+        }
+
+        public void Dispose()
+        {
+            if (!_isDisposed)
+            {
+
+                _isDisposed = true;
+                CameraRows.Clear();
             }
         }
 
@@ -179,7 +244,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         #region Events
 
         public event EventHandler? RequestClose;
-
+        public event EventHandler<string>? RemoveCameraRow;
+        private bool _isDisposed = false;
         #endregion
     }
 }

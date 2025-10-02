@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Base.Models;
+using System;
+using System.Dynamic;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.Models;
 /****************************************************************************
@@ -12,14 +14,13 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Models;
 /// <summary>
 /// 스트리밍 옵션 DTO
 /// </summary>
-public class StreamingOptions
+public class StreamingOptions : BaseModel
 {
     // 네트워크 설정
     public int NetworkCaching { get; set; } = 300;
     public bool UseTcp { get; set; } = true;
     public int FrameBufferSize { get; set; } = 100000;
     public int ConnectionTimeoutSeconds { get; set; } = 10;
-    public int RtpTimeout { get; set; } = 60000; // RTP 타임아웃 (ms)
 
     // 성능 설정
     public bool UseHardwareAcceleration { get; set; } = true;
@@ -41,25 +42,15 @@ public class StreamingOptions
 
     // 비디오 설정
     public bool KeepAspectRatio { get; set; } = true;
-    public int MaxFrameRate { get; set; } = 30;
-    public int VideoQuality { get; set; } = 100; // 0-100
     public string VideoCodec { get; set; } = "h264";
-    public int MaxWidth { get; set; } = 1920;
-    public int MaxHeight { get; set; } = 1080;
 
     // 메모리 최적화
     public bool EnableMemoryOptimization { get; set; } = true;
     public int MaxBufferSizeMB { get; set; } = 50;
-    public bool UseRingBuffer { get; set; } = true;
-    public int RingBufferSize { get; set; } = 1024 * 1024 * 10; // 10MB
 
     // 로깅
     public bool EnableDebugLogging { get; set; } = false;
     public bool EnableStatistics { get; set; } = true;
-
-    // 스냅샷
-    public string SnapshotFormat { get; set; } = "png";
-    public int SnapshotQuality { get; set; } = 85; // JPEG quality
 
     /// <summary>
     /// 기본 옵션 생성
@@ -78,12 +69,8 @@ public class StreamingOptions
         {
             NetworkCaching = 1000,
             FrameBufferSize = 50000,
-            MaxFrameRate = 15,
-            VideoQuality = 50,
             AllowFrameSkip = true,
             EnableMemoryOptimization = true,
-            MaxWidth = 1280,
-            MaxHeight = 720
         };
     }
 
@@ -96,12 +83,8 @@ public class StreamingOptions
         {
             NetworkCaching = 100,
             FrameBufferSize = 200000,
-            MaxFrameRate = 60,
-            VideoQuality = 100,
             AllowFrameSkip = false,
             UseHardwareAcceleration = true,
-            MaxWidth = 3840,
-            MaxHeight = 2160
         };
     }
 
@@ -117,7 +100,6 @@ public class StreamingOptions
             UseTcp = this.UseTcp,
             FrameBufferSize = this.FrameBufferSize,
             ConnectionTimeoutSeconds = this.ConnectionTimeoutSeconds,
-            RtpTimeout = this.RtpTimeout,
 
             // 성능 설정
             UseHardwareAcceleration = this.UseHardwareAcceleration,
@@ -139,25 +121,16 @@ public class StreamingOptions
 
             // 비디오 설정
             KeepAspectRatio = this.KeepAspectRatio,
-            MaxFrameRate = this.MaxFrameRate,
-            VideoQuality = this.VideoQuality,
             VideoCodec = this.VideoCodec,
-            MaxWidth = this.MaxWidth,
-            MaxHeight = this.MaxHeight,
 
             // 메모리 최적화
             EnableMemoryOptimization = this.EnableMemoryOptimization,
             MaxBufferSizeMB = this.MaxBufferSizeMB,
-            UseRingBuffer = this.UseRingBuffer,
-            RingBufferSize = this.RingBufferSize,
 
             // 로깅
             EnableDebugLogging = this.EnableDebugLogging,
             EnableStatistics = this.EnableStatistics,
 
-            // 스냅샷
-            SnapshotFormat = this.SnapshotFormat,
-            SnapshotQuality = this.SnapshotQuality
         };
     }
 }

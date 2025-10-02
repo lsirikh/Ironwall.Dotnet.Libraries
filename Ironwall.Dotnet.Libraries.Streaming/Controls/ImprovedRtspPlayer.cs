@@ -256,7 +256,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
     /// <summary>
     /// VideoView 가져오기 (서비스에서 사용)
     /// </summary>
-    public VideoView GetVideoView()
+    public VideoView? GetVideoView()
     {
         return _videoView;
     }
@@ -279,7 +279,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
 
     #region - Private Methods -
 
-    private async void OnLoaded(object? sender, RoutedEventArgs e)
+    private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         // XAML에서 설정된 ContextId가 있다면 캐시 업데이트
         if (!string.IsNullOrEmpty(ContextId) && ContextId != _cachedContextId)
@@ -291,18 +291,6 @@ public class ImprovedRtspPlayer : Control, IDisposable
         RegisterToService();
 
         _log?.Info($"[ImprovedRtspPlayer] Control loaded: {_cachedContextId}");
-
-        if (AutoPlay && ConnectionInfo != null)
-        {
-            // 지연 후 연결 (서비스를 통해)
-            var randomDelay = Math.Abs(_cachedContextId.GetHashCode() % 1500) + 500; // 500-2000ms
-            await Task.Delay(randomDelay);
-
-            if (!_disposed && IsLoaded)
-            {
-                await ConnectAsync();
-            }
-        }
     }
 
     private async void OnUnloaded(object? sender, RoutedEventArgs e)
@@ -400,11 +388,20 @@ public class ImprovedRtspPlayer : Control, IDisposable
 
     private async Task<bool> TakeSnapshotAsync(string filePath = null)
     {
-        if (_streamingService == null)
-            return false;
+        try
+        {
+            if (_streamingService == null)
+                return false;
 
-        filePath ??= $"snapshot_{_cachedContextId}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-        return await _streamingService.TakeSnapshotAsync(_cachedContextId, filePath);
+            filePath ??= $"snapshot_{_cachedContextId}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+            return await _streamingService.TakeSnapshotAsync(_cachedContextId ?? throw new NullReferenceException($"CachedContextId가 설정되어있지 않습니다.") , filePath);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error(ex.Message);
+            return false;
+        }
+        
     }
 
     private bool CanPlay()
@@ -453,9 +450,17 @@ public class ImprovedRtspPlayer : Control, IDisposable
 
     private static async void OnConnectionInfoChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is ImprovedRtspPlayer player && player.AutoPlay && e.NewValue != null)
+        if (d is ImprovedRtspPlayer player)
         {
-            await player.ConnectAsync();
+            player._log?.Info($"[ImprovedRtspPlayer] ConnectionInfo changed: " +
+            $"Old={e.OldValue != null}, New={e.NewValue != null}, " +
+            $"AutoPlay={player.AutoPlay}, ContextId={player._cachedContextId}");
+
+            if (player.AutoPlay && e.NewValue != null)
+            {
+                player._log?.Info($"[ImprovedRtspPlayer] Triggering ConnectAsync for {player._cachedContextId}");
+                await player.ConnectAsync();
+            }
         }
     }
 
@@ -497,6 +502,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
             {
                 player.UpdateUI(state);
             }
+
         }
     }
 

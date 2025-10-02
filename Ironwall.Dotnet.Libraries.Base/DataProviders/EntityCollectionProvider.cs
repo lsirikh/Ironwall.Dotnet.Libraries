@@ -157,6 +157,6 @@ public abstract class EntityCollectionProvider<T> : ICollector<T>
 
     #region - Attributes -
     protected readonly object _locker;
-    protected readonly ILogService? _log;
+    protected ILogService? _log;
     #endregion
 }

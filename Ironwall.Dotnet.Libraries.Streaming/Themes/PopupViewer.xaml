@@ -79,16 +79,29 @@
 
 							<!--  Header  -->
 							<Border
+								x:Name="PART_HeaderBorder"
 								Grid.Row="0"
 								Height="48"
 								Background="#FF1E1E1E"
 								CornerRadius="7,7,0,0">
+								<Border.Style>
+									<Style TargetType="Border">
+										<Setter Property="Visibility" Value="Visible" />
+										<!--  드래그 가능한 커서 표시  -->
+										<Setter Property="Cursor" Value="SizeAll" />
+									</Style>
+								</Border.Style>
 								<Grid>
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="Auto" />
 										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="Auto" />
 									</Grid.ColumnDefinitions>
+
+									<Rectangle
+										Grid.ColumnSpan="3"
+										Fill="Transparent"
+										IsHitTestVisible="True" />
 
 									<!--  Icon  -->
 									<Border
@@ -97,7 +110,8 @@
 										Height="32"
 										Margin="12,0,8,0"
 										Background="#FF007ACC"
-										CornerRadius="4">
+										CornerRadius="4"
+										IsHitTestVisible="False">
 										<TextBlock
 											HorizontalAlignment="Center"
 											VerticalAlignment="Center"
@@ -114,6 +128,7 @@
 										FontSize="16"
 										FontWeight="Medium"
 										Foreground="White"
+										IsHitTestVisible="False"
 										Text="{TemplateBinding Title}" />
 
 									<!--  Close Button  -->
@@ -170,48 +185,48 @@
 										</StackPanel>
 									</Border>
 
-									<!--  Camera Grid  -->
+									<!--  Camera Rows Container  -->
 									<ScrollViewer
 										x:Name="CameraScrollViewer"
 										HorizontalScrollBarVisibility="Disabled"
 										VerticalScrollBarVisibility="Auto">
-										<ScrollViewer.Style>
-											<Style TargetType="ScrollViewer">
-												<Setter Property="Visibility" Value="Visible" />
-												<Style.Triggers>
-													<DataTrigger Binding="{Binding CurrentCount, RelativeSource={RelativeSource TemplatedParent}}" Value="0">
-														<Setter Property="Visibility" Value="Collapsed" />
-													</DataTrigger>
-												</Style.Triggers>
-											</Style>
-										</ScrollViewer.Style>
 
+										<!--  CameraSource를 Row 컬렉션으로 바인딩  -->
 										<ItemsControl x:Name="PART_CameraContainer" ItemsSource="{TemplateBinding CameraSource}">
 											<ItemsControl.ItemsPanel>
 												<ItemsPanelTemplate>
-													<!--  2열 자동 배치  -->
-													<UniformGrid
-														HorizontalAlignment="Stretch"
-														VerticalAlignment="Stretch"
-														Columns="2" />
+													<StackPanel Orientation="Vertical" />
 												</ItemsPanelTemplate>
 											</ItemsControl.ItemsPanel>
 
 											<ItemsControl.ItemTemplate>
 												<DataTemplate>
-													<!--  각 카메라 아이템  -->
+													<!--  각 Row  -->
 													<Border
-														Margin="2"
+														Height="Auto"
 														BorderBrush="#FF3F3F46"
-														BorderThickness="1"
-														CornerRadius="2">
-														<!--  ImprovedRtspPlayer 배치  -->
-														<local:ImprovedRtspPlayer
-															MinHeight="200"
-															AutoPlay="True"
-															ConnectionInfo="{Binding ConnectionInfo}"
-															ContextId="{Binding Id}"
-															ShowControls="{Binding RelativeSource={RelativeSource AncestorType={x:Type local:PopupViewer}}, Path=ShowPlayerControls}" />
+														BorderThickness="0,0,0,1">
+														<!--  Row 내 카메라들  -->
+														<ItemsControl ItemsSource="{Binding Cameras}">
+															<ItemsControl.ItemsPanel>
+																<ItemsPanelTemplate>
+																	<UniformGrid Rows="1" />
+																</ItemsPanelTemplate>
+															</ItemsControl.ItemsPanel>
+
+															<ItemsControl.ItemTemplate>
+																<DataTemplate>
+																	<Border Margin="2">
+																		<local:ImprovedRtspPlayer
+																			AutoPlay="{Binding AutoPlay}"
+																			ConnectionInfo="{Binding ConnectionInfo}"
+																			ContextId="{Binding Guid}"
+																			ShowControls="{Binding ShowControls}"
+																			StreamingOptions="{Binding StreamingOptions}" />
+																	</Border>
+																</DataTemplate>
+															</ItemsControl.ItemTemplate>
+														</ItemsControl>
 													</Border>
 												</DataTemplate>
 											</ItemsControl.ItemTemplate>

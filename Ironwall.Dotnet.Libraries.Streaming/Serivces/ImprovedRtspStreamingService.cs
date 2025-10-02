@@ -12,6 +12,7 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Security.Policy;
@@ -63,7 +64,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
 
     #region - IPlayerRegistry Implementation -
 
-    public bool RegisterPlayer(string contextId, ImprovedRtspPlayer player)
+    public bool RegisterPlayer(string? contextId, ImprovedRtspPlayer player)
     {
         if (string.IsNullOrEmpty(contextId) || player == null)
         {
@@ -80,7 +81,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             {
                 context.AttachPlayer(player);
                 // Player 상태 동기화
-                context.UpdatePlayerState(context.State);
+                //context.UpdatePlayerState(context.State);
+                UpdateState(contextId, context.State, "Register Player");
             }
 
             return true;
@@ -108,14 +110,16 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         return false;
     }
 
-    public ImprovedRtspPlayer GetPlayer(string contextId)
+    public ImprovedRtspPlayer? GetPlayer(string? contextId)
     {
+        if (contextId == null) return null;
         _players.TryGetValue(contextId, out var player);
         return player;
     }
 
-    public bool HasPlayer(string contextId)
+    public bool HasPlayer(string? contextId)
     {
+        if (contextId == null) return false;
         return _players.ContainsKey(contextId);
     }
 
@@ -144,7 +148,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
 
     public async Task<bool> ConnectAsync(
         string contextId,
-        RtspConnectionInfo connectionInfo,
+        RtspConnectionInfo? connectionInfo,
         StreamingOptions? options = null,
         VideoView? videoView = null)
     {
@@ -157,6 +161,12 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         if (string.IsNullOrEmpty(contextId))
         {
             _log?.Error("[ImprovedRtspStreamingService] Invalid contextId");
+            return false;
+        }
+
+        if(connectionInfo == null) 
+        {
+            _log?.Error("[ImprovedRtspStreamingService] Invalid ConnectionInfo");
             return false;
         }
 
@@ -180,7 +190,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             ImprovedRtspPlayer rtspPlayer = GetPlayer(contextId);
 
             // 최대 연결 수 체크
-            if (_contexts.Count >= _setupModel.MaxConnections)
+            if (_contexts.Count >= _setupModel.MaxConnections + 3) // 여유를 둔다
             {
                 _log?.Warning($"[ImprovedRtspStreamingService] Max connections reached: {_setupModel.MaxConnections}");
                 OnErrorOccurred(contextId, "Maximum connections limit reached", ErrorSeverity.Warning);
@@ -193,7 +203,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             if(context != null && context.State == PlaybackState.Reconnecting)
             {
                 // URL 유효성 검사
-                var url = connectionInfo.GetFullUrl();
+                var url = connectionInfo!.GetFullUrl();
                 if (!RtspUrlValidator.IsValidUrl(url))
                 {
                     _log?.Error($"[ImprovedRtspStreamingService] Invalid RTSP URL: {url}");
@@ -203,7 +213,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 }
 
                 // Player 상태 업데이트
-                context.UpdatePlayerState(PlaybackState.Connecting, "Connecting...");
+                //context.UpdatePlayerState(PlaybackState.Connecting, "Connecting...");
+                UpdateState(contextId, PlaybackState.Connecting, "Connecting...");
 
                 // 재시도 정책으로 연결
                 return await _retryPolicy.ExecuteAsync(async () =>
@@ -223,7 +234,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                     while ((_contexts.ContainsKey(contextId) ||
                             _weakContexts.ContainsKey(contextId)) && verifyWait-- > 0)
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(50);
                         GC.Collect();
                         GC.WaitForPendingFinalizers();
                     }
@@ -240,12 +251,12 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 context = _contextPool.Get() ?? new ImprovedStreamingContext();
 
                 // Context 초기화 - RtspPlayer 포함
-                context.Initialize(contextId, connectionInfo, options ?? new StreamingOptions(), _libVLC, rtspPlayer);
+                context.Initialize(contextId, connectionInfo!, options ?? new StreamingOptions(), _libVLC!, rtspPlayer);
 
                 // Context 유효성 확인
                 if (string.IsNullOrEmpty(context.Id))
                 {
-                    _log?.Error($"[ImprovedRtspStreamingService] Context initialization failed - Id is null");
+                    _log?.Error($"[ImprovedRtspStreamingService] Context initialization failed - Guid is null");
                     context.Cleanup();
                     _contextPool.Return(context);
                     return false;
@@ -264,7 +275,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 _weakContexts[contextId] = new WeakReference<ImprovedStreamingContext>(context);
 
                 // URL 유효성 검사
-                var url = connectionInfo.GetFullUrl();
+                var url = connectionInfo!.GetFullUrl();
                 if (!RtspUrlValidator.IsValidUrl(url))
                 {
                     _log?.Error($"[ImprovedRtspStreamingService] Invalid RTSP URL: {url}");
@@ -273,8 +284,9 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                     return false;
                 }
                 // Player 상태 업데이트
-                context.UpdatePlayerState(PlaybackState.Connecting, "Connecting...");
-
+                //context.UpdatePlayerState(PlaybackState.Connecting, "Connecting...");
+                UpdateState(contextId, PlaybackState.Connecting, "Connecting...");
+                
                 // 재시도 정책으로 연결
                 return await _retryPolicy.ExecuteAsync(async () =>
                 {
@@ -300,19 +312,19 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
     }
 
 
-    private async Task<bool> ConnectInternalAsync(ImprovedStreamingContext context, string url, VideoView videoViewParam)
+    private async Task<bool> ConnectInternalAsync(ImprovedStreamingContext context, string url, VideoView? videoViewParam)
     {
+        if (context == null || string.IsNullOrEmpty(context.Id))
+        {
+            _log?.Error($"[ImprovedRtspStreamingService] Invalid context");
+            return false;
+        }
+
+        var contextId = context.Id;
+        _log?.Info($"[ImprovedRtspStreamingService] Creating media for {contextId}: {url}");
+
         try
         {
-            if (context == null || string.IsNullOrEmpty(context.Id))
-            {
-                _log?.Error($"[ImprovedRtspStreamingService] Invalid context");
-                return false;
-            }
-
-            var contextId = context.Id;
-            _log?.Info($"[ImprovedRtspStreamingService] Creating media for {contextId}: {url}");
-
             // Media 생성 및 옵션 설정
             var media = CreateOptimizedMedia(url, context.Options!);
             context.SetMedia(media);
@@ -320,12 +332,13 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             if (context.MediaPlayer == null)
             {
                 _log?.Error($"[ImprovedRtspStreamingService] MediaPlayer is null for {contextId}");
-                context.UpdatePlayerState(PlaybackState.Error, "MediaPlayer creation failed");
+                //context.UpdatePlayerState(PlaybackState.Error, "MediaPlayer creation failed");
+                UpdateState(contextId, PlaybackState.Error, "MediaPlayer creation failed");
                 return false;
             }
 
             // VideoView 할당 부분을 UI 스레드에서 처리
-            VideoView targetVideoView = null;
+            VideoView? targetVideoView = null;
 
             // Player에서 VideoView 가져오기 (UI 스레드 필요)
             if (context.Player != null)
@@ -349,7 +362,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 {
                     try
                     {
-                        // 🟢 UI 스레드에서 안전하게 접근
+                        // UI 스레드에서 안전하게 접근
                         if (targetVideoView.MediaPlayer != null)
                         {
                             _log?.Info($"[ImprovedRtspStreamingService] Clearing existing MediaPlayer");
@@ -371,7 +384,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 if (!assignSuccess)
                 {
                     _log?.Error($"[ImprovedRtspStreamingService] MediaPlayer assignment verification failed");
-                    context.UpdatePlayerState(PlaybackState.Error, "Failed to assign MediaPlayer");
+                    //context.UpdatePlayerState(PlaybackState.Error, "Failed to assign MediaPlayer");
+                    UpdateState(contextId, PlaybackState.Error, "Failed to assign MediaPlayer");
                     return false;
                 }
             }
@@ -395,7 +409,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             {
                 _log?.Error($"[ImprovedRtspStreamingService] Failed to start stream {contextId}");
                 UnregisterEventHandlers(context);
-                context.UpdatePlayerState(PlaybackState.Error, "Failed to start stream");
+                //context.UpdatePlayerState(PlaybackState.Error, "Failed to start stream");
+                UpdateState(contextId, PlaybackState.Error, "Failed to start stream");
             }
 
             return result;
@@ -403,147 +418,11 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         catch (Exception ex)
         {
             _log?.Error($"[ImprovedRtspStreamingService] ConnectInternal error: {ex.Message}");
-            context.UpdatePlayerState(PlaybackState.Error, $"Error: {ex.Message}");
+            //context.UpdatePlayerState(PlaybackState.Error, $"Error: {ex.Message}");
+            UpdateState(contextId,PlaybackState.Error, $"Error: {ex.Message}");
             throw;
         }
     }
-
-    #region Deprecated
-    //private async Task<bool> ConnectInternalAsync(
-    //    ImprovedStreamingContext context,
-    //    string url,
-    //    VideoView videoViewParam)
-    //{
-    //    try
-    //    {
-    //        if (context == null || string.IsNullOrEmpty(context.Id))
-    //        {
-    //            _log?.Error($"[ImprovedRtspStreamingService] Invalid context or context.Id is null");
-    //            return false;
-    //        }
-
-    //        var contextId = context.Id;
-
-    //        _log?.Info($"[ImprovedRtspStreamingService] Creating media for {contextId}: {url}");
-
-    //        // Media 생성 및 옵션 설정
-    //        var media = CreateOptimizedMedia(url, context.Options!);
-    //        context.SetMedia(media);
-
-    //        if (context.MediaPlayer == null)
-    //        {
-    //            _log?.Error($"[ImprovedRtspStreamingService] MediaPlayer is null for {contextId}");
-    //            context.UpdatePlayerState(PlaybackState.Error, "MediaPlayer creation failed");
-    //            return false;
-    //        }
-
-    //        // VideoView 할당 (Player가 있으면 Player의 VideoView 사용, 없으면 파라미터 사용)
-    //        VideoView targetVideoView = null;
-
-    //        if (context.Player != null)
-    //        {
-    //            // Player에서 VideoView 가져오기 (UI 스레드에서 실행)
-    //            var tcs = new TaskCompletionSource<VideoView>();
-    //            await DispatcherService.BeginInvoke(() =>
-    //            {
-    //                try
-    //                {
-    //                    targetVideoView = context.Player.GetVideoView();
-    //                    tcs.SetResult(targetVideoView);
-    //                }
-    //                catch (Exception ex)
-    //                {
-    //                    _log?.Error($"[ImprovedRtspStreamingService] Failed to get VideoView from Player: {ex.Message}");
-    //                    tcs.SetException(ex);
-    //                }
-    //            });
-
-    //            try
-    //            {
-    //                targetVideoView = await tcs.Task;
-    //            }
-    //            catch
-    //            {
-    //                targetVideoView = null;
-    //            }
-    //        }
-    //        else if (videoViewParam != null)
-    //        {
-    //            targetVideoView = videoViewParam;
-    //        }
-
-    //        if (targetVideoView != null)
-    //        {
-    //            _log?.Info($"[ImprovedRtspStreamingService] Assigning MediaPlayer to VideoView for {contextId}");
-
-    //            // UI 스레드에서 MediaPlayer 할당
-    //            var assignTcs = new TaskCompletionSource<bool>();
-    //            await DispatcherService.BeginInvoke(() =>
-    //            {
-    //                try
-    //                {
-    //                    // 기존 MediaPlayer 해제
-    //                    if (targetVideoView.MediaPlayer != null)
-    //                    {
-    //                        _log?.Info($"[ImprovedRtspStreamingService] Clearing existing MediaPlayer for {contextId}");
-    //                        targetVideoView.MediaPlayer = null;
-    //                    }
-
-    //                    // 새 MediaPlayer 할당
-    //                    targetVideoView.MediaPlayer = context.MediaPlayer;
-    //                    _log?.Info($"[ImprovedRtspStreamingService] MediaPlayer assigned to VideoView for {contextId}");
-    //                    assignTcs.SetResult(true);
-    //                }
-    //                catch (Exception ex)
-    //                {
-    //                    _log?.Error($"[ImprovedRtspStreamingService] Failed to assign MediaPlayer: {ex.Message}");
-    //                    assignTcs.SetException(ex);
-    //                }
-    //            });
-
-    //            await assignTcs.Task;
-
-    //            if (targetVideoView.MediaPlayer != context.MediaPlayer)
-    //            {
-    //                _log?.Error($"[ImprovedRtspStreamingService] MediaPlayer assignment verification failed for {contextId}");
-    //                context.UpdatePlayerState(PlaybackState.Error, "Failed to assign MediaPlayer");
-    //                return false;
-    //            }
-    //        }
-    //        else
-    //        {
-    //            _log?.Warning($"[ImprovedRtspStreamingService] No VideoView available for {contextId}. Video may appear in separate window.");
-    //        }
-
-    //        // 이벤트 핸들러 등록
-    //        RegisterEventHandlers(context);
-
-    //        // 재생 시작
-    //        var result = context.MediaPlayer.Play();
-
-    //        if (result)
-    //        {
-    //            _log?.Info($"[ImprovedRtspStreamingService] Stream {contextId} started successfully");
-    //            context.LastConnectionTime = DateTime.Now;
-    //            context.ReconnectAttempts = 0;
-    //        }
-    //        else
-    //        {
-    //            _log?.Error($"[ImprovedRtspStreamingService] Failed to start stream {contextId}");
-    //            UnregisterEventHandlers(context);
-    //            context.UpdatePlayerState(PlaybackState.Error, "Failed to start stream");
-    //        }
-
-    //        return result;
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        _log?.Error($"[ImprovedRtspStreamingService] ConnectInternal error for {context.Id}: {ex.Message}");
-    //        context.UpdatePlayerState(PlaybackState.Error, $"Error: {ex.Message}");
-    //        throw;
-    //    }
-    //}
-    #endregion
 
     public async Task DisconnectAsync(string contextId)
     {
@@ -552,6 +431,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             _log?.Info($"[ImprovedRtspStreamingService] Disconnecting stream: {contextId}");
 
             DisconnectPreparing(contextId);
+
+            //UpdateState(contextId, PlaybackState.Disconnected);
 
             await CleanupContextAsync(contextId);
         }
@@ -580,6 +461,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         {
             context.IsReconnecting = false;
         }
+        
     }
 
 
@@ -591,61 +473,85 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         _log?.Info("[ImprovedRtspStreamingService] All streams disconnected");
     }
 
-    public void Play(string contextId)
+    public void Play(string? contextId)
     {
-        if (TryGetContext(contextId, out var context) && context.MediaPlayer != null)
+        if (contextId == null) return;
+        if (TryGetContext(contextId, out var context) && context != null)
         {
-            context.MediaPlayer.Play();
-            context.UpdatePlayerState(PlaybackState.Playing, "Playing");
+            if (context.MediaPlayer != null)
+            {
+                context.MediaPlayer.Play();
+                //context.UpdatePlayerState(PlaybackState.Playing, "Playing");
+                UpdateState(contextId, PlaybackState.Playing, "Playing");
+            }
             _log?.Info($"[ImprovedRtspStreamingService] Stream {contextId} playing");
         }
     }
 
-    public void Pause(string contextId)
+    public void Pause(string? contextId)
     {
-        if (TryGetContext(contextId, out var context) && context.MediaPlayer != null)
+        if (contextId == null) return;
+        if (TryGetContext(contextId, out var context) && context != null)
         {
-            context.MediaPlayer.SetPause(true);
-            context.UpdatePlayerState(PlaybackState.Paused, "Paused");
+            if(context.MediaPlayer != null)
+            {
+                context.MediaPlayer.SetPause(true);
+                //context.UpdatePlayerState(PlaybackState.Paused, "Paused");
+                UpdateState(contextId, PlaybackState.Paused, "Paused");
+            }
             _log?.Info($"[ImprovedRtspStreamingService] Stream {contextId} paused");
         }
     }
 
-    public void Stop(string contextId)
+    public void Stop(string? contextId)
     {
-        if (TryGetContext(contextId, out var context) && context.MediaPlayer != null)
+        if (contextId == null) return;
+        if (TryGetContext(contextId, out var context) && context != null)
         {
-            if (context.MediaPlayer?.IsPlaying == true)
+            if (context.MediaPlayer != null && context.MediaPlayer?.IsPlaying == true)
+            {
                 context.MediaPlayer.Stop();
-            
-            context.UpdatePlayerState(PlaybackState.Stopped, "Stopped");
+                //context.UpdatePlayerState(PlaybackState.Stopped, "Stopped");
+                UpdateState(contextId, PlaybackState.Stopped, "Stopped");
+            }
             _log?.Info($"[ImprovedRtspStreamingService] Stream {contextId} stopped");
         }
     }
 
-    public void SetVolume(string contextId, int volume)
+    public void SetVolume(string? contextId, int volume)
     {
-        if (TryGetContext(contextId, out var context) && context.MediaPlayer != null)
+        if (contextId == null) return;
+        if (TryGetContext(contextId, out var context) && context != null)
         {
-            var clampedVolume = Math.Clamp(volume, 0, 100);
-            context.MediaPlayer.Volume = clampedVolume;
-            context.Options.Volume = clampedVolume;
-            _log?.Info($"[ImprovedRtspStreamingService] Volume set to {clampedVolume} for {contextId}");
+            if (context.MediaPlayer != null)
+            {
+                var clampedVolume = Math.Clamp(volume, 0, 100);
+                context.MediaPlayer.Volume = clampedVolume;
+                if(context.Options != null)
+                    context.Options.Volume = clampedVolume;
+                _log?.Info($"[ImprovedRtspStreamingService] Volume set to {clampedVolume} for {contextId}");
+            }
         }
     }
 
-    public void ToggleMute(string contextId)
+    public void ToggleMute(string? contextId)
     {
-        if (TryGetContext(contextId, out var context) && context.MediaPlayer != null)
+        if (contextId == null) return;
+        if (TryGetContext(contextId, out var context) && context != null)
         {
-            context.MediaPlayer.Mute = !context.MediaPlayer.Mute;
-            context.Options.IsMuted = context.MediaPlayer.Mute;
-            _log?.Info($"[ImprovedRtspStreamingService] Mute toggled for {contextId}: {context.MediaPlayer.Mute}");
+            if (context.MediaPlayer != null)
+            { 
+                context.MediaPlayer.Mute = !context.MediaPlayer.Mute;
+                if (context.Options != null)
+                    context.Options.IsMuted = context.MediaPlayer.Mute;
+                _log?.Info($"[ImprovedRtspStreamingService] Mute toggled for {contextId}: {context.MediaPlayer.Mute}");
+            }
         }
     }
 
-    public MediaPlayer GetMediaPlayer(string contextId)
+    public MediaPlayer? GetMediaPlayer(string? contextId)
     {
+        if (contextId == null) return null;
         return TryGetContext(contextId, out var context) ? context.MediaPlayer : null;
     }
 
@@ -654,8 +560,9 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         return TryGetContext(contextId, out var context) ? context.State : PlaybackState.None;
     }
 
-    public StreamingStatistics GetStatistics(string contextId)
+    public StreamingStatistics? GetStatistics(string? contextId)
     {
+        if (contextId == null) return null;
         return TryGetContext(contextId, out var context) ? context.Statistics : null;
     }
 
@@ -665,14 +572,18 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                context.State == PlaybackState.Playing;
     }
 
-    public async Task<bool> TakeSnapshotAsync(string contextId, string filePath)
+    public async Task<bool> TakeSnapshotAsync(string contextId, string fileName)
     {
         try
         {
-            if (TryGetContext(contextId, out var context) && context.MediaPlayer != null)
+            if (contextId == null) return false;
+            if (TryGetContext(contextId, out var context) && context != null)
             {
-                _log?.Info($"[ImprovedRtspStreamingService] Taking snapshot for {contextId}: {filePath}");
-                return await Task.Run(() => context.MediaPlayer.TakeSnapshot(0, filePath, 0, 0));
+                if (context.MediaPlayer != null)
+                { 
+                    _log?.Info($"[ImprovedRtspStreamingService] Taking snapshot for {contextId}: {fileName}");
+                    return await Task.Run(() => context.MediaPlayer.TakeSnapshot(0, $"{_setupModel.SnapshotPath}\\{fileName}", 0, 0));
+                }
             }
             return false;
         }
@@ -683,21 +594,13 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         }
     }
 
-    public void SetFrameSkip(string contextId, int skipFrames)
+    public void SetFrameSkip(string? contextId, int skipFrames)
     {
-        if (TryGetContext(contextId, out var context))
+        if (contextId == null) return;
+        if (TryGetContext(contextId, out var context) && context != null)
         {
             context.FrameSkipCount = Math.Max(0, skipFrames);
             _log?.Info($"[ImprovedRtspStreamingService] Frame skip set to {skipFrames} for {contextId}");
-        }
-    }
-
-    public void SetQuality(string contextId, int quality)
-    {
-        if (TryGetContext(contextId, out var context))
-        {
-            context.Options.VideoQuality = Math.Clamp(quality, 0, 100);
-            _log?.Info($"[ImprovedRtspStreamingService] Quality set to {quality} for {contextId}");
         }
     }
 
@@ -716,8 +619,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         {
             Stop(contextId);
             // 상태를 Restricted로 변경
-            context.UpdatePlayerState(PlaybackState.Restricted, message);
-            UpdateState(contextId, PlaybackState.Restricted);
+            //context.UpdatePlayerState(PlaybackState.Restricted, message);
+            UpdateState(contextId, PlaybackState.Restricted, message);
 
             _log?.Info($"[ImprovedRtspStreamingService] Stream restricted: {contextId}");
         }
@@ -732,12 +635,12 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
     /// </summary>
     public async Task UnrestrictStreamAsync(string contextId)
     {
-        if (!TryGetContext(contextId, out var context))
-            return;
-
-        if (context.MediaPlayer != null && context.MediaPlayer?.IsPlaying == true)
+        if (contextId == null) return;
+        if (!TryGetContext(contextId, out var context)) return;
+        
+        if (context != null)
         {
-            return;
+            if (context.MediaPlayer != null && context.MediaPlayer?.IsPlaying == true) return;
         }
 
         // 단순히 재연결
@@ -774,12 +677,12 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
     {
         var media = new Media(_libVLC, url, FromType.FromLocation);
 
-        // 네트워크 캐싱 (적응형)
+        // ===== 네트워크 캐싱 =====
         var caching = CalculateOptimalCaching(options);
         media.AddOption($":network-caching={caching}");
         media.AddOption($":live-caching={caching}");
 
-        // 프로토콜 설정
+        // ===== 프로토콜 설정 =====
         if (options.UseTcp)
         {
             media.AddOption(":rtsp-tcp");
@@ -790,23 +693,61 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             media.AddOption(":rtp-max-misorder=100");
         }
 
-        // 버퍼 설정
+        // ==== Multicast 설정 (안정적) ====
+        if (options.EnableMulticast)
+        {
+            media.AddOption(":rtsp-mcast");
+        }
+
+        // ===== 버퍼 설정 =====
         media.AddOption($":rtsp-frame-buffer-size={options.FrameBufferSize}");
+
+        // ===== 메모리 최적화 (안정적) =====
+        if (options.EnableMemoryOptimization && options.MaxBufferSizeMB > 0)
+        {
+            var fileCache = Math.Min(options.MaxBufferSizeMB * 1024, caching * 10);
+            media.AddOption($":file-caching={fileCache}");
+        }
 
         // 하드웨어 가속
         if (options.UseHardwareAcceleration)
         {
             media.AddOption(":avcodec-hw=any");
-            media.AddOption(":avcodec-threads=0"); // 자동 스레드 수
+            // 디코딩 스레드 설정 (안정적)
+            if (options.MaxDecodingThreads > 0)
+            {
+                media.AddOption($":avcodec-threads={options.MaxDecodingThreads}");
+            }
+            else
+            {
+                media.AddOption(":avcodec-threads=0"); // auto
+            }
         }
 
-        // 성능 최적화 옵션
+        // ===== 프레임 스킵 =====
         if (options.AllowFrameSkip)
         {
             media.AddOption(":avcodec-fast");
             media.AddOption(":avcodec-skip-frame=1"); // Non-ref frames skip
             media.AddOption(":avcodec-skip-idct=1");
             media.AddOption(":avcodec-hurry-up");
+        }
+
+        // ===== 비디오 코덱 힌트 (안정적) =====
+        if (!string.IsNullOrEmpty(options.VideoCodec))
+        {
+            media.AddOption($":avcodec-codec={options.VideoCodec}");
+        }
+
+        // ===== 오디오 설정 (안정적) =====
+        if (!options.EnableAudio)
+        {
+            media.AddOption(":no-audio");
+        }
+        else if (options.AudioSampleRate > 0 && options.AudioSampleRate != 44100)
+        {
+            // 비표준 샘플레이트만 명시
+            media.AddOption($":audio-rate={options.AudioSampleRate}");
         }
 
         // 타임아웃 설정
@@ -979,8 +920,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         context.State = PlaybackState.Playing;
         context.LastConnectionTime = DateTime.Now;
         context.ReconnectAttempts = 0;
-        context.UpdatePlayerState(PlaybackState.Playing, "Playing");
-        UpdateState(context.Id, PlaybackState.Playing);
+        //context.UpdatePlayerState(PlaybackState.Playing, "Playing");
+        UpdateState(context.Id, PlaybackState.Playing, "Playing");
         _log?.Info($"[ImprovedRtspStreamingService] Stream {context.Id} is playing");
     }
 
@@ -989,13 +930,15 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         if (cache < 100)
         {
             context.State = PlaybackState.Buffering;
-            context.UpdatePlayerState(PlaybackState.Buffering, $"Buffering {cache:F1}%");
+            //context.UpdatePlayerState(PlaybackState.Buffering, $"Buffering {cache:F1}%");
+            //UpdateState(context.Guid, PlaybackState.Buffering, $"Buffering {cache:F1}%");
             _log?.Info($"[ImprovedRtspStreamingService] Stream {context.Id} buffering: {cache:F1}%");
         }
         else
         {
             context.State = PlaybackState.Playing;
-            context.UpdatePlayerState(PlaybackState.Playing, "Playing");
+            //context.UpdatePlayerState(PlaybackState.Playing, "Playing");
+            UpdateState(context.Id, PlaybackState.Playing, "Playing");
         }
         UpdateState(context.Id, context.State);
 
@@ -1012,16 +955,10 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
     {
         context.State = PlaybackState.Error;
         context.Statistics.ErrorCount++;
-        context.UpdatePlayerState(PlaybackState.Error, "Stream error occurred");
-        UpdateState(context.Id, PlaybackState.Error);
+        //context.UpdatePlayerState(PlaybackState.Error, "Stream error occurred");
+        UpdateState(context.Id, PlaybackState.Error, "Stream error occurred");
 
         _log?.Error($"[ImprovedRtspStreamingService] Stream {context.Id} encountered error");
-
-        //if (context.Options.EnableAutoReconnect &&
-        //    context.ReconnectAttempts < context.Options.MaxReconnectAttempts)
-        //{
-        //   await HandleReconnectAsync(context.Id);
-        //}
 
         if (context.Options.EnableAutoReconnect &&
             context.ReconnectAttempts < context.Options.MaxReconnectAttempts &&
@@ -1055,8 +992,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
     private void OnStreamEnded(ImprovedStreamingContext context)
     {
         context.State = PlaybackState.Stopped;
-        context.UpdatePlayerState(PlaybackState.Stopped, "Stream ended");
-        UpdateState(context.Id, PlaybackState.Stopped);
+        //context.UpdatePlayerState(PlaybackState.Stopped, "Stream ended");
+        UpdateState(context.Id, PlaybackState.Stopped, "Stream ended");
         _log?.Info($"[ImprovedRtspStreamingService] Stream {context.Id} ended");
     }
 
@@ -1105,7 +1042,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         context.IsReconnecting = true;
 
         context.ReconnectAttempts++;
-        context.Statistics.ReconnectCount++;
+        if(context.Statistics != null)
+            context.Statistics.ReconnectCount++;
 
         // 최대 재연결 횟수 체크
         if (context.ReconnectAttempts > context.Options.MaxReconnectAttempts)
@@ -1116,8 +1054,8 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             return;
         }
 
-        context.UpdatePlayerState(PlaybackState.Reconnecting, $"Reconnecting... (Attempt {context.ReconnectAttempts})");
-        UpdateState(contextId, PlaybackState.Reconnecting);
+        //context.UpdatePlayerState(PlaybackState.Reconnecting, $"Reconnecting... (Attempt {context.ReconnectAttempts})");
+        UpdateState(contextId, PlaybackState.Reconnecting, $"Reconnecting... (Attempt {context.ReconnectAttempts})");
 
         _log?.Info($"[ImprovedRtspStreamingService] Reconnect attempt {context.ReconnectAttempts}/{context.Options.MaxReconnectAttempts} for {contextId}");
 
@@ -1214,28 +1152,40 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                     // UI 스레드에서 VideoView 정리
                     if (context.Player != null)
                     {
-                        var tcs = new TaskCompletionSource<bool>();
-                        DispatcherService.Invoke(() =>
+                        //var tcs = new TaskCompletionSource<bool>();
+                        //DispatcherService.Invoke(() =>
+                        //{
+                        //    try
+                        //    {
+                        //        var videoView = context.Player.GetVideoView();
+                        //        if (videoView != null)
+                        //        {
+                        //            videoView.MediaPlayer = null;
+                        //        }
+                        //        tcs.SetResult(true);
+                        //    }
+                        //    catch (Exception ex)
+                        //    {
+                        //        tcs.SetException(ex);
+                        //    }
+                        //});
+                        //await tcs.Task;
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
-                            try
+                            var videoView = context.Player.GetVideoView();
+                            if (videoView != null)
                             {
-                                var videoView = context.Player.GetVideoView();
-                                if (videoView != null)
-                                {
-                                    videoView.MediaPlayer = null;
-                                }
-                                tcs.SetResult(true);
-                            }
-                            catch (Exception ex)
-                            {
-                                tcs.SetException(ex);
+                                videoView.MediaPlayer = null;
                             }
                         });
-                        await tcs.Task;
                     }
-
                     // Context 정리 (Player 분리 포함)
                     context.Cleanup();
+
+                    // Player 상태 업데이트
+                    //context.UpdatePlayerState(PlaybackState.Disconnected, "Camera was disconnected and Context was Cleaned up!");
+                    //UpdateState(contextId, PlaybackState.Disconnected, "Camera was disconnected and Context was Cleaned up!");
+                    
 
                     // Pool 반환
                     _contextPool.Return(context);
@@ -1261,9 +1211,12 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             // Dictionary에서 제거
             _contexts.TryRemove(contextId, out _);
             _weakContexts.TryRemove(contextId, out _);
-
-            // Player 상태 업데이트
-            context.UpdatePlayerState(PlaybackState.Disconnected, "Disconnected");
+            
+            // Cleanup 완료 후에 Disconnected 이벤트 발생
+            StateChanged?.Invoke(this, new StreamingStateChangedEventArgs(
+                contextId,
+                context?.State ?? PlaybackState.None,
+                PlaybackState.Disconnected));
 
             _log?.Info($"[ImprovedRtspStreamingService] Context {contextId} cleanup completed");
         }
@@ -1273,15 +1226,49 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         }
     }
 
-    private void UpdateState(string contextId, PlaybackState newState)
+    /// <summary>
+    /// 상태 업데이트 이벤트 처리 및 Context 상태 처리
+    /// </summary>
+    /// <param name="contextId"></param>
+    /// <param name="newState"></param>
+    /// <param name="message"></param>
+    private void UpdateState(string contextId, PlaybackState newState, string? message = null)
     {
-        if (TryGetContext(contextId, out var context))
+        try
         {
-            var oldState = context.State;
-            context.State = newState;
+            if (TryGetContext(contextId, out var context))
+            {
+                if (context == null)
+                    throw new NullReferenceException($"{contextId}에 해당하는 Context가 Pool에 존재하지 않습니다.");
 
-            StateChanged?.Invoke(this, new StreamingStateChangedEventArgs(contextId, oldState, newState));
-            _log?.Info($"[ImprovedRtspStreamingService] State changed for {contextId}: {oldState} -> {newState}");
+                var oldState = context.State;
+                context.State = newState;
+
+                // Player 상태 먼저 업데이트 (UI 업데이트)
+                context.UpdatePlayerState(newState, message);
+
+                // Disconnected/Stopped 상태는 지연 처리
+                if (newState == PlaybackState.Disconnected || newState == PlaybackState.Stopped)
+                {
+                    // 비동기로 이벤트 발생 (cleanup 완료 후)
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(100); // cleanup 대기
+                        StateChanged?.Invoke(this, new StreamingStateChangedEventArgs(contextId, oldState, newState));
+                    });
+                }
+                else
+                {
+                    // 다른 상태는 즉시 이벤트 발생
+                    StateChanged?.Invoke(this, new StreamingStateChangedEventArgs(contextId, oldState, newState));
+                }
+
+                _log?.Info($"[ImprovedRtspStreamingService] State changed for {contextId}: {oldState} -> {newState}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ImprovedRtspStreamingService] UpdateState error: {ex.Message}");
         }
     }
 
@@ -1387,6 +1374,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                     context.IsReconnecting = false;
                 }
 
+                UpdateState(contextId, PlaybackState.Stopped);
                 // 비동기 종료
                 _ = Task.Run(() => DisconnectAsync(contextId));
             }

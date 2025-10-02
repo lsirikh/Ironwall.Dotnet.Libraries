@@ -21,26 +21,23 @@ public interface IImprovedRtspStreamingService: IService, IDisposable
         StreamingOptions? options = null, VideoView? videoView = null);
     Task DisconnectAllAsync();
     Task DisconnectAsync(string contextId);
-    Task ExecuteAsync(CancellationToken token = default);
-    MediaPlayer GetMediaPlayer(string contextId);
+    MediaPlayer? GetMediaPlayer(string? contextId);
     PlaybackState GetPlaybackState(string contextId);
-    ImprovedRtspPlayer GetPlayer(string contextId);
-    StreamingStatistics GetStatistics(string contextId);
+    ImprovedRtspPlayer? GetPlayer(string? contextId);
+    StreamingStatistics? GetStatistics(string? contextId);
     bool HasPlayer(string contextId);
     bool IsConnected(string contextId);
-    void Pause(string contextId);
-    void Play(string contextId);
-    bool RegisterPlayer(string contextId, ImprovedRtspPlayer player);
-    void SetFrameSkip(string contextId, int skipFrames);
-    void SetQuality(string contextId, int quality);
-    void SetVolume(string contextId, int volume);
+    void Pause(string? contextId);
+    void Play(string? contextId);
+    void SetFrameSkip(string? contextId, int skipFrames);
+    void ToggleMute(string? contextId);
+    void SetVolume(string? contextId, int volume);
     void Stop(string contextId);
-    Task StopAsync(CancellationToken token = default);
-    Task<bool> TakeSnapshotAsync(string contextId, string filePath);
-    void ToggleMute(string contextId);
+    bool RegisterPlayer(string? contextId, ImprovedRtspPlayer player);
     bool UnregisterPlayer(string contextId);
-
     void RestrictStream(string contextId, string message = "Surveillance Not Allowed");
     Task UnrestrictStreamAsync(string contextId);
+    
+    Task<bool> TakeSnapshotAsync(string contextId, string filePath);
 
 }

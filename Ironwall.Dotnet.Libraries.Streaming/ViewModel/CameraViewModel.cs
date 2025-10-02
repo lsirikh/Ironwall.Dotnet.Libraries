@@ -13,127 +13,42 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 ****************************************************************************/
 public class CameraViewModel : PropertyChangedBase
 {
-    #region Attribute(Fields)
-    private string? _contextId;
-    private RtspConnectionInfo? _connectionInfo;
-    private bool _isActive;
-    private int _gridRow;
-    private int _gridColumn;
-    private int _slotIndex = -1;
-    private bool _isSelected;
-    private PlaybackState _playbackState = PlaybackState.None;
-    private string _statusMessage = "Ready";
-    #endregion
 
-    #region Methods
-    /// <summary>
-    /// 연결 상태 문자열
-    /// </summary>
-    public string ConnectionStatus
+    public CameraViewModel()
     {
-        get
-        {
-            if (!IsActive) return "Inactive";
-            return PlaybackState switch
-            {
-                PlaybackState.None => "Not Connected",
-                PlaybackState.Connecting => "Connecting...",
-                PlaybackState.Playing => "Playing",
-                PlaybackState.Paused => "Paused",
-                PlaybackState.Buffering => "Buffering...",
-                PlaybackState.Error => "Error",
-                PlaybackState.Reconnecting => "Reconnecting...",
-                PlaybackState.Disconnected => "Disconnected",
-                _ => "Unknown"
-            };
-        }
     }
 
-    /// <summary>
-    /// 카메라 정보 요약
-    /// </summary>
-    public override string ToString()
+    public CameraViewModel(ICameraModel model)
     {
-        return $"{ContextId} [{GridPosition}] - {ConnectionStatus}";
+        Model = model;
     }
-
-    /// <summary>
-    /// 상태 초기화
-    /// </summary>
-    public void Reset()
-    {
-        IsActive = false;
-        IsSelected = false;
-        ConnectionInfo = null;
-        PlaybackState = PlaybackState.None;
-        StatusMessage = "Ready";
-    }
-
-    /// <summary>
-    /// 연결 정보 업데이트
-    /// </summary>
-    public void UpdateConnection(RtspConnectionInfo info)
-    {
-        ConnectionInfo = info;
-        IsActive = info != null && info.IsValid();
-        NotifyOfPropertyChange(nameof(ConnectionStatus));
-    }
-
-    /// <summary>
-    /// 상태 업데이트
-    /// </summary>
-    public void UpdateState(PlaybackState state, string message = null)
-    {
-        PlaybackState = state;
-        if (!string.IsNullOrEmpty(message))
-        {
-            StatusMessage = message;
-        }
-        NotifyOfPropertyChange(nameof(ConnectionStatus));
-    }
-    #endregion
 
     #region Properties
-    public string? ContextId
+    public string Guid
     {
-        get => _contextId;
-        set => Set(ref _contextId, value);
+        get { return _model.Guid; }
+        set { _model.Guid = value; NotifyOfPropertyChange(nameof(Guid)); }
     }
 
-    public RtspConnectionInfo? ConnectionInfo
+    public string? DisplayName
     {
-        get => _connectionInfo;
-        set => Set(ref _connectionInfo, value);
+        get { return _model.Title; }
+        set { _model.Title = value; NotifyOfPropertyChange(nameof(DisplayName)); }
     }
 
-    public bool IsActive
+    public RtspConnectionInfo ConnectionInfo
     {
-        get => _isActive;
-        set => Set(ref _isActive, value);
+        get { return _model.ConnectionInfo; }
+        set { _model.ConnectionInfo = value; NotifyOfPropertyChange(nameof(ConnectionInfo)); }
     }
 
-    public int GridRow
+    /// <summary>
+    /// 스트리밍 옵션
+    /// </summary>
+    public StreamingOptions? StreamingOptions
     {
-        get => _gridRow;
-        set => Set(ref _gridRow, value);
-    }
-
-    public int GridColumn
-    {
-        get => _gridColumn;
-        set => Set(ref _gridColumn, value);
-    }
-
-    public int SlotIndex
-    {
-        get => _slotIndex;
-        set => Set(ref _slotIndex, value);
-    }
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set => Set(ref _isSelected, value);
+        get { return _model.StreamingOptions; }
+        set { _model.StreamingOptions = value; NotifyOfPropertyChange(nameof(StreamingOptions)); }
     }
 
     /// <summary>
@@ -153,24 +68,48 @@ public class CameraViewModel : PropertyChangedBase
         get => _statusMessage;
         set => Set(ref _statusMessage, value);
     }
-    /// <summary>
-    /// 스트리밍 옵션
-    /// </summary>
-    public StreamingOptions? StreamingOptions { get; set; }
 
     /// <summary>
     /// 자동 재생 여부
     /// </summary>
-    public bool AutoPlay { get; set; } = false;
+    public bool AutoPlay
+    {
+        get { return _model.AutoPlay; }
+        set { _model.AutoPlay = value; NotifyOfPropertyChange(nameof(AutoPlay)); }
+    }
+
 
     /// <summary>
     /// 컨트롤 표시 여부
     /// </summary>
-    public bool ShowControls { get; set; } = true;
+    public bool ShowControls
+    {
+        get { return _model.ShowControls; }
+        set { _model.ShowControls = value; NotifyOfPropertyChange(nameof(ShowControls)); }
+    }
+
+    public DateTime StartTime
+    {
+        get => _startTime;
+        set => Set(ref _startTime, value);
+    }
+
 
     /// <summary>
-    /// 그리드 위치 문자열
+    /// Wrapper Model
     /// </summary>
-    public string GridPosition => $"Row {GridRow + 1}, Col {GridColumn + 1}";
+    public ICameraModel Model
+    {
+        get => _model;
+        set => Set(ref _model, value);
+    }
+
+    #endregion
+
+    #region Attribute(Fields)
+    private ICameraModel _model = new CameraModel();
+    private PlaybackState _playbackState = PlaybackState.None;
+    private string _statusMessage = "Ready";
+    private DateTime _startTime;
     #endregion
 }

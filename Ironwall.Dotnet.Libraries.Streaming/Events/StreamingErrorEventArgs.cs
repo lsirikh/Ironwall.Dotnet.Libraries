@@ -15,15 +15,15 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Events;
 public class StreamingErrorEventArgs : EventArgs
 {
     public string ErrorMessage { get; }
-    public Exception Exception { get; }
+    public Exception? Exception { get; }
+    public string? ContextId { get; }
     public DateTime Timestamp { get; }
-    public string ContextId { get; }
     public ErrorSeverity Severity { get; }
 
     public StreamingErrorEventArgs(
         string errorMessage,
-        Exception exception = null,
-        string contextId = null,
+        Exception? exception = null,
+        string? contextId = null,
         ErrorSeverity severity = ErrorSeverity.Error)
     {
         ErrorMessage = errorMessage;

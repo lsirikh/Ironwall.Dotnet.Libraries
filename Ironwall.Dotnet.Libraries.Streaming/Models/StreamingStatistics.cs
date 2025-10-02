@@ -15,7 +15,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Models;
 public class StreamingStatistics
 {
     // 기본 정보
-    public string ContextId { get; set; }
+    public string ContextId { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime LastUpdateTime { get; set; }
     public TimeSpan TotalPlayTime { get; set; }
@@ -58,12 +58,12 @@ public class StreamingStatistics
     public int VideoWidth { get; set; }
     public int VideoHeight { get; set; }
     public double FrameRate { get; set; }
-    public string VideoCodec { get; set; }
+    public string? VideoCodec { get; set; }
 
     // 오디오 정보
     public int AudioChannels { get; set; }
     public int AudioSampleRate { get; set; }
-    public string AudioCodec { get; set; }
+    public string? AudioCodec { get; set; }
 
     /// <summary>
     /// 프레임 드롭 비율 계산 (%)

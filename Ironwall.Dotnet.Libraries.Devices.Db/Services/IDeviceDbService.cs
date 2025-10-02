@@ -1,11 +1,12 @@
-﻿using Ironwall.Dotnet.Monitoring.Models.Devices;
+﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Db.Services;
 /// <summary>
 /// 디바이스 DB 연동을 위한 서비스 인터페이스입니다.
 /// 컨트롤러, 센서, 카메라에 대한 CRUD 및 초기화 작업을 제공합니다.
 /// </summary>
-public interface IDeviceDbService
+public interface IDeviceDbService : IService
 {
     /// <summary>
     /// DB 연결 여부를 나타냅니다.

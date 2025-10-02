@@ -1,9 +1,11 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Streaming.Controls;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
 using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 using Ironwall.Dotnet.Libraries.Streaming.Views;
 using System;
+using System.Collections.Concurrent;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
@@ -18,23 +20,28 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
     public class PopupViewerService : IPopupViewerService
     {
         private readonly ILogService? _log;
-        private readonly IWindowManager? _windowManager;
+        //private readonly IWindowManager? _windowManager;
 
-        private PopupWindowViewModel _currentViewModel;
-        private Window _currentWindow;
+        private PopupWindowViewModel? _currentViewModel;
+        private Window? _currentWindow;
         private readonly object _lock = new object();
 
-        public bool IsPopupOpen => _currentWindow?.IsVisible ?? false;
+        private EnumDisplayPosition _displayPosition = EnumDisplayPosition.TopRight;
+        private int _marginOffset = 20; // 화면 가장자리 여백
 
+        private List<string> _listedCameraRowIds = new List<string>();
+
+        public bool IsPopupOpen => _currentWindow?.IsVisible ?? false;
+        public List<string> ListedCameraRowIds => _listedCameraRowIds;
         public PopupViewerService()
         {
             _log = IoC.Get<ILogService>();
-            _windowManager = IoC.Get<IWindowManager>();
+            //_windowManager = IoC.Get<IWindowManager>();
         }
 
-        public void ShowPopup(params RtspConnectionInfo[] connections)
+        public void ShowPopup(params ICameraModel[] cameras)
         {
-            if (connections == null || connections.Length == 0)
+            if (cameras == null || cameras.Length == 0)
                 return;
 
             Execute.OnUIThread(() =>
@@ -47,8 +54,11 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                         CreateNewPopup();
                     }
 
+                    if (_currentViewModel == null) return;
+
                     // 카메라 추가
-                    _currentViewModel.AddCameras(connections);
+                    var row = _currentViewModel.AddCameras(cameras);
+                    _listedCameraRowIds.Add(row);
 
                     // 윈도우 표시
                     if (_currentWindow != null && !_currentWindow.IsVisible)
@@ -65,24 +75,27 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             // ViewModel 생성
             _currentViewModel = new PopupWindowViewModel();
             _currentViewModel.RequestClose += OnViewModelRequestClose;
+            _currentViewModel.RemoveCameraRow += OnViewModelRemoveCameraRow;
 
-            // Window 생성 (Caliburn.Micro 방식)
-            _currentWindow = new PopupWindowView
-            {
-                DataContext = _currentViewModel
-            };
+            // PopupWindowView 생성 (일반 Window 대신)
+            _currentWindow = new PopupWindowView();
+            _currentWindow.DataContext = _currentViewModel;
 
             _currentWindow.Closed += OnWindowClosed;
-
             _log?.Info("[PopupViewerService] New popup created");
         }
 
-        private void OnViewModelRequestClose(object sender, EventArgs e)
+        private void OnViewModelRemoveCameraRow(object? sender, string e)
+        {
+            _listedCameraRowIds.Add(e);
+        }
+
+        private void OnViewModelRequestClose(object? sender, EventArgs e)
         {
             ClosePopup();
         }
 
-        private void OnWindowClosed(object sender, EventArgs e)
+        private void OnWindowClosed(object? sender, EventArgs e)
         {
             lock (_lock)
             {
@@ -110,35 +123,88 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             });
         }
 
-        private void PositionWindow()
+        public void PositionWindow(EnumDisplayPosition? position = null)
         {
             if (_currentWindow == null) return;
 
-            // 화면 우측 상단에 위치
             var workArea = SystemParameters.WorkArea;
-            _currentWindow.Left = workArea.Right - _currentWindow.Width - 20;  // 우측
-            _currentWindow.Top = workArea.Top + 20;  // 상단 (+ 값이어야 함)
+            var windowWidth = _currentWindow.Width;
+            var windowHeight = _currentWindow.Height;
 
+            if(position != null) 
+                _displayPosition = position ?? EnumDisplayPosition.TopRight;
 
-            //// 우측 상단
-            //_currentWindow.Left = workArea.Right - _currentWindow.Width - 20;
-            //_currentWindow.Top = workArea.Top + 20;
+            switch (_displayPosition)
+            {
+                case EnumDisplayPosition.TopLeft:
+                    _currentWindow.Left = workArea.Left + _marginOffset;
+                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    break;
 
-            //// 우측 하단
-            //_currentWindow.Left = workArea.Right - _currentWindow.Width - 20;
-            //_currentWindow.Top = workArea.Bottom - _currentWindow.Height - 20;
+                case EnumDisplayPosition.TopCenter:
+                    _currentWindow.Left = workArea.Left + (workArea.Width - windowWidth) / 2;
+                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    break;
 
-            //// 좌측 상단
-            //_currentWindow.Left = workArea.Left + 20;
-            //_currentWindow.Top = workArea.Top + 20;
+                case EnumDisplayPosition.TopRight:
+                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
+                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    break;
 
-            //// 좌측 하단
-            //_currentWindow.Left = workArea.Left + 20;
-            //_currentWindow.Top = workArea.Bottom - _currentWindow.Height - 20;
+                case EnumDisplayPosition.MiddleLeft:
+                    _currentWindow.Left = workArea.Left + _marginOffset;
+                    _currentWindow.Top = workArea.Top + (workArea.Height - windowHeight) / 2;
+                    break;
 
-            //// 중앙
-            //_currentWindow.Left = (workArea.Width - _currentWindow.Width) / 2;
-            //_currentWindow.Top = (workArea.Height - _currentWindow.Height) / 2;
+                case EnumDisplayPosition.Center:
+                    _currentWindow.Left = workArea.Left + (workArea.Width - windowWidth) / 2;
+                    _currentWindow.Top = workArea.Top + (workArea.Height - windowHeight) / 2;
+                    break;
+
+                case EnumDisplayPosition.MiddleRight:
+                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
+                    _currentWindow.Top = workArea.Top + (workArea.Height - windowHeight) / 2;
+                    break;
+
+                case EnumDisplayPosition.BottomLeft:
+                    _currentWindow.Left = workArea.Left + _marginOffset;
+                    _currentWindow.Top = workArea.Bottom - windowHeight - _marginOffset;
+                    break;
+
+                case EnumDisplayPosition.BottomCenter:
+                    _currentWindow.Left = workArea.Left + (workArea.Width - windowWidth) / 2;
+                    _currentWindow.Top = workArea.Bottom - windowHeight - _marginOffset;
+                    break;
+
+                case EnumDisplayPosition.BottomRight:
+                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
+                    _currentWindow.Top = workArea.Bottom - windowHeight - _marginOffset;
+                    break;
+
+                default:
+                    // 기본값: TopRight
+                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
+                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    break;
+            }
+
+            _log?.Info($"[PopupViewerService] Window positioned at {_displayPosition}: ({_currentWindow.Left}, {_currentWindow.Top})");
         }
+    }
+
+    /// <summary>
+    /// 팝업 윈도우 표시 위치
+    /// </summary>
+    public enum EnumDisplayPosition
+    {
+        TopLeft,
+        TopCenter,
+        TopRight,
+        MiddleLeft,
+        Center,
+        MiddleRight,
+        BottomLeft,
+        BottomCenter,
+        BottomRight
     }
 }

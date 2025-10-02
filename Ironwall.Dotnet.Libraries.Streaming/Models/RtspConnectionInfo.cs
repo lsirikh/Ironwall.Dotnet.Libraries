@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Base.Models;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -14,19 +15,19 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Models;
 /// <summary>
 /// RTSP 연결 정보 DTO (순수 데이터 객체)
 /// </summary>
-public class RtspConnectionInfo
+public class RtspConnectionInfo : BaseModel
 {
     public string Url { get; set; } = string.Empty;
-    public string Username { get; set; }
-    public string Password { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
     public string IpAddress { get; set; } = string.Empty;
     public int Port { get; set; } = 554;
     public string Protocol { get; set; } = "rtsp";
-    public string StreamPath { get; set; }
-    public string ChannelId { get; set; }
-    public string Description { get; set; }
-    public string CameraName { get; set; }
-    public string Location { get; set; }
+    public string StreamPath { get; set; } = string.Empty;
+    public string ChannelId { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string CameraName { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
     public int StreamType { get; set; } = 0; // 0: Main Stream, 1: Sub Stream
     public bool IsEnabled { get; set; } = true;
 
@@ -66,6 +67,7 @@ public class RtspConnectionInfo
     {
         return new RtspConnectionInfo
         {
+            Id  = this.Id,
             Url = this.Url,
             Username = this.Username,
             Password = this.Password,
