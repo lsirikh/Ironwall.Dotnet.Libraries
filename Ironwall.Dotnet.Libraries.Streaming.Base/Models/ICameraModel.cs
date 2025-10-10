@@ -1,7 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
 
-namespace Ironwall.Dotnet.Libraries.Streaming.Models;
-
+namespace Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 public interface ICameraModel : IBaseModel
 {
     bool AutoPlay { get; set; }

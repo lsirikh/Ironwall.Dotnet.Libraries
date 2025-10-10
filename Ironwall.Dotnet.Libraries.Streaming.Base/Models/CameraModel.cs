@@ -1,6 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
 
-namespace Ironwall.Dotnet.Libraries.Streaming.Models{
+namespace Ironwall.Dotnet.Libraries.Streaming.Base.Models{
     /****************************************************************************
        Purpose      :                                                          
        Created By   : GHLee                                                

@@ -2,7 +2,7 @@
 using System;
 using System.Dynamic;
 
-namespace Ironwall.Dotnet.Libraries.Streaming.Models;
+namespace Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 /****************************************************************************
    Purpose      :                                                          
    Created By   : GHLee                                                

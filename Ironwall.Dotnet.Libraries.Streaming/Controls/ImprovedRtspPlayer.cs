@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Commands;
 using Ironwall.Dotnet.Libraries.Streaming.Events;
 using Ironwall.Dotnet.Libraries.Streaming.Models;

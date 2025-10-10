@@ -1,9 +1,10 @@
-﻿using Ironwall.Dotnet.Libraries.Base.Models;
+﻿
+using Ironwall.Dotnet.Libraries.Base.Models;
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace Ironwall.Dotnet.Libraries.Streaming.Models;
+namespace Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 /****************************************************************************
    Purpose      :                                                          
    Created By   : GHLee                                                

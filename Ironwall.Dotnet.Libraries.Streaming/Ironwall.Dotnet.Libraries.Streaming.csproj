@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
   </ItemGroup>
 
   <ItemGroup>

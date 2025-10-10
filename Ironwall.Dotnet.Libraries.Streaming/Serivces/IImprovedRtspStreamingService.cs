@@ -1,8 +1,8 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Controls;
 using Ironwall.Dotnet.Libraries.Streaming.Events;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
-using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WPF;
 
