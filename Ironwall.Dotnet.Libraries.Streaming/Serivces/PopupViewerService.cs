@@ -21,7 +21,6 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
     public class PopupViewerService : IPopupViewerService
     {
         private readonly ILogService? _log;
-        //private readonly IWindowManager? _windowManager;
 
         private PopupWindowViewModel? _currentViewModel;
         private Window? _currentWindow;
@@ -34,10 +33,14 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
 
         public bool IsPopupOpen => _currentWindow?.IsVisible ?? false;
         public List<string> ListedCameraRowIds => _listedCameraRowIds;
+        
+        public event EventHandler? RequestClose;
+        public event EventHandler<string>? RemoveCameraRow;
+
+
         public PopupViewerService()
         {
             _log = IoC.Get<ILogService>();
-            //_windowManager = IoC.Get<IWindowManager>();
         }
 
         public void ShowPopup(params ICameraModel[] cameras)
@@ -58,14 +61,76 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     if (_currentViewModel == null) return;
 
                     // 카메라 추가
-                    var row = _currentViewModel.AddCameras(cameras);
-                    _listedCameraRowIds.Add(row);
+                    var rowId = _currentViewModel.AddCameras(cameras);
+                    if (!string.IsNullOrEmpty(rowId))
+                    {
+                        _listedCameraRowIds.Add(rowId);
+                        _log?.Info($"[PopupViewerService] Row added: {rowId}. Total rows tracked: {_listedCameraRowIds.Count}");
+                    }
 
                     // 윈도우 표시
                     if (_currentWindow != null && !_currentWindow.IsVisible)
                     {
                         _currentWindow.Show();
-                        PositionWindow();
+                        SetDisplayPosition();
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// RowId로 Row 제거 (EventService에서 호출)
+        /// </summary>
+        public bool RemoveRowById(string rowId)
+        {
+            if (string.IsNullOrEmpty(rowId))
+                return false;
+
+            bool result = false;
+
+            Execute.OnUIThread(() =>
+            {
+                lock (_lock)
+                {
+                    if (_currentViewModel == null)
+                    {
+                        _log?.Warning($"[PopupViewerService] Cannot remove row, ViewModel is null");
+                        return;
+                    }
+
+                    _log?.Info($"[PopupViewerService] Removing row: {rowId}");
+                    result = _currentViewModel.RemoveRowById(rowId);
+
+                    if (result)
+                    {
+                        _listedCameraRowIds.Remove(rowId);
+                        _log?.Info($"[PopupViewerService] Row removed: {rowId}. Remaining rows: {_listedCameraRowIds.Count}");
+                    }
+                    else
+                    {
+                        _log?.Warning($"[PopupViewerService] Failed to remove row: {rowId}");
+                    }
+                }
+            });
+
+            return result;
+        }
+
+        /// <summary>
+        /// 여러 RowId를 한 번에 제거
+        /// </summary>
+        public void RemoveRowsByIds(params string[] rowIds)
+        {
+            if (rowIds == null || rowIds.Length == 0)
+                return;
+
+            Execute.OnUIThread(() =>
+            {
+                lock (_lock)
+                {
+                    foreach (var rowId in rowIds)
+                    {
+                        RemoveRowById(rowId);
                     }
                 }
             });
@@ -86,13 +151,20 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             _log?.Info("[PopupViewerService] New popup created");
         }
 
-        private void OnViewModelRemoveCameraRow(object? sender, string e)
+        private void OnViewModelRemoveCameraRow(object? sender, string rowId)
         {
-            _listedCameraRowIds.Add(e);
+            // ViewModel에서 Row가 제거될 때 호출
+            if (_listedCameraRowIds.Contains(rowId))
+            {
+                RemoveCameraRow?.Invoke(this, rowId);
+                _listedCameraRowIds.Remove(rowId);
+                _log?.Info($"[PopupViewerService] Row removed event: {rowId}");
+            }
         }
 
         private void OnViewModelRequestClose(object? sender, EventArgs e)
         {
+            RequestClose?.Invoke(this, e);
             ClosePopup();
         }
 
@@ -100,9 +172,13 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
         {
             lock (_lock)
             {
+                _log?.Info("[PopupViewerService] Popup window closed");
+
                 if (_currentViewModel != null)
                 {
                     _currentViewModel.RequestClose -= OnViewModelRequestClose;
+                    _currentViewModel.RemoveCameraRow -= OnViewModelRemoveCameraRow;
+                    _currentViewModel.Dispose();
                     _currentViewModel = null;
                 }
 
@@ -112,7 +188,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     _currentWindow = null;
                 }
 
-                _log?.Info("[PopupViewerService] Popup closed");
+                _listedCameraRowIds.Clear();
             }
         }
 
@@ -120,74 +196,97 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
         {
             Execute.OnUIThread(() =>
             {
-                _currentWindow?.Close();
+                lock (_lock)
+                {
+                    if (_currentWindow != null)
+                    {
+                        _log?.Info("[PopupViewerService] Closing popup");
+                        _currentWindow.Close();
+                    }
+                }
             });
         }
 
-        public void PositionWindow(EnumDisplayPosition? position = null)
+        public void SetDisplayPosition(EnumDisplayPosition? position = null)
         {
+            _displayPosition = position ?? EnumDisplayPosition.TopRight;
+            if (_currentWindow?.IsVisible == true)
+            {
+                PositionWindow();
+            }
+        }
+
+        public void SetMarginOffset(int offset)
+        {
+            _marginOffset = Math.Max(0, offset);
+            if (_currentWindow?.IsVisible == true)
+            {
+                PositionWindow();
+            }
+        }
+
+        private void PositionWindow()
+        {
+
             if (_currentWindow == null) return;
 
             var workArea = SystemParameters.WorkArea;
-            var windowWidth = _currentWindow.Width;
-            var windowHeight = _currentWindow.Height;
+            double windowWidth = _currentWindow.ActualWidth > 0 ? _currentWindow.ActualWidth : 800;
+            double windowHeight = _currentWindow.ActualHeight > 0 ? _currentWindow.ActualHeight : 600;
 
-            if(position != null) 
-                _displayPosition = position ?? EnumDisplayPosition.TopRight;
+            double left = 0;
+            double top = 0;
 
             switch (_displayPosition)
             {
                 case EnumDisplayPosition.TopLeft:
-                    _currentWindow.Left = workArea.Left + _marginOffset;
-                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    left = workArea.Left + _marginOffset;
+                    top = workArea.Top + _marginOffset;
                     break;
 
                 case EnumDisplayPosition.TopCenter:
-                    _currentWindow.Left = workArea.Left + (workArea.Width - windowWidth) / 2;
-                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    left = workArea.Left + (workArea.Width - windowWidth) / 2;
+                    top = workArea.Top + _marginOffset;
                     break;
 
                 case EnumDisplayPosition.TopRight:
-                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
-                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    left = workArea.Right - windowWidth - _marginOffset;
+                    top = workArea.Top + _marginOffset;
                     break;
 
                 case EnumDisplayPosition.MiddleLeft:
-                    _currentWindow.Left = workArea.Left + _marginOffset;
-                    _currentWindow.Top = workArea.Top + (workArea.Height - windowHeight) / 2;
+                    left = workArea.Left + _marginOffset;
+                    top = workArea.Top + (workArea.Height - windowHeight) / 2;
                     break;
 
                 case EnumDisplayPosition.Center:
-                    _currentWindow.Left = workArea.Left + (workArea.Width - windowWidth) / 2;
-                    _currentWindow.Top = workArea.Top + (workArea.Height - windowHeight) / 2;
+                    left = workArea.Left + (workArea.Width - windowWidth) / 2;
+                    top = workArea.Top + (workArea.Height - windowHeight) / 2;
                     break;
 
                 case EnumDisplayPosition.MiddleRight:
-                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
-                    _currentWindow.Top = workArea.Top + (workArea.Height - windowHeight) / 2;
+                    left = workArea.Right - windowWidth - _marginOffset;
+                    top = workArea.Top + (workArea.Height - windowHeight) / 2;
                     break;
 
                 case EnumDisplayPosition.BottomLeft:
-                    _currentWindow.Left = workArea.Left + _marginOffset;
-                    _currentWindow.Top = workArea.Bottom - windowHeight - _marginOffset;
+                    left = workArea.Left + _marginOffset;
+                    top = workArea.Bottom - windowHeight - _marginOffset;
                     break;
 
                 case EnumDisplayPosition.BottomCenter:
-                    _currentWindow.Left = workArea.Left + (workArea.Width - windowWidth) / 2;
-                    _currentWindow.Top = workArea.Bottom - windowHeight - _marginOffset;
+                    left = workArea.Left + (workArea.Width - windowWidth) / 2;
+                    top = workArea.Bottom - windowHeight - _marginOffset;
                     break;
 
                 case EnumDisplayPosition.BottomRight:
-                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
-                    _currentWindow.Top = workArea.Bottom - windowHeight - _marginOffset;
-                    break;
-
-                default:
-                    // 기본값: TopRight
-                    _currentWindow.Left = workArea.Right - windowWidth - _marginOffset;
-                    _currentWindow.Top = workArea.Top + _marginOffset;
+                    left = workArea.Right - windowWidth - _marginOffset;
+                    top = workArea.Bottom - windowHeight - _marginOffset;
                     break;
             }
+
+            _currentWindow.Left = left;
+            _currentWindow.Top = top;
 
             _log?.Info($"[PopupViewerService] Window positioned at {_displayPosition}: ({_currentWindow.Left}, {_currentWindow.Top})");
         }

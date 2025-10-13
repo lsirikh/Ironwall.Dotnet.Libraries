@@ -12,11 +12,22 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
        Email        : lsirikh@naver.com                                         
     ****************************************************************************/
     /// <summary>
-    /// Row 단위 카메라 그룹 ViewModel (새로 추가)
+    /// Row 단위 카메라 그룹 ViewModel
+    /// RowId를 생성자에서 한 번만 생성하여 고유성 보장
     /// </summary>
     public class CameraRowViewModel : PropertyChangedBase
     {
-        public string RowId => Guid.NewGuid().ToString();
+        // RowId를 필드로 저장 - 생성자에서 한 번만 생성
+        private readonly string _rowId;
+
+        public CameraRowViewModel()
+        {
+            // 생성 시 한 번만 GUID 생성하여 저장
+            _rowId = Guid.NewGuid().ToString();
+        }
+
+        // RowId는 읽기 전용 프로퍼티
+        public string RowId => _rowId;
 
         private ObservableCollection<CameraViewModel> _cameras = new ObservableCollection<CameraViewModel>();
         public ObservableCollection<CameraViewModel> Cameras
