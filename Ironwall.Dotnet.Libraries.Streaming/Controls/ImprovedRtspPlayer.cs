@@ -83,6 +83,18 @@ public class ImprovedRtspPlayer : Control, IDisposable
     }
 
     #region - Dependency Properties -
+    public static readonly DependencyProperty DisplayNameProperty =
+        DependencyProperty.Register(
+            nameof(DisplayName), 
+            typeof(string), 
+            typeof(ImprovedRtspPlayer), 
+            new PropertyMetadata(null));
+
+    public string DisplayName
+    {
+        get { return (string)GetValue(DisplayNameProperty); }
+        set { SetValue(DisplayNameProperty, value); }
+    }
 
     public static readonly DependencyProperty ContextIdProperty =
         DependencyProperty.Register(
@@ -449,7 +461,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
         }
     }
 
-    private static async void OnConnectionInfoChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    private static void OnConnectionInfoChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is ImprovedRtspPlayer player)
         {
@@ -460,7 +472,8 @@ public class ImprovedRtspPlayer : Control, IDisposable
             if (player.AutoPlay && e.NewValue != null)
             {
                 player._log?.Info($"[ImprovedRtspPlayer] Triggering ConnectAsync for {player._cachedContextId}");
-                await player.ConnectAsync();
+                //await player.ConnectAsync();
+                _ = player.ConnectAsync();
             }
         }
     }

@@ -11,7 +11,7 @@ public interface IPopupViewerService
     /// <summary>
     /// 팝업 윈도우에 카메라를 표시합니다.
     /// </summary>
-    void ShowPopup(params ICameraModel[] connections);
+    void ShowPopup(string? eventId = null, params ICameraModel[] connections);
 
     /// <summary>
     /// 팝업 윈도우의 위치를 설정합니다.

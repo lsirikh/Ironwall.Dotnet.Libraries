@@ -82,7 +82,6 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             {
                 context.AttachPlayer(player);
                 // Player 상태 동기화
-                //context.UpdatePlayerState(context.State);
                 UpdateState(contextId, context.State, "Register Player");
             }
 
@@ -285,7 +284,6 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                     return false;
                 }
                 // Player 상태 업데이트
-                //context.UpdatePlayerState(PlaybackState.Connecting, "Connecting...");
                 UpdateState(contextId, PlaybackState.Connecting, "Connecting...");
                 
                 // 재시도 정책으로 연결
@@ -1357,8 +1355,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 Application.Current?.Dispatcher?.BeginInvoke(() =>
                 {
                     player.TimeoutDisplay = remaining > 0
-                        ? $"{player.ContextId} ({remaining}s)"
-                        : player.ContextId ?? "";
+                        ? $"{remaining}s"  : "-s";
                 });
             }
 

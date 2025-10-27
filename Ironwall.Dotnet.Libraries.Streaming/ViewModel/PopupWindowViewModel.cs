@@ -31,8 +31,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         private const int MAX_ROWS = 5; // 최대 표시 가능한 Row의 갯수
         private const int MAX_CAMERAS_PER_ROW = 3; // 1개 Row 당 최대 시현 카메라
 
-        // 카메라 조회용 Dictionary
-        private readonly Dictionary<string, CameraViewModel> _cameraLookup = new Dictionary<string, CameraViewModel>();
+        // ContextId  조회용 Dictionary
+        private readonly Dictionary<string, CameraViewModel> _contextLookup = new Dictionary<string, CameraViewModel>();
 
         // 대기 큐 - FIFO 방식으로 관리
         private readonly Queue<CameraRowViewModel> _waitingQueue = new Queue<CameraRowViewModel>();
@@ -111,7 +111,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         /// </summary>
         /// <param name="cameras">추가할 카메라 배열</param>
         /// <returns>생성된 RowId</returns>
-        public string? AddCameras(params ICameraModel[] cameras)
+        public string? AddCameras(string eventId, params ICameraModel[] cameras)
         {
             lock (_lockObject)
             {
@@ -121,12 +121,12 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                 _log?.Info($"[PopupWindowViewModel] Adding {cameras.Length} cameras as new row");
 
                 // 새로운 Row 생성
-                var newRow = new CameraRowViewModel();
+                var newRow = new CameraRowViewModel(eventId);
 
                 // 연결 정보를 CameraItemViewModel로 변환 (최대 2개까지)
                 var camerasToAdd = cameras.Take(MAX_CAMERAS_PER_ROW).Select(conn =>
                 {
-                    return new CameraViewModel(conn);
+                    return new CameraViewModel(conn, newRow.RowId);
                 }).ToList();
 
                 // Row에 카메라 추가
@@ -135,7 +135,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                     newRow.Cameras.Add(camera);
 
                     //Dictionary에 추가
-                    _cameraLookup[camera.Guid] = camera;
+                    _contextLookup[camera.ContextId] = camera;
                 }
 
                 // RowId로 조회 가능하도록 Dictionary에 추가
@@ -195,7 +195,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                     // Dictionary에서 카메라들 제거
                     foreach (var camera in row.Cameras)
                     {
-                        _cameraLookup.Remove(camera.Guid);
+                        _contextLookup.Remove(camera.ContextId);
                     }
 
                     // Row 제거
@@ -241,7 +241,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                     // Dictionary에서 카메라들 제거
                     foreach (var camera in row.Cameras)
                     {
-                        _cameraLookup.Remove(camera.Guid);
+                        _contextLookup.Remove(camera.ContextId);
                     }
 
                     _rowLookup.Remove(rowId);
@@ -292,7 +292,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             //Dictionary에서도 제거
             foreach (var camera in bottomRow.Cameras)
             {
-                _cameraLookup.Remove(camera.Guid);
+                _contextLookup.Remove(camera.ContextId);
             }
 
 
@@ -333,10 +333,10 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
 
             lock (_lockObject)
             {
-                _log?.Info($"[PopupWindowViewModel] Removing camera: {camera.Guid}");
+                _log?.Info($"[PopupWindowViewModel] Removing camera: {camera.ContextId}");
 
                 // Dictionary에서도 제거
-                _cameraLookup.Remove(camera.Guid);
+                _contextLookup.Remove(camera.ContextId);
 
                 // Row에서 카메라 찾아서 제거
                 var row = CameraRows.FirstOrDefault(r => r.Cameras.Contains(camera));
@@ -371,7 +371,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
 
         private CameraViewModel? FindCameraById(string contextId)
         {
-            _cameraLookup.TryGetValue(contextId, out var camera);
+            _contextLookup.TryGetValue(contextId, out var camera);
             return camera;
         }
 
@@ -389,7 +389,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             {
                 CameraRows.Clear();
                 _waitingQueue.Clear();
-                _cameraLookup.Clear();
+                _contextLookup.Clear();
                 _rowLookup.Clear();
             }
 
@@ -409,7 +409,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                 {
                     CameraRows.Clear();
                     _waitingQueue.Clear();
-                    _cameraLookup.Clear();
+                    _contextLookup.Clear();
                     _rowLookup.Clear();
                 }
             }

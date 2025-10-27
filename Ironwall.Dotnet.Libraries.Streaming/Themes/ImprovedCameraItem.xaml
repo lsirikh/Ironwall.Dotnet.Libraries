@@ -196,37 +196,41 @@
 								Background="#FF3F3F46">
 								<Grid>
 									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="50" />
+										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="Auto" />
 									</Grid.ColumnDefinitions>
 
 									<!--  Camera Name  -->
-									<!--<TextBlock
-										Grid.Column="0"
-										VerticalAlignment="Center"
-										FontWeight="Medium"
-										Foreground="White"
-										Text="{Binding ContextId, RelativeSource={RelativeSource TemplatedParent}}" />-->
 									<TextBlock
 										Grid.Column="0"
+										Margin="0,0,10,0"
 										VerticalAlignment="Center"
 										FontWeight="Medium"
 										Foreground="White"
-										Text="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}" />
+										Text="{Binding DisplayName, RelativeSource={RelativeSource TemplatedParent}}" />
+									<TextBlock
+										Grid.Column="1"
+										VerticalAlignment="Center"
+										FontWeight="Medium"
+										Foreground="White"
+										Text="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}"
+										TextAlignment="Left" />
 
 									<!--  Status Text  -->
 									<TextBlock
-										Grid.Column="1"
+										Grid.Column="2"
 										Margin="0,0,10,0"
 										VerticalAlignment="Center"
 										FontSize="10"
 										Foreground="#FFB0B0B0"
-										Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}}" />
+										Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}}"
+										TextAlignment="Right" />
 
 									<!--  Status Indicator  -->
 									<Ellipse
-										Grid.Column="2"
+										Grid.Column="3"
 										Width="8"
 										Height="8"
 										Margin="0,0,6,0"
@@ -364,9 +368,6 @@
 												Style="{StaticResource ImprovedStreamingButtonStyle}" />
 										</StackPanel>
 									</Grid>
-
-
-
 
 									<!--  No Stream Message (초기 상태)  -->
 									<Grid x:Name="DisconnectedPanel" Visibility="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToVisibilityConverter}, ConverterParameter=none}">

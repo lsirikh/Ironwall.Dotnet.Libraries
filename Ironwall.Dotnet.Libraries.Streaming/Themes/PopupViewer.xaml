@@ -207,7 +207,7 @@
 														BorderBrush="#FF3F3F46"
 														BorderThickness="0,0,0,1">
 														<!--  Row 내 카메라들  -->
-														<ItemsControl ItemsSource="{Binding Cameras}">
+														<!--<ItemsControl ItemsSource="{Binding Cameras}">
 															<ItemsControl.ItemsPanel>
 																<ItemsPanelTemplate>
 																	<UniformGrid Rows="1" />
@@ -220,13 +220,114 @@
 																		<local:ImprovedRtspPlayer
 																			AutoPlay="{Binding AutoPlay}"
 																			ConnectionInfo="{Binding ConnectionInfo}"
-																			ContextId="{Binding Guid}"
+																			ContextId="{Binding ContextId}"
+																			DisplayName="{Binding DisplayName}"
 																			ShowControls="{Binding ShowControls}"
 																			StreamingOptions="{Binding StreamingOptions}" />
 																	</Border>
 																</DataTemplate>
 															</ItemsControl.ItemTemplate>
-														</ItemsControl>
+														</ItemsControl>-->
+														<!--  ===== Row 구조 변경: Grid로 EventId Header 추가 =====  -->
+														<Grid>
+															<Grid.RowDefinitions>
+																<!--  EventId Header  -->
+																<RowDefinition Height="Auto" />
+																<!--  Cameras  -->
+																<RowDefinition Height="Auto" />
+															</Grid.RowDefinitions>
+
+															<!--  ===== EventId Header =====  -->
+															<Border
+																Grid.Row="0"
+																Padding="8,4"
+																Background="#FF2A2A2E">
+																<Border.Style>
+																	<Style TargetType="Border">
+																		<!--  EventId가 없으면 숨김  -->
+																		<Setter Property="Visibility" Value="Visible" />
+																		<Style.Triggers>
+																			<DataTrigger Binding="{Binding EventId}" Value="">
+																				<Setter Property="Visibility" Value="Collapsed" />
+																			</DataTrigger>
+																			<DataTrigger Binding="{Binding EventId}" Value="{x:Null}">
+																				<Setter Property="Visibility" Value="Collapsed" />
+																			</DataTrigger>
+																		</Style.Triggers>
+																	</Style>
+																</Border.Style>
+
+																<Grid>
+																	<Grid.ColumnDefinitions>
+																		<ColumnDefinition Width="Auto" />
+																		<ColumnDefinition Width="*" />
+																		<ColumnDefinition Width="Auto" />
+																	</Grid.ColumnDefinitions>
+
+																	<!--  Event Icon  -->
+																	<Border
+																		Grid.Column="0"
+																		Width="20"
+																		Height="20"
+																		Margin="0,0,8,0"
+																		Background="#FF007ACC"
+																		CornerRadius="3">
+																		<TextBlock
+																			HorizontalAlignment="Center"
+																			VerticalAlignment="Center"
+																			FontFamily="Segoe MDL2 Assets"
+																			FontSize="12"
+																			Foreground="White"
+																			Text="&#xE8F4;" />
+																		<!--  알림 아이콘  -->
+																	</Border>
+
+																	<!--  EventId Text  -->
+																	<TextBlock
+																		Grid.Column="1"
+																		VerticalAlignment="Center"
+																		FontSize="12"
+																		FontWeight="Medium"
+																		Foreground="#FFFFC107">
+																		<Run Text="Event ID: " />
+																		<Run FontWeight="Bold" Text="{Binding EventId, Mode=OneWay}" />
+																	</TextBlock>
+
+																	<!--  Camera Count in this Row  -->
+																	<TextBlock
+																		Grid.Column="2"
+																		VerticalAlignment="Center"
+																		FontSize="11"
+																		Foreground="#FFA0A0A0">
+																		<Run Text="카메라: " />
+																		<Run Text="{Binding Cameras.Count, Mode=OneWay}" />
+																	</TextBlock>
+																</Grid>
+															</Border>
+
+															<!--  ===== Row 내 카메라들 =====  -->
+															<ItemsControl Grid.Row="1" ItemsSource="{Binding Cameras}">
+																<ItemsControl.ItemsPanel>
+																	<ItemsPanelTemplate>
+																		<UniformGrid Rows="1" />
+																	</ItemsPanelTemplate>
+																</ItemsControl.ItemsPanel>
+
+																<ItemsControl.ItemTemplate>
+																	<DataTemplate>
+																		<Border Margin="2">
+																			<local:ImprovedRtspPlayer
+																				AutoPlay="{Binding AutoPlay}"
+																				ConnectionInfo="{Binding ConnectionInfo}"
+																				ContextId="{Binding ContextId}"
+																				DisplayName="{Binding DisplayName}"
+																				ShowControls="{Binding ShowControls}"
+																				StreamingOptions="{Binding StreamingOptions}" />
+																		</Border>
+																	</DataTemplate>
+																</ItemsControl.ItemTemplate>
+															</ItemsControl>
+														</Grid>
 													</Border>
 												</DataTemplate>
 											</ItemsControl.ItemTemplate>

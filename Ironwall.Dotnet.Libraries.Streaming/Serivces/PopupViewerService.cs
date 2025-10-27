@@ -43,7 +43,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             _log = IoC.Get<ILogService>();
         }
 
-        public void ShowPopup(params ICameraModel[] cameras)
+        public void ShowPopup(string eventId, params ICameraModel[] cameras)
         {
             if (cameras == null || cameras.Length == 0)
                 return;
@@ -61,7 +61,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     if (_currentViewModel == null) return;
 
                     // 카메라 추가
-                    var rowId = _currentViewModel.AddCameras(cameras);
+                    var rowId = _currentViewModel.AddCameras(eventId, cameras);
                     if (!string.IsNullOrEmpty(rowId))
                     {
                         _listedCameraRowIds.Add(rowId);

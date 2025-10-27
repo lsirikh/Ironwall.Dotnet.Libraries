@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
 using System;
+using System.Diagnostics;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 /****************************************************************************
@@ -22,6 +23,11 @@ public class CameraViewModel : PropertyChangedBase
     public CameraViewModel(ICameraModel model)
     {
         Model = model;
+    }
+
+    public CameraViewModel(ICameraModel model, string rowId) : this(model)
+    {
+        _contextId = $"{rowId}_{Guid}";
     }
 
     #region Properties
@@ -94,7 +100,8 @@ public class CameraViewModel : PropertyChangedBase
         get => _startTime;
         set => Set(ref _startTime, value);
     }
-
+    
+    public string ContextId => _contextId ?? _model.Guid;
 
     /// <summary>
     /// Wrapper Model
@@ -112,5 +119,6 @@ public class CameraViewModel : PropertyChangedBase
     private PlaybackState _playbackState = PlaybackState.None;
     private string _statusMessage = "Ready";
     private DateTime _startTime;
+    private string? _contextId;
     #endregion
 }

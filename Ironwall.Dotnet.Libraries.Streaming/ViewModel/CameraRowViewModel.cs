@@ -18,7 +18,9 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
     public class CameraRowViewModel : PropertyChangedBase
     {
         // RowId를 필드로 저장 - 생성자에서 한 번만 생성
-        private readonly string _rowId;
+        private readonly string _rowId = string.Empty;
+        private readonly string _eventId = string.Empty;
+        private ObservableCollection<CameraViewModel> _cameras = new ObservableCollection<CameraViewModel>();
 
         public CameraRowViewModel()
         {
@@ -26,10 +28,14 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             _rowId = Guid.NewGuid().ToString();
         }
 
+        public CameraRowViewModel(string eventId):this()
+        {
+            _eventId = eventId;
+        }
+
         // RowId는 읽기 전용 프로퍼티
         public string RowId => _rowId;
-
-        private ObservableCollection<CameraViewModel> _cameras = new ObservableCollection<CameraViewModel>();
+        public string EventId => _eventId;
         public ObservableCollection<CameraViewModel> Cameras
         {
             get => _cameras;
