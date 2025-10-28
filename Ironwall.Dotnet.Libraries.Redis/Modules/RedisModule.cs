@@ -39,9 +39,19 @@ namespace Ironwall.Dotnet.Libraries.Redis.Redis.Modules
         {
             try
             {
-                // RedisService의 인스턴스를 생성하고 ConnectAsync 메서드를 동기적으로 호출합니다.
-                builder.RegisterInstance(_setup).AsSelf().SingleInstance();
+                // RedisSetupModel을 IRedisSetupModel과 RedisSetupModel 둘 다로 등록
+                if (_setup is RedisSetupModel redisSetupModel)
+                {
+                    builder.RegisterInstance(redisSetupModel).As<IRedisSetupModel>().As<RedisSetupModel>().SingleInstance();
+                }
+                else
+                {
+                    // IRedisSetupModel을 받아서 RedisSetupModel 생성
+                    var newRedisSetupModel = new RedisSetupModel(_setup);
+                    builder.RegisterInstance(newRedisSetupModel).As<IRedisSetupModel>().As<RedisSetupModel>().SingleInstance();
+                }
 
+                // RedisService의 인스턴스를 생성하고 ConnectAsync 메서드를 동기적으로 호출합니다.
                 builder.Register(ctx =>
                 {
                     _log?.Info($"{nameof(RedisModule)} is trying to create a single {nameof(RedisService)} instance by connecting to the Redis server.");

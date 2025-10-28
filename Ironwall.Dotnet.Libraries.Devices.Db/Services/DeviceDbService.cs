@@ -835,7 +835,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
                 JOIN CameraDevices c ON d.Id = c.Id
                 WHERE d.DeviceType = @DeviceType;";
 
-            var rows = (await _conn.QueryAsync<CameraJoinSQL>(sql, new { DeviceType = EnumDeviceType.IpCamera })).ToList();
+            var rows = (await _conn.QueryAsync<CameraJoinSQL>(sql, new { DeviceType = EnumDeviceType.IpCamera.ToString() })).ToList();
             var list = rows.Select(r => (ICameraDeviceModel)r.ToDomain()).ToList();
 
             _log?.Info($"FetchCamerasAsync 완료 - Cameras {list.Count}");

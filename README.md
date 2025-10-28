@@ -160,6 +160,153 @@
 - **테스트 프레임워크**: `xUnit`
 
 ---
+
+## 5. Ironwall.Dotnet.Libraries.GMaps 소개
+
+### 5.1 개요
+`Ironwall.Dotnet.Libraries.GMaps`는 **GMap.NET 기반의 지도 관제 시스템**을 위한 라이브러리입니다.
+지도 설정, 마커 관리, 타일 캐싱 등의 기능을 제공하며, **WPF 애플리케이션의 지도 뷰**를 담당합니다.
+
+### 5.2 프로젝트 구성
+
+#### **📂 Models**
+> 지도 관련 데이터 모델 정의
+
+- `GMapSetupModel.cs`
+  - 지도 설정 정보를 관리하는 모델 (MapType, MapMode, MapName, TileDirectory 등)
+- `HomePositionModel.cs`
+  - 지도 홈 포지션 정보 (위도, 경도, 고도, 줌 레벨)
+
+#### **📂 Providers**
+> 지도 제공자 및 타일 관리
+
+- `MapProvider.cs`
+  - 사용 가능한 지도 목록을 관리하는 Provider
+  - Defined 지도 (Google, Bing, OpenStreetMap 등) 및 Custom 지도 지원
+
+#### **📂 ViewModels**
+> 지도 설정 및 관제 ViewModel
+
+- `MapSetupViewModel.cs`
+  - 지도 설정 화면의 ViewModel
+  - MapType, MapName, MapMode, TileDirectory, HomePosition 관리
+  - 폴더 선택 다이얼로그 연동 (ButtonTileDirectory)
+
+#### 개발 환경
+- **.NET Version**: `net8.0-windows`
+- **언어**: `C#`
+- **UI Framework**: `WPF`
+- **지도 라이브러리**: `GMap.NET`
+
+---
+
+## 6. Ironwall.Dotnet.Libraries.Nats 소개
+
+### 6.1 개요
+`Ironwall.Dotnet.Libraries.Nats`는 **NATS 메시징 시스템 연동**을 위한 라이브러리입니다.
+경량 고성능 메시징을 제공하며, Pub/Sub 및 Request/Reply 패턴을 지원합니다.
+
+### 6.2 프로젝트 구성
+
+#### **📂 Models**
+> NATS 설정 데이터 모델
+
+- `NatsSetupModel.cs`
+  - NATS 서버 연결 정보 관리 (IpAddress, Port, Username, Password)
+  - NATS 클러스터 설정 지원
+
+#### **📂 Services**
+> NATS 연동 서비스
+
+- `NatsService.cs`
+  - NATS Pub/Sub 기능 구현
+  - Request/Reply 패턴 지원
+  - 메시지 직렬화/역직렬화
+
+#### 개발 환경
+- **.NET Version**: `net8.0-windows`
+- **언어**: `C#`
+- **NATS 클라이언트**: `NATS.Client`
+
+---
+
+## 7. Ironwall.Dotnet.Libraries.Redis 소개
+
+### 7.1 개요
+`Ironwall.Dotnet.Libraries.Redis`는 **Redis 메시징 시스템 연동**을 위한 라이브러리입니다.
+Pub/Sub 패턴을 활용한 실시간 이벤트 전송 및 수신 기능을 제공합니다.
+
+### 7.2 프로젝트 구성
+
+#### **📂 Models**
+> Redis 설정 데이터 모델
+
+- `RedisSetupModel.cs`
+  - Redis 서버 연결 정보 관리 (IpAddress, Port, Password, ChannelName)
+
+#### **📂 Services**
+> Redis 연동 서비스
+
+- `RedisService.cs`
+  - Redis Pub/Sub 기능 구현
+  - 메시지 발행 및 구독 관리
+
+#### 개발 환경
+- **.NET Version**: `net8.0-windows`
+- **언어**: `C#`
+- **Redis 클라이언트**: `StackExchange.Redis`
+
+---
+
+## 버전 관리
+
+### v1.3.1 (2025-10-28)
+
+#### 📌 추가된 기능
+
+##### Ironwall.Dotnet.Libraries.GMaps
+- **MapSetupViewModel 개선**
+  - `MapTypes` 속성: EnumMapProvider 기반으로 "Defined", "Custom" 반환
+  - `MapNames` 속성: MapProvider에서 실제 지도 이름 목록 제공 (ObservableCollection)
+  - `ButtonTileDirectory()` 메서드: FolderBrowserDialog 기반 타일 디렉토리 선택
+  - HomePosition 복합 객체 저장 헬퍼 메서드 추가
+
+- **MapSetupModel 확장**
+  - MapType, MapMode, MapName, TileDirectory 속성 관리
+  - HomePosition 객체 (위도, 경도, 고도, 줌 레벨, 사용 여부)
+
+##### Ironwall.Dotnet.Libraries.Nats
+- **NatsSetupModel 확장**
+  - IpAddressNats: NATS 서버 IP 주소
+  - PortNats: NATS 서버 포트
+  - UserName: NATS 인증 사용자명 (선택적)
+  - Password: NATS 인증 비밀번호 (선택적)
+
+##### Ironwall.Dotnet.Libraries.Redis
+- **RedisSetupModel 추가**
+  - IpAddressRedis: Redis 서버 IP 주소
+  - PortRedis: Redis 서버 포트
+  - PasswordRedis: Redis 인증 비밀번호 (선택적)
+  - NameChannel: Redis Pub/Sub 채널 이름
+
+#### 🔧 수정된 파일
+- `Ironwall.Dotnet.Libraries.GMaps/Models/GMapSetupModel.cs`
+- `Ironwall.Dotnet.Libraries.GMaps/ViewModels/MapSetupViewModel.cs`
+- `Ironwall.Dotnet.Libraries.Nats/Models/NatsSetupModel.cs`
+- `Ironwall.Dotnet.Libraries.Redis/Models/RedisSetupModel.cs`
+- `Ironwall.Dotnet.Libraries.Enums/EnumMapProvider.cs` (참조)
+
+#### 🐛 버그 수정
+- MaterialDesign PackIconKind "MountainAltitude" → "ImageFilterHdr" 변경 (유효하지 않은 아이콘 수정)
+
+#### 📝 설계 개선
+- MapType과 MapName의 명확한 구분
+  - MapType: 제공자 타입 (Defined/Custom)
+  - MapName: 실제 지도 이름 (Google 위성지도, OpenStreetMap 등)
+- 타일 디렉토리 선택 UI 패턴 표준화 (읽기 전용 TextBox + 버튼)
+
+---
+
 ## v1.2.4 (2025-08-28)
 
 ### 추가된 파일

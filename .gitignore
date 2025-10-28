@@ -337,6 +337,10 @@ ASALocalRun/
 # Local History for Visual Studio
 .localhistory/
 
+/Design/*
+/.claude
+setup-*
+
 # BeatPulse healthcheck temp database
 healthchecksdb
 /Dotnet.Streaming.UI/Exts/cudnn64_9.dll

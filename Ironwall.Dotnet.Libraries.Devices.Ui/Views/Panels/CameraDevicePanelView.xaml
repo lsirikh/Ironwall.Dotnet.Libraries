@@ -91,9 +91,8 @@
 								Width="30"
 								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
-								/>
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 							<md:PackIcon
 								Width="30"
 								Height="30"
@@ -122,7 +121,7 @@
 								Width="30"
 								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
 								Value="44" />
 							<md:PackIcon

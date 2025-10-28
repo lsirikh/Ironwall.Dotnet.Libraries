@@ -78,26 +78,27 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             }
             catch (Exception ex)
             {
-                _log.Error($"{ex.Message}");
+                _log?.Error($"{ex.Message}");
                 IsOnvifButtonEnable = false;
             }
         }
-        public void OnvifButton()
-        {
-            try
-            {
-                if (!IsOnvifButtonEnable) return;
 
-                var onvifDialog = IoC.Get<OnvifDialogViewModel>();
-                if (_selection.FirstOrDefault() == null) throw new NullReferenceException("OnvifProperty를 확인하기 위한 인스턴스 설정에 문제가 있습니다.");
-                onvifDialog.UpdateModel(model: (ICameraDeviceModel)_selection.FirstOrDefault()!.Model);
-                _eventAggregator?.PublishOnUIThreadAsync(new OpenOnvifPropertyDialogMessageModel());
-            }
-            catch (Exception ex)  
-            {
-                _log?.Error(ex.Message);
-            }
-        }
+        //public void OnvifButton()
+        //{
+        //    try
+        //    {
+        //        if (!IsOnvifButtonEnable) return;
+
+        //        var onvifDialog = IoC.Get<OnvifDialogViewModel>();
+        //        if (_selection.FirstOrDefault() == null) throw new NullReferenceException("OnvifProperty를 확인하기 위한 인스턴스 설정에 문제가 있습니다.");
+        //        onvifDialog.UpdateModel(model: (ICameraDeviceModel)_selection.FirstOrDefault()!.Model);
+        //        _eventAggregator?.PublishOnUIThreadAsync(new OpenOnvifPropertyDialogMessageModel());
+        //    }
+        //    catch (Exception ex)  
+        //    {
+        //        _log?.Error(ex.Message);
+        //    }
+        //}
 
         public void ApplyButton()
         {
