@@ -12,14 +12,14 @@ namespace Ironwall.Dotnet.Libraries.Nats.Models;
 /// <summary>
 /// NATS 메시지 수신 시 발생하는 이벤트 인자
 /// </summary>
-public class NatsMessageArgsModel : EventArgs
+public class MessageArgsModel : EventArgs
 {
     #region - Ctors -
-    public NatsMessageArgsModel()
+    public MessageArgsModel()
     {
     }
 
-    public NatsMessageArgsModel(string? subject, string? subscriptionSubject, string? data)
+    public MessageArgsModel(string? subject, string? subscriptionSubject, string? data)
     {
         Subject = subject;
         SubscriptionSubject = subscriptionSubject;

@@ -27,10 +27,10 @@ public interface IMessageService<T> : IService
     /// <summary>
     /// 동기식 메시지 수신 이벤트
     /// </summary>
-    event EventHandler<NatsMessageArgsModel> NatsSubscribeEvent;
+    event EventHandler<MessageArgsModel> NatsSubscribeEvent;
 
     /// <summary>
     /// 비동기식 메시지 수신 이벤트
     /// </summary>
-    event Func<NatsMessageArgsModel, Task> NatsSubscribeEventAsync;
+    event Func<MessageArgsModel, Task> NatsSubscribeEventAsync;
 }

@@ -73,11 +73,7 @@ public abstract class MessageService<T> : IMessageService<T>
                             _log?.Info($"[SubscriptionTask] Received message from '{msg.Subject}': {data}");
 
                             // 비동기 이벤트 핸들러 호출
-                            await OnNatsSubscribeEventAsync(new NatsMessageArgsModel(
-                                msg.Subject,
-                                _defaultSubject,
-                                data
-                            ));
+                            await OnNatsSubscribeEventAsync(new MessageArgsModel(msg.Subject, _defaultSubject, data));
                         }
                         catch (Exception ex)
                         {
@@ -111,7 +107,7 @@ public abstract class MessageService<T> : IMessageService<T>
     /// <summary>
     /// 비동기 이벤트 핸들러 실행
     /// </summary>
-    protected virtual async Task OnNatsSubscribeEventAsync(NatsMessageArgsModel e)
+    protected virtual async Task OnNatsSubscribeEventAsync(MessageArgsModel e)
     {
         _log?.Info($"[OnNatsSubscribeEventAsync] Invoking event handlers for subject: {e.Subject}");
 
@@ -126,7 +122,7 @@ public abstract class MessageService<T> : IMessageService<T>
 
             foreach (var handler in handlers)
             {
-                await ((Func<NatsMessageArgsModel, Task>)handler)(e);
+                await ((Func<MessageArgsModel, Task>)handler)(e);
             }
         }
         else
@@ -197,8 +193,8 @@ public abstract class MessageService<T> : IMessageService<T>
     #endregion
 
     #region - Attributes -
-    public event EventHandler<NatsMessageArgsModel>? NatsSubscribeEvent;
-    public event Func<NatsMessageArgsModel, Task>? NatsSubscribeEventAsync;
+    public event EventHandler<MessageArgsModel>? NatsSubscribeEvent;
+    public event Func<MessageArgsModel, Task>? NatsSubscribeEventAsync;
 
     protected string _defaultSubject = string.Empty;
     protected ILogService? _log;

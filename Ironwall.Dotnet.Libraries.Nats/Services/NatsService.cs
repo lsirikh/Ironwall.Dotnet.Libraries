@@ -133,11 +133,11 @@ internal class NatsService : MessageService<INatsService>, INatsService
         }
     }
 
-    public override async Task PublishAsync(string subject, string data)
+    public override async Task PublishAsync(string subject, string msg)
     {
         try
         {
-            _log?.Info($"[PublishAsync] Attempting to publish to '{subject}': {data}");
+            _log?.Info($"[PublishAsync] Attempting to publish to '{subject}': {msg}");
 
             if (Connection == null)
             {
@@ -145,8 +145,8 @@ internal class NatsService : MessageService<INatsService>, INatsService
                 return;
             }
 
-            await Connection.PublishAsync(subject, data);
-            _log?.Info($"[PublishAsync] Successfully published to '{subject}': {data}");
+            await Connection.PublishAsync(subject, msg);
+            _log?.Info($"[PublishAsync] Successfully published to '{subject}': {msg}");
         }
         catch (Exception ex)
         {
