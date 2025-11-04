@@ -260,6 +260,7 @@
 																<Grid>
 																	<Grid.ColumnDefinitions>
 																		<ColumnDefinition Width="Auto" />
+																		<ColumnDefinition Width="Auto" />
 																		<ColumnDefinition Width="*" />
 																		<ColumnDefinition Width="Auto" />
 																	</Grid.ColumnDefinitions>
@@ -269,7 +270,6 @@
 																		Grid.Column="0"
 																		Width="20"
 																		Height="20"
-																		Margin="0,0,8,0"
 																		Background="#FF007ACC"
 																		CornerRadius="3">
 																		<TextBlock
@@ -285,6 +285,7 @@
 																	<!--  EventId Text  -->
 																	<TextBlock
 																		Grid.Column="1"
+																		Margin="10,0"
 																		VerticalAlignment="Center"
 																		FontSize="12"
 																		FontWeight="Medium"
@@ -293,9 +294,19 @@
 																		<Run FontWeight="Bold" Text="{Binding EventId, Mode=OneWay}" />
 																	</TextBlock>
 
-																	<!--  Camera Count in this Row  -->
 																	<TextBlock
 																		Grid.Column="2"
+																		VerticalAlignment="Center"
+																		FontSize="11"
+																		Foreground="#FFA0A0A0"
+																		TextTrimming="CharacterEllipsis">
+																		<Run Text="설명: " />
+																		<Run Text="{Binding Description, Mode=OneWay}" />
+																	</TextBlock>
+
+																	<!--  Camera Count in this Row  -->
+																	<TextBlock
+																		Grid.Column="3"
 																		VerticalAlignment="Center"
 																		FontSize="11"
 																		Foreground="#FFA0A0A0">

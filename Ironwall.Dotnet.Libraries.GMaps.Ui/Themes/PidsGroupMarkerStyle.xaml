@@ -26,11 +26,11 @@
 							ClipToBounds="False">
 
 							<!--  Main Polyline - 경계선/펜스 라인  -->
+							<!--  Stroke="{Binding MarkerStroke}"  -->
 							<Polyline
 								Name="PART_MainPolyline"
 								Fill="{TemplateBinding MarkerFill}"
 								Opacity="{TemplateBinding LineOpacity}"
-								Stroke="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}"
 								StrokeEndLineCap="Round"
 								StrokeLineJoin="Round"
 								StrokeStartLineCap="Round"
@@ -138,9 +138,10 @@
 
 						<!--  Normal 상태 (정상)  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Normal}">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
+							<!--<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />-->
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#4CAF50" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}" />
 						</DataTrigger>
 
 						<!--  Pulse Animation for Detecting State  -->

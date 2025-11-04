@@ -11,13 +11,13 @@ public interface IPopupViewerService
     /// <summary>
     /// 팝업 윈도우에 카메라를 표시합니다.
     /// </summary>
-    void ShowPopup(string? eventId = null, params ICameraModel[] connections);
+    void ShowPopup(string? eventId = null, string? description = null, params ICameraModel[] connections);
 
     /// <summary>
     /// 팝업 윈도우의 위치를 설정합니다.
     /// </summary>
     /// <param name="position"></param>
-    void SetDisplayPosition(EnumDisplayPosition? position = null);
+    void SetDisplayPosition(EnumDisplayPosition position);
 
     /// <summary>
     /// 팝업 윈도우의 마진을 설정합니다.

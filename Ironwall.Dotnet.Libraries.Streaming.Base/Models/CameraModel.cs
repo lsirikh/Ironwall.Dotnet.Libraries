@@ -35,12 +35,12 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Base.Models{
         /// <summary>
         /// 자동 재생 여부
         /// </summary>
-        public bool AutoPlay { get; set; } = false;
+        public bool AutoPlay { get; set; } = true;
 
         /// <summary>
         /// 컨트롤 표시 여부
         /// </summary>
-        public bool ShowControls { get; set; } = true;
+        public bool ShowControls { get; set; } = false;
 
     }
 }

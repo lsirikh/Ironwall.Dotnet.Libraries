@@ -5,10 +5,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 
 public interface ICameraEventModel : IBaseModel
 {
-    EnumPopupCmd Command { get; set; }
-    List<string> CameraGuids { get; set; }
     string EventName { get; set; }
-    int DeviceGroup { get; set; }
+    List<string> CameraGuids { get; set; }
     string Description { get; set; }
-    EnumPopupStatus EventStatus { get; set; }
+    bool IsEnable { get; set; }
 }

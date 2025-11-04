@@ -26,27 +26,21 @@ public class CameraEventModel : BaseModel, ICameraEventModel
     #region - IHanldes -
     #endregion
     #region - Properties -
-    public EnumPopupCmd Command { get; set; }
-    /// <summary>
-    /// 이벤트 이름/제목 (예: "침입 감지", "모션 알람")
-    /// </summary>
+    
     public string EventName { get; set; } = string.Empty;
     // <summary>
     /// 대상 카메라 GUID 목록 (DB 조회용) 주 방식
     /// </summary>
     public List<string> CameraGuids { get; set; } = new List<string>();
     /// <summary>
-    /// 이벤트 장비 그룹
-    /// </summary>
-    public int DeviceGroup { get; set; }
-    /// <summary>
     /// 상세 설명
     /// </summary>
     public string Description { get; set; } = string.Empty;
     /// <summary>
-    /// 이벤트 상태
+    /// 이벤트 활성화 여부 (true: 활성, false: 비활성)
     /// </summary>
-    public EnumPopupStatus EventStatus { get; set; }
+    public bool IsEnable { get; set; } = true;
+   
     #endregion
     #region - Attributes -
     #endregion

@@ -28,7 +28,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         private readonly object _lockObject = new object();
 
         // Row 관리 상수
-        private const int MAX_ROWS = 5; // 최대 표시 가능한 Row의 갯수
+        private const int MAX_ROWS = 4; // 최대 표시 가능한 Row의 갯수
         private const int MAX_CAMERAS_PER_ROW = 3; // 1개 Row 당 최대 시현 카메라
 
         // ContextId  조회용 Dictionary
@@ -79,7 +79,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             set => Set(ref _title, value);
         }
 
-        private int _maxCameras = 15;
+        private int _maxCameras = MAX_ROWS * MAX_CAMERAS_PER_ROW;
         public int MaxCameras
         {
             get => _maxCameras;
@@ -111,7 +111,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         /// </summary>
         /// <param name="cameras">추가할 카메라 배열</param>
         /// <returns>생성된 RowId</returns>
-        public string? AddCameras(string eventId, params ICameraModel[] cameras)
+        public string? AddCameras(string eventId, string description, params ICameraModel[] cameras)
         {
             lock (_lockObject)
             {
@@ -121,7 +121,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                 _log?.Info($"[PopupWindowViewModel] Adding {cameras.Length} cameras as new row");
 
                 // 새로운 Row 생성
-                var newRow = new CameraRowViewModel(eventId);
+                var newRow = new CameraRowViewModel(eventId, description);
 
                 // 연결 정보를 CameraItemViewModel로 변환 (최대 2개까지)
                 var camerasToAdd = cameras.Take(MAX_CAMERAS_PER_ROW).Select(conn =>

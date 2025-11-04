@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
+using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 
@@ -40,6 +41,18 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             IdUser = $"{account.Username}({account.EmployeeNumber})";
             Contents = content ?? "자동 조치보고";
             await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
+
+            var message = new SendActionRequestMessage
+            {
+                DetectionEventId = Model.Id,
+                ActionDetails = Contents,
+                ActionUser = idUser,
+                ActionTime = DateTime.Now
+            };
+
+            // EventAggregator를 통해 메시지 발행
+            await _eventAggregator.PublishOnBackgroundThreadAsync(message);
+
             await base.SendAction(content, idUser);
         }
 
@@ -57,6 +70,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #endregion
         #region - Properties -
         public EnumDetectionType Result => (Model as IDetectionEventModel)!.Result;
+        
         #endregion
         #region - Attributes -
         #endregion

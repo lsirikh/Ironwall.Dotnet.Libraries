@@ -20,6 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         // RowId를 필드로 저장 - 생성자에서 한 번만 생성
         private readonly string _rowId = string.Empty;
         private readonly string _eventId = string.Empty;
+        private readonly string? _description;
         private ObservableCollection<CameraViewModel> _cameras = new ObservableCollection<CameraViewModel>();
 
         public CameraRowViewModel()
@@ -28,14 +29,16 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             _rowId = Guid.NewGuid().ToString();
         }
 
-        public CameraRowViewModel(string eventId):this()
+        public CameraRowViewModel(string eventId, string? description):this()
         {
             _eventId = eventId;
+            _description = description;
         }
 
         // RowId는 읽기 전용 프로퍼티
         public string RowId => _rowId;
         public string EventId => _eventId;
+        public string? Description => _description;
         public ObservableCollection<CameraViewModel> Cameras
         {
             get => _cameras;

@@ -43,7 +43,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             _log = IoC.Get<ILogService>();
         }
 
-        public void ShowPopup(string eventId, params ICameraModel[] cameras)
+        public void ShowPopup(string eventId, string description,  params ICameraModel[] cameras)
         {
             if (cameras == null || cameras.Length == 0)
                 return;
@@ -61,7 +61,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     if (_currentViewModel == null) return;
 
                     // 카메라 추가
-                    var rowId = _currentViewModel.AddCameras(eventId, cameras);
+                    var rowId = _currentViewModel.AddCameras(eventId, description, cameras);
                     if (!string.IsNullOrEmpty(rowId))
                     {
                         _listedCameraRowIds.Add(rowId);
@@ -72,7 +72,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     if (_currentWindow != null && !_currentWindow.IsVisible)
                     {
                         _currentWindow.Show();
-                        SetDisplayPosition();
+                        PositionWindow();
                     }
                 }
             });
@@ -207,9 +207,10 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             });
         }
 
-        public void SetDisplayPosition(EnumDisplayPosition? position = null)
+        public void SetDisplayPosition(EnumDisplayPosition position)
         {
-            _displayPosition = position ?? EnumDisplayPosition.TopRight;
+            _displayPosition = position;
+            _log?.Info($"[PopupViewerService] DisplayPosition was updated to {position}");
             if (_currentWindow?.IsVisible == true)
             {
                 PositionWindow();
