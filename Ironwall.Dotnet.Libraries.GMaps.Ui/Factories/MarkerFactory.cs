@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -33,6 +34,10 @@ public class MarkerFactory : IMarkerFactory
             {
                 IGeometricSymbolModel geometricSymbol => CreateGeometricMarker(geometricSymbol),
                 IPidsSymbolModel pidsSymbol => CreatePidsMarker(pidsSymbol),
+                IMilitarySymbolModel militarySymbol => CreateMilitaryMarker(militarySymbol),
+                IInfraSymbolModel infraSymbol => CreateInfraMarker(infraSymbol),
+                IPidsGroupSymbolModel pidsGroupSymbol => CreatePidsGroupMarker(pidsGroupSymbol),
+                ILineSymbolModel lineSymbol => CreateLineMarker(lineSymbol),
                 _ => CreateCustomMarker(symbolModel)
             };
         }
@@ -44,9 +49,33 @@ public class MarkerFactory : IMarkerFactory
         }
     }
 
+    private GMapPidsGroupMarker CreatePidsGroupMarker(IPidsGroupSymbolModel pidsGroupSymbol)
+    {
+        _log?.Info($"GMapPidsGroupMarker 생성: {pidsGroupSymbol.Title}");
+        return new GMapPidsGroupMarker(_log!, pidsGroupSymbol);
+    }
+
+    private GMapInfraMarker CreateInfraMarker(IInfraSymbolModel symbol)
+    {
+        _log?.Info($"GMapInfraMarker 생성: {symbol.Title}");
+        return new GMapInfraMarker(_log!, symbol);
+    }
+
+    private GMapLineMarker CreateLineMarker(ILineSymbolModel symbol)
+    {
+        _log?.Info($"GMapLineMarker 생성: {symbol.Title}");
+        return new GMapLineMarker(_log!, symbol);
+    }
+
+    private GMapMilitarySymbolMarker CreateMilitaryMarker(IMilitarySymbolModel symbol)
+    {
+        _log?.Info($"GMapMilitarySymbolMarker 생성: {symbol.Title}, UnitType: {symbol.UnitType}");
+        return new GMapMilitarySymbolMarker(_log!, symbol);
+    }
+
     private GMapPidsMarker CreatePidsMarker(IPidsSymbolModel symbol)
     {
-        _log?.Info($"GMapGeometricMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}");
+        _log?.Info($"GMapPidsMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}");
         return new GMapPidsMarker(_log!, symbol);
     }
 

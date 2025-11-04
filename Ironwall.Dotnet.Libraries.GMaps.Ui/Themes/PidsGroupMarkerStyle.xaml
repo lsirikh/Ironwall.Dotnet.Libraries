@@ -1,0 +1,266 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols"
+	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  PidsGroup Marker Style (Line + PIDS Event 결합)  -->
+	<Style x:Key="BasePidsGroupMarkerStyle" TargetType="{x:Type control:GMapMarkerPidsGroupControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type control:GMapMarkerPidsGroupControl}">
+					<Grid Name="PART_MainContainer">
+
+						<!--  Line Canvas - 라인 그리기 영역  -->
+						<Canvas
+							Name="PART_LineCanvas"
+							Width="{TemplateBinding Width}"
+							Height="{TemplateBinding Height}"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							ClipToBounds="False">
+
+							<!--  Main Polyline - 경계선/펜스 라인  -->
+							<Polyline
+								Name="PART_MainPolyline"
+								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding LineOpacity}"
+								Stroke="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}"
+								StrokeEndLineCap="Round"
+								StrokeLineJoin="Round"
+								StrokeStartLineCap="Round"
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
+
+
+						</Canvas>
+
+						<!--  Pulse Animation Element (Detecting 상태용)  -->
+						<Ellipse
+							Name="PulseEllipse"
+							Width="10"
+							Height="10"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="Red"
+							Opacity="0"
+							RenderTransformOrigin="0.5,0.5">
+							<Ellipse.RenderTransform>
+								<ScaleTransform x:Name="PulseScaleTransform" ScaleX="1" ScaleY="1" />
+							</Ellipse.RenderTransform>
+						</Ellipse>
+
+						<!--  Event Status Indicator Badge  -->
+						<Border
+							Name="PART_EventStatusIndicator"
+							Width="16"
+							Height="16"
+							Margin="0,-8,-8,0"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Top"
+							Background="#4CAF50"
+							BorderBrush="White"
+							BorderThickness="2"
+							CornerRadius="8"
+							Visibility="Collapsed">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="5"
+									Opacity="0.7"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+						</Border>
+
+						<!--  Title Label (옵션)  -->
+						<Border
+							Name="PART_TitleContainer"
+							MinWidth="60"
+							MaxWidth="200"
+							Margin="0,0,0,-30"
+							Padding="4,2"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Bottom"
+							Background="White"
+							BorderBrush="Gray"
+							BorderThickness="1"
+							CornerRadius="4"
+							Visibility="Collapsed">
+							<TextBlock
+								Name="PART_TitleText"
+								FontSize="{TemplateBinding TitleSize}"
+								FontWeight="SemiBold"
+								Foreground="Black"
+								Text="{TemplateBinding MarkerTitle}"
+								TextAlignment="Center"
+								TextTrimming="CharacterEllipsis" />
+						</Border>
+
+						<!--  Selection Highlight  -->
+						<Rectangle
+							Name="PART_SelectionHighlight"
+							Width="{TemplateBinding Width}"
+							Height="{TemplateBinding Height}"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="Transparent"
+							Opacity="0"
+							Stroke="DodgerBlue"
+							StrokeDashArray="3 3"
+							StrokeThickness="2" />
+					</Grid>
+
+					<ControlTemplate.Triggers>
+						<!--  Title 표시 트리거  -->
+						<Trigger Property="ShowTitle" Value="True">
+							<Setter TargetName="PART_TitleContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!--  선택 상태 트리거  -->
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="PART_SelectionHighlight" Property="Opacity" Value="0.5" />
+						</Trigger>
+
+						<!--  Line Pattern Triggers  -->
+						<Trigger Property="LinePattern" Value="{x:Static enum:EnumLinePattern.Dashed}">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="4 2" />
+						</Trigger>
+						<Trigger Property="LinePattern" Value="{x:Static enum:EnumLinePattern.Dotted}">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="1 2" />
+						</Trigger>
+						<Trigger Property="LinePattern" Value="{x:Static enum:EnumLinePattern.DashDot}">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="4 2 1 2" />
+						</Trigger>
+
+						<!--  Normal 상태 (정상)  -->
+						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Normal}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#4CAF50" />
+						</DataTrigger>
+
+						<!--  Pulse Animation for Detecting State  -->
+						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#F44336" />
+
+							<DataTrigger.EnterActions>
+								<BeginStoryboard Name="PulseStoryboard_Begin">
+									<Storyboard RepeatBehavior="Forever">
+										<!--  Opacity Animation  -->
+										<DoubleAnimation
+											Storyboard.TargetName="PulseEllipse"
+											Storyboard.TargetProperty="Opacity"
+											From="0.8"
+											To="0"
+											Duration="0:0:1" />
+										<!--  Scale Animation  -->
+										<DoubleAnimation
+											Storyboard.TargetName="PulseScaleTransform"
+											Storyboard.TargetProperty="ScaleX"
+											From="1"
+											To="30"
+											Duration="0:0:1" />
+										<DoubleAnimation
+											Storyboard.TargetName="PulseScaleTransform"
+											Storyboard.TargetProperty="ScaleY"
+											From="1"
+											To="30"
+											Duration="0:0:1" />
+									</Storyboard>
+								</BeginStoryboard>
+							</DataTrigger.EnterActions>
+							<DataTrigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="PulseStoryboard_Begin" />
+							</DataTrigger.ExitActions>
+						</DataTrigger>
+
+						<!--  Fault 상태 (장애 - 빠른 깜빡임)  -->
+						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Fault}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#FF9800" />
+
+							<DataTrigger.EnterActions>
+								<BeginStoryboard Name="FaultBlinkStoryboard">
+									<Storyboard RepeatBehavior="Forever">
+										<!--  빠른 깜빡임 애니메이션  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_MainPolyline"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+										<ColorAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_EventStatusIndicator"
+											Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+											From="#F44336"
+											To="#FF8A80"
+											Duration="0:0:0.3" />
+									</Storyboard>
+								</BeginStoryboard>
+							</DataTrigger.EnterActions>
+							<DataTrigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="FaultBlinkStoryboard" />
+							</DataTrigger.ExitActions>
+						</DataTrigger>
+
+						<!--  Connection 상태 (연결중)  -->
+						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Connection}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#00BCD4" />
+
+							<DataTrigger.EnterActions>
+								<BeginStoryboard Name="ConnectionPulseStoryboard">
+									<Storyboard RepeatBehavior="Forever">
+										<!--  느린 펄스 애니메이션  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_EventStatusIndicator"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.5"
+											Duration="0:0:1" />
+									</Storyboard>
+								</BeginStoryboard>
+							</DataTrigger.EnterActions>
+							<DataTrigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="ConnectionPulseStoryboard" />
+							</DataTrigger.ExitActions>
+						</DataTrigger>
+
+						<!--  Mouse Over Effect  -->
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeThickness" Value="4" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Width" Value="18" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Height" Value="18" />
+						</Trigger>
+
+						<!--  Disabled State  -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter TargetName="PART_MainContainer" Property="Opacity" Value="0.5" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+
+		<!--  Default Property Values  -->
+		<Setter Property="IsHitTestVisible" Value="True" />
+		<Setter Property="Focusable" Value="True" />
+		<Setter Property="Width" Value="Auto" />
+		<Setter Property="Height" Value="Auto" />
+	</Style>
+
+	<!--  Apply Default Style  -->
+	<Style BasedOn="{StaticResource BasePidsGroupMarkerStyle}" TargetType="{x:Type control:GMapMarkerPidsGroupControl}" />
+
+</ResourceDictionary>

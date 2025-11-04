@@ -43,7 +43,8 @@ public class GMapCustomControl : GMapControl
         InitializeCollections();
         InitializeEvents();
         InitializeAdornerManager();
-
+        // 라인 드로잉 서비스 초기화
+        InitializeLineDrawingService();
 
         _mgrsOverlay = new MGRSGridOverlayService(_log);
         _log?.Info("GMapCustomControl 초기화 완료");
@@ -64,7 +65,7 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     private void InitializeCollections()
     {
-        CustomMarkers = new ObservableCollection<IEditableMarker>();
+        //CustomMarkers = new ObservableCollection<IEditableMarker>();
         CustomImages = new ObservableCollection<GMapCustomImage>();
     }
 
@@ -99,8 +100,28 @@ public class GMapCustomControl : GMapControl
         _log?.Info("AdornerManager 초기화 및 이벤트 구독 완료");
     }
 
-   
+
     #endregion
+    #region Line Drawing Fields
+
+    private LineDrawingService _lineDrawingService;
+
+    #endregion
+
+    #region Line Drawing Properties
+
+    /// <summary>
+    /// 라인 드로잉 서비스
+    /// </summary>
+    public LineDrawingService LineDrawingService => _lineDrawingService;
+
+    /// <summary>
+    /// 라인 드로잉 중 여부
+    /// </summary>
+    public bool IsLineDrawing => _lineDrawingService?.IsDrawing ?? false;
+
+    #endregion
+
     #region Integration Events
     /// <summary>
     /// 지도 클릭 이벤트 - ViewModel에 클릭 위치 전달
@@ -178,6 +199,108 @@ public class GMapCustomControl : GMapControl
         AdornerManager.AdornerRemoved -= OnAdornerRemoved;
     }
     #endregion
+    #region Line Drawing Methods
+
+    /// <summary>
+    /// 라인 드로잉 서비스 초기화
+    /// </summary>
+    private void InitializeLineDrawingService()
+    {
+        _lineDrawingService = new LineDrawingService(this, _log);
+
+        // 이벤트 구독
+        _lineDrawingService.StateChanged += OnLineDrawingStateChanged;
+        _lineDrawingService.PointAdded += OnLinePointAdded;
+        _lineDrawingService.LineCompleted += OnLineCompleted;
+        _lineDrawingService.DrawingCancelled += OnLineDrawingCancelled;
+
+        _log?.Info("라인 드로잉 서비스 초기화 완료");
+    }
+
+    /// <summary>
+    /// 라인 드로잉 시작
+    /// </summary>
+    public async Task<bool> StartLineDrawingAsync(LineDrawingParameters parameters = null)
+    {
+        try
+        {
+            // 편집 모드 활성화
+            //IsEditMode = true;
+
+            // 라인 드로잉 시작
+            return await _lineDrawingService.StartLineDrawingAsync(parameters);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"라인 드로잉 시작 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 라인 드로잉 완료
+    /// </summary>
+    public async Task<bool> CompleteLineDrawingAsync()
+    {
+        return await _lineDrawingService?.CompleteDrawingAsync();
+    }
+
+    /// <summary>
+    /// 라인 드로잉 취소
+    /// </summary>
+    public async Task<bool> CancelLineDrawingAsync()
+    {
+        return await _lineDrawingService?.CancelDrawingAsync();
+    }
+
+    #endregion
+
+    #region Line Drawing Event Handlers
+
+    /// <summary>
+    /// 라인 드로잉 상태 변경 이벤트 핸들러
+    /// </summary>
+    private void OnLineDrawingStateChanged(object? sender, LineDrawingState state)
+    {
+        _log?.Info($"라인 드로잉 상태 변경: {state}");
+
+        // 완료/취소 시 편집 모드 해제 고려
+        if (state == LineDrawingState.Completed || state == LineDrawingState.Cancelled)
+        {
+            // 필요시 편집 모드 해제
+            // IsEditingMode = false;
+        }
+    }
+
+    /// <summary>
+    /// 라인 포인트 추가 이벤트 핸들러
+    /// </summary>
+    private void OnLinePointAdded(object? sender, PointLatLng point)
+    {
+        _log?.Info($"라인 포인트 추가: {point}");
+    }
+
+    /// <summary>
+    /// 라인 완성 이벤트 핸들러
+    /// </summary>
+    private void OnLineCompleted(object? sender, ILineEditableMarker lineMarker)
+    {
+        _log?.Info($"라인 완성: {lineMarker.Title}");
+
+        // 완성된 라인 마커 이벤트 발생
+        //OnMarkerCreated?.Invoke(lineMarker);
+
+    }
+
+    /// <summary>
+    /// 라인 드로잉 취소 이벤트 핸들러
+    /// </summary>
+    private void OnLineDrawingCancelled(object? sender, EventArgs e)
+    {
+        _log?.Info("라인 드로잉 취소됨");
+    }
+
+    #endregion
     #region Override Methods
 
     protected override void OnInitialized(EventArgs e)
@@ -226,7 +349,7 @@ public class GMapCustomControl : GMapControl
 
             DeselectAllMarkers();
 
-            _log?.Info($"OnAreaChange 이벤트 발생: Zoom={zoom}");
+            //_log?.Info($"OnAreaChange 이벤트 발생: Zoom={zoom}");
         }
         catch (Exception ex)
         {
@@ -247,7 +370,7 @@ public class GMapCustomControl : GMapControl
 
             TriggerSelectionChange(viewArea, zoom, false);
 
-            _log?.Info($"위치 변경됨: ({point.Lat:F6}, {point.Lng:F6})");
+            //_log?.Info($"위치 변경됨: ({point.Lat:F6}, {point.Lng:F6})");
         }
         catch (Exception ex)
         {
@@ -262,23 +385,21 @@ public class GMapCustomControl : GMapControl
     {
         try
         {
-            if (CustomMarkers == null) return;
+            if (Markers == null) return;
 
-            foreach (var marker in CustomMarkers.OfType<IEditableMarker>())
+            foreach (var marker in Markers.OfType<IEditableMarker>().ToList())
             {
                 if (SetMarkerVisibility(marker))
                 {
-                    marker.ShowShape = true;
-                    marker.ShowTitle = false;
+                    marker.IsVisible = true;
                 }
                 else
                 {
-                    marker.ShowShape = false;
-                    marker.ShowTitle = false;
+                    marker.IsVisible = false;
                 }
             }
 
-            _log?.Info($"마커 가시성 업데이트 완료: Zoom={Zoom}, 마커 수={CustomMarkers?.Count}");
+            //_log?.Info($"마커 가시성 업데이트 완료: Zoom={Zoom}, 마커 수={Markers?.Count}");
         }
         catch (Exception ex)
         {
@@ -320,6 +441,8 @@ public class GMapCustomControl : GMapControl
         }
     }
 
+
+
     /// <summary>
     /// 마커 컬렉션 변경 이벤트
     /// </summary>
@@ -330,65 +453,52 @@ public class GMapCustomControl : GMapControl
             case NotifyCollectionChangedAction.Add:
                 foreach (var newItem in e.NewItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>())
                 {
-                    _log?.Info($"CustomMarkers에 추가 중: {newItem.Title}");
-                    CustomMarkers.Add(newItem);
                     RegisterMarkerForAdorner(newItem);
+                    _log?.Info($"마커 Adorner 등록: {newItem.Title}");
                 }
-                _log?.Info($"CustomMarkers 최종 개수: {CustomMarkers.Count}");
+                _log?.Info($"Markers 최종 개수: {Markers.Count}");
                 break;
 
             case NotifyCollectionChangedAction.Remove:
                 foreach (var oldItem in e.OldItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>())
                 {
-                    var entity = CustomMarkers.FirstOrDefault(m => m.Id == oldItem.Id);
-                    if (entity != null)
-                    {
-                        CustomMarkers.Remove(entity);
-                        UnregisterMarkerFromAdorner(entity);
-                    }
+                    UnregisterMarkerFromAdorner(oldItem);
+                    _log?.Info($"마커 Adorner 해제: {oldItem.Title}");
                 }
                 break;
 
             case NotifyCollectionChangedAction.Replace:
-                // 기존 마커 제거 후 새 마커 추가
+                // 기존 마커들 Adorner 해제
                 var oldMarkers = e.OldItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>();
                 var newMarkers = e.NewItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>();
 
                 foreach (var oldMarker in oldMarkers)
                 {
-                    var entity = CustomMarkers.FirstOrDefault(m => m.Id == oldMarker.Id);
-                    if (entity != null)
-                    {
-                        var index = CustomMarkers.IndexOf(entity);
-                        CustomMarkers.Remove(entity);
-                        UnregisterMarkerFromAdorner(entity);
+                    UnregisterMarkerFromAdorner(oldMarker);
+                }
 
-                        foreach (var newMarker in newMarkers)
-                        {
-                            CustomMarkers.Insert(index, newMarker);
-                            RegisterMarkerForAdorner(newMarker);
-                        }
-                    }
+                // 새 마커들 Adorner 등록
+                foreach (var newMarker in newMarkers)
+                {
+                    RegisterMarkerForAdorner(newMarker);
                 }
                 break;
 
             case NotifyCollectionChangedAction.Reset:
-                // 기존 마커들 Adorner 정리
-                foreach (var marker in CustomMarkers)
-                {
-                    UnregisterMarkerFromAdorner(marker);
-                }
+                // Reset은 컬렉션이 완전히 비워지거나 대량 변경될 때 발생
+                // 모든 기존 Adorner 정리
+                AdornerManager?.DeselectAllMarkers(this);
 
-                CustomMarkers.Clear();
+                // 현재 마커들에 대해 Adorner 재등록
                 foreach (var marker in Markers.OfType<IEditableMarker>())
                 {
-                    CustomMarkers.Add(marker);
                     RegisterMarkerForAdorner(marker);
                 }
+
+                _log?.Info($"마커 컬렉션 Reset 완료: {Markers.Count}개 마커 재등록");
                 break;
         }
     }
-
     public void TriggerMarkerClicked(GMapMarker marker)
     {
         try
@@ -454,6 +564,15 @@ public class GMapCustomControl : GMapControl
         var geoPos = FromLocalToLatLng((int)mousePos.X, (int)mousePos.Y);
 
         _log?.Info($"마우스 위치: 화면({mousePos.X:F2}, {mousePos.Y:F2}) -> 지리({geoPos.Lat:F6}, {geoPos.Lng:F6})");
+
+        if (IsLineDrawing)
+        {
+            // OnMapClicked 이벤트 발생
+            OnMapClicked?.Invoke(geoPos, mousePos);
+
+            e.Handled = true;
+            return;
+        }
 
         // 편집 모드일 때만 편집 처리
         if (IsEditMode)
@@ -552,22 +671,36 @@ public class GMapCustomControl : GMapControl
     }
 
     // GMapCustomControl.cs - GetMarkerAt 메서드를 화면 좌표 기반으로 수정
-    private IEditableMarker GetMarkerAtScreen(Point screenPosition)
+    private IEditableMarker? GetMarkerAtScreen(Point screenPosition)
     {
         _log?.Info($"GetMarkerAtScreen 호출: 화면위치({screenPosition.X:F2}, {screenPosition.Y:F2})");
-        _log?.Info($"총 커스텀 마커 수: {CustomMarkers?.Count ?? 0}");
+        //_log?.Info($"총 커스텀 마커 수: {CustomMarkers?.Count ?? 0}");
 
-        if (CustomMarkers == null || !CustomMarkers.Any())
+        //if (CustomMarkers == null || !CustomMarkers.Any())
+        //{
+        //    _log?.Info("커스텀 마커가 없음");
+        //    return null;
+        //}
+
+        _log?.Info($"총 마커 수: {Markers?.Count ?? 0}");
+        if (Markers == null || !Markers.Any())
         {
             _log?.Info("커스텀 마커가 없음");
             return null;
         }
 
-        foreach (var marker in CustomMarkers)
+        // 안전한 마커 리스트 생성 (null 제거)
+        //var validMarkers = CustomMarkers.Where(m => m != null && !string.IsNullOrEmpty(m.Title)).ToList();
+        var validMarkers = Markers.OfType<IEditableMarker>().Where(m => m != null && !string.IsNullOrEmpty(m.Title)).ToList();
+
+        foreach (var marker in validMarkers)
         {
             try
             {
-                if(!SetMarkerVisibility(marker)) continue;
+                // 마커 상태 확인
+                if (marker.IsDisposed) continue; // Dispose된 마커 건너뛰기
+                if (!SetMarkerVisibility(marker)) continue;
+
                 // 마커의 화면 좌표 계산
                 var markerScreenPos = FromLatLngToLocal(marker.Position);
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);
@@ -760,11 +893,19 @@ public class GMapCustomControl : GMapControl
     {
         try
         {
-            if (CustomMarkers != null)
+            //if (CustomMarkers != null)
+            //{
+            //    foreach (var marker in CustomMarkers)
+            //    {
+            //        marker.IsSelected = false;
+            //    }
+            //}
+
+            if (Markers != null)
             {
-                foreach (var img in CustomMarkers)
+                foreach (IEditableMarker marker in Markers)
                 {
-                    img.IsSelected = false;
+                    marker.IsSelected = false;
                 }
             }
 
@@ -863,11 +1004,17 @@ public class GMapCustomControl : GMapControl
         {
             if (AdornerManager?.MultiSelectEnabled == true)
             {
-                foreach (var marker in CustomMarkers)
+                //foreach (var marker in CustomMarkers)
+                //{
+                //    SelectMarker(marker);
+                //}
+                //_log?.Info($"모든 마커 선택 완료: {CustomMarkers.Count}개");
+
+                foreach (IEditableMarker marker in Markers)
                 {
                     SelectMarker(marker);
                 }
-                _log?.Info($"모든 마커 선택 완료: {CustomMarkers.Count}개");
+                _log?.Info($"모든 마커 선택 완료: {Markers.Count}개");
             }
         }
         catch (Exception ex)
@@ -1272,9 +1419,12 @@ public class GMapCustomControl : GMapControl
         try
         {
             // 마커 위치 업데이트
-            foreach (GMapMarker marker in CustomMarkers)
+            //foreach (GMapMarker marker in CustomMarkers)
+            //{
+            //    marker.ForceUpdateLocalPosition(this);
+            //}
+            foreach (GMapMarker marker in Markers)
             {
-                //if(marker is GMapMarker gMarker)
                 marker.ForceUpdateLocalPosition(this);
             }
 
@@ -1413,7 +1563,8 @@ public class GMapCustomControl : GMapControl
         {
             // 편집 모드 해제 시 모든 선택 해제
             foreach (var img in CustomImages) img.IsSelected = false;
-            foreach (var marker in CustomMarkers) marker.IsSelected = false;
+            //foreach (var marker in CustomMarkers) marker.IsSelected = false;
+            foreach (IEditableMarker marker in Markers) marker.IsSelected = false;
 
             // 모든 Adorner 제거
             AdornerManager?.DeselectAllMarkers(this);
@@ -1435,7 +1586,11 @@ public class GMapCustomControl : GMapControl
         if (images.Any()) return images.First();
 
         // 마커 확인
-        var markers = CustomMarkers.Where(m =>
+        //var markers = CustomMarkers.Where(m =>
+        //    Math.Abs(m.Position.Lat - position.Lat) < 0.0001 &&
+        //    Math.Abs(m.Position.Lng - position.Lng) < 0.0001).ToList();
+
+        var markers = Markers.Where(m =>
             Math.Abs(m.Position.Lat - position.Lat) < 0.0001 &&
             Math.Abs(m.Position.Lng - position.Lng) < 0.0001).ToList();
 
@@ -1752,8 +1907,7 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 커스텀 마커 컬렉션
     /// </summary>
-    //public ObservableCollection<GMapCustomMarker> CustomMarkers { get; private set; }
-    public ObservableCollection<IEditableMarker> CustomMarkers { get; private set; }
+    //public ObservableCollection<IEditableMarker> CustomMarkers { get; private set; }
 
     /// <summary>
     /// 커스텀 이미지 컬렉션

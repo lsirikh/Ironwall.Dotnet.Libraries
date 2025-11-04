@@ -1,7 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Symbols;
-public interface IPidsSymbolModel :  ISymbolModel
+public interface IPidsSymbolModel : IPidsEventCapable
 {
     double DetectionAngle { get; set; }
     double DetectionBearing { get; set; }
@@ -11,7 +11,6 @@ public interface IPidsSymbolModel :  ISymbolModel
     double FOVOpacity { get; set; }
     int LinkedDeviceId { get; set; }
     bool ShowFOV { get; set; }
-    EnumEventStatus EventStatus { get; set; }
-    void SetUpdate();
+  
     event EventHandler Update;
 }

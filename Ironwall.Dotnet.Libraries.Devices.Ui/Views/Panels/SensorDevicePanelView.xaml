@@ -87,10 +87,10 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
+								Width="30"
+								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 							<md:PackIcon
 								Width="30"
@@ -116,13 +116,14 @@
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
-						<Grid>
+						<Grid IsEnabled="{Binding IsButtonEnable}">
 							<ProgressBar
-								Width="100"
-								Height="20"
+								Width="30"
+								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+								Value="44" />
 							<md:PackIcon
 								Width="30"
 								Height="30"

@@ -6,6 +6,7 @@ public interface ISymbolModel : IBaseModel
 {
     int Pid { get; set; }
     string Title { get; set; }
+    double TitleSize { get; set; }
     double Height { get; set; }
     double Width { get; set; }
     double Latitude { get; set; }
@@ -20,4 +21,5 @@ public interface ISymbolModel : IBaseModel
     double StrokeThickness { get; set; }
     EnumMarkerCategory Category { get; set; }
     EnumOperationState OperationState { get; set; }
+
 }

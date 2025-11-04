@@ -7,6 +7,7 @@ using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+using System.Windows.Controls;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 
@@ -91,7 +92,58 @@ public class MarkerAdornerLayer : IDisposable
     /// <param name="marker">대상 마커</param>
     /// <param name="markerControl">마커 UI 컨트롤</param>
     /// <returns>생성된 Adorner (이미 존재하면 기존 것 반환)</returns>
-    public MarkerEditAdorner CreateAdorner(IEditableMarker marker, IMarkerControl markerControl)
+    //public MarkerEditAdorner CreateAdorner(IEditableMarker marker, IMarkerControl markerControl)
+    //{
+    //    if (marker == null) throw new ArgumentNullException(nameof(marker));
+    //    if (markerControl == null) throw new ArgumentNullException(nameof(markerControl));
+
+    //    lock (_lock)
+    //    {
+    //        try
+    //        {
+    //            // 이미 존재하는 Adorner가 있는지 확인
+    //            if (_activeAdorners.TryGetValue(marker, out var existingAdorner))
+    //            {
+    //                _log?.Info($"기존 Adorner 반환: {marker.Title}");
+    //                return existingAdorner;
+    //            }
+    //            AdornerLayer? adornerLayer = null;
+
+    //            // 새 Adorner 생성
+    //            var adorner = new MarkerEditAdorner(markerControl.VisualElement, marker, _mapControl, _log);
+
+    //            // 이벤트 구독
+    //            SubscribeToAdornerEvents(adorner);
+
+    //            // AdornerLayer에 추가
+    //            adornerLayer = AdornerLayer.GetAdornerLayer(markerControl.VisualElement);
+    //            if (adornerLayer != null)
+    //            {
+    //                adornerLayer.Add(adorner);
+    //                _activeAdorners[marker] = adorner;
+
+    //                _log?.Info($"Adorner 생성 및 추가: {marker.Title}");
+
+    //                // 이벤트 발생
+    //                AdornerCreated?.Invoke(this, new AdornerLifecycleEventArgs(marker, AdornerLifecycleEventType.Created));
+
+    //                return adorner;
+    //            }
+    //            else
+    //            {
+    //                _log?.Warning($"AdornerLayer를 찾을 수 없음: {marker.Title}");
+    //                adorner.Dispose();
+    //                return null;
+    //            }
+    //        }
+    //        catch (Exception ex)
+    //        {
+    //            _log?.Error($"Adorner 생성 실패: {marker.Title}, 오류: {ex.Message}");
+    //            return null;
+    //        }
+    //    }
+    //}
+    public MarkerEditAdorner? CreateAdorner(IEditableMarker marker, IMarkerControl markerControl)
     {
         if (marker == null) throw new ArgumentNullException(nameof(marker));
         if (markerControl == null) throw new ArgumentNullException(nameof(markerControl));
@@ -107,16 +159,40 @@ public class MarkerAdornerLayer : IDisposable
                     return existingAdorner;
                 }
 
-                // 새 Adorner 생성
-                var adorner = new MarkerEditAdorner(markerControl.VisualElement, marker, _mapControl, _log);
+                // 수정: 적절한 AdornerLayer 찾기
+                AdornerLayer? adornerLayer = null;
 
-                // 이벤트 구독
-                SubscribeToAdornerEvents(adorner);
+                // 옵션 1: Map 컨트롤의 AdornerLayer 사용 (권장)
+                adornerLayer = AdornerLayer.GetAdornerLayer(_mapControl);
 
-                // AdornerLayer에 추가
-                var adornerLayer = AdornerLayer.GetAdornerLayer(markerControl.VisualElement);
+                // 옵션 2: 더 하위 레벨의 AdornerLayer 찾기
+                if (adornerLayer == null)
+                {
+                    var parent = markerControl.VisualElement.Parent as FrameworkElement;
+                    while (parent != null && adornerLayer == null)
+                    {
+                        adornerLayer = AdornerLayer.GetAdornerLayer(parent);
+                        if (parent == _mapControl) break; // mapControl 레벨에서 멈춤
+                        parent = parent.Parent as FrameworkElement;
+                    }
+                }
+
+                // 마지막 대안
+                if (adornerLayer == null)
+                {
+                    adornerLayer = AdornerLayer.GetAdornerLayer(markerControl.VisualElement);
+                }
+
                 if (adornerLayer != null)
                 {
+                    var adorner = new MarkerEditAdorner(markerControl.VisualElement, marker, _mapControl, _log);
+
+                    // ✅ Z-Index 설정으로 순서 조정
+                    Panel.SetZIndex(adorner, -1);
+
+                    // 이벤트 구독
+                    SubscribeToAdornerEvents(adorner);
+
                     adornerLayer.Add(adorner);
                     _activeAdorners[marker] = adorner;
 
@@ -130,7 +206,6 @@ public class MarkerAdornerLayer : IDisposable
                 else
                 {
                     _log?.Warning($"AdornerLayer를 찾을 수 없음: {marker.Title}");
-                    adorner.Dispose();
                     return null;
                 }
             }
@@ -141,6 +216,7 @@ public class MarkerAdornerLayer : IDisposable
             }
         }
     }
+
 
     /// <summary>
     /// 특정 마커의 Adorner 제거

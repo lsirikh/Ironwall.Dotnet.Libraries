@@ -1,0 +1,15 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="BasePropertyStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyCustomControl}">
+
+		<!--  Custom 마커는 추가 속성이 없으므로 특화 컨텐츠 없음  -->
+		<Setter Property="HasSpecificProperties" Value="False" />
+	</Style>
+</ResourceDictionary>

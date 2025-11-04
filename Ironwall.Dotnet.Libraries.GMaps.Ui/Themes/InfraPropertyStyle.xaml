@@ -1,0 +1,128 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="BasePropertyStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyInfraControl}">
+		<Setter Property="HasSpecificProperties" Value="True" />
+		<Setter Property="SpecificPropertiesTitle" Value="건물 속성" />
+		<!--  Infrastructure 특화 UI  -->
+		<Setter Property="SpecificContent">
+			<Setter.Value>
+				<StackPanel>
+					<!--  건물 종류  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="건물종류" />
+						<ComboBox
+							Grid.Column="1"
+							ItemsSource="{Binding AvailableBuildingTypes}"
+							SelectedItem="{Binding BuildingType}"
+							Style="{StaticResource CompactComboBox}" />
+					</Grid>
+
+					<!--  건물 용도  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="건물용도" />
+						<ComboBox
+							Grid.Column="1"
+							ItemsSource="{Binding AvailableBuildingUsages}"
+							SelectedItem="{Binding BuildingUsage}"
+							Style="{StaticResource CompactComboBox}" />
+					</Grid>
+
+					<!--  지상 층수  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="30" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="지상층" />
+						<Slider
+							Grid.Column="1"
+							IsSnapToTickEnabled="True"
+							Maximum="50"
+							Minimum="1"
+							TickFrequency="1"
+							Value="{Binding FloorCount}" />
+						<TextBlock
+							Grid.Column="2"
+							Margin="5,0"
+							VerticalAlignment="Center"
+							Foreground="White"
+							Text="{Binding FloorCount, StringFormat='F{0}'}" />
+					</Grid>
+
+					<!--  지하 층수  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="30" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="지하층" />
+						<Slider
+							Grid.Column="1"
+							IsSnapToTickEnabled="True"
+							Maximum="10"
+							Minimum="0"
+							TickFrequency="1"
+							Value="{Binding BasementFloorCount}" />
+						<TextBlock
+							Grid.Column="2"
+							Margin="5,0"
+							VerticalAlignment="Center"
+							Foreground="White"
+							Text="{Binding BasementFloorCount, StringFormat='B{0}'}" />
+					</Grid>
+
+					<!--  건물 면적  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="60" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="45" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="면적" />
+						<TextBox
+							Grid.Column="1"
+							Style="{StaticResource CompactTextBox}"
+							Text="{Binding BuildingArea, StringFormat='{}{0:F0}'}" />
+						<TextBlock
+							Grid.Column="2"
+							Margin="5,0,0,0"
+							Foreground="White"
+							Text="㎡" />
+					</Grid>
+				</StackPanel>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>

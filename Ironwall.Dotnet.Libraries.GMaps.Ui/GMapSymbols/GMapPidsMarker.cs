@@ -15,7 +15,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
   Company      : Sensorway Co., Ltd.                                       
   Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
+public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMarker
 {
     #region - Ctors -
     public GMapPidsMarker(ILogService log, IPidsSymbolModel pidsModel)
@@ -23,8 +23,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     {
         pidsModel.Update += PidsModel_Update;
     }
-
-    
     #endregion
 
     #region - Animation System -
@@ -38,110 +36,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         OnPropertyChanged(nameof(EventStatus));
         OnPropertyChanged(nameof(OperationState));
     }
-
-    /// <summary>
-    /// 모델 속성 변경 감지 (EventStatus 변경 시 자동 애니메이션)
-    /// </summary>
-    private void OnModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IPidsSymbolModel.EventStatus))
-        {
-            UpdateAnimationFromEventStatus();
-        }
-    }
-
-    /// <summary>
-    /// EventStatus에 따른 애니메이션 자동 업데이트
-    /// </summary>
-    private void UpdateAnimationFromEventStatus()
-    {
-        try
-        {
-            switch (_model.EventStatus)
-            {
-                case EnumEventStatus.Normal:
-                    StopAnimation();
-                    SetStaticColor(_originalColor);
-                    break;
-
-                case EnumEventStatus.Detecting:
-                    StartBlinkAnimation(EnumColorType.Green, TimeSpan.FromMilliseconds(500));
-                    break;
-
-                case EnumEventStatus.Fault:
-                    StartBlinkAnimation(EnumColorType.Red, TimeSpan.FromMilliseconds(200));
-                    break;
-
-                case EnumEventStatus.Connection:
-                    SetStaticColor(EnumColorType.Blue);
-                    break;
-
-                default:
-                    SetStaticColor(EnumColorType.Gray);
-                    break;
-            }
-
-            _log?.Info($"애니메이션 상태 변경: {_model.Title} → {_model.EventStatus}");
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"애니메이션 업데이트 실패: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 깜빡임 애니메이션 시작
-    /// </summary>
-    private void StartBlinkAnimation(EnumColorType targetColor, TimeSpan interval)
-    {
-        StopAnimation();
-
-        _isAnimating = true;
-        bool isHighlighted = false;
-
-        _animationTimer = new DispatcherTimer
-        {
-            Interval = interval
-        };
-
-        _animationTimer.Tick += (s, e) =>
-        {
-            try
-            {
-                FillColor = isHighlighted ? _originalColor : targetColor;
-                isHighlighted = !isHighlighted;
-            }
-            catch (Exception ex)
-            {
-                _log?.Error($"애니메이션 틱 오류: {ex.Message}");
-            }
-        };
-
-        _animationTimer.Start();
-    }
-
-    /// <summary>
-    /// 정적 색상 설정
-    /// </summary>
-    private void SetStaticColor(EnumColorType color)
-    {
-        StopAnimation();
-        FillColor = color;
-    }
-
-    /// <summary>
-    /// 애니메이션 중지
-    /// </summary>
-    private void StopAnimation()
-    {
-        if (_animationTimer != null)
-        {
-            _animationTimer.Stop();
-            _animationTimer = null;
-        }
-        _isAnimating = false;
-    }
-
     #endregion
 
     #region - Overrides -
@@ -153,6 +47,11 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         var markerControl = new GMapMarkerPidsControl(this);
         _log?.Info($"GMapMarkerPidsControl 생성: {_model.Title}");
         return markerControl;
+    }
+
+    protected override void ConfigureMarkerControl(UIElement marker)
+    {
+        base.ConfigureMarkerControl(marker);
     }
 
     /// <summary>
@@ -177,10 +76,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     /// </summary>
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
-        {
-            StopAnimation();
-        }
         base.Dispose(disposing);
     }
     #endregion
@@ -242,6 +137,20 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         }
     }
 
+    /// <summary>
+    /// 이벤트 상태 (애니메이션 트리거)
+    /// </summary>
+    public EnumEventStatus EventStatus
+    {
+        get => _model.EventStatus;
+        set
+        {
+            _model.EventStatus = value;
+            OnPropertyChanged(nameof(EventStatus));
+            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
+        }
+    }
+
     public double DetectionRange
     {
         get => _model.DetectionRange;
@@ -299,20 +208,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         {
             _model.FOVOpacity = value;
             OnPropertyChanged(nameof(FOVOpacity));
-        }
-    }
-
-    /// <summary>
-    /// 이벤트 상태 (애니메이션 트리거)
-    /// </summary>
-    public EnumEventStatus EventStatus
-    {
-        get => _model.EventStatus;
-        set
-        {
-            _model.EventStatus = value;
-            OnPropertyChanged(nameof(EventStatus));
-            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
         }
     }
 

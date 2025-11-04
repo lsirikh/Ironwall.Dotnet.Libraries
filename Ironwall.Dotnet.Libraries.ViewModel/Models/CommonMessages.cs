@@ -57,6 +57,7 @@ public class CallDeleteDetectionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteMalfunctionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteConnectionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteActionEventProcessMessageModel : IMessageModel { }
+public class CallDelete3rdEventProcessMessageModel : IMessageModel { }
 public class ExitProgramMessageModel : IMessageModel { }
 public class OpenConfirmPopupMessageModel : CommonMessageModel { }
 public class OpenInfoPopupMessageModel : CommonMessageModel { }

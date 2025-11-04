@@ -6,7 +6,6 @@ using Ironwall.Dotnet.Libraries.Devices.Db.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Db.Services;
 using Ironwall.Dotnet.Libraries.Devices.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs;
@@ -40,7 +39,6 @@ public class DeviceUiModule : Module
         {
             builder.RegisterModule(new DeviceModule(_log, _count++));
             builder.RegisterModule(new DeviceDbModule(_log, _dbSetup, _count++)); // 2
-            builder.RegisterModule(new OnvifServiceModule(_log));
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();
@@ -50,7 +48,6 @@ public class DeviceUiModule : Module
             builder.RegisterType<SensorDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<OnvifDialogViewModel>().SingleInstance();
             builder.RegisterType<CameraDeviceViewModel>().SingleInstance();
-            builder.RegisterType<CameraOnvifService>().AsSelf().As<IService>().SingleInstance().WithMetadata("Order", _count++);
         }
         catch
         {

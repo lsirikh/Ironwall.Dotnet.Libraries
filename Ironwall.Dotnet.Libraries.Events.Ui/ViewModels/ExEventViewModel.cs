@@ -4,7 +4,6 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 /****************************************************************************

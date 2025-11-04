@@ -3,7 +3,6 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Db.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
-using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -28,13 +27,11 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     public CameraDevicePanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
                                        , IDeviceDbService dbService
-                                       , CameraOnvifService cameraOnvifService
                                        , CameraDeviceProvider deviceProvider
                                        ) : base(eventAggregator, log)
     {
         _dbService = dbService;
         _deviceProvider = deviceProvider;
-        _cameraOnvifService = cameraOnvifService;
     }
     #endregion
     #region - Implementation of Interface -
@@ -258,21 +255,21 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
                         ViewModelProvider.Add(viewModel);
 
-                        if(viewModel.Mode == Enums.EnumCameraMode.ONVIF)
-                        {
-                            _ = Task.Run(async () => 
-                            {
-                                viewModel.Status = Enums.EnumDeviceStatus.DEACTIVATED;  
-                                //Onvif가 처리된 모델로 새로 입힌다.
-                                var onvifInstance = await _cameraOnvifService.CreateOnvifInstance(item, cancellationToken);
-                                if (onvifInstance == null) return;
-                                var onvifedModel = CameraMappingHelper.ToDeviceModel(onvifInstance, item);
-                                if (onvifedModel == null) return;
+                        //if(viewModel.Mode == Enums.EnumCameraMode.ONVIF)
+                        //{
+                        //    _ = Task.Run(async () => 
+                        //    {
+                        //        viewModel.Status = Enums.EnumDeviceStatus.DEACTIVATED;  
+                        //        //Onvif가 처리된 모델로 새로 입힌다.
+                        //        var onvifInstance = await _cameraOnvifService.CreateOnvifInstance(item, cancellationToken);
+                        //        if (onvifInstance == null) return;
+                        //        var onvifedModel = CameraMappingHelper.ToDeviceModel(onvifInstance, item);
+                        //        if (onvifedModel == null) return;
 
-                                viewModel.Status = Enums.EnumDeviceStatus.ACTIVATED;  
-                                viewModel.Refresh();
-                            });
-                        }
+                        //        viewModel.Status = Enums.EnumDeviceStatus.ACTIVATED;  
+                        //        viewModel.Refresh();
+                        //    });
+                        //}
                     }
                     NotifyOfPropertyChange(() => ViewModelProvider);
                 });
@@ -304,14 +301,14 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             }
         }, cancellationToken);
 
-        if (_cancellationTokenSource != null || !_cancellationTokenSource.IsCancellationRequested)
+        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
         {
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        await DataInitialize(_cancellationTokenSource.Token).ConfigureAwait(false);
+        await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
         UpdateAction?.Invoke();
 
         // 4. 진행중 UI 닫기
@@ -324,7 +321,6 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - Attributes -
     private IDeviceDbService _dbService;
     private CameraDeviceProvider _deviceProvider;
-    private CameraOnvifService _cameraOnvifService;
     #endregion
 
 }

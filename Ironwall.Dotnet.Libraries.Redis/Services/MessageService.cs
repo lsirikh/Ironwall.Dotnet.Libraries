@@ -143,7 +143,7 @@ namespace Ironwall.Dotnet.Libraries.Redis.Services
         /// 프로그램 종료 시, 혹은 서비스 이용 종료 시, Redis 기능을 Dispose 하고 Redis의 소켓을 
         /// 닫는 종료 메커니즘을 포함하고 있는 메소드이다.
         /// </summary>
-        protected void UnegisterSubscribers()
+        protected async void UnegisterSubscribers()
         {
             try
             {
@@ -151,25 +151,66 @@ namespace Ironwall.Dotnet.Libraries.Redis.Services
 
                 if (Subscriber.IsConnected() && Subscriber.Multiplexer.IsConnected)
                 {
-                    Subscriber?.UnsubscribeAllAsync();
-                    Subscriber?.Multiplexer?.Close();
-                    Subscriber?.Multiplexer?.Dispose();
+                    try
+                    {
+                        // 모든 구독을 비동기로 해제하고 완료될 때까지 대기
+                        _log?.Info("[MessageService] Unsubscribing from all channels...");
+                        await Subscriber.UnsubscribeAllAsync();
+                        _log?.Info("[MessageService] Unsubscribed successfully.");
+                    }
+                    catch (ObjectDisposedException ex)
+                    {
+                        _log?.Warning($"[MessageService] Already disposed: {ex.Message}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log?.Error($"[MessageService] Unsubscribe error: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        // Multiplexer 종료 (비동기)
+                        if (Subscriber.Multiplexer != null && Subscriber.Multiplexer.IsConnected)
+                        {
+                            _log?.Info("[MessageService] Closing Redis connection...");
+                            await Subscriber.Multiplexer.CloseAsync(allowCommandsToComplete: false);
+                            _log?.Info("[MessageService] Connection closed.");
+                        }
+                    }
+                    catch (ObjectDisposedException ex)
+                    {
+                        _log?.Warning($"[MessageService] Already disposed: {ex.Message}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log?.Error($"[MessageService] Close error: {ex.Message}");
+                    }
                 }
-            }
-            catch (ComponentNotRegisteredException ex)
-            {
-                _log?.Error(ex.Message);
-                throw;
-            }
-            catch (ObjectDisposedException ex)
-            {
-                _log?.Error(ex.Message);
-                throw;
+
+                try
+                {
+                    if (Subscriber?.Multiplexer != null)
+                    {
+                        _log?.Info("[MessageService] Disposing Redis Multiplexer...");
+                        Subscriber.Multiplexer.Dispose();
+                        _log?.Info("[MessageService] Disposed successfully.");
+                    }
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    _log?.Warning($"[MessageService] Already disposed: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    _log?.Error($"[MessageService] Dispose error: {ex.Message}");
+                }
+
+                Subscriber = null;
+                _log?.Info("[MessageService] Unregister complete.");
             }
             catch (Exception ex)
             {
-                _log?.Error(ex.Message);
-                throw;
+                _log?.Error($"[MessageService] UnregisterSubscribersAsync Error: {ex.Message}");
             }
         }
 
