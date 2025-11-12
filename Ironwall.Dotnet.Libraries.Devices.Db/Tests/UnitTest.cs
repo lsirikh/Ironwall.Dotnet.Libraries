@@ -45,8 +45,8 @@ public sealed class DeviceDbFixture : IAsyncLifetime
     };
 
 
-    public int CtrlCount = 5;
-    public int SnsPerCtrl = 100;
+    public int CtrlCount = 3;
+    public int SnsPerCtrl = 80;
     public int CameraCount = 0;
 
     private readonly DeviceDbSetupModel _setup = new()
@@ -154,8 +154,9 @@ public sealed class DeviceDbFixture : IAsyncLifetime
             {
                 0 => EnumCameraMode.ETC,
                 1 => EnumCameraMode.ONVIF,
-                2 => EnumCameraMode.INNODEP_API,
-                3 => EnumCameraMode.NONE,
+                2 => EnumCameraMode.EMSTONE_API,
+                3 => EnumCameraMode.INNODEP_API,
+                4 => EnumCameraMode.NONE,
                 _ => EnumCameraMode.ONVIF
             };
 

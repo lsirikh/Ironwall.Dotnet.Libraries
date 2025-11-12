@@ -16,7 +16,6 @@ namespace Ironwall.Dotnet.Libraries.Api.Modules;
 ****************************************************************************/
 public class ApiModule : Module
 {
-
     #region - Ctors -
     public ApiModule(ILogService log, ApiSetupModel setup, string name = "default")
     {

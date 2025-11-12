@@ -10,6 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
     {
         NONE,
         ONVIF,
+        EMSTONE_API,
         INNODEP_API,
         ETC,
     }

@@ -1,0 +1,176 @@
+using Ironwall.Dotnet.Libraries.Api.Messages.Common;
+using Ironwall.Dotnet.Libraries.Api.Messages.Events;
+using Ironwall.Dotnet.Libraries.Base.Services;
+
+namespace Ironwall.Dotnet.Libraries.Events.Api.Services;
+/****************************************************************************
+   Purpose      : Event API Service Interface (GOP RESTful API 연동)
+   Created By   : GHLee
+   Created On   : 11/11/2025 12:00:00 AM
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+
+   Description  : GOP_Restful_Api_연동설계.md 기반 Event API 호출 서비스
+                  - RESTful API 표준 네이밍 컨벤션 사용 (Get/Create 패턴)
+                  - HTTP 기반 RESTful API 호출 래핑
+                  - ApiResponse/ApiListResponse 반환 타입 사용
+****************************************************************************/
+
+/// <summary>
+/// Event API 서비스 인터페이스
+/// <para>GOP RESTful API를 통한 Event CRUD 작업을 제공합니다.</para>
+/// <para>RESTful API 표준 네이밍 (Get/Create/Patch/Update/Delete)을 따릅니다.</para>
+/// </summary>
+public interface IEventApiService : IService
+{
+    // ────────────────────────── Detection Event ──────────────────────────
+
+    /// <summary>
+    /// GOP API를 통해 Detection Event 목록을 조회합니다.
+    /// <para>침입 탐지 이벤트를 날짜 범위와 필터로 검색합니다.</para>
+    /// </summary>
+    /// <param name="startDate">시작 날짜 (ISO 8601 형식, 예: 2025-01-01T00:00:00Z) (선택)</param>
+    /// <param name="endDate">종료 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="controller">Controller ID 필터 (선택)</param>
+    /// <param name="sensor">Sensor ID 필터 (선택)</param>
+    /// <param name="status">이벤트 상태 필터 (True, False) (선택)</param>
+    /// <param name="page">페이지 번호 (기본값: 1)</param>
+    /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Detection Event DTO 목록을 포함한 API 응답</returns>
+    Task<ApiListResponse<DetectionEventDto>> GetDetectionEventsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int? controller = null,
+        int? sensor = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 특정 ID의 Detection Event를 조회합니다.
+    /// </summary>
+    /// <param name="id">Detection Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Detection Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<DetectionEventDto>> GetDetectionEventByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 새로운 Detection Event를 생성합니다.
+    /// </summary>
+    /// <param name="dto">생성할 Detection Event의 데이터 전송 객체</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>생성된 Detection Event DTO를 포함한 API 응답 (ID 포함)</returns>
+    Task<ApiResponse<DetectionEventDto>> CreateDetectionEventAsync(
+        DetectionEventDto dto,
+        CancellationToken token = default);
+
+    // ────────────────────────── Malfunction Event ──────────────────────────
+
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event 목록을 조회합니다.
+    /// <para>장애/고장 이벤트를 날짜 범위와 필터로 검색합니다.</para>
+    /// </summary>
+    /// <param name="startDate">시작 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="endDate">종료 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="controller">Controller ID 필터 (선택)</param>
+    /// <param name="sensor">Sensor ID 필터 (선택)</param>
+    /// <param name="page">페이지 번호 (기본값: 1)</param>
+    /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Malfunction Event DTO 목록을 포함한 API 응답</returns>
+    Task<ApiListResponse<MalfunctionEventDto>> GetMalfunctionEventsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int? controller = null,
+        int? sensor = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 특정 ID의 Malfunction Event를 조회합니다.
+    /// </summary>
+    /// <param name="id">Malfunction Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Malfunction Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<MalfunctionEventDto>> GetMalfunctionEventByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 새로운 Malfunction Event를 생성합니다.
+    /// </summary>
+    /// <param name="dto">생성할 Malfunction Event의 데이터 전송 객체</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>생성된 Malfunction Event DTO를 포함한 API 응답 (ID 포함)</returns>
+    Task<ApiResponse<MalfunctionEventDto>> CreateMalfunctionEventAsync(
+        MalfunctionEventDto dto,
+        CancellationToken token = default);
+
+    // ────────────────────────── Connection Event ──────────────────────────
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event 목록을 조회합니다.
+    /// <para>디바이스 연결/해제 이벤트를 날짜 범위와 필터로 검색합니다.</para>
+    /// </summary>
+    /// <param name="startDate">시작 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="endDate">종료 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="controller">Controller ID 필터 (선택)</param>
+    /// <param name="sensor">Sensor ID 필터 (선택)</param>
+    /// <param name="page">페이지 번호 (기본값: 1)</param>
+    /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Connection Event DTO 목록을 포함한 API 응답</returns>
+    Task<ApiListResponse<ConnectionEventDto>> GetConnectionEventsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int? controller = null,
+        int? sensor = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 새로운 Connection Event를 생성합니다.
+    /// </summary>
+    /// <param name="dto">생성할 Connection Event의 데이터 전송 객체</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>생성된 Connection Event DTO를 포함한 API 응답 (ID 포함)</returns>
+    Task<ApiResponse<ConnectionEventDto>> CreateConnectionEventAsync(
+        ConnectionEventDto dto,
+        CancellationToken token = default);
+
+    // ────────────────────────── Action Event ──────────────────────────
+
+    /// <summary>
+    /// GOP API를 통해 Action Event 목록을 조회합니다.
+    /// <para>사용자 조치 이벤트를 날짜 범위로 검색합니다.</para>
+    /// </summary>
+    /// <param name="startDate">시작 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="endDate">종료 날짜 (ISO 8601 형식) (선택)</param>
+    /// <param name="page">페이지 번호 (기본값: 1)</param>
+    /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Action Event DTO 목록을 포함한 API 응답</returns>
+    Task<ApiListResponse<ActionEventDto>> GetActionEventsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 새로운 Action Event를 생성합니다.
+    /// </summary>
+    /// <param name="dto">생성할 Action Event의 데이터 전송 객체</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>생성된 Action Event DTO를 포함한 API 응답 (ID 포함)</returns>
+    Task<ApiResponse<ActionEventDto>> CreateActionEventAsync(
+        ActionEventCreateDto dto,
+        CancellationToken token = default);
+}
