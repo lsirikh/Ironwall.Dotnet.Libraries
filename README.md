@@ -380,46 +380,6 @@ protected override void ConfigureContainer(ContainerBuilder builder)
 
 상세한 기술 문서는 다음을 참조하세요:
 
-### 기술 문서 (Design 폴더)
-
-#### 서비스 아키텍처
-- **[서비스 아키텍처 보고서](Design/MonitoringSolution_ServiceArchitecture_Report.md)**
-  - DomainService, MessageService 분석
-  - 6개 데이터베이스 서비스 상세
-  - Redis, NATS 메시징 서비스
-  - Sound, ONVIF 서비스
-  - 8가지 아키텍처 패턴
-  - 서비스 라이프사이클 및 등록
-
-#### Gateway 라이브러리
-- **[Gateway 매뉴얼](Design/GatewayManual.md)** (v1.0.1)
-  - Gateway 라이브러리 기술 명세
-  - 프로젝트 구조 및 아키텍처
-  - Behavior 패턴 구현
-  - XAML 통합 가이드
-
-- **[Gateway 매뉴얼 보고서](Design/GatewayManual_Report.md)** (v1.0.1)
-  - Gateway 개발 과정 보고서
-  - Phase 1-8 구현 단계
-  - Behavior 패턴 도입 배경
-  - 문제 해결 과정
-
-- **[Gateway 통합 계획](Design/GatewayIntegration_Plan.md)**
-  - Gateway 모듈 통합 전략
-  - Dotnet.Monitoring.Solution 통합 방법
-  - 데이터베이스 스키마
-
-#### NATS 라이브러리
-- **[NATS 라이브러리 가이드](Design/Nats_Dotnet_Library.md)**
-  - NATS.Client.Core v2 통합
-  - Pub/Sub 및 Request/Reply 패턴
-  - 설정 및 사용 예제
-
-- **[NATS 라이브러리 보고서](Design/Nats_Dotnet_Library_Report.md)**
-  - NATS 개발 과정 문서
-  - 구현 단계별 상세 설명
-  - 문제 해결 및 최적화
-
 ### API 레퍼런스
 
 주요 인터페이스 및 기본 클래스:
@@ -797,7 +757,7 @@ public class ActionEventDto
 
 ---
 
-### v1.2.0 이전 (2025-09-01)
+### v1.2.0 이전 (2025-08-01)
 
 **작업자:** GH.LEE
 
