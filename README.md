@@ -220,6 +220,31 @@ NATS 메시징 (NATS.Client.Core v2)
 HTTP API 통합
 - `ApiService` - RESTful API 클라이언트
 - `ApiSetupModel` - API 설정
+- `HttpResponseMessageExtensions` - 응답 변환 확장 메서드
+- 타임아웃, 재시도 정책, 에러 처리 지원
+
+#### Ironwall.Dotnet.Libraries.Api.Messages
+GOP RESTful API DTO 정의
+- **Common**: `ApiResponse<T>`, `ApiListResponse<T>`, `PaginationDto`, `MetaDto`, `ApiError`
+- **Devices**: `ControllerDeviceDto`, `SensorDeviceDto`, `CameraDeviceDto`
+- **Events**: `DetectionEventDto`, `MalfunctionEventDto`, `ConnectionEventDto`, `ActionEventDto`, `ActionEventCreateDto`
+- **Integrations**: `EventMappingDto` - 3rd party 이벤트 매핑
+- **Defines**: `IEventDto` - 이벤트 공통 인터페이스
+- **Helpers**: `FromEventConverter` - 다형성 JSON 변환기
+
+#### Ironwall.Dotnet.Libraries.Devices.Api
+Device API 서비스 (GOP RESTful API 연동)
+- `IDeviceApiService` / `DeviceApiService`
+- Controller, Sensor, Camera CRUD 작업
+- 필터링, 페이지네이션, 정렬 지원
+- xUnit 단위 테스트 포함 (100% 커버리지)
+
+#### Ironwall.Dotnet.Libraries.Events.Api
+Event API 서비스 (GOP RESTful API 연동)
+- `IEventApiService` / `EventApiService`
+- Detection, Malfunction, Connection, Action 이벤트 CRUD
+- 날짜 범위 검색, 다중 필터 지원
+- xUnit 단위 테스트 포함 (100% 커버리지)
 
 ---
 
@@ -413,6 +438,109 @@ protected override void ConfigureContainer(ContainerBuilder builder)
 - `ConductorOneViewModel<T>` - 단일 활성 화면 관리
 - `BaseDataGridViewModel<T>` - DataGrid 패턴
 
+#### API 계층 (GOP RESTful API 통합)
+
+**기본 서비스**:
+- `IApiService` / `ApiService` - HTTP 클라이언트 기반 API 서비스
+- `IDeviceApiService` / `DeviceApiService` - Device CRUD 작업
+- `IEventApiService` / `EventApiService` - Event CRUD 작업
+
+**응답 타입**:
+- `ApiResponse<T>` - 단일 엔티티 응답
+- `ApiListResponse<T>` - 페이지네이션 목록 응답
+
+**사용 예제**:
+
+```csharp
+// 1. Autofac 모듈 등록
+builder.RegisterModule(new DeviceApiModule(setup, log, 100));
+builder.RegisterModule(new EventApiModule(setup, log, 110));
+
+// 2. Device API 사용
+var deviceService = container.Resolve<IDeviceApiService>();
+
+// Controller 목록 조회 (페이지네이션 + 필터링)
+var response = await deviceService.GetControllersAsync(
+    groupDevice: 1,
+    status: "ACTIVATED",
+    includeSensors: true,
+    page: 1,
+    limit: 20
+);
+
+if (response.Success)
+{
+    Console.WriteLine($"Total: {response.Pagination.Total}");
+    foreach (var controller in response.Data)
+    {
+        Console.WriteLine($"Controller: {controller.NameDevice} ({controller.Id})");
+    }
+}
+
+// Controller 생성
+var newController = new ControllerDeviceDto
+{
+    GroupDevice = 1,
+    NameDevice = "Controller-01",
+    Status = "ACTIVATED"
+};
+var createResponse = await deviceService.CreateControllerAsync(newController);
+
+// 3. Event API 사용
+var eventService = container.Resolve<IEventApiService>();
+
+// Detection Event 조회 (날짜 범위 필터)
+var events = await eventService.GetDetectionEventsAsync(
+    startDate: "2025-01-01T00:00:00Z",
+    endDate: "2025-12-31T23:59:59Z",
+    controller: 1,
+    page: 1,
+    limit: 50
+);
+
+// Action Event 생성 (다형성 이벤트 참조)
+var actionEvent = new ActionEventCreateDto
+{
+    TypeEvent = "Action",
+    Content = "침입 경보 확인 완료",
+    User = "admin",
+    FromEvent = 123,              // Detection Event ID
+    FromEventType = "detection",  // "detection" or "malfunction"
+    Datetime = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+};
+var actionResponse = await eventService.CreateActionEventAsync(actionEvent);
+
+// 4. 응답의 FromEvent 다형성 처리 (GET 시)
+var actionDto = await eventService.GetActionEventsAsync();
+if (actionDto.Data.Any())
+{
+    var firstAction = actionDto.Data.First();
+    if (firstAction.FromEvent is DetectionEventDto detection)
+    {
+        Console.WriteLine($"Detection Result: {detection.Result}");
+    }
+    else if (firstAction.FromEvent is MalfunctionEventDto malfunction)
+    {
+        Console.WriteLine($"Malfunction Type: {malfunction.TypeMalfunction}");
+    }
+}
+```
+
+**에러 처리**:
+
+```csharp
+var response = await deviceService.GetControllersAsync();
+
+if (!response.Success)
+{
+    Console.WriteLine($"Error: {response.Meta.Message}");
+    if (response.Error != null)
+    {
+        Console.WriteLine($"Detail: {response.Error.Detail}");
+    }
+}
+```
+
 ## 개발 환경
 
 ### 빌드
@@ -443,6 +571,159 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 ```
 
 ## 변경 이력
+
+### v1.4.0 (2025-11-12)
+
+**작업자:** GH.LEE
+
+#### 주요 변경사항
+
+##### GOP RESTful API 통합 라이브러리 신규 개발
+
+**Ironwall.Dotnet.Libraries.Api.Messages**
+- **목적**: GOP RESTful API와의 데이터 교환을 위한 DTO(Data Transfer Object) 정의
+- **구조**:
+  - `Common/`: 공통 응답 타입 (`ApiResponse<T>`, `ApiListResponse<T>`, `PaginationDto`, `MetaDto`, `ApiError`)
+  - `Devices/`: 장치 DTO (`ControllerDeviceDto`, `SensorDeviceDto`, `CameraDeviceDto`)
+  - `Events/`: 이벤트 DTO (`DetectionEventDto`, `MalfunctionEventDto`, `ConnectionEventDto`, `ActionEventDto`, `ActionEventCreateDto`)
+  - `Integrations/`: 3rd party 연동 DTO (`EventMappingDto`)
+  - `Defines/`: 공통 인터페이스 (`IEventDto`)
+  - `Helpers/`: JSON 변환기 (`FromEventConverter`)
+
+**핵심 기능**:
+1. **다형성 JSON 직렬화/역직렬화**
+   - `IEventDto` 인터페이스로 `DetectionEventDto`, `MalfunctionEventDto` 통합
+   - `FromEventConverter`: `type_event` 필드 기반 자동 타입 결정
+   - `ActionEventDto.FromEvent` 필드에서 다중 이벤트 타입 지원
+
+2. **Request/Response DTO 분리**
+   - `ActionEventCreateDto`: POST 요청용 (flat 구조, integer `from_event`)
+   - `ActionEventDto`: GET 응답용 (nested 구조, `IEventDto FromEvent`)
+   - GOP API 요구사항 준수 (`from_event`, `from_event_type` 필드)
+
+3. **공통 응답 래퍼**
+   - `ApiResponse<T>`: 단일 엔티티 응답
+   - `ApiListResponse<T>`: 페이지네이션 목록 응답 (meta, pagination 포함)
+   - 일관된 에러 처리 (`ApiError` 구조)
+
+**Ironwall.Dotnet.Libraries.Devices.Api**
+- **목적**: Device 관련 GOP RESTful API 호출 서비스
+- **주요 클래스**:
+  - `IDeviceApiService` / `DeviceApiService`: Device API 인터페이스 및 구현
+  - `ResponseHelper`: HTTP 응답 변환 헬퍼
+  - `DeviceApiModule`: Autofac 의존성 주입 모듈
+  - `UnitTest`: xUnit 단위 테스트 (15개 테스트, 100% 통과)
+
+**제공 기능**:
+- **Controller Device CRUD**
+  - `GetControllersAsync()`: Controller 목록 조회 (필터: group, status, includeSensors)
+  - `GetControllerByIdAsync()`: ID로 Controller 조회
+  - `CreateControllerAsync()`: 새 Controller 생성
+  - `PatchControllerAsync()`: 부분 업데이트 (PATCH)
+  - `UpdateControllerAsync()`: 전체 교체 (PUT)
+  - `DeleteControllerAsync()`: Controller 삭제
+
+- **Sensor Device CRUD**
+  - `GetSensorsAsync()`: Sensor 목록 조회 (필터: controller, group, type, status)
+  - `GetSensorByIdAsync()`: ID로 Sensor 조회
+  - `CreateSensorAsync()`: 새 Sensor 생성
+  - `PatchSensorAsync()`: 부분 업데이트
+  - `UpdateSensorAsync()`: 전체 교체
+  - `DeleteSensorAsync()`: Sensor 삭제
+
+- **Camera Device CRUD**
+  - `GetCamerasAsync()`: Camera 목록 조회 (필터: group, mode, category, status)
+  - `GetCameraByIdAsync()`: ID로 Camera 조회
+  - `CreateCameraAsync()`: 새 Camera 생성
+  - `PatchCameraAsync()`: 부분 업데이트
+  - `UpdateCameraAsync()`: 전체 교체
+  - `DeleteCameraAsync()`: Camera 삭제
+
+**Ironwall.Dotnet.Libraries.Events.Api**
+- **목적**: Event 관련 GOP RESTful API 호출 서비스
+- **주요 클래스**:
+  - `IEventApiService` / `EventApiService`: Event API 인터페이스 및 구현
+  - `ResponseHelper`: HTTP 응답 변환 헬퍼
+  - `EventApiModule`: Autofac 의존성 주입 모듈
+  - `UnitTest`: xUnit 단위 테스트 (15개 테스트, 100% 통과)
+
+**제공 기능**:
+- **Detection Event (침입 탐지)**
+  - `GetDetectionEventsAsync()`: 날짜 범위, controller, sensor, status 필터링
+  - `GetDetectionEventByIdAsync()`: ID로 이벤트 조회
+  - `CreateDetectionEventAsync()`: 새 Detection 이벤트 생성
+
+- **Malfunction Event (장애/고장)**
+  - `GetMalfunctionEventsAsync()`: 날짜 범위, controller, sensor 필터링
+  - `GetMalfunctionEventByIdAsync()`: ID로 이벤트 조회
+  - `CreateMalfunctionEventAsync()`: 새 Malfunction 이벤트 생성
+
+- **Connection Event (연결/해제)**
+  - `GetConnectionEventsAsync()`: 날짜 범위, controller, sensor 필터링
+  - `CreateConnectionEventAsync()`: 새 Connection 이벤트 생성
+
+- **Action Event (사용자 조치)**
+  - `GetActionEventsAsync()`: 날짜 범위 필터링
+  - `CreateActionEventAsync()`: 새 Action 이벤트 생성 (ActionEventCreateDto 사용)
+
+#### 기술 상세
+
+**1. RESTful API 표준 네이밍 컨벤션**
+- `Get{Resource}Async()`: 목록 조회 (GET)
+- `Get{Resource}ByIdAsync()`: 단일 조회 (GET)
+- `Create{Resource}Async()`: 생성 (POST)
+- `Patch{Resource}Async()`: 부분 업데이트 (PATCH)
+- `Update{Resource}Async()`: 전체 교체 (PUT)
+- `Delete{Resource}Async()`: 삭제 (DELETE)
+
+**2. 페이지네이션 및 필터링**
+```csharp
+Task<ApiListResponse<T>> GetResourcesAsync(
+    int? filter1 = null,
+    string? filter2 = null,
+    int page = 1,
+    int limit = 20,
+    CancellationToken token = default);
+```
+
+**3. 응답 구조**
+```json
+{
+  "data": [...],
+  "meta": {
+    "code": 200,
+    "message": "Success"
+  },
+  "pagination": {
+    "total": 100,
+    "page": 1,
+    "limit": 20,
+    "total_pages": 5
+  }
+}
+```
+
+**4. 다형성 이벤트 처리**
+```csharp
+public class ActionEventDto
+{
+    [JsonProperty("from_event", Order = 5)]
+    [JsonConverter(typeof(FromEventConverter))]
+    public IEventDto? FromEvent { get; set; }  // DetectionEventDto 또는 MalfunctionEventDto
+}
+```
+
+#### 테스트 커버리지
+- **Devices.Api**: 15개 테스트 ✅ (Controllers: 5, Sensors: 5, Cameras: 5)
+- **Events.Api**: 15개 테스트 ✅ (Detection: 3, Malfunction: 3, Connection: 2, Action: 2, Integration: 5)
+- **빌드**: 0 errors, 0 warnings ✅
+
+#### 문서화
+- `GOP_Restful_Api_연동설계.md`: API 연동 설계 문서 (Design 폴더)
+- `README_FromEvent.md`: FromEvent 다형성 사용법 문서
+- 각 메서드에 XML 주석을 통한 상세 설명 포함
+
+---
 
 ### v1.3.1 (2025-10-28)
 
@@ -569,6 +850,6 @@ Copyright (C) 2023-2025 Sensorway Co., Ltd. All rights reserved.
 
 ---
 
-**문서 버전**: 2.0.0
-**최종 업데이트**: 2025-10-30
+**문서 버전**: 2.1.0
+**최종 업데이트**: 2025-11-12
 **문서 상태**: ✅ 최종 승인
