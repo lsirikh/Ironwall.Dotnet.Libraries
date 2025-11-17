@@ -34,7 +34,7 @@ public class ActionEventCreateDto
     /// <summary>
     /// 원본 이벤트 타입
     /// </summary>
-    [JsonProperty("from_event_type", Order = 5)]
+    [JsonProperty("from_type_event", Order = 5)]
     public string FromEventType { get; set; } = string.Empty;
 
     /// <summary>

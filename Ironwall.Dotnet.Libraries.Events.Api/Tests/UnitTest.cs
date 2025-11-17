@@ -134,7 +134,7 @@ public class EventApiServiceTests
 
         // Act
         var response = await service.GetDetectionEventsAsync(
-            startDate: DateTime.Now.AddDays(-1).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            startDate: DateTime.Now.AddDays(-3).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             endDate: DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
 
         // Assert
@@ -203,6 +203,105 @@ public class EventApiServiceTests
         Assert.NotNull(response);
         Assert.True(response.Success);
         Assert.NotNull(response.Data);
+    }
+
+    /// <summary>
+    /// Detection Event 수정 (부분) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "05-1. Patch DetectionEvent")]
+    public async Task PatchDetectionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new DetectionEventDto
+        {
+            Sequence = 20,
+            ActionReported = "True",
+            //Result = "DISTANCE_SENSOR"
+            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        };
+
+        // Act
+        var response = await service.PatchDetectionEventAsync(2, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal("True", response.Data.ActionReported);
+        }
+    }
+
+    /// <summary>
+    /// Detection Event 수정 (전체) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "05-2. Update DetectionEvent")]
+    public async Task UpdateDetectionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new DetectionEventDto
+        {
+            GroupEvent = "1",
+            TypeEvent = "Intrusion",
+            Controller = 1,
+            Sensor = 6,
+            TypeDevice = "Fence",
+            Sequence = 1,
+            ActionReported = "False",
+            Result = "VIBRATION_SENSOR",
+            //Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            Datetime = "2025-11-14T11:20:11.512331"
+        };
+
+        // Act
+        var response = await service.UpdateDetectionEventAsync(6, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(20, response.Data.Sequence);
+        }
+    }
+
+    /// <summary>
+    /// Detection Event 삭제 API 테스트
+    /// </summary>
+    [Fact(DisplayName = "05-3. Delete DetectionEvent")]
+    public async Task DeleteDetectionEvent_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.DeleteDetectionEventAsync(2);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.True(response.Data);
+        }
     }
     #endregion
 
@@ -298,6 +397,107 @@ public class EventApiServiceTests
             $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
         Assert.NotNull(response.Data);
     }
+
+    /// <summary>
+    /// Malfunction Event 수정 (부분) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "08-1. Patch MalfunctionEvent")]
+    public async Task PatchMalfunctionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new MalfunctionEventDto
+        {
+            ActionReported = "True",
+            Reason = "FAULT_MULTI"
+        };
+
+        // Act
+        var response = await service.PatchMalfunctionEventAsync(1, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal("FAULT_MULTI", response.Data.Reason);
+        }
+    }
+
+    /// <summary>
+    /// Malfunction Event 수정 (전체) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "08-2. Update MalfunctionEvent")]
+    public async Task UpdateMalfunctionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new MalfunctionEventDto
+        {
+            GroupEvent = "group_fault_002_updated",
+            TypeEvent = "Fault",
+            Controller = 1,
+            Sensor = 4,
+            TypeDevice = "Multi",
+            Sequence = 15,
+            ActionReported = "True",
+            Reason = "FAULT_ETC",
+            FirstStart = 2,
+            FirstEnd = 2,
+            SecondStart = 5,
+            SecondEnd = 5,
+            Status = "False",
+            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        };
+
+        // Act
+        var response = await service.UpdateMalfunctionEventAsync(1, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(15, response.Data.Sequence);
+        }
+    }
+
+    /// <summary>
+    /// Malfunction Event 삭제 API 테스트
+    /// </summary>
+    [Fact(DisplayName = "08-3. Delete MalfunctionEvent")]
+    public async Task DeleteMalfunctionEvent_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.DeleteMalfunctionEventAsync(1);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.True(response.Data);
+        }
+    }
     #endregion
 
     #region - Connection Event API Tests -
@@ -324,6 +524,32 @@ public class EventApiServiceTests
         Assert.NotNull(response);
         Assert.True(response.Success);
         Assert.NotNull(response.Data);
+    }
+
+    /// <summary>
+    /// Connection Event 단일 조회 API 테스트
+    /// </summary>
+    [Fact(DisplayName = "09-1. Get ConnectionEvent By ID")]
+    public async Task GetConnectionEventById_Should_Return_Single()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.GetConnectionEventByIdAsync(1);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(1, response.Data.Id);
+        }
     }
 
     /// <summary>
@@ -359,6 +585,100 @@ public class EventApiServiceTests
         Assert.True(response.Success);
         Assert.NotNull(response.Data);
     }
+
+    /// <summary>
+    /// Connection Event 수정 (부분) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "10-1. Patch ConnectionEvent")]
+    public async Task PatchConnectionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new ConnectionEventDto
+        {
+            Sequence = 10,
+            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        };
+
+        // Act
+        var response = await service.PatchConnectionEventAsync(1, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(10, response.Data.Sequence);
+        }
+    }
+
+    /// <summary>
+    /// Connection Event 수정 (전체) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "10-2. Update ConnectionEvent")]
+    public async Task UpdateConnectionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new ConnectionEventDto
+        {
+            GroupEvent = "group_conn_003_updated",
+            TypeEvent = "Connection",
+            Controller = 1,
+            Sensor = 3,
+            TypeDevice = "PIR",
+            Sequence = 12,
+            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        };
+
+        // Act
+        var response = await service.UpdateConnectionEventAsync(1, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(12, response.Data.Sequence);
+        }
+    }
+
+    /// <summary>
+    /// Connection Event 삭제 API 테스트
+    /// </summary>
+    [Fact(DisplayName = "10-3. Delete ConnectionEvent")]
+    public async Task DeleteConnectionEvent_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.DeleteConnectionEventAsync(1);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.True(response.Data);
+        }
+    }
     #endregion
 
     #region - Action Event API Tests -
@@ -378,13 +698,39 @@ public class EventApiServiceTests
 
         // Act
         var response = await service.GetActionEventsAsync(
-            startDate: DateTime.Now.AddDays(-1).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            startDate: DateTime.Now.AddDays(-10).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             endDate: DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
 
         // Assert
         Assert.NotNull(response);
         Assert.True(response.Success);
         Assert.NotNull(response.Data);
+    }
+
+    /// <summary>
+    /// Action Event 단일 조회 API 테스트
+    /// </summary>
+    [Fact(DisplayName = "11-1. Get ActionEvent By ID")]
+    public async Task GetActionEventById_Should_Return_Single()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.GetActionEventByIdAsync(1);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(1, response.Data.Id);
+        }
     }
 
     /// <summary>
@@ -405,9 +751,9 @@ public class EventApiServiceTests
         {
             TypeEvent = "Action",
             Content = "Test action content",  // Required by GOP API
-            User = "admin",  // Required by GOP API
-            FromEvent = 1,  // Required by GOP API
-            FromEventType = "detection",  // Required by GOP API (must be 'detection', 'malfunction', or 'connection')
+            User = "admin1",  // Required by GOP API
+            FromEvent = 6,  // Required by GOP API
+            FromEventType = "Intrusion",  // Required by GOP API (must be 'detection', 'malfunction', or 'connection')
             Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
@@ -419,6 +765,96 @@ public class EventApiServiceTests
         Assert.True(response.Success,
             $"API Error: {response.Error?.Code} - {response.Message}. Details: {response.Error?.Details}");
         Assert.NotNull(response.Data);
+    }
+
+    /// <summary>
+    /// Action Event 수정 (부분) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "12-1. Patch ActionEvent")]
+    public async Task PatchActionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new ActionEventDto
+        {
+            Content = "침입 탐지 확인 완료 - 오탐지로 판명",
+            User = "operator_kim"
+        };
+
+        // Act
+        var response = await service.PatchActionEventAsync(1, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal("operator_kim", response.Data.User);
+        }
+    }
+
+    /// <summary>
+    /// Action Event 수정 (전체) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "12-2. Update ActionEvent")]
+    public async Task UpdateActionEvent_Should_Return_Updated()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        var dto = new ActionEventDto
+        {
+            Content = "침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청",
+            User = "operator_park",
+            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        };
+
+        // Act
+        var response = await service.UpdateActionEventAsync(1, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal("operator_park", response.Data.User);
+        }
+    }
+
+    /// <summary>
+    /// Action Event 삭제 API 테스트
+    /// </summary>
+    [Fact(DisplayName = "12-3. Delete ActionEvent")]
+    public async Task DeleteActionEvent_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new EventApiModule(_logService, _setupModel, "EventApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IEventApiService>("EventApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.DeleteActionEventAsync(1);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.True(response.Data);
+        }
     }
     #endregion
 

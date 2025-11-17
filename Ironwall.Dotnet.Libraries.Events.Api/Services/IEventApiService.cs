@@ -69,6 +69,42 @@ public interface IEventApiService : IService
         DetectionEventDto dto,
         CancellationToken token = default);
 
+    /// <summary>
+    /// GOP API를 통해 Detection Event의 일부 속성을 수정합니다 (PATCH).
+    /// <para>제공된 필드만 업데이트되며, null 또는 누락된 필드는 무시됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Detection Event의 데이터베이스 ID</param>
+    /// <param name="dto">수정할 속성을 포함한 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Detection Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<DetectionEventDto>> PatchDetectionEventAsync(
+        int id,
+        DetectionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Detection Event의 전체 데이터를 교체합니다 (PUT).
+    /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Detection Event의 데이터베이스 ID</param>
+    /// <param name="dto">전체 Detection Event 데이터를 포함한 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Detection Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<DetectionEventDto>> UpdateDetectionEventAsync(
+        int id,
+        DetectionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Detection Event를 삭제합니다.
+    /// </summary>
+    /// <param name="id">삭제할 Detection Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    Task<ApiResponse<bool>> DeleteDetectionEventAsync(
+        int id,
+        CancellationToken token = default);
+
     // ────────────────────────── Malfunction Event ──────────────────────────
 
     /// <summary>
@@ -112,6 +148,42 @@ public interface IEventApiService : IService
         MalfunctionEventDto dto,
         CancellationToken token = default);
 
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event의 일부 속성을 수정합니다 (PATCH).
+    /// <para>제공된 필드만 업데이트되며, null 또는 누락된 필드는 무시됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Malfunction Event의 데이터베이스 ID</param>
+    /// <param name="dto">수정할 속성을 포함한 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Malfunction Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<MalfunctionEventDto>> PatchMalfunctionEventAsync(
+        int id,
+        MalfunctionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event의 전체 데이터를 교체합니다 (PUT).
+    /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Malfunction Event의 데이터베이스 ID</param>
+    /// <param name="dto">전체 Malfunction Event 데이터를 포함한 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Malfunction Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<MalfunctionEventDto>> UpdateMalfunctionEventAsync(
+        int id,
+        MalfunctionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event를 삭제합니다.
+    /// </summary>
+    /// <param name="id">삭제할 Malfunction Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    Task<ApiResponse<bool>> DeleteMalfunctionEventAsync(
+        int id,
+        CancellationToken token = default);
+
     // ────────────────────────── Connection Event ──────────────────────────
 
     /// <summary>
@@ -136,6 +208,16 @@ public interface IEventApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// GOP API를 통해 특정 ID의 Connection Event를 조회합니다.
+    /// </summary>
+    /// <param name="id">Connection Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Connection Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<ConnectionEventDto>> GetConnectionEventByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    /// <summary>
     /// GOP API를 통해 새로운 Connection Event를 생성합니다.
     /// </summary>
     /// <param name="dto">생성할 Connection Event의 데이터 전송 객체</param>
@@ -143,6 +225,42 @@ public interface IEventApiService : IService
     /// <returns>생성된 Connection Event DTO를 포함한 API 응답 (ID 포함)</returns>
     Task<ApiResponse<ConnectionEventDto>> CreateConnectionEventAsync(
         ConnectionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event의 일부 속성을 수정합니다 (PATCH).
+    /// <para>제공된 필드만 업데이트되며, null 또는 누락된 필드는 무시됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Connection Event의 데이터베이스 ID</param>
+    /// <param name="dto">수정할 속성을 포함한 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Connection Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<ConnectionEventDto>> PatchConnectionEventAsync(
+        int id,
+        ConnectionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event의 전체 데이터를 교체합니다 (PUT).
+    /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Connection Event의 데이터베이스 ID</param>
+    /// <param name="dto">전체 Connection Event 데이터를 포함한 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Connection Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<ConnectionEventDto>> UpdateConnectionEventAsync(
+        int id,
+        ConnectionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event를 삭제합니다.
+    /// </summary>
+    /// <param name="id">삭제할 Connection Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    Task<ApiResponse<bool>> DeleteConnectionEventAsync(
+        int id,
         CancellationToken token = default);
 
     // ────────────────────────── Action Event ──────────────────────────
@@ -165,6 +283,16 @@ public interface IEventApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// GOP API를 통해 특정 ID의 Action Event를 조회합니다.
+    /// </summary>
+    /// <param name="id">Action Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Action Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<ActionEventDto>> GetActionEventByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    /// <summary>
     /// GOP API를 통해 새로운 Action Event를 생성합니다.
     /// </summary>
     /// <param name="dto">생성할 Action Event의 데이터 전송 객체</param>
@@ -172,5 +300,41 @@ public interface IEventApiService : IService
     /// <returns>생성된 Action Event DTO를 포함한 API 응답 (ID 포함)</returns>
     Task<ApiResponse<ActionEventDto>> CreateActionEventAsync(
         ActionEventCreateDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Action Event의 일부 속성을 수정합니다 (PATCH).
+    /// <para>제공된 필드만 업데이트되며, null 또는 누락된 필드는 무시됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Action Event의 데이터베이스 ID</param>
+    /// <param name="dto">수정할 속성을 포함한 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<ActionEventDto>> PatchActionEventAsync(
+        int id,
+        ActionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Action Event의 전체 데이터를 교체합니다 (PUT).
+    /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
+    /// </summary>
+    /// <param name="id">수정할 Action Event의 데이터베이스 ID</param>
+    /// <param name="dto">전체 Action Event 데이터를 포함한 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
+    Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(
+        int id,
+        ActionEventDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// GOP API를 통해 Action Event를 삭제합니다.
+    /// </summary>
+    /// <param name="id">삭제할 Action Event의 데이터베이스 ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    Task<ApiResponse<bool>> DeleteActionEventAsync(
+        int id,
         CancellationToken token = default);
 }

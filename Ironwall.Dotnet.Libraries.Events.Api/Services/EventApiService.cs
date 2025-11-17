@@ -160,6 +160,71 @@ public class EventApiService : IEventApiService
             return ApiResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", "Failed to create detection event", ex.Message);
         }
     }
+
+    /// <summary>
+    /// GOP API를 통해 Detection Event의 일부 속성을 수정합니다.
+    /// <para>PATCH /events/detections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Detection Event ID</param>
+    /// <param name="dto">수정할 Detection Event 정보 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Detection Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<DetectionEventDto>> PatchDetectionEventAsync(int id, DetectionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"events/detections/{id}", dto);
+            return await response.ToApiResponseAsync<DetectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchDetectionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to patch detection event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Detection Event의 전체 데이터를 교체합니다.
+    /// <para>PUT /events/detections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Detection Event ID</param>
+    /// <param name="dto">전체 Detection Event 정보 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Detection Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<DetectionEventDto>> UpdateDetectionEventAsync(int id, DetectionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"events/detections/{id}", dto);
+            return await response.ToApiResponseAsync<DetectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateDetectionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to update detection event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Detection Event를 삭제합니다.
+    /// <para>DELETE /events/detections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">삭제할 Detection Event ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    public async Task<ApiResponse<bool>> DeleteDetectionEventAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"events/detections/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteDetectionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete detection event {id}", ex.Message);
+        }
+    }
     #endregion
 
     #region - Malfunction Event API -
@@ -247,6 +312,71 @@ public class EventApiService : IEventApiService
             return ApiResponse<MalfunctionEventDto>.CreateError("INTERNAL_ERROR", "Failed to create malfunction event", ex.Message);
         }
     }
+
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event의 일부 속성을 수정합니다.
+    /// <para>PATCH /events/malfunctions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Malfunction Event ID</param>
+    /// <param name="dto">수정할 Malfunction Event 정보 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Malfunction Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<MalfunctionEventDto>> PatchMalfunctionEventAsync(int id, MalfunctionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"events/malfunctions/{id}", dto);
+            return await response.ToApiResponseAsync<MalfunctionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchMalfunctionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<MalfunctionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to patch malfunction event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event의 전체 데이터를 교체합니다.
+    /// <para>PUT /events/malfunctions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Malfunction Event ID</param>
+    /// <param name="dto">전체 Malfunction Event 정보 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Malfunction Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<MalfunctionEventDto>> UpdateMalfunctionEventAsync(int id, MalfunctionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"events/malfunctions/{id}", dto);
+            return await response.ToApiResponseAsync<MalfunctionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateMalfunctionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<MalfunctionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to update malfunction event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Malfunction Event를 삭제합니다.
+    /// <para>DELETE /events/malfunctions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">삭제할 Malfunction Event ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    public async Task<ApiResponse<bool>> DeleteMalfunctionEventAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"events/malfunctions/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteMalfunctionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete malfunction event {id}", ex.Message);
+        }
+    }
     #endregion
 
     #region - Connection Event API -
@@ -313,6 +443,92 @@ public class EventApiService : IEventApiService
             return ApiResponse<ConnectionEventDto>.CreateError("INTERNAL_ERROR", "Failed to create connection event", ex.Message);
         }
     }
+
+    /// <summary>
+    /// GOP API를 통해 특정 ID의 Connection Event를 조회합니다.
+    /// <para>GET /events/connections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">Connection Event ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Connection Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<ConnectionEventDto>> GetConnectionEventByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"events/connections/{id}");
+            return await response.ToApiResponseAsync<ConnectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetConnectionEventByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<ConnectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get connection event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event의 일부 속성을 수정합니다.
+    /// <para>PATCH /events/connections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Connection Event ID</param>
+    /// <param name="dto">수정할 Connection Event 정보 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Connection Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<ConnectionEventDto>> PatchConnectionEventAsync(int id, ConnectionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"events/connections/{id}", dto);
+            return await response.ToApiResponseAsync<ConnectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchConnectionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<ConnectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to patch connection event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event의 전체 데이터를 교체합니다.
+    /// <para>PUT /events/connections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Connection Event ID</param>
+    /// <param name="dto">전체 Connection Event 정보 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Connection Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<ConnectionEventDto>> UpdateConnectionEventAsync(int id, ConnectionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"events/connections/{id}", dto);
+            return await response.ToApiResponseAsync<ConnectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateConnectionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<ConnectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to update connection event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Connection Event를 삭제합니다.
+    /// <para>DELETE /events/connections/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">삭제할 Connection Event ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    public async Task<ApiResponse<bool>> DeleteConnectionEventAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"events/connections/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteConnectionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete connection event {id}", ex.Message);
+        }
+    }
     #endregion
 
     #region - Action Event API -
@@ -371,6 +587,92 @@ public class EventApiService : IEventApiService
         {
             _log?.Error($"[{nameof(CreateActionEventAsync)}] Error: {ex.Message}");
             return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", "Failed to create action event", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 특정 ID의 Action Event를 조회합니다.
+    /// <para>GET /events/actions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">Action Event ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>Action Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<ActionEventDto>> GetActionEventByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"events/actions/{id}");
+            return await response.ToApiResponseAsync<ActionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetActionEventByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get action event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Action Event의 일부 속성을 수정합니다.
+    /// <para>PATCH /events/actions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Action Event ID</param>
+    /// <param name="dto">수정할 Action Event 정보 DTO (부분 업데이트)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<ActionEventDto>> PatchActionEventAsync(int id, ActionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"events/actions/{id}", dto);
+            return await response.ToApiResponseAsync<ActionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchActionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to patch action event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Action Event의 전체 데이터를 교체합니다.
+    /// <para>PUT /events/actions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">수정할 Action Event ID</param>
+    /// <param name="dto">전체 Action Event 정보 DTO</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
+    public async Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(int id, ActionEventDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"events/actions/{id}", dto);
+            return await response.ToApiResponseAsync<ActionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateActionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to update action event {id}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Action Event를 삭제합니다.
+    /// <para>DELETE /events/actions/{id} 엔드포인트 호출</para>
+    /// </summary>
+    /// <param name="id">삭제할 Action Event ID</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
+    public async Task<ApiResponse<bool>> DeleteActionEventAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"events/actions/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteActionEventAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete action event {id}", ex.Message);
         }
     }
     #endregion
