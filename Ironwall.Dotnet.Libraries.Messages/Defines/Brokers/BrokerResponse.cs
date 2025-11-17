@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 using System;
 
-namespace Ironwall.Dotnet.Libraries.Messages.Defines;
+namespace Ironwall.Dotnet.Libraries.Messages.Defines.Brokers;
 /****************************************************************************
    Purpose      : Generic Body를 지원하는 응답 메시지
    Created By   : GHLee
@@ -12,15 +12,15 @@ namespace Ironwall.Dotnet.Libraries.Messages.Defines;
 ****************************************************************************/
 
 /// <summary>
-/// Generic Body를 지원하는 ResponseMessage
+/// Generic Body를 지원하는 BrokerResponse
 /// </summary>
-/// <typeparam name="TBody">Body 타입</typeparam>
-public class ResponseMessage<TBody> : BaseMessage<TBody> where TBody : class
+/// <typeparam name="TBody">Data 타입</typeparam>
+public class BrokerResponse<TBody> : BaseMessage<TBody> where TBody : class
 {
-    public ResponseMessage()
+    public BrokerResponse()
     {
-        MType = EnumMessageType.RSP;
-        ReqId = string.Empty;
+        TypeMessage = "RSP";
+        RequestId = string.Empty;
         Message = string.Empty;
     }
 
@@ -28,7 +28,7 @@ public class ResponseMessage<TBody> : BaseMessage<TBody> where TBody : class
     /// 원본 요청 메시지 ID
     /// </summary>
     [JsonProperty(Order = 7, PropertyName = "req_id")]
-    public string ReqId { get; set; }
+    public string RequestId { get; set; }
 
     /// <summary>
     /// 처리 성공 여부
@@ -44,13 +44,13 @@ public class ResponseMessage<TBody> : BaseMessage<TBody> where TBody : class
 }
 
 /// <summary>
-/// Non-Generic ResponseMessage (Body 없는 단순 응답용)
+/// Non-Generic BrokerResponse (Data 없는 단순 응답용)
 /// </summary>
-public class ResponseMessage : BaseMessage
+public class ResponseMessage : BaseBrokerMessage
 {
     public ResponseMessage()
     {
-        MType = EnumMessageType.RSP;
+        TypeMessage = "RSP";
         ReqId = string.Empty;
         Message = string.Empty;
     }

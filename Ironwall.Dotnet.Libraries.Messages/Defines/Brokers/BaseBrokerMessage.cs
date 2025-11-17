@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 using System;
 
-namespace Ironwall.Dotnet.Libraries.Messages.Defines;
+namespace Ironwall.Dotnet.Libraries.Messages.Defines.Brokers;
 /****************************************************************************
    Purpose      : 모든 메시지의 기본 클래스 (Non-Generic)                                                      
    Created By   : GHLee                                                
@@ -10,7 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Defines;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public abstract class BaseMessage
+public abstract class BaseBrokerMessage
 {
     /// <summary>
     /// 메시지 고유 식별자 (GUID)
@@ -21,14 +21,14 @@ public abstract class BaseMessage
     /// <summary>
     /// 메시지 타입 (REQ, RSP, ACK 등)
     /// </summary>
-    [JsonProperty(Order = 2, PropertyName = "m_type")]
-    public EnumMessageType MType { get; set; }
+    [JsonProperty(Order = 2, PropertyName = "type_message")]
+    public string TypeMessage { get; set; }=string.Empty;
 
     /// <summary>
     /// 명령 타입 (EVENT_CALL 등)
     /// </summary>
-    [JsonProperty(Order = 3, PropertyName = "cmd")]
-    public EnumCommandType Cmd { get; set; }
+    [JsonProperty(Order = 3, PropertyName = "type_command")]
+    public string Command { get; set; }= string.Empty;
 
     /// <summary>
     /// 발신 시스템 UUID
@@ -37,16 +37,10 @@ public abstract class BaseMessage
     public string From { get; set; } = string.Empty;
 
     /// <summary>
-    /// 수신 시스템 UUID
+    /// 응답 생성 시각 (ISO 8601 형식)
     /// </summary>
-    [JsonProperty(Order = 5, PropertyName = "target")]
-    public string Target { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 메시지 생성 시간 (yyyy-MM-dd HH:mm:ss.fff)
-    /// </summary>
-    [JsonProperty(Order = 99, PropertyName = "created")]
-    public string Created { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+    [JsonProperty(Order = 99, PropertyName = "timestamp")]
+    public string Timestamp { get; set; } = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 }
 
 /****************************************************************************
@@ -54,11 +48,11 @@ public abstract class BaseMessage
    Created By   : GHLee                                                
    Created On   : 10/30/2025 3:00:00 PM                                                    
 ****************************************************************************/
-public abstract class BaseMessage<TBody> : BaseMessage where TBody : class
+public abstract class BaseMessage<T> : BaseBrokerMessage where T : class
 {
     /// <summary>
     /// 메시지 본문 (Generic 타입)
     /// </summary>
-    [JsonProperty(Order = 6, PropertyName = "body")]
-    public TBody? Body { get; set; }
+    [JsonProperty(Order = 5, PropertyName = "data")]
+    public T? Data { get; set; }
 }

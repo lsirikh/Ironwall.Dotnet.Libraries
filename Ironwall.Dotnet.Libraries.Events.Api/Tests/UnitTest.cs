@@ -346,7 +346,7 @@ public class EventApiServiceTests
         await service.ExecuteAsync(CancellationToken.None);
 
         // Act
-        var response = await service.GetMalfunctionEventByIdAsync(1);
+        var response = await service.GetMalfunctionEventByIdAsync(5);
 
         // Assert
         Assert.NotNull(response);
@@ -752,8 +752,8 @@ public class EventApiServiceTests
             TypeEvent = "Action",
             Content = "Test action content",  // Required by GOP API
             User = "admin1",  // Required by GOP API
-            FromEvent = 6,  // Required by GOP API
-            FromEventType = "Intrusion",  // Required by GOP API (must be 'detection', 'malfunction', or 'connection')
+            FromEvent = 5,  // Required by GOP API
+            FromEventType = "Fault",  // Required by GOP API (must be 'Intrusion', 'Fault')
             Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
