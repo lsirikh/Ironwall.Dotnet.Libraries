@@ -1,7 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
-//using Ironwall.Dotnet.Libraries.Devices.Db.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -25,14 +24,13 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 {
     
     #region - Ctors -
-    public CameraDevicePanelViewModel(IEventAggregator eventAggregator
-                                       , ILogService log
-                                       //, IDeviceDbService dbService
-                                       , IDeviceApiService apiService
-                                       , CameraDeviceProvider deviceProvider
-                                       ) : base(eventAggregator, log)
+    public CameraDevicePanelViewModel(
+        IEventAggregator eventAggregator,
+        ILogService log,
+        IDeviceApiService apiService,
+        CameraDeviceProvider deviceProvider)
+        : base(eventAggregator, log)
     {
-        //_dbService = dbService;
         _apiService = apiService;
         _deviceProvider = deviceProvider;
     }
@@ -104,14 +102,14 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
     public override async void OnClickSaveButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        if (!await _processGate.WaitAsync(0))
             return;
 
         try
         {
             SaveButtonEnable = false;
 
-            if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
+            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
             {
                 _pCancellationTokenSource.Cancel();
                 _pCancellationTokenSource.Dispose();
@@ -119,33 +117,40 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             _pCancellationTokenSource = new CancellationTokenSource();
 
             var token = _pCancellationTokenSource.Token;
-            var currentList = _deviceProvider; // 또는 _deviceProvider.CollectionEntity
 
-            //var dbList = await _dbService.FetchCamerasAsync(token);
-            var dbList = await _apiService.FetchCamerasAsync(token);
+            // 현재 Provider의 목록
+            var currentList = _deviceProvider.OfType<CameraDeviceModel>().ToList();
+
+            // 서버 목록 조회 (비교를 위해)
+            var serverList = await FetchCamerasAsync(token);
 
             // Insert 대상: ID가 없는 경우 (신규)
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
 
-            // Update 대상: ID가 있고, 변경된 경우
+            // Update 대상: ID가 있고 변경된 경우
             var updateList = currentList
                 .Where(m => m.Id > 0)
-                .Join(dbList, m => m.Id, d => d.Id,
+                .Join(serverList, m => m.Id, d => d.Id,
                     (m, d) => new { updated = m, original = d })
                 .Where(p => !DeviceEquals(p.updated, p.original))
                 .Select(p => p.updated)
                 .ToList();
 
-
-            // 순차 처리
-            foreach (var model in updateList)
-                await _dbService.UpdateCameraAsync(model, token);
-
+            // Create 처리
             foreach (var model in insertList)
-                await _dbService.InsertCameraAsync(model, token);
+            {
+                await CreateCameraAsync(model, token);
+            }
 
-            await DataInitialize(_cancellationTokenSource!.Token);
-            await Task.Delay(2000);
+            // Update 처리
+            foreach (var model in updateList)
+            {
+                await UpdateCameraAsync(model, token);
+            }
+
+            // 재조회
+            await DataInitialize(_pCancellationTokenSource.Token);
+            await Task.Delay(2000, token);
         }
         catch (TaskCanceledException ex) { _log?.Warning(ex.Message); }
         catch (OperationCanceledException) { /* 무시 */ }
@@ -154,7 +159,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         {
             UpdateAction?.Invoke();
             SaveButtonEnable = true;
-            _processGate.Release();                // 뮤텍스 해제
+            _processGate.Release();
         }
     }
 
@@ -233,6 +238,94 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     }
 
     #endregion
+    #region - Helper Methods -
+    /// <summary>
+    /// GOP API를 통해 Camera 목록 조회하고 Model로 변환
+    /// </summary>
+    private async Task<List<CameraDeviceModel>> FetchCamerasAsync(CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetCamerasAsync(
+                page: 1,
+                limit: 1000,
+                token: token);
+
+            if (response.Success && response.Data != null)
+            {
+                return response.Data
+                    .Select(dto => dto.ToCameraDeviceModel())
+                    .ToList();
+            }
+            else
+            {
+                _log?.Error($"Failed to fetch cameras: {response.Error?.Message}");
+                return new List<CameraDeviceModel>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchCamerasAsync: {ex.Message}");
+            return new List<CameraDeviceModel>();
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Camera 생성
+    /// </summary>
+    private async Task<bool> CreateCameraAsync(CameraDeviceModel model, CancellationToken token = default)
+    {
+        try
+        {
+            var dto = model.ToCameraDeviceDto();
+            var response = await _apiService.CreateCameraAsync(dto, token);
+
+            if (response.Success)
+            {
+                _log?.Info($"Camera created successfully: {response.Data?.Id}");
+                return true;
+            }
+            else
+            {
+                _log?.Error($"Failed to create camera: {response.Error?.Message}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in CreateCameraAsync: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Camera 업데이트
+    /// </summary>
+    private async Task<bool> UpdateCameraAsync(CameraDeviceModel model, CancellationToken token = default)
+    {
+        try
+        {
+            var dto = model.ToCameraDeviceDto();
+            var response = await _apiService.UpdateCameraAsync(model.Id, dto, token);
+
+            if (response.Success)
+            {
+                _log?.Info($"Camera updated successfully: {model.Id}");
+                return true;
+            }
+            else
+            {
+                _log?.Error($"Failed to update camera {model.Id}: {response.Error?.Message}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in UpdateCameraAsync: {ex.Message}");
+            return false;
+        }
+    }
+    #endregion
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
@@ -242,38 +335,32 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             {
                 IsVisible = false;
 
-                //DB Fetching
-                await _dbService.FetchInstanceAsync(cancellationToken);
+                // API Fetching (DBService → ApiService 마이그레이션)
+                var models = await FetchCamerasAsync(cancellationToken);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-                //ViewModelProvider Setting
-                if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
 
+                if (cancellationToken.IsCancellationRequested)
+                    throw new TaskCanceledException("Task was cancelled!");
+
+                // Provider 업데이트
+                _deviceProvider.Clear();
+                foreach (var model in models)
+                {
+                    _deviceProvider.Add(model);
+                }
+
+                // ViewModelProvider 업데이트
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in _deviceProvider.OfType<ICameraDeviceModel>().Select((item, index) => (item, index)))
+                    foreach (var (item, index) in models.Select((item, index) => (item, index)))
                     {
-                        if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
+                        if (cancellationToken.IsCancellationRequested)
+                            throw new TaskCanceledException("Task was cancelled!");
+
                         var viewModel = new CameraDeviceViewModel(item) { Index = index + 1 };
-
                         ViewModelProvider.Add(viewModel);
-
-                        //if(viewModel.Mode == Enums.EnumCameraMode.ONVIF)
-                        //{
-                        //    _ = Task.Run(async () => 
-                        //    {
-                        //        viewModel.Status = Enums.EnumDeviceStatus.DEACTIVATED;  
-                        //        //Onvif가 처리된 모델로 새로 입힌다.
-                        //        var onvifInstance = await _cameraOnvifService.CreateOnvifInstance(item, cancellationToken);
-                        //        if (onvifInstance == null) return;
-                        //        var onvifedModel = CameraMappingHelper.ToDeviceModel(onvifInstance, item);
-                        //        if (onvifedModel == null) return;
-
-                        //        viewModel.Status = Enums.EnumDeviceStatus.ACTIVATED;  
-                        //        viewModel.Refresh();
-                        //    });
-                        //}
                     }
                     NotifyOfPropertyChange(() => ViewModelProvider);
                 });
@@ -293,18 +380,27 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteCameraDeviceProcessMessageModel message, CancellationToken cancellationToken)
     {
-        // 1. 진행중 UI 표시
-        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+        // Progress Popup 표시
+        await _eventAggregator.PublishOnCurrentThreadAsync(
+            new OpenProgressPopupMessageModel(),
+            cancellationToken);
 
-        // 2. 비동기 작업 (UI 스레드와 분리)
+        // 삭제 처리 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
             foreach (var item in SelectedItems.ToList())
             {
-                var ret = await _dbService.DeleteCameraAsync((ICameraDeviceModel)item.Model, cancellationToken);
+                var model = (ICameraDeviceModel)item.Model;
+                var response = await _apiService.DeleteCameraAsync(model.Id, cancellationToken);
+
+                if (!response.Success)
+                {
+                    _log?.Error($"Failed to delete camera {model.Id}: {response.Error?.Message}");
+                }
             }
         }, cancellationToken);
 
+        // 취소 토큰 재생성
         if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
         {
             _cancellationTokenSource.Cancel();
@@ -312,20 +408,21 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
+        // 재조회
         await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
         UpdateAction?.Invoke();
 
-        // 4. 진행중 UI 닫기
-        await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        // Progress Popup 닫기
+        await _eventAggregator.PublishOnCurrentThreadAsync(
+            new ClosePopupMessageModel(),
+            cancellationToken);
     }
     #endregion
     #region - Properties -
     public event System.Action? UpdateAction;
     #endregion
     #region - Attributes -
-    //private IDeviceDbService _dbService;
-    private IDeviceApiService _apiService;
-    private CameraDeviceProvider _deviceProvider;
+    private readonly IDeviceApiService _apiService;
+    private readonly CameraDeviceProvider _deviceProvider;
     #endregion
-
 }
