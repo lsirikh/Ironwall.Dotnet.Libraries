@@ -130,7 +130,59 @@ DeviceProviderService는 GOP RESTful API를 통해 초기 Device 데이터를 �
          └──────────────────┘
 ```
 
-### 3.3 Key Dependencies
+### 3.3 Navigation Mapping (양방향 참조)
+
+**Critical Requirement**: Controller와 Sensor 간의 양방향 네비게이션 매핑을 구축해야 합니다.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│         Navigation Mapping (Bidirectional)              │
+│                                                           │
+│   ControllerDeviceModel                                  │
+│   ├─ Id: 1                                               │
+│   ├─ Devices: List<IBaseDeviceModel>  ◄──┐              │
+│   │   ├─ SensorDeviceModel (Id: 101)     │              │
+│   │   ├─ SensorDeviceModel (Id: 102)     │              │
+│   │   └─ SensorDeviceModel (Id: 103)     │              │
+│                                           │              │
+│   SensorDeviceModel                       │              │
+│   ├─ Id: 101                              │              │
+│   └─ Controller: IControllerDeviceModel ──┘              │
+│      (참조: Controller Id: 1)                            │
+│                                                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Mapping 구축 로직**:
+1. **Controller → Sensor (Parent → Children)**:
+   - `ControllerDeviceModel.Devices` 리스트에 해당 Controller에 속한 모든 Sensor 추가
+   - 형제 센서 간 공통 부모 참조 가능
+
+2. **Sensor → Controller (Child → Parent)**:
+   - `SensorDeviceModel.Controller` 속성에 부모 Controller 인스턴스 할당
+   - Controller의 정보 (IpAddress, Port 등) 직접 접근 가능
+
+**Reference Pattern (from DeviceDbService)**:
+```csharp
+// 1. Controller Dictionary 구축
+var ctrlDict = controllers.ToDictionary(c => c.Id);
+
+// 2. Sensor 순회하며 양방향 매핑
+foreach (var sensor in sensors)
+{
+    if (ctrlDict.TryGetValue(sensor.ControllerId, out var parent))
+    {
+        // Sensor → Controller (Child → Parent)
+        sensor.Controller = parent;
+
+        // Controller → Sensor (Parent → Children)
+        parent.Devices ??= new List<IBaseDeviceModel>();
+        parent.Devices.Add(sensor);
+    }
+}
+```
+
+### 3.4 Key Dependencies
 
 | Component | Type | Purpose |
 |-----------|------|---------|
@@ -183,23 +235,31 @@ if (controllers?.Any() != false)
     }
 ```
 
-#### FR-3: Sensor Devices Fetching (Large-Scale Data Handling)
+#### FR-3: Sensor Devices Fetching (Large-Scale Data Handling + Navigation Mapping)
 - **ID**: FR-3
 - **Priority**: P0 (Critical)
-- **Description**: GOP API를 통해 Sensor 장비 목록을 가져와 Provider에 저장합니다. **4000개 이상의 대용량 데이터를 처리**해야 합니다.
+- **Description**: GOP API를 통해 Sensor 장비 목록을 가져와 Provider에 저장합니다. **4000개 이상의 대용량 데이터를 처리**하며, **Controller와의 양방향 네비게이션 매핑**을 구축해야 합니다.
 - **Acceptance Criteria**:
   - ✅ `FetchSensorsAsync()` 메소드 구현
   - ✅ 페이징 처리 (`page=1,2,3...`, `limit=100`)
   - ✅ `includeController=true` 파라미터 사용 (Controller 정보 포함)
   - ✅ `IDeviceApiService.GetSensorsAsync()` 사용
   - ✅ `DtoToModelHelper.ToSensorDeviceModel()` 변환
+  - ✅ **Navigation Mapping 구축 (양방향 참조)**:
+    - ✅ `SensorDeviceModel.Controller` 할당 (Child → Parent)
+    - ✅ `ControllerDeviceModel.Devices` 리스트에 Sensor 추가 (Parent → Children)
   - ✅ `DeviceProvider` 및 `SensorDeviceProvider`에 추가
-  - ✅ Controller Relations 구축 (Sensor → Controller 참조)
   - ✅ Splash Screen 메시지: "SensorProvider의 정보를 모두 불러왔습니다..."
   - ✅ 진행률 표시 (선택사항): "Sensor 로딩 중... (1200/4500)"
 
-**Pagination Logic**:
+**Pagination Logic with Navigation Mapping**:
 ```csharp
+// ──────────────── Step 1: Fetch All Controllers First ────────────────
+var controllers = await FetchControllersAsync(token);
+var ctrlDict = controllers.ToDictionary(c => c.Id);
+
+// ──────────────── Step 2: Fetch Sensors with Pagination ────────────────
+var allSensors = new List<SensorDeviceModel>();
 int currentPage = 1;
 int pageSize = 100;
 int totalFetched = 0;
@@ -217,8 +277,20 @@ while (true)
 
     foreach (var dto in response.Data)
     {
-        var model = dto.ToSensorDeviceModel();
-        _deviceProvider.Add(model);
+        var sensor = dto.ToSensorDeviceModel();
+
+        // ──────────────── Step 3: Build Navigation Mapping ────────────────
+        // Sensor → Controller (Child → Parent)
+        if (dto.Controller != null && ctrlDict.TryGetValue(dto.Controller.Id, out var parent))
+        {
+            sensor.Controller = parent;
+
+            // Controller → Sensor (Parent → Children)
+            parent.Devices ??= new List<IBaseDeviceModel>();
+            parent.Devices.Add(sensor);
+        }
+
+        allSensors.Add(sensor);
         totalFetched++;
     }
 
@@ -235,6 +307,12 @@ while (true)
 
     currentPage++;
 }
+
+// ──────────────── Step 4: Add to Providers ────────────────
+foreach (var sensor in allSensors)
+{
+    _deviceProvider.Add(sensor);
+}
 ```
 
 #### FR-4: Camera Devices Fetching
@@ -249,8 +327,26 @@ while (true)
   - ✅ `DeviceProvider` 및 `CameraDeviceProvider`에 추가
   - ✅ Splash Screen 메시지: "CameraProvider의 정보를 모두 불러왔습니다..."
 
-#### FR-5: Provider Cache Management
+#### FR-5: Fetch Order & Navigation Mapping Strategy
 - **ID**: FR-5
+- **Priority**: P0 (Critical)
+- **Description**: **Navigation Mapping 구축을 위해 Controller를 먼저 로딩한 후 Sensor를 로딩**해야 합니다.
+- **Acceptance Criteria**:
+  - ✅ **Fetch Order 준수**:
+    1. ✅ `FetchControllersAsync()` - Controller 먼저 로딩
+    2. ✅ Build Controller Dictionary (`ctrlDict`)
+    3. ✅ `FetchSensorsAsync()` - Sensor 로딩 + Navigation Mapping
+    4. ✅ `FetchCamerasAsync()` - Camera 로딩 (독립적)
+  - ✅ Controller Dictionary 구축 (`Dictionary<int, ControllerDeviceModel>`)
+  - ✅ Sensor 로딩 시 Dictionary 조회하여 부모 Controller 매핑
+  - ✅ 양방향 참조 구축:
+    - `sensor.Controller = parent`
+    - `parent.Devices.Add(sensor)`
+
+**Critical Note**: Sensor를 먼저 로딩하면 Controller 참조를 찾을 수 없으므로 **반드시 Controller → Sensor 순서를 유지**해야 합니다.
+
+#### FR-6: Provider Cache Management
+- **ID**: FR-6
 - **Priority**: P0 (Critical)
 - **Description**: Provider를 Clear하고 새로운 데이터로 채웁니다.
 - **Acceptance Criteria**:
@@ -350,32 +446,47 @@ while (true)
 
 ---
 
-### 5.3 Phase 3: Sensor Fetching (BEHAVIORAL - High Priority)
-**Goal**: Sensor 데이터 로딩 구현 (대용량 처리)
+### 5.3 Phase 3: Sensor Fetching with Navigation Mapping (BEHAVIORAL - High Priority)
+**Goal**: Sensor 데이터 로딩 구현 (대용량 처리 + 양방향 참조)
+
+**Prerequisites**:
+- ✅ Phase 2 완료 (Controller Dictionary 구축 필요)
 
 **Tasks**:
-- [ ] Implement `FetchSensorsAsync()`
+- [ ] Update `FetchAllDevicesAsync()` to build Controller Dictionary
+  - [ ] After `FetchControllersAsync()`, create `ctrlDict = controllers.ToDictionary(c => c.Id)`
+  - [ ] Pass `ctrlDict` to `FetchSensorsAsync(ctrlDict, token)`
+- [ ] Implement `FetchSensorsAsync(Dictionary<int, ControllerDeviceModel> ctrlDict, CancellationToken token)`
   - [ ] Pagination loop (`page=1,2,3...`, `limit=100`)
   - [ ] Call `IDeviceApiService.GetSensorsAsync(includeController: true)`
   - [ ] Convert DTO → Model using `DtoToModelHelper`
-  - [ ] Build Controller Relations (Sensor → Controller)
+  - [ ] **Build Navigation Mapping** (Critical):
+    - [ ] Check `dto.Controller != null`
+    - [ ] Lookup parent: `ctrlDict.TryGetValue(dto.Controller.Id, out var parent)`
+    - [ ] Assign: `sensor.Controller = parent` (Child → Parent)
+    - [ ] Initialize: `parent.Devices ??= new List<IBaseDeviceModel>()`
+    - [ ] Add: `parent.Devices.Add(sensor)` (Parent → Children)
   - [ ] Add to `DeviceProvider` and `SensorDeviceProvider`
   - [ ] Publish Splash Screen message with progress
 - [ ] Handle large datasets (4000+ sensors)
-  - [ ] Optimize memory usage
-  - [ ] Progress reporting (`"{totalFetched} loaded"`)
+  - [ ] Optimize memory usage (avoid redundant allocations)
+  - [ ] Progress reporting (`"Sensor 로딩 중... ({totalFetched} loaded)"`)
 - [ ] Error handling
+  - [ ] Handle missing Controller gracefully (log warning)
   - [ ] Partial data recovery (keep already loaded sensors)
   - [ ] Log detailed pagination errors
 
 **Test Criteria**:
 - ✅ Load 4000+ Sensors from GOP server
 - ✅ Verify all Sensors are in Provider
-- ✅ Verify Controller Relations are correct
+- ✅ **Verify Navigation Mapping**:
+  - ✅ All Sensors have `Controller` reference (not null)
+  - ✅ All Controllers have `Devices` list populated
+  - ✅ Sensor count matches Controller's child count
 - ✅ Splash Screen progress updates work
 - ✅ Performance < 10 seconds (100Mbps network)
 
-**Commit**: `BEHAVIORAL: Implement Sensor devices fetching with large-scale pagination`
+**Commit**: `BEHAVIORAL: Implement Sensor devices fetching with navigation mapping and large-scale pagination`
 
 ---
 
@@ -507,7 +618,7 @@ internal class DeviceProviderService : IDeviceProviderService
     {
         try
         {
-            // 1. Controllers
+            // ──────────── 1. Controllers (먼저 로딩 - Navigation Mapping을 위해) ────────────
             var controllers = await FetchControllersAsync(token);
             _deviceProvider.Clear();
             _controllerProvider.Clear();
@@ -517,8 +628,11 @@ internal class DeviceProviderService : IDeviceProviderService
 
             await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
 
-            // 2. Sensors
-            var sensors = await FetchSensorsAsync(token);
+            // ──────────── 2. Build Controller Dictionary (양방향 참조를 위한 Dictionary) ────────────
+            var ctrlDict = controllers.ToDictionary(c => c.Id);
+
+            // ──────────── 3. Sensors (Navigation Mapping 구축) ────────────
+            var sensors = await FetchSensorsAsync(ctrlDict, token);
             _sensorProvider.Clear();
             if (sensors?.Any() == true)
                 foreach (var item in sensors)
@@ -526,7 +640,7 @@ internal class DeviceProviderService : IDeviceProviderService
 
             await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
 
-            // 3. Cameras
+            // ──────────── 4. Cameras (독립적 로딩) ────────────
             var cameras = await FetchCamerasAsync(token);
             _cameraProvider.Clear();
             if (cameras?.Any() == true)
@@ -548,12 +662,17 @@ internal class DeviceProviderService : IDeviceProviderService
         CancellationToken token = default)
     {
         // Implementation with pagination
+        // Returns list of Controllers (without Devices list populated yet)
     }
 
     private async Task<List<SensorDeviceModel>> FetchSensorsAsync(
+        Dictionary<int, ControllerDeviceModel> ctrlDict,
         CancellationToken token = default)
     {
         // Implementation with pagination (large-scale)
+        // Builds Navigation Mapping:
+        //   - sensor.Controller = parent (Child → Parent)
+        //   - parent.Devices.Add(sensor) (Parent → Children)
     }
 
     private async Task<List<CameraDeviceModel>> FetchCamerasAsync(
