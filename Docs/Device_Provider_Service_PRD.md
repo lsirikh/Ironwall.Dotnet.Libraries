@@ -475,6 +475,51 @@ foreach (var item in allCameras)
   - ✅ 에러 핸들링 공통화
   - ✅ Logging 표준화
 
+#### NFR-5: Logging & Observability
+- **ID**: NFR-5
+- **Priority**: P0 (Critical)
+- **Target**: `ILogService`를 통한 체계적인 로깅 전략
+- **Requirements**:
+  - ✅ Constructor에서 `ILogService? logService` 주입
+  - ✅ `_log` 필드로 저장 (`_log?.Info()` null-safe 호출)
+  - ✅ **3가지 로그 레벨 사용**:
+    - ✅ `Info`: 정상 작동 상태 (Start/Complete/Progress)
+    - ✅ `Warning`: 경고 사항 (부분 실패, 타임아웃, 재시도)
+    - ✅ `Error`: 치명적 오류 (API 실패, 예외 발생)
+  - ✅ **필수 로깅 항목**:
+    - ✅ 서비스 시작/종료
+    - ✅ 각 Device Type별 Fetch 시작/완료
+    - ✅ 페이징 진행률 (선택사항: 1000개 단위)
+    - ✅ API 호출 실패 (response.Error?.Message)
+    - ✅ 예외 발생 (Exception.Message + Stack Trace)
+    - ✅ Navigation Mapping 구축 완료 (Sensor Count)
+
+**Logging Strategy**:
+```csharp
+// ────────────────── 1. Info: 정상 작동 상태 ──────────────────
+_log?.Info("DeviceProviderService.StartService() started");
+_log?.Info($"Fetching Controllers... (page={currentPage}, limit={pageSize})");
+_log?.Info($"Controllers fetched successfully: {totalFetched} items loaded");
+_log?.Info($"Navigation Mapping built: {totalSensors} sensors mapped to {controllers.Count} controllers");
+_log?.Info("DeviceProviderService.FetchAllDevicesAsync() completed");
+
+// ────────────────── 2. Warning: 경고 사항 ──────────────────
+_log?.Warning($"Controller not found for Sensor ID={sensor.Id}, ControllerId={sensor.ControllerId}");
+_log?.Warning($"Pagination timeout at page {currentPage}, keeping {totalFetched} items already loaded");
+_log?.Warning($"Partial data loaded: {totalFetched}/{expectedTotal} items");
+
+// ────────────────── 3. Error: 치명적 오류 ──────────────────
+_log?.Error($"Failed to fetch controllers: {response.Error?.Message}");
+_log?.Error($"Exception in FetchControllersAsync: {ex.Message}");
+_log?.Error($"API call failed with status code: {response.StatusCode}");
+```
+
+**Log Message Format**:
+- **Service Name Prefix**: `"DeviceProviderService.{MethodName}()"`
+- **Action + Result**: `"Fetching Controllers..." → "Controllers fetched successfully"`
+- **Include Metrics**: `"(page=1, limit=100)"`, `"{totalFetched} items loaded"`
+- **Include Context**: `"Sensor ID={id}"`, `"ControllerId={controllerId}"`
+
 ---
 
 ## 5. Implementation Plan
@@ -489,19 +534,24 @@ foreach (var item in allCameras)
   - [ ] Method: `Task FetchAllDevicesAsync(CancellationToken token = default)`
 - [ ] Create `DeviceProviderService.cs` skeleton
 - [ ] Add constructor dependencies:
-  - [ ] `ILogService log`
+  - [ ] `ILogService? logService` (**nullable** for null-safe logging)
   - [ ] `IEventAggregator eventAggregator`
   - [ ] `IDeviceApiService apiService`
   - [ ] `DeviceProvider deviceProvider`
   - [ ] `ControllerDeviceProvider controllerProvider`
   - [ ] `SensorDeviceProvider sensorProvider`
   - [ ] `CameraDeviceProvider cameraProvider`
+- [ ] Add private field: `private readonly ILogService? _log;`
+- [ ] Implement basic logging in `StartService()`:
+  - [ ] `_log?.Info("DeviceProviderService.StartService() started")`
+  - [ ] `_log?.Info("DeviceProviderService.StartService() completed")`
+  - [ ] `_log?.Error($"DeviceProviderService.StartService() failed: {ex.Message}")`
 
 **Deliverables**:
 - `IDeviceProviderService.cs`
-- `DeviceProviderService.cs` (empty methods)
+- `DeviceProviderService.cs` (empty methods with logging structure)
 
-**Commit**: `STRUCTURAL: Add DeviceProviderService interface and skeleton`
+**Commit**: `STRUCTURAL: Add DeviceProviderService interface and skeleton with logging`
 
 ---
 
@@ -521,17 +571,24 @@ foreach (var item in allCameras)
   - [ ] **Progress reporting**: Publish Splash Screen with `"Controller 로딩 중... ({totalFetched} loaded)"`
   - [ ] Add to `DeviceProvider` and `ControllerDeviceProvider`
   - [ ] Publish final Splash Screen message: "ControllerProvider의 정보를 모두 불러왔습니다..."
+- [ ] **Logging implementation**:
+  - [ ] `_log?.Info("FetchControllersAsync() started")`
+  - [ ] `_log?.Info($"Controllers loading progress: {totalFetched} items loaded")` (every 100 items)
+  - [ ] `_log?.Info($"FetchControllersAsync() completed: {totalFetched} items")`
+  - [ ] `_log?.Error($"Failed to fetch controllers at page {currentPage}: {response.Error?.Message}")`
+  - [ ] `_log?.Error($"Exception in FetchControllersAsync: {ex.Message}")`
 - [ ] Error handling
-  - [ ] Log API errors (`_log?.Error($"Failed to fetch controllers: {response.Error?.Message}")`)
   - [ ] Return empty list on failure
   - [ ] Handle pagination errors gracefully (keep already loaded data)
 - [ ] Update `FetchAllDevicesAsync()` to call `FetchControllersAsync()`
+  - [ ] Add `_log?.Info($"Controllers loaded: {controllers.Count} items")`
 
 **Test Criteria**:
 - ✅ Load 100 Controllers from GOP server
 - ✅ Verify all Controllers are in Provider
 - ✅ Splash Screen message appears
 - ✅ Progress updates display correctly ("Controller 로딩 중... (50/100)")
+- ✅ Log messages appear in log file (Info/Error levels)
 - ✅ Performance < 2 seconds
 
 **Commit**: `BEHAVIORAL: Implement Controller devices fetching with pagination`
@@ -563,10 +620,19 @@ foreach (var item in allCameras)
 - [ ] Handle large datasets (4000+ sensors)
   - [ ] Optimize memory usage (avoid redundant allocations)
   - [ ] Progress reporting (`"Sensor 로딩 중... ({totalFetched} loaded)"`)
+- [ ] **Logging implementation**:
+  - [ ] `_log?.Info("FetchSensorsAsync() started")`
+  - [ ] `_log?.Info($"Sensors loading progress: {totalFetched} items loaded, {mappedCount} mapped")` (every 1000 items)
+  - [ ] `_log?.Info($"FetchSensorsAsync() completed: {totalFetched} items, {mappedCount} mapped to controllers")`
+  - [ ] `_log?.Warning($"Controller not found for Sensor ID={sensor.Id}, ControllerId={dto.Controller.Id}")`
+  - [ ] `_log?.Error($"Failed to fetch sensors at page {currentPage}: {response.Error?.Message}")`
+  - [ ] `_log?.Error($"Exception in FetchSensorsAsync: {ex.Message}")`
 - [ ] Error handling
   - [ ] Handle missing Controller gracefully (log warning)
   - [ ] Partial data recovery (keep already loaded sensors)
   - [ ] Log detailed pagination errors
+- [ ] Update `FetchAllDevicesAsync()`:
+  - [ ] Add `_log?.Info($"Sensors loaded: {sensors.Count} items (Navigation Mapping built)")`
 
 **Test Criteria**:
 - ✅ Load 4000+ Sensors from GOP server
@@ -576,6 +642,8 @@ foreach (var item in allCameras)
   - ✅ All Controllers have `Devices` list populated
   - ✅ Sensor count matches Controller's child count
 - ✅ Splash Screen progress updates work
+- ✅ Log messages appear (Info/Warning/Error levels)
+- ✅ Warning logged for orphaned sensors (Controller not found)
 - ✅ Performance < 10 seconds (100Mbps network)
 
 **Commit**: `BEHAVIORAL: Implement Sensor devices fetching with navigation mapping and large-scale pagination`
@@ -598,16 +666,23 @@ foreach (var item in allCameras)
   - [ ] **Progress reporting**: Publish Splash Screen with `"Camera 로딩 중... ({totalFetched} loaded)"`
   - [ ] Add to `DeviceProvider` and `CameraDeviceProvider`
   - [ ] Publish final Splash Screen message: "CameraProvider의 정보를 모두 불러왔습니다..."
+- [ ] **Logging implementation**:
+  - [ ] `_log?.Info("FetchCamerasAsync() started")`
+  - [ ] `_log?.Info($"FetchCamerasAsync() completed: {totalFetched} items")`
+  - [ ] `_log?.Error($"Failed to fetch cameras at page {currentPage}: {response.Error?.Message}")`
+  - [ ] `_log?.Error($"Exception in FetchCamerasAsync: {ex.Message}")`
 - [ ] Error handling
-  - [ ] Log API errors (`_log?.Error($"Failed to fetch cameras: {response.Error?.Message}")`)
   - [ ] Return empty list on failure
   - [ ] Handle pagination errors gracefully (keep already loaded data)
+- [ ] Update `FetchAllDevicesAsync()`:
+  - [ ] Add `_log?.Info($"Cameras loaded: {cameras.Count} items")`
 
 **Test Criteria**:
 - ✅ Load 50 Cameras from GOP server
 - ✅ Verify all Cameras are in Provider
 - ✅ Splash Screen message appears
 - ✅ Progress updates display correctly ("Camera 로딩 중... (25/50)")
+- ✅ Log messages appear in log file (Info/Error levels)
 - ✅ Performance < 1 second
 
 **Commit**: `BEHAVIORAL: Implement Camera devices fetching with pagination`
@@ -683,7 +758,7 @@ internal class DeviceProviderService : IDeviceProviderService
 {
     #region - Ctors -
     public DeviceProviderService(
-        ILogService log,
+        ILogService? logService,
         IEventAggregator eventAggregator,
         IDeviceApiService apiService,
         DeviceProvider deviceProvider,
@@ -691,7 +766,7 @@ internal class DeviceProviderService : IDeviceProviderService
         SensorDeviceProvider sensorProvider,
         CameraDeviceProvider cameraProvider)
     {
-        _log = log;
+        _log = logService;
         _eventAggregator = eventAggregator;
         _apiService = apiService;
         _deviceProvider = deviceProvider;
@@ -706,11 +781,13 @@ internal class DeviceProviderService : IDeviceProviderService
     {
         try
         {
+            _log?.Info("DeviceProviderService.StartService() started");
             await FetchAllDevicesAsync(token);
+            _log?.Info("DeviceProviderService.StartService() completed");
         }
         catch (Exception ex)
         {
-            _log?.Error($"DeviceProviderService.StartService failed: {ex.Message}");
+            _log?.Error($"DeviceProviderService.StartService() failed: {ex.Message}");
             throw;
         }
     }
@@ -719,6 +796,8 @@ internal class DeviceProviderService : IDeviceProviderService
     {
         try
         {
+            _log?.Info("DeviceProviderService.FetchAllDevicesAsync() started");
+
             // ──────────── 1. Controllers (먼저 로딩 - Navigation Mapping을 위해) ────────────
             var controllers = await FetchControllersAsync(token);
             _deviceProvider.Clear();
@@ -727,6 +806,7 @@ internal class DeviceProviderService : IDeviceProviderService
                 foreach (var item in controllers)
                     _deviceProvider.Add(item);
 
+            _log?.Info($"Controllers loaded: {controllers.Count} items");
             await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
 
             // ──────────── 2. Build Controller Dictionary (양방향 참조를 위한 Dictionary) ────────────
@@ -739,6 +819,7 @@ internal class DeviceProviderService : IDeviceProviderService
                 foreach (var item in sensors)
                     _deviceProvider.Add(item);
 
+            _log?.Info($"Sensors loaded: {sensors.Count} items (Navigation Mapping built)");
             await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
 
             // ──────────── 4. Cameras (독립적 로딩) ────────────
@@ -748,11 +829,14 @@ internal class DeviceProviderService : IDeviceProviderService
                 foreach (var cam in cameras)
                     _deviceProvider.Add(cam);
 
+            _log?.Info($"Cameras loaded: {cameras.Count} items");
             await PublishSplashMessage("CameraProvider의 정보를 모두 불러왔습니다...");
+
+            _log?.Info("DeviceProviderService.FetchAllDevicesAsync() completed");
         }
         catch (Exception ex)
         {
-            _log?.Error($"FetchAllDevicesAsync failed: {ex.Message}");
+            _log?.Error($"DeviceProviderService.FetchAllDevicesAsync() failed: {ex.Message}");
             throw;
         }
     }
@@ -762,24 +846,173 @@ internal class DeviceProviderService : IDeviceProviderService
     private async Task<List<ControllerDeviceModel>> FetchControllersAsync(
         CancellationToken token = default)
     {
-        // Implementation with pagination
-        // Returns list of Controllers (without Devices list populated yet)
+        var allControllers = new List<ControllerDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchControllersAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetControllersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch controllers at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var controller = dto.ToControllerDeviceModel();
+                    allControllers.Add(controller);
+                    totalFetched++;
+                }
+
+                // Progress reporting (optional: every 100 items)
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Controllers loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchControllersAsync() completed: {totalFetched} items");
+            return allControllers;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchControllersAsync: {ex.Message}");
+            return allControllers; // Return partial data
+        }
     }
 
     private async Task<List<SensorDeviceModel>> FetchSensorsAsync(
         Dictionary<int, ControllerDeviceModel> ctrlDict,
         CancellationToken token = default)
     {
-        // Implementation with pagination (large-scale)
-        // Builds Navigation Mapping:
-        //   - sensor.Controller = parent (Child → Parent)
-        //   - parent.Devices.Add(sensor) (Parent → Children)
+        var allSensors = new List<SensorDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+        int mappedCount = 0;
+
+        try
+        {
+            _log?.Info("FetchSensorsAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetSensorsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    includeController: true,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch sensors at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var sensor = dto.ToSensorDeviceModel();
+
+                    // ──────────── Build Navigation Mapping ────────────
+                    if (dto.Controller != null && ctrlDict.TryGetValue(dto.Controller.Id, out var parent))
+                    {
+                        sensor.Controller = parent; // Child → Parent
+                        parent.Devices ??= new List<IBaseDeviceModel>();
+                        parent.Devices.Add(sensor); // Parent → Children
+                        mappedCount++;
+                    }
+                    else if (dto.Controller != null)
+                    {
+                        _log?.Warning($"Controller not found for Sensor ID={sensor.Id}, ControllerId={dto.Controller.Id}");
+                    }
+
+                    allSensors.Add(sensor);
+                    totalFetched++;
+                }
+
+                // Progress reporting (optional: every 1000 items for large datasets)
+                if (totalFetched % 1000 == 0)
+                    _log?.Info($"Sensors loading progress: {totalFetched} items loaded, {mappedCount} mapped");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchSensorsAsync() completed: {totalFetched} items, {mappedCount} mapped to controllers");
+            return allSensors;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchSensorsAsync: {ex.Message}");
+            return allSensors; // Return partial data
+        }
     }
 
     private async Task<List<CameraDeviceModel>> FetchCamerasAsync(
         CancellationToken token = default)
     {
-        // Implementation with pagination
+        var allCameras = new List<CameraDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchCamerasAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetCamerasAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch cameras at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var camera = dto.ToCameraDeviceModel();
+                    allCameras.Add(camera);
+                    totalFetched++;
+                }
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchCamerasAsync() completed: {totalFetched} items");
+            return allCameras;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchCamerasAsync: {ex.Message}");
+            return allCameras; // Return partial data
+        }
     }
 
     private async Task PublishSplashMessage(string message)
@@ -795,7 +1028,7 @@ internal class DeviceProviderService : IDeviceProviderService
     #endregion
 
     #region - Attributes -
-    private readonly ILogService _log;
+    private readonly ILogService? _log;
     private readonly IEventAggregator _eventAggregator;
     private readonly IDeviceApiService _apiService;
     private readonly DeviceProvider _deviceProvider;
