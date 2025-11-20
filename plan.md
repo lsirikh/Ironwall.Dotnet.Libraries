@@ -114,7 +114,7 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
 ### 3.5 Phase 3 Verification
 - [x] Build solution - check for errors (warnings only, no errors) ✅
 - [ ] Manual testing: CRUD operations
-- [ ] COMMIT: "BEHAVIORAL: Migrate SensorDevicePanelViewModel to ApiService"
+- [x] COMMIT: "BEHAVIORAL: Migrate SensorDevicePanelViewModel to ApiService" (commit: 09e0d6f) ✅
 
 ---
 
@@ -137,7 +137,7 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
 ### 4.4 Phase 4 Verification
 - [x] Build solution - check for errors (warnings only, no errors) ✅
 - [ ] Manual testing: CRUD operations
-- [ ] COMMIT: "BEHAVIORAL: Migrate ControllerDevicePanelViewModel to ApiService"
+- [x] COMMIT: "BEHAVIORAL: Migrate ControllerDevicePanelViewModel to ApiService" (commit: 7725030) ✅
 
 ---
 
@@ -250,18 +250,37 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
 
 - **Build Status:** ✅ Compiles successfully (warnings only)
 
-### 🔧 Temporary Fixes (for compilation)
-
-#### Phase 3/4: Sensor & Controller ViewModels
-- **Files Modified (temporarily):**
+#### Phase 3: SensorDevicePanelViewModel (BEHAVIORAL)
+- **File Modified:**
   - `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/SensorDevicePanelViewModel.cs`
+
+- **Changes:**
+  - ✅ Constructor updated (removed `IDeviceDbService`, uses `IDeviceApiService`)
+  - ✅ Added `FetchSensorsAsync()` helper method (with includeController=true)
+  - ✅ Added `CreateSensorAsync()` helper method
+  - ✅ Added `UpdateSensorAsync()` helper method
+  - ✅ Updated `DataInitialize()` to use ApiService
+  - ✅ Updated `OnClickSaveButton()` with INSERT/UPDATE logic
+  - ✅ Updated `HandleAsync()` delete method
+  - ✅ All `_dbService` references removed
+
+- **Build Status:** ✅ Compiles successfully (warnings only)
+
+#### Phase 4: ControllerDevicePanelViewModel (BEHAVIORAL)
+- **File Modified:**
   - `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/ControllerDevicePanelViewModel.cs`
 
 - **Changes:**
-  - Constructor updated to use `IDeviceApiService` instead of `IDeviceDbService`
-  - All `_dbService` method calls commented out with `// TODO: Phase 3/4`
-  - Allows project to compile and Camera tests to run
-  - **Full implementation pending** (Phase 3 and Phase 4 work)
+  - ✅ Constructor updated (removed `IDeviceDbService`, uses `IDeviceApiService`)
+  - ✅ Added `FetchControllersAsync()` helper method
+  - ✅ Added `CreateControllerAsync()` helper method
+  - ✅ Added `UpdateControllerAsync()` helper method
+  - ✅ Updated `DataInitialize()` to use ApiService
+  - ✅ Updated `OnClickSaveButton()` with INSERT/UPDATE logic
+  - ✅ Updated `HandleAsync()` delete method
+  - ✅ All `_dbService` references removed
+
+- **Build Status:** ✅ Compiles successfully (warnings only)
 
 ---
 
@@ -292,9 +311,7 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
 - `Ironwall.Dotnet.Libraries.Devices.Ui/Helpers/DtoToModelHelper.cs` (new)
 - `Ironwall.Dotnet.Libraries.Devices.Ui.Tests/**` (new test project)
 
-### BEHAVIORAL Commit
-- `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/CameraDevicePanelViewModel.cs`
-
-### Temporary Changes (NOT for commit yet)
-- `SensorDevicePanelViewModel.cs` - Phase 3 work pending
-- `ControllerDevicePanelViewModel.cs` - Phase 4 work pending
+### BEHAVIORAL Commits
+- `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/CameraDevicePanelViewModel.cs` (commit: e65b151)
+- `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/SensorDevicePanelViewModel.cs` (commit: 09e0d6f)
+- `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/ControllerDevicePanelViewModel.cs` (commit: 7725030)
