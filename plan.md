@@ -40,6 +40,8 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
 - [x] Verify all tests pass (GREEN) - 4/4 tests passed
 - [x] Code review: Check for duplication (✅ Acceptable, no refactoring needed)
 - [x] COMMIT: "STRUCTURAL: Add DtoToModelHelper with full test coverage" (commit: a5af3ec)
+- [x] Fix Model → DTO null handling (use "" instead of null) - 4/4 tests still passing
+- [x] COMMIT: "fix: Use empty strings instead of null in Model → DTO conversions" (commit: cd51501)
 
 ---
 
@@ -192,17 +194,22 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
    - Files: Multiple
    - Tests: All tests passing
 
+6. `fix: Use empty strings instead of null in Model → DTO conversions`
+   - Files: `DtoToModelHelper.cs`
+   - Tests: All tests passing (4/4)
+   - Purpose: Prevent null values in API requests
+
 ---
 
 ## Current Status
-- **Phase 1**: ✅ COMPLETE (All tests passing: 4/4)
+- **Phase 1**: ✅ COMPLETE (All tests passing: 4/4, null handling fixed)
 - **Phase 2**: ✅ COMPLETE (build successful, manual testing pending)
 - **Phase 3**: 🔧 PARTIALLY DONE (constructor updated, logic pending)
 - **Phase 4**: 🔧 PARTIALLY DONE (constructor updated, logic pending)
 - **Phase 5**: ⏸️ NOT STARTED
 
 ## Next Step
-▶️ **Ready for Commits: STRUCTURAL and BEHAVIORAL**
+▶️ **Manual Testing**: Test Camera CRUD operations with real GOP server
 
 ---
 
