@@ -211,10 +211,10 @@ foreach (var sensor in sensors)
   - ✅ Splash Screen 메시지 전송 (`SplashScreenMessage`)
   - ✅ 에러 발생 시 로깅 및 예외 전파
 
-#### FR-2: Controller Devices Fetching
+#### FR-2: Controller Devices Fetching (with Pagination)
 - **ID**: FR-2
 - **Priority**: P0 (Critical)
-- **Description**: GOP API를 통해 Controller 장비 목록을 가져와 Provider에 저장합니다.
+- **Description**: GOP API를 통해 Controller 장비 목록을 가져와 Provider에 저장합니다. **페이징 처리**를 통해 대용량 데이터를 지원합니다.
 - **Acceptance Criteria**:
   - ✅ `FetchControllersAsync()` 메소드 구현
   - ✅ 페이징 처리 (`page=1,2,3...`, `limit=100`)
@@ -222,17 +222,53 @@ foreach (var sensor in sensors)
   - ✅ `DtoToModelHelper.ToControllerDeviceModel()` 변환
   - ✅ `DeviceProvider` 및 `ControllerDeviceProvider`에 추가
   - ✅ Splash Screen 메시지: "ControllerProvider의 정보를 모두 불러왔습니다..."
+  - ✅ 진행률 표시 (선택사항): "Controller 로딩 중... (80/150)"
 
-**Reference Pattern (from DeviceDbService)**:
+**Pagination Logic**:
 ```csharp
-var controllers = await FetchControllersAsync(token);
+var allControllers = new List<ControllerDeviceModel>();
+int currentPage = 1;
+int pageSize = 100;
+int totalFetched = 0;
+
+while (true)
+{
+    var response = await _apiService.GetControllersAsync(
+        page: currentPage,
+        limit: pageSize,
+        token: token);
+
+    if (!response.Success || response.Data == null || response.Data.Count == 0)
+        break;
+
+    foreach (var dto in response.Data)
+    {
+        var controller = dto.ToControllerDeviceModel();
+        allControllers.Add(controller);
+        totalFetched++;
+    }
+
+    // Optional: Splash Screen with progress
+    await _eventAggregator.PublishOnUIThreadAsync(
+        new SplashScreenMessage()
+        {
+            Title = this.GetType().Name,
+            Message = $"Controller 로딩 중... ({totalFetched} loaded)"
+        });
+
+    if (response.Data.Count < pageSize)
+        break; // Last page
+
+    currentPage++;
+}
+
+// Add to Providers
 _deviceProvider.Clear();
 _controllerProvider.Clear();
-if (controllers?.Any() != false)
-    foreach (var item in controllers.OfType<IControllerDeviceModel>())
-    {
-        _deviceProvider.Add(item);
-    }
+foreach (var item in allControllers)
+{
+    _deviceProvider.Add(item);
+}
 ```
 
 #### FR-3: Sensor Devices Fetching (Large-Scale Data Handling + Navigation Mapping)
@@ -315,10 +351,10 @@ foreach (var sensor in allSensors)
 }
 ```
 
-#### FR-4: Camera Devices Fetching
+#### FR-4: Camera Devices Fetching (with Pagination)
 - **ID**: FR-4
 - **Priority**: P0 (Critical)
-- **Description**: GOP API를 통해 Camera 장비 목록을 가져와 Provider에 저장합니다.
+- **Description**: GOP API를 통해 Camera 장비 목록을 가져와 Provider에 저장합니다. **페이징 처리를 통해 대용량 데이터를 효율적으로 로딩**합니다.
 - **Acceptance Criteria**:
   - ✅ `FetchCamerasAsync()` 메소드 구현
   - ✅ 페이징 처리 (`page=1,2,3...`, `limit=100`)
@@ -326,6 +362,53 @@ foreach (var sensor in allSensors)
   - ✅ `DtoToModelHelper.ToCameraDeviceModel()` 변환
   - ✅ `DeviceProvider` 및 `CameraDeviceProvider`에 추가
   - ✅ Splash Screen 메시지: "CameraProvider의 정보를 모두 불러왔습니다..."
+  - ✅ 진행률 표시 (선택사항): "Camera 로딩 중... (30/80)"
+
+**Pagination Logic**:
+```csharp
+var allCameras = new List<CameraDeviceModel>();
+int currentPage = 1;
+int pageSize = 100;
+int totalFetched = 0;
+
+while (true)
+{
+    var response = await _apiService.GetCamerasAsync(
+        page: currentPage,
+        limit: pageSize,
+        token: token);
+
+    if (!response.Success || response.Data == null || response.Data.Count == 0)
+        break;
+
+    foreach (var dto in response.Data)
+    {
+        var camera = dto.ToCameraDeviceModel();
+        allCameras.Add(camera);
+        totalFetched++;
+    }
+
+    // Optional: Splash Screen with progress
+    await _eventAggregator.PublishOnUIThreadAsync(
+        new SplashScreenMessage()
+        {
+            Title = this.GetType().Name,
+            Message = $"Camera 로딩 중... ({totalFetched} loaded)"
+        });
+
+    if (response.Data.Count < pageSize)
+        break; // Last page
+
+    currentPage++;
+}
+
+// Add to Providers
+_cameraProvider.Clear();
+foreach (var item in allCameras)
+{
+    _deviceProvider.Add(item);
+}
+```
 
 #### FR-5: Fetch Order & Navigation Mapping Strategy
 - **ID**: FR-5
@@ -423,24 +506,33 @@ foreach (var sensor in allSensors)
 ---
 
 ### 5.2 Phase 2: Controller Fetching (BEHAVIORAL)
-**Goal**: Controller 데이터 로딩 구현
+**Goal**: Controller 데이터 로딩 구현 (페이징 처리 포함)
 
 **Tasks**:
 - [ ] Implement `FetchControllersAsync()`
-  - [ ] Pagination loop (`page=1,2,3...`)
-  - [ ] Call `IDeviceApiService.GetControllersAsync()`
-  - [ ] Convert DTO → Model using `DtoToModelHelper`
+  - [ ] **Pagination loop 구현**:
+    - [ ] Initialize: `List<ControllerDeviceModel>`, `currentPage = 1`, `pageSize = 100`, `totalFetched = 0`
+    - [ ] While loop: `while (true)` with `currentPage++`
+    - [ ] Break condition: `response.Data == null || response.Data.Count == 0`
+    - [ ] Early exit: `response.Data.Count < pageSize` (last page)
+  - [ ] Call `IDeviceApiService.GetControllersAsync(page, limit, token)`
+  - [ ] Convert DTO → Model using `DtoToModelHelper.ToControllerDeviceModel()`
+  - [ ] Add to `allControllers` list
+  - [ ] **Progress reporting**: Publish Splash Screen with `"Controller 로딩 중... ({totalFetched} loaded)"`
   - [ ] Add to `DeviceProvider` and `ControllerDeviceProvider`
-  - [ ] Publish Splash Screen message
+  - [ ] Publish final Splash Screen message: "ControllerProvider의 정보를 모두 불러왔습니다..."
 - [ ] Error handling
-  - [ ] Log API errors
+  - [ ] Log API errors (`_log?.Error($"Failed to fetch controllers: {response.Error?.Message}")`)
   - [ ] Return empty list on failure
+  - [ ] Handle pagination errors gracefully (keep already loaded data)
 - [ ] Update `FetchAllDevicesAsync()` to call `FetchControllersAsync()`
 
 **Test Criteria**:
 - ✅ Load 100 Controllers from GOP server
 - ✅ Verify all Controllers are in Provider
 - ✅ Splash Screen message appears
+- ✅ Progress updates display correctly ("Controller 로딩 중... (50/100)")
+- ✅ Performance < 2 seconds
 
 **Commit**: `BEHAVIORAL: Implement Controller devices fetching with pagination`
 
@@ -491,23 +583,32 @@ foreach (var sensor in allSensors)
 ---
 
 ### 5.4 Phase 4: Camera Fetching (BEHAVIORAL)
-**Goal**: Camera 데이터 로딩 구현
+**Goal**: Camera 데이터 로딩 구현 (페이징 처리 포함)
 
 **Tasks**:
 - [ ] Implement `FetchCamerasAsync()`
-  - [ ] Pagination loop (`page=1,2,3...`)
-  - [ ] Call `IDeviceApiService.GetCamerasAsync()`
-  - [ ] Convert DTO → Model using `DtoToModelHelper`
+  - [ ] **Pagination loop 구현**:
+    - [ ] Initialize: `List<CameraDeviceModel>`, `currentPage = 1`, `pageSize = 100`, `totalFetched = 0`
+    - [ ] While loop: `while (true)` with `currentPage++`
+    - [ ] Break condition: `response.Data == null || response.Data.Count == 0`
+    - [ ] Early exit: `response.Data.Count < pageSize` (last page)
+  - [ ] Call `IDeviceApiService.GetCamerasAsync(page, limit, token)`
+  - [ ] Convert DTO → Model using `DtoToModelHelper.ToCameraDeviceModel()`
+  - [ ] Add to `allCameras` list
+  - [ ] **Progress reporting**: Publish Splash Screen with `"Camera 로딩 중... ({totalFetched} loaded)"`
   - [ ] Add to `DeviceProvider` and `CameraDeviceProvider`
-  - [ ] Publish Splash Screen message
+  - [ ] Publish final Splash Screen message: "CameraProvider의 정보를 모두 불러왔습니다..."
 - [ ] Error handling
-  - [ ] Log API errors
+  - [ ] Log API errors (`_log?.Error($"Failed to fetch cameras: {response.Error?.Message}")`)
   - [ ] Return empty list on failure
+  - [ ] Handle pagination errors gracefully (keep already loaded data)
 
 **Test Criteria**:
 - ✅ Load 50 Cameras from GOP server
 - ✅ Verify all Cameras are in Provider
 - ✅ Splash Screen message appears
+- ✅ Progress updates display correctly ("Camera 로딩 중... (25/50)")
+- ✅ Performance < 1 second
 
 **Commit**: `BEHAVIORAL: Implement Camera devices fetching with pagination`
 
