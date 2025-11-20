@@ -17,11 +17,12 @@ namespace Ironwall.Dotnet.Libraries.Api.Modules;
 public class ApiModule : Module
 {
     #region - Ctors -
-    public ApiModule(ILogService log, ApiSetupModel setup, string name = "default")
+    public ApiModule(ILogService? log, IApiSetupModel setup, string name = "default", int count=100)
     {
         _log = log;
         _setup = setup;
         _name = name;
+        _count = count;
     }
     #endregion
     #region - Implementation of Interface -
@@ -31,7 +32,7 @@ public class ApiModule : Module
     {
         builder.RegisterInstance(_setup).Named<ApiSetupModel>(_name).SingleInstance();
         builder.Register(build => new ApiService(_log, build.ResolveNamed<ApiSetupModel>(_name)))
-            .Named<IApiService>(_name).SingleInstance().WithMetadata("Order", 2);
+            .Named<IApiService>(_name).SingleInstance().WithMetadata("Order", _count);
         _log?.Info($"{nameof(ApiModule)} is trying to create a single {nameof(ApiService)} instance.");
     }
     #endregion
@@ -44,9 +45,10 @@ public class ApiModule : Module
     #region - Properties -
     #endregion
     #region - Attributes -
-    private readonly ILogService _log;
-    private readonly ApiSetupModel _setup;
+    private readonly ILogService? _log;
+    private readonly IApiSetupModel _setup;
     private readonly string _name;
+    private readonly int _count;
     //private readonly string _ipAddress = string.Empty;
     //private readonly int _port;
     //private readonly string _username = string.Empty;

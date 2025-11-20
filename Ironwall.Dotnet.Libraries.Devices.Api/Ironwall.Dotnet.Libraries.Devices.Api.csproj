@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -19,8 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Api\Ironwall.Dotnet.Libraries.Api.csproj" />
-    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Api.Messages\Ironwall.Dotnet.Libraries.Api.Messages.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Messages\Ironwall.Dotnet.Libraries.Messages.csproj" />
   </ItemGroup>
 
 </Project>

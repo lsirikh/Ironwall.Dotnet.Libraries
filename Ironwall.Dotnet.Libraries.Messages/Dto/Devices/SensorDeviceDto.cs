@@ -1,3 +1,4 @@
+using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -5,14 +6,8 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 /// <summary>
 /// Sensor 디바이스 DTO
 /// </summary>
-public class SensorDeviceDto
+public class SensorDeviceDto : BaseDto
 {
-    /// <summary>
-    /// 데이터베이스 ID (자동 생성)
-    /// </summary>
-    [JsonProperty("id", Order = 1)]
-    public int Id { get; set; }
-
     /// <summary>
     /// 디바이스 번호
     /// </summary>
@@ -56,14 +51,8 @@ public class SensorDeviceDto
     public int ControllerId { get; set; }
 
     /// <summary>
-    /// 생성일시 (ISO 8601)
+    /// 소속 Controller ID (선택적, include_controller=true 시)
     /// </summary>
-    [JsonProperty("created_at", Order = 9)]
-    public string? CreatedAt { get; set; }
-
-    /// <summary>
-    /// 수정일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("updated_at", Order = 10)]
-    public string? UpdatedAt { get; set; }
+    [JsonProperty("controller", Order = 9)]
+    public ControllerDeviceDto? Controller { get; set; }
 }

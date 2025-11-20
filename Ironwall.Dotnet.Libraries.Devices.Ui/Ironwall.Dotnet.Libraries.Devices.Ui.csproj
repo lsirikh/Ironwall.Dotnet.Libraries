@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
-    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Db\Ironwall.Dotnet.Libraries.Devices.Db.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Api\Ironwall.Dotnet.Libraries.Devices.Api.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution.Base\Ironwall.Dotnet.Libraries.OnvifSolution.Base.csproj" />

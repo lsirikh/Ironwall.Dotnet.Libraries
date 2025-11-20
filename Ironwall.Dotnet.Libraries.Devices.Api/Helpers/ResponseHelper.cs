@@ -1,18 +1,18 @@
-using Ironwall.Dotnet.Libraries.Api.Messages.Common;
-using Ironwall.Dotnet.Libraries.Base.Services;
+/*using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Newtonsoft.Json;
 using System.Net;
 using System.Net.Http;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Api.Helpers;
-/****************************************************************************
+*//****************************************************************************
    Purpose      : HTTP Response Helper
    Created By   : GHLee
    Created On   : 11/10/2025 6:00:00 PM
    Department   : SW Team
    Company      : Sensorway Co., Ltd.
    Email        : lsirikh@naver.com
-****************************************************************************/
+****************************************************************************//*
 
 /// <summary>
 /// HttpResponseMessage를 ApiResponse/ApiListResponse로 변환하는 Helper
@@ -170,3 +170,4 @@ public static class ResponseHelper
         };
     }
 }
+*/

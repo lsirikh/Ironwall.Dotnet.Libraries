@@ -7,7 +7,6 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
     /****************************************************************************

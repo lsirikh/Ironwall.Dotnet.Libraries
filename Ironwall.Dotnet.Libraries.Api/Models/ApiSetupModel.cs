@@ -9,7 +9,7 @@ namespace Ironwall.Dotnet.Libraries.Api.Models;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public partial class ApiSetupModel
+public partial class ApiSetupModel : IApiSetupModel
 {
     #region - Ctors -
     #endregion

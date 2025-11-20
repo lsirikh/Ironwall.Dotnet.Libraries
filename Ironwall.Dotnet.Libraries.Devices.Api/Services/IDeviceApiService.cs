@@ -1,6 +1,7 @@
-using Ironwall.Dotnet.Libraries.Api.Messages.Common;
-using Ironwall.Dotnet.Libraries.Api.Messages.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Api.Services;
 /****************************************************************************
@@ -112,6 +113,7 @@ public interface IDeviceApiService : IService
     /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
     /// <param name="typeDevice">디바이스 타입 필터 (Fence, PIR, Contact, IoController, Laser, Cable) (선택)</param>
     /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
+    /// <param name="includeController">연결된 제어기 포함 여부 (선택, 기본값: false)</param>
     /// <param name="page">페이지 번호 (기본값: 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
@@ -121,6 +123,7 @@ public interface IDeviceApiService : IService
         int? groupDevice = null,
         string? typeDevice = null,
         string? status = null,
+        bool includeController = false,
         int page = 1,
         int limit = 20,
         CancellationToken token = default);
@@ -129,10 +132,12 @@ public interface IDeviceApiService : IService
     /// GOP API를 통해 특정 ID의 Sensor를 조회합니다.
     /// </summary>
     /// <param name="id">Sensor의 데이터베이스 ID</param>
+    /// <param name="includeController">연결된 제어기 포함 여부 (선택, 기본값: false)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Sensor DTO를 포함한 API 응답</returns>
     Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(
         int id,
+        bool includeController = false,
         CancellationToken token = default);
 
     /// <summary>

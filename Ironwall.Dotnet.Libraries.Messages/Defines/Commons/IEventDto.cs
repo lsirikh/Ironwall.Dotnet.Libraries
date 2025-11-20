@@ -47,11 +47,6 @@ public interface IEventDto
     string ActionReported { get; set; }
 
     /// <summary>
-    /// 이벤트 발생 일시
-    /// </summary>
-    string Datetime { get; set; }
-
-    /// <summary>
     /// 생성일시
     /// </summary>
     string? CreatedAt { get; set; }

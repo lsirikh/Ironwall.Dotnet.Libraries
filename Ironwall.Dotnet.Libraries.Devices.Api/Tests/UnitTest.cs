@@ -1,6 +1,6 @@
 using Autofac;
-using Ironwall.Dotnet.Libraries.Api.Messages.Common;
-using Ironwall.Dotnet.Libraries.Api.Messages.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
@@ -195,12 +195,12 @@ public class DeviceApiServiceTests
 
         var dto = new ControllerDeviceDto
         {
-            GroupDevice = 3,
-            NumberDevice = 3,
-            NameDevice = "제어기_3",
+            GroupDevice = 1,
+            NumberDevice = 1,
+            NameDevice = "제어기_1",
             TypeDevice = "Controller",
             Status = "ACTIVATED",
-            IpAddress = "192.168.1.103",
+            IpAddress = "192.168.1.101",
             IpPort = 9001
         };
 
@@ -303,6 +303,33 @@ public class DeviceApiServiceTests
     }
 
     /// <summary>
+    /// Sensor 목록 조회 (include_controller=true) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "09-1. Get Sensors with Controller Info")]
+    public async Task GetSensors_WithController_Should_Return_List()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.GetSensorsAsync(includeController: true, page:2, limit:20);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success);
+        Assert.NotNull(response.Data);
+
+        // Verify Pagination
+        Assert.NotNull(response.Pagination);
+        _logService.Info($"[Test] Sensors with Controller - Total: {response.Pagination.Total}");
+    }
+
+    /// <summary>
     /// Sensor 단일 조회 API 테스트
     /// </summary>
     [Fact(DisplayName = "10. Get Sensor By ID")]
@@ -325,6 +352,33 @@ public class DeviceApiServiceTests
         {
             Assert.NotNull(response.Data);
             Assert.Equal(1, response.Data.Id);
+        }
+    }
+
+    /// <summary>
+    /// Sensor 단일 조회 (include_controller=true) API 테스트
+    /// </summary>
+    [Fact(DisplayName = "10-1. Get Sensor By ID with Controller Info")]
+    public async Task GetSensorById_WithController_Should_Return_Single()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        // Act
+        var response = await service.GetSensorByIdAsync(1, includeController: true);
+
+        // Assert
+        Assert.NotNull(response);
+        if (response.Success)
+        {
+            Assert.NotNull(response.Data);
+            Assert.Equal(1, response.Data.Id);
+            _logService.Info($"[Test] Sensor with Controller - ControllerId: {response.Data.ControllerId}");
         }
     }
 
@@ -642,6 +696,267 @@ public class DeviceApiServiceTests
 
         // Assert
         Assert.NotNull(response);
+    }
+    #endregion
+
+    #region - Bulk Registration Tests -
+    /// <summary>
+    /// 제어기 다수 등록 테스트
+    /// </summary>
+    [Fact(DisplayName = "21. Bulk Create Controllers")]
+    public async Task BulkCreateControllers_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        int controllerCount = 3;
+        var createdControllers = new List<ControllerDeviceDto>();
+
+        // Act
+        for (int i = 1; i <= controllerCount; i++)
+        {
+            var dto = new ControllerDeviceDto
+            {
+                GroupDevice = i,
+                NumberDevice = 1,
+                NameDevice = $"제어기_{i:00}",
+                TypeDevice = "Controller",
+                Status = "ACTIVATED",
+                IpAddress = $"192.168.{i}.1",
+                IpPort = 9000 + i
+            };
+
+            var response = await service.CreateControllerAsync(dto);
+
+            // Assert
+            Assert.NotNull(response);
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+
+            _logService.Info($"[BulkTest] Controller created: {response.Data.NameDevice} (ID: {response.Data.Id})");
+            createdControllers.Add(response.Data);
+        }
+
+        // Verify total count
+        Assert.Equal(controllerCount, createdControllers.Count);
+    }
+
+    /// <summary>
+    /// 센서 다수 등록 테스트
+    /// </summary>
+    [Fact(DisplayName = "22. Bulk Create Sensors")]
+    public async Task BulkCreateSensors_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        int controllerId = 1;
+        int sensorCount = 80;
+        var createdSensors = new List<SensorDeviceDto>();
+
+        // Act
+        for (int i = 1; i <= sensorCount; i++)
+        {
+            var dto = new SensorDeviceDto
+            {
+                ControllerId = controllerId,
+                GroupDevice = controllerId,
+                NumberDevice = i,
+                NameDevice = $"펜스센서_{controllerId:00}-{i:000}",
+                TypeDevice = "Fence",
+                Status = "ACTIVATED"
+            };
+
+            var response = await service.CreateSensorAsync(dto);
+
+            // Assert
+            Assert.NotNull(response);
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+
+            if (i % 10 == 0) // Log every 10th sensor
+            {
+                _logService.Info($"[BulkTest] {i}/{sensorCount} sensors created");
+            }
+
+            createdSensors.Add(response.Data);
+        }
+
+        // Verify total count
+        Assert.Equal(sensorCount, createdSensors.Count);
+        _logService.Info($"[BulkTest] Total sensors created: {createdSensors.Count}");
+    }
+
+    /// <summary>
+    /// 제어기 및 센서 다수 등록 통합 테스트 (Db의 SeedAsync 참고)
+    /// </summary>
+    [Fact(DisplayName = "23. Bulk Create Controllers with Sensors")]
+    public async Task BulkCreateControllersWithSensors_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        int controllerCount = 3;
+        int sensorsPerController = 80;
+        var createdControllers = new List<ControllerDeviceDto>();
+        var allCreatedSensors = new List<SensorDeviceDto>();
+
+        // Act
+        for (int c = 1; c <= controllerCount; c++)
+        {
+            // 1. 제어기 생성
+            var controllerDto = new ControllerDeviceDto
+            {
+                GroupDevice = c,
+                NumberDevice = c,
+                NameDevice = $"제어기_{c:00}",
+                TypeDevice = "Controller",
+                Status = "ACTIVATED",
+                IpAddress = $"192.168.{c}.1",
+                IpPort = 9000 + c
+            };
+
+            var controllerResponse = await service.CreateControllerAsync(controllerDto);
+
+            // Assert Controller
+            Assert.NotNull(controllerResponse);
+            Assert.True(controllerResponse.Success);
+            Assert.NotNull(controllerResponse.Data);
+
+            _logService.Info($"[BulkTest] Controller created: {controllerResponse.Data.NameDevice} (ID: {controllerResponse.Data.Id})");
+            createdControllers.Add(controllerResponse.Data);
+
+            // 2. 해당 제어기에 센서들 생성
+            var controllerId = controllerResponse.Data.Id;
+            for (int s = 1; s <= sensorsPerController; s++)
+            {
+                var sensorDto = new SensorDeviceDto
+                {
+                    ControllerId = controllerId,
+                    GroupDevice = c,
+                    NumberDevice = s,
+                    NameDevice = $"펜스센서_{c:00}-{s:000}",
+                    TypeDevice = "Fence",
+                    Status = "ACTIVATED"
+                };
+
+                var sensorResponse = await service.CreateSensorAsync(sensorDto);
+
+                // Assert Sensor
+                Assert.NotNull(sensorResponse);
+                Assert.True(sensorResponse.Success);
+                Assert.NotNull(sensorResponse.Data);
+
+                allCreatedSensors.Add(sensorResponse.Data);
+
+                if (s % 20 == 0) // Log every 20th sensor
+                {
+                    _logService.Info($"[BulkTest] Controller {c}: {s}/{sensorsPerController} sensors created");
+                }
+            }
+            await Task.Delay(200);
+            _logService.Info($"[BulkTest] Controller {c} completed with {sensorsPerController} sensors");
+        }
+
+        // Verify totals
+        Assert.Equal(controllerCount, createdControllers.Count);
+        Assert.Equal(controllerCount * sensorsPerController, allCreatedSensors.Count);
+
+        _logService.Info($"[BulkTest] Total created - Controllers: {createdControllers.Count}, Sensors: {allCreatedSensors.Count}");
+    }
+
+    /// <summary>
+    /// 카메라 다수 등록 테스트
+    /// </summary>
+    [Fact(DisplayName = "24. Bulk Create Cameras")]
+    public async Task BulkCreateCameras_Should_Return_Success()
+    {
+        // Arrange
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "DeviceApi"));
+        _container = builder.Build();
+
+        var service = _container.ResolveNamed<IDeviceApiService>("DeviceApi");
+        await service.ExecuteAsync(CancellationToken.None);
+
+        int cameraCount = 30;
+        var createdCameras = new List<CameraDeviceDto>();
+
+        // Act
+        for (int cam = 1; cam <= cameraCount; cam++)
+        {
+            // 카메라 타입을 순환적으로 할당
+            string cameraType = (cam % 5) switch
+            {
+                0 => "THERMAL",
+                1 => "FIXED",
+                2 => "PTZ",
+                3 => "FISHEYES",
+                4 => "NONE",
+                _ => "FIXED"
+            };
+
+            // 카메라 모드를 순환적으로 할당
+            string cameraMode = (cam % 4) switch
+            {
+                0 => "ETC",
+                1 => "ONVIF",
+                2 => "EMSTONE_API",
+                3 => "INNODEP_API",
+                _ => "ONVIF"
+            };
+
+            var dto = new CameraDeviceDto
+            {
+                GroupDevice = (cam - 1) / 10 + 100, // 100, 101, 102, 103... 그룹으로 분산
+                NumberDevice = ((cam - 1) % 10) + 1,  // 각 그룹 내에서 1~10 번호
+                NameDevice = $"IP카메라_{cam:000}_{cameraType}",
+                TypeDevice = "IpCamera",
+                Version = "v2.0.1",
+                Status = cam % 7 == 0 ? "ERROR" : "ACTIVATED", // 7번째마다 ERROR
+                IpAddress = $"192.168.200.{cam}",
+                IpPort = cameraType == "THERMAL" ? 80 : 8554, // 열화상 카메라는 다른 포트
+                UserName = "admin",
+                UserPassword = "sensorway123",
+                RtspUri = $"rtsp://192.168.200.{cam}/stream1",
+                RtspPort = cameraType == "FISHEYES" ? 8554 : 554, // 어안 카메라는 다른 RTSP 포트
+                Mode = cameraMode,
+                Category = cameraType
+            };
+
+            var response = await service.CreateCameraAsync(dto);
+
+            // Assert
+            Assert.NotNull(response);
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+
+            if (cam % 10 == 0) // Log every 10th camera
+            {
+                _logService.Info($"[BulkTest] {cam}/{cameraCount} cameras created");
+            }
+
+            createdCameras.Add(response.Data);
+        }
+
+        // Verify total count
+        Assert.Equal(cameraCount, createdCameras.Count);
+        _logService.Info($"[BulkTest] Total cameras created: {createdCameras.Count}");
     }
     #endregion
 

@@ -1,9 +1,10 @@
-using Ironwall.Dotnet.Libraries.Api.Messages.Common;
-using Ironwall.Dotnet.Libraries.Api.Messages.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Devices.Api.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Api.Services;
 /****************************************************************************
@@ -102,7 +103,7 @@ public class DeviceApiService : IDeviceApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync("devices/controllers", parameters);
-            return await response.ToApiListResponseAsync<ControllerDeviceDto>(_log);
+            return await response.ToApiListResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -130,7 +131,7 @@ public class DeviceApiService : IDeviceApiService
             if (includeSensors) parameters.Add("include_sensors", "true");
 
             var response = await _apiService.GetRequestAsync($"devices/controllers/{id}", parameters);
-            return await response.ToApiResponseAsync<ControllerDeviceDto>(_log);
+            return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -153,7 +154,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PostRequestAsync("devices/controllers", dto);
-            return await response.ToApiResponseAsync<ControllerDeviceDto>(_log);
+            return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -179,7 +180,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PatchRequestAsync($"devices/controllers/{id}", dto);
-            return await response.ToApiResponseAsync<ControllerDeviceDto>(_log);
+            return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -205,7 +206,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"devices/controllers/{id}", dto);
-            return await response.ToApiResponseAsync<ControllerDeviceDto>(_log);
+            return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -228,7 +229,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.DeleteRequestAsync($"devices/controllers/{id}");
-            return await response.ToApiResponseAsync<bool>(_log);
+            return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
         {
@@ -247,6 +248,7 @@ public class DeviceApiService : IDeviceApiService
     /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
     /// <param name="typeDevice">디바이스 타입 필터 (PIR, Laser, Fence, IoController, Cable, Contact, Underground 등) (선택)</param>
     /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
+    /// <param name="includeController">연결된 제어기 포함 여부 (선택, 기본값 false)</param>
     /// <param name="page">페이지 번호 (기본값 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
@@ -256,6 +258,7 @@ public class DeviceApiService : IDeviceApiService
         int? groupDevice = null,
         string? typeDevice = null,
         string? status = null,
+        bool includeController = false,
         int page = 1,
         int limit = 20,
         CancellationToken token = default)
@@ -267,11 +270,12 @@ public class DeviceApiService : IDeviceApiService
             if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
             if (!string.IsNullOrEmpty(typeDevice)) parameters.Add("type_device", typeDevice);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            if (includeController) parameters.Add("include_controller", "true");
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync("devices/sensors", parameters);
-            return await response.ToApiListResponseAsync<SensorDeviceDto>(_log);
+            return await response.ToApiListResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -285,14 +289,21 @@ public class DeviceApiService : IDeviceApiService
     /// <para>GET /devices/sensors/{id} 엔드포인트를 호출</para>
     /// </summary>
     /// <param name="id">Sensor ID</param>
+    /// <param name="includeController">연결된 제어기 포함 여부 (선택, 기본값 false)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Sensor DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(int id, CancellationToken token = default)
+    public async Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(
+        int id,
+        bool includeController = false,
+        CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"devices/sensors/{id}");
-            return await response.ToApiResponseAsync<SensorDeviceDto>(_log);
+            var parameters = new Dictionary<string, string>();
+            if (includeController) parameters.Add("include_controller", "true");
+
+            var response = await _apiService.GetRequestAsync($"devices/sensors/{id}", parameters);
+            return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -313,7 +324,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PostRequestAsync("devices/sensors", dto);
-            return await response.ToApiResponseAsync<SensorDeviceDto>(_log);
+            return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -336,7 +347,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PatchRequestAsync($"devices/sensors/{id}", dto);
-            return await response.ToApiResponseAsync<SensorDeviceDto>(_log);
+            return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -359,7 +370,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"devices/sensors/{id}", dto);
-            return await response.ToApiResponseAsync<SensorDeviceDto>(_log);
+            return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -380,7 +391,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.DeleteRequestAsync($"devices/sensors/{id}");
-            return await response.ToApiResponseAsync<bool>(_log);
+            return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
         {
@@ -423,7 +434,7 @@ public class DeviceApiService : IDeviceApiService
             parameters.Add("limit", limit.ToString());
 
             var response = await _apiService.GetRequestAsync("devices/cameras", parameters);
-            return await response.ToApiListResponseAsync<CameraDeviceDto>(_log);
+            return await response.ToApiListResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -444,7 +455,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.GetRequestAsync($"devices/cameras/{id}");
-            return await response.ToApiResponseAsync<CameraDeviceDto>(_log);
+            return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -465,7 +476,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PostRequestAsync("devices/cameras", dto);
-            return await response.ToApiResponseAsync<CameraDeviceDto>(_log);
+            return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -488,7 +499,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PatchRequestAsync($"devices/cameras/{id}", dto);
-            return await response.ToApiResponseAsync<CameraDeviceDto>(_log);
+            return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -511,7 +522,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.PutRequestAsync($"devices/cameras/{id}", dto);
-            return await response.ToApiResponseAsync<CameraDeviceDto>(_log);
+            return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
         {
@@ -532,7 +543,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var response = await _apiService.DeleteRequestAsync($"devices/cameras/{id}");
-            return await response.ToApiResponseAsync<bool>(_log);
+            return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
         {

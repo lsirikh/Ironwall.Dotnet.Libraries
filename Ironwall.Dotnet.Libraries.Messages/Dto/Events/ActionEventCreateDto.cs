@@ -1,3 +1,4 @@
+using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
@@ -5,41 +6,35 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 /// <summary>
 /// 조치 이벤트 생성 DTO (POST 요청용)
 /// </summary>
-public class ActionEventCreateDto
+public class ActionEventCreateDto : BaseDto
 {
     /// <summary>
     /// 이벤트 타입 (EnumEventType: "Action")
     /// </summary>
-    [JsonProperty("type_event", Order = 1)]
+    [JsonProperty("type_event", Order = 2)]
     public string TypeEvent { get; set; } = "Action";
 
     /// <summary>
     /// 조치 세부 내용
     /// </summary>
-    [JsonProperty("content", Order = 2)]
+    [JsonProperty("content", Order = 3)]
     public string Content { get; set; } = string.Empty;
 
     /// <summary>
     /// 조치자
     /// </summary>
-    [JsonProperty("user", Order = 3)]
+    [JsonProperty("user", Order = 4)]
     public string User { get; set; } = string.Empty;
 
     /// <summary>
     /// 원본 이벤트 ID
     /// </summary>
-    [JsonProperty("from_event", Order = 4)]
+    [JsonProperty("from_event", Order = 5)]
     public int FromEvent { get; set; }
 
     /// <summary>
     /// 원본 이벤트 타입
     /// </summary>
-    [JsonProperty("from_type_event", Order = 5)]
+    [JsonProperty("from_type_event", Order = 6)]
     public string FromEventType { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 이벤트 발생 일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("datetime", Order = 6)]
-    public string Datetime { get; set; } = string.Empty;
 }

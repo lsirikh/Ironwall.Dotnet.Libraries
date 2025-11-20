@@ -1,9 +1,10 @@
-using Ironwall.Dotnet.Libraries.Api.Messages.Common;
-using Ironwall.Dotnet.Libraries.Api.Messages.Events;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Api.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.Events.Api.Services;
 /****************************************************************************

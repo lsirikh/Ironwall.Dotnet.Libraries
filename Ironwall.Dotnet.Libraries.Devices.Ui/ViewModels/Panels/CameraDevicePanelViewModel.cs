@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Devices.Db.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+//using Ironwall.Dotnet.Libraries.Devices.Db.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -26,11 +27,13 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - Ctors -
     public CameraDevicePanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IDeviceDbService dbService
+                                       //, IDeviceDbService dbService
+                                       , IDeviceApiService apiService
                                        , CameraDeviceProvider deviceProvider
                                        ) : base(eventAggregator, log)
     {
-        _dbService = dbService;
+        //_dbService = dbService;
+        _apiService = apiService;
         _deviceProvider = deviceProvider;
     }
     #endregion
@@ -118,7 +121,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             var token = _pCancellationTokenSource.Token;
             var currentList = _deviceProvider; // 또는 _deviceProvider.CollectionEntity
 
-            var dbList = await _dbService.FetchCamerasAsync(token);
+            //var dbList = await _dbService.FetchCamerasAsync(token);
+            var dbList = await _apiService.FetchCamerasAsync(token);
 
             // Insert 대상: ID가 없는 경우 (신규)
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
@@ -319,7 +323,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     public event System.Action? UpdateAction;
     #endregion
     #region - Attributes -
-    private IDeviceDbService _dbService;
+    //private IDeviceDbService _dbService;
+    private IDeviceApiService _apiService;
     private CameraDeviceProvider _deviceProvider;
     #endregion
 

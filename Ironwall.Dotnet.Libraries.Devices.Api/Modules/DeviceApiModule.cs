@@ -21,11 +21,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 public class DeviceApiModule : Module
 {
     #region - Ctors -
-    public DeviceApiModule(ILogService log, ApiSetupModel setup, string name = "DeviceApi")
+    public DeviceApiModule(ILogService? log, IApiSetupModel setup, string name = "DeviceApi", int count=100)
     {
         _log = log;
         _setup = setup;
         _name = name;
+        _count = count;
     }
     #endregion
 
@@ -52,7 +53,7 @@ public class DeviceApiModule : Module
                 .Named<IDeviceApiService>(_name)
                 .AsImplementedInterfaces()
                 .SingleInstance()
-                .WithMetadata("Order", 4);
+                .WithMetadata("Order", _count);
 
             _log?.Info($"[{nameof(DeviceApiModule)}] Module loaded successfully with name: {_name}");
         }
@@ -65,8 +66,9 @@ public class DeviceApiModule : Module
     #endregion
 
     #region - Attributes -
-    private readonly ILogService _log;
-    private readonly ApiSetupModel _setup;
+    private readonly ILogService? _log;
+    private readonly IApiSetupModel _setup;
     private readonly string _name;
+    private readonly int _count;
     #endregion
 }

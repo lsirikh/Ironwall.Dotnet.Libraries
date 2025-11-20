@@ -1,6 +1,6 @@
 using Autofac;
-using Ironwall.Dotnet.Libraries.Api.Messages.Common;
-using Ironwall.Dotnet.Libraries.Api.Messages.Events;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Modules;
@@ -574,7 +574,6 @@ public class EventApiServiceTests
             TypeEvent = "Connection",
             TypeDevice = "Fence",
             Sequence = 1,
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -603,7 +602,6 @@ public class EventApiServiceTests
         var dto = new ConnectionEventDto
         {
             Sequence = 10,
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -640,7 +638,6 @@ public class EventApiServiceTests
             Sensor = 3,
             TypeDevice = "PIR",
             Sequence = 12,
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -754,7 +751,6 @@ public class EventApiServiceTests
             User = "admin1",  // Required by GOP API
             FromEvent = 5,  // Required by GOP API
             FromEventType = "Fault",  // Required by GOP API (must be 'Intrusion', 'Fault')
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act

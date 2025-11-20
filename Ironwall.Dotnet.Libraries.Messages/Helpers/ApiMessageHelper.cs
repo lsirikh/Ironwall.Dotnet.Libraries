@@ -1,23 +1,16 @@
-/*using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Newtonsoft.Json;
 using System.Net;
 using System.Net.Http;
 
-namespace Ironwall.Dotnet.Libraries.Events.Api.Helpers;
-*//****************************************************************************
-   Purpose      : HTTP Response Helper
-   Created By   : GHLee
-   Created On   : 11/11/2025 12:00:00 AM
-   Department   : SW Team
-   Company      : Sensorway Co., Ltd.
-   Email        : lsirikh@naver.com
-****************************************************************************//*
+namespace Ironwall.Dotnet.Libraries.Messages.Helpers;
 
 /// <summary>
-/// HttpResponseMessage를 ApiResponse/ApiListResponse로 변환하는 Helper
-/// <para>Newtonsoft.Json을 사용하여 DTO의 JsonProperty 어트리뷰트와 호환됩니다.</para>
+/// API 메시지 변환 Helper
+/// <para>HttpResponseMessage를 ApiResponse/ApiListResponse로 변환합니다.</para>
+/// <para>기존 ResponseHelper의 기능을 통합하여 일관된 패턴 제공</para>
 /// </summary>
-public static class ResponseHelper
+public static class ApiMessageHelper
 {
     private static readonly JsonSerializerSettings _jsonSettings = new()
     {
@@ -26,9 +19,10 @@ public static class ResponseHelper
         DateFormatHandling = DateFormatHandling.IsoDateFormat
     };
 
+    #region - HttpResponse → ApiResponse 변환 -
     /// <summary>
-    /// HttpResponseMessage → ApiResponse<T> 변환
-    /// <para>Newtonsoft.Json을 사용하여 DTO의 JsonProperty 어트리뷰트를 정확히 매핑합니다.</para>
+    /// HttpResponseMessage → ApiResponse&lt;T&gt; 변환 (확장 메서드)
+    /// <para>기존 ResponseHelper.ToApiResponseAsync와 동일</para>
     /// </summary>
     public static async Task<ApiResponse<T>> ToApiResponseAsync<T>(this HttpResponseMessage response)
     {
@@ -51,14 +45,9 @@ public static class ResponseHelper
                 {
                     var errorResult = JsonConvert.DeserializeObject<ApiResponse<T>>(content, _jsonSettings);
                     if (errorResult != null)
-                    {
                         return errorResult;
-                    }
                 }
-                catch
-                {
-                    // JSON 파싱 실패 시 기본 에러 응답 생성
-                }
+                catch { }
 
                 return ApiResponse<T>.CreateError(
                     GetErrorCode(response.StatusCode),
@@ -76,8 +65,8 @@ public static class ResponseHelper
     }
 
     /// <summary>
-    /// HttpResponseMessage → ApiListResponse<T> 변환
-    /// <para>Newtonsoft.Json을 사용하여 DTO의 JsonProperty 어트리뷰트를 정확히 매핑합니다.</para>
+    /// HttpResponseMessage → ApiListResponse&lt;T&gt; 변환 (확장 메서드)
+    /// <para>기존 ResponseHelper.ToApiListResponseAsync와 동일</para>
     /// </summary>
     public static async Task<ApiListResponse<T>> ToApiListResponseAsync<T>(this HttpResponseMessage response)
     {
@@ -95,19 +84,13 @@ public static class ResponseHelper
             }
             else
             {
-                // 에러 응답 처리
                 try
                 {
                     var errorResult = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
                     if (errorResult != null)
-                    {
                         return errorResult;
-                    }
                 }
-                catch
-                {
-                    // JSON 파싱 실패 시 기본 에러 응답 생성
-                }
+                catch { }
 
                 return ApiListResponse<T>.CreateError(
                     GetErrorCode(response.StatusCode),
@@ -123,9 +106,47 @@ public static class ResponseHelper
                 ex.Message);
         }
     }
+    #endregion
+
+    #region - JSON 직접 변환 (선택적) -
+    /// <summary>
+    /// JSON 문자열 → ApiResponse&lt;T&gt; 역직렬화
+    /// <para>HTTP 응답 없이 JSON 문자열만 있을 때 사용</para>
+    /// </summary>
+    public static ApiResponse<T>? FromJsonResponse<T>(string json)
+    {
+        return JsonConvert.DeserializeObject<ApiResponse<T>>(json, _jsonSettings);
+    }
 
     /// <summary>
-    /// HTTP 상태 코드를 에러 코드로 변환
+    /// JSON 문자열 → ApiListResponse&lt;T&gt; 역직렬화
+    /// </summary>
+    public static ApiListResponse<T>? FromJsonListResponse<T>(string json)
+    {
+        return JsonConvert.DeserializeObject<ApiListResponse<T>>(json, _jsonSettings);
+    }
+
+    /// <summary>
+    /// ApiResponse&lt;T&gt; → JSON 직렬화
+    /// <para>테스트나 로깅 목적으로 사용</para>
+    /// </summary>
+    public static string ToJson<T>(this ApiResponse<T> response)
+    {
+        return JsonConvert.SerializeObject(response, _jsonSettings);
+    }
+
+    /// <summary>
+    /// ApiListResponse&lt;T&gt; → JSON 직렬화
+    /// </summary>
+    public static string ToJson<T>(this ApiListResponse<T> response)
+    {
+        return JsonConvert.SerializeObject(response, _jsonSettings);
+    }
+    #endregion
+
+    #region - 헬퍼 메서드 -
+    /// <summary>
+    /// HTTP 상태 코드 → 에러 코드 변환
     /// </summary>
     private static string GetErrorCode(HttpStatusCode statusCode)
     {
@@ -142,5 +163,5 @@ public static class ResponseHelper
             _ => "UNKNOWN_ERROR"
         };
     }
+    #endregion
 }
-*/
