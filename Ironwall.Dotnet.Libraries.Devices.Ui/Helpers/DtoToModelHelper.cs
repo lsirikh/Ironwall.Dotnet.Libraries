@@ -112,15 +112,15 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupDevice = model.DeviceGroup,
-            NameDevice = model.DeviceName,
+            NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
-            Version = model.Version,
+            Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
-            IpAddress = model.IpAddress,
+            IpAddress = model.IpAddress ?? string.Empty,
             IpPort = model.Port,
-            UserName = model.Username,
-            UserPassword = model.Password,
-            RtspUri = model.RtspUri,
+            UserName = model.Username ?? string.Empty,
+            UserPassword = model.Password ?? string.Empty,
+            RtspUri = model.RtspUri ?? string.Empty,
             RtspPort = model.RtspPort,
             Mode = model.Mode.ToString(),
             Category = model.Category.ToString()
@@ -166,9 +166,9 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupDevice = model.DeviceGroup,
-            NameDevice = model.DeviceName,
+            NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
-            Version = model.Version,
+            Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             ControllerId = model.Controller?.Id ?? 0
         };
@@ -215,11 +215,11 @@ public static class DtoToModelHelper
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
             GroupDevice = model.DeviceGroup,
-            NameDevice = model.DeviceName,
+            NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
-            Version = model.Version,
+            Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
-            IpAddress = model.IpAddress,
+            IpAddress = model.IpAddress ?? string.Empty,
             IpPort = model.Port
         };
     }
