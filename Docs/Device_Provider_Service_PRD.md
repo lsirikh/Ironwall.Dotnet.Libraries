@@ -446,9 +446,12 @@ foreach (var item in allCameras)
 - **ID**: NFR-1
 - **Target**: Sensor 4000개 로딩 시간 < 10초 (네트워크 환경: 100Mbps)
 - **Metrics**:
-  - Controller 100개 로딩: < 2초
-  - Sensor 4000개 로딩: < 8초 (페이징 처리)
-  - Camera 50개 로딩: < 1초
+  - Controller 100개 로딩: < 2초 (1 page, limit=100)
+  - Sensor 4000개 로딩: < 8초 (40 pages, limit=100 per page)
+  - Camera 50개 로딩: < 1초 (1 page, limit=100)
+- **Pagination Constraint**:
+  - ⚠️ **GOP API 최대 반환 개수: 100개/요청** (`limit=100`)
+  - 100개 초과 시 여러 페이지 요청 필요 (page=1, 2, 3...)
 
 #### NFR-2: Reliability
 - **ID**: NFR-2
