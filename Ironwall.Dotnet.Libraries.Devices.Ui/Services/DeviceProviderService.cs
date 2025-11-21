@@ -218,7 +218,6 @@ public class DeviceProviderService : IDeviceProviderService
         int currentPage = 1;
         int pageSize = 100;
         int totalFetched = 0;
-        int orphanedCount = 0;
 
         try
         {
@@ -241,27 +240,6 @@ public class DeviceProviderService : IDeviceProviderService
                 foreach (var dto in response.Data)
                 {
                     var sensor = dto.ToSensorDeviceModel();
-
-                    // ──────────── Navigation Mapping (양방향 참조) ────────────
-                    // 1) Sensor → Controller 참조 설정
-                    if (sensor.Controller != null && controllerDict.TryGetValue(sensor.Controller.Id, out var controller))
-                    {
-                        sensor.Controller = controller;
-
-                        // 2) Controller → Sensor 역방향 참조 설정
-                        if (controller.Devices == null)
-                            controller.Devices = new List<IBaseDeviceModel>();
-
-                        controller.Devices.Add(sensor);
-                    }
-                    else
-                    {
-                        // Orphaned sensor (Controller 없음)
-                        int controllerId = sensor.Controller?.Id ?? -1;
-                        _log?.Warning($"Sensor {sensor.Id} (DeviceName: {sensor.DeviceName}) has invalid Controller.Id: {controllerId}");
-                        orphanedCount++;
-                    }
-
                     allSensors.Add(sensor);
                     totalFetched++;
                 }
@@ -275,6 +253,12 @@ public class DeviceProviderService : IDeviceProviderService
 
                 currentPage++;
             }
+
+            // ──────────── Navigation Mapping (양방향 참조 설정) ────────────
+            int orphanedCount = NavigationMappingHelper.SetupBidirectionalReferences(
+                allSensors,
+                controllerDict,
+                _log);
 
             _log?.Info($"FetchSensorsAsync() completed: {totalFetched} items (Orphaned: {orphanedCount})");
             return allSensors;
