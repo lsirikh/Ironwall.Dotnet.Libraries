@@ -17,7 +17,6 @@ namespace Ironwall.Dotnet.Libraries.Devices.Defines;
 ****************************************************************************/
 public abstract class BaseDeviceProdiver<T> : BaseProvider<T>, ILoadable where T : IBaseDeviceModel
 {
-
     #region - Ctors -
     protected BaseDeviceProdiver(ILogService log, DeviceProvider provider) : base(log)
     {
@@ -119,5 +118,4 @@ public abstract class BaseDeviceProdiver<T> : BaseProvider<T>, ILoadable where T
     #region - Attributes -
     private DeviceProvider _provider;
     #endregion
-
 }
