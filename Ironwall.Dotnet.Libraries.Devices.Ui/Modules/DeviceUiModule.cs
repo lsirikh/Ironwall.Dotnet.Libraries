@@ -38,7 +38,7 @@ public class DeviceUiModule : Module
         {
             builder.RegisterModule(new DeviceModule(_log, _count++));
             //builder.RegisterModule(new DeviceDbModule(_log, _apiSetup, _count++)); // 2
-            builder.RegisterModule(new DeviceApiModule(_log, _apiSetup, count: _count++)); // 2
+            builder.RegisterModule(new DeviceApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++)); // 2
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();

@@ -248,7 +248,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         {
             var response = await _apiService.GetCamerasAsync(
                 page: 1,
-                limit: 1000,
+                limit: 100,
                 token: token);
 
             if (response.Success && response.Data != null)

@@ -12,6 +12,19 @@ namespace Ironwall.Dotnet.Libraries.Api.Models;
 public partial class ApiSetupModel : IApiSetupModel
 {
     #region - Ctors -
+    public ApiSetupModel()
+    {
+        
+    }
+    public ApiSetupModel(IApiSetupModel model)
+    {
+        Url = model.Url;
+        Username = model.Username;
+        Password = model.Password;
+        ApiKey = model.ApiKey;
+        Phone = model.Phone;
+        Timeout = model.Timeout;
+    }
     #endregion
     #region - Implementation of Interface -
     #endregion

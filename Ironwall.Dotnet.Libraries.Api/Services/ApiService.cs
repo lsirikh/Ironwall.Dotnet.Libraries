@@ -19,7 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Api.Services;
 public class ApiService : IApiService
 {
     #region - Ctors -
-    public ApiService(ILogService log
+    public ApiService(ILogService? log
                     , ApiSetupModel setupModel)
     {
         _log = log;
@@ -230,7 +230,7 @@ public class ApiService : IApiService
     public string Phone => _setupModel.Phone;
     #endregion
     #region - Attributes -
-    private readonly ILogService _log;
+    private readonly ILogService? _log;
     private readonly ApiSetupModel _setupModel;
     private HttpClient? _client;
     private const int TIMEOUT = 10;

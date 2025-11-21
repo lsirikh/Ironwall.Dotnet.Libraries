@@ -368,7 +368,6 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         });
     }
 
-
     #endregion
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteSensorDeviceProcessMessageModel message, CancellationToken cancellationToken)

@@ -49,10 +49,5 @@ public class ApiModule : Module
     private readonly IApiSetupModel _setup;
     private readonly string _name;
     private readonly int _count;
-    //private readonly string _ipAddress = string.Empty;
-    //private readonly int _port;
-    //private readonly string _username = string.Empty;
-    //private readonly string _password = string.Empty;
-    //private readonly string _apiKey = string.Empty;
     #endregion
 }

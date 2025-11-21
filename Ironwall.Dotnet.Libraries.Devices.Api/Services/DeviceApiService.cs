@@ -37,7 +37,7 @@ public class DeviceApiService : IDeviceApiService
     /// <param name="apiService">HTTP API 클라이언트 서비스</param>
     /// <param name="setupModel">API 설정 모델</param>
     public DeviceApiService(
-        ILogService log,
+        ILogService? log,
         IApiService apiService,
         ApiSetupModel setupModel)
     {
@@ -102,7 +102,7 @@ public class DeviceApiService : IDeviceApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("devices/controllers", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/controllers", parameters);
             return await response.ToApiListResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -130,7 +130,7 @@ public class DeviceApiService : IDeviceApiService
             var parameters = new Dictionary<string, string>();
             if (includeSensors) parameters.Add("include_sensors", "true");
 
-            var response = await _apiService.GetRequestAsync($"devices/controllers/{id}", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", parameters);
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -153,7 +153,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("devices/controllers", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/controllers", dto);
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -179,7 +179,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"devices/controllers/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", dto);
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -205,7 +205,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"devices/controllers/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/controllers/{id}", dto);
             return await response.ToApiResponseAsync<ControllerDeviceDto>();
         }
         catch (Exception ex)
@@ -228,7 +228,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"devices/controllers/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/controllers/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
@@ -274,7 +274,7 @@ public class DeviceApiService : IDeviceApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("devices/sensors", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/sensors", parameters);
             return await response.ToApiListResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -302,7 +302,7 @@ public class DeviceApiService : IDeviceApiService
             var parameters = new Dictionary<string, string>();
             if (includeController) parameters.Add("include_controller", "true");
 
-            var response = await _apiService.GetRequestAsync($"devices/sensors/{id}", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", parameters);
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -323,7 +323,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("devices/sensors", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/sensors", dto);
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -346,7 +346,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"devices/sensors/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", dto);
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -369,7 +369,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"devices/sensors/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/sensors/{id}", dto);
             return await response.ToApiResponseAsync<SensorDeviceDto>();
         }
         catch (Exception ex)
@@ -390,7 +390,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"devices/sensors/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/sensors/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
@@ -433,7 +433,7 @@ public class DeviceApiService : IDeviceApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("devices/cameras", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras", parameters);
             return await response.ToApiListResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -454,7 +454,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"devices/cameras/{id}");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{id}");
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -475,7 +475,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("devices/cameras", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/cameras", dto);
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -498,7 +498,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"devices/cameras/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", dto);
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -521,7 +521,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"devices/cameras/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{id}", dto);
             return await response.ToApiResponseAsync<CameraDeviceDto>();
         }
         catch (Exception ex)
@@ -542,7 +542,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"devices/cameras/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/cameras/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
@@ -554,7 +554,7 @@ public class DeviceApiService : IDeviceApiService
     #endregion
 
     #region - Attributes -
-    private readonly ILogService _log;
+    private readonly ILogService? _log;
     private readonly IApiService _apiService;
     private readonly ApiSetupModel _setupModel;
     #endregion

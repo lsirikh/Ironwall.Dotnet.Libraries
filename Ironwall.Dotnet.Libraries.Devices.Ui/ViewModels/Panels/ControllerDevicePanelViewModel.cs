@@ -241,7 +241,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         {
             var response = await _apiService.GetControllersAsync(
                 page: 1,
-                limit: 100,
+                limit: 20,
                 token: token);
 
             if (response.Success && response.Data != null)

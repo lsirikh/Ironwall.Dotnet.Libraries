@@ -37,17 +37,16 @@ public class DeviceApiModule : Module
         {
             // 1. ApiModule 등록 (내부에서 IApiService 등록)
             // ApiSetupModel은 이제 Timeout 속성을 포함하므로 직접 사용 가능
-            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}-Base"));
+            //builder.RegisterModule(new ApiModule(_log, setupModel, "MediaMTX"));
+            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count));
 
             // 2. ApiSetupModel 등록
-            builder.RegisterInstance(_setup)
-                .Named<ApiSetupModel>(_name)
-                .SingleInstance();
+            builder.RegisterInstance(_setup).Named<ApiSetupModel>(_name).SingleInstance();
 
             // 3. DeviceApiService 등록
             builder.Register(ctx => new DeviceApiService(
                     _log,
-                    ctx.ResolveNamed<IApiService>($"{_name}-Base"),
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
                     ctx.ResolveNamed<ApiSetupModel>(_name)
                 ))
                 .Named<IDeviceApiService>(_name)
