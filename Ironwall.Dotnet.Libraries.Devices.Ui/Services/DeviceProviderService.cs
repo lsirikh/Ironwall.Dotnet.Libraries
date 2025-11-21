@@ -1,7 +1,9 @@
 using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -100,10 +102,103 @@ public class DeviceProviderService : IDeviceProviderService
     /// </summary>
     public async Task FetchAllDevicesAsync(CancellationToken token = default)
     {
-        // TODO: Phase 2 - Implement FetchControllersAsync
-        // TODO: Phase 3 - Implement FetchSensorsAsync with Navigation Mapping
-        // TODO: Phase 4 - Implement FetchCamerasAsync
-        await Task.CompletedTask;
+        try
+        {
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} started");
+
+            // ──────────── 1. Controllers (먼저 로딩) ────────────
+            var controllers = await FetchControllersAsync(token);
+            _deviceProvider.Clear();
+            _controllerProvider.Clear();
+            if (controllers?.Any() == true)
+                foreach (var item in controllers)
+                    _deviceProvider.Add(item);
+
+            _log?.Info($"Controllers loaded: {controllers.Count} items");
+            await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
+
+            // TODO: Phase 3 - Implement FetchSensorsAsync with Navigation Mapping
+            // TODO: Phase 4 - Implement FetchCamerasAsync
+
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} failed: {ex.Message}");
+            throw;
+        }
+    }
+    #endregion
+
+    #region - Private Methods -
+    /// <summary>
+    /// GOP API를 통해 Controller 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<ControllerDeviceModel>> FetchControllersAsync(
+        CancellationToken token = default)
+    {
+        var allControllers = new List<ControllerDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchControllersAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetControllersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch controllers at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var controller = dto.ToControllerDeviceModel();
+                    allControllers.Add(controller);
+                    totalFetched++;
+                }
+
+                // Progress reporting (every 100 items)
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Controllers loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchControllersAsync() completed: {totalFetched} items");
+            return allControllers;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchControllersAsync: {ex.Message}");
+            return allControllers; // Return partial data
+        }
+    }
+
+    /// <summary>
+    /// Splash Screen 메시지를 발행합니다.
+    /// </summary>
+    private async Task PublishSplashMessage(string message)
+    {
+        if (_eventAggregator != null)
+            await _eventAggregator.PublishOnUIThreadAsync(
+                new SplashScreenMessage()
+                {
+                    Title = this.GetType().Name,
+                    Message = message
+                });
     }
     #endregion
 
