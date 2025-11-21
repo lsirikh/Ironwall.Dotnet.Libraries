@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
