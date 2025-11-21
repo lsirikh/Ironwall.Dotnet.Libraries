@@ -128,7 +128,15 @@ public class DeviceProviderService : IDeviceProviderService
             _log?.Info($"Sensors loaded: {sensors.Count} items");
             await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
 
-            // TODO: Phase 4 - Implement FetchCamerasAsync
+            // ──────────── 3. Cameras ────────────
+            var cameras = await FetchCamerasAsync(token);
+            _cameraProvider.Clear();
+            if (cameras?.Any() == true)
+                foreach (var item in cameras)
+                    _deviceProvider.Add(item);
+
+            _log?.Info($"Cameras loaded: {cameras.Count} items");
+            await PublishSplashMessage("CameraProvider의 정보를 모두 불러왔습니다...");
 
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
         }
@@ -275,6 +283,62 @@ public class DeviceProviderService : IDeviceProviderService
         {
             _log?.Error($"Exception in FetchSensorsAsync: {ex.Message}");
             return allSensors; // Return partial data
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Camera 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<CameraDeviceModel>> FetchCamerasAsync(
+        CancellationToken token = default)
+    {
+        var allCameras = new List<CameraDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchCamerasAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetCamerasAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch cameras at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var camera = dto.ToCameraDeviceModel();
+                    allCameras.Add(camera);
+                    totalFetched++;
+                }
+
+                // Progress reporting (every 100 items)
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Cameras loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchCamerasAsync() completed: {totalFetched} items");
+            return allCameras;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchCamerasAsync: {ex.Message}");
+            return allCameras; // Return partial data
         }
     }
 
