@@ -561,9 +561,39 @@ GOP API 기반 DeviceProviderService 구현 (TDD 방식)
 - [ ] Add additional edge case tests (optional, deferred)
 - [x] COMMIT: "test(devices-ui): Fix all 11 unit tests - Phase 5.4 complete" (commit: 0dac5dd)
 
-### 5.5 Code Quality Check
+### 5.5 Code Quality & Refactoring (NavigationMappingHelper)
+**목표**: Navigation Mapping 로직을 재사용 가능한 Helper로 추출하여 단일 책임 원칙(SRP) 준수
+
+#### 5.5.1 TDD Red - 테스트 작성 (실패하는 테스트 먼저)
+- [ ] `NavigationMappingHelperTests` 클래스 생성
+  - [ ] Test: `SetupBidirectionalReferences_ShouldMapSensorToController`
+  - [ ] Test: `SetupBidirectionalReferences_ShouldMapControllerToSensors`
+  - [ ] Test: `SetupBidirectionalReferences_ShouldHandleOrphanedSensors`
+  - [ ] Test: `SetupBidirectionalReferences_ShouldReturnOrphanedCount`
+  - [ ] Test: `GetOrphanedSensors_ShouldReturnSensorsWithInvalidControllers`
+  - [ ] Test: `SetupBidirectionalReferences_ShouldHandleNullControllerInSensor`
+- [ ] COMMIT: "test(devices-ui): Add NavigationMappingHelper tests (TDD Red)"
+
+#### 5.5.2 TDD Green - 최소 구현
+- [ ] `NavigationMappingHelper.cs` 생성 (Helpers 폴더)
+- [ ] `SetupBidirectionalReferences()` 메서드 구현
+  - [ ] Sensor → Controller 참조 설정
+  - [ ] Controller → Sensor 역방향 참조 설정
+  - [ ] Orphaned sensor 경고 로깅
+  - [ ] Orphaned sensor 수 반환
+- [ ] `GetOrphanedSensors()` 메서드 구현
+- [ ] 모든 테스트 통과 확인
+- [ ] COMMIT: "feat(devices-ui): Implement NavigationMappingHelper (TDD Green)"
+
+#### 5.5.3 TDD Refactor - Service 리팩토링
+- [ ] DeviceProviderService.FetchSensorsAsync() 수정
+  - [ ] 기존 Navigation Mapping 코드를 Helper 호출로 변경
+  - [ ] 코드 간결화 (245-263 라인 → 1-2 라인)
+- [ ] 기존 테스트 모두 통과 확인 (11개)
+- [ ] COMMIT: "refactor(devices-ui): Extract Navigation Mapping to helper class"
+
+#### 5.5.4 Optional - 추가 품질 개선
 - [ ] Check for code duplication
-  - [ ] Consider extracting `FetchPagedDevicesAsync<T>()` helper (optional)
 - [ ] Verify null safety (`nullable enable`)
 - [ ] Review exception handling
 - [ ] Verify logging is comprehensive

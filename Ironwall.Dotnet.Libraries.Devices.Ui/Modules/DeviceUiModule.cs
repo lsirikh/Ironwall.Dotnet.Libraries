@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Modules;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs;
@@ -37,8 +38,10 @@ public class DeviceUiModule : Module
         try
         {
             builder.RegisterModule(new DeviceModule(_log, _count++));
-            //builder.RegisterModule(new DeviceDbModule(_log, _apiSetup, _count++)); // 2
-            builder.RegisterModule(new DeviceApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++)); // 2
+            //builder.RegisterModule(new DeviceDbModule(_log, _apiSetup, _count++));
+            builder.RegisterModule(new DeviceApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
+            builder.RegisterType<DeviceProviderService>().As<IDeviceProviderService>().As<IService>()
+                .SingleInstance().WithMetadata("Order", _count);
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();
             builder.RegisterType<DeviceTabControlViewModel>().SingleInstance();
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();

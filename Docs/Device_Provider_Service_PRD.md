@@ -182,12 +182,69 @@ foreach (var sensor in sensors)
 }
 ```
 
-### 3.4 Key Dependencies
+### 3.4 NavigationMappingHelper (Phase 5.5 Refactoring)
+
+**목적**: Navigation Mapping 로직을 재사용 가능한 Helper 클래스로 분리하여 단일 책임 원칙(SRP)을 준수하고 테스트 용이성을 향상시킵니다.
+
+**클래스 구조**:
+```csharp
+/// <summary>
+/// Controller ↔ Sensor 양방향 Navigation Mapping을 처리하는 Helper 클래스
+/// </summary>
+public static class NavigationMappingHelper
+{
+    /// <summary>
+    /// Sensor 목록에 Controller 참조를 매핑하고 양방향 참조를 설정합니다.
+    /// </summary>
+    /// <param name="sensors">Sensor 모델 목록</param>
+    /// <param name="controllerDict">Controller ID → Model Dictionary</param>
+    /// <param name="logService">로깅 서비스 (orphaned sensor 경고용)</param>
+    /// <returns>Orphaned sensor 수</returns>
+    public static int SetupBidirectionalReferences(
+        IEnumerable<SensorDeviceModel> sensors,
+        Dictionary<int, ControllerDeviceModel> controllerDict,
+        ILogService? logService = null);
+
+    /// <summary>
+    /// Orphaned sensor (Controller 참조가 유효하지 않은 센서) 목록을 반환합니다.
+    /// </summary>
+    public static List<SensorDeviceModel> GetOrphanedSensors(
+        IEnumerable<SensorDeviceModel> sensors,
+        Dictionary<int, ControllerDeviceModel> controllerDict);
+}
+```
+
+**사용 예시 (DeviceProviderService)**:
+```csharp
+// Before (Phase 5.4)
+foreach (var sensor in sensors)
+{
+    if (sensor.Controller != null && controllerDict.TryGetValue(sensor.Controller.Id, out var controller))
+    {
+        sensor.Controller = controller;
+        controller.Devices ??= new List<IBaseDeviceModel>();
+        controller.Devices.Add(sensor);
+    }
+}
+
+// After (Phase 5.5)
+var orphanedCount = NavigationMappingHelper.SetupBidirectionalReferences(
+    sensors, controllerDict, _log);
+```
+
+**장점**:
+- ✅ **단일 책임 원칙**: Service는 API 호출과 Provider 관리에만 집중
+- ✅ **재사용성**: 다른 서비스에서도 Navigation Mapping 로직 재사용 가능
+- ✅ **테스트 용이성**: Helper를 독립적으로 단위 테스트 가능
+- ✅ **가독성**: Service 코드가 간결해지고 의도가 명확해짐
+
+### 3.5 Key Dependencies
 
 | Component | Type | Purpose |
 |-----------|------|---------|
 | `IDeviceApiService` | Interface | GOP RESTful API 호출 |
 | `DtoToModelHelper` | Static Class | DTO ↔ Model 변환 |
+| `NavigationMappingHelper` | Static Class | Controller ↔ Sensor 양방향 참조 설정 (Phase 5.5) |
 | `DeviceProvider` | Provider | 전체 Device 캐시 (공통) |
 | `ControllerDeviceProvider` | Provider | Controller 장비 캐시 |
 | `SensorDeviceProvider` | Provider | Sensor 장비 캐시 |

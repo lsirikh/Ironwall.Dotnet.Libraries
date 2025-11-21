@@ -588,3 +588,179 @@ public class MockLogService : ILogService
     public event EventHandler<LogEventArgs>? LogEvent;
 }
 #endregion
+
+/****************************************************************************
+   Purpose      : NavigationMappingHelper Unit Tests (TDD Red Phase)
+   Created By   : GHLee
+   Created On   : 11/21/2025 11:15:00 AM
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
+
+   Description  : TDD 방식의 NavigationMappingHelper 테스트
+                  - Kent Beck의 Red-Green-Refactor 사이클
+                  - Phase 5.5: Code Quality & Refactoring
+****************************************************************************/
+
+/// <summary>
+/// NavigationMappingHelper 단위 테스트
+/// <para>Controller ↔ Sensor 양방향 참조 설정 로직을 검증합니다.</para>
+/// </summary>
+public class NavigationMappingHelperTests
+{
+    #region - Test: SetupBidirectionalReferences() -
+    [Fact]
+    public void SetupBidirectionalReferences_ShouldMapSensorToController()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" };
+        var controllerDict = new Dictionary<int, ControllerDeviceModel> { { 1, controller } };
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 1 } },
+            new() { Id = 102, DeviceName = "Sensor-2", Controller = new ControllerDeviceModel { Id = 1 } }
+        };
+
+        // Act
+        NavigationMappingHelper.SetupBidirectionalReferences(sensors, controllerDict);
+
+        // Assert - Sensor → Controller 참조가 Dictionary의 실제 인스턴스로 교체되어야 함
+        Assert.Same(controller, sensors[0].Controller);
+        Assert.Same(controller, sensors[1].Controller);
+    }
+
+    [Fact]
+    public void SetupBidirectionalReferences_ShouldMapControllerToSensors()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" };
+        var controllerDict = new Dictionary<int, ControllerDeviceModel> { { 1, controller } };
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 1 } },
+            new() { Id = 102, DeviceName = "Sensor-2", Controller = new ControllerDeviceModel { Id = 1 } }
+        };
+
+        // Act
+        NavigationMappingHelper.SetupBidirectionalReferences(sensors, controllerDict);
+
+        // Assert - Controller → Sensors 역방향 참조가 설정되어야 함
+        Assert.NotNull(controller.Devices);
+        Assert.Equal(2, controller.Devices.Count);
+        Assert.Contains(sensors[0], controller.Devices);
+        Assert.Contains(sensors[1], controller.Devices);
+    }
+
+    [Fact]
+    public void SetupBidirectionalReferences_ShouldHandleOrphanedSensors()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" };
+        var controllerDict = new Dictionary<int, ControllerDeviceModel> { { 1, controller } };
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 1 } },
+            new() { Id = 102, DeviceName = "Sensor-Orphaned", Controller = new ControllerDeviceModel { Id = 999 } } // Invalid Controller
+        };
+
+        // Act
+        var orphanedCount = NavigationMappingHelper.SetupBidirectionalReferences(sensors, controllerDict);
+
+        // Assert
+        Assert.Equal(1, orphanedCount); // 1개의 orphaned sensor
+        Assert.Same(controller, sensors[0].Controller); // Valid sensor는 매핑됨
+        Assert.Equal(999, sensors[1].Controller.Id); // Orphaned sensor는 원래 Controller 유지
+        Assert.Single(controller.Devices); // Controller에는 1개의 센서만 연결
+    }
+
+    [Fact]
+    public void SetupBidirectionalReferences_ShouldReturnOrphanedCount()
+    {
+        // Arrange
+        var controllerDict = new Dictionary<int, ControllerDeviceModel>();
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 999 } },
+            new() { Id = 102, DeviceName = "Sensor-2", Controller = new ControllerDeviceModel { Id = 888 } },
+            new() { Id = 103, DeviceName = "Sensor-3", Controller = new ControllerDeviceModel { Id = 777 } }
+        };
+
+        // Act
+        var orphanedCount = NavigationMappingHelper.SetupBidirectionalReferences(sensors, controllerDict);
+
+        // Assert - 모든 센서가 orphaned
+        Assert.Equal(3, orphanedCount);
+    }
+
+    [Fact]
+    public void SetupBidirectionalReferences_ShouldHandleNullControllerInSensor()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" };
+        var controllerDict = new Dictionary<int, ControllerDeviceModel> { { 1, controller } };
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 1 } },
+            new() { Id = 102, DeviceName = "Sensor-NoController", Controller = null } // Null Controller
+        };
+
+        // Act
+        var orphanedCount = NavigationMappingHelper.SetupBidirectionalReferences(sensors, controllerDict);
+
+        // Assert
+        Assert.Equal(1, orphanedCount); // Null controller도 orphaned로 카운트
+        Assert.Same(controller, sensors[0].Controller);
+        Assert.Null(sensors[1].Controller);
+    }
+    #endregion
+
+    #region - Test: GetOrphanedSensors() -
+    [Fact]
+    public void GetOrphanedSensors_ShouldReturnSensorsWithInvalidControllers()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" };
+        var controllerDict = new Dictionary<int, ControllerDeviceModel> { { 1, controller } };
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 1 } },
+            new() { Id = 102, DeviceName = "Sensor-Orphaned", Controller = new ControllerDeviceModel { Id = 999 } },
+            new() { Id = 103, DeviceName = "Sensor-NoController", Controller = null }
+        };
+
+        // Act
+        var orphanedSensors = NavigationMappingHelper.GetOrphanedSensors(sensors, controllerDict);
+
+        // Assert
+        Assert.Equal(2, orphanedSensors.Count);
+        Assert.Contains(orphanedSensors, s => s.Id == 102);
+        Assert.Contains(orphanedSensors, s => s.Id == 103);
+    }
+
+    [Fact]
+    public void GetOrphanedSensors_ShouldReturnEmptyListWhenAllSensorsValid()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" };
+        var controllerDict = new Dictionary<int, ControllerDeviceModel> { { 1, controller } };
+
+        var sensors = new List<SensorDeviceModel>
+        {
+            new() { Id = 101, DeviceName = "Sensor-1", Controller = new ControllerDeviceModel { Id = 1 } },
+            new() { Id = 102, DeviceName = "Sensor-2", Controller = new ControllerDeviceModel { Id = 1 } }
+        };
+
+        // Act
+        var orphanedSensors = NavigationMappingHelper.GetOrphanedSensors(sensors, controllerDict);
+
+        // Assert
+        Assert.Empty(orphanedSensors);
+    }
+    #endregion
+}
