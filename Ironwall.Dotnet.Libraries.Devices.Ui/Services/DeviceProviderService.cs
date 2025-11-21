@@ -117,7 +117,17 @@ public class DeviceProviderService : IDeviceProviderService
             _log?.Info($"Controllers loaded: {controllers.Count} items");
             await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
 
-            // TODO: Phase 3 - Implement FetchSensorsAsync with Navigation Mapping
+            // ──────────── 2. Sensors (Navigation Mapping) ────────────
+            var controllerDict = controllers.ToDictionary(c => c.Id, c => c);
+            var sensors = await FetchSensorsAsync(controllerDict, token);
+            _sensorProvider.Clear();
+            if (sensors?.Any() == true)
+                foreach (var item in sensors)
+                    _deviceProvider.Add(item);
+
+            _log?.Info($"Sensors loaded: {sensors.Count} items");
+            await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
+
             // TODO: Phase 4 - Implement FetchCamerasAsync
 
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
@@ -184,6 +194,87 @@ public class DeviceProviderService : IDeviceProviderService
         {
             _log?.Error($"Exception in FetchControllersAsync: {ex.Message}");
             return allControllers; // Return partial data
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Sensor 목록을 조회하고 Controller와의 양방향 참조를 설정합니다 (Pagination 지원).
+    /// </summary>
+    /// <param name="controllerDict">Controller ID → ControllerDeviceModel Dictionary</param>
+    /// <param name="token">Cancellation Token</param>
+    private async Task<List<SensorDeviceModel>> FetchSensorsAsync(
+        Dictionary<int, ControllerDeviceModel> controllerDict,
+        CancellationToken token = default)
+    {
+        var allSensors = new List<SensorDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+        int orphanedCount = 0;
+
+        try
+        {
+            _log?.Info("FetchSensorsAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetSensorsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch sensors at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var sensor = dto.ToSensorDeviceModel();
+
+                    // ──────────── Navigation Mapping (양방향 참조) ────────────
+                    // 1) Sensor → Controller 참조 설정
+                    if (sensor.Controller != null && controllerDict.TryGetValue(sensor.Controller.Id, out var controller))
+                    {
+                        sensor.Controller = controller;
+
+                        // 2) Controller → Sensor 역방향 참조 설정
+                        if (controller.Devices == null)
+                            controller.Devices = new List<IBaseDeviceModel>();
+
+                        controller.Devices.Add(sensor);
+                    }
+                    else
+                    {
+                        // Orphaned sensor (Controller 없음)
+                        int controllerId = sensor.Controller?.Id ?? -1;
+                        _log?.Warning($"Sensor {sensor.Id} (DeviceName: {sensor.DeviceName}) has invalid Controller.Id: {controllerId}");
+                        orphanedCount++;
+                    }
+
+                    allSensors.Add(sensor);
+                    totalFetched++;
+                }
+
+                // Progress reporting (every 1000 items)
+                if (totalFetched % 1000 == 0)
+                    _log?.Info($"Sensors loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break; // Last page
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchSensorsAsync() completed: {totalFetched} items (Orphaned: {orphanedCount})");
+            return allSensors;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchSensorsAsync: {ex.Message}");
+            return allSensors; // Return partial data
         }
     }
 
