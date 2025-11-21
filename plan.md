@@ -505,7 +505,28 @@ GOP API 기반 DeviceProviderService 구현 (TDD 방식)
 
 ## Phase 5: Integration Testing & Optimization (REFACTOR)
 
-### 5.1 Integration Tests
+### 5.1 Unit Test Infrastructure
+- [x] Delete standalone `Ironwall.Dotnet.Libraries.Devices.Ui.Tests` project
+- [x] Add xUnit packages to `Devices.Ui.csproj`:
+  - [x] Microsoft.NET.Test.Sdk (17.14.0)
+  - [x] xunit (2.9.3)
+  - [x] xunit.runner.visualstudio (3.1.0)
+- [x] Create `Tests/UnitTest.cs` in main project
+- [x] Implement Mock classes:
+  - [x] MockDeviceApiService (IDeviceApiService)
+  - [x] MockEventAggregator (IEventAggregator)
+  - [x] MockLogService (ILogService)
+- [x] Create test categories:
+  - [x] StartService() tests
+  - [x] FetchAllDevicesAsync() tests
+  - [x] Pagination tests
+  - [x] Error handling tests
+  - [x] Navigation Mapping tests (bidirectional)
+- [x] Build successful: 0 errors, 85 warnings
+- [x] Test results: 11 tests created (5 passing, 6 need mock refinement)
+- [x] COMMIT: "test(devices-ui): Consolidate unit tests into main project" (commit: edf5ea4)
+
+### 5.2 Integration Tests
 - [ ] Test with real GOP server
 - [ ] Test scenario: 100 Controllers
 - [ ] Test scenario: 4000+ Sensors (large-scale)
@@ -516,7 +537,7 @@ GOP API 기반 DeviceProviderService 구현 (TDD 방식)
   - [ ] Partial data loading (pagination error in middle)
 - [ ] Verify Navigation Mapping integrity
 
-### 5.2 Performance Optimization
+### 5.3 Performance Optimization
 - [ ] Measure actual performance:
   - [ ] Controllers: < 2초
   - [ ] Sensors: < 10초
@@ -525,7 +546,13 @@ GOP API 기반 DeviceProviderService 구현 (TDD 방식)
 - [ ] Consider retry logic (optional, 3회 시도)
 - [ ] Add timeout configuration (30초)
 
-### 5.3 Code Quality Check
+### 5.4 Unit Test Refinement
+- [ ] Fix pagination mock logic (page index tracking)
+- [ ] Fix DTO to Model mapping for Navigation properties
+- [ ] Verify all 11 tests pass
+- [ ] Add additional edge case tests
+
+### 5.5 Code Quality Check
 - [ ] Check for code duplication
   - [ ] Consider extracting `FetchPagedDevicesAsync<T>()` helper (optional)
 - [ ] Verify null safety (`nullable enable`)
@@ -533,13 +560,13 @@ GOP API 기반 DeviceProviderService 구현 (TDD 방식)
 - [ ] Verify logging is comprehensive
 - [ ] Check memory usage (no leaks)
 
-### 5.4 Documentation Update
+### 5.6 Documentation Update
 - [ ] Update PRD with actual implementation notes
 - [ ] Document any deviations from plan
 - [ ] Add troubleshooting section if needed
 - [ ] Update README (if needed)
 
-### 5.5 Final Verification
+### 5.7 Final Verification
 - [ ] All tests passing
 - [ ] No compiler warnings
 - [ ] Code review completed
@@ -575,10 +602,11 @@ GOP API 기반 DeviceProviderService 구현 (TDD 방식)
 - **Phase 2**: ✅ COMPLETE (Controller fetching with pagination, commit: d8fe224)
 - **Phase 3**: ✅ COMPLETE (Sensor fetching with Navigation Mapping, commit: 346d220)
 - **Phase 4**: ✅ COMPLETE (Camera fetching and StartService integration, commit: 3c4073a)
-- **Phase 5**: ⏸️ NOT STARTED
+- **Phase 5.1**: ✅ COMPLETE (Unit Test Infrastructure, commit: edf5ea4)
+- **Phase 5.2-5.7**: ⏸️ PENDING (Integration tests, performance optimization, test refinement)
 
 ## Next Step
-▶️ **Phase 5**: Integration testing and optimization (manual testing with GOP server)
+▶️ **Phase 5.4**: Unit Test Refinement (fix failing tests and improve mock logic)
 
 ---
 
