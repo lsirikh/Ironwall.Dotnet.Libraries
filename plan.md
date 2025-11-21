@@ -315,3 +315,300 @@ DBService 기반 → ApiService 기반 마이그레이션 (TDD 방식)
 - `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/CameraDevicePanelViewModel.cs` (commit: e65b151)
 - `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/SensorDevicePanelViewModel.cs` (commit: 09e0d6f)
 - `Ironwall.Dotnet.Libraries.Devices.Ui/ViewModels/Panels/ControllerDevicePanelViewModel.cs` (commit: 7725030)
+
+---
+
+# DeviceProviderService Implementation - TDD Plan
+
+## Overview
+GOP API 기반 DeviceProviderService 구현 (TDD 방식)
+- 문서: `Docs/Device_Provider_Service_PRD.md`
+- 방법론: `Docs/CLAUDE.md` (Kent Beck's TDD: Red-Green-Refactor)
+- 목표: Application 시작 시 모든 Device 데이터를 GOP API로부터 가져와 Provider에 캐싱
+
+---
+
+## Phase 1: Interface & Service Setup (STRUCTURAL)
+
+### 1.1 Create Services Folder and Interface
+- [ ] Create `Services/` folder in `Ironwall.Dotnet.Libraries.Devices.Ui`
+- [ ] Create `IDeviceProviderService.cs` interface
+  - [ ] Inherit from `IService`
+  - [ ] Method: `Task StartService(CancellationToken token = default)`
+  - [ ] Method: `Task FetchAllDevicesAsync(CancellationToken token = default)`
+
+### 1.2 Create Service Skeleton
+- [ ] Create `DeviceProviderService.cs` class
+- [ ] Add constructor with dependencies:
+  - [ ] `ILogService? logService` (nullable)
+  - [ ] `IEventAggregator eventAggregator`
+  - [ ] `IDeviceApiService apiService`
+  - [ ] `DeviceProvider deviceProvider`
+  - [ ] `ControllerDeviceProvider controllerProvider`
+  - [ ] `SensorDeviceProvider sensorProvider`
+  - [ ] `CameraDeviceProvider cameraProvider`
+- [ ] Add private readonly fields:
+  - [ ] `private readonly ILogService? _log;`
+  - [ ] Other providers
+- [ ] Implement empty methods:
+  - [ ] `StartService()` with basic logging structure
+  - [ ] `FetchAllDevicesAsync()` stub
+
+### 1.3 Phase 1 Verification
+- [ ] Build solution - check for errors
+- [ ] Verify interface inheritance and method signatures
+- [ ] COMMIT: "STRUCTURAL: Add DeviceProviderService interface and skeleton with logging"
+
+---
+
+## Phase 2: Controller Fetching Implementation (BEHAVIORAL)
+
+### 2.1 RED: Write Failing Test (Optional - if testing service directly)
+- [ ] Test project: `Ironwall.Dotnet.Libraries.Devices.Ui.Tests`
+- [ ] Test: `FetchControllersAsync_ShouldReturnListOfControllers`
+  - [ ] Arrange: Mock IDeviceApiService
+  - [ ] Act: Call FetchControllersAsync()
+  - [ ] Assert: Returns non-empty list
+
+### 2.2 GREEN: Implement FetchControllersAsync()
+- [ ] Create private method: `FetchControllersAsync(CancellationToken token)`
+- [ ] Initialize variables:
+  - [ ] `var allControllers = new List<ControllerDeviceModel>();`
+  - [ ] `int currentPage = 1;`
+  - [ ] `int pageSize = 100;`
+  - [ ] `int totalFetched = 0;`
+- [ ] Add try-catch block
+- [ ] Add logging: `_log?.Info("FetchControllersAsync() started")`
+- [ ] Implement pagination while loop:
+  - [ ] Call `_apiService.GetControllersAsync(page, limit, token)`
+  - [ ] Check `response.Success` and break if failed
+  - [ ] Convert DTOs: `dto.ToControllerDeviceModel()`
+  - [ ] Add to list
+  - [ ] Progress logging (every 100 items)
+  - [ ] Break if last page (`response.Data.Count < pageSize`)
+- [ ] Add logging: `_log?.Info($"FetchControllersAsync() completed: {totalFetched} items")`
+- [ ] Error logging in catch: `_log?.Error($"Exception in FetchControllersAsync: {ex.Message}")`
+- [ ] Return `allControllers`
+
+### 2.3 Update FetchAllDevicesAsync()
+- [ ] Call `FetchControllersAsync(token)`
+- [ ] Clear providers: `_deviceProvider.Clear()`, `_controllerProvider.Clear()`
+- [ ] Add controllers to providers
+- [ ] Add logging: `_log?.Info($"Controllers loaded: {controllers.Count} items")`
+- [ ] Publish Splash Screen: "ControllerProvider의 정보를 모두 불러왔습니다..."
+
+### 2.4 Phase 2 Verification
+- [ ] Build solution
+- [ ] Run tests (if created)
+- [ ] Manual test: GOP server integration (100 controllers)
+- [ ] Verify log output (Info/Error levels)
+- [ ] Performance check: < 2 seconds
+- [ ] COMMIT: "BEHAVIORAL: Implement Controller devices fetching with pagination and logging"
+
+---
+
+## Phase 3: Sensor Fetching with Navigation Mapping (BEHAVIORAL - High Priority)
+
+### 3.1 Prerequisites Check
+- [ ] Phase 2 완료 확인 (Controllers must be loaded first)
+- [ ] Verify `DtoToModelHelper.ToSensorDeviceModel()` exists
+
+### 3.2 GREEN: Implement FetchSensorsAsync()
+- [ ] Create private method: `FetchSensorsAsync(Dictionary<int, ControllerDeviceModel> ctrlDict, CancellationToken token)`
+- [ ] Initialize variables:
+  - [ ] `var allSensors = new List<SensorDeviceModel>();`
+  - [ ] `int currentPage = 1;`
+  - [ ] `int pageSize = 100;`
+  - [ ] `int totalFetched = 0;`
+  - [ ] `int mappedCount = 0;`
+- [ ] Add try-catch block
+- [ ] Add logging: `_log?.Info("FetchSensorsAsync() started")`
+- [ ] Implement pagination while loop:
+  - [ ] Call `_apiService.GetSensorsAsync(page, limit, includeController: true, token)`
+  - [ ] Check response success
+  - [ ] Convert DTO: `dto.ToSensorDeviceModel()`
+  - [ ] **Build Navigation Mapping**:
+    - [ ] Check `dto.Controller != null`
+    - [ ] Lookup: `ctrlDict.TryGetValue(dto.Controller.Id, out var parent)`
+    - [ ] Assign: `sensor.Controller = parent` (Child → Parent)
+    - [ ] Initialize: `parent.Devices ??= new List<IBaseDeviceModel>()`
+    - [ ] Add: `parent.Devices.Add(sensor)` (Parent → Children)
+    - [ ] Increment `mappedCount`
+  - [ ] Warning logging if Controller not found:
+    - [ ] `_log?.Warning($"Controller not found for Sensor ID={sensor.Id}, ControllerId={dto.Controller.Id}")`
+  - [ ] Add to list
+  - [ ] Progress logging (every 1000 items): `_log?.Info($"Sensors loading progress: {totalFetched} items, {mappedCount} mapped")`
+  - [ ] Break if last page
+- [ ] Add logging: `_log?.Info($"FetchSensorsAsync() completed: {totalFetched} items, {mappedCount} mapped to controllers")`
+- [ ] Return `allSensors`
+
+### 3.3 Update FetchAllDevicesAsync()
+- [ ] After Controllers loaded, build Dictionary:
+  - [ ] `var ctrlDict = controllers.ToDictionary(c => c.Id);`
+- [ ] Call `FetchSensorsAsync(ctrlDict, token)`
+- [ ] Clear sensor provider
+- [ ] Add sensors to providers
+- [ ] Add logging: `_log?.Info($"Sensors loaded: {sensors.Count} items (Navigation Mapping built)")`
+- [ ] Publish Splash Screen: "SensorProvider의 정보를 모두 불러왔습니다..."
+
+### 3.4 Phase 3 Verification
+- [ ] Build solution
+- [ ] Manual test: Load 4000+ Sensors from GOP server
+- [ ] **Verify Navigation Mapping**:
+  - [ ] Check Sensor.Controller is not null
+  - [ ] Check Controller.Devices list is populated
+  - [ ] Verify Sensor count matches Controller's child count
+- [ ] Verify log output (Info/Warning/Error levels)
+- [ ] Verify Warning logs for orphaned sensors (if any)
+- [ ] Performance check: < 10 seconds
+- [ ] COMMIT: "BEHAVIORAL: Implement Sensor devices fetching with navigation mapping, pagination, and logging"
+
+---
+
+## Phase 4: Camera Fetching Implementation (BEHAVIORAL)
+
+### 4.1 GREEN: Implement FetchCamerasAsync()
+- [ ] Create private method: `FetchCamerasAsync(CancellationToken token)`
+- [ ] Initialize variables (same pattern as Controllers)
+- [ ] Add try-catch block
+- [ ] Add logging: `_log?.Info("FetchCamerasAsync() started")`
+- [ ] Implement pagination while loop:
+  - [ ] Call `_apiService.GetCamerasAsync(page, limit, token)`
+  - [ ] Check response success
+  - [ ] Convert DTO: `dto.ToCameraDeviceModel()`
+  - [ ] Add to list
+  - [ ] Break if last page
+- [ ] Add logging: `_log?.Info($"FetchCamerasAsync() completed: {totalFetched} items")`
+- [ ] Return `allCameras`
+
+### 4.2 Update FetchAllDevicesAsync()
+- [ ] Call `FetchCamerasAsync(token)`
+- [ ] Clear camera provider
+- [ ] Add cameras to providers
+- [ ] Add logging: `_log?.Info($"Cameras loaded: {cameras.Count} items")`
+- [ ] Publish Splash Screen: "CameraProvider의 정보를 모두 불러왔습니다..."
+
+### 4.3 Implement StartService()
+- [ ] Add logging: `_log?.Info("DeviceProviderService.StartService() started")`
+- [ ] Call `FetchAllDevicesAsync(token)` inside try-catch
+- [ ] Add logging: `_log?.Info("DeviceProviderService.StartService() completed")`
+- [ ] Error logging: `_log?.Error($"DeviceProviderService.StartService() failed: {ex.Message}")`
+
+### 4.4 Phase 4 Verification
+- [ ] Build solution
+- [ ] Manual test: Load 50 Cameras from GOP server
+- [ ] Verify log output (Info/Error levels)
+- [ ] Performance check: < 1 second
+- [ ] End-to-end test: `StartService()` loads all devices
+- [ ] COMMIT: "BEHAVIORAL: Implement Camera devices fetching and complete StartService with logging"
+
+---
+
+## Phase 5: Integration Testing & Optimization (REFACTOR)
+
+### 5.1 Integration Tests
+- [ ] Test with real GOP server
+- [ ] Test scenario: 100 Controllers
+- [ ] Test scenario: 4000+ Sensors (large-scale)
+- [ ] Test scenario: 50 Cameras
+- [ ] Test error scenarios:
+  - [ ] GOP server connection failure
+  - [ ] Network timeout (30 seconds)
+  - [ ] Partial data loading (pagination error in middle)
+- [ ] Verify Navigation Mapping integrity
+
+### 5.2 Performance Optimization
+- [ ] Measure actual performance:
+  - [ ] Controllers: < 2초
+  - [ ] Sensors: < 10초
+  - [ ] Cameras: < 1초
+- [ ] Adjust page size if needed
+- [ ] Consider retry logic (optional, 3회 시도)
+- [ ] Add timeout configuration (30초)
+
+### 5.3 Code Quality Check
+- [ ] Check for code duplication
+  - [ ] Consider extracting `FetchPagedDevicesAsync<T>()` helper (optional)
+- [ ] Verify null safety (`nullable enable`)
+- [ ] Review exception handling
+- [ ] Verify logging is comprehensive
+- [ ] Check memory usage (no leaks)
+
+### 5.4 Documentation Update
+- [ ] Update PRD with actual implementation notes
+- [ ] Document any deviations from plan
+- [ ] Add troubleshooting section if needed
+- [ ] Update README (if needed)
+
+### 5.5 Final Verification
+- [ ] All tests passing
+- [ ] No compiler warnings
+- [ ] Code review completed
+- [ ] Performance targets met
+- [ ] COMMIT: "REFACTOR: Optimize pagination logic, error handling, and logging"
+
+---
+
+## Commit Discipline (Kent Beck's Tidy First)
+
+### STRUCTURAL Commits (No behavior change)
+1. `STRUCTURAL: Add DeviceProviderService interface and skeleton with logging`
+   - Files: `IDeviceProviderService.cs`, `DeviceProviderService.cs` (empty methods)
+
+### BEHAVIORAL Commits (Functionality changes)
+2. `BEHAVIORAL: Implement Controller devices fetching with pagination and logging`
+   - Files: `DeviceProviderService.cs` (FetchControllersAsync implementation)
+
+3. `BEHAVIORAL: Implement Sensor devices fetching with navigation mapping, pagination, and logging`
+   - Files: `DeviceProviderService.cs` (FetchSensorsAsync with Navigation Mapping)
+
+4. `BEHAVIORAL: Implement Camera devices fetching and complete StartService with logging`
+   - Files: `DeviceProviderService.cs` (FetchCamerasAsync + StartService)
+
+### REFACTOR Commits (Optimization)
+5. `REFACTOR: Optimize pagination logic, error handling, and logging`
+   - Files: Multiple (performance improvements, code cleanup)
+
+---
+
+## Current Status
+- **Phase 1**: ⏸️ NOT STARTED
+- **Phase 2**: ⏸️ NOT STARTED
+- **Phase 3**: ⏸️ NOT STARTED
+- **Phase 4**: ⏸️ NOT STARTED
+- **Phase 5**: ⏸️ NOT STARTED
+
+## Next Step
+▶️ **Phase 1.1**: Create Services folder and IDeviceProviderService interface
+
+---
+
+## Key Implementation Notes
+
+### Navigation Mapping Pattern
+```csharp
+// 1. Fetch Controllers first (순서 중요!)
+var controllers = await FetchControllersAsync(token);
+var ctrlDict = controllers.ToDictionary(c => c.Id);
+
+// 2. Fetch Sensors with Dictionary
+var sensors = await FetchSensorsAsync(ctrlDict, token);
+
+// 3. Inside FetchSensorsAsync:
+if (dto.Controller != null && ctrlDict.TryGetValue(dto.Controller.Id, out var parent))
+{
+    sensor.Controller = parent;           // Child → Parent
+    parent.Devices ??= new List<IBaseDeviceModel>();
+    parent.Devices.Add(sensor);           // Parent → Children
+}
+```
+
+### Logging Strategy
+- **Info**: Start/Complete/Progress (정상 작동)
+- **Warning**: Missing Controller, Partial data (경고 사항)
+- **Error**: API failure, Exception (치명적 오류)
+
+### Performance Targets
+- Controllers 100개: < 2초
+- Sensors 4000개: < 10초 (페이징 처리)
+- Cameras 50개: < 1초
