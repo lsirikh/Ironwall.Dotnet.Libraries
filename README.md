@@ -131,9 +131,13 @@ MVVM ViewModel 계층
 - 장치 설정 관리
 
 #### Ironwall.Dotnet.Libraries.Devices.Ui
-장치 UI 컴포넌트
+장치 UI 컴포넌트 및 서비스
+- **DeviceProviderService**: GOP API를 통한 Device 데이터 Fetching 및 Provider 업데이트
+- **NavigationMappingHelper**: Controller ↔ Sensor 양방향 Navigation 참조 설정 (TDD 구현)
+- **DtoToModelHelper**: DTO ↔ Model 변환 헬퍼
 - 장치 목록 ViewModel
 - 장치 속성 다이얼로그
+- xUnit 단위 테스트 (18개 테스트, 100% 통과)
 
 #### Ironwall.Dotnet.Libraries.Events
 이벤트 처리
@@ -370,6 +374,13 @@ protected override void ConfigureContainer(ContainerBuilder builder)
 | NAudio | 2.2.1 | 오디오 재생 |
 | FFmpeg.AutoGen | 7.1.0 | 비디오 디코딩 |
 
+### 테스트
+| 패키지 | 버전 | 용도 |
+|------|------|------|
+| xUnit | 2.9.3 | 단위 테스트 프레임워크 |
+| xunit.runner.visualstudio | 2.8.2 | Visual Studio 테스트 러너 |
+| Microsoft.NET.Test.Sdk | 17.11.1 | .NET 테스트 SDK |
+
 ### 지도 및 시각화
 | 라이브러리 | 용도 |
 |------|------|
@@ -522,7 +533,22 @@ bin/Release/net8.0-windows/
 
 ### 테스트
 
-현재 단위 테스트 프로젝트는 구성 중입니다.
+**단위 테스트 실행:**
+```bash
+# 전체 테스트 실행
+dotnet test Ironwall.Dotnet.Libraries.sln
+
+# 특정 프로젝트 테스트 실행
+dotnet test Ironwall.Dotnet.Libraries.Devices.Ui/Ironwall.Dotnet.Libraries.Devices.Ui.csproj
+dotnet test Ironwall.Dotnet.Libraries.Devices.Api/Ironwall.Dotnet.Libraries.Devices.Api.csproj
+dotnet test Ironwall.Dotnet.Libraries.Events.Api/Ironwall.Dotnet.Libraries.Events.Api.csproj
+```
+
+**테스트 커버리지:**
+- **Devices.Ui**: 18개 테스트 (DeviceProviderService: 11, NavigationMappingHelper: 7)
+- **Devices.Api**: 15개 테스트 (Controllers: 5, Sensors: 5, Cameras: 5)
+- **Events.Api**: 15개 테스트 (Detection: 3, Malfunction: 3, Connection: 2, Action: 2, Integration: 5)
+- **Total**: 48개 테스트, 100% 통과 ✅
 
 ### 패키지 게시 (내부용)
 
