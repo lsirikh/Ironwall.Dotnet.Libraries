@@ -169,6 +169,7 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetControllersAsync(
                     page: currentPage,
                     limit: pageSize,
+                    includeSensors: true,
                     token: token);
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -228,6 +229,7 @@ public class DeviceProviderService : IDeviceProviderService
                 var response = await _apiService.GetSensorsAsync(
                     page: currentPage,
                     limit: pageSize,
+                    includeController: true,
                     token: token);
 
                 if (!response.Success || response.Data == null || response.Data.Count == 0)
