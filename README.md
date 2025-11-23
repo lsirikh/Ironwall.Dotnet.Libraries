@@ -130,6 +130,15 @@ MVVM ViewModel 계층
 - 장치 정보 영속화
 - 장치 설정 관리
 
+#### Ironwall.Dotnet.Libraries.Devices.Api
+Device API 서비스 (GOP RESTful API 연동)
+- `IDeviceApiService` / `DeviceApiService`
+- Controller, Sensor, Camera CRUD 작업
+- 필터링, 페이지네이션, 정렬 지원
+- `ResponseHelper`: HTTP 응답 변환 헬퍼
+- `DeviceApiModule`: Autofac 의존성 주입 모듈
+- xUnit 단위 테스트 (15개 테스트, 100% 통과)
+
 #### Ironwall.Dotnet.Libraries.Devices.Ui
 장치 UI 컴포넌트 및 서비스
 - **DeviceProviderService**: GOP API를 통한 Device 데이터 Fetching 및 Provider 업데이트
@@ -149,6 +158,15 @@ MVVM ViewModel 계층
 이벤트 데이터베이스 서비스
 - 이벤트 로그 저장
 - 이벤트 히스토리 조회
+
+#### Ironwall.Dotnet.Libraries.Events.Api
+Event API 서비스 (GOP RESTful API 연동)
+- `IEventApiService` / `EventApiService`
+- Detection, Malfunction, Connection, Action 이벤트 CRUD
+- 날짜 범위 검색, 다중 필터 지원
+- `ResponseHelper`: HTTP 응답 변환 헬퍼
+- `EventApiModule`: Autofac 의존성 주입 모듈
+- xUnit 단위 테스트 (15개 테스트, 100% 통과)
 
 #### Ironwall.Dotnet.Libraries.Events.Ui
 이벤트 UI 컴포넌트
