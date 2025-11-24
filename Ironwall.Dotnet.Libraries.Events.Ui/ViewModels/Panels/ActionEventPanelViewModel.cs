@@ -1,6 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -24,11 +24,11 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     #region - Ctors -
     public ActionEventPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
+                                       , EventProviderService providerService
                                        , EventProvider eventProvider)
                                        : base(eventAggregator, log)
     {
-        _dbService = eventDbService;
+        _providerService = providerService;
         EventProvider = eventProvider;
     }
     #endregion
@@ -112,8 +112,6 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             var token = _pCancellationTokenSource.Token;
             var currentList = EventProvider.OfType<IActionEventModel>();
 
-            var dbList = await _dbService.FetchActionEventsAsync(startDate: StartDate, endDate: EndDate, token: token);
-
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
             var updateList = ViewModelProvider
                              .Where(vm => vm.IsEdited && vm.Model.Id > 0)
@@ -121,10 +119,10 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                              .ToList();
 
             foreach (var model in updateList)
-                await _dbService.UpdateActionEventAsync(model, token);
+                await _providerService.UpdateActionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IActionEventModel>())
-                await _dbService.InsertActionEventAsync(model, token);
+                await _providerService.InsertActionEventAsync(model, token);
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -251,10 +249,24 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             try
             {
                 IsVisible = false;
-                //await Task.Delay(300, cancellationToken);
 
-                //DB Fetching
-                await _dbService.FetchInstanceAsync(startDate:_startDate, endDate:_endDate, token:cancellationToken);
+                //API Fetching - ActionEvents are fetched via EventProviderService
+                var events = await _providerService.FetchActionEventsAsync(cancellationToken);
+                if (events == null) return;
+
+                // Client-side date filtering (GOP API doesn't support date range)
+                var filteredEvents = events.Where(e => e.DateTime >= _startDate && e.DateTime <= _endDate).ToList();
+
+                // Update EventProvider (shared collection)
+                var existingActionEvents = EventProvider.OfType<IActionEventModel>().ToList();
+                foreach (var item in existingActionEvents)
+                {
+                    EventProvider.Remove(item);
+                }
+                foreach (var item in filteredEvents)
+                {
+                    EventProvider.Add(item);
+                }
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
@@ -305,7 +317,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
         {
             foreach (var item in SelectedItems.ToList())
             {
-                var ret = await _dbService.DeleteActionEventAsync((IActionEventModel)item.Model, cancellationToken);
+                var ret = await _providerService.DeleteActionEventAsync(item.Model.Id, cancellationToken);
             }
         }, cancellationToken);
 
@@ -356,6 +368,6 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
-    private IEventDbService _dbService;
+    private EventProviderService _providerService;
     #endregion
 }

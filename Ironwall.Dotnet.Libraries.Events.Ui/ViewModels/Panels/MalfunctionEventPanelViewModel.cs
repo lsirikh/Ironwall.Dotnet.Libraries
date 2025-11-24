@@ -1,7 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -26,15 +26,14 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     #region - Ctors -
     public MalfunctionEventPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
+                                       , EventProviderService providerService
                                        , DeviceProvider deviceProvider
                                        , EventProvider eventProvider)
                                        : base(eventAggregator, log)
     {
-        _dbService = eventDbService;
+        _providerService = providerService;
         _eventProvider = eventProvider;
         DeviceProvider = deviceProvider;
-
     }
     #endregion
     #region - Implementation of Interface -
@@ -121,8 +120,6 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             var token = _pCancellationTokenSource.Token;
             var currentList = _eventProvider;
 
-            var dbList = await _dbService.FetchMalfunctionEventsAsync(startDate: StartDate, endDate: EndDate, token: token);
-
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
             var updateList = ViewModelProvider
                              .Where(vm => vm.IsEdited && vm.Model.Id > 0)
@@ -130,10 +127,10 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                              .ToList();
 
             foreach (var model in updateList)
-                await _dbService.UpdateMalfunctionEventAsync(model, token);
+                await _providerService.UpdateMalfunctionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IMalfunctionEventModel>())
-                await _dbService.InsertMalfunctionEventAsync(model, token);
+                await _providerService.InsertMalfunctionEventAsync(model, token);
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -273,13 +270,16 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             try
             {
                 IsVisible = false;
-                //await Task.Delay(300, cancellationToken);
 
-                //DB Fetching
-                var events = await _dbService.FetchMalfunctionEventsAsync(startDate: StartDate, endDate: EndDate, token: cancellationToken);
+                //API Fetching
+                var events = await _providerService.FetchMalfunctionEventsAsync(cancellationToken);
                 if (events == null) return;
+
+                // Client-side date filtering (GOP API doesn't support date range)
+                var filteredEvents = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+
                 _eventProvider.Clear();
-                foreach (var item in events)
+                foreach (var item in filteredEvents)
                 {
                     _eventProvider.Add(item);
                 }
@@ -327,7 +327,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
         {
             foreach (var item in SelectedItems.ToList())
             {
-                var ret = await _dbService.DeleteMalfunctionEventAsync((IMalfunctionEventModel)item.Model, cancellationToken);
+                var ret = await _providerService.DeleteMalfunctionEventAsync(item.Model.Id, cancellationToken);
             }
         }, cancellationToken);
 
@@ -378,7 +378,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
-    private IEventDbService _dbService;
+    private EventProviderService _providerService;
     private EventProvider _eventProvider;
     #endregion
 }

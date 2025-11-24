@@ -1,7 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -28,12 +28,12 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     #region - Ctors -
     public DetectionEventPanelViewModel(IEventAggregator eventAggregator
                                         , ILogService log
-                                        , IEventDbService eventDbService
+                                        , EventProviderService providerService
                                         , DeviceProvider deviceProvider
-                                        , EventProvider eventProvider) 
+                                        , EventProvider eventProvider)
                                         : base(eventAggregator, log)
     {
-        _dbService = eventDbService;
+        _providerService = providerService;
         _eventProvider = eventProvider;
         DeviceProvider = deviceProvider;
     }
@@ -120,8 +120,6 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             var token = _pCancellationTokenSource.Token;
             var currentList = _eventProvider;
 
-            var dbList = await _dbService.FetchDetectionEventsAsync(startDate:StartDate, endDate:EndDate, token:token);
-
             var insertList = currentList
                             .Where(m => m.Id <= 0)
                             .ToList();
@@ -131,10 +129,10 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                             .ToList();
 
             foreach (var model in updateList)
-                await _dbService.UpdateDetectionEventAsync(model, token);
+                await _providerService.UpdateDetectionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IDetectionEventModel>())
-                await _dbService.InsertDetectionEventAsync(model, token);
+                await _providerService.InsertDetectionEventAsync(model, token);
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -271,11 +269,15 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             {
                 IsVisible = false;
 
-                //DB Fetching
-                var events = await _dbService.FetchDetectionEventsAsync(startDate:StartDate, endDate:EndDate, token:cancellationToken);
+                //API Fetching
+                var events = await _providerService.FetchDetectionEventsAsync(cancellationToken);
                 if (events == null) return;
+
+                // Client-side date filtering (GOP API doesn't support date range)
+                var filteredEvents = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+
                 _eventProvider.Clear();
-                foreach (var item in events)
+                foreach (var item in filteredEvents)
                 {
                     _eventProvider.Add(item);
                 }
@@ -327,7 +329,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         {
             foreach (var item in SelectedItems.ToList())
             {
-                var ret = await _dbService.DeleteDetectionEventAsync((IDetectionEventModel)item.Model, cancellationToken);
+                var ret = await _providerService.DeleteDetectionEventAsync(item.Model.Id, cancellationToken);
             }
         }, cancellationToken);
 
@@ -377,7 +379,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
-    private IEventDbService _dbService;
+    private EventProviderService _providerService;
     private EventProvider _eventProvider;
     #endregion
 
