@@ -75,6 +75,49 @@ public class DtoToModelHelperTests
         Assert.Equal("THERMAL_SENSOR", dto.Result);
         Assert.Equal(100, dto.Sensor);
     }
+
+    [Fact]
+    public void ToMalfunctionEventModel_ShouldConvertDtoToModel()
+    {
+        // Arrange
+        var dto = new MalfunctionEventDto
+        {
+            Id = 2,
+            GroupEvent = "Zone B",
+            TypeEvent = "Fault",
+            Controller = 20,
+            Sensor = 200,
+            TypeDevice = "FENCE",
+            Sequence = 2,
+            Status = "True",
+            ActionReported = "False",
+            Reason = "FAULT_FENCE",
+            FirstStart = 10,
+            FirstEnd = 20,
+            SecondStart = 30,
+            SecondEnd = 40,
+            Datetime = "2025-11-24T11:00:00.000Z",
+            CreatedAt = "2025-11-24T11:00:00.000Z",
+            UpdatedAt = "2025-11-24T11:00:00.000Z"
+        };
+
+        // Act
+        var model = dto.ToMalfunctionEventModel(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.Equal(2, model.Id);
+        Assert.Equal(new DateTime(2025, 11, 24, 11, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(EnumEventType.Fault, model.MessageType);
+        Assert.Equal("Zone B", model.EventGroup);
+        Assert.Equal(EnumTrueFalse.True, model.Status);
+        Assert.Equal(EnumFaultType.FAULT_FENCE, model.Reason);
+        Assert.Equal(10, model.FirstStart);
+        Assert.Equal(20, model.FirstEnd);
+        Assert.Equal(30, model.SecondStart);
+        Assert.Equal(40, model.SecondEnd);
+        Assert.NotNull(model.Device);
+        Assert.Equal(200, model.Device.Id);
+    }
 }
 
 public class EventProviderServiceTests

@@ -44,4 +44,25 @@ public static class DtoToModelHelper
             Sensor = model.Device?.Id ?? 0
         };
     }
+
+    /// <summary>
+    /// MalfunctionEventDto → IMalfunctionEventModel 변환
+    /// </summary>
+    public static IMalfunctionEventModel ToMalfunctionEventModel(this MalfunctionEventDto dto)
+    {
+        return new MalfunctionEventModel
+        {
+            Id = dto.Id,
+            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
+            EventGroup = dto.GroupEvent,
+            Status = dto.Status == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
+            Reason = Enum.Parse<EnumFaultType>(dto.Reason),
+            FirstStart = dto.FirstStart,
+            FirstEnd = dto.FirstEnd,
+            SecondStart = dto.SecondStart,
+            SecondEnd = dto.SecondEnd,
+            Device = new SensorDeviceModel { Id = dto.Sensor }
+        };
+    }
 }
