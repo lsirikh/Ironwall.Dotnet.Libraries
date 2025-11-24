@@ -21,11 +21,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Api.Modules;
 public class EventApiModule : Module
 {
     #region - Ctors -
-    public EventApiModule(ILogService log, ApiSetupModel setup, string name = "EventApi")
+    public EventApiModule(ILogService? log, ApiSetupModel setup, string name = "EventApi", int count=100)
     {
         _log = log;
         _setup = setup;
         _name = name;
+        _count = count;
+
     }
     #endregion
 
@@ -36,23 +38,21 @@ public class EventApiModule : Module
         {
             // 1. ApiModule 등록 (내부에서 IApiService 등록)
             // ApiSetupModel은 partial이므로 _setup을 그대로 사용 가능
-            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}-Base"));
+            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count));
 
             // 2. ApiSetupModel 등록
-            builder.RegisterInstance(_setup)
-                .Named<ApiSetupModel>(_name)
-                .SingleInstance();
+            builder.RegisterInstance(_setup).Named<ApiSetupModel>(_name).SingleInstance();
 
             // 3. EventApiService 등록
             builder.Register(ctx => new EventApiService(
                     _log,
-                    ctx.ResolveNamed<IApiService>($"{_name}-Base"),
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
                     ctx.ResolveNamed<ApiSetupModel>(_name)
                 ))
                 .Named<IEventApiService>(_name)
                 .AsImplementedInterfaces()
                 .SingleInstance()
-                .WithMetadata("Order", 4);
+                .WithMetadata("Order", _count);
 
             _log?.Info($"[{nameof(EventApiModule)}] Module loaded successfully with name: {_name}");
         }
@@ -63,10 +63,10 @@ public class EventApiModule : Module
         }
     }
     #endregion
-
     #region - Attributes -
-    private readonly ILogService _log;
+    private readonly ILogService? _log;
     private readonly ApiSetupModel _setup;
     private readonly string _name;
+    private readonly int _count;
     #endregion
 }

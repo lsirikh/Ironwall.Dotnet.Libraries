@@ -1,7 +1,9 @@
 ﻿using Autofac;
+using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Modules;
+using Ironwall.Dotnet.Libraries.Events.Api.Modules;
 using Ironwall.Dotnet.Libraries.Events.Db.Modules;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Modules;
@@ -25,10 +27,10 @@ public class EventUiModule : Module
 {
     
     #region - Ctors -
-    public EventUiModule(IEventSetupModel eventSetup, IMariaDbSetupModel dbSetup, ILogService? log = default, int count = default)
+    public EventUiModule(IEventSetupModel eventSetup, IApiSetupModel apiSetup, ILogService? log = default, int count = default)
     {
         _log = log;
-        _dbSetup = dbSetup;
+        _apiSetup = apiSetup;
         _eventSetup = eventSetup;
         _count = count;
     }
@@ -39,7 +41,9 @@ public class EventUiModule : Module
         try
         {
             builder.RegisterModule(new EventModule(_eventSetup, _log, _count++));
-            builder.RegisterModule(new EventDbModule(_dbSetup, _log, _count++)); // 2
+            //builder.RegisterModule(new EventDbModule(_dbSetup, _log, _count++)); // 2
+            builder.RegisterModule(new EventApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
+
             builder.RegisterType<EventDashboardViewModel>().SingleInstance();
             builder.RegisterType<EventTabControlViewModel>().SingleInstance();
             builder.RegisterType<DetectionEventPanelViewModel>().SingleInstance();
@@ -51,10 +55,10 @@ public class EventUiModule : Module
             builder.RegisterType<EventCardListPanelViewModel>().SingleInstance();
             builder.RegisterType<SymbolEventManager>().SingleInstance();
          
-            builder.RegisterType<DetectionReportDialogViewModel>().AsSelf()                       //  new DetectionReportDialogViewModel() 로도 해결 가능
-                                                                   .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환
-                                                                   .SingleInstance();              // or InstancePerDependency()
-            builder.RegisterType<MalfunctionReportDialogViewModel>().AsSelf()                       // new DetectionReportDialogViewModel() 로도 해결 가능
+            builder.RegisterType<DetectionReportDialogViewModel>().AsSelf()//  new DetectionReportDialogViewModel() 로도 해결 가능
+                                                                  .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환
+                                                                  .SingleInstance();              // or InstancePerDependency()
+            builder.RegisterType<MalfunctionReportDialogViewModel>().AsSelf()// new DetectionReportDialogViewModel() 로도 해결 가능
                                                                    .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환
                                                                    .SingleInstance();              // or InstancePerDependency()
 
@@ -77,7 +81,7 @@ public class EventUiModule : Module
     #endregion
     #region - Attributes -
     private ILogService? _log;
-    private IMariaDbSetupModel _dbSetup;
+    private IApiSetupModel _apiSetup;
     private IEventSetupModel _eventSetup;
     private int _count;
     #endregion

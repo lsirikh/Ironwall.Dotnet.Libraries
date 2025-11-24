@@ -70,7 +70,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #endregion
         #region - Properties -
         public EnumDetectionType Result => (Model as IDetectionEventModel)!.Result;
-        
         #endregion
         #region - Attributes -
         #endregion
