@@ -1,6 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Events;
@@ -28,11 +28,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Ctors -
         public DataChartPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
+                                       , EventProviderService providerService
                                        , EventProvider eventProvider)
                                        : base(eventAggregator, log)
         {
-            _dbService = eventDbService;
+            _providerService = providerService;
             _eventProvider = eventProvider;
 
             // 차트용 컬렉션 초기화
@@ -107,7 +107,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             {
                 try
                 {
-                    await _dbService.FetchInstanceAsync(StartDate, EndDate, ct);
+                    // Fetch all event types from GOP API
+                    var detectionTask = _providerService.FetchDetectionEventsAsync(ct);
+                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(ct);
+                    var connectionTask = _providerService.FetchConnectionEventsAsync(ct);
+                    var actionTask = _providerService.FetchActionEventsAsync(ct);
+
+                    await Task.WhenAll(detectionTask, malfunctionTask, connectionTask, actionTask);
+
+                    // Update EventProvider with fetched events
+                    _eventProvider.Clear();
+                    foreach (var item in detectionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in malfunctionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in connectionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in actionTask.Result) _eventProvider.Add(item);
 
                     var eventTypes = new[]
                     {
@@ -261,7 +274,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         protected DateTime _endDate;
         protected DateTime _endDateDisplay;
         private EventProvider _eventProvider;
-        private IEventDbService _dbService;
+        private EventProviderService _providerService;
         #endregion
     }
 

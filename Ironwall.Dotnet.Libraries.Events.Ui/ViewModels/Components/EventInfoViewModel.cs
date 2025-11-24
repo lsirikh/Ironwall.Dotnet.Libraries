@@ -15,7 +15,7 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using LiveChartsCore.Measure;
 using LiveChartsCore.Drawing;
 using static MaterialDesignThemes.Wpf.Theme.ToolBar;
@@ -40,17 +40,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         #region - Ctors -
         public EventInfoViewModel(DeviceProvider deviceProvider
                                 , EventProvider eventProvider
-                                , IEventDbService eventDbService)
+                                , EventProviderService providerService)
         {
-
             _deviceProvider = deviceProvider;
             _eventProvider = eventProvider;
             LSeries = new ObservableCollection<ISeries>();
             DSeries = new ObservableCollection<ISeries>();
-            _dbService = eventDbService;
+            _providerService = providerService;
 
             _names = new[] { "DET", "MAL", "CON", "ACT" };
-            RefreshActiveness(); 
+            RefreshActiveness();
         }
         #endregion
         #region - Implementation of Interface -
@@ -173,8 +172,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             {
                 try
                 {
-                    // 이벤트 인스턴스 가져오기
-                    await _dbService.FetchInstanceAsync(_startDate, _endDate, cancellationToken);
+                    // Fetch all event types from GOP API
+                    var detectionTask = _providerService.FetchDetectionEventsAsync(cancellationToken);
+                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(cancellationToken);
+                    var connectionTask = _providerService.FetchConnectionEventsAsync(cancellationToken);
+                    var actionTask = _providerService.FetchActionEventsAsync(cancellationToken);
+
+                    await Task.WhenAll(detectionTask, malfunctionTask, connectionTask, actionTask);
+
+                    // Update EventProvider with fetched events
+                    _eventProvider.Clear();
+                    foreach (var item in detectionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in malfunctionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in connectionTask.Result) _eventProvider.Add(item);
+                    foreach (var item in actionTask.Result) _eventProvider.Add(item);
 
                     // 컨트롤러(Device) 번호 → 문자열 레이블
                     var devices = _deviceProvider.OfType<IControllerDeviceModel>()
@@ -405,7 +416,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
         #endregion
         #region - Attributes -
-        private IEventDbService _dbService;
+        private EventProviderService _providerService;
         private DeviceProvider _deviceProvider;
         private EventProvider _eventProvider;
         private string[] _names;

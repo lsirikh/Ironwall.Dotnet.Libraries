@@ -1,6 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Modules;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
@@ -34,12 +34,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
                                           , ILogService log
-                                          , IEventDbService dbService
+                                          , EventProviderService providerService
                                           , IAccountModel userModel
                                           , SymbolEventManager symbolEventManager)
                                         : base(ea, log)
         {
-            _dbService = dbService;
+            _providerService = providerService;
             _userModel = userModel;
             _symbolEventManager = symbolEventManager;
         }
@@ -172,15 +172,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         OriginEvent = eventModel,
                     };
 
-                    DispatcherService.Invoke(() => 
+                    DispatcherService.Invoke(() =>
                     {
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
 
-                    await _dbService.InsertActionEventAsync(action, cancellationToken);
+                    await _providerService.InsertActionEventAsync(action, cancellationToken);
                     eventModel.Status = Enums.EnumTrueFalse.True;
-                    await _dbService.UpdateDetectionEventAsync((IDetectionEventModel)eventModel!, cancellationToken);
+                    await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)eventModel!, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -218,9 +218,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         vm.Dispose();
                     });
 
-                    await _dbService.InsertActionEventAsync(action, cancellationToken);
+                    await _providerService.InsertActionEventAsync(action, cancellationToken);
                     eventModel.Status = Enums.EnumTrueFalse.True;
-                    await _dbService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)eventModel!, cancellationToken);
+                    await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)eventModel!, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -250,7 +250,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             OriginEvent = vm,
                         };
                         vm.Status = Enums.EnumTrueFalse.True;
-                        await _dbService.UpdateDetectionEventAsync((IDetectionEventModel)vm!, cancellationToken);
+                        await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)vm!, cancellationToken);
                     }
                     else if(item is MalfunctionEventCardViewModel mEventCardViewModel)
                     {
@@ -263,7 +263,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             OriginEvent = vm,
                         };
                         vm.Status = Enums.EnumTrueFalse.True;
-                        await _dbService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)vm!, cancellationToken);
+                        await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)vm!, cancellationToken);
                     }
                     else
                     {
@@ -282,7 +282,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         item.Dispose();
                     });
 
-                    await _dbService.InsertActionEventAsync(action, cancellationToken);
+                    await _providerService.InsertActionEventAsync(action, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -328,7 +328,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public event Action? UpdateAction;
         #endregion
         #region - Attributes -
-        private IEventDbService _dbService;
+        private EventProviderService _providerService;
         private IAccountModel _userModel;
         private SymbolEventManager _symbolEventManager;
         private EventCardBaseViewModel _selectedEventCardViewModel;
