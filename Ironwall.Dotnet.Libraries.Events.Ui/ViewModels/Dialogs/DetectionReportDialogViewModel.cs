@@ -1,6 +1,5 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;

@@ -340,6 +340,7 @@ public class EventProviderServiceTests
             Data = new List<DetectionEventDto>
             {
                 new DetectionEventDto { Id = 1, GroupEvent = "Zone A", TypeEvent = "Intrusion", Sensor = 100, ActionReported = "True", Result = "THERMAL_SENSOR", CreatedAt = "2025-11-24T10:00:00.000Z" },
+                new DetectionEventDto { Id = 2, GroupEvent = "Zone A", TypeEvent = "Intrusion", Sensor = 101, ActionReported = "False", Result = "PIR_SENSOR", CreatedAt = "2025-11-24T10:05:00.000Z" }
             },
             Pagination = new PaginationDto { Page = 1, TotalPages = 2, Total = 3, Limit = 2 }
         };
@@ -489,4 +490,729 @@ public class EventProviderServiceTests
         Assert.NotNull(result);
         Assert.Empty(result);
     }
+
+    [Fact]
+    public async Task FetchMalfunctionEventsAsync_ShouldReturnConvertedModels()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<MalfunctionEventDto>
+        {
+            new MalfunctionEventDto
+            {
+                Id = 1,
+                GroupEvent = "Zone A",
+                TypeEvent = "Fault",
+                Sensor = 100,
+                Status = "True",
+                ActionReported = "False",
+                Reason = "FAULT_FENCE",
+                FirstStart = 10,
+                FirstEnd = 15,
+                SecondStart = 20,
+                SecondEnd = 25,
+                CreatedAt = "2025-11-24T11:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<MalfunctionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 1,
+                Total = 1,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetMalfunctionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchMalfunctionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal(1, result[0].Id);
+        Assert.Equal(EnumEventType.Fault, result[0].MessageType);
+        Assert.Equal(EnumFaultType.FAULT_FENCE, result[0].Reason);
+    }
+
+    [Fact]
+    public async Task FetchConnectionEventsAsync_ShouldReturnConvertedModels()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<ConnectionEventDto>
+        {
+            new ConnectionEventDto
+            {
+                Id = 1,
+                GroupEvent = "Zone A",
+                TypeEvent = "Connection",
+                Sensor = 100,
+                CreatedAt = "2025-11-24T12:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<ConnectionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 1,
+                Total = 1,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetConnectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchConnectionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal(1, result[0].Id);
+        Assert.Equal(EnumEventType.Connection, result[0].MessageType);
+    }
+
+    [Fact]
+    public async Task FetchActionEventsAsync_ShouldReturnConvertedModels()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<ActionEventDto>
+        {
+            new ActionEventDto
+            {
+                Id = 1,
+                TypeEvent = "Action",
+                Content = "Patrol dispatched",
+                User = "operator_test",
+                CreatedAt = "2025-11-24T13:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<ActionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 1,
+                Total = 1,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetActionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchActionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal(1, result[0].Id);
+        Assert.Equal(EnumEventType.Action, result[0].MessageType);
+        Assert.Equal("Patrol dispatched", result[0].Content);
+        Assert.Equal("operator_test", result[0].User);
+    }
+
+    // ═════════════════════════ Phase 1.2.4: CUD Operations ═════════════════════════
+
+    #region Detection Event CUD Tests
+
+    [Fact]
+    public async Task InsertDetectionEventAsync_ShouldCreateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new DetectionEventModel
+        {
+            DateTime = DateTime.Parse("2025-11-24T12:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Intrusion,
+            EventGroup = "Zone C",
+            Status = EnumTrueFalse.True,
+            Result = EnumDetectionType.THERMAL_SENSOR,
+            Device = new SensorDeviceModel { Id = 200 }
+        };
+
+        var createdDto = new DetectionEventDto
+        {
+            Id = 999,
+            GroupEvent = "Zone C",
+            TypeEvent = "Intrusion",
+            Sensor = 200,
+            ActionReported = "True",
+            Result = "THERMAL_SENSOR",
+            CreatedAt = "2025-11-24T12:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = createdDto
+        };
+
+        mockApiService
+            .Setup(x => x.CreateDetectionEventAsync(
+                It.IsAny<DetectionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.InsertDetectionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(999, result.Id);
+        Assert.Equal(EnumEventType.Intrusion, result.MessageType);
+        Assert.Equal(EnumDetectionType.THERMAL_SENSOR, result.Result);
+        mockApiService.Verify(x => x.CreateDetectionEventAsync(
+            It.Is<DetectionEventDto>(dto => dto.Sensor == 200 && dto.Result == "THERMAL_SENSOR"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateDetectionEventAsync_ShouldUpdateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new DetectionEventModel
+        {
+            Id = 100,
+            DateTime = DateTime.Parse("2025-11-24T12:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Intrusion,
+            EventGroup = "Zone C",
+            Status = EnumTrueFalse.False,
+            Result = EnumDetectionType.PIR_SENSOR,
+            Device = new SensorDeviceModel { Id = 200 }
+        };
+
+        var updatedDto = new DetectionEventDto
+        {
+            Id = 100,
+            GroupEvent = "Zone C",
+            TypeEvent = "Intrusion",
+            Sensor = 200,
+            ActionReported = "False",
+            Result = "PIR_SENSOR",
+            CreatedAt = "2025-11-24T12:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = updatedDto
+        };
+
+        mockApiService
+            .Setup(x => x.UpdateDetectionEventAsync(
+                100,
+                It.IsAny<DetectionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.UpdateDetectionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(100, result.Id);
+        Assert.Equal(EnumTrueFalse.False, result.Status);
+        mockApiService.Verify(x => x.UpdateDetectionEventAsync(
+            100,
+            It.Is<DetectionEventDto>(dto => dto.Id == 100 && dto.ActionReported == "False"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteDetectionEventAsync_ShouldReturnTrue()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true
+        };
+
+        mockApiService
+            .Setup(x => x.DeleteDetectionEventAsync(100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.DeleteDetectionEventAsync(100);
+
+        // Assert
+        Assert.True(result);
+        mockApiService.Verify(x => x.DeleteDetectionEventAsync(100, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    #endregion
+
+    #region Malfunction Event CUD Tests
+
+    [Fact]
+    public async Task InsertMalfunctionEventAsync_ShouldCreateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new MalfunctionEventModel
+        {
+            DateTime = DateTime.Parse("2025-11-24T13:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Fault,
+            EventGroup = "Zone D",
+            Status = EnumTrueFalse.True,
+            Reason = EnumFaultType.FAULT_CONTROLLER,
+            FirstStart = 10,
+            FirstEnd = 15,
+            SecondStart = 20,
+            SecondEnd = 25,
+            Device = new SensorDeviceModel { Id = 300 }
+        };
+
+        var createdDto = new MalfunctionEventDto
+        {
+            Id = 888,
+            GroupEvent = "Zone D",
+            TypeEvent = "Fault",
+            Sensor = 300,
+            Status = "True",
+            Reason = "FAULT_CONTROLLER",
+            FirstStart = 10,
+            FirstEnd = 15,
+            SecondStart = 20,
+            SecondEnd = 25,
+            CreatedAt = "2025-11-24T13:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<MalfunctionEventDto>
+        {
+            Success = true,
+            Data = createdDto
+        };
+
+        mockApiService
+            .Setup(x => x.CreateMalfunctionEventAsync(
+                It.IsAny<MalfunctionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.InsertMalfunctionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(888, result.Id);
+        Assert.Equal(EnumEventType.Fault, result.MessageType);
+        Assert.Equal(EnumFaultType.FAULT_CONTROLLER, result.Reason);
+    }
+
+    [Fact]
+    public async Task UpdateMalfunctionEventAsync_ShouldUpdateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new MalfunctionEventModel
+        {
+            Id = 200,
+            DateTime = DateTime.Parse("2025-11-24T13:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Fault,
+            EventGroup = "Zone D",
+            Status = EnumTrueFalse.False,
+            Reason = EnumFaultType.FAULT_FENCE,
+            FirstStart = 11,
+            FirstEnd = 16,
+            SecondStart = 21,
+            SecondEnd = 26,
+            Device = new SensorDeviceModel { Id = 300 }
+        };
+
+        var updatedDto = new MalfunctionEventDto
+        {
+            Id = 200,
+            GroupEvent = "Zone D",
+            TypeEvent = "Fault",
+            Sensor = 300,
+            Status = "False",
+            Reason = "FAULT_FENCE",
+            FirstStart = 11,
+            FirstEnd = 16,
+            SecondStart = 21,
+            SecondEnd = 26,
+            CreatedAt = "2025-11-24T13:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<MalfunctionEventDto>
+        {
+            Success = true,
+            Data = updatedDto
+        };
+
+        mockApiService
+            .Setup(x => x.UpdateMalfunctionEventAsync(
+                200,
+                It.IsAny<MalfunctionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.UpdateMalfunctionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(200, result.Id);
+        Assert.Equal(EnumTrueFalse.False, result.Status);
+        Assert.Equal(11, result.FirstStart);
+    }
+
+    [Fact]
+    public async Task DeleteMalfunctionEventAsync_ShouldReturnTrue()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true
+        };
+
+        mockApiService
+            .Setup(x => x.DeleteMalfunctionEventAsync(200, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.DeleteMalfunctionEventAsync(200);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    #endregion
+
+    #region Connection Event CUD Tests
+
+    [Fact]
+    public async Task InsertConnectionEventAsync_ShouldCreateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new ConnectionEventModel
+        {
+            DateTime = DateTime.Parse("2025-11-24T14:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Connection,
+            EventGroup = "Zone E",
+            Status = EnumTrueFalse.True,
+            Device = new SensorDeviceModel { Id = 400 }
+        };
+
+        var createdDto = new ConnectionEventDto
+        {
+            Id = 777,
+            GroupEvent = "Zone E",
+            TypeEvent = "Connection",
+            Sensor = 400,
+            CreatedAt = "2025-11-24T14:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<ConnectionEventDto>
+        {
+            Success = true,
+            Data = createdDto
+        };
+
+        mockApiService
+            .Setup(x => x.CreateConnectionEventAsync(
+                It.IsAny<ConnectionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.InsertConnectionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(777, result.Id);
+        Assert.Equal(EnumEventType.Connection, result.MessageType);
+    }
+
+    [Fact]
+    public async Task UpdateConnectionEventAsync_ShouldUpdateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new ConnectionEventModel
+        {
+            Id = 300,
+            DateTime = DateTime.Parse("2025-11-24T14:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Connection,
+            EventGroup = "Zone E",
+            Status = EnumTrueFalse.True,
+            Device = new SensorDeviceModel { Id = 400 }
+        };
+
+        var updatedDto = new ConnectionEventDto
+        {
+            Id = 300,
+            GroupEvent = "Zone E",
+            TypeEvent = "Connection",
+            Sensor = 400,
+            CreatedAt = "2025-11-24T14:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<ConnectionEventDto>
+        {
+            Success = true,
+            Data = updatedDto
+        };
+
+        mockApiService
+            .Setup(x => x.UpdateConnectionEventAsync(
+                300,
+                It.IsAny<ConnectionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.UpdateConnectionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(300, result.Id);
+        Assert.Equal(EnumEventType.Connection, result.MessageType);
+    }
+
+    [Fact]
+    public async Task DeleteConnectionEventAsync_ShouldReturnTrue()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true
+        };
+
+        mockApiService
+            .Setup(x => x.DeleteConnectionEventAsync(300, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.DeleteConnectionEventAsync(300);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    #endregion
+
+    #region Action Event CUD Tests
+
+    [Fact]
+    public async Task InsertActionEventAsync_ShouldCreateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new ActionEventModel
+        {
+            DateTime = DateTime.Parse("2025-11-24T15:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Action,
+            Content = "Emergency response",
+            User = "admin_user"
+        };
+
+        var createdDto = new ActionEventDto
+        {
+            Id = 666,
+            TypeEvent = "Action",
+            Content = "Emergency response",
+            User = "admin_user",
+            CreatedAt = "2025-11-24T15:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<ActionEventDto>
+        {
+            Success = true,
+            Data = createdDto
+        };
+
+        mockApiService
+            .Setup(x => x.CreateActionEventAsync(
+                It.IsAny<ActionEventCreateDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.InsertActionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(666, result.Id);
+        Assert.Equal(EnumEventType.Action, result.MessageType);
+        Assert.Equal("Emergency response", result.Content);
+    }
+
+    [Fact]
+    public async Task UpdateActionEventAsync_ShouldUpdateAndReturnModel()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var model = new ActionEventModel
+        {
+            Id = 400,
+            DateTime = DateTime.Parse("2025-11-24T15:00:00.000Z").ToUniversalTime(),
+            MessageType = EnumEventType.Action,
+            Content = "Updated response",
+            User = "supervisor"
+        };
+
+        var updatedDto = new ActionEventDto
+        {
+            Id = 400,
+            TypeEvent = "Action",
+            Content = "Updated response",
+            User = "supervisor",
+            CreatedAt = "2025-11-24T15:00:00.000Z"
+        };
+
+        var apiResponse = new ApiResponse<ActionEventDto>
+        {
+            Success = true,
+            Data = updatedDto
+        };
+
+        mockApiService
+            .Setup(x => x.UpdateActionEventAsync(
+                400,
+                It.IsAny<ActionEventDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.UpdateActionEventAsync(model);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(400, result.Id);
+        Assert.Equal("Updated response", result.Content);
+    }
+
+    [Fact]
+    public async Task DeleteActionEventAsync_ShouldReturnTrue()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true
+        };
+
+        mockApiService
+            .Setup(x => x.DeleteActionEventAsync(400, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.DeleteActionEventAsync(400);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    #endregion
 }

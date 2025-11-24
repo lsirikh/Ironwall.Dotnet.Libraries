@@ -4,7 +4,6 @@ using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Modules;
 using Ironwall.Dotnet.Libraries.Events.Api.Modules;
-using Ironwall.Dotnet.Libraries.Events.Db.Modules;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Modules;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;

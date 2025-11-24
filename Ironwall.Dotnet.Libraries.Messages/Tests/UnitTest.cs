@@ -157,7 +157,7 @@ public class ApiResponseTests
         // Assert
         Assert.NotNull(response);
         Assert.True(response.Success);
-        Assert.Equal(2, response.Data.Count);
+        Assert.Equal(2, response.Data?.Count);
         Assert.NotNull(response.Pagination);
         Assert.Equal(1, response.Pagination.Page);
         Assert.Equal(20, response.Pagination.Limit);

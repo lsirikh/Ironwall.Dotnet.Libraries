@@ -35,9 +35,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Api.Messages\Ironwall.Dotnet.Libraries.Api.Messages.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Api\Ironwall.Dotnet.Libraries.Events.Api.csproj" />
-    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Db\Ironwall.Dotnet.Libraries.Events.Db.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />

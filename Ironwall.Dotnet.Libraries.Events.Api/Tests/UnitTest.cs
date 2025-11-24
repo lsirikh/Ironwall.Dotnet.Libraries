@@ -193,7 +193,7 @@ public class EventApiServiceTests
             Sequence = 1,
             ActionReported = "False",
             Result = "VIBRATION_SENSOR",
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -224,7 +224,7 @@ public class EventApiServiceTests
             Sequence = 20,
             ActionReported = "True",
             //Result = "DISTANCE_SENSOR"
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -262,13 +262,11 @@ public class EventApiServiceTests
             TypeDevice = "Fence",
             Sequence = 1,
             ActionReported = "False",
-            Result = "VIBRATION_SENSOR",
-            //Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-            CreatedAt = "2025-11-14T11:20:11.512331"
+            Result = "VIBRATION_SENSOR"
         };
 
         // Act
-        var response = await service.UpdateDetectionEventAsync(6, dto);
+        var response = await service.UpdateDetectionEventAsync(1, dto);
 
         // Assert
         Assert.NotNull(response);
@@ -385,7 +383,7 @@ public class EventApiServiceTests
             SecondStart=15,
             SecondEnd=15,
             Status = "True",
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -459,7 +457,7 @@ public class EventApiServiceTests
             SecondStart = 5,
             SecondEnd = 5,
             Status = "False",
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
@@ -749,8 +747,8 @@ public class EventApiServiceTests
             TypeEvent = "Action",
             Content = "Test action content",  // Required by GOP API
             User = "admin1",  // Required by GOP API
-            FromEvent = 5,  // Required by GOP API
-            FromEventType = "Fault",  // Required by GOP API (must be 'Intrusion', 'Fault')
+            FromEvent = 1,  // Required by GOP API
+            FromEventType = "Intrusion",  // Required by GOP API (must be 'Intrusion', 'Fault')
         };
 
         // Act
@@ -813,7 +811,7 @@ public class EventApiServiceTests
         {
             Content = "침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청",
             User = "operator_park",
-            Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Act
