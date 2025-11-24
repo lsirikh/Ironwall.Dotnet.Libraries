@@ -118,6 +118,42 @@ public class DtoToModelHelperTests
         Assert.NotNull(model.Device);
         Assert.Equal(200, model.Device.Id);
     }
+
+    [Fact]
+    public void ToMalfunctionEventDto_ShouldConvertModelToDto()
+    {
+        // Arrange
+        var model = new MalfunctionEventModel
+        {
+            Id = 2,
+            DateTime = new DateTime(2025, 11, 24, 11, 0, 0, DateTimeKind.Utc),
+            MessageType = EnumEventType.Fault,
+            EventGroup = "Zone B",
+            Status = EnumTrueFalse.True,
+            Reason = EnumFaultType.FAULT_FENCE,
+            FirstStart = 10,
+            FirstEnd = 20,
+            SecondStart = 30,
+            SecondEnd = 40,
+            Device = new SensorDeviceModel { Id = 200 }
+        };
+
+        // Act
+        var dto = model.ToMalfunctionEventDto(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.Equal(2, dto.Id);
+        Assert.Equal("2025-11-24T11:00:00.000Z", dto.Datetime);
+        Assert.Equal("Fault", dto.TypeEvent);
+        Assert.Equal("Zone B", dto.GroupEvent);
+        Assert.Equal("True", dto.Status);
+        Assert.Equal("FAULT_FENCE", dto.Reason);
+        Assert.Equal(10, dto.FirstStart);
+        Assert.Equal(20, dto.FirstEnd);
+        Assert.Equal(30, dto.SecondStart);
+        Assert.Equal(40, dto.SecondEnd);
+        Assert.Equal(200, dto.Sensor);
+    }
 }
 
 public class EventProviderServiceTests
