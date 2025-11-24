@@ -5,7 +5,6 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using K4os.Compression.LZ4.Internal;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;

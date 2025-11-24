@@ -21,7 +21,6 @@ using LiveChartsCore.Drawing;
 using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using System.Xml.Linq;
-using Org.BouncyCastle.Security;
 using LiveChartsCore.Kernel;
 using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
 using MahApps.Metro.Controls;

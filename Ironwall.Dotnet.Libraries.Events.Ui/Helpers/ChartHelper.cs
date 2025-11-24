@@ -7,7 +7,6 @@ using System;
 using LiveChartsCore.Drawing;
 using LiveChartsCore.Kernel;
 using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
-using System.IO.Pipelines;
 using LiveChartsCore.SkiaSharpView.Drawing;
 using System.Windows.Media.Animation;
 

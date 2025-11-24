@@ -6,7 +6,6 @@ using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using MySqlX.XDevAPI.Common;
 using System;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
