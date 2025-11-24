@@ -821,3 +821,25 @@ Events.Ui → Events.Api → GOP RESTful API → MariaDB
 **Date**: 2025-11-24
 **Total Duration**: Phases 2-4 completed in single session
 **Final Status**: All 7 ViewModels migrated, Events.Db dependency removed
+
+---
+
+## 🔧 Post-Migration Fixes (2025-11-24)
+
+### Namespace Cleanup (STRUCTURAL) ✅
+**Commit**: 65ec699 - "fix(events-ui): Remove invalid namespace imports from Events.Ui"
+
+**Issue**: Build failures due to leftover namespace imports from Events.Db removal
+
+**Files Fixed**:
+1. `ChartHelper.cs` - Removed `System.IO.Pipelines`
+2. `EventInfoViewModel.cs` - Removed `Org.BouncyCastle.Security`
+3. `DetectionSelectionViewModel.cs` - Removed `MySqlX.XDevAPI.Common`
+4. `EventReportDialogViewModel.cs` - Removed `K4os.Compression.LZ4.Internal`
+5. `MalfunctionReportDialogViewModel.cs` - Removed `Org.BouncyCastle.Crypto.Engines`
+
+**Build Status**: ✅ SUCCESS (0 errors, 6 warnings)
+
+**Root Cause**: These namespaces were indirectly available through Events.Db dependency and became invalid after removing that dependency in Phase 4.
+
+---
