@@ -154,6 +154,113 @@ public class DtoToModelHelperTests
         Assert.Equal(40, dto.SecondEnd);
         Assert.Equal(200, dto.Sensor);
     }
+
+    [Fact]
+    public void ToConnectionEventModel_ShouldConvertDtoToModel()
+    {
+        // Arrange
+        var dto = new ConnectionEventDto
+        {
+            Id = 3,
+            GroupEvent = "Zone C",
+            TypeEvent = "Connection",
+            Controller = 30,
+            Sensor = 300,
+            TypeDevice = "CONTROLLER",
+            Sequence = 3,
+            Datetime = "2025-11-24T12:00:00.000Z",
+            CreatedAt = "2025-11-24T12:00:00.000Z",
+            UpdatedAt = "2025-11-24T12:00:00.000Z"
+        };
+
+        // Act
+        var model = dto.ToConnectionEventModel(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.Equal(3, model.Id);
+        Assert.Equal(new DateTime(2025, 11, 24, 12, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(EnumEventType.Connection, model.MessageType);
+        Assert.Equal("Zone C", model.EventGroup);
+        Assert.NotNull(model.Device);
+        Assert.Equal(300, model.Device.Id);
+    }
+
+    [Fact]
+    public void ToConnectionEventDto_ShouldConvertModelToDto()
+    {
+        // Arrange
+        var model = new ConnectionEventModel
+        {
+            Id = 3,
+            DateTime = new DateTime(2025, 11, 24, 12, 0, 0, DateTimeKind.Utc),
+            MessageType = EnumEventType.Connection,
+            EventGroup = "Zone C",
+            Status = EnumTrueFalse.True,
+            Device = new SensorDeviceModel { Id = 300 }
+        };
+
+        // Act
+        var dto = model.ToConnectionEventDto(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.Equal(3, dto.Id);
+        Assert.Equal("2025-11-24T12:00:00.000Z", dto.Datetime);
+        Assert.Equal("Connection", dto.TypeEvent);
+        Assert.Equal("Zone C", dto.GroupEvent);
+        Assert.Equal(300, dto.Sensor);
+    }
+
+    [Fact]
+    public void ToActionEventModel_ShouldConvertDtoToModel()
+    {
+        // Arrange
+        var dto = new ActionEventDto
+        {
+            Id = 4,
+            TypeEvent = "Action",
+            Content = "Reset system",
+            User = "admin",
+            FromEvent = null, // Simplified - no nested event for now
+            Datetime = "2025-11-24T13:00:00.000Z",
+            CreatedAt = "2025-11-24T13:00:00.000Z",
+            UpdatedAt = "2025-11-24T13:00:00.000Z"
+        };
+
+        // Act
+        var model = dto.ToActionEventModel(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.Equal(4, model.Id);
+        Assert.Equal(new DateTime(2025, 11, 24, 13, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(EnumEventType.Action, model.MessageType);
+        Assert.Equal("Reset system", model.Content);
+        Assert.Equal("admin", model.User);
+    }
+
+    [Fact]
+    public void ToActionEventDto_ShouldConvertModelToDto()
+    {
+        // Arrange
+        var model = new ActionEventModel
+        {
+            Id = 4,
+            DateTime = new DateTime(2025, 11, 24, 13, 0, 0, DateTimeKind.Utc),
+            MessageType = EnumEventType.Action,
+            Content = "Reset system",
+            User = "admin",
+            OriginEvent = null // Simplified - no nested event for now
+        };
+
+        // Act
+        var dto = model.ToActionEventDto(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.Equal(4, dto.Id);
+        Assert.Equal("2025-11-24T13:00:00.000Z", dto.Datetime);
+        Assert.Equal("Action", dto.TypeEvent);
+        Assert.Equal("Reset system", dto.Content);
+        Assert.Equal("admin", dto.User);
+    }
 }
 
 public class EventProviderServiceTests

@@ -86,4 +86,67 @@ public static class DtoToModelHelper
             Sensor = model.Device?.Id ?? 0
         };
     }
+
+    /// <summary>
+    /// ConnectionEventDto → IConnectionEventModel 변환
+    /// </summary>
+    public static IConnectionEventModel ToConnectionEventModel(this ConnectionEventDto dto)
+    {
+        return new ConnectionEventModel
+        {
+            Id = dto.Id,
+            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
+            EventGroup = dto.GroupEvent,
+            Status = EnumTrueFalse.True, // Connection events are typically status=True
+            Device = new SensorDeviceModel { Id = dto.Sensor }
+        };
+    }
+
+    /// <summary>
+    /// IConnectionEventModel → ConnectionEventDto 변환 (역방향)
+    /// </summary>
+    public static ConnectionEventDto ToConnectionEventDto(this IConnectionEventModel model)
+    {
+        return new ConnectionEventDto
+        {
+            Id = model.Id,
+            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            TypeEvent = model.MessageType.ToString(),
+            GroupEvent = model.EventGroup ?? string.Empty,
+            Sensor = model.Device?.Id ?? 0
+        };
+    }
+
+    /// <summary>
+    /// ActionEventDto → IActionEventModel 변환
+    /// </summary>
+    public static IActionEventModel ToActionEventModel(this ActionEventDto dto)
+    {
+        return new ActionEventModel
+        {
+            Id = dto.Id,
+            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            MessageType = EnumEventType.Action,
+            Content = dto.Content,
+            User = dto.User,
+            OriginEvent = null // TODO: Handle nested event conversion if needed
+        };
+    }
+
+    /// <summary>
+    /// IActionEventModel → ActionEventDto 변환 (역방향)
+    /// </summary>
+    public static ActionEventDto ToActionEventDto(this IActionEventModel model)
+    {
+        return new ActionEventDto
+        {
+            Id = model.Id,
+            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            TypeEvent = model.MessageType.ToString(),
+            Content = model.Content ?? string.Empty,
+            User = model.User ?? string.Empty,
+            FromEvent = null // TODO: Handle nested event conversion if needed
+        };
+    }
 }
