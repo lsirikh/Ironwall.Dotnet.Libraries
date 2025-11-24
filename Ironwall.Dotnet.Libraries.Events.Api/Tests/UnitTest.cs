@@ -264,7 +264,7 @@ public class EventApiServiceTests
             ActionReported = "False",
             Result = "VIBRATION_SENSOR",
             //Datetime = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-            Datetime = "2025-11-14T11:20:11.512331"
+            CreatedAt = "2025-11-14T11:20:11.512331"
         };
 
         // Act

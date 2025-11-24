@@ -1,4 +1,5 @@
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
@@ -6,13 +7,8 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 /// <summary>
 /// 장애 이벤트 DTO
 /// </summary>
-public class MalfunctionEventDto : IEventDto
+public class MalfunctionEventDto : BaseDto, IEventDto
 {
-    /// <summary>
-    /// 데이터베이스 ID (자동 생성)
-    /// </summary>
-    [JsonProperty("id", Order = 1)]
-    public int Id { get; set; }
 
     /// <summary>
     /// 이벤트 그룹
@@ -91,22 +87,4 @@ public class MalfunctionEventDto : IEventDto
     /// </summary>
     [JsonProperty("second_end", Order = 14)]
     public int SecondEnd { get; set; }
-
-    /// <summary>
-    /// 이벤트 발생 일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("datetime", Order = 15)]
-    public string Datetime { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 생성일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("created_at", Order = 16)]
-    public string? CreatedAt { get; set; }
-
-    /// <summary>
-    /// 수정일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("updated_at", Order = 17)]
-    public string? UpdatedAt { get; set; }
 }

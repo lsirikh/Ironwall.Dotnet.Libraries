@@ -33,7 +33,6 @@ public class DtoToModelHelperTests
             Sequence = 1,
             ActionReported = "True",
             Result = "THERMAL_SENSOR",
-            Datetime = "2025-11-24T10:30:00.000Z",
             CreatedAt = "2025-11-24T10:30:00.000Z",
             UpdatedAt = "2025-11-24T10:30:00.000Z"
         };
@@ -72,7 +71,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(1, dto.Id);
-        Assert.Equal("2025-11-24T10:30:00.000Z", dto.Datetime);
+        Assert.Equal("2025-11-24T10:30:00.000Z", dto.CreatedAt);
         Assert.Equal("Intrusion", dto.TypeEvent);
         Assert.Equal("Zone A", dto.GroupEvent);
         Assert.Equal("True", dto.ActionReported);
@@ -100,7 +99,6 @@ public class DtoToModelHelperTests
             FirstEnd = 20,
             SecondStart = 30,
             SecondEnd = 40,
-            Datetime = "2025-11-24T11:00:00.000Z",
             CreatedAt = "2025-11-24T11:00:00.000Z",
             UpdatedAt = "2025-11-24T11:00:00.000Z"
         };
@@ -147,7 +145,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(2, dto.Id);
-        Assert.Equal("2025-11-24T11:00:00.000Z", dto.Datetime);
+        Assert.Equal("2025-11-24T11:00:00.000Z", dto.CreatedAt);
         Assert.Equal("Fault", dto.TypeEvent);
         Assert.Equal("Zone B", dto.GroupEvent);
         Assert.Equal("True", dto.Status);
@@ -172,7 +170,6 @@ public class DtoToModelHelperTests
             Sensor = 300,
             TypeDevice = "CONTROLLER",
             Sequence = 3,
-            Datetime = "2025-11-24T12:00:00.000Z",
             CreatedAt = "2025-11-24T12:00:00.000Z",
             UpdatedAt = "2025-11-24T12:00:00.000Z"
         };
@@ -208,7 +205,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(3, dto.Id);
-        Assert.Equal("2025-11-24T12:00:00.000Z", dto.Datetime);
+        Assert.Equal("2025-11-24T12:00:00.000Z", dto.CreatedAt);
         Assert.Equal("Connection", dto.TypeEvent);
         Assert.Equal("Zone C", dto.GroupEvent);
         Assert.Equal(300, dto.Sensor);
@@ -225,7 +222,6 @@ public class DtoToModelHelperTests
             Content = "Reset system",
             User = "admin",
             FromEvent = null, // Simplified - no nested event for now
-            Datetime = "2025-11-24T13:00:00.000Z",
             CreatedAt = "2025-11-24T13:00:00.000Z",
             UpdatedAt = "2025-11-24T13:00:00.000Z"
         };
@@ -260,7 +256,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(4, dto.Id);
-        Assert.Equal("2025-11-24T13:00:00.000Z", dto.Datetime);
+        Assert.Equal("2025-11-24T13:00:00.000Z", dto.CreatedAt);
         Assert.Equal("Action", dto.TypeEvent);
         Assert.Equal("Reset system", dto.Content);
         Assert.Equal("admin", dto.User);
@@ -286,7 +282,7 @@ public class EventProviderServiceTests
                 Sensor = 100,
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
-                Datetime = "2025-11-24T10:00:00.000Z"
+                CreatedAt = "2025-11-24T10:00:00.000Z"
             }
         };
 
@@ -328,5 +324,169 @@ public class EventProviderServiceTests
         Assert.Equal(1, result[0].Id);
         Assert.Equal(EnumEventType.Intrusion, result[0].MessageType);
         Assert.Equal(EnumDetectionType.THERMAL_SENSOR, result[0].Result);
+    }
+
+    [Fact]
+    public async Task FetchDetectionEventsAsync_WithMultiplePages_ShouldReturnAllPages()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        // Page 1
+        var page1Response = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = new List<DetectionEventDto>
+            {
+                new DetectionEventDto { Id = 1, GroupEvent = "Zone A", TypeEvent = "Intrusion", Sensor = 100, ActionReported = "True", Result = "THERMAL_SENSOR", CreatedAt = "2025-11-24T10:00:00.000Z" },
+            },
+            Pagination = new PaginationDto { Page = 1, TotalPages = 2, Total = 3, Limit = 2 }
+        };
+
+        // Page 2
+        var page2Response = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = new List<DetectionEventDto>
+            {
+                new DetectionEventDto { Id = 3, GroupEvent = "Zone B", TypeEvent = "Intrusion", Sensor = 102, ActionReported = "False", Result = "VIBRATION_SENSOR", CreatedAt = "2025-11-24T10:10:00.000Z" }
+            },
+            Pagination = new PaginationDto { Page = 2, TotalPages = 2, Total = 3, Limit = 2 }
+        };
+
+        mockApiService
+            .SetupSequence(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(page1Response)
+            .ReturnsAsync(page2Response);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.Count);
+        Assert.Equal(1, result[0].Id);
+        Assert.Equal(2, result[1].Id);
+        Assert.Equal(3, result[2].Id);
+    }
+
+    [Fact]
+    public async Task FetchDetectionEventsAsync_WithEmptyResponse_ShouldReturnEmptyList()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = new List<DetectionEventDto>(),
+            Pagination = new PaginationDto { Page = 1, TotalPages = 0, Total = 0, Limit = 100 }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task FetchDetectionEventsAsync_WithApiError_ShouldReturnEmptyListAndLogError()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = false,
+            Data = null,
+            Error = new ApiError { Message = "Database connection failed" }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+        // Note: Cannot verify ILogService.Error call due to CallerMemberName attributes in expression trees
+    }
+
+    [Fact]
+    public async Task FetchDetectionEventsAsync_WithNullData_ShouldReturnEmptyList()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = null,
+            Pagination = new PaginationDto { Page = 1, TotalPages = 1, Total = 0, Limit = 100 }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
     }
 }

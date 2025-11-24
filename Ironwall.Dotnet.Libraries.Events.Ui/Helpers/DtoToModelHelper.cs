@@ -19,7 +19,7 @@ public static class DtoToModelHelper
         return new DetectionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
@@ -36,7 +36,7 @@ public static class DtoToModelHelper
         return new DetectionEventDto
         {
             Id = model.Id,
-            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
             GroupEvent = model.EventGroup ?? string.Empty,
             ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
@@ -53,7 +53,7 @@ public static class DtoToModelHelper
         return new MalfunctionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = dto.Status == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
@@ -74,7 +74,7 @@ public static class DtoToModelHelper
         return new MalfunctionEventDto
         {
             Id = model.Id,
-            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
             GroupEvent = model.EventGroup ?? string.Empty,
             Status = model.Status == EnumTrueFalse.True ? "True" : "False",
@@ -95,7 +95,7 @@ public static class DtoToModelHelper
         return new ConnectionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = EnumTrueFalse.True, // Connection events are typically status=True
@@ -111,7 +111,7 @@ public static class DtoToModelHelper
         return new ConnectionEventDto
         {
             Id = model.Id,
-            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
             GroupEvent = model.EventGroup ?? string.Empty,
             Sensor = model.Device?.Id ?? 0
@@ -126,7 +126,7 @@ public static class DtoToModelHelper
         return new ActionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.Datetime).ToUniversalTime(),
+            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = EnumEventType.Action,
             Content = dto.Content,
             User = dto.User,
@@ -142,7 +142,7 @@ public static class DtoToModelHelper
         return new ActionEventDto
         {
             Id = model.Id,
-            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
             Content = model.Content ?? string.Empty,
             User = model.User ?? string.Empty,

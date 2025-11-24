@@ -42,20 +42,14 @@ public class ActionEventDto
     public IEventDto? FromEvent { get; set; }
 
     /// <summary>
-    /// 이벤트 발생 일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("datetime", Order = 6)]
-    public string Datetime { get; set; } = string.Empty;
-
-    /// <summary>
     /// 생성일시 (ISO 8601)
     /// </summary>
-    [JsonProperty("created_at", Order = 7)]
+    [JsonProperty("created_at", Order = 6)]
     public string? CreatedAt { get; set; }
 
     /// <summary>
     /// 수정일시 (ISO 8601)
     /// </summary>
-    [JsonProperty("updated_at", Order = 15)]
+    [JsonProperty("updated_at", Order = 7)]
     public string? UpdatedAt { get; set; }
 }

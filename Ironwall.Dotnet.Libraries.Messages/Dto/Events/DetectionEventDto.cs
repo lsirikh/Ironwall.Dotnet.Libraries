@@ -56,10 +56,4 @@ public class DetectionEventDto : BaseDto, IEventDto
     /// </summary>
     [JsonProperty("result", Order = 9)]
     public string Result { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 이벤트 발생 일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("datetime", Order = 10)]
-    public string Datetime { get; set; } = string.Empty;
 }
