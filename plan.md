@@ -108,7 +108,7 @@ public async Task InsertDetectionEventAsync_ShouldCreateAndReturnModel()
 
 ---
 
-## 🚧 Phase 2: Panel ViewModel Migration (IN PROGRESS)
+## ✅ Phase 2: Panel ViewModel Migration (COMPLETE)
 
 ### Migration Pattern Overview
 
@@ -129,11 +129,13 @@ events = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToL
 
 ---
 
-### Phase 2.1: DetectionEventPanelViewModel ⬜
+### Phase 2.1: DetectionEventPanelViewModel ✅
 
 **File**: `ViewModels/Panels/DetectionEventPanelViewModel.cs`
+**Status**: COMPLETE - All methods migrated to EventProviderService
+**Commit**: 4b3ce40
 
-#### Test 2.1.1 (RED): Replace IEventDbService - Build Verification ⬜
+#### Test 2.1.1: Replace IEventDbService - Build Verification ✅
 **Type**: STRUCTURAL (No behavior change)
 
 **Changes**:
@@ -671,4 +673,151 @@ Added EventProviderService singleton
 
 ---
 
-**END OF PLAN**
+## ✅ Phase 2-4: ViewModel Migration Results (COMPLETE)
+
+### Phase 2: Panel ViewModels (4 files) ✅
+**Commit**: 4b3ce40 - "refactor(events-ui): Migrate Panel ViewModels from Events.Db to Events.Api"
+
+1. **DetectionEventPanelViewModel** ✅
+   - Constructor: `IEventDbService` → `EventProviderService`
+   - DataInitialize: Server-side date filter → Client-side LINQ
+   - OnClickSaveButton: Update/Insert migrated
+   - HandleAsync: Delete migrated (uses event ID)
+
+2. **MalfunctionEventPanelViewModel** ✅
+   - Same pattern as Detection
+   - All CRUD operations migrated
+
+3. **ConnectionEventPanelViewModel** ✅
+   - Same pattern as Detection
+   - All CRUD operations migrated
+
+4. **ActionEventPanelViewModel** ✅
+   - Special case: Replaces `FetchInstanceAsync()` with `FetchActionEventsAsync()`
+   - Updates EventProvider (shared collection)
+   - All CRUD operations migrated
+
+### Phase 3: Auxiliary ViewModels (3 files) ✅
+**Commit**: 76a8a4a - "refactor(events-ui): Migrate auxiliary ViewModels from Events.Db to Events.Api"
+
+5. **EventCardListPanelViewModel** ✅
+   - HandleAsync methods: Insert/Update for Detection/Malfunction
+   - Uses EventProviderService for action reporting
+
+6. **DataChartPanelViewModel** ✅
+   - DataInitialize: Replaces `FetchInstanceAsync()` with parallel `Task.WhenAll()`
+   - Fetches all 4 event types simultaneously
+   - Updates EventProvider with all events
+
+7. **EventInfoViewModel** ✅
+   - DataInitialize: Replaces `FetchInstanceAsync()` with parallel `Task.WhenAll()`
+   - Same parallel fetch pattern as DataChart
+   - Updates EventProvider with all events
+
+### Phase 4: Dependency Cleanup ✅
+**Commit**: 51fcf30 - "refactor(events-ui): Remove Events.Db dependency from Events.Ui"
+
+**Changes**:
+- ❌ Removed `Events.Db` project reference from Events.Ui.csproj
+- ✅ Added `Devices` project reference (was transitive via Events.Db)
+- ❌ Removed unused `using Ironwall.Dotnet.Libraries.Events.Db.*` statements
+- ✅ All ViewModels now use `EventProviderService` exclusively
+
+**Files Modified**:
+- `Ironwall.Dotnet.Libraries.Events.Ui.csproj`
+- `Modules/EventUiModule.cs`
+- `ViewModels/Dialogs/DetectionReportDialogViewModel.cs`
+
+---
+
+## 📊 Migration Summary
+
+### Statistics
+- **Total ViewModels Migrated**: 7 (4 Panel + 3 Auxiliary)
+- **Total Commits**: 3 (Phase 2-4)
+- **Build Status**: ✅ SUCCESS (0 errors, minor warnings)
+- **Dependencies Removed**: Events.Db (MariaDB direct access)
+- **New Architecture**: Events.Api (GOP RESTful API)
+
+### Key Technical Decisions
+
+1. **Date Filtering Strategy**
+   - **OLD**: Server-side DB query with `startDate`/`endDate` parameters
+   - **NEW**: Client-side LINQ filtering after fetching all events
+   - **Reason**: GOP API doesn't support date range queries
+
+2. **Parallel Fetching Pattern**
+   - Used `Task.WhenAll()` for DataChart and EventInfo ViewModels
+   - Fetches all 4 event types simultaneously
+   - Improves performance over sequential fetching
+
+3. **Delete Operation Signature**
+   - **OLD**: `DeleteAsync(IEventModel model, token)`
+   - **NEW**: `DeleteAsync(int id, token)`
+   - **Reason**: GOP API uses ID-based deletion
+
+4. **FetchInstanceAsync() Migration**
+   - **OLD**: Single method fetching all event types with date range
+   - **NEW**: Parallel fetch of 4 individual event types + client-side filtering
+   - **Applied To**: ActionEventPanelViewModel, DataChartPanelViewModel, EventInfoViewModel
+
+### Architecture Before/After
+
+**BEFORE (Events.Db)**:
+```
+Events.Ui → Events.Db → MariaDB
+           (IEventDbService)
+```
+
+**AFTER (Events.Api)**:
+```
+Events.Ui → Events.Api → GOP RESTful API → MariaDB
+           (EventProviderService)
+```
+
+### Benefits Achieved
+
+1. ✅ **Decoupling**: UI layer no longer directly accesses database
+2. ✅ **Scalability**: RESTful API can be scaled independently
+3. ✅ **Testability**: EventProviderService fully unit tested (28 tests)
+4. ✅ **Consistency**: All ViewModels use same EventProviderService pattern
+5. ✅ **Performance**: Parallel fetching for chart/info ViewModels
+
+### Migration Pattern Applied
+
+```csharp
+// STRUCTURAL Change (Constructor)
+- IEventDbService _dbService
++ EventProviderService _providerService
+
+// BEHAVIORAL Change (Data Fetch)
+- var events = await _dbService.FetchDetectionEventsAsync(startDate, endDate, token);
++ var events = await _providerService.FetchDetectionEventsAsync(token);
++ events = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+
+// BEHAVIORAL Change (Delete)
+- await _dbService.DeleteDetectionEventAsync(model, token);
++ await _providerService.DeleteDetectionEventAsync(model.Id, token);
+```
+
+---
+
+## 🎯 Next Steps (Future Work)
+
+### Phase 5: Integration Testing (Planned)
+- Test full application with GOP API backend
+- Verify cascade deletion works correctly
+- Performance testing with large datasets
+- Verify date filtering accuracy
+
+### Phase 6: Documentation (Planned)
+- Update architecture diagrams
+- Document GOP API integration
+- Add deployment guide for API-first architecture
+
+---
+
+**MIGRATION COMPLETE** ✅
+**Date**: 2025-11-24
+**Total Duration**: Phases 2-4 completed in single session
+**Final Status**: All 7 ViewModels migrated, Events.Db dependency removed
