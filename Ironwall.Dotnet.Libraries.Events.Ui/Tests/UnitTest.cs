@@ -1,10 +1,14 @@
 using Xunit;
 using Moq;
-using Ironwall.Dotnet.Libraries.Api.Messages.Events;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Libraries.Events.Api.Services;
+using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -265,5 +269,64 @@ public class DtoToModelHelperTests
 
 public class EventProviderServiceTests
 {
-    // Tests will be added following TDD cycle
+    [Fact]
+    public async Task FetchDetectionEventsAsync_ShouldReturnConvertedModels()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<DetectionEventDto>
+        {
+            new DetectionEventDto
+            {
+                Id = 1,
+                GroupEvent = "Zone A",
+                TypeEvent = "Intrusion",
+                Sensor = 100,
+                ActionReported = "True",
+                Result = "THERMAL_SENSOR",
+                Datetime = "2025-11-24T10:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 1,
+                Total = 1,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(
+            mockLogService.Object,
+            mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsAsync(); // ← This method doesn't exist yet (RED)
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal(1, result[0].Id);
+        Assert.Equal(EnumEventType.Intrusion, result[0].MessageType);
+        Assert.Equal(EnumDetectionType.THERMAL_SENSOR, result[0].Result);
+    }
 }

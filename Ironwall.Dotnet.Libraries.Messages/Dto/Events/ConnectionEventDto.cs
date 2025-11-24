@@ -43,4 +43,10 @@ public class ConnectionEventDto : BaseDto
     /// </summary>
     [JsonProperty("sequence", Order = 7)]
     public int Sequence { get; set; }
+
+    /// <summary>
+    /// 이벤트 발생 일시 (ISO 8601)
+    /// </summary>
+    [JsonProperty("datetime", Order = 8)]
+    public string Datetime { get; set; } = string.Empty;
 }
