@@ -27,4 +27,21 @@ public static class DtoToModelHelper
             Device = new SensorDeviceModel { Id = dto.Sensor }
         };
     }
+
+    /// <summary>
+    /// IDetectionEventModel → DetectionEventDto 변환 (역방향)
+    /// </summary>
+    public static DetectionEventDto ToDetectionEventDto(this IDetectionEventModel model)
+    {
+        return new DetectionEventDto
+        {
+            Id = model.Id,
+            Datetime = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            TypeEvent = model.MessageType.ToString(),
+            GroupEvent = model.EventGroup ?? string.Empty,
+            ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
+            Result = model.Result.ToString(),
+            Sensor = model.Device?.Id ?? 0
+        };
+    }
 }
