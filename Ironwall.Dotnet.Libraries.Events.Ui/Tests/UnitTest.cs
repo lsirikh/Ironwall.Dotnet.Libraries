@@ -1,9 +1,6 @@
 using Xunit;
 using Moq;
-using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
-using Ironwall.Dotnet.Libraries.Events.Models;
-using Ironwall.Dotnet.Monitoring.Models.Events;
-using Ironwall.Dotnet.Libraries.Events.Api.Dtos;
+using Ironwall.Dotnet.Libraries.Api.Messages.Events;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
