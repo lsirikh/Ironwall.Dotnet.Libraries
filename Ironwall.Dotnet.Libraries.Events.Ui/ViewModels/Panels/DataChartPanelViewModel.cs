@@ -107,15 +107,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             {
                 try
                 {
-                    // Fetch all event types from GOP API
-                    var detectionTask = _providerService.FetchDetectionEventsAsync(ct);
-                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(ct);
-                    var connectionTask = _providerService.FetchConnectionEventsAsync(ct);
-                    var actionTask = _providerService.FetchActionEventsAsync(ct);
+                    // Fetch all event types from GOP API with date filtering (server-side)
+                    var detectionTask = _providerService.FetchDetectionEventsAsync(StartDate, EndDate, ct);
+                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(StartDate, EndDate, ct);
+                    var connectionTask = _providerService.FetchConnectionEventsAsync(StartDate, EndDate, ct);
+                    var actionTask = _providerService.FetchActionEventsAsync(StartDate, EndDate, ct);
 
                     await Task.WhenAll(detectionTask, malfunctionTask, connectionTask, actionTask);
 
-                    // Update EventProvider with fetched events
+                    // Update EventProvider with fetched events (already filtered by date)
                     _eventProvider.Clear();
                     foreach (var item in detectionTask.Result) _eventProvider.Add(item);
                     foreach (var item in malfunctionTask.Result) _eventProvider.Add(item);
@@ -136,7 +136,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     foreach (var type in eventTypes)
                     {
                         var grouped = type.Events
-                            .Where(ev => ev.DateTime >= StartDate && ev.DateTime <= EndDate)
+                            // No client-side filtering needed - already filtered by GOP API
                             .GroupBy(ev => ev.DateTime.ToString("yyyy-MM-dd HH"))
                             .OrderBy(g => g.Key)
                             .Select(g => new { Time = g.Key, Count = g.Count() })
@@ -199,6 +199,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 catch (TaskCanceledException ex)
                 {
                     _log?.Warning($"TaskCanceledException in DataInitialize: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    _log?.Error($"Exception in DataInitialize: {ex.GetType().Name} - {ex.Message}");
                 }
                 finally
                 {

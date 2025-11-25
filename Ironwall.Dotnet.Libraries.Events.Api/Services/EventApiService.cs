@@ -109,7 +109,7 @@ public class EventApiService : IEventApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("events/detections", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections", parameters);
             return await response.ToApiListResponseAsync<DetectionEventDto>();
         }
         catch (Exception ex)
@@ -130,7 +130,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"events/detections/{id}");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections/{id}");
             return await response.ToApiResponseAsync<DetectionEventDto>();
         }
         catch (Exception ex)
@@ -152,7 +152,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("events/detections", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/detections", dto);
             return await response.ToApiResponseAsync<DetectionEventDto>();
         }
         catch (Exception ex)
@@ -174,7 +174,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"events/detections/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/events/detections/{id}", dto);
             return await response.ToApiResponseAsync<DetectionEventDto>();
         }
         catch (Exception ex)
@@ -196,7 +196,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"events/detections/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/events/detections/{id}", dto);
             return await response.ToApiResponseAsync<DetectionEventDto>();
         }
         catch (Exception ex)
@@ -217,7 +217,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"events/detections/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/events/detections/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
@@ -261,7 +261,7 @@ public class EventApiService : IEventApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("events/malfunctions", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions", parameters);
             return await response.ToApiListResponseAsync<MalfunctionEventDto>();
         }
         catch (Exception ex)
@@ -282,7 +282,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"events/malfunctions/{id}");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions/{id}");
             return await response.ToApiResponseAsync<MalfunctionEventDto>();
         }
         catch (Exception ex)
@@ -304,7 +304,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("events/malfunctions", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/malfunctions", dto);
             return await response.ToApiResponseAsync<MalfunctionEventDto>();
         }
         catch (Exception ex)
@@ -326,7 +326,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"events/malfunctions/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/vents/malfunctions/{id}", dto);
             return await response.ToApiResponseAsync<MalfunctionEventDto>();
         }
         catch (Exception ex)
@@ -348,7 +348,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"events/malfunctions/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/events/malfunctions/{id}", dto);
             return await response.ToApiResponseAsync<MalfunctionEventDto>();
         }
         catch (Exception ex)
@@ -369,7 +369,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"events/malfunctions/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/events/malfunctions/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
@@ -413,7 +413,7 @@ public class EventApiService : IEventApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("events/connections", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/connections", parameters);
             return await response.ToApiListResponseAsync<ConnectionEventDto>();
         }
         catch (Exception ex)
@@ -435,7 +435,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("events/connections", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/connections", dto);
             return await response.ToApiResponseAsync<ConnectionEventDto>();
         }
         catch (Exception ex)
@@ -456,7 +456,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"events/connections/{id}");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/connections/{id}");
             return await response.ToApiResponseAsync<ConnectionEventDto>();
         }
         catch (Exception ex)
@@ -478,7 +478,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"events/connections/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/events/connections/{id}", dto);
             return await response.ToApiResponseAsync<ConnectionEventDto>();
         }
         catch (Exception ex)
@@ -500,7 +500,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"events/connections/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/events/connections/{id}", dto);
             return await response.ToApiResponseAsync<ConnectionEventDto>();
         }
         catch (Exception ex)
@@ -521,7 +521,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"events/connections/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/events/connections/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)
@@ -559,7 +559,7 @@ public class EventApiService : IEventApiService
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
-            var response = await _apiService.GetRequestAsync("events/actions", parameters);
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/actions", parameters);
             return await response.ToApiListResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
@@ -581,7 +581,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PostRequestAsync("events/actions", dto);
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/events/actions", dto);
             return await response.ToApiResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
@@ -602,7 +602,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"events/actions/{id}");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/actions/{id}");
             return await response.ToApiResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
@@ -624,7 +624,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"events/actions/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/events/actions/{id}", dto);
             return await response.ToApiResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
@@ -646,7 +646,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PutRequestAsync($"events/actions/{id}", dto);
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/events/actions/{id}", dto);
             return await response.ToApiResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
@@ -667,7 +667,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.DeleteRequestAsync($"events/actions/{id}");
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/events/actions/{id}");
             return await response.ToApiResponseAsync<bool>();
         }
         catch (Exception ex)

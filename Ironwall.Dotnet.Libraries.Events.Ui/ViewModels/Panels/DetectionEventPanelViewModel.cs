@@ -269,12 +269,9 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             {
                 IsVisible = false;
 
-                //API Fetching
-                var events = await _providerService.FetchDetectionEventsAsync(cancellationToken);
-                if (events == null) return;
-
-                // Client-side date filtering (GOP API doesn't support date range)
-                var filteredEvents = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+                //API Fetching with server-side date filtering
+                var filteredEvents = await _providerService.FetchDetectionEventsAsync(StartDate, EndDate, cancellationToken);
+                if (filteredEvents == null) return;
 
                 _eventProvider.Clear();
                 foreach (var item in filteredEvents)

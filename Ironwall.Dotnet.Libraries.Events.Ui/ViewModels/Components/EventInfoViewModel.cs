@@ -39,13 +39,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         #region - Ctors -
         public EventInfoViewModel(DeviceProvider deviceProvider
                                 , EventProvider eventProvider
-                                , EventProviderService providerService)
+                                , EventProviderService providerService
+                                , IEventAggregator? eventAggregator = null
+                                , ILogService? log = null)
         {
             _deviceProvider = deviceProvider;
             _eventProvider = eventProvider;
             LSeries = new ObservableCollection<ISeries>();
             DSeries = new ObservableCollection<ISeries>();
             _providerService = providerService;
+
+            // BasePanelViewModel initialization
+            _className = this.GetType().Name.ToString();
+            _eventAggregator = eventAggregator ?? IoC.Get<IEventAggregator>();
+            _log = log ?? IoC.Get<ILogService>();
 
             _names = new[] { "DET", "MAL", "CON", "ACT" };
             RefreshActiveness();
@@ -171,11 +178,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             {
                 try
                 {
-                    // Fetch all event types from GOP API
-                    var detectionTask = _providerService.FetchDetectionEventsAsync(cancellationToken);
-                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(cancellationToken);
-                    var connectionTask = _providerService.FetchConnectionEventsAsync(cancellationToken);
-                    var actionTask = _providerService.FetchActionEventsAsync(cancellationToken);
+                    // Fetch all event types from GOP API (fetch last 7 days by default)
+                    var endDate = DateTime.Now;
+                    var startDate = endDate.AddDays(-7);
+
+                    var detectionTask = _providerService.FetchDetectionEventsAsync(startDate, endDate, cancellationToken);
+                    var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(startDate, endDate, cancellationToken);
+                    var connectionTask = _providerService.FetchConnectionEventsAsync(startDate, endDate, cancellationToken);
+                    var actionTask = _providerService.FetchActionEventsAsync(startDate, endDate, cancellationToken);
 
                     await Task.WhenAll(detectionTask, malfunctionTask, connectionTask, actionTask);
 
@@ -185,6 +195,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     foreach (var item in malfunctionTask.Result) _eventProvider.Add(item);
                     foreach (var item in connectionTask.Result) _eventProvider.Add(item);
                     foreach (var item in actionTask.Result) _eventProvider.Add(item);
+
+                    // 디버깅: Connection 이벤트 카운트 로그
+                    _log?.Info($"[EventInfoViewModel] Fetched {detectionTask.Result.Count} detection, " +
+                               $"{malfunctionTask.Result.Count} malfunction, " +
+                               $"{connectionTask.Result.Count} connection, " +
+                               $"{actionTask.Result.Count} action events");
+
+                    // Connection 이벤트의 Device 상태 확인
+                    var connectionEvents = connectionTask.Result;
+                    foreach (var ev in connectionEvents)
+                    {
+                        var sensor = ev.Device as ISensorDeviceModel;
+                        _log?.Info($"[ConnectionEvent] ID={ev.Id}, Sensor.Id={sensor?.Id}, " +
+                                   $"Controller={(sensor?.Controller != null ? sensor.Controller.DeviceNumber.ToString() : "null")}");
+                    }
 
                     // 컨트롤러(Device) 번호 → 문자열 레이블
                     var devices = _deviceProvider.OfType<IControllerDeviceModel>()

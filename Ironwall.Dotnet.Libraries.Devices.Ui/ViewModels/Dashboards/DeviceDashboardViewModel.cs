@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -23,12 +24,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel
     #region - Ctors -
     public DeviceDashboardViewModel(IEventAggregator eventAggregator
                                 , ILogService log
+                                , IDeviceProviderService deviceProviderService
                                 , DeviceTabControlViewModel tabControlViewModel
                                 , ControllerDevicePanelViewModel controllerDevicePanelViewModel
                                 , SensorDevicePanelViewModel sensorDevicePanelViewModel
                                 , CameraDevicePanelViewModel cameraDevicePanelViewModel
                                 ) : base(eventAggregator, log)
     {
+        _deviceProviderService = deviceProviderService;
         TabControlViewModel = tabControlViewModel;
         ControllerPanelViewModel = controllerDevicePanelViewModel;
         SensorPanelViewModel = sensorDevicePanelViewModel;
@@ -49,7 +52,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SensorPanelViewModel.UpdateAction += SensorPanelViewModel_UpdateAction;
         CameraPanelViewModel.CheckSelectedItems += CameraPanelViewModel_CheckSelectedItems;
         CameraPanelViewModel.UpdateAction += CameraPanelViewModel_UpdateAction;
-
+        await _deviceProviderService.FetchAllDevicesAsync(cancellationToken);
         await TabControlViewModel.ActivateAsync();
 
         await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
@@ -363,6 +366,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         get { return _selectedItemEditor; }
         set { _selectedItemEditor = value; NotifyOfPropertyChange(() => SelectedItemEditor); }
     }
+
+    private IDeviceProviderService _deviceProviderService;
 
     public DeviceTabControlViewModel TabControlViewModel { get; }
     public ControllerDevicePanelViewModel ControllerPanelViewModel { get; }

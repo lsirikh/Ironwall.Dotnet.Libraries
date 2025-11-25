@@ -1,12 +1,13 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.Specialized;
+using System.Threading;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
@@ -39,8 +40,8 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     {
         await base.OnActivateAsync(cancellationToken);
         await DataInitialize(cancellationToken).ConfigureAwait(false);
-        IsVisible = true;
         //UpdateAction?.Invoke(_startDate, _endDate);
+        IsVisible = true;
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -111,6 +112,8 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
             var token = _pCancellationTokenSource.Token;
             var currentList = EventProvider.OfType<IActionEventModel>();
+
+            var filteredEvents = await _providerService.FetchActionEventsAsync(_startDate, _endDate, token);
 
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
             var updateList = ViewModelProvider
@@ -230,7 +233,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     {
         try
         {
-            if (_cancellationTokenSource == null && _cancellationTokenSource.IsCancellationRequested)
+            if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
                 return;
 
             _cancellationTokenSource.Cancel();
@@ -250,12 +253,9 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             {
                 IsVisible = false;
 
-                //API Fetching - ActionEvents are fetched via EventProviderService
-                var events = await _providerService.FetchActionEventsAsync(cancellationToken);
-                if (events == null) return;
-
-                // Client-side date filtering (GOP API doesn't support date range)
-                var filteredEvents = events.Where(e => e.DateTime >= _startDate && e.DateTime <= _endDate).ToList();
+                //API Fetching with server-side date filtering
+                var filteredEvents = await _providerService.FetchActionEventsAsync(_startDate, _endDate, cancellationToken);
+                if (filteredEvents == null) return;
 
                 // Update EventProvider (shared collection)
                 var existingActionEvents = EventProvider.OfType<IActionEventModel>().ToList();
@@ -265,7 +265,27 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                 }
                 foreach (var item in filteredEvents)
                 {
+                    // ActionEvent 추가
                     EventProvider.Add(item);
+
+                    // OriginEvent도 EventProvider에 추가 (중복 방지)
+                    if (item.OriginEvent != null)
+                    {
+                        var existingOrigin = EventProvider
+                            .OfType<IExEventModel>()
+                            .FirstOrDefault(e => e.Id == item.OriginEvent.Id &&
+                                                 e.GetType() == item.OriginEvent.GetType());
+
+                        if (existingOrigin == null)
+                        {
+                            EventProvider.Add(item.OriginEvent);
+                        }
+                        else
+                        {
+                            // EventProvider에 이미 있는 OriginEvent 사용 (참조 통일)
+                            item.OriginEvent = existingOrigin;
+                        }
+                    }
                 }
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
@@ -281,9 +301,8 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                     {
                         if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
 
-                        var origin = EventProvider.OfType<IExEventModel>().Where(entity => entity.Id == item?.OriginEvent!.Id).FirstOrDefault();
-                        if (origin == null) continue;
-                        item.OriginEvent = origin;
+                        // OriginEvent는 이미 FetchActionEventsAsync()에서 설정됨
+                        // (ToActionEventModel → ResolveOriginEvent 통해 자동 매칭)
                         ViewModelProvider.Add(new ActionEventViewModel(item) { Index = index + 1 });
                     }
 

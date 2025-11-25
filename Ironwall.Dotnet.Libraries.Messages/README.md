@@ -1,9 +1,10 @@
 # Ironwall.Dotnet.Libraries.Messages
 
-**버전**: 1.0.0  
-**생성자**: 이기호 (GHLEE)  
-**소속**: Sensorway Co., Ltd.  
-**생성일**: 2025-11-12  
+**버전**: 1.1.0
+**생성자**: 이기호 (GHLEE)
+**소속**: Sensorway Co., Ltd.
+**생성일**: 2025-11-12
+**최종 수정일**: 2025-01-18
 
 ---
 
@@ -14,8 +15,12 @@
 3. [활용 방법](#3-활용-방법)
    - [3.1 RESTful API 메시지](#31-restful-api-메시지)
    - [3.2 Message Broker 메시지](#32-message-broker-메시지)
+   - [3.3 DetectionExEventDto 확장 이벤트](#33-detectionexeventdto-확장-이벤트)
 4. [사전정의된 타입](#4-사전정의된-타입)
-5. [업데이트 정보](#5-업데이트-정보)
+5. [외부 시스템 통합 DTO](#5-외부-시스템-통합-dto)
+   - [5.1 Camera_SPG (PTZ 제어)](#51-camera_spg-ptz-제어)
+   - [5.2 NVR_emstone (Emstone NVR 통합)](#52-nvr_emstone-emstone-nvr-통합)
+6. [업데이트 정보](#6-업데이트-정보)
 
 ---
 
@@ -30,6 +35,7 @@
 - ✅ **DTO 중심 설계**: 데이터 전송 객체(DTO)를 중심으로 일관된 메시지 생성
 - ✅ **타입 안정성**: 제네릭과 강타입을 활용한 타입 안전성 보장
 - ✅ **JSON 직렬화**: Newtonsoft.Json 기반 표준화된 직렬화 지원
+- ✅ **외부 시스템 통합**: 카메라 PTZ, NVR 시스템 등 외부 장비 통합 지원
 
 ### 설계 원칙
 
@@ -75,17 +81,30 @@ Ironwall.Dotnet.Libraries.Messages/
 │   │   ├── ActionEventCreateDto.cs   # 조치 이벤트 생성용
 │   │   ├── ConnectionEventDto.cs     # 연결 이벤트
 │   │   ├── DetectionEventDto.cs      # 탐지 이벤트
+│   │   ├── DetectionExEventDto.cs    # 확장 탐지 이벤트 (v1.1.0)
+│   │   ├── EventUrlsDto.cs           # 이벤트 URL 정보 (v1.1.0)
 │   │   └── MalfunctionEventDto.cs    # 장애 이벤트
 │   │
 │   ├── Integrations/                 # 통합 DTO
 │   │   └── EventMappingDto.cs        # 이벤트 매핑
 │   │
-│   └── RtspPopups/                   # RTSP 팝업 DTO
-│       └── EventCallDto.cs           # 이벤트 호출
+│   ├── RtspPopups/                   # RTSP 팝업 DTO
+│   │   └── EventCallDto.cs           # 이벤트 호출
+│   │
+│   ├── Camera_SPG/                   # SPG 카메라 PTZ 제어 (v1.1.0)
+│   │   └── PTZDTO.cs                 # PTZ 제어 명령
+│   │
+│   └── NVR_emstone/                  # Emstone NVR 통합 (v1.1.0)
+│       └── Camera/
+│           ├── CameraDto.cs          # 카메라 정보
+│           ├── CameraSourceDto.cs    # 카메라 소스 정보
+│           ├── CameraOSDDto.cs       # OSD 설정
+│           └── CameraPTZTourDto.cs   # PTZ 투어 설정
 │
 ├── Helpers/                          # 메시지 생성 Helper 클래스
 │   ├── ApiMessageHelper.cs           # API 메시지 변환 Helper
 │   ├── BrokerMessageHelper.cs        # Broker 메시지 생성 Helper
+│   ├── DetectionExEventDtoHelper.cs  # DetectionExEventDto 전용 Helper (v1.1.0)
 │   └── FromEventConverter.cs         # 이벤트 변환기
 │
 └── Models/                           # 구체적인 메시지 모델 (레거시)
@@ -100,6 +119,8 @@ Ironwall.Dotnet.Libraries.Messages/
 | **Defines/Apis** | API 메시지 구조 | RESTful API 응답 표준 구조 정의 |
 | **Defines/Brokers** | Broker 메시지 구조 | NATS, Redis 등 메시지 브로커 메시지 구조 |
 | **Dto** | 데이터 전송 객체 | 실제 비즈니스 데이터 구조 |
+| **Dto/Camera_SPG** | SPG 카메라 통합 | SPG 카메라 PTZ 제어 DTO |
+| **Dto/NVR_emstone** | Emstone NVR 통합 | Emstone NVR 시스템 연동 DTO |
 | **Helpers** | 메시지 생성 도구 | DTO → 메시지 변환 Extension Methods |
 | **Models** | (Deprecated) | 기존 Concrete 클래스 (Helper 패턴으로 대체됨) |
 
@@ -512,6 +533,211 @@ public class EventCallService : MessageService<EventCallService>
 
 ---
 
+### 3.3 DetectionExEventDto 확장 이벤트
+
+#### 3.3.1 개요
+
+**DetectionExEventDto**는 기본 `DetectionEventDto`를 확장하여 **NATS 메시지 브로커 전송에 최적화된 구조**를 제공합니다.
+
+**주요 특징**:
+- 이벤트 명칭 및 카테고리 추가
+- RTSP URL (실시간/녹화) 정보 포함
+- Composition 패턴 사용 (상속 대신 포함)
+- NATS 메시지 Body 구조에 맞는 설계
+
+**구조**:
+```csharp
+public class DetectionExEventDto
+{
+    [JsonProperty("name_event", Order = 1)]
+    public string NameEvent { get; set; } = string.Empty;  // 이벤트 명칭
+
+    [JsonProperty("category_event", Order = 2)]
+    public string CategoryEvent { get; set; } = string.Empty;  // 이벤트 카테고리
+
+    [JsonProperty("origin_event", Order = 3)]
+    public DetectionEventDto OriginEvent { get; set; } = new();  // 원본 이벤트
+
+    [JsonProperty("urls", Order = 4)]
+    public EventUrlsDto Urls { get; set; } = new();  // RTSP URL 정보
+}
+
+public class EventUrlsDto
+{
+    [JsonProperty("live", Order = 1)]
+    public string Live { get; set; } = string.Empty;  // 실시간 RTSP URL
+
+    [JsonProperty("record", Order = 2)]
+    public string Record { get; set; } = string.Empty;  // 녹화 RTSP URL
+}
+```
+
+#### 3.3.2 NATS 메시지 구조 예제
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "type_message": "REQ",
+  "command": "DETECTION_EX_EVENT",
+  "from": "SENSOR_MANAGER",
+  "data": {
+    "name_event": "침입탐지-카메라연동",
+    "category_event": "DETECT_SENSOR_WITH_CAMERA",
+    "origin_event": {
+      "id": 123,
+      "name_device": "Sensor-A-001",
+      "type_device": "Multi",
+      "type_event": "Intrusion",
+      "result": "PIR_SENSOR",
+      "action_reported": "True",
+      "message_event": "PIR 센서 침입 탐지",
+      "datetime_event": "2025-01-18T10:30:00.000Z"
+    },
+    "urls": {
+      "live": "rtsp://192.168.1.100:554/live",
+      "record": "rtsp://192.168.1.100:554/playback?start=20250118T103000"
+    }
+  },
+  "timestamp": "2025-01-18T10:30:00.500Z"
+}
+```
+
+#### 3.3.3 DetectionExEventDtoHelper 사용법
+
+`DetectionExEventDtoHelper`는 `DetectionEventDto`를 `DetectionExEventDto`로 쉽게 변환하고 NATS 메시지로 생성합니다.
+
+**기본 변환 (Extension Method)**:
+```csharp
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+
+var detectionEvent = new DetectionEventDto
+{
+    Id = 123,
+    NameDevice = "Sensor-A-001",
+    TypeDevice = "Multi",
+    TypeEvent = "Intrusion",
+    Result = "PIR_SENSOR",
+    ActionReported = "True",
+    MessageEvent = "PIR 센서 침입 탐지",
+    DatetimeEvent = "2025-01-18T10:30:00.000Z"
+};
+
+// DetectionEventDto → DetectionExEventDto 변환
+var detectionExEvent = detectionEvent.ToDetectionExEvent(
+    eventName: "침입탐지-카메라연동",
+    category: "DETECT_SENSOR_WITH_CAMERA",
+    liveUrl: "rtsp://192.168.1.100:554/live",
+    recordUrl: "rtsp://192.168.1.100:554/playback?start=20250118T103000"
+);
+
+Console.WriteLine($"Event Name: {detectionExEvent.NameEvent}");
+Console.WriteLine($"Category: {detectionExEvent.CategoryEvent}");
+Console.WriteLine($"Live URL: {detectionExEvent.Urls.Live}");
+Console.WriteLine($"Record URL: {detectionExEvent.Urls.Record}");
+```
+
+**URL 없이 변환**:
+```csharp
+// URL 정보 없이 변환 (Urls는 빈 문자열로 설정됨)
+var detectionExEvent = detectionEvent.ToDetectionExEvent(
+    eventName: "침입탐지-일반",
+    category: "DETECT_SENSOR_ONLY"
+);
+// Urls.Live = string.Empty
+// Urls.Record = string.Empty
+```
+
+**EventUrlsDto 직접 생성**:
+```csharp
+// EventUrlsDto 헬퍼 메서드로 생성
+var urls = DetectionExEventDtoHelper.CreateEventUrls(
+    liveUrl: "rtsp://192.168.1.100:554/live",
+    recordUrl: "rtsp://192.168.1.100:554/playback?start=20250118T103000"
+);
+
+var detectionExEvent = new DetectionExEventDto
+{
+    NameEvent = "침입탐지",
+    CategoryEvent = "DETECT_SENSOR_WITH_CAMERA",
+    OriginEvent = detectionEvent,
+    Urls = urls
+};
+```
+
+**NATS BrokerRequest로 변환**:
+```csharp
+// DetectionExEventDto → BrokerRequest<DetectionExEventDto> 변환
+var brokerRequest = detectionExEvent.ToBrokerRequest(
+    from: "SENSOR_MANAGER",
+    command: "DETECTION_EX_EVENT"
+);
+
+// 기본 Command 사용 (기본값: "DETECTION_EX_EVENT")
+var brokerRequest2 = detectionExEvent.ToBrokerRequest(from: "SENSOR_MANAGER");
+
+// JSON 직렬화 후 NATS로 발행
+var json = brokerRequest.ToJson();
+await natsConnection.PublishAsync("detection.ex.event", json);
+```
+
+**전체 워크플로우 예제**:
+```csharp
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using NATS.Client.Core;
+
+public async Task PublishDetectionExEventAsync(
+    NatsConnection nats,
+    DetectionEventDto detectionEvent,
+    string liveUrl,
+    string recordUrl)
+{
+    // Step 1: DetectionEventDto → DetectionExEventDto 변환
+    var detectionExEvent = detectionEvent.ToDetectionExEvent(
+        eventName: "침입탐지-카메라연동",
+        category: "DETECT_SENSOR_WITH_CAMERA",
+        liveUrl: liveUrl,
+        recordUrl: recordUrl
+    );
+
+    // Step 2: DetectionExEventDto → BrokerRequest 변환
+    var request = detectionExEvent.ToBrokerRequest(from: "SENSOR_MANAGER");
+
+    // Step 3: JSON 직렬화 및 NATS 발행
+    var json = request.ToJson();
+    await nats.PublishAsync("detection.ex.event", json);
+
+    Console.WriteLine($"Published DetectionExEvent: {detectionExEvent.NameEvent}");
+}
+```
+
+#### 3.3.4 이벤트 카테고리 예시
+
+**일반적인 카테고리 값**:
+- `"DETECT_SENSOR_ONLY"`: 센서 단독 탐지
+- `"DETECT_SENSOR_WITH_CAMERA"`: 센서 + 카메라 연동 탐지
+- `"DETECT_CAMERA_ONLY"`: 카메라 단독 탐지 (AI 분석)
+- `"DETECT_COMBINED"`: 복합 탐지 (센서 + 카메라 + 기타)
+
+**사용 예제**:
+```csharp
+// 센서 + 카메라 연동 탐지
+var detectionEx1 = detectionEvent.ToDetectionExEvent(
+    eventName: "침입탐지-001",
+    category: "DETECT_SENSOR_WITH_CAMERA",
+    liveUrl: "rtsp://192.168.1.100:554/live"
+);
+
+// 센서 단독 탐지 (카메라 없음)
+var detectionEx2 = detectionEvent.ToDetectionExEvent(
+    eventName: "침입탐지-002",
+    category: "DETECT_SENSOR_ONLY"
+);
+```
+
+---
+
 ## 4. 사전정의된 타입
 
 이 섹션에서는 DTO에서 `string` 타입으로 정의되었지만, 실제로는 **Enum 값의 ToString()**으로 사용되는 타입들을 정리합니다.
@@ -774,7 +1000,416 @@ var malfunctionEvent = new MalfunctionEventDto
 
 ---
 
-## 5. 업데이트 정보
+## 5. 외부 시스템 통합 DTO
+
+이 섹션에서는 외부 카메라 시스템 및 NVR과의 통합을 위한 DTO를 설명합니다.
+
+### 5.1 Camera_SPG (PTZ 제어)
+
+#### 5.1.1 개요
+
+SPG 카메라 시스템의 **PTZ (Pan-Tilt-Zoom) 제어** 명령을 위한 DTO입니다.
+
+**위치**: `Dto/Camera_SPG/PTZDTO.cs`
+
+#### 5.1.2 구조
+
+```csharp
+public class PTZDTO : BaseDto
+{
+    /// <summary>
+    /// 카메라 ID
+    /// </summary>
+    [JsonProperty("cameraId", Order = 2)]
+    public int CameraId { get; set; }
+
+    /// <summary>
+    /// Pan 각도 (좌우 회전)
+    /// </summary>
+    [JsonProperty("p", Order = 3)]
+    public int P { get; set; }
+
+    /// <summary>
+    /// Tilt 각도 (상하 회전)
+    /// </summary>
+    [JsonProperty("t", Order = 4)]
+    public int T { get; set; }
+
+    /// <summary>
+    /// Zoom 레벨 (확대/축소)
+    /// </summary>
+    [JsonProperty("z", Order = 5)]
+    public int Z { get; set; }
+}
+```
+
+#### 5.1.3 JSON 예제
+
+```json
+{
+  "cameraId": 101,
+  "p": 45,
+  "t": -30,
+  "z": 2
+}
+```
+
+#### 5.1.4 사용 예제
+
+```csharp
+using Ironwall.Dotnet.Libraries.Messages.Dto.Camera_SPG;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
+
+// PTZ 제어 명령 생성
+var ptzCommand = new PTZDTO
+{
+    CameraId = 101,
+    P = 45,   // Pan: 45도 우측 회전
+    T = -30,  // Tilt: 30도 하향
+    Z = 2     // Zoom: 레벨 2
+};
+
+// BrokerRequest로 변환 후 NATS로 발행
+var request = ptzCommand.ToBrokerRequest(
+    command: "PTZ_CONTROL",
+    from: "CAMERA_MANAGER"
+);
+
+await natsConnection.PublishAsync("camera.spg.ptz", request.ToJson());
+```
+
+---
+
+### 5.2 NVR_emstone (Emstone NVR 통합)
+
+#### 5.2.1 개요
+
+Emstone NVR 시스템과의 통합을 위한 카메라 정보 및 설정 DTO입니다.
+
+**위치**: `Dto/NVR_emstone/Camera/`
+
+#### 5.2.2 CameraDto (카메라 정보)
+
+**전체 카메라 정보를 담는 주요 DTO**입니다.
+
+**구조**:
+```csharp
+public class CameraDto : BaseDto
+{
+    [JsonProperty("id")]
+    public string Id { get; set; } = string.Empty;  // 카메라 ID
+
+    [JsonProperty("name")]
+    public string Name { get; set; } = string.Empty;  // 카메라 이름
+
+    [JsonProperty("address")]
+    public string Address { get; set; } = string.Empty;  // IP 주소
+
+    [JsonProperty("location")]
+    public string Location { get; set; } = string.Empty;  // 설치 위치
+
+    [JsonProperty("source")]
+    public int Source { get; set; }  // 네트워크 카메라 소스 ID
+
+    [JsonProperty("channel")]
+    public int Channel { get; set; }  // 채널 ID
+
+    [JsonProperty("connected")]
+    public bool IsConnected { get; set; }  // 연결 여부
+
+    [JsonProperty("has_signal")]
+    public bool HasSignal { get; set; }  // 신호 유효 여부
+
+    [JsonProperty("has_ptz")]
+    public bool HasPtz { get; set; }  // PTZ 기능 지원 여부
+
+    [JsonProperty("recording")]
+    public bool IsRecording { get; set; }  // 녹화 상태
+
+    [JsonProperty("force_recording")]
+    public bool IsForceRecording { get; set; }  // 강제 녹화 상태
+
+    [JsonProperty("ptz_presets")]
+    public List<Dictionary<string, Dictionary<string, string>>> PtzPresets { get; set; }
+        = new List<Dictionary<string, Dictionary<string, string>>>();  // PTZ 프리셋 리스트
+
+    [JsonProperty("ptz_tours")]
+    public List<Dictionary<string, List<CameraPTZTourDto>>> PtzTours { get; set; }
+        = new List<Dictionary<string, List<CameraPTZTourDto>>>();  // PTZ 투어 설정
+
+    [JsonProperty("streaming")]
+    public bool IsStreaming { get; set; }  // 스트리밍 활성화 여부
+
+    [JsonProperty("http_url")]
+    public string HttpUrl { get; set; } = string.Empty;  // HTTP URL
+
+    [JsonProperty("note")]
+    public string Note { get; set; } = string.Empty;  // 비고
+
+    [JsonProperty("osd")]
+    public CameraOSDDto OsdSettings { get; set; } = new CameraOSDDto();  // OSD 설정
+
+    [JsonProperty("ptz_type")]
+    public string PtzType { get; set; } = "NONE";  // PTZ 타입 (AUTO/NONE/PTZ/ZOOM)
+
+    [JsonProperty("purpose")]
+    public string Purpose { get; set; } = string.Empty;  // 설치 목적
+
+    [JsonProperty("shape")]
+    public string Shape { get; set; } = string.Empty;  // 외형 (BULLET/DOME/BOX/PTZ)
+
+    [JsonProperty("dewap")]  // JSON 키 오타 유지 (호환성)
+    public string Dewarp { get; set; } = string.Empty;  // 왜곡 보정
+}
+```
+
+**JSON 예제**:
+```json
+{
+  "id": "CAM-101",
+  "name": "Front Gate Camera",
+  "address": "192.168.1.101",
+  "location": "Building A - Front Gate",
+  "source": 1,
+  "channel": 1,
+  "connected": true,
+  "has_signal": true,
+  "has_ptz": true,
+  "recording": true,
+  "force_recording": false,
+  "streaming": true,
+  "http_url": "http://192.168.1.101/viewer",
+  "ptz_type": "PTZ",
+  "purpose": "Entrance Monitoring",
+  "shape": "DOME",
+  "osd": {
+    "text": "Front Gate",
+    "size": 16,
+    "color": "#FFFFFF",
+    "location": "top-left"
+  }
+}
+```
+
+#### 5.2.3 CameraSourceDto (카메라 소스 정보)
+
+**네트워크 카메라 소스 정보를 담는 DTO**입니다.
+
+**구조**:
+```csharp
+public class CameraSourceDto : BaseDto
+{
+    [JsonProperty("name", Order = 2)]
+    public string Name { get; set; } = string.Empty;  // 카메라 이름
+
+    [JsonProperty("address", Order = 3)]
+    public string Address { get; set; } = string.Empty;  // IP 주소
+
+    [JsonProperty("mac", Order = 4)]
+    public string Mac { get; set; } = string.Empty;  // MAC 주소
+
+    [JsonProperty("location", Order = 5)]
+    public string Location { get; set; } = string.Empty;  // 위치
+
+    [JsonProperty("channels", Order = 6)]
+    public List<Dictionary<string, int>> Channels { get; set; }
+        = new List<Dictionary<string, int>>();  // 채널 리스트
+}
+```
+
+**JSON 예제**:
+```json
+{
+  "name": "NVR Camera Source 1",
+  "address": "192.168.1.100",
+  "mac": "00:11:22:33:44:55",
+  "location": "Server Room",
+  "channels": [
+    { "channel_1": 1 },
+    { "channel_2": 2 },
+    { "channel_3": 3 }
+  ]
+}
+```
+
+#### 5.2.4 CameraOSDDto (OSD 설정)
+
+**카메라 화면에 표시되는 OSD (On-Screen Display) 설정 DTO**입니다.
+
+**구조**:
+```csharp
+public class CameraOSDDto
+{
+    [JsonProperty("text")]
+    public string Text { get; set; } = string.Empty;  // OSD 텍스트
+
+    [JsonProperty("size")]
+    public int Size { get; set; }  // 폰트 크기
+
+    [JsonProperty("color")]
+    public string Color { get; set; } = string.Empty;  // 폰트 색상 (예: "#FFFFFF")
+
+    [JsonProperty("location")]
+    public string Location { get; set; } = string.Empty;
+    // 위치: "top-left", "top-center", "top-right",
+    //       "bottom-left", "bottom-center", "bottom-right"
+
+    [JsonProperty("date_format")]
+    public string DataFormat { get; set; } = string.Empty;  // 날짜 형식
+
+    [JsonProperty("time_format")]
+    public string TimeFormat { get; set; } = string.Empty;  // 시간 형식
+}
+```
+
+**JSON 예제**:
+```json
+{
+  "text": "Main Entrance",
+  "size": 16,
+  "color": "#FFFFFF",
+  "location": "top-left",
+  "date_format": "YYYY-MM-DD",
+  "time_format": "HH:mm:ss"
+}
+```
+
+#### 5.2.5 CameraPTZTourDto (PTZ 투어 설정)
+
+**PTZ 자동 투어 설정을 담는 DTO**입니다.
+
+**구조**:
+```csharp
+public class CameraPTZTourDto
+{
+    [JsonProperty("preset")]
+    public int Preset { get; set; }  // 프리셋 번호
+
+    [JsonProperty("duration")]
+    public int Duration { get; set; }  // 지속 시간 (초)
+
+    [JsonProperty("speed")]
+    public int Speed { get; set; }  // 이동 속도
+}
+```
+
+**JSON 예제**:
+```json
+{
+  "preset": 1,
+  "duration": 10,
+  "speed": 50
+}
+```
+
+**PTZ 투어 시퀀스 예제**:
+```json
+{
+  "tour_1": [
+    { "preset": 1, "duration": 10, "speed": 50 },
+    { "preset": 2, "duration": 15, "speed": 30 },
+    { "preset": 3, "duration": 10, "speed": 50 }
+  ]
+}
+```
+
+#### 5.2.6 사용 예제
+
+**Emstone NVR 카메라 정보 조회**:
+```csharp
+using Ironwall.Dotnet.Libraries.Messages.Dto.NVR_emstone.Camera;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
+
+public async Task<CameraDto> GetCameraInfoAsync(string cameraId)
+{
+    var httpClient = new HttpClient();
+    var response = await httpClient.GetAsync($"http://nvr.server.com/api/cameras/{cameraId}");
+
+    var apiResponse = await response.ToApiResponseAsync<CameraDto>();
+
+    if (apiResponse.Success && apiResponse.Data != null)
+    {
+        var camera = apiResponse.Data;
+        Console.WriteLine($"Camera: {camera.Name}");
+        Console.WriteLine($"Connected: {camera.IsConnected}");
+        Console.WriteLine($"Has PTZ: {camera.HasPtz}");
+        Console.WriteLine($"Recording: {camera.IsRecording}");
+
+        return camera;
+    }
+
+    return null;
+}
+```
+
+**PTZ 투어 설정**:
+```csharp
+var tour = new List<CameraPTZTourDto>
+{
+    new CameraPTZTourDto { Preset = 1, Duration = 10, Speed = 50 },
+    new CameraPTZTourDto { Preset = 2, Duration = 15, Speed = 30 },
+    new CameraPTZTourDto { Preset = 3, Duration = 10, Speed = 50 }
+};
+
+var camera = new CameraDto
+{
+    Id = "CAM-101",
+    Name = "Main Camera",
+    HasPtz = true,
+    PtzTours = new List<Dictionary<string, List<CameraPTZTourDto>>>
+    {
+        new Dictionary<string, List<CameraPTZTourDto>>
+        {
+            { "patrol_tour", tour }
+        }
+    }
+};
+```
+
+---
+
+## 6. 업데이트 정보
+
+### v1.1.0 (2025-01-18)
+
+#### 새로운 기능
+
+1. **DetectionExEventDto 확장 이벤트 (신규)**
+   - ✅ `DetectionExEventDto`: NATS 메시지 브로커 전송 최적화 구조
+   - ✅ `EventUrlsDto`: RTSP URL (실시간/녹화) 정보 포함
+   - ✅ `DetectionExEventDtoHelper`: 확장 이벤트 생성 Helper
+     - `ToDetectionExEvent()`: DetectionEventDto → DetectionExEventDto 변환
+     - `CreateEventUrls()`: EventUrlsDto 생성
+     - `ToBrokerRequest()`: DetectionExEventDto → BrokerRequest 변환
+
+2. **외부 시스템 통합 DTO (신규)**
+   - ✅ **Camera_SPG**: SPG 카메라 PTZ 제어 DTO
+     - `PTZDTO`: Pan, Tilt, Zoom 제어 명령
+   - ✅ **NVR_emstone**: Emstone NVR 시스템 통합 DTO
+     - `CameraDto`: 전체 카메라 정보 (20+ 속성)
+     - `CameraSourceDto`: 네트워크 카메라 소스 정보
+     - `CameraOSDDto`: OSD (화면 표시) 설정
+     - `CameraPTZTourDto`: PTZ 자동 투어 설정
+
+#### 문서 업데이트
+
+- ✅ Section 3.3: DetectionExEventDto 사용법 및 예제 추가
+- ✅ Section 5: 외부 시스템 통합 DTO 문서화
+- ✅ 프로젝트 구조 업데이트 (Camera_SPG, NVR_emstone 폴더 추가)
+
+#### 테스트
+
+- ✅ DetectionExEventDtoHelper 단위 테스트 7개 추가
+  - `ToDetectionExEvent_WithAllParameters_ShouldCreateCorrectly`
+  - `ToDetectionExEvent_WithMinimalParameters_ShouldCreateWithEmptyUrls`
+  - `CreateEventUrls_WithBothUrls_ShouldCreateCorrectly`
+  - `CreateEventUrls_WithNullUrls_ShouldCreateWithEmptyStrings`
+  - `ToBrokerRequest_ShouldCreateValidRequest`
+  - `ToBrokerRequest_WithCustomCommand_ShouldUseCustomCommand`
+  - `Integration_FullWorkflow_ShouldWorkCorrectly`
+- ✅ 전체 테스트: 36/36 통과
+
+---
 
 ### v1.0.0 (2025-11-12)
 
@@ -812,15 +1447,6 @@ var malfunctionEvent = new MalfunctionEventDto
 - ❌ **Deprecated**: `EventCallRequestMessage` 등 Concrete 메시지 클래스
 - ✅ **New**: Helper 패턴으로 DTO만으로 메시지 생성
 - ✅ **Unified**: API와 Broker에 동일한 Helper 패턴 적용
-
----
-
-## 참조 문서
-
-- **GOP RESTful API 연동 설계서**: `Docs/GOP_Restful_Api_연동설계.md`
-- **Messages 라이브러리 아키텍처 분석**: `Docs/Messages_라이브러리_아키텍처_분석.md`
-- **Ironwall.Dotnet.Libraries.Events.Api**: API 사용 예제 참조
-- **Ironwall.Dotnet.Libraries.Nats**: NATS 통합 예제 참조
 
 ---
 

@@ -874,3 +874,110 @@ Events.Ui → Events.Api → GOP RESTful API → MariaDB
 - Does not block Events.Ui migration completion
 
 ---
+
+## 🔧 Critical Fix: Server-Side Date Filtering Implementation
+
+**Date**: 2025-11-24
+**Commit**: [Pending]
+**Context**: User explicitly stated that GOP API date filtering is REQUIRED
+
+### Problem
+Initial `EventProviderService` implementation was fetching ALL events without date parameters and performing client-side filtering:
+
+```csharp
+// ❌ INCORRECT (original implementation)
+var events = await _providerService.FetchDetectionEventsAsync(cancellationToken);
+var filtered = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+```
+
+**Performance Impact**:
+- Fetching all events from GOP API (potentially thousands)
+- Network bandwidth waste
+- Slow query times
+- Client-side memory overhead
+
+### User Feedback
+User stated:
+> "EventProviderService에서 Fetch이벤트에서는 기간정보는 항상 필수적이다"
+> "최소한 start_date, end_date를 파라미터로 받아야된다"
+
+Translation: Date parameters are ALWAYS essential in EventProviderService Fetch methods.
+
+### Solution Implemented
+
+**1. Updated EventProviderService** (4 methods modified):
+```csharp
+// ✅ CORRECT (fixed implementation)
+public async Task<List<IDetectionEventModel>> FetchDetectionEventsAsync(
+    DateTime startDate,        // ← NEW: Required parameter
+    DateTime endDate,          // ← NEW: Required parameter
+    CancellationToken token = default)
+{
+    var response = await _apiService.GetDetectionEventsAsync(
+        startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+        endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+        page: currentPage,
+        limit: pageSize,
+        token: token);
+    // ...
+}
+```
+
+Applied to:
+- `FetchDetectionEventsAsync(DateTime, DateTime, CancellationToken)`
+- `FetchMalfunctionEventsAsync(DateTime, DateTime, CancellationToken)`
+- `FetchConnectionEventsAsync(DateTime, DateTime, CancellationToken)`
+- `FetchActionEventsAsync(DateTime, DateTime, CancellationToken)`
+
+**2. Updated Panel ViewModels** (4 files modified):
+- [DetectionEventPanelViewModel.cs:273](Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Panels/DetectionEventPanelViewModel.cs#L273)
+- [MalfunctionEventPanelViewModel.cs:275](Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Panels/MalfunctionEventPanelViewModel.cs#L275)
+- [ConnectionEventPanelViewModel.cs:264](Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Panels/ConnectionEventPanelViewModel.cs#L264)
+- [ActionEventPanelViewModel.cs:254](Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Panels/ActionEventPanelViewModel.cs#L254)
+
+Changed from:
+```csharp
+// OLD: Client-side filtering
+var events = await _providerService.FetchDetectionEventsAsync(token);
+var filtered = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+```
+
+To:
+```csharp
+// NEW: Server-side filtering
+var filtered = await _providerService.FetchDetectionEventsAsync(StartDate, EndDate, token);
+```
+
+**3. Updated Other ViewModels**:
+- [DataChartPanelViewModel.cs:111-114](Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Panels/DataChartPanelViewModel.cs#L111-L114)
+- [EventInfoViewModel.cs:178-181](Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Components/EventInfoViewModel.cs#L178-L181) (uses default 7-day range)
+
+**4. Updated Unit Tests** (8 tests fixed):
+All `EventProviderService` unit tests now pass date parameters:
+```csharp
+var startDate = DateTime.Now.AddDays(-1);
+var endDate = DateTime.Now;
+var result = await service.FetchDetectionEventsAsync(startDate, endDate);
+```
+
+### Build Status
+✅ **SUCCESS**: 0 errors, 148 warnings (non-critical)
+
+### Performance Benefits
+- **Network**: Only fetches events within date range from GOP API
+- **Memory**: Reduced client-side memory usage
+- **Speed**: Faster queries with server-side filtering
+- **Scalability**: Handles large event datasets efficiently
+
+### API Compatibility
+GOP API already supports date filtering via query parameters:
+- `start_date` (string, ISO 8601 format)
+- `end_date` (string, ISO 8601 format)
+
+All event endpoints support these parameters:
+- `/api/v1/event/detection`
+- `/api/v1/event/malfunction`
+- `/api/v1/event/connection`
+- `/api/v1/event/action`
+
+---

@@ -57,17 +57,43 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
        IEnumerable<IControllerDeviceModel> controllers,
        IEnumerable<IConnectionEventModel> allEvents)
         {
+            // 디버깅: 전체 Connection 이벤트 카운트
+            var totalCount = allEvents.Count();
+            Console.WriteLine($"[DataHelper.GetConnectionCountsByController] Total events: {totalCount}");
+            Console.WriteLine($"[DataHelper.GetConnectionCountsByController] Date range: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}");
+
+            // 날짜 범위 필터링
             var evInRange = allEvents
+                .Where(ev => ev.DateTime >= startDate && ev.DateTime < endDate)
+                .ToList();
+
+            Console.WriteLine($"[DataHelper.GetConnectionCountsByController] Events in date range: {evInRange.Count}");
+
+            // Device 유효성 체크
+            foreach (var ev in evInRange)
+            {
+                var sensor = ev.Device as ISensorDeviceModel;
+                Console.WriteLine($"[ConnectionEvent] ID={ev.Id}, DateTime={ev.DateTime:yyyy-MM-dd HH:mm:ss}, " +
+                                  $"Device={sensor?.Id}, Controller={(sensor?.Controller != null ? sensor.Controller.DeviceNumber.ToString() : "null")}");
+            }
+
+            // Device + Controller 필터링
+            var evWithController = evInRange
                 .Where(ev =>
-                    ev.DateTime >= startDate &&
-                    ev.DateTime < endDate &&
                     ev.Device is ISensorDeviceModel sensor &&
-                    sensor.Controller != null);
+                    sensor.Controller != null)
+                .ToList();
+
+            Console.WriteLine($"[DataHelper.GetConnectionCountsByController] Events with Controller: {evWithController.Count}");
 
             return controllers
                 .OrderBy(c => c.DeviceNumber)
-                .Select(c => (double)evInRange.Count(ev =>
-                    ((ISensorDeviceModel)ev.Device!).Controller!.DeviceNumber == c.DeviceNumber))
+                .Select(c => {
+                    var count = evWithController.Count(ev =>
+                        ((ISensorDeviceModel)ev.Device!).Controller!.DeviceNumber == c.DeviceNumber);
+                    Console.WriteLine($"[Controller {c.DeviceNumber}] Count: {count}");
+                    return (double)count;
+                })
                 .ToList();
         }
 

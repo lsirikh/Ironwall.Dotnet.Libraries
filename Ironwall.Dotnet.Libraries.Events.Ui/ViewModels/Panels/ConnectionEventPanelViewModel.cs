@@ -260,12 +260,9 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
             {
                 IsVisible = false;
 
-                //API Fetching
-                var events = await _providerService.FetchConnectionEventsAsync(cancellationToken);
-                if (events == null) return;
-
-                // Client-side date filtering (GOP API doesn't support date range)
-                var filteredEvents = events.Where(e => e.DateTime >= StartDate && e.DateTime <= EndDate).ToList();
+                //API Fetching with server-side date filtering
+                var filteredEvents = await _providerService.FetchConnectionEventsAsync(StartDate, EndDate, cancellationToken);
+                if (filteredEvents == null) return;
 
                 _eventProvider.Clear();
                 foreach (var item in filteredEvents)

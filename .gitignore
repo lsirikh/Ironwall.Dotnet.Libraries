@@ -342,6 +342,26 @@ ASALocalRun/
 /.claude
 setup-*
 
+# Prds
+Prds/
+prds/
+Prd/
+prd/
+*prd.md
+prd*.md
+plan.md
+claude.md
+.claude/
+.claude/*
+.Claude/
+
+
+# docs
+Docs/
+docs/
+Doc/
+doc/
+
 # BeatPulse healthcheck temp database
 healthchecksdb
 /Dotnet.Streaming.UI/Exts/cudnn64_9.dll

@@ -1,4 +1,5 @@
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Ironwall.Dotnet.Libraries.Messages.Helpsers;
 using Newtonsoft.Json;
 
@@ -7,7 +8,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 /// <summary>
 /// 조치 이벤트 DTO
 /// </summary>
-public class ActionEventDto
+public class ActionEventDto: BaseDto
 {
     /// <summary>
     /// 데이터베이스 ID (자동 생성)
@@ -40,16 +41,4 @@ public class ActionEventDto
     [JsonProperty("from_event", Order = 5)]
     [JsonConverter(typeof(FromEventConverter))]
     public IEventDto? FromEvent { get; set; }
-
-    /// <summary>
-    /// 생성일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("created_at", Order = 6)]
-    public string? CreatedAt { get; set; }
-
-    /// <summary>
-    /// 수정일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("updated_at", Order = 7)]
-    public string? UpdatedAt { get; set; }
 }

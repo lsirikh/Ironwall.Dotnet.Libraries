@@ -37,7 +37,7 @@ public class EventApiServiceTests
         // GOP API 서버 설정 (실제 테스트 시 GOP 서버 URL로 변경 필요)
         _setupModel = new ApiSetupModel
         {
-            Url = "http://localhost:8000/api/",  // GOP API 서버 주소
+            Url = "http://localhost:8000/api",  // GOP API 서버 주소
             Username = "admin",
             Password = "admin123",
             ApiKey = "",
@@ -567,7 +567,7 @@ public class EventApiServiceTests
         var dto = new ConnectionEventDto
         {
             Controller = 1,
-            Sensor = 1,
+            Sensor = 3,
             GroupEvent = "1",
             TypeEvent = "Connection",
             TypeDevice = "Fence",
@@ -747,7 +747,7 @@ public class EventApiServiceTests
             TypeEvent = "Action",
             Content = "Test action content",  // Required by GOP API
             User = "admin1",  // Required by GOP API
-            FromEvent = 1,  // Required by GOP API
+            FromEvent = 2,  // Required by GOP API
             FromEventType = "Intrusion",  // Required by GOP API (must be 'Intrusion', 'Fault')
         };
 

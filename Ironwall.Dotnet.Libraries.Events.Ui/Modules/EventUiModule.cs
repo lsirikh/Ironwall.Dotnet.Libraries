@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Events.Api.Modules;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Modules;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
@@ -43,6 +44,14 @@ public class EventUiModule : Module
             //builder.RegisterModule(new EventDbModule(_dbSetup, _log, _count++)); // 2
             builder.RegisterModule(new EventApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
 
+            // EventProviderService: DeviceProvider 및 EventProvider 의존성 추가
+            builder.Register(c => new EventProviderService(
+                c.Resolve<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventApiService>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Events.Providers.EventProvider>()
+            )).SingleInstance();
+            
             builder.RegisterType<EventDashboardViewModel>().SingleInstance();
             builder.RegisterType<EventTabControlViewModel>().SingleInstance();
             builder.RegisterType<DetectionEventPanelViewModel>().SingleInstance();

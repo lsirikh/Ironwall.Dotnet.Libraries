@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.RtspPopups;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Xunit;
+using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Tests;
 
@@ -698,4 +699,416 @@ public class MessageIntegrationTests
         var parsed = DateTime.TryParse(request.Timestamp, out var timestamp);
         Assert.True(parsed);
     }
+}
+
+
+public class DetectionExEventDtoTests
+{
+    #region - EventUrlsDto 테스트 -
+
+    [Fact]
+    [Trait("Category", "DTO")]
+    public void EventUrlsDto_Serialization_ShouldWorkCorrectly()
+    {
+        // Arrange
+        var urlsDto = new EventUrlsDto
+        {
+            Live = "rtsp://192.168.1.100:554/live",
+            Record = "rtsp://192.168.1.100:554/playback?start=20250118T100000&end=20250118T101000"
+        };
+
+        // Act
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(urlsDto);
+
+        // Assert
+        Assert.NotNull(json);
+        Assert.Contains("\"live\":\"rtsp://192.168.1.100:554/live\"", json);
+        Assert.Contains("\"record\":\"rtsp://192.168.1.100:554/playback", json);
+    }
+
+    [Fact]
+    [Trait("Category", "DTO")]
+    public void EventUrlsDto_Deserialization_ShouldWorkCorrectly()
+    {
+        // Arrange
+        var json = @"{
+            ""live"": ""rtsp://192.168.1.101:554/live/camera1"",
+            ""record"": ""rtsp://192.168.1.101:554/record/camera1""
+        }";
+
+        // Act
+        var urlsDto = Newtonsoft.Json.JsonConvert.DeserializeObject<EventUrlsDto>(json);
+
+        // Assert
+        Assert.NotNull(urlsDto);
+        Assert.Equal("rtsp://192.168.1.101:554/live/camera1", urlsDto.Live);
+        Assert.Equal("rtsp://192.168.1.101:554/record/camera1", urlsDto.Record);
+    }
+
+    #endregion
+
+    #region - DetectionExEventDto 테스트 -
+
+    [Fact]
+    [Trait("Category", "DTO")]
+    public void DetectionExEventDto_Deserialization_ShouldWorkCorrectly()
+    {
+        // Arrange
+        var json = @"{
+            ""name_event"": ""침입탐지-카메라연동"",
+            ""category_event"": ""DETECT_SENSOR_WITH_CAMERA"",
+            ""origin_event"": {
+                ""id"": 1001,
+                ""group_event"": ""group_test"",
+                ""type_event"": ""Intrusion"",
+                ""controller"": 1,
+                ""sensor"": 5,
+                ""type_device"": ""Multi"",
+                ""sequence"": 123,
+                ""action_reported"": ""False"",
+                ""result"": ""PIR_SENSOR""
+            },
+            ""urls"": {
+                ""live"": ""rtsp://192.168.1.100:554/live"",
+                ""record"": ""rtsp://192.168.1.100:554/playback?start=20250118T100000""
+            }
+        }";
+
+        // Act
+        var detectionExDto = Newtonsoft.Json.JsonConvert.DeserializeObject<DetectionExEventDto>(json);
+
+        // Assert
+        Assert.NotNull(detectionExDto);
+        Assert.Equal("침입탐지-카메라연동", detectionExDto.NameEvent);
+        Assert.Equal("DETECT_SENSOR_WITH_CAMERA", detectionExDto.CategoryEvent);
+
+        Assert.NotNull(detectionExDto.OriginEvent);
+        Assert.Equal(1001, detectionExDto.OriginEvent.Id);
+        Assert.Equal("Intrusion", detectionExDto.OriginEvent.TypeEvent);
+        Assert.Equal(1, detectionExDto.OriginEvent.Controller);
+        Assert.Equal(5, detectionExDto.OriginEvent.Sensor);
+        Assert.Equal("Multi", detectionExDto.OriginEvent.TypeDevice);
+        Assert.Equal(123, detectionExDto.OriginEvent.Sequence);
+        Assert.Equal("PIR_SENSOR", detectionExDto.OriginEvent.Result);
+
+        Assert.NotNull(detectionExDto.Urls);
+        Assert.Equal("rtsp://192.168.1.100:554/live", detectionExDto.Urls.Live);
+        Assert.Contains("rtsp://192.168.1.100:554/playback", detectionExDto.Urls.Record);
+    }
+
+    [Fact]
+    [Trait("Category", "DTO")]
+    public void DetectionExEventDto_Serialization_ShouldWorkCorrectly()
+    {
+        // Arrange
+        var detectionExDto = new DetectionExEventDto
+        {
+            NameEvent = "테스트이벤트",
+            CategoryEvent = "DETECT_SENSOR_WITH_CAMERA",
+            OriginEvent = new DetectionEventDto
+            {
+                Id = 2001,
+                GroupEvent = "group_001",
+                TypeEvent = "Intrusion",
+                Controller = 2,
+                Sensor = 10,
+                TypeDevice = "Fence",
+                Sequence = 456,
+                ActionReported = "True",
+                Result = "THERMAL_SENSOR"
+            },
+            Urls = new EventUrlsDto
+            {
+                Live = "rtsp://192.168.1.200:554/live/cam2",
+                Record = "rtsp://192.168.1.200:554/record/cam2"
+            }
+        };
+
+        // Act
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(detectionExDto, Newtonsoft.Json.Formatting.Indented);
+
+        // Assert
+        Assert.NotNull(json);
+        Assert.Contains("\"name_event\":", json);
+        Assert.Contains("\"테스트이벤트\"", json);
+        Assert.Contains("\"category_event\":", json);
+        Assert.Contains("\"DETECT_SENSOR_WITH_CAMERA\"", json);
+        Assert.Contains("\"origin_event\":", json);
+        Assert.Contains("\"controller\": 2", json);
+        Assert.Contains("\"type_device\": \"Fence\"", json);
+        Assert.Contains("\"sequence\": 456", json);
+        Assert.Contains("\"urls\":", json);
+        Assert.Contains("\"live\":", json);
+        Assert.Contains("\"record\":", json);
+    }
+
+    [Fact]
+    [Trait("Category", "DTO")]
+    public void DetectionExEventDto_DefaultValues_ShouldBeCorrect()
+    {
+        // Arrange & Act
+        var detectionExDto = new DetectionExEventDto();
+
+        // Assert
+        Assert.NotNull(detectionExDto);
+        Assert.Equal(string.Empty, detectionExDto.NameEvent);
+        Assert.Equal(string.Empty, detectionExDto.CategoryEvent);
+        Assert.NotNull(detectionExDto.OriginEvent);
+        Assert.NotNull(detectionExDto.Urls);
+        Assert.Equal(string.Empty, detectionExDto.Urls.Live);
+        Assert.Equal(string.Empty, detectionExDto.Urls.Record);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public void DetectionExEventDto_FullNatsMessage_ShouldWorkCorrectly()
+    {
+        // Arrange - 완전한 NATS 메시지 Body 시뮬레이션
+        var detectionExDto = new DetectionExEventDto
+        {
+            NameEvent = "침입탐지-001",
+            CategoryEvent = "DETECT_SENSOR_WITH_CAMERA",
+            OriginEvent = new DetectionEventDto
+            {
+                Id = 3001,
+                GroupEvent = "security_zone_1",
+                TypeEvent = "Intrusion",
+                Controller = 3,
+                Sensor = 15,
+                TypeDevice = "Underground",
+                Sequence = 789,
+                ActionReported = "False",
+                Result = "VIBRATION_SENSOR"
+            },
+            Urls = new EventUrlsDto
+            {
+                Live = "rtsp://192.168.1.150:554/live/zone1",
+                Record = "rtsp://192.168.1.150:554/playback?start=20250118T143000&end=20250118T144000"
+            }
+        };
+
+        // Act - 직렬화 및 역직렬화 (왕복 테스트)
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(detectionExDto);
+        var deserializedDto = Newtonsoft.Json.JsonConvert.DeserializeObject<DetectionExEventDto>(json);
+
+        // Assert - 모든 데이터가 보존되는지 확인
+        Assert.NotNull(deserializedDto);
+        Assert.Equal(detectionExDto.NameEvent, deserializedDto.NameEvent);
+        Assert.Equal(detectionExDto.CategoryEvent, deserializedDto.CategoryEvent);
+
+        Assert.Equal(detectionExDto.OriginEvent.Id, deserializedDto.OriginEvent.Id);
+        Assert.Equal(detectionExDto.OriginEvent.Controller, deserializedDto.OriginEvent.Controller);
+        Assert.Equal(detectionExDto.OriginEvent.Sensor, deserializedDto.OriginEvent.Sensor);
+        Assert.Equal(detectionExDto.OriginEvent.TypeDevice, deserializedDto.OriginEvent.TypeDevice);
+        Assert.Equal(detectionExDto.OriginEvent.Sequence, deserializedDto.OriginEvent.Sequence);
+        Assert.Equal(detectionExDto.OriginEvent.Result, deserializedDto.OriginEvent.Result);
+
+        Assert.Equal(detectionExDto.Urls.Live, deserializedDto.Urls.Live);
+        Assert.Equal(detectionExDto.Urls.Record, deserializedDto.Urls.Record);
+    }
+
+    #endregion
+}
+
+
+public class DetectionExEventDtoHelperTests
+{
+    #region - Test Data -
+
+    private DetectionEventDto CreateSampleDetectionEvent()
+    {
+        return new DetectionEventDto
+        {
+            Id = 1001,
+            GroupEvent = "group_test",
+            TypeEvent = "Intrusion",
+            Controller = 1,
+            Sensor = 5,
+            TypeDevice = "Multi",
+            Sequence = 123,
+            ActionReported = "False",
+            Result = "PIR_SENSOR"
+        };
+    }
+
+    #endregion
+
+    #region - ToDetectionExEvent 테스트 -
+
+    [Fact]
+    [Trait("Category", "Helper")]
+    public void ToDetectionExEvent_WithAllParameters_ShouldCreateCorrectly()
+    {
+        // Arrange
+        var origin = CreateSampleDetectionEvent();
+        var eventName = "침입탐지-카메라연동";
+        var category = "DETECT_SENSOR_WITH_CAMERA";
+        var liveUrl = "rtsp://192.168.1.100:554/live";
+        var recordUrl = "rtsp://192.168.1.100:554/playback?start=20250118T100000";
+
+        // Act
+        var result = origin.ToDetectionExEvent(eventName, category, liveUrl, recordUrl);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(eventName, result.NameEvent);
+        Assert.Equal(category, result.CategoryEvent);
+        Assert.Equal(origin, result.OriginEvent);
+        Assert.Equal(liveUrl, result.Urls.Live);
+        Assert.Equal(recordUrl, result.Urls.Record);
+    }
+
+    [Fact]
+    [Trait("Category", "Helper")]
+    public void ToDetectionExEvent_WithMinimalParameters_ShouldCreateWithEmptyUrls()
+    {
+        // Arrange
+        var origin = CreateSampleDetectionEvent();
+
+        // Act
+        var result = origin.ToDetectionExEvent("테스트이벤트", "DETECT_SENSOR");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("테스트이벤트", result.NameEvent);
+        Assert.Equal("DETECT_SENSOR", result.CategoryEvent);
+        Assert.Equal(origin, result.OriginEvent);
+        Assert.Equal(string.Empty, result.Urls.Live);
+        Assert.Equal(string.Empty, result.Urls.Record);
+    }
+
+    #endregion
+
+    #region - CreateEventUrls 테스트 -
+
+    [Fact]
+    [Trait("Category", "Helper")]
+    public void CreateEventUrls_WithBothUrls_ShouldCreateCorrectly()
+    {
+        // Arrange
+        var liveUrl = "rtsp://192.168.1.101:554/live/cam1";
+        var recordUrl = "rtsp://192.168.1.101:554/record/cam1";
+
+        // Act
+        var result = DetectionExEventDtoHelper.CreateEventUrls(liveUrl, recordUrl);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(liveUrl, result.Live);
+        Assert.Equal(recordUrl, result.Record);
+    }
+
+    [Fact]
+    [Trait("Category", "Helper")]
+    public void CreateEventUrls_WithNullUrls_ShouldCreateWithEmptyStrings()
+    {
+        // Act
+        var result = DetectionExEventDtoHelper.CreateEventUrls();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(string.Empty, result.Live);
+        Assert.Equal(string.Empty, result.Record);
+    }
+
+    #endregion
+
+    #region - ToBrokerRequest 테스트 -
+
+    [Fact]
+    [Trait("Category", "Helper")]
+    public void ToBrokerRequest_ShouldCreateValidRequest()
+    {
+        // Arrange
+        var origin = CreateSampleDetectionEvent();
+        var detectionEx = origin.ToDetectionExEvent(
+            "침입탐지-001",
+            "DETECT_SENSOR_WITH_CAMERA",
+            "rtsp://192.168.1.100:554/live",
+            "rtsp://192.168.1.100:554/record"
+        );
+
+        // Act
+        var result = detectionEx.ToBrokerRequest("monitoring-service", "DETECTION_EX_EVENT");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("REQ", result.TypeMessage);
+        Assert.Equal("DETECTION_EX_EVENT", result.Command);
+        Assert.Equal("monitoring-service", result.From);
+        Assert.NotNull(result.Id);
+        Assert.NotNull(result.Data);
+        Assert.Equal(detectionEx, result.Data);
+        Assert.NotNull(result.Timestamp);
+    }
+
+    [Fact]
+    [Trait("Category", "Helper")]
+    public void ToBrokerRequest_WithCustomCommand_ShouldUseCustomCommand()
+    {
+        // Arrange
+        var origin = CreateSampleDetectionEvent();
+        var detectionEx = origin.ToDetectionExEvent("테스트", "DETECT");
+
+        // Act
+        var result = detectionEx.ToBrokerRequest("test-service", "CUSTOM_DETECTION");
+
+        // Assert
+        Assert.Equal("CUSTOM_DETECTION", result.Command);
+    }
+
+    #endregion
+
+    #region - Integration 테스트 -
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public void Integration_FullWorkflow_ShouldWorkCorrectly()
+    {
+        // Arrange - DetectionEventDto 생성
+        var origin = new DetectionEventDto
+        {
+            Id = 2001,
+            GroupEvent = "security_zone_1",
+            TypeEvent = "Intrusion",
+            Controller = 3,
+            Sensor = 15,
+            TypeDevice = "Underground",
+            Sequence = 789,
+            ActionReported = "False",
+            Result = "VIBRATION_SENSOR"
+        };
+
+        // Act - DetectionExEventDto 변환
+        var detectionEx = origin.ToDetectionExEvent(
+            eventName: "침입탐지-지하감지",
+            category: "DETECT_SENSOR_WITH_CAMERA",
+            liveUrl: "rtsp://192.168.1.150:554/live/zone1",
+            recordUrl: "rtsp://192.168.1.150:554/playback?start=20250118T143000&end=20250118T144000"
+        );
+
+        // Act - BrokerRequest 변환
+        var brokerRequest = detectionEx.ToBrokerRequest("gop-service", "DETECTION_ALERT");
+
+        // Act - JSON 직렬화
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(brokerRequest);
+
+        // Act - JSON 역직렬화
+        var deserializedRequest = Newtonsoft.Json.JsonConvert.DeserializeObject<BrokerRequest<DetectionExEventDto>>(json);
+
+        // Assert - 전체 워크플로우 검증
+        Assert.NotNull(deserializedRequest);
+        Assert.Equal("DETECTION_ALERT", deserializedRequest.Command);
+        Assert.Equal("gop-service", deserializedRequest.From);
+
+        var data = deserializedRequest.Data;
+        Assert.NotNull(data);
+        Assert.Equal("침입탐지-지하감지", data.NameEvent);
+        Assert.Equal("DETECT_SENSOR_WITH_CAMERA", data.CategoryEvent);
+        Assert.Equal(2001, data.OriginEvent.Id);
+        Assert.Equal("VIBRATION_SENSOR", data.OriginEvent.Result);
+        Assert.Equal("rtsp://192.168.1.150:554/live/zone1", data.Urls.Live);
+    }
+
+    #endregion
 }

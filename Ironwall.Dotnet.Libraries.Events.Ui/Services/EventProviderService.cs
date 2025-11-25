@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Monitoring.Models.Events;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 
@@ -15,19 +16,29 @@ public class EventProviderService
 {
     private readonly ILogService? _log;
     private readonly IEventApiService _apiService;
+    private readonly DeviceProvider? _deviceProvider;
+    private readonly Ironwall.Dotnet.Libraries.Events.Providers.EventProvider? _eventProvider;
 
-    public EventProviderService(
-        ILogService? logService,
-        IEventApiService apiService)
+    public EventProviderService(ILogService? logService,
+                                IEventApiService apiService,
+                                DeviceProvider? deviceProvider = null,
+                                Ironwall.Dotnet.Libraries.Events.Providers.EventProvider? eventProvider = null)
     {
         _log = logService;
         _apiService = apiService;
+        _deviceProvider = deviceProvider;
+        _eventProvider = eventProvider;
     }
 
     /// <summary>
     /// GOP API를 통해 Detection Event 목록을 조회하고 Model로 변환합니다.
     /// </summary>
+    /// <param name="startDate">시작 날짜 (필수)</param>
+    /// <param name="endDate">종료 날짜 (필수)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
     public async Task<List<IDetectionEventModel>> FetchDetectionEventsAsync(
+        DateTime startDate,
+        DateTime endDate,
         CancellationToken token = default)
     {
         var allEvents = new List<IDetectionEventModel>();
@@ -36,11 +47,13 @@ public class EventProviderService
 
         try
         {
-            _log?.Info("FetchDetectionEventsAsync() started");
+            _log?.Info($"FetchDetectionEventsAsync() started: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}");
 
             while (true)
             {
                 var response = await _apiService.GetDetectionEventsAsync(
+                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -52,9 +65,9 @@ public class EventProviderService
                     break;
                 }
 
-                // DTO → Model 변환 using DtoToModelHelper
+                // DTO → Model 변환 using DtoToModelHelper (DeviceProvider 전달)
                 var models = response.Data
-                    .Select(dto => dto.ToDetectionEventModel())
+                    .Select(dto => dto.ToDetectionEventModel(_deviceProvider))
                     .ToList();
 
                 allEvents.AddRange(models);
@@ -82,7 +95,12 @@ public class EventProviderService
     /// <summary>
     /// GOP API를 통해 Malfunction Event 목록을 조회하고 Model로 변환합니다.
     /// </summary>
+    /// <param name="startDate">시작 날짜 (필수)</param>
+    /// <param name="endDate">종료 날짜 (필수)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
     public async Task<List<IMalfunctionEventModel>> FetchMalfunctionEventsAsync(
+        DateTime startDate,
+        DateTime endDate,
         CancellationToken token = default)
     {
         var allEvents = new List<IMalfunctionEventModel>();
@@ -91,11 +109,13 @@ public class EventProviderService
 
         try
         {
-            _log?.Info("FetchMalfunctionEventsAsync() started");
+            _log?.Info($"FetchMalfunctionEventsAsync() started: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}");
 
             while (true)
             {
                 var response = await _apiService.GetMalfunctionEventsAsync(
+                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -108,7 +128,7 @@ public class EventProviderService
                 }
 
                 var models = response.Data
-                    .Select(dto => dto.ToMalfunctionEventModel())
+                    .Select(dto => dto.ToMalfunctionEventModel(_deviceProvider))
                     .ToList();
 
                 allEvents.AddRange(models);
@@ -135,7 +155,12 @@ public class EventProviderService
     /// <summary>
     /// GOP API를 통해 Connection Event 목록을 조회하고 Model로 변환합니다.
     /// </summary>
+    /// <param name="startDate">시작 날짜 (필수)</param>
+    /// <param name="endDate">종료 날짜 (필수)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
     public async Task<List<IConnectionEventModel>> FetchConnectionEventsAsync(
+        DateTime startDate,
+        DateTime endDate,
         CancellationToken token = default)
     {
         var allEvents = new List<IConnectionEventModel>();
@@ -144,11 +169,13 @@ public class EventProviderService
 
         try
         {
-            _log?.Info("FetchConnectionEventsAsync() started");
+            _log?.Info($"FetchConnectionEventsAsync() started: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}");
 
             while (true)
             {
                 var response = await _apiService.GetConnectionEventsAsync(
+                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -161,7 +188,7 @@ public class EventProviderService
                 }
 
                 var models = response.Data
-                    .Select(dto => dto.ToConnectionEventModel())
+                    .Select(dto => dto.ToConnectionEventModel(_deviceProvider))
                     .ToList();
 
                 allEvents.AddRange(models);
@@ -188,7 +215,12 @@ public class EventProviderService
     /// <summary>
     /// GOP API를 통해 Action Event 목록을 조회하고 Model로 변환합니다.
     /// </summary>
+    /// <param name="startDate">시작 날짜 (필수)</param>
+    /// <param name="endDate">종료 날짜 (필수)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
     public async Task<List<IActionEventModel>> FetchActionEventsAsync(
+        DateTime startDate,
+        DateTime endDate,
         CancellationToken token = default)
     {
         var allEvents = new List<IActionEventModel>();
@@ -197,11 +229,13 @@ public class EventProviderService
 
         try
         {
-            _log?.Info("FetchActionEventsAsync() started");
+            _log?.Info($"FetchActionEventsAsync() started: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}");
 
             while (true)
             {
                 var response = await _apiService.GetActionEventsAsync(
+                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -214,7 +248,7 @@ public class EventProviderService
                 }
 
                 var models = response.Data
-                    .Select(dto => dto.ToActionEventModel())
+                    .Select(dto => dto.ToActionEventModel(_eventProvider, _deviceProvider))
                     .ToList();
 
                 allEvents.AddRange(models);
@@ -551,7 +585,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var createdModel = response.Data.ToActionEventModel();
+            var createdModel = response.Data.ToActionEventModel(_eventProvider, _deviceProvider);
             _log?.Info($"InsertActionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
@@ -583,7 +617,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var updatedModel = response.Data.ToActionEventModel();
+            var updatedModel = response.Data.ToActionEventModel(_eventProvider, _deviceProvider);
             _log?.Info($"UpdateActionEventAsync() completed for ID {model.Id}");
             return updatedModel;
         }
