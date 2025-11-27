@@ -25,7 +25,7 @@ public static class DtoToModelHelper
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
-            Device = new SensorDeviceModel { Id = dto.Sensor }
+            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, null)
         };
     }
 
@@ -34,6 +34,7 @@ public static class DtoToModelHelper
     /// </summary>
     public static DetectionEventDto ToDetectionEventDto(this IDetectionEventModel model)
     {
+        var (controllerId, sensorId) = ResolveDeviceIds(model.Device);
         return new DetectionEventDto
         {
             Id = model.Id,
@@ -42,7 +43,10 @@ public static class DtoToModelHelper
             GroupEvent = model.EventGroup ?? string.Empty,
             ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
             Result = model.Result.ToString(),
-            Sensor = model.Device?.Id ?? 0
+            Controller = controllerId,
+            Sensor = sensorId,
+            TypeDevice = model.Device?.DeviceType.ToString() ?? string.Empty,
+            Sequence = 0
         };
     }
 
@@ -57,13 +61,13 @@ public static class DtoToModelHelper
             DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
-            Status = dto.Status == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
+            Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Reason = Enum.Parse<EnumFaultType>(dto.Reason),
             FirstStart = dto.FirstStart,
             FirstEnd = dto.FirstEnd,
             SecondStart = dto.SecondStart,
             SecondEnd = dto.SecondEnd,
-            Device = new SensorDeviceModel { Id = dto.Sensor }
+            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, null)
         };
     }
 
@@ -72,19 +76,23 @@ public static class DtoToModelHelper
     /// </summary>
     public static MalfunctionEventDto ToMalfunctionEventDto(this IMalfunctionEventModel model)
     {
+        var (controllerId, sensorId) = ResolveDeviceIds(model.Device);
         return new MalfunctionEventDto
         {
             Id = model.Id,
             CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
             GroupEvent = model.EventGroup ?? string.Empty,
-            Status = model.Status == EnumTrueFalse.True ? "True" : "False",
+            ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
             Reason = model.Reason.ToString(),
             FirstStart = model.FirstStart,
             FirstEnd = model.FirstEnd,
             SecondStart = model.SecondStart,
             SecondEnd = model.SecondEnd,
-            Sensor = model.Device?.Id ?? 0
+            Controller = controllerId,
+            Sensor = sensorId,
+            TypeDevice = model.Device?.DeviceType.ToString() ?? string.Empty,
+            Sequence = 0
         };
     }
 
@@ -100,7 +108,7 @@ public static class DtoToModelHelper
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = EnumTrueFalse.True, // Connection events are typically status=True
-            Device = new SensorDeviceModel { Id = dto.Sensor }
+            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, null)
         };
     }
 
@@ -109,13 +117,17 @@ public static class DtoToModelHelper
     /// </summary>
     public static ConnectionEventDto ToConnectionEventDto(this IConnectionEventModel model)
     {
+        var (controllerId, sensorId) = ResolveDeviceIds(model.Device);
         return new ConnectionEventDto
         {
             Id = model.Id,
             CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
             GroupEvent = model.EventGroup ?? string.Empty,
-            Sensor = model.Device?.Id ?? 0
+            Controller = controllerId,
+            Sensor = sensorId,
+            TypeDevice = model.Device?.DeviceType.ToString() ?? string.Empty,
+            Sequence = 0
         };
     }
 
@@ -152,6 +164,79 @@ public static class DtoToModelHelper
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
+    // Device Resolution Helpers (Controller/Sensor 타입 구분)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// DTO의 Controller/Sensor 조합으로 적절한 Device 반환
+    /// <para>Controller > 0 && Sensor == 0 → ControllerDeviceModel</para>
+    /// <para>Sensor > 0 → SensorDeviceModel</para>
+    /// </summary>
+    private static IBaseDeviceModel? ResolveDeviceFromDto(
+        int controller,
+        int sensor,
+        string? typeDevice,
+        DeviceProvider? deviceProvider)
+    {
+        // Case 1: Sensor가 있으면 Sensor Device
+        if (sensor > 0)
+        {
+            if (deviceProvider != null)
+            {
+                var sensorDevice = deviceProvider
+                    .OfType<ISensorDeviceModel>()
+                    .FirstOrDefault(d => d.Id == sensor);
+                if (sensorDevice != null)
+                    return sensorDevice;
+            }
+            return new SensorDeviceModel { Id = sensor };
+        }
+
+        // Case 2: Controller만 있으면 Controller Device
+        if (controller > 0 && sensor == 0)
+        {
+            if (deviceProvider != null)
+            {
+                var controllerDevice = deviceProvider
+                    .OfType<IControllerDeviceModel>()
+                    .FirstOrDefault(d => d.Id == controller);
+                if (controllerDevice != null)
+                    return controllerDevice;
+            }
+            return new ControllerDeviceModel { Id = controller };
+        }
+
+        // Case 3: 둘 다 없음
+        return null;
+    }
+
+    /// <summary>
+    /// Device에서 Controller ID와 Sensor ID 추출
+    /// <para>SensorDeviceModel → (Controller.Id, Sensor.Id)</para>
+    /// <para>ControllerDeviceModel → (Controller.Id, 0)</para>
+    /// </summary>
+    private static (int ControllerId, int SensorId) ResolveDeviceIds(IBaseDeviceModel? device)
+    {
+        if (device == null)
+            return (0, 0);
+
+        // Case 1: SensorDeviceModel
+        if (device is ISensorDeviceModel sensorDevice)
+        {
+            return (sensorDevice.Controller?.Id ?? 0, sensorDevice.Id);
+        }
+
+        // Case 2: ControllerDeviceModel
+        if (device is IControllerDeviceModel controllerDevice)
+        {
+            return (controllerDevice.Id, 0);  // Controller만 있고 Sensor는 0
+        }
+
+        // Case 3: 기타 (CameraDevice 등)
+        return (0, device.Id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
     // DeviceProvider 통합 오버로드 (TDD로 구현)
     // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -170,37 +255,8 @@ public static class DtoToModelHelper
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
-            Device = ResolveDevice(dto.Sensor, deviceProvider)
+            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
         };
-    }
-
-    /// <summary>
-    /// Device ID를 DeviceProvider에서 조회하여 실제 Instance 반환
-    /// <para>⚠️ 중요: GOP DB에서 각 Device 타입의 ID는 독립적이므로 타입 필터링 필수</para>
-    /// <para>예: controllers.id=1, sensors.id=1, cameras.id=1 모두 존재 가능</para>
-    /// </summary>
-    /// <param name="deviceId">Device ID (DTO의 Sensor 필드)</param>
-    /// <param name="deviceProvider">Device Provider (null 가능)</param>
-    /// <returns>매칭된 Device Instance 또는 ID만 가진 빈 SensorDeviceModel</returns>
-    private static ISensorDeviceModel ResolveDevice(int deviceId, DeviceProvider? deviceProvider)
-    {
-        if (deviceId <= 0)
-            return new SensorDeviceModel { Id = 0 };
-
-        if (deviceProvider == null)
-            return new SensorDeviceModel { Id = deviceId };
-
-        // ✅ DeviceProvider에서 타입 필터링 후 ID로 조회
-        // OfType<ISensorDeviceModel>()로 Sensor만 먼저 필터링
-        var device = deviceProvider
-            .OfType<ISensorDeviceModel>()
-            .FirstOrDefault(d => d.Id == deviceId);
-
-        if (device != null)
-            return device; // 실제 Device Instance
-
-        // Fallback: Provider에 없으면 ID만 가진 객체
-        return new SensorDeviceModel { Id = deviceId };
     }
 
     /// <summary>
@@ -216,13 +272,13 @@ public static class DtoToModelHelper
             DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
-            Status = dto.Status == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
+            Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Reason = Enum.Parse<EnumFaultType>(dto.Reason),
             FirstStart = dto.FirstStart,
             FirstEnd = dto.FirstEnd,
             SecondStart = dto.SecondStart,
             SecondEnd = dto.SecondEnd,
-            Device = ResolveDevice(dto.Sensor, deviceProvider)
+            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
         };
     }
 
@@ -240,7 +296,7 @@ public static class DtoToModelHelper
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = EnumTrueFalse.True,
-            Device = ResolveDevice(dto.Sensor, deviceProvider)
+            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
         };
     }
 
@@ -315,5 +371,41 @@ public static class DtoToModelHelper
                 // ConnectionEventDto나 기타 타입은 조치보고 대상 아님
                 return null;
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // DetectionExEventDto 변환 (NATS 메시지 Body 구조)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// DetectionExEventDto → IDetectionEventModel 변환
+    /// <para>OriginEvent를 추출하여 DetectionEventModel로 변환</para>
+    /// </summary>
+    /// <param name="dto">DetectionExEventDto 인스턴스</param>
+    /// <returns>IDetectionEventModel 인스턴스</returns>
+    /// <exception cref="ArgumentNullException">OriginEvent가 null인 경우</exception>
+    public static IDetectionEventModel ToDetectionEventModel(this DetectionExEventDto dto)
+    {
+        if (dto.OriginEvent == null)
+            throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
+
+        return dto.OriginEvent.ToDetectionEventModel();
+    }
+
+    /// <summary>
+    /// DetectionExEventDto → IDetectionEventModel 변환 (DeviceProvider 활용)
+    /// </summary>
+    /// <param name="dto">DetectionExEventDto 인스턴스</param>
+    /// <param name="deviceProvider">DeviceProvider (Device 매핑용)</param>
+    /// <returns>IDetectionEventModel 인스턴스</returns>
+    /// <exception cref="ArgumentNullException">OriginEvent가 null인 경우</exception>
+    public static IDetectionEventModel ToDetectionEventModel(
+        this DetectionExEventDto dto,
+        DeviceProvider? deviceProvider)
+    {
+        if (dto.OriginEvent == null)
+            throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
+
+        return dto.OriginEvent.ToDetectionEventModel(deviceProvider);
     }
 }

@@ -637,7 +637,7 @@ public class MessageIntegrationTests
             Id = 2001,
             TypeEvent = "Fault",
             Reason = "FAULT_FENCE",
-            Status = "True"
+            ActionReported = "True"
         };
         var malfunctionRequest = malfunctionDto.ToBrokerRequest("client");
         var malfunctionJson = malfunctionRequest.ToJson();
@@ -767,10 +767,6 @@ public class DetectionExEventDtoTests
                 ""sequence"": 123,
                 ""action_reported"": ""False"",
                 ""result"": ""PIR_SENSOR""
-            },
-            ""urls"": {
-                ""live"": ""rtsp://192.168.1.100:554/live"",
-                ""record"": ""rtsp://192.168.1.100:554/playback?start=20250118T100000""
             }
         }";
 
@@ -790,10 +786,6 @@ public class DetectionExEventDtoTests
         Assert.Equal("Multi", detectionExDto.OriginEvent.TypeDevice);
         Assert.Equal(123, detectionExDto.OriginEvent.Sequence);
         Assert.Equal("PIR_SENSOR", detectionExDto.OriginEvent.Result);
-
-        Assert.NotNull(detectionExDto.Urls);
-        Assert.Equal("rtsp://192.168.1.100:554/live", detectionExDto.Urls.Live);
-        Assert.Contains("rtsp://192.168.1.100:554/playback", detectionExDto.Urls.Record);
     }
 
     [Fact]
@@ -816,11 +808,6 @@ public class DetectionExEventDtoTests
                 Sequence = 456,
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR"
-            },
-            Urls = new EventUrlsDto
-            {
-                Live = "rtsp://192.168.1.200:554/live/cam2",
-                Record = "rtsp://192.168.1.200:554/record/cam2"
             }
         };
 
@@ -837,9 +824,6 @@ public class DetectionExEventDtoTests
         Assert.Contains("\"controller\": 2", json);
         Assert.Contains("\"type_device\": \"Fence\"", json);
         Assert.Contains("\"sequence\": 456", json);
-        Assert.Contains("\"urls\":", json);
-        Assert.Contains("\"live\":", json);
-        Assert.Contains("\"record\":", json);
     }
 
     [Fact]
@@ -854,9 +838,6 @@ public class DetectionExEventDtoTests
         Assert.Equal(string.Empty, detectionExDto.NameEvent);
         Assert.Equal(string.Empty, detectionExDto.CategoryEvent);
         Assert.NotNull(detectionExDto.OriginEvent);
-        Assert.NotNull(detectionExDto.Urls);
-        Assert.Equal(string.Empty, detectionExDto.Urls.Live);
-        Assert.Equal(string.Empty, detectionExDto.Urls.Record);
     }
 
     [Fact]
@@ -879,11 +860,6 @@ public class DetectionExEventDtoTests
                 Sequence = 789,
                 ActionReported = "False",
                 Result = "VIBRATION_SENSOR"
-            },
-            Urls = new EventUrlsDto
-            {
-                Live = "rtsp://192.168.1.150:554/live/zone1",
-                Record = "rtsp://192.168.1.150:554/playback?start=20250118T143000&end=20250118T144000"
             }
         };
 
@@ -902,213 +878,149 @@ public class DetectionExEventDtoTests
         Assert.Equal(detectionExDto.OriginEvent.TypeDevice, deserializedDto.OriginEvent.TypeDevice);
         Assert.Equal(detectionExDto.OriginEvent.Sequence, deserializedDto.OriginEvent.Sequence);
         Assert.Equal(detectionExDto.OriginEvent.Result, deserializedDto.OriginEvent.Result);
-
-        Assert.Equal(detectionExDto.Urls.Live, deserializedDto.Urls.Live);
-        Assert.Equal(detectionExDto.Urls.Record, deserializedDto.Urls.Record);
     }
 
     #endregion
 }
 
-
-public class DetectionExEventDtoHelperTests
+/// <summary>
+/// BrokerMessageHelper 파싱 테스트
+/// Phase 8: Single Event Message Handling
+/// </summary>
+public class BrokerMessageParsingTests
 {
-    #region - Test Data -
-
-    private DetectionEventDto CreateSampleDetectionEvent()
+    #region - Test 8.2.1: 단일 MalfunctionEventDto 파싱 -
+    [Fact(DisplayName = "TEST-8.2.1: ParseEventsFromBrokerMessage - 단일 MalfunctionEventDto escaped string")]
+    public void ParseEventsFromBrokerMessage_WithSingleMalfunctionEvent_ShouldReturnOneItem()
     {
-        return new DetectionEventDto
-        {
-            Id = 1001,
-            GroupEvent = "group_test",
-            TypeEvent = "Intrusion",
-            Controller = 1,
-            Sensor = 5,
-            TypeDevice = "Multi",
-            Sequence = 123,
-            ActionReported = "False",
-            Result = "PIR_SENSOR"
-        };
-    }
+        // Arrange - 실제 수신된 메시지
+        var json = @"{
+            ""id"": ""6cf7e2dc-d530-4328-aeaf-1eaefbae6fbc"",
+            ""type_message"": ""REQ"",
+            ""type_command"": ""Fault"",
+            ""from"": ""proxyManager"",
+            ""data"": ""{\""id\"":0,\""group_event\"":\""1\"",\""type_event\"":\""Fault\"",\""controller\"":1,\""sensor\"":1,\""type_device\"":\""Fence\"",\""sequence\"":42,\""action_reported\"":\""False\"",\""reason\"":\""FAULT_FENCE\"",\""first_start\"":0,\""first_end\"":0,\""second_start\"":0,\""second_end\"":0,\""created_at\"":\""2025-11-27T01:45:53.019Z\"",\""updated_at\"":null}"",
+            ""timestamp"": ""2025-11-27T01:45:53.019Z""
+        }";
 
+        // Act
+        var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(0, result[0].Id);
+        Assert.Equal("1", result[0].GroupEvent);
+        Assert.Equal("FAULT_FENCE", result[0].Reason);
+        Assert.Equal(1, result[0].Controller);
+        Assert.Equal(1, result[0].Sensor);
+    }
     #endregion
 
-    #region - ToDetectionExEvent 테스트 -
-
-    [Fact]
-    [Trait("Category", "Helper")]
-    public void ToDetectionExEvent_WithAllParameters_ShouldCreateCorrectly()
+    #region - Test 8.2.2: 배열 MalfunctionEventDto 파싱 -
+    [Fact(DisplayName = "TEST-8.2.2: ParseEventsFromBrokerMessage - 배열 형태 escaped string")]
+    public void ParseEventsFromBrokerMessage_WithArrayEvents_ShouldReturnMultipleItems()
     {
         // Arrange
-        var origin = CreateSampleDetectionEvent();
-        var eventName = "침입탐지-카메라연동";
-        var category = "DETECT_SENSOR_WITH_CAMERA";
-        var liveUrl = "rtsp://192.168.1.100:554/live";
-        var recordUrl = "rtsp://192.168.1.100:554/playback?start=20250118T100000";
+        var json = @"{
+            ""id"": ""xxx"",
+            ""type_message"": ""REQ"",
+            ""type_command"": ""Fault"",
+            ""from"": ""proxyManager"",
+            ""data"": ""[{\""id\"":1,\""reason\"":\""FAULT_FENCE\""},{\""id\"":2,\""reason\"":\""FAULT_CONTROLLER\""}]"",
+            ""timestamp"": ""2025-11-27T01:45:53.019Z""
+        }";
 
         // Act
-        var result = origin.ToDetectionExEvent(eventName, category, liveUrl, recordUrl);
+        var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(eventName, result.NameEvent);
-        Assert.Equal(category, result.CategoryEvent);
-        Assert.Equal(origin, result.OriginEvent);
-        Assert.Equal(liveUrl, result.Urls.Live);
-        Assert.Equal(recordUrl, result.Urls.Record);
+        Assert.Equal(2, result.Count);
+        Assert.Equal(1, result[0].Id);
+        Assert.Equal(2, result[1].Id);
     }
-
-    [Fact]
-    [Trait("Category", "Helper")]
-    public void ToDetectionExEvent_WithMinimalParameters_ShouldCreateWithEmptyUrls()
-    {
-        // Arrange
-        var origin = CreateSampleDetectionEvent();
-
-        // Act
-        var result = origin.ToDetectionExEvent("테스트이벤트", "DETECT_SENSOR");
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("테스트이벤트", result.NameEvent);
-        Assert.Equal("DETECT_SENSOR", result.CategoryEvent);
-        Assert.Equal(origin, result.OriginEvent);
-        Assert.Equal(string.Empty, result.Urls.Live);
-        Assert.Equal(string.Empty, result.Urls.Record);
-    }
-
     #endregion
 
-    #region - CreateEventUrls 테스트 -
-
-    [Fact]
-    [Trait("Category", "Helper")]
-    public void CreateEventUrls_WithBothUrls_ShouldCreateCorrectly()
+    #region - Test 8.2.3: 직접 객체 data 파싱 -
+    [Fact(DisplayName = "TEST-8.2.3: ParseEventsFromBrokerMessage - data가 직접 객체인 경우")]
+    public void ParseEventsFromBrokerMessage_WithDirectObject_ShouldParse()
     {
-        // Arrange
-        var liveUrl = "rtsp://192.168.1.101:554/live/cam1";
-        var recordUrl = "rtsp://192.168.1.101:554/record/cam1";
+        // Arrange - data가 escaped string이 아닌 직접 객체
+        var json = @"{
+            ""id"": ""xxx"",
+            ""type_message"": ""REQ"",
+            ""type_command"": ""Fault"",
+            ""from"": ""proxyManager"",
+            ""data"": {""id"":0,""group_event"":""1"",""reason"":""FAULT_FENCE""},
+            ""timestamp"": ""2025-11-27T01:45:53.019Z""
+        }";
 
         // Act
-        var result = DetectionExEventDtoHelper.CreateEventUrls(liveUrl, recordUrl);
+        var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(liveUrl, result.Live);
-        Assert.Equal(recordUrl, result.Record);
+        Assert.Single(result);
+        Assert.Equal(0, result[0].Id);
+        Assert.Equal("FAULT_FENCE", result[0].Reason);
     }
-
-    [Fact]
-    [Trait("Category", "Helper")]
-    public void CreateEventUrls_WithNullUrls_ShouldCreateWithEmptyStrings()
-    {
-        // Act
-        var result = DetectionExEventDtoHelper.CreateEventUrls();
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(string.Empty, result.Live);
-        Assert.Equal(string.Empty, result.Record);
-    }
-
     #endregion
 
-    #region - ToBrokerRequest 테스트 -
-
-    [Fact]
-    [Trait("Category", "Helper")]
-    public void ToBrokerRequest_ShouldCreateValidRequest()
+    #region - Test 8.2.4: ParseSingleEventFromBrokerMessage -
+    [Fact(DisplayName = "TEST-8.2.4: ParseSingleEventFromBrokerMessage - 단일 객체 파싱")]
+    public void ParseSingleEventFromBrokerMessage_WithValidMessage_ShouldReturnDto()
     {
         // Arrange
-        var origin = CreateSampleDetectionEvent();
-        var detectionEx = origin.ToDetectionExEvent(
-            "침입탐지-001",
-            "DETECT_SENSOR_WITH_CAMERA",
-            "rtsp://192.168.1.100:554/live",
-            "rtsp://192.168.1.100:554/record"
-        );
+        var json = @"{
+            ""id"": ""xxx"",
+            ""type_message"": ""REQ"",
+            ""type_command"": ""Fault"",
+            ""from"": ""proxyManager"",
+            ""data"": ""{\""id\"":123,\""reason\"":\""FAULT_FENCE\""}"",
+            ""timestamp"": ""2025-11-27T01:45:53.019Z""
+        }";
 
         // Act
-        var result = detectionEx.ToBrokerRequest("monitoring-service", "DETECTION_EX_EVENT");
+        var result = BrokerMessageHelper.ParseSingleEventFromBrokerMessage<MalfunctionEventDto>(json);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("REQ", result.TypeMessage);
-        Assert.Equal("DETECTION_EX_EVENT", result.Command);
-        Assert.Equal("monitoring-service", result.From);
-        Assert.NotNull(result.Id);
-        Assert.NotNull(result.Data);
-        Assert.Equal(detectionEx, result.Data);
-        Assert.NotNull(result.Timestamp);
+        Assert.Equal(123, result.Id);
+        Assert.Equal("FAULT_FENCE", result.Reason);
     }
-
-    [Fact]
-    [Trait("Category", "Helper")]
-    public void ToBrokerRequest_WithCustomCommand_ShouldUseCustomCommand()
-    {
-        // Arrange
-        var origin = CreateSampleDetectionEvent();
-        var detectionEx = origin.ToDetectionExEvent("테스트", "DETECT");
-
-        // Act
-        var result = detectionEx.ToBrokerRequest("test-service", "CUSTOM_DETECTION");
-
-        // Assert
-        Assert.Equal("CUSTOM_DETECTION", result.Command);
-    }
-
     #endregion
 
-    #region - Integration 테스트 -
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public void Integration_FullWorkflow_ShouldWorkCorrectly()
+    #region - Test 8.2.5: null data 처리 -
+    [Fact(DisplayName = "TEST-8.2.5: ParseEventsFromBrokerMessage - data가 null인 경우")]
+    public void ParseEventsFromBrokerMessage_WithNullData_ShouldReturnEmptyList()
     {
-        // Arrange - DetectionEventDto 생성
-        var origin = new DetectionEventDto
-        {
-            Id = 2001,
-            GroupEvent = "security_zone_1",
-            TypeEvent = "Intrusion",
-            Controller = 3,
-            Sensor = 15,
-            TypeDevice = "Underground",
-            Sequence = 789,
-            ActionReported = "False",
-            Result = "VIBRATION_SENSOR"
-        };
+        // Arrange
+        var json = @"{
+            ""id"": ""xxx"",
+            ""type_message"": ""REQ"",
+            ""data"": null
+        }";
 
-        // Act - DetectionExEventDto 변환
-        var detectionEx = origin.ToDetectionExEvent(
-            eventName: "침입탐지-지하감지",
-            category: "DETECT_SENSOR_WITH_CAMERA",
-            liveUrl: "rtsp://192.168.1.150:554/live/zone1",
-            recordUrl: "rtsp://192.168.1.150:554/playback?start=20250118T143000&end=20250118T144000"
-        );
+        // Act
+        var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
 
-        // Act - BrokerRequest 변환
-        var brokerRequest = detectionEx.ToBrokerRequest("gop-service", "DETECTION_ALERT");
-
-        // Act - JSON 직렬화
-        var json = Newtonsoft.Json.JsonConvert.SerializeObject(brokerRequest);
-
-        // Act - JSON 역직렬화
-        var deserializedRequest = Newtonsoft.Json.JsonConvert.DeserializeObject<BrokerRequest<DetectionExEventDto>>(json);
-
-        // Assert - 전체 워크플로우 검증
-        Assert.NotNull(deserializedRequest);
-        Assert.Equal("DETECTION_ALERT", deserializedRequest.Command);
-        Assert.Equal("gop-service", deserializedRequest.From);
-
-        var data = deserializedRequest.Data;
-        Assert.NotNull(data);
-        Assert.Equal("침입탐지-지하감지", data.NameEvent);
-        Assert.Equal("DETECT_SENSOR_WITH_CAMERA", data.CategoryEvent);
-        Assert.Equal(2001, data.OriginEvent.Id);
-        Assert.Equal("VIBRATION_SENSOR", data.OriginEvent.Result);
-        Assert.Equal("rtsp://192.168.1.150:554/live/zone1", data.Urls.Live);
+        // Assert
+        Assert.Empty(result);
     }
 
+    [Fact(DisplayName = "TEST-8.2.5-2: ParseSingleEventFromBrokerMessage - data가 null인 경우")]
+    public void ParseSingleEventFromBrokerMessage_WithNullData_ShouldReturnNull()
+    {
+        // Arrange
+        var json = @"{
+            ""id"": ""xxx"",
+            ""type_message"": ""REQ"",
+            ""data"": null
+        }";
+
+        // Act
+        var result = BrokerMessageHelper.ParseSingleEventFromBrokerMessage<MalfunctionEventDto>(json);
+
+        // Assert
+        Assert.Null(result);
+    }
     #endregion
 }

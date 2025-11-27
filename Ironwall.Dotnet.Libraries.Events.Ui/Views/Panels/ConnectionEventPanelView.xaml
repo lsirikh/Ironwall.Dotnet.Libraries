@@ -141,17 +141,18 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
-								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="30"
+					Height="30"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="CircleArrows"
-								ToolTip="갱신하기"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="30"
+					Height="30"
+					Kind="CircleArrows"
+					ToolTip="갱신하기"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						</Grid>
 					</Button.Content>
 
@@ -168,21 +169,23 @@
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
-								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="30"
+					Height="30"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="Floppy"
-								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="30"
+					Height="30"
+					Kind="Floppy"
+					ToolTip="저장하기"
+					Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						</Grid>
 					</Button.Content>
 				</Button>

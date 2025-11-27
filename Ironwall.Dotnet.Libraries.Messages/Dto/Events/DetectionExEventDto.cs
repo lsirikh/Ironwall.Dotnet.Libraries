@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Wpf.Pids.Proxy.Master.DTO.Integrations;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
@@ -27,8 +28,8 @@ public class DetectionExEventDto
     public DetectionEventDto OriginEvent { get; set; } = new DetectionEventDto();
 
     /// <summary>
-    /// 영상 URL 정보 (live/record RTSP)
+    /// 카메라별 프리셋 정보 및 영상 URL 정보 (live/record RTSP)
     /// </summary>
-    [JsonProperty("urls")]
-    public EventUrlsDto Urls { get; set; } = new EventUrlsDto();
+    [JsonProperty("camera_presets")]
+    public List<CameraEventPresetDto> CameraPresets = new List<CameraEventPresetDto>();
 }

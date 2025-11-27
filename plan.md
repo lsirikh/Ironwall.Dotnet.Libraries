@@ -875,6 +875,187 @@ Events.Ui → Events.Api → GOP RESTful API → MariaDB
 
 ---
 
+## 🐛 Phase 6: MalfunctionEventPanel Bug Fix - IsEdited Flag Not Set
+
+**Date**: 2025-01-18
+**PRD**: `MalfunctionEventPanel-bug-fix-prd.md`
+**Status**: 🚧 IN PROGRESS
+
+### Problem Summary
+`MalfunctionEventPanelView`에서 항목 수정 후 저장 버튼 클릭 시 `updateList`가 비어있어 수정사항이 저장되지 않음.
+
+### Root Cause
+WPF DataGrid에서 **편집 모드 종료 전에 저장 버튼을 클릭**하면 `CellEditingTemplate`의 바인딩이 ViewModel에 커밋되지 않아 `IsEdited` 플래그가 `true`로 설정되지 않음.
+
+### Solution
+저장 버튼 클릭 시 `DataGrid.CommitEdit()` 호출하여 편집 중인 셀의 변경사항을 먼저 커밋.
+
+---
+
+### Phase 6.1: CommitEditOnClickBehavior 생성 (STRUCTURAL)
+
+#### Test 6.1.1: Create CommitEditOnClickBehavior class [x]
+**Type**: STRUCTURAL
+**File**: `Behaviors/CommitEditOnClickBehavior.cs` (신규)
+
+**RED Phase**:
+- 빌드 시 Behavior 클래스 없음
+
+**GREEN Phase**:
+```csharp
+// Behaviors/CommitEditOnClickBehavior.cs
+using Microsoft.Xaml.Behaviors;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+
+namespace Ironwall.Dotnet.Libraries.Events.Ui.Behaviors;
+
+public class CommitEditOnClickBehavior : Behavior<Button>
+{
+    public static readonly DependencyProperty DataGridProperty =
+        DependencyProperty.Register(
+            nameof(DataGrid),
+            typeof(DataGrid),
+            typeof(CommitEditOnClickBehavior));
+
+    public DataGrid DataGrid
+    {
+        get => (DataGrid)GetValue(DataGridProperty);
+        set => SetValue(DataGridProperty, value);
+    }
+
+    protected override void OnAttached()
+    {
+        base.OnAttached();
+        AssociatedObject.PreviewMouseLeftButtonDown += OnPreviewClick;
+    }
+
+    protected override void OnDetaching()
+    {
+        AssociatedObject.PreviewMouseLeftButtonDown -= OnPreviewClick;
+        base.OnDetaching();
+    }
+
+    private void OnPreviewClick(object sender, MouseButtonEventArgs e)
+    {
+        DataGrid?.CommitEdit(DataGridEditingUnit.Row, true);
+    }
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Events.Ui
+```
+
+**Expected**: GREEN (빌드 성공)
+
+**Commit**:
+```
+feat(events-ui): Add CommitEditOnClickBehavior for DataGrid edit commit
+
+STRUCTURAL change - new behavior class
+Solves IsEdited flag not set issue when saving
+```
+
+---
+
+### Phase 6.2: MalfunctionEventPanelView에 Behavior 적용 (BEHAVIORAL)
+
+#### Test 6.2.1: Apply behavior to Save button [x]
+**Type**: BEHAVIORAL
+**File**: `Views/Panels/MalfunctionEventPanelView.xaml`
+
+**Changes** (Save Button 부분):
+```xml
+<!-- 기존 코드 (Line 161-190) -->
+<Button Grid.Column="14" ...>
+    <i:Interaction.Behaviors>
+        <behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+        <!-- 아래 줄 추가 -->
+        <behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
+    </i:Interaction.Behaviors>
+    ...
+</Button>
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Events.Ui
+```
+
+**Expected**: GREEN (빌드 성공)
+
+**Manual Test**:
+1. 앱 실행 → 장애내역 탭
+2. 기존 항목의 FirstStart 값 수정 (예: 10 → 20)
+3. 저장 버튼 클릭
+4. **예상**: 수정 사항이 서버에 저장됨
+5. 새로고침 후 변경된 값 유지 확인
+
+**Commit**:
+```
+fix(events-ui): Apply CommitEditOnClickBehavior to MalfunctionEventPanelView Save button
+
+BEHAVIORAL change - fixes IsEdited flag not being set
+DataGrid now commits edits before save logic runs
+```
+
+---
+
+### Phase 6.3: 다른 Panel에도 동일 수정 적용 (BEHAVIORAL)
+
+#### Test 6.3.1: Apply to DetectionEventPanelView [x]
+**File**: `Views/Panels/DetectionEventPanelView.xaml`
+
+#### Test 6.3.2: Apply to ConnectionEventPanelView [x]
+**File**: `Views/Panels/ConnectionEventPanelView.xaml`
+
+#### Test 6.3.3: Apply to ActionEventPanelView [x]
+**File**: `Views/Panels/ActionEventPanelView.xaml`
+
+**Commit**:
+```
+fix(events-ui): Apply CommitEditOnClickBehavior to all EventPanel Save buttons
+
+BEHAVIORAL change - consistent fix across all panels
+Ensures DataGrid edits are committed before save
+```
+
+---
+
+### Phase 6.4: Unit Test 추가 (Optional)
+
+#### Test 6.4.1: Unit test for CommitEditOnClickBehavior [ ]
+**Type**: BEHAVIORAL
+**File**: `Tests/UnitTest.cs`
+
+```csharp
+[Fact]
+public void CommitEditOnClickBehavior_OnPreviewClick_ShouldCommitDataGridEdits()
+{
+    // Arrange: DataGrid with edited cell
+    // Act: Trigger PreviewMouseLeftButtonDown
+    // Assert: CommitEdit was called
+}
+```
+
+---
+
+### Phase 6 Progress Tracking
+
+| Test | Type | Status | File |
+|------|------|--------|------|
+| 6.1.1 | STRUCTURAL | [x] | Behaviors/CommitEditOnClickBehavior.cs |
+| 6.2.1 | BEHAVIORAL | [x] | Views/Panels/MalfunctionEventPanelView.xaml |
+| 6.3.1 | BEHAVIORAL | [x] | Views/Panels/DetectionEventPanelView.xaml |
+| 6.3.2 | BEHAVIORAL | [x] | Views/Panels/ConnectionEventPanelView.xaml |
+| 6.3.3 | BEHAVIORAL | [x] | Views/Panels/ActionEventPanelView.xaml |
+| 6.4.1 | BEHAVIORAL | [ ] | Tests/UnitTest.cs (Optional) |
+
+---
+
 ## 🔧 Critical Fix: Server-Side Date Filtering Implementation
 
 **Date**: 2025-11-24
@@ -979,5 +1160,685 @@ All event endpoints support these parameters:
 - `/api/v1/event/malfunction`
 - `/api/v1/event/connection`
 - `/api/v1/event/action`
+
+---
+
+## 🚀 Phase 7: DetectionExEventDto → DetectionEventModel 변환 Helper
+
+**Date**: 2025-11-27
+**PRD**: `Docs/DetectionExEventDto_ToModel_PRD.md`
+**Status**: ✅ PARTIAL COMPLETE (7.1, 7.4.1-2 완료)
+
+### Problem Summary
+NATS 메시지로 수신되는 `DetectionExEventDto`를 `IDetectionEventModel`로 변환하는 Helper 메서드가 없음.
+
+### DTO Structure
+
+```
+DetectionExEventDto
+├── NameEvent: string              // 이벤트 명칭
+├── CategoryEvent: string          // 이벤트 카테고리
+├── OriginEvent: DetectionEventDto // 핵심 이벤트 데이터 ⭐
+└── CameraPresets: List<CameraEventPresetDto>  // 카메라 프리셋 목록
+    └── CameraEventPresetDto
+        ├── CamId: int
+        ├── Urls: EventUrlsDto     // RTSP URL 정보 ⭐
+        │   ├── Live: string
+        │   └── Record: string
+        ├── Category: string       // FIXED/PTZ
+        ├── PresetId: string
+        ├── MovePresetTime: int
+        ├── HomePreset: int
+        └── MoveHomeTime: int
+```
+
+---
+
+### Phase 7.1: DetectionExEventDto 기본 변환 (STRUCTURAL)
+
+#### Test 7.1.1: ToDetectionEventModel(DetectionExEventDto) 메서드 추가 [x]
+**Type**: STRUCTURAL
+**File**: `Helpers/DtoToModelHelper.cs`
+
+**RED Phase**:
+- `DetectionExEventDto`에 대한 `ToDetectionEventModel()` 확장 메서드 없음
+
+**GREEN Phase**:
+```csharp
+/// <summary>
+/// DetectionExEventDto → IDetectionEventModel 변환
+/// <para>OriginEvent를 추출하여 DetectionEventModel로 변환</para>
+/// </summary>
+public static IDetectionEventModel ToDetectionEventModel(this DetectionExEventDto dto)
+{
+    if (dto.OriginEvent == null)
+        throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
+
+    return dto.OriginEvent.ToDetectionEventModel();
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Events.Ui
+```
+
+**Expected**: GREEN (빌드 성공)
+
+---
+
+#### Test 7.1.2: DeviceProvider 오버로드 추가 [x]
+**Type**: STRUCTURAL
+**File**: `Helpers/DtoToModelHelper.cs`
+
+**GREEN Phase**:
+```csharp
+/// <summary>
+/// DetectionExEventDto → IDetectionEventModel 변환 (DeviceProvider 활용)
+/// </summary>
+public static IDetectionEventModel ToDetectionEventModel(
+    this DetectionExEventDto dto,
+    DeviceProvider? deviceProvider)
+{
+    if (dto.OriginEvent == null)
+        throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
+
+    return dto.OriginEvent.ToDetectionEventModel(deviceProvider);
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Events.Ui
+```
+
+**Expected**: GREEN (빌드 성공)
+
+---
+
+### Phase 7.2: CameraPresets 변환 Helper (STRUCTURAL)
+
+#### Test 7.2.1: ToCameraPresetInfo 메서드 추가 [ ]
+**Type**: STRUCTURAL
+**File**: `Helpers/DtoToModelHelper.cs`
+
+**GREEN Phase**:
+```csharp
+/// <summary>
+/// CameraEventPresetDto → 카메라 프리셋 정보 튜플 추출
+/// </summary>
+public static (int CamId, string LiveUrl, string RecordUrl, string Category, string PresetId)
+    ToCameraPresetInfo(this CameraEventPresetDto dto)
+{
+    return (
+        dto.CamId,
+        dto.Urls?.Live ?? string.Empty,
+        dto.Urls?.Record ?? string.Empty,
+        dto.Category,
+        dto.PresetId
+    );
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Events.Ui
+```
+
+**Expected**: GREEN (빌드 성공)
+
+---
+
+#### Test 7.2.2: GetCameraPresets 메서드 추가 [ ]
+**Type**: STRUCTURAL
+**File**: `Helpers/DtoToModelHelper.cs`
+
+**GREEN Phase**:
+```csharp
+/// <summary>
+/// DetectionExEventDto에서 모든 카메라 프리셋 정보 추출
+/// </summary>
+public static List<(int CamId, string LiveUrl, string RecordUrl, string Category, string PresetId)>
+    GetCameraPresets(this DetectionExEventDto dto)
+{
+    if (dto.CameraPresets == null || dto.CameraPresets.Count == 0)
+        return new List<(int, string, string, string, string)>();
+
+    return dto.CameraPresets
+        .Select(p => p.ToCameraPresetInfo())
+        .ToList();
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Events.Ui
+```
+
+**Expected**: GREEN (빌드 성공)
+
+---
+
+### Phase 7.3: DetectionExEventDto 접근자 수정 (STRUCTURAL)
+
+#### Test 7.3.1: CameraPresets public 접근자로 변경 [x]
+**Type**: STRUCTURAL
+**File**: `Messages/Dto/Events/DetectionExEventDto.cs`
+
+**Issue**: 현재 `CameraPresets`가 `private` field로 선언됨
+```csharp
+// BEFORE (private field)
+List<CameraEventPresetDto> CameraPresets = new List<CameraEventPresetDto>();
+
+// AFTER (public field)
+public List<CameraEventPresetDto> CameraPresets = new List<CameraEventPresetDto>();
+```
+
+**✅ COMPLETE**: 사용자가 직접 `public` 접근자로 수정 완료
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Messages
+```
+
+**Expected**: GREEN (빌드 성공)
+
+---
+
+### Phase 7.4: Unit Tests (BEHAVIORAL)
+
+#### Test 7.4.1: ToDetectionEventModel 정상 케이스 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Tests/UnitTest.cs`
+
+```csharp
+[Fact]
+public void ToDetectionEventModel_FromDetectionExEventDto_ShouldConvertCorrectly()
+{
+    // Arrange
+    var exDto = new DetectionExEventDto
+    {
+        NameEvent = "침입탐지-001",
+        CategoryEvent = "DETECT_SENSOR_WITH_CAMERA",
+        OriginEvent = new DetectionEventDto
+        {
+            Id = 1,
+            CreatedAt = "2025-11-27T10:00:00.000Z",
+            TypeEvent = "Intrusion",
+            Controller = 1,
+            Sensor = 5,
+            TypeDevice = "Fence",
+            ActionReported = "False",
+            Result = "Intrusion"
+        }
+    };
+
+    // Act
+    var model = exDto.ToDetectionEventModel();
+
+    // Assert
+    Assert.NotNull(model);
+    Assert.Equal(1, model.Id);
+    Assert.Equal(EnumEventType.Intrusion, model.MessageType);
+    Assert.Equal(EnumDetectionType.Intrusion, model.Result);
+}
+```
+
+---
+
+#### Test 7.4.2: OriginEvent null 예외 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Tests/UnitTest.cs`
+
+```csharp
+[Fact]
+public void ToDetectionEventModel_WithNullOriginEvent_ShouldThrowArgumentNullException()
+{
+    // Arrange
+    var exDto = new DetectionExEventDto
+    {
+        NameEvent = "Test",
+        OriginEvent = null!
+    };
+
+    // Act & Assert
+    Assert.Throws<ArgumentNullException>(() => exDto.ToDetectionEventModel());
+}
+```
+
+---
+
+#### Test 7.4.3: GetCameraPresets 테스트 [ ]
+**Type**: BEHAVIORAL
+**File**: `Tests/UnitTest.cs`
+
+```csharp
+[Fact]
+public void GetCameraPresets_WithMultiplePresets_ShouldReturnAllPresets()
+{
+    // Arrange
+    var exDto = new DetectionExEventDto
+    {
+        OriginEvent = new DetectionEventDto { Id = 1 },
+        CameraPresets = new List<CameraEventPresetDto>
+        {
+            new CameraEventPresetDto
+            {
+                CamId = 101,
+                Urls = new EventUrlsDto { Live = "rtsp://live1", Record = "rtsp://record1" },
+                Category = "PTZ",
+                PresetId = "1"
+            },
+            new CameraEventPresetDto
+            {
+                CamId = 102,
+                Urls = new EventUrlsDto { Live = "rtsp://live2", Record = "rtsp://record2" },
+                Category = "FIXED",
+                PresetId = ""
+            }
+        }
+    };
+
+    // Act
+    var presets = exDto.GetCameraPresets();
+
+    // Assert
+    Assert.Equal(2, presets.Count);
+    Assert.Equal(101, presets[0].CamId);
+    Assert.Equal("rtsp://live1", presets[0].LiveUrl);
+    Assert.Equal("PTZ", presets[0].Category);
+}
+```
+
+---
+
+#### Test 7.4.4: GetCameraPresets null/empty 처리 테스트 [ ]
+**Type**: BEHAVIORAL
+**File**: `Tests/UnitTest.cs`
+
+```csharp
+[Fact]
+public void GetCameraPresets_WithNullOrEmpty_ShouldReturnEmptyList()
+{
+    // Arrange
+    var exDto1 = new DetectionExEventDto { OriginEvent = new DetectionEventDto(), CameraPresets = null! };
+    var exDto2 = new DetectionExEventDto { OriginEvent = new DetectionEventDto(), CameraPresets = new List<CameraEventPresetDto>() };
+
+    // Act
+    var result1 = exDto1.GetCameraPresets();
+    var result2 = exDto2.GetCameraPresets();
+
+    // Assert
+    Assert.Empty(result1);
+    Assert.Empty(result2);
+}
+```
+
+---
+
+### Phase 7 Progress Tracking
+
+| Test | Type | Status | File |
+|------|------|--------|------|
+| 7.1.1 | STRUCTURAL | [x] | Helpers/DtoToModelHelper.cs |
+| 7.1.2 | STRUCTURAL | [x] | Helpers/DtoToModelHelper.cs |
+| 7.2.1 | STRUCTURAL | DEPRECATED | Helpers/DtoToModelHelper.cs |
+| 7.2.2 | STRUCTURAL | DEPRECATED | Helpers/DtoToModelHelper.cs |
+| 7.3.1 | STRUCTURAL | [x] | Messages/Dto/Events/DetectionExEventDto.cs (public field로 수정됨) |
+| 7.4.1 | BEHAVIORAL | [x] | Tests/UnitTest.cs |
+| 7.4.2 | BEHAVIORAL | [x] | Tests/UnitTest.cs |
+| 7.4.3 | BEHAVIORAL | DEPRECATED | Tests/UnitTest.cs (CameraPresets deprecated) |
+| 7.4.4 | BEHAVIORAL | DEPRECATED | Tests/UnitTest.cs (CameraPresets deprecated) |
+
+---
+
+### 🎯 Phase 7 완료 Summary
+
+**완료된 항목**:
+- [x] Test 7.1.1: `ToDetectionEventModel(DetectionExEventDto)` 메서드 추가
+- [x] Test 7.1.2: `DeviceProvider` 오버로드 추가
+- [x] Test 7.3.1: `CameraPresets` public 접근자로 변경 (사용자 직접 수정)
+- [x] Test 7.4.1: `ToDetectionEventModel` 정상 케이스 테스트 (4개 테스트 PASS)
+- [x] Test 7.4.2: `OriginEvent null` 예외 테스트 (2개 테스트 PASS)
+
+**Deprecated 항목** (CameraPresets 관련):
+- Test 7.2.1-2: `ToCameraPresetInfo`, `GetCameraPresets` (Deprecated class)
+- Test 7.4.3-4: CameraPresets 관련 테스트 (Deprecated)
+
+**Test Results**:
+```
+통과!  - 실패: 0, 통과: 4, 전체: 4
+- TEST-7.4.1: ToDetectionEventModel은 DetectionExEventDto에서 OriginEvent를 추출하여 변환해야 함
+- TEST-7.4.1-2: ToDetectionEventModel은 DeviceProvider를 활용하여 Device를 매칭해야 함
+- TEST-7.4.2: ToDetectionEventModel은 OriginEvent가 null일 때 ArgumentNullException을 던져야 함
+- TEST-7.4.2-2: ToDetectionEventModel(DeviceProvider)도 OriginEvent가 null일 때 예외를 던져야 함
+```
+
+---
+
+## 🚀 Phase 8: Single Event Message Handling (Broker 메시지 파싱)
+
+**Date**: 2025-11-27
+**PRD**: `Docs/Single_Event_Message_Handling_PRD.md`
+**Status**: ✅ COMPLETE
+
+### Problem Summary
+NATS Broker로부터 단일 `MalfunctionEventDto` 메시지를 수신했을 때 JSON 파싱 에러 발생.
+`data` 필드가 escaped JSON string으로 오는데, 현재 코드가 배열만 처리 가능.
+
+### 수신된 메시지 예시
+```json
+{
+  "id": "6cf7e2dc-d530-4328-aeaf-1eaefbae6fbc",
+  "type_message": "REQ",
+  "type_command": "Fault",
+  "from": "proxyManager",
+  "data": "{\"id\":0,\"group_event\":\"1\",\"reason\":\"FAULT_FENCE\",...}",
+  "timestamp": "2025-11-27T01:45:53.019Z"
+}
+```
+
+---
+
+### Phase 8.1: BrokerMessageHelper 확장 (STRUCTURAL)
+
+#### Test 8.1.1: ParseSingleEventFromBrokerMessage 메서드 추가 [x]
+**Type**: STRUCTURAL
+**File**: `Messages/Helpers/BrokerMessageHelper.cs`
+
+**RED Phase**:
+- `ParseSingleEventFromBrokerMessage<TDto>()` 메서드 없음
+
+**GREEN Phase**:
+```csharp
+/// <summary>
+/// Broker 메시지에서 단일 Event DTO 추출
+/// <para>data가 escaped JSON string인 경우 2차 파싱</para>
+/// </summary>
+public static TDto? ParseSingleEventFromBrokerMessage<TDto>(string json) where TDto : class
+{
+    try
+    {
+        var brokerMsg = JObject.Parse(json);
+        var dataToken = brokerMsg["data"];
+
+        if (dataToken == null)
+            return null;
+
+        string dataJson = dataToken.Type == JTokenType.String
+            ? dataToken.ToString()
+            : dataToken.ToString(Formatting.None);
+
+        return JsonConvert.DeserializeObject<TDto>(dataJson, _jsonSettings);
+    }
+    catch (JsonException)
+    {
+        return null;
+    }
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Messages
+```
+
+---
+
+#### Test 8.1.2: ParseEventsFromBrokerMessage 메서드 추가 [x]
+**Type**: STRUCTURAL
+**File**: `Messages/Helpers/BrokerMessageHelper.cs`
+
+**GREEN Phase**:
+```csharp
+/// <summary>
+/// Broker 메시지에서 Event DTO 목록 추출 (배열/단일 모두 지원)
+/// <para>data가 escaped JSON string인 경우 2차 파싱</para>
+/// </summary>
+public static List<TDto> ParseEventsFromBrokerMessage<TDto>(string json) where TDto : class
+{
+    var result = new List<TDto>();
+
+    try
+    {
+        var brokerMsg = JObject.Parse(json);
+        var dataToken = brokerMsg["data"];
+
+        if (dataToken == null)
+            return result;
+
+        // data가 string인 경우 (escaped JSON) → 2차 파싱
+        string dataJson = dataToken.Type == JTokenType.String
+            ? dataToken.ToString()
+            : dataToken.ToString(Formatting.None);
+
+        var innerToken = JToken.Parse(dataJson);
+
+        if (innerToken is JArray arr)
+        {
+            foreach (var item in arr)
+            {
+                var dto = item.ToObject<TDto>();
+                if (dto != null)
+                    result.Add(dto);
+            }
+        }
+        else if (innerToken is JObject obj)
+        {
+            var dto = obj.ToObject<TDto>();
+            if (dto != null)
+                result.Add(dto);
+        }
+    }
+    catch (JsonException)
+    {
+        // 파싱 실패 시 빈 리스트 반환
+    }
+
+    return result;
+}
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Messages
+```
+
+---
+
+### Phase 8.2: Unit Tests (BEHAVIORAL)
+
+#### Test 8.2.1: 단일 MalfunctionEventDto 파싱 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Messages/Tests/UnitTest.cs`
+
+```csharp
+[Fact(DisplayName = "TEST-8.2.1: ParseEventsFromBrokerMessage - 단일 MalfunctionEventDto escaped string")]
+public void ParseEventsFromBrokerMessage_WithSingleMalfunctionEvent_ShouldReturnOneItem()
+{
+    // Arrange - 실제 수신된 메시지
+    var json = @"{
+        ""id"": ""6cf7e2dc-d530-4328-aeaf-1eaefbae6fbc"",
+        ""type_message"": ""REQ"",
+        ""type_command"": ""Fault"",
+        ""from"": ""proxyManager"",
+        ""data"": ""{\""id\"":0,\""group_event\"":\""1\"",\""type_event\"":\""Fault\"",\""controller\"":1,\""sensor\"":1,\""type_device\"":\""Fence\"",\""sequence\"":42,\""action_reported\"":\""False\"",\""reason\"":\""FAULT_FENCE\"",\""first_start\"":0,\""first_end\"":0,\""second_start\"":0,\""second_end\"":0,\""created_at\"":\""2025-11-27T01:45:53.019Z\"",\""updated_at\"":null}"",
+        ""timestamp"": ""2025-11-27T01:45:53.019Z""
+    }";
+
+    // Act
+    var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
+
+    // Assert
+    Assert.Single(result);
+    Assert.Equal(0, result[0].Id);
+    Assert.Equal("1", result[0].GroupEvent);
+    Assert.Equal("FAULT_FENCE", result[0].Reason);
+    Assert.Equal(1, result[0].Controller);
+    Assert.Equal(1, result[0].Sensor);
+}
+```
+
+---
+
+#### Test 8.2.2: 배열 MalfunctionEventDto 파싱 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Messages/Tests/UnitTest.cs`
+
+```csharp
+[Fact(DisplayName = "TEST-8.2.2: ParseEventsFromBrokerMessage - 배열 형태 escaped string")]
+public void ParseEventsFromBrokerMessage_WithArrayEvents_ShouldReturnMultipleItems()
+{
+    // Arrange
+    var json = @"{
+        ""id"": ""xxx"",
+        ""type_message"": ""REQ"",
+        ""type_command"": ""Fault"",
+        ""from"": ""proxyManager"",
+        ""data"": ""[{\""id\"":1,\""reason\"":\""FAULT_FENCE\""},{\""id\"":2,\""reason\"":\""FAULT_CONTROLLER\""}]"",
+        ""timestamp"": ""2025-11-27T01:45:53.019Z""
+    }";
+
+    // Act
+    var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
+
+    // Assert
+    Assert.Equal(2, result.Count);
+    Assert.Equal(1, result[0].Id);
+    Assert.Equal(2, result[1].Id);
+}
+```
+
+---
+
+#### Test 8.2.3: 직접 객체 data 파싱 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Messages/Tests/UnitTest.cs`
+
+```csharp
+[Fact(DisplayName = "TEST-8.2.3: ParseEventsFromBrokerMessage - data가 직접 객체인 경우")]
+public void ParseEventsFromBrokerMessage_WithDirectObject_ShouldParse()
+{
+    // Arrange - data가 escaped string이 아닌 직접 객체
+    var json = @"{
+        ""id"": ""xxx"",
+        ""type_message"": ""REQ"",
+        ""type_command"": ""Fault"",
+        ""from"": ""proxyManager"",
+        ""data"": {""id"":0,""group_event"":""1"",""reason"":""FAULT_FENCE""},
+        ""timestamp"": ""2025-11-27T01:45:53.019Z""
+    }";
+
+    // Act
+    var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
+
+    // Assert
+    Assert.Single(result);
+    Assert.Equal(0, result[0].Id);
+    Assert.Equal("FAULT_FENCE", result[0].Reason);
+}
+```
+
+---
+
+#### Test 8.2.4: ParseSingleEventFromBrokerMessage 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Messages/Tests/UnitTest.cs`
+
+```csharp
+[Fact(DisplayName = "TEST-8.2.4: ParseSingleEventFromBrokerMessage - 단일 객체 파싱")]
+public void ParseSingleEventFromBrokerMessage_WithValidMessage_ShouldReturnDto()
+{
+    // Arrange
+    var json = @"{
+        ""id"": ""xxx"",
+        ""type_message"": ""REQ"",
+        ""type_command"": ""Fault"",
+        ""from"": ""proxyManager"",
+        ""data"": ""{\""id\"":123,\""reason\"":\""FAULT_FENCE\""}"",
+        ""timestamp"": ""2025-11-27T01:45:53.019Z""
+    }";
+
+    // Act
+    var result = BrokerMessageHelper.ParseSingleEventFromBrokerMessage<MalfunctionEventDto>(json);
+
+    // Assert
+    Assert.NotNull(result);
+    Assert.Equal(123, result.Id);
+    Assert.Equal("FAULT_FENCE", result.Reason);
+}
+```
+
+---
+
+#### Test 8.2.5: null data 처리 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Messages/Tests/UnitTest.cs`
+
+```csharp
+[Fact(DisplayName = "TEST-8.2.5: ParseEventsFromBrokerMessage - data가 null인 경우")]
+public void ParseEventsFromBrokerMessage_WithNullData_ShouldReturnEmptyList()
+{
+    // Arrange
+    var json = @"{
+        ""id"": ""xxx"",
+        ""type_message"": ""REQ"",
+        ""data"": null
+    }";
+
+    // Act
+    var result = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
+
+    // Assert
+    Assert.Empty(result);
+}
+```
+
+---
+
+### Phase 8 Progress Tracking
+
+| Test | Type | Status | File |
+|------|------|--------|------|
+| 8.1.1 | STRUCTURAL | [x] | Messages/Helpers/BrokerMessageHelper.cs |
+| 8.1.2 | STRUCTURAL | [x] | Messages/Helpers/BrokerMessageHelper.cs |
+| 8.2.1 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+| 8.2.2 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+| 8.2.3 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+| 8.2.4 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+| 8.2.5 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+
+---
+
+### 🎯 Phase 8 완료 Summary
+
+**완료된 항목**:
+- [x] Test 8.1.1: `ParseSingleEventFromBrokerMessage<TDto>()` 메서드 추가
+- [x] Test 8.1.2: `ParseEventsFromBrokerMessage<TDto>()` 메서드 추가
+- [x] Test 8.2.1: 단일 MalfunctionEventDto escaped string 파싱
+- [x] Test 8.2.2: 배열 MalfunctionEventDto escaped string 파싱
+- [x] Test 8.2.3: 직접 객체 data 파싱
+- [x] Test 8.2.4: ParseSingleEventFromBrokerMessage 테스트
+- [x] Test 8.2.5: null data 처리 테스트 (2개)
+
+**Test Results**:
+```
+통과!  - 실패: 0, 통과: 6, 전체: 6
+- TEST-8.2.1: ParseEventsFromBrokerMessage - 단일 MalfunctionEventDto escaped string
+- TEST-8.2.2: ParseEventsFromBrokerMessage - 배열 형태 escaped string
+- TEST-8.2.3: ParseEventsFromBrokerMessage - data가 직접 객체인 경우
+- TEST-8.2.4: ParseSingleEventFromBrokerMessage - 단일 객체 파싱
+- TEST-8.2.5: ParseEventsFromBrokerMessage - data가 null인 경우
+- TEST-8.2.5-2: ParseSingleEventFromBrokerMessage - data가 null인 경우
+```
+
+**사용 방법**:
+```csharp
+// 단일 이벤트 파싱
+var dto = BrokerMessageHelper.ParseSingleEventFromBrokerMessage<MalfunctionEventDto>(json);
+
+// 배열/단일 모두 지원
+var dtos = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>(json);
+```
 
 ---

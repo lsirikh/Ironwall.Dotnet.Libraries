@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Brokers;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Helpers;
 
@@ -168,6 +169,90 @@ public static class BrokerMessageHelper
     public static BrokerResponse<TDto>? FromJsonResponse<TDto>(string json) where TDto : class
     {
         return JsonConvert.DeserializeObject<BrokerResponse<TDto>>(json, _jsonSettings);
+    }
+    #endregion
+
+    #region - Broker 메시지 파싱 (data가 escaped string인 경우) -
+    /// <summary>
+    /// Broker 메시지에서 단일 Event DTO 추출
+    /// <para>data가 escaped JSON string인 경우 2차 파싱</para>
+    /// </summary>
+    /// <typeparam name="TDto">변환할 DTO 타입</typeparam>
+    /// <param name="json">전체 Broker 메시지 JSON</param>
+    /// <returns>파싱된 DTO 또는 null</returns>
+    public static TDto? ParseSingleEventFromBrokerMessage<TDto>(string json) where TDto : class
+    {
+        try
+        {
+            var brokerMsg = JObject.Parse(json);
+            var dataToken = brokerMsg["data"];
+
+            if (dataToken == null || dataToken.Type == JTokenType.Null)
+                return null;
+
+            // data가 string인 경우 (escaped JSON) → 직접 문자열 사용
+            // data가 객체인 경우 → JSON으로 변환
+            string dataJson = dataToken.Type == JTokenType.String
+                ? dataToken.ToString()
+                : dataToken.ToString(Formatting.None);
+
+            return JsonConvert.DeserializeObject<TDto>(dataJson, _jsonSettings);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Broker 메시지에서 Event DTO 목록 추출 (배열/단일 모두 지원)
+    /// <para>data가 escaped JSON string인 경우 2차 파싱</para>
+    /// </summary>
+    /// <typeparam name="TDto">변환할 DTO 타입</typeparam>
+    /// <param name="json">전체 Broker 메시지 JSON</param>
+    /// <returns>파싱된 DTO 목록 (파싱 실패 시 빈 리스트)</returns>
+    public static List<TDto> ParseEventsFromBrokerMessage<TDto>(string json) where TDto : class
+    {
+        var result = new List<TDto>();
+
+        try
+        {
+            var brokerMsg = JObject.Parse(json);
+            var dataToken = brokerMsg["data"];
+
+            if (dataToken == null || dataToken.Type == JTokenType.Null)
+                return result;
+
+            // data가 string인 경우 (escaped JSON) → 직접 문자열 사용
+            // data가 객체인 경우 → JSON으로 변환
+            string dataJson = dataToken.Type == JTokenType.String
+                ? dataToken.ToString()
+                : dataToken.ToString(Formatting.None);
+
+            var innerToken = JToken.Parse(dataJson);
+
+            if (innerToken is JArray arr)
+            {
+                foreach (var item in arr)
+                {
+                    var dto = item.ToObject<TDto>();
+                    if (dto != null)
+                        result.Add(dto);
+                }
+            }
+            else if (innerToken is JObject obj)
+            {
+                var dto = obj.ToObject<TDto>();
+                if (dto != null)
+                    result.Add(dto);
+            }
+        }
+        catch (JsonException)
+        {
+            // 파싱 실패 시 빈 리스트 반환
+        }
+
+        return result;
     }
     #endregion
 }

@@ -382,7 +382,6 @@ public class EventApiServiceTests
             FirstEnd=10,
             SecondStart=15,
             SecondEnd=15,
-            Status = "True",
             CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
@@ -456,7 +455,6 @@ public class EventApiServiceTests
             FirstEnd = 2,
             SecondStart = 5,
             SecondEnd = 5,
-            Status = "False",
             CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 

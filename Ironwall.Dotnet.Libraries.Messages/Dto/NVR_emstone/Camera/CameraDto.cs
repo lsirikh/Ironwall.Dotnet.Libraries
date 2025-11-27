@@ -80,7 +80,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.NVR_emstone.Camera
         /// PTZ 프리셋 리스트
         /// </summary>
         [JsonProperty("ptz_presets")]
-        public List<Dictionary<string, Dictionary<string,string>>> PtzPresets { get; set; } = new List<Dictionary<string, Dictionary<string,string>>>();
+        public List<CameraPresetDto> PtzPresets { get; set; } = new List<CameraPresetDto>();
 
         /// <summary>
         /// PTZ 투어 설정 리스트

@@ -19,7 +19,7 @@ public abstract class BaseBrokerMessage
     public string Id { get; set; } = string.Empty;
 
     /// <summary>
-    /// 메시지 타입 (REQ, RSP, ACK 등)
+    /// 메시지 타입 (REQ, RSP 등)
     /// </summary>
     [JsonProperty(Order = 2, PropertyName = "type_message")]
     public string TypeMessage { get; set; }=string.Empty;

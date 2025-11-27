@@ -115,6 +115,10 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
             var currentList = _eventProvider;
 
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
+            var insertList2 = ViewModelProvider
+                 .Where(vm => vm.Model.Id <= 0)
+                 .Select(vm => (IConnectionEventModel)vm.Model)
+                 .ToList();
             var updateList = ViewModelProvider
                              .Where(vm => vm.IsEdited && vm.Model.Id > 0)
                              .Select(vm => (IConnectionEventModel)vm.Model)

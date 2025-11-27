@@ -30,7 +30,6 @@ public class EventApiModule : Module
 
     }
     #endregion
-
     #region - Implementation of Interface -
     protected override void Load(ContainerBuilder builder)
     {

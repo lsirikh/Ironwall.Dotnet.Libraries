@@ -169,6 +169,7 @@
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
 						<Grid>

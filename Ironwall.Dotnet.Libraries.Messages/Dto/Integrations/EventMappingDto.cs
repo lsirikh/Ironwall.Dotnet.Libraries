@@ -1,3 +1,4 @@
+using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
@@ -15,7 +16,7 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 /// Event Mapping DTO - 이벤트 매핑 설정
 /// <para>GOP API의 이벤트 매핑 연동을 위한 데이터 전송 객체</para>
 /// </summary>
-public class EventMappingDto
+public class EventMappingDto : BaseDto
 {
     /// <summary>
     /// 데이터베이스 ID (자동 생성)
@@ -52,16 +53,4 @@ public class EventMappingDto
     /// </summary>
     [JsonProperty("status", Order = 6)]
     public bool Status { get; set; }
-
-    /// <summary>
-    /// 생성일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("created_at", Order = 7)]
-    public string? CreatedAt { get; set; }
-
-    /// <summary>
-    /// 수정일시 (ISO 8601)
-    /// </summary>
-    [JsonProperty("updated_at", Order = 8)]
-    public string? UpdatedAt { get; set; }
 }

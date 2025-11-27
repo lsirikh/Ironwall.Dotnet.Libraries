@@ -94,7 +94,6 @@ public class DtoToModelHelperTests
             Sensor = 200,
             TypeDevice = "FENCE",
             Sequence = 2,
-            Status = "True",
             ActionReported = "False",
             Reason = "FAULT_FENCE",
             FirstStart = 10,
@@ -150,7 +149,6 @@ public class DtoToModelHelperTests
         Assert.Equal("2025-11-24T11:00:00.000Z", dto.CreatedAt);
         Assert.Equal("Fault", dto.TypeEvent);
         Assert.Equal("Zone B", dto.GroupEvent);
-        Assert.Equal("True", dto.Status);
         Assert.Equal("FAULT_FENCE", dto.Reason);
         Assert.Equal(10, dto.FirstStart);
         Assert.Equal(20, dto.FirstEnd);
@@ -518,7 +516,6 @@ public class EventProviderServiceTests
                 GroupEvent = "Zone A",
                 TypeEvent = "Fault",
                 Sensor = 100,
-                Status = "True",
                 ActionReported = "False",
                 Reason = "FAULT_FENCE",
                 FirstStart = 10,
@@ -856,7 +853,6 @@ public class EventProviderServiceTests
             GroupEvent = "Zone D",
             TypeEvent = "Fault",
             Sensor = 300,
-            Status = "True",
             Reason = "FAULT_CONTROLLER",
             FirstStart = 10,
             FirstEnd = 15,
@@ -917,7 +913,6 @@ public class EventProviderServiceTests
             GroupEvent = "Zone D",
             TypeEvent = "Fault",
             Sensor = 300,
-            Status = "False",
             Reason = "FAULT_FENCE",
             FirstStart = 11,
             FirstEnd = 16,
@@ -1772,7 +1767,6 @@ public class DtoToModelHelperWithOriginEventTests
                 CreatedAt = "2025-11-25T11:00:00.000Z",
                 TypeEvent = "Fault",
                 GroupEvent = "2",
-                Status = "True",
                 Reason = "FAULT_FENCE",
                 Sensor = 2
             }
@@ -1948,7 +1942,6 @@ public class DtoToModelHelperWithOriginEventTests
                 CreatedAt = "2025-11-25T11:00:00.000Z",
                 TypeEvent = "Fault",
                 GroupEvent = "2",
-                Status = "True",
                 Reason = "FAULT_FENCE",
                 Sensor = 2
             }
@@ -1966,6 +1959,136 @@ public class DtoToModelHelperWithOriginEventTests
 
         var malfunctionOrigin = (IMalfunctionEventModel)model.OriginEvent;
         Assert.Equal("Malfunction Sensor", malfunctionOrigin.Device.DeviceName);
+    }
+    #endregion
+}
+
+/// <summary>
+/// DetectionExEventDto 변환 테스트
+/// TDD로 ToDetectionEventModel(DetectionExEventDto) 구현
+/// Phase 7.4.1-2: Unit Tests 작성
+/// </summary>
+public class DetectionExEventDtoToModelTests
+{
+    #region - Test 7.4.1: ToDetectionEventModel 정상 케이스 -
+    [Fact(DisplayName = "TEST-7.4.1: ToDetectionEventModel은 DetectionExEventDto에서 OriginEvent를 추출하여 변환해야 함")]
+    public void ToDetectionEventModel_WithValidOriginEvent_ShouldReturnDetectionEventModel()
+    {
+        // Arrange
+        var exDto = new DetectionExEventDto
+        {
+            NameEvent = "침입 감지",
+            CategoryEvent = "보안",
+            OriginEvent = new DetectionEventDto
+            {
+                Id = 100,
+                CreatedAt = "2025-11-27T10:00:00.000Z",
+                TypeEvent = "Intrusion",
+                GroupEvent = "Zone A",
+                Controller = 1,
+                Sensor = 10,
+                TypeDevice = "Fence",
+                ActionReported = "True",
+                Result = "THERMAL_SENSOR"
+            }
+        };
+
+        // Act
+        var model = exDto.ToDetectionEventModel();
+
+        // Assert
+        Assert.NotNull(model);
+        Assert.Equal(100, model.Id);
+        Assert.Equal(new DateTime(2025, 11, 27, 10, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(EnumEventType.Intrusion, model.MessageType);
+        Assert.Equal("Zone A", model.EventGroup);
+        Assert.Equal(EnumTrueFalse.True, model.Status);
+        Assert.Equal(EnumDetectionType.THERMAL_SENSOR, model.Result);
+        Assert.NotNull(model.Device);
+        Assert.Equal(10, model.Device.Id);
+    }
+    #endregion
+
+    #region - Test 7.4.1-2: DeviceProvider 오버로드 테스트 -
+    [Fact(DisplayName = "TEST-7.4.1-2: ToDetectionEventModel은 DeviceProvider를 활용하여 Device를 매칭해야 함")]
+    public void ToDetectionEventModel_WithDeviceProvider_ShouldMatchDeviceFromProvider()
+    {
+        // Arrange
+        var deviceProvider = new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider();
+        var expectedDevice = new SensorDeviceModel
+        {
+            Id = 10,
+            DeviceNumber = 101,
+            DeviceName = "펜스센서_A-001",
+            DeviceType = EnumDeviceType.Fence,
+            Status = EnumDeviceStatus.ACTIVATED
+        };
+        deviceProvider.Add(expectedDevice);
+
+        var exDto = new DetectionExEventDto
+        {
+            NameEvent = "침입 감지",
+            CategoryEvent = "보안",
+            OriginEvent = new DetectionEventDto
+            {
+                Id = 100,
+                CreatedAt = "2025-11-27T10:00:00.000Z",
+                TypeEvent = "Intrusion",
+                GroupEvent = "Zone A",
+                Controller = 1,
+                Sensor = 10,
+                TypeDevice = "Fence",
+                ActionReported = "True",
+                Result = "THERMAL_SENSOR"
+            }
+        };
+
+        // Act
+        var model = exDto.ToDetectionEventModel(deviceProvider);
+
+        // Assert
+        Assert.NotNull(model);
+        Assert.NotNull(model.Device);
+        Assert.Equal(10, model.Device.Id);
+        Assert.Equal("펜스센서_A-001", model.Device.DeviceName); // DeviceProvider에서 매칭된 정보
+        Assert.Equal(101, model.Device.DeviceNumber);
+        Assert.Equal(EnumDeviceStatus.ACTIVATED, model.Device.Status);
+    }
+    #endregion
+
+    #region - Test 7.4.2: OriginEvent null 예외 테스트 -
+    [Fact(DisplayName = "TEST-7.4.2: ToDetectionEventModel은 OriginEvent가 null일 때 ArgumentNullException을 던져야 함")]
+    public void ToDetectionEventModel_WithNullOriginEvent_ShouldThrowArgumentNullException()
+    {
+        // Arrange
+        var exDto = new DetectionExEventDto
+        {
+            NameEvent = "테스트",
+            CategoryEvent = "테스트",
+            OriginEvent = null! // null!
+        };
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentNullException>(() => exDto.ToDetectionEventModel());
+        Assert.Equal("OriginEvent", exception.ParamName);
+        Assert.Contains("OriginEvent cannot be null", exception.Message);
+    }
+
+    [Fact(DisplayName = "TEST-7.4.2-2: ToDetectionEventModel(DeviceProvider)도 OriginEvent가 null일 때 예외를 던져야 함")]
+    public void ToDetectionEventModel_WithDeviceProviderAndNullOriginEvent_ShouldThrowArgumentNullException()
+    {
+        // Arrange
+        var deviceProvider = new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider();
+        var exDto = new DetectionExEventDto
+        {
+            NameEvent = "테스트",
+            CategoryEvent = "테스트",
+            OriginEvent = null!
+        };
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentNullException>(() => exDto.ToDetectionEventModel(deviceProvider));
+        Assert.Equal("OriginEvent", exception.ParamName);
     }
     #endregion
 }

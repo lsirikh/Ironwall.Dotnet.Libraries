@@ -40,6 +40,6 @@ namespace Ironwall.Dotnet.Libraries.Enums
         // 장애보고 (115: 0x73)
         Fault = 115,
         // 풍량모드 (118: 0x76)
-        WindyMode = 118
+        WindyMode = 118,
     }
 }
