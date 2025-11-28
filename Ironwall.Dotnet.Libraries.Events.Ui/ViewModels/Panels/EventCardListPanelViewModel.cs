@@ -299,12 +299,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         //{
         //    BrkAction brkAction = new BrkAction
         //    {
-        //        IdCommand = (int)EnumEventType.Action,
+        //        IdCommand = (int)EnumEventType.ACTION,
         //        IdGroup = viewModel.IdGroup,
         //        IdController = viewModel.IdController,
         //        IdSensor = viewModel.IdSensor,
         //        TypeDevice = (int)viewModel.TypeDevice,
-        //        TypeMessage = (int)EnumEventType.Action,
+        //        TypeMessage = (int)EnumEventType.ACTION,
         //        Content = EnumLanguageHelper.GetAutoActionType(SetupModel.Language),
         //    };
         //    var json = JsonConvert.SerializeObject(brkAction);

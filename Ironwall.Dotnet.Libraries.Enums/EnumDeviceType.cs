@@ -31,7 +31,6 @@ namespace Ironwall.Dotnet.Libraries.Enums
         OpticalCable = 16, //16
 
         Fence_Group = 17,
-        //Fence_Line = 17, //17
     }
     
 }

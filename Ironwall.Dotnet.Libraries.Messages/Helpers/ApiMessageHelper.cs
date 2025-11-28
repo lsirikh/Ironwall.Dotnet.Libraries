@@ -16,7 +16,8 @@ public static class ApiMessageHelper
     {
         NullValueHandling = NullValueHandling.Ignore,
         MissingMemberHandling = MissingMemberHandling.Ignore,
-        DateFormatHandling = DateFormatHandling.IsoDateFormat
+        DateFormatHandling = DateFormatHandling.IsoDateFormat,
+        DateParseHandling = DateParseHandling.None  // ISO 날짜 문자열을 DateTime으로 변환하지 않음
     };
 
     #region - HttpResponse → ApiResponse 변환 -

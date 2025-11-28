@@ -1842,3 +1842,639 @@ var dtos = BrokerMessageHelper.ParseEventsFromBrokerMessage<MalfunctionEventDto>
 ```
 
 ---
+
+## 🐛 Phase 9: DateTime Format Issue Fix - FromEvent Deserialization
+
+**Date**: 2025-11-27
+**PRD**: `docs/debugging/DateTime_Format_Issue_PRD.md`
+**Status**: ✅ COMPLETE
+
+### Problem Summary
+`ApiMessageHelper.ToApiResponseAsync<ActionEventDto>()` 호출 후 `FromEvent.CreatedAt` 값이 ISO 8601 형식(`"2025-11-27T16:50:59.905273"`)에서 US 날짜 형식(`"11/27/2025 20:09:13"`)으로 변경됨.
+
+### Root Cause
+`ApiMessageHelper._jsonSettings`에 `DateParseHandling` 설정이 누락됨.
+- `DateParseHandling` 기본값: `DateTime` (문자열을 DateTime으로 자동 파싱)
+- JSON.NET이 ISO 문자열을 `DateTime`으로 파싱 후, `string` 속성에 할당 시 `DateTime.ToString()` 호출
+- 시스템 로케일 기본 형식으로 출력 (`"11/27/2025 4:50:59 PM"`)
+
+### Solution
+`DateParseHandling = DateParseHandling.None` 추가하여 문자열을 DateTime으로 변환하지 않도록 설정.
+
+---
+
+### Phase 9.1: Failing Test 작성 (RED)
+
+#### Test 9.1.1: FromEvent.CreatedAt ISO 형식 유지 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-9.1.1: FromJsonResponse<ActionEventDto> - FromEvent.CreatedAt은 ISO 형식을 유지해야 함")]
+public void FromJsonResponse_ActionEventDto_ShouldPreserveFromEventDateFormat()
+{
+    // Arrange
+    var json = @"{
+        ""success"": true,
+        ""message"": ""OK"",
+        ""data"": {
+            ""id"": 123,
+            ""group_event"": ""GROUP1"",
+            ""type_event"": ""Action"",
+            ""sequence"": 1,
+            ""status"": ""Complete"",
+            ""from_event"": {
+                ""id"": 456,
+                ""type_event"": ""Intrusion"",
+                ""created_at"": ""2025-11-27T16:50:59.905273"",
+                ""updated_at"": ""2025-11-27T16:50:59.905273""
+            },
+            ""created_at"": ""2025-11-27T20:09:13.123456"",
+            ""updated_at"": ""2025-11-27T20:09:13.123456""
+        }
+    }";
+
+    // Act
+    var result = ApiMessageHelper.FromJsonResponse<ActionEventDto>(json);
+
+    // Assert
+    Assert.NotNull(result?.Data?.FromEvent);
+    Assert.Equal("2025-11-27T16:50:59.905273", result.Data.FromEvent.CreatedAt);
+    Assert.Equal("2025-11-27T16:50:59.905273", result.Data.FromEvent.UpdatedAt);
+}
+```
+
+**Test Command**:
+```bash
+dotnet test Ironwall.Dotnet.Libraries.Messages --filter "DisplayName~TEST-9.1.1"
+```
+
+**Expected**: RED (테스트 실패 - CreatedAt이 US 형식으로 반환됨)
+
+---
+
+#### Test 9.1.2: FromEvent MalfunctionEventDto 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-9.1.2: FromJsonResponse<ActionEventDto> - FromEvent가 MalfunctionEventDto일 때도 ISO 형식 유지")]
+public void FromJsonResponse_ActionEventDto_WithMalfunctionFromEvent_ShouldPreserveDateFormat()
+{
+    // Arrange
+    var json = @"{
+        ""success"": true,
+        ""message"": ""OK"",
+        ""data"": {
+            ""id"": 789,
+            ""from_event"": {
+                ""id"": 101,
+                ""type_event"": ""Fault"",
+                ""reason"": ""FAULT_FENCE"",
+                ""created_at"": ""2025-11-27T10:30:00.000000"",
+                ""updated_at"": ""2025-11-27T10:30:00.000000""
+            }
+        }
+    }";
+
+    // Act
+    var result = ApiMessageHelper.FromJsonResponse<ActionEventDto>(json);
+
+    // Assert
+    Assert.NotNull(result?.Data?.FromEvent);
+    Assert.Equal("2025-11-27T10:30:00.000000", result.Data.FromEvent.CreatedAt);
+}
+```
+
+**Expected**: RED (테스트 실패)
+
+---
+
+### Phase 9.2: DateParseHandling.None 설정 추가 (GREEN)
+
+#### Test 9.2.1: ApiMessageHelper._jsonSettings 수정 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Helpers/ApiMessageHelper.cs`
+
+**GREEN Phase**:
+```csharp
+// Line 15-20: 기존 코드
+private static readonly JsonSerializerSettings _jsonSettings = new()
+{
+    NullValueHandling = NullValueHandling.Ignore,
+    MissingMemberHandling = MissingMemberHandling.Ignore,
+    DateFormatHandling = DateFormatHandling.IsoDateFormat,
+    DateParseHandling = DateParseHandling.None  // ← 추가
+};
+```
+
+**Test Command**:
+```bash
+dotnet test Ironwall.Dotnet.Libraries.Messages --filter "DisplayName~TEST-9.1"
+```
+
+**Expected**: GREEN (모든 테스트 통과)
+
+---
+
+### Phase 9.3: 회귀 테스트 (VERIFY)
+
+#### Test 9.3.1: 기존 테스트 회귀 확인 [x]
+**Type**: VERIFICATION
+**Command**:
+```bash
+dotnet test Ironwall.Dotnet.Libraries.Messages
+```
+
+**Expected**: 모든 기존 테스트 통과
+
+---
+
+#### Test 9.3.2: 전체 빌드 확인 [x]
+**Type**: VERIFICATION
+**Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Messages
+```
+
+**Expected**: 빌드 성공 (0 errors)
+
+---
+
+### Phase 9 Progress Tracking
+
+| Test | Type | Status | File |
+|------|------|--------|------|
+| 9.1.1 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+| 9.1.2 | BEHAVIORAL | [x] | Messages/Tests/UnitTest.cs |
+| 9.2.1 | BEHAVIORAL | [x] | Messages/Helpers/ApiMessageHelper.cs |
+| 9.3.1 | VERIFICATION | [x] | (전체 테스트) |
+| 9.3.2 | VERIFICATION | [x] | (전체 빌드) |
+
+---
+
+### Commit Plan
+
+**Commit 1 (RED)**:
+```
+test(messages): Add failing tests for DateTime format preservation in FromEvent
+
+RED phase - tests expected to fail
+Documents the bug: FromEvent.CreatedAt changes from ISO to US format
+```
+
+**Commit 2 (GREEN)**:
+```
+fix(messages): Add DateParseHandling.None to preserve ISO date strings
+
+GREEN phase - fixes DateTime format issue
+ApiMessageHelper._jsonSettings now prevents automatic date parsing
+FromEvent.CreatedAt maintains original ISO 8601 format
+```
+
+---
+
+### 🎯 Phase 9 완료 Summary
+
+**완료된 항목**:
+- [x] Test 9.1.1: `FromEvent.CreatedAt` ISO 형식 유지 테스트 (DetectionEventDto)
+- [x] Test 9.1.2: `FromEvent.CreatedAt` ISO 형식 유지 테스트 (MalfunctionEventDto)
+- [x] Test 9.2.1: `ApiMessageHelper._jsonSettings`에 `DateParseHandling.None` 추가
+- [x] Test 9.3.1: 전체 테스트 회귀 확인 (37개 테스트 통과)
+- [x] Test 9.3.2: 전체 빌드 확인 (0 errors)
+
+**Test Results**:
+```
+통과!  - 실패: 0, 통과: 37, 전체: 37, 기간: 113 ms
+```
+
+**수정된 파일**:
+- `Ironwall.Dotnet.Libraries.Messages/Helpers/ApiMessageHelper.cs` (Line 20)
+- `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs` (Lines 1028-1097)
+
+**Root Cause**:
+- `DateParseHandling` 기본값이 `DateTime`으로 설정되어 있어 ISO 문자열을 자동 파싱
+- `string` 속성에 할당 시 `DateTime.ToString()` 호출되어 시스템 로케일 형식으로 변환
+
+**Solution**:
+```csharp
+DateParseHandling = DateParseHandling.None  // ISO 날짜 문자열을 DateTime으로 변환하지 않음
+```
+
+**Benefits**:
+- ✅ `FromEvent.CreatedAt`이 원본 ISO 8601 형식 유지
+- ✅ `FromEvent.UpdatedAt`도 동일하게 형식 유지
+- ✅ 모든 기존 테스트 통과 (회귀 없음)
+- ✅ 시스템 로케일에 독립적인 날짜 형식
+
+---
+
+## 🚀 Phase 10: KoreaTimeHelper - 한국 시간 ISO 8601 Helper
+
+**Date**: 2025-11-28
+**PRD**: `docs/prd/PRD_KoreaTime_Helper.md`
+**Status**: ✅ COMPLETED
+
+### Problem Summary
+현재 시스템의 `CreatedAt`, `UpdatedAt`, `Timestamp` 필드가 UTC 기준으로 저장됨.
+한국에서 운영되는 시스템이므로 한국 표준시(KST, UTC+09:00)로 표현 필요.
+
+### Solution
+`KoreaTimeHelper` 클래스를 생성하여 한국 시간 ISO 8601 문자열 생성 및 변환 제공.
+
+```
+Before: "2025-11-28T09:30:00.000Z" (UTC)
+After:  "2025-11-28T18:30:00.000+09:00" (KST)
+```
+
+---
+
+### Phase 10.1: KoreaTimeHelper 클래스 생성 (TDD)
+
+#### Test 10.1.1: GetKoreaTimeIso8601() 형식 검증 테스트 [x]
+**Type**: BEHAVIORAL (RED → GREEN)
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.1: GetKoreaTimeIso8601 - +09:00 오프셋 포함 형식 반환")]
+public void GetKoreaTimeIso8601_ShouldReturnValidIso8601Format()
+{
+    // Act
+    var result = KoreaTimeHelper.GetKoreaTimeIso8601();
+
+    // Assert
+    Assert.True(result.EndsWith("+09:00"),
+        $"Expected +09:00 offset, got: {result}");
+    Assert.Contains("T", result);
+}
+```
+
+**GREEN Phase**:
+- `Helpers/KoreaTimeHelper.cs` 파일 생성
+- `GetKoreaTimeIso8601()` 메서드 구현
+
+**Test Command**:
+```bash
+dotnet test Ironwall.Dotnet.Libraries.Messages --filter "DisplayName~TEST-10.1.1"
+```
+
+---
+
+#### Test 10.1.2: GetKoreaTimeIso8601() 현재 시간 검증 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.2: GetKoreaTimeIso8601 - 현재 시간 기준 반환")]
+public void GetKoreaTimeIso8601_ShouldBeCurrentTime()
+{
+    // Arrange
+    var beforeUtc = DateTime.UtcNow;
+
+    // Act
+    var result = KoreaTimeHelper.GetKoreaTimeIso8601();
+    var parsed = DateTimeOffset.Parse(result);
+
+    // Assert
+    var afterUtc = DateTime.UtcNow;
+    Assert.True(parsed.UtcDateTime >= beforeUtc.AddSeconds(-1));
+    Assert.True(parsed.UtcDateTime <= afterUtc.AddSeconds(1));
+}
+```
+
+---
+
+#### Test 10.1.3: ToKoreaTimeIso8601(DateTime) UTC → KST 변환 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.3: ToKoreaTimeIso8601 - UTC DateTime을 KST로 변환 (+9시간)")]
+public void ToKoreaTimeIso8601_ShouldAddNineHours()
+{
+    // Arrange
+    var utcTime = new DateTime(2025, 11, 28, 9, 30, 0, DateTimeKind.Utc);
+
+    // Act
+    var result = KoreaTimeHelper.ToKoreaTimeIso8601(utcTime);
+
+    // Assert
+    Assert.StartsWith("2025-11-28T18:30:00", result);
+    Assert.EndsWith("+09:00", result);
+}
+```
+
+---
+
+#### Test 10.1.4: ParseToKoreaTime(string) UTC ISO 파싱 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.4: ParseToKoreaTime - UTC ISO 문자열을 KST DateTime으로 파싱")]
+public void ParseToKoreaTime_ShouldParseUtcToKst()
+{
+    // Arrange
+    var utcIso = "2025-11-28T09:30:00.000Z";
+
+    // Act
+    var result = KoreaTimeHelper.ParseToKoreaTime(utcIso);
+
+    // Assert
+    Assert.Equal(18, result.Hour);
+    Assert.Equal(30, result.Minute);
+}
+```
+
+---
+
+#### Test 10.1.5: ParseToKoreaTime(string) KST ISO 파싱 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.5: ParseToKoreaTime - KST ISO 문자열을 KST DateTime으로 파싱")]
+public void ParseToKoreaTime_ShouldParseKstOffset()
+{
+    // Arrange
+    var kstIso = "2025-11-28T18:30:00.000+09:00";
+
+    // Act
+    var result = KoreaTimeHelper.ParseToKoreaTime(kstIso);
+
+    // Assert
+    Assert.Equal(18, result.Hour);
+    Assert.Equal(30, result.Minute);
+}
+```
+
+---
+
+#### Test 10.1.6: ToKoreaTimeDisplayString() 표시 형식 변환 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.6: ToKoreaTimeDisplayString - ISO를 표시용 문자열로 변환")]
+public void ToKoreaTimeDisplayString_ShouldFormatCorrectly()
+{
+    // Arrange
+    var iso = "2025-11-28T18:30:45.123+09:00";
+
+    // Act
+    var defaultFormat = KoreaTimeHelper.ToKoreaTimeDisplayString(iso);
+    var customFormat = KoreaTimeHelper.ToKoreaTimeDisplayString(iso, "MM/dd HH:mm");
+
+    // Assert
+    Assert.Equal("2025-11-28 18:30:45", defaultFormat);
+    Assert.Equal("11/28 18:30", customFormat);
+}
+```
+
+---
+
+#### Test 10.1.7: ToUtcIso8601() KST → UTC 변환 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.7: ToUtcIso8601 - KST ISO를 UTC ISO로 변환")]
+public void ToUtcIso8601_ShouldConvertKstToUtc()
+{
+    // Arrange
+    var kstIso = "2025-11-28T18:30:00.000+09:00";
+
+    // Act
+    var result = KoreaTimeHelper.ToUtcIso8601(kstIso);
+
+    // Assert
+    Assert.StartsWith("2025-11-28T09:30:00", result);
+    Assert.EndsWith("Z", result);
+}
+```
+
+---
+
+#### Test 10.1.8: ToKoreaTimeDisplayString() 빈 문자열 처리 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.1.8: ToKoreaTimeDisplayString - 빈 문자열 입력 시 빈 문자열 반환")]
+public void ToKoreaTimeDisplayString_WithEmptyString_ShouldReturnEmpty()
+{
+    // Act
+    var result1 = KoreaTimeHelper.ToKoreaTimeDisplayString("");
+    var result2 = KoreaTimeHelper.ToKoreaTimeDisplayString(null!);
+
+    // Assert
+    Assert.Equal(string.Empty, result1);
+    Assert.Equal(string.Empty, result2);
+}
+```
+
+---
+
+### Phase 10.2: DTO 클래스 적용 (BEHAVIORAL)
+
+#### Test 10.2.1: BaseDto.CreatedAt 기본값 변경 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Dto/Bases/BaseDto.cs`
+
+**Changes**:
+```csharp
+// BEFORE:
+public string? CreatedAt { get; set; } = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+
+// AFTER:
+public string? CreatedAt { get; set; } = KoreaTimeHelper.GetKoreaTimeIso8601();
+```
+
+**Test Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Messages
+```
+
+---
+
+#### Test 10.2.2: MetaDto.Timestamp 기본값 변경 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Defines/Apis/MetaDto.cs`
+
+**Changes**:
+```csharp
+// BEFORE:
+public string Timestamp { get; set; } = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+
+// AFTER:
+public string Timestamp { get; set; } = KoreaTimeHelper.GetKoreaTimeIso8601();
+```
+
+---
+
+#### Test 10.2.3: BaseDto 인스턴스 KST 형식 검증 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.2.3: BaseDto.CreatedAt - 기본값이 KST 오프셋 포함")]
+public void BaseDto_CreatedAt_ShouldUseKoreaTime()
+{
+    // Act
+    var dto = new BaseDto();
+
+    // Assert
+    Assert.NotNull(dto.CreatedAt);
+    Assert.EndsWith("+09:00", dto.CreatedAt);
+}
+```
+
+---
+
+#### Test 10.2.4: MetaDto 인스턴스 KST 형식 검증 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.2.4: MetaDto.Timestamp - 기본값이 KST 오프셋 포함")]
+public void MetaDto_Timestamp_ShouldUseKoreaTime()
+{
+    // Act
+    var dto = new MetaDto();
+
+    // Assert
+    Assert.NotNull(dto.Timestamp);
+    Assert.EndsWith("+09:00", dto.Timestamp);
+}
+```
+
+---
+
+### Phase 10.3: JSON 직렬화/역직렬화 검증 (BEHAVIORAL)
+
+#### Test 10.3.1: BaseDto JSON 직렬화 KST 오프셋 유지 테스트 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.Messages/Tests/UnitTest.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-10.3.1: BaseDto JSON 직렬화 - KST 오프셋 유지")]
+public void BaseDto_Serialization_ShouldPreserveKoreaOffset()
+{
+    // Arrange
+    var dto = new BaseDto { Id = 1 };
+
+    // Act
+    var json = JsonConvert.SerializeObject(dto);
+    var deserialized = JsonConvert.DeserializeObject<BaseDto>(json);
+
+    // Assert
+    Assert.NotNull(deserialized?.CreatedAt);
+    Assert.Contains("+09:00", deserialized.CreatedAt);
+}
+```
+
+---
+
+### Phase 10.4: 회귀 테스트 (VERIFICATION)
+
+#### Test 10.4.1: 전체 테스트 회귀 확인 [x]
+**Type**: VERIFICATION
+**Command**:
+```bash
+dotnet test Ironwall.Dotnet.Libraries.Messages
+```
+
+**Expected**: 모든 기존 테스트 통과 + 신규 테스트 통과
+
+---
+
+#### Test 10.4.2: 전체 빌드 확인 [x]
+**Type**: VERIFICATION
+**Command**:
+```bash
+dotnet build Ironwall.Dotnet.Libraries.Messages
+```
+
+**Expected**: 빌드 성공 (0 errors)
+
+---
+
+### Phase 10 Progress Tracking
+
+| Test | Type | Status | Description |
+|------|------|--------|-------------|
+| 10.1.1 | BEHAVIORAL | [x] | GetKoreaTimeIso8601() +09:00 형식 검증 |
+| 10.1.2 | BEHAVIORAL | [x] | GetKoreaTimeIso8601() 현재 시간 검증 |
+| 10.1.3 | BEHAVIORAL | [x] | ToKoreaTimeIso8601(DateTime) UTC→KST 변환 |
+| 10.1.4 | BEHAVIORAL | [x] | ParseToKoreaTime() UTC ISO 파싱 |
+| 10.1.5 | BEHAVIORAL | [x] | ParseToKoreaTime() KST ISO 파싱 |
+| 10.1.6 | BEHAVIORAL | [x] | ToKoreaTimeDisplayString() 표시 형식 |
+| 10.1.7 | BEHAVIORAL | [x] | ToUtcIso8601() KST→UTC 변환 |
+| 10.1.8 | BEHAVIORAL | [x] | ToKoreaTimeDisplayString() 빈 문자열 처리 |
+| 10.2.1 | BEHAVIORAL | [x] | BaseDto.CreatedAt 기본값 변경 |
+| 10.2.2 | BEHAVIORAL | [x] | MetaDto.Timestamp 기본값 변경 |
+| 10.2.3 | BEHAVIORAL | [x] | BaseDto 인스턴스 KST 형식 검증 |
+| 10.2.4 | BEHAVIORAL | [x] | MetaDto 인스턴스 KST 형식 검증 |
+| 10.3.1 | BEHAVIORAL | [x] | BaseDto JSON 직렬화 오프셋 유지 |
+| 10.4.1 | VERIFICATION | [x] | 전체 테스트 회귀 확인 (48/48 통과) |
+| 10.4.2 | VERIFICATION | [x] | 전체 빌드 확인 (0 errors) |
+
+---
+
+### Commit Plan
+
+**Commit 1 (RED - Tests)**:
+```
+test(messages): Add failing tests for KoreaTimeHelper
+
+RED phase - tests expected to fail
+Documents expected behavior for Korea time ISO 8601 helper
+```
+
+**Commit 2 (GREEN - Implementation)**:
+```
+feat(messages): Implement KoreaTimeHelper for Korea time ISO 8601
+
+GREEN phase - implements KoreaTimeHelper class
+- GetKoreaTimeIso8601(): Returns current time with +09:00 offset
+- ToKoreaTimeIso8601(): Converts UTC DateTime to KST ISO 8601
+- ParseToKoreaTime(): Parses ISO string to KST DateTime
+- ToKoreaTimeDisplayString(): Formats for UI display
+- ToUtcIso8601(): Converts KST to UTC ISO 8601
+```
+
+**Commit 3 (DTO Integration)**:
+```
+feat(messages): Apply KoreaTimeHelper to BaseDto and MetaDto
+
+BEHAVIORAL change - updates default timestamp values
+- BaseDto.CreatedAt uses KoreaTimeHelper.GetKoreaTimeIso8601()
+- MetaDto.Timestamp uses KoreaTimeHelper.GetKoreaTimeIso8601()
+```
+
+---
+
+### 🎯 Next Action
+
+**When you say "go"**:
+
+1. **Find next unmarked test**: [ ] **Test 10.1.1** (GetKoreaTimeIso8601 형식 검증)
+2. **RED**: Write failing test first
+3. **GREEN**: Implement `KoreaTimeHelper.GetKoreaTimeIso8601()`
+4. **Verify**: Run test → should pass
+5. **Continue** to Test 10.1.2
+
+---

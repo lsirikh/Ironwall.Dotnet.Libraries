@@ -26,7 +26,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
 
     public static class TypeConst_en
     {
-        public const string INTRUSION = "Intrusion Detection";
+        public const string INTRUSION = "DETECTION Detection";
         public const string FAULT_CONTROLLER = "CONTROLLER failure";
         public const string FAULT_FENCE = "Vibration sensor failure";
         public const string FAULT_MULTI = "multiple sensor failure";

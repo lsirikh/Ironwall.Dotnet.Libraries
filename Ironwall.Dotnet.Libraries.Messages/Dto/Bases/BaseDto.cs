@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,10 +16,11 @@ public class BaseDto
     public int Id { get; set; }
 
     /// <summary>
-    /// 생성일시 (ISO 8601)
+    /// 생성일시 (ISO 8601 with Korea offset)
+    /// 예: "2025-11-28T18:30:00.000+09:00"
     /// </summary>
     [JsonProperty("created_at", Order = 99)]
-    public string? CreatedAt { get; set; } = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+    public string? CreatedAt { get; set; } = KoreaTimeHelper.GetKoreaTimeIso8601();
 
     /// <summary>
     /// 수정일시 (ISO 8601)

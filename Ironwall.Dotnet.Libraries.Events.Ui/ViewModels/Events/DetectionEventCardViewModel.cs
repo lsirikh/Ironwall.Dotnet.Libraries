@@ -42,17 +42,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             Contents = content ?? "자동 조치보고";
             await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
 
-            var message = new SendActionRequestMessage
-            {
-                DetectionEventId = Model.Id,
-                ActionDetails = Contents,
-                ActionUser = idUser,
-                ActionTime = DateTime.Now
-            };
-
-            // EventAggregator를 통해 메시지 발행
-            await _eventAggregator.PublishOnBackgroundThreadAsync(message);
-
             await base.SendAction(content, idUser);
         }
 

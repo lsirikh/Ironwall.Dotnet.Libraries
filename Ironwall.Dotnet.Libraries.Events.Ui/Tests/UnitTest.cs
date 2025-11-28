@@ -28,7 +28,7 @@ public class DtoToModelHelperTests
         {
             Id = 1,
             GroupEvent = "Zone A",
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Controller = 10,
             Sensor = 100,
             TypeDevice = "FENCE",
@@ -74,7 +74,7 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(1, dto.Id);
         Assert.Equal("2025-11-24T10:30:00.000Z", dto.CreatedAt);
-        Assert.Equal("Intrusion", dto.TypeEvent);
+        Assert.Equal("DETECTION", dto.TypeEvent);
         Assert.Equal("Zone A", dto.GroupEvent);
         Assert.Equal("True", dto.ActionReported);
         Assert.Equal("THERMAL_SENSOR", dto.Result);
@@ -89,7 +89,7 @@ public class DtoToModelHelperTests
         {
             Id = 2,
             GroupEvent = "Zone B",
-            TypeEvent = "Fault",
+            TypeEvent = "MALFUNCTION",
             Controller = 20,
             Sensor = 200,
             TypeDevice = "FENCE",
@@ -147,7 +147,7 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(2, dto.Id);
         Assert.Equal("2025-11-24T11:00:00.000Z", dto.CreatedAt);
-        Assert.Equal("Fault", dto.TypeEvent);
+        Assert.Equal("MALFUNCTION", dto.TypeEvent);
         Assert.Equal("Zone B", dto.GroupEvent);
         Assert.Equal("FAULT_FENCE", dto.Reason);
         Assert.Equal(10, dto.FirstStart);
@@ -165,7 +165,7 @@ public class DtoToModelHelperTests
         {
             Id = 3,
             GroupEvent = "Zone C",
-            TypeEvent = "Connection",
+            TypeEvent = "CONNECTION",
             Controller = 30,
             Sensor = 300,
             TypeDevice = "CONTROLLER",
@@ -206,7 +206,7 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(3, dto.Id);
         Assert.Equal("2025-11-24T12:00:00.000Z", dto.CreatedAt);
-        Assert.Equal("Connection", dto.TypeEvent);
+        Assert.Equal("CONNECTION", dto.TypeEvent);
         Assert.Equal("Zone C", dto.GroupEvent);
         Assert.Equal(300, dto.Sensor);
     }
@@ -218,7 +218,7 @@ public class DtoToModelHelperTests
         var dto = new ActionEventDto
         {
             Id = 4,
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "Reset system",
             User = "admin",
             FromEvent = null, // Simplified - no nested event for now
@@ -257,7 +257,7 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(4, dto.Id);
         Assert.Equal("2025-11-24T13:00:00.000Z", dto.CreatedAt);
-        Assert.Equal("Action", dto.TypeEvent);
+        Assert.Equal("ACTION", dto.TypeEvent);
         Assert.Equal("Reset system", dto.Content);
         Assert.Equal("admin", dto.User);
     }
@@ -278,7 +278,7 @@ public class EventProviderServiceTests
             {
                 Id = 1,
                 GroupEvent = "Zone A",
-                TypeEvent = "Intrusion",
+                TypeEvent = "DETECTION",
                 Sensor = 100,
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
@@ -341,8 +341,8 @@ public class EventProviderServiceTests
             Success = true,
             Data = new List<DetectionEventDto>
             {
-                new DetectionEventDto { Id = 1, GroupEvent = "Zone A", TypeEvent = "Intrusion", Sensor = 100, ActionReported = "True", Result = "THERMAL_SENSOR", CreatedAt = "2025-11-24T10:00:00.000Z" },
-                new DetectionEventDto { Id = 2, GroupEvent = "Zone A", TypeEvent = "Intrusion", Sensor = 101, ActionReported = "False", Result = "PIR_SENSOR", CreatedAt = "2025-11-24T10:05:00.000Z" }
+                new DetectionEventDto { Id = 1, GroupEvent = "Zone A", TypeEvent = "DETECTION", Sensor = 100, ActionReported = "True", Result = "THERMAL_SENSOR", CreatedAt = "2025-11-24T10:00:00.000Z" },
+                new DetectionEventDto { Id = 2, GroupEvent = "Zone A", TypeEvent = "DETECTION", Sensor = 101, ActionReported = "False", Result = "PIR_SENSOR", CreatedAt = "2025-11-24T10:05:00.000Z" }
             },
             Pagination = new PaginationDto { Page = 1, TotalPages = 2, Total = 3, Limit = 2 }
         };
@@ -353,7 +353,7 @@ public class EventProviderServiceTests
             Success = true,
             Data = new List<DetectionEventDto>
             {
-                new DetectionEventDto { Id = 3, GroupEvent = "Zone B", TypeEvent = "Intrusion", Sensor = 102, ActionReported = "False", Result = "VIBRATION_SENSOR", CreatedAt = "2025-11-24T10:10:00.000Z" }
+                new DetectionEventDto { Id = 3, GroupEvent = "Zone B", TypeEvent = "DETECTION", Sensor = 102, ActionReported = "False", Result = "VIBRATION_SENSOR", CreatedAt = "2025-11-24T10:10:00.000Z" }
             },
             Pagination = new PaginationDto { Page = 2, TotalPages = 2, Total = 3, Limit = 2 }
         };
@@ -514,7 +514,7 @@ public class EventProviderServiceTests
             {
                 Id = 1,
                 GroupEvent = "Zone A",
-                TypeEvent = "Fault",
+                TypeEvent = "MALFUNCTION",
                 Sensor = 100,
                 ActionReported = "False",
                 Reason = "FAULT_FENCE",
@@ -578,7 +578,7 @@ public class EventProviderServiceTests
             {
                 Id = 1,
                 GroupEvent = "Zone A",
-                TypeEvent = "Connection",
+                TypeEvent = "CONNECTION",
                 Sensor = 100,
                 CreatedAt = "2025-11-24T12:00:00.000Z"
             }
@@ -634,7 +634,7 @@ public class EventProviderServiceTests
             new ActionEventDto
             {
                 Id = 1,
-                TypeEvent = "Action",
+                TypeEvent = "ACTION",
                 Content = "Patrol dispatched",
                 User = "operator_test",
                 CreatedAt = "2025-11-24T13:00:00.000Z"
@@ -704,7 +704,7 @@ public class EventProviderServiceTests
         {
             Id = 999,
             GroupEvent = "Zone C",
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Sensor = 200,
             ActionReported = "True",
             Result = "THERMAL_SENSOR",
@@ -760,7 +760,7 @@ public class EventProviderServiceTests
         {
             Id = 100,
             GroupEvent = "Zone C",
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Sensor = 200,
             ActionReported = "False",
             Result = "PIR_SENSOR",
@@ -851,7 +851,7 @@ public class EventProviderServiceTests
         {
             Id = 888,
             GroupEvent = "Zone D",
-            TypeEvent = "Fault",
+            TypeEvent = "MALFUNCTION",
             Sensor = 300,
             Reason = "FAULT_CONTROLLER",
             FirstStart = 10,
@@ -911,7 +911,7 @@ public class EventProviderServiceTests
         {
             Id = 200,
             GroupEvent = "Zone D",
-            TypeEvent = "Fault",
+            TypeEvent = "MALFUNCTION",
             Sensor = 300,
             Reason = "FAULT_FENCE",
             FirstStart = 11,
@@ -996,7 +996,7 @@ public class EventProviderServiceTests
         {
             Id = 777,
             GroupEvent = "Zone E",
-            TypeEvent = "Connection",
+            TypeEvent = "CONNECTION",
             Sensor = 400,
             CreatedAt = "2025-11-24T14:00:00.000Z"
         };
@@ -1045,7 +1045,7 @@ public class EventProviderServiceTests
         {
             Id = 300,
             GroupEvent = "Zone E",
-            TypeEvent = "Connection",
+            TypeEvent = "CONNECTION",
             Sensor = 400,
             CreatedAt = "2025-11-24T14:00:00.000Z"
         };
@@ -1122,7 +1122,7 @@ public class EventProviderServiceTests
         var createdDto = new ActionEventDto
         {
             Id = 666,
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "Emergency response",
             User = "admin_user",
             CreatedAt = "2025-11-24T15:00:00.000Z"
@@ -1171,7 +1171,7 @@ public class EventProviderServiceTests
         var updatedDto = new ActionEventDto
         {
             Id = 400,
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "Updated response",
             User = "supervisor",
             CreatedAt = "2025-11-24T15:00:00.000Z"
@@ -1437,8 +1437,8 @@ public class EventProviderServiceIntegrationTests : IDisposable
         _logService.Info($"Fetched total {totalCount} events from real API:");
         _logService.Info($"  - Detection: {detectionEvents.Count}");
         _logService.Info($"  - Malfunction: {malfunctionEvents.Count}");
-        _logService.Info($"  - Connection: {connectionEvents.Count}");
-        _logService.Info($"  - Action: {actionEvents.Count}");
+        _logService.Info($"  - CONNECTION: {connectionEvents.Count}");
+        _logService.Info($"  - ACTION: {actionEvents.Count}");
     }
 
     [Fact(DisplayName = "INT-07. Fetch Events with Short Date Range - Real API")]
@@ -1553,7 +1553,7 @@ public class DtoToModelHelperWithDeviceProviderTests
         {
             Id = 100,
             Sensor = 1,
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -1582,7 +1582,7 @@ public class DtoToModelHelperWithDeviceProviderTests
         {
             Id = 100,
             Sensor = 1, // 존재하지 않는 ID
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -1608,7 +1608,7 @@ public class DtoToModelHelperWithDeviceProviderTests
         {
             Id = 100,
             Sensor = 1,
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -1655,7 +1655,7 @@ public class DtoToModelHelperWithDeviceProviderTests
         {
             Id = 100,
             Sensor = 1, // Controller와 Sensor 둘 다 id=1
-            TypeEvent = "Intrusion",
+            TypeEvent = "DETECTION",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -1706,17 +1706,17 @@ public class DtoToModelHelperWithOriginEventTests
         {
             Id = 123,
             CreatedAt = "2025-11-25T10:30:00.000Z",
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "오탐 처리",
             User = "admin",
             FromEvent = new DetectionEventDto
             {
                 Id = 456, // EventProvider에 있는 Event
                 CreatedAt = "2025-11-25T10:00:00.000Z",
-                TypeEvent = "Intrusion",
+                TypeEvent = "DETECTION",
                 GroupEvent = "1",
                 ActionReported = "True",
-                Result = "Intrusion",
+                Result = "DETECTION",
                 Sensor = 1
             }
         };
@@ -1758,14 +1758,14 @@ public class DtoToModelHelperWithOriginEventTests
         {
             Id = 124,
             CreatedAt = "2025-11-25T11:30:00.000Z",
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "장애 확인",
             User = "admin",
             FromEvent = new MalfunctionEventDto
             {
                 Id = 789, // EventProvider에 있는 Event
                 CreatedAt = "2025-11-25T11:00:00.000Z",
-                TypeEvent = "Fault",
+                TypeEvent = "MALFUNCTION",
                 GroupEvent = "2",
                 Reason = "FAULT_FENCE",
                 Sensor = 2
@@ -1799,14 +1799,14 @@ public class DtoToModelHelperWithOriginEventTests
         {
             Id = 125,
             CreatedAt = "2025-11-25T12:00:00.000Z",
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "신규 조치",
             User = "admin",
             FromEvent = new DetectionEventDto
             {
                 Id = 999, // EventProvider에 없는 Event
                 CreatedAt = "2025-11-25T11:50:00.000Z",
-                TypeEvent = "Intrusion",
+                TypeEvent = "DETECTION",
                 GroupEvent = "3",
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
@@ -1840,14 +1840,14 @@ public class DtoToModelHelperWithOriginEventTests
         {
             Id = 126,
             CreatedAt = "2025-11-25T13:00:00.000Z",
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "조치",
             User = "admin",
             FromEvent = new DetectionEventDto
             {
                 Id = 888,
                 CreatedAt = "2025-11-25T12:50:00.000Z",
-                TypeEvent = "Intrusion",
+                TypeEvent = "DETECTION",
                 GroupEvent = "4",
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
@@ -1880,7 +1880,7 @@ public class DtoToModelHelperWithOriginEventTests
         {
             Id = 127,
             CreatedAt = "2025-11-25T14:00:00.000Z",
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "조치",
             User = "admin",
             FromEvent = null // FromEvent가 null
@@ -1933,14 +1933,14 @@ public class DtoToModelHelperWithOriginEventTests
         {
             Id = 128,
             CreatedAt = "2025-11-25T12:00:00.000Z",
-            TypeEvent = "Action",
+            TypeEvent = "ACTION",
             Content = "장애 조치",
             User = "admin",
             FromEvent = new MalfunctionEventDto
             {
                 Id = 1, // DetectionEvent와 MalfunctionEvent 둘 다 id=1
                 CreatedAt = "2025-11-25T11:00:00.000Z",
-                TypeEvent = "Fault",
+                TypeEvent = "MALFUNCTION",
                 GroupEvent = "2",
                 Reason = "FAULT_FENCE",
                 Sensor = 2
@@ -1983,7 +1983,7 @@ public class DetectionExEventDtoToModelTests
             {
                 Id = 100,
                 CreatedAt = "2025-11-27T10:00:00.000Z",
-                TypeEvent = "Intrusion",
+                TypeEvent = "DETECTION",
                 GroupEvent = "Zone A",
                 Controller = 1,
                 Sensor = 10,
@@ -2033,7 +2033,7 @@ public class DetectionExEventDtoToModelTests
             {
                 Id = 100,
                 CreatedAt = "2025-11-27T10:00:00.000Z",
-                TypeEvent = "Intrusion",
+                TypeEvent = "DETECTION",
                 GroupEvent = "Zone A",
                 Controller = 1,
                 Sensor = 10,

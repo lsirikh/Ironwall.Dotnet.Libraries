@@ -1024,3 +1024,237 @@ public class BrokerMessageParsingTests
     }
     #endregion
 }
+
+/// <summary>
+/// Phase 9: DateTime Format Issue Fix - FromEvent Deserialization
+/// PRD: docs/debugging/DateTime_Format_Issue_PRD.md
+/// </summary>
+public class DateTimeFormatPreservationTests
+{
+    #region - Test 9.1.1: FromEvent.CreatedAt ISO 형식 유지 테스트 -
+    [Fact(DisplayName = "TEST-9.1.1: FromJsonResponse<ActionEventDto> - FromEvent.CreatedAt은 ISO 형식을 유지해야 함")]
+    public void FromJsonResponse_ActionEventDto_ShouldPreserveFromEventDateFormat()
+    {
+        // Arrange
+        var json = @"{
+            ""success"": true,
+            ""message"": ""OK"",
+            ""data"": {
+                ""id"": 123,
+                ""group_event"": ""GROUP1"",
+                ""type_event"": ""Action"",
+                ""sequence"": 1,
+                ""status"": ""Complete"",
+                ""from_event"": {
+                    ""id"": 456,
+                    ""type_event"": ""Intrusion"",
+                    ""created_at"": ""2025-11-27T16:50:59.905273"",
+                    ""updated_at"": ""2025-11-27T16:50:59.905273""
+                },
+                ""created_at"": ""2025-11-27T20:09:13.123456"",
+                ""updated_at"": ""2025-11-27T20:09:13.123456""
+            }
+        }";
+
+        // Act
+        var result = ApiMessageHelper.FromJsonResponse<ActionEventDto>(json);
+
+        // Assert
+        Assert.NotNull(result?.Data?.FromEvent);
+        Assert.Equal("2025-11-27T16:50:59.905273", result.Data.FromEvent.CreatedAt);
+        Assert.Equal("2025-11-27T16:50:59.905273", result.Data.FromEvent.UpdatedAt);
+    }
+    #endregion
+
+    #region - Test 9.1.2: FromEvent MalfunctionEventDto 테스트 -
+    [Fact(DisplayName = "TEST-9.1.2: FromJsonResponse<ActionEventDto> - FromEvent가 MalfunctionEventDto일 때도 ISO 형식 유지")]
+    public void FromJsonResponse_ActionEventDto_WithMalfunctionFromEvent_ShouldPreserveDateFormat()
+    {
+        // Arrange
+        var json = @"{
+            ""success"": true,
+            ""message"": ""OK"",
+            ""data"": {
+                ""id"": 789,
+                ""from_event"": {
+                    ""id"": 101,
+                    ""type_event"": ""Fault"",
+                    ""reason"": ""FAULT_FENCE"",
+                    ""created_at"": ""2025-11-27T10:30:00.000000"",
+                    ""updated_at"": ""2025-11-27T10:30:00.000000""
+                }
+            }
+        }";
+
+        // Act
+        var result = ApiMessageHelper.FromJsonResponse<ActionEventDto>(json);
+
+        // Assert
+        Assert.NotNull(result?.Data?.FromEvent);
+        Assert.Equal("2025-11-27T10:30:00.000000", result.Data.FromEvent.CreatedAt);
+    }
+    #endregion
+}
+
+#region - Phase 10: KoreaTimeHelper Tests -
+/// <summary>
+/// KoreaTimeHelper 테스트 클래스
+/// <para>한국 시간 ISO 8601 Helper 메서드 검증</para>
+/// </summary>
+public class KoreaTimeHelperTests
+{
+    [Fact(DisplayName = "TEST-10.1.1: GetKoreaTimeIso8601 - +09:00 오프셋 포함 형식 반환")]
+    public void GetKoreaTimeIso8601_ShouldReturnValidIso8601Format()
+    {
+        // Act
+        var result = KoreaTimeHelper.GetKoreaTimeIso8601();
+
+        // Assert
+        Assert.True(result.EndsWith("+09:00"),
+            $"Expected +09:00 offset, got: {result}");
+        Assert.Contains("T", result);
+    }
+
+    [Fact(DisplayName = "TEST-10.1.2: GetKoreaTimeIso8601 - 현재 시간 기준 반환")]
+    public void GetKoreaTimeIso8601_ShouldBeCurrentTime()
+    {
+        // Arrange
+        var beforeUtc = DateTime.UtcNow;
+
+        // Act
+        var result = KoreaTimeHelper.GetKoreaTimeIso8601();
+        var parsed = DateTimeOffset.Parse(result);
+
+        // Assert
+        var afterUtc = DateTime.UtcNow;
+        Assert.True(parsed.UtcDateTime >= beforeUtc.AddSeconds(-1));
+        Assert.True(parsed.UtcDateTime <= afterUtc.AddSeconds(1));
+    }
+
+    [Fact(DisplayName = "TEST-10.1.3: ToKoreaTimeIso8601 - UTC DateTime을 KST로 변환 (+9시간)")]
+    public void ToKoreaTimeIso8601_ShouldAddNineHours()
+    {
+        // Arrange
+        var utcTime = new DateTime(2025, 11, 28, 9, 30, 0, DateTimeKind.Utc);
+
+        // Act
+        var result = KoreaTimeHelper.ToKoreaTimeIso8601(utcTime);
+
+        // Assert
+        Assert.StartsWith("2025-11-28T18:30:00", result);
+        Assert.EndsWith("+09:00", result);
+    }
+
+    [Fact(DisplayName = "TEST-10.1.4: ParseToKoreaTime - UTC ISO 문자열을 KST DateTime으로 파싱")]
+    public void ParseToKoreaTime_ShouldParseUtcToKst()
+    {
+        // Arrange
+        var utcIso = "2025-11-28T09:30:00.000Z";
+
+        // Act
+        var result = KoreaTimeHelper.ParseToKoreaTime(utcIso);
+
+        // Assert
+        Assert.Equal(18, result.Hour);
+        Assert.Equal(30, result.Minute);
+    }
+
+    [Fact(DisplayName = "TEST-10.1.5: ParseToKoreaTime - KST ISO 문자열을 KST DateTime으로 파싱")]
+    public void ParseToKoreaTime_ShouldParseKstOffset()
+    {
+        // Arrange
+        var kstIso = "2025-11-28T18:30:00.000+09:00";
+
+        // Act
+        var result = KoreaTimeHelper.ParseToKoreaTime(kstIso);
+
+        // Assert
+        Assert.Equal(18, result.Hour);
+        Assert.Equal(30, result.Minute);
+    }
+
+    [Fact(DisplayName = "TEST-10.1.6: ToKoreaTimeDisplayString - ISO를 표시용 문자열로 변환")]
+    public void ToKoreaTimeDisplayString_ShouldFormatCorrectly()
+    {
+        // Arrange
+        var iso = "2025-11-28T18:30:45.123+09:00";
+
+        // Act
+        var defaultFormat = KoreaTimeHelper.ToKoreaTimeDisplayString(iso);
+        var customFormat = KoreaTimeHelper.ToKoreaTimeDisplayString(iso, "MM-dd HH:mm");
+
+        // Assert
+        Assert.Equal("2025-11-28 18:30:45", defaultFormat);
+        Assert.Equal("11-28 18:30", customFormat);
+    }
+
+    [Fact(DisplayName = "TEST-10.1.7: ToUtcIso8601 - KST ISO를 UTC ISO로 변환")]
+    public void ToUtcIso8601_ShouldConvertKstToUtc()
+    {
+        // Arrange
+        var kstIso = "2025-11-28T18:30:00.000+09:00";
+
+        // Act
+        var result = KoreaTimeHelper.ToUtcIso8601(kstIso);
+
+        // Assert
+        Assert.StartsWith("2025-11-28T09:30:00", result);
+        Assert.EndsWith("Z", result);
+    }
+
+    [Fact(DisplayName = "TEST-10.1.8: ToKoreaTimeDisplayString - 빈 문자열 입력 시 빈 문자열 반환")]
+    public void ToKoreaTimeDisplayString_WithEmptyString_ShouldReturnEmpty()
+    {
+        // Act
+        var result1 = KoreaTimeHelper.ToKoreaTimeDisplayString("");
+        var result2 = KoreaTimeHelper.ToKoreaTimeDisplayString(null!);
+
+        // Assert
+        Assert.Equal(string.Empty, result1);
+        Assert.Equal(string.Empty, result2);
+    }
+
+    [Fact(DisplayName = "TEST-10.2.3: BaseDto.CreatedAt - KST +09:00 오프셋 형식 검증")]
+    public void BaseDto_CreatedAt_ShouldHaveKstOffset()
+    {
+        // Arrange
+        var baseDto = new Dto.Bases.BaseDto();
+
+        // Assert
+        Assert.NotNull(baseDto.CreatedAt);
+        Assert.True(baseDto.CreatedAt.EndsWith("+09:00"),
+            $"Expected +09:00 offset, got: {baseDto.CreatedAt}");
+        Assert.Contains("T", baseDto.CreatedAt);
+    }
+
+    [Fact(DisplayName = "TEST-10.2.4: MetaDto.Timestamp - KST +09:00 오프셋 형식 검증")]
+    public void MetaDto_Timestamp_ShouldHaveKstOffset()
+    {
+        // Arrange
+        var metaDto = new MetaDto();
+
+        // Assert
+        Assert.NotNull(metaDto.Timestamp);
+        Assert.True(metaDto.Timestamp.EndsWith("+09:00"),
+            $"Expected +09:00 offset, got: {metaDto.Timestamp}");
+        Assert.Contains("T", metaDto.Timestamp);
+    }
+
+    [Fact(DisplayName = "TEST-10.3.1: BaseDto JSON 직렬화 - KST 오프셋 유지 검증")]
+    public void BaseDto_JsonSerialization_ShouldPreserveKstOffset()
+    {
+        // Arrange
+        var baseDto = new Dto.Bases.BaseDto { Id = 1 };
+
+        // Act
+        var json = JsonConvert.SerializeObject(baseDto);
+        var deserialized = JsonConvert.DeserializeObject<Dto.Bases.BaseDto>(json);
+
+        // Assert
+        Assert.NotNull(deserialized?.CreatedAt);
+        Assert.True(deserialized.CreatedAt.EndsWith("+09:00"),
+            $"Expected +09:00 offset after round-trip, got: {deserialized.CreatedAt}");
+        Assert.Contains("+09:00", json);
+    }
+}
+#endregion

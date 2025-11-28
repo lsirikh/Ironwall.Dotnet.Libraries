@@ -126,8 +126,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     {
                         new CategoryMeta("Detection",  new SKColor(255, 205, 0), _eventProvider.OfType<IDetectionEventModel>()),
                         new CategoryMeta("Malfunction", new SKColor(30, 144, 255), _eventProvider.OfType<IMalfunctionEventModel>()),
-                        new CategoryMeta("Connection", new SKColor(155, 89, 182), _eventProvider.OfType<IConnectionEventModel>()),
-                        new CategoryMeta("Action", new SKColor(50, 205, 50), _eventProvider.OfType<IActionEventModel>())
+                        new CategoryMeta("CONNECTION", new SKColor(155, 89, 182), _eventProvider.OfType<IConnectionEventModel>()),
+                        new CategoryMeta("ACTION", new SKColor(50, 205, 50), _eventProvider.OfType<IActionEventModel>())
                     };
 
                     var xLabels = new SortedSet<string>();

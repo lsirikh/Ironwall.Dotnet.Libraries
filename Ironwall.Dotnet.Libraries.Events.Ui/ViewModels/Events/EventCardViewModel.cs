@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
@@ -41,6 +42,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 Cts.Cancel();
                 Cts.Dispose();
             }
+
+            var message = new SendActionRequestMessage
+            {
+                EventId = Model.Id,
+                EventType = EnumEventType.Intrusion,
+                ActionDetails = Contents,
+                ActionUser = idUser,
+                ActionTime = DateTime.Now
+            };
+
+            // EventAggregator를 통해 메시지 발행
+            await _eventAggregator.PublishOnBackgroundThreadAsync(message);
+
             await CloseDialog();
         }
         #endregion

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using System;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Comms;
 /****************************************************************************
@@ -12,9 +13,14 @@ namespace Ironwall.Dotnet.Monitoring.Models.Comms;
 public class SendActionRequestMessage
 {
     /// <summary>
-    /// DetectionEvent의 DB ID
+    /// DetectionEvent/Malfunction의 DB ID
     /// </summary>
-    public int DetectionEventId { get; set; }
+    public int EventId { get; set; }
+
+    /// <summary>
+    /// EventType을 통한 타입 조회
+    /// </summary>
+    public EnumEventType EventType { get; set; }
 
     /// <summary>
     /// 조치 내용

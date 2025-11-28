@@ -140,11 +140,9 @@ public sealed class DeviceDbFixture : IAsyncLifetime
             int typeIndex = cam % 5;
             EnumCameraType cameraType = typeIndex switch
             {
-                0 => EnumCameraType.THERMAL,
+                0 => EnumCameraType.NONE,
                 1 => EnumCameraType.FIXED,
                 2 => EnumCameraType.PTZ,
-                3 => EnumCameraType.FISHEYES,
-                4 => EnumCameraType.NONE,
                 _ => EnumCameraType.FIXED
             };
 
@@ -169,11 +167,11 @@ public sealed class DeviceDbFixture : IAsyncLifetime
                 Version = "v2.0.1",
                 Status = cam % 7 == 0 ? EnumDeviceStatus.ERROR : EnumDeviceStatus.ACTIVATED, // 7번째마다 ERROR
                 IpAddress = $"192.168.200.{cam}",
-                Port = cameraType == EnumCameraType.THERMAL ? 80 : 8554, // 열화상 카메라는 다른 포트
+                Port =80, // 열화상 카메라는 다른 포트
                 Username = "admin",
                 Password = "sensorway123",
                 RtspUri = $"rtsp://192.168.200.{cam}/stream1",
-                RtspPort = cameraType == EnumCameraType.FISHEYES ? 8554 : 554, // 어안 카메라는 다른 RTSP 포트
+                RtspPort = 554, // 어안 카메라는 다른 RTSP 포트
                 Mode = cameraMode,
                 Category = cameraType
             };
