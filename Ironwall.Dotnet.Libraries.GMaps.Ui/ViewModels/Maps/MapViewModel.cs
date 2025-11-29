@@ -3806,6 +3806,10 @@ public class MapViewModel : BasePanelViewModel
 
         PropertyPanel = _propertyPanelFactory.CreatePropertyPanel(SelectedMarker);
 
+        if(PropertyPanel is GMapPropertyPidsControl pidsControlPanel)
+        {
+            _log?.Info($"PropertyPanel의 {pidsControlPanel?.LinkedDevice?.DeviceName}");
+        }
         if (PropertyPanel != null)
         {
             // 이벤트 구독 추가

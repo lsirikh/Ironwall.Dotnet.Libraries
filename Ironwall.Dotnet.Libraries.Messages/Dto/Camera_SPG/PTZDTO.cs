@@ -8,31 +8,37 @@ using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Camera_SPG
 {
-    public class PTZDTO: BaseDto
+    public class PTZDto: BaseDto
     {
         /// <summary>
         /// 카메라 번호
         /// </summary>
-        [JsonProperty("cameraId", Order = 2)]
+        [JsonProperty("id_camera", Order = 2)]
         public int CameraId { get; set; }
+
+        /// <summary>
+        /// 카메라 이름
+        /// </summary>
+        [JsonProperty("name_camera", Order = 2)]
+        public string CameraName { get; set; } = string.Empty;
 
         /// <summary>
         /// 팬 각도
         /// </summary>
         [JsonProperty("p", Order = 3)]
-        public int P { get; set; }
+        public float P { get; set; }
 
         /// <summary>
         /// 틸트 각도
         /// </summary>
         [JsonProperty("t", Order = 4)]
-        public int T { get; set; }
+        public float T { get; set; }
 
 
         /// <summary>
         /// 줌 배율
         /// </summary>
         [JsonProperty("z", Order = 5)]
-        public int Z { get; set; }
+        public float Z { get; set; }
     }
 }

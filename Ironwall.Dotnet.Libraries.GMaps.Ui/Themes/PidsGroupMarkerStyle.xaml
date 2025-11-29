@@ -25,8 +25,7 @@
 							VerticalAlignment="Center"
 							ClipToBounds="False">
 
-							<!--  Main Polyline - 경계선/펜스 라인  -->
-							<!--  Stroke="{Binding MarkerStroke}"  -->
+							<!--  Main Polyline - 기본 상태 (Normal)  -->
 							<Polyline
 								Name="PART_MainPolyline"
 								Fill="{TemplateBinding MarkerFill}"
@@ -34,8 +33,20 @@
 								StrokeEndLineCap="Round"
 								StrokeLineJoin="Round"
 								StrokeStartLineCap="Round"
-								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+								Visibility="Visible" />
 
+							<!--  Event Polyline - 이벤트 상태 (Detecting/Fault/Connection)  -->
+							<Polyline
+								Name="PART_EventPolyline"
+								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding LineOpacity}"
+								Stroke="#F44336"
+								StrokeEndLineCap="Round"
+								StrokeLineJoin="Round"
+								StrokeStartLineCap="Round"
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+								Visibility="Collapsed" />
 
 						</Canvas>
 
@@ -136,19 +147,23 @@
 							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="4 2 1 2" />
 						</Trigger>
 
-						<!--  Normal 상태 (정상)  -->
+						<!--  Normal 상태 (정상) - MainPolyline 표시, EventPolyline 숨김  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Normal}">
-							<!--<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />-->
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}" />
+							<Setter TargetName="PART_MainPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
 						</DataTrigger>
 
-						<!--  Pulse Animation for Detecting State  -->
+						<!--  Detecting 상태 (침입 감지) - EventPolyline(Red) 표시  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#F44336" />
+							<!--  MainPolyline 숨기고 EventPolyline 표시  -->
+							<Setter TargetName="PART_MainPolyline" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="#F44336" />
 
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="PulseStoryboard_Begin">
@@ -181,19 +196,22 @@
 							</DataTrigger.ExitActions>
 						</DataTrigger>
 
-						<!--  Fault 상태 (장애 - 빠른 깜빡임)  -->
+						<!--  Fault 상태 (장애) - EventPolyline(Orange) 표시 + 깜빡임  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Fault}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#FF9800" />
+							<!--  MainPolyline 숨기고 EventPolyline 표시  -->
+							<Setter TargetName="PART_MainPolyline" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="#FF9800" />
 
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="FaultBlinkStoryboard">
 									<Storyboard RepeatBehavior="Forever">
-										<!--  빠른 깜빡임 애니메이션  -->
+										<!--  빠른 깜빡임 애니메이션 (EventPolyline에 적용)  -->
 										<DoubleAnimation
 											AutoReverse="True"
-											Storyboard.TargetName="PART_MainPolyline"
+											Storyboard.TargetName="PART_EventPolyline"
 											Storyboard.TargetProperty="Opacity"
 											From="1"
 											To="0.3"
@@ -202,8 +220,8 @@
 											AutoReverse="True"
 											Storyboard.TargetName="PART_EventStatusIndicator"
 											Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-											From="#F44336"
-											To="#FF8A80"
+											From="#FF9800"
+											To="#FFCC80"
 											Duration="0:0:0.3" />
 									</Storyboard>
 								</BeginStoryboard>
@@ -213,11 +231,14 @@
 							</DataTrigger.ExitActions>
 						</DataTrigger>
 
-						<!--  Connection 상태 (연결중)  -->
+						<!--  Connection 상태 (연결중) - EventPolyline(Cyan) 표시  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Connection}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="#00BCD4" />
+							<!--  MainPolyline 숨기고 EventPolyline 표시  -->
+							<Setter TargetName="PART_MainPolyline" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="#00BCD4" />
 
 							<DataTrigger.EnterActions>
 								<BeginStoryboard Name="ConnectionPulseStoryboard">

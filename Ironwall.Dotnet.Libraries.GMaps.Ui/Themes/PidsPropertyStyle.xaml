@@ -15,7 +15,7 @@
 		<Setter Property="SpecificContent">
 			<Setter.Value>
 				<StackPanel>
-					<!--  연결된 디바이스 ID  -->
+					<!--  연결된 디바이스  -->
 					<Grid Margin="0,5">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="80" />
@@ -24,11 +24,14 @@
 						<TextBlock
 							Grid.Column="0"
 							Style="{StaticResource PropertyLabel}"
-							Text="디바이스ID" />
-						<TextBox
+							Text="연결디바이스" />
+						<ComboBox
 							Grid.Column="1"
-							Style="{StaticResource CompactTextBox}"
-							Text="{Binding LinkedDeviceId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+							ItemsSource="{Binding FilteredDeviceList}"
+							SelectedItem="{Binding LinkedDevice, Mode=TwoWay}"
+							Style="{StaticResource CompactComboBox}"
+							DisplayMemberPath="DeviceName">
+						</ComboBox>
 					</Grid>
 
 					<!--  FOV 표시  -->

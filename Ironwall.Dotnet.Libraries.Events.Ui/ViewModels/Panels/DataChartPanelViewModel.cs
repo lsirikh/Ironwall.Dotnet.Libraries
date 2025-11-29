@@ -107,7 +107,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             {
                 try
                 {
-                    // Fetch all event types from GOP API with date filtering (server-side)
+                    /*──────────────────────────────────────────────────────────────
+                     *  1. GOP API로부터 이벤트 데이터 병렬 수집
+                     *──────────────────────────────────────────────────────────────*/
                     var detectionTask = _providerService.FetchDetectionEventsAsync(StartDate, EndDate, ct);
                     var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(StartDate, EndDate, ct);
                     var connectionTask = _providerService.FetchConnectionEventsAsync(StartDate, EndDate, ct);
@@ -115,37 +117,82 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     await Task.WhenAll(detectionTask, malfunctionTask, connectionTask, actionTask);
 
-                    // Update EventProvider with fetched events (already filtered by date)
+                    /*──────────────────────────────────────────────────────────────
+                     *  2. EventProvider 갱신 (메모리 캐시 역할)
+                     *──────────────────────────────────────────────────────────────*/
                     _eventProvider.Clear();
                     foreach (var item in detectionTask.Result) _eventProvider.Add(item);
                     foreach (var item in malfunctionTask.Result) _eventProvider.Add(item);
                     foreach (var item in connectionTask.Result) _eventProvider.Add(item);
                     foreach (var item in actionTask.Result) _eventProvider.Add(item);
 
+                    /*──────────────────────────────────────────────────────────────
+                     *  3. 차트 카테고리 정의
+                     *     - Name   : 범례에 표시될 시리즈명
+                     *     - Color  : 라인 & 포인트 색상
+                     *     - Events : 해당 타입의 이벤트 컬렉션
+                     *──────────────────────────────────────────────────────────────*/
                     var eventTypes = new[]
                     {
-                        new CategoryMeta("Detection",  new SKColor(255, 205, 0), _eventProvider.OfType<IDetectionEventModel>()),
-                        new CategoryMeta("Malfunction", new SKColor(30, 144, 255), _eventProvider.OfType<IMalfunctionEventModel>()),
-                        new CategoryMeta("CONNECTION", new SKColor(155, 89, 182), _eventProvider.OfType<IConnectionEventModel>()),
-                        new CategoryMeta("ACTION", new SKColor(50, 205, 50), _eventProvider.OfType<IActionEventModel>())
-                    };
+                new CategoryMeta("Detection",   new SKColor(255, 205, 0),   _eventProvider.OfType<IDetectionEventModel>()),
+                new CategoryMeta("Malfunction", new SKColor(30, 144, 255),  _eventProvider.OfType<IMalfunctionEventModel>()),
+                new CategoryMeta("Connection",  new SKColor(155, 89, 182),  _eventProvider.OfType<IConnectionEventModel>()),
+                new CategoryMeta("Action",      new SKColor(50, 205, 50),   _eventProvider.OfType<IActionEventModel>())
+            };
 
+                    /*──────────────────────────────────────────────────────────────
+                     *  4. [1차 순회] 시간축 라벨 수집 & 카테고리별 집계
+                     *  
+                     *     ┌─────────────────────────────────────────────────────┐
+                     *     │  WHY 2-PASS?                                        │
+                     *     │  ─────────────────────────────────────────────────  │
+                     *     │  각 카테고리마다 이벤트가 발생한 시간대가 다르다.   │
+                     *     │  모든 시간 라벨을 먼저 수집해야 빠진 구간을 0으로   │
+                     *     │  채워서 라인이 끊어지지 않게 만들 수 있다.          │
+                     *     └─────────────────────────────────────────────────────┘
+                     *
+                     *     xLabels    : 전체 시간축 (SortedSet → 자동 정렬)
+                     *     groupedData: 카테고리별 { 시간 → 이벤트 수 } 딕셔너리
+                     *──────────────────────────────────────────────────────────────*/
                     var xLabels = new SortedSet<string>();
-                    var seriesList = new List<ISeries>();
+                    var groupedData = new Dictionary<string, Dictionary<string, int>>();
 
                     foreach (var type in eventTypes)
                     {
                         var grouped = type.Events
-                            // No client-side filtering needed - already filtered by GOP API
                             .GroupBy(ev => ev.DateTime.ToString("yyyy-MM-dd HH"))
-                            .OrderBy(g => g.Key)
-                            .Select(g => new { Time = g.Key, Count = g.Count() })
-                            .ToList();
+                            .ToDictionary(g => g.Key, g => g.Count());
 
-                        xLabels.UnionWith(grouped.Select(g => g.Time));
+                        groupedData[type.Name] = grouped;
+                        xLabels.UnionWith(grouped.Keys);
+                    }
 
-                        var values = xLabels.Select(label =>
-                            grouped.FirstOrDefault(g => g.Time == label)?.Count ?? 0).ToArray();
+                    /*──────────────────────────────────────────────────────────────
+                     *  5. [2차 순회] 시리즈 생성
+                     *  
+                     *     xLabels가 확정된 후, 각 카테고리별로 values 배열 생성.
+                     *     해당 시간대에 이벤트가 없으면 0을 채워 연속 라인 보장.
+                     *     
+                     *     ┌───────┬───────┬───────┬───────┐
+                     *     │ 03:00 │ 05:00 │ 07:00 │ 09:00 │  ← xLabels
+                     *     ├───────┼───────┼───────┼───────┤
+                     *     │   3   │   0   │  15   │   0   │  ← Detection
+                     *     │  30   │  28   │  14   │  22   │  ← Malfunction
+                     *     │   0   │   0   │   0   │   0   │  ← CONNECTION
+                     *     │   2   │   0   │   0   │   1   │  ← ACTION
+                     *     └───────┴───────┴───────┴───────┘
+                     *──────────────────────────────────────────────────────────────*/
+                    var xLabelArray = xLabels.ToArray();
+                    var seriesList = new List<ISeries>();
+
+                    foreach (var type in eventTypes)
+                    {
+                        var dict = groupedData[type.Name];
+
+                        // 없는 시간대는 0으로 채움 → 라인 연속성 확보
+                        var values = xLabelArray
+                            .Select(label => dict.TryGetValue(label, out var count) ? count : 0)
+                            .ToArray();
 
                         seriesList.Add(new LineSeries<int>
                         {
@@ -153,13 +200,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             LineSmoothness = 0.5,
                             GeometrySize = 8,
 
-                            // 선 색상
                             Stroke = new SolidColorPaint(type.Color, 3),
-
-                            // 포인트 테두리 색 (더 진한 색상)
                             GeometryStroke = new SolidColorPaint(type.Color, 3),
-
-                            // 포인트 내부 색 (더 진한 색상)
                             GeometryFill = new SolidColorPaint(Darken(type.Color, 0.5f)),
 
                             Fill = null,
@@ -167,9 +209,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         });
                     }
 
+                    /*──────────────────────────────────────────────────────────────
+                     *  6. 축(Axis) 설정
+                     *──────────────────────────────────────────────────────────────*/
                     var xAxis = new Axis
                     {
-                        Labels = xLabels.ToArray(),
+                        Labels = xLabelArray,
                         LabelsRotation = 15,
                         TextSize = 12,
                         UnitWidth = 1,
@@ -183,6 +228,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         MinLimit = 0
                     };
 
+                    /*──────────────────────────────────────────────────────────────
+                     *  7. UI 스레드에서 차트 컬렉션 갱신
+                     *──────────────────────────────────────────────────────────────*/
                     DispatcherService.Invoke(() =>
                     {
                         Series.Clear();

@@ -151,26 +151,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
 
 
-        ////
-        //public List<double> CreateDetectionCount()
-        //{
-        //    List<double> dCount = DataHelper.GetDetectionCountsByController(_startDate, _endDate,
-        //                DeviceProvider.OfType<IControllerDeviceModel>(),
-        //                _eventProvider.OfType<IDetectionEventModel>());
-
-        //    return dCount;
-        //}
-
-        //public ISeries GetDetectBarDataSet(int index, List<double> dCount)
-        //{
-        //    return ChartHelper.MakeBar(_names[index++], dCount, new SKColor(255, 205, 0), new SKColor(255, 255, 255));
-        //}
-
-        //public ISeries GetDetectDognutDataSet(int index, List<double> dCount)
-        //{
-        //    return ChartHelper.MakeBar(_names[index++], dCount, new SKColor(255, 205, 0), new SKColor(255, 255, 255));
-        //}
-
 
         public Task DataInitialize(CancellationToken cancellationToken = default)
         {
@@ -178,9 +158,18 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             {
                 try
                 {
-                    // Fetch all event types from GOP API (fetch last 7 days by default)
-                    var endDate = DateTime.Now;
-                    var startDate = endDate.AddDays(-7);
+                    /*──────────────────────────────────────────────────────────────
+                       *  ★ 수정: SetData()에서 설정한 _startDate, _endDate 사용
+                    *──────────────────────────────────────────────────────────────*/
+                    var startDate = _startDate;
+                    var endDate = _endDate;
+
+                    // 만약 날짜가 설정 안 됐으면 기본값 사용
+                    if (startDate == default || endDate == default)
+                    {
+                        endDate = DateTime.Now;
+                        startDate = endDate.AddDays(-7);
+                    }
 
                     var detectionTask = _providerService.FetchDetectionEventsAsync(startDate, endDate, cancellationToken);
                     var malfunctionTask = _providerService.FetchMalfunctionEventsAsync(startDate, endDate, cancellationToken);
@@ -202,51 +191,50 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                                $"{connectionTask.Result.Count} connection, " +
                                $"{actionTask.Result.Count} action events");
 
-                    // Connection 이벤트의 Device 상태 확인
-                    var connectionEvents = connectionTask.Result;
-                    foreach (var ev in connectionEvents)
-                    {
-                        var sensor = ev.Device as ISensorDeviceModel;
-                        _log?.Info($"[ConnectionEvent] ID={ev.Id}, Sensor.Id={sensor?.Id}, " +
-                                   $"Controller={(sensor?.Controller != null ? sensor.Controller.DeviceNumber.ToString() : "null")}");
-                    }
+                   // //Connection 이벤트의 Device 상태 확인
+                   //var connectionEvents = connectionTask.Result;
+                   // foreach (var ev in connectionEvents)
+                   // {
+                   //     switch (ev.Device.DeviceType)
+                   //     {
+                   //         case Enums.EnumDeviceType.NONE:
+                   //             break;
+                   //         case Enums.EnumDeviceType.Controller:
+                   //             var controller = ev.Device as IControllerDeviceModel;
+                   //             _log?.Info($"[ConnectionEvent] ID={ev.Id}, controller.Id={controller?.Id}, " +
+                   //                        $"Controller.DeviceNumber={controller?.DeviceNumber}");
+                   //             break;
+                   //         case Enums.EnumDeviceType.Multi:
+                   //         case Enums.EnumDeviceType.Fence:
+                   //         case Enums.EnumDeviceType.Underground:
+                   //         case Enums.EnumDeviceType.Contact:
+                   //         case Enums.EnumDeviceType.PIR:
+                   //         case Enums.EnumDeviceType.IoController:
+                   //         case Enums.EnumDeviceType.Laser:
+                   //         case Enums.EnumDeviceType.Cable:
+                   //         case Enums.EnumDeviceType.SmartSensor:
+                   //         case Enums.EnumDeviceType.SmartSensor2:
+                   //         case Enums.EnumDeviceType.SmartCompound:
+                   //         case Enums.EnumDeviceType.Radar:
+                   //         case Enums.EnumDeviceType.OpticalCable:
+                   //             var sensor = ev.Device as ISensorDeviceModel;
+                   //             _log?.Info($"[ConnectionEvent] ID={ev.Id}, Sensor.Id={sensor?.Id}, " +
+                   //                        $"Controller={(sensor?.Controller != null ? sensor.Controller.DeviceNumber.ToString() : "null")}");
+                   //             break;
+                   //         case Enums.EnumDeviceType.IpCamera:
+                   //             break;
+                   //         case Enums.EnumDeviceType.IpSpeaker:
+                   //             break;
+                   //         case Enums.EnumDeviceType.Fence_Group:
+                   //             break;
+                   //         default:
+                   //             break;
+                   //     }
+                   // }
 
                     // 컨트롤러(Device) 번호 → 문자열 레이블
                     var devices = _deviceProvider.OfType<IControllerDeviceModel>()
                                                 .OrderBy(d => d.DeviceNumber);          // 보기 좋게 정렬
-                                               
-
-                    //List<double> mCount = DataHelper.GetMalfunctionCountsByController(_startDate, _endDate,
-                    //    DeviceProvider.OfType<IControllerDeviceModel>(),
-                    //    _eventProvider.OfType<IMalfunctionEventModel>());
-
-                    //List<double> cCount = DataHelper.GetConnectionCountsByController(_startDate, _endDate,
-                    //    DeviceProvider.OfType<IControllerDeviceModel>(),
-                    //    _eventProvider.OfType<IConnectionEventModel>());
-
-                    //List<double> aCount = DataHelper.GetActionCountsByController(_startDate, _endDate,
-                    //    DeviceProvider.OfType<IControllerDeviceModel>(),
-                    //    _eventProvider.OfType<IActionEventModel>());
-
-                    //int index = 0;
-                    //var totalBarSeries = new[]
-                    //{
-                    //    //ChartHelper.MakeBar(_names[index++], dCount, new SKColor(255, 205, 0), new SKColor(255,255,255)),
-                    //    ChartHelper.MakeBar(_names[index++], mCount, new SKColor( 30,144,255), new SKColor(255,255,255)),
-                    //    ChartHelper.MakeBar(_names[index++], cCount, new SKColor(155, 89,182), new SKColor(255,255,255)),
-                    //    ChartHelper.MakeBar(_names[index++], aCount, new SKColor( 50,205, 50), new SKColor(255,255,255)),
-                    //};
-
-                    //index = 0;
-                    //var totalDognutSeries = new[]
-                    //{
-                    //    //ChartHelper.MakePie(_names[index++], dCount.Sum(), new SKColor(255, 205, 0), new SKColor(255,255,255)),
-                    //    ChartHelper.MakePie(_names[index++], mCount.Sum(), new SKColor( 30,144,255), new SKColor(255,255,255)),
-                    //    ChartHelper.MakePie(_names[index++], cCount.Sum(), new SKColor(155, 89,182), new SKColor(255,255,255)),
-                    //    ChartHelper.MakePie(_names[index++], aCount.Sum(), new SKColor( 50,205, 50), new SKColor(255,255,255)),
-                    //};
-                    // ─── X축: “카테고리” 4개 ────────────────────────────────
-
 
 
                     var xLabel = new Axis
@@ -273,32 +261,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                         NamePadding = new Padding(0, 5, 0, -10),   // L,T,R,B
                         MinLimit = 0
                     };
-
-
-                    //DispatcherService.Invoke(async () =>
-                    //{
-                    //    LSeries.Clear();
-                    //    DSeries.Clear();
-                    //    XAxes.Clear();
-                    //    XAxes.Add(xLabel);      // 컬렉션 변경 → 차트가 즉시 갱신
-                    //    YAxes.Clear();
-                    //    YAxes.Add(yLabels);
-
-                    //    int delay = 100;
-
-                    //    foreach (var item in totalBarSeries)
-                    //    {
-                    //        LSeries.Add(item);
-                    //        //await Task.Delay(delay);
-                    //    }
-
-                    //    foreach (var item in totalDognutSeries)
-                    //    {
-                    //        DSeries.Add(item);
-                    //        //await Task.Delay(delay);
-                    //    }
-
-                    //});
 
 
                     DispatcherService.Invoke(() => {

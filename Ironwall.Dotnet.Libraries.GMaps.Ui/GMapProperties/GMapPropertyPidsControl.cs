@@ -1,6 +1,10 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -34,15 +38,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         protected override void ClearSpecificBindings()
         {
             System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 시작 ===");
-            
+
             BindingOperations.ClearBinding(this, LinkedDeviceIdProperty);
+            BindingOperations.ClearBinding(this, LinkedDeviceProperty);
             BindingOperations.ClearBinding(this, DetectionRangeProperty);
             BindingOperations.ClearBinding(this, DetectionAngleProperty);
             BindingOperations.ClearBinding(this, DetectionBearingProperty);
             BindingOperations.ClearBinding(this, ShowFOVProperty);
             BindingOperations.ClearBinding(this, FOVColorProperty);
             BindingOperations.ClearBinding(this, FOVOpacityProperty);
-            
+
             System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 완료 ===");
         }
 
@@ -57,6 +62,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 // LinkedDeviceId 바인딩
                 var linkedDeviceIdBinding = CreateTwoWayBinding(nameof(pidsMarker.LinkedDeviceId));
                 SetBinding(LinkedDeviceIdProperty, linkedDeviceIdBinding);
+
+                // LinkedDevice 바인딩 (런타임 디바이스 객체)
+                var linkedDeviceBinding = CreateTwoWayBinding(nameof(pidsMarker.LinkedDevice));
+                SetBinding(LinkedDeviceProperty, linkedDeviceBinding);
 
                 // ShowFOV 바인딩
                 var showFOVBinding = CreateTwoWayBinding(nameof(pidsMarker.ShowFOV));
@@ -88,7 +97,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         {
             if (!(marker is IPidsEditableMarker pidsMarker)) return;
 
+            System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 시작 ===");
+            System.Diagnostics.Debug.WriteLine($"  마커 Title: {pidsMarker.Title}");
+            System.Diagnostics.Debug.WriteLine($"  마커 LinkedDeviceId: {pidsMarker.LinkedDeviceId}");
+            System.Diagnostics.Debug.WriteLine($"  마커 LinkedDevice: {pidsMarker.LinkedDevice?.DeviceName ?? "null"}");
+            System.Diagnostics.Debug.WriteLine($"  FilteredDeviceList Count: {FilteredDeviceList?.Count ?? 0}");
+
             this.LinkedDeviceId = pidsMarker.LinkedDeviceId;
+            this.LinkedDevice = pidsMarker.LinkedDevice;
             this.ShowFOV = pidsMarker.ShowFOV;
             this.FOVColor = pidsMarker.FOVColor;
             this.FOVOpacity = pidsMarker.FOVOpacity;
@@ -98,7 +114,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             this.DetectionAngle = pidsMarker.DetectionAngle;
             this.DetectionBearing = pidsMarker.DetectionBearing;
 
-            System.Diagnostics.Debug.WriteLine($"PIDS 마커에서 속성 로드 완료");
+            System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
+            System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");
         }
 
         protected override void UpdateSpecificProperties()
@@ -106,6 +123,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             if (SelectedMarker is IPidsEditableMarker pidsMarker)
             {
                 pidsMarker.LinkedDeviceId = this.LinkedDeviceId;
+                pidsMarker.LinkedDevice = this.LinkedDevice;
                 pidsMarker.ShowFOV = this.ShowFOV;
                 pidsMarker.FOVColor = this.FOVColor;
                 pidsMarker.FOVOpacity = this.FOVOpacity;
@@ -139,6 +157,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             DependencyProperty.Register("LinkedDeviceId", typeof(int),
                 typeof(GMapPropertyPidsControl),
                 new PropertyMetadata(0, OnLinkedDeviceIdChanged));
+
+        /// <summary>
+        /// 연결된 디바이스 객체 (런타임 바인딩용)
+        /// <para>ComboBox에서 선택된 디바이스를 바인딩합니다.</para>
+        /// </summary>
+        public IBaseDeviceModel? LinkedDevice
+        {
+            get { return (IBaseDeviceModel?)GetValue(LinkedDeviceProperty); }
+            set { SetValue(LinkedDeviceProperty, value); }
+        }
+
+        public static readonly DependencyProperty LinkedDeviceProperty =
+            DependencyProperty.Register("LinkedDevice", typeof(IBaseDeviceModel),
+                typeof(GMapPropertyPidsControl),
+                new PropertyMetadata(null, OnLinkedDeviceChanged));
+
+        /// <summary>
+        /// DeviceType에 따라 필터링된 디바이스 목록 (ComboBox ItemsSource)
+        /// </summary>
+        public ObservableCollection<IBaseDeviceModel> FilteredDeviceList
+        {
+            get { return (ObservableCollection<IBaseDeviceModel>)GetValue(FilteredDeviceListProperty); }
+            set { SetValue(FilteredDeviceListProperty, value); }
+        }
+
+        public static readonly DependencyProperty FilteredDeviceListProperty =
+            DependencyProperty.Register("FilteredDeviceList", typeof(ObservableCollection<IBaseDeviceModel>),
+                typeof(GMapPropertyPidsControl),
+                new PropertyMetadata(null));
 
         /// <summary>
         /// 탐지 범위 (미터)
@@ -232,12 +279,28 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         {
             System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceIdChanged: {e.OldValue} → {e.NewValue}");
 
-            if (d is GMapPropertyPidsControl control && 
+            if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
                 pidsMarker.LinkedDeviceId = (int)e.NewValue;
-                control.OnMarkerPropertyChanged("LinkedDeviceId", e.OldValue, e.NewValue);
+                // 주의: OnMarkerPropertyChanged 호출하지 않음
+                // LinkedDevice 변경 시 LinkedDeviceId가 자동 동기화되므로,
+                // LinkedDevice 변경 핸들러에서만 DB 업데이트를 수행합니다.
+                // 이중 업데이트로 인한 MySQL 동시성 충돌 방지
+            }
+        }
+
+        private static void OnLinkedDeviceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceChanged: {e.OldValue} → {e.NewValue}");
+
+            if (d is GMapPropertyPidsControl control &&
+                control.SelectedMarker is IPidsEditableMarker pidsMarker &&
+                !control._isInitializing && !control._isClearingBindings)
+            {
+                pidsMarker.LinkedDevice = (IBaseDeviceModel?)e.NewValue;
+                control.OnMarkerPropertyChanged("LinkedDevice", e.OldValue, e.NewValue);
             }
         }
 

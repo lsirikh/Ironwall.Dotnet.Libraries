@@ -2467,14 +2467,545 @@ BEHAVIORAL change - updates default timestamp values
 
 ---
 
+---
+
+## 🚀 Phase 11: PIDS Device Binding Refactoring
+
+**Date**: 2025-11-28
+**PRD**: `docs/prd/PRD_PIDS_DeviceBinding_Refactoring.md`
+**Status**: 🚧 IN PROGRESS
+
+### Problem Summary
+현재 PIDS 심볼은 `LinkedDeviceId` (int)로 디바이스를 참조하고 있어:
+- 타입 안전성 부족 (잘못된 ID 입력 가능)
+- 사용자 경험 저하 (TextBox에 ID 직접 입력)
+- DeviceType별 필터링 없음
+
+### Solution
+`LinkedDeviceId` (int) → `LinkedDevice` (IBaseDeviceModel?)로 변경하고,
+Property UI에서 ComboBox(Dropdown)으로 DeviceType에 맞는 디바이스만 선택 가능하도록 개선.
+
+```
+Before: TextBox → LinkedDeviceId (int)
+After:  ComboBox → LinkedDevice (IBaseDeviceModel?) → Filtered by DeviceType
+```
+
+### Affected Files
+
+| Layer | File | Changes |
+|-------|------|---------|
+| **Model** | `IPidsSymbolModel.cs` | `LinkedDevice` property 추가 |
+| **Model** | `PidsSymbolModel.cs` | `LinkedDevice` 구현, Legacy ID 유지 |
+| **Marker** | `IPidsEditableMarker.cs` | `LinkedDevice` property 추가 |
+| **Marker** | `GMapPidsMarker.cs` | `LinkedDevice` 바인딩 |
+| **Control** | `GMapPropertyPidsControl.cs` | `FilteredDeviceList`, ComboBox 바인딩 |
+| **XAML** | `PidsPropertyStyle.xaml` | TextBox → ComboBox |
+
+---
+
+### Phase 11.1: Model Interface & Implementation (TDD)
+
+#### Test 11.1.1: IPidsSymbolModel.LinkedDevice property 존재 확인 [x]
+**Type**: BEHAVIORAL (RED → GREEN)
+**File**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.1.1: IPidsSymbolModel - LinkedDevice property 존재")]
+public void IPidsSymbolModel_ShouldHaveLinkedDeviceProperty()
+{
+    // Arrange
+    var model = new PidsSymbolModel();
+
+    // Act & Assert
+    Assert.Null(model.LinkedDevice); // nullable, 초기값 null
+    Assert.True(typeof(IPidsSymbolModel).GetProperty("LinkedDevice") != null);
+}
+```
+
+**GREEN Phase**:
+- `IPidsSymbolModel.cs`에 `IBaseDeviceModel? LinkedDevice { get; set; }` 추가
+- `PidsSymbolModel.cs`에 구현 추가
+
+---
+
+#### Test 11.1.2: PidsSymbolModel.LinkedDevice 설정 시 LinkedDeviceId 동기화 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.1.2: PidsSymbolModel - LinkedDevice 설정 시 LinkedDeviceId 동기화")]
+public void PidsSymbolModel_WhenLinkedDeviceSet_ShouldSyncLinkedDeviceId()
+{
+    // Arrange
+    var model = new PidsSymbolModel();
+    var mockDevice = new ControllerDeviceModel { Id = 42, DeviceName = "Test Controller" };
+
+    // Act
+    model.LinkedDevice = mockDevice;
+
+    // Assert
+    Assert.Equal(42, model.LinkedDeviceId);
+    Assert.Equal(mockDevice, model.LinkedDevice);
+}
+```
+
+---
+
+#### Test 11.1.3: PidsSymbolModel.LinkedDevice null 설정 시 LinkedDeviceId = 0 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.1.3: PidsSymbolModel - LinkedDevice null 시 LinkedDeviceId = 0")]
+public void PidsSymbolModel_WhenLinkedDeviceNull_ShouldSetLinkedDeviceIdToZero()
+{
+    // Arrange
+    var model = new PidsSymbolModel();
+    var mockDevice = new ControllerDeviceModel { Id = 42 };
+    model.LinkedDevice = mockDevice;
+
+    // Act
+    model.LinkedDevice = null;
+
+    // Assert
+    Assert.Equal(0, model.LinkedDeviceId);
+    Assert.Null(model.LinkedDevice);
+}
+```
+
+---
+
+#### Test 11.1.4: PidsSymbolModel JSON 직렬화 - LinkedDeviceId 유지 (하위 호환) [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.1.4: PidsSymbolModel JSON 직렬화 - LinkedDeviceId 필드 유지")]
+public void PidsSymbolModel_JsonSerialization_ShouldPreserveLinkedDeviceId()
+{
+    // Arrange
+    var model = new PidsSymbolModel();
+    var mockDevice = new ControllerDeviceModel { Id = 99 };
+    model.LinkedDevice = mockDevice;
+
+    // Act
+    var json = JsonConvert.SerializeObject(model);
+
+    // Assert
+    Assert.Contains("\"linked_device_id\":99", json);
+    // LinkedDevice 객체는 직렬화하지 않음 (ID만 저장)
+    Assert.DoesNotContain("\"linked_device\":", json);
+}
+```
+
+---
+
+### Phase 11.2: Marker Interface & ViewModel (TDD)
+
+#### Test 11.2.1: IPidsEditableMarker.LinkedDevice property 존재 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPidsMarkerTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.2.1: IPidsEditableMarker - LinkedDevice property 존재")]
+public void IPidsEditableMarker_ShouldHaveLinkedDeviceProperty()
+{
+    // Assert
+    var propertyInfo = typeof(IPidsEditableMarker).GetProperty("LinkedDevice");
+    Assert.NotNull(propertyInfo);
+    Assert.Equal(typeof(IBaseDeviceModel), propertyInfo.PropertyType);
+}
+```
+
+---
+
+#### Test 11.2.2: GMapPidsMarker.LinkedDevice 설정 시 Model 동기화 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPidsMarkerTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.2.2: GMapPidsMarker - LinkedDevice 설정 시 Model 동기화")]
+public void GMapPidsMarker_WhenLinkedDeviceSet_ShouldSyncToModel()
+{
+    // Arrange
+    var log = new MockLogService();
+    var model = new PidsSymbolModel();
+    var marker = new GMapPidsMarker(log, model);
+    var mockDevice = new SensorDeviceModel { Id = 123, DeviceName = "Sensor-1" };
+
+    // Act
+    marker.LinkedDevice = mockDevice;
+
+    // Assert
+    Assert.Equal(mockDevice, marker.LinkedDevice);
+    Assert.Equal(123, marker.LinkedDeviceId);
+    Assert.Equal(mockDevice, model.LinkedDevice);
+}
+```
+
+---
+
+#### Test 11.2.3: GMapPidsMarker.LinkedDevice PropertyChanged 이벤트 발생 [x]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPidsMarkerTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.2.3: GMapPidsMarker - LinkedDevice 변경 시 PropertyChanged 발생")]
+public void GMapPidsMarker_WhenLinkedDeviceChanged_ShouldRaisePropertyChanged()
+{
+    // Arrange
+    var log = new MockLogService();
+    var model = new PidsSymbolModel();
+    var marker = new GMapPidsMarker(log, model);
+    var propertyChangedRaised = false;
+    marker.PropertyChanged += (s, e) =>
+    {
+        if (e.PropertyName == "LinkedDevice") propertyChangedRaised = true;
+    };
+
+    // Act
+    marker.LinkedDevice = new SensorDeviceModel { Id = 1 };
+
+    // Assert
+    Assert.True(propertyChangedRaised);
+}
+```
+
+---
+
+### Phase 11.3: Property Control & UI (TDD)
+
+#### Test 11.3.1: GMapPropertyPidsControl.LinkedDevice DependencyProperty 존재 [ ]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPropertyPidsControlTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.3.1: GMapPropertyPidsControl - LinkedDevice DependencyProperty 존재")]
+public void GMapPropertyPidsControl_ShouldHaveLinkedDeviceDependencyProperty()
+{
+    // Assert
+    var dpField = typeof(GMapPropertyPidsControl)
+        .GetField("LinkedDeviceProperty", BindingFlags.Public | BindingFlags.Static);
+    Assert.NotNull(dpField);
+    Assert.IsType<DependencyProperty>(dpField.GetValue(null));
+}
+```
+
+---
+
+#### Test 11.3.2: GMapPropertyPidsControl.FilteredDeviceList 생성 [ ]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPropertyPidsControlTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.3.2: GMapPropertyPidsControl - FilteredDeviceList DependencyProperty 존재")]
+public void GMapPropertyPidsControl_ShouldHaveFilteredDeviceListProperty()
+{
+    // Assert
+    var dpField = typeof(GMapPropertyPidsControl)
+        .GetField("FilteredDeviceListProperty", BindingFlags.Public | BindingFlags.Static);
+    Assert.NotNull(dpField);
+}
+```
+
+---
+
+#### Test 11.3.3: FilteredDeviceList - DeviceType 필터링 로직 [ ]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPropertyPidsControlTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.3.3: FilteredDeviceList - Controller 타입 필터링")]
+public void FilteredDeviceList_WhenControllerSymbol_ShouldShowOnlyControllers()
+{
+    // Arrange
+    var control = new GMapPropertyPidsControl();
+    var devices = new List<IBaseDeviceModel>
+    {
+        new ControllerDeviceModel { Id = 1, DeviceType = EnumDeviceType.Controller },
+        new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Fence },
+        new CameraDeviceModel { Id = 3, DeviceType = EnumDeviceType.IpCamera }
+    };
+    control.DeviceProvider = new MockDeviceProvider(devices);
+
+    var marker = CreateMarkerWithType(EnumDeviceType.Controller);
+    control.SelectedMarker = marker;
+
+    // Act
+    var filtered = control.FilteredDeviceList.ToList();
+
+    // Assert
+    Assert.Single(filtered);
+    Assert.Equal(EnumDeviceType.Controller, filtered[0].DeviceType);
+}
+```
+
+---
+
+#### Test 11.3.4: FilteredDeviceList - Fence 타입 그룹 필터링 [ ]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPropertyPidsControlTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.3.4: FilteredDeviceList - Fence 타입 → 센서 계열 모두 표시")]
+public void FilteredDeviceList_WhenFenceSymbol_ShouldShowAllSensorTypes()
+{
+    // Arrange
+    var control = new GMapPropertyPidsControl();
+    var devices = new List<IBaseDeviceModel>
+    {
+        new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence },
+        new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Underground },
+        new SensorDeviceModel { Id = 3, DeviceType = EnumDeviceType.PIR },
+        new ControllerDeviceModel { Id = 4, DeviceType = EnumDeviceType.Controller }
+    };
+    control.DeviceProvider = new MockDeviceProvider(devices);
+
+    var marker = CreateMarkerWithType(EnumDeviceType.Fence);
+    control.SelectedMarker = marker;
+
+    // Act
+    var filtered = control.FilteredDeviceList.ToList();
+
+    // Assert
+    Assert.Equal(3, filtered.Count); // Fence, Underground, PIR (Controller 제외)
+    Assert.DoesNotContain(filtered, d => d.DeviceType == EnumDeviceType.Controller);
+}
+```
+
+---
+
+#### Test 11.3.5: FilteredDeviceList - IpCamera 타입 필터링 [ ]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPropertyPidsControlTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.3.5: FilteredDeviceList - IpCamera 타입 필터링")]
+public void FilteredDeviceList_WhenCameraSymbol_ShouldShowOnlyCameras()
+{
+    // Arrange
+    var control = new GMapPropertyPidsControl();
+    var devices = new List<IBaseDeviceModel>
+    {
+        new CameraDeviceModel { Id = 1, DeviceType = EnumDeviceType.IpCamera },
+        new CameraDeviceModel { Id = 2, DeviceType = EnumDeviceType.IpCamera },
+        new SensorDeviceModel { Id = 3, DeviceType = EnumDeviceType.Fence }
+    };
+    control.DeviceProvider = new MockDeviceProvider(devices);
+
+    var marker = CreateMarkerWithType(EnumDeviceType.IpCamera);
+    control.SelectedMarker = marker;
+
+    // Act
+    var filtered = control.FilteredDeviceList.ToList();
+
+    // Assert
+    Assert.Equal(2, filtered.Count);
+    Assert.All(filtered, d => Assert.Equal(EnumDeviceType.IpCamera, d.DeviceType));
+}
+```
+
+---
+
+### Phase 11.4: XAML UI Changes (STRUCTURAL)
+
+#### Test 11.4.1: PidsPropertyStyle.xaml - ComboBox 존재 확인 [ ]
+**Type**: STRUCTURAL
+**File**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PidsPropertyStyle.xaml`
+
+**Changes**:
+```xml
+<!-- BEFORE: TextBox -->
+<TextBox Text="{Binding LinkedDeviceId}" />
+
+<!-- AFTER: ComboBox -->
+<ComboBox
+    ItemsSource="{Binding FilteredDeviceList}"
+    SelectedItem="{Binding LinkedDevice, Mode=TwoWay}"
+    DisplayMemberPath="DeviceName">
+    <ComboBox.ItemTemplate>
+        <DataTemplate>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding DeviceNumber, StringFormat='[{0}]'}" FontWeight="Bold" />
+                <TextBlock Text="{Binding DeviceName}" Margin="5,0,0,0" />
+            </StackPanel>
+        </DataTemplate>
+    </ComboBox.ItemTemplate>
+</ComboBox>
+```
+
+---
+
+### Phase 11.5: Migration & Backward Compatibility
+
+#### Test 11.5.1: Legacy LinkedDeviceId 로드 시 LinkedDevice 복원 [ ]
+**Type**: BEHAVIORAL
+**File**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
+
+**RED Phase**:
+```csharp
+[Fact(DisplayName = "TEST-11.5.1: Legacy JSON 로드 시 LinkedDevice 마이그레이션")]
+public void PidsSymbolModel_WhenLoadedFromLegacyJson_ShouldMigrateLinkedDevice()
+{
+    // Arrange
+    var legacyJson = @"{""linked_device_id"": 42, ""device_type"": 1}";
+    var deviceProvider = new MockDeviceProvider(new List<IBaseDeviceModel>
+    {
+        new ControllerDeviceModel { Id = 42, DeviceName = "Controller-42" }
+    });
+
+    // Act
+    var model = JsonConvert.DeserializeObject<PidsSymbolModel>(legacyJson);
+    model.MigrateFromLegacyId(deviceProvider);
+
+    // Assert
+    Assert.NotNull(model.LinkedDevice);
+    Assert.Equal(42, model.LinkedDevice.Id);
+    Assert.Equal("Controller-42", model.LinkedDevice.DeviceName);
+}
+```
+
+---
+
+### Phase 11.6: Regression Tests (VERIFICATION)
+
+#### Test 11.6.1: 전체 테스트 회귀 확인 [ ]
+**Type**: VERIFICATION
+**Command**:
+```bash
+dotnet test Ironwall.Dotnet.Monitoring.Models
+dotnet test Ironwall.Dotnet.Libraries.GMaps.Ui
+```
+
+**Expected**: 모든 기존 테스트 통과 + 신규 테스트 통과
+
+---
+
+#### Test 11.6.2: 전체 빌드 확인 [ ]
+**Type**: VERIFICATION
+**Command**:
+```bash
+dotnet build Ironwall.Dotnet.Monitoring.Models
+dotnet build Ironwall.Dotnet.Libraries.GMaps.Ui
+```
+
+**Expected**: 빌드 성공 (0 errors)
+
+---
+
+### Phase 11 Progress Tracking
+
+| Test | Type | Status | Description |
+|------|------|--------|-------------|
+| 11.1.1 | BEHAVIORAL | [x] | IPidsSymbolModel.LinkedDevice property |
+| 11.1.2 | BEHAVIORAL | [x] | LinkedDevice 설정 시 LinkedDeviceId 동기화 |
+| 11.1.3 | BEHAVIORAL | [x] | LinkedDevice null 시 LinkedDeviceId = 0 |
+| 11.1.4 | BEHAVIORAL | [x] | JSON 직렬화 하위 호환성 |
+| 11.2.1 | BEHAVIORAL | [x] | IPidsEditableMarker.LinkedDevice property |
+| 11.2.2 | BEHAVIORAL | [x] | GMapPidsMarker.LinkedDevice Model 동기화 |
+| 11.2.3 | BEHAVIORAL | [x] | PropertyChanged 이벤트 발생 |
+| 11.3.1 | BEHAVIORAL | [x] | LinkedDevice DependencyProperty |
+| 11.3.2 | BEHAVIORAL | [x] | FilteredDeviceList DependencyProperty |
+| 11.3.3 | BEHAVIORAL | [x] | Controller 타입 필터링 |
+| 11.3.4 | BEHAVIORAL | [x] | Fence 타입 그룹 필터링 |
+| 11.3.5 | BEHAVIORAL | [x] | IpCamera 타입 필터링 |
+| 11.4.1 | STRUCTURAL | [x] | XAML ComboBox UI |
+| 11.5.1 | BEHAVIORAL | [x] | Legacy 마이그레이션 |
+| 11.6.1 | VERIFICATION | [x] | 전체 테스트 회귀 확인 |
+| 11.6.2 | VERIFICATION | [x] | 전체 빌드 확인 |
+
+---
+
+### DeviceType Filtering Rules
+
+| Symbol DeviceType | Selectable Device Types | 설명 |
+|-------------------|-------------------------|------|
+| **Controller** | `Controller` | 제어기만 |
+| **Multi** | `Multi` | 다중센서만 |
+| **Fence** | `Fence`, `Underground`, `Contact`, `PIR`, `Laser`, `Cable`, `OpticalCable` | 센서 계열 |
+| **IpCamera** | `IpCamera` | 카메라만 |
+
+---
+
+### Commit Plan
+
+**Commit 1 (RED - Tests)**:
+```
+test(pids): Add failing tests for LinkedDevice property
+
+RED phase - tests expected to fail
+Documents expected behavior for device binding refactoring
+```
+
+**Commit 2 (GREEN - Model Layer)**:
+```
+feat(models): Add LinkedDevice to IPidsSymbolModel and PidsSymbolModel
+
+GREEN phase - implements LinkedDevice property
+- IPidsSymbolModel.LinkedDevice (IBaseDeviceModel?)
+- PidsSymbolModel syncs LinkedDevice ↔ LinkedDeviceId
+- JSON serialization maintains backward compatibility
+```
+
+**Commit 3 (GREEN - Marker Layer)**:
+```
+feat(gmaps): Add LinkedDevice to IPidsEditableMarker and GMapPidsMarker
+
+- IPidsEditableMarker.LinkedDevice property
+- GMapPidsMarker binds to model's LinkedDevice
+- PropertyChanged notification
+```
+
+**Commit 4 (GREEN - Control Layer)**:
+```
+feat(gmaps): Add FilteredDeviceList to GMapPropertyPidsControl
+
+- FilteredDeviceList DependencyProperty
+- DeviceType-based filtering logic
+- LinkedDevice DependencyProperty
+```
+
+**Commit 5 (STRUCTURAL - UI)**:
+```
+refactor(gmaps): Replace TextBox with ComboBox in PidsPropertyStyle.xaml
+
+STRUCTURAL change - UI only
+- ComboBox with ItemTemplate
+- FilteredDeviceList binding
+- LinkedDevice two-way binding
+```
+
+**Commit 6 (Migration)**:
+```
+feat(models): Add MigrateFromLegacyId for backward compatibility
+
+- Resolves LinkedDeviceId to LinkedDevice via DeviceProvider
+- Supports loading legacy JSON data
+```
+
+---
+
 ### 🎯 Next Action
 
 **When you say "go"**:
 
-1. **Find next unmarked test**: [ ] **Test 10.1.1** (GetKoreaTimeIso8601 형식 검증)
-2. **RED**: Write failing test first
-3. **GREEN**: Implement `KoreaTimeHelper.GetKoreaTimeIso8601()`
-4. **Verify**: Run test → should pass
-5. **Continue** to Test 10.1.2
+1. **Find next unmarked test**: [ ] **Test 11.1.1** (IPidsSymbolModel.LinkedDevice)
+2. **Create test file**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
+3. **RED**: Write failing test
+4. **GREEN**: Implement `LinkedDevice` in `IPidsSymbolModel.cs` and `PidsSymbolModel.cs`
+5. **Verify**: Run test → should pass
+6. **Continue** to Test 11.1.2
 
 ---

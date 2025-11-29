@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Windows;
@@ -112,7 +113,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
 
     #region - Properties -
     /// <summary>
-    /// 연결된 장치 ID
+    /// 연결된 장치 ID (하위 호환성 유지)
     /// </summary>
     public int LinkedDeviceId
     {
@@ -121,6 +122,21 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         {
             _model.LinkedDeviceId = value;
             OnPropertyChanged(nameof(LinkedDeviceId));
+        }
+    }
+
+    /// <summary>
+    /// 연결된 디바이스 객체 (런타임 바인딩용)
+    /// <para>설정 시 LinkedDeviceId가 자동 동기화됩니다.</para>
+    /// </summary>
+    public IBaseDeviceModel? LinkedDevice
+    {
+        get => _model.LinkedDevice;
+        set
+        {
+            _model.LinkedDevice = value;
+            OnPropertyChanged(nameof(LinkedDevice));
+            OnPropertyChanged(nameof(LinkedDeviceId));  // ID도 동기화되므로 알림
         }
     }
 

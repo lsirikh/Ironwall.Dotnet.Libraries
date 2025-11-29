@@ -266,6 +266,19 @@ public static class DtoToModelHelper
         this MalfunctionEventDto dto,
         DeviceProvider? deviceProvider)
     {
+        if(dto.Id == 270)
+            System.Diagnostics.Debug.WriteLine($"=======================");
+       
+        // 🔍 디버깅: 실제 로드된 EnumFaultType 확인
+        var enumType = typeof(EnumFaultType);
+        var assemblyLocation = enumType.Assembly.Location;
+        var allValues = Enum.GetNames<EnumFaultType>();
+
+        System.Diagnostics.Debug.WriteLine($"===========================================");
+        System.Diagnostics.Debug.WriteLine($"EnumFaultType Assembly: {assemblyLocation}");
+        System.Diagnostics.Debug.WriteLine($"Available values: {string.Join(", ", allValues)}");
+        System.Diagnostics.Debug.WriteLine($"dto.Id = {dto.Id}, dto.Reason: [{dto.Reason}]");
+        System.Diagnostics.Debug.WriteLine($"===========================================");
         return new MalfunctionEventModel
         {
             Id = dto.Id,

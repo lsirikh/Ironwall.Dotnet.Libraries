@@ -123,3 +123,150 @@ public class UnitTest : IAsyncLifetime
         };
 
 }
+
+#region Phase 11: PIDS Device Binding Tests
+/****************************************************************************
+   Phase 11: PIDS Device Binding Refactoring Tests
+   PRD: docs/prd/PRD_PIDS_DeviceBinding_Refactoring.md
+
+   Test 11.1.1: IPidsSymbolModel.LinkedDevice property 존재
+   Test 11.1.2: LinkedDevice 설정 시 LinkedDeviceId 동기화
+   Test 11.1.3: LinkedDevice null 시 LinkedDeviceId = 0
+   Test 11.1.4: JSON 직렬화 - LinkedDeviceId 유지
+****************************************************************************/
+
+public class PidsDeviceBindingTests
+{
+    [Fact(DisplayName = "TEST-11.1.1: IPidsSymbolModel - LinkedDevice property 존재")]
+    public void IPidsSymbolModel_ShouldHaveLinkedDeviceProperty()
+    {
+        // Arrange
+        var model = new Symbols.PidsSymbolModel();
+
+        // Act & Assert - Interface에 LinkedDevice 속성 존재 확인
+        var propertyInfo = typeof(Symbols.IPidsSymbolModel).GetProperty("LinkedDevice");
+        Assert.NotNull(propertyInfo);
+
+        // Model 초기값은 null
+        Assert.Null(model.LinkedDevice);
+    }
+
+    [Fact(DisplayName = "TEST-11.1.2: PidsSymbolModel - LinkedDevice 설정 시 LinkedDeviceId 동기화")]
+    public void PidsSymbolModel_WhenLinkedDeviceSet_ShouldSyncLinkedDeviceId()
+    {
+        // Arrange
+        var model = new Symbols.PidsSymbolModel();
+        var mockDevice = new ControllerDeviceModel { Id = 42, DeviceName = "Test Controller" };
+
+        // Act
+        model.LinkedDevice = mockDevice;
+
+        // Assert
+        Assert.Equal(42, model.LinkedDeviceId);
+        Assert.Equal(mockDevice, model.LinkedDevice);
+    }
+
+    [Fact(DisplayName = "TEST-11.1.3: PidsSymbolModel - LinkedDevice null 시 LinkedDeviceId = 0")]
+    public void PidsSymbolModel_WhenLinkedDeviceNull_ShouldSetLinkedDeviceIdToZero()
+    {
+        // Arrange
+        var model = new Symbols.PidsSymbolModel();
+        var mockDevice = new ControllerDeviceModel { Id = 42 };
+        model.LinkedDevice = mockDevice;
+
+        // Act
+        model.LinkedDevice = null;
+
+        // Assert
+        Assert.Equal(0, model.LinkedDeviceId);
+        Assert.Null(model.LinkedDevice);
+    }
+
+    [Fact(DisplayName = "TEST-11.1.4: PidsSymbolModel JSON 직렬화 - LinkedDeviceId 필드 유지")]
+    public void PidsSymbolModel_JsonSerialization_ShouldPreserveLinkedDeviceId()
+    {
+        // Arrange
+        var model = new Symbols.PidsSymbolModel();
+        var mockDevice = new ControllerDeviceModel { Id = 99 };
+        model.LinkedDevice = mockDevice;
+
+        // Act
+        var json = JsonConvert.SerializeObject(model);
+
+        // Assert - device_id (LinkedDeviceId) 필드가 JSON에 존재
+        Assert.Contains("\"device_id\":99", json);
+        // LinkedDevice 객체는 직렬화하지 않음 ([JsonIgnore])
+        Assert.DoesNotContain("\"linked_device\":", json);
+    }
+}
+#endregion
+
+#region Phase 11.5: Legacy Migration Tests
+/****************************************************************************
+   Phase 11.5: Legacy JSON Migration Tests
+   Test 11.5.1: Legacy JSON 로드 시 LinkedDevice 마이그레이션
+****************************************************************************/
+
+public class PidsLegacyMigrationTests
+{
+    [Fact(DisplayName = "TEST-11.5.1: Legacy JSON 로드 시 LinkedDevice 마이그레이션")]
+    public void PidsSymbolModel_WhenLoadedFromLegacyJson_ShouldMigrateLinkedDevice()
+    {
+        // Arrange - Legacy JSON with only LinkedDeviceId (no LinkedDevice)
+        var legacyJson = @"{""device_id"": 42, ""device_type"": 1}";
+        var deviceList = new List<IBaseDeviceModel>
+        {
+            new ControllerDeviceModel { Id = 42, DeviceName = "Controller-42" },
+            new SensorDeviceModel { Id = 100, DeviceName = "Sensor-100" }
+        };
+
+        // Act - Deserialize and migrate
+        var model = JsonConvert.DeserializeObject<Symbols.PidsSymbolModel>(legacyJson);
+
+        // Migration: Find device by LinkedDeviceId
+        model!.BindToDeviceList(deviceList);
+
+        // Assert
+        Assert.NotNull(model.LinkedDevice);
+        Assert.Equal(42, model.LinkedDevice!.Id);
+        Assert.Equal("Controller-42", model.LinkedDevice.DeviceName);
+    }
+
+    [Fact(DisplayName = "TEST-11.5.2: BindToDeviceList - LinkedDeviceId가 0이면 LinkedDevice는 null")]
+    public void PidsSymbolModel_WhenLinkedDeviceIdIsZero_ShouldNotBind()
+    {
+        // Arrange
+        var model = new Symbols.PidsSymbolModel();
+        model.LinkedDeviceId = 0;
+        var deviceList = new List<IBaseDeviceModel>
+        {
+            new ControllerDeviceModel { Id = 42, DeviceName = "Controller-42" }
+        };
+
+        // Act
+        model.BindToDeviceList(deviceList);
+
+        // Assert
+        Assert.Null(model.LinkedDevice);
+    }
+
+    [Fact(DisplayName = "TEST-11.5.3: BindToDeviceList - 매칭되는 디바이스가 없으면 LinkedDevice는 null")]
+    public void PidsSymbolModel_WhenNoMatchingDevice_ShouldRemainNull()
+    {
+        // Arrange
+        var model = new Symbols.PidsSymbolModel();
+        model.LinkedDeviceId = 999; // Non-existent device ID
+        var deviceList = new List<IBaseDeviceModel>
+        {
+            new ControllerDeviceModel { Id = 42, DeviceName = "Controller-42" }
+        };
+
+        // Act
+        model.BindToDeviceList(deviceList);
+
+        // Assert
+        Assert.Null(model.LinkedDevice);
+        Assert.Equal(999, model.LinkedDeviceId); // ID는 유지됨
+    }
+}
+#endregion

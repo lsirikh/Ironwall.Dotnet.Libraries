@@ -199,6 +199,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             // 템플릿에서 UI 요소 찾기
             _lineCanvas = GetTemplateChild("PART_LineCanvas") as Canvas;
             MainPolyline = GetTemplateChild("PART_MainPolyline") as Polyline;
+            EventPolyline = GetTemplateChild("PART_EventPolyline") as Polyline;
 
             // 초기값 설정 및 바인딩 복구
             if (MainPolyline != null && Marker != null)
@@ -208,7 +209,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 MainPolyline.Opacity = Marker.LineOpacity;
             }
 
-            System.Diagnostics.Debug.WriteLine($"Template 적용: Canvas={_lineCanvas != null}, Polyline={MainPolyline != null}");
+            // EventPolyline 초기 설정
+            if (EventPolyline != null && Marker != null)
+            {
+                EventPolyline.StrokeThickness = Marker.StrokeThickness;
+                EventPolyline.Opacity = Marker.LineOpacity;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Template 적용: Canvas={_lineCanvas != null}, MainPolyline={MainPolyline != null}, EventPolyline={EventPolyline != null}");
         }
 
         /// <summary>
@@ -337,6 +345,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 }
 
                 MainPolyline.Points = pointCollection;
+
+                // EventPolyline에도 동일한 Points 적용 (Visibility 토글로 전환)
+                if (EventPolyline != null)
+                {
+                    EventPolyline.Points = pointCollection;
+                }
 
                 // Canvas 크기도 업데이트
                 if (_lineCanvas != null)
@@ -539,6 +553,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
 
         public Polyline? MainPolyline { get; private set; }
+
+        /// <summary>
+        /// 이벤트 상태용 Polyline (Detecting, Fault, Connection 상태에서 사용)
+        /// </summary>
+        public Polyline? EventPolyline { get; private set; }
 
         // Adorner에서 접근할 수 있도록 Public 속성 추가
         public PointCollection LinePoints => MainPolyline?.Points ?? new PointCollection();

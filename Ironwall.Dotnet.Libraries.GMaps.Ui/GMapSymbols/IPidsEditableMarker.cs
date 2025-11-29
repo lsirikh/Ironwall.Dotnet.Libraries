@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +11,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
     public interface IPidsEditableMarker : IEditableMarker
     {
         int LinkedDeviceId { get; set; }
+
+        /// <summary>
+        /// 연결된 디바이스 객체 (런타임 바인딩용)
+        /// <para>설정 시 LinkedDeviceId가 자동 동기화됩니다.</para>
+        /// </summary>
+        IBaseDeviceModel? LinkedDevice { get; set; }
+
         EnumEventStatus EventStatus { get; set; }
         EnumDeviceType DeviceType { get; set; }
         bool ShowFOV { get; set; }
