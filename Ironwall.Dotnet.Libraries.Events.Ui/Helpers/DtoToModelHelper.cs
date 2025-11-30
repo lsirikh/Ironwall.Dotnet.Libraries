@@ -1,8 +1,9 @@
-using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities.ObjectModel;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 
@@ -178,36 +179,80 @@ public static class DtoToModelHelper
         string? typeDevice,
         DeviceProvider? deviceProvider)
     {
-        // Case 1: Sensor가 있으면 Sensor Device
-        if (sensor > 0)
+        try
         {
-            if (deviceProvider != null)
-            {
-                var sensorDevice = deviceProvider
-                    .OfType<ISensorDeviceModel>()
-                    .FirstOrDefault(d => d.Id == sensor);
-                if (sensorDevice != null)
-                    return sensorDevice;
-            }
-            return new SensorDeviceModel { Id = sensor };
-        }
+            var dType = Enum.Parse<EnumDeviceType>(typeDevice ?? throw new NullReferenceException(message:"Device Type({})이 정의되지 않았습니다."));
 
-        // Case 2: Controller만 있으면 Controller Device
-        if (controller > 0 && sensor == 0)
+            switch (dType)
+            {
+                case EnumDeviceType.NONE:
+                    break;
+                case EnumDeviceType.Controller:
+                    {
+                        if (deviceProvider != null)
+                        {
+                            var controllerDevice = deviceProvider
+                                .OfType<IControllerDeviceModel>()
+                                .FirstOrDefault(d => d.DeviceNumber == controller);
+                            if (controllerDevice != null)
+                                return controllerDevice;
+                        }
+                        return new ControllerDeviceModel { };
+                    }
+                case EnumDeviceType.Multi:
+                case EnumDeviceType.Fence:
+                case EnumDeviceType.Underground:
+                case EnumDeviceType.Contact:
+                case EnumDeviceType.PIR:
+                case EnumDeviceType.IoController:
+                case EnumDeviceType.Laser:
+                case EnumDeviceType.Cable:
+                case EnumDeviceType.SmartSensor:
+                case EnumDeviceType.SmartSensor2:
+                case EnumDeviceType.SmartCompound:
+                    {
+                        if (deviceProvider != null)
+                        {
+                            var sensorDevice = deviceProvider
+                                .OfType<ISensorDeviceModel>()
+                                .FirstOrDefault(d => 
+                                d?.Controller?.DeviceNumber == controller
+                                && d.DeviceNumber == sensor);
+                            if (sensorDevice != null)
+                                return sensorDevice;
+                        }
+                        return new SensorDeviceModel { };
+                    }
+                case EnumDeviceType.IpCamera:
+                    {
+                        if (deviceProvider != null)
+                        {
+                            var cameraDevice = deviceProvider
+                                .OfType<ICameraDeviceModel>()
+                                .FirstOrDefault(d => d.DeviceNumber == sensor);
+                            if (cameraDevice != null)
+                                return cameraDevice;
+                        }
+                        return new CameraDeviceModel { };
+                    }
+                    break;
+                case EnumDeviceType.IpSpeaker:
+                    break;
+                case EnumDeviceType.Radar:
+                    break;
+                case EnumDeviceType.OpticalCable:
+                    break;
+                case EnumDeviceType.Fence_Group:
+                    break;
+                default:
+                    break;
+            }
+            return null;
+        }
+        catch (Exception)
         {
-            if (deviceProvider != null)
-            {
-                var controllerDevice = deviceProvider
-                    .OfType<IControllerDeviceModel>()
-                    .FirstOrDefault(d => d.Id == controller);
-                if (controllerDevice != null)
-                    return controllerDevice;
-            }
-            return new ControllerDeviceModel { Id = controller };
+            throw;
         }
-
-        // Case 3: 둘 다 없음
-        return null;
     }
 
     /// <summary>

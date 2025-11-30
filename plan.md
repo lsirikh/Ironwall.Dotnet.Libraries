@@ -2997,15 +2997,541 @@ feat(models): Add MigrateFromLegacyId for backward compatibility
 
 ---
 
+## Phase 12: PTZ → FOV Integration (PRD v1.2)
+
+**참조 문서**: `docs/prd/PRD_PTZ_FOV_Integration.md`
+**목표**: NATS로 수신되는 PTZ 데이터를 카메라 FOV에 실시간 반영
+**핵심 원칙**: DeviceSymbolLookupModel 재사용 (신규 클래스 생성 불필요)
+
+---
+
+### Phase 12.1: DeviceSymbolLookupModel 확장 (BEHAVIORAL) ✅
+**Status**: 완료
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Models/DeviceSymbolLookupModel.cs`
+
+#### [x] Test 12.1.1: ConvertPanToBearing - 기본 변환
+```csharp
+[Fact]
+public void ConvertPanToBearing_WithPan90_ShouldReturn90()
+{
+    // Arrange: pan = 90
+    // Act: ConvertPanToBearing(90)
+    // Assert: bearing = 90 (0~180 범위는 그대로)
+}
+```
+
+#### [x] Test 12.1.2: ConvertPanToBearing - 180도 초과 변환
+```csharp
+[Fact]
+public void ConvertPanToBearing_WithPan270_ShouldReturnMinus90()
+{
+    // Arrange: pan = 270
+    // Act: ConvertPanToBearing(270)
+    // Assert: bearing = -90 (270 - 360 = -90)
+}
+```
+
+#### [x] Test 12.1.3: ConvertZoomToAngle - 줌 100% (1x)
+```csharp
+[Fact]
+public void ConvertZoomToAngle_WithZoom100_ShouldReturnBaseAngle()
+{
+    // Arrange: zoom = 100 (1x)
+    // Act: ConvertZoomToAngle(100)
+    // Assert: angle = 80 (BaseDetectionAngle)
+}
+```
+
+#### [x] Test 12.1.4: ConvertZoomToAngle - 줌 200% (2x)
+```csharp
+[Fact]
+public void ConvertZoomToAngle_WithZoom200_ShouldReturnHalfAngle()
+{
+    // Arrange: zoom = 200 (2x)
+    // Act: ConvertZoomToAngle(200)
+    // Assert: angle = 40 (80 / 2)
+}
+```
+
+#### [x] Test 12.1.5: ConvertZoomToAngle - 최소값 제한
+```csharp
+[Fact]
+public void ConvertZoomToAngle_WithZoom2000_ShouldClampToMinAngle()
+{
+    // Arrange: zoom = 2000 (20x) → 80/20 = 4 < MinDetectionAngle(5)
+    // Act: ConvertZoomToAngle(2000)
+    // Assert: angle = 5 (MinDetectionAngle)
+}
+```
+
+#### [x] Test 12.1.6: ConvertZoomToRange - 줌 100% (1x)
+```csharp
+[Fact]
+public void ConvertZoomToRange_WithZoom100_ShouldReturnBaseRange()
+{
+    // Arrange: zoom = 100 (1x)
+    // Act: ConvertZoomToRange(100)
+    // Assert: range = 100 (BaseDetectionRange)
+}
+```
+
+#### [x] Test 12.1.7: ConvertZoomToRange - 줌 400% (4x)
+```csharp
+[Fact]
+public void ConvertZoomToRange_WithZoom400_ShouldReturn4xRange()
+{
+    // Arrange: zoom = 400 (4x)
+    // Act: ConvertZoomToRange(400)
+    // Assert: range = 400 (100 * 4)
+}
+```
+
+#### [x] Test 12.1.8: ConvertZoomToRange - 최대값 제한
+```csharp
+[Fact]
+public void ConvertZoomToRange_WithZoom3000_ShouldClampToMaxRange()
+{
+    // Arrange: zoom = 3000 (30x) → 100*30 = 3000 > MaxDetectionRange(2000)
+    // Act: ConvertZoomToRange(3000)
+    // Assert: range = 2000 (MaxDetectionRange)
+}
+```
+
+#### [x] Test 12.1.9: UpdateFOV - IPidsSymbolModel 아닌 경우 무시
+```csharp
+[Fact]
+public void UpdateFOV_WithNonPidsSymbol_ShouldNotThrow()
+{
+    // Arrange: SymbolModel = IPidsEventCapable (not IPidsSymbolModel)
+    // Act: UpdateFOV(90, 45, 200)
+    // Assert: No exception, no update
+}
+```
+
+#### [x] Test 12.1.10: UpdateFOV - 정상 동작
+```csharp
+[Fact]
+public void UpdateFOV_WithValidPidsSymbol_ShouldUpdateAllProperties()
+{
+    // Arrange: SymbolModel = Mock<IPidsSymbolModel>
+    // Act: UpdateFOV(pan=180, tilt=45, zoom=200)
+    // Assert:
+    //   - DetectionBearing = 180
+    //   - DetectionAngle = 40 (80/2)
+    //   - DetectionRange = 200 (100*2)
+    //   - SetUpdate() called once
+}
+```
+
+---
+
+### Phase 12.2: SymbolEventManager 확장 (BEHAVIORAL) ✅
+**Status**: 완료
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Managers/SymbolEventManager.cs`
+
+#### [x] Test 12.2.1: ProcessCameraPtz - 등록된 카메라
+```csharp
+[Fact]
+public void ProcessCameraPtz_WithRegisteredCamera_ShouldCallUpdateFOV()
+{
+    // Arrange:
+    //   - Register device with Id=1
+    //   - cameraModel.Id = 1
+    // Act: ProcessCameraPtz(cameraModel, 90, 45, 200)
+    // Assert: lookup.UpdateFOV called with (90, 45, 200)
+}
+```
+
+#### [x] Test 12.2.2: ProcessCameraPtz - 미등록 카메라
+```csharp
+[Fact]
+public void ProcessCameraPtz_WithUnregisteredCamera_ShouldLogWarning()
+{
+    // Arrange:
+    //   - No device registered
+    //   - cameraModel.Id = 999
+    // Act: ProcessCameraPtz(cameraModel, 90, 45, 200)
+    // Assert: Warning logged, no exception
+}
+```
+
+---
+
+### Phase 12.3: NatsDomainService 연동 (BEHAVIORAL) ✅
+**Status**: 완료
+**Files**: `Ironwall.Dotnet.Monitoring.Solution/Services/NatsDomainService.cs`
+
+#### [x] Test 12.3.1: ProcessCurrentPtz - CameraName으로 조회 성공
+```csharp
+[Fact]
+public void ProcessCurrentPtz_WithValidCameraName_ShouldCallProcessCameraPtz()
+{
+    // Arrange:
+    //   - PTZDto { CameraName = "CAM-001", P = 90, T = 45, Z = 200 }
+    //   - CameraDeviceProvider contains camera with DeviceName = "CAM-001"
+    // Act: ProcessCurrentPtz(jToken)
+    // Assert: _symbolEventManager.ProcessCameraPtz called
+}
+```
+
+#### [x] Test 12.3.2: ProcessCurrentPtz - CameraName 조회 실패
+```csharp
+[Fact]
+public void ProcessCurrentPtz_WithInvalidCameraName_ShouldLogWarning()
+{
+    // Arrange:
+    //   - PTZDto { CameraName = "UNKNOWN", P = 90, T = 45, Z = 200 }
+    //   - CameraDeviceProvider is empty
+    // Act: ProcessCurrentPtz(jToken)
+    // Assert: Warning logged, no ProcessCameraPtz call
+}
+```
+
+#### [x] Test 12.3.3: ProcessCurrentPtz - 잘못된 JSON
+```csharp
+[Fact]
+public void ProcessCurrentPtz_WithInvalidJson_ShouldLogError()
+{
+    // Arrange: Invalid JSON string
+    // Act: ProcessCurrentPtz(jToken)
+    // Assert: Error logged, no exception thrown
+}
+```
+
+---
+
+### Phase 12.4: 통합 테스트 (INTEGRATION) ✅
+**Status**: 완료
+
+#### [x] Test 12.4.1: End-to-End PTZ → FOV 업데이트
+```csharp
+[Fact]
+public async Task PtzMessage_ShouldUpdateCameraFOV_EndToEnd()
+{
+    // Arrange:
+    //   - Full DI setup
+    //   - Camera symbol registered with LinkedDeviceId
+    // Act: Send PTZ message via NATS (mock)
+    // Assert:
+    //   - Symbol.DetectionBearing updated
+    //   - Symbol.DetectionAngle updated
+    //   - Symbol.DetectionRange updated
+}
+```
+
+---
+
+### Phase 12 구현 체크리스트
+
+| Phase | Action Item | Status |
+|-------|-------------|--------|
+| 12.1 | Test 12.1.1: ConvertPanToBearing 기본 | [x] |
+| 12.1 | Test 12.1.2: ConvertPanToBearing 180도 초과 | [x] |
+| 12.1 | Test 12.1.3: ConvertZoomToAngle 줌 100% | [x] |
+| 12.1 | Test 12.1.4: ConvertZoomToAngle 줌 200% | [x] |
+| 12.1 | Test 12.1.5: ConvertZoomToAngle 최소값 제한 | [x] |
+| 12.1 | Test 12.1.6: ConvertZoomToRange 줌 100% | [x] |
+| 12.1 | Test 12.1.7: ConvertZoomToRange 줌 400% | [x] |
+| 12.1 | Test 12.1.8: ConvertZoomToRange 최대값 제한 | [x] |
+| 12.1 | Test 12.1.9: UpdateFOV Non-Pids 무시 | [x] |
+| 12.1 | Test 12.1.10: UpdateFOV 정상 동작 | [x] |
+| 12.2 | Test 12.2.1: ProcessCameraPtz 등록된 카메라 | [x] |
+| 12.2 | Test 12.2.2: ProcessCameraPtz 미등록 카메라 | [x] |
+| 12.3 | Test 12.3.1: ProcessCurrentPtz 성공 | [x] |
+| 12.3 | Test 12.3.2: ProcessCurrentPtz 카메라 없음 | [x] |
+| 12.3 | Test 12.3.3: ProcessCurrentPtz 잘못된 JSON | [x] |
+| 12.4 | Test 12.4.1: End-to-End 통합 | [x] |
+| 12.5 | Test 12.5.1: PidsModel_Update FOV 속성 알림 | [x] |
+
+---
+
+### Phase 12.5: GMapPidsMarker UI 연동 수정 (BEHAVIORAL)
+**Status**: ✅ 완료
+**Files**: `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapSymbols/GMapPidsMarker.cs`
+
+**문제 발견**: `PidsSymbolModel.SetUpdate()` 호출 시 `GMapPidsMarker`에서 FOV 속성 변경 알림이 누락됨
+
+#### [x] Test 12.5.1: PidsModel_Update - FOV 속성 알림 확인
+```csharp
+[Fact]
+public void PidsModel_Update_ShouldNotifyFOVPropertyChanges()
+{
+    // Arrange: GMapPidsMarker with mocked IPidsSymbolModel
+    // Act: model.SetUpdate() 호출
+    // Assert:
+    //   - PropertyChanged(DetectionRange) fired
+    //   - PropertyChanged(DetectionAngle) fired
+    //   - PropertyChanged(DetectionBearing) fired
+}
+```
+
+---
+
 ### 🎯 Next Action
 
-**When you say "go"**:
+**Phase 12 (PTZ → FOV Integration) 완료!**
 
-1. **Find next unmarked test**: [ ] **Test 11.1.1** (IPidsSymbolModel.LinkedDevice)
-2. **Create test file**: `Ironwall.Dotnet.Monitoring.Models/Tests/PidsSymbolModelTests.cs`
-3. **RED**: Write failing test
-4. **GREEN**: Implement `LinkedDevice` in `IPidsSymbolModel.cs` and `PidsSymbolModel.cs`
-5. **Verify**: Run test → should pass
-6. **Continue** to Test 11.1.2
+- ✅ Phase 12.1: IPidsSymbolModel FOV 속성 추가
+- ✅ Phase 12.2: PidsSymbolModel 구현
+- ✅ Phase 12.3: SymbolEventManager.ProcessCameraPtz 구현
+- ✅ Phase 12.4: End-to-End 통합 테스트
+- ✅ Phase 12.5: GMapPidsMarker UI 연동 수정
+
+**모든 테스트 통과**: 11개 전체 통과
+
+---
+
+## Phase 13: 두 딕셔너리 구조로 심볼 분리 (PRD v1.5)
+
+**참조 문서**: `Docs/prd/PRD_PTZ_FOV_Integration.md` (Section 11)
+**목표**: `_deviceSymbolLookup` + `_groupSymbolLookup` 분리로 개별/그룹 마커 충돌 해결
+**문제**: MapViewModel에서 동일 Device.Id로 GMapPidsMarker와 GMapPidsGroupMarker를 덮어쓰기
+
+---
+
+### Phase 13.1: SymbolEventManager - RegisterGroupSymbol 추가 (BEHAVIORAL) ✅
+**Status**: ✅ GREEN (100%)
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Managers/SymbolEventManager.cs`
+
+#### ✅ Test 13.1.1: RegisterGroupSymbol - 그룹 심볼 등록
+```csharp
+[Fact]
+public void RegisterGroupSymbol_ShouldAddToGroupLookup()
+{
+    // Arrange: SymbolEventManager 생성
+    // Act: RegisterGroupSymbol(deviceGroup: 1, mockPidsGroupSymbol)
+    // Assert: _groupSymbolLookup[1]에 등록됨
+}
+```
+
+#### ✅ Test 13.1.2: RegisterDeviceSymbol과 RegisterGroupSymbol 동시 등록
+```csharp
+[Fact]
+public void RegisterBothSymbols_ShouldNotOverwrite()
+{
+    // Arrange: Device.Id = 5, DeviceGroup = 1
+    // Act: RegisterDeviceSymbol(device, pidsSymbol)
+    //      RegisterGroupSymbol(1, pidsGroupSymbol)
+    // Assert: 두 딕셔너리 모두 별도 등록됨, 덮어쓰기 없음
+}
+```
+
+---
+
+### Phase 13.2: ProcessDeviceEvent - 개별 + 그룹 처리 (BEHAVIORAL) ✅
+**Status**: ✅ GREEN (100%)
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Managers/SymbolEventManager.cs`
+
+#### ✅ Test 13.2.1: Intrusion 이벤트 - 개별 + 그룹 모두 처리
+```csharp
+[Fact]
+public void ProcessDeviceEvent_Intrusion_ShouldProcessBothSymbols()
+{
+    // Arrange: RegisterDeviceSymbol + RegisterGroupSymbol
+    // Act: ProcessDeviceEvent(deviceId: 5, deviceGroup: 1, Intrusion, WARNING)
+    // Assert: 개별 심볼과 그룹 심볼 모두 ProcessEvent 호출됨
+}
+```
+
+#### ✅ Test 13.2.2: Connection 이벤트 - 개별만 처리
+```csharp
+[Fact]
+public void ProcessDeviceEvent_Connection_ShouldProcessOnlyDeviceSymbol()
+{
+    // Arrange: RegisterDeviceSymbol + RegisterGroupSymbol
+    // Act: ProcessDeviceEvent(deviceId: 5, deviceGroup: 1, Connection, WARNING)
+    // Assert: 개별 심볼만 ProcessEvent 호출, 그룹은 호출 안됨
+}
+```
+
+---
+
+### Phase 13.3: ProcessControllerEvent - Fence 타입 분기 (BEHAVIORAL) ✅
+**Status**: ✅ GREEN (100%)
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Managers/SymbolEventManager.cs`
+
+#### ✅ Test 13.3.1: Fence 타입 제어기 장애 - 그룹 처리
+```csharp
+[Fact]
+public void ProcessControllerEvent_FenceType_ShouldProcessGroupSymbol()
+{
+    // Arrange: RegisterDeviceSymbol(controller) + RegisterGroupSymbol
+    // Act: ProcessControllerEvent(ctrlId: 10, group: 1, Fence, Fault, CRITICAL)
+    // Assert: 개별 + 그룹 모두 ProcessEvent 호출
+}
+```
+
+#### ✅ Test 13.3.2: 일반 타입 제어기 장애 - 개별만 처리
+```csharp
+[Fact]
+public void ProcessControllerEvent_NonFenceType_ShouldProcessOnlyDeviceSymbol()
+{
+    // Arrange: RegisterDeviceSymbol(controller) + RegisterGroupSymbol
+    // Act: ProcessControllerEvent(ctrlId: 10, group: 1, IpCamera, Fault, CRITICAL)
+    // Assert: 개별만 ProcessEvent 호출, 그룹은 호출 안됨
+}
+```
+
+---
+
+### Phase 13.4: ProcessEventReport - 개별 + 그룹 복원 (BEHAVIORAL) ✅
+**Status**: ✅ GREEN (100%)
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Managers/SymbolEventManager.cs`
+
+#### ✅ Test 13.4.1: 조치보고 - 개별 + 그룹 복원
+```csharp
+[Fact]
+public void ProcessEventReport_ShouldRestoreBothSymbols()
+{
+    // Arrange: RegisterDeviceSymbol + RegisterGroupSymbol
+    // Act: ProcessEventReport(deviceId: 5, deviceGroup: 1)
+    // Assert: 개별 + 그룹 모두 ProcessEventReport 호출
+}
+```
+
+---
+
+### Phase 13.5: ProcessCameraPtz - 개별 심볼만 FOV 업데이트 (BEHAVIORAL) ✅
+**Status**: ✅ GREEN (100%)
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/Managers/SymbolEventManager.cs`
+
+#### ✅ Test 13.5.1: PTZ - 개별 심볼만 FOV 업데이트
+```csharp
+[Fact]
+public void ProcessCameraPtz_ShouldUpdateOnlyDeviceSymbolFOV()
+{
+    // Arrange: RegisterDeviceSymbol(camera, pidsSymbol) + RegisterGroupSymbol
+    // Act: ProcessCameraPtz(cameraId: 1, pan: 90, tilt: 0, zoom: 200)
+    // Assert: 개별 심볼의 FOV만 업데이트, 그룹 심볼은 무관
+}
+```
+
+---
+
+### Phase 13.6: MapViewModel 수정 (INTEGRATION)
+**Status**: ✅ GREEN (100%)
+**Files**: `Ironwall.Dotnet.Libraries.GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+
+#### ✅ Test 13.6.1: 그룹 마커 등록 시 RegisterGroupSymbol 호출
+```csharp
+// MapViewModel.cs Line 209 수정 후 테스트
+// 기존: _symbolEventManager.RegisterDeviceSymbol(device, groupSymbol.Model)
+// 변경: _symbolEventManager.RegisterGroupSymbol(device.DeviceGroup, groupSymbol.Model)
+```
+
+---
+
+### Phase 13.7: NatsDomainService 수정 (INTEGRATION)
+**Status**: ✅ GREEN (100%)
+**Files**: `Dotnet.Monitoring.Solution/Services/NatsDomainService.cs`
+
+#### ✅ Test 13.7.1: ProcessDetection - deviceGroup 파라미터 추가
+```csharp
+// 기존: ProcessDeviceEvent(device.Id, eventType, severity)
+// 변경: ProcessDeviceEvent(device.Id, device.DeviceGroup, eventType, severity)
+```
+
+#### ✅ Test 13.7.2: ProcessMalfunction - deviceGroup 파라미터 추가
+```csharp
+// 기존: ProcessDeviceEvent(device.Id, eventType, severity)
+// 변경: ProcessDeviceEvent(device.Id, device.DeviceGroup, eventType, severity)
+```
+
+---
+
+### Phase 13.8: EventCardListPanelViewModel 수정 (INTEGRATION)
+**Status**: ⬜ 진행 전
+**Files**: `Ironwall.Dotnet.Libraries.Events.Ui/ViewModels/Panels/EventCardListPanelViewModel.cs`
+
+#### ⬜ Test 13.8.1: ProcessEventReport - deviceGroup 파라미터 추가
+```csharp
+// Line 165, 204, 276 수정
+// 기존: ProcessEventReport(deviceId)
+// 변경: ProcessEventReport(deviceId, deviceGroup)
+```
+
+---
+
+### Phase 13 구현 체크리스트
+
+| Phase | Action Item | Status |
+|-------|-------------|--------|
+| 13.1 | RegisterGroupSymbol 메서드 추가 | ✅ |
+| 13.1 | _groupSymbolLookup 딕셔너리 추가 | ✅ |
+| 13.2 | ProcessDeviceEvent 시그니처 변경 (deviceGroup 추가) | ✅ |
+| 13.2 | ShouldProcessGroupSymbol 헬퍼 메서드 추가 | ✅ |
+| 13.3 | ProcessControllerEvent 시그니처 변경 | ✅ |
+| 13.3 | IsFenceType 헬퍼 메서드 추가 | ✅ |
+| 13.4 | ProcessEventReport 시그니처 변경 | ✅ |
+| 13.5 | ProcessCameraPtz 변경 없음 (확인만) | ✅ |
+| 13.6 | MapViewModel RegisterGroupSymbol 호출 | ✅ |
+| 13.7 | NatsDomainService deviceGroup 전달 | ✅ |
+| 13.8 | EventCardListPanelViewModel deviceGroup 전달 | ✅ |
+
+---
+
+## Phase 14: 복합 키 (Id, DeviceType) 구조 (버그 픽스)
+
+**Status**: GREEN (100%)
+**Issue**: 탐지 이벤트 시 카메라도 같이 깜박거림, Fence 심볼은 깜빡이지 않음
+**Root Cause**: 동일한 `Device.Id`가 다른 `DeviceType`에서 사용될 수 있음 (예: Fence ID=5, Camera ID=5)
+**Solution**: `_deviceSymbolLookup` 딕셔너리 키를 `int` → `(int Id, EnumDeviceType Type)` 복합 키로 변경
+
+### Phase 14.1: SymbolEventManager 복합 키 변경 (BEHAVIORAL) ✅
+
+**Files Modified**:
+- `Events.Ui/Managers/SymbolEventManager.cs`
+
+**Changes**:
+```csharp
+// OLD:
+private readonly Dictionary<int, DeviceSymbolLookupModel> _deviceSymbolLookup;
+
+// NEW:
+private readonly Dictionary<(int Id, EnumDeviceType Type), DeviceSymbolLookupModel> _deviceSymbolLookup;
+```
+
+**Updated Methods**:
+- `RegisterDeviceSymbol(IBaseDeviceModel, IPidsEventCapable)` - 복합 키로 등록
+- `ProcessDeviceEvent(int deviceId, EnumDeviceType deviceType, int deviceGroup, ...)` - deviceType 파라미터 추가
+- `ProcessControllerEvent(...)` - `EnumDeviceType.Controller`로 조회
+- `ProcessEventReport(int deviceId, EnumDeviceType deviceType, int deviceGroup)` - deviceType 파라미터 추가
+- `ProcessCameraPtz(int cameraId, ...)` - `EnumDeviceType.IpCamera`로 조회
+- Test accessors: `HasDeviceSymbol(int, EnumDeviceType)`, `GetDeviceSymbol(int, EnumDeviceType)`
+
+### Phase 14.2: 호출부 수정 (INTEGRATION) ✅
+
+**Files Modified**:
+- `Dotnet.Monitoring.Solution/Services/NatsDomainService.cs`
+  - Line 124: `ProcessDeviceEvent(device.Id, device.DeviceType, device.DeviceGroup, ...)`
+  - Line 193: `ProcessDeviceEvent(device.Id, device.DeviceType, device.DeviceGroup, ...)`
+- `Events.Ui/ViewModels/Panels/EventCardListPanelViewModel.cs`
+  - Added `using Ironwall.Dotnet.Libraries.Enums;`
+  - Line 165-166: `ProcessEventReport(device.Id, device.DeviceType, device.DeviceGroup)`
+  - Line 205-206: `ProcessEventReport(device.Id, device.DeviceType, device.DeviceGroup)`
+  - Line 241-285: `CallAllEventReportMessageModel` handler에 `deviceType` 추가
+
+### Phase 14.3: 테스트 수정 (STRUCTURAL) ✅
+
+**Files Modified**:
+- `Events.Ui/Tests/UnitTest.cs`
+  - 모든 mock device에 `DeviceType` 설정 추가
+  - `HasDeviceSymbol`, `GetDeviceSymbol` 호출에 `EnumDeviceType` 파라미터 추가
+
+**Test Results**: 8/8 통과
+
+---
+
+### 🎯 Next Action
+
+**Phase 14 완료 (2025-11-29)**:
+- SymbolEventManager 복합 키 `(int Id, EnumDeviceType Type)` 구조 구현 완료
+- NatsDomainService, EventCardListPanelViewModel 호출부 수정 완료
+- 테스트 코드 수정 및 8개 테스트 모두 통과
+
+**Expected Behavior After Fix**:
+- 탐지 이벤트 시 해당 센서(Fence) 심볼만 깜빡임
+- 카메라 심볼은 별도의 ID+Type 조합으로 분리되어 영향 없음
+- PTZ 업데이트는 `(cameraId, IpCamera)` 키로 정확히 카메라만 조회
 
 ---

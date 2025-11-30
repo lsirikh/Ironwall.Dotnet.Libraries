@@ -2092,3 +2092,693 @@ public class DetectionExEventDtoToModelTests
     }
     #endregion
 }
+
+#region Phase 12: PTZ → FOV Integration Tests
+/// <summary>
+/// Unit tests for DeviceSymbolLookupModel PTZ → FOV conversion
+/// Following TDD (Red-Green-Refactor) methodology
+/// PRD Reference: docs/prd/PRD_PTZ_FOV_Integration.md
+/// </summary>
+public class DeviceSymbolLookupModelTests
+{
+    #region Test 12.1.1: ConvertPanToBearing - 기본 변환
+    [Fact]
+    public void ConvertPanToBearing_WithPan90_ShouldReturn90()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float pan = 90f;
+
+        // Act
+        var bearing = lookup.TestConvertPanToBearing(pan);
+
+        // Assert
+        Assert.Equal(90.0, bearing);
+    }
+    #endregion
+
+    #region Test 12.1.2: ConvertPanToBearing - 180도 초과 변환
+    [Fact]
+    public void ConvertPanToBearing_WithPan270_ShouldReturnMinus90()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float pan = 270f;
+
+        // Act
+        var bearing = lookup.TestConvertPanToBearing(pan);
+
+        // Assert
+        Assert.Equal(-90.0, bearing);  // 270 - 360 = -90
+    }
+    #endregion
+
+    #region Test 12.1.3: ConvertZoomToAngle - 줌 100% (1x)
+    [Fact]
+    public void ConvertZoomToAngle_WithZoom100_ShouldReturnBaseAngle()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float zoom = 100f;  // 1x
+
+        // Act
+        var angle = lookup.TestConvertZoomToAngle(zoom);
+
+        // Assert
+        Assert.Equal(80.0, angle);  // BaseDetectionAngle = 80
+    }
+    #endregion
+
+    #region Test 12.1.4: ConvertZoomToAngle - 줌 200% (2x)
+    [Fact]
+    public void ConvertZoomToAngle_WithZoom200_ShouldReturnHalfAngle()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float zoom = 200f;  // 2x
+
+        // Act
+        var angle = lookup.TestConvertZoomToAngle(zoom);
+
+        // Assert
+        Assert.Equal(40.0, angle);  // 80 / 2 = 40
+    }
+    #endregion
+
+    #region Test 12.1.5: ConvertZoomToAngle - 최소값 제한
+    [Fact]
+    public void ConvertZoomToAngle_WithZoom2000_ShouldClampToMinAngle()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float zoom = 2000f;  // 20x → 80/20 = 4 < MinDetectionAngle(5)
+
+        // Act
+        var angle = lookup.TestConvertZoomToAngle(zoom);
+
+        // Assert
+        Assert.Equal(5.0, angle);  // Clamped to MinDetectionAngle
+    }
+    #endregion
+
+    #region Test 12.1.6: ConvertZoomToRange - 줌 100% (1x)
+    [Fact]
+    public void ConvertZoomToRange_WithZoom100_ShouldReturnBaseRange()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float zoom = 100f;  // 1x
+
+        // Act
+        var range = lookup.TestConvertZoomToRange(zoom);
+
+        // Assert
+        Assert.Equal(100.0, range);  // BaseDetectionRange = 100
+    }
+    #endregion
+
+    #region Test 12.1.7: ConvertZoomToRange - 줌 400% (4x)
+    [Fact]
+    public void ConvertZoomToRange_WithZoom400_ShouldReturn4xRange()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float zoom = 400f;  // 4x
+
+        // Act
+        var range = lookup.TestConvertZoomToRange(zoom);
+
+        // Assert
+        Assert.Equal(400.0, range);  // 100 * 4 = 400
+    }
+    #endregion
+
+    #region Test 12.1.8: ConvertZoomToRange - 최대값 제한
+    [Fact]
+    public void ConvertZoomToRange_WithZoom3000_ShouldClampToMaxRange()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        float zoom = 3000f;  // 30x → 100*30 = 3000 > MaxDetectionRange(2000)
+
+        // Act
+        var range = lookup.TestConvertZoomToRange(zoom);
+
+        // Assert
+        Assert.Equal(2000.0, range);  // Clamped to MaxDetectionRange
+    }
+    #endregion
+
+    #region Test 12.1.9: UpdateFOV - IPidsSymbolModel 아닌 경우 무시
+    [Fact]
+    public void UpdateFOV_WithNonPidsSymbol_ShouldNotThrow()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        // SymbolModel is IPidsEventCapable but NOT IPidsSymbolModel
+        var mockSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsEventCapable>();
+        lookup.SymbolModel = mockSymbol.Object;
+
+        // Act & Assert - should not throw exception
+        var exception = Record.Exception(() => lookup.TestUpdateFOV(90f, 45f, 200f));
+        Assert.Null(exception);
+    }
+    #endregion
+
+    #region Test 12.1.10: UpdateFOV - 정상 동작
+    [Fact]
+    public void UpdateFOV_WithValidPidsSymbol_ShouldUpdateAllProperties()
+    {
+        // Arrange
+        var lookup = CreateTestLookup();
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();  // Allow property setters
+        lookup.SymbolModel = mockPidsSymbol.Object;
+
+        // Act
+        lookup.TestUpdateFOV(pan: 180f, tilt: 45f, zoom: 200f);
+
+        // Assert
+        // DetectionBearing = 180 (pan 180 → bearing 180)
+        mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
+        // DetectionAngle = 40 (80 / 2)
+        mockPidsSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);
+        // DetectionRange = 200 (100 * 2)
+        mockPidsSymbol.VerifySet(s => s.DetectionRange = 200.0, Times.Once);
+        // SetUpdate() should be called once
+        mockPidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
+    }
+    #endregion
+
+    #region Helper Methods
+    private TestableDeviceSymbolLookupModel CreateTestLookup()
+    {
+        return new TestableDeviceSymbolLookupModel();
+    }
+    #endregion
+}
+
+/// <summary>
+/// Testable wrapper for DeviceSymbolLookupModel to expose private methods
+/// </summary>
+public class TestableDeviceSymbolLookupModel : Ironwall.Dotnet.Libraries.Events.Ui.Models.DeviceSymbolLookupModel
+{
+    public TestableDeviceSymbolLookupModel() : base(null!, null!, CreateMockEventSetupModel())
+    {
+    }
+
+    private static Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel CreateMockEventSetupModel()
+    {
+        var mockModel = new Mock<Ironwall.Dotnet.Libraries.Events.Models.IEventSetupModel>();
+        mockModel.Setup(m => m.IsAutoEventDiscard).Returns(false);
+        mockModel.Setup(m => m.IsSound).Returns(false);
+        mockModel.Setup(m => m.TimeDurationSound).Returns(0);
+        mockModel.Setup(m => m.TimeDiscardSec).Returns(0);
+        mockModel.Setup(m => m.LengthMaxEventPrev).Returns(0);
+        mockModel.Setup(m => m.LengthMinEventPrev).Returns(0);
+        return new Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel(mockModel.Object);
+    }
+
+    public double TestConvertPanToBearing(float pan)
+    {
+        return ConvertPanToBearing(pan);
+    }
+
+    public double TestConvertZoomToAngle(float zoom)
+    {
+        return ConvertZoomToAngle(zoom);
+    }
+
+    public double TestConvertZoomToRange(float zoom)
+    {
+        return ConvertZoomToRange(zoom);
+    }
+
+    public void TestUpdateFOV(float pan, float tilt, float zoom)
+    {
+        UpdateFOV(pan, tilt, zoom);
+    }
+}
+#endregion
+
+#region Phase 12.2: SymbolEventManager Tests
+/// <summary>
+/// SymbolEventManager PTZ/FOV 테스트
+/// PRD Reference: docs/prd/PRD_PTZ_FOV_Integration.md
+/// </summary>
+public class SymbolEventManagerTests
+{
+    #region Test 12.2.1: ProcessCameraPtz - 등록된 카메라
+    [Fact]
+    public void ProcessCameraPtz_WithRegisteredCamera_ShouldCallUpdateFOV()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        // 카메라 장비 생성 (Id = 1)
+        var cameraDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        cameraDevice.Setup(d => d.Id).Returns(1);
+        cameraDevice.Setup(d => d.DeviceType).Returns(EnumDeviceType.IpCamera);
+
+        // PIDS 심볼 생성
+        var mockSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockSymbol.SetupAllProperties();
+
+        // 장비-심볼 매핑 등록
+        manager.RegisterDeviceSymbol(cameraDevice.Object, mockSymbol.Object);
+
+        // Act
+        manager.ProcessCameraPtz(cameraId: 1, pan: 90f, tilt: 45f, zoom: 200f);
+
+        // Assert - FOV 속성이 업데이트 되어야 함
+        mockSymbol.VerifySet(s => s.DetectionBearing = 90.0, Times.Once);
+        mockSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);  // 80 / 2
+        mockSymbol.VerifySet(s => s.DetectionRange = 200.0, Times.Once);  // 100 * 2
+        mockSymbol.Verify(s => s.SetUpdate(), Times.Once);
+    }
+    #endregion
+
+    #region Test 12.2.2: ProcessCameraPtz - 미등록 카메라
+    [Fact]
+    public void ProcessCameraPtz_WithUnregisteredCamera_ShouldLogWarning()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        // 등록된 장비 없음
+
+        // Act
+        var exception = Record.Exception(() => manager.ProcessCameraPtz(cameraId: 999, pan: 90f, tilt: 45f, zoom: 200f));
+
+        // Assert - 예외 없음, 경고 로그만 출력
+        Assert.Null(exception);
+        mockLog.Verify(l => l.Warning(
+            It.Is<string>(s => s.Contains("999")),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<int>()), Times.Once);
+    }
+    #endregion
+
+    #region Test 12.4.1: End-to-End PTZ → FOV 통합 테스트
+    [Fact]
+    public void EndToEnd_PtzUpdate_ShouldUpdateCameraFOV()
+    {
+        // Arrange - Full integration setup
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        // 카메라 장비 생성 (Id = 100, DeviceName = "CAM-001")
+        var cameraDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.ICameraDeviceModel>();
+        cameraDevice.Setup(d => d.Id).Returns(100);
+        cameraDevice.Setup(d => d.DeviceName).Returns("CAM-001");
+        cameraDevice.Setup(d => d.DeviceType).Returns(EnumDeviceType.IpCamera);
+
+        // PIDS 심볼 생성 (카메라 FOV 표시용)
+        var pidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        pidsSymbol.SetupAllProperties();
+
+        // 장비-심볼 매핑 등록 (카메라도 일반 디바이스처럼 등록)
+        manager.RegisterDeviceSymbol(cameraDevice.Object, pidsSymbol.Object);
+
+        // Act - PTZ 메시지 수신 시뮬레이션
+        // NatsDomainService.ProcessCurrentPtz() → SymbolEventManager.ProcessCameraPtz()
+        manager.ProcessCameraPtz(cameraId: 100, pan: 270f, tilt: 30f, zoom: 400f);
+
+        // Assert - FOV 속성이 올바르게 업데이트 되어야 함
+        // Pan 270 → Bearing -90 (270 - 360)
+        pidsSymbol.VerifySet(s => s.DetectionBearing = -90.0, Times.Once);
+        // Zoom 400% (4x) → Angle 20 (80 / 4)
+        pidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);
+        // Zoom 400% (4x) → Range 400 (100 * 4)
+        pidsSymbol.VerifySet(s => s.DetectionRange = 400.0, Times.Once);
+        // SetUpdate() 호출되어 UI 갱신 트리거
+        pidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
+    }
+    #endregion
+
+    #region Helper Methods
+    private static Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel CreateMockEventSetupModel()
+    {
+        var mockModel = new Mock<Ironwall.Dotnet.Libraries.Events.Models.IEventSetupModel>();
+        mockModel.Setup(m => m.IsAutoEventDiscard).Returns(false);
+        mockModel.Setup(m => m.IsSound).Returns(false);
+        mockModel.Setup(m => m.TimeDurationSound).Returns(0);
+        mockModel.Setup(m => m.TimeDiscardSec).Returns(0);
+        mockModel.Setup(m => m.LengthMaxEventPrev).Returns(0);
+        mockModel.Setup(m => m.LengthMinEventPrev).Returns(0);
+        return new Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel(mockModel.Object);
+    }
+    #endregion
+}
+#endregion
+
+#region Phase 13: 두 딕셔너리 구조로 심볼 분리 (PRD v1.5)
+/// <summary>
+/// Phase 13: SymbolEventManager 두 딕셔너리 구조 테스트
+/// PRD Reference: docs/prd/PRD_PTZ_FOV_Integration.md (Section 11)
+/// 목표: _deviceSymbolLookup + _groupSymbolLookup 분리
+/// </summary>
+public class SymbolEventManagerDualDictionaryTests
+{
+    #region Test 13.1.1: RegisterGroupSymbol - 그룹 심볼 등록
+    [Fact]
+    public void RegisterGroupSymbol_ShouldAddToGroupLookup()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+        mockGroupSymbol.Setup(s => s.Title).Returns("Group1");
+
+        // Act
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockDevice.Object, mockGroupSymbol.Object);
+
+        // Assert - 그룹 심볼이 등록되었는지 확인
+        Assert.True(manager.HasGroupSymbol(1));
+    }
+    #endregion
+
+    #region Test 13.1.2: RegisterBothSymbols - 동시 등록 시 덮어쓰기 없음
+    [Fact]
+    public void RegisterBothSymbols_ShouldNotOverwrite()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        // Device.Id = 5, DeviceGroup = 1, DeviceType = Fence (복합 키용)
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+        mockPidsSymbol.Setup(s => s.Title).Returns("Camera1");
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+        mockGroupSymbol.Setup(s => s.Title).Returns("Zone1");
+
+        // Act - 두 심볼 모두 등록
+        manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockDevice.Object, mockGroupSymbol.Object);
+
+        // Assert - 두 딕셔너리에 각각 등록되었는지 확인 (Phase 14: 복합 키 사용)
+        Assert.True(manager.HasDeviceSymbol(5, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence));  // Device.Id = 5, DeviceType = Fence
+        Assert.True(manager.HasGroupSymbol(1));   // DeviceGroup = 1
+
+        // 개별 심볼과 그룹 심볼이 서로 덮어쓰지 않음
+        var deviceLookup = manager.GetDeviceSymbol(5, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+        var groupLookup = manager.GetGroupSymbol(1);
+        Assert.NotNull(deviceLookup);
+        Assert.NotNull(groupLookup);
+        Assert.NotSame(deviceLookup.SymbolModel, groupLookup.SymbolModel);
+    }
+    #endregion
+
+    #region Test 13.2.1: Intrusion 이벤트 - 개별 + 그룹 모두 처리
+    [Fact]
+    public void ProcessDeviceEvent_Intrusion_ShouldProcessBothSymbols()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockDevice.Object, mockGroupSymbol.Object);
+
+        // Act - Intrusion 이벤트 (Phase 14: deviceType 추가)
+        manager.ProcessDeviceEvent(
+            deviceId: 5,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            deviceGroup: 1,
+            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion,
+            severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
+
+        // Assert - 개별 심볼 EventStatus 변경됨
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
+
+        // Assert - 그룹 심볼도 EventStatus 변경됨
+        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
+    }
+    #endregion
+
+    #region Test 13.2.2: Connection 이벤트 - 개별만 처리
+    [Fact]
+    public void ProcessDeviceEvent_Connection_ShouldProcessOnlyDeviceSymbol()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockDevice.Object, mockGroupSymbol.Object);
+
+        // Act - Connection 이벤트 (Phase 14: deviceType 추가)
+        manager.ProcessDeviceEvent(
+            deviceId: 5,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            deviceGroup: 1,
+            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Connection,
+            severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
+
+        // Assert - 개별 심볼만 처리됨
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Connection, Times.AtLeastOnce);
+
+        // Assert - 그룹 심볼은 처리 안됨 (Connection은 개별만)
+        mockGroupSymbol.VerifySet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(), Times.Never);
+    }
+    #endregion
+
+    #region Test 13.3.1: Fence 타입 제어기 장애 - 그룹 처리
+    [Fact]
+    public void ProcessControllerEvent_FenceType_ShouldProcessGroupSymbol()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockController = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IControllerDeviceModel>();
+        mockController.Setup(d => d.Id).Returns(10);
+        mockController.Setup(d => d.DeviceGroup).Returns(1);
+        mockController.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Controller);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockController.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockController.Object, mockGroupSymbol.Object);
+
+        // Act - Fence 타입 제어기 장애 이벤트
+        manager.ProcessControllerEvent(
+            controllerId: 10,
+            deviceGroup: 1,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
+            severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
+
+        // Assert - 개별 심볼 처리됨
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+
+        // Assert - Fence 타입이므로 그룹 심볼도 처리됨
+        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+    }
+    #endregion
+
+    #region Test 13.3.2: 일반 타입 제어기 장애 - 개별만 처리
+    [Fact]
+    public void ProcessControllerEvent_NonFenceType_ShouldProcessOnlyDeviceSymbol()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockController = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IControllerDeviceModel>();
+        mockController.Setup(d => d.Id).Returns(10);
+        mockController.Setup(d => d.DeviceGroup).Returns(1);
+        mockController.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Controller);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockController.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockController.Object, mockGroupSymbol.Object);
+
+        // Act - IpCamera 타입 (Non-Fence) 장애 이벤트
+        manager.ProcessControllerEvent(
+            controllerId: 10,
+            deviceGroup: 1,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.IpCamera,
+            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
+            severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
+
+        // Assert - 개별 심볼만 처리됨
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+
+        // Assert - Non-Fence이므로 그룹 심볼 처리 안됨
+        mockGroupSymbol.VerifySet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(), Times.Never);
+    }
+    #endregion
+
+    #region Test 13.4.1: 조치보고 - 개별 + 그룹 복원
+    [Fact]
+    public void ProcessEventReport_ShouldRestoreBothSymbols()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockDevice.Object, mockGroupSymbol.Object);
+
+        // Act - 조치보고 (Phase 14: deviceType 추가)
+        // ProcessEventReport는 _animationManager.ReportCurrentEvent()를 호출
+        // 이 테스트는 메서드가 예외 없이 호출되는지 확인
+        var ex = Record.Exception(() => manager.ProcessEventReport(
+            deviceId: 5,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            deviceGroup: 1));
+
+        // Assert - 예외 없이 정상 호출됨
+        Assert.Null(ex);
+
+        // Note: 실제 EventStatus 복원은 EventAnimationManager의 비동기 콜백에서 수행됨
+        // 따라서 동기 테스트에서는 직접 검증 불가
+    }
+    #endregion
+
+    #region Test 13.5.1: PTZ - 개별 심볼만 FOV 업데이트
+    [Fact]
+    public void ProcessCameraPtz_ShouldUpdateOnlyDeviceSymbolFOV()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockCamera = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.ICameraDeviceModel>();
+        mockCamera.Setup(d => d.Id).Returns(1);
+        mockCamera.Setup(d => d.DeviceGroup).Returns(1);
+        mockCamera.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.IpCamera);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockCamera.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockCamera.Object, mockGroupSymbol.Object);
+
+        // Act - PTZ 업데이트 (개별 심볼만 FOV 변경)
+        manager.ProcessCameraPtz(cameraId: 1, pan: 180f, tilt: 0f, zoom: 400f);
+
+        // Assert - 개별 심볼(IPidsSymbolModel)의 FOV만 업데이트
+        mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
+        mockPidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);   // 80 / 4
+        mockPidsSymbol.VerifySet(s => s.DetectionRange = 400.0, Times.Once);  // 100 * 4
+        mockPidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
+
+        // 그룹 심볼은 IPidsSymbolModel이 아니므로 FOV 속성 없음 - 호출 안됨
+    }
+    #endregion
+
+    #region Helper Methods
+    private static Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel CreateMockEventSetupModel()
+    {
+        var mockModel = new Mock<Ironwall.Dotnet.Libraries.Events.Models.IEventSetupModel>();
+        mockModel.Setup(m => m.IsAutoEventDiscard).Returns(false);
+        mockModel.Setup(m => m.IsSound).Returns(false);
+        mockModel.Setup(m => m.TimeDurationSound).Returns(0);
+        mockModel.Setup(m => m.TimeDiscardSec).Returns(0);
+        mockModel.Setup(m => m.LengthMaxEventPrev).Returns(0);
+        mockModel.Setup(m => m.LengthMinEventPrev).Returns(0);
+        return new Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel(mockModel.Object);
+    }
+    #endregion
+}
+#endregion

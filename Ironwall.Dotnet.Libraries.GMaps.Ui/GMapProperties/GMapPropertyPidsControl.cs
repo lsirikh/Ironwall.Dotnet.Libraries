@@ -199,7 +199,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty DetectionRangeProperty =
             DependencyProperty.Register("DetectionRange", typeof(double),
                 typeof(GMapPropertyPidsControl),
-                new PropertyMetadata(100.0, OnDetectionRangeChanged, CoerceDoubleValue));
+                new PropertyMetadata(30.0, OnDetectionRangeChanged, CoerceDoubleValue));
 
         /// <summary>
         /// 탐지 각도 (도)

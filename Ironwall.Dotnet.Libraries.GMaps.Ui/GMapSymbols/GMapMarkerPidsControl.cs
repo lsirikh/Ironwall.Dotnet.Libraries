@@ -122,7 +122,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
 
     public static readonly DependencyProperty DetectionRangeProperty =
         DependencyProperty.Register("DetectionRange", typeof(double), typeof(GMapMarkerPidsControl),
-            new PropertyMetadata(200.0, OnFOVParameterChanged));
+            new PropertyMetadata(30.0, OnFOVParameterChanged));
 
     /// <summary>
     /// 감지 각도 (도)

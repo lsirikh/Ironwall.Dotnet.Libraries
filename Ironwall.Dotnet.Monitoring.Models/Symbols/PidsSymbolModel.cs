@@ -72,7 +72,7 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
 
     // 모든 PIDS 장비에 공통으로 사용되는 FOV 속성
     [JsonProperty("detection_range", Order = 26)]
-    public double DetectionRange { get; set; } = 100; // 미터
+    public double DetectionRange { get; set; } = 30.0; // 미터
 
     [JsonProperty("detection_angle", Order = 27)]
     public double DetectionAngle { get; set; } = 80; // 도
