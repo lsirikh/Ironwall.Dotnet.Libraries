@@ -40,6 +40,35 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     }
     #endregion
 
+    #region Private Fields
+
+    /// <summary>
+    /// 부모 GMapCustomControl 참조 (이벤트 구독 해제용)
+    /// </summary>
+    private GMapCustomControl? _mapControl;
+
+    /// <summary>
+    /// 각도 기반 애니메이션용 현재 반지름 값 (픽셀)
+    /// </summary>
+    private double _animatedRadius;
+
+    /// <summary>
+    /// 각도 기반 애니메이션용 현재 방향각 (도)
+    /// </summary>
+    private double _animatedBearing;
+
+    /// <summary>
+    /// 각도 기반 애니메이션용 현재 시야각 (도)
+    /// </summary>
+    private double _animatedAngle;
+
+    /// <summary>
+    /// 애니메이션 진행 중 여부
+    /// </summary>
+    private bool _isAnimating;
+
+    #endregion
+
     #region Additional Dependency Properties
 
     /// <summary>
@@ -168,14 +197,25 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     public GMapMarkerPidsControl(GMapPidsMarker pidsMarker) : base(pidsMarker)
     {
         this.Loaded += GMapMarkerPidsControl_Loaded;
+        this.Unloaded += GMapMarkerPidsControl_Unloaded;
     }
 
     private void GMapMarkerPidsControl_Loaded(object sender, RoutedEventArgs e)
     {
-        var mapControl = FindParentMapControl();
-        if (mapControl != null)
+        _mapControl = FindParentMapControl();
+        if (_mapControl != null)
         {
-            mapControl.OnMapZoomChanged += OnMapZoomChanged;
+            _mapControl.OnMapZoomChanged += OnMapZoomChanged;
+        }
+    }
+
+    private void GMapMarkerPidsControl_Unloaded(object sender, RoutedEventArgs e)
+    {
+        // 이벤트 구독 해제 (메모리 누수 방지)
+        if (_mapControl != null)
+        {
+            _mapControl.OnMapZoomChanged -= OnMapZoomChanged;
+            _mapControl = null;
         }
     }
 
@@ -183,6 +223,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         if (ShowFOV && DeviceType == EnumDeviceType.IpCamera)
         {
+            System.Diagnostics.Debug.WriteLine($"[FOV] OnMapZoomChanged 호출됨 - Zoom: {_mapControl?.Zoom}");
             UpdateFOVPath();
         }
     }
@@ -540,8 +581,15 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     //    }
     //}
 
+    /// <summary>
+    /// FOV Path 업데이트 (수정된 버전 - Phase 15.7)
+    /// - 각도 기반 애니메이션 지원 (PointAnimation 대신 DoubleAnimation 사용)
+    /// - 좌표 계산 로직 내장 (WPF 좌표계 호환)
+    /// - animate=false: 즉시 업데이트, animate=true: 부드러운 전환
+    /// </summary>
     private void UpdateFOVPath(bool animate = false)
     {
+        // UI 스레드 접근 보장
         if (!Dispatcher.CheckAccess())
         {
             Dispatcher.BeginInvoke(() => UpdateFOVPath(animate));
@@ -550,6 +598,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
 
         try
         {
+            // 템플릿 파트 가져오기
             if (GetTemplateChild("PART_FOVFigure") is PathFigure figure &&
                 GetTemplateChild("PART_FOVLine1") is LineSegment line1 &&
                 GetTemplateChild("PART_FOVArc") is ArcSegment arc &&
@@ -557,134 +606,141 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 GetTemplateChild("PART_FOVCanvas") is Canvas fovCanvas &&
                 GetTemplateChild("PART_FOVTransform") is TranslateTransform transform)
             {
-
-                //Marker.Width = ActualWidth;
-                //Marker.Height = ActualHeight;
-
-                // Transform 설정
+                // 1. 캔버스 및 중심점 설정
                 transform.X = ActualWidth / 2.0;
                 transform.Y = ActualHeight / 2.0;
 
                 fovCanvas.Width = ActualWidth;
                 fovCanvas.Height = ActualHeight;
 
-                var centerX = 0;
-                var centerY = 0;
+                figure.StartPoint = new Point(0, 0);
 
-                var mapControl = FindParentMapControl();
+                // 2. 거리 계산 (미터 -> 픽셀)
+                var mapControl = _mapControl ?? FindParentMapControl();
                 if (mapControl == null || Marker?.Position == null) return;
 
-                // 목표값 계산
-                var radiusInPixels = ConvertMetersToPixels(DetectionRange, Marker.Position, mapControl);
-                var bearingRad = DetectionBearing * Math.PI / 180.0;
-                var halfAngleRad = DetectionAngle / 2.0 * Math.PI / 180.0;
-                var startAngleRad = bearingRad - halfAngleRad;
-                var endAngleRad = bearingRad + halfAngleRad;
+                double targetRadius = ConvertMetersToPixels(DetectionRange, Marker.Position, mapControl);
+                if (targetRadius < 1) targetRadius = 1;
 
-                var targetStartPoint = new Point(
-                    centerX + radiusInPixels * Math.Cos(startAngleRad),
-                    centerY + radiusInPixels * Math.Sin(startAngleRad));
+                double targetBearing = DetectionBearing;
+                double targetAngle = DetectionAngle;
 
-                var targetEndPoint = new Point(
-                    centerX + radiusInPixels * Math.Cos(endAngleRad),
-                    centerY + radiusInPixels * Math.Sin(endAngleRad));
-
-                // 중심점은 항상 즉시 설정
-                figure.StartPoint = new Point(centerX, centerY);
-                arc.IsLargeArc = DetectionAngle > 180;
-                arc.SweepDirection = SweepDirection.Clockwise;
-
-                // 애니메이션 적용
-                if (animate && ShowFOV)
+                // 3. 애니메이션 적용 여부 결정
+                if (animate && !_isAnimating && _animatedRadius > 0)
                 {
-                    var duration = TimeSpan.FromMilliseconds(500);
-                    var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
-
-                    // Line1 애니메이션
-                    var line1Anim = new PointAnimation
-                    {
-                        From = line1.Point,  // 현재 위치에서 시작
-                        To = targetStartPoint,
-                        Duration = duration,
-                        EasingFunction = ease
-                    };
-                    line1.BeginAnimation(LineSegment.PointProperty, line1Anim);
-
-                    // Arc Point 애니메이션
-                    var arcPointAnim = new PointAnimation
-                    {
-                        From = arc.Point,  // 현재 위치에서 시작
-                        To = targetEndPoint,
-                        Duration = duration,
-                        EasingFunction = ease
-                    };
-                    arc.BeginAnimation(ArcSegment.PointProperty, arcPointAnim);
-
-                    // Arc Size 애니메이션 - DoubleAnimation 두 개로 대체
-                    var currentRadiusX = arc.Size.Width;
-                    var currentRadiusY = arc.Size.Height;
-
-                    // Width 애니메이션
-                    var widthAnim = new DoubleAnimation
-                    {
-                        From = currentRadiusX,
-                        To = radiusInPixels,
-                        Duration = duration,
-                        EasingFunction = ease
-                    };
-
-                    // Height 애니메이션
-                    var heightAnim = new DoubleAnimation
-                    {
-                        From = currentRadiusY,
-                        To = radiusInPixels,
-                        Duration = duration,
-                        EasingFunction = ease
-                    };
-
-                    // Storyboard로 Size 애니메이션 처리
-                    var sb = new Storyboard();
-
-                    // Width
-                    Storyboard.SetTarget(widthAnim, arc);
-                    Storyboard.SetTargetProperty(widthAnim,
-                        new PropertyPath("Size.Width"));
-                    sb.Children.Add(widthAnim);
-
-                    // Height
-                    Storyboard.SetTarget(heightAnim, arc);
-                    Storyboard.SetTargetProperty(heightAnim,
-                        new PropertyPath("Size.Height"));
-                    sb.Children.Add(heightAnim);
-
-                    sb.Begin();
-
-                    System.Diagnostics.Debug.WriteLine($"애니메이션 시작:");
-                    System.Diagnostics.Debug.WriteLine($"  From: {line1.Point} → To: {targetStartPoint}");
-                    System.Diagnostics.Debug.WriteLine($"  Radius: {currentRadiusX} → {radiusInPixels}");
+                    // 각도 기반 애니메이션 시작
+                    StartAngleBasedAnimation(
+                        line1, arc, centerEllipse, transform,
+                        targetRadius, targetBearing, targetAngle);
                 }
                 else
                 {
-                    // 즉시 적용
-                    line1.Point = targetStartPoint;
-                    arc.Point = targetEndPoint;
-                    arc.Size = new Size(radiusInPixels, radiusInPixels);
+                    // 즉시 업데이트 (애니메이션 없음 또는 초기화)
+                    _animatedRadius = targetRadius;
+                    _animatedBearing = targetBearing;
+                    _animatedAngle = targetAngle;
 
-                    System.Diagnostics.Debug.WriteLine($"즉시 업데이트:");
-                    System.Diagnostics.Debug.WriteLine($"  Point: {targetStartPoint}");
-                    System.Diagnostics.Debug.WriteLine($"  Size: {radiusInPixels}");
+                    ApplyFOVValues(line1, arc, centerEllipse, transform,
+                        targetRadius, targetBearing, targetAngle);
                 }
 
-                // 중심점 마커 위치
-                Canvas.SetLeft(centerEllipse, transform.X - 2);
-                Canvas.SetTop(centerEllipse, transform.Y - 2);
+                System.Diagnostics.Debug.WriteLine($"[FOV] Zoom:{mapControl.Zoom}, Range:{DetectionRange}m, Radius:{targetRadius:F1}px, Bearing:{targetBearing}, Angle:{targetAngle}, Animate:{animate}");
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"FOV Path 업데이트 실패: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
         }
+    }
+
+    /// <summary>
+    /// 각도 기반 애니메이션 시작 (Phase 15.7)
+    /// - DoubleAnimation으로 반지름/방향/각도 값을 애니메이션
+    /// - CompositionTarget.Rendering으로 매 프레임마다 좌표 재계산
+    /// </summary>
+    private void StartAngleBasedAnimation(
+        LineSegment line1, ArcSegment arc, Ellipse centerEllipse, TranslateTransform transform,
+        double targetRadius, double targetBearing, double targetAngle)
+    {
+        _isAnimating = true;
+
+        var duration = TimeSpan.FromMilliseconds(200);
+        var startRadius = _animatedRadius;
+        var startBearing = _animatedBearing;
+        var startAngle = _animatedAngle;
+
+        var startTime = DateTime.Now;
+
+        // CompositionTarget.Rendering 이벤트 핸들러
+        void OnRendering(object? sender, EventArgs e)
+        {
+            var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
+            var progress = Math.Min(1.0, elapsed / duration.TotalMilliseconds);
+
+            // EaseOut 함수 적용 (부드러운 감속)
+            var easedProgress = 1 - Math.Pow(1 - progress, 3);
+
+            // 현재 값 보간
+            _animatedRadius = startRadius + (targetRadius - startRadius) * easedProgress;
+            _animatedBearing = startBearing + (targetBearing - startBearing) * easedProgress;
+            _animatedAngle = startAngle + (targetAngle - startAngle) * easedProgress;
+
+            // 좌표 재계산 및 적용
+            ApplyFOVValues(line1, arc, centerEllipse, transform,
+                _animatedRadius, _animatedBearing, _animatedAngle);
+
+            // 애니메이션 완료 체크
+            if (progress >= 1.0)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _isAnimating = false;
+
+                // 최종 값으로 정확히 설정
+                _animatedRadius = targetRadius;
+                _animatedBearing = targetBearing;
+                _animatedAngle = targetAngle;
+                ApplyFOVValues(line1, arc, centerEllipse, transform,
+                    targetRadius, targetBearing, targetAngle);
+            }
+        }
+
+        CompositionTarget.Rendering += OnRendering;
+    }
+
+    /// <summary>
+    /// FOV 값을 Path 요소에 적용 (좌표 계산 및 설정)
+    /// </summary>
+    private void ApplyFOVValues(
+        LineSegment line1, ArcSegment arc, Ellipse centerEllipse, TranslateTransform transform,
+        double radius, double bearing, double angle)
+    {
+        // 각도 계산 (Map Bearing -> WPF Coordinates)
+        // Map: 0도=북쪽(North), 시계방향(CW) 증가
+        // WPF: 0도=동쪽(East), 시계방향(CW) 증가
+        // 변환 공식: WPF_Angle = Map_Angle - 90
+        double halfAngle = angle / 2.0;
+        double startAngleDeg = bearing - halfAngle - 90;
+        double endAngleDeg = bearing + halfAngle - 90;
+
+        // 좌표 계산 (삼각함수)
+        double startRad = startAngleDeg * Math.PI / 180.0;
+        double endRad = endAngleDeg * Math.PI / 180.0;
+
+        double startX = radius * Math.Cos(startRad);
+        double startY = radius * Math.Sin(startRad);
+        double endX = radius * Math.Cos(endRad);
+        double endY = radius * Math.Sin(endRad);
+
+        // Path 요소 업데이트
+        line1.Point = new Point(startX, startY);
+        arc.Point = new Point(endX, endY);
+        arc.Size = new Size(radius, radius);
+        arc.IsLargeArc = angle > 180.0;
+        arc.SweepDirection = SweepDirection.Clockwise;
+
+        // 중심점 마커 위치
+        Canvas.SetLeft(centerEllipse, transform.X - 2);
+        Canvas.SetTop(centerEllipse, transform.Y - 2);
     }
 
     /// <summary>
@@ -807,7 +863,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         if (d is GMapMarkerPidsControl control && control.Marker != null && control.ShowFOV)
         {
-            control.UpdateFOVPath(animate: true);  // 애니메이션 활성화
+            // 사용자 상호작용에 의한 변경은 부드러운 애니메이션 적용
+            control.UpdateFOVPath(animate: true);
         }
     }
 

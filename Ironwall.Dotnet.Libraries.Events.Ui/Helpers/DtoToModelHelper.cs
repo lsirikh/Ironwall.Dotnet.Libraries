@@ -359,7 +359,7 @@ public static class DtoToModelHelper
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // EventProvider 통합 오버로드 (TDD로 구현 - OriginEvent Instantiation)
+    // EventProvider 통합 오버로드
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>

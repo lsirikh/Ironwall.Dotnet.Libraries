@@ -2782,3 +2782,321 @@ public class SymbolEventManagerDualDictionaryTests
     #endregion
 }
 #endregion
+
+#region Phase 16: DataHelper IBaseDeviceModel Refactoring Tests
+/// <summary>
+/// Phase 16 Tests: DataHelper 리팩토링 - IBaseDeviceModel 기반 변환
+/// TDD 방식으로 GetControllerNumber, IsDeviceMatch, GetXxxCountsByDevice 구현
+/// </summary>
+public class DataHelperRefactoringTests
+{
+    #region Phase 16.1: GetControllerNumber Tests
+
+    /// <summary>
+    /// Test 16.1.1: IControllerDeviceModel 입력 시 DeviceNumber 반환
+    /// </summary>
+    [Fact]
+    public void GetControllerNumber_WithControllerDevice_ShouldReturnDeviceNumber()
+    {
+        // Arrange: IControllerDeviceModel with DeviceNumber = 5
+        var controller = new ControllerDeviceModel { DeviceNumber = 5 };
+
+        // Act: GetControllerNumber(device)
+        var result = DataHelper.GetControllerNumber(controller);
+
+        // Assert: Returns 5
+        Assert.Equal(5, result);
+    }
+
+    /// <summary>
+    /// Test 16.1.2: ISensorDeviceModel 입력 시 Controller.DeviceNumber 반환
+    /// </summary>
+    [Fact]
+    public void GetControllerNumber_WithSensorDevice_ShouldReturnControllerNumber()
+    {
+        // Arrange: ISensorDeviceModel with Controller.DeviceNumber = 3
+        var sensor = new SensorDeviceModel
+        {
+            DeviceNumber = 100,
+            Controller = new ControllerDeviceModel { DeviceNumber = 3 }
+        };
+
+        // Act: GetControllerNumber(device)
+        var result = DataHelper.GetControllerNumber(sensor);
+
+        // Assert: Returns 3
+        Assert.Equal(3, result);
+    }
+
+    /// <summary>
+    /// Test 16.1.3: ISensorDeviceModel with null Controller 입력 시 -1 반환
+    /// </summary>
+    [Fact]
+    public void GetControllerNumber_WithSensorNoController_ShouldReturnMinusOne()
+    {
+        // Arrange: ISensorDeviceModel with Controller = null
+        var sensor = new SensorDeviceModel
+        {
+            DeviceNumber = 100,
+            Controller = null!
+        };
+
+        // Act: GetControllerNumber(device)
+        var result = DataHelper.GetControllerNumber(sensor);
+
+        // Assert: Returns -1
+        Assert.Equal(-1, result);
+    }
+
+    /// <summary>
+    /// Test 16.1.4: ICameraDeviceModel 입력 시 -1 반환 (Controller 속성 없음)
+    /// </summary>
+    [Fact]
+    public void GetControllerNumber_WithCameraDevice_ShouldReturnMinusOne()
+    {
+        // Arrange: ICameraDeviceModel (no Controller property)
+        var camera = new CameraDeviceModel { DeviceNumber = 10 };
+
+        // Act: GetControllerNumber(device)
+        var result = DataHelper.GetControllerNumber(camera);
+
+        // Assert: Returns -1
+        Assert.Equal(-1, result);
+    }
+
+    /// <summary>
+    /// Test 16.1.5: null 입력 시 -1 반환
+    /// </summary>
+    [Fact]
+    public void GetControllerNumber_WithNull_ShouldReturnMinusOne()
+    {
+        // Arrange: null device
+        IBaseDeviceModel? device = null;
+
+        // Act: GetControllerNumber(null)
+        var result = DataHelper.GetControllerNumber(device);
+
+        // Assert: Returns -1
+        Assert.Equal(-1, result);
+    }
+
+    #endregion
+
+    #region Phase 16.2: IsDeviceMatch Tests
+
+    /// <summary>
+    /// Test 16.2.1: ID 직접 매칭 시 true 반환
+    /// </summary>
+    [Fact]
+    public void IsDeviceMatch_WithSameId_ShouldReturnTrue()
+    {
+        // Arrange: eventDevice.Id = 100, targetDevice.Id = 100
+        var eventDevice = new SensorDeviceModel { Id = 100, DeviceNumber = 1 };
+        var targetDevice = new SensorDeviceModel { Id = 100, DeviceNumber = 2 };
+
+        // Act: IsDeviceMatch(eventDevice, targetDevice)
+        var result = DataHelper.IsDeviceMatch(eventDevice, targetDevice);
+
+        // Assert: Returns true
+        Assert.True(result);
+    }
+
+    /// <summary>
+    /// Test 16.2.2: DeviceNumber + DeviceType 매칭 시 true 반환
+    /// </summary>
+    [Fact]
+    public void IsDeviceMatch_WithSameNumberAndType_ShouldReturnTrue()
+    {
+        // Arrange: eventDevice (DeviceNumber=5, Type=Sensor), target (DeviceNumber=5, Type=Sensor)
+        var eventDevice = new SensorDeviceModel { Id = 1, DeviceNumber = 5, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+        var targetDevice = new SensorDeviceModel { Id = 2, DeviceNumber = 5, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+
+        // Act: IsDeviceMatch(eventDevice, targetDevice)
+        var result = DataHelper.IsDeviceMatch(eventDevice, targetDevice);
+
+        // Assert: Returns true
+        Assert.True(result);
+    }
+
+    /// <summary>
+    /// Test 16.2.3: Sensor→Controller 매핑 시 true 반환
+    /// </summary>
+    [Fact]
+    public void IsDeviceMatch_SensorToController_ShouldReturnTrue()
+    {
+        // Arrange: eventDevice = Sensor with Controller.DeviceNumber = 3
+        //          targetDevice = Controller with DeviceNumber = 3
+        var eventDevice = new SensorDeviceModel
+        {
+            Id = 100,
+            DeviceNumber = 10,
+            Controller = new ControllerDeviceModel { DeviceNumber = 3 }
+        };
+        var targetDevice = new ControllerDeviceModel { Id = 3, DeviceNumber = 3 };
+
+        // Act: IsDeviceMatch(eventDevice, targetDevice)
+        var result = DataHelper.IsDeviceMatch(eventDevice, targetDevice);
+
+        // Assert: Returns true
+        Assert.True(result);
+    }
+
+    /// <summary>
+    /// Test 16.2.4: null eventDevice 입력 시 false 반환
+    /// </summary>
+    [Fact]
+    public void IsDeviceMatch_WithNullEventDevice_ShouldReturnFalse()
+    {
+        // Arrange: eventDevice = null, targetDevice = Controller
+        IBaseDeviceModel? eventDevice = null;
+        var targetDevice = new ControllerDeviceModel { Id = 1, DeviceNumber = 1 };
+
+        // Act: IsDeviceMatch(null, targetDevice)
+        var result = DataHelper.IsDeviceMatch(eventDevice, targetDevice);
+
+        // Assert: Returns false
+        Assert.False(result);
+    }
+
+    /// <summary>
+    /// Test 16.2.5: 불일치 케이스 시 false 반환
+    /// </summary>
+    [Fact]
+    public void IsDeviceMatch_WithDifferentDevices_ShouldReturnFalse()
+    {
+        // Arrange: eventDevice (DeviceNumber=5), targetDevice (DeviceNumber=7)
+        var eventDevice = new SensorDeviceModel { Id = 1, DeviceNumber = 5 };
+        var targetDevice = new SensorDeviceModel { Id = 2, DeviceNumber = 7 };
+
+        // Act: IsDeviceMatch(eventDevice, targetDevice)
+        var result = DataHelper.IsDeviceMatch(eventDevice, targetDevice);
+
+        // Assert: Returns false
+        Assert.False(result);
+    }
+
+    #endregion
+
+    #region Phase 16.3: GetDetectionCountsByDevice Tests
+
+    /// <summary>
+    /// Test 16.3.1: Sensor 이벤트 카운트
+    /// </summary>
+    [Fact]
+    public void GetDetectionCountsByDevice_WithSensorEvents_ShouldCountCorrectly()
+    {
+        // Arrange: 3 events from Sensor1, 2 from Sensor2
+        var sensor1 = new SensorDeviceModel { Id = 1, DeviceNumber = 1, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+        var sensor2 = new SensorDeviceModel { Id = 2, DeviceNumber = 2, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+
+        var events = new List<IDetectionEventModel>
+        {
+            new DetectionEventModel { Id = 1, DateTime = DateTime.Now, Device = sensor1 },
+            new DetectionEventModel { Id = 2, DateTime = DateTime.Now, Device = sensor1 },
+            new DetectionEventModel { Id = 3, DateTime = DateTime.Now, Device = sensor1 },
+            new DetectionEventModel { Id = 4, DateTime = DateTime.Now, Device = sensor2 },
+            new DetectionEventModel { Id = 5, DateTime = DateTime.Now, Device = sensor2 },
+        };
+
+        var devices = new List<IBaseDeviceModel> { sensor1, sensor2 };
+
+        // Act: GetDetectionCountsByDevice
+        var result = DataHelper.GetDetectionCountsByDevice(
+            DateTime.Now.AddDays(-1), DateTime.Now.AddDays(1), devices, events);
+
+        // Assert: [3.0, 2.0]
+        Assert.Equal(2, result.Count);
+        Assert.Equal(3.0, result[0]);
+        Assert.Equal(2.0, result[1]);
+    }
+
+    /// <summary>
+    /// Test 16.3.2: Controller 기준 집계 (Sensor→Controller 매핑)
+    /// </summary>
+    [Fact]
+    public void GetDetectionCountsByDevice_WithControllerTarget_ShouldAggregateChildren()
+    {
+        // Arrange: 2 events from Sensor(Controller.DeviceNumber=1), 1 from Sensor(Controller.DeviceNumber=2)
+        var ctrl1 = new ControllerDeviceModel { Id = 1, DeviceNumber = 1 };
+        var ctrl2 = new ControllerDeviceModel { Id = 2, DeviceNumber = 2 };
+        var sensor1 = new SensorDeviceModel { Id = 10, DeviceNumber = 10, Controller = ctrl1 };
+        var sensor2 = new SensorDeviceModel { Id = 20, DeviceNumber = 20, Controller = ctrl2 };
+
+        var events = new List<IDetectionEventModel>
+        {
+            new DetectionEventModel { Id = 1, DateTime = DateTime.Now, Device = sensor1 },
+            new DetectionEventModel { Id = 2, DateTime = DateTime.Now, Device = sensor1 },
+            new DetectionEventModel { Id = 3, DateTime = DateTime.Now, Device = sensor2 },
+        };
+
+        var devices = new List<IBaseDeviceModel> { ctrl1, ctrl2 };
+
+        // Act: GetDetectionCountsByDevice
+        var result = DataHelper.GetDetectionCountsByDevice(
+            DateTime.Now.AddDays(-1), DateTime.Now.AddDays(1), devices, events);
+
+        // Assert: [2.0, 1.0]
+        Assert.Equal(2, result.Count);
+        Assert.Equal(2.0, result[0]);
+        Assert.Equal(1.0, result[1]);
+    }
+
+    #endregion
+
+    #region Phase 16.6: GetActionCountsByDevice Tests
+
+    /// <summary>
+    /// Test 16.6.1: OriginEvent.Device 기준 카운트
+    /// </summary>
+    [Fact]
+    public void GetActionCountsByDevice_ShouldUseOriginEventDevice()
+    {
+        // Arrange: ActionEvent with OriginEvent.Device = Sensor(Controller.DeviceNumber=1)
+        var ctrl1 = new ControllerDeviceModel { Id = 1, DeviceNumber = 1 };
+        var sensor1 = new SensorDeviceModel { Id = 10, DeviceNumber = 10, Controller = ctrl1 };
+        var originEvent = new DetectionEventModel { Id = 100, Device = sensor1 };
+
+        var events = new List<IActionEventModel>
+        {
+            new ActionEventModel { Id = 1, DateTime = DateTime.Now, OriginEvent = originEvent },
+        };
+
+        var devices = new List<IBaseDeviceModel> { ctrl1 };
+
+        // Act: GetActionCountsByDevice
+        var result = DataHelper.GetActionCountsByDevice(
+            DateTime.Now.AddDays(-1), DateTime.Now.AddDays(1), devices, events);
+
+        // Assert: [1.0]
+        Assert.Equal(1, result.Count);
+        Assert.Equal(1.0, result[0]);
+    }
+
+    /// <summary>
+    /// Test 16.6.3: null OriginEvent 처리
+    /// </summary>
+    [Fact]
+    public void GetActionCountsByDevice_WithNullOriginEvent_ShouldNotCount()
+    {
+        // Arrange: ActionEvent with OriginEvent = null
+        var ctrl1 = new ControllerDeviceModel { Id = 1, DeviceNumber = 1 };
+
+        var events = new List<IActionEventModel>
+        {
+            new ActionEventModel { Id = 1, DateTime = DateTime.Now, OriginEvent = null },
+        };
+
+        var devices = new List<IBaseDeviceModel> { ctrl1 };
+
+        // Act: GetActionCountsByDevice
+        var result = DataHelper.GetActionCountsByDevice(
+            DateTime.Now.AddDays(-1), DateTime.Now.AddDays(1), devices, events);
+
+        // Assert: [0.0]
+        Assert.Equal(1, result.Count);
+        Assert.Equal(0.0, result[0]);
+    }
+
+    #endregion
+}
+#endregion

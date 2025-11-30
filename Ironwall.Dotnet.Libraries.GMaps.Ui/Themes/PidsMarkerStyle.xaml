@@ -463,7 +463,7 @@
 									                             Converter={StaticResource BooleanToVisibilityConverter}}">
 									<Path.Data>
 										<PathGeometry>
-											<PathFigure x:Name="PART_FOVFigure" StartPoint="0,0">
+											<PathFigure x:Name="PART_FOVFigure" StartPoint="0,0" IsClosed="True">
 												<LineSegment x:Name="PART_FOVLine1" Point="0,0" />
 												<ArcSegment
 													x:Name="PART_FOVArc"
@@ -471,7 +471,6 @@
 													Point="0,0"
 													Size="0,0"
 													SweepDirection="Clockwise" />
-												<LineSegment Point="0,0" />
 											</PathFigure>
 										</PathGeometry>
 									</Path.Data>

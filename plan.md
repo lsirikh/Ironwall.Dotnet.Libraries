@@ -3522,6 +3522,171 @@ private readonly Dictionary<(int Id, EnumDeviceType Type), DeviceSymbolLookupMod
 
 ---
 
+## Phase 15: Camera FOV 버그 수정 (PRD: Docs/Camera_FOV_Fix_PRD.md) ✅
+
+**Status**: COMPLETE
+**PRD Reference**: `Docs/Camera_FOV_Fix_PRD.md` v1.1
+**Issue**:
+- FOV-001: 부채꼴 형상이 크기 조절 과정에서 비정상적으로 변형됨
+- FOV-002: 지도 Zoom 조절 시 FOV 크기가 상대적으로 변경되지 않음
+
+---
+
+### Phase 15.1: ArcSegment 애니메이션 제거 (BEHAVIORAL)
+
+**Files**: `GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
+
+#### Test 15.1.1: UpdateFOVPath 즉시 업데이트 [x]
+```csharp
+[Fact]
+public void UpdateFOVPath_ShouldUpdateArcSizeImmediately()
+{
+    // Arrange: FOV 파라미터 설정 (Range=100, Angle=60, Bearing=0)
+    // Act: UpdateFOVPath() 호출
+    // Assert: arc.Size가 즉시 변경됨 (애니메이션 없이)
+}
+```
+
+**Implementation**:
+- [ ] `UpdateFOVPath()` 메서드에서 `animate` 분기 제거
+- [ ] Storyboard 애니메이션 코드 삭제 (Lines 598-665)
+- [ ] 즉시 업데이트 로직만 유지
+
+---
+
+### Phase 15.2: 각도 좌표계 변환 (BEHAVIORAL)
+
+**Files**: `GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
+
+#### Test 15.2.1: 방위각 0° (북) → WPF 각도 -90° (위) 변환 [x]
+```csharp
+[Fact]
+public void BearingConversion_North0_ShouldPointUp()
+{
+    // Arrange: DetectionBearing = 0 (북쪽)
+    // Act: 각도 변환 수행
+    // Assert: WPF 각도가 -90° (위쪽)
+}
+```
+
+#### Test 15.2.2: 방위각 90° (동) → WPF 각도 0° (오른쪽) 변환 [x]
+```csharp
+[Fact]
+public void BearingConversion_East90_ShouldPointRight()
+{
+    // Arrange: DetectionBearing = 90 (동쪽)
+    // Act: 각도 변환 수행
+    // Assert: WPF 각도가 0° (오른쪽)
+}
+```
+
+**Implementation**:
+- [ ] `UpdateFOVPath()`에서 각도 변환 추가: `var wpfAngle = DetectionBearing - 90`
+
+---
+
+### Phase 15.3: _mapControl 필드 관리 (STRUCTURAL)
+
+**Files**: `GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
+
+#### Test 15.3.1: Loaded 이벤트에서 _mapControl 저장 [x]
+```csharp
+[Fact]
+public void Loaded_ShouldStoreMapControlReference()
+{
+    // Arrange: GMapMarkerPidsControl 생성
+    // Act: Loaded 이벤트 시뮬레이션
+    // Assert: _mapControl 필드가 null이 아님
+}
+```
+
+#### Test 15.3.2: Unloaded 이벤트에서 이벤트 구독 해제 [x]
+```csharp
+[Fact]
+public void Unloaded_ShouldUnsubscribeFromZoomEvent()
+{
+    // Arrange: GMapMarkerPidsControl with subscribed events
+    // Act: Unloaded 이벤트 시뮬레이션
+    // Assert: OnMapZoomChanged 이벤트 핸들러 제거됨
+}
+```
+
+**Implementation**:
+- [x] `private GMapCustomControl? _mapControl;` 필드 추가
+- [x] `Loaded` 핸들러에서 `_mapControl = FindParentMapControl()` 저장
+- [x] `Unloaded` 이벤트 핸들러 추가
+- [x] `Unloaded`에서 `_mapControl.OnMapZoomChanged -= OnMapZoomChanged` 호출
+
+---
+
+### Phase 15.4: PathFigure IsClosed 설정 (STRUCTURAL)
+
+**Files**: `GMaps.Ui/Themes/PidsMarkerStyle.xaml`
+
+#### Test 15.4.1: PathFigure 자동 닫힘 [x]
+```csharp
+[Fact]
+public void PathFigure_ShouldAutoClose()
+{
+    // Arrange: XAML 로드
+    // Act: PathFigure의 IsClosed 속성 확인
+    // Assert: IsClosed == true
+}
+```
+
+**Implementation**:
+- [x] XAML에서 `<PathFigure x:Name="PART_FOVFigure" IsClosed="True">` 설정
+- [x] 마지막 `<LineSegment Point="0,0" />` 제거 (자동 닫힘으로 불필요)
+
+---
+
+### Phase 15.5: Zoom 연동 개선 (BEHAVIORAL)
+
+**Files**: `GMaps.Ui/GMapSymbols/GMapMarkerPidsControl.cs`
+
+#### Test 15.5.1: Zoom 변경 시 FOV 크기 재계산 [x]
+```csharp
+[Fact]
+public void OnMapZoomChanged_ShouldRecalculateFOVSize()
+{
+    // Arrange: 초기 Zoom=15, DetectionRange=100m
+    // Act: Zoom=18로 변경
+    // Assert: radiusInPixels 값이 증가함 (약 8배)
+}
+```
+
+#### Test 15.5.2: 미터→픽셀 변환 정확도 [x]
+```csharp
+[Fact]
+public void ConvertMetersToPixels_ShouldBeAccurate()
+{
+    // Arrange: 100m 거리, 위도 37.5°, Zoom=15
+    // Act: ConvertMetersToPixels 호출
+    // Assert: 결과값이 예상 범위 내 (허용 오차 10%)
+}
+```
+
+**Implementation**:
+- [x] `OnMapZoomChanged()`에서 `_mapControl` 필드 사용 (재탐색 불필요)
+- [x] `UpdateFOVPath()`에서 `_mapControl ?? FindParentMapControl()` 패턴 적용
+
+---
+
+### Phase 15 구현 체크리스트
+
+| 단계 | 설명 | 상태 |
+|------|------|------|
+| 15.1.1 | ArcSegment 애니메이션 제거 | [x] |
+| 15.2.1 | 방위각 북(0°) 변환 테스트 | [x] |
+| 15.2.2 | 방위각 동(90°) 변환 테스트 | [x] |
+| 15.3.1 | _mapControl 필드 저장 | [x] |
+| 15.3.2 | Unloaded 이벤트 구독 해제 | [x] |
+| 15.4.1 | PathFigure IsClosed 설정 | [x] |
+| 15.5.1 | Zoom 변경 시 재계산 | [x] |
+| 15.5.2 | 미터→픽셀 변환 정확도 | [x] |
+
+---
+
 ### 🎯 Next Action
 
 **Phase 14 완료 (2025-11-29)**:
@@ -3529,9 +3694,341 @@ private readonly Dictionary<(int Id, EnumDeviceType Type), DeviceSymbolLookupMod
 - NatsDomainService, EventCardListPanelViewModel 호출부 수정 완료
 - 테스트 코드 수정 및 8개 테스트 모두 통과
 
-**Expected Behavior After Fix**:
-- 탐지 이벤트 시 해당 센서(Fence) 심볼만 깜빡임
-- 카메라 심볼은 별도의 ID+Type 조합으로 분리되어 영향 없음
-- PTZ 업데이트는 `(cameraId, IpCamera)` 키로 정확히 카메라만 조회
+**Phase 15 완료 (2025-11-30)**:
+- Camera FOV 버그 수정 완료
+- FOVCalculationHelper 클래스 생성 (각도 좌표계 변환 로직)
+- _mapControl 필드 관리 구현 (Loaded/Unloaded 이벤트 핸들러)
+- PathFigure IsClosed="True" 설정
+- 7개 단위 테스트 모두 통과
+
+**Phase 15.7 추가 (2025-11-30) - 각도 기반 애니메이션**:
+- PointAnimation 대신 CompositionTarget.Rendering 기반 애니메이션 구현
+- 매 프레임마다 삼각함수로 좌표 재계산 (호 경로 따라 정확한 이동)
+- EaseOut 함수 적용 (부드러운 감속 효과)
+- `_animatedRadius`, `_animatedBearing`, `_animatedAngle` 필드 추가
+- `StartAngleBasedAnimation()`, `ApplyFOVValues()` 메서드 추가
+- 빌드 성공 + 7개 테스트 통과
+
+---
+
+## Phase 16: DataHelper IBaseDeviceModel 리팩토링 (PRD: Docs/EventInfoViewModel_Refactoring_Report.md)
+
+**목표**: EventInfoViewModel의 CountsCounter delegate를 IBaseDeviceModel 기반으로 변경
+**이슈**: ActionEventPanel 31개 vs EventInfoModel 차트 27개 데이터 불일치 해결
+**참조**: `Docs/EventInfoViewModel_Refactoring_Report.md`, `Docs/ActionEventPanel_DataMismatch_Report.md`
+
+### 이벤트-Device 타입 매핑
+
+| 이벤트 타입 | Device 타입 |
+|------------|------------|
+| Detection | `ISensorDeviceModel`, `ICameraDeviceModel` |
+| Malfunction | `IControllerDeviceModel`, `ISensorDeviceModel` |
+| Connection | `IControllerDeviceModel`, `ISensorDeviceModel` |
+| Action | `IControllerDeviceModel`, `ISensorDeviceModel`, `ICameraDeviceModel` (OriginEvent.Device 기준) |
+
+**참고**: `ICameraDeviceModel`은 `Controller` 속성을 가지지 않음 (직접 ID/DeviceNumber 매칭만 가능)
+
+---
+
+### Phase 16.1: GetControllerNumber 헬퍼 메서드 (BEHAVIORAL)
+
+**파일**: `Helpers/DataHelper.cs`, `Tests/UnitTest.cs`
+
+#### Test 16.1.1: GetControllerNumber - IControllerDeviceModel 반환 ✅
+```csharp
+[Fact]
+public void GetControllerNumber_WithControllerDevice_ShouldReturnDeviceNumber()
+{
+    // Arrange: IControllerDeviceModel with DeviceNumber = 5
+    // Act: GetControllerNumber(device)
+    // Assert: Returns 5
+}
+```
+
+#### Test 16.1.2: GetControllerNumber - ISensorDeviceModel 반환 ✅
+```csharp
+[Fact]
+public void GetControllerNumber_WithSensorDevice_ShouldReturnControllerNumber()
+{
+    // Arrange: ISensorDeviceModel with Controller.DeviceNumber = 3
+    // Act: GetControllerNumber(device)
+    // Assert: Returns 3
+}
+```
+
+#### Test 16.1.3: GetControllerNumber - ISensorDeviceModel with null Controller ✅
+```csharp
+[Fact]
+public void GetControllerNumber_WithSensorNoController_ShouldReturnMinusOne()
+{
+    // Arrange: ISensorDeviceModel with Controller = null
+    // Act: GetControllerNumber(device)
+    // Assert: Returns -1
+}
+```
+
+#### Test 16.1.4: GetControllerNumber - ICameraDeviceModel 반환 ✅
+```csharp
+[Fact]
+public void GetControllerNumber_WithCameraDevice_ShouldReturnMinusOne()
+{
+    // Arrange: ICameraDeviceModel (no Controller property)
+    // Act: GetControllerNumber(device)
+    // Assert: Returns -1
+}
+```
+
+#### Test 16.1.5: GetControllerNumber - null 입력 ✅
+```csharp
+[Fact]
+public void GetControllerNumber_WithNull_ShouldReturnMinusOne()
+{
+    // Arrange: null device
+    // Act: GetControllerNumber(null)
+    // Assert: Returns -1
+}
+```
+
+---
+
+### Phase 16.2: IsDeviceMatch 헬퍼 메서드 (BEHAVIORAL)
+
+**파일**: `Helpers/DataHelper.cs`, `Tests/UnitTest.cs`
+
+#### Test 16.2.1: IsDeviceMatch - ID 직접 매칭 ⬜
+```csharp
+[Fact]
+public void IsDeviceMatch_WithSameId_ShouldReturnTrue()
+{
+    // Arrange: eventDevice.Id = 100, targetDevice.Id = 100
+    // Act: IsDeviceMatch(eventDevice, targetDevice)
+    // Assert: Returns true
+}
+```
+
+#### Test 16.2.2: IsDeviceMatch - DeviceNumber + DeviceType 매칭 ⬜
+```csharp
+[Fact]
+public void IsDeviceMatch_WithSameNumberAndType_ShouldReturnTrue()
+{
+    // Arrange: eventDevice (DeviceNumber=5, Type=Sensor), target (DeviceNumber=5, Type=Sensor)
+    // Act: IsDeviceMatch(eventDevice, targetDevice)
+    // Assert: Returns true
+}
+```
+
+#### Test 16.2.3: IsDeviceMatch - Sensor→Controller 매핑 ⬜
+```csharp
+[Fact]
+public void IsDeviceMatch_SensorToController_ShouldReturnTrue()
+{
+    // Arrange: eventDevice = Sensor with Controller.DeviceNumber = 3
+    //          targetDevice = Controller with DeviceNumber = 3
+    // Act: IsDeviceMatch(eventDevice, targetDevice)
+    // Assert: Returns true
+}
+```
+
+#### Test 16.2.4: IsDeviceMatch - null eventDevice ⬜
+```csharp
+[Fact]
+public void IsDeviceMatch_WithNullEventDevice_ShouldReturnFalse()
+{
+    // Arrange: eventDevice = null, targetDevice = Controller
+    // Act: IsDeviceMatch(null, targetDevice)
+    // Assert: Returns false
+}
+```
+
+#### Test 16.2.5: IsDeviceMatch - 불일치 케이스 ⬜
+```csharp
+[Fact]
+public void IsDeviceMatch_WithDifferentDevices_ShouldReturnFalse()
+{
+    // Arrange: eventDevice (DeviceNumber=5), targetDevice (DeviceNumber=7)
+    // Act: IsDeviceMatch(eventDevice, targetDevice)
+    // Assert: Returns false
+}
+```
+
+---
+
+### Phase 16.3: GetDetectionCountsByDevice (BEHAVIORAL)
+
+**파일**: `Helpers/DataHelper.cs`, `Tests/UnitTest.cs`
+
+#### Test 16.3.1: GetDetectionCountsByDevice - Sensor 이벤트 카운트 ⬜
+```csharp
+[Fact]
+public void GetDetectionCountsByDevice_WithSensorEvents_ShouldCountCorrectly()
+{
+    // Arrange: 3 events from Sensor(DeviceNumber=1), 2 from Sensor(DeviceNumber=2)
+    //          Devices: [Sensor1, Sensor2]
+    // Act: GetDetectionCountsByDevice(...)
+    // Assert: [3.0, 2.0]
+}
+```
+
+#### Test 16.3.2: GetDetectionCountsByDevice - Camera 이벤트 포함 ⬜
+```csharp
+[Fact]
+public void GetDetectionCountsByDevice_WithCameraEvents_ShouldIncludeCamera()
+{
+    // Arrange: 2 events from Camera(DeviceNumber=1)
+    //          Devices: [Camera1]
+    // Act: GetDetectionCountsByDevice(...)
+    // Assert: [2.0] (Camera 이벤트 포함됨)
+}
+```
+
+#### Test 16.3.3: GetDetectionCountsByDevice - Controller 기준 집계 ⬜
+```csharp
+[Fact]
+public void GetDetectionCountsByDevice_WithControllerTarget_ShouldAggregateChildren()
+{
+    // Arrange: 2 events from Sensor(Controller.DeviceNumber=1)
+    //          1 event from Sensor(Controller.DeviceNumber=2)
+    //          Devices: [Controller1, Controller2]
+    // Act: GetDetectionCountsByDevice(...)
+    // Assert: [2.0, 1.0]
+}
+```
+
+---
+
+### Phase 16.4: GetMalfunctionCountsByDevice (BEHAVIORAL)
+
+#### Test 16.4.1: GetMalfunctionCountsByDevice - Controller 직접 이벤트 ⬜
+```csharp
+[Fact]
+public void GetMalfunctionCountsByDevice_WithControllerEvents_ShouldCountDirectly()
+{
+    // Arrange: 2 events where Device = Controller(DeviceNumber=1)
+    //          Devices: [Controller1]
+    // Act: GetMalfunctionCountsByDevice(...)
+    // Assert: [2.0]
+}
+```
+
+#### Test 16.4.2: GetMalfunctionCountsByDevice - Sensor 이벤트 Controller 매핑 ⬜
+```csharp
+[Fact]
+public void GetMalfunctionCountsByDevice_WithSensorEvents_ShouldMapToController()
+{
+    // Arrange: 2 events where Device = Sensor(Controller.DeviceNumber=1)
+    //          Devices: [Controller1]
+    // Act: GetMalfunctionCountsByDevice(...)
+    // Assert: [2.0]
+}
+```
+
+---
+
+### Phase 16.5: GetConnectionCountsByDevice (BEHAVIORAL)
+
+#### Test 16.5.1: GetConnectionCountsByDevice - 혼합 이벤트 ⬜
+```csharp
+[Fact]
+public void GetConnectionCountsByDevice_WithMixedEvents_ShouldCountAll()
+{
+    // Arrange: 1 Controller event + 2 Sensor events (same Controller)
+    //          Devices: [Controller1]
+    // Act: GetConnectionCountsByDevice(...)
+    // Assert: [3.0]
+}
+```
+
+---
+
+### Phase 16.6: GetActionCountsByDevice (BEHAVIORAL)
+
+#### Test 16.6.1: GetActionCountsByDevice - OriginEvent.Device 기준 카운트 ⬜
+```csharp
+[Fact]
+public void GetActionCountsByDevice_ShouldUseOriginEventDevice()
+{
+    // Arrange: ActionEvent with OriginEvent.Device = Sensor(Controller.DeviceNumber=1)
+    //          Devices: [Controller1]
+    // Act: GetActionCountsByDevice(...)
+    // Assert: [1.0]
+}
+```
+
+#### Test 16.6.2: GetActionCountsByDevice - Camera OriginEvent 포함 ⬜
+```csharp
+[Fact]
+public void GetActionCountsByDevice_WithCameraOrigin_ShouldInclude()
+{
+    // Arrange: ActionEvent with OriginEvent.Device = Camera(DeviceNumber=1)
+    //          Devices: [Camera1]
+    // Act: GetActionCountsByDevice(...)
+    // Assert: [1.0] (Camera 이벤트 포함됨)
+}
+```
+
+#### Test 16.6.3: GetActionCountsByDevice - null OriginEvent 처리 ⬜
+```csharp
+[Fact]
+public void GetActionCountsByDevice_WithNullOriginEvent_ShouldNotCount()
+{
+    // Arrange: ActionEvent with OriginEvent = null
+    //          Devices: [Controller1]
+    // Act: GetActionCountsByDevice(...)
+    // Assert: [0.0] (null은 카운트 안 됨)
+}
+```
+
+---
+
+### Phase 16.7: EventInfoViewModel 통합 (STRUCTURAL)
+
+#### ActionItem 16.7.1: CountsCounter delegate 변경 ⬜
+**파일**: `ViewModels/Components/EventInfoViewModel.cs`
+```csharp
+// 변경 전
+delegate List<double> CountsCounter(
+    DateTime from, DateTime to,
+    IEnumerable<IControllerDeviceModel> ctrls,
+    IEnumerable<IBaseEventModel> evts);
+
+// 변경 후
+delegate List<double> CountsCounter(
+    DateTime from, DateTime to,
+    IEnumerable<IBaseDeviceModel> devices,
+    IEnumerable<IBaseEventModel> evts);
+```
+
+#### ActionItem 16.7.2: _meta 딕셔너리 업데이트 ⬜
+**파일**: `ViewModels/Components/EventInfoViewModel.cs`
+- DataHelper.GetDetectionCountsByDevice 호출
+- DataHelper.GetMalfunctionCountsByDevice 호출
+- DataHelper.GetConnectionCountsByDevice 호출
+- DataHelper.GetActionCountsByDevice 호출
+
+#### ActionItem 16.7.3: SetData 메서드 devices 변수 변경 ⬜
+```csharp
+// 변경 전
+var devices = _deviceProvider.OfType<IControllerDeviceModel>()...
+
+// 변경 후
+var devices = _deviceProvider.OfType<IBaseDeviceModel>()...
+```
+
+---
+
+### Phase 16 진행 상태
+
+| Phase | 항목 | 상태 |
+|-------|-----|------|
+| 16.1 | GetControllerNumber (5개 테스트) | [x] |
+| 16.2 | IsDeviceMatch (5개 테스트) | [x] |
+| 16.3 | GetDetectionCountsByDevice (2개 테스트) | [x] |
+| 16.4 | GetMalfunctionCountsByDevice (구현 완료) | [x] |
+| 16.5 | GetConnectionCountsByDevice (구현 완료) | [x] |
+| 16.6 | GetActionCountsByDevice (2개 테스트) | [x] |
+| 16.7 | EventInfoViewModel 통합 (3개 항목) | [x] |
+
+**총 테스트 수**: 19개
+**총 ActionItem 수**: 22개
 
 ---

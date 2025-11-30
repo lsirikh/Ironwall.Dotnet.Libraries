@@ -354,29 +354,29 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         private readonly Dictionary<string, CategoryMeta> _meta = new()
         {
             ["DET"] = new(
-                "Detection", 
+                "Detection",
                 new SKColor(255, 205, 0),
-                new SKColor(255, 205, 0), 
-                (from, to, ctrls, evts) => 
-                DataHelper.GetDetectionCountsByController(from, to, ctrls, evts.OfType<IDetectionEventModel>())),
+                new SKColor(255, 205, 0),
+                (from, to, devices, evts) =>
+                DataHelper.GetDetectionCountsByDevice(from, to, devices, evts.OfType<IDetectionEventModel>())),
             ["MAL"] = new(
-                "Malfunction", 
-                new SKColor(30, 144, 255), 
-                new SKColor(30, 144, 255), 
-                (from, to, ctrls, evts) =>
-                DataHelper.GetMalfunctionCountsByController(from, to, ctrls, evts.OfType<IMalfunctionEventModel>())),
+                "Malfunction",
+                new SKColor(30, 144, 255),
+                new SKColor(30, 144, 255),
+                (from, to, devices, evts) =>
+                DataHelper.GetMalfunctionCountsByDevice(from, to, devices, evts.OfType<IMalfunctionEventModel>())),
             ["CON"] = new(
-                "Connection", 
-                new SKColor(155, 89, 182), 
+                "Connection",
                 new SKColor(155, 89, 182),
-                (from, to, ctrls, evts) => 
-                DataHelper.GetConnectionCountsByController(from, to, ctrls, evts.OfType<IConnectionEventModel>())),
+                new SKColor(155, 89, 182),
+                (from, to, devices, evts) =>
+                DataHelper.GetConnectionCountsByDevice(from, to, devices, evts.OfType<IConnectionEventModel>())),
             ["ACT"] = new(
-                "Action", 
-                new SKColor(50, 205, 50), 
+                "Action",
                 new SKColor(50, 205, 50),
-                (from, to, ctrls, evts) => 
-                DataHelper.GetActionCountsByController(from, to, ctrls, evts.OfType<IActionEventModel>()))
+                new SKColor(50, 205, 50),
+                (from, to, devices, evts) =>
+                DataHelper.GetActionCountsByDevice(from, to, devices, evts.OfType<IActionEventModel>()))
         };
 
         public bool IsDetectionActive 
@@ -428,9 +428,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         SKColor PieColor,
         CountsCounter Counter);
 
-    // delegate 도 “파일 최상위” 에 둔다
+    // delegate 도 "파일 최상위" 에 둔다
     delegate List<double> CountsCounter(
         DateTime from, DateTime to,
-        IEnumerable<IControllerDeviceModel> ctrls,
+        IEnumerable<IBaseDeviceModel> devices,
         IEnumerable<IBaseEventModel> evts);
 }

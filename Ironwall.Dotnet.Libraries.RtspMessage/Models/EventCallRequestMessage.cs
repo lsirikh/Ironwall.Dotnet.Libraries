@@ -1,9 +1,11 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Brokers;
-using Ironwall.Dotnet.Libraries.Messages.Dto.RtspPopups;
-using Newtonsoft.Json;
+﻿using Ironwall.Dotnet.Libraries.RtspMessage.Defines;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace Ironwall.Dotnet.Libraries.Messages.Models.Brokers;
+namespace Ironwall.Dotnet.Libraries.RtspMessage.Models;
 /****************************************************************************
    Purpose      : EVENT_CALL 명령을 위한 요청 메시지
    Created By   : GHLee                                                
@@ -14,19 +16,19 @@ namespace Ironwall.Dotnet.Libraries.Messages.Models.Brokers;
 ****************************************************************************/
 
 /// <summary>
-/// EVENT_CALL 전용 BrokerRequest
-/// BrokerRequest<EventCallDto>를 상속하여 타입 안정성 제공
+/// EVENT_CALL 전용 RequestMessage
+/// RequestMessage<EventCallRequestBody>를 상속하여 타입 안정성 제공
 /// </summary>
-public class EventCallRequestMessage : BrokerRequest<EventCallDto>
+public class EventCallRequestMessage : RequestMessage<EventCallRequestBody>
 {
     public EventCallRequestMessage()
     {
-        Command = "EVENT_CALL";
-        Data = new EventCallDto();
+        Cmd = EnumCommandType.EVENT_CALL;
+        Body = new EventCallRequestBody();
     }
 
     public override string ToString()
     {
-        return $"[{TypeMessage}] EVENT_CALL from {From} - Event: {Data?.EventName}, State: {Data?.State}";
+        return $"[{MType}] EVENT_CALL from {From} to {Target} - Event: {Body?.EventName}, State: {Body?.State}";
     }
 }

@@ -1,24 +1,27 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Brokers;
-using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
+﻿using Ironwall.Dotnet.Libraries.RtspMessage.Defines;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace Ironwall.Dotnet.Libraries.Messages.Dto.RtspPopups;
+namespace Ironwall.Dotnet.Libraries.RtspMessage.Models;
 /****************************************************************************
-   Purpose      : EVENT_CALL 명령의 요청 Data                                                      
+   Purpose      : EVENT_CALL 명령의 요청 Body                                                      
    Created By   : GHLee                                                
    Created On   : 10/30/2025 3:00:00 PM                                                    
    Department   : SW Team                                                   
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class EventCallDto: BaseDto
+public class EventCallRequestBody
 {
-    public EventCallDto()
+    public EventCallRequestBody()
     {
         EventName = string.Empty;
         Details = string.Empty;
-        State = "ON";
+        State = EnumEventState.ON;
     }
 
     /// <summary>
@@ -37,5 +40,5 @@ public class EventCallDto: BaseDto
     /// 이벤트 상태 (on, off)
     /// </summary>
     [JsonProperty(Order = 3, PropertyName = "state")]
-    public string State { get; set; }
+    public EnumEventState State { get; set; }
 }
