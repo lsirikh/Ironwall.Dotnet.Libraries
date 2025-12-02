@@ -270,3 +270,42 @@ public class PidsLegacyMigrationTests
     }
 }
 #endregion
+
+#region Phase 20: PidsSymbol FOV BaseBearing Tests
+/****************************************************************************
+   Phase 20: PidsSymbol FOV BaseBearing 초기 각도 설정
+   PRD: Docs/prd/PRD_PidsSymbol_FOV_BaseBearing.md
+
+   Test 20.1.1: BaseBearing 기본값 검증
+   Test 20.1.2: BaseBearing JSON 직렬화 검증
+****************************************************************************/
+
+public class PidsFovBaseBearingTests
+{
+    [Fact(DisplayName = "TEST-20.1.1: PidsSymbolModel - BaseBearing 기본값은 0.0")]
+    public void BaseBearing_ShouldHaveDefaultValue()
+    {
+        // Arrange & Act
+        var symbol = new Symbols.PidsSymbolModel();
+
+        // Assert
+        Assert.Equal(0.0, symbol.BaseBearing);
+    }
+
+    [Fact(DisplayName = "TEST-20.1.2: PidsSymbolModel - BaseBearing JSON 직렬화")]
+    public void BaseBearing_ShouldSerializeToJson()
+    {
+        // Arrange
+        var symbol = new Symbols.PidsSymbolModel
+        {
+            BaseBearing = 90.0
+        };
+
+        // Act
+        var json = JsonConvert.SerializeObject(symbol);
+
+        // Assert
+        Assert.Contains("\"base_bearing\":90.0", json);
+    }
+}
+#endregion

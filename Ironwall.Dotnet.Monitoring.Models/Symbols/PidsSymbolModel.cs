@@ -80,6 +80,13 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
     [JsonProperty("detection_bearing", Order = 28)]
     public double DetectionBearing { get; set; } = 0; // 도 (북쪽 기준)
 
+    /// <summary>
+    /// 기준 방향 각도 (카메라 물리적 설치 방향)
+    /// <para>0.0 ~ 360.0 (정북 기준 시계방향 각도)</para>
+    /// </summary>
+    [JsonProperty("base_bearing", Order = 29)]
+    public double BaseBearing { get; set; } = 0.0; // 도 (북쪽 기준, 고정값)
+
     public event EventHandler Update;
 
     public void SetUpdate()
