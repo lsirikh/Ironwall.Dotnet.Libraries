@@ -309,6 +309,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `FOVColor`          VARCHAR(20) NOT NULL DEFAULT 'Red',
                 `FOVOpacity`        DECIMAL(3,2) DEFAULT 0.3,
                 `EventStatus`       VARCHAR(20) NOT NULL DEFAULT 'Normal',
+                `BaseBearing`       DECIMAL(5,2) DEFAULT 0.0,
                 `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 CONSTRAINT `FK_PidsSymbols_Symbols`
@@ -1220,10 +1221,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
                 s.FillColor, s.StrokeColor, s.StrokeThickness,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   s.Category = 'PIDS_EQUIPMENT'
@@ -1257,10 +1258,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
                 s.FillColor, s.StrokeColor, s.StrokeThickness,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   s.Id = @Id;";
@@ -1295,10 +1296,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
                 s.FillColor, s.StrokeColor, s.StrokeThickness,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   p.LinkedDeviceId = @DeviceId;";
@@ -1330,10 +1331,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
                 s.FillColor, s.StrokeColor, s.StrokeThickness,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   p.DeviceType = @DeviceType
@@ -1398,8 +1399,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             // 2. PidsSymbols 테이블에 PIDS 전용 정보 삽입
             const string pidsSql = @"
-        INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus)
-        VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus);";
+        INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing)
+        VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing);";
 
             await conn.ExecuteAsync(pidsSql, new
             {
@@ -1409,7 +1410,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.ShowFOV,
                 FOVColor = model.FOVColor.ToString(),
                 model.FOVOpacity,
-                EventStatus = model.EventStatus.ToString()
+                EventStatus = model.EventStatus.ToString(),
+                model.BaseBearing
             }, transaction);
 
             await transaction.CommitAsync(token);
@@ -1489,7 +1491,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string pidsSql = @"
         UPDATE PidsSymbols SET
             LinkedDeviceId = @LinkedDeviceId, DeviceType = @DeviceType, ShowFOV = @ShowFOV,
-            FOVColor = @FOVColor, FOVOpacity = @FOVOpacity, EventStatus = @EventStatus
+            FOVColor = @FOVColor, FOVOpacity = @FOVOpacity, EventStatus = @EventStatus,
+            BaseBearing = @BaseBearing
         WHERE SymbolId = @SymbolId;";
 
             var pidsAffected = await conn.ExecuteAsync(pidsSql, new
@@ -1500,7 +1503,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.ShowFOV,
                 FOVColor = model.FOVColor.ToString(),
                 model.FOVOpacity,
-                EventStatus = model.EventStatus.ToString()
+                EventStatus = model.EventStatus.ToString(),
+                model.BaseBearing
             }, transaction);
 
             if (symbolAffected == 0 || pidsAffected == 0)
@@ -1587,10 +1591,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
-                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
+                s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
                 s.FillColor, s.StrokeColor, s.StrokeThickness,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   p.EventStatus = @EventStatus
@@ -3084,6 +3088,9 @@ internal sealed class PidsSymbolSQL : SymbolSQL
     /// <summary>이벤트 상태</summary>
     public string EventStatus { get; set; } = "Normal";
 
+    /// <summary>기준 방향 각도 (카메라 물리적 설치 방향)</summary>
+    public decimal BaseBearing { get; set; } = 0.0m;
+
     /// <summary>
     /// JOIN 결과를 PidsSymbolModel로 변환
     /// </summary>
@@ -3115,9 +3122,10 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         ShowFOV = ShowFOV,
         FOVColor = Enum.Parse<EnumColorType>(FOVColor),
         FOVOpacity = (double)FOVOpacity,
-        EventStatus = Enum.Parse<EnumEventStatus>(EventStatus)
+        EventStatus = Enum.Parse<EnumEventStatus>(EventStatus),
+        BaseBearing = (double)BaseBearing
 
-        // DetectionRange, DetectionAngle, DetectionBearing는 
+        // DetectionRange, DetectionAngle, DetectionBearing는
         // 실시간 데이터이므로 DB에서 로드하지 않음 (기본값 사용)
     };
 }

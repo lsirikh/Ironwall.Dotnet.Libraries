@@ -13,6 +13,7 @@ public interface IPidsSymbolModel : IPidsEventCapable
     double FOVOpacity { get; set; }
     int LinkedDeviceId { get; set; }
     bool ShowFOV { get; set; }
+    double BaseBearing { get; set; }
 
     /// <summary>
     /// 연결된 디바이스 객체 (런타임 바인딩용, JSON 직렬화 제외)
