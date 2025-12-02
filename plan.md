@@ -4750,3 +4750,150 @@ public async Task CreatePropertyPanel_AfterDeviceRefresh_ShouldMatchLinkedDevice
 - 기존 기능에 영향 없음 (회귀 테스트 통과)
 
 ---
+
+---
+
+## Phase 20: PidsSymbol FOV BaseBearing 초기 각도 설정
+
+**PRD**: 
+**목표**: PidsSymbol FOV가 BaseBearing(카메라 물리적 설치 방향)에서 시작하도록 개선
+**핵심 공식**: 
+
+---
+
+### Phase 20.1: 데이터 모델 업데이트 (STRUCTURAL - TDD)
+
+**파일**: 
+
+#### Test 20.1.1: BaseBearing 속성 기본값 검증 [ ]
+
+
+
+#### Test 20.1.2: BaseBearing JSON 직렬화 검증 [ ]
+
+
+
+#### ActionItem 20.1.1: PidsSymbolModel에 BaseBearing 속성 추가 [ ]
+
+**파일**: 
+
+
+
+---
+
+### Phase 20.2: Database Schema 업데이트 (STRUCTURAL)
+
+**파일**: 
+
+#### ActionItem 20.2.1: createPidsSymbolsSql에 BaseBearing 컬럼 추가 [ ]
+
+**라인 303** 수정:
+
+
+#### ActionItem 20.2.2: Insert 쿼리에 BaseBearing 추가 [ ]
+
+
+
+#### ActionItem 20.2.3: Update 쿼리에 BaseBearing 추가 [ ]
+
+
+
+#### ActionItem 20.2.4: Select 쿼리에 BaseBearing 추가 [ ]
+
+
+
+---
+
+### Phase 20.3: FOV 생성 로직 수정 (BEHAVIORAL - TDD)
+
+**목표**: FOV 생성 시 BaseBearing 반영
+
+#### Test 20.3.1: FOV 생성 시 BaseBearing 반영 검증 [ ]
+
+
+
+#### Test 20.3.2: Symbol 로드 후 DetectionBearing 초기화 검증 [ ]
+
+
+
+#### ActionItem 20.3.1: FOV 생성 코드 탐색 [ ]
+
+- ,  또는 관련 ViewModel 탐색
+- 현재  초기화 방식 분석
+
+#### ActionItem 20.3.2: FOV 초기 Bearing에 BaseBearing 적용 [ ]
+
+
+
+---
+
+### Phase 20.4: UI 구현 (BEHAVIORAL)
+
+**목표**: 사용자가 BaseBearing을 설정할 수 있는 UI 추가
+
+#### ActionItem 20.4.1: PidsPropertyStyle.xaml에 BaseBearing Slider 추가 [ ]
+
+**파일**: 
+**위치**: DetectionBearing Slider 뒤 (라인 209 이후)
+
+
+
+#### ActionItem 20.4.2: GMapPropertyPidsControl.cs에 BaseBearing 속성 추가 [ ]
+
+**파일**: 
+
+
+
+---
+
+### Phase 20.5: 통합 테스트 및 검증 (BEHAVIORAL)
+
+#### ActionItem 20.5.1: 수동 통합 테스트 시나리오 [ ]
+
+1. **신규 Symbol 생성**:
+   - BaseBearing = 90도 설정
+   - FOV가 정동 방향(90도)으로 생성됨
+   - DetectionBearing = 90도
+
+2. **사용자 회전**:
+   - FOV를 45도 회전
+   - DetectionBearing = 135도 (BaseBearing + 45)
+   - BaseBearing = 90도 유지
+
+3. **DB 저장/로드**:
+   - Symbol 저장
+   - 애플리케이션 재시작
+   - Symbol 로드 시 BaseBearing = 90도
+   - DetectionBearing = 90도로 초기화
+
+4. **하위 호환성**:
+   - 기존 Symbol (BaseBearing = 0)
+   - DetectionBearing = 0도 (정북 방향)
+
+#### ActionItem 20.5.2: 회귀 테스트 [ ]
+
+- 기존 Symbol FOV 기능 정상 동작 확인
+- FOV 색상, 투명도, 거리, 각도 설정 정상 확인
+
+---
+
+### Phase 20 진행 상태
+
+| Phase | 내용 | 상태 |
+|-------|------|------|
+| 20.1 | PidsSymbolModel BaseBearing 속성 추가 (2개 테스트 + 1개 ActionItem) | [ ] |
+| 20.2 | Database Schema 업데이트 (4개 ActionItem) | [ ] |
+| 20.3 | FOV 생성 로직 수정 (2개 테스트 + 2개 ActionItem) | [ ] |
+| 20.4 | UI 구현 (2개 ActionItem) | [ ] |
+| 20.5 | 통합 테스트 및 검증 (2개 ActionItem) | [ ] |
+
+**총 테스트 수**: 4개 (Unit Tests)
+**총 ActionItem 수**: 11개
+
+**핵심 변경사항**:
+- PidsSymbolModel에  속성 추가 (DB 저장)
+- DetectionRange, DetectionAngle, DetectionBearing은 런타임 전용 (DB 저장 안 함)
+- FOV 생성 시 로 초기화
+- UI에 BaseBearing Slider 추가 (0~360도)
+
+---

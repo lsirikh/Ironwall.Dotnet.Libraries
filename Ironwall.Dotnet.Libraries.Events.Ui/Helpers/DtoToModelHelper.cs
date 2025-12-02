@@ -296,7 +296,7 @@ public static class DtoToModelHelper
         this DetectionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        return new DetectionEventModel
+        var model = new DetectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -307,6 +307,7 @@ public static class DtoToModelHelper
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
             Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
         };
+        return model;
     }
 
     /// <summary>
@@ -316,20 +317,10 @@ public static class DtoToModelHelper
         this MalfunctionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        if(dto.Id == 270)
-            System.Diagnostics.Debug.WriteLine($"=======================");
-       
-        // 🔍 디버깅: 실제 로드된 EnumFaultType 확인
         var enumType = typeof(EnumFaultType);
         var assemblyLocation = enumType.Assembly.Location;
         var allValues = Enum.GetNames<EnumFaultType>();
-
-        System.Diagnostics.Debug.WriteLine($"===========================================");
-        System.Diagnostics.Debug.WriteLine($"EnumFaultType Assembly: {assemblyLocation}");
-        System.Diagnostics.Debug.WriteLine($"Available values: {string.Join(", ", allValues)}");
-        System.Diagnostics.Debug.WriteLine($"dto.Id = {dto.Id}, dto.Reason: [{dto.Reason}]");
-        System.Diagnostics.Debug.WriteLine($"===========================================");
-        return new MalfunctionEventModel
+        var model = new MalfunctionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -344,6 +335,7 @@ public static class DtoToModelHelper
             SecondEnd = dto.SecondEnd,
             Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
         };
+        return model;
     }
 
     /// <summary>
@@ -353,7 +345,7 @@ public static class DtoToModelHelper
         this ConnectionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        return new ConnectionEventModel
+        var model = new ConnectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
@@ -363,6 +355,7 @@ public static class DtoToModelHelper
             Status = EnumTrueFalse.True,
             Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
         };
+        return model;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

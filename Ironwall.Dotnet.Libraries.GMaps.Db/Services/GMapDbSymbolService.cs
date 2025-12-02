@@ -1119,7 +1119,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 2. GeometrySymbols 테이블 업데이트 (간소화)
             const string geometrySql = @"
             UPDATE GeometrySymbols SET
-                ShapeType = @ShapeType, Opacity = @Opacity
+                ShapeType = @ShapeType, Opacity = @Opacity,
+                UpdatedAt = CURRENT_TIMESTAMP
             WHERE SymbolId = @SymbolId;";
 
             var geometryAffected = await conn.ExecuteAsync(geometrySql, new
@@ -1492,7 +1493,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         UPDATE PidsSymbols SET
             LinkedDeviceId = @LinkedDeviceId, DeviceType = @DeviceType, ShowFOV = @ShowFOV,
             FOVColor = @FOVColor, FOVOpacity = @FOVOpacity, EventStatus = @EventStatus,
-            BaseBearing = @BaseBearing
+            BaseBearing = @BaseBearing,
+            UpdatedAt = CURRENT_TIMESTAMP
         WHERE SymbolId = @SymbolId;";
 
             var pidsAffected = await conn.ExecuteAsync(pidsSql, new
@@ -1822,7 +1824,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             UPDATE MilitarySymbols SET
                 Affiliation = @Affiliation, BattleDimension = @BattleDimension, StandardIdentity = @StandardIdentity,
                 UnitType = @UnitType, UnitSize = @UnitSize, UnitDesignator = @UnitDesignator,
-                HigherFormation = @HigherFormation, CallSign = @CallSign, CountryCode = @CountryCode
+                HigherFormation = @HigherFormation, CallSign = @CallSign, CountryCode = @CountryCode,
+                UpdatedAt = CURRENT_TIMESTAMP
             WHERE SymbolId = @SymbolId;";
 
             var militaryAffected = await conn.ExecuteAsync(militarySql, new
@@ -2144,8 +2147,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 2. LineSymbols 테이블 업데이트
             const string lineSql = @"
         UPDATE LineSymbols SET
-            LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath, 
-            ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern
+            LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath,
+            ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern,
+            UpdatedAt = CURRENT_TIMESTAMP
         WHERE SymbolId = @SymbolId;";
 
             var lineAffected = await conn.ExecuteAsync(lineSql, new
@@ -2439,7 +2443,8 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         UPDATE InfraSymbols SET
             BuildingType = @BuildingType, BuildingUsage = @BuildingUsage,
             FloorCount = @FloorCount, BasementFloorCount = @BasementFloorCount,
-            BuildingArea = @BuildingArea
+            BuildingArea = @BuildingArea,
+            UpdatedAt = CURRENT_TIMESTAMP
         WHERE SymbolId = @SymbolId;";
 
             var infraAffected = await conn.ExecuteAsync(infraSql, new
@@ -2762,8 +2767,9 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string pidsGroupSql = @"
                 UPDATE PidsGroupSymbols SET
                     LinkedDeviceGroup = @LinkedDeviceGroup, EventStatus = @EventStatus,
-                    LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath, 
-                    ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern
+                    LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath,
+                    ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern,
+                    UpdatedAt = CURRENT_TIMESTAMP
                 WHERE SymbolId = @SymbolId;";
 
             var pidsGroupAffected = await conn.ExecuteAsync(pidsGroupSql, new
