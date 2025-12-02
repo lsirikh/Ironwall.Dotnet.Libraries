@@ -106,13 +106,14 @@ public class DeviceProviderService : IDeviceProviderService
         {
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} started");
 
+            //_deviceProvider.Clear();
             // ──────────── 1. Controllers (먼저 로딩) ────────────
             var controllers = await FetchControllersAsync(token);
-            _deviceProvider.Clear();
-            _controllerProvider.Clear();
-            if (controllers?.Any() == true)
-                foreach (var item in controllers)
-                    _deviceProvider.Add(item);
+            //_controllerProvider.Clear();
+            UpdateOrAddDevices(_deviceProvider, controllers);
+            // if (controllers?.Any() == true)
+            //     foreach (var item in controllers)
+            //         _deviceProvider.Add(item);
 
             _log?.Info($"Controllers loaded: {controllers.Count} items");
             await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
@@ -120,20 +121,22 @@ public class DeviceProviderService : IDeviceProviderService
             // ──────────── 2. Sensors (Navigation Mapping) ────────────
             var controllerDict = controllers.ToDictionary(c => c.Id, c => c);
             var sensors = await FetchSensorsAsync(controllerDict, token);
-            _sensorProvider.Clear();
-            if (sensors?.Any() == true)
-                foreach (var item in sensors)
-                    _deviceProvider.Add(item);
+            //_sensorProvider.Clear();
+            UpdateOrAddDevices(_deviceProvider, sensors);
+            // if (sensors?.Any() == true)
+            //     foreach (var item in sensors)
+            //         _deviceProvider.Add(item);
 
             _log?.Info($"Sensors loaded: {sensors.Count} items");
             await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
 
             // ──────────── 3. Cameras ────────────
             var cameras = await FetchCamerasAsync(token);
-            _cameraProvider.Clear();
-            if (cameras?.Any() == true)
-                foreach (var item in cameras)
-                    _deviceProvider.Add(item);
+            //_cameraProvider.Clear();
+            UpdateOrAddDevices(_deviceProvider, cameras);
+            // if (cameras?.Any() == true)
+            //     foreach (var item in cameras)
+            //         _deviceProvider.Add(item);
 
             _log?.Info($"Cameras loaded: {cameras.Count} items");
             await PublishSplashMessage("CameraProvider의 정보를 모두 불러왔습니다...");
@@ -344,6 +347,86 @@ public class DeviceProviderService : IDeviceProviderService
     #endregion
 
     #region - Attributes -
+    /// <summary>
+    /// DeviceProvider의 Device 객체들을 업데이트하거나 추가합니다 (Clear 대신 사용).
+    /// 기존 Device 객체의 참조를 유지하면서 속성만 업데이트합니다.
+    /// </summary>
+    /// <typeparam name="T">IBaseDeviceModel 구현 타입</typeparam>
+    /// <param name="provider">DeviceProvider 인스턴스</param>
+    /// <param name="newDevices">API에서 받은 새로운 Device 목록</param>
+    private void UpdateOrAddDevices<T>(DeviceProvider provider, List<T> newDevices) where T : IBaseDeviceModel
+    {
+        var existingDevices = provider.OfType<T>().ToList();
+        var newDeviceDict = newDevices.ToDictionary(d => (d.Id, d.DeviceType), d => d);
+
+        // 1. 기존 객체 업데이트 또는 삭제
+        foreach (var existing in existingDevices)
+        {
+            var key = (existing.Id, existing.DeviceType);
+            if (newDeviceDict.TryGetValue(key, out var newDevice))
+            {
+                UpdateDeviceProperties(existing, newDevice);  // 속성만 업데이트
+                newDeviceDict.Remove(key);
+            }
+            else
+            {
+                provider.Remove(existing);  // API에 없으면 삭제
+            }
+        }
+
+        // 2. 새로운 객체 추가
+        foreach (var newDevice in newDeviceDict.Values)
+        {
+            provider.Add(newDevice);
+        }
+    }
+
+    /// <summary>
+    /// 기존 Device 객체의 속성을 새 Device 데이터로 업데이트합니다.
+    /// 참조를 유지하면서 속성만 복사합니다.
+    /// </summary>
+    /// <typeparam name="T">IBaseDeviceModel 구현 타입</typeparam>
+    /// <param name="existing">업데이트할 기존 Device</param>
+    /// <param name="newDevice">속성값을 복사해올 새 Device</param>
+    private void UpdateDeviceProperties<T>(T existing, T newDevice) where T : IBaseDeviceModel
+    {
+        // 공통 속성 업데이트
+        existing.DeviceName = newDevice.DeviceName;
+        existing.DeviceGroup = newDevice.DeviceGroup;
+        existing.DeviceNumber = newDevice.DeviceNumber;
+        existing.Status = newDevice.Status;
+        existing.DeviceType = newDevice.DeviceType;
+        existing.Version = newDevice.Version;
+
+        // Type-Specific 속성 업데이트
+        if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)
+        {
+            existingController.IpAddress = newController.IpAddress;
+            existingController.Port = newController.Port;
+            existingController.Devices = newController.Devices;
+        }
+        else if (existing is SensorDeviceModel existingSensor && newDevice is SensorDeviceModel newSensor)
+        {
+            existingSensor.Controller = newSensor.Controller;
+        }
+        else if (existing is CameraDeviceModel existingCamera && newDevice is CameraDeviceModel newCamera)
+        {
+            existingCamera.IpAddress = newCamera.IpAddress;
+            existingCamera.Port = newCamera.Port;
+            existingCamera.Username = newCamera.Username;
+            existingCamera.Password = newCamera.Password;
+            existingCamera.RtspUri = newCamera.RtspUri;
+            existingCamera.RtspPort = newCamera.RtspPort;
+            existingCamera.Mode = newCamera.Mode;
+            existingCamera.Category = newCamera.Category;
+            existingCamera.Identification = newCamera.Identification;
+            existingCamera.PtzCapability = newCamera.PtzCapability;
+            existingCamera.Position = newCamera.Position;
+            existingCamera.Presets = newCamera.Presets;
+            existingCamera.Optics = newCamera.Optics;
+        }
+    }
+
     private readonly ILogService? _log;
     private readonly IEventAggregator _eventAggregator;
     private readonly IDeviceApiService _apiService;

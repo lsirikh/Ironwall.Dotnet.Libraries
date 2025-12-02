@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -414,6 +415,187 @@ public class DeviceProviderServiceTests
             sensorProvider: sensorProvider ?? new SensorDeviceProvider(mockLog, devProvider),
             cameraProvider: cameraProvider ?? new CameraDeviceProvider(mockLog, devProvider));
     }
+    #endregion
+
+    #region - Phase 19: DeviceProvider Update Tests (TDD) -
+
+    /// <summary>
+    /// TEST-19.1.1: UpdateOrAddDevices - 기존 Device 속성 업데이트 (참조 유지)
+    ///
+    /// 시나리오:
+    /// 1. DeviceProvider에 Device A (Id=1) 추가
+    /// 2. API에서 같은 Id=1의 새 데이터 수신
+    /// 3. UpdateOrAddDevices 호출
+    /// 4. 기존 Device A 객체의 속성만 업데이트됨 (참조 유지)
+    /// </summary>
+    [Fact]
+    public void TEST_19_1_1_UpdateOrAddDevices_WithExistingDevice_ShouldUpdatePropertiesNotReplace()
+    {
+        // Arrange
+        var mockApiService = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApiService);
+        var deviceProvider = new DeviceProvider();
+
+        var existingDevice = new SensorDeviceModel
+        {
+            Id = 1,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceName = "센서-1-OLD",
+            DeviceGroup = 1,
+            Status = EnumDeviceStatus.DEACTIVATED
+        };
+        deviceProvider.Add(existingDevice);
+
+        var originalReference = deviceProvider.First();
+
+        var newDeviceData = new List<SensorDeviceModel>
+        {
+            new SensorDeviceModel
+            {
+                Id = 1,
+                DeviceType = EnumDeviceType.Fence,
+                DeviceName = "센서-1-NEW",  // 이름 변경
+                DeviceGroup = 2,  // 그룹 변경
+                Status = EnumDeviceStatus.ACTIVATED  // 상태 변경
+            }
+        };
+
+        // Act
+        var updateMethod = typeof(DeviceProviderService).GetMethod(
+            "UpdateOrAddDevices",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        var genericMethod = updateMethod?.MakeGenericMethod(typeof(SensorDeviceModel));
+        genericMethod?.Invoke(service, new object[] { deviceProvider, newDeviceData });
+
+        // Assert
+        Assert.Single(deviceProvider);  // 개수 유지
+        Assert.Same(originalReference, deviceProvider.First());  // 같은 참조 유지 ✅
+        Assert.Equal("센서-1-NEW", existingDevice.DeviceName);  // 속성 업데이트됨
+        Assert.Equal(2, existingDevice.DeviceGroup);
+        Assert.Equal(EnumDeviceStatus.ACTIVATED, existingDevice.Status);
+    }
+
+    /// <summary>
+    /// TEST-19.1.2: UpdateOrAddDevices - 새 Device 추가
+    ///
+    /// 시나리오:
+    /// 1. DeviceProvider에 Device A (Id=1) 존재
+    /// 2. API에서 Device A, B (Id=2) 수신
+    /// 3. UpdateOrAddDevices 호출
+    /// 4. Device B가 Provider에 추가됨
+    /// </summary>
+    [Fact]
+    public void TEST_19_1_2_UpdateOrAddDevices_WithNewDevice_ShouldAddToProvider()
+    {
+        // Arrange
+        var mockApiService = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApiService);
+        var deviceProvider = new DeviceProvider();
+
+        var existingDevice = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence };
+        deviceProvider.Add(existingDevice);
+
+        var newDeviceData = new List<SensorDeviceModel>
+        {
+            new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence },  // 기존
+            new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Fence, DeviceName = "센서-2" }  // 신규
+        };
+
+        // Act
+        var updateMethod = typeof(DeviceProviderService).GetMethod(
+            "UpdateOrAddDevices",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        var genericMethod = updateMethod?.MakeGenericMethod(typeof(SensorDeviceModel));
+        genericMethod?.Invoke(service, new object[] { deviceProvider, newDeviceData });
+
+        // Assert
+        Assert.Equal(2, deviceProvider.Count);  // 개수 증가
+        var addedDevice = deviceProvider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 2);
+        Assert.NotNull(addedDevice);
+        Assert.Equal("센서-2", addedDevice.DeviceName);
+    }
+
+    /// <summary>
+    /// TEST-19.1.3: UpdateOrAddDevices - 삭제된 Device 제거
+    ///
+    /// 시나리오:
+    /// 1. DeviceProvider에 Device A (Id=1), B (Id=2) 존재
+    /// 2. API에서 Device A (Id=1)만 수신 (B 삭제됨)
+    /// 3. UpdateOrAddDevices 호출
+    /// 4. Device B가 Provider에서 제거됨
+    /// </summary>
+    [Fact]
+    public void TEST_19_1_3_UpdateOrAddDevices_WithDeletedDevice_ShouldRemoveFromProvider()
+    {
+        // Arrange
+        var mockApiService = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApiService);
+        var deviceProvider = new DeviceProvider();
+
+        deviceProvider.Add(new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence });
+        deviceProvider.Add(new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Fence });
+
+        var newDeviceData = new List<SensorDeviceModel>
+        {
+            new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence }  // Id=2 삭제됨
+        };
+
+        // Act
+        var updateMethod = typeof(DeviceProviderService).GetMethod(
+            "UpdateOrAddDevices",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        var genericMethod = updateMethod?.MakeGenericMethod(typeof(SensorDeviceModel));
+        genericMethod?.Invoke(service, new object[] { deviceProvider, newDeviceData });
+
+        // Assert
+        Assert.Single(deviceProvider);  // 개수 감소
+        Assert.Null(deviceProvider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 2));
+    }
+
+    /// <summary>
+    /// TEST-19.1.4: UpdateOrAddDevices - Composite Key (Id, DeviceType) 사용
+    ///
+    /// 시나리오:
+    /// 1. Controller Id=1과 Sensor Id=1이 동시에 존재
+    /// 2. Controller Id=1 데이터 업데이트
+    /// 3. UpdateOrAddDevices 호출
+    /// 4. Controller만 업데이트되고 Sensor는 유지됨
+    /// </summary>
+    [Fact]
+    public void TEST_19_1_4_UpdateOrAddDevices_WithSameIdDifferentType_ShouldTreatAsSeparate()
+    {
+        // Arrange
+        var mockApiService = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApiService);
+        var deviceProvider = new DeviceProvider();
+
+        var controller = new ControllerDeviceModel { Id = 1, DeviceType = EnumDeviceType.Controller };
+        var sensor = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence };
+        deviceProvider.Add(controller);
+        deviceProvider.Add(sensor);
+
+        var newControllers = new List<ControllerDeviceModel>
+        {
+            new ControllerDeviceModel { Id = 1, DeviceType = EnumDeviceType.Controller, DeviceName = "제어기-1-NEW" }
+        };
+
+        // Act
+        var updateMethod = typeof(DeviceProviderService).GetMethod(
+            "UpdateOrAddDevices",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        var genericMethod = updateMethod?.MakeGenericMethod(typeof(ControllerDeviceModel));
+        genericMethod?.Invoke(service, new object[] { deviceProvider, newControllers });
+
+        // Assert
+        Assert.Equal(2, deviceProvider.Count);  // 센서는 그대로, 제어기만 업데이트
+        Assert.Equal("제어기-1-NEW", controller.DeviceName);  // 제어기 업데이트됨
+        Assert.NotNull(deviceProvider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 1));  // 센서 유지
+    }
+
     #endregion
 }
 

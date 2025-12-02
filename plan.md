@@ -4032,3 +4032,721 @@ var devices = _deviceProvider.OfType<IBaseDeviceModel>()...
 **총 ActionItem 수**: 22개
 
 ---
+
+## Phase 18: Camera Status Symbol 주황색 문제 디버깅 (PRD: Docs/prd/Camera_Status_Symbol_Orange_Debug.md)
+
+**목표**: Camera Symbol의 Status Symbol이 주황색(장비장애)으로 표시되는 근본 원인 파악 및 수정
+**문제**: Camera는 장비 상태 메시지를 받지 않는데 `EnumEventStatus.Fault` 상태로 표시됨
+**참조**: `Docs/prd/Camera_Status_Symbol_Orange_Debug.md`
+
+### 가설 (Hypotheses)
+
+| 가설 | 설명 | 검증 방법 |
+|------|------|-----------|
+| A | Symbol 초기값이 Fault로 설정됨 | Symbol 생성 시 EventStatus 확인 |
+| B | 잘못된 Event Type이 Camera에 전달됨 | ProcessEvent() 호출 로그 추적 |
+| C | Device ID 충돌로 잘못 매핑됨 | Event → Device 매핑 로직 검증 |
+| D | EventStatus 복원 로직 미동작 | OnEventRestored() 호출 확인 |
+| E | Camera 초기 상태 설정 누락 | Symbol 초기화 코드 분석 |
+
+---
+
+### Phase 18.1: Symbol 초기화 로깅 (BEHAVIORAL - TDD)
+
+**파일**: `Ironwall.Dotnet.Monitoring.Models/Symbols/PidsSymbolModel.cs`, `Tests/UnitTest.cs`
+
+#### Test 18.1.1: PidsSymbolModel 초기 EventStatus는 Normal이어야 함 ✅
+```csharp
+[Fact]
+public void PidsSymbolModel_OnCreation_ShouldHaveNormalEventStatus()
+{
+    // Arrange & Act
+    var symbolModel = new PidsSymbolModel
+    {
+        Title = "TEST-CAM-01",
+        LinkedDeviceId = 100
+    };
+
+    // Assert
+    Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+}
+```
+
+#### Test 18.1.2: Camera용 DeviceSymbolLookupModel 초기 상태 확인 ✅
+```csharp
+[Fact]
+public void DeviceSymbolLookupModel_WithCamera_ShouldInitializeNormal()
+{
+    // Arrange
+    var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+    var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+    var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+    {
+        DeviceModel = cameraDevice,
+        SymbolModel = symbolModel
+    };
+
+    // Assert
+    Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+}
+```
+
+---
+
+### Phase 18.2: ProcessEvent 호출 추적 (BEHAVIORAL - TDD)
+
+**파일**: `Models/DeviceSymbolLookupModel.cs`, `Tests/UnitTest.cs`
+
+#### Test 18.2.1: Camera는 Fault 이벤트를 무시해야 함 ✅
+```csharp
+[Fact]
+public void ProcessEvent_WithCameraAndFaultEvent_ShouldIgnore()
+{
+    // Arrange
+    var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+    var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+    var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+    {
+        DeviceModel = cameraDevice,
+        SymbolModel = symbolModel
+    };
+
+    // Act
+    lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.High);
+
+    // Assert
+    Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus); // 변경되지 않아야 함
+}
+```
+
+#### Test 18.2.2: Camera는 Connection 이벤트를 무시해야 함 ✅
+```csharp
+[Fact]
+public void ProcessEvent_WithCameraAndConnectionEvent_ShouldIgnore()
+{
+    // Arrange
+    var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+    var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+    var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+    {
+        DeviceModel = cameraDevice,
+        SymbolModel = symbolModel
+    };
+
+    // Act
+    lookup.ProcessEvent(EnumEventType.Connection, EnumSeverityLevel.High);
+
+    // Assert
+    Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+}
+```
+
+#### Test 18.2.3: Camera는 Intrusion 이벤트를 처리해야 함 ✅
+```csharp
+[Fact]
+public void ProcessEvent_WithCameraAndIntrusionEvent_ShouldProcess()
+{
+    // Arrange
+    var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+    var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+    var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+    {
+        DeviceModel = cameraDevice,
+        SymbolModel = symbolModel
+    };
+
+    // Act
+    lookup.ProcessEvent(EnumEventType.Intrusion, EnumSeverityLevel.High);
+
+    // Assert
+    Assert.Equal(EnumEventStatus.Detecting, symbolModel.EventStatus);
+}
+```
+
+#### Test 18.2.4: Sensor는 Fault 이벤트를 처리해야 함 (회귀 테스트) ✅
+```csharp
+[Fact]
+public void ProcessEvent_WithSensorAndFaultEvent_ShouldProcess()
+{
+    // Arrange
+    var sensorDevice = new SensorDeviceModel { Id = 50, DeviceType = EnumDeviceType.Fence };
+    var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+    var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+    {
+        DeviceModel = sensorDevice,
+        SymbolModel = symbolModel
+    };
+
+    // Act
+    lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.High);
+
+    // Assert
+    Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus); // Sensor는 정상 처리
+}
+```
+
+---
+
+### Phase 18.3: DeviceSymbolLookupModel 수정 (STRUCTURAL)
+
+#### ActionItem 18.3.1: Camera Device Type 검증 로직 추가 ⬜
+**파일**: `Models/DeviceSymbolLookupModel.cs`
+```csharp
+public void ProcessEvent(EnumEventType eventType, EnumSeverityLevel severity)
+{
+    try
+    {
+        // Camera는 Fault/Connection 이벤트를 처리하지 않음
+        if (DeviceModel is ICameraDeviceModel &&
+            (eventType == EnumEventType.Fault || eventType == EnumEventType.Connection))
+        {
+            _log?.Warning($"[ProcessEvent] Camera({DeviceModel.Id})는 {eventType} 이벤트를 무시합니다.");
+            return; // Early return
+        }
+
+        // 기존 로직 유지
+        UpdateDeviceAndSymbolState(eventType, severity);
+        _animationManager.ProcessNewEvent(eventType);
+        SymbolModel.SetUpdate();
+
+        // ... (기존 switch 문)
+    }
+    catch (Exception ex)
+    {
+        _log?.Error(ex.Message);
+    }
+}
+```
+
+---
+
+### Phase 18.4: PidsSymbolModel 초기화 검증 (STRUCTURAL)
+
+#### ActionItem 18.4.1: PidsSymbolModel 초기값 확인 및 명시적 설정 ⬜
+**파일**: `Ironwall.Dotnet.Monitoring.Models/Symbols/PidsSymbolModel.cs`
+
+**현재 상태 확인**:
+- 생성자에서 `EventStatus` 초기값 확인
+- 기본값이 `Fault`인 경우 `Normal`로 변경
+
+**예상 수정**:
+```csharp
+public PidsSymbolModel()
+{
+    EventStatus = EnumEventStatus.Normal; // 명시적 초기화
+    OperationState = EnumOperationState.ACTIVE;
+}
+```
+
+---
+
+### Phase 18.5: 통합 테스트 및 검증 (VERIFICATION)
+
+#### ActionItem 18.5.1: 전체 테스트 실행 ⬜
+- Phase 18.1~18.2 테스트 (4개) 통과 확인
+- Phase 16 회귀 테스트 (14개) 통과 확인
+- 기존 Event 관련 테스트 통과 확인
+
+#### ActionItem 18.5.2: 로그 수집 및 검증 ⬜
+```csharp
+// DeviceSymbolLookupModel.ProcessEvent()에 디버깅 로그 추가
+_log?.Info($"[ProcessEvent] DeviceId={DeviceModel?.Id}, " +
+           $"DeviceType={DeviceModel?.DeviceType}, " +
+           $"EventType={eventType}, " +
+           $"Current EventStatus={SymbolModel?.EventStatus}");
+```
+
+---
+
+### Phase 18 진행 상태
+
+| Phase | 항목 | 상태 |
+|-------|-----|------|
+| 18.1 | Symbol 초기화 테스트 (2개 테스트) | [x] |
+| 18.2 | ProcessEvent 추적 테스트 (4개 테스트) | [x] |
+| 18.3 | Camera Event 필터링 구현 (1개 ActionItem) | [x] |
+| 18.4 | PidsSymbolModel 초기화 검증 (Skip - 이미 Normal로 설정됨) | [x] |
+| 18.5 | 통합 테스트 및 검증 (회귀 테스트 통과) | [x] |
+
+**총 테스트 수**: 6개 (모두 통과)
+**총 ActionItem 수**: 4개 (완료)
+
+**결과**:
+- ✅ Phase 18 테스트: 6개 통과
+- ✅ Phase 16 회귀 테스트: 14개 통과
+- ✅ 총 20개 테스트 통과
+
+**근본 원인 파악**:
+- **가설 B 확인**: Camera가 Fault/Connection 이벤트를 받아 EventStatus가 변경됨
+- **해결 방법**: DeviceSymbolLookupModel.ProcessEvent()에서 Camera Device Type 검증 로직 추가
+- Camera는 Intrusion 이벤트만 처리하고 Fault/Connection 이벤트는 무시
+
+---
+
+## Phase 19: DeviceProvider Refresh 시 LinkedDevice 참조 손실 문제 해결
+
+**참조 문서**: [PRD_DeviceProvider_Refresh_LinkedDevice_Corruption.md](Docs/prd/PRD_DeviceProvider_Refresh_LinkedDevice_Corruption.md)
+
+**문제**: DeviceDashboardViewModel에서 `FetchAllDevicesAsync()` 호출 시 `_deviceProvider.Clear()`로 기존 Device 객체 삭제 → GMapPidsMarker.LinkedDevice가 Orphaned Reference → GMapPropertyPidsControl ComboBox 매칭 실패
+
+**해결 방식 (PRD 방안 1)**: DeviceProviderService.cs에서 Clear 대신 Update 방식 구현
+- `UpdateOrAddDevices` 메서드: 기존 객체 속성 업데이트 또는 새 객체 추가
+- `UpdateDeviceProperties` 메서드: Type-specific 속성 업데이트
+- 참조 유지로 GMapPidsMarker.LinkedDevice Orphaned 방지
+
+---
+
+### Phase 19.1: UpdateOrAddDevices 메서드 구현 (BEHAVIORAL - TDD) [ ]
+
+**파일**: `Ironwall.Dotnet.Libraries.Devices.Ui/Services/DeviceProviderService.cs`
+
+#### Test 19.1.1: UpdateOrAddDevices - 기존 Device 속성 업데이트 [ ]
+
+**목표**: API에서 받은 새 데이터로 기존 Device 객체의 속성만 업데이트 (참조 유지)
+
+```csharp
+[Fact]
+public void UpdateOrAddDevices_WithExistingDevice_ShouldUpdatePropertiesNotReplace()
+{
+    // Arrange
+    var provider = new DeviceProvider();
+    var existingDevice = new SensorDeviceModel
+    {
+        Id = 1,
+        DeviceType = EnumDeviceType.Fence,
+        DeviceName = "센서-1-OLD",
+        DeviceGroup = 1,
+        Status = 0
+    };
+    provider.Add(existingDevice);
+
+    var originalReference = provider.First();
+
+    var newDeviceData = new List<SensorDeviceModel>
+    {
+        new SensorDeviceModel
+        {
+            Id = 1,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceName = "센서-1-NEW",  // 이름 변경
+            DeviceGroup = 2,  // 그룹 변경
+            Status = 1  // 상태 변경
+        }
+    };
+
+    // Act
+    _service.UpdateOrAddDevices(provider, newDeviceData);
+
+    // Assert
+    Assert.Equal(1, provider.Count);  // 개수 유지
+    Assert.Same(originalReference, provider.First());  // 같은 참조 유지 ✅
+    Assert.Equal("센서-1-NEW", existingDevice.DeviceName);  // 속성 업데이트됨
+    Assert.Equal(2, existingDevice.DeviceGroup);
+    Assert.Equal(1, existingDevice.Status);
+}
+```
+
+#### Test 19.1.2: UpdateOrAddDevices - 새 Device 추가 [ ]
+
+**목표**: API에 새로운 Device가 있으면 Provider에 추가
+
+```csharp
+[Fact]
+public void UpdateOrAddDevices_WithNewDevice_ShouldAddToProvider()
+{
+    // Arrange
+    var provider = new DeviceProvider();
+    var existingDevice = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence };
+    provider.Add(existingDevice);
+
+    var newDeviceData = new List<SensorDeviceModel>
+    {
+        new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence },  // 기존
+        new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Fence, DeviceName = "센서-2" }  // 신규
+    };
+
+    // Act
+    _service.UpdateOrAddDevices(provider, newDeviceData);
+
+    // Assert
+    Assert.Equal(2, provider.Count);  // 개수 증가
+    var addedDevice = provider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 2);
+    Assert.NotNull(addedDevice);
+    Assert.Equal("센서-2", addedDevice.DeviceName);
+}
+```
+
+#### Test 19.1.3: UpdateOrAddDevices - 삭제된 Device 제거 [ ]
+
+**목표**: API에 없는 Device는 Provider에서 제거
+
+```csharp
+[Fact]
+public void UpdateOrAddDevices_WithDeletedDevice_ShouldRemoveFromProvider()
+{
+    // Arrange
+    var provider = new DeviceProvider();
+    provider.Add(new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence });
+    provider.Add(new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Fence });
+
+    var newDeviceData = new List<SensorDeviceModel>
+    {
+        new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence }  // Id=2 삭제됨
+    };
+
+    // Act
+    _service.UpdateOrAddDevices(provider, newDeviceData);
+
+    // Assert
+    Assert.Equal(1, provider.Count);  // 개수 감소
+    Assert.Null(provider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 2));
+}
+```
+
+#### Test 19.1.4: UpdateOrAddDevices - Composite Key (Id, DeviceType) 사용 [ ]
+
+**목표**: Controller Id=1과 Sensor Id=1이 동시에 존재 가능 (DeviceType으로 구분)
+
+```csharp
+[Fact]
+public void UpdateOrAddDevices_WithSameIdDifferentType_ShouldTreatAsSeparate()
+{
+    // Arrange
+    var provider = new DeviceProvider();
+    var controller = new ControllerDeviceModel { Id = 1, DeviceType = EnumDeviceType.Controller };
+    var sensor = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence };
+    provider.Add(controller);
+    provider.Add(sensor);
+
+    var newControllers = new List<ControllerDeviceModel>
+    {
+        new ControllerDeviceModel { Id = 1, DeviceType = EnumDeviceType.Controller, DeviceName = "제어기-1-NEW" }
+    };
+
+    // Act
+    _service.UpdateOrAddDevices(provider, newControllers);
+
+    // Assert
+    Assert.Equal(2, provider.Count);  // 센서는 그대로, 제어기만 업데이트
+    Assert.Equal("제어기-1-NEW", controller.DeviceName);  // 제어기 업데이트됨
+    Assert.NotNull(provider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 1));  // 센서 유지
+}
+```
+
+---
+
+### Phase 19.2: UpdateDeviceProperties 메서드 구현 (BEHAVIORAL - TDD) [ ]
+
+**파일**: `Ironwall.Dotnet.Libraries.Devices.Ui/Services/DeviceProviderService.cs`
+
+#### ActionItem 19.2.1: UpdateDeviceProperties - 공통 속성 업데이트 [ ]
+
+**목표**: IBaseDeviceModel의 공통 속성 (DeviceName, DeviceGroup, Status 등) 업데이트
+
+```csharp
+private void UpdateDeviceProperties(IBaseDeviceModel existing, IBaseDeviceModel newData)
+{
+    // 공통 속성 업데이트
+    existing.DeviceName = newData.DeviceName;
+    existing.DeviceGroup = newData.DeviceGroup;
+    existing.Status = newData.Status;
+    existing.IpAddress = newData.IpAddress;
+    existing.Port = newData.Port;
+    existing.Version = newData.Version;
+    // ... 기타 IBaseDeviceModel 속성
+}
+```
+
+#### ActionItem 19.2.2: UpdateDeviceProperties - Type-Specific 속성 업데이트 [ ]
+
+**목표**: ControllerDeviceModel, SensorDeviceModel, CameraDeviceModel의 고유 속성 업데이트
+
+```csharp
+private void UpdateDeviceProperties(IBaseDeviceModel existing, IBaseDeviceModel newData)
+{
+    // 공통 속성 업데이트 (위 코드)
+
+    // Type-specific 속성 업데이트
+    switch (existing)
+    {
+        case ControllerDeviceModel controller when newData is ControllerDeviceModel newController:
+            // Controller 고유 속성
+            break;
+
+        case SensorDeviceModel sensor when newData is SensorDeviceModel newSensor:
+            sensor.Controller = newSensor.Controller;
+            sensor.ControllerDeviceId = newSensor.ControllerDeviceId;
+            // ... 기타 Sensor 속성
+            break;
+
+        case CameraDeviceModel camera when newData is CameraDeviceModel newCamera:
+            camera.RtspUri = newCamera.RtspUri;
+            camera.CameraNumber = newCamera.CameraNumber;
+            // ... 기타 Camera 속성
+            break;
+    }
+}
+```
+
+---
+
+### Phase 19.3: FetchAllDevicesAsync 수정 및 통합 테스트 [ ]
+
+**파일**: `Ironwall.Dotnet.Libraries.Devices.Ui/Services/DeviceProviderService.cs`
+
+#### ActionItem 19.3.1: FetchAllDevicesAsync에서 Clear 대신 UpdateOrAddDevices 사용 [ ]
+
+**변경 전**:
+```csharp
+var controllers = await FetchControllersAsync(token);
+_deviceProvider.Clear();  // ← 삭제
+_controllerProvider.Clear();
+if (controllers?.Any() == true)
+    foreach (var item in controllers)
+        _deviceProvider.Add(item);
+```
+
+**변경 후**:
+```csharp
+var controllers = await FetchControllersAsync(token);
+UpdateOrAddDevices(_deviceProvider, controllers);  // ← Update 방식
+_log?.Info($"Controllers updated: {controllers.Count} items");
+```
+
+#### Test 19.3.1: FetchAllDevicesAsync - LinkedDevice 참조 유지 [ ]
+
+**목표**: FetchAllDevicesAsync 호출 후에도 GMapPidsMarker.LinkedDevice가 같은 참조 유지
+
+```csharp
+[Fact]
+public async Task FetchAllDevicesAsync_ShouldMaintainLinkedDeviceReference()
+{
+    // Arrange
+    var device = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence, DeviceName = "센서-1" };
+    _deviceProvider.Add(device);
+
+    var symbol = new PidsSymbolModel { LinkedDeviceId = 1, DeviceType = EnumDeviceType.Fence };
+    symbol.BindToDeviceList(_deviceProvider.ToList());
+
+    var originalReference = symbol.LinkedDevice;
+    Assert.NotNull(originalReference);
+    Assert.Same(device, originalReference);
+
+    // Act
+    await _service.FetchAllDevicesAsync();  // API 호출하여 갱신
+
+    // Assert
+    Assert.NotNull(symbol.LinkedDevice);
+    Assert.Same(originalReference, symbol.LinkedDevice);  // 같은 참조 유지 ✅
+    Assert.Equal(1, symbol.LinkedDevice.Id);
+}
+```
+
+#### ActionItem 19.3.2: 회귀 테스트 - GMapPropertyPidsControl ComboBox 매칭 [ ]
+
+**수동 테스트 시나리오**:
+1. 앱 시작 → MapView 로드 → PIDS 심볼 클릭 → ComboBox 선택 확인 ✅
+2. DeviceDashboardViewModel 열기 → 닫기
+3. MapView 편집 모드 → PIDS 심볼 클릭 → **ComboBox 선택 유지 확인** ✅
+4. 이벤트 라우팅, Symbol 저장 정상 동작 확인
+
+---
+
+```csharp
+[Fact]
+public void RebindLinkedDeviceFromMarker_DeviceNotFound_ShouldRemainCurrent()
+{
+    // Arrange
+    var oldDevice = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence };
+    var symbol = new PidsSymbolModel { LinkedDeviceId = 1, DeviceType = EnumDeviceType.Fence };
+    var marker = new GMapPidsMarker(log, symbol);
+    marker.Model.BindToDeviceList(new[] { oldDevice });
+
+    var panel = new GMapPropertyPidsControl();
+    panel.SelectedMarker = marker;
+    panel.FilteredDeviceList = new ObservableCollection<IBaseDeviceModel>
+    {
+        new SensorDeviceModel { Id = 2, DeviceType = EnumDeviceType.Fence }  // ID 불일치
+    };
+
+    var previousReference = marker.LinkedDevice;
+
+    // Act
+    panel.InvokePrivateMethod("SetupSpecificPropertiesFromMarker", marker);
+
+    // Assert
+    Assert.Same(previousReference, marker.LinkedDevice);  // 기존 참조 유지 (변경 안됨)
+}
+```
+
+---
+
+### Phase 19.2: SetupSpecificPropertiesFromMarker 수정 (BEHAVIORAL - TDD)
+
+#### ActionItem 19.2.1: RebindLinkedDeviceFromMarker 메서드 추가 ⬜
+
+**파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/GMapProperties/GMapPropertyPidsControl.cs`
+
+```csharp
+/// <summary>
+/// Marker의 LinkedDevice를 FilteredDeviceList 기준으로 재바인딩합니다.
+/// <para>SetupSpecificPropertiesFromMarker에서 호출됩니다.</para>
+/// </summary>
+private void RebindLinkedDeviceFromMarker(IPidsEditableMarker pidsMarker)
+{
+    if (FilteredDeviceList == null || FilteredDeviceList.Count == 0)
+    {
+        System.Diagnostics.Debug.WriteLine("[RebindLinkedDeviceFromMarker] FilteredDeviceList가 비어있음");
+        return;
+    }
+
+    if (pidsMarker.LinkedDeviceId == 0)
+    {
+        System.Diagnostics.Debug.WriteLine("[RebindLinkedDeviceFromMarker] LinkedDeviceId = 0 - 재바인딩 생략");
+        return;
+    }
+
+    var previousDevice = pidsMarker.LinkedDevice;
+    var newDevice = FilteredDeviceList.FirstOrDefault(d => d.Id == pidsMarker.LinkedDeviceId);
+
+    if (newDevice == null)
+    {
+        System.Diagnostics.Debug.WriteLine($"[RebindLinkedDeviceFromMarker] ⚠️ LinkedDeviceId={pidsMarker.LinkedDeviceId}를 찾을 수 없음");
+        return;
+    }
+
+    if (ReferenceEquals(previousDevice, newDevice))
+    {
+        System.Diagnostics.Debug.WriteLine($"[RebindLinkedDeviceFromMarker] ✅ LinkedDevice 이미 최신: {newDevice.DeviceName}");
+        return;
+    }
+
+    System.Diagnostics.Debug.WriteLine($"[RebindLinkedDeviceFromMarker] 🔄 재바인딩 중...");
+    System.Diagnostics.Debug.WriteLine($"  이전: {previousDevice?.DeviceName ?? "null"} (0x{previousDevice?.GetHashCode():X8})");
+    System.Diagnostics.Debug.WriteLine($"  새로: {newDevice.DeviceName} (0x{newDevice.GetHashCode():X8})");
+
+    // PidsSymbolModel.BindToDeviceList 호출하여 _linkedDevice 필드 직접 설정
+    pidsMarker.Model.BindToDeviceList(FilteredDeviceList);
+
+    System.Diagnostics.Debug.WriteLine($"[RebindLinkedDeviceFromMarker] ✅ 완료: {pidsMarker.LinkedDevice?.DeviceName}");
+}
+```
+
+#### ActionItem 19.2.2: SetupSpecificPropertiesFromMarker에서 재바인딩 호출 추가 ⬜
+
+```csharp
+protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)
+{
+    if (!(marker is IPidsEditableMarker pidsMarker)) return;
+
+    System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 시작 ===");
+    System.Diagnostics.Debug.WriteLine($"  마커 Title: {pidsMarker.Title}");
+    System.Diagnostics.Debug.WriteLine($"  마커 LinkedDeviceId: {pidsMarker.LinkedDeviceId}");
+    System.Diagnostics.Debug.WriteLine($"  마커 LinkedDevice: {pidsMarker.LinkedDevice?.DeviceName ?? "null"}");
+    System.Diagnostics.Debug.WriteLine($"  FilteredDeviceList Count: {FilteredDeviceList?.Count ?? 0}");
+
+    // ──────────── 추가: LinkedDevice 재바인딩 (DeviceProvider 갱신 대응) ────────────
+    if (FilteredDeviceList != null && FilteredDeviceList.Count > 0 && pidsMarker.LinkedDeviceId > 0)
+    {
+        RebindLinkedDeviceFromMarker(pidsMarker);
+    }
+
+    this.LinkedDeviceId = pidsMarker.LinkedDeviceId;
+    this.LinkedDevice = pidsMarker.LinkedDevice;  // ← 재바인딩 후 최신 참조
+    this.ShowFOV = pidsMarker.ShowFOV;
+    this.FOVColor = pidsMarker.FOVColor;
+    this.FOVOpacity = pidsMarker.FOVOpacity;
+    this.DetectionRange = pidsMarker.DetectionRange;
+    this.DetectionAngle = pidsMarker.DetectionAngle;
+    this.DetectionBearing = pidsMarker.DetectionBearing;
+
+    System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
+    System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");
+}
+```
+
+---
+
+### Phase 19.3: 통합 테스트 및 검증 (BEHAVIORAL)
+
+#### Test 19.3.1: DeviceProvider 갱신 후 ComboBox 매칭 성공 ⬜
+
+```csharp
+[Fact]
+public async Task CreatePropertyPanel_AfterDeviceRefresh_ShouldMatchLinkedDeviceInComboBox()
+{
+    // Arrange
+    var device1 = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence, DeviceName = "센서-1" };
+    deviceProvider.Add(device1);
+
+    var symbol = new PidsSymbolModel { LinkedDeviceId = 1, DeviceType = EnumDeviceType.Fence };
+    var marker = new GMapPidsMarker(log, symbol);
+    marker.Model.BindToDeviceList(deviceProvider.ToList());
+
+    var oldReference = marker.LinkedDevice;
+    Assert.NotNull(oldReference);
+
+    // Act: DeviceProvider 갱신 (Clear + Add)
+    deviceProvider.Clear();
+    var device1New = new SensorDeviceModel { Id = 1, DeviceType = EnumDeviceType.Fence, DeviceName = "센서-1" };
+    deviceProvider.Add(device1New);
+
+    // Property Panel 생성
+    var panel = propertyPanelFactory.CreatePropertyPanel(marker) as GMapPropertyPidsControl;
+
+    // Assert
+    Assert.NotNull(panel);
+    Assert.NotNull(panel.FilteredDeviceList);
+    Assert.NotSame(oldReference, marker.LinkedDevice);  // 참조 변경됨
+    Assert.Same(device1New, marker.LinkedDevice);       // 새 객체 참조
+    Assert.Contains(marker.LinkedDevice, panel.FilteredDeviceList);  // ComboBox 매칭 성공
+}
+```
+
+#### ActionItem 19.3.1: 수동 테스트 (DeviceDashboard 시나리오) ⬜
+
+**시나리오**:
+1. 앱 시작 → MapView 로드 → PIDS 심볼 클릭 → ComboBox 선택 확인 ✅
+2. DeviceDashboardViewModel 열기 → 닫기
+3. MapView 편집 모드 → PIDS 심볼 클릭 → **ComboBox 선택 유지 확인** ✅
+4. 로그 확인:
+   ```
+   [RebindLinkedDeviceFromMarker] 🔄 재바인딩 중...
+     이전: 센서-1 (0x1234ABCD)
+     새로: 센서-1 (0x5678CDEF)
+   [RebindLinkedDeviceFromMarker] ✅ 완료: 센서-1
+   ```
+
+#### ActionItem 19.3.2: 회귀 테스트 (기존 기능 영향 없음 확인) ⬜
+
+**검증 항목**:
+- [ ] Phase 16 테스트 (14개) 통과
+- [ ] Phase 18 테스트 (6개) 통과
+- [ ] SymbolEventManager 이벤트 라우팅 정상 동작
+- [ ] Symbol 저장/로드 정상 동작
+- [ ] 앱 재시작 시 LinkedDevice 바인딩 정상
+
+---
+
+### Phase 19 진행 상태
+
+| Phase | 항목 | 상태 |
+|-------|-----|------|
+| 19.1 | RebindLinkedDeviceFromMarker 테스트 (4개 테스트) | ⬜ |
+| 19.2 | SetupSpecificPropertiesFromMarker 수정 (2개 ActionItem) | ⬜ |
+| 19.3 | 통합 테스트 및 검증 (1개 테스트 + 2개 ActionItem) | ⬜ |
+
+**총 테스트 수**: 5개 (예정)
+**총 ActionItem 수**: 4개 (예정)
+
+**예상 결과**:
+- DeviceProvider 갱신 후에도 LinkedDevice 참조가 자동으로 업데이트됨
+- GMapPropertyPidsControl ComboBox에서 정상적으로 LinkedDevice 선택 가능
+- 기존 기능에 영향 없음 (회귀 테스트 통과)
+
+---

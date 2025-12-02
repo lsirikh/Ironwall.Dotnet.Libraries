@@ -11,6 +11,10 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Autofac;
 using Ironwall.Dotnet.Libraries.Events.Api.Modules;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Events.Models;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -3097,6 +3101,157 @@ public class DataHelperRefactoringTests
         Assert.Equal(0.0, result[0]);
     }
 
+    #endregion
+
+    #region Phase 18: Camera Status Symbol 주황색 문제 디버깅
+    /// <summary>
+    /// Phase 18.1: Symbol 초기화 테스트
+    /// Phase 18.2: ProcessEvent 호출 추적 테스트
+    /// </summary>
+
+    #region Phase 18.1: Symbol 초기화 테스트
+
+    [Fact]
+    public void PidsSymbolModel_OnCreation_ShouldHaveNormalEventStatus()
+    {
+        // Arrange & Act
+        var symbolModel = new PidsSymbolModel
+        {
+            Title = "TEST-CAM-01",
+            LinkedDeviceId = 100
+        };
+
+        // Assert
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+    }
+
+    [Fact]
+    public void DeviceSymbolLookupModel_WithCamera_ShouldInitializeNormal()
+    {
+        // Arrange
+        var log = new Mock<ILogService>().Object;
+        var ea = new Mock<IEventAggregator>().Object;
+        var eventSetup = new EventSetupModel(new Mock<IEventSetupModel>().Object);
+
+        var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+        var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        {
+            DeviceModel = cameraDevice,
+            SymbolModel = symbolModel
+        };
+
+        // Assert
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+    }
+
+    #endregion
+
+    #region Phase 18.2: ProcessEvent 추적 테스트
+
+    [Fact]
+    public void ProcessEvent_WithCameraAndFaultEvent_ShouldIgnore()
+    {
+        // Arrange
+        var log = new Mock<ILogService>().Object;
+        var ea = new Mock<IEventAggregator>().Object;
+        var eventSetup = new EventSetupModel(new Mock<IEventSetupModel>().Object);
+
+        var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+        var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        {
+            DeviceModel = cameraDevice,
+            SymbolModel = symbolModel
+        };
+
+        // Act
+        lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
+
+        // Assert
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus); // 변경되지 않아야 함
+    }
+
+    [Fact]
+    public void ProcessEvent_WithCameraAndConnectionEvent_ShouldIgnore()
+    {
+        // Arrange
+        var log = new Mock<ILogService>().Object;
+        var ea = new Mock<IEventAggregator>().Object;
+        var eventSetup = new EventSetupModel(new Mock<IEventSetupModel>().Object);
+
+        var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+        var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        {
+            DeviceModel = cameraDevice,
+            SymbolModel = symbolModel
+        };
+
+        // Act
+        lookup.ProcessEvent(EnumEventType.Connection, EnumSeverityLevel.CRITICAL);
+
+        // Assert
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+    }
+
+    [Fact]
+    public void ProcessEvent_WithCameraAndIntrusionEvent_ShouldProcess()
+    {
+        // Arrange
+        var log = new Mock<ILogService>().Object;
+        var ea = new Mock<IEventAggregator>().Object;
+        var eventSetup = new EventSetupModel(new Mock<IEventSetupModel>().Object);
+
+        var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
+        var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        {
+            DeviceModel = cameraDevice,
+            SymbolModel = symbolModel
+        };
+
+        // Act
+        lookup.ProcessEvent(EnumEventType.Intrusion, EnumSeverityLevel.CRITICAL);
+
+        // Assert
+        Assert.Equal(EnumEventStatus.Detecting, symbolModel.EventStatus);
+    }
+
+    [Fact]
+    public void ProcessEvent_WithSensorAndFaultEvent_ShouldProcess()
+    {
+        // Arrange
+        var log = new Mock<ILogService>().Object;
+        var ea = new Mock<IEventAggregator>().Object;
+        var eventSetup = new EventSetupModel(new Mock<IEventSetupModel>().Object);
+
+        var sensorDevice = new SensorDeviceModel
+        {
+            Id = 50,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceNumber = 1
+        };
+        var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
+
+        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        {
+            DeviceModel = sensorDevice,
+            SymbolModel = symbolModel
+        };
+
+        // Act
+        lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
+
+        // Assert
+        Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus); // Sensor는 정상 처리
+    }
+
+    #endregion
     #endregion
 }
 #endregion

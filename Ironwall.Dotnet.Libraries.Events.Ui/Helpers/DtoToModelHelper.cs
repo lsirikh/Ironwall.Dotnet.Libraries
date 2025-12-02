@@ -21,7 +21,8 @@ public static class DtoToModelHelper
         return new DetectionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
@@ -59,7 +60,8 @@ public static class DtoToModelHelper
         return new MalfunctionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
@@ -105,7 +107,8 @@ public static class DtoToModelHelper
         return new ConnectionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = EnumTrueFalse.True, // Connection events are typically status=True
@@ -140,7 +143,8 @@ public static class DtoToModelHelper
         return new ActionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = EnumEventType.Action,
             Content = dto.Content,
             User = dto.User,
@@ -295,7 +299,8 @@ public static class DtoToModelHelper
         return new DetectionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
@@ -327,7 +332,8 @@ public static class DtoToModelHelper
         return new MalfunctionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
@@ -350,7 +356,8 @@ public static class DtoToModelHelper
         return new ConnectionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             EventGroup = dto.GroupEvent,
             Status = EnumTrueFalse.True,
@@ -373,7 +380,8 @@ public static class DtoToModelHelper
         return new ActionEventModel
         {
             Id = dto.Id,
-            DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
+            DateTime = ParseDateTime(dto.CreatedAt),
+            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = EnumEventType.Action,
             Content = dto.Content,
             User = dto.User,
@@ -383,8 +391,8 @@ public static class DtoToModelHelper
 
     /// <summary>
     /// FromEvent DTO를 EventProvider에서 조회하거나 변환
-    /// <para>⚠️ 중요: GOP DB에서 각 Event 타입의 ID는 독립적이므로 타입 필터링 필수</para>
-    /// <para>⚠️ 조치보고 대상: DetectionEventDto, MalfunctionEventDto만 해당 (ConnectionEventDto 제외)</para>
+    /// <para>중요: GOP DB에서 각 Event 타입의 ID는 독립적이므로 타입 필터링 필수</para>
+    /// <para>조치보고 대상: DetectionEventDto, MalfunctionEventDto만 해당 (ConnectionEventDto 제외)</para>
     /// </summary>
     private static IExEventModel? ResolveOriginEvent(
         object? fromEvent,
@@ -400,7 +408,7 @@ public static class DtoToModelHelper
             case DetectionEventDto detectionDto:
                 if (eventProvider != null)
                 {
-                    // ✅ 타입 필터링 후 ID 매칭
+                    // 타입 필터링 후 ID 매칭
                     var existing = eventProvider
                         .OfType<IDetectionEventModel>()
                         .FirstOrDefault(e => e.Id == detectionDto.Id);
@@ -414,7 +422,7 @@ public static class DtoToModelHelper
             case MalfunctionEventDto malfunctionDto:
                 if (eventProvider != null)
                 {
-                    // ✅ 타입 필터링 후 ID 매칭
+                    // 타입 필터링 후 ID 매칭
                     var existing = eventProvider
                         .OfType<IMalfunctionEventModel>()
                         .FirstOrDefault(e => e.Id == malfunctionDto.Id);
@@ -465,5 +473,21 @@ public static class DtoToModelHelper
             throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
 
         return dto.OriginEvent.ToDetectionEventModel(deviceProvider);
+    }
+
+    private static DateTime ParseDateTime(string? dateTimeString)
+    {
+        // Null/Empty 처리
+        if (string.IsNullOrEmpty(dateTimeString))
+            return DateTime.Now;
+
+        // 그대로 파싱 (KST로 간주)
+        if (DateTime.TryParse(dateTimeString, out var dateTime))
+        {
+            return dateTime;
+        }
+
+        // Fallback: 파싱 실패 시 현재 시간
+        return DateTime.Now;
     }
 }

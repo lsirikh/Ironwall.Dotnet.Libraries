@@ -304,6 +304,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             }
         }
 
+       
+
         private static void OnDetectionRangeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine($"OnDetectionRangeChanged: {e.OldValue} → {e.NewValue}");

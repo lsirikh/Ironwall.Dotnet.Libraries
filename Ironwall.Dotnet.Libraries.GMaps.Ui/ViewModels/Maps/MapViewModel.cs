@@ -206,7 +206,7 @@ public class MapViewModel : BasePanelViewModel
                     .FirstOrDefault(s => s.LinkedDeviceGroup == device.DeviceGroup);
                 if (groupSymbol != null)
                 {
-                    // ★ 변경: RegisterDeviceSymbol → RegisterGroupSymbol (Phase 13.6)
+                    // 변경: RegisterDeviceSymbol → RegisterGroupSymbol
                     _symbolEventManager.RegisterGroupSymbol(device.DeviceGroup, device, groupSymbol.Model);
 
                     _log?.Info($"그룹-심볼 매핑: DeviceGroup({device.DeviceGroup}) <-> {groupSymbol.Title}");

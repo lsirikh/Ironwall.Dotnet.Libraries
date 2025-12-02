@@ -481,9 +481,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 var newMarker = e.NewValue as IEditableMarker;
 
 
-                System.Diagnostics.Debug.WriteLine($"OldMarker: {oldMarker?.Title ?? "null"}");
-                System.Diagnostics.Debug.WriteLine($"NewMarker: {newMarker?.Title ?? "null"}");
-                System.Diagnostics.Debug.WriteLine($"Control Type: {control.GetType().Name}");
+                System.Diagnostics.Debug.WriteLine($"OldMarker: {oldMarker?.Title ?? "null"}, NewMarker: {newMarker?.Title ?? "null"}, Control Type: {control.GetType().Name}");
 
                 //// 1단계: 바인딩 정리 전에 Source를 먼저 차단
                 // 중요: ClearAllBindings 전에 플래그 설정!

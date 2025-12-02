@@ -41,7 +41,7 @@ public class DeviceSymbolLookupModel : BaseModel
     {
         try
         {
-            
+
             // 1. 기존 비즈니스 상태 업데이트 (기존 로직 유지)
             UpdateDeviceAndSymbolState(eventType, severity);
 

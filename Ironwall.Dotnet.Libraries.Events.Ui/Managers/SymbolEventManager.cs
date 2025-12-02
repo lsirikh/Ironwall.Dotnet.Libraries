@@ -68,6 +68,8 @@ public class SymbolEventManager : IDisposable
         };
 
         _groupSymbolLookup[deviceGroup] = lookup;
+
+        _log?.Info($"그룹 심볼 등록: Group({deviceGroup}) → {symbolModel.GetType().Name} ");
     }
 
     // 센서 이벤트 처리 (deviceId + deviceType: 개별 마커, deviceGroup: 그룹 마커)
