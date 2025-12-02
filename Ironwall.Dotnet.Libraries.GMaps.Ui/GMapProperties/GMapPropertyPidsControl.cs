@@ -334,8 +334,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
+                // DetectionRange는 런타임 전용 (DB 저장 안 함)
                 pidsMarker.DetectionRange = (double)e.NewValue;
-                control.OnMarkerPropertyChanged("DetectionRange", e.OldValue, e.NewValue);
+                // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
             }
         }
 
@@ -347,8 +348,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
+                // DetectionAngle은 런타임 전용 (DB 저장 안 함)
                 pidsMarker.DetectionAngle = (double)e.NewValue;
-                control.OnMarkerPropertyChanged("DetectionAngle", e.OldValue, e.NewValue);
+                // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
             }
         }
 
@@ -360,8 +362,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
+                // DetectionBearing은 런타임 전용 (DB 저장 안 함)
                 pidsMarker.DetectionBearing = (double)e.NewValue;
-                control.OnMarkerPropertyChanged("DetectionBearing", e.OldValue, e.NewValue);
+                // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
             }
         }
 
