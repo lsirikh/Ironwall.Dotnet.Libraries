@@ -3129,10 +3129,12 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         FOVColor = Enum.Parse<EnumColorType>(FOVColor),
         FOVOpacity = (double)FOVOpacity,
         EventStatus = Enum.Parse<EnumEventStatus>(EventStatus),
-        BaseBearing = (double)BaseBearing
+        BaseBearing = (double)BaseBearing,
 
-        // DetectionRange, DetectionAngle, DetectionBearing는
-        // 실시간 데이터이므로 DB에서 로드하지 않음 (기본값 사용)
+        // DetectionBearing 초기값을 BaseBearing으로 설정 (FOV 초기 방향)
+        DetectionBearing = (double)BaseBearing
+
+        // DetectionRange, DetectionAngle는 기본값 사용 (런타임 조정 가능)
     };
 }
 
