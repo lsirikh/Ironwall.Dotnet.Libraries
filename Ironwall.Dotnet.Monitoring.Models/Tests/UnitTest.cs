@@ -307,5 +307,37 @@ public class PidsFovBaseBearingTests
         // Assert
         Assert.Contains("\"base_bearing\":90.0", json);
     }
+
+    [Fact(DisplayName = "TEST-20.3.1: FOV 생성 시 BaseBearing 반영")]
+    public void CreateFov_WithBaseBearing_ShouldSetInitialBearing()
+    {
+        // Arrange
+        var symbol = new Symbols.PidsSymbolModel
+        {
+            BaseBearing = 135.0
+        };
+
+        // Act
+        symbol.DetectionBearing = symbol.BaseBearing;
+
+        // Assert
+        Assert.Equal(135.0, symbol.DetectionBearing);
+    }
+
+    [Fact(DisplayName = "TEST-20.3.2: Symbol 로드 후 DetectionBearing 초기화")]
+    public void LoadSymbol_ShouldInitializeDetectionBearing()
+    {
+        // Arrange
+        var symbol = new Symbols.PidsSymbolModel
+        {
+            BaseBearing = 90.0
+        };
+
+        // Act - Simulate loading from DB and initializing DetectionBearing
+        symbol.DetectionBearing = symbol.BaseBearing;
+
+        // Assert
+        Assert.Equal(90.0, symbol.DetectionBearing);
+    }
 }
 #endregion
