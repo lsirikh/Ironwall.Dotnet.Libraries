@@ -44,6 +44,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             BindingOperations.ClearBinding(this, DetectionRangeProperty);
             BindingOperations.ClearBinding(this, DetectionAngleProperty);
             BindingOperations.ClearBinding(this, DetectionBearingProperty);
+            BindingOperations.ClearBinding(this, BaseBearingProperty);
             BindingOperations.ClearBinding(this, ShowFOVProperty);
             BindingOperations.ClearBinding(this, FOVColorProperty);
             BindingOperations.ClearBinding(this, FOVOpacityProperty);
@@ -88,6 +89,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
                 var detectionBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.DetectionBearing));
                 SetBinding(DetectionBearingProperty, detectionBearingBinding);
+
+                var baseBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.BaseBearing));
+                SetBinding(BaseBearingProperty, baseBearingBinding);
             }
 
             System.Diagnostics.Debug.WriteLine("=== PidsControl SetupSpecificBindings 완료 ===");
@@ -113,6 +117,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             this.DetectionRange = pidsMarker.DetectionRange;
             this.DetectionAngle = pidsMarker.DetectionAngle;
             this.DetectionBearing = pidsMarker.DetectionBearing;
+            this.BaseBearing = pidsMarker.BaseBearing;
 
             System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
             System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");
@@ -132,6 +137,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 pidsMarker.DetectionRange = this.DetectionRange;
                 pidsMarker.DetectionAngle = this.DetectionAngle;
                 pidsMarker.DetectionBearing = this.DetectionBearing;
+                pidsMarker.BaseBearing = this.BaseBearing;
             }
         }
 
@@ -228,6 +234,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             DependencyProperty.Register("DetectionBearing", typeof(double),
                 typeof(GMapPropertyPidsControl),
                 new PropertyMetadata(0.0, OnDetectionBearingChanged, CoerceDoubleValue));
+
+        /// <summary>
+        /// 기준 방향 각도 (카메라 물리적 설치 방향, 도)
+        /// </summary>
+        public double BaseBearing
+        {
+            get { return (double)GetValue(BaseBearingProperty); }
+            set { SetValue(BaseBearingProperty, value); }
+        }
+
+        public static readonly DependencyProperty BaseBearingProperty =
+            DependencyProperty.Register("BaseBearing", typeof(double),
+                typeof(GMapPropertyPidsControl),
+                new PropertyMetadata(0.0, OnBaseBearingChanged, CoerceDoubleValue));
 
         /// <summary>
         /// FOV 표시 여부
@@ -342,6 +362,19 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             {
                 pidsMarker.DetectionBearing = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("DetectionBearing", e.OldValue, e.NewValue);
+            }
+        }
+
+        private static void OnBaseBearingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnBaseBearingChanged: {e.OldValue} → {e.NewValue}");
+
+            if (d is GMapPropertyPidsControl control &&
+                control.SelectedMarker is IPidsEditableMarker pidsMarker &&
+                !control._isInitializing && !control._isClearingBindings)
+            {
+                pidsMarker.BaseBearing = (double)e.NewValue;
+                control.OnMarkerPropertyChanged("BaseBearing", e.OldValue, e.NewValue);
             }
         }
 

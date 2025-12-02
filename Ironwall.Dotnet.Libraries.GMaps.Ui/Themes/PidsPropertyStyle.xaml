@@ -207,6 +207,33 @@
 									Foreground="White"
 									Text="{Binding DetectionBearing, StringFormat='{}{0:F0}°'}" />
 							</Grid>
+
+							<!--  기준 방향 (BaseBearing)  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="기준방향" />
+								<Slider
+									x:Name="BaseBearingSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="360"
+									Minimum="0"
+									TickFrequency="5"
+									Value="{Binding BaseBearing}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="{Binding BaseBearing, StringFormat='{}{0:F0}°'}" />
+							</Grid>
 						</StackPanel>
 					</Border>
 				</StackPanel>

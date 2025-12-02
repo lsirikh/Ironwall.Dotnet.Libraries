@@ -204,6 +204,16 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         }
     }
 
+    public double BaseBearing
+    {
+        get => _model.BaseBearing;
+        set
+        {
+            _model.BaseBearing = value;
+            OnPropertyChanged(nameof(BaseBearing));
+        }
+    }
+
     public bool ShowFOV
     {
         get => _model.ShowFOV;

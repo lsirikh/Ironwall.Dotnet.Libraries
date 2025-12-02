@@ -26,5 +26,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         double DetectionRange { get; set; }
         double DetectionAngle { get; set; }
         double DetectionBearing { get; set; }
+        double BaseBearing { get; set; }
     }
 }
