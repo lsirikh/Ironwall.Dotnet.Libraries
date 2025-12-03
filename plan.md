@@ -4897,3 +4897,627 @@ public async Task CreatePropertyPanel_AfterDeviceRefresh_ShouldMatchLinkedDevice
 - UI에 BaseBearing Slider 추가 (0~360도)
 
 ---
+
+# Image Overlay Symbol Feature - TDD Plan
+
+**프로젝트**: Ironwall.Dotnet.Libraries.GMaps.Ui Image Overlay Feature
+**버전**: v1.9.0
+**문서 형식**: Kent Beck's TDD + Tidy First Methodology
+**참조 문서**: `Docs/PRD/PRD_ImageOverlay_Feature.md`, `CLAUDE.md`
+**작성일**: 2025-12-03
+
+---
+
+## TDD Methodology
+
+Always follow the instructions in this plan. When you say "go":
+1. Find the next unmarked test `[ ]`
+2. **RED**: Write failing test first
+3. **GREEN**: Implement minimum code to pass
+4. **REFACTOR**: Clean up while keeping tests green
+5. Mark test as complete `[x]`
+6. Commit following discipline below
+
+**진행 상태 표시**:
+- `[ ]` 미진행
+- `[~]` 진행중
+- `[x]` 완료
+
+---
+
+## Phase 21: Image Overlay - Model 계층 (TEST-IMG-1.x)
+
+**목표**: ImageModel 기능 검증 및 확장
+**파일**: `Ironwall.Dotnet.Monitoring.Models/Symbols/ImageModel.cs`
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/ImageModelTests.cs`
+
+### Phase 21.1: ImageModel 기본 기능 (BEHAVIORAL)
+
+#### TEST-IMG-1.1: ImageModel 경계 좌표 계산 [x]
+
+```csharp
+[Fact]
+public void ImageModel_ToRect_ShouldReturnCorrectRectLatLng()
+{
+    // Arrange
+    var model = new ImageModel
+    {
+        Left = 126.0,
+        Right = 127.0,
+        Top = 38.0,
+        Bottom = 37.0
+    };
+
+    // Act
+    var rect = model.ToRect();
+
+    // Assert
+    Assert.Equal(38.0, rect.Top);
+    Assert.Equal(37.0, rect.Bottom);
+    Assert.Equal(126.0, rect.Left);
+    Assert.Equal(127.0, rect.Right);
+}
+```
+
+#### TEST-IMG-1.2: ImageModel Deconstruct 메서드 [x]
+
+```csharp
+[Fact]
+public void ImageModel_Deconstruct_ShouldSetBoundsFromRectLatLng()
+{
+    // Arrange
+    var model = new ImageModel();
+    var rect = new RectLatLng(38.0, 126.0, 1.0, 1.0); // Top, Left, Width, Height
+
+    // Act
+    model.Deconstruct(rect);
+
+    // Assert
+    Assert.Equal(38.0, model.Top);
+    Assert.Equal(126.0, model.Left);
+    Assert.Equal(127.0, model.Right);
+    Assert.Equal(37.0, model.Bottom);
+}
+```
+
+#### TEST-IMG-1.3: ImageModel 복사 생성자 [x]
+
+```csharp
+[Fact]
+public void ImageModel_CopyConstructor_ShouldCopyAllProperties()
+{
+    // Arrange
+    var original = new ImageModel
+    {
+        Id = 1,
+        Title = "Test Image",
+        FilePath = "C:\\test.png",
+        Left = 126.0,
+        Right = 127.0,
+        Top = 38.0,
+        Bottom = 37.0,
+        Opacity = 0.8,
+        Rotation = 45.0
+    };
+
+    // Act
+    var copy = new ImageModel(original);
+
+    // Assert
+    Assert.Equal(original.Title, copy.Title);
+    Assert.Equal(original.FilePath, copy.FilePath);
+    Assert.Equal(original.Left, copy.Left);
+    Assert.Equal(original.Opacity, copy.Opacity);
+    Assert.NotEqual(original.Id, copy.Id); // ID는 복사하지 않음 (새 객체)
+}
+```
+
+---
+
+## Phase 22: Image Overlay - DB 계층 (TEST-IMG-2.x)
+
+**목표**: Images 테이블 CRUD 구현
+**파일**:
+- `Ironwall.Dotnet.Libraries.GMaps.Db/Services/GMapDbSymbolService.cs`
+- `Ironwall.Dotnet.Libraries.GMaps.Db/Services/IGMapDbSymbolService.cs`
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/ImageDbTests.cs`
+
+### Phase 22.1: DB 스키마 (STRUCTURAL)
+
+#### ActionItem 22.1.1: Images 테이블 스키마 정의 [x]
+
+```sql
+CREATE TABLE IF NOT EXISTS `Images` (
+    `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+    `Title`             VARCHAR(200) NOT NULL,
+    `FilePath`          VARCHAR(500) NOT NULL,
+    `Latitude`          DECIMAL(10,8) NOT NULL,
+    `Longitude`         DECIMAL(11,8) NOT NULL,
+    `Altitude`          FLOAT DEFAULT 0,
+    `LeftLng`           DECIMAL(11,8) NOT NULL,
+    `TopLat`            DECIMAL(10,8) NOT NULL,
+    `RightLng`          DECIMAL(11,8) NOT NULL,
+    `BottomLat`         DECIMAL(10,8) NOT NULL,
+    `Width`             DECIMAL(8,3) DEFAULT 100,
+    `Height`            DECIMAL(8,3) DEFAULT 100,
+    `Rotation`          DECIMAL(6,3) DEFAULT 0,
+    `Opacity`           DECIMAL(3,2) DEFAULT 0.8,
+    `Visibility`        BOOLEAN DEFAULT TRUE,
+    `HasGeoReference`   BOOLEAN DEFAULT FALSE,
+    `CoordinateSystem`  VARCHAR(50) DEFAULT 'WGS84',
+    `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `IX_Images_Location` (`Latitude`, `Longitude`)
+);
+```
+
+#### ActionItem 22.1.2: IGMapDbSymbolService 인터페이스 확장 [x]
+
+```csharp
+// Images CRUD 메서드 추가
+Task<IEnumerable<IImageModel>> GetAllImagesAsync();
+Task<IImageModel?> GetImageByIdAsync(int id);
+Task<IImageModel> InsertImageAsync(IImageModel model);
+Task<bool> UpdateImageAsync(IImageModel model);
+Task<bool> DeleteImageAsync(int id);
+```
+
+### Phase 22.2: DB CRUD (BEHAVIORAL)
+
+#### TEST-IMG-2.1: InsertImageAsync [x]
+
+```csharp
+[Fact]
+public async Task InsertImageAsync_ShouldReturnModelWithId()
+{
+    // Arrange
+    var model = new ImageModel
+    {
+        Title = "Test Image",
+        FilePath = "C:\\test.png",
+        Latitude = 37.5,
+        Longitude = 126.9
+    };
+
+    // Act
+    var result = await _service.InsertImageAsync(model);
+
+    // Assert
+    Assert.True(result.Id > 0);
+    Assert.Equal("Test Image", result.Title);
+}
+```
+
+#### TEST-IMG-2.2: GetAllImagesAsync [x]
+
+```csharp
+[Fact]
+public async Task GetAllImagesAsync_ShouldReturnAllImages()
+{
+    // Arrange: Insert 3 images
+    // Act
+    var results = await _service.GetAllImagesAsync();
+
+    // Assert
+    Assert.Equal(3, results.Count());
+}
+```
+
+#### TEST-IMG-2.3: UpdateImageAsync [x]
+
+```csharp
+[Fact]
+public async Task UpdateImageAsync_ShouldUpdateProperties()
+{
+    // Arrange: Insert image, modify title
+    // Act: Update
+    // Assert: Title changed
+}
+```
+
+#### TEST-IMG-2.4: DeleteImageAsync [x]
+
+```csharp
+[Fact]
+public async Task DeleteImageAsync_ShouldRemoveImage()
+{
+    // Arrange: Insert image
+    // Act: Delete
+    // Assert: GetById returns null
+}
+```
+
+---
+
+## Phase 23: Image Overlay - Marker/ViewModel 계층 (TEST-IMG-3.x)
+
+**목표**: GMapImageMarker 구현 (하이브리드 패턴)
+**파일**:
+- `GMaps.Ui/GMapSymbols/IImageEditableMarker.cs` (신규)
+- `GMaps.Ui/GMapSymbols/GMapImageMarker.cs` (신규)
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapImageMarkerTests.cs`
+
+### Phase 23.1: IImageEditableMarker 인터페이스 (STRUCTURAL)
+
+#### ActionItem 23.1.1: IImageEditableMarker 인터페이스 정의 [x]
+
+```csharp
+public interface IImageEditableMarker : IEditableMarker
+{
+    string? FilePath { get; set; }
+    double Opacity { get; set; }
+    bool HasGeoReference { get; }
+    string? CoordinateSystem { get; set; }
+    RectLatLng ImageBounds { get; set; }
+    double Left { get; }
+    double Top { get; }
+    double Right { get; }
+    double Bottom { get; }
+    PointLatLng Center { get; }
+    bool Contains(PointLatLng point);
+    double AspectRatio { get; }
+    bool MaintainAspectRatio { get; set; }
+    ImageSource? ImageSource { get; }
+    IImageModel ImageModel { get; }
+}
+```
+
+### Phase 23.2: GMapImageMarker 클래스 (BEHAVIORAL)
+
+#### TEST-IMG-3.1: GMapImageMarker 생성자 [x]
+
+```csharp
+[Fact]
+public void GMapImageMarker_Constructor_ShouldInitializeWithImageModel()
+{
+    // Arrange
+    var imageModel = new ImageModel
+    {
+        Title = "Test",
+        FilePath = "C:\\test.png",
+        Left = 126.0, Right = 127.0,
+        Top = 38.0, Bottom = 37.0
+    };
+
+    // Act
+    var marker = new GMapImageMarker(_mockLog.Object, imageModel);
+
+    // Assert
+    Assert.Equal("Test", marker.Title);
+    Assert.NotNull(marker.ImageBounds);
+}
+```
+
+#### TEST-IMG-3.2: GMapImageMarker UpdateLocation [x]
+
+```csharp
+[Fact]
+public void GMapImageMarker_UpdateLocation_ShouldMoveBounds()
+{
+    // Arrange
+    var marker = CreateTestImageMarker();
+    var newPosition = new PointLatLng(38.0, 127.0);
+
+    // Act
+    marker.UpdateLocation(newPosition);
+
+    // Assert
+    Assert.Equal(newPosition, marker.Center);
+}
+```
+
+#### TEST-IMG-3.3: GMapImageMarker UpdateSize [x]
+
+```csharp
+[Fact]
+public void GMapImageMarker_UpdateSize_ShouldResizeBounds()
+{
+    // Arrange
+    var marker = CreateTestImageMarker();
+
+    // Act
+    marker.UpdateSize(2.0, 1.0); // width, height in degrees
+
+    // Assert
+    Assert.Equal(2.0, marker.ImageBounds.WidthLng, 5);
+}
+```
+
+#### TEST-IMG-3.4: GMapImageMarker UpdateRotation [x]
+
+```csharp
+[Fact]
+public void GMapImageMarker_UpdateRotation_ShouldSetRotation()
+{
+    // Arrange
+    var marker = CreateTestImageMarker();
+
+    // Act
+    marker.UpdateRotation(45.0);
+
+    // Assert
+    Assert.Equal(45.0, marker.Bearing);
+}
+```
+
+#### TEST-IMG-3.5: GMapImageMarker Contains 위임 [x]
+
+```csharp
+[Fact]
+public void GMapImageMarker_Contains_ShouldDelegateToGMapCustomImage()
+{
+    // Arrange
+    var marker = CreateTestImageMarker(); // Bounds: 126-127, 37-38
+
+    // Act & Assert
+    Assert.True(marker.Contains(new PointLatLng(37.5, 126.5))); // Inside
+    Assert.False(marker.Contains(new PointLatLng(40.0, 130.0))); // Outside
+}
+```
+
+---
+
+## Phase 24: Image Overlay - CustomControl + UI 계층 (TEST-IMG-4.x)
+
+**목표**: GMapMarkerImageControl 및 XAML 스타일 구현
+**파일**:
+- `GMaps.Ui/GMapSymbols/GMapMarkerImageControl.cs` (신규)
+- `GMaps.Ui/Themes/ImageMarkerStyle.xaml` (신규)
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapMarkerImageControlTests.cs`
+
+### Phase 24.1: GMapMarkerImageControl (BEHAVIORAL)
+
+#### ActionItem 24.1.1: GMapMarkerImageControl 클래스 생성 [x]
+
+```csharp
+public class GMapMarkerImageControl : GMapMarkerCustomControl
+{
+    static GMapMarkerImageControl()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(GMapMarkerImageControl),
+            new FrameworkPropertyMetadata(typeof(GMapMarkerImageControl)));
+    }
+
+    public GMapMarkerImageControl(GMapImageMarker marker) : base(marker)
+    {
+        // ImageSource, ImageOpacity, ImageRotation 초기화
+    }
+}
+```
+
+#### ActionItem 24.1.2: DependencyProperties 정의 [x]
+
+- `ImageSource` (ImageSource)
+- `ImageOpacity` (double, default 1.0)
+- `ImageRotation` (double, default 0.0)
+
+### Phase 24.2: ImageMarkerStyle.xaml (STRUCTURAL)
+
+#### ActionItem 24.2.1: ImageMarkerStyle.xaml 생성 [x]
+
+주요 구성요소:
+- PART_MainContainer
+- PART_ImageContainer (회전 변환 적용)
+- PART_Image
+- PART_SelectionBorder
+- PART_LabelContainer
+
+#### ActionItem 24.2.2: Generic.xaml에 참조 추가 [x]
+
+```xml
+<ResourceDictionary Source="ImageMarkerStyle.xaml" />
+```
+
+---
+
+## Phase 25: Image Overlay - Adorner 계층 (TEST-IMG-5.x)
+
+**목표**: MarkerEditAdorner에 IImageEditableMarker 지원 추가
+**파일**: `GMaps.Ui/Adorners/MarkerEditAdorner.cs` (수정)
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/MarkerEditAdornerTests.cs`
+
+### Phase 25.1: MarkerEditAdorner 확장 (BEHAVIORAL)
+
+#### TEST-IMG-5.1: MarkerEditAdorner IImageEditableMarker 지원 [x]
+
+```csharp
+[Fact]
+public void MarkerEditAdorner_ShouldSupportIImageEditableMarker()
+{
+    // Arrange
+    var imageMarker = CreateTestImageMarker();
+
+    // Act
+    var adorner = new MarkerEditAdorner(canvas, imageMarker);
+
+    // Assert
+    Assert.NotNull(adorner);
+    Assert.True(adorner.SupportsMarker(imageMarker));
+}
+```
+
+#### ActionItem 25.1.1: GetMarkerBounds 메서드 확장 [x]
+
+```csharp
+private Rect GetMarkerBounds(IEditableMarker marker)
+{
+    if (marker is IImageEditableMarker imageMarker)
+    {
+        // ImageBounds를 픽셀 좌표로 변환
+        return ConvertImageBoundsToPixel(imageMarker.ImageBounds);
+    }
+    // 기존 마커 처리...
+}
+```
+
+#### ActionItem 25.1.2: 핸들 렌더링 확장 [x]
+
+- 4 모서리 핸들 (Resize)
+- 4 변 중앙 핸들 (Resize)
+- 중앙 핸들 (Move)
+- 회전 핸들 (Rotate)
+
+---
+
+## Phase 26: Image Overlay - Property 계층 (TEST-IMG-6.x) ✅ COMPLETED
+
+**목표**: GMapPropertyImageControl 및 XAML 스타일 구현
+**파일**:
+- `GMaps.Ui/GMapProperties/GMapPropertyImageControl.cs` (신규) ✅
+- `GMaps.Ui/Themes/ImagePropertyStyle.xaml` (신규) ✅
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/GMapPropertyImageControlTests.cs`
+
+### Phase 26.1: GMapPropertyImageControl (BEHAVIORAL) ✅
+
+#### ActionItem 26.1.1: GMapPropertyImageControl 클래스 생성 [x]
+
+```csharp
+public class GMapPropertyImageControl : GMapPropertyBaseControl
+{
+    // DependencyProperties
+    public string FilePath { get; set; }
+    public double ImageOpacity { get; set; }
+    public double ImageRotation { get; set; }
+    public bool ImageVisibility { get; set; }
+
+    // 읽기 전용 경계 정보
+    public double Left { get; }
+    public double Top { get; }
+    public double Right { get; }
+    public double Bottom { get; }
+    public string BoundsInfo { get; }
+
+    protected override void SetupSpecificBindings() { ... }
+    protected override void ClearSpecificBindings() { ... }
+}
+```
+
+### Phase 26.2: ImagePropertyStyle.xaml (STRUCTURAL) ✅
+
+#### ActionItem 26.2.1: ImagePropertyStyle.xaml 생성 [x]
+
+주요 UI 구성:
+- 파일 경로 (TextBox - 읽기 전용) ✅
+- 투명도 (Slider 0~1) ✅
+- 회전 (Slider 0~360) ✅
+- 표시 여부 (CheckBox) ✅
+- 가로세로비 유지 (CheckBox) ✅
+- 경계 좌표 정보 (Border - 읽기 전용) ✅
+
+#### ActionItem 26.2.2: Generic.xaml에 참조 추가 [x]
+
+```xml
+<ResourceDictionary Source="ImagePropertyStyle.xaml" />
+```
+
+---
+
+## Phase 27: Image Overlay - 통합 (TEST-IMG-7.x) ✅ COMPLETED
+
+**목표**: MapViewModel, MapView, Factory 통합
+**파일**:
+- `GMaps.Ui/ViewModels/Maps/MapViewModel.cs` (수정 - 향후 MapViewModel 통합 시)
+- `GMaps.Ui/Views/Maps/MapView.xaml` (수정 - 향후 UI 통합 시)
+- `GMaps.Ui/Factories/MarkerFactory.cs` (수정) ✅
+- `GMaps.Ui/Factories/PropertyPanelFactory.cs` (수정) ✅
+**테스트 파일**: `Ironwall.Dotnet.Libraries.GMaps.Ui/Tests/IntegrationTests.cs` ✅
+
+### Phase 27.1: Factory 확장 (STRUCTURAL) ✅
+
+#### ActionItem 27.1.1: MarkerFactory.CreateImageMarker 추가 [x]
+
+```csharp
+public GMapImageMarker CreateImageMarker(IImageModel imageModel)
+{
+    _log?.Info($"GMapImageMarker 생성: {imageModel.Title}");
+    return new GMapImageMarker(_log!, imageModel);
+}
+```
+
+#### ActionItem 27.1.2: PropertyPanelFactory 확장 [x]
+
+```csharp
+{ typeof(GMapImageMarker), typeof(GMapPropertyImageControl) }
+```
+
+### Phase 27.2: MapViewModel 확장 (BEHAVIORAL)
+
+#### ActionItem 27.2.1: ImageConfigureAsync 메서드 추가 [ ]
+
+```csharp
+private async Task ImageConfigureAsync()
+{
+    var images = await _gMapDbSymbolService.GetAllImagesAsync();
+    foreach (var imageModel in images)
+    {
+        AddImageMarkerFromModel(imageModel);
+    }
+}
+```
+
+#### ActionItem 27.2.2: Image Commands 추가 [ ]
+
+- LoadImageOverlayCommand
+- AddImageMarkerCommand
+- DeleteImageMarkerCommand
+
+#### ActionItem 27.2.3: OnActivateAsync에 ImageConfigureAsync 호출 추가 [ ]
+
+### Phase 27.3: MapView.xaml 확장 (STRUCTURAL)
+
+#### ActionItem 27.3.1: File 메뉴에 이미지 항목 추가 [ ]
+
+```xml
+<MenuItem Header="이미지 불러오기" Command="{Binding LoadImageOverlayCommand}" />
+<MenuItem Header="이미지 삭제" Command="{Binding DeleteImageMarkerCommand}" />
+```
+
+### Phase 27.4: 통합 테스트 (BEHAVIORAL) ✅
+
+#### TEST-IMG-7.1: MarkerFactory - CreateImageMarker [x]
+
+```csharp
+[Fact]
+public void TEST_IMG_7_1_MarkerFactory_CreateImageMarker_ShouldReturnGMapImageMarker()
+{
+    var factory = new MarkerFactory(_mockLog.Object, _mockDeviceProvider.Object);
+    var marker = factory.CreateImageMarker(imageModel);
+    Assert.IsType<GMapImageMarker>(marker);
+}
+```
+
+#### TEST-IMG-7.2: PropertyPanelFactory - GMapImageMarker 매핑 [x]
+
+```csharp
+[Fact]
+public void TEST_IMG_7_2_PropertyPanelFactory_ShouldHaveImageMarkerMapping()
+{
+    // 리플렉션으로 _markerToPanelMap에 GMapImageMarker → GMapPropertyImageControl 매핑 확인
+    Assert.Equal(typeof(GMapPropertyImageControl), map[typeof(GMapImageMarker)]);
+}
+```
+
+#### TEST-IMG-7.3: PropertyPanelFactory - 전체 마커 매핑 (8개) [x]
+
+#### TEST-IMG-7.4: ImageModel → Marker 생성 + Factory 매핑 확인 [x]
+
+#### TEST-IMG-7.5: GMapImageMarker - IEditableMarker 호환성 [x]
+
+---
+
+## Image Overlay Feature 진행 상태 요약
+
+| Phase | 내용 | 테스트 수 | ActionItem 수 | 상태 |
+|-------|------|----------|--------------|------|
+| 21 | Model 계층 | 3 | 0 | [x] |
+| 22 | DB 계층 | 4 | 2 | [x] |
+| 23 | Marker/ViewModel 계층 | 5 | 1 | [x] |
+| 24 | CustomControl + UI 계층 | 0 | 4 | [x] |
+| 25 | Adorner 계층 | 6 | 2 | [x] |
+| 26 | Property 계층 | 0 | 3 | [x] |
+| 27 | 통합 | 5 | 6 | [x] |
+
+**총 테스트 수**: 16개
+**총 ActionItem 수**: 18개
+
+---

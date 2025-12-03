@@ -29,6 +29,21 @@ public class MarkerClickEventArgs : EventArgs
     }
 }
 
+/// <summary>
+/// Image 마커 클릭 이벤트 인수 (Phase 24)
+/// </summary>
+public class ImageMarkerClickEventArgs : EventArgs
+{
+    public IImageEditableMarker? Marker { get; }
+    public MouseButtonEventArgs MouseEventArgs { get; }
+
+    public ImageMarkerClickEventArgs(IImageEditableMarker? marker, MouseButtonEventArgs mouseEventArgs)
+    {
+        Marker = marker;
+        MouseEventArgs = mouseEventArgs;
+    }
+}
+
 // 임계값 초과 이벤트 인수
 public class ThresholdExceededEventArgs : EventArgs
 {

@@ -147,7 +147,10 @@ public class MapViewModel : BasePanelViewModel
             // 3. 심볼 설정
             await SymbolConfigureAsync();
 
-            // 4. ComboBox 초기 선택 알림
+            // 4. 이미지 오버레이 설정 (Phase 28)
+            await ImageConfigureAsync();
+
+            // 5. ComboBox 초기 선택 알림
             NotifyOfPropertyChange(nameof(AvailableMaps));
             NotifyOfPropertyChange(nameof(SelectedMapItem));
 
@@ -617,6 +620,7 @@ public class MapViewModel : BasePanelViewModel
     private void InitializeFileCommands()
     {
         LoadMapImageCommand = new RelayCommand(ExecuteLoadMapImage, CanExecuteLoadImageMap);
+        LoadImageOverlayCommand = new RelayCommand(ExecuteLoadImageOverlay, CanExecuteLoadImageOverlay);
         CreateCustomMapCommand = new RelayCommand(ExecuteCreateCustomMap, CanExecuteCreateCustomMap);
         SetMapTileFolderCommand = new RelayCommand(ExecuteSetMapTileFolder, CanExecuteSetMapTileFolder);
         ExitApplicationCommand = new RelayCommand(ExecuteExitApplication, CanExecuteExitApplication);
@@ -699,6 +703,87 @@ public class MapViewModel : BasePanelViewModel
     #endregion
 
     #region - 파일 명령어 구현 -
+
+    #region Image Overlay Command (Phase 29)
+
+    /// <summary>
+    /// 이미지 오버레이 로드 명령어 실행 가능 여부
+    /// </summary>
+    private bool CanExecuteLoadImageOverlay(object arg) => MainMap != null;
+
+    /// <summary>
+    /// 이미지 오버레이 로드 실행 - 이미지 파일을 GMapImageMarker로 추가
+    /// </summary>
+    private async void ExecuteLoadImageOverlay(object obj)
+    {
+        try
+        {
+            _log?.Info("이미지 오버레이 불러오기 시작");
+
+            // 파일 다이얼로그 열기
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "이미지 파일 선택",
+                Filter = "Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All Files (*.*)|*.*",
+                DefaultExt = ".png",
+                Multiselect = false
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                var filePath = openFileDialog.FileName;
+                var title = System.IO.Path.GetFileNameWithoutExtension(filePath);
+                var currentPosition = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
+
+                // ImageModel 생성
+                var imageModel = new Ironwall.Dotnet.Monitoring.Models.Symbols.ImageModel
+                {
+                    Title = title,
+                    FilePath = filePath,
+                    Latitude = currentPosition.Lat,
+                    Longitude = currentPosition.Lng,
+                    Opacity = 0.8,
+                    Rotation = 0.0,
+                    // 기본 경계 설정 (이미지 크기 기반으로 대략적인 범위)
+                    Left = currentPosition.Lng - 0.01,
+                    Right = currentPosition.Lng + 0.01,
+                    Top = currentPosition.Lat + 0.01,
+                    Bottom = currentPosition.Lat - 0.01
+                };
+
+                // MarkerFactory로 마커 생성
+                var marker = _markerFactory.CreateImageMarker(imageModel);
+
+                if (marker != null)
+                {
+                    // 지도에 마커 추가
+                    MainMap.Markers.Add(marker);
+
+                    // DB에 저장
+                    var savedId = await DbSaveProcess(marker);
+                    if (savedId > 0)
+                    {
+                        imageModel.Id = savedId;
+                        _log?.Info($"이미지 오버레이 추가 및 DB 저장 완료: {title} (Id={savedId})");
+                    }
+                    else
+                    {
+                        _log?.Warning($"이미지 오버레이 추가됨, DB 저장 실패: {title}");
+                    }
+
+                    // 뷰 갱신
+                    MainMap.InvalidateVisual();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"이미지 오버레이 불러오기 실패: {ex.Message}");
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// 이미지 맵 로드 명령어 실행 가능 여부
     /// </summary>
@@ -1570,6 +1655,89 @@ public class MapViewModel : BasePanelViewModel
             PidsSymbolModel => 2, // 두 번째
             _ => 1 // 가장 먼저
         };
+    }
+
+    /// <summary>
+    /// DB에서 이미지 오버레이 로드 및 지도에 표시 (Phase 28)
+    /// </summary>
+    /// <remarks>
+    /// PRD: PRD_ImageOverlay_Feature.md - 4.5.2 MapViewModel 확장 설계
+    /// - OnActivateAsync에서 호출
+    /// - DB에서 Images 테이블 조회
+    /// - MarkerFactory로 GMapImageMarker 생성
+    /// - MainMap.Markers에 추가
+    /// </remarks>
+    private async Task ImageConfigureAsync()
+    {
+        try
+        {
+            _log?.Info("ImageConfigureAsync - DB에서 이미지 오버레이 로드 시작");
+
+            // 1. DB에서 이미지 목록 조회
+            var images = await _gMapDbSymbolService.FetchImagesAsync();
+
+            if (images == null || images.Count == 0)
+            {
+                _log?.Info("ImageConfigureAsync - 로드할 이미지 없음");
+                return;
+            }
+
+            // 2. 각 이미지를 지도에 추가
+            int successCount = 0;
+            foreach (var imageModel in images)
+            {
+                try
+                {
+                    AddImageMarkerFromModel(imageModel);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    _log?.Error($"이미지 마커 추가 실패 (Id={imageModel.Id}): {ex.Message}");
+                }
+            }
+
+            _log?.Info($"ImageConfigureAsync 완료 - {successCount}/{images.Count}개 이미지 로드됨");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"ImageConfigureAsync 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// ImageModel에서 마커 생성 및 지도에 추가 (Phase 28)
+    /// </summary>
+    /// <param name="imageModel">이미지 모델</param>
+    /// <remarks>
+    /// PRD: PRD_ImageOverlay_Feature.md - 4.5.2 MapViewModel 확장 설계
+    /// </remarks>
+    private void AddImageMarkerFromModel(IImageModel imageModel)
+    {
+        try
+        {
+            _log?.Info($"이미지 마커 생성 시작: {imageModel.Title} (Id={imageModel.Id})");
+
+            // 1. MarkerFactory로 마커 생성
+            var marker = _markerFactory.CreateImageMarker(imageModel);
+
+            // 2. 지도에 추가
+            if (MainMap != null && marker != null)
+            {
+                MainMap.Markers.Add(marker);
+                _log?.Info($"이미지 마커 추가 완료: {imageModel.Title}");
+            }
+            else
+            {
+                _log?.Warning($"MainMap 또는 마커가 null입니다: MainMap={MainMap != null}, marker={marker != null}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"이미지 마커 추가 실패 (Id={imageModel.Id}): {ex.Message}");
+            throw;
+        }
     }
     #endregion
 
@@ -3295,6 +3463,9 @@ public class MapViewModel : BasePanelViewModel
             case GMapPidsGroupMarker pidsGroupMarker:
                 // GMapPidsGroupMarker 전용 로직
                 return await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(pidsGroupMarker.Model);
+            case GMapImageMarker imageMarker:
+                // GMapImageMarker 전용 로직 (Phase 28)
+                return await _gMapDbSymbolService.InsertImageAsync(imageMarker.ImageModel);
             default:
                 // 공통 로직
                 return 0;
@@ -3333,6 +3504,10 @@ public class MapViewModel : BasePanelViewModel
                 // GMapPidsGroupMarker 전용 로직
                 await _gMapDbSymbolService.UpdatePidsGroupSymbolAsync(pidsGroupMarker.Model);
                 break;
+            case GMapImageMarker imageMarker:
+                // GMapImageMarker 전용 로직 (Phase 28)
+                await _gMapDbSymbolService.UpdateImageAsync(imageMarker.ImageModel);
+                break;
             default:
                 // 공통 로직
                 break;
@@ -3364,6 +3539,9 @@ public class MapViewModel : BasePanelViewModel
             case GMapPidsGroupMarker pidsGroupMarker:
                 // GMapPidsGroupMarker 전용 로직
                 return await _gMapDbSymbolService.DeletePidsGroupSymbolAsync(pidsGroupMarker.Model);
+            case GMapImageMarker imageMarker:
+                // GMapImageMarker 전용 로직 (Phase 28)
+                return await _gMapDbSymbolService.DeleteImageAsync(imageMarker.ImageModel.Id);
             default:
                 // 공통 로직
                 return false;
@@ -3741,6 +3919,7 @@ public class MapViewModel : BasePanelViewModel
     #region - 명령어 속성 -
     // 파일 관련 명령어
     public RelayCommand? LoadMapImageCommand { get; private set; }
+    public RelayCommand? LoadImageOverlayCommand { get; private set; }
     public RelayCommand? CreateCustomMapCommand { get; private set; }
     public RelayCommand? SetMapTileFolderCommand { get; private set; }
     public RelayCommand? ExitApplicationCommand { get; private set; }

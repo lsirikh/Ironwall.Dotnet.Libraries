@@ -420,12 +420,23 @@ public class MarkerAdornerLayer : IDisposable
             // 이벤트 구독 해제
             UnsubscribeFromAdornerEvents(adorner);
 
-            // AdornerLayer에서 제거
-            var markerControl = adorner.AdornedElement as IMarkerControl;
-            if (markerControl != null)
+            // AdornerLayer에서 제거 - 우선 _mapControl에서 찾기 (CreateAdorner와 동일한 방식)
+            AdornerLayer? adornerLayer = AdornerLayer.GetAdornerLayer(_mapControl);
+
+            // _mapControl에서 찾지 못한 경우 AdornedElement에서 찾기
+            if (adornerLayer == null)
             {
-                var adornerLayer = AdornerLayer.GetAdornerLayer(markerControl.VisualElement);
-                adornerLayer?.Remove(adorner);
+                adornerLayer = AdornerLayer.GetAdornerLayer(adorner.AdornedElement);
+            }
+
+            if (adornerLayer != null)
+            {
+                adornerLayer.Remove(adorner);
+                _log?.Info($"AdornerLayer에서 Adorner 제거: {marker.Title}");
+            }
+            else
+            {
+                _log?.Warning($"AdornerLayer를 찾을 수 없음 (제거 시): {marker.Title}");
             }
 
             // 딕셔너리에서 제거

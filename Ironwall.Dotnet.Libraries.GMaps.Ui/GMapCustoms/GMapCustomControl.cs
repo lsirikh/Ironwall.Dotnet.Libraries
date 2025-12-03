@@ -720,7 +720,8 @@ public class GMapCustomControl : GMapControl
                 var markerRadius = Math.Max(marker.Width, marker.Height) / 2.0 + 10; // 10px 여유분
 
                 _log?.Info($"마커 '{marker.Title}': 화면위치({markerScreenPoint.X:F2}, {markerScreenPoint.Y:F2}), " +
-                          $"화면거리: {screenDistance:F2}px, 클릭반경: {markerRadius:F2}px");
+                          $"화면거리: {screenDistance:F2}px, 클릭반경: {markerRadius:F2}px, " +
+                          $"마커크기: {marker.Width}x{marker.Height}");
 
                 if (screenDistance <= markerRadius)
                 {
@@ -850,6 +851,13 @@ public class GMapCustomControl : GMapControl
 
     private IMarkerControl FindMarkerControlByMarker(IEditableMarker marker)
     {
+        // 마커 자체가 IMarkerControl을 구현하는 경우 (예: GMapImageMarker)
+        if (marker is IMarkerControl markerControl)
+        {
+            _log?.Info($"마커 자체가 IMarkerControl 구현: {marker.GetType().Name}");
+            return markerControl;
+        }
+
         // Visual Tree를 순회하면서 해당 마커와 연결된 컨트롤 찾기
         return FindMarkerControlInVisualTree(this, marker);
     }

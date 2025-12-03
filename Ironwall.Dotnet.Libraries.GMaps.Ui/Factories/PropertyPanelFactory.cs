@@ -34,6 +34,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             { typeof(GMapLineMarker), typeof(GMapPropertyLineControl) },
             { typeof(GMapInfraMarker), typeof(GMapPropertyInfraControl) },
             { typeof(GMapPidsGroupMarker), typeof(GMapPropertyPidsGroupControl) },
+            { typeof(GMapImageMarker), typeof(GMapPropertyImageControl) },
         };
         }
         #endregion

@@ -321,7 +321,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     }
 
     #endregion
-
     #region - Helper Methods -
 
     /// <summary>

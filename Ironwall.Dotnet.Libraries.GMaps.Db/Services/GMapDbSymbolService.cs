@@ -434,6 +434,31 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 UNIQUE KEY `UQ_PidsGroupPoints_Symbol_Sequence` (`GroupSymbolId`, `SequenceOrder`)
             );";
 
+            // ── Images 테이블 ──
+            var createImagesSql = @"
+            CREATE TABLE IF NOT EXISTS `Images` (
+                `Id`                INT AUTO_INCREMENT PRIMARY KEY,
+                `Title`             VARCHAR(200),                                       -- 이미지 제목
+                `FilePath`          VARCHAR(500) NOT NULL,                              -- 이미지 파일 경로
+                `Left`              DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 좌측 경도 (Left Longitude)
+                `Top`               DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 상단 위도 (Top Latitude)
+                `Right`             DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 우측 경도 (Right Longitude)
+                `Bottom`            DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 하단 위도 (Bottom Latitude)
+                `Latitude`          DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 중심 위도
+                `Longitude`         DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 중심 경도
+                `Altitude`          FLOAT DEFAULT 0,                                    -- 고도
+                `Width`             DECIMAL(10,3) DEFAULT 0,                            -- 이미지 너비 (픽셀)
+                `Height`            DECIMAL(10,3) DEFAULT 0,                            -- 이미지 높이 (픽셀)
+                `Opacity`           DECIMAL(3,2) DEFAULT 1.0,                           -- 투명도 (0.0 ~ 1.0)
+                `Rotation`          DECIMAL(6,3) DEFAULT 0,                             -- 회전 각도 (도)
+                `Visibility`        BOOLEAN DEFAULT TRUE,                               -- 표시 여부
+                `HasGeoReference`   BOOLEAN DEFAULT FALSE,                              -- 지리 참조 여부
+                `CoordinateSystem`  VARCHAR(50),                                        -- 좌표계 (예: EPSG:4326)
+                `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX `IX_Images_Location` (`Latitude`, `Longitude`),
+                INDEX `IX_Images_Bounds` (`Left`, `Top`, `Right`, `Bottom`)
+            );";
 
             // 실행 순서
             await conn.ExecuteAsync(createSymbolsSql);
@@ -481,6 +506,11 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "PidsGroupPoints 테이블 생성…" });
+
+            await conn.ExecuteAsync(createImagesSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "Images 테이블 생성…" });
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
@@ -2883,7 +2913,222 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
     #endregion
 
-    
+    #region - Image CRUD -
+    /// <summary>
+    /// 모든 이미지를 조회합니다
+    /// </summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>Image 목록</returns>
+    public async Task<List<IImageModel>?> FetchImagesAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
+                        Latitude, Longitude, Altitude, Width, Height,
+                        Opacity, Rotation, Visibility, HasGeoReference, CoordinateSystem,
+                        CreatedAt, UpdatedAt
+                FROM    Images
+                ORDER BY CreatedAt DESC;";
+
+            var list = (await conn.QueryAsync<ImageSQL>(sql))
+                .Select(s => s.ToDomain())
+                .ToList();
+
+            _log?.Info($"FetchImagesAsync 완료 - {list.Count}건");
+            return list.OfType<IImageModel>().ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Images 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// ID로 단일 이미지를 조회합니다
+    /// </summary>
+    /// <param name="id">Image ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>Image 모델</returns>
+    public async Task<IImageModel?> FetchImageAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (id <= 0)
+                throw new ArgumentOutOfRangeException(nameof(id));
+
+            const string sql = @"
+                SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
+                        Latitude, Longitude, Altitude, Width, Height,
+                        Opacity, Rotation, Visibility, HasGeoReference, CoordinateSystem,
+                        CreatedAt, UpdatedAt
+                FROM    Images
+                WHERE   Id = @Id;";
+
+            var imageDto = await conn.QuerySingleOrDefaultAsync<ImageSQL>(sql, new { Id = id });
+            var image = imageDto?.ToDomain();
+
+            _log?.Info(image != null
+                ? $"FetchImageAsync 완료 - Id={image.Id}"
+                : $"FetchImageAsync 대상 없음 - Id={id}");
+
+            return image;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 단일 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 새로운 이미지를 삽입합니다
+    /// </summary>
+    /// <param name="model">Image 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Image ID</returns>
+    public async Task<int> InsertImageAsync(IImageModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO Images
+                    (Title, FilePath, `Left`, Top, `Right`, Bottom,
+                     Latitude, Longitude, Altitude, Width, Height,
+                     Opacity, Rotation, Visibility, HasGeoReference, CoordinateSystem)
+                VALUES
+                    (@Title, @FilePath, @Left, @Top, @Right, @Bottom,
+                     @Latitude, @Longitude, @Altitude, @Width, @Height,
+                     @Opacity, @Rotation, @Visibility, @HasGeoReference, @CoordinateSystem);
+                SELECT LAST_INSERT_ID();";
+
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Title,
+                model.FilePath,
+                model.Left,
+                model.Top,
+                model.Right,
+                model.Bottom,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Width,
+                model.Height,
+                model.Opacity,
+                model.Rotation,
+                model.Visibility,
+                model.HasGeoReference,
+                model.CoordinateSystem
+            });
+
+            model.Id = id;
+            _log?.Info($"Image 삽입 완료 - Id={id}, Title={model.Title}");
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 이미지를 업데이트합니다
+    /// </summary>
+    /// <param name="model">Image 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 Image 모델</returns>
+    public async Task<IImageModel?> UpdateImageAsync(IImageModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            if (model.Id <= 0) throw new ArgumentException(nameof(model.Id));
+
+            const string sql = @"
+                UPDATE Images SET
+                    Title = @Title, FilePath = @FilePath,
+                    `Left` = @Left, Top = @Top, `Right` = @Right, Bottom = @Bottom,
+                    Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude,
+                    Width = @Width, Height = @Height,
+                    Opacity = @Opacity, Rotation = @Rotation, Visibility = @Visibility,
+                    HasGeoReference = @HasGeoReference, CoordinateSystem = @CoordinateSystem,
+                    UpdatedAt = CURRENT_TIMESTAMP
+                WHERE Id = @Id;";
+
+            var affected = await conn.ExecuteAsync(sql, new
+            {
+                model.Id,
+                model.Title,
+                model.FilePath,
+                model.Left,
+                model.Top,
+                model.Right,
+                model.Bottom,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Width,
+                model.Height,
+                model.Opacity,
+                model.Rotation,
+                model.Visibility,
+                model.HasGeoReference,
+                model.CoordinateSystem
+            });
+
+            if (affected == 0)
+                throw new KeyNotFoundException($"Image not found. Id={model.Id}");
+
+            _log?.Info($"Image 업데이트 완료 - Id={model.Id}");
+            return await FetchImageAsync(model.Id, token);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 이미지를 삭제합니다
+    /// </summary>
+    /// <param name="id">Image ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    public async Task<bool> DeleteImageAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            if (id <= 0) throw new ArgumentException(nameof(id));
+
+            const string sql = "DELETE FROM Images WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id });
+
+            _log?.Info(ret > 0
+                ? $"DeleteImageAsync 완료 - Id={id}"
+                : $"DeleteImageAsync 대상 없음 - Id={id}");
+
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Image 삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+    #endregion
+
     #endregion
     #region - IHanldes -
     #endregion
@@ -3425,6 +3670,97 @@ internal sealed class PidsGroupPointSQL
         longitude: (double)Longitude,
         altitude: (double)Altitude
     );
+}
+
+#endregion
+
+#region - DTO Classes for Image -
+
+/// <summary>
+/// Images 테이블과 매핑되는 DTO
+/// </summary>
+internal sealed class ImageSQL
+{
+    /// <summary>자동 증가 기본 키</summary>
+    public int Id { get; set; }
+
+    /// <summary>이미지 제목</summary>
+    public string? Title { get; set; }
+
+    /// <summary>이미지 파일 경로</summary>
+    public string FilePath { get; set; } = string.Empty;
+
+    /// <summary>좌측 경도 (Left Longitude)</summary>
+    public decimal Left { get; set; }
+
+    /// <summary>상단 위도 (Top Latitude)</summary>
+    public decimal Top { get; set; }
+
+    /// <summary>우측 경도 (Right Longitude)</summary>
+    public decimal Right { get; set; }
+
+    /// <summary>하단 위도 (Bottom Latitude)</summary>
+    public decimal Bottom { get; set; }
+
+    /// <summary>중심 위도</summary>
+    public decimal Latitude { get; set; }
+
+    /// <summary>중심 경도</summary>
+    public decimal Longitude { get; set; }
+
+    /// <summary>고도</summary>
+    public float Altitude { get; set; }
+
+    /// <summary>이미지 너비 (픽셀)</summary>
+    public decimal Width { get; set; }
+
+    /// <summary>이미지 높이 (픽셀)</summary>
+    public decimal Height { get; set; }
+
+    /// <summary>투명도 (0.0 ~ 1.0)</summary>
+    public decimal Opacity { get; set; } = 1.0m;
+
+    /// <summary>회전 각도 (도)</summary>
+    public decimal Rotation { get; set; }
+
+    /// <summary>표시 여부</summary>
+    public bool Visibility { get; set; } = true;
+
+    /// <summary>지리 참조 여부</summary>
+    public bool HasGeoReference { get; set; }
+
+    /// <summary>좌표계 (예: EPSG:4326)</summary>
+    public string? CoordinateSystem { get; set; }
+
+    /// <summary>생성 일시</summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>수정 일시</summary>
+    public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// DTO를 ImageModel로 변환
+    /// </summary>
+    public ImageModel ToDomain() => new()
+    {
+        Id = Id,
+        Title = Title,
+        FilePath = FilePath,
+        Left = (double)Left,
+        Top = (double)Top,
+        Right = (double)Right,
+        Bottom = (double)Bottom,
+        Latitude = (double)Latitude,
+        Longitude = (double)Longitude,
+        Altitude = Altitude,
+        Width = (double)Width,
+        Height = (double)Height,
+        Opacity = (double)Opacity,
+        Rotation = (double)Rotation,
+        Visibility = Visibility,
+        HasGeoReference = HasGeoReference,
+        CoordinateSystem = CoordinateSystem
+    };
 }
 
 #endregion

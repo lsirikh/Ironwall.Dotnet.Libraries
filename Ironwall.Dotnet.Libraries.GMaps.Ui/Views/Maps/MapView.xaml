@@ -116,6 +116,19 @@
 				</MenuItem>
 
 				<MenuItem
+					Command="{Binding LoadImageOverlayCommand}"
+					Header="이미지 불러오기"
+					Icon="{md:PackIcon Kind=Image}"
+					InputGestureText="Ctrl+I">
+					<MenuItem.InputBindings>
+						<KeyBinding
+							Key="I"
+							Command="{Binding LoadImageOverlayCommand}"
+							Modifiers="Ctrl" />
+					</MenuItem.InputBindings>
+				</MenuItem>
+
+				<MenuItem
 					Command="{Binding CreateCustomMapCommand}"
 					Header="새 커스텀 맵 생성"
 					Icon="{md:PackIcon Kind=MapPlus}"

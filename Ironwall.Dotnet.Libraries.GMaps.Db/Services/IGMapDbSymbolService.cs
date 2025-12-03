@@ -494,6 +494,55 @@ public interface IGMapDbSymbolService
     #endregion
 
 
+    #region - Image CRUD Operations -
+    /// <summary>모든 이미지를 조회합니다</summary>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>Image 목록</returns>
+    /// <remarks>
+    /// Images 테이블에서 모든 이미지 오버레이 정보를 조회합니다.
+    /// 경계 좌표(Left, Top, Right, Bottom), 표시 속성(Opacity, Visibility, Rotation) 등을 포함합니다.
+    /// </remarks>
+    Task<List<IImageModel>?> FetchImagesAsync(CancellationToken token = default);
+
+    /// <summary>ID로 단일 이미지를 조회합니다</summary>
+    /// <param name="id">Image ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>Image 모델</returns>
+    /// <remarks>
+    /// Images 테이블에서 특정 ID의 이미지 정보를 조회합니다.
+    /// </remarks>
+    Task<IImageModel?> FetchImageAsync(int id, CancellationToken token = default);
+
+    /// <summary>새로운 이미지를 삽입합니다</summary>
+    /// <param name="model">Image 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>생성된 Image ID</returns>
+    /// <remarks>
+    /// Images 테이블에 새 이미지 정보를 삽입합니다.
+    /// 파일 경로, 경계 좌표, 표시 속성 등을 저장합니다.
+    /// </remarks>
+    Task<int> InsertImageAsync(IImageModel model, CancellationToken token = default);
+
+    /// <summary>이미지를 업데이트합니다</summary>
+    /// <param name="model">Image 모델</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>업데이트된 Image 모델</returns>
+    /// <remarks>
+    /// Images 테이블의 기존 이미지 정보를 업데이트합니다.
+    /// 경계 좌표, 회전, 투명도 등의 속성 변경에 사용됩니다.
+    /// </remarks>
+    Task<IImageModel?> UpdateImageAsync(IImageModel model, CancellationToken token = default);
+
+    /// <summary>이미지를 삭제합니다</summary>
+    /// <param name="id">Image ID</param>
+    /// <param name="token">취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    /// <remarks>
+    /// Images 테이블에서 특정 이미지를 삭제합니다.
+    /// </remarks>
+    Task<bool> DeleteImageAsync(int id, CancellationToken token = default);
+    #endregion
+
     #region - Properties -
     /// <summary>데이터베이스 연결 상태</summary>
     /// <value>연결되어 있으면 true, 그렇지 않으면 false</value>

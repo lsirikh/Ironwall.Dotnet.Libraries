@@ -161,4 +161,18 @@ public class MarkerFactory : IMarkerFactory
         _log?.Info($"GMapCustomMarker 생성: {symbol.Title}");
         return new GMapCustomMarker(_log!, symbol);
     }
+
+    /// <summary>
+    /// ImageModel로부터 GMapImageMarker를 생성합니다.
+    /// </summary>
+    /// <param name="imageModel">이미지 모델</param>
+    /// <returns>GMapImageMarker 인스턴스</returns>
+    public GMapImageMarker CreateImageMarker(IImageModel imageModel)
+    {
+        if (imageModel == null)
+            throw new ArgumentNullException(nameof(imageModel));
+
+        _log?.Info($"GMapImageMarker 생성: {imageModel.Title}");
+        return new GMapImageMarker(_log!, imageModel);
+    }
 }

@@ -201,17 +201,29 @@ public class AdornerManagerService : IDisposable
     /// <returns>성공 여부</returns>
     public bool SelectMarker(IEditableMarker marker, IMarkerControl markerControl, GMapControl mapControl = null)
     {
-        if (marker == null || markerControl == null) return false;
+        if (marker == null || markerControl == null)
+        {
+            _log?.Warning($"SelectMarker: marker 또는 markerControl이 null (marker: {marker != null}, markerControl: {markerControl != null})");
+            return false;
+        }
 
         var targetMapControl = mapControl ?? _mapControl;
-        if (targetMapControl == null) return false;
+        if (targetMapControl == null)
+        {
+            _log?.Warning("SelectMarker: targetMapControl이 null");
+            return false;
+        }
 
         lock (_lock)
         {
             try
             {
                 var adornerLayer = GetAdornerLayer(targetMapControl);
-                if (adornerLayer == null) return false;
+                if (adornerLayer == null)
+                {
+                    _log?.Warning($"SelectMarker: AdornerLayer를 찾을 수 없음 (등록된 컨트롤 수: {_adornerLayers.Count})");
+                    return false;
+                }
 
                 // 다중 선택이 비활성화된 경우 다른 마커들 선택 해제
                 if (!_multiSelectEnabled)
