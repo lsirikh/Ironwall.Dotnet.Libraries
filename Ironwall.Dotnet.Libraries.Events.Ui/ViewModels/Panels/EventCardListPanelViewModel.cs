@@ -1,16 +1,17 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
-using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Modules;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
+using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.Specialized;
@@ -158,21 +159,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 if (message != null && message.ViewModel != null)
                 {
                     var vm = message.ViewModel;
-                    var eventModel = vm.Model;
-                    if (eventModel == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
+                    var model = vm.Model;
+                    if (model == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
 
-                    if (eventModel.Device != null)
+                    if (model.Device != null)
                     {
                         // Phase 14: 복합 키 - deviceType 추가
-                        _symbolEventManager.ProcessEventReport(eventModel.Device.Id, eventModel.Device.DeviceType, eventModel.Device.DeviceGroup);
+                        _symbolEventManager.ProcessEventReport(model.Device.Id, model.Device.DeviceType, model.Device.DeviceGroup);
                     }
-
-                    var action = new ActionEventModel()
-                    {
-                        Content = message.Content,
-                        User = message.User,
-                        OriginEvent = eventModel,
-                    };
 
                     DispatcherService.Invoke(() =>
                     {
@@ -180,9 +174,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         vm.Dispose();
                     });
 
-                    await _providerService.InsertActionEventAsync(action, cancellationToken);
-                    eventModel.Status = Enums.EnumTrueFalse.True;
-                    await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)eventModel!, cancellationToken);
+                    model.Status = Enums.EnumTrueFalse.True;
+                    await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)model!, cancellationToken);
+
+                    var actionRequest = new SendActionRequestMessage
+                    {
+                        EventId = model.Id,
+                        EventType = EnumEventType.Intrusion,
+                        ActionDetails = message.Content,
+                        ActionUser = message.User,
+                        ActionTime = DateTime.Now
+                    };
+
+                    // EventAggregator를 통해 메시지 발행
+                    await _eventAggregator.PublishOnBackgroundThreadAsync(actionRequest);
                 }
             }
             catch (Exception ex)
@@ -198,22 +203,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 if (message != null && message.ViewModel != null)
                 {
                     var vm = message.ViewModel;
-                    var eventModel = vm.Model;
-                    if (eventModel == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
+                    var model = vm.Model;
+                    if (model == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
 
-                    if (eventModel.Device != null)
+                    if (model.Device != null)
                     {
                         // Phase 14: 복합 키 - deviceType 추가
-                        _symbolEventManager.ProcessEventReport(eventModel.Device.Id, eventModel.Device.DeviceType, eventModel.Device.DeviceGroup);
+                        _symbolEventManager.ProcessEventReport(model.Device.Id, model.Device.DeviceType, model.Device.DeviceGroup);
                     }
-
-
-                    var action = new ActionEventModel()
-                    {
-                        Content = message.Content,
-                        User = message.User,
-                        OriginEvent = eventModel,
-                    };
 
                     DispatcherService.Invoke(() =>
                     {
@@ -221,9 +218,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         vm.Dispose();
                     });
 
-                    await _providerService.InsertActionEventAsync(action, cancellationToken);
-                    eventModel.Status = Enums.EnumTrueFalse.True;
-                    await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)eventModel!, cancellationToken);
+                    model.Status = Enums.EnumTrueFalse.True;
+                    await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)model!, cancellationToken);
+
+                    var actionRequest = new SendActionRequestMessage
+                    {
+                        EventId = model.Id,
+                        EventType = EnumEventType.Fault,
+                        ActionDetails = message.Content,
+                        ActionUser = message.User,
+                        ActionTime = DateTime.Now
+                    };
+
+                    // EventAggregator를 통해 메시지 발행
+                    await _eventAggregator.PublishOnBackgroundThreadAsync(actionRequest);
                 }
             }
             catch (Exception ex)
@@ -246,33 +254,57 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     if (item is DetectionEventCardViewModel dEventCardViewModel)
                     {
-                        var vm = dEventCardViewModel.Model;
-                        deviceId = vm.Device?.Id; // Device ID 추출
-                        deviceType = vm.Device?.DeviceType ?? EnumDeviceType.NONE; // Phase 14: DeviceType 추출
-                        deviceGroup = vm.Device?.DeviceGroup ?? 0; // Device Group 추출
+                        var model = dEventCardViewModel.Model;
+                        deviceId = model.Device?.Id; // Device ID 추출
+                        deviceType = model.Device?.DeviceType ?? EnumDeviceType.NONE; // Phase 14: DeviceType 추출
+                        deviceGroup = model.Device?.DeviceGroup ?? 0; // Device Group 추출
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
                             User = $"{_userModel.Username}({_userModel.EmployeeNumber})",
-                            OriginEvent = vm,
+                            OriginEvent = model,
                         };
-                        vm.Status = Enums.EnumTrueFalse.True;
-                        await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)vm!, cancellationToken);
+                        model.Status = Enums.EnumTrueFalse.True;
+                        await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)model!, cancellationToken);
+
+                        var actionRequest = new SendActionRequestMessage
+                        {
+                            EventId = model.Id,
+                            EventType = EnumEventType.Intrusion,
+                            ActionDetails = "자동 조치보고",
+                            ActionUser = $"{_userModel.Username}({_userModel.EmployeeNumber})",
+                            ActionTime = DateTime.Now
+                        };
+
+                        // EventAggregator를 통해 메시지 발행
+                        await _eventAggregator.PublishOnBackgroundThreadAsync(actionRequest);
                     }
                     else if(item is MalfunctionEventCardViewModel mEventCardViewModel)
                     {
-                        var vm = mEventCardViewModel.Model;
-                        deviceId = vm.Device?.Id; // Device ID 추출
-                        deviceType = vm.Device?.DeviceType ?? EnumDeviceType.NONE; // Phase 14: DeviceType 추출
-                        deviceGroup = vm.Device?.DeviceGroup ?? 0; // Device Group 추출
+                        var model = mEventCardViewModel.Model;
+                        deviceId = model.Device?.Id; // Device ID 추출
+                        deviceType = model.Device?.DeviceType ?? EnumDeviceType.NONE; // Phase 14: DeviceType 추출
+                        deviceGroup = model.Device?.DeviceGroup ?? 0; // Device Group 추출
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
                             User = $"{_userModel.Username}({_userModel.EmployeeNumber})",
-                            OriginEvent = vm,
+                            OriginEvent = model,
                         };
-                        vm.Status = Enums.EnumTrueFalse.True;
-                        await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)vm!, cancellationToken);
+                        model.Status = Enums.EnumTrueFalse.True;
+                        await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)model!, cancellationToken);
+
+                        var actionRequest = new SendActionRequestMessage
+                        {
+                            EventId = model.Id,
+                            EventType = EnumEventType.Fault,
+                            ActionDetails = "자동 조치보고",
+                            ActionUser = $"{_userModel.Username}({_userModel.EmployeeNumber})",
+                            ActionTime = DateTime.Now
+                        };
+
+                        // EventAggregator를 통해 메시지 발행
+                        await _eventAggregator.PublishOnBackgroundThreadAsync(actionRequest);
                     }
                     else
                     {
@@ -292,7 +324,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         item.Dispose();
                     });
 
-                    await _providerService.InsertActionEventAsync(action, cancellationToken);
+                    //await _providerService.InsertActionEventAsync(action, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -304,28 +336,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
             }
         }
-
-        //private async void SendAction(EventCardViewModel viewModel)
-        //{
-        //    BrkAction brkAction = new BrkAction
-        //    {
-        //        IdCommand = (int)EnumEventType.ACTION,
-        //        IdGroup = viewModel.IdGroup,
-        //        IdController = viewModel.IdController,
-        //        IdSensor = viewModel.IdSensor,
-        //        TypeDevice = (int)viewModel.TypeDevice,
-        //        TypeMessage = (int)EnumEventType.ACTION,
-        //        Content = EnumLanguageHelper.GetAutoActionType(SetupModel.Language),
-        //    };
-        //    var json = JsonConvert.SerializeObject(brkAction);
-        //    json = $"[{json}]";
-        //    if (SetupModel.IsServer)
-        //    {
-        //        var channel = RedisChannel.Literal(SetupModel.NameChannel2);
-        //        await Subscriber.PublishAsync(channel, json);
-        //    }
-
-        //}
         #endregion
         #region - IHanldes -
         #endregion

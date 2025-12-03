@@ -144,7 +144,7 @@ public class DeviceSymbolLookupModel : BaseModel
     private const double BaseDetectionAngle = 80.0;   // 기본 검출 각도 (1x 줌)
     private const double MinDetectionAngle = 5.0;     // 최소 검출 각도
     private const double MaxDetectionAngle = 120.0;   // 최대 검출 각도
-    private const double BaseDetectionRange = 100.0;  // 기본 검출 거리 (미터, 1x 줌)
+    private const double BaseDetectionRange = 30.0;  // 기본 검출 거리 (미터, 1x 줌)
     private const double MinDetectionRange = 10.0;    // 최소 검출 거리
     private const double MaxDetectionRange = 2000.0;  // 최대 검출 거리
 
@@ -221,7 +221,7 @@ public class DeviceSymbolLookupModel : BaseModel
         _log?.Info($"[UpdateFOV] 변환값: Bearing={bearing:F2}, Angle={angle:F2}, Range={range:F2}");
 
         // PTZ → FOV 변환 적용
-        pidsSymbol.DetectionBearing = bearing;
+        pidsSymbol.DetectionBearing = pidsSymbol.BaseBearing + bearing;
         pidsSymbol.DetectionAngle = angle;
         pidsSymbol.DetectionRange = range;
 

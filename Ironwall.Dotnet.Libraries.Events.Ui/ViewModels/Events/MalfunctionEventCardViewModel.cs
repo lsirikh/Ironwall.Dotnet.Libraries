@@ -41,17 +41,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             Contents = content ?? "자동 조치보고";
             await _eventAggregator.PublishOnCurrentThreadAsync(new MalfunctionReportedMessageModel(this, Contents, IdUser));
 
-            var message = new SendActionRequestMessage
-            {
-                EventId = Model.Id,
-                EventType = EnumEventType.Intrusion,
-                ActionDetails = Contents,
-                ActionUser = idUser,
-                ActionTime = DateTime.Now
-            };
+            //var message = new SendActionRequestMessage
+            //{
+            //    EventId = Model.Id,
+            //    EventType = EnumEventType.Intrusion,
+            //    ActionDetails = Contents,
+            //    ActionUser = idUser,
+            //    ActionTime = DateTime.Now
+            //};
 
-            // EventAggregator를 통해 메시지 발행
-            await _eventAggregator.PublishOnBackgroundThreadAsync(message);
+            //// EventAggregator를 통해 메시지 발행
+            //await _eventAggregator.PublishOnBackgroundThreadAsync(message);
 
             await base.SendAction(content, idUser);
         }

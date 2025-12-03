@@ -58,6 +58,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Initialization
 
     /// <summary>
@@ -102,6 +103,7 @@ public class GMapCustomControl : GMapControl
 
 
     #endregion
+    
     #region Line Drawing Fields
 
     private LineDrawingService _lineDrawingService;
@@ -147,6 +149,7 @@ public class GMapCustomControl : GMapControl
     public event EventHandler<AdornerLifecycleEventArgs> AdornerCreated;
     public event EventHandler<AdornerLifecycleEventArgs> AdornerRemoved;
     #endregion
+    
     #region AdornerManager Integration
     /// <summary>
     /// Adorner 관리 서비스 (ViewModel에서 주입)
@@ -199,6 +202,7 @@ public class GMapCustomControl : GMapControl
         AdornerManager.AdornerRemoved -= OnAdornerRemoved;
     }
     #endregion
+    
     #region Line Drawing Methods
 
     /// <summary>
@@ -301,6 +305,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Override Methods
 
     protected override void OnInitialized(EventArgs e)
@@ -330,6 +335,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Event Handlers
     /// <summary>
     /// 줌 변경 이벤트 핸들러
@@ -548,6 +554,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Mouse Input Handling
 
     /// <summary>
@@ -659,6 +666,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Object Detection Methods
     /// <summary>
     /// 두 지점 간의 거리 계산 (간단한 유클리드 거리)
@@ -749,6 +757,7 @@ public class GMapCustomControl : GMapControl
             img.Visibility && img.Contains(position));
     }
     #endregion
+    
     #region Marker Adorner Management
 
     /// <summary>
@@ -792,6 +801,7 @@ public class GMapCustomControl : GMapControl
         }
     }
     #endregion
+    
     #region Public Methods - Marker Selection
 
     /// <summary>
@@ -935,6 +945,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Keyboard Input Handling
 
     /// <summary>
@@ -1024,6 +1035,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Image Edit Methods
 
     /// <summary>
@@ -1111,6 +1123,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Handle Detection Methods
     /// <summary>
     /// 클릭된 이미지 핸들 감지
@@ -1152,6 +1165,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Rendering Methods
 
     /// <summary>
@@ -1280,6 +1294,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Map Rotation Methods
 
     /// <summary>
@@ -1548,6 +1563,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Edit Mode Management
 
     /// <summary>
@@ -1598,6 +1614,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Helper Methods
 
     /// <summary>
@@ -1689,6 +1706,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Image Resize Helper Methods
 
     /// <summary>
@@ -1797,6 +1815,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Dependency Properties
 
     /// <summary>
@@ -1902,6 +1921,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Public Properties
 
     /// <summary>
@@ -1930,6 +1950,7 @@ public class GMapCustomControl : GMapControl
     public int TotalImageOverlayCount => CustomImages?.Count ?? 0;
 
     #endregion
+    
     #region Public Methods
 
     /// <summary>
@@ -1980,8 +2001,10 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region IDisposable Support
     #endregion
+    
     #region Enums
 
     public enum ResizeHandle
@@ -1993,6 +2016,7 @@ public class GMapCustomControl : GMapControl
     }
 
     #endregion
+    
     #region Private Fields
 
     private IEventAggregator? _eventAggregator;
