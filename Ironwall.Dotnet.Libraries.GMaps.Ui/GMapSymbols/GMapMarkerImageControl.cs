@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Caliburn.Micro;
+using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
@@ -14,26 +15,28 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
 /****************************************************************************
-   Purpose      : Image Overlay 마커용 CustomControl (Phase 24)
+   Purpose      : Image Overlay 마커용 CustomControl (Phase 24, Phase 29 개선)
    Created By   : Claude Code
    Created On   : 2025-12-03
    PRD Reference: Docs/PRD/PRD_ImageOverlay_Feature.md
    Department   : SW Team
    Company      : Sensorway Co., Ltd.
 
-   Note: GMapImageMarker는 IEditableMarker를 구현하지 않으므로
-         GMapMarkerBaseControl<T>를 상속하지 않고 독립적으로 구현
+   Note: GMapCustomImage와 동일한 직접 렌더링 방식 적용 (Phase 29)
+         - OnRender에서 ImageBounds → 화면좌표 직접 변환
+         - Position을 TopLeft로 설정하여 Offset 동기화 문제 해결
 ****************************************************************************/
 
 /// <summary>
 /// Image Overlay 마커용 WPF CustomControl
 /// </summary>
 /// <remarks>
-/// - GMapImageMarker와 바인딩
-/// - 이미지 표시, 투명도, 회전 지원
-/// - 선택 상태 표시
+/// Phase 29: GMapCustomImage와 동일한 직접 렌더링 방식 적용
+/// - OnRender()에서 ImageBounds를 화면 좌표로 직접 변환하여 이미지 그리기
+/// - 줌 변경 시 InvalidateVisual()로 재렌더링 트리거
+/// - Position을 ImageBounds.LocationTopLeft로 설정, Offset = (0,0)
 /// </remarks>
-public class GMapMarkerImageControl : Control
+public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
 {
     #region Static Constructor
 
@@ -48,19 +51,6 @@ public class GMapMarkerImageControl : Control
     #region Dependency Properties
 
     /// <summary>
-    /// 연결된 마커 객체
-    /// </summary>
-    public GMapImageMarker? Marker
-    {
-        get => (GMapImageMarker?)GetValue(MarkerProperty);
-        set => SetValue(MarkerProperty, value);
-    }
-
-    public static readonly DependencyProperty MarkerProperty =
-        DependencyProperty.Register(nameof(Marker), typeof(GMapImageMarker), typeof(GMapMarkerImageControl),
-            new PropertyMetadata(null, OnMarkerChanged));
-
-    /// <summary>
     /// 이미지 소스
     /// </summary>
     public ImageSource? ImageSource
@@ -71,7 +61,15 @@ public class GMapMarkerImageControl : Control
 
     public static readonly DependencyProperty ImageSourceProperty =
         DependencyProperty.Register(nameof(ImageSource), typeof(ImageSource), typeof(GMapMarkerImageControl),
-            new PropertyMetadata(null));
+            new PropertyMetadata(null, OnImageSourceChanged));
+
+    private static void OnImageSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is GMapMarkerImageControl control)
+        {
+            control.InvalidateVisual();
+        }
+    }
 
     /// <summary>
     /// 이미지 투명도 (0.0 ~ 1.0)
@@ -84,78 +82,15 @@ public class GMapMarkerImageControl : Control
 
     public static readonly DependencyProperty ImageOpacityProperty =
         DependencyProperty.Register(nameof(ImageOpacity), typeof(double), typeof(GMapMarkerImageControl),
-            new PropertyMetadata(1.0));
+            new PropertyMetadata(1.0, OnImageOpacityChanged));
 
-    /// <summary>
-    /// 이미지 회전 각도 (도)
-    /// </summary>
-    public double ImageRotation
+    private static void OnImageOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        get => (double)GetValue(ImageRotationProperty);
-        set => SetValue(ImageRotationProperty, value);
+        if (d is GMapMarkerImageControl control)
+        {
+            control.InvalidateVisual();
+        }
     }
-
-    public static readonly DependencyProperty ImageRotationProperty =
-        DependencyProperty.Register(nameof(ImageRotation), typeof(double), typeof(GMapMarkerImageControl),
-            new PropertyMetadata(0.0, OnImageRotationChanged));
-
-    /// <summary>
-    /// 마커 제목
-    /// </summary>
-    public string? MarkerTitle
-    {
-        get => (string?)GetValue(MarkerTitleProperty);
-        set => SetValue(MarkerTitleProperty, value);
-    }
-
-    public static readonly DependencyProperty MarkerTitleProperty =
-        DependencyProperty.Register(nameof(MarkerTitle), typeof(string), typeof(GMapMarkerImageControl),
-            new PropertyMetadata("Image"));
-
-    /// <summary>
-    /// 선택 상태
-    /// </summary>
-    public bool IsSelected
-    {
-        get => (bool)GetValue(IsSelectedProperty);
-        set => SetValue(IsSelectedProperty, value);
-    }
-
-    public static readonly DependencyProperty IsSelectedProperty =
-        DependencyProperty.Register(nameof(IsSelected), typeof(bool), typeof(GMapMarkerImageControl),
-            new PropertyMetadata(false, OnIsSelectedChanged));
-
-    /// <summary>
-    /// 라벨 표시 여부
-    /// </summary>
-    public bool ShowTitle
-    {
-        get => (bool)GetValue(ShowTitleProperty);
-        set => SetValue(ShowTitleProperty, value);
-    }
-
-    public static readonly DependencyProperty ShowTitleProperty =
-        DependencyProperty.Register(nameof(ShowTitle), typeof(bool), typeof(GMapMarkerImageControl),
-            new PropertyMetadata(false));
-
-    #endregion
-
-    #region Events
-
-    /// <summary>
-    /// 마커 클릭 이벤트
-    /// </summary>
-    public event EventHandler<ImageMarkerClickEventArgs>? MarkerClick;
-
-    /// <summary>
-    /// 마커 더블클릭 이벤트
-    /// </summary>
-    public event EventHandler<ImageMarkerClickEventArgs>? MarkerDoubleClick;
-
-    /// <summary>
-    /// 마커 선택 상태 변경 이벤트
-    /// </summary>
-    public event EventHandler<bool>? SelectionChanged;
 
     #endregion
 
@@ -164,20 +99,27 @@ public class GMapMarkerImageControl : Control
     /// <summary>
     /// 기본 생성자
     /// </summary>
-    public GMapMarkerImageControl()
+    public GMapMarkerImageControl() : base()
     {
-        _log = IoC.Get<ILogService>();
+        InitializeRenderingSystem();
     }
 
     /// <summary>
     /// 마커와 함께 생성
     /// </summary>
     /// <param name="marker">연결할 GMapImageMarker</param>
-    public GMapMarkerImageControl(GMapImageMarker marker) : this()
+    public GMapMarkerImageControl(GMapImageMarker marker) : base(marker)
     {
-        Marker = marker;
-        UpdateFromMarker();
-        SetupDataBindings();
+        InitializeRenderingSystem();
+    }
+
+    /// <summary>
+    /// 렌더링 시스템 초기화 (Phase 29)
+    /// </summary>
+    private void InitializeRenderingSystem()
+    {
+        Loaded += OnControlLoaded;
+        Unloaded += OnControlUnloaded;
     }
 
     #endregion
@@ -189,77 +131,47 @@ public class GMapMarkerImageControl : Control
     /// </summary>
     public IImageEditableMarker? ImageEditableMarker => Marker;
 
-    /// <summary>
-    /// Visual Element 접근용
-    /// </summary>
-    public FrameworkElement VisualElement => this;
-
     #endregion
 
-    #region Public Methods
+    #region Abstract Methods Implementation
 
     /// <summary>
-    /// 마커 정보로 UI 새로고침
+    /// GMapImageMarker 전용 UI 업데이트 구현 (Phase 29 개선)
     /// </summary>
-    public void RefreshFromMarker()
-    {
-        UpdateFromMarker();
-    }
-
-    #endregion
-
-    #region Protected Methods
-
-    /// <summary>
-    /// 마커 정보로부터 UI 업데이트
-    /// </summary>
-    protected virtual void UpdateFromMarker()
-    {
-        if (Marker == null || _isUpdatingFromMarker) return;
-
-        _isUpdatingFromMarker = true;
-        try
-        {
-            MarkerTitle = Marker.Title ?? "Image";
-            Width = Marker.Width;
-            Height = Marker.Height;
-            ImageOpacity = Marker.Opacity;
-            ImageRotation = Marker.Bearing;
-            ImageSource = Marker.ImageSource;
-            IsSelected = Marker.IsSelected;
-            Visibility = Marker.IsVisible ? Visibility.Visible : Visibility.Collapsed;
-
-            _log?.Info($"GMapMarkerImageControl 업데이트: {MarkerTitle}, {Width}x{Height}, Opacity={ImageOpacity}");
-        }
-        finally
-        {
-            _isUpdatingFromMarker = false;
-        }
-    }
-
-    /// <summary>
-    /// 데이터 바인딩 설정
-    /// </summary>
-    protected virtual void SetupDataBindings()
+    protected override void UpdateFromSpecificMarker()
     {
         if (Marker == null) return;
 
-        // 기본 속성 바인딩
-        SetupPropertyBinding(MarkerTitleProperty, nameof(Marker.Title));
-        SetupPropertyBinding(WidthProperty, nameof(Marker.Width));
-        SetupPropertyBinding(HeightProperty, nameof(Marker.Height));
-        SetupPropertyBinding(ImageOpacityProperty, nameof(Marker.Opacity));
-        SetupPropertyBinding(ImageRotationProperty, nameof(Marker.Bearing));
-        SetupPropertyBinding(IsSelectedProperty, nameof(Marker.IsSelected));
+        // Image 전용 속성 업데이트
+        ImageOpacity = Marker.Opacity;
+        ImageSource = Marker.ImageSource;
 
-        // Visibility 바인딩 (Converter 사용)
-        var visibilityBinding = new Binding(nameof(Marker.IsVisible))
+        // Phase 29: 초기 크기 설정 (OnRender에서 실제 크기 계산)
+        // 지도 컨트롤이 있으면 정확한 크기 계산
+        var mapControl = FindParentMapControl();
+        if (mapControl != null)
         {
-            Source = Marker,
-            Mode = BindingMode.OneWay,
-            Converter = new System.Windows.Controls.BooleanToVisibilityConverter()
-        };
-        SetBinding(VisibilityProperty, visibilityBinding);
+            UpdateGeometryFromBounds(mapControl);
+        }
+        else
+        {
+            // 지도 컨트롤 없으면 기본 크기 사용
+            Width = Math.Max(Marker.Width, 50);
+            Height = Math.Max(Marker.Height, 50);
+        }
+
+        _log?.Info($"GMapMarkerImageControl 업데이트: {MarkerTitle}, Size={Width:F0}x{Height:F0}, Opacity={ImageOpacity}");
+    }
+
+    /// <summary>
+    /// GMapImageMarker 전용 바인딩 설정 구현
+    /// </summary>
+    protected override void SetupSpecificBindings()
+    {
+        if (Marker == null) return;
+
+        // Image 전용 바인딩
+        SetupPropertyBinding(ImageOpacityProperty, nameof(Marker.Opacity));
 
         // ImageSource는 직접 바인딩 (읽기 전용)
         var imageSourceBinding = new Binding(nameof(Marker.ImageSource))
@@ -270,64 +182,9 @@ public class GMapMarkerImageControl : Control
         SetBinding(ImageSourceProperty, imageSourceBinding);
     }
 
-    /// <summary>
-    /// 속성 바인딩 헬퍼
-    /// </summary>
-    protected void SetupPropertyBinding(DependencyProperty targetProperty, string sourcePropertyName, BindingMode mode = BindingMode.TwoWay)
-    {
-        var binding = new Binding(sourcePropertyName)
-        {
-            Source = Marker,
-            Mode = mode,
-            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
-        };
-        SetBinding(targetProperty, binding);
-    }
-
     #endregion
 
-    #region Override Methods
-
-    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
-    {
-        base.OnMouseLeftButtonDown(e);
-
-        try
-        {
-            Focus();
-
-            var now = DateTime.Now;
-            var timeDiff = (now - _lastClickTime).TotalMilliseconds;
-
-            if (timeDiff <= DoubleClickInterval)
-            {
-                // 더블클릭
-                MarkerDoubleClick?.Invoke(this, new ImageMarkerClickEventArgs(Marker, e));
-            }
-            else
-            {
-                // 단일 클릭 - 선택 토글
-                IsSelected = !IsSelected;
-                MarkerClick?.Invoke(this, new ImageMarkerClickEventArgs(Marker, e));
-            }
-
-            _lastClickTime = now;
-
-            // 부모 맵 컨트롤에 이벤트 전달
-            var mapControl = FindParentMapControl();
-            if (mapControl != null && Marker != null)
-            {
-                _log?.Info($"Image 마커 클릭 이벤트 전달: {Marker.Title}");
-                // mapControl.TriggerMarkerClicked(Marker); // IEditableMarker가 아니므로 별도 처리 필요
-            }
-
-            e.Handled = true;
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"Image 마커 클릭 처리 중 오류: {ex.Message}");
-        }
-    }
+    #region Override Methods - Direct Rendering (Phase 29)
 
     public override void OnApplyTemplate()
     {
@@ -335,79 +192,173 @@ public class GMapMarkerImageControl : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// 직접 렌더링 (Phase 29) - GMapCustomImage와 동일한 방식
+    /// </summary>
+    /// <remarks>
+    /// GMapCustomControl.RenderSingleImageOverlay()와 동일한 원리:
+    /// 1. ImageBounds의 TopLeft, BottomRight를 화면 좌표로 변환
+    /// 2. 변환된 화면 좌표로 Rect 계산
+    /// 3. DrawingContext.DrawImage()로 직접 그리기
+    /// </remarks>
+    protected override void OnRender(DrawingContext dc)
+    {
+        // 기본 렌더링 (배경, 테두리 등)
+        base.OnRender(dc);
+
+        if (Marker == null || ImageSource == null) return;
+
+        var mapControl = FindParentMapControl();
+        if (mapControl == null) return;
+
+        try
+        {
+            // Phase 34: 픽셀 고정 모드 - Marker.Width/Height를 직접 사용
+            // 변경 전: ImageBounds → FromLatLngToLocal() → 줌에 따라 다른 크기
+            // 변경 후: Marker.Width/Height (사용자 설정 픽셀 값) 직접 사용
+            double screenWidth = Marker.Width;
+            double screenHeight = Marker.Height;
+
+            // 크기 제한 적용 (최소 10px)
+            const double MinSize = 10.0;
+            if (screenWidth < MinSize) screenWidth = MinSize;
+            if (screenHeight < MinSize) screenHeight = MinSize;
+
+            // 컨트롤 크기 동기화 (Adorner 선택 영역용)
+            Width = screenWidth;
+            Height = screenHeight;
+
+            // Phase 34: Offset은 Marker.Width/Height 기준으로 계산
+            // Position(Center)에서 좌상단까지의 거리 = (-Width/2, -Height/2)
+            Marker.Offset = new Point(-screenWidth / 2, -screenHeight / 2);
+
+            // 이미지 그리기 영역 (컨트롤 로컬 좌표 기준)
+            var imageRect = new Rect(0, 0, screenWidth, screenHeight);
+
+            // 회전 처리
+            if (Marker.Bearing != 0)
+            {
+                var centerX = screenWidth / 2;
+                var centerY = screenHeight / 2;
+                var rotateTransform = new RotateTransform(Marker.Bearing, centerX, centerY);
+                dc.PushTransform(rotateTransform);
+            }
+
+            // 투명도 처리
+            if (ImageOpacity < 1.0)
+            {
+                dc.PushOpacity(ImageOpacity);
+            }
+
+            // 이미지 그리기
+            dc.DrawImage(ImageSource, imageRect);
+
+            // Transform 스택 정리
+            if (ImageOpacity < 1.0) dc.Pop();
+            if (Marker.Bearing != 0) dc.Pop();
+            
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GMapMarkerImageControl.OnRender 오류: {ex.Message}");
+        }
+    }
+
     #endregion
 
-    #region Private Methods
+    #region Zoom Event Handling (Phase 29)
+
+    private GMapCustomControl? _mapControl;
 
     /// <summary>
-    /// 부모 GMapCustomControl 찾기
+    /// 컨트롤 로드 시 지도 이벤트 구독
     /// </summary>
-    private GMapCustomControl? FindParentMapControl()
+    private void OnControlLoaded(object sender, RoutedEventArgs e)
     {
-        DependencyObject parent = this;
-        while (parent != null)
+        _mapControl = FindParentMapControl();
+        if (_mapControl != null)
         {
-            parent = VisualTreeHelper.GetParent(parent);
-            if (parent is GMapCustomControl mapControl)
-            {
-                return mapControl;
-            }
+            // 줌 변경 시 재렌더링 트리거
+            _mapControl.OnMapZoomChanged += OnMapZoomChanged;
+
+            // 초기 렌더링
+            UpdateGeometryFromBounds(_mapControl);
+            InvalidateVisual();
         }
-        return null;
+    }
+
+    /// <summary>
+    /// 컨트롤 언로드 시 이벤트 구독 해제
+    /// </summary>
+    private void OnControlUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_mapControl != null)
+        {
+            _mapControl.OnMapZoomChanged -= OnMapZoomChanged;
+            _mapControl = null;
+        }
+    }
+
+    /// <summary>
+    /// 줌 변경 이벤트 핸들러 - 재렌더링 트리거
+    /// </summary>
+    private void OnMapZoomChanged()
+    {
+        // Phase 29 핵심: 줌 변경 시 InvalidateVisual() 호출
+        // OnRender()가 다시 호출되어 최신 화면 좌표로 이미지 그리기
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// ImageBounds 기반 크기 계산 (Phase 29)
+    /// </summary>
+    private void UpdateGeometryFromBounds(GMapControl mapControl)
+    {
+        if (Marker == null) return;
+
+        try
+        {
+            // Phase 34: 픽셀 고정 모드 - Marker.Width/Height를 직접 사용
+            // 변경 전: ImageBounds → FromLatLngToLocal() → 줌에 따라 다른 크기
+            // 변경 후: Marker.Width/Height (사용자 설정 픽셀 값) 직접 사용
+            double screenWidth = Marker.Width;
+            double screenHeight = Marker.Height;
+
+            // 크기 제한
+            const double MinSize = 10.0;
+            screenWidth = Math.Max(screenWidth, MinSize);
+            screenHeight = Math.Max(screenHeight, MinSize);
+            Width = screenWidth;
+            Height = screenHeight;
+
+            // Phase 34: Offset은 Marker.Width/Height 기준으로 계산
+            Marker.Offset = new Point(-screenWidth / 2, -screenHeight / 2);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"UpdateGeometryFromBounds 오류: {ex.Message}");
+        }
     }
 
     #endregion
 
-    #region Static Callbacks
+    #region Legacy Method for Test Compatibility
 
-    private static void OnMarkerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    /// <summary>
+    /// 지도 줌 변경 시 이미지 크기 업데이트 (테스트 호환성 유지)
+    /// </summary>
+    /// <remarks>
+    /// Phase 29에서 OnRender 직접 렌더링으로 변경되었으나,
+    /// 기존 테스트 호환성을 위해 메서드 시그니처 유지
+    /// </remarks>
+    protected void UpdateImageGeometry(GMapControl? mapControl)
     {
-        if (d is GMapMarkerImageControl control && !control._isUpdatingFromMarker)
+        if (mapControl != null)
         {
-            control._isUpdatingFromMarker = true;
-            try
-            {
-                control.UpdateFromMarker();
-                control.SetupDataBindings();
-            }
-            finally
-            {
-                control._isUpdatingFromMarker = false;
-            }
+            UpdateGeometryFromBounds(mapControl);
+            InvalidateVisual();
         }
     }
-
-    private static void OnImageRotationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is GMapMarkerImageControl control)
-        {
-            var rotateTransform = new RotateTransform((double)e.NewValue);
-            control.RenderTransform = rotateTransform;
-            control.RenderTransformOrigin = new Point(0.5, 0.5);
-        }
-    }
-
-    private static void OnIsSelectedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is GMapMarkerImageControl control)
-        {
-            var isSelected = (bool)e.NewValue;
-            if (control.Marker != null)
-            {
-                control.Marker.IsSelected = isSelected;
-            }
-            control.SelectionChanged?.Invoke(control, isSelected);
-        }
-    }
-
-    #endregion
-
-    #region Fields
-
-    private bool _isUpdatingFromMarker;
-    private DateTime _lastClickTime;
-    private const int DoubleClickInterval = 500;
-    private readonly ILogService? _log;
 
     #endregion
 }

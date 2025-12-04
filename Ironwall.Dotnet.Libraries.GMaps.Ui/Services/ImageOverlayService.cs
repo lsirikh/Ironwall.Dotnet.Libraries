@@ -99,7 +99,7 @@ public class ImageOverlayService
                 throw new InvalidOperationException("TIF 파일을 ImageSource로 변환할 수 없습니다.");
             }
 
-            // 4. ImageModel 생성 및 기본 정보 설정
+            // 4. ImageModel 생성 및 기본 정보 설정 (현재 지도 Zoom 레벨 저장)
             var model = new ImageModel()
             {
                 Title = overlayName ?? Path.GetFileNameWithoutExtension(tifFilePath),
@@ -110,7 +110,8 @@ public class ImageOverlayService
                 CoordinateSystem = geoTransform?.CoordinateSystem ?? "WGS84",
                 Opacity = 0.7,
                 HasGeoReference = hasGeoReference,
-                Rotation = 0.0
+                Rotation = 0.0,
+                Zoom = 0  // 현재 지도 줌 레벨 저장 (0 = 모든 줌 레벨에서 표시)
             };
 
             // 5. 정확한 지리적 경계 계산 (ImageModelExtensions 활용)
@@ -197,7 +198,7 @@ public class ImageOverlayService
 
             _log?.Info($"이미지 정보: {imageWidth}x{imageHeight}");
 
-            // 2. ImageModel 생성
+            // 2. ImageModel 생성 (현재 지도 Zoom 레벨 저장)
             var model = new ImageModel()
             {
                 Title = overlayName ?? Path.GetFileNameWithoutExtension(imageFilePath),
@@ -208,7 +209,8 @@ public class ImageOverlayService
                 CoordinateSystem = "WGS84",
                 Opacity = 0.7,
                 HasGeoReference = false,
-                Rotation = 0.0
+                Rotation = 0.0,
+                Zoom = gMap?.Zoom ?? 0  // 현재 지도 줌 레벨 저장 (0 = 모든 줌 레벨에서 표시)
             };
 
             // 3. 경계 계산 (일반 이미지는 지리참조 없음)

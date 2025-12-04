@@ -20,4 +20,10 @@ public interface IImageModel : IBaseModel
     double Top { get; set; }
     bool Visibility { get; set; }
     double Width { get; set; }
+
+    /// <summary>
+    /// 이미지가 표시되는 최소 줌 레벨.
+    /// 지도 줌이 이 값 이상일 때만 이미지가 표시됨.
+    /// </summary>
+    double Zoom { get; set; }
 }

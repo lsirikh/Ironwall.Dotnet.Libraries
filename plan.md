@@ -5521,3 +5521,623 @@ public void TEST_IMG_7_2_PropertyPanelFactory_ShouldHaveImageMarkerMapping()
 **총 ActionItem 수**: 18개
 
 ---
+
+## Phase 28: Zoom 기반 이미지 크기 조절 (Image Overlay Enhancement)
+
+**PRD 참조**: `Docs/PRD/PRD_ImageOverlay_Feature.md` - Section 10
+**목표**: 지도 줌 레벨 변경 시 이미지가 지리적 스케일에 맞게 크기 조절되도록 개선
+**방식**: TDD (Red → Green → Refactor)
+
+---
+
+### Phase 28.1: GMapMarkerImageControl 지도 이벤트 구독 (STRUCTURAL)
+
+**목표**: GMapMarkerImageControl에서 지도 줌 변경 이벤트를 감지할 수 있도록 구조 변경
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`
+
+#### ActionItem 28.1.1: _mapControl 필드 추가
+- [x] `private GMapCustomControl? _mapControl;` 필드 추가
+- [x] `private double _lastZoom;` 필드 추가 (성능 최적화용)
+
+#### Test 28.1.1: FindParentMapControl 메서드 존재 확인
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.1.1: GMapMarkerBaseControl에 FindParentMapControl 메서드 존재")]
+public void FindParentMapControl_ShouldExist_InBaseClass()
+```
+- [x] RED: 테스트 작성
+- [x] GREEN: base class에서 상속 확인 또는 구현
+- [x] REFACTOR: 필요시 정리
+
+#### ActionItem 28.1.2: Loaded/Unloaded 이벤트 핸들러 추가
+- [x] 생성자에서 `Loaded += OnControlLoaded;` 추가
+- [x] 생성자에서 `Unloaded += OnControlUnloaded;` 추가
+
+#### Test 28.1.2: OnControlLoaded에서 MapControl 찾기
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.1.2: OnControlLoaded 호출 시 _mapControl 설정")]
+public void OnControlLoaded_ShouldFind_MapControl()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: OnControlLoaded 구현
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.1.3: OnMapZoomChanged 이벤트 구독
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.1.3: MapControl 발견 시 OnMapZoomChanged 이벤트 구독")]
+public void OnControlLoaded_ShouldSubscribe_OnMapZoomChanged()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: 이벤트 구독 구현
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.1.4: OnControlUnloaded에서 이벤트 구독 해제
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.1.4: OnControlUnloaded 호출 시 이벤트 구독 해제")]
+public void OnControlUnloaded_ShouldUnsubscribe_Events()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: OnControlUnloaded 구현
+- [ ] REFACTOR: 필요시 정리
+
+---
+
+### Phase 28.2: UpdateImageGeometry 메서드 구현 (BEHAVIORAL)
+
+**목표**: 지리적 경계를 화면 좌표로 변환하여 컨트롤 크기 계산
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`
+
+#### Test 28.2.1: UpdateImageGeometry 메서드 존재
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.2.1: UpdateImageGeometry 메서드 존재")]
+public void UpdateImageGeometry_ShouldExist()
+```
+- [x] RED: 테스트 작성
+- [x] GREEN: 빈 메서드 추가
+- [x] REFACTOR: 필요시 정리
+
+#### Test 28.2.2: 지리적 경계에서 화면 크기 계산
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.2.2: ImageBounds에서 화면 크기 계산")]
+public void UpdateImageGeometry_ShouldCalculate_ScreenSize_FromBounds()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: FromLatLngToLocal 변환 구현
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.2.3: 최소 크기 제한 적용
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.2.3: 최소 크기 20px 제한")]
+public void UpdateImageGeometry_ShouldEnforce_MinimumSize()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: Math.Clamp 최소값 적용
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.2.4: 최대 크기 제한 적용
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.2.4: 최대 크기 2000px 제한")]
+public void UpdateImageGeometry_ShouldEnforce_MaximumSize()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: Math.Clamp 최대값 적용
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.2.5: 줌 변경 시 크기 변화 확인
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.2.5: 줌 아웃 시 화면 크기 감소")]
+public void UpdateImageGeometry_ShouldDecrease_Size_OnZoomOut()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: 전체 로직 통합
+- [ ] REFACTOR: 필요시 정리
+
+---
+
+### Phase 28.3: GMapImageMarker.UpdateScreenPosition 구현 (BEHAVIORAL)
+
+**목표**: 마커의 Offset을 동적으로 계산하여 중심점 유지
+**파일**: `GMapSymbols/GMapImageMarker.cs`
+
+#### Test 28.3.1: UpdateScreenPosition 메서드 존재
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.3.1: UpdateScreenPosition 메서드 존재")]
+public void UpdateScreenPosition_ShouldExist()
+```
+- [x] RED: 테스트 작성
+- [x] GREEN: 메서드 시그니처 추가
+- [x] REFACTOR: 필요시 정리
+
+#### Test 28.3.2: Offset 동적 계산
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.3.2: 화면 크기 기반 Offset 계산")]
+public void UpdateScreenPosition_ShouldCalculate_Offset()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: Offset = new Point(-width/2, -height/2) 구현
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.3.3: 지리적 경계 유지 확인
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.3.3: UpdateScreenPosition 후 지리적 경계 동일")]
+public void UpdateScreenPosition_ShouldMaintain_GeographicBounds()
+```
+- [x] RED: 테스트 작성
+- [x] GREEN: Position = Center 유지 확인
+- [x] REFACTOR: 필요시 정리
+
+---
+
+### Phase 28.4: 성능 최적화 및 통합 (BEHAVIORAL)
+
+**목표**: 불필요한 업데이트 방지 및 전체 동작 검증
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`, `Tests/`
+
+#### Test 28.4.1: 줌 변경 없을 시 업데이트 스킵
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.4.1: 동일 줌 레벨에서 업데이트 스킵")]
+public void OnMapZoomChanged_ShouldSkip_WhenZoomUnchanged()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: _lastZoom 비교 로직 구현
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.4.2: 회전 적용 확인
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.4.2: Bearing 값이 있을 때 RenderTransform 적용")]
+public void UpdateImageGeometry_ShouldApply_Rotation()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: RotateTransform 적용
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.4.3: 통합 테스트 - 줌 인
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.4.3: 줌 10→15 변경 시 이미지 확대")]
+public void Integration_ZoomIn_ShouldIncrease_ImageSize()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: 전체 파이프라인 동작 확인
+- [ ] REFACTOR: 필요시 정리
+
+#### Test 28.4.4: 통합 테스트 - 줌 아웃
+```csharp
+[Fact(DisplayName = "TEST-ZOOM-28.4.4: 줌 15→10 변경 시 이미지 축소")]
+public void Integration_ZoomOut_ShouldDecrease_ImageSize()
+```
+- [ ] RED: 테스트 작성
+- [ ] GREEN: 전체 파이프라인 동작 확인
+- [ ] REFACTOR: 필요시 정리
+
+---
+
+### Phase 28 Summary
+
+| Phase | 내용 | 테스트 수 | ActionItem 수 | 상태 |
+|-------|------|----------|--------------|------|
+| 28.1 | 지도 이벤트 구독 | 4 | 2 | [ ] |
+| 28.2 | UpdateImageGeometry | 5 | 0 | [ ] |
+| 28.3 | UpdateScreenPosition | 3 | 0 | [ ] |
+| 28.4 | 성능 최적화 및 통합 | 4 | 0 | [ ] |
+
+**총 테스트 수**: 16개
+**총 ActionItem 수**: 2개
+
+---
+
+## Phase 33: GMapImageMarker 심각한 버그 3건 수정 (TDD)
+
+**PRD 참조**: `Docs/PRD/PRD_ImageOverlay_Feature.md` Section 16
+**작성일**: 2025-12-03
+**방법론**: Kent Beck's TDD (Red → Green → Refactor)
+
+### 버그 개요
+
+| 번호 | 증상 | 심각도 | 근본 원인 |
+|-----|------|--------|----------|
+| 1 | 마커 클릭 시 중점 Snap 오류 | 🔴 High | OnRender에서 Position을 TopLeft로 변경 |
+| 2 | Adorner 크기조절 시 크래시 | 🔴 Critical | 단위 불일치 (픽셀 vs 위경도) |
+| 3 | PropertyWindow 크기 입력 무시 | 🟡 Medium | ImageBounds 미동기화 |
+
+**공통 근본 원인**: `위경도 기반 ImageBounds`와 `픽셀 기반 Width/Height` 간 동기화 불완전
+
+---
+
+### Phase 33.1: 버그 2 수정 - UpdateSize 단위 변환 (BEHAVIORAL) 🔴 Critical
+
+**목표**: MarkerEditAdorner가 픽셀 단위로 호출해도 정상 동작하도록 UpdateSize 수정
+**파일**: `GMapSymbols/GMapImageMarker.cs`, `Tests/GMapImageMarkerTests.cs`
+
+#### Test 33.1.1: UpdateSize 픽셀 단위 입력 테스트 (기존 동작 재현)
+```csharp
+[Fact(DisplayName = "BUG-33.1.1: UpdateSize(200, 150) 호출 시 비정상 ImageBounds 생성 재현")]
+public void UpdateSize_WithPixelValues_ShouldNotCreate_HugeBounds()
+```
+- [x] RED: 현재 UpdateSize(200, 150) 호출 시 ImageBounds.WidthLng > 10° 되는 버그 재현 ✅
+- [x] GREEN: UpdateSize가 픽셀 단위를 올바르게 처리하도록 수정 ✅
+- [x] REFACTOR: 코드 정리 (픽셀/위경도 자동 감지 로직 추가) ✅
+
+#### Test 33.1.2: UpdateSize with MapControl - 픽셀→위경도 변환
+```csharp
+[Fact(DisplayName = "BUG-33.1.2: UpdateSize(200, 150, mapControl) - 픽셀→위경도 변환")]
+public void UpdateSize_WithMapControl_ShouldConvert_PixelsToLatLng()
+```
+- [x] RED: mapControl 전달 시 올바른 위경도 변환 테스트 ✅
+- [x] GREEN: 현재 비율 기반 스케일링으로 1:1 비율 유지 확인 ✅
+- [x] REFACTOR: 불필요 (현재 구현으로 충분) ✅
+
+#### Test 33.1.3: UpdateSize 후 ImageModel 동기화 확인
+```csharp
+[Fact(DisplayName = "BUG-33.1.3: UpdateSize 후 ImageModel.Left/Right/Top/Bottom 동기화")]
+public void UpdateSize_ShouldSync_ImageModelBounds()
+```
+- [x] RED: UpdateSize 후 ImageModel 속성 일치 테스트 ✅
+- [x] GREEN: _imageModel.Left/Right/Top/Bottom 업데이트 완료 ✅
+- [x] REFACTOR: 불필요 (동기화 로직 이미 구현됨) ✅
+
+#### Test 33.1.4: UpdateSize 후 DB 저장 가능한 값 범위 확인
+```csharp
+[Fact(DisplayName = "BUG-33.1.4: UpdateSize 후 Left/Right가 -180~180 범위 내")]
+public void UpdateSize_ShouldProduce_ValidLngRange()
+```
+- [x] RED: 경도 값이 유효 범위인지 확인 ✅
+- [x] GREEN: 범위 검증 통과 ✅
+- [x] REFACTOR: 불필요 ✅
+
+---
+
+### Phase 33.2: 버그 1 수정 - Position 일관성 유지 (BEHAVIORAL) 🔴 High
+
+**목표**: OnRender()에서 Position 변경 제거, 중심점 기반 일관성 유지
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`, `Tests/GMapImageMarkerTests.cs`
+
+#### Test 33.2.1: OnRender 후 Position이 Center 유지
+```csharp
+[Fact(DisplayName = "BUG-33.2.1: GMapImageMarker Position은 항상 Center여야 함")]
+public void GMapImageMarker_Position_ShouldAlways_BeCenter()
+```
+- [x] RED: Position == Center 테스트 작성 ✅
+- [x] GREEN: OnRender에서 Position 변경 코드 제거, Offset만 설정 ✅
+- [x] REFACTOR: UpdateGeometryFromBounds도 동일하게 수정 ✅
+
+#### Test 33.2.2: UpdateLocation 후 Position == Center 유지
+```csharp
+[Fact(DisplayName = "BUG-33.2.2: UpdateLocation 후 Position == Center 유지")]
+public void UpdateLocation_Position_ShouldEqual_NewCenter()
+```
+- [x] RED: UpdateLocation 후 Position == Center 테스트 ✅
+- [x] GREEN: 이미 올바르게 구현됨 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.2.3: UpdateSize 후 Position == Center 유지
+```csharp
+[Fact(DisplayName = "BUG-33.2.3: UpdateSize 후 Position == Center 유지")]
+public void UpdateSize_Position_ShouldEqual_Center()
+```
+- [x] RED: UpdateSize 후 Position == Center 테스트 ✅
+- [x] GREEN: 이미 올바르게 구현됨 ✅
+- [x] REFACTOR: 불필요 ✅
+
+---
+
+### Phase 33.3: 버그 3 수정 - Width/Height setter 개선 (BEHAVIORAL) 🟡 Medium
+
+**목표**: PropertyWindow에서 크기 입력 시 ImageBounds도 동기화
+**파일**: `GMapSymbols/GMapImageMarker.cs`, `Tests/GMapImageMarkerTests.cs`
+
+#### Test 33.3.1: Width setter가 ImageBounds 업데이트
+```csharp
+[Fact(DisplayName = "BUG-33.3.1: Width 설정 시 ImageBounds.WidthLng 변경")]
+public void Width_Setter_ShouldUpdate_ImageBoundsWidth()
+```
+- [x] RED: Width 설정 후 ImageBounds.WidthLng 변경 테스트 ✅
+- [x] GREEN: Width setter에서 UpdateBoundsFromPixelScale() 호출 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.3.2: Height setter가 ImageBounds 업데이트
+```csharp
+[Fact(DisplayName = "BUG-33.3.2: Height 설정 시 ImageBounds.HeightLat 변경")]
+public void Height_Setter_ShouldUpdate_ImageBoundsHeight()
+```
+- [x] RED: Height 설정 후 ImageBounds.HeightLat 변경 테스트 ✅
+- [x] GREEN: Height setter에서 UpdateBoundsFromPixelScale() 호출 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.3.3: Width/Height 변경 후 중심점 유지
+```csharp
+[Fact(DisplayName = "BUG-33.3.3: Width/Height 변경 후 중심점 유지")]
+public void WidthHeight_Change_ShouldMaintain_Center()
+```
+- [x] RED: Width/Height 변경 후 Center 동일 테스트 ✅
+- [x] GREEN: UpdateBoundsFromPixelScale에서 중심점 유지 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.3.4: Width/Height 변경 후 ImageModel 경계 동기화
+```csharp
+[Fact(DisplayName = "BUG-33.3.4: Width/Height 변경 후 ImageModel 경계 동기화")]
+public void WidthHeight_Change_ShouldSync_ImageModelBounds()
+```
+- [x] RED: Width/Height 변경 후 ImageModel 경계 일치 테스트 ✅
+- [x] GREEN: UpdateBoundsFromPixelScale에서 Model 동기화 ✅
+- [x] REFACTOR: 불필요 ✅
+
+---
+
+### Phase 33.4: 통합 및 회귀 테스트 (BEHAVIORAL)
+
+**목표**: 수정 후 전체 시나리오 동작 확인
+**파일**: `Tests/IntegrationTests.cs`
+
+#### Test 33.4.1: Adorner 크기조절 → DB 저장 시나리오
+```csharp
+[Fact(DisplayName = "BUG-33.4.1: Adorner 리사이즈 후 UpdateImageAsync 정상 동작")]
+public void AdornerResize_ThenDbSave_ShouldWork()
+```
+- [x] RED: MarkerEditAdorner → UpdateSize → UpdateImageAsync 전체 흐름 테스트 ✅
+- [x] GREEN: 통합 시나리오 통과 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.4.2: PropertyWindow 입력 → 화면 반영 시나리오
+```csharp
+[Fact(DisplayName = "BUG-33.4.2: PropertyWindow Width 입력 후 화면에 반영")]
+public void PropertyWindow_WidthInput_ShouldReflect_OnScreen()
+```
+- [x] RED: PropertyWindow 입력 → ImageBounds 변경 → OnRender 화면 크기 일치 테스트 ✅
+- [x] GREEN: 통합 시나리오 통과 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.4.3: 드래그 이동 → 위치 정확성 시나리오
+```csharp
+[Fact(DisplayName = "BUG-33.4.3: 마커 드래그 후 Position이 클릭 지점과 일치")]
+public void MarkerDrag_ShouldMove_ToClickedPosition()
+```
+- [x] RED: 드래그 후 Position이 예상 위치와 일치하는지 테스트 ✅
+- [x] GREEN: 통합 시나리오 통과 ✅
+- [x] REFACTOR: 불필요 ✅
+
+#### Test 33.4.4: 회전 + 줌 + 크기조절 복합 시나리오
+```csharp
+[Fact(DisplayName = "BUG-33.4.4: Bearing=45, Zoom변경, Resize 복합 동작")]
+public void ComplexScenario_Rotation_Zoom_Resize_ShouldWork()
+```
+- [x] RED: 회전 후 줌 변경 후 크기조절 - 모든 상태 정상 유지 테스트 ✅
+- [x] GREEN: 복합 시나리오 통과 ✅
+- [x] REFACTOR: 최종 정리 ✅
+
+---
+
+### Phase 33 Summary
+
+| Phase | 내용 | 테스트 수 | 상태 |
+|-------|------|----------|------|
+| 33.1 | UpdateSize 단위 변환 (버그 2) | 4 | [x] ✅ |
+| 33.2 | Position 일관성 유지 (버그 1) | 3 | [x] ✅ |
+| 33.3 | Width/Height setter 개선 (버그 3) | 4 | [x] ✅ |
+| 33.4 | 통합 및 회귀 테스트 | 4 | [x] ✅ |
+
+**총 테스트 수**: 15개 → **24개** (Phase 33.1-33.4 추가)
+**우선순위**: 33.1 (Critical) → 33.2 (High) → 33.3 (Medium) → 33.4 (Integration)
+
+---
+
+### Phase 33 구현 체크리스트 ✅ COMPLETE
+
+#### 파일 변경 완료
+- [x] `GMapSymbols/GMapImageMarker.cs` - UpdateSize, Width/Height setter 수정 ✅
+- [x] `GMapSymbols/GMapMarkerImageControl.cs` - OnRender Position 변경 제거 ✅
+- [x] `Tests/GMapImageMarkerTests.cs` - 버그 재현 및 수정 테스트 추가 (24개 테스트) ✅
+
+#### 핵심 변경 사항 완료
+1. **UpdateSize(double, double)** - 픽셀 vs 위경도 단위 자동 감지 ✅
+2. **OnRender()** - Position 변경 제거, Offset만 설정 ✅
+3. **Width/Height setter** - UpdateBoundsFromPixelScale() 호출 추가 ✅
+4. **UpdateBoundsFromPixelScale()** - 새 메서드 추가 (중심 유지 크기 변경) ✅
+
+---
+
+## Phase 34: 줌 변경 시 이미지 크기 급증 버그 수정 (2025-12-04)
+
+**문제**: 줌 레벨 변경 시 이미지가 갑자기 엄청 커지는 버그
+**원인**: ImageBounds(위경도)가 고정된 상태에서 FromLatLngToLocal() 변환 시 줌에 따라 다른 픽셀 크기 계산
+**해결**: 픽셀 고정 모드 - Width/Height 유지, 줌 변경 시 렌더링만 조정
+
+**참조**: `Docs/prd/PRD_ImageOverlay_Feature.md` Section 17
+
+---
+
+### Phase 34.1: OnRender 픽셀 크기 고정 (BEHAVIORAL)
+
+**목표**: OnRender에서 ImageBounds 기반이 아닌 Marker.Width/Height 기반으로 렌더링
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`
+
+#### ActionItem 34.1.1: OnRender에서 Width/Height 직접 사용
+```csharp
+// 변경 전: ImageBounds → 화면좌표 변환 (줌에 따라 다른 크기)
+var topLeftScreen = mapControl.FromLatLngToLocal(bounds.LocationTopLeft);
+var bottomRightScreen = mapControl.FromLatLngToLocal(bounds.LocationRightBottom);
+double screenWidth = Math.Abs(bottomRightScreen.X - topLeftScreen.X);
+
+// 변경 후: Marker.Width/Height 직접 사용 (고정 크기)
+double screenWidth = Marker.Width;
+double screenHeight = Marker.Height;
+```
+- [x] RED: OnRender 후 Width가 Marker.Width와 동일한지 테스트 ✅
+- [x] GREEN: OnRender에서 Marker.Width/Height 직접 사용하도록 변경 ✅
+- [x] REFACTOR: 불필요한 FromLatLngToLocal 호출 제거 ✅
+
+#### Test 34.1.1: OnRender 후 Width/Height 유지
+```csharp
+[Fact(DisplayName = "BUG-34.1.1: Width/Height는 픽셀 고정 모드로 유지")]
+public void WidthHeight_ShouldBe_PixelFixedMode()
+```
+- [x] RED: 테스트 작성 ✅
+- [x] GREEN: OnRender 수정 ✅
+- [x] REFACTOR: 정리 ✅
+
+---
+
+### Phase 34.2: Offset 계산 개선 (BEHAVIORAL)
+
+**목표**: Center 기반 Offset 계산으로 정확한 위치 표시
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`
+
+#### ActionItem 34.2.1: Center 위치에서 Offset 계산
+```csharp
+// Center의 화면 좌표 계산
+var centerScreen = mapControl.FromLatLngToLocal(Marker.Center);
+
+// Offset = Center에서 좌상단까지의 거리 (음수)
+Marker.Offset = new Point(-Marker.Width / 2, -Marker.Height / 2);
+```
+- [x] RED: Offset이 (-Width/2, -Height/2)인지 테스트 ✅
+- [x] GREEN: Offset 계산 로직 구현 ✅
+- [x] REFACTOR: 정리 ✅
+
+#### Test 34.2.1: Offset 계산 정확성
+```csharp
+[Fact(DisplayName = "BUG-34.2.1: Offset은 중심 기준 (-Width/2, -Height/2)")]
+public void Offset_ShouldBe_HalfWidthHeightNegative()
+```
+- [x] RED: 테스트 작성 ✅
+- [x] GREEN: Offset 계산 수정 ✅
+- [x] REFACTOR: 정리 ✅
+
+---
+
+### Phase 34.3: 줌 변경 시 InvalidateVisual만 호출 (BEHAVIORAL)
+
+**목표**: 줌 변경 시 크기 재계산 없이 렌더링만 갱신
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`
+
+#### ActionItem 34.3.1: OnMapZoomChanged 단순화
+```csharp
+private void OnMapZoomChanged()
+{
+    // 픽셀 고정 모드: Width/Height는 변경하지 않음
+    // Position(Center)의 화면 좌표만 업데이트하면 됨
+    InvalidateVisual();
+}
+```
+- [x] RED: 줌 변경 전후 Width/Height 동일 테스트 ✅
+- [x] GREEN: OnMapZoomChanged가 크기 변경하지 않도록 확인 ✅
+- [x] REFACTOR: 불필요한 코드 제거 ✅
+
+#### Test 34.3.1: 줌 변경 시 Width/Height 유지
+```csharp
+[Fact(DisplayName = "BUG-34.3.1: UpdateSize 후 Width/Height 픽셀 값 유지")]
+public void UpdateSize_ShouldSet_PixelValues()
+```
+- [x] RED: 테스트 작성 ✅
+- [x] GREEN: 구현 확인 ✅
+- [x] REFACTOR: 정리 ✅
+
+---
+
+### Phase 34.4: UpdateGeometryFromBounds 수정 (BEHAVIORAL)
+
+**목표**: UpdateGeometryFromBounds도 Marker.Width/Height 사용
+**파일**: `GMapSymbols/GMapMarkerImageControl.cs`
+
+#### ActionItem 34.4.1: UpdateGeometryFromBounds 픽셀 고정 모드
+```csharp
+private void UpdateGeometryFromBounds(GMapControl mapControl)
+{
+    // 변경 전: ImageBounds → 화면좌표 변환
+    // 변경 후: Marker.Width/Height 직접 사용
+
+    double screenWidth = Marker.Width;
+    double screenHeight = Marker.Height;
+
+    Width = screenWidth;
+    Height = screenHeight;
+
+    Marker.Offset = new Point(-screenWidth / 2, -screenHeight / 2);
+}
+```
+- [x] RED: UpdateGeometryFromBounds 호출 후 Width가 Marker.Width와 동일 테스트 ✅
+- [x] GREEN: 구현 ✅
+- [x] REFACTOR: 정리 ✅
+
+#### Test 34.4.1: UpdateGeometryFromBounds 픽셀 고정
+```csharp
+[Fact(DisplayName = "BUG-34.5.1: 줌 변경 시뮬레이션 - Width/Height 유지")]
+public void ZoomChange_Simulation_ShouldMaintain_PixelSize()
+```
+- [x] RED: 테스트 작성 ✅
+- [x] GREEN: 구현 ✅
+- [x] REFACTOR: 정리 ✅
+
+---
+
+### Phase 34.5: 통합 테스트 (BEHAVIORAL)
+
+**목표**: 전체 시나리오 동작 확인
+**파일**: `Tests/GMapImageMarkerTests.cs`
+
+#### Test 34.5.1: 줌 인/아웃 시나리오
+```csharp
+[Fact(DisplayName = "BUG-34.5.1: 줌 변경 시뮬레이션 - Width/Height 유지")]
+public void ZoomChange_Simulation_ShouldMaintain_PixelSize()
+```
+- [x] RED: 테스트 작성 ✅
+- [x] GREEN: 통합 시나리오 통과 ✅
+- [x] REFACTOR: 정리 ✅
+
+#### Test 34.5.2: Adorner + 줌 변경 복합 시나리오
+```csharp
+[Fact(DisplayName = "BUG-34.5.2: Adorner 크기조절 후 줌 변경 시 크기 유지")]
+public void AdornerResize_ThenZoomChange_ShouldMaintain_Size()
+```
+- [x] RED: 테스트 작성 ✅
+- [x] GREEN: 통합 시나리오 통과 ✅
+- [x] REFACTOR: 정리 ✅
+
+---
+
+### Phase 34 Summary
+
+| Phase | 내용 | 테스트 수 | 상태 |
+|-------|------|----------|------|
+| 34.1 | OnRender 픽셀 크기 고정 | 1 | [x] ✅ |
+| 34.2 | Offset 계산 개선 | 1 | [x] ✅ |
+| 34.3 | 줌 변경 시 크기 유지 | 1 | [x] ✅ |
+| 34.4 | UpdateGeometryFromBounds 수정 | 1 | [x] ✅ |
+| 34.5 | 통합 테스트 | 2 | [x] ✅ |
+
+**총 테스트 수**: 6개 (추가 5개 - 이전 24개 + 신규 5개 = 29개)
+**핵심 변경 파일**: `GMapMarkerImageControl.cs`
+
+---
+
+### Phase 34 변경 사항 요약
+
+#### 변경된 파일
+1. **GMapMarkerImageControl.cs** (핵심 변경)
+   - `OnRender()` (라인 216-233): ImageBounds 기반 → Marker.Width/Height 직접 사용
+   - `UpdateGeometryFromBounds()` (라인 321-335): 동일하게 픽셀 고정 모드로 변경
+
+2. **GMapImageMarkerTests.cs** (테스트 추가)
+   - Phase 34 테스트 5개 추가 (라인 732-864)
+
+#### 핵심 코드 변경
+
+**변경 전 (OnRender)**:
+```csharp
+var bounds = Marker.ImageBounds;
+var topLeftScreen = mapControl.FromLatLngToLocal(bounds.LocationTopLeft);
+var bottomRightScreen = mapControl.FromLatLngToLocal(bounds.LocationRightBottom);
+double screenWidth = Math.Abs(bottomRightScreen.X - topLeftScreen.X);
+double screenHeight = Math.Abs(bottomRightScreen.Y - topLeftScreen.Y);
+```
+
+**변경 후 (OnRender)**:
+```csharp
+// Phase 34: 픽셀 고정 모드 - Marker.Width/Height를 직접 사용
+double screenWidth = Marker.Width;
+double screenHeight = Marker.Height;
+```
+
+#### 버그 수정 원리
+- **문제**: `FromLatLngToLocal()`은 현재 줌 레벨 기반으로 변환 → 줌이 높을수록 픽셀 커짐
+- **해결**: 사용자가 설정한 `Marker.Width/Height`를 직접 사용 → 줌과 무관하게 일정한 크기
+
+---

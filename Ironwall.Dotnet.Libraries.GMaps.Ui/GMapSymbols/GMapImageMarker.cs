@@ -258,6 +258,10 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     }
 
     /// <summary>표시 너비 (픽셀)</summary>
+    /// <remarks>
+    /// Phase 33.3: Width 설정 시 ImageBounds도 비율에 맞게 업데이트
+    /// PropertyWindow에서 Width 입력 시 화면에 반영되도록 수정
+    /// </remarks>
     public double Width
     {
         get => _imageModel.Width;
@@ -265,13 +269,26 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         {
             if (Math.Abs(_imageModel.Width - value) > 0.001)
             {
+                var oldWidth = _imageModel.Width;
                 _imageModel.Width = value;
+
+                // Phase 33.3: ImageBounds도 비율에 맞게 업데이트
+                if (oldWidth > 0.001)
+                {
+                    var scale = value / oldWidth;
+                    UpdateBoundsFromPixelScale(scale, 1.0);
+                }
+
                 OnPropertyChanged(nameof(Width));
             }
         }
     }
 
     /// <summary>표시 높이 (픽셀)</summary>
+    /// <remarks>
+    /// Phase 33.3: Height 설정 시 ImageBounds도 비율에 맞게 업데이트
+    /// PropertyWindow에서 Height 입력 시 화면에 반영되도록 수정
+    /// </remarks>
     public double Height
     {
         get => _imageModel.Height;
@@ -279,21 +296,33 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         {
             if (Math.Abs(_imageModel.Height - value) > 0.001)
             {
+                var oldHeight = _imageModel.Height;
                 _imageModel.Height = value;
+
+                // Phase 33.3: ImageBounds도 비율에 맞게 업데이트
+                if (oldHeight > 0.001)
+                {
+                    var scale = value / oldHeight;
+                    UpdateBoundsFromPixelScale(1.0, scale);
+                }
+
                 OnPropertyChanged(nameof(Height));
             }
         }
     }
 
-    /// <summary>줌 레벨</summary>
+    /// <summary>
+    /// 표시 줌 레벨 (0 = 모든 줌 레벨에서 표시)
+    /// 지도 줌이 이 값 이상일 때만 이미지가 표시됨
+    /// </summary>
     public double Zoom
     {
-        get => _zoom;
+        get => _imageModel.Zoom;
         set
         {
-            if (Math.Abs(_zoom - value) > 0.001)
+            if (Math.Abs(_imageModel.Zoom - value) > 0.001)
             {
-                _zoom = value;
+                _imageModel.Zoom = value;
                 OnPropertyChanged(nameof(Zoom));
             }
         }
@@ -644,25 +673,66 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     }
 
     /// <summary>
-    /// 마커 크기 업데이트 (경도/위도 단위)
+    /// 마커 크기 업데이트 (픽셀 또는 위경도 단위 자동 감지)
     /// </summary>
-    /// <param name="widthLng">경도 범위</param>
-    /// <param name="heightLat">위도 범위</param>
-    public void UpdateSize(double widthLng, double heightLat)
+    /// <remarks>
+    /// Phase 33 버그 수정: MarkerEditAdorner가 픽셀 단위로 호출해도 정상 동작
+    /// - 입력값이 10° 이상이면 픽셀로 간주하고 비율 기반 스케일링
+    /// - 입력값이 10° 미만이면 위경도로 처리
+    /// </remarks>
+    /// <param name="width">너비 (픽셀 또는 경도)</param>
+    /// <param name="height">높이 (픽셀 또는 위도)</param>
+    public void UpdateSize(double width, double height)
     {
         try
         {
+            // Phase 33: 픽셀 vs 위경도 자동 감지
+            // 정상적인 이미지 오버레이는 10° 이하 (약 1100km 이하)
+            const double MaxReasonableDegrees = 10.0;
+
+            double actualWidthLng;
+            double actualHeightLat;
+
+            if (width > MaxReasonableDegrees || height > MaxReasonableDegrees)
+            {
+                // 픽셀 값으로 간주 - 현재 ImageBounds 비율로 스케일링
+                // 픽셀 입력을 현재 위경도 크기 대비 비율로 변환
+                double currentWidthLng = _imageBounds.WidthLng;
+                double currentHeightLat = _imageBounds.HeightLat;
+
+                // 현재 픽셀 크기 (Width/Height)와 입력 픽셀의 비율 계산
+                double scaleX = width / Math.Max(_imageModel.Width, 1.0);
+                double scaleY = height / Math.Max(_imageModel.Height, 1.0);
+
+                actualWidthLng = currentWidthLng * scaleX;
+                actualHeightLat = currentHeightLat * scaleY;
+
+                // 픽셀 크기도 업데이트
+                _imageModel.Width = width;
+                _imageModel.Height = height;
+
+                _log?.Info($"GMapImageMarker '{Title}' 픽셀 크기 입력 감지: {width}px x {height}px → {actualWidthLng:F6}° x {actualHeightLat:F6}°");
+            }
+            else
+            {
+                // 위경도 값으로 처리
+                actualWidthLng = width;
+                actualHeightLat = height;
+
+                _log?.Info($"GMapImageMarker '{Title}' 위경도 크기 입력: {actualWidthLng:F6}° x {actualHeightLat:F6}°");
+            }
+
             // 현재 중심점 유지
             var center = Center;
 
             // 새 경계 계산
-            double newLeft = center.Lng - widthLng / 2.0;
-            double newRight = center.Lng + widthLng / 2.0;
-            double newTop = center.Lat + heightLat / 2.0;
-            double newBottom = center.Lat - heightLat / 2.0;
+            double newLeft = center.Lng - actualWidthLng / 2.0;
+            double newRight = center.Lng + actualWidthLng / 2.0;
+            double newTop = center.Lat + actualHeightLat / 2.0;
+            double newBottom = center.Lat - actualHeightLat / 2.0;
 
             // ImageBounds 업데이트
-            _imageBounds = new RectLatLng(newTop, newLeft, widthLng, heightLat);
+            _imageBounds = new RectLatLng(newTop, newLeft, actualWidthLng, actualHeightLat);
 
             // Model 동기화
             _imageModel.Left = newLeft;
@@ -676,8 +746,8 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             OnPropertyChanged(nameof(Top));
             OnPropertyChanged(nameof(Bottom));
             OnPropertyChanged(nameof(AspectRatio));
-
-            _log?.Info($"GMapImageMarker '{Title}' 크기 업데이트: {widthLng:F6}° x {heightLat:F6}°");
+            OnPropertyChanged(nameof(Width));
+            OnPropertyChanged(nameof(Height));
         }
         catch (Exception ex)
         {
@@ -713,6 +783,57 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     }
 
     /// <summary>
+    /// 픽셀 스케일 기반 ImageBounds 업데이트 (Phase 33.3)
+    /// </summary>
+    /// <remarks>
+    /// Width/Height setter에서 호출하여 ImageBounds를 비율에 맞게 업데이트
+    /// 중심점은 유지하면서 크기만 변경
+    /// </remarks>
+    /// <param name="scaleX">가로 스케일 (1.0 = 변경 없음)</param>
+    /// <param name="scaleY">세로 스케일 (1.0 = 변경 없음)</param>
+    private void UpdateBoundsFromPixelScale(double scaleX, double scaleY)
+    {
+        try
+        {
+            // 현재 중심점 저장
+            var center = Center;
+
+            // 새 크기 계산
+            double newWidthLng = _imageBounds.WidthLng * scaleX;
+            double newHeightLat = _imageBounds.HeightLat * scaleY;
+
+            // 새 경계 계산 (중심점 유지)
+            double newLeft = center.Lng - newWidthLng / 2.0;
+            double newRight = center.Lng + newWidthLng / 2.0;
+            double newTop = center.Lat + newHeightLat / 2.0;
+            double newBottom = center.Lat - newHeightLat / 2.0;
+
+            // ImageBounds 업데이트
+            _imageBounds = new RectLatLng(newTop, newLeft, newWidthLng, newHeightLat);
+
+            // Model 동기화
+            _imageModel.Left = newLeft;
+            _imageModel.Right = newRight;
+            _imageModel.Top = newTop;
+            _imageModel.Bottom = newBottom;
+
+            // PropertyChanged 알림
+            OnPropertyChanged(nameof(ImageBounds));
+            OnPropertyChanged(nameof(Left));
+            OnPropertyChanged(nameof(Right));
+            OnPropertyChanged(nameof(Top));
+            OnPropertyChanged(nameof(Bottom));
+            OnPropertyChanged(nameof(AspectRatio));
+
+            _log?.Info($"GMapImageMarker '{Title}' 픽셀 스케일 업데이트: scaleX={scaleX:F2}, scaleY={scaleY:F2}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"UpdateBoundsFromPixelScale 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// 지정된 점이 이미지 경계 내에 있는지 확인
     /// </summary>
     /// <param name="point">확인할 점</param>
@@ -721,6 +842,29 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     {
         return point.Lat >= Bottom && point.Lat <= Top &&
                point.Lng >= Left && point.Lng <= Right;
+    }
+
+    /// <summary>
+    /// 지도 줌 변경 시 화면 위치 업데이트 (Phase 28)
+    /// </summary>
+    /// <remarks>
+    /// 지리적 경계(ImageBounds)는 유지하고 화면 픽셀 위치만 업데이트합니다.
+    /// GMapMarkerImageControl에서 OnMapZoomChanged 이벤트 핸들러가 호출합니다.
+    /// </remarks>
+    /// <param name="mapControl">GMap 컨트롤 (null 허용 - 안전 처리)</param>
+    public void UpdateScreenPosition(GMapControl? mapControl)
+    {
+        // null 안전 처리 - 지리적 경계는 변경하지 않음
+        if (mapControl == null)
+        {
+            return;
+        }
+
+        // Shape가 GMapMarkerImageControl이면 RefreshFromMarker 호출
+        if (Shape is GMapMarkerImageControl markerControl)
+        {
+            markerControl.RefreshFromMarker();
+        }
     }
 
     #endregion
@@ -736,7 +880,6 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
 
     // IEditableMarker 추가 속성용 필드
     private double _titleSize = 11.0;
-    private double _zoom = 1.0;
     private bool _showShape = true;
     private bool _showTitle;
     private EnumColorType _fillColor = EnumColorType.Transparent;

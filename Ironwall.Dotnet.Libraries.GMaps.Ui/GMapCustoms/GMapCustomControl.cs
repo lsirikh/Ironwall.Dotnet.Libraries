@@ -392,7 +392,8 @@ public class GMapCustomControl : GMapControl
         try
         {
             if (Markers == null) return;
-
+            //현재 Markers가 Add 될때마다 UpdateMarkersVisibilityByZoom로직이 수행되는 비효율성이 있다.
+            //*****버그****** 이 문제를 해결해야된다.
             foreach (var marker in Markers.OfType<IEditableMarker>().ToList())
             {
                 if (SetMarkerVisibility(marker))

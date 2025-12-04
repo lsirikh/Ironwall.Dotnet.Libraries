@@ -714,6 +714,11 @@ public class MapViewModel : BasePanelViewModel
     /// <summary>
     /// 이미지 오버레이 로드 실행 - 이미지 파일을 GMapImageMarker로 추가
     /// </summary>
+    /// <remarks>
+    /// Phase 30: 줌 레벨 기반 ImageBounds 계산
+    /// - 하드코딩된 0.01° 대신 현재 줌 레벨에서 이미지 픽셀 크기에 맞는 degree 계산
+    /// - FromLocalToLatLng()를 사용하여 화면 픽셀 → 지리 좌표 변환
+    /// </remarks>
     private async void ExecuteLoadImageOverlay(object obj)
     {
         try
@@ -735,6 +740,40 @@ public class MapViewModel : BasePanelViewModel
                 var title = System.IO.Path.GetFileNameWithoutExtension(filePath);
                 var currentPosition = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
 
+                // Phase 30: 이미지 실제 크기 로드
+                double imageWidth = 200;  // 기본값
+                double imageHeight = 200; // 기본값
+                try
+                {
+                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bitmap.UriSource = new Uri(filePath);
+                    bitmap.EndInit();
+                    imageWidth = bitmap.PixelWidth;
+                    imageHeight = bitmap.PixelHeight;
+                    _log?.Info($"이미지 크기 로드: {imageWidth}x{imageHeight}");
+                }
+                catch (Exception ex)
+                {
+                    _log?.Warning($"이미지 크기 로드 실패, 기본값 사용: {ex.Message}");
+                }
+
+                // Phase 30: 현재 줌 레벨에서 픽셀 → degree 변환
+                // 중심점의 화면 좌표를 구하고, 이미지 크기만큼 떨어진 지점의 지리 좌표 계산
+                var centerScreen = MainMap.FromLatLngToLocal(currentPosition);
+                var topLeftScreen = new GMap.NET.GPoint(
+                    (long)(centerScreen.X - imageWidth / 2),
+                    (long)(centerScreen.Y - imageHeight / 2));
+                var bottomRightScreen = new GMap.NET.GPoint(
+                    (long)(centerScreen.X + imageWidth / 2),
+                    (long)(centerScreen.Y + imageHeight / 2));
+
+                var topLeftGeo = MainMap.FromLocalToLatLng((int)topLeftScreen.X, (int)topLeftScreen.Y);
+                var bottomRightGeo = MainMap.FromLocalToLatLng((int)bottomRightScreen.X, (int)bottomRightScreen.Y);
+
+                _log?.Info($"Phase 30 ImageBounds 계산: TopLeft=({topLeftGeo.Lat:F6}, {topLeftGeo.Lng:F6}), BottomRight=({bottomRightGeo.Lat:F6}, {bottomRightGeo.Lng:F6})");
+
                 // ImageModel 생성
                 var imageModel = new Ironwall.Dotnet.Monitoring.Models.Symbols.ImageModel
                 {
@@ -744,11 +783,13 @@ public class MapViewModel : BasePanelViewModel
                     Longitude = currentPosition.Lng,
                     Opacity = 0.8,
                     Rotation = 0.0,
-                    // 기본 경계 설정 (이미지 크기 기반으로 대략적인 범위)
-                    Left = currentPosition.Lng - 0.01,
-                    Right = currentPosition.Lng + 0.01,
-                    Top = currentPosition.Lat + 0.01,
-                    Bottom = currentPosition.Lat - 0.01
+                    Width = imageWidth,
+                    Height = imageHeight,
+                    // Phase 30: 줌 레벨 기반 정확한 경계 설정
+                    Left = topLeftGeo.Lng,
+                    Right = bottomRightGeo.Lng,
+                    Top = topLeftGeo.Lat,
+                    Bottom = bottomRightGeo.Lat
                 };
 
                 // MarkerFactory로 마커 생성

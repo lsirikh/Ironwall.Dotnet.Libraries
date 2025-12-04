@@ -42,6 +42,7 @@ public class ImageModel : BaseModel, IImageModel
         Height = 100;
         Visibility = true;
         Opacity = 0.8;
+        Zoom = 0;  // 기본값: 0 = 모든 줌 레벨에서 표시
     }
 
     /// <summary>
@@ -103,6 +104,7 @@ public class ImageModel : BaseModel, IImageModel
         Height = model.Height;
         Visibility = model.Visibility;
         Opacity = model.Opacity;
+        Zoom = model.Zoom;
     }
 
     #endregion
@@ -146,6 +148,13 @@ public class ImageModel : BaseModel, IImageModel
     public double Rotation { get; set; }
     public bool Visibility { get; set; }
     public double Opacity { get; set; }
+
+    /// <summary>
+    /// 이미지가 표시되는 최소 줌 레벨.
+    /// 지도 줌이 이 값 이상일 때만 이미지가 표시됨.
+    /// 0 = 모든 줌 레벨에서 표시
+    /// </summary>
+    public double Zoom { get; set; }
     #endregion
     #endregion
     #region - Attributes -

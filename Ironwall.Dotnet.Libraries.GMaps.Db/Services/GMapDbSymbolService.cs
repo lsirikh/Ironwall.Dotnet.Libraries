@@ -447,6 +447,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `Latitude`          DECIMAL(10,8) NOT NULL DEFAULT 0,                   -- 중심 위도
                 `Longitude`         DECIMAL(11,8) NOT NULL DEFAULT 0,                   -- 중심 경도
                 `Altitude`          FLOAT DEFAULT 0,                                    -- 고도
+                `Zoom`              DECIMAL(3,1) DEFAULT 0,                             -- 표시 줌 레벨 (0 = 모든 줌 레벨)
                 `Width`             DECIMAL(10,3) DEFAULT 0,                            -- 이미지 너비 (픽셀)
                 `Height`            DECIMAL(10,3) DEFAULT 0,                            -- 이미지 높이 (픽셀)
                 `Opacity`           DECIMAL(3,2) DEFAULT 1.0,                           -- 투명도 (0.0 ~ 1.0)
@@ -2927,7 +2928,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                 SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
-                        Latitude, Longitude, Altitude, Width, Height,
+                        Latitude, Longitude, Altitude, Zoom, Width, Height,
                         Opacity, Rotation, Visibility, HasGeoReference, CoordinateSystem,
                         CreatedAt, UpdatedAt
                 FROM    Images
@@ -2964,7 +2965,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             const string sql = @"
                 SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
-                        Latitude, Longitude, Altitude, Width, Height,
+                        Latitude, Longitude, Altitude, Zoom, Width, Height,
                         Opacity, Rotation, Visibility, HasGeoReference, CoordinateSystem,
                         CreatedAt, UpdatedAt
                 FROM    Images
@@ -3001,11 +3002,11 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 INSERT INTO Images
                     (Title, FilePath, `Left`, Top, `Right`, Bottom,
-                     Latitude, Longitude, Altitude, Width, Height,
+                     Latitude, Longitude, Altitude, Zoom, Width, Height,
                      Opacity, Rotation, Visibility, HasGeoReference, CoordinateSystem)
                 VALUES
                     (@Title, @FilePath, @Left, @Top, @Right, @Bottom,
-                     @Latitude, @Longitude, @Altitude, @Width, @Height,
+                     @Latitude, @Longitude, @Altitude, @Zoom, @Width, @Height,
                      @Opacity, @Rotation, @Visibility, @HasGeoReference, @CoordinateSystem);
                 SELECT LAST_INSERT_ID();";
 
@@ -3020,6 +3021,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Latitude,
                 model.Longitude,
                 model.Altitude,
+                model.Zoom,
                 model.Width,
                 model.Height,
                 model.Opacity,
@@ -3059,7 +3061,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     Title = @Title, FilePath = @FilePath,
                     `Left` = @Left, Top = @Top, `Right` = @Right, Bottom = @Bottom,
                     Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude,
-                    Width = @Width, Height = @Height,
+                    Zoom = @Zoom, Width = @Width, Height = @Height,
                     Opacity = @Opacity, Rotation = @Rotation, Visibility = @Visibility,
                     HasGeoReference = @HasGeoReference, CoordinateSystem = @CoordinateSystem,
                     UpdatedAt = CURRENT_TIMESTAMP
@@ -3077,6 +3079,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Latitude,
                 model.Longitude,
                 model.Altitude,
+                model.Zoom,
                 model.Width,
                 model.Height,
                 model.Opacity,
@@ -3711,6 +3714,9 @@ internal sealed class ImageSQL
     /// <summary>고도</summary>
     public float Altitude { get; set; }
 
+    /// <summary>표시 줌 레벨 (0 = 모든 줌 레벨)</summary>
+    public decimal Zoom { get; set; }
+
     /// <summary>이미지 너비 (픽셀)</summary>
     public decimal Width { get; set; }
 
@@ -3753,6 +3759,7 @@ internal sealed class ImageSQL
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
+        Zoom = (double)Zoom,
         Width = (double)Width,
         Height = (double)Height,
         Opacity = (double)Opacity,
