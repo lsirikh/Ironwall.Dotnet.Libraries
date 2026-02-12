@@ -73,6 +73,7 @@
 						<Grid.RowDefinitions>
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
 						</Grid.RowDefinitions>
 						<!--  탐지 정보 Custom 구현 시작  -->
 						<!--<TextBlock
@@ -155,6 +156,16 @@
 							FontSize="16"
 							Opacity="1"
 							Text="{Binding MessageType, FallbackValue=타입, Mode=OneWay}" />
+						<TextBlock
+							Grid.Row="2"
+							Grid.Column="0"
+							Grid.ColumnSpan="2"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Bottom"
+							FontFamily="{StaticResource NotoSansCJKkRMedium}"
+							FontSize="16"
+							Opacity="1"
+							Text="{Binding Result, FallbackValue=장비, Mode=OneWay, StringFormat='({0})'}" />
 
 					</Grid>
 					<Separator

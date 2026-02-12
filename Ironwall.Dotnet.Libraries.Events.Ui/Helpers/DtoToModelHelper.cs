@@ -395,41 +395,54 @@ public static class DtoToModelHelper
         if (fromEvent == null)
             return null;
 
-        // FromEvent의 타입에 따라 적절한 변환 메서드 호출
-        switch (fromEvent)
+        try
         {
-            case DetectionEventDto detectionDto:
-                if (eventProvider != null)
-                {
-                    // 타입 필터링 후 ID 매칭
-                    var existing = eventProvider
-                        .OfType<IDetectionEventModel>()
-                        .FirstOrDefault(e => e.Id == detectionDto.Id);
+            // 스냅샷 생성 (Thread-Safe)
+            var eventSnapshot = eventProvider?.ToList();
 
-                    if (existing != null)
-                        return existing;
-                }
-                // Fallback: DTO 직접 변환 (DeviceProvider 전달하여 Device도 매칭)
-                return detectionDto.ToDetectionEventModel(deviceProvider);
+            // FromEvent의 타입에 따라 적절한 변환 메서드 호출
+            switch (fromEvent)
+            {
+                case DetectionEventDto detectionDto:
+                    if (eventProvider != null)
+                    {
+                        // 타입 필터링 후 ID 매칭
+                        var existing = eventSnapshot
+                            .OfType<IDetectionEventModel>()
+                            .FirstOrDefault(e => e.Id == detectionDto.Id);
 
-            case MalfunctionEventDto malfunctionDto:
-                if (eventProvider != null)
-                {
-                    // 타입 필터링 후 ID 매칭
-                    var existing = eventProvider
-                        .OfType<IMalfunctionEventModel>()
-                        .FirstOrDefault(e => e.Id == malfunctionDto.Id);
+                        if (existing != null)
+                            return existing;
+                    }
+                    // Fallback: DTO 직접 변환 (DeviceProvider 전달하여 Device도 매칭)
+                    return detectionDto.ToDetectionEventModel(deviceProvider);
 
-                    if (existing != null)
-                        return existing;
-                }
-                // Fallback: DTO 직접 변환 (DeviceProvider 전달하여 Device도 매칭)
-                return malfunctionDto.ToMalfunctionEventModel(deviceProvider);
+                case MalfunctionEventDto malfunctionDto:
+                    if (eventProvider != null)
+                    {
+                        // 타입 필터링 후 ID 매칭
+                        var existing = eventSnapshot
+                            .OfType<IMalfunctionEventModel>()
+                            .FirstOrDefault(e => e.Id == malfunctionDto.Id);
 
-            default:
-                // ConnectionEventDto나 기타 타입은 조치보고 대상 아님
-                return null;
+                        if (existing != null)
+                            return existing;
+                    }
+                    // Fallback: DTO 직접 변환 (DeviceProvider 전달하여 Device도 매칭)
+                    return malfunctionDto.ToMalfunctionEventModel(deviceProvider);
+
+                default:
+                    // ConnectionEventDto나 기타 타입은 조치보고 대상 아님
+                    return null;
+            }
         }
+        catch (Exception)
+        {
+
+            throw;
+        }
+
+        
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
