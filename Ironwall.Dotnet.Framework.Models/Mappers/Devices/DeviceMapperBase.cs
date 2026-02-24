@@ -18,14 +18,12 @@ namespace Ironwall.Dotnet.Framework.Models.Mappers
 
         public DeviceMapperBase(IBaseDeviceModel model) : base(model)
         {
-            DeviceGroup = model.DeviceGroup;
             DeviceNumber = model.DeviceNumber;
             DeviceName = model.DeviceName;
             DeviceType = model.DeviceType;
             Version = model.Version;
             Status = model.Status;
         }
-        public int DeviceGroup { get; set; }
         public int DeviceNumber { get; set; }
         public string DeviceName { get; set; }
         public EnumDeviceType DeviceType { get; set; }

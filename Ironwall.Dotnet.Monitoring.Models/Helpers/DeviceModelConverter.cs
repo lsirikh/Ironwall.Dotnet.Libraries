@@ -60,9 +60,14 @@ namespace Ironwall.Dotnet.Monitoring.Models.Helpers
                         device = jo.ToObject<CameraDeviceModel>();
                         break;
                     case EnumDeviceType.IpSpeaker:
+                        device = jo.ToObject<SpeakerDeviceModel>();
                         break;
-                    //case EnumDeviceType.Fence_Line:
-                    //    break;
+                    case EnumDeviceType.Enclosure:
+                        device = jo.ToObject<EnclosureDeviceModel>();
+                        break;
+                    case EnumDeviceType.Lamp:
+                        device = jo.ToObject<LampDeviceModel>();
+                        break;
                     default:
                         throw new Exception($"Unknown device type: {deviceType}");
                 }

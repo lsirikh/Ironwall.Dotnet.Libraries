@@ -62,4 +62,13 @@ public class CameraDeviceModel : BaseDeviceModel, ICameraDeviceModel
 
     [JsonProperty("optics", Order = 19)]
     public ICameraOpticsModel? Optics { get; set; }
+
+    [JsonProperty("urls", Order = 20)]
+    public ICameraUrlsModel? Urls { get; set; }
+
+    [JsonProperty("setting", Order = 21)]
+    public ICameraSettingModel? Setting { get; set; }
+
+    [JsonProperty("is_record", Order = 22)]
+    public bool? IsRecord { get; set; }
 }

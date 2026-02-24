@@ -21,17 +21,17 @@ namespace Ironwall.Dotnet.Framework.Models.Mappers
 
         public EventMapperBase(IBaseEventModel model) : base(model.Id)
         {
-            MessageType = (int)model.MessageType;
+            MessageType = model.MessageType;
             Datetime = model.DateTime.ToString("yyyy-MM-dd HH:mm:ss.ff");
         }
 
         public EventMapperBase(IBaseEventMessageModel model) : base(model.Id)
         {
-            MessageType = (int)EnumHelper.GetEventType(model.Command);
+            MessageType = EnumHelper.GetEventType(model.Command);
             Datetime = model.Datetime.ToString("yyyy-MM-dd HH:mm:ss.ff");
         }
         [JsonProperty("type_event", Order = 2)]
-        public int MessageType { get; set; }
+        public EnumEventType MessageType { get; set; }
         [JsonProperty("datetime", Order = 3)]
         public string Datetime { get; set; }
     }

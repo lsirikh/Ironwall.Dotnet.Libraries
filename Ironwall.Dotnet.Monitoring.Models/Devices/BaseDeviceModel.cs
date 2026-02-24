@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Enums;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Devices;
 /****************************************************************************
@@ -20,7 +21,7 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
 
     public BaseDeviceModel(IBaseDeviceModel model) : base(model)
     {
-        DeviceGroup = model.DeviceGroup;
+        DeviceGroups = model.DeviceGroups;
         DeviceNumber = model.DeviceNumber;
         DeviceName = model.DeviceName;
         DeviceType = model.DeviceType;
@@ -30,8 +31,13 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
 
     [JsonProperty("device_number", Order = 2)]
     public int DeviceNumber { get; set; }
-    [JsonProperty("device_group", Order = 3)]
-    public int DeviceGroup { get; set; }
+    [JsonProperty("device_groups", Order = 3, NullValueHandling = NullValueHandling.Ignore)]
+    public List<int>? DeviceGroups { get; set; }
+    [JsonIgnore]
+    public string DeviceGroupsText =>
+        DeviceGroups != null && DeviceGroups.Count > 0
+            ? string.Join(", ", DeviceGroups)
+            : "";
     [JsonProperty("device_name", Order = 4)]
     public string? DeviceName { get; set; }
     [JsonProperty("device_type", Order = 5)]
