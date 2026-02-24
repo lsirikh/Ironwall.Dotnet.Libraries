@@ -441,7 +441,7 @@ public class DeviceProviderServiceTests
             Id = 1,
             DeviceType = EnumDeviceType.Fence,
             DeviceName = "센서-1-OLD",
-            DeviceGroup = 1,
+            DeviceGroups = new List<int> { 1 },
             Status = EnumDeviceStatus.DEACTIVATED
         };
         deviceProvider.Add(existingDevice);
@@ -455,7 +455,7 @@ public class DeviceProviderServiceTests
                 Id = 1,
                 DeviceType = EnumDeviceType.Fence,
                 DeviceName = "센서-1-NEW",  // 이름 변경
-                DeviceGroup = 2,  // 그룹 변경
+                DeviceGroups = new List<int> { 2 },  // 그룹 변경
                 Status = EnumDeviceStatus.ACTIVATED  // 상태 변경
             }
         };
@@ -472,7 +472,7 @@ public class DeviceProviderServiceTests
         Assert.Single(deviceProvider);  // 개수 유지
         Assert.Same(originalReference, deviceProvider.First());  // 같은 참조 유지 ✅
         Assert.Equal("센서-1-NEW", existingDevice.DeviceName);  // 속성 업데이트됨
-        Assert.Equal(2, existingDevice.DeviceGroup);
+        Assert.Equal(new List<int> { 2 }, existingDevice.DeviceGroups);
         Assert.Equal(EnumDeviceStatus.ACTIVATED, existingDevice.Status);
     }
 
@@ -737,6 +737,124 @@ public class MockDeviceApiService : IDeviceApiService
     public Task<ApiResponse<bool>> DeleteCameraAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
+    public Task<ApiResponse<CameraSettingDto>> GetCameraSettingAsync(int cameraId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraSettingDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+
+    public Task<ApiResponse<CameraSettingDto>> PatchCameraSettingAsync(int cameraId, CameraSettingDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraSettingDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+
+    // ──────────────────────────── Speakers ────────────────────────────
+    public Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(int? groupDevice = null, string? speakerType = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<SpeakerDeviceDto>.CreateSuccess(new List<SpeakerDeviceDto>()));
+    public Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<SpeakerDeviceDto>> CreateSpeakerAsync(SpeakerDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<SpeakerDeviceDto>> PatchSpeakerAsync(int id, SpeakerDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<SpeakerDeviceDto>> UpdateSpeakerAsync(int id, SpeakerDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeleteSpeakerAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Enclosures ────────────────────────────
+    public Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(int? groupDevice = null, string? doorStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<EnclosureDeviceDto>.CreateSuccess(new List<EnclosureDeviceDto>()));
+    public Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<EnclosureDeviceDto>> CreateEnclosureAsync(EnclosureDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<EnclosureDeviceDto>> PatchEnclosureAsync(int id, EnclosureDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<EnclosureDeviceDto>> UpdateEnclosureAsync(int id, EnclosureDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeleteEnclosureAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Lamps ────────────────────────────
+    public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(int? groupDevice = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<LampDeviceDto>.CreateSuccess(new List<LampDeviceDto>()));
+    public Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<LampDeviceDto>> CreateLampAsync(LampDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<LampDeviceDto>> PatchLampAsync(int id, LampDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<LampDeviceDto>> UpdateLampAsync(int id, LampDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeleteLampAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Camera Setting (Update only — Get/Patch already above) ────────────────────────────
+    public Task<ApiResponse<CameraSettingDto>> UpdateCameraSettingAsync(int cameraId, CameraSettingDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraSettingDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Camera Presets ────────────────────────────
+    public Task<ApiResponse<PresetListDataDto>> GetPresetsAsync(int cameraId, bool includeRois = false, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<PresetListDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CameraPresetDto>> CreatePresetAsync(int cameraId, CameraPresetDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraPresetDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CameraPresetDto>> GetPresetByIdAsync(int cameraId, int presetId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraPresetDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CameraPresetDto>> PatchPresetAsync(int cameraId, int presetId, CameraPresetDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraPresetDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CameraPresetDto>> UpdatePresetAsync(int cameraId, int presetId, CameraPresetDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CameraPresetDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeletePresetAsync(int cameraId, int presetId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Camera ROIs ────────────────────────────
+    public Task<ApiResponse<RoiListDataDto>> GetRoisAsync(int presetId, bool includePoints = false, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<RoiListDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<RoiDto>> CreateRoiAsync(int presetId, RoiDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<RoiDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<RoiDto>> GetRoiByIdAsync(int presetId, int roiId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<RoiDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<RoiDto>> PatchRoiAsync(int presetId, int roiId, RoiDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<RoiDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<RoiDto>> UpdateRoiAsync(int presetId, int roiId, RoiDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<RoiDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeleteRoiAsync(int presetId, int roiId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Camera Points ────────────────────────────
+    public Task<ApiResponse<PointListDataDto>> GetPointsAsync(int roiId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<PointListDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<XyPointDto>> CreatePointAsync(int roiId, XyPointDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<XyPointDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<PointListDataDto>> ReplacePointsAsync(int roiId, XyPointBulkDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<PointListDataDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<bool>> DeletePointAsync(int roiId, int pointId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── DeviceGroup ────────────────────────────
+    public Task<ApiListResponse<DeviceGroupDto>> GetDeviceGroupsAsync(string? name = null, int page = 1, int limit = 20, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<DeviceGroupDto>.CreateSuccess(new List<DeviceGroupDto>()));
+    public Task<ApiResponse<DeviceGroupDto>> GetDeviceGroupByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceGroupDto>> CreateDeviceGroupAsync(DeviceGroupDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceGroupDto>> PatchDeviceGroupAsync(int id, DeviceGroupDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceGroupDto>> UpdateDeviceGroupAsync(int id, DeviceGroupDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceGroupDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<object>> DeleteDeviceGroupAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceGroupAssignResultDto>> AssignDevicesToGroupAsync(int groupId, DeviceGroupAssignRequestDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceGroupAssignResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<object>> RemoveDeviceFromGroupAsync(int groupId, int deviceId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ──────────────────────────── Enclosure Metrics ────────────────────────────
+    public Task<EnclosureMetricSaveResponseDto> CreateEnclosureMetricAsync(int enclosureId, EnclosureMetricDto dto, CancellationToken token = default)
+        => Task.FromResult(new EnclosureMetricSaveResponseDto());
+    public Task<ApiListResponse<EnclosureMetricDto>> GetEnclosureMetricsAsync(int enclosureId, string? startTime = null, string? endTime = null, int limit = 100, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<EnclosureMetricDto>.CreateSuccess(new List<EnclosureMetricDto>()));
+    public Task<ApiResponse<EnclosureMetricDto>> GetEnclosureMetricLatestAsync(int enclosureId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<EnclosureMetricDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<MetricDeleteResultDto>> DeleteEnclosureMetricsAsync(int enclosureId, string? beforeDate = null, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<MetricDeleteResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
     // ──────────────────────────── IService ────────────────────────────
     public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
     public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
@@ -946,4 +1064,124 @@ public class NavigationMappingHelperTests
         Assert.Empty(orphanedSensors);
     }
     #endregion
+}
+
+/// <summary>
+/// A19.6: DtoToModelHelper — Camera 변환 메서드 테스트
+/// </summary>
+public class DtoToModelHelperCameraTests
+{
+    [Fact(DisplayName = "A19.6-1: HardwareSpecDto → ICameraInfoModel 변환")]
+    [Trait("Category", "DtoToModel")]
+    public void HardwareSpecDto_ToICameraInfoModel()
+    {
+        var dto = new HardwareSpecDto
+        {
+            Name = "PTZ Camera",
+            Location = "정문",
+            Manufacturer = "Hanwha",
+            Model = "XNP-9300",
+            Hardware = "v2.0",
+            Firmware = "3.10",
+            DeviceId = "CAM-001",
+            MacAddress = "00:11:22:33:44:55",
+            OnvifVersion = "2.4"
+        };
+
+        var model = DtoToModelHelper.ToCameraInfoModel(dto);
+
+        Assert.NotNull(model);
+        Assert.Equal("PTZ Camera", model.Name);
+        Assert.Equal("정문", model.Location);
+        Assert.Equal("Hanwha", model.Manufacturer);
+        Assert.Equal("XNP-9300", model.Model);
+        Assert.Equal("v2.0", model.Hardware);
+        Assert.Equal("3.10", model.Firmware);
+        Assert.Equal("CAM-001", model.DeviceId);
+        Assert.Equal("00:11:22:33:44:55", model.MacAddress);
+        Assert.Equal("2.4", model.OnvifVersion);
+    }
+
+    [Fact(DisplayName = "A19.6-2: CameraUrlsDto → ICameraUrlsModel 변환")]
+    [Trait("Category", "DtoToModel")]
+    public void CameraUrlsDto_ToICameraUrlsModel()
+    {
+        var dto = new CameraUrlsDto
+        {
+            Homepage = new CameraHomepageDto { Url = "http://192.168.1.100" },
+            Onvif = new CameraOnvifDto { DeviceService = "http://192.168.1.100:80/onvif" },
+            Streams = new CameraStreamsDto
+            {
+                Rtsp = new CameraRtspDto { Main = "rtsp://main", Sub = "rtsp://sub" },
+                Webrtc = new CameraWebrtcDto { Main = "http://webrtc" }
+            },
+            Snapshot = new CameraSnapshotDto { Ch1 = "http://snapshot" }
+        };
+
+        var model = DtoToModelHelper.ToCameraUrlsModel(dto);
+
+        Assert.NotNull(model);
+        Assert.Equal("http://192.168.1.100", model.HomepageUrl);
+        Assert.Equal("http://192.168.1.100:80/onvif", model.OnvifDeviceService);
+        Assert.Equal("rtsp://main", model.RtspMain);
+        Assert.Equal("rtsp://sub", model.RtspSub);
+        Assert.Equal("http://webrtc", model.WebrtcMain);
+        Assert.Equal("http://snapshot", model.SnapshotCh1);
+    }
+
+    [Fact(DisplayName = "A19.6-3: CameraSettingDto → ICameraSettingModel 변환")]
+    [Trait("Category", "DtoToModel")]
+    public void CameraSettingDto_ToICameraSettingModel()
+    {
+        var dto = new CameraSettingDto
+        {
+            Id = 5,
+            CameraId = 100,
+            WeatherMode = "RAIN",
+            CameraMode = "PATROL",
+            Heater = "on",
+            Fan = "off",
+            Headlight = "on",
+            DayNightMode = "NIGHT",
+            FocusMode = "MANUAL",
+            IrisMode = "AUTO",
+            Tracking = "ACTIVE",
+            Palette = "WHITE_HOT"
+        };
+
+        var model = DtoToModelHelper.ToCameraSettingModel(dto);
+
+        Assert.NotNull(model);
+        Assert.Equal(5, model.Id);
+        Assert.Equal(100, model.CameraId);
+        Assert.Equal("RAIN", model.WeatherMode);
+        Assert.Equal("PATROL", model.CameraMode);
+        Assert.Equal("on", model.Heater);
+        Assert.Equal("off", model.Fan);
+        Assert.Equal("on", model.Headlight);
+        Assert.Equal("NIGHT", model.DayNightMode);
+        Assert.Equal("MANUAL", model.FocusMode);
+        Assert.Equal("AUTO", model.IrisMode);
+        Assert.Equal("ACTIVE", model.Tracking);
+        Assert.Equal("WHITE_HOT", model.Palette);
+    }
+
+    [Fact(DisplayName = "A19.6-4: GeolocationDto → ICameraPositionModel 변환")]
+    [Trait("Category", "DtoToModel")]
+    public void GeolocationDto_ToICameraPositionModel()
+    {
+        var dto = new GeolocationDto
+        {
+            Latitude = 37.5665,
+            Longitude = 126.978,
+            Altitude = 85.5
+        };
+
+        var model = DtoToModelHelper.ToCameraPositionModel(dto);
+
+        Assert.NotNull(model);
+        Assert.Equal(37.5665, model.Latitude);
+        Assert.Equal(126.978, model.Longitude);
+        Assert.Equal(85.5, model.Altitude);
+    }
 }

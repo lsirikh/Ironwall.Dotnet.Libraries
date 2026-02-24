@@ -440,7 +440,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             var deviceId = await _conn.ExecuteScalarAsync<int>(deviceSql, new
             {
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
@@ -509,7 +509,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             {
                 model.Id,
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
@@ -708,7 +708,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
         var deviceId = await _conn.ExecuteScalarAsync<int>(deviceSql, new
         {
             model.DeviceNumber,
-            model.DeviceGroup,
+            DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
             model.DeviceName,
             DeviceType = model.DeviceType.ToString(),
             model.Version,
@@ -759,7 +759,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             {
                 model.Id,
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
@@ -894,7 +894,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             var deviceId = await _conn.ExecuteScalarAsync<int>(deviceSql, new
             {
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
@@ -958,7 +958,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             {
                 model.Id,
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
@@ -1076,7 +1076,7 @@ internal sealed class ControllerJoinSQL
     {
         Id = Id,
         DeviceNumber = DeviceNumber,
-        DeviceGroup = DeviceGroup,
+        DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
         DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
         Version = Version,
@@ -1101,7 +1101,7 @@ internal sealed class SensorJoinSQL
     {
         Id = Id,
         DeviceNumber = DeviceNumber,
-        DeviceGroup = DeviceGroup,
+        DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
         DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
         Version = Version,
@@ -1131,7 +1131,7 @@ internal sealed class CameraJoinSQL
     {
         Id = Id,
         DeviceNumber = DeviceNumber,
-        DeviceGroup = DeviceGroup,
+        DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
         DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
         Version = Version,

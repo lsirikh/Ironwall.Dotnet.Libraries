@@ -26,16 +26,10 @@ public class ActionEventCreateDto
     public string User { get; set; } = string.Empty;
 
     /// <summary>
-    /// 원본 이벤트 ID
+    /// 원본 이벤트 ID (events.id FK)
     /// </summary>
-    [JsonProperty("from_event", Order = 4)]
-    public int FromEvent { get; set; }
-
-    /// <summary>
-    /// 원본 이벤트 타입
-    /// </summary>
-    [JsonProperty("from_type_event", Order = 5)]
-    public string FromEventType { get; set; } = string.Empty;
+    [JsonProperty("from_event_id", Order = 4)]
+    public int FromEventId { get; set; }
 
     /// <summary>
     /// 이벤트 발생 일시 (ISO 8601)

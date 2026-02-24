@@ -20,10 +20,10 @@ public class CameraDeviceDto
     public int NumberDevice { get; set; }
 
     /// <summary>
-    /// 디바이스 그룹
+    /// 복수 그룹 소속
     /// </summary>
-    [JsonProperty("group_device", Order = 3)]
-    public int GroupDevice { get; set; }
+    [JsonProperty("device_groups", Order = 3)]
+    public List<int>? DeviceGroups { get; set; }
 
     /// <summary>
     /// 디바이스 이름

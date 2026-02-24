@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -551,6 +552,788 @@ public class DeviceApiService : IDeviceApiService
             return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete camera {id}", ex.Message);
         }
     }
+
+    public async Task<ApiResponse<CameraSettingDto>> GetCameraSettingAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/settings");
+            return await response.ToApiResponseAsync<CameraSettingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetCameraSettingAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraSettingDto>.CreateError("INTERNAL_ERROR", $"Failed to get camera setting {cameraId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<CameraSettingDto>> PatchCameraSettingAsync(int cameraId, CameraSettingDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/settings", dto);
+            return await response.ToApiResponseAsync<CameraSettingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchCameraSettingAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraSettingDto>.CreateError("INTERNAL_ERROR", $"Failed to patch camera setting {cameraId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<CameraSettingDto>> UpdateCameraSettingAsync(int cameraId, CameraSettingDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/settings", dto);
+            return await response.ToApiResponseAsync<CameraSettingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateCameraSettingAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraSettingDto>.CreateError("INTERNAL_ERROR", $"Failed to update camera setting {cameraId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Camera Preset API -
+
+    public async Task<ApiResponse<PresetListDataDto>> GetPresetsAsync(int cameraId, bool includeRois = false, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (includeRois) parameters.Add("include_rois", "true");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets", parameters);
+            return await response.ToApiResponseAsync<PresetListDataDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetPresetsAsync)}] Error: {ex.Message}");
+            return ApiResponse<PresetListDataDto>.CreateError("INTERNAL_ERROR", $"Failed to get presets for camera {cameraId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<CameraPresetDto>> CreatePresetAsync(int cameraId, CameraPresetDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets", dto);
+            return await response.ToApiResponseAsync<CameraPresetDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreatePresetAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraPresetDto>.CreateError("INTERNAL_ERROR", $"Failed to create preset for camera {cameraId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<CameraPresetDto>> GetPresetByIdAsync(int cameraId, int presetId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets/{presetId}");
+            return await response.ToApiResponseAsync<CameraPresetDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetPresetByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraPresetDto>.CreateError("INTERNAL_ERROR", $"Failed to get preset {presetId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<CameraPresetDto>> PatchPresetAsync(int cameraId, int presetId, CameraPresetDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets/{presetId}", dto);
+            return await response.ToApiResponseAsync<CameraPresetDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchPresetAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraPresetDto>.CreateError("INTERNAL_ERROR", $"Failed to patch preset {presetId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<CameraPresetDto>> UpdatePresetAsync(int cameraId, int presetId, CameraPresetDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets/{presetId}", dto);
+            return await response.ToApiResponseAsync<CameraPresetDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdatePresetAsync)}] Error: {ex.Message}");
+            return ApiResponse<CameraPresetDto>.CreateError("INTERNAL_ERROR", $"Failed to update preset {presetId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeletePresetAsync(int cameraId, int presetId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/cameras/{cameraId}/presets/{presetId}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeletePresetAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete preset {presetId}", ex.Message);
+        }
+    }
+
+    #endregion
+
+    #region - ROI API -
+
+    public async Task<ApiResponse<RoiListDataDto>> GetRoisAsync(int presetId, bool includePoints = false, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (includePoints) parameters.Add("include_points", "true");
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/presets/{presetId}/rois", parameters);
+            return await response.ToApiResponseAsync<RoiListDataDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetRoisAsync)}] Error: {ex.Message}");
+            return ApiResponse<RoiListDataDto>.CreateError("INTERNAL_ERROR", $"Failed to get ROIs for preset {presetId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<RoiDto>> CreateRoiAsync(int presetId, RoiDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/presets/{presetId}/rois", dto);
+            return await response.ToApiResponseAsync<RoiDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateRoiAsync)}] Error: {ex.Message}");
+            return ApiResponse<RoiDto>.CreateError("INTERNAL_ERROR", $"Failed to create ROI for preset {presetId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<RoiDto>> GetRoiByIdAsync(int presetId, int roiId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/presets/{presetId}/rois/{roiId}");
+            return await response.ToApiResponseAsync<RoiDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetRoiByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<RoiDto>.CreateError("INTERNAL_ERROR", $"Failed to get ROI {roiId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<RoiDto>> PatchRoiAsync(int presetId, int roiId, RoiDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/presets/{presetId}/rois/{roiId}", dto);
+            return await response.ToApiResponseAsync<RoiDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchRoiAsync)}] Error: {ex.Message}");
+            return ApiResponse<RoiDto>.CreateError("INTERNAL_ERROR", $"Failed to patch ROI {roiId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<RoiDto>> UpdateRoiAsync(int presetId, int roiId, RoiDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/presets/{presetId}/rois/{roiId}", dto);
+            return await response.ToApiResponseAsync<RoiDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateRoiAsync)}] Error: {ex.Message}");
+            return ApiResponse<RoiDto>.CreateError("INTERNAL_ERROR", $"Failed to update ROI {roiId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteRoiAsync(int presetId, int roiId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/presets/{presetId}/rois/{roiId}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteRoiAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete ROI {roiId}", ex.Message);
+        }
+    }
+
+    #endregion
+
+    #region - Point API -
+
+    public async Task<ApiResponse<PointListDataDto>> GetPointsAsync(int roiId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/rois/{roiId}/points");
+            return await response.ToApiResponseAsync<PointListDataDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetPointsAsync)}] Error: {ex.Message}");
+            return ApiResponse<PointListDataDto>.CreateError("INTERNAL_ERROR", $"Failed to get points for ROI {roiId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<XyPointDto>> CreatePointAsync(int roiId, XyPointDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/rois/{roiId}/points", dto);
+            return await response.ToApiResponseAsync<XyPointDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreatePointAsync)}] Error: {ex.Message}");
+            return ApiResponse<XyPointDto>.CreateError("INTERNAL_ERROR", $"Failed to create point for ROI {roiId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<PointListDataDto>> ReplacePointsAsync(int roiId, XyPointBulkDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/rois/{roiId}/points", dto);
+            return await response.ToApiResponseAsync<PointListDataDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(ReplacePointsAsync)}] Error: {ex.Message}");
+            return ApiResponse<PointListDataDto>.CreateError("INTERNAL_ERROR", $"Failed to replace points for ROI {roiId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeletePointAsync(int roiId, int pointId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/rois/{roiId}/points/{pointId}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeletePointAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete point {pointId}", ex.Message);
+        }
+    }
+
+    #endregion
+
+    #region - Speaker Device API -
+    public async Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(
+        int? groupDevice = null,
+        string? speakerType = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
+            if (!string.IsNullOrEmpty(speakerType)) parameters.Add("speaker_type", speakerType);
+            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            parameters.Add("page", page.ToString());
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/speakers", parameters);
+            return await response.ToApiListResponseAsync<SpeakerDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetSpeakersAsync)}] Error: {ex.Message}");
+            return ApiListResponse<SpeakerDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to get speakers", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/speakers/{id}");
+            return await response.ToApiResponseAsync<SpeakerDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetSpeakerByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<SpeakerDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to get speaker {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<SpeakerDeviceDto>> CreateSpeakerAsync(SpeakerDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/speakers", dto);
+            return await response.ToApiResponseAsync<SpeakerDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<SpeakerDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to create speaker", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<SpeakerDeviceDto>> PatchSpeakerAsync(int id, SpeakerDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", dto);
+            return await response.ToApiResponseAsync<SpeakerDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<SpeakerDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to patch speaker {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<SpeakerDeviceDto>> UpdateSpeakerAsync(int id, SpeakerDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/speakers/{id}", dto);
+            return await response.ToApiResponseAsync<SpeakerDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<SpeakerDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to update speaker {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteSpeakerAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/speakers/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete speaker {id}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Enclosure Device API -
+    public async Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(
+        int? groupDevice = null,
+        string? doorStatus = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
+            if (!string.IsNullOrEmpty(doorStatus)) parameters.Add("door_status", doorStatus);
+            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            parameters.Add("page", page.ToString());
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/enclosures", parameters);
+            return await response.ToApiListResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEnclosuresAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to get enclosures", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}");
+            return await response.ToApiResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEnclosureByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to get enclosure {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EnclosureDeviceDto>> CreateEnclosureAsync(EnclosureDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/enclosures", dto);
+            return await response.ToApiResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateEnclosureAsync)}] Error: {ex.Message}");
+            return ApiResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to create enclosure", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EnclosureDeviceDto>> PatchEnclosureAsync(int id, EnclosureDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", dto);
+            return await response.ToApiResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchEnclosureAsync)}] Error: {ex.Message}");
+            return ApiResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to patch enclosure {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EnclosureDeviceDto>> UpdateEnclosureAsync(int id, EnclosureDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}", dto);
+            return await response.ToApiResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateEnclosureAsync)}] Error: {ex.Message}");
+            return ApiResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to update enclosure {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteEnclosureAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/enclosures/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteEnclosureAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete enclosure {id}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Lamp Device API -
+    public async Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(
+        int? groupDevice = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
+            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            parameters.Add("page", page.ToString());
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/lamps", parameters);
+            return await response.ToApiListResponseAsync<LampDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetLampsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<LampDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to get lamps", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/lamps/{id}");
+            return await response.ToApiResponseAsync<LampDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetLampByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<LampDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to get lamp {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<LampDeviceDto>> CreateLampAsync(LampDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/lamps", dto);
+            return await response.ToApiResponseAsync<LampDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<LampDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to create lamp", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<LampDeviceDto>> PatchLampAsync(int id, LampDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", dto);
+            return await response.ToApiResponseAsync<LampDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<LampDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to patch lamp {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<LampDeviceDto>> UpdateLampAsync(int id, LampDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/lamps/{id}", dto);
+            return await response.ToApiResponseAsync<LampDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<LampDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to update lamp {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteLampAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/lamps/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete lamp {id}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Enclosure Metrics API (§5.5.9~12) -
+    public async Task<EnclosureMetricSaveResponseDto> CreateEnclosureMetricAsync(
+        int enclosureId, EnclosureMetricDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync(
+                $"{_setupModel.Url}/devices/enclosures/{enclosureId}/metrics", dto);
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<EnclosureMetricSaveResponseDto>(content);
+            return result ?? new EnclosureMetricSaveResponseDto { Success = false, Message = "Parse error" };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateEnclosureMetricAsync)}] Error: {ex.Message}");
+            return new EnclosureMetricSaveResponseDto { Success = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<ApiListResponse<EnclosureMetricDto>> GetEnclosureMetricsAsync(
+        int enclosureId, string? startTime = null, string? endTime = null,
+        int limit = 100, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                ["limit"] = limit.ToString()
+            };
+            if (!string.IsNullOrEmpty(startTime)) parameters["start_time"] = startTime;
+            if (!string.IsNullOrEmpty(endTime)) parameters["end_time"] = endTime;
+
+            var response = await _apiService.GetRequestAsync(
+                $"{_setupModel.Url}/devices/enclosures/{enclosureId}/metrics", parameters);
+            return await response.ToApiListResponseAsync<EnclosureMetricDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEnclosureMetricsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EnclosureMetricDto>.CreateError("INTERNAL_ERROR", "Failed to get enclosure metrics", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EnclosureMetricDto>> GetEnclosureMetricLatestAsync(
+        int enclosureId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync(
+                $"{_setupModel.Url}/devices/enclosures/{enclosureId}/metrics/latest");
+            return await response.ToApiResponseAsync<EnclosureMetricDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEnclosureMetricLatestAsync)}] Error: {ex.Message}");
+            return ApiResponse<EnclosureMetricDto>.CreateError("INTERNAL_ERROR", "Failed to get latest enclosure metric", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<MetricDeleteResultDto>> DeleteEnclosureMetricsAsync(
+        int enclosureId, string? beforeDate = null, CancellationToken token = default)
+    {
+        try
+        {
+            var endpoint = $"{_setupModel.Url}/devices/enclosures/{enclosureId}/metrics";
+            if (!string.IsNullOrEmpty(beforeDate))
+                endpoint += $"?before_date={beforeDate}";
+
+            var response = await _apiService.DeleteRequestAsync(endpoint);
+            return await response.ToApiResponseAsync<MetricDeleteResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteEnclosureMetricsAsync)}] Error: {ex.Message}");
+            return ApiResponse<MetricDeleteResultDto>.CreateError("INTERNAL_ERROR", "Failed to delete enclosure metrics", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - DeviceGroup CRUD -
+
+    public async Task<ApiListResponse<DeviceGroupDto>> GetDeviceGroupsAsync(
+        string? name = null, int page = 1, int limit = 20, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                ["page"] = page.ToString(),
+                ["limit"] = limit.ToString()
+            };
+            if (!string.IsNullOrEmpty(name))
+                parameters["name"] = name;
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/groups", parameters);
+            return await response.ToApiListResponseAsync<DeviceGroupDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDeviceGroupsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<DeviceGroupDto>.CreateError("INTERNAL_ERROR", "Failed to get device groups", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<DeviceGroupDto>> GetDeviceGroupByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/groups/{id}");
+            return await response.ToApiResponseAsync<DeviceGroupDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDeviceGroupByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceGroupDto>.CreateError("INTERNAL_ERROR", $"Failed to get device group {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<DeviceGroupDto>> CreateDeviceGroupAsync(DeviceGroupDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/groups", dto);
+            return await response.ToApiResponseAsync<DeviceGroupDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateDeviceGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceGroupDto>.CreateError("INTERNAL_ERROR", "Failed to create device group", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<DeviceGroupDto>> PatchDeviceGroupAsync(int id, DeviceGroupDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/groups/{id}", dto);
+            return await response.ToApiResponseAsync<DeviceGroupDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchDeviceGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceGroupDto>.CreateError("INTERNAL_ERROR", $"Failed to patch device group {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<DeviceGroupDto>> UpdateDeviceGroupAsync(int id, DeviceGroupDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/devices/groups/{id}", dto);
+            return await response.ToApiResponseAsync<DeviceGroupDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateDeviceGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceGroupDto>.CreateError("INTERNAL_ERROR", $"Failed to update device group {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<object>> DeleteDeviceGroupAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/groups/{id}");
+            return await response.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteDeviceGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"Failed to delete device group {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<DeviceGroupAssignResultDto>> AssignDevicesToGroupAsync(
+        int groupId, DeviceGroupAssignRequestDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/devices/groups/{groupId}/devices", dto);
+            return await response.ToApiResponseAsync<DeviceGroupAssignResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(AssignDevicesToGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceGroupAssignResultDto>.CreateError("INTERNAL_ERROR", "Failed to assign devices to group", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<object>> RemoveDeviceFromGroupAsync(int groupId, int deviceId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/groups/{groupId}/devices/{deviceId}");
+            return await response.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(RemoveDeviceFromGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", "Failed to remove device from group", ex.Message);
+        }
+    }
+
     #endregion
 
     #region - Attributes -

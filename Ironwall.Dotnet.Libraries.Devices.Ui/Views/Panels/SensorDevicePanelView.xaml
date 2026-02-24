@@ -214,7 +214,7 @@
 				<DataGridTemplateColumn
 					CanUserSort="True"
 					Header="Device Group"
-					SortMemberPath="DeviceGroup">
+					SortMemberPath="DeviceGroupsText">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
 							<Setter Property="HorizontalAlignment" Value="Center" />
@@ -225,7 +225,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding DeviceGroupsText}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -233,7 +233,7 @@
 						<DataTemplate>
 							<TextBox
 								VerticalAlignment="Center"
-								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding DeviceGroupsText}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>

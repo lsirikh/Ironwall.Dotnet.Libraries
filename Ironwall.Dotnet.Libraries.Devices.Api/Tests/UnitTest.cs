@@ -195,7 +195,7 @@ public class DeviceApiServiceTests
 
         var dto = new ControllerDeviceDto
         {
-            GroupDevice = 1,
+            DeviceGroups = new List<DeviceGroupDto> { new() { Id = 1 } },
             NumberDevice = 1,
             NameDevice = "제어기_1",
             TypeDevice = "Controller",
@@ -399,7 +399,7 @@ public class DeviceApiServiceTests
         var dto = new SensorDeviceDto
         {
             ControllerId = 1,
-            GroupDevice = 1,
+            DeviceGroups = new List<DeviceGroupDto> { new() { Id = 1 } },
             NumberDevice = 2,
             NameDevice = "Fence_002",
             TypeDevice = "Fence",
@@ -468,7 +468,7 @@ public class DeviceApiServiceTests
         var dto = new SensorDeviceDto
         {
             ControllerId = 1,
-            GroupDevice = 1,
+            DeviceGroups = new List<DeviceGroupDto> { new() { Id = 1 } },
             NumberDevice = 1,
             NameDevice = "전체_수정_센서",
             TypeDevice = "Laser",
@@ -578,7 +578,7 @@ public class DeviceApiServiceTests
 
         var dto = new CameraDeviceDto
         {
-            GroupDevice = 1,
+            DeviceGroups = new List<DeviceGroupDto> { new() { Id = 1 } },
             NumberDevice = 100,
             NameDevice = "테스트_카메라",
             TypeDevice = "IpCamera",
@@ -654,7 +654,7 @@ public class DeviceApiServiceTests
 
         var dto = new CameraDeviceDto
         {
-            GroupDevice = 1,
+            DeviceGroups = new List<DeviceGroupDto> { new() { Id = 1 } },
             NumberDevice = 100,
             NameDevice = "테스트_카메라",
             TypeDevice = "IpCamera",
@@ -722,7 +722,7 @@ public class DeviceApiServiceTests
         {
             var dto = new ControllerDeviceDto
             {
-                GroupDevice = i,
+                DeviceGroups = new List<DeviceGroupDto> { new() { Id = i } },
                 NumberDevice = 1,
                 NameDevice = $"제어기_{i:00}",
                 TypeDevice = "Controller",
@@ -770,7 +770,7 @@ public class DeviceApiServiceTests
             var dto = new SensorDeviceDto
             {
                 ControllerId = controllerId,
-                GroupDevice = controllerId,
+                DeviceGroups = new List<DeviceGroupDto> { new() { Id = controllerId } },
                 NumberDevice = i,
                 NameDevice = $"펜스센서_{controllerId:00}-{i:000}",
                 TypeDevice = "Fence",
@@ -822,7 +822,7 @@ public class DeviceApiServiceTests
             // 1. 제어기 생성
             var controllerDto = new ControllerDeviceDto
             {
-                GroupDevice = c,
+                DeviceGroups = new List<DeviceGroupDto> { new() { Id = c } },
                 NumberDevice = c,
                 NameDevice = $"제어기_{c:00}",
                 TypeDevice = "Controller",
@@ -848,7 +848,7 @@ public class DeviceApiServiceTests
                 var sensorDto = new SensorDeviceDto
                 {
                     ControllerId = controllerId,
-                    GroupDevice = c,
+                    DeviceGroups = new List<DeviceGroupDto> { new() { Id = c } },
                     NumberDevice = s,
                     NameDevice = $"펜스센서_{c:00}-{s:000}",
                     TypeDevice = "Fence",
@@ -923,7 +923,7 @@ public class DeviceApiServiceTests
 
             var dto = new CameraDeviceDto
             {
-                GroupDevice = (cam - 1) / 10 + 100, // 100, 101, 102, 103... 그룹으로 분산
+                DeviceGroups = new List<DeviceGroupDto> { new() { Id = (cam - 1) / 10 + 100 } }, // 100, 101, 102, 103... 그룹으로 분산
                 NumberDevice = ((cam - 1) % 10) + 1,  // 각 그룹 내에서 1~10 번호
                 NameDevice = $"IP카메라_{cam:000}_{cameraType}",
                 TypeDevice = "IpCamera",
@@ -1004,4 +1004,157 @@ public class DeviceApiServiceTests
         Assert.Equal(10, setup.Timeout); // Default value from base ApiSetupModel
     }
     #endregion
+}
+
+/// <summary>
+/// Enclosure Metrics API 테스트 (§5.5.9~12)
+/// GOP API 서버 (localhost:8000) 가동 필요, Enclosure id=3 필요
+/// </summary>
+[Collection("EnclosureMetricsTests")]
+public class EnclosureMetricsTests
+{
+    private readonly ILogService _logService;
+    private readonly ApiSetupModel _setupModel;
+    private const int TestEnclosureId = 3;
+
+    public EnclosureMetricsTests()
+    {
+        _logService = new LogService();
+        _setupModel = new ApiSetupModel
+        {
+            Url = "http://localhost:8000/api",
+            Username = "admin",
+            Password = "admin123",
+            Timeout = 30
+        };
+    }
+
+    private async Task<IDeviceApiService> CreateServiceAsync()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(new DeviceApiModule(_logService, _setupModel, "EnclosureTest"));
+        var container = builder.Build();
+        var service = container.ResolveNamed<IDeviceApiService>("EnclosureTest");
+        await service.ExecuteAsync(CancellationToken.None);
+        return service;
+    }
+
+    [Fact(DisplayName = "A62.1: CreateEnclosureMetricAsync — 환경 메트릭 기록")]
+    public async Task CreateEnclosureMetricAsync_ShouldSaveMetric()
+    {
+        // Arrange
+        var service = await CreateServiceAsync();
+        var dto = new EnclosureMetricDto
+        {
+            Temperature = "26.5",
+            Humidity = "55.0",
+            Current = "1.5",
+            Voltage = "220.0"
+        };
+
+        // Act
+        var response = await service.CreateEnclosureMetricAsync(TestEnclosureId, dto);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success, $"API 호출 실패: {response.Message}");
+        Assert.NotNull(response.Data);
+        Assert.Equal(TestEnclosureId, response.Data.EnclosureId);
+        Assert.Equal("26.5", response.Data.Temperature);
+
+        _logService.Info($"[Test] Enclosure metric created: Id={response.Data.Id}");
+    }
+
+    [Fact(DisplayName = "A62.2: GetEnclosureMetricsAsync — 메트릭 이력 조회")]
+    public async Task GetEnclosureMetricsAsync_ShouldReturnHistory()
+    {
+        // Arrange
+        var service = await CreateServiceAsync();
+        // 먼저 1건 생성
+        await service.CreateEnclosureMetricAsync(TestEnclosureId, new EnclosureMetricDto
+        {
+            Temperature = "27.0",
+            Humidity = "50.0"
+        });
+
+        // Act
+        var response = await service.GetEnclosureMetricsAsync(TestEnclosureId);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success, $"API 호출 실패: {response.Message}");
+        Assert.NotNull(response.Data);
+        Assert.True(response.Data.Count >= 1);
+
+        _logService.Info($"[Test] Enclosure metrics count: {response.Data.Count}");
+    }
+
+    [Fact(DisplayName = "A62.3: GetEnclosureMetricLatestAsync — 최신 메트릭 조회")]
+    public async Task GetEnclosureMetricLatestAsync_ShouldReturnLatest()
+    {
+        // Arrange
+        var service = await CreateServiceAsync();
+
+        // Act
+        var response = await service.GetEnclosureMetricLatestAsync(TestEnclosureId);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success, $"API 호출 실패: {response.Message}");
+        Assert.NotNull(response.Data);
+        Assert.Equal(TestEnclosureId, response.Data.EnclosureId);
+
+        _logService.Info($"[Test] Latest metric: Temp={response.Data.Temperature}");
+    }
+
+    [Fact(DisplayName = "A62.4: DeleteEnclosureMetricsAsync — 메트릭 삭제")]
+    public async Task DeleteEnclosureMetricsAsync_ShouldReturnDeletedCount()
+    {
+        // Arrange
+        var service = await CreateServiceAsync();
+
+        // Act — 과거 날짜로 삭제 (삭제 대상 없어도 성공)
+        var response = await service.DeleteEnclosureMetricsAsync(TestEnclosureId, "2020-01-01");
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success, $"API 호출 실패: {response.Message}");
+        Assert.NotNull(response.Data);
+        Assert.True(response.Data.DeletedCount >= 0);
+
+        _logService.Info($"[Test] Enclosure metrics deleted: {response.Data.DeletedCount}");
+    }
+
+    [Fact(DisplayName = "A62.5: Enclosure Metrics Lifecycle — Record→Query→Latest→Delete")]
+    public async Task EnclosureMetricsLifecycle_RecordQueryDelete()
+    {
+        var service = await CreateServiceAsync();
+
+        // 1. Create
+        var createResponse = await service.CreateEnclosureMetricAsync(TestEnclosureId, new EnclosureMetricDto
+        {
+            Temperature = "30.0",
+            Humidity = "65.0",
+            Current = "2.0",
+            Voltage = "220.0",
+            Vibration = 5
+        });
+        Assert.True(createResponse.Success, $"Create 실패: {createResponse.Message}");
+
+        // 2. Get History
+        var historyResponse = await service.GetEnclosureMetricsAsync(TestEnclosureId);
+        Assert.True(historyResponse.Success, $"GetHistory 실패: {historyResponse.Message}");
+        Assert.True(historyResponse.Data!.Count >= 1);
+
+        // 3. Get Latest
+        var latestResponse = await service.GetEnclosureMetricLatestAsync(TestEnclosureId);
+        Assert.True(latestResponse.Success, $"GetLatest 실패: {latestResponse.Message}");
+        Assert.NotNull(latestResponse.Data);
+
+        // 4. Delete (과거 날짜)
+        var deleteResponse = await service.DeleteEnclosureMetricsAsync(TestEnclosureId, "2020-01-01");
+        Assert.True(deleteResponse.Success, $"Delete 실패: {deleteResponse.Message}");
+
+        _logService.Info("[Test] Enclosure Metrics lifecycle completed successfully");
+    }
 }

@@ -263,4 +263,269 @@ public interface IDeviceApiService : IService
     Task<ApiResponse<bool>> DeleteCameraAsync(
         int id,
         CancellationToken token = default);
+
+    // ────────────────────────── Camera Setting ──────────────────────────
+
+    Task<ApiResponse<CameraSettingDto>> GetCameraSettingAsync(
+        int cameraId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<CameraSettingDto>> PatchCameraSettingAsync(
+        int cameraId,
+        CameraSettingDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<CameraSettingDto>> UpdateCameraSettingAsync(
+        int cameraId,
+        CameraSettingDto dto,
+        CancellationToken token = default);
+
+    // ────────────────────────── Camera Preset CRUD (§5.3.8) ──────────────────────────
+
+    Task<ApiResponse<PresetListDataDto>> GetPresetsAsync(
+        int cameraId,
+        bool includeRois = false,
+        CancellationToken token = default);
+
+    Task<ApiResponse<CameraPresetDto>> CreatePresetAsync(
+        int cameraId,
+        CameraPresetDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<CameraPresetDto>> GetPresetByIdAsync(
+        int cameraId,
+        int presetId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<CameraPresetDto>> PatchPresetAsync(
+        int cameraId,
+        int presetId,
+        CameraPresetDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<CameraPresetDto>> UpdatePresetAsync(
+        int cameraId,
+        int presetId,
+        CameraPresetDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeletePresetAsync(
+        int cameraId,
+        int presetId,
+        CancellationToken token = default);
+
+    // ────────────────────────── ROI CRUD (§5.3.9) ──────────────────────────
+
+    Task<ApiResponse<RoiListDataDto>> GetRoisAsync(
+        int presetId,
+        bool includePoints = false,
+        CancellationToken token = default);
+
+    Task<ApiResponse<RoiDto>> CreateRoiAsync(
+        int presetId,
+        RoiDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<RoiDto>> GetRoiByIdAsync(
+        int presetId,
+        int roiId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<RoiDto>> PatchRoiAsync(
+        int presetId,
+        int roiId,
+        RoiDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<RoiDto>> UpdateRoiAsync(
+        int presetId,
+        int roiId,
+        RoiDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteRoiAsync(
+        int presetId,
+        int roiId,
+        CancellationToken token = default);
+
+    // ────────────────────────── Point CRUD (ROI 하위) ──────────────────────────
+
+    Task<ApiResponse<PointListDataDto>> GetPointsAsync(
+        int roiId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<XyPointDto>> CreatePointAsync(
+        int roiId,
+        XyPointDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<PointListDataDto>> ReplacePointsAsync(
+        int roiId,
+        XyPointBulkDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeletePointAsync(
+        int roiId,
+        int pointId,
+        CancellationToken token = default);
+
+    // ────────────────────────── Speaker Device CRUD ──────────────────────────
+
+    Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(
+        int? groupDevice = null,
+        string? speakerType = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    Task<ApiResponse<SpeakerDeviceDto>> CreateSpeakerAsync(
+        SpeakerDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<SpeakerDeviceDto>> PatchSpeakerAsync(
+        int id,
+        SpeakerDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<SpeakerDeviceDto>> UpdateSpeakerAsync(
+        int id,
+        SpeakerDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteSpeakerAsync(
+        int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── Enclosure Device CRUD ──────────────────────────
+
+    Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(
+        int? groupDevice = null,
+        string? doorStatus = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EnclosureDeviceDto>> CreateEnclosureAsync(
+        EnclosureDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EnclosureDeviceDto>> PatchEnclosureAsync(
+        int id,
+        EnclosureDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EnclosureDeviceDto>> UpdateEnclosureAsync(
+        int id,
+        EnclosureDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteEnclosureAsync(
+        int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── Lamp Device CRUD ──────────────────────────
+
+    Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(
+        int? groupDevice = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    Task<ApiResponse<LampDeviceDto>> CreateLampAsync(
+        LampDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<LampDeviceDto>> PatchLampAsync(
+        int id,
+        LampDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<LampDeviceDto>> UpdateLampAsync(
+        int id,
+        LampDeviceDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteLampAsync(
+        int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── Enclosure Metrics (§5.5.9~12) ──────────────────────────
+
+    Task<EnclosureMetricSaveResponseDto> CreateEnclosureMetricAsync(
+        int enclosureId,
+        EnclosureMetricDto dto,
+        CancellationToken token = default);
+
+    Task<ApiListResponse<EnclosureMetricDto>> GetEnclosureMetricsAsync(
+        int enclosureId,
+        string? startTime = null,
+        string? endTime = null,
+        int limit = 100,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EnclosureMetricDto>> GetEnclosureMetricLatestAsync(
+        int enclosureId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<MetricDeleteResultDto>> DeleteEnclosureMetricsAsync(
+        int enclosureId,
+        string? beforeDate = null,
+        CancellationToken token = default);
+
+    // ────────────────────────── DeviceGroup CRUD (§5.6) ──────────────────────────
+
+    Task<ApiListResponse<DeviceGroupDto>> GetDeviceGroupsAsync(
+        string? name = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<DeviceGroupDto>> GetDeviceGroupByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    Task<ApiResponse<DeviceGroupDto>> CreateDeviceGroupAsync(
+        DeviceGroupDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<DeviceGroupDto>> PatchDeviceGroupAsync(
+        int id,
+        DeviceGroupDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<DeviceGroupDto>> UpdateDeviceGroupAsync(
+        int id,
+        DeviceGroupDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<object>> DeleteDeviceGroupAsync(
+        int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── DeviceGroup 디바이스 할당/제거 ──────────────────────────
+
+    Task<ApiResponse<DeviceGroupAssignResultDto>> AssignDevicesToGroupAsync(
+        int groupId,
+        DeviceGroupAssignRequestDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<object>> RemoveDeviceFromGroupAsync(
+        int groupId,
+        int deviceId,
+        CancellationToken token = default);
 }

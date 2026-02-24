@@ -36,7 +36,6 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         {
             foreach (var item in _selection)
             {
-                item.DeviceGroup = DeviceGroup ?? item.DeviceGroup;
                 item.DeviceNumber = DeviceNumber ?? item.DeviceNumber;
                 item.DeviceName = DeviceName ?? item.DeviceName;
                 item.DeviceType = DeviceType ?? item.DeviceType;
@@ -97,7 +96,6 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
 
         public void RefreshAll()
         {
-            DeviceGroup = CommonOrNullValue(_selection, m => m.DeviceGroup);
             DeviceNumber = CommonOrNullValue(_selection, m => m.DeviceNumber);
             DeviceName = CommonOrNullString(_selection, m => m.DeviceName);
             DeviceType = CommonOrNullValue(_selection, m => m.DeviceType);
@@ -110,7 +108,6 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         #region - IHanldes -
         #endregion
         #region - Properties -
-        public int? DeviceGroup { get; set; }
         public int? DeviceNumber { get; set; }
         public string? DeviceName { get; set; }
         public EnumDeviceType? DeviceType { get; set; }

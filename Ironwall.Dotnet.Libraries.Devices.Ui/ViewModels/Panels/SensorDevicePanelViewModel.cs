@@ -222,7 +222,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     private static bool DeviceEquals(ISensorDeviceModel a, ISensorDeviceModel b)
     {
         return a.DeviceNumber == b.DeviceNumber &&
-               a.DeviceGroup == b.DeviceGroup &&
+               (a.DeviceGroups ?? new()).SequenceEqual(b.DeviceGroups ?? new()) &&
                a.DeviceName == b.DeviceName &&
                a.DeviceType == b.DeviceType &&
                a.Version == b.Version &&

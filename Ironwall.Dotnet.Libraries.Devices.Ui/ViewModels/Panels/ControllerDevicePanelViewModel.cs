@@ -221,7 +221,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     private static bool DeviceEquals(IControllerDeviceModel a, IControllerDeviceModel b)
     {
         return a.DeviceNumber == b.DeviceNumber &&
-               a.DeviceGroup == b.DeviceGroup &&
+               (a.DeviceGroups ?? new()).SequenceEqual(b.DeviceGroups ?? new()) &&
                a.DeviceName == b.DeviceName &&
                a.DeviceType == b.DeviceType &&
                a.Version == b.Version &&

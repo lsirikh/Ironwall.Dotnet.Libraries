@@ -1,6 +1,7 @@
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Servers;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 
@@ -19,12 +20,11 @@ public static class DtoToModelHelper
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
 
-        // GREEN: 전체 변환 로직 구현
-        return new CameraDeviceModel
+        var model = new CameraDeviceModel
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroup = dto.GroupDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto.TypeDevice),
             Version = dto.Version ?? string.Empty,
@@ -34,10 +34,18 @@ public static class DtoToModelHelper
             Username = dto.UserName,
             Password = dto.UserPassword,
             RtspUri = dto.RtspUri,
-            RtspPort = dto.RtspPort,
+            RtspPort = dto.RtspPort ?? 0,
             Mode = ParseCameraMode(dto.Mode),
-            Category = ParseCameraType(dto.Category)
+            Category = ParseCameraType(dto.Category),
+            IsRecord = dto.IsRecord
         };
+
+        if (dto.HardwareSpec != null)
+            model.Identification = ToCameraInfoModel(dto.HardwareSpec);
+        if (dto.Urls != null)
+            model.Urls = ToCameraUrlsModel(dto.Urls);
+
+        return model;
     }
 
     // ────────────────────────── Enum 파싱 헬퍼 ──────────────────────────
@@ -111,7 +119,7 @@ public static class DtoToModelHelper
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            GroupDevice = model.DeviceGroup,
+            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -138,7 +146,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroup = dto.GroupDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto.TypeDevice),
             Version = dto.Version ?? string.Empty,
@@ -165,7 +173,7 @@ public static class DtoToModelHelper
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            GroupDevice = model.DeviceGroup,
+            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -193,7 +201,7 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
-            DeviceGroup = dto.GroupDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
             DeviceName = dto.NameDevice,
             DeviceType = ParseDeviceType(dto.TypeDevice),
             Version = dto.Version ?? string.Empty,
@@ -214,13 +222,239 @@ public static class DtoToModelHelper
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            GroupDevice = model.DeviceGroup,
+            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             IpAddress = model.IpAddress ?? string.Empty,
             IpPort = model.Port
+        };
+    }
+
+    // ────────────────────────── Speaker ──────────────────────────
+
+    public static SpeakerDeviceModel ToSpeakerDeviceModel(this SpeakerDeviceDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        var model = new SpeakerDeviceModel
+        {
+            Id = dto.Id,
+            DeviceNumber = dto.NumberDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceName = dto.NameDevice,
+            DeviceType = ParseDeviceType(dto.TypeDevice),
+            Version = dto.Version ?? string.Empty,
+            Status = ParseDeviceStatus(dto.Status),
+            SpeakerType = dto.SpeakerType ?? "NORMAL",
+            Description = dto.Description
+        };
+
+        if (dto.Server != null)
+        {
+            model.Server = new ServerModel
+            {
+                Id = dto.Server.Id,
+                CategoryId = dto.Server.CategoryId,
+                Name = dto.Server.Name,
+                Status = dto.Server.Status,
+                IpAddress = dto.Server.IpAddress,
+                Port = dto.Server.Port,
+                Hostname = dto.Server.Hostname,
+                UserName = dto.Server.UserName,
+                UserPassword = dto.Server.UserPassword
+            };
+        }
+
+        return model;
+    }
+
+    public static SpeakerDeviceDto ToSpeakerDeviceDto(this SpeakerDeviceModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        var dto = new SpeakerDeviceDto
+        {
+            Id = model.Id,
+            NumberDevice = model.DeviceNumber,
+            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            NameDevice = model.DeviceName ?? string.Empty,
+            TypeDevice = model.DeviceType.ToString(),
+            Version = model.Version ?? string.Empty,
+            Status = model.Status.ToString(),
+            SpeakerType = model.SpeakerType ?? "NORMAL",
+            Description = model.Description
+        };
+
+        if (model.Server != null)
+        {
+            dto.Server = new ServerDto
+            {
+                Id = model.Server.Id,
+                CategoryId = model.Server.CategoryId,
+                Name = model.Server.Name,
+                Status = model.Server.Status,
+                IpAddress = model.Server.IpAddress,
+                Port = model.Server.Port,
+                Hostname = model.Server.Hostname,
+                UserName = model.Server.UserName,
+                UserPassword = model.Server.UserPassword
+            };
+        }
+
+        return dto;
+    }
+
+    // ────────────────────────── Enclosure ──────────────────────────
+
+    public static EnclosureDeviceModel ToEnclosureDeviceModel(this EnclosureDeviceDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new EnclosureDeviceModel
+        {
+            Id = dto.Id,
+            DeviceNumber = dto.NumberDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceName = dto.NameDevice,
+            DeviceType = ParseDeviceType(dto.TypeDevice),
+            Version = dto.Version ?? string.Empty,
+            Status = ParseDeviceStatus(dto.Status),
+            DoorStatus = dto.DoorStatus ?? "CLOSED",
+            HeaterEnabled = dto.HeaterEnabled,
+            FanEnabled = dto.FanEnabled
+        };
+    }
+
+    public static EnclosureDeviceDto ToEnclosureDeviceDto(this EnclosureDeviceModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        return new EnclosureDeviceDto
+        {
+            Id = model.Id,
+            NumberDevice = model.DeviceNumber,
+            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            NameDevice = model.DeviceName ?? string.Empty,
+            TypeDevice = model.DeviceType.ToString(),
+            Version = model.Version ?? string.Empty,
+            Status = model.Status.ToString(),
+            DoorStatus = model.DoorStatus ?? "CLOSED",
+            HeaterEnabled = model.HeaterEnabled,
+            FanEnabled = model.FanEnabled
+        };
+    }
+
+    // ────────────────────────── Camera Sub-Model 변환 ──────────────────────────
+
+    public static CameraInfoModel ToCameraInfoModel(HardwareSpecDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new CameraInfoModel
+        {
+            Name = dto.Name,
+            Location = dto.Location,
+            Manufacturer = dto.Manufacturer,
+            Model = dto.Model,
+            Hardware = dto.Hardware,
+            Firmware = dto.Firmware,
+            DeviceId = dto.DeviceId,
+            MacAddress = dto.MacAddress,
+            OnvifVersion = dto.OnvifVersion
+        };
+    }
+
+    public static CameraUrlsModel ToCameraUrlsModel(CameraUrlsDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new CameraUrlsModel
+        {
+            HomepageUrl = dto.Homepage?.Url,
+            OnvifDeviceService = dto.Onvif?.DeviceService,
+            RtspMain = dto.Streams?.Rtsp?.Main,
+            RtspSub = dto.Streams?.Rtsp?.Sub,
+            WebrtcMain = dto.Streams?.Webrtc?.Main,
+            SnapshotCh1 = dto.Snapshot?.Ch1
+        };
+    }
+
+    public static CameraSettingModel ToCameraSettingModel(CameraSettingDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new CameraSettingModel
+        {
+            Id = dto.Id,
+            CameraId = dto.CameraId,
+            WeatherMode = dto.WeatherMode,
+            CameraMode = dto.CameraMode,
+            Heater = dto.Heater,
+            Fan = dto.Fan,
+            Headlight = dto.Headlight,
+            DayNightMode = dto.DayNightMode,
+            FocusMode = dto.FocusMode,
+            IrisMode = dto.IrisMode,
+            Tracking = dto.Tracking,
+            Palette = dto.Palette
+        };
+    }
+
+    public static CameraPositionModel ToCameraPositionModel(GeolocationDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new CameraPositionModel
+        {
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            Altitude = dto.Altitude
+        };
+    }
+
+    // ────────────────────────── Lamp ──────────────────────────
+
+    public static LampDeviceModel ToLampDeviceModel(this LampDeviceDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new LampDeviceModel
+        {
+            Id = dto.Id,
+            DeviceNumber = dto.NumberDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceName = dto.NameDevice,
+            DeviceType = ParseDeviceType(dto.TypeDevice),
+            Version = dto.Version ?? string.Empty,
+            Status = ParseDeviceStatus(dto.Status),
+            IpAddress = dto.IpAddress ?? string.Empty,
+            IpPort = dto.IpPort,
+            UserName = dto.UserName,
+            UserPassword = dto.UserPassword,
+            Description = dto.Description
+        };
+    }
+
+    public static LampDeviceDto ToLampDeviceDto(this LampDeviceModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        return new LampDeviceDto
+        {
+            Id = model.Id,
+            NumberDevice = model.DeviceNumber,
+            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            NameDevice = model.DeviceName ?? string.Empty,
+            TypeDevice = model.DeviceType.ToString(),
+            Version = model.Version ?? string.Empty,
+            Status = model.Status.ToString(),
+            IpAddress = model.IpAddress ?? string.Empty,
+            IpPort = model.IpPort,
+            UserName = model.UserName,
+            UserPassword = model.UserPassword,
+            Description = model.Description
         };
     }
 }

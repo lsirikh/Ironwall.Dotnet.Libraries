@@ -17,4 +17,7 @@ public interface ICameraDeviceViewModel : IDeviceViewModel
     int RtspPort { get; set; }
     string? RtspUri { get; set; }
     string? Username { get; set; }
+    ICameraUrlsModel? Urls { get; set; }
+    ICameraSettingModel? Setting { get; set; }
+    bool? IsRecord { get; set; }
 }

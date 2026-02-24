@@ -392,7 +392,7 @@ public class DeviceProviderService : IDeviceProviderService
     {
         // 공통 속성 업데이트
         existing.DeviceName = newDevice.DeviceName;
-        existing.DeviceGroup = newDevice.DeviceGroup;
+        existing.DeviceGroups = newDevice.DeviceGroups;
         existing.DeviceNumber = newDevice.DeviceNumber;
         existing.Status = newDevice.Status;
         existing.DeviceType = newDevice.DeviceType;

@@ -54,6 +54,17 @@ public class DeviceApiModule : Module
                 .SingleInstance()
                 .WithMetadata("Order", _count);
 
+            // 4. ServerApiService 등록
+            builder.Register(ctx => new ServerApiService(
+                    _log,
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
+                    ctx.ResolveNamed<ApiSetupModel>(_name)
+                ))
+                .Named<IServerApiService>(_name)
+                .AsImplementedInterfaces()
+                .SingleInstance()
+                .WithMetadata("Order", _count + 1);
+
             _log?.Info($"[{nameof(DeviceApiModule)}] Module loaded successfully with name: {_name}");
         }
         catch (Exception ex)

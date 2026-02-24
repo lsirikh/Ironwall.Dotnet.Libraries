@@ -47,6 +47,9 @@ public class DeviceUiModule : Module
             builder.RegisterType<ControllerDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<SensorDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<CameraDevicePanelViewModel>().SingleInstance();
+            builder.RegisterType<SpeakerDevicePanelViewModel>().SingleInstance();
+            builder.RegisterType<EnclosureDevicePanelViewModel>().SingleInstance();
+            builder.RegisterType<LampDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<ControllerDeviceViewModel>().SingleInstance();
             builder.RegisterType<SensorDevicePanelViewModel>().SingleInstance();
             builder.RegisterType<OnvifDialogViewModel>().SingleInstance();

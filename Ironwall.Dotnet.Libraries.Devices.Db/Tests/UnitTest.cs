@@ -107,7 +107,7 @@ public sealed class DeviceDbFixture : IAsyncLifetime
         {
             var ctrl = new ControllerDeviceModel
             {
-                DeviceGroup = c,
+                DeviceGroups = new List<int> { c },
                 DeviceNumber = 1,
                 DeviceName = $"제어기_{c:00}",
                 DeviceType = EnumDeviceType.Controller,
@@ -121,7 +121,7 @@ public sealed class DeviceDbFixture : IAsyncLifetime
             {
                 ctrl.Devices.Add(new SensorDeviceModel
                 {
-                    DeviceGroup = c,
+                    DeviceGroups = new List<int> { c },
                     DeviceNumber = s,
                     DeviceName = $"펜스센서_{c:00}-{s:000}",
                     DeviceType = EnumDeviceType.Fence,
@@ -160,7 +160,7 @@ public sealed class DeviceDbFixture : IAsyncLifetime
 
             var camera = new CameraDeviceModel
             {
-                DeviceGroup = (cam - 1) / 10 + 100, // 100, 101, 102, 103... 그룹으로 분산
+                DeviceGroups = new List<int> { (cam - 1) / 10 + 100 }, // 100, 101, 102, 103... 그룹으로 분산
                 DeviceNumber = ((cam - 1) % 10) + 1,  // 각 그룹 내에서 1~10 번호
                 DeviceName = $"IP카메라_{cam:000}_{cameraType}",
                 DeviceType = EnumDeviceType.IpCamera,
@@ -348,7 +348,7 @@ public class CameraDeviceDbTests
         {
             var camera = new CameraDeviceModel
             {
-                DeviceGroup = 1,
+                DeviceGroups = new List<int> { 1 },
                 DeviceNumber = i,
                 DeviceName = $"카메라_{i:00}",
                 DeviceType = EnumDeviceType.IpCamera,

@@ -158,6 +158,36 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
                 NotifyOfPropertyChange(() => Optics);
             }
         }
+
+        public ICameraUrlsModel? Urls
+        {
+            get => (_model as ICameraDeviceModel)!.Urls;
+            set
+            {
+                (_model as ICameraDeviceModel)!.Urls = value;
+                NotifyOfPropertyChange(() => Urls);
+            }
+        }
+
+        public ICameraSettingModel? Setting
+        {
+            get => (_model as ICameraDeviceModel)!.Setting;
+            set
+            {
+                (_model as ICameraDeviceModel)!.Setting = value;
+                NotifyOfPropertyChange(() => Setting);
+            }
+        }
+
+        public bool? IsRecord
+        {
+            get => (_model as ICameraDeviceModel)!.IsRecord;
+            set
+            {
+                (_model as ICameraDeviceModel)!.IsRecord = value;
+                NotifyOfPropertyChange(() => IsRecord);
+            }
+        }
         #endregion
         #region - Attributes -
         #endregion

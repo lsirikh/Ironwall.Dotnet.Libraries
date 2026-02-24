@@ -43,15 +43,21 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         set { _index = value; NotifyOfPropertyChange(() => Index); }
     }
 
-    public int DeviceGroup
+    public List<int>? DeviceGroups
     {
-        get { return _model.DeviceGroup; }
+        get { return _model.DeviceGroups; }
         set
         {
-            _model.DeviceGroup = value;
-            NotifyOfPropertyChange(() => DeviceGroup);
+            _model.DeviceGroups = value;
+            NotifyOfPropertyChange(() => DeviceGroups);
+            NotifyOfPropertyChange(() => DeviceGroupsText);
         }
     }
+
+    public string DeviceGroupsText =>
+        DeviceGroups != null && DeviceGroups.Count > 0
+            ? string.Join(", ", DeviceGroups)
+            : "";
 
     public int DeviceNumber
     {
