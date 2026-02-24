@@ -84,7 +84,7 @@ public sealed class EventDbFixture : IAsyncLifetime
             var ctrl = new ControllerDeviceModel
             {
                 Id = conIndex++,
-                DeviceGroup = c,
+                DeviceGroups = new List<int> { c },
                 DeviceNumber = 1,
                 DeviceName = $"제어기_{c:00}",
                 DeviceType = EnumDeviceType.Controller,
@@ -99,7 +99,7 @@ public sealed class EventDbFixture : IAsyncLifetime
                 var sensor = new SensorDeviceModel
                 {
                     Id = sensorIndex++,
-                    DeviceGroup = c,
+                    DeviceGroups = new List<int> { c },
                     DeviceNumber = s,
                     DeviceName = $"펜스센서_{c:00}-{s:000}",
                     DeviceType = EnumDeviceType.Fence,

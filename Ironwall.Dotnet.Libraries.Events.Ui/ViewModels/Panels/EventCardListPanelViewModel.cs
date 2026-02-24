@@ -165,7 +165,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     if (model.Device != null)
                     {
                         // Phase 14: 복합 키 - deviceType 추가
-                        _symbolEventManager.ProcessEventReport(model.Device.Id, model.Device.DeviceType, model.Device.DeviceGroup);
+                        _symbolEventManager.ProcessEventReport(model.Device.Id, model.Device.DeviceType, model.Device.DeviceGroups);
                     }
 
                     DispatcherService.Invoke(() =>
@@ -209,7 +209,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     if (model.Device != null)
                     {
                         // Phase 14: 복합 키 - deviceType 추가
-                        _symbolEventManager.ProcessEventReport(model.Device.Id, model.Device.DeviceType, model.Device.DeviceGroup);
+                        _symbolEventManager.ProcessEventReport(model.Device.Id, model.Device.DeviceType, model.Device.DeviceGroups);
                     }
 
                     DispatcherService.Invoke(() =>
@@ -249,7 +249,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     ActionEventModel action;
                     int? deviceId = null;
                     EnumDeviceType deviceType = EnumDeviceType.NONE;  // Phase 14: 복합 키용 deviceType 추가
-                    int deviceGroup = 0;
+                    List<int>? deviceGroups = null;
 
 
                     if (item is DetectionEventCardViewModel dEventCardViewModel)
@@ -257,7 +257,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         var model = dEventCardViewModel.Model;
                         deviceId = model.Device?.Id; // Device ID 추출
                         deviceType = model.Device?.DeviceType ?? EnumDeviceType.NONE; // Phase 14: DeviceType 추출
-                        deviceGroup = model.Device?.DeviceGroup ?? 0; // Device Group 추출
+                        deviceGroups = model.Device?.DeviceGroups; // Device Groups 추출
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
@@ -284,7 +284,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         var model = mEventCardViewModel.Model;
                         deviceId = model.Device?.Id; // Device ID 추출
                         deviceType = model.Device?.DeviceType ?? EnumDeviceType.NONE; // Phase 14: DeviceType 추출
-                        deviceGroup = model.Device?.DeviceGroup ?? 0; // Device Group 추출
+                        deviceGroups = model.Device?.DeviceGroups; // Device Groups 추출
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
@@ -315,7 +315,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     if (deviceId.HasValue)
                     {
                         // Phase 14: 복합 키 - deviceType 추가
-                        _symbolEventManager.ProcessEventReport(deviceId.Value, deviceType, deviceGroup);
+                        _symbolEventManager.ProcessEventReport(deviceId.Value, deviceType, deviceGroups);
                     }
 
                     DispatcherService.Invoke(() =>

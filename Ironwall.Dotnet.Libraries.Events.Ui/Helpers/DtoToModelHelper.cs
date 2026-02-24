@@ -1,18 +1,22 @@
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities.ObjectModel;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 
 /// <summary>
 /// Event DTO ↔ Model 변환 Helper
-/// Devices.Ui의 DtoToModelHelper 패턴 적용
+/// Nested Device 구조 기반 (Phase 8B)
 /// </summary>
 public static class DtoToModelHelper
 {
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // DTO → Model 변환 (기본)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
     /// <summary>
     /// DetectionEventDto → IDetectionEventModel 변환
     /// </summary>
@@ -22,33 +26,10 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
-            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, null)
-        };
-    }
-
-    /// <summary>
-    /// IDetectionEventModel → DetectionEventDto 변환 (역방향)
-    /// </summary>
-    public static DetectionEventDto ToDetectionEventDto(this IDetectionEventModel model)
-    {
-        var (controllerId, sensorId) = ResolveDeviceIds(model.Device);
-        return new DetectionEventDto
-        {
-            Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-            TypeEvent = model.MessageType.ToString(),
-            GroupEvent = model.EventGroup ?? string.Empty,
-            ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
-            Result = model.Result.ToString(),
-            Controller = controllerId,
-            Sensor = sensorId,
-            TypeDevice = model.Device?.DeviceType.ToString() ?? string.Empty,
-            Sequence = 0
+            Device = ConvertDeviceFromDto(dto.Device, null)
         };
     }
 
@@ -61,41 +42,14 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Reason = Enum.Parse<EnumFaultType>(dto.Reason),
-            FirstStart = dto.FirstStart,
-            FirstEnd = dto.FirstEnd,
-            SecondStart = dto.SecondStart,
-            SecondEnd = dto.SecondEnd,
-            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, null)
-        };
-    }
-
-    /// <summary>
-    /// IMalfunctionEventModel → MalfunctionEventDto 변환 (역방향)
-    /// </summary>
-    public static MalfunctionEventDto ToMalfunctionEventDto(this IMalfunctionEventModel model)
-    {
-        var (controllerId, sensorId) = ResolveDeviceIds(model.Device);
-        return new MalfunctionEventDto
-        {
-            Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-            TypeEvent = model.MessageType.ToString(),
-            GroupEvent = model.EventGroup ?? string.Empty,
-            ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
-            Reason = model.Reason.ToString(),
-            FirstStart = model.FirstStart,
-            FirstEnd = model.FirstEnd,
-            SecondStart = model.SecondStart,
-            SecondEnd = model.SecondEnd,
-            Controller = controllerId,
-            Sensor = sensorId,
-            TypeDevice = model.Device?.DeviceType.ToString() ?? string.Empty,
-            Sequence = 0
+            FirstStart = dto.Detail?.FirstStart ?? 0,
+            FirstEnd = dto.Detail?.FirstEnd ?? 0,
+            SecondStart = dto.Detail?.SecondStart ?? 0,
+            SecondEnd = dto.Detail?.SecondEnd ?? 0,
+            Device = ConvertDeviceFromDto(dto.Device, null)
         };
     }
 
@@ -108,30 +62,9 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            EventGroup = dto.GroupEvent,
-            Status = EnumTrueFalse.True, // Connection events are typically status=True
-            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, null)
-        };
-    }
-
-    /// <summary>
-    /// IConnectionEventModel → ConnectionEventDto 변환 (역방향)
-    /// </summary>
-    public static ConnectionEventDto ToConnectionEventDto(this IConnectionEventModel model)
-    {
-        var (controllerId, sensorId) = ResolveDeviceIds(model.Device);
-        return new ConnectionEventDto
-        {
-            Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-            TypeEvent = model.MessageType.ToString(),
-            GroupEvent = model.EventGroup ?? string.Empty,
-            Controller = controllerId,
-            Sensor = sensorId,
-            TypeDevice = model.Device?.DeviceType.ToString() ?? string.Empty,
-            Sequence = 0
+            Status = EnumTrueFalse.True,
+            Device = ConvertDeviceFromDto(dto.Device, null)
         };
     }
 
@@ -144,16 +77,75 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = EnumEventType.Action,
             Content = dto.Content,
             User = dto.User,
-            OriginEvent = null // TODO: Handle nested event conversion if needed
+            OriginEvent = null
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // Model → DTO 변환 (역방향)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// IDetectionEventModel → DetectionEventDto 변환
+    /// </summary>
+    public static DetectionEventDto ToDetectionEventDto(this IDetectionEventModel model)
+    {
+        return new DetectionEventDto
+        {
+            Id = model.Id,
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            TypeEvent = model.MessageType.ToString(),
+            ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
+            Result = model.Result.ToString(),
+            Device = ConvertDeviceToDto(model.Device),
+            DeviceDescription = model.Device?.DeviceName
         };
     }
 
     /// <summary>
-    /// IActionEventModel → ActionEventDto 변환 (역방향)
+    /// IMalfunctionEventModel → MalfunctionEventDto 변환
+    /// </summary>
+    public static MalfunctionEventDto ToMalfunctionEventDto(this IMalfunctionEventModel model)
+    {
+        return new MalfunctionEventDto
+        {
+            Id = model.Id,
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            TypeEvent = model.MessageType.ToString(),
+            ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
+            Reason = model.Reason.ToString(),
+            Device = ConvertDeviceToDto(model.Device),
+            DeviceDescription = model.Device?.DeviceName,
+            Detail = new MalfunctionDetailDto
+            {
+                FirstStart = model.FirstStart,
+                FirstEnd = model.FirstEnd,
+                SecondStart = model.SecondStart,
+                SecondEnd = model.SecondEnd
+            }
+        };
+    }
+
+    /// <summary>
+    /// IConnectionEventModel → ConnectionEventDto 변환
+    /// </summary>
+    public static ConnectionEventDto ToConnectionEventDto(this IConnectionEventModel model)
+    {
+        return new ConnectionEventDto
+        {
+            Id = model.Id,
+            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            TypeEvent = model.MessageType.ToString(),
+            Device = ConvertDeviceToDto(model.Device),
+            DeviceDescription = model.Device?.DeviceName
+        };
+    }
+
+    /// <summary>
+    /// IActionEventModel → ActionEventDto 변환
     /// </summary>
     public static ActionEventDto ToActionEventDto(this IActionEventModel model)
     {
@@ -164,129 +156,12 @@ public static class DtoToModelHelper
             TypeEvent = model.MessageType.ToString(),
             Content = model.Content ?? string.Empty,
             User = model.User ?? string.Empty,
-            FromEvent = null // TODO: Handle nested event conversion if needed
+            FromEvent = null
         };
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // Device Resolution Helpers (Controller/Sensor 타입 구분)
-    // ═══════════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// DTO의 Controller/Sensor 조합으로 적절한 Device 반환
-    /// <para>Controller > 0 && Sensor == 0 → ControllerDeviceModel</para>
-    /// <para>Sensor > 0 → SensorDeviceModel</para>
-    /// </summary>
-    private static IBaseDeviceModel? ResolveDeviceFromDto(
-        int controller,
-        int sensor,
-        string? typeDevice,
-        DeviceProvider? deviceProvider)
-    {
-        try
-        {
-            var dType = Enum.Parse<EnumDeviceType>(typeDevice ?? throw new NullReferenceException(message:"Device Type({})이 정의되지 않았습니다."));
-
-            switch (dType)
-            {
-                case EnumDeviceType.NONE:
-                    break;
-                case EnumDeviceType.Controller:
-                    {
-                        if (deviceProvider != null)
-                        {
-                            var controllerDevice = deviceProvider
-                                .OfType<IControllerDeviceModel>()
-                                .FirstOrDefault(d => d.DeviceNumber == controller);
-                            if (controllerDevice != null)
-                                return controllerDevice;
-                        }
-                        return new ControllerDeviceModel { };
-                    }
-                case EnumDeviceType.Multi:
-                case EnumDeviceType.Fence:
-                case EnumDeviceType.Underground:
-                case EnumDeviceType.Contact:
-                case EnumDeviceType.PIR:
-                case EnumDeviceType.IoController:
-                case EnumDeviceType.Laser:
-                case EnumDeviceType.Cable:
-                case EnumDeviceType.SmartSensor:
-                case EnumDeviceType.SmartSensor2:
-                case EnumDeviceType.SmartCompound:
-                    {
-                        if (deviceProvider != null)
-                        {
-                            var sensorDevice = deviceProvider
-                                .OfType<ISensorDeviceModel>()
-                                .FirstOrDefault(d => 
-                                d?.Controller?.DeviceNumber == controller
-                                && d.DeviceNumber == sensor);
-                            if (sensorDevice != null)
-                                return sensorDevice;
-                        }
-                        return new SensorDeviceModel { };
-                    }
-                case EnumDeviceType.IpCamera:
-                    {
-                        if (deviceProvider != null)
-                        {
-                            var cameraDevice = deviceProvider
-                                .OfType<ICameraDeviceModel>()
-                                .FirstOrDefault(d => d.DeviceNumber == sensor);
-                            if (cameraDevice != null)
-                                return cameraDevice;
-                        }
-                        return new CameraDeviceModel { };
-                    }
-                    break;
-                case EnumDeviceType.IpSpeaker:
-                    break;
-                case EnumDeviceType.Radar:
-                    break;
-                case EnumDeviceType.OpticalCable:
-                    break;
-                case EnumDeviceType.Fence_Group:
-                    break;
-                default:
-                    break;
-            }
-            return null;
-        }
-        catch (Exception)
-        {
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Device에서 Controller ID와 Sensor ID 추출
-    /// <para>SensorDeviceModel → (Controller.Id, Sensor.Id)</para>
-    /// <para>ControllerDeviceModel → (Controller.Id, 0)</para>
-    /// </summary>
-    private static (int ControllerId, int SensorId) ResolveDeviceIds(IBaseDeviceModel? device)
-    {
-        if (device == null)
-            return (0, 0);
-
-        // Case 1: SensorDeviceModel
-        if (device is ISensorDeviceModel sensorDevice)
-        {
-            return (sensorDevice.Controller?.Id ?? 0, sensorDevice.Id);
-        }
-
-        // Case 2: ControllerDeviceModel
-        if (device is IControllerDeviceModel controllerDevice)
-        {
-            return (controllerDevice.Id, 0);  // Controller만 있고 Sensor는 0
-        }
-
-        // Case 3: 기타 (CameraDevice 등)
-        return (0, device.Id);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // DeviceProvider 통합 오버로드 (TDD로 구현)
+    // DeviceProvider 통합 오버로드
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -296,18 +171,15 @@ public static class DtoToModelHelper
         this DetectionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        var model = new DetectionEventModel
+        return new DetectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
-            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
+            Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
-        return model;
     }
 
     /// <summary>
@@ -317,25 +189,19 @@ public static class DtoToModelHelper
         this MalfunctionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        var enumType = typeof(EnumFaultType);
-        var assemblyLocation = enumType.Assembly.Location;
-        var allValues = Enum.GetNames<EnumFaultType>();
-        var model = new MalfunctionEventModel
+        return new MalfunctionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            EventGroup = dto.GroupEvent,
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Reason = Enum.Parse<EnumFaultType>(dto.Reason),
-            FirstStart = dto.FirstStart,
-            FirstEnd = dto.FirstEnd,
-            SecondStart = dto.SecondStart,
-            SecondEnd = dto.SecondEnd,
-            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
+            FirstStart = dto.Detail?.FirstStart ?? 0,
+            FirstEnd = dto.Detail?.FirstEnd ?? 0,
+            SecondStart = dto.Detail?.SecondStart ?? 0,
+            SecondEnd = dto.Detail?.SecondEnd ?? 0,
+            Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
-        return model;
     }
 
     /// <summary>
@@ -345,17 +211,14 @@ public static class DtoToModelHelper
         this ConnectionEventDto dto,
         DeviceProvider? deviceProvider)
     {
-        var model = new ConnectionEventModel
+        return new ConnectionEventModel
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            EventGroup = dto.GroupEvent,
             Status = EnumTrueFalse.True,
-            Device = ResolveDeviceFromDto(dto.Controller, dto.Sensor, dto.TypeDevice, deviceProvider)
+            Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
-        return model;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -374,7 +237,6 @@ public static class DtoToModelHelper
         {
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
-            //DateTime = DateTime.Parse(dto.CreatedAt ?? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime(),
             MessageType = EnumEventType.Action,
             Content = dto.Content,
             User = dto.User,
@@ -382,10 +244,71 @@ public static class DtoToModelHelper
         };
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // Device 변환 헬퍼 (Nested DTO ↔ Model)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// BaseDeviceDto → IBaseDeviceModel 변환
+    /// <para>DeviceProvider가 있으면 ID로 실제 Device 조회, 없으면 DTO 기반 최소 모델 생성</para>
+    /// </summary>
+    private static IBaseDeviceModel? ConvertDeviceFromDto(
+        BaseDeviceDto? deviceDto,
+        DeviceProvider? deviceProvider)
+    {
+        if (deviceDto == null)
+            return null;
+
+        // DeviceProvider가 있으면 ID로 실제 Device 조회
+        if (deviceProvider != null)
+        {
+            var existing = deviceProvider.FirstOrDefault(d => d.Id == deviceDto.Id);
+            if (existing != null)
+                return existing;
+        }
+
+        // Fallback: DTO에서 최소 모델 생성
+        if (!string.IsNullOrEmpty(deviceDto.TypeDevice) &&
+            Enum.TryParse<EnumDeviceType>(deviceDto.TypeDevice, out var deviceType))
+        {
+            switch (deviceType)
+            {
+                case EnumDeviceType.Controller:
+                    return new ControllerDeviceModel { Id = deviceDto.Id, DeviceType = deviceType };
+                case EnumDeviceType.IpCamera:
+                    return new CameraDeviceModel { Id = deviceDto.Id, DeviceType = deviceType };
+                default:
+                    // Sensor 계열 (Fence, Multi, PIR, etc.)
+                    return new SensorDeviceModel { Id = deviceDto.Id, DeviceType = deviceType };
+            }
+        }
+
+        return new SensorDeviceModel { Id = deviceDto.Id };
+    }
+
+    /// <summary>
+    /// IBaseDeviceModel → BaseDeviceDto 변환
+    /// </summary>
+    private static BaseDeviceDto? ConvertDeviceToDto(IBaseDeviceModel? device)
+    {
+        if (device == null)
+            return null;
+
+        return new BaseDeviceDto
+        {
+            Id = device.Id,
+            TypeDevice = device.DeviceType.ToString(),
+            NameDevice = device.DeviceName ?? string.Empty,
+            NumberDevice = device.DeviceNumber
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // OriginEvent 변환 헬퍼
+    // ═══════════════════════════════════════════════════════════════════════════════
+
     /// <summary>
     /// FromEvent DTO를 EventProvider에서 조회하거나 변환
-    /// <para>중요: GOP DB에서 각 Event 타입의 ID는 독립적이므로 타입 필터링 필수</para>
-    /// <para>조치보고 대상: DetectionEventDto, MalfunctionEventDto만 해당 (ConnectionEventDto 제외)</para>
     /// </summary>
     private static IExEventModel? ResolveOriginEvent(
         object? fromEvent,
@@ -397,103 +320,54 @@ public static class DtoToModelHelper
 
         try
         {
-            // 스냅샷 생성 (Thread-Safe)
             var eventSnapshot = eventProvider?.ToList();
 
-            // FromEvent의 타입에 따라 적절한 변환 메서드 호출
             switch (fromEvent)
             {
                 case DetectionEventDto detectionDto:
                     if (eventProvider != null)
                     {
-                        // 타입 필터링 후 ID 매칭
-                        var existing = eventSnapshot
+                        var existing = eventSnapshot?
                             .OfType<IDetectionEventModel>()
                             .FirstOrDefault(e => e.Id == detectionDto.Id);
-
                         if (existing != null)
                             return existing;
                     }
-                    // Fallback: DTO 직접 변환 (DeviceProvider 전달하여 Device도 매칭)
                     return detectionDto.ToDetectionEventModel(deviceProvider);
 
                 case MalfunctionEventDto malfunctionDto:
                     if (eventProvider != null)
                     {
-                        // 타입 필터링 후 ID 매칭
-                        var existing = eventSnapshot
+                        var existing = eventSnapshot?
                             .OfType<IMalfunctionEventModel>()
                             .FirstOrDefault(e => e.Id == malfunctionDto.Id);
-
                         if (existing != null)
                             return existing;
                     }
-                    // Fallback: DTO 직접 변환 (DeviceProvider 전달하여 Device도 매칭)
                     return malfunctionDto.ToMalfunctionEventModel(deviceProvider);
 
                 default:
-                    // ConnectionEventDto나 기타 타입은 조치보고 대상 아님
                     return null;
             }
         }
         catch (Exception)
         {
-
             throw;
         }
-
-        
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // DetectionExEventDto 변환 (NATS 메시지 Body 구조)
+    // DateTime 파싱 헬퍼
     // ═══════════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// DetectionExEventDto → IDetectionEventModel 변환
-    /// <para>OriginEvent를 추출하여 DetectionEventModel로 변환</para>
-    /// </summary>
-    /// <param name="dto">DetectionExEventDto 인스턴스</param>
-    /// <returns>IDetectionEventModel 인스턴스</returns>
-    /// <exception cref="ArgumentNullException">OriginEvent가 null인 경우</exception>
-    public static IDetectionEventModel ToDetectionEventModel(this DetectionExEventDto dto)
-    {
-        if (dto.OriginEvent == null)
-            throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
-
-        return dto.OriginEvent.ToDetectionEventModel();
-    }
-
-    /// <summary>
-    /// DetectionExEventDto → IDetectionEventModel 변환 (DeviceProvider 활용)
-    /// </summary>
-    /// <param name="dto">DetectionExEventDto 인스턴스</param>
-    /// <param name="deviceProvider">DeviceProvider (Device 매핑용)</param>
-    /// <returns>IDetectionEventModel 인스턴스</returns>
-    /// <exception cref="ArgumentNullException">OriginEvent가 null인 경우</exception>
-    public static IDetectionEventModel ToDetectionEventModel(
-        this DetectionExEventDto dto,
-        DeviceProvider? deviceProvider)
-    {
-        if (dto.OriginEvent == null)
-            throw new ArgumentNullException(nameof(dto.OriginEvent), "OriginEvent cannot be null");
-
-        return dto.OriginEvent.ToDetectionEventModel(deviceProvider);
-    }
 
     private static DateTime ParseDateTime(string? dateTimeString)
     {
-        // Null/Empty 처리
         if (string.IsNullOrEmpty(dateTimeString))
             return DateTime.Now;
 
-        // 그대로 파싱 (KST로 간주)
         if (DateTime.TryParse(dateTimeString, out var dateTime))
-        {
             return dateTime;
-        }
 
-        // Fallback: 파싱 실패 시 현재 시간
         return DateTime.Now;
     }
 }

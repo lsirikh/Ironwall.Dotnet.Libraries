@@ -1,5 +1,6 @@
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 
@@ -326,7 +327,7 @@ public interface IEventApiService : IService
     /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
     Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(
         int id,
-        ActionEventDto dto,
+        ActionEventCreateDto dto,
         CancellationToken token = default);
 
     /// <summary>
@@ -337,5 +338,158 @@ public interface IEventApiService : IService
     /// <returns>삭제 성공 여부를 포함한 API 응답</returns>
     Task<ApiResponse<bool>> DeleteActionEventAsync(
         int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── Detection/Malfunction Action 조회 ──────────────────────────
+
+    Task<ApiResponse<ActionEventDto>> GetDetectionActionAsync(
+        int detectionId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<ActionEventDto>> GetMalfunctionActionAsync(
+        int malfunctionId,
+        CancellationToken token = default);
+
+    // ────────────────────────── Detection Log ──────────────────────────
+
+    Task<ApiListResponse<DetectionEventDto>> GetDetectionLogsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<DetectionEventDto>> GetDetectionLogByIdAsync(
+        int eventId,
+        CancellationToken token = default);
+
+    // ────────────────────────── Event Mapping CRUD (§7.2) ──────────────────────────
+
+    Task<ApiListResponse<EventMappingDto>> GetEventMappingsAsync(
+        int? deviceGroupId = null,
+        bool? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingDto>> GetEventMappingByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingDto>> CreateEventMappingAsync(
+        EventMappingDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingDto>> PatchEventMappingAsync(
+        int id,
+        EventMappingDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingDto>> UpdateEventMappingAsync(
+        int id,
+        EventMappingDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteEventMappingAsync(
+        int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── Mapping Camera CRUD (§7.3) ──────────────────────────
+
+    Task<ApiListResponse<EventMappingCameraDto>> GetMappingCamerasAsync(
+        int mappingId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingCameraDto>> GetMappingCameraByIdAsync(
+        int mappingId,
+        int configId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingCameraDto>> CreateMappingCameraAsync(
+        int mappingId,
+        EventMappingCameraDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingCameraDto>> PatchMappingCameraAsync(
+        int mappingId,
+        int configId,
+        EventMappingCameraDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingCameraDto>> UpdateMappingCameraAsync(
+        int mappingId,
+        int configId,
+        EventMappingCameraDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteMappingCameraAsync(
+        int mappingId,
+        int configId,
+        CancellationToken token = default);
+
+    // ────────────────────────── Mapping Speaker CRUD (§7.4) ──────────────────────────
+
+    Task<ApiListResponse<EventMappingSpeakerDto>> GetMappingSpeakersAsync(
+        int mappingId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingSpeakerDto>> GetMappingSpeakerByIdAsync(
+        int mappingId,
+        int configId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingSpeakerDto>> CreateMappingSpeakerAsync(
+        int mappingId,
+        EventMappingSpeakerDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingSpeakerDto>> PatchMappingSpeakerAsync(
+        int mappingId,
+        int configId,
+        EventMappingSpeakerDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingSpeakerDto>> UpdateMappingSpeakerAsync(
+        int mappingId,
+        int configId,
+        EventMappingSpeakerDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteMappingSpeakerAsync(
+        int mappingId,
+        int configId,
+        CancellationToken token = default);
+
+    // ────────────────────────── Mapping Lamp CRUD (§7.5) ──────────────────────────
+
+    Task<ApiListResponse<EventMappingLampDto>> GetMappingLampsAsync(
+        int mappingId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingLampDto>> GetMappingLampByIdAsync(
+        int mappingId,
+        int configId,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingLampDto>> CreateMappingLampAsync(
+        int mappingId,
+        EventMappingLampDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingLampDto>> PatchMappingLampAsync(
+        int mappingId,
+        int configId,
+        EventMappingLampDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventMappingLampDto>> UpdateMappingLampAsync(
+        int mappingId,
+        int configId,
+        EventMappingLampDto dto,
+        CancellationToken token = default);
+
+    Task<ApiResponse<bool>> DeleteMappingLampAsync(
+        int mappingId,
+        int configId,
         CancellationToken token = default);
 }

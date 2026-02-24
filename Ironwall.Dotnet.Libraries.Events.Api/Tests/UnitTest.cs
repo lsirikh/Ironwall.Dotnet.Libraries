@@ -1,6 +1,7 @@
 using Autofac;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Modules;
@@ -185,15 +186,9 @@ public class EventApiServiceTests
 
         var dto = new DetectionEventDto
         {
-            GroupEvent = "1",
             TypeEvent = "Intrusion",
-            Controller = 1,
-            Sensor = 2,
-            TypeDevice = "Fence",
-            Sequence = 1,
-            ActionReported = "False",
-            Result = "VIBRATION_SENSOR",
-            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            DeviceId = 2,
+            Result = "VIBRATION_SENSOR"
         };
 
         // Act
@@ -221,7 +216,6 @@ public class EventApiServiceTests
 
         var dto = new DetectionEventDto
         {
-            Sequence = 20,
             ActionReported = "True",
             //Result = "DISTANCE_SENSOR"
             CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
@@ -255,12 +249,9 @@ public class EventApiServiceTests
 
         var dto = new DetectionEventDto
         {
-            GroupEvent = "1",
             TypeEvent = "Intrusion",
-            Controller = 1,
-            Sensor = 6,
-            TypeDevice = "Fence",
-            Sequence = 1,
+            Device = new BaseDeviceDto { Id = 6, TypeDevice = "Sensor" },
+            DeviceDescription = "Fence sensor #6",
             ActionReported = "False",
             Result = "VIBRATION_SENSOR"
         };
@@ -273,7 +264,7 @@ public class EventApiServiceTests
         if (response.Success)
         {
             Assert.NotNull(response.Data);
-            Assert.Equal(20, response.Data.Sequence);
+            Assert.NotNull(response.Data.Device);
         }
     }
 
@@ -370,19 +361,16 @@ public class EventApiServiceTests
 
         var dto = new MalfunctionEventDto
         {
-            Controller = 1,
-            Sensor = 1,
-            GroupEvent = "1",
             TypeEvent = "Fault",
-            TypeDevice = "Fence",
-            Sequence = 1,
-            ActionReported = "False",  // Required by GOP API
+            DeviceId = 2,
             Reason = "FAULT_FENCE",
-            FirstStart=10,
-            FirstEnd=10,
-            SecondStart=15,
-            SecondEnd=15,
-            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            Detail = new MalfunctionDetailDto
+            {
+                FirstStart = 10,
+                FirstEnd = 10,
+                SecondStart = 15,
+                SecondEnd = 15
+            }
         };
 
         // Act
@@ -443,18 +431,18 @@ public class EventApiServiceTests
 
         var dto = new MalfunctionEventDto
         {
-            GroupEvent = "group_fault_002_updated",
             TypeEvent = "Fault",
-            Controller = 1,
-            Sensor = 4,
-            TypeDevice = "Multi",
-            Sequence = 15,
+            Device = new BaseDeviceDto { Id = 4, TypeDevice = "Sensor" },
+            DeviceDescription = "Multi sensor #4",
             ActionReported = "True",
             Reason = "FAULT_ETC",
-            FirstStart = 2,
-            FirstEnd = 2,
-            SecondStart = 5,
-            SecondEnd = 5,
+            Detail = new MalfunctionDetailDto
+            {
+                FirstStart = 2,
+                FirstEnd = 2,
+                SecondStart = 5,
+                SecondEnd = 5
+            },
             CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
@@ -466,7 +454,7 @@ public class EventApiServiceTests
         if (response.Success)
         {
             Assert.NotNull(response.Data);
-            Assert.Equal(15, response.Data.Sequence);
+            Assert.NotNull(response.Data.Device);
         }
     }
 
@@ -564,12 +552,8 @@ public class EventApiServiceTests
 
         var dto = new ConnectionEventDto
         {
-            Controller = 1,
-            Sensor = 3,
-            GroupEvent = "1",
             TypeEvent = "Connection",
-            TypeDevice = "Fence",
-            Sequence = 1,
+            DeviceId = 2,
         };
 
         // Act
@@ -597,7 +581,7 @@ public class EventApiServiceTests
 
         var dto = new ConnectionEventDto
         {
-            Sequence = 10,
+            TypeEvent = "Connection",
         };
 
         // Act
@@ -608,7 +592,6 @@ public class EventApiServiceTests
         if (response.Success)
         {
             Assert.NotNull(response.Data);
-            Assert.Equal(10, response.Data.Sequence);
         }
     }
 
@@ -628,12 +611,9 @@ public class EventApiServiceTests
 
         var dto = new ConnectionEventDto
         {
-            GroupEvent = "group_conn_003_updated",
             TypeEvent = "Connection",
-            Controller = 1,
-            Sensor = 3,
-            TypeDevice = "PIR",
-            Sequence = 12,
+            Device = new BaseDeviceDto { Id = 3, TypeDevice = "Sensor" },
+            DeviceDescription = "PIR sensor #3",
         };
 
         // Act
@@ -644,7 +624,7 @@ public class EventApiServiceTests
         if (response.Success)
         {
             Assert.NotNull(response.Data);
-            Assert.Equal(12, response.Data.Sequence);
+            Assert.NotNull(response.Data.Device);
         }
     }
 
@@ -745,8 +725,7 @@ public class EventApiServiceTests
             TypeEvent = "Action",
             Content = "Test action content",  // Required by GOP API
             User = "admin1",  // Required by GOP API
-            FromEvent = 2,  // Required by GOP API
-            FromEventType = "Intrusion",  // Required by GOP API (must be 'Intrusion', 'Fault')
+            FromEventId = 2,  // Required by GOP API (events.id FK)
         };
 
         // Act
@@ -805,11 +784,12 @@ public class EventApiServiceTests
         var service = _container.ResolveNamed<IEventApiService>("EventApi");
         await service.ExecuteAsync(CancellationToken.None);
 
-        var dto = new ActionEventDto
+        var dto = new ActionEventCreateDto
         {
+            TypeEvent = "Action",
             Content = "침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청",
             User = "operator_park",
-            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            FromEventId = 1
         };
 
         // Act
@@ -843,10 +823,9 @@ public class EventApiServiceTests
 
         // Assert
         Assert.NotNull(response);
-        if (response.Success)
-        {
-            Assert.True(response.Data);
-        }
+        // Delete 응답의 data는 null 반환 — Success 여부만 확인
+        Assert.True(response.Success || response.Error?.Code == "NOT_FOUND",
+            $"Unexpected error: {response.Error?.Code} - {response.Message}");
     }
     #endregion
 

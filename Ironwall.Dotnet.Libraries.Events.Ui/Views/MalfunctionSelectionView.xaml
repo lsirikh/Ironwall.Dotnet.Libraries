@@ -107,7 +107,7 @@
 				<ComboBox.ItemTemplate>
 					<DataTemplate>
 						<StackPanel Orientation="Horizontal">
-							<TextBlock Width="35" Text="{Binding DeviceGroup, StringFormat={}{0:D3}}" />
+							<TextBlock Width="35" Text="{Binding DeviceGroupsText}" />
 							<TextBlock Width="60" Text="{Binding DeviceType}" />
 							<TextBlock Width="140" Text="{Binding DeviceName}" />
 						</StackPanel>

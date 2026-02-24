@@ -572,8 +572,7 @@ public class EventProviderService
                 TypeEvent = model.MessageType.ToString(),
                 Content = model.Content ?? string.Empty,
                 User = model.User ?? string.Empty,
-                FromEvent = model.OriginEvent?.Id ?? 0,
-                FromEventType = model.OriginEvent?.MessageType.ToString() ?? string.Empty
+                FromEventId = model.OriginEvent?.Id ?? 0
             };
 
             var response = await _apiService.CreateActionEventAsync(createDto, token);
@@ -607,8 +606,14 @@ public class EventProviderService
         {
             _log?.Info($"UpdateActionEventAsync() started for ID {model.Id}");
 
-            var dto = model.ToActionEventDto();
-            var response = await _apiService.UpdateActionEventAsync(model.Id, dto, token);
+            var createDto = new ActionEventCreateDto
+            {
+                TypeEvent = "Action",
+                Content = model.Content ?? string.Empty,
+                User = model.User ?? string.Empty,
+                FromEventId = model.OriginEvent?.Id ?? 0
+            };
+            var response = await _apiService.UpdateActionEventAsync(model.Id, createDto, token);
 
             if (!response.Success || response.Data == null)
             {

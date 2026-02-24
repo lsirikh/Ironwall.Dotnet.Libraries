@@ -1,5 +1,6 @@
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Integrations;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -326,7 +327,7 @@ public class EventApiService : IEventApiService
     {
         try
         {
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/vents/malfunctions/{id}", dto);
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/events/malfunctions/{id}", dto);
             return await response.ToApiResponseAsync<MalfunctionEventDto>();
         }
         catch (Exception ex)
@@ -642,7 +643,7 @@ public class EventApiService : IEventApiService
     /// <param name="dto">전체 Action Event 정보 DTO</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(int id, ActionEventDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(int id, ActionEventCreateDto dto, CancellationToken token = default)
     {
         try
         {
@@ -674,6 +675,432 @@ public class EventApiService : IEventApiService
         {
             _log?.Error($"[{nameof(DeleteActionEventAsync)}] Error: {ex.Message}");
             return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete action event {id}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Detection/Malfunction Action 조회 -
+    public async Task<ApiResponse<ActionEventDto>> GetDetectionActionAsync(int detectionId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections/{detectionId}/action");
+            return await response.ToApiResponseAsync<ActionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDetectionActionAsync)}] Error: {ex.Message}");
+            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get detection action {detectionId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<ActionEventDto>> GetMalfunctionActionAsync(int malfunctionId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions/{malfunctionId}/action");
+            return await response.ToApiResponseAsync<ActionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMalfunctionActionAsync)}] Error: {ex.Message}");
+            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get malfunction action {malfunctionId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Detection Log -
+    public async Task<ApiListResponse<DetectionEventDto>> GetDetectionLogsAsync(
+        string? startDate = null,
+        string? endDate = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
+            if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
+            parameters.Add("page", page.ToString());
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/detection-logs", parameters);
+            return await response.ToApiListResponseAsync<DetectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDetectionLogsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", "Failed to get detection logs", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<DetectionEventDto>> GetDetectionLogByIdAsync(int eventId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/detection-logs/{eventId}");
+            return await response.ToApiResponseAsync<DetectionEventDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetDetectionLogByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<DetectionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get detection log {eventId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Event Mapping CRUD -
+    public async Task<ApiListResponse<EventMappingDto>> GetEventMappingsAsync(
+        int? deviceGroupId = null,
+        bool? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (deviceGroupId.HasValue) parameters.Add("device_group_id", deviceGroupId.Value.ToString());
+            if (status.HasValue) parameters.Add("status", status.Value.ToString().ToLower());
+            parameters.Add("page", page.ToString());
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings", parameters);
+            return await response.ToApiListResponseAsync<EventMappingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEventMappingsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EventMappingDto>.CreateError("INTERNAL_ERROR", "Failed to get event mappings", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingDto>> GetEventMappingByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}");
+            return await response.ToApiResponseAsync<EventMappingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEventMappingByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingDto>.CreateError("INTERNAL_ERROR", $"Failed to get event mapping {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingDto>> CreateEventMappingAsync(EventMappingDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings", dto);
+            return await response.ToApiResponseAsync<EventMappingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateEventMappingAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingDto>.CreateError("INTERNAL_ERROR", "Failed to create event mapping", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingDto>> PatchEventMappingAsync(int id, EventMappingDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}", dto);
+            return await response.ToApiResponseAsync<EventMappingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchEventMappingAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingDto>.CreateError("INTERNAL_ERROR", $"Failed to patch event mapping {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingDto>> UpdateEventMappingAsync(int id, EventMappingDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}", dto);
+            return await response.ToApiResponseAsync<EventMappingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateEventMappingAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingDto>.CreateError("INTERNAL_ERROR", $"Failed to update event mapping {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteEventMappingAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{id}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteEventMappingAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete event mapping {id}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Mapping Camera CRUD -
+    public async Task<ApiListResponse<EventMappingCameraDto>> GetMappingCamerasAsync(int mappingId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras");
+            return await response.ToApiItemsListResponseAsync<EventMappingCameraDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMappingCamerasAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EventMappingCameraDto>.CreateError("INTERNAL_ERROR", $"Failed to get mapping cameras {mappingId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingCameraDto>> GetMappingCameraByIdAsync(int mappingId, int configId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}");
+            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMappingCameraByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingCameraDto>.CreateError("INTERNAL_ERROR", $"Failed to get mapping camera {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingCameraDto>> CreateMappingCameraAsync(int mappingId, EventMappingCameraDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras", dto);
+            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateMappingCameraAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingCameraDto>.CreateError("INTERNAL_ERROR", $"Failed to create mapping camera {mappingId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingCameraDto>> PatchMappingCameraAsync(int mappingId, int configId, EventMappingCameraDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", dto);
+            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchMappingCameraAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingCameraDto>.CreateError("INTERNAL_ERROR", $"Failed to patch mapping camera {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingCameraDto>> UpdateMappingCameraAsync(int mappingId, int configId, EventMappingCameraDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}", dto);
+            return await response.ToApiResponseAsync<EventMappingCameraDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateMappingCameraAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingCameraDto>.CreateError("INTERNAL_ERROR", $"Failed to update mapping camera {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteMappingCameraAsync(int mappingId, int configId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/cameras/{configId}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteMappingCameraAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete mapping camera {mappingId}/{configId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Mapping Speaker CRUD -
+    public async Task<ApiListResponse<EventMappingSpeakerDto>> GetMappingSpeakersAsync(int mappingId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers");
+            return await response.ToApiItemsListResponseAsync<EventMappingSpeakerDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMappingSpeakersAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EventMappingSpeakerDto>.CreateError("INTERNAL_ERROR", $"Failed to get mapping speakers {mappingId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingSpeakerDto>> GetMappingSpeakerByIdAsync(int mappingId, int configId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}");
+            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMappingSpeakerByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingSpeakerDto>.CreateError("INTERNAL_ERROR", $"Failed to get mapping speaker {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingSpeakerDto>> CreateMappingSpeakerAsync(int mappingId, EventMappingSpeakerDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers", dto);
+            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateMappingSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingSpeakerDto>.CreateError("INTERNAL_ERROR", $"Failed to create mapping speaker {mappingId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingSpeakerDto>> PatchMappingSpeakerAsync(int mappingId, int configId, EventMappingSpeakerDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", dto);
+            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchMappingSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingSpeakerDto>.CreateError("INTERNAL_ERROR", $"Failed to patch mapping speaker {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingSpeakerDto>> UpdateMappingSpeakerAsync(int mappingId, int configId, EventMappingSpeakerDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}", dto);
+            return await response.ToApiResponseAsync<EventMappingSpeakerDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateMappingSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingSpeakerDto>.CreateError("INTERNAL_ERROR", $"Failed to update mapping speaker {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteMappingSpeakerAsync(int mappingId, int configId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/speakers/{configId}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteMappingSpeakerAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete mapping speaker {mappingId}/{configId}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Mapping Lamp CRUD -
+    public async Task<ApiListResponse<EventMappingLampDto>> GetMappingLampsAsync(int mappingId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps");
+            return await response.ToApiItemsListResponseAsync<EventMappingLampDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMappingLampsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<EventMappingLampDto>.CreateError("INTERNAL_ERROR", $"Failed to get mapping lamps {mappingId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingLampDto>> GetMappingLampByIdAsync(int mappingId, int configId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}");
+            return await response.ToApiResponseAsync<EventMappingLampDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetMappingLampByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingLampDto>.CreateError("INTERNAL_ERROR", $"Failed to get mapping lamp {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingLampDto>> CreateMappingLampAsync(int mappingId, EventMappingLampDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps", dto);
+            return await response.ToApiResponseAsync<EventMappingLampDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CreateMappingLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingLampDto>.CreateError("INTERNAL_ERROR", $"Failed to create mapping lamp {mappingId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingLampDto>> PatchMappingLampAsync(int mappingId, int configId, EventMappingLampDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", dto);
+            return await response.ToApiResponseAsync<EventMappingLampDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchMappingLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingLampDto>.CreateError("INTERNAL_ERROR", $"Failed to patch mapping lamp {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventMappingLampDto>> UpdateMappingLampAsync(int mappingId, int configId, EventMappingLampDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PutRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}", dto);
+            return await response.ToApiResponseAsync<EventMappingLampDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(UpdateMappingLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventMappingLampDto>.CreateError("INTERNAL_ERROR", $"Failed to update mapping lamp {mappingId}/{configId}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteMappingLampAsync(int mappingId, int configId, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/integrations/event-mappings/{mappingId}/lamps/{configId}");
+            return await response.ToApiResponseAsync<bool>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteMappingLampAsync)}] Error: {ex.Message}");
+            return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete mapping lamp {mappingId}/{configId}", ex.Message);
         }
     }
     #endregion

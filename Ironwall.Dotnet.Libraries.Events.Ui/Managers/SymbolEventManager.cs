@@ -72,8 +72,8 @@ public class SymbolEventManager : IDisposable
         _log?.Info($"그룹 심볼 등록: Group({deviceGroup}) → {symbolModel.GetType().Name} ");
     }
 
-    // 센서 이벤트 처리 (deviceId + deviceType: 개별 마커, deviceGroup: 그룹 마커)
-    public void ProcessDeviceEvent(int deviceId, EnumDeviceType deviceType, int deviceGroup, EnumEventType eventType, EnumSeverityLevel severity = EnumSeverityLevel.WARNING)
+    // 센서 이벤트 처리 (deviceId + deviceType: 개별 마커, deviceGroups: 그룹 마커)
+    public void ProcessDeviceEvent(int deviceId, EnumDeviceType deviceType, List<int>? deviceGroups, EnumEventType eventType, EnumSeverityLevel severity = EnumSeverityLevel.WARNING)
     {
         // 1. 개별 심볼 처리 - 복합 키 (Id, DeviceType) 사용
         var key = (deviceId, deviceType);
@@ -87,16 +87,22 @@ public class SymbolEventManager : IDisposable
             _log?.Warning($"매핑되지 않은 장비: Device({deviceId}, {deviceType})");
         }
 
-        // 2. 그룹 심볼 처리 (Intrusion 이벤트만)
-        if (ShouldProcessGroupSymbol(eventType) && _groupSymbolLookup.TryGetValue(deviceGroup, out var groupLookup))
+        // 2. 그룹 심볼 처리 (Intrusion 이벤트만) - 복수 그룹 지원
+        if (ShouldProcessGroupSymbol(eventType) && deviceGroups != null)
         {
-            groupLookup.ProcessEvent(eventType, severity);
-            _log?.Info($"그룹 이벤트 처리: DeviceGroup({deviceGroup}) -> {eventType}");
+            foreach (var groupId in deviceGroups)
+            {
+                if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+                {
+                    groupLookup.ProcessEvent(eventType, severity);
+                    _log?.Info($"그룹 이벤트 처리: DeviceGroup({groupId}) -> {eventType}");
+                }
+            }
         }
     }
 
     // 컨트롤러 이벤트 처리 (복합 키 사용)
-    public void ProcessControllerEvent(int controllerId, int deviceGroup, EnumDeviceType deviceType, EnumEventType eventType, EnumSeverityLevel severity = EnumSeverityLevel.WARNING)
+    public void ProcessControllerEvent(int controllerId, List<int>? deviceGroups, EnumDeviceType deviceType, EnumEventType eventType, EnumSeverityLevel severity = EnumSeverityLevel.WARNING)
     {
         // 1. 개별 심볼 처리 - 복합 키 (Id, DeviceType) 사용
         // 컨트롤러는 DeviceType.Controller로 조회
@@ -111,15 +117,21 @@ public class SymbolEventManager : IDisposable
             _log?.Warning($"매핑되지 않은 컨트롤러: Controller({controllerId})");
         }
 
-        // 2. 그룹 심볼 처리 (Fence 타입만)
-        if (IsFenceType(deviceType) && _groupSymbolLookup.TryGetValue(deviceGroup, out var groupLookup))
+        // 2. 그룹 심볼 처리 (Fence 타입만) - 복수 그룹 지원
+        if (IsFenceType(deviceType) && deviceGroups != null)
         {
-            groupLookup.ProcessEvent(eventType, severity);
-            _log?.Info($"그룹 이벤트 처리 (Fence): DeviceGroup({deviceGroup}) -> {eventType}");
+            foreach (var groupId in deviceGroups)
+            {
+                if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+                {
+                    groupLookup.ProcessEvent(eventType, severity);
+                    _log?.Info($"그룹 이벤트 처리 (Fence): DeviceGroup({groupId}) -> {eventType}");
+                }
+            }
         }
     }
 
-    public void ProcessEventReport(int deviceId, EnumDeviceType deviceType, int deviceGroup)
+    public void ProcessEventReport(int deviceId, EnumDeviceType deviceType, List<int>? deviceGroups)
     {
         // 1. 개별 심볼 복원 - 복합 키 (Id, DeviceType) 사용
         var key = (deviceId, deviceType);
@@ -133,11 +145,17 @@ public class SymbolEventManager : IDisposable
             _log?.Warning($"조치보고 실패 - 매핑되지 않은 장비: Device({deviceId}, {deviceType})");
         }
 
-        // 2. 그룹 심볼 복원
-        if (_groupSymbolLookup.TryGetValue(deviceGroup, out var groupLookup))
+        // 2. 그룹 심볼 복원 - 복수 그룹 지원
+        if (deviceGroups != null)
         {
-            groupLookup.ProcessEventReport();
-            _log?.Info($"조치보고 처리 (그룹): DeviceGroup({deviceGroup})");
+            foreach (var groupId in deviceGroups)
+            {
+                if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+                {
+                    groupLookup.ProcessEventReport();
+                    _log?.Info($"조치보고 처리 (그룹): DeviceGroup({groupId})");
+                }
+            }
         }
     }
 

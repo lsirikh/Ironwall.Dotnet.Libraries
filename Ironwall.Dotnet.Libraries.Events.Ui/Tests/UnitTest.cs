@@ -1,6 +1,7 @@
 using Xunit;
 using Moq;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -31,12 +32,9 @@ public class DtoToModelHelperTests
         var dto = new DetectionEventDto
         {
             Id = 1,
-            GroupEvent = "Zone A",
-            TypeEvent = "DETECTION",
-            Controller = 10,
-            Sensor = 100,
-            TypeDevice = "FENCE",
-            Sequence = 1,
+            TypeEvent = "Intrusion",
+            Device = new BaseDeviceDto { Id = 100, TypeDevice = "Fence" },
+            DeviceDescription = "Fence sensor #100",
             ActionReported = "True",
             Result = "THERMAL_SENSOR",
             CreatedAt = "2025-11-24T10:30:00.000Z",
@@ -44,13 +42,12 @@ public class DtoToModelHelperTests
         };
 
         // Act
-        var model = dto.ToDetectionEventModel(); // ← This method doesn't exist yet (RED)
+        var model = dto.ToDetectionEventModel();
 
         // Assert
         Assert.Equal(1, model.Id);
         Assert.Equal(new DateTime(2025, 11, 24, 10, 30, 0, DateTimeKind.Utc), model.DateTime);
         Assert.Equal(EnumEventType.Intrusion, model.MessageType);
-        Assert.Equal("Zone A", model.EventGroup);
         Assert.Equal(EnumTrueFalse.True, model.Status);
         Assert.Equal(EnumDetectionType.THERMAL_SENSOR, model.Result);
         Assert.NotNull(model.Device);
@@ -78,11 +75,11 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(1, dto.Id);
         Assert.Equal("2025-11-24T10:30:00.000Z", dto.CreatedAt);
-        Assert.Equal("DETECTION", dto.TypeEvent);
-        Assert.Equal("Zone A", dto.GroupEvent);
+        Assert.Equal("Intrusion", dto.TypeEvent);
         Assert.Equal("True", dto.ActionReported);
         Assert.Equal("THERMAL_SENSOR", dto.Result);
-        Assert.Equal(100, dto.Sensor);
+        Assert.NotNull(dto.Device);
+        Assert.Equal(100, dto.Device.Id);
     }
 
     [Fact]
@@ -92,31 +89,30 @@ public class DtoToModelHelperTests
         var dto = new MalfunctionEventDto
         {
             Id = 2,
-            GroupEvent = "Zone B",
-            TypeEvent = "MALFUNCTION",
-            Controller = 20,
-            Sensor = 200,
-            TypeDevice = "FENCE",
-            Sequence = 2,
+            TypeEvent = "Fault",
+            Device = new BaseDeviceDto { Id = 200, TypeDevice = "Fence" },
+            DeviceDescription = "Fence sensor #200",
             ActionReported = "False",
             Reason = "FAULT_FENCE",
-            FirstStart = 10,
-            FirstEnd = 20,
-            SecondStart = 30,
-            SecondEnd = 40,
+            Detail = new MalfunctionDetailDto
+            {
+                FirstStart = 10,
+                FirstEnd = 20,
+                SecondStart = 30,
+                SecondEnd = 40
+            },
             CreatedAt = "2025-11-24T11:00:00.000Z",
             UpdatedAt = "2025-11-24T11:00:00.000Z"
         };
 
         // Act
-        var model = dto.ToMalfunctionEventModel(); // ← This method doesn't exist yet (RED)
+        var model = dto.ToMalfunctionEventModel();
 
         // Assert
         Assert.Equal(2, model.Id);
         Assert.Equal(new DateTime(2025, 11, 24, 11, 0, 0, DateTimeKind.Utc), model.DateTime);
         Assert.Equal(EnumEventType.Fault, model.MessageType);
-        Assert.Equal("Zone B", model.EventGroup);
-        Assert.Equal(EnumTrueFalse.True, model.Status);
+        Assert.Equal(EnumTrueFalse.False, model.Status);
         Assert.Equal(EnumFaultType.FAULT_FENCE, model.Reason);
         Assert.Equal(10, model.FirstStart);
         Assert.Equal(20, model.FirstEnd);
@@ -151,14 +147,15 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(2, dto.Id);
         Assert.Equal("2025-11-24T11:00:00.000Z", dto.CreatedAt);
-        Assert.Equal("MALFUNCTION", dto.TypeEvent);
-        Assert.Equal("Zone B", dto.GroupEvent);
+        Assert.Equal("Fault", dto.TypeEvent);
         Assert.Equal("FAULT_FENCE", dto.Reason);
-        Assert.Equal(10, dto.FirstStart);
-        Assert.Equal(20, dto.FirstEnd);
-        Assert.Equal(30, dto.SecondStart);
-        Assert.Equal(40, dto.SecondEnd);
-        Assert.Equal(200, dto.Sensor);
+        Assert.NotNull(dto.Detail);
+        Assert.Equal(10, dto.Detail.FirstStart);
+        Assert.Equal(20, dto.Detail.FirstEnd);
+        Assert.Equal(30, dto.Detail.SecondStart);
+        Assert.Equal(40, dto.Detail.SecondEnd);
+        Assert.NotNull(dto.Device);
+        Assert.Equal(200, dto.Device.Id);
     }
 
     [Fact]
@@ -168,24 +165,20 @@ public class DtoToModelHelperTests
         var dto = new ConnectionEventDto
         {
             Id = 3,
-            GroupEvent = "Zone C",
-            TypeEvent = "CONNECTION",
-            Controller = 30,
-            Sensor = 300,
-            TypeDevice = "CONTROLLER",
-            Sequence = 3,
+            TypeEvent = "Connection",
+            Device = new BaseDeviceDto { Id = 300, TypeDevice = "Controller" },
+            DeviceDescription = "Controller #300",
             CreatedAt = "2025-11-24T12:00:00.000Z",
             UpdatedAt = "2025-11-24T12:00:00.000Z"
         };
 
         // Act
-        var model = dto.ToConnectionEventModel(); // ← This method doesn't exist yet (RED)
+        var model = dto.ToConnectionEventModel();
 
         // Assert
         Assert.Equal(3, model.Id);
         Assert.Equal(new DateTime(2025, 11, 24, 12, 0, 0, DateTimeKind.Utc), model.DateTime);
         Assert.Equal(EnumEventType.Connection, model.MessageType);
-        Assert.Equal("Zone C", model.EventGroup);
         Assert.NotNull(model.Device);
         Assert.Equal(300, model.Device.Id);
     }
@@ -210,9 +203,9 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(3, dto.Id);
         Assert.Equal("2025-11-24T12:00:00.000Z", dto.CreatedAt);
-        Assert.Equal("CONNECTION", dto.TypeEvent);
-        Assert.Equal("Zone C", dto.GroupEvent);
-        Assert.Equal(300, dto.Sensor);
+        Assert.Equal("Connection", dto.TypeEvent);
+        Assert.NotNull(dto.Device);
+        Assert.Equal(300, dto.Device.Id);
     }
 
     [Fact]
@@ -281,9 +274,8 @@ public class EventProviderServiceTests
             new DetectionEventDto
             {
                 Id = 1,
-                GroupEvent = "Zone A",
-                TypeEvent = "DETECTION",
-                Sensor = 100,
+                TypeEvent = "Intrusion",
+                Device = new BaseDeviceDto { Id = 100 },
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
                 CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -345,8 +337,8 @@ public class EventProviderServiceTests
             Success = true,
             Data = new List<DetectionEventDto>
             {
-                new DetectionEventDto { Id = 1, GroupEvent = "Zone A", TypeEvent = "DETECTION", Sensor = 100, ActionReported = "True", Result = "THERMAL_SENSOR", CreatedAt = "2025-11-24T10:00:00.000Z" },
-                new DetectionEventDto { Id = 2, GroupEvent = "Zone A", TypeEvent = "DETECTION", Sensor = 101, ActionReported = "False", Result = "PIR_SENSOR", CreatedAt = "2025-11-24T10:05:00.000Z" }
+                new DetectionEventDto { Id = 1, TypeEvent = "Intrusion", Device = new BaseDeviceDto { Id = 100 }, ActionReported = "True", Result = "THERMAL_SENSOR", CreatedAt = "2025-11-24T10:00:00.000Z" },
+                new DetectionEventDto { Id = 2, TypeEvent = "Intrusion", Device = new BaseDeviceDto { Id = 101 }, ActionReported = "False", Result = "PIR_SENSOR", CreatedAt = "2025-11-24T10:05:00.000Z" }
             },
             Pagination = new PaginationDto { Page = 1, TotalPages = 2, Total = 3, Limit = 2 }
         };
@@ -357,7 +349,7 @@ public class EventProviderServiceTests
             Success = true,
             Data = new List<DetectionEventDto>
             {
-                new DetectionEventDto { Id = 3, GroupEvent = "Zone B", TypeEvent = "DETECTION", Sensor = 102, ActionReported = "False", Result = "VIBRATION_SENSOR", CreatedAt = "2025-11-24T10:10:00.000Z" }
+                new DetectionEventDto { Id = 3, TypeEvent = "Intrusion", Device = new BaseDeviceDto { Id = 102 }, ActionReported = "False", Result = "VIBRATION_SENSOR", CreatedAt = "2025-11-24T10:10:00.000Z" }
             },
             Pagination = new PaginationDto { Page = 2, TotalPages = 2, Total = 3, Limit = 2 }
         };
@@ -517,15 +509,11 @@ public class EventProviderServiceTests
             new MalfunctionEventDto
             {
                 Id = 1,
-                GroupEvent = "Zone A",
-                TypeEvent = "MALFUNCTION",
-                Sensor = 100,
+                TypeEvent = "Fault",
+                Device = new BaseDeviceDto { Id = 100 },
                 ActionReported = "False",
                 Reason = "FAULT_FENCE",
-                FirstStart = 10,
-                FirstEnd = 15,
-                SecondStart = 20,
-                SecondEnd = 25,
+                Detail = new MalfunctionDetailDto { FirstStart = 10, FirstEnd = 15, SecondStart = 20, SecondEnd = 25 },
                 CreatedAt = "2025-11-24T11:00:00.000Z"
             }
         };
@@ -581,9 +569,8 @@ public class EventProviderServiceTests
             new ConnectionEventDto
             {
                 Id = 1,
-                GroupEvent = "Zone A",
-                TypeEvent = "CONNECTION",
-                Sensor = 100,
+                TypeEvent = "Connection",
+                Device = new BaseDeviceDto { Id = 100 },
                 CreatedAt = "2025-11-24T12:00:00.000Z"
             }
         };
@@ -707,9 +694,8 @@ public class EventProviderServiceTests
         var createdDto = new DetectionEventDto
         {
             Id = 999,
-            GroupEvent = "Zone C",
-            TypeEvent = "DETECTION",
-            Sensor = 200,
+            TypeEvent = "Intrusion",
+            Device = new BaseDeviceDto { Id = 200 },
             ActionReported = "True",
             Result = "THERMAL_SENSOR",
             CreatedAt = "2025-11-24T12:00:00.000Z"
@@ -738,7 +724,7 @@ public class EventProviderServiceTests
         Assert.Equal(EnumEventType.Intrusion, result.MessageType);
         Assert.Equal(EnumDetectionType.THERMAL_SENSOR, result.Result);
         mockApiService.Verify(x => x.CreateDetectionEventAsync(
-            It.Is<DetectionEventDto>(dto => dto.Sensor == 200 && dto.Result == "THERMAL_SENSOR"),
+            It.Is<DetectionEventDto>(dto => dto.Device != null && dto.Device.Id == 200 && dto.Result == "THERMAL_SENSOR"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -763,9 +749,8 @@ public class EventProviderServiceTests
         var updatedDto = new DetectionEventDto
         {
             Id = 100,
-            GroupEvent = "Zone C",
-            TypeEvent = "DETECTION",
-            Sensor = 200,
+            TypeEvent = "Intrusion",
+            Device = new BaseDeviceDto { Id = 200 },
             ActionReported = "False",
             Result = "PIR_SENSOR",
             CreatedAt = "2025-11-24T12:00:00.000Z"
@@ -854,14 +839,10 @@ public class EventProviderServiceTests
         var createdDto = new MalfunctionEventDto
         {
             Id = 888,
-            GroupEvent = "Zone D",
-            TypeEvent = "MALFUNCTION",
-            Sensor = 300,
+            TypeEvent = "Fault",
+            Device = new BaseDeviceDto { Id = 300 },
             Reason = "FAULT_CONTROLLER",
-            FirstStart = 10,
-            FirstEnd = 15,
-            SecondStart = 20,
-            SecondEnd = 25,
+            Detail = new MalfunctionDetailDto { FirstStart = 10, FirstEnd = 15, SecondStart = 20, SecondEnd = 25 },
             CreatedAt = "2025-11-24T13:00:00.000Z"
         };
 
@@ -914,14 +895,10 @@ public class EventProviderServiceTests
         var updatedDto = new MalfunctionEventDto
         {
             Id = 200,
-            GroupEvent = "Zone D",
-            TypeEvent = "MALFUNCTION",
-            Sensor = 300,
+            TypeEvent = "Fault",
+            Device = new BaseDeviceDto { Id = 300 },
             Reason = "FAULT_FENCE",
-            FirstStart = 11,
-            FirstEnd = 16,
-            SecondStart = 21,
-            SecondEnd = 26,
+            Detail = new MalfunctionDetailDto { FirstStart = 11, FirstEnd = 16, SecondStart = 21, SecondEnd = 26 },
             CreatedAt = "2025-11-24T13:00:00.000Z"
         };
 
@@ -999,9 +976,8 @@ public class EventProviderServiceTests
         var createdDto = new ConnectionEventDto
         {
             Id = 777,
-            GroupEvent = "Zone E",
-            TypeEvent = "CONNECTION",
-            Sensor = 400,
+            TypeEvent = "Connection",
+            Device = new BaseDeviceDto { Id = 400 },
             CreatedAt = "2025-11-24T14:00:00.000Z"
         };
 
@@ -1048,9 +1024,8 @@ public class EventProviderServiceTests
         var updatedDto = new ConnectionEventDto
         {
             Id = 300,
-            GroupEvent = "Zone E",
-            TypeEvent = "CONNECTION",
-            Sensor = 400,
+            TypeEvent = "Connection",
+            Device = new BaseDeviceDto { Id = 400 },
             CreatedAt = "2025-11-24T14:00:00.000Z"
         };
 
@@ -1190,7 +1165,7 @@ public class EventProviderServiceTests
         mockApiService
             .Setup(x => x.UpdateActionEventAsync(
                 400,
-                It.IsAny<ActionEventDto>(),
+                It.IsAny<ActionEventCreateDto>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(apiResponse);
 
@@ -1552,12 +1527,12 @@ public class DtoToModelHelperWithDeviceProviderTests
         };
         deviceProvider.Add(expectedDevice);
 
-        // Act - ResolveDevice는 private이므로 ToDetectionEventModel을 통해 간접 테스트
+        // Act - ConvertDeviceFromDto는 private이므로 ToDetectionEventModel을 통해 간접 테스트
         var dto = new DetectionEventDto
         {
             Id = 100,
-            Sensor = 1,
-            TypeEvent = "DETECTION",
+            Device = new BaseDeviceDto { Id = 1, TypeDevice = "Fence" },
+            TypeEvent = "Intrusion",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -1585,8 +1560,8 @@ public class DtoToModelHelperWithDeviceProviderTests
         var dto = new DetectionEventDto
         {
             Id = 100,
-            Sensor = 1, // 존재하지 않는 ID
-            TypeEvent = "DETECTION",
+            Device = new BaseDeviceDto { Id = 1 }, // 존재하지 않는 ID
+            TypeEvent = "Intrusion",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
@@ -1611,15 +1586,15 @@ public class DtoToModelHelperWithDeviceProviderTests
         var dto = new DetectionEventDto
         {
             Id = 100,
-            Sensor = 1,
-            TypeEvent = "DETECTION",
+            Device = new BaseDeviceDto { Id = 1 },
+            TypeEvent = "Intrusion",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
         };
 
         // Act
-        var model = dto.ToDetectionEventModel(null); // ← RED
+        var model = dto.ToDetectionEventModel(null);
 
         // Assert
         Assert.NotNull(model.Device);
@@ -1658,15 +1633,15 @@ public class DtoToModelHelperWithDeviceProviderTests
         var dto = new DetectionEventDto
         {
             Id = 100,
-            Sensor = 1, // Controller와 Sensor 둘 다 id=1
-            TypeEvent = "DETECTION",
+            Device = new BaseDeviceDto { Id = 1, TypeDevice = "Fence" }, // Controller와 Sensor 둘 다 id=1
+            TypeEvent = "Intrusion",
             Result = "THERMAL_SENSOR",
             ActionReported = "True",
             CreatedAt = "2025-11-24T10:00:00.000Z"
         };
 
         // Act
-        var model = dto.ToDetectionEventModel(deviceProvider); // ← RED
+        var model = dto.ToDetectionEventModel(deviceProvider);
 
         // Assert - Sensor가 반환되어야 함 (Controller 아님!)
         Assert.NotNull(model.Device);
@@ -1717,11 +1692,10 @@ public class DtoToModelHelperWithOriginEventTests
             {
                 Id = 456, // EventProvider에 있는 Event
                 CreatedAt = "2025-11-25T10:00:00.000Z",
-                TypeEvent = "DETECTION",
-                GroupEvent = "1",
+                TypeEvent = "Intrusion",
                 ActionReported = "True",
-                Result = "DETECTION",
-                Sensor = 1
+                Result = "THERMAL_SENSOR",
+                Device = new BaseDeviceDto { Id = 1 }
             }
         };
 
@@ -1769,10 +1743,9 @@ public class DtoToModelHelperWithOriginEventTests
             {
                 Id = 789, // EventProvider에 있는 Event
                 CreatedAt = "2025-11-25T11:00:00.000Z",
-                TypeEvent = "MALFUNCTION",
-                GroupEvent = "2",
+                TypeEvent = "Fault",
                 Reason = "FAULT_FENCE",
-                Sensor = 2
+                Device = new BaseDeviceDto { Id = 2 }
             }
         };
 
@@ -1810,11 +1783,10 @@ public class DtoToModelHelperWithOriginEventTests
             {
                 Id = 999, // EventProvider에 없는 Event
                 CreatedAt = "2025-11-25T11:50:00.000Z",
-                TypeEvent = "DETECTION",
-                GroupEvent = "3",
+                TypeEvent = "Intrusion",
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
-                Sensor = 1
+                Device = new BaseDeviceDto { Id = 1 }
             }
         };
 
@@ -1851,11 +1823,10 @@ public class DtoToModelHelperWithOriginEventTests
             {
                 Id = 888,
                 CreatedAt = "2025-11-25T12:50:00.000Z",
-                TypeEvent = "DETECTION",
-                GroupEvent = "4",
+                TypeEvent = "Intrusion",
                 ActionReported = "True",
                 Result = "THERMAL_SENSOR",
-                Sensor = 1
+                Device = new BaseDeviceDto { Id = 1 }
             }
         };
 
@@ -1944,10 +1915,9 @@ public class DtoToModelHelperWithOriginEventTests
             {
                 Id = 1, // DetectionEvent와 MalfunctionEvent 둘 다 id=1
                 CreatedAt = "2025-11-25T11:00:00.000Z",
-                TypeEvent = "MALFUNCTION",
-                GroupEvent = "2",
+                TypeEvent = "Fault",
                 Reason = "FAULT_FENCE",
-                Sensor = 2
+                Device = new BaseDeviceDto { Id = 2 }
             }
         };
 
@@ -1963,136 +1933,6 @@ public class DtoToModelHelperWithOriginEventTests
 
         var malfunctionOrigin = (IMalfunctionEventModel)model.OriginEvent;
         Assert.Equal("Malfunction Sensor", malfunctionOrigin.Device.DeviceName);
-    }
-    #endregion
-}
-
-/// <summary>
-/// DetectionExEventDto 변환 테스트
-/// TDD로 ToDetectionEventModel(DetectionExEventDto) 구현
-/// Phase 7.4.1-2: Unit Tests 작성
-/// </summary>
-public class DetectionExEventDtoToModelTests
-{
-    #region - Test 7.4.1: ToDetectionEventModel 정상 케이스 -
-    [Fact(DisplayName = "TEST-7.4.1: ToDetectionEventModel은 DetectionExEventDto에서 OriginEvent를 추출하여 변환해야 함")]
-    public void ToDetectionEventModel_WithValidOriginEvent_ShouldReturnDetectionEventModel()
-    {
-        // Arrange
-        var exDto = new DetectionExEventDto
-        {
-            NameEvent = "침입 감지",
-            CategoryEvent = "보안",
-            OriginEvent = new DetectionEventDto
-            {
-                Id = 100,
-                CreatedAt = "2025-11-27T10:00:00.000Z",
-                TypeEvent = "DETECTION",
-                GroupEvent = "Zone A",
-                Controller = 1,
-                Sensor = 10,
-                TypeDevice = "Fence",
-                ActionReported = "True",
-                Result = "THERMAL_SENSOR"
-            }
-        };
-
-        // Act
-        var model = exDto.ToDetectionEventModel();
-
-        // Assert
-        Assert.NotNull(model);
-        Assert.Equal(100, model.Id);
-        Assert.Equal(new DateTime(2025, 11, 27, 10, 0, 0, DateTimeKind.Utc), model.DateTime);
-        Assert.Equal(EnumEventType.Intrusion, model.MessageType);
-        Assert.Equal("Zone A", model.EventGroup);
-        Assert.Equal(EnumTrueFalse.True, model.Status);
-        Assert.Equal(EnumDetectionType.THERMAL_SENSOR, model.Result);
-        Assert.NotNull(model.Device);
-        Assert.Equal(10, model.Device.Id);
-    }
-    #endregion
-
-    #region - Test 7.4.1-2: DeviceProvider 오버로드 테스트 -
-    [Fact(DisplayName = "TEST-7.4.1-2: ToDetectionEventModel은 DeviceProvider를 활용하여 Device를 매칭해야 함")]
-    public void ToDetectionEventModel_WithDeviceProvider_ShouldMatchDeviceFromProvider()
-    {
-        // Arrange
-        var deviceProvider = new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider();
-        var expectedDevice = new SensorDeviceModel
-        {
-            Id = 10,
-            DeviceNumber = 101,
-            DeviceName = "펜스센서_A-001",
-            DeviceType = EnumDeviceType.Fence,
-            Status = EnumDeviceStatus.ACTIVATED
-        };
-        deviceProvider.Add(expectedDevice);
-
-        var exDto = new DetectionExEventDto
-        {
-            NameEvent = "침입 감지",
-            CategoryEvent = "보안",
-            OriginEvent = new DetectionEventDto
-            {
-                Id = 100,
-                CreatedAt = "2025-11-27T10:00:00.000Z",
-                TypeEvent = "DETECTION",
-                GroupEvent = "Zone A",
-                Controller = 1,
-                Sensor = 10,
-                TypeDevice = "Fence",
-                ActionReported = "True",
-                Result = "THERMAL_SENSOR"
-            }
-        };
-
-        // Act
-        var model = exDto.ToDetectionEventModel(deviceProvider);
-
-        // Assert
-        Assert.NotNull(model);
-        Assert.NotNull(model.Device);
-        Assert.Equal(10, model.Device.Id);
-        Assert.Equal("펜스센서_A-001", model.Device.DeviceName); // DeviceProvider에서 매칭된 정보
-        Assert.Equal(101, model.Device.DeviceNumber);
-        Assert.Equal(EnumDeviceStatus.ACTIVATED, model.Device.Status);
-    }
-    #endregion
-
-    #region - Test 7.4.2: OriginEvent null 예외 테스트 -
-    [Fact(DisplayName = "TEST-7.4.2: ToDetectionEventModel은 OriginEvent가 null일 때 ArgumentNullException을 던져야 함")]
-    public void ToDetectionEventModel_WithNullOriginEvent_ShouldThrowArgumentNullException()
-    {
-        // Arrange
-        var exDto = new DetectionExEventDto
-        {
-            NameEvent = "테스트",
-            CategoryEvent = "테스트",
-            OriginEvent = null! // null!
-        };
-
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentNullException>(() => exDto.ToDetectionEventModel());
-        Assert.Equal("OriginEvent", exception.ParamName);
-        Assert.Contains("OriginEvent cannot be null", exception.Message);
-    }
-
-    [Fact(DisplayName = "TEST-7.4.2-2: ToDetectionEventModel(DeviceProvider)도 OriginEvent가 null일 때 예외를 던져야 함")]
-    public void ToDetectionEventModel_WithDeviceProviderAndNullOriginEvent_ShouldThrowArgumentNullException()
-    {
-        // Arrange
-        var deviceProvider = new Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider();
-        var exDto = new DetectionExEventDto
-        {
-            NameEvent = "테스트",
-            CategoryEvent = "테스트",
-            OriginEvent = null!
-        };
-
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentNullException>(() => exDto.ToDetectionEventModel(deviceProvider));
-        Assert.Equal("OriginEvent", exception.ParamName);
     }
     #endregion
 }
@@ -2472,7 +2312,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
         mockDevice.Setup(d => d.Id).Returns(5);
-        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
 
         var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
         mockGroupSymbol.SetupAllProperties();
@@ -2500,7 +2340,7 @@ public class SymbolEventManagerDualDictionaryTests
         // Device.Id = 5, DeviceGroup = 1, DeviceType = Fence (복합 키용)
         var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
         mockDevice.Setup(d => d.Id).Returns(5);
-        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
@@ -2541,7 +2381,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
         mockDevice.Setup(d => d.Id).Returns(5);
-        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
@@ -2557,7 +2397,7 @@ public class SymbolEventManagerDualDictionaryTests
         manager.ProcessDeviceEvent(
             deviceId: 5,
             deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
-            deviceGroup: 1,
+            deviceGroups: new List<int> { 1 },
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
 
@@ -2582,7 +2422,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
         mockDevice.Setup(d => d.Id).Returns(5);
-        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
@@ -2598,7 +2438,7 @@ public class SymbolEventManagerDualDictionaryTests
         manager.ProcessDeviceEvent(
             deviceId: 5,
             deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
-            deviceGroup: 1,
+            deviceGroups: new List<int> { 1 },
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Connection,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
 
@@ -2623,7 +2463,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockController = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IControllerDeviceModel>();
         mockController.Setup(d => d.Id).Returns(10);
-        mockController.Setup(d => d.DeviceGroup).Returns(1);
+        mockController.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockController.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Controller);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
@@ -2638,7 +2478,7 @@ public class SymbolEventManagerDualDictionaryTests
         // Act - Fence 타입 제어기 장애 이벤트
         manager.ProcessControllerEvent(
             controllerId: 10,
-            deviceGroup: 1,
+            deviceGroups: new List<int> { 1 },
             deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
@@ -2664,7 +2504,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockController = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IControllerDeviceModel>();
         mockController.Setup(d => d.Id).Returns(10);
-        mockController.Setup(d => d.DeviceGroup).Returns(1);
+        mockController.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockController.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Controller);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
@@ -2679,7 +2519,7 @@ public class SymbolEventManagerDualDictionaryTests
         // Act - IpCamera 타입 (Non-Fence) 장애 이벤트
         manager.ProcessControllerEvent(
             controllerId: 10,
-            deviceGroup: 1,
+            deviceGroups: new List<int> { 1 },
             deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.IpCamera,
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
@@ -2705,7 +2545,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
         mockDevice.Setup(d => d.Id).Returns(5);
-        mockDevice.Setup(d => d.DeviceGroup).Returns(1);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
@@ -2723,7 +2563,7 @@ public class SymbolEventManagerDualDictionaryTests
         var ex = Record.Exception(() => manager.ProcessEventReport(
             deviceId: 5,
             deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
-            deviceGroup: 1));
+            deviceGroups: new List<int> { 1 }));
 
         // Assert - 예외 없이 정상 호출됨
         Assert.Null(ex);
@@ -2746,7 +2586,7 @@ public class SymbolEventManagerDualDictionaryTests
 
         var mockCamera = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.ICameraDeviceModel>();
         mockCamera.Setup(d => d.Id).Returns(1);
-        mockCamera.Setup(d => d.DeviceGroup).Returns(1);
+        mockCamera.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
         mockCamera.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.IpCamera);
 
         var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
