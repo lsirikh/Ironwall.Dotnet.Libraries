@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -109,45 +110,11 @@ public class MarkerFactory : IMarkerFactory
         return new GMapPidsMarker(_log!, symbol);
     }
 
-    /// <summary>
-    /// DeviceType에 따라 디바이스 목록을 필터링합니다.
-    /// PropertyPanelFactory와 동일한 로직을 사용합니다.
-    /// </summary>
     private IEnumerable<IBaseDeviceModel> FilterDevicesByType(
         IEnumerable<IBaseDeviceModel> devices,
         EnumDeviceType targetType)
     {
-        return targetType switch
-        {
-            EnumDeviceType.Controller =>
-                devices.Where(d => d.DeviceType == EnumDeviceType.Controller),
-
-            EnumDeviceType.Multi =>
-                devices.Where(d => d.DeviceType == EnumDeviceType.Multi),
-
-            EnumDeviceType.IpCamera =>
-                devices.Where(d => d.DeviceType == EnumDeviceType.IpCamera),
-
-            // Fence 계열 센서들
-            EnumDeviceType.Fence or
-            EnumDeviceType.Underground or
-            EnumDeviceType.Contact or
-            EnumDeviceType.PIR or
-            EnumDeviceType.Laser or
-            EnumDeviceType.Cable or
-            EnumDeviceType.OpticalCable =>
-                devices.Where(d =>
-                    d.DeviceType == EnumDeviceType.Fence ||
-                    d.DeviceType == EnumDeviceType.Underground ||
-                    d.DeviceType == EnumDeviceType.Contact ||
-                    d.DeviceType == EnumDeviceType.PIR ||
-                    d.DeviceType == EnumDeviceType.Laser ||
-                    d.DeviceType == EnumDeviceType.Cable ||
-                    d.DeviceType == EnumDeviceType.OpticalCable),
-
-            // 기타: 전체 목록
-            _ => devices
-        };
+        return DeviceFilterHelper.FilterDevicesByType(devices, targetType);
     }
 
     private GMapGeometricMarker CreateGeometricMarker(IGeometricSymbolModel symbol)

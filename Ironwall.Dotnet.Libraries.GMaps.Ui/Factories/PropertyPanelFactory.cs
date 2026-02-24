@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
@@ -92,50 +93,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             _log?.Info($"PIDS Panel FilteredDeviceList 설정: {filteredDevices.Count()}개 (DeviceType: {deviceType})");
         }
 
-        /// <summary>
-        /// DeviceType에 따라 디바이스 목록을 필터링합니다.
-        /// </summary>
         private IEnumerable<IBaseDeviceModel> FilterDevicesByType(
             IEnumerable<IBaseDeviceModel> devices,
             Libraries.Enums.EnumDeviceType targetType)
         {
-            // DeviceType 필터링 규칙:
-            // - Controller: Controller만
-            // - Multi: Multi만
-            // - Fence 계열 (Fence, Underground, Contact, PIR, Laser, Cable, OpticalCable): 센서 계열
-            // - IpCamera: IpCamera만
-
-            return targetType switch
-            {
-                Libraries.Enums.EnumDeviceType.Controller =>
-                    devices.Where(d => d.DeviceType == Libraries.Enums.EnumDeviceType.Controller),
-
-                Libraries.Enums.EnumDeviceType.Multi =>
-                    devices.Where(d => d.DeviceType == Libraries.Enums.EnumDeviceType.Multi),
-
-                Libraries.Enums.EnumDeviceType.IpCamera =>
-                    devices.Where(d => d.DeviceType == Libraries.Enums.EnumDeviceType.IpCamera),
-
-                // Fence 계열 센서들
-                Libraries.Enums.EnumDeviceType.Fence or
-                Libraries.Enums.EnumDeviceType.Underground or
-                Libraries.Enums.EnumDeviceType.Contact or
-                Libraries.Enums.EnumDeviceType.PIR or
-                Libraries.Enums.EnumDeviceType.Laser or
-                Libraries.Enums.EnumDeviceType.Cable or
-                Libraries.Enums.EnumDeviceType.OpticalCable =>
-                    devices.Where(d =>
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.Fence ||
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.Underground ||
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.Contact ||
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.PIR ||
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.Laser ||
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.Cable ||
-                        d.DeviceType == Libraries.Enums.EnumDeviceType.OpticalCable),
-
-                // 기타: 전체 목록
-                _ => devices
-            };
+            return DeviceFilterHelper.FilterDevicesByType(devices, targetType);
         }
         #endregion
         #region - IHanldes -
