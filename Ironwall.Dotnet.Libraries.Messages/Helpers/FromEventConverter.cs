@@ -3,7 +3,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Ironwall.Dotnet.Libraries.Messages.Helpsers;
+namespace Ironwall.Dotnet.Libraries.Messages.Helpers;
 
 /// <summary>
 /// ActionEvent의 FromEvent 필드를 위한 Custom JsonConverter

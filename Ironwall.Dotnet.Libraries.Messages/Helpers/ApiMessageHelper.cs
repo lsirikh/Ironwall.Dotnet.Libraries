@@ -107,6 +107,61 @@ public static class ApiMessageHelper
                 ex.Message);
         }
     }
+
+    /// <summary>
+    /// HttpResponseMessage → ApiListResponse&lt;T&gt; 변환 (items 래퍼 패턴)
+    /// <para>서버가 { data: { items: [...], total: N } } 형식으로 응답하는 경우 사용</para>
+    /// </summary>
+    public static async Task<ApiListResponse<T>> ToApiItemsListResponseAsync<T>(this HttpResponseMessage response)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jObj = Newtonsoft.Json.Linq.JObject.Parse(content);
+                var success = (bool?)jObj["success"] ?? false;
+                var message = (string?)jObj["message"] ?? string.Empty;
+                var itemsToken = jObj["data"]?["items"];
+                var total = (int?)jObj["data"]?["total"] ?? 0;
+
+                var items = itemsToken != null
+                    ? itemsToken.ToObject<List<T>>(JsonSerializer.Create(_jsonSettings))
+                    : new List<T>();
+
+                return new ApiListResponse<T>
+                {
+                    Success = success,
+                    Message = message,
+                    Data = items,
+                    Pagination = new Defines.Apis.PaginationDto { Total = total }
+                };
+            }
+            else
+            {
+                try
+                {
+                    var errorResult = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
+                    if (errorResult != null)
+                        return errorResult;
+                }
+                catch { }
+
+                return ApiListResponse<T>.CreateError(
+                    GetErrorCode(response.StatusCode),
+                    $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
+                    content);
+            }
+        }
+        catch (Exception ex)
+        {
+            return ApiListResponse<T>.CreateError(
+                "INTERNAL_ERROR",
+                "Failed to process API items list response",
+                ex.Message);
+        }
+    }
     #endregion
 
     #region - JSON 직접 변환 (선택적) -

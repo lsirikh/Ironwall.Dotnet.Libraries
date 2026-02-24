@@ -187,7 +187,7 @@ public static class BrokerMessageHelper
         try
         {
             var brokerMsg = JObject.Parse(json);
-            var dataToken = brokerMsg["data"];
+            var dataToken = brokerMsg["body"];
 
             if (dataToken == null || dataToken.Type == JTokenType.Null)
                 return null;
@@ -220,7 +220,7 @@ public static class BrokerMessageHelper
         try
         {
             var brokerMsg = JObject.Parse(json);
-            var dataToken = brokerMsg["data"];
+            var dataToken = brokerMsg["body"];
 
             if (dataToken == null || dataToken.Type == JTokenType.Null)
                 return result;

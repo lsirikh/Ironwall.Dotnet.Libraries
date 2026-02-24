@@ -1,4 +1,3 @@
-using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
 using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -6,53 +5,17 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 /// <summary>
 /// Sensor 디바이스 DTO
 /// </summary>
-public class SensorDeviceDto : BaseDto
+public class SensorDeviceDto : BaseDeviceDto
 {
-    /// <summary>
-    /// 디바이스 번호
-    /// </summary>
-    [JsonProperty("number_device", Order = 2)]
-    public int NumberDevice { get; set; }
-
-    /// <summary>
-    /// 디바이스 그룹
-    /// </summary>
-    [JsonProperty("group_device", Order = 3)]
-    public int GroupDevice { get; set; }
-
-    /// <summary>
-    /// 디바이스 이름
-    /// </summary>
-    [JsonProperty("name_device", Order = 4)]
-    public string NameDevice { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 디바이스 타입 (EnumDeviceType: "Multi", "Fence", "Underground", "Contact", "PIR", etc.)
-    /// </summary>
-    [JsonProperty("type_device", Order = 5)]
-    public string TypeDevice { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 펌웨어 버전
-    /// </summary>
-    [JsonProperty("version", Order = 6)]
-    public string Version { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 디바이스 상태 (EnumDeviceStatus: "ACTIVATED", "ERROR", "DEACTIVATED")
-    /// </summary>
-    [JsonProperty("status", Order = 7)]
-    public string Status { get; set; } = "DEACTIVATED";
-
     /// <summary>
     /// 소속 Controller ID
     /// </summary>
-    [JsonProperty("controller_id", Order = 8)]
+    [JsonProperty("controller_id", Order = 14)]
     public int ControllerId { get; set; }
 
     /// <summary>
-    /// 소속 Controller ID (선택적, include_controller=true 시)
+    /// 소속 Controller (선택적, include_controller=true 시)
     /// </summary>
-    [JsonProperty("controller", Order = 9)]
+    [JsonProperty("controller", Order = 15)]
     public ControllerDeviceDto? Controller { get; set; }
 }

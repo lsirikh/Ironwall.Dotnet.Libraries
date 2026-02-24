@@ -1,46 +1,36 @@
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 
 /// <summary>
-/// 연결 이벤트 DTO
+/// 연결 이벤트 DTO (Nested device 구조)
 /// </summary>
-public class ConnectionEventDto : BaseDto
+public class ConnectionEventDto : BaseDto, IDeviceEventDto
 {
-    /// <summary>
-    /// 이벤트 그룹
-    /// </summary>
-    [JsonProperty("group_event", Order = 2)]
-    public string GroupEvent { get; set; } = string.Empty;
-
     /// <summary>
     /// 이벤트 타입 (EnumEventType: "Connection")
     /// </summary>
-    [JsonProperty("type_event", Order = 3)]
+    [JsonProperty("type_event", Order = 2)]
     public string TypeEvent { get; set; } = "Connection";
 
     /// <summary>
-    /// Controller ID
+    /// 장치 ID (Create/Update 시 사용, FK → Device)
     /// </summary>
-    [JsonProperty("controller", Order = 4)]
-    public int Controller { get; set; }
+    [JsonProperty("device_id", Order = 3, DefaultValueHandling = DefaultValueHandling.Ignore)]
+    public int DeviceId { get; set; }
 
     /// <summary>
-    /// Sensor ID
+    /// 중첩 Device 객체 (서버 응답에서 반환, 공통 Base 타입)
     /// </summary>
-    [JsonProperty("sensor", Order = 5)]
-    public int Sensor { get; set; }
+    [JsonProperty("device", Order = 4, NullValueHandling = NullValueHandling.Ignore)]
+    public BaseDeviceDto? Device { get; set; }
 
     /// <summary>
-    /// 디바이스 타입 (EnumDeviceType: "Underground", "Multi", "Fence", etc.)
+    /// 장비 설명 문자열
     /// </summary>
-    [JsonProperty("type_device", Order = 6)]
-    public string TypeDevice { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 시퀀스 번호
-    /// </summary>
-    [JsonProperty("sequence", Order = 7)]
-    public int Sequence { get; set; }
+    [JsonProperty("device_description", Order = 5, NullValueHandling = NullValueHandling.Ignore)]
+    public string? DeviceDescription { get; set; }
 }

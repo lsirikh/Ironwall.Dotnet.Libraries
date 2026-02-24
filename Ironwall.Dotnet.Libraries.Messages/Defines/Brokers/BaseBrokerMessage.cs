@@ -21,13 +21,13 @@ public abstract class BaseBrokerMessage
     /// <summary>
     /// 메시지 타입 (REQ, RSP 등)
     /// </summary>
-    [JsonProperty(Order = 2, PropertyName = "type_message")]
+    [JsonProperty(Order = 2, PropertyName = "m_type")]
     public string TypeMessage { get; set; }=string.Empty;
 
     /// <summary>
     /// 명령 타입 (EVENT_CALL 등)
     /// </summary>
-    [JsonProperty(Order = 3, PropertyName = "type_command")]
+    [JsonProperty(Order = 3, PropertyName = "cmd")]
     public string Command { get; set; }= string.Empty;
 
     /// <summary>
@@ -39,7 +39,7 @@ public abstract class BaseBrokerMessage
     /// <summary>
     /// 응답 생성 시각 (ISO 8601 형식)
     /// </summary>
-    [JsonProperty(Order = 99, PropertyName = "timestamp")]
+    [JsonProperty(Order = 99, PropertyName = "created")]
     public string Timestamp { get; set; } = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 }
 
@@ -53,6 +53,6 @@ public abstract class BaseMessage<T> : BaseBrokerMessage where T : class
     /// <summary>
     /// 메시지 본문 (Generic 타입)
     /// </summary>
-    [JsonProperty(Order = 5, PropertyName = "data")]
+    [JsonProperty(Order = 5, PropertyName = "body")]
     public T? Data { get; set; }
 }
