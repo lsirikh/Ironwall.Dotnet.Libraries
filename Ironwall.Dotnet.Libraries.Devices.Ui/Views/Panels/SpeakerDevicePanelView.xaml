@@ -293,6 +293,28 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
+				<!--  Server  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Server"
+					IsReadOnly="True"
+					SortMemberPath="Server.Name">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Server.Name}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+
 				<!--  Description  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"

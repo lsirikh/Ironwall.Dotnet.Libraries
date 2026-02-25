@@ -57,8 +57,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SensorPanelViewModel.UpdateAction += SensorPanelViewModel_UpdateAction;
         CameraPanelViewModel.CheckSelectedItems += CameraPanelViewModel_CheckSelectedItems;
         CameraPanelViewModel.UpdateAction += CameraPanelViewModel_UpdateAction;
+        SpeakerPanelViewModel.CheckSelectedItems += SpeakerPanelViewModel_CheckSelectedItems;
         SpeakerPanelViewModel.UpdateAction += SpeakerPanelViewModel_UpdateAction;
+        EnclosurePanelViewModel.CheckSelectedItems += EnclosurePanelViewModel_CheckSelectedItems;
         EnclosurePanelViewModel.UpdateAction += EnclosurePanelViewModel_UpdateAction;
+        LampPanelViewModel.CheckSelectedItems += LampPanelViewModel_CheckSelectedItems;
         LampPanelViewModel.UpdateAction += LampPanelViewModel_UpdateAction;
         await _deviceProviderService.FetchAllDevicesAsync(cancellationToken);
         await TabControlViewModel.ActivateAsync();
@@ -85,8 +88,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SensorPanelViewModel.UpdateAction -= SensorPanelViewModel_UpdateAction;
         CameraPanelViewModel.CheckSelectedItems -= CameraPanelViewModel_CheckSelectedItems;
         CameraPanelViewModel.UpdateAction -= CameraPanelViewModel_UpdateAction;
+        SpeakerPanelViewModel.CheckSelectedItems -= SpeakerPanelViewModel_CheckSelectedItems;
         SpeakerPanelViewModel.UpdateAction -= SpeakerPanelViewModel_UpdateAction;
+        EnclosurePanelViewModel.CheckSelectedItems -= EnclosurePanelViewModel_CheckSelectedItems;
         EnclosurePanelViewModel.UpdateAction -= EnclosurePanelViewModel_UpdateAction;
+        LampPanelViewModel.CheckSelectedItems -= LampPanelViewModel_CheckSelectedItems;
         LampPanelViewModel.UpdateAction -= LampPanelViewModel_UpdateAction;
 
         ClearData();
@@ -147,7 +153,52 @@ public class DeviceDashboardViewModel : BasePanelViewModel
             IsSelected = true;
         }
     }
-    
+
+    private void SpeakerPanelViewModel_CheckSelectedItems(IList<SpeakerDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new SpeakerSelectionViewModel(selectedItems);
+            (SelectedItemEditor as SpeakerSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private void EnclosurePanelViewModel_CheckSelectedItems(IList<EnclosureDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new EnclosureSelectionViewModel(selectedItems);
+            (SelectedItemEditor as EnclosureSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private void LampPanelViewModel_CheckSelectedItems(IList<LampDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new LampSelectionViewModel(selectedItems);
+            (SelectedItemEditor as LampSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
     private async void SensorPanelViewModel_UpdateAction()
     {
         await GetDeviceType();

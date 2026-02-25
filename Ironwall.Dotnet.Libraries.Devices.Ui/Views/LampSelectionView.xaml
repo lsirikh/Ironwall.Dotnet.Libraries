@@ -1,0 +1,187 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.LampSelectionView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	d:Background="WhiteSmoke"
+	mc:Ignorable="d">
+
+	<GroupBox
+		Margin="5"
+		Style="{StaticResource MaterialDesignGroupBox}"
+		UseLayoutRounding="True">
+		<GroupBox.Header>
+			<StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal">
+				<md:PackIcon Kind="Settings" />
+				<TextBlock
+					Margin="5,0"
+					VerticalAlignment="Center"
+					Text="경광등 속성" />
+			</StackPanel>
+		</GroupBox.Header>
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="1*" />
+			</Grid.RowDefinitions>
+			<Grid Grid.Row="0" Margin="5,0">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="2*" MinWidth="50" />
+				</Grid.ColumnDefinitions>
+
+				<!--  Row 0: DeviceNumber, DeviceName, IpAddress, IpPort  -->
+
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="0"
+					Style="{StaticResource TextBlockTitle}"
+					Text="Device No" />
+				<TextBox
+					Grid.Row="0"
+					Grid.Column="1"
+					md:HintAssist.Hint="1"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="2"
+					Style="{StaticResource TextBlockTitle}"
+					Text="Name" />
+				<TextBox
+					Grid.Row="0"
+					Grid.Column="3"
+					md:HintAssist.Hint="경광등_01"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="4"
+					Style="{StaticResource TextBlockTitle}"
+					Text="IP" />
+				<TextBox
+					Grid.Row="0"
+					Grid.Column="5"
+					md:HintAssist.Hint="192.168.0.10"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding IpAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="6"
+					Style="{StaticResource TextBlockTitle}"
+					Text="Port" />
+				<TextBox
+					Grid.Row="0"
+					Grid.Column="7"
+					md:HintAssist.Hint="9000"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding IpPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+					<i:Interaction.Behaviors>
+						<behavior:NumericOnlyBehavior />
+					</i:Interaction.Behaviors>
+				</TextBox>
+
+				<!--  Row 1: UserName, UserPassword, Description, Status, Apply Button  -->
+
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="0"
+					Style="{StaticResource TextBlockTitle}"
+					Text="User" />
+				<TextBox
+					Grid.Row="1"
+					Grid.Column="1"
+					md:HintAssist.Hint="admin"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="2"
+					Style="{StaticResource TextBlockTitle}"
+					Text="PW" />
+				<PasswordBox
+					Grid.Row="1"
+					Grid.Column="3"
+					PasswordChar="*"
+					Style="{StaticResource PasswordBoxInput}">
+					<i:Interaction.Behaviors>
+						<behavior:PasswordBehavior Password="{Binding UserPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					</i:Interaction.Behaviors>
+				</PasswordBox>
+
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="4"
+					Style="{StaticResource TextBlockTitle}"
+					Text="Desc" />
+				<TextBox
+					Grid.Row="1"
+					Grid.Column="5"
+					md:HintAssist.Hint="설명"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="6"
+					Style="{StaticResource TextBlockTitle}"
+					Text="Status" />
+				<ComboBox
+					Grid.Row="1"
+					Grid.Column="7"
+					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
+					SelectedItem="{Binding Status, Mode=TwoWay}"
+					Style="{StaticResource ComboBoxContent}">
+					<ComboBox.ItemsPanel>
+						<ItemsPanelTemplate>
+							<VirtualizingStackPanel />
+						</ItemsPanelTemplate>
+					</ComboBox.ItemsPanel>
+					<ComboBox.ItemTemplate>
+						<DataTemplate>
+							<TextBlock Text="{Binding}" />
+						</DataTemplate>
+					</ComboBox.ItemTemplate>
+				</ComboBox>
+
+				<Button
+					x:Name="ApplyButton"
+					Grid.Row="1"
+					Grid.Column="8"
+					Grid.ColumnSpan="2"
+					BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+					Style="{StaticResource MaterialDesignFlatButton}">
+					<Button.Content>
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
+							<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
+						</StackPanel>
+					</Button.Content>
+				</Button>
+			</Grid>
+		</Grid>
+	</GroupBox>
+</UserControl>

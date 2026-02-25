@@ -322,6 +322,71 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
+				<!--  UserName  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="UserName"
+					SortMemberPath="UserName">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  UserPassword  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Password"
+					SortMemberPath="UserPassword">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock VerticalAlignment="Center" TextAlignment="Center">
+								<TextBlock.Text>
+									<MultiBinding Converter="{StaticResource PasswordMaskConverter}">
+										<Binding Path="UserPassword" />
+									</MultiBinding>
+								</TextBlock.Text>
+							</TextBlock>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<PasswordBox
+								x:Name="TextBoxPW"
+								PasswordChar="*"
+								Style="{StaticResource PasswordBoxInput}">
+								<i:Interaction.Behaviors>
+									<behavior:PasswordBehavior Password="{Binding UserPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+								</i:Interaction.Behaviors>
+							</PasswordBox>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
 				<!--  Description  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"

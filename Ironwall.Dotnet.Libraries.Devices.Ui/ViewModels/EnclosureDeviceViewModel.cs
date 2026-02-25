@@ -43,5 +43,18 @@ public class EnclosureDeviceViewModel : DeviceViewModel, IEnclosureDeviceViewMod
             NotifyOfPropertyChange(() => FanEnabled);
         }
     }
+
+    public IEnclosureThresholdConfigModel? ThresholdConfig
+        => (_model as IEnclosureDeviceModel)!.ThresholdConfig;
+
+    public string ThresholdSummary
+    {
+        get
+        {
+            var tc = ThresholdConfig;
+            if (tc == null) return "-";
+            return $"T:{tc.TempHigh ?? 0}/{tc.TempLow ?? 0} H:{tc.HumidityHigh ?? 0}/{tc.HumidityLow ?? 0}";
+        }
+    }
     #endregion
 }

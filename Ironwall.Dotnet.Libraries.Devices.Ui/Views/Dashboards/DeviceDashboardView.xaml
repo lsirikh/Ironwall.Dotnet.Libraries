@@ -400,7 +400,7 @@
 					</GroupBox.Header>
 					<TextBlock
 						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
-						Text="{Binding PIRSensor, FallbackValue=10}"
+						Text="{Binding IOController, FallbackValue=10}"
 						TextAlignment="Center" />
 				</GroupBox>
 				<!--<md:Card
