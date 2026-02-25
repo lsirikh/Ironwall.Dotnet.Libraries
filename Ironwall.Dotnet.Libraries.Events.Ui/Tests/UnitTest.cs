@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -16,6 +17,9 @@ using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Events.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
+using System.IO;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -3092,6 +3096,476 @@ public class DataHelperRefactoringTests
     }
 
     #endregion
+    #endregion
+}
+#endregion
+
+#region Phase 19: Event UI DeviceProperty Binding Tests
+/// <summary>
+/// Phase 19: ExEventViewModel / EventCardViewModel에 ControllerId,
+/// ControllerDeviceNumber, DeviceTypeName 속성 추가 테스트
+/// </summary>
+public class EventUiDevicePropertyBindingTests : IDisposable
+{
+    public EventUiDevicePropertyBindingTests()
+    {
+        // Caliburn.Micro IoC 초기화 (BasePanelViewModel + EventCardBaseViewModel 대응)
+        var mockSetup = new Mock<IEventSetupModel>();
+        mockSetup.Setup(s => s.TimeDiscardSec).Returns(30);
+        mockSetup.Setup(s => s.IsAutoEventDiscard).Returns(false);
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            if (type == typeof(EventSetupModel)) return new EventSetupModel(mockSetup.Object);
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = (type, key) => throw new InvalidOperationException("IoC is not initialized.");
+        IoC.GetAllInstances = type => throw new InvalidOperationException("IoC is not initialized.");
+        IoC.BuildUp = obj => throw new InvalidOperationException("IoC is not initialized.");
+    }
+
+    #region Test 1.1: ExEventViewModel_ControllerId_ReturnsSensorControllerIdWhenSensor
+    [Fact]
+    public void ExEventViewModel_ControllerId_ReturnsSensorControllerIdWhenSensor()
+    {
+        // Arrange: Sensor 디바이스 + Controller 참조
+        var controller = new ControllerDeviceModel { Id = 10, DeviceNumber = 3 };
+        var sensor = new SensorDeviceModel
+        {
+            Id = 1,
+            DeviceNumber = 5,
+            DeviceType = EnumDeviceType.Fence,
+            Controller = controller
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = sensor,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Act
+        var result = vm.ControllerId;
+
+        // Assert: Sensor의 Controller.Id를 반환
+        Assert.Equal(10, result);
+    }
+    #endregion
+
+    #region Test 1.2: ExEventViewModel_ControllerId_ReturnsNullWhenCamera
+    [Fact]
+    public void ExEventViewModel_ControllerId_ReturnsNullWhenCamera()
+    {
+        // Arrange: Camera 디바이스 (Controller 없음)
+        var camera = new CameraDeviceModel
+        {
+            Id = 2,
+            DeviceNumber = 10,
+            DeviceType = EnumDeviceType.IpCamera
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = camera,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Act
+        var result = vm.ControllerId;
+
+        // Assert: Camera는 ISensorDeviceModel이 아니므로 null
+        Assert.Null(result);
+    }
+    #endregion
+
+    #region Test 1.3: ExEventViewModel_ControllerDeviceNumber_ReturnsSensorControllerNumber
+    [Fact]
+    public void ExEventViewModel_ControllerDeviceNumber_ReturnsSensorControllerNumber()
+    {
+        // Arrange
+        var controller = new ControllerDeviceModel { Id = 10, DeviceNumber = 3 };
+        var sensor = new SensorDeviceModel
+        {
+            Id = 1,
+            DeviceNumber = 5,
+            DeviceType = EnumDeviceType.Fence,
+            Controller = controller
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = sensor,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Act
+        var result = vm.ControllerDeviceNumber;
+
+        // Assert: Sensor의 Controller.DeviceNumber를 반환
+        Assert.Equal(3, result);
+    }
+    #endregion
+
+    #region Test 1.4: ExEventViewModel_DeviceTypeName_ReturnsCorrectKoreanName
+    [Theory]
+    [InlineData(EnumDeviceType.Controller, "제어기")]
+    [InlineData(EnumDeviceType.Fence, "센서")]
+    [InlineData(EnumDeviceType.IpCamera, "카메라")]
+    [InlineData(EnumDeviceType.IpSpeaker, "스피커")]
+    [InlineData(EnumDeviceType.Enclosure, "함체")]
+    [InlineData(EnumDeviceType.Lamp, "경고등")]
+    public void ExEventViewModel_DeviceTypeName_ReturnsCorrectKoreanName(EnumDeviceType deviceType, string expectedName)
+    {
+        // Arrange
+        var device = new BaseDeviceModel
+        {
+            Id = 1,
+            DeviceNumber = 1,
+            DeviceType = deviceType
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = device,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Act
+        var result = vm.DeviceTypeName;
+
+        // Assert
+        Assert.Equal(expectedName, result);
+    }
+    #endregion
+
+    #region Test 1.5: EventCardViewModel_ControllerId_DelegatesToModel
+    [Fact]
+    public void EventCardViewModel_ControllerId_DelegatesToModel()
+    {
+        // Arrange: DetectionEventCardViewModel으로 테스트
+        var controller = new ControllerDeviceModel { Id = 20, DeviceNumber = 7 };
+        var sensor = new SensorDeviceModel
+        {
+            Id = 3,
+            DeviceNumber = 8,
+            DeviceType = EnumDeviceType.Fence,
+            Controller = controller
+        };
+        var detectionEvent = new DetectionEventModel
+        {
+            Device = sensor,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now,
+            Result = EnumDetectionType.VIBRATION_SENSOR
+        };
+        var vm = new DetectionEventCardViewModel(detectionEvent);
+
+        // Act
+        var result = vm.ControllerId;
+
+        // Assert
+        Assert.Equal(20, result);
+    }
+    #endregion
+
+    #region Test 1.6: EventCardViewModel_DeviceTypeName_DelegatesToModel
+    [Fact]
+    public void EventCardViewModel_DeviceTypeName_DelegatesToModel()
+    {
+        // Arrange: Camera 디바이스로 DetectionEventCardViewModel 테스트
+        var camera = new CameraDeviceModel
+        {
+            Id = 5,
+            DeviceNumber = 12,
+            DeviceType = EnumDeviceType.IpCamera
+        };
+        var detectionEvent = new DetectionEventModel
+        {
+            Device = camera,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now,
+            Result = EnumDetectionType.VIBRATION_SENSOR
+        };
+        var vm = new DetectionEventCardViewModel(detectionEvent);
+
+        // Act
+        var result = vm.DeviceTypeName;
+
+        // Assert
+        Assert.Equal("카메라", result);
+    }
+    #endregion
+
+    #region Test 2.1: DetectionEventCardView_ControllerId_BindsToViewModelProperty
+    [Fact]
+    public void DetectionEventCardView_ControllerId_BindsToViewModelProperty()
+    {
+        // XAML 파일에서 Device.Controller.Id 깨진 바인딩이 없어야 한다
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", "DetectionEventCardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // Assert: 깨진 Device.Controller 경로가 없어야 함
+        Assert.DoesNotContain("Device.Controller.Id", xamlContent);
+        // Assert: 대신 ControllerId 바인딩이 있어야 함
+        Assert.Contains("ControllerId", xamlContent);
+    }
+    #endregion
+
+    #region Test 2.2: MalfunctionEventCardView_ControllerId_BindsToViewModelProperty
+    [Fact]
+    public void MalfunctionEventCardView_ControllerId_BindsToViewModelProperty()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", "MalfunctionEventCardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // Assert: 깨진 Device.Controller 경로가 없어야 함
+        Assert.DoesNotContain("Device.Controller.Id", xamlContent);
+        Assert.DoesNotContain("Device.Controller.DeviceNumber", xamlContent);
+        // Assert: 대신 ViewModel 속성 바인딩이 있어야 함
+        Assert.Contains("ControllerId", xamlContent);
+        Assert.Contains("ControllerDeviceNumber", xamlContent);
+    }
+    #endregion
+
+    #region Test 2.3: MalfunctionEventCardView_DeviceTypeName_ShowsNewDeviceTypes
+    [Fact]
+    public void MalfunctionEventCardView_DeviceTypeName_ShowsNewDeviceTypes()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", "MalfunctionEventCardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // Assert: DeviceTypeName 바인딩이 존재해야 함
+        Assert.Contains("DeviceTypeName", xamlContent);
+    }
+    #endregion
+
+    #region Test 2.4: DetectionEventCardView_DeviceTypeName_ShowsNewDeviceTypes
+    [Fact]
+    public void DetectionEventCardView_DeviceTypeName_ShowsNewDeviceTypes()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", "DetectionEventCardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // Assert: DeviceTypeName 바인딩이 존재해야 함
+        Assert.Contains("DeviceTypeName", xamlContent);
+    }
+    #endregion
+
+    #region Test 3.1: DetectionEventPanelView_HasDeviceGroupsColumn
+    [Fact]
+    public void DetectionEventPanelView_HasDeviceGroupsColumn()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Panels", "DetectionEventPanelView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.Contains("DeviceGroupsText", xamlContent);
+    }
+    #endregion
+
+    #region Test 3.2: MalfunctionEventPanelView_HasDeviceGroupsColumn
+    [Fact]
+    public void MalfunctionEventPanelView_HasDeviceGroupsColumn()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Panels", "MalfunctionEventPanelView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.Contains("DeviceGroupsText", xamlContent);
+    }
+    #endregion
+
+    #region Test 3.3: ConnectionEventPanelView_HasDeviceGroupsColumn
+    [Fact]
+    public void ConnectionEventPanelView_HasDeviceGroupsColumn()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Panels", "ConnectionEventPanelView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.Contains("DeviceGroupsText", xamlContent);
+    }
+    #endregion
+
+    #region Test 3.4: ActionEventPanelView_HasDeviceGroupsColumn
+    [Fact]
+    public void ActionEventPanelView_HasDeviceGroupsColumn()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Panels", "ActionEventPanelView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.Contains("DeviceGroupsText", xamlContent);
+    }
+    #endregion
+
+    #region Test 4.1: DetectionSelectionVM_Device_AcceptsAllDeviceTypes
+    [Theory]
+    [InlineData(typeof(SpeakerDeviceModel))]
+    [InlineData(typeof(EnclosureDeviceModel))]
+    [InlineData(typeof(LampDeviceModel))]
+    [InlineData(typeof(CameraDeviceModel))]
+    [InlineData(typeof(SensorDeviceModel))]
+    public void ExEventViewModel_Device_AcceptsAllDeviceTypes(Type deviceType)
+    {
+        // Arrange: 모든 디바이스 타입을 IBaseDeviceModel로 할당 가능한지 확인
+        var device = (IBaseDeviceModel)Activator.CreateInstance(deviceType)!;
+        device.Id = 1;
+        device.DeviceNumber = 100;
+        var eventModel = new ExEventModel
+        {
+            Device = device,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Assert: Device 속성에 할당되어 접근 가능
+        Assert.NotNull(vm.Device);
+        Assert.Equal(100, vm.Device!.DeviceNumber);
+    }
+    #endregion
+
+    #region Test 4.2: MalfunctionSelectionVM_Device_AcceptsAllDeviceTypes
+    [Fact]
+    public void ExEventViewModel_Device_AcceptsEnclosureWithDeviceGroups()
+    {
+        // Arrange: Enclosure 디바이스에 DeviceGroups 할당
+        var enclosure = new EnclosureDeviceModel
+        {
+            Id = 1,
+            DeviceNumber = 50,
+            DeviceType = EnumDeviceType.Enclosure,
+            DeviceGroups = new System.Collections.Generic.List<int> { 1, 2, 3 }
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = enclosure,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Assert
+        Assert.Equal("함체", vm.DeviceTypeName);
+        Assert.Null(vm.ControllerId);
+        Assert.NotNull(vm.Device!.DeviceGroups);
+        Assert.Equal(3, vm.Device.DeviceGroups!.Count);
+    }
+    #endregion
+
+    #region Test 4.3: ConnectionSelectionVM_Device_AcceptsAllDeviceTypes
+    [Fact]
+    public void ExEventViewModel_Device_AcceptsSpeakerType()
+    {
+        // Arrange
+        var speaker = new SpeakerDeviceModel
+        {
+            Id = 2,
+            DeviceNumber = 30,
+            DeviceType = EnumDeviceType.IpSpeaker
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = speaker,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Assert
+        Assert.Equal("스피커", vm.DeviceTypeName);
+        Assert.Null(vm.ControllerId);
+    }
+    #endregion
+
+    #region Test 4.4: ActionSelectionVM_OriginEvent_DisplaysDeviceName
+    [Fact]
+    public void ExEventViewModel_Device_AcceptsLampType()
+    {
+        // Arrange
+        var lamp = new LampDeviceModel
+        {
+            Id = 3,
+            DeviceNumber = 40,
+            DeviceType = EnumDeviceType.Lamp
+        };
+        var eventModel = new ExEventModel
+        {
+            Device = lamp,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now
+        };
+        var vm = new ExEventViewModel(eventModel);
+
+        // Assert
+        Assert.Equal("경고등", vm.DeviceTypeName);
+        Assert.Null(vm.ControllerId);
+    }
+    #endregion
+
+    #region Test 5.1: DetectionReportDialog_CompatibleWithNewModel
+    [Fact]
+    public void DetectionReportDialog_CompatibleWithNewModel()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Dialogs", "DetectionReportDialogView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // 깨진 Device.Controller 경로가 없어야 함
+        Assert.DoesNotContain("Device.Controller", xamlContent);
+    }
+    #endregion
+
+    #region Test 5.2: MalfunctionReportDialog_CompatibleWithNewModel
+    [Fact]
+    public void MalfunctionReportDialog_CompatibleWithNewModel()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Dialogs", "MalfunctionReportDialogView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.DoesNotContain("Device.Controller", xamlContent);
+    }
+    #endregion
+
+    #region Test 5.3: EventDashboard_TabControl_CompatibleWithNewModel
+    [Fact]
+    public void EventDashboard_TabControl_CompatibleWithNewModel()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Dashboards", "EventDashboardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.DoesNotContain("Device.Controller", xamlContent);
+    }
+    #endregion
+
+    #region Test 5.4: EventCardListPanel_CompatibleWithNewModel
+    [Fact]
+    public void EventCardListPanel_CompatibleWithNewModel()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Panels", "EventCardListPanelView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        Assert.DoesNotContain("Device.Controller", xamlContent);
+    }
     #endregion
 }
 #endregion

@@ -72,6 +72,18 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public EnumTrueFalse Status => _model.Status;
         public EnumEventType MessageType => _model.MessageType;
         public override IExEventModel Model => _model;
+        public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
+        public int? ControllerDeviceNumber => (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
+        public string? DeviceTypeName => Device?.DeviceType switch
+        {
+            EnumDeviceType.Controller => "제어기",
+            EnumDeviceType.IpCamera => "카메라",
+            EnumDeviceType.IpSpeaker => "스피커",
+            EnumDeviceType.Enclosure => "함체",
+            EnumDeviceType.Lamp => "경고등",
+            not null => "센서",
+            null => null
+        };
         #endregion
         #region - Attributes -
         protected readonly T _model;

@@ -133,7 +133,7 @@
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
 								Opacity="1"
-								Text="센서"
+								Text="{Binding DeviceTypeName, FallbackValue=센서}"
 								TextAlignment="Center" />
 							<TextBlock
 								Grid.Column="4"
@@ -288,7 +288,7 @@
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
 							Opacity="1"
-							Text="{Binding Device.Controller.Id, Mode=TwoWay}" />
+							Text="{Binding ControllerId, Mode=OneWay}" />
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
