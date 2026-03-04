@@ -9,6 +9,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
+using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -2038,4 +2039,31 @@ public sealed class DeviceGroupEqualsTests
         Assert.False(DeviceGroupPanelViewModel.DeviceGroupEquals(a, b));
     }
 }
+
+#region - DeviceAssignDialogViewModel Unit Tests -
+public sealed class DeviceAssignDialogViewModelTests
+{
+    [Fact]
+    public void Initialize_ExcludesAlreadyAssignedDevices()
+    {
+        // Arrange
+        var provider = new DeviceProvider();
+        provider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "CTL-01", DeviceNumber = 1 });
+        provider.Add(new ControllerDeviceModel { Id = 2, DeviceName = "CTL-02", DeviceNumber = 2 });
+        provider.Add(new ControllerDeviceModel { Id = 3, DeviceName = "CTL-03", DeviceNumber = 3 });
+
+        var vm = new DeviceAssignDialogViewModel(new MockDeviceApiService(), provider);
+        var assignedIds = new[] { 1, 3 }; // devices 1 and 3 already assigned
+
+        // Act
+        vm.Initialize(groupId: 10, assignedDeviceIds: assignedIds);
+
+        // Assert: only device 2 should be in AllDevices
+        Assert.Single(vm.AllDevices);
+        Assert.Equal(2, vm.AllDevices[0].Id);
+        Assert.DoesNotContain(vm.AllDevices, d => d.Id == 1);
+        Assert.DoesNotContain(vm.AllDevices, d => d.Id == 3);
+    }
+}
+#endregion
 #endregion

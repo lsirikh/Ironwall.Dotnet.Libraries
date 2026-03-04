@@ -26,105 +26,104 @@
 					Text="장비그룹 속성" />
 			</StackPanel>
 		</GroupBox.Header>
-		<Grid>
+
+		<Grid Margin="5,4,5,4">
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto" />
 				<RowDefinition Height="*" />
 			</Grid.RowDefinitions>
 
-			<!--  Row 0: Group Properties  -->
-			<Grid Grid.Row="0" Margin="5,0">
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
+			<!--  ===== Row 0: Name / Desc / 적용  |  추가 / 제거 =====  -->
+			<Grid Grid.Row="0" Margin="0,0,0,6">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="1.5*" MinWidth="60" />
 					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="2*" MinWidth="80" />
 					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" MinWidth="50" />
+					<ColumnDefinition Width="*" />
 					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" MinWidth="50" />
 					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" MinWidth="50" />
 				</Grid.ColumnDefinitions>
 
-				<!--  Row 0: Name, Description  -->
-
 				<TextBlock
-					Grid.Row="0"
 					Grid.Column="0"
 					Style="{StaticResource TextBlockTitle}"
 					Text="Name" />
 				<TextBox
-					Grid.Row="0"
 					Grid.Column="1"
 					md:HintAssist.Hint="1구역"
 					Style="{StaticResource TextBoxInput}"
 					Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 				<TextBlock
-					Grid.Row="0"
 					Grid.Column="2"
 					Style="{StaticResource TextBlockTitle}"
-					Text="Desc" />
+					Text="Description" />
 				<TextBox
-					Grid.Row="0"
 					Grid.Column="3"
-					Grid.ColumnSpan="3"
 					md:HintAssist.Hint="설명"
 					Style="{StaticResource TextBoxInput}"
 					Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-				<!--  Row 1: Apply Button  -->
-
+				<!--  적용 버튼  -->
 				<Button
 					x:Name="ApplyButton"
-					Grid.Row="1"
-					Grid.Column="8"
-					Grid.ColumnSpan="2"
+					Grid.Column="4"
 					BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
 					Style="{StaticResource MaterialDesignFlatButton}">
-					<Button.Content>
-						<StackPanel Orientation="Horizontal">
-							<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
-							<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
-						</StackPanel>
-					</Button.Content>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
+						<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
+					</StackPanel>
+				</Button>
+
+				<!--  Spacer  -->
+				<Separator
+					Grid.Column="5"
+					Margin="8,4"
+					Style="{StaticResource MaterialDesignDarkSeparator}"
+					HorizontalAlignment="Stretch"
+					/>
+
+				<!--  추가 버튼  -->
+				<Button
+					Grid.Column="6"
+					Margin="0,0,4,0"
+					cal:Message.Attach="AddDeviceButton"
+					IsEnabled="{Binding IsSingleSelected}"
+					Style="{StaticResource MaterialDesignRaisedButton}">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="Plus" VerticalAlignment="Center" />
+						<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" Text="추가" />
+					</StackPanel>
+				</Button>
+
+				<!--  제거 버튼  -->
+				<Button
+					Grid.Column="7"
+					cal:Message.Attach="RemoveDeviceButton"
+					IsEnabled="{Binding CanRemoveDeviceButton}"
+					Style="{StaticResource MaterialDesignOutlinedButton}">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="Minus" VerticalAlignment="Center" />
+						<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" Text="제거" />
+					</StackPanel>
 				</Button>
 			</Grid>
 
-			<!--  Row 1: Assigned Devices (단일 선택 시만 표시)  -->
+			<!--  ===== Row 1: 소속 장비 DataGrid (단일 선택 시만 표시) =====  -->
 			<Grid
 				Grid.Row="1"
-				Margin="5,8,5,0"
 				Visibility="{Binding IsSingleSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="*" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
-
-				<!--  Section Header  -->
-				<StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
-					<md:PackIcon Kind="DevicesOther" VerticalAlignment="Center" />
-					<TextBlock
-						Margin="4,0,0,0"
-						VerticalAlignment="Center"
-						FontWeight="SemiBold"
-						Text="소속 장비" />
-				</StackPanel>
-
-				<!--  Device List  -->
 				<DataGrid
-					Grid.Row="1"
 					AutoGenerateColumns="False"
 					CanUserAddRows="False"
 					CanUserDeleteRows="False"
 					IsReadOnly="True"
 					ItemsSource="{Binding AssignedDevices}"
+					MinHeight="110"
+					SelectedItem="{Binding SelectedAssignedDevice, Mode=TwoWay}"
 					SelectionMode="Single"
 					Style="{StaticResource MaterialDesignDataGrid}">
 					<DataGrid.Columns>
@@ -140,40 +139,21 @@
 							Width="*" />
 						<DataGridTextColumn
 							Binding="{Binding DeviceType}"
-							Header="유형"
+							Header="장비유형"
 							IsReadOnly="True"
 							Width="110" />
-						<DataGridTemplateColumn Header="제거" Width="70">
-							<DataGridTemplateColumn.CellTemplate>
-								<DataTemplate>
-									<Button
-										HorizontalAlignment="Center"
-										cal:Message.Attach="RemoveDeviceButton($dataContext)"
-										Content="제거"
-										Style="{StaticResource MaterialDesignOutlinedButton}"
-										FontSize="11"
-										Padding="4,2" />
-								</DataTemplate>
-							</DataGridTemplateColumn.CellTemplate>
-						</DataGridTemplateColumn>
+						<DataGridTextColumn
+							Binding="{Binding Status}"
+							Header="상태"
+							IsReadOnly="True"
+							Width="90" />
+						<DataGridCheckBoxColumn
+							Binding="{Binding IsEnable}"
+							Header="활성화"
+							IsReadOnly="True"
+							Width="60" />
 					</DataGrid.Columns>
 				</DataGrid>
-
-				<!--  Add Button  -->
-				<StackPanel
-					Grid.Row="2"
-					Margin="0,6,0,0"
-					HorizontalAlignment="Right"
-					Orientation="Horizontal">
-					<Button
-						cal:Message.Attach="AddDeviceButton"
-						Style="{StaticResource MaterialDesignRaisedButton}">
-						<StackPanel Orientation="Horizontal">
-							<md:PackIcon Kind="Plus" VerticalAlignment="Center" />
-							<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" Text="추가" />
-						</StackPanel>
-					</Button>
-				</StackPanel>
 			</Grid>
 		</Grid>
 	</GroupBox>

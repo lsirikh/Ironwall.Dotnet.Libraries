@@ -9,6 +9,8 @@ public class DeviceAssignItemViewModel : PropertyChangedBase
     public string? DeviceName { get; set; }
     public EnumDeviceType DeviceType { get; set; }
     public int DeviceNumber { get; set; }
+    public EnumDeviceStatus Status { get; set; }
+    public bool IsEnable { get; set; }
 
     private bool _isChecked;
     public bool IsChecked

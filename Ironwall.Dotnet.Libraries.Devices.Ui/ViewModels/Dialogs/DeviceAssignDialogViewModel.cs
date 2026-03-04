@@ -23,6 +23,7 @@ public class DeviceAssignDialogViewModel : Screen
         _deviceProvider = deviceProvider;
         _log = log;
         AllDevices = new BindableCollection<DeviceAssignItemViewModel>();
+        SelectedDevices = new BindableCollection<DeviceAssignItemViewModel>();
     }
     #endregion
 
@@ -33,7 +34,8 @@ public class DeviceAssignDialogViewModel : Screen
         _assignedIds = new HashSet<int>(assignedDeviceIds);
 
         AllDevices.Clear();
-        foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>())
+        foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>()
+                                             .Where(m => !_assignedIds.Contains(m.Id)))
         {
             AllDevices.Add(new DeviceAssignItemViewModel
             {
@@ -41,18 +43,15 @@ public class DeviceAssignDialogViewModel : Screen
                 DeviceName = model.DeviceName,
                 DeviceType = model.DeviceType,
                 DeviceNumber = model.DeviceNumber,
-                IsAlreadyAssigned = _assignedIds.Contains(model.Id),
-                IsChecked = _assignedIds.Contains(model.Id),
+                Status = model.Status,
+                IsEnable = model.IsEnable,
             });
         }
     }
 
-    public async Task AssignButton(CancellationToken token = default)
+    public async Task ConfirmButton(CancellationToken token = default)
     {
-        var newIds = AllDevices
-            .Where(d => d.IsChecked && !_assignedIds.Contains(d.Id))
-            .Select(d => d.Id)
-            .ToList();
+        var newIds = SelectedDevices.Select(d => d.Id).ToList();
 
         if (newIds.Count == 0) { await TryCloseAsync(true); return; }
 
@@ -62,7 +61,7 @@ public class DeviceAssignDialogViewModel : Screen
             var resp = await _apiService.AssignDevicesToGroupAsync(_groupId, dto, token);
             if (!resp.Success) _log?.Warning($"AssignDevicesToGroup failed: {resp.Message}");
         }
-        catch (Exception ex) { _log?.Error($"AssignButton: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"ConfirmButton: {ex.Message}"); }
 
         await TryCloseAsync(true);
     }
@@ -75,6 +74,7 @@ public class DeviceAssignDialogViewModel : Screen
 
     #region - Properties -
     public BindableCollection<DeviceAssignItemViewModel> AllDevices { get; }
+    public BindableCollection<DeviceAssignItemViewModel> SelectedDevices { get; }
     #endregion
 
     #region - Attributes -

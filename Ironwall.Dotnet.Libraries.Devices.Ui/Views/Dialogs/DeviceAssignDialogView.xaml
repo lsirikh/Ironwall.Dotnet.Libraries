@@ -2,12 +2,15 @@
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dialogs.DeviceAssignDialogView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Behaviors"
 	xmlns:cal="http://www.caliburnproject.org"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-	d:DesignHeight="500"
-	d:DesignWidth="480"
+	d:DesignHeight="480"
+	d:DesignWidth="520"
 	mc:Ignorable="d">
 	<Grid Margin="16">
 		<Grid.RowDefinitions>
@@ -21,51 +24,49 @@
 			Grid.Row="0"
 			Margin="0,0,0,12"
 			Style="{StaticResource MaterialDesignHeadline6TextBlock}"
-			Text="장비 할당" />
+			Text="그룹 장비 추가" />
 
-		<!--  Device CheckList DataGrid  -->
+		<!--  Device Multi-Select DataGrid  -->
 		<DataGrid
 			Grid.Row="1"
 			AutoGenerateColumns="False"
 			CanUserAddRows="False"
 			CanUserDeleteRows="False"
-			IsReadOnly="False"
+			IsReadOnly="True"
 			ItemsSource="{Binding AllDevices}"
-			SelectionMode="Single"
+			MinHeight="220"
+			SelectionMode="Extended"
 			Style="{StaticResource MaterialDesignDataGrid}">
+			<i:Interaction.Behaviors>
+				<behavior:ClearSelectionOnEscBehavior />
+				<behavior_inner:DeviceAssignSelectedItemsBehavior SelectedItems="{Binding SelectedDevices, Mode=TwoWay}" />
+			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
-				<!--  Check  -->
-				<DataGridTemplateColumn Header="선택" Width="50">
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<CheckBox
-								HorizontalAlignment="Center"
-								IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								IsEnabled="{Binding IsAlreadyAssigned, Converter={StaticResource InverseBoolConverter}}" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-				</DataGridTemplateColumn>
-
-				<!--  DeviceNumber  -->
 				<DataGridTextColumn
 					Binding="{Binding DeviceNumber}"
 					Header="번호"
 					IsReadOnly="True"
 					Width="60" />
-
-				<!--  DeviceName  -->
 				<DataGridTextColumn
 					Binding="{Binding DeviceName}"
 					Header="장비명"
 					IsReadOnly="True"
 					Width="*" />
-
-				<!--  DeviceType  -->
 				<DataGridTextColumn
 					Binding="{Binding DeviceType}"
-					Header="유형"
+					Header="장비유형"
 					IsReadOnly="True"
 					Width="110" />
+				<DataGridTextColumn
+					Binding="{Binding Status}"
+					Header="상태"
+					IsReadOnly="True"
+					Width="90" />
+				<DataGridCheckBoxColumn
+					Binding="{Binding IsEnable}"
+					Header="활성화"
+					IsReadOnly="True"
+					Width="60" />
 			</DataGrid.Columns>
 		</DataGrid>
 
@@ -77,8 +78,8 @@
 			Orientation="Horizontal">
 			<Button
 				Margin="0,0,8,0"
-				cal:Message.Attach="AssignButton"
-				Content="할당"
+				cal:Message.Attach="ConfirmButton"
+				Content="확인"
 				Style="{StaticResource MaterialDesignRaisedButton}" />
 			<Button
 				cal:Message.Attach="CancelButton"
