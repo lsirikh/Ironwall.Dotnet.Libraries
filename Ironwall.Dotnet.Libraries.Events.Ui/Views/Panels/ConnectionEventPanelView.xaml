@@ -199,7 +199,7 @@
 				Width="100"
 				Height="20"
 				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
 				Visibility="{Binding IsVisible, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 		</Grid>
 		<DataGrid

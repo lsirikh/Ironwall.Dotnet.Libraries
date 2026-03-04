@@ -145,7 +145,7 @@
 								Width="30"
 								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
 								Value="44" />
 							<md:PackIcon
