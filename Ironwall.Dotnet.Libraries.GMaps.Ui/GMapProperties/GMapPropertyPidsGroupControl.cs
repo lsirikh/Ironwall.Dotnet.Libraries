@@ -1,6 +1,8 @@
 ﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Data;
 
@@ -211,6 +213,19 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         #endregion
 
         #region PidsGroup Specific Properties
+
+        /// <summary>
+        /// 선택 가능한 디바이스 그룹 목록 (PropertyPanelFactory에서 주입)
+        /// </summary>
+        public ObservableCollection<IDeviceGroupModel> FilteredDeviceGroupList
+        {
+            get { return (ObservableCollection<IDeviceGroupModel>)GetValue(FilteredDeviceGroupListProperty); }
+            set { SetValue(FilteredDeviceGroupListProperty, value); }
+        }
+
+        public static readonly DependencyProperty FilteredDeviceGroupListProperty =
+            DependencyProperty.Register("FilteredDeviceGroupList", typeof(ObservableCollection<IDeviceGroupModel>),
+                typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(null));
 
         /// <summary>
         /// 연결된 디바이스 그룹 ID

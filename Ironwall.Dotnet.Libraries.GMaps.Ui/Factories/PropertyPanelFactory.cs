@@ -21,10 +21,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
     public class PropertyPanelFactory : IPropertyPanelFactory
     {
         #region - Ctors -
-        public PropertyPanelFactory(ILogService log, DeviceProvider deviceProvider)
+        public PropertyPanelFactory(ILogService log, DeviceProvider deviceProvider, DeviceGroupProvider deviceGroupProvider)
         {
             _log = log;
             _deviceProvider = deviceProvider;
+            _deviceGroupProvider = deviceGroupProvider;
 
             _markerToPanelMap = new Dictionary<Type, Type>
         {
@@ -64,6 +65,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
                     _log?.Info($"PIDS FilteredDeviceList 선행 설정 완료 (SelectedMarker 설정 전)");
                 }
 
+                // PidsGroup 패널인 경우 FilteredDeviceGroupList를 SelectedMarker 설정 전에 초기화
+                if (panel is GMapPropertyPidsGroupControl pidsGroupPanel)
+                {
+                    SetupPidsGroupList(pidsGroupPanel);
+                    _log?.Info($"PidsGroup FilteredDeviceGroupList 선행 설정 완료 (SelectedMarker 설정 전)");
+                }
+
                 // FilteredDeviceList 설정 후에 SelectedMarker 설정
                 // → OnSelectedMarkerChanged에서 LinkedDevice가 FilteredDeviceList와 매칭됨
                 panel.SelectedMarker = marker;
@@ -93,6 +101,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             _log?.Info($"PIDS Panel FilteredDeviceList 설정: {filteredDevices.Count()}개 (DeviceType: {deviceType})");
         }
 
+        /// <summary>
+        /// PidsGroup 패널의 FilteredDeviceGroupList를 DeviceGroupProvider로 채웁니다.
+        /// </summary>
+        private void SetupPidsGroupList(GMapPropertyPidsGroupControl panel)
+        {
+            var groups = _deviceGroupProvider?.ToList() ?? new System.Collections.Generic.List<IDeviceGroupModel>();
+            panel.FilteredDeviceGroupList = new ObservableCollection<IDeviceGroupModel>(groups);
+            _log?.Info($"PidsGroup Panel FilteredDeviceGroupList 설정: {groups.Count}개");
+        }
+
         private IEnumerable<IBaseDeviceModel> FilterDevicesByType(
             IEnumerable<IBaseDeviceModel> devices,
             Libraries.Enums.EnumDeviceType targetType)
@@ -107,6 +125,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
         #region - Attributes -
         private ILogService _log;
         private DeviceProvider _deviceProvider;
+        private DeviceGroupProvider _deviceGroupProvider;
         private Dictionary<Type, Type> _markerToPanelMap;
         #endregion
     }

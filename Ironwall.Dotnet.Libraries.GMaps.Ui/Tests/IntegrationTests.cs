@@ -32,11 +32,13 @@ public class IntegrationTests
 {
     private readonly Mock<ILogService> _mockLog;
     private readonly Mock<DeviceProvider> _mockDeviceProvider;
+    private readonly DeviceGroupProvider _deviceGroupProvider;
 
     public IntegrationTests()
     {
         _mockLog = new Mock<ILogService>();
         _mockDeviceProvider = new Mock<DeviceProvider>();
+        _deviceGroupProvider = new DeviceGroupProvider(_mockLog.Object);
     }
 
     #region Helper Methods
@@ -108,7 +110,7 @@ public class IntegrationTests
     public void TEST_IMG_7_2_PropertyPanelFactory_ShouldHaveImageMarkerMapping()
     {
         // Arrange
-        var factory = new PropertyPanelFactory(_mockLog.Object, _mockDeviceProvider.Object);
+        var factory = new PropertyPanelFactory(_mockLog.Object, _mockDeviceProvider.Object, _deviceGroupProvider);
 
         // Act - 리플렉션으로 _markerToPanelMap 접근
         var mapField = typeof(PropertyPanelFactory)
@@ -132,7 +134,7 @@ public class IntegrationTests
     public void TEST_IMG_7_3_PropertyPanelFactory_ShouldHaveAllMarkerMappings()
     {
         // Arrange
-        var factory = new PropertyPanelFactory(_mockLog.Object, _mockDeviceProvider.Object);
+        var factory = new PropertyPanelFactory(_mockLog.Object, _mockDeviceProvider.Object, _deviceGroupProvider);
 
         // Act - 리플렉션으로 _markerToPanelMap 접근
         var mapField = typeof(PropertyPanelFactory)
@@ -160,7 +162,7 @@ public class IntegrationTests
     {
         // Arrange
         var markerFactory = new MarkerFactory(_mockLog.Object, _mockDeviceProvider.Object);
-        var propertyFactory = new PropertyPanelFactory(_mockLog.Object, _mockDeviceProvider.Object);
+        var propertyFactory = new PropertyPanelFactory(_mockLog.Object, _mockDeviceProvider.Object, _deviceGroupProvider);
         var imageModel = CreateTestImageModel();
 
         // Act - Step 1: MarkerFactory로 마커 생성
