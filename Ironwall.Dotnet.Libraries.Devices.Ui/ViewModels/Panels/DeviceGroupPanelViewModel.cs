@@ -104,12 +104,24 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
             var currentList = _deviceGroupProvider.OfType<DeviceGroupModel>().ToList();
             var serverList = await FetchDeviceGroupsAsync(token);
 
+            // Insert: 로컬에서 새로 추가된 항목 (Id <= 0)
             foreach (var model in currentList.Where(m => m.Id <= 0))
-                await _apiService.CreateDeviceGroupAsync(model.ToDeviceGroupDto(), token);
+                await CreateDeviceGroupHelper(model, token);
 
-            foreach (var model in currentList.Where(m => m.Id > 0)
-                .Join(serverList, m => m.Id, d => d.Id, (m, d) => m))
-                await _apiService.UpdateDeviceGroupAsync(model.Id, model.ToDeviceGroupDto(), token);
+            // Update: 서버에 존재하고 내용이 변경된 항목만
+            foreach (var model in currentList.Where(m => m.Id > 0))
+            {
+                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
+                if (server != null && !DeviceGroupEquals(model, server))
+                    await UpdateDeviceGroupHelper(model, token);
+            }
+
+            // Delete: 서버에는 있지만 로컬에서 제거된 항목
+            foreach (var server in serverList.Where(s => !currentList.Any(c => c.Id == s.Id)))
+            {
+                var resp = await _apiService.DeleteDeviceGroupAsync(server.Id, token);
+                if (!resp.Success) _log?.Warning($"DeviceGroup delete failed: id={server.Id} {resp.Message}");
+            }
 
             await DataInitialize(_pCancellationTokenSource.Token);
             await Task.Delay(2000, token);
@@ -123,6 +135,26 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
             SaveButtonEnable = true;
             _processGate.Release();
         }
+    }
+
+    private async Task CreateDeviceGroupHelper(DeviceGroupModel model, CancellationToken token)
+    {
+        try
+        {
+            var resp = await _apiService.CreateDeviceGroupAsync(model.ToDeviceGroupDto(), token);
+            if (!resp.Success) _log?.Warning($"DeviceGroup create failed: {resp.Message}");
+        }
+        catch (Exception ex) { _log?.Error($"CreateDeviceGroupHelper: {ex.Message}"); }
+    }
+
+    private async Task UpdateDeviceGroupHelper(DeviceGroupModel model, CancellationToken token)
+    {
+        try
+        {
+            var resp = await _apiService.UpdateDeviceGroupAsync(model.Id, model.ToDeviceGroupDto(), token);
+            if (!resp.Success) _log?.Warning($"DeviceGroup update failed: id={model.Id} {resp.Message}");
+        }
+        catch (Exception ex) { _log?.Error($"UpdateDeviceGroupHelper: {ex.Message}"); }
     }
 
     public override void OnSelectionChanged(IList<DeviceGroupViewModel> rows)
@@ -251,6 +283,10 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     #endregion
     #region - Properties -
     public event System.Action? UpdateAction;
+    #endregion
+    #region - Helpers -
+    internal static bool DeviceGroupEquals(IDeviceGroupModel a, IDeviceGroupModel b)
+        => a.Name == b.Name && a.Description == b.Description;
     #endregion
     #region - Attributes -
     private readonly IDeviceApiService _apiService;

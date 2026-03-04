@@ -1,9 +1,11 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 /****************************************************************************
@@ -54,10 +56,20 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         }
     }
 
-    public string DeviceGroupsText =>
-        DeviceGroups != null && DeviceGroups.Count > 0
-            ? string.Join(", ", DeviceGroups)
-            : "";
+    public string DeviceGroupsText
+    {
+        get
+        {
+            if (DeviceGroups == null || DeviceGroups.Count == 0) return "";
+            try
+            {
+                var provider = IoC.Get<DeviceGroupProvider>();
+                return string.Join(", ", DeviceGroups.Select(id =>
+                    provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+            }
+            catch { return string.Join(", ", DeviceGroups); }
+        }
+    }
 
     public int DeviceNumber
     {

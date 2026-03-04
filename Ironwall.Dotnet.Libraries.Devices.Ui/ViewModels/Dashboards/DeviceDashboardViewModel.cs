@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -240,7 +241,12 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         }
         else
         {
-            SelectedItemEditor = new DeviceGroupSelectionViewModel(selectedItems);
+            SelectedItemEditor = new DeviceGroupSelectionViewModel(
+                selectedItems,
+                IoC.Get<IEventAggregator>(),
+                IoC.Get<IDeviceApiService>(),
+                IoC.Get<DeviceProvider>(),
+                IoC.Get<ILogService>());
             (SelectedItemEditor as DeviceGroupSelectionViewModel)!.RefreshAll();
             IsSelected = true;
         }

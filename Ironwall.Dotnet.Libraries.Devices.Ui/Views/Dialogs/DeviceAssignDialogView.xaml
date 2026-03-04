@@ -1,0 +1,89 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.Dialogs.DeviceAssignDialogView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://www.caliburnproject.org"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	d:DesignHeight="500"
+	d:DesignWidth="480"
+	mc:Ignorable="d">
+	<Grid Margin="16">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<!--  Header  -->
+		<TextBlock
+			Grid.Row="0"
+			Margin="0,0,0,12"
+			Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+			Text="장비 할당" />
+
+		<!--  Device CheckList DataGrid  -->
+		<DataGrid
+			Grid.Row="1"
+			AutoGenerateColumns="False"
+			CanUserAddRows="False"
+			CanUserDeleteRows="False"
+			IsReadOnly="False"
+			ItemsSource="{Binding AllDevices}"
+			SelectionMode="Single"
+			Style="{StaticResource MaterialDesignDataGrid}">
+			<DataGrid.Columns>
+				<!--  Check  -->
+				<DataGridTemplateColumn Header="선택" Width="50">
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<CheckBox
+								HorizontalAlignment="Center"
+								IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								IsEnabled="{Binding IsAlreadyAssigned, Converter={StaticResource InverseBoolConverter}}" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  DeviceNumber  -->
+				<DataGridTextColumn
+					Binding="{Binding DeviceNumber}"
+					Header="번호"
+					IsReadOnly="True"
+					Width="60" />
+
+				<!--  DeviceName  -->
+				<DataGridTextColumn
+					Binding="{Binding DeviceName}"
+					Header="장비명"
+					IsReadOnly="True"
+					Width="*" />
+
+				<!--  DeviceType  -->
+				<DataGridTextColumn
+					Binding="{Binding DeviceType}"
+					Header="유형"
+					IsReadOnly="True"
+					Width="110" />
+			</DataGrid.Columns>
+		</DataGrid>
+
+		<!--  Buttons  -->
+		<StackPanel
+			Grid.Row="2"
+			Margin="0,12,0,0"
+			HorizontalAlignment="Right"
+			Orientation="Horizontal">
+			<Button
+				Margin="0,0,8,0"
+				cal:Message.Attach="AssignButton"
+				Content="할당"
+				Style="{StaticResource MaterialDesignRaisedButton}" />
+			<Button
+				cal:Message.Attach="CancelButton"
+				Content="취소"
+				Style="{StaticResource MaterialDesignOutlinedButton}" />
+		</StackPanel>
+	</Grid>
+</UserControl>

@@ -2010,3 +2010,32 @@ public class CapturingEventAggregator : IEventAggregator
         return Task.CompletedTask;
     }
 }
+
+#region - DeviceGroupEquals Unit Tests -
+public sealed class DeviceGroupEqualsTests
+{
+    [Fact]
+    public void DeviceGroupEquals_SameName_SameDesc_ReturnsTrue()
+    {
+        var a = new DeviceGroupModel { Name = "그룹A", Description = "설명A" };
+        var b = new DeviceGroupModel { Name = "그룹A", Description = "설명A" };
+        Assert.True(DeviceGroupPanelViewModel.DeviceGroupEquals(a, b));
+    }
+
+    [Fact]
+    public void DeviceGroupEquals_DifferentName_ReturnsFalse()
+    {
+        var a = new DeviceGroupModel { Name = "그룹A", Description = "설명" };
+        var b = new DeviceGroupModel { Name = "그룹B", Description = "설명" };
+        Assert.False(DeviceGroupPanelViewModel.DeviceGroupEquals(a, b));
+    }
+
+    [Fact]
+    public void DeviceGroupEquals_DifferentDesc_ReturnsFalse()
+    {
+        var a = new DeviceGroupModel { Name = "그룹A", Description = "설명A" };
+        var b = new DeviceGroupModel { Name = "그룹A", Description = "설명B" };
+        Assert.False(DeviceGroupPanelViewModel.DeviceGroupEquals(a, b));
+    }
+}
+#endregion
