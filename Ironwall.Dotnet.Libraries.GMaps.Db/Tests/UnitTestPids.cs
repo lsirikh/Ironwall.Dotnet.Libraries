@@ -719,3 +719,40 @@ public class GMapDbPidsSymbol_IntegrationTests
         Assert.Equal(EnumDeviceType.IpCamera, fetchedSymbol.DeviceType);
     }
 }
+
+#region - EnumParseHelper Unit Tests -
+
+public sealed class GMapDbEnumParseHelperTests
+{
+    [Fact]
+    public void TryParseEnum_ValidValue_ParsesCorrectly()
+    {
+        // Arrange + Act
+        var result = EnumParseHelper.TryParseEnum("IpCamera", EnumDeviceType.NONE);
+
+        // Assert
+        Assert.Equal(EnumDeviceType.IpCamera, result);
+    }
+
+    [Fact]
+    public void TryParseEnum_UnknownValue_ReturnsFallback()
+    {
+        // Arrange + Act
+        var result = EnumParseHelper.TryParseEnum("UnknownType", EnumDeviceType.NONE);
+
+        // Assert — 예외 없이 fallback 반환
+        Assert.Equal(EnumDeviceType.NONE, result);
+    }
+
+    [Fact]
+    public void TryParseEnum_EmptyString_ReturnsFallback()
+    {
+        // Arrange + Act
+        var result = EnumParseHelper.TryParseEnum("", EnumDeviceType.NONE);
+
+        // Assert — 빈 문자열도 fallback 반환
+        Assert.Equal(EnumDeviceType.NONE, result);
+    }
+}
+
+#endregion

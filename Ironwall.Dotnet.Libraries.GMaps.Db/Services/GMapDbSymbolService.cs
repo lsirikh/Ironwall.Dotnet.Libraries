@@ -3254,7 +3254,7 @@ internal class SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3262,11 +3262,11 @@ internal class SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
     };
@@ -3295,7 +3295,7 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3303,16 +3303,16 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
 
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
         // GeometrySymbol 전용 속성들 (간소화)
-        ShapeType = Enum.Parse<EnumShapeType>(GeometryShapeType),
+        ShapeType = EnumParseHelper.TryParseEnum(GeometryShapeType, EnumShapeType.Circle),
         Opacity = (double)GeometryOpacity
     };
 }
@@ -3355,7 +3355,7 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3363,20 +3363,20 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
         // PidsSymbol 전용 속성들
         LinkedDeviceId = LinkedDeviceId,
-        DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
+        DeviceType = EnumParseHelper.TryParseEnum(DeviceType, EnumDeviceType.NONE),
         ShowFOV = ShowFOV,
-        FOVColor = Enum.Parse<EnumColorType>(FOVColor),
+        FOVColor = EnumParseHelper.TryParseEnum(FOVColor, EnumColorType.Blue),
         FOVOpacity = (double)FOVOpacity,
-        EventStatus = Enum.Parse<EnumEventStatus>(EventStatus),
+        EventStatus = EnumParseHelper.TryParseEnum(EventStatus, EnumEventStatus.Normal),
         BaseBearing = (double)BaseBearing,
 
         // DetectionBearing 초기값을 BaseBearing으로 설정 (FOV 초기 방향)
@@ -3430,7 +3430,7 @@ internal sealed class MilitarySymbolSQL : SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3438,19 +3438,19 @@ internal sealed class MilitarySymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
         // MilitarySymbol 전용 속성들
-        Affiliation = Enum.Parse<EnumMilitaryAffiliation>(Affiliation),
-        BattleDimension = Enum.Parse<EnumMilitaryBattleDimension>(BattleDimension),
-        StandardIdentity = Enum.Parse<EnumMilitaryStandardIdentity>(StandardIdentity),
-        UnitType = Enum.Parse<EnumMilitaryUnitType>(UnitType),
-        UnitSize = Enum.Parse<EnumMilitaryUnitSize>(UnitSize),
+        Affiliation = EnumParseHelper.TryParseEnum(Affiliation, EnumMilitaryAffiliation.Unknown),
+        BattleDimension = EnumParseHelper.TryParseEnum(BattleDimension, EnumMilitaryBattleDimension.Land),
+        StandardIdentity = EnumParseHelper.TryParseEnum(StandardIdentity, EnumMilitaryStandardIdentity.Present),
+        UnitType = EnumParseHelper.TryParseEnum(UnitType, EnumMilitaryUnitType.Infantry),
+        UnitSize = EnumParseHelper.TryParseEnum(UnitSize, EnumMilitaryUnitSize.Individual),
         UnitDesignator = UnitDesignator,
         HigherFormation = HigherFormation,
         CallSign = CallSign,
@@ -3488,7 +3488,7 @@ internal sealed class LineSymbolSQL : SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3496,18 +3496,18 @@ internal sealed class LineSymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
         // LineSymbol 전용 속성들
         LineOpacity = (double)LineOpacity,
         IsClosedPath = IsClosedPath,
         ShowArrowHead = ShowArrowHead,
-        LinePattern = Enum.Parse<EnumLinePattern>(LinePattern),
+        LinePattern = EnumParseHelper.TryParseEnum(LinePattern, EnumLinePattern.Solid),
         LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
     };
 }
@@ -3566,7 +3566,7 @@ internal sealed class InfraSymbolSQL : SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3574,11 +3574,11 @@ internal sealed class InfraSymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = Enum.Parse<EnumMarkerCategory>(Category),
+        Category = EnumParseHelper.TryParseEnum(Category, EnumMarkerCategory.BASIC_SHAPES),
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
         // InfraSymbol 전용 속성들
@@ -3627,7 +3627,7 @@ internal sealed class PidsGroupSymbolSQL : SymbolSQL
         Pid = Pid,
         Title = Title,
         TitleSize = TitleSize,
-        OperationState = Enum.Parse<EnumOperationState>(OperationState),
+        OperationState = EnumParseHelper.TryParseEnum(OperationState, EnumOperationState.NONE),
         Latitude = (double)Latitude,
         Longitude = (double)Longitude,
         Altitude = Altitude,
@@ -3635,20 +3635,20 @@ internal sealed class PidsGroupSymbolSQL : SymbolSQL
         Bearing = (double)Bearing,
         Width = (double)Width,
         Height = (double)Height,
-        Category = EnumMarkerCategory.AREA_BOUNDARY,  // 또는 Enum.Parse
+        Category = EnumMarkerCategory.AREA_BOUNDARY,
         ShowShape = ShowShape,
         ShowTitle = ShowTitle,
-        FillColor = Enum.Parse<EnumColorType>(FillColor),
-        StrokeColor = Enum.Parse<EnumColorType>(StrokeColor),
+        FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
+        StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
 
         // PidsGroupSymbol 전용 속성들
         LinkedDeviceGroup = LinkedDeviceGroup,
-        EventStatus = Enum.Parse<EnumEventStatus>(EventStatus),
+        EventStatus = EnumParseHelper.TryParseEnum(EventStatus, EnumEventStatus.Normal),
         LineOpacity = (double)LineOpacity,
         IsClosedPath = IsClosedPath,
         ShowArrowHead = ShowArrowHead,
-        LinePattern = Enum.Parse<EnumLinePattern>(LinePattern),
+        LinePattern = EnumParseHelper.TryParseEnum(LinePattern, EnumLinePattern.Solid),
         LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
     };
 }
@@ -3770,4 +3770,21 @@ internal sealed class ImageSQL
     };
 }
 
+#endregion
+
+#region - Enum Parse Helper -
+/// <summary>
+/// DB에서 읽은 문자열을 Enum으로 안전하게 변환하는 헬퍼.
+/// 알 수 없는 문자열이 있으면 예외 대신 fallback 값을 반환한다.
+/// </summary>
+internal static class EnumParseHelper
+{
+    internal static T TryParseEnum<T>(string value, T fallback)
+        where T : struct, Enum
+    {
+        if (Enum.TryParse<T>(value, ignoreCase: true, out var result))
+            return result;
+        return fallback;
+    }
+}
 #endregion
