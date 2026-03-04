@@ -29,11 +29,9 @@ public static class CameraMappingHelper
 
         /*────────────── 1) 네트워크 기본 ──────────────*/
         dest.IpAddress = src.IpAddress ?? "";
-        dest.Port = src.Port;
-        dest.RtspPort = src.PortRtsp;
-        dest.Username = src.Username;
-        dest.Password = src.Password;
-        dest.RtspUri = src.CameraMedia?.Profiles.FirstOrDefault()?.MediaUri?.Uri;
+        dest.IpPort = src.Port;
+        dest.UserName = src.Username;
+        dest.UserPassword = src.Password;
         dest.Version = src.FirmwareVersion;
         /*────────────── 2) 분류 · 상태 ───────────────*/
         dest.Category = src.Type switch
@@ -51,56 +49,17 @@ public static class CameraMappingHelper
             _ => EnumDeviceStatus.DEACTIVATED
         };
 
-        /*────────────── 3) Identification ─────────────*/
-        dest.Identification ??= new CameraInfoModel();           // 객체 없으면 만들어 둠
-        dest.Identification.Name = src.Name;
-        dest.Identification.Location = src.Location;
-        dest.Identification.Manufacturer = src.Manufacturer;
-        dest.Identification.Model = src.DeviceModel;
-        dest.Identification.Hardware = src.HardwareId;
-        dest.Identification.Firmware = src.FirmwareVersion;
-        dest.Identification.DeviceId = src.SerialNumber;
-        dest.Identification.MacAddress = src.MacAddress;
-        dest.Identification.OnvifVersion = src.OnvifVersion;
-        dest.Identification.Uri = src.ServiceUri;
-
-        /*────────────── 4) PTZ 프리셋 ────────────────*/
-        dest.Presets ??= new List<ICameraPresetModel>();
-        dest.Presets.Clear();
-
-        if (src.CameraMedia?.PTZPresets?.Any() == true)
-        {
-            dest.Presets.AddRange(
-                src.CameraMedia.PTZPresets.Select(p => new CameraPresetModel
-                {
-                    
-                    Preset = int.TryParse(p.Token, out var n) ? n : 0,
-                    Name = p.Name,
-                    Description = $"Preset {p.Name}",
-                    Pitch = p.Position?.PanTilt?.X ?? 0,
-                    Tilt = p.Position?.PanTilt?.Y ?? 0,
-                    Zoom = p.Position?.Zoom?.X ?? 0,
-                    Delay = 0
-                }));
-        }
-
-        /*────────────── 5) PTZ Capability ─────────────*/
-        if (src.CameraMedia?.Profiles?.FirstOrDefault()?.PTZConfig is { } cfg)
-        {
-            dest.PtzCapability ??= new CameraPtzCapabilityModel();
-            dest.PtzCapability.MinPan = cfg.PanTiltLimits?.Range.XRange.Min ?? -180;
-            dest.PtzCapability.MaxPan = cfg.PanTiltLimits?.Range.XRange.Max ?? 180;
-            dest.PtzCapability.MinTilt = cfg.PanTiltLimits?.Range.YRange.Min ?? -90;
-            dest.PtzCapability.MaxTilt = cfg.PanTiltLimits?.Range.YRange.Max ?? 90;
-            dest.PtzCapability.MinZoom = cfg.ZoomLimits?.Range.XRange.Min ?? 0;
-            dest.PtzCapability.MaxZoom = cfg.ZoomLimits?.Range.XRange.Max ?? 100;
-            dest.PtzCapability.MaxVisibleDistance = 0;
-            dest.PtzCapability.ZoomLevel = 0;
-        }
-        else
-        {
-            dest.PtzCapability = null;   // 관련 정보가 없으면 제거
-        }
+        /*────────────── 3) HardwareSpec ─────────────*/
+        dest.HardwareSpec ??= new CameraInfoModel();           // 객체 없으면 만들어 둠
+        dest.HardwareSpec.Name = src.Name;
+        dest.HardwareSpec.Location = src.Location;
+        dest.HardwareSpec.Manufacturer = src.Manufacturer;
+        dest.HardwareSpec.Model = src.DeviceModel;
+        dest.HardwareSpec.Hardware = src.HardwareId;
+        dest.HardwareSpec.Firmware = src.FirmwareVersion;
+        dest.HardwareSpec.DeviceId = src.SerialNumber;
+        dest.HardwareSpec.MacAddress = src.MacAddress;
+        dest.HardwareSpec.OnvifVersion = src.OnvifVersion;
 
         return dest;                     // 갱신된 원본 인스턴스
     }

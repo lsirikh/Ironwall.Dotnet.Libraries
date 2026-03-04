@@ -1,18 +1,17 @@
-﻿<UserControl
-	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraOpticsView"
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraUrlsView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-	d:DesignHeight="450"
+	d:DesignHeight="300"
 	d:DesignWidth="800"
 	mc:Ignorable="d">
-	<Grid Height="440" Margin="16">
+	<Grid Height="300" Margin="16">
 		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="4*" />
-			<ColumnDefinition Width="6*" />
+			<ColumnDefinition Width="3*" />
+			<ColumnDefinition Width="7*" />
 		</Grid.ColumnDefinitions>
 
 		<Grid.RowDefinitions>
@@ -24,88 +23,88 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  Zoom Level  -->
+		<!--  HomepageUrl  -->
 		<TextBlock
 			Grid.Row="0"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Zoom Level" />
+			Text="Homepage" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="1"
-			md:HintAssist.Hint="배율 (예: 1 ~ 50)"
 			IsReadOnly="True"
+			md:HintAssist.Hint="http://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding ZoomLevel}" />
+			Text="{Binding HomepageUrl, Mode=OneWay}" />
 
-		<!--  Focal Length  -->
+		<!--  OnvifDeviceService  -->
 		<TextBlock
 			Grid.Row="1"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Focal Length (mm)" />
+			Text="ONVIF Service" />
 		<TextBox
 			Grid.Row="1"
 			Grid.Column="1"
-			md:HintAssist.Hint="초점 거리"
 			IsReadOnly="True"
+			md:HintAssist.Hint="http://.../onvif/device_service"
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding FocalLength}" />
+			Text="{Binding OnvifDeviceService, Mode=OneWay}" />
 
-		<!--  Sensor Width  -->
+		<!--  RtspMain  -->
 		<TextBlock
 			Grid.Row="2"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="센서 폭 (mm)" />
+			Text="RTSP Main" />
 		<TextBox
 			Grid.Row="2"
 			Grid.Column="1"
-			md:HintAssist.Hint="이미지 센서 가로 길이"
 			IsReadOnly="True"
+			md:HintAssist.Hint="rtsp://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding SensorWidth}" />
+			Text="{Binding RtspMain, Mode=OneWay}" />
 
-		<!--  Sensor Height  -->
+		<!--  RtspSub  -->
 		<TextBlock
 			Grid.Row="3"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="센서 높이 (mm)" />
+			Text="RTSP Sub" />
 		<TextBox
 			Grid.Row="3"
 			Grid.Column="1"
-			md:HintAssist.Hint="이미지 센서 세로 길이"
 			IsReadOnly="True"
+			md:HintAssist.Hint="rtsp://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding SensorHeight}" />
+			Text="{Binding RtspSub, Mode=OneWay}" />
 
-		<!--  Horizontal FOV  -->
+		<!--  WebrtcMain  -->
 		<TextBlock
 			Grid.Row="4"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="수평 시야각 (°)" />
+			Text="WebRTC Main" />
 		<TextBox
 			Grid.Row="4"
 			Grid.Column="1"
-			md:HintAssist.Hint="계산된 FOV"
 			IsReadOnly="True"
+			md:HintAssist.Hint="http://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding HorizontalFOV, Mode=OneWay}" />
+			Text="{Binding WebrtcMain, Mode=OneWay}" />
 
-		<!--  View Distance  -->
+		<!--  SnapshotCh1  -->
 		<TextBlock
 			Grid.Row="5"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="가시 거리 (m)" />
+			Text="Snapshot Ch1" />
 		<TextBox
 			Grid.Row="5"
 			Grid.Column="1"
-			md:HintAssist.Hint="배율×10m (예: 30× → 300 m)"
 			IsReadOnly="True"
+			md:HintAssist.Hint="http://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding ViewDistance, Mode=OneWay}" />
+			Text="{Binding SnapshotCh1, Mode=OneWay}" />
 	</Grid>
 </UserControl>

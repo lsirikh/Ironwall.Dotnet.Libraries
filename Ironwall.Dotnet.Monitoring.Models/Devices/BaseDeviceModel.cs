@@ -27,6 +27,10 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
         DeviceType = model.DeviceType;
         Version = model.Version;
         Status = model.Status;
+        Location = model.Location;
+        Latitude = model.Latitude;
+        Longitude = model.Longitude;
+        IsEnable = model.IsEnable;
     }
 
     [JsonProperty("device_number", Order = 2)]
@@ -46,4 +50,12 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
     public string? Version { get; set; } 
     [JsonIgnore]
     public EnumDeviceStatus Status { get; set; } = EnumDeviceStatus.DEACTIVATED;
+    [JsonProperty("location", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
+    public string? Location { get; set; }
+    [JsonProperty("latitude", Order = 11)]
+    public double Latitude { get; set; }
+    [JsonProperty("longitude", Order = 12)]
+    public double Longitude { get; set; }
+    [JsonProperty("is_enable", Order = 13)]
+    public bool IsEnable { get; set; }
 }

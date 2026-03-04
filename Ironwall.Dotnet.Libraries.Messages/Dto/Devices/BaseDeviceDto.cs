@@ -41,20 +41,26 @@ public class BaseDeviceDto : BaseDto
     public bool IsEnable { get; set; }
 
     /// <summary>
-    /// 복수 그룹 소속 (DeviceGroupDto 객체 배열)
+    /// 복수 그룹 소속 (응답 전용 — 서버가 DeviceGroupDto 객체 배열로 반환)
     /// </summary>
     [JsonProperty("device_groups", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
     public List<DeviceGroupDto>? DeviceGroups { get; set; }
 
     /// <summary>
+    /// 그룹 ID 배열 (요청 전용 — Model.DeviceGroups에서 직접 매핑)
+    /// </summary>
+    [JsonProperty("group_ids", Order = 8, NullValueHandling = NullValueHandling.Ignore)]
+    public List<int>? GroupIds { get; set; }
+
+    /// <summary>
     /// 펌웨어 버전
     /// </summary>
-    [JsonProperty("version", Order = 8)]
+    [JsonProperty("version", Order = 9)]
     public string Version { get; set; } = string.Empty;
 
     /// <summary>
     /// 위치 좌표 (위치 설명, 위도, 경도, 고도)
     /// </summary>
-    [JsonProperty("geolocation", Order = 9, NullValueHandling = NullValueHandling.Ignore)]
+    [JsonProperty("geolocation", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
     public GeolocationDto? Geolocation { get; set; }
 }

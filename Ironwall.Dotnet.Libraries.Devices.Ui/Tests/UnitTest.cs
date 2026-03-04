@@ -8,6 +8,9 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
+using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Xunit;
 
@@ -401,7 +404,8 @@ public class DeviceProviderServiceTests
         DeviceProvider? deviceProvider = null,
         ControllerDeviceProvider? controllerProvider = null,
         SensorDeviceProvider? sensorProvider = null,
-        CameraDeviceProvider? cameraProvider = null)
+        CameraDeviceProvider? cameraProvider = null,
+        DeviceGroupProvider? deviceGroupProvider = null)
     {
         var mockLog = new MockLogService();
         var devProvider = deviceProvider ?? new DeviceProvider();
@@ -413,7 +417,8 @@ public class DeviceProviderServiceTests
             deviceProvider: devProvider,
             controllerProvider: controllerProvider ?? new ControllerDeviceProvider(mockLog, devProvider),
             sensorProvider: sensorProvider ?? new SensorDeviceProvider(mockLog, devProvider),
-            cameraProvider: cameraProvider ?? new CameraDeviceProvider(mockLog, devProvider));
+            cameraProvider: cameraProvider ?? new CameraDeviceProvider(mockLog, devProvider),
+            deviceGroupProvider: deviceGroupProvider ?? new DeviceGroupProvider(mockLog));
     }
     #endregion
 
@@ -598,6 +603,214 @@ public class DeviceProviderServiceTests
 
     #endregion
 }
+
+#region Phase Camera-7: CameraUrlsViewModel Tests
+
+public class CameraUrlsViewModelTests
+{
+    [Fact(DisplayName = "Test-7.1: CameraUrlsViewModel 6 properties passthrough")]
+    public void CameraUrlsViewModel_AllProperties_Passthrough()
+    {
+        var model = new CameraUrlsModel
+        {
+            HomepageUrl = "http://192.168.1.100",
+            OnvifDeviceService = "http://192.168.1.100/onvif/device_service",
+            RtspMain = "rtsp://192.168.1.100:554/stream1",
+            RtspSub = "rtsp://192.168.1.100:554/stream2",
+            WebrtcMain = "http://192.168.1.100:8080/webrtc",
+            SnapshotCh1 = "http://192.168.1.100/snapshot"
+        };
+
+        var vm = new CameraUrlsViewModel(model);
+
+        Assert.Equal("http://192.168.1.100", vm.HomepageUrl);
+        Assert.Equal("http://192.168.1.100/onvif/device_service", vm.OnvifDeviceService);
+        Assert.Equal("rtsp://192.168.1.100:554/stream1", vm.RtspMain);
+        Assert.Equal("rtsp://192.168.1.100:554/stream2", vm.RtspSub);
+        Assert.Equal("http://192.168.1.100:8080/webrtc", vm.WebrtcMain);
+        Assert.Equal("http://192.168.1.100/snapshot", vm.SnapshotCh1);
+
+        // Test set
+        vm.RtspMain = "rtsp://192.168.1.100:554/changed";
+        Assert.Equal("rtsp://192.168.1.100:554/changed", model.RtspMain);
+    }
+}
+
+#endregion
+
+#region Phase Camera-8: CameraSettingViewModel Tests
+
+public class CameraSettingViewModelTests
+{
+    [Fact(DisplayName = "Test-8.1: CameraSettingViewModel 11 properties passthrough")]
+    public void CameraSettingViewModel_AllProperties_Passthrough()
+    {
+        var model = new CameraSettingModel
+        {
+            Id = 1,
+            CameraId = 100,
+            WeatherMode = "FOG",
+            CameraMode = "PATROL",
+            Heater = "on",
+            Fan = "off",
+            Headlight = "on",
+            DayNightMode = "NIGHT",
+            FocusMode = "MANUAL",
+            IrisMode = "AUTO",
+            Tracking = "ACTIVE",
+            Palette = "WHITE_HOT"
+        };
+
+        var vm = new CameraSettingViewModel(model);
+
+        Assert.Equal(100, vm.CameraId);
+        Assert.Equal("FOG", vm.WeatherMode);
+        Assert.Equal("PATROL", vm.CameraMode);
+        Assert.Equal("on", vm.Heater);
+        Assert.Equal("off", vm.Fan);
+        Assert.Equal("on", vm.Headlight);
+        Assert.Equal("NIGHT", vm.DayNightMode);
+        Assert.Equal("MANUAL", vm.FocusMode);
+        Assert.Equal("AUTO", vm.IrisMode);
+        Assert.Equal("ACTIVE", vm.Tracking);
+        Assert.Equal("WHITE_HOT", vm.Palette);
+
+        // Test set
+        vm.WeatherMode = "RAIN";
+        Assert.Equal("RAIN", model.WeatherMode);
+    }
+}
+
+#endregion
+
+#region Phase Camera-6: DtoToModelHelper Mapping Tests
+
+public class CameraDtoToModelMappingTests
+{
+    [Fact(DisplayName = "Test-6.1: ToCameraDeviceModel maps IpPort")]
+    public void ToCameraDeviceModel_MapsIpPort()
+    {
+        var dto = CreateCameraDto();
+        dto.IpPort = 8080;
+        var model = dto.ToCameraDeviceModel();
+        Assert.Equal(8080, model.IpPort);
+    }
+
+    [Fact(DisplayName = "Test-6.2: ToCameraDeviceModel maps UserName")]
+    public void ToCameraDeviceModel_MapsUserName()
+    {
+        var dto = CreateCameraDto();
+        dto.UserName = "admin";
+        var model = dto.ToCameraDeviceModel();
+        Assert.Equal("admin", model.UserName);
+    }
+
+    [Fact(DisplayName = "Test-6.3: ToCameraDeviceModel maps UserPassword")]
+    public void ToCameraDeviceModel_MapsUserPassword()
+    {
+        var dto = CreateCameraDto();
+        dto.UserPassword = "pass123";
+        var model = dto.ToCameraDeviceModel();
+        Assert.Equal("pass123", model.UserPassword);
+    }
+
+    [Fact(DisplayName = "Test-6.4: ToCameraDeviceModel maps HardwareSpec")]
+    public void ToCameraDeviceModel_MapsHardwareSpec()
+    {
+        var dto = CreateCameraDto();
+        dto.HardwareSpec = new HardwareSpecDto { Name = "TestCam", Manufacturer = "Sensorway" };
+        var model = dto.ToCameraDeviceModel();
+        Assert.NotNull(model.HardwareSpec);
+        Assert.Equal("TestCam", model.HardwareSpec!.Name);
+        Assert.Equal("Sensorway", model.HardwareSpec.Manufacturer);
+    }
+
+    [Fact(DisplayName = "Test-6.5: CameraInfoModel has no Uri property")]
+    public void CameraInfoModel_NoUriProperty()
+    {
+        Assert.Null(typeof(CameraInfoModel).GetProperty("Uri"));
+    }
+
+    private static CameraDeviceDto CreateCameraDto() => new()
+    {
+        Id = 1,
+        NumberDevice = 100,
+        NameDevice = "Camera-01",
+        TypeDevice = "IpCamera",
+        IpAddress = "192.168.1.100",
+        IpPort = 80,
+        Mode = "ONVIF",
+        Category = "FIXED"
+    };
+}
+
+#endregion
+
+#region Phase Camera-5: DeviceEquals Tests
+
+public class CameraDeviceEqualsTests
+{
+    private static CameraDeviceModel CreateCamera(int num = 1) => new()
+    {
+        DeviceNumber = num,
+        DeviceGroups = new List<int> { 1 },
+        DeviceName = $"Camera-{num:00}",
+        DeviceType = EnumDeviceType.IpCamera,
+        Version = "v1.0",
+        Status = EnumDeviceStatus.ACTIVATED,
+        IpAddress = "192.168.1.100",
+        IpPort = 80,
+        UserName = "admin",
+        UserPassword = "pass",
+        Mode = EnumCameraMode.ONVIF,
+        Category = EnumCameraType.FIXED,
+        IsRecord = false
+    };
+
+    [Fact(DisplayName = "Test-5.1: DeviceEquals same data returns true")]
+    public void DeviceEquals_SameData_ReturnsTrue()
+    {
+        var a = CreateCamera();
+        var b = CreateCamera();
+        Assert.True(CameraDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact(DisplayName = "Test-5.2: DeviceEquals different IpPort returns false")]
+    public void DeviceEquals_DifferentIpPort_ReturnsFalse()
+    {
+        var a = CreateCamera();
+        var b = CreateCamera();
+        b.IpPort = 8080;
+        Assert.False(CameraDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact(DisplayName = "Test-5.3: DeviceEquals different IsRecord returns false")]
+    public void DeviceEquals_DifferentIsRecord_ReturnsFalse()
+    {
+        var a = CreateCamera();
+        var b = CreateCamera();
+        b.IsRecord = true;
+        Assert.False(CameraDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact(DisplayName = "Test-5.4: CameraUrlsEquals both null returns true")]
+    public void CameraUrlsEquals_BothNull_ReturnsTrue()
+    {
+        Assert.True(CameraDevicePanelViewModel.CameraUrlsEquals(null, null));
+    }
+
+    [Fact(DisplayName = "Test-5.5: DeviceEquals different RtspMain returns false")]
+    public void DeviceEquals_DifferentRtspMain_ReturnsFalse()
+    {
+        var a = CreateCamera();
+        a.Urls = new CameraUrlsModel { RtspMain = "rtsp://192.168.1.100/stream1" };
+        var b = CreateCamera();
+        b.Urls = new CameraUrlsModel { RtspMain = "rtsp://192.168.1.100/stream2" };
+        Assert.False(CameraDevicePanelViewModel.DeviceEquals(a, b));
+    }
+}
+
+#endregion
 
 #region - Mock Classes -
 /// <summary>
@@ -887,6 +1100,34 @@ public class MockLogService : ILogService
 
     // Empty event implementation
     public event EventHandler<LogEventArgs>? LogEvent;
+}
+
+public class MockDeviceProviderService : IDeviceProviderService
+{
+    public bool FetchAllDevicesAsyncCalled { get; private set; }
+    public bool StartServiceCalled { get; private set; }
+    public bool FetchDeviceGroupsAsyncCalled { get; private set; }
+
+    public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
+
+    public Task StartService(CancellationToken token = default)
+    {
+        StartServiceCalled = true;
+        return Task.CompletedTask;
+    }
+
+    public Task FetchAllDevicesAsync(CancellationToken token = default)
+    {
+        FetchAllDevicesAsyncCalled = true;
+        return Task.CompletedTask;
+    }
+
+    public Task FetchDeviceGroupsAsync(CancellationToken token = default)
+    {
+        FetchDeviceGroupsAsyncCalled = true;
+        return Task.CompletedTask;
+    }
 }
 #endregion
 
@@ -1183,5 +1424,589 @@ public class DtoToModelHelperCameraTests
         Assert.Equal(37.5665, model.Latitude);
         Assert.Equal(126.978, model.Longitude);
         Assert.Equal(85.5, model.Altitude);
+    }
+}
+
+/// <summary>
+/// Device Panel CRUD 완성 테스트 (Speaker/Enclosure/Lamp)
+/// </summary>
+public class DevicePanelCrudCompletionTests : IDisposable
+{
+    public DevicePanelCrudCompletionTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public void MessageModel_CallDeleteSpeakerExists()
+    {
+        var msg = new CallDeleteSpeakerDeviceProcessMessageModel();
+        Assert.IsAssignableFrom<IMessageModel>(msg);
+    }
+
+    [Fact]
+    public void MessageModel_CallDeleteEnclosureExists()
+    {
+        var msg = new CallDeleteEnclosureDeviceProcessMessageModel();
+        Assert.IsAssignableFrom<IMessageModel>(msg);
+    }
+
+    [Fact]
+    public void MessageModel_CallDeleteLampExists()
+    {
+        var msg = new CallDeleteLampDeviceProcessMessageModel();
+        Assert.IsAssignableFrom<IMessageModel>(msg);
+    }
+
+    [Fact]
+    public async Task SpeakerPanel_DeleteButton_PublishesConfirmPopup()
+    {
+        // Arrange
+        var capturedMessages = new List<object>();
+        var mockAggregator = new CapturingEventAggregator(capturedMessages);
+        var mockLog = new MockLogService();
+        var mockApi = new MockDeviceApiService();
+        var deviceProvider = new DeviceProvider();
+        var provider = new SpeakerDeviceProvider(mockLog, deviceProvider);
+
+        var vm = new SpeakerDevicePanelViewModel(mockAggregator, mockLog, mockApi, provider, new MockDeviceProviderService());
+
+        // 선택된 아이템이 있어야 delete 진행
+        var speakerModel = new SpeakerDeviceModel { Id = 1, DeviceNumber = 10, DeviceName = "Speaker1" };
+        vm.ViewModelProvider.Add(new Devices.Ui.ViewModels.SpeakerDeviceViewModel(speakerModel));
+        vm.OnSelectionChanged(vm.ViewModelProvider.ToList());
+
+        // Act
+        vm.OnClickDeleteButton(null!, new System.Windows.RoutedEventArgs());
+
+        // Assert — 확인 팝업 메시지가 발행되었는지
+        await Task.Delay(100); // async publish 대기
+        var confirmMsg = capturedMessages.OfType<OpenConfirmPopupMessageModel>().FirstOrDefault();
+        Assert.NotNull(confirmMsg);
+        Assert.IsType<CallDeleteSpeakerDeviceProcessMessageModel>(confirmMsg.MessageModel);
+    }
+
+    [Fact]
+    public async Task EnclosurePanel_DeleteButton_PublishesConfirmPopup()
+    {
+        // Arrange
+        var capturedMessages = new List<object>();
+        var mockAggregator = new CapturingEventAggregator(capturedMessages);
+        var mockLog = new MockLogService();
+        var mockApi = new MockDeviceApiService();
+        var deviceProvider = new DeviceProvider();
+        var provider = new EnclosureDeviceProvider(mockLog, deviceProvider);
+
+        var vm = new EnclosureDevicePanelViewModel(mockAggregator, mockLog, mockApi, provider, new MockDeviceProviderService());
+
+        var enclosureModel = new EnclosureDeviceModel { Id = 1, DeviceNumber = 20, DeviceName = "Enclosure1" };
+        vm.ViewModelProvider.Add(new Devices.Ui.ViewModels.EnclosureDeviceViewModel(enclosureModel));
+        vm.OnSelectionChanged(vm.ViewModelProvider.ToList());
+
+        // Act
+        vm.OnClickDeleteButton(null!, new System.Windows.RoutedEventArgs());
+
+        // Assert
+        await Task.Delay(100);
+        var confirmMsg = capturedMessages.OfType<OpenConfirmPopupMessageModel>().FirstOrDefault();
+        Assert.NotNull(confirmMsg);
+        Assert.IsType<CallDeleteEnclosureDeviceProcessMessageModel>(confirmMsg.MessageModel);
+    }
+
+    [Fact]
+    public async Task LampPanel_DeleteButton_PublishesConfirmPopup()
+    {
+        // Arrange
+        var capturedMessages = new List<object>();
+        var mockAggregator = new CapturingEventAggregator(capturedMessages);
+        var mockLog = new MockLogService();
+        var mockApi = new MockDeviceApiService();
+        var deviceProvider = new DeviceProvider();
+        var provider = new LampDeviceProvider(mockLog, deviceProvider);
+
+        var vm = new LampDevicePanelViewModel(mockAggregator, mockLog, mockApi, provider, new MockDeviceProviderService());
+
+        var lampModel = new LampDeviceModel { Id = 1, DeviceNumber = 30, DeviceName = "Lamp1" };
+        vm.ViewModelProvider.Add(new Devices.Ui.ViewModels.LampDeviceViewModel(lampModel));
+        vm.OnSelectionChanged(vm.ViewModelProvider.ToList());
+
+        // Act
+        vm.OnClickDeleteButton(null!, new System.Windows.RoutedEventArgs());
+
+        // Assert
+        await Task.Delay(100);
+        var confirmMsg = capturedMessages.OfType<OpenConfirmPopupMessageModel>().FirstOrDefault();
+        Assert.NotNull(confirmMsg);
+        Assert.IsType<CallDeleteLampDeviceProcessMessageModel>(confirmMsg.MessageModel);
+    }
+
+    #region - DeviceEquals Tests -
+    [Fact]
+    public void SpeakerDeviceEquals_SameData_ReturnsTrue()
+    {
+        var a = new SpeakerDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 2 },
+            DeviceName = "Speaker1", DeviceType = Enums.EnumDeviceType.IpSpeaker,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            SpeakerType = "TypeA", Description = "desc"
+        };
+        var b = new SpeakerDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 2 },
+            DeviceName = "Speaker1", DeviceType = Enums.EnumDeviceType.IpSpeaker,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            SpeakerType = "TypeA", Description = "desc"
+        };
+        Assert.True(SpeakerDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact]
+    public void SpeakerDeviceEquals_DifferentField_ReturnsFalse()
+    {
+        var a = new SpeakerDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 2 },
+            DeviceName = "Speaker1", DeviceType = Enums.EnumDeviceType.IpSpeaker,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            SpeakerType = "TypeA", Description = "desc"
+        };
+        var b = new SpeakerDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 2 },
+            DeviceName = "Speaker1-Changed", DeviceType = Enums.EnumDeviceType.IpSpeaker,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            SpeakerType = "TypeA", Description = "desc"
+        };
+        Assert.False(SpeakerDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact]
+    public void EnclosureDeviceEquals_SameData_ReturnsTrue()
+    {
+        var a = new EnclosureDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1 },
+            DeviceName = "Enc1", DeviceType = Enums.EnumDeviceType.Enclosure,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            DoorStatus = "closed", HeaterEnabled = true, FanEnabled = false
+        };
+        var b = new EnclosureDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1 },
+            DeviceName = "Enc1", DeviceType = Enums.EnumDeviceType.Enclosure,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            DoorStatus = "closed", HeaterEnabled = true, FanEnabled = false
+        };
+        Assert.True(EnclosureDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact]
+    public void EnclosureDeviceEquals_DifferentField_ReturnsFalse()
+    {
+        var a = new EnclosureDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1 },
+            DeviceName = "Enc1", DeviceType = Enums.EnumDeviceType.Enclosure,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            DoorStatus = "closed", HeaterEnabled = true, FanEnabled = false
+        };
+        var b = new EnclosureDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1 },
+            DeviceName = "Enc1", DeviceType = Enums.EnumDeviceType.Enclosure,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            DoorStatus = "open", HeaterEnabled = true, FanEnabled = false
+        };
+        Assert.False(EnclosureDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact]
+    public void LampDeviceEquals_SameData_ReturnsTrue()
+    {
+        var a = new LampDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 3 },
+            DeviceName = "Lamp1", DeviceType = Enums.EnumDeviceType.Lamp,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            IpAddress = "192.168.1.1", IpPort = 8080,
+            UserName = "admin", UserPassword = "pass", Description = "desc"
+        };
+        var b = new LampDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 3 },
+            DeviceName = "Lamp1", DeviceType = Enums.EnumDeviceType.Lamp,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            IpAddress = "192.168.1.1", IpPort = 8080,
+            UserName = "admin", UserPassword = "pass", Description = "desc"
+        };
+        Assert.True(LampDevicePanelViewModel.DeviceEquals(a, b));
+    }
+
+    [Fact]
+    public void LampDeviceEquals_DifferentField_ReturnsFalse()
+    {
+        var a = new LampDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 3 },
+            DeviceName = "Lamp1", DeviceType = Enums.EnumDeviceType.Lamp,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            IpAddress = "192.168.1.1", IpPort = 8080,
+            UserName = "admin", UserPassword = "pass", Description = "desc"
+        };
+        var b = new LampDeviceModel
+        {
+            DeviceNumber = 1, DeviceGroups = new List<int> { 1, 3 },
+            DeviceName = "Lamp1", DeviceType = Enums.EnumDeviceType.Lamp,
+            Version = "1.0", Status = Enums.EnumDeviceStatus.ACTIVATED,
+            IpAddress = "192.168.1.2", IpPort = 8080,
+            UserName = "admin", UserPassword = "pass", Description = "desc"
+        };
+        Assert.False(LampDevicePanelViewModel.DeviceEquals(a, b));
+    }
+    #endregion
+}
+
+/// <summary>
+/// SensorPanel Cache-first 테스트 (PRD v3.0)
+/// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
+/// </summary>
+public class SensorPanelCacheTests : IDisposable
+{
+    public SensorPanelCacheTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public async Task SensorPanel_DataInitialize_DoesNotCallApi()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockProviderService = new MockDeviceProviderService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+
+        var deviceProvider = new DeviceProvider();
+        var sensorProvider = new SensorDeviceProvider(mockLog, deviceProvider);
+        var controllerProvider = new ControllerDeviceProvider(mockLog, deviceProvider);
+
+        // 시작 시 Provider에 미리 데이터 채우기 (DeviceProviderService.StartService가 했을 작업)
+        deviceProvider.Add(new SensorDeviceModel { Id = 1, DeviceName = "Sensor-1" });
+        deviceProvider.Add(new SensorDeviceModel { Id = 2, DeviceName = "Sensor-2" });
+
+        var vm = new SensorDevicePanelViewModel(
+            ea, mockLog, mockApi, sensorProvider, controllerProvider, mockProviderService);
+
+        // Act — OnActivateAsync 트리거 (DataInitialize 호출)
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+
+        // Assert — API 호출 없음, 캐시에서 2개 로딩
+        Assert.False(mockApi.GetSensorsCalled, "DataInitialize must not call API when provider has data");
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+    }
+}
+
+/// <summary>
+/// SpeakerPanel Cache-first 테스트 (PRD v3.0)
+/// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
+/// </summary>
+public class SpeakerPanelCacheTests : IDisposable
+{
+    public SpeakerPanelCacheTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public async Task SpeakerPanel_DataInitialize_DoesNotCallApi()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockProviderService = new MockDeviceProviderService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+
+        var deviceProvider = new DeviceProvider();
+        var speakerProvider = new SpeakerDeviceProvider(mockLog, deviceProvider);
+
+        deviceProvider.Add(new SpeakerDeviceModel { Id = 1, DeviceName = "Speaker-1" });
+        deviceProvider.Add(new SpeakerDeviceModel { Id = 2, DeviceName = "Speaker-2" });
+
+        var vm = new SpeakerDevicePanelViewModel(
+            ea, mockLog, mockApi, speakerProvider, mockProviderService);
+
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+    }
+}
+
+/// <summary>
+/// EnclosurePanel Cache-first 테스트 (PRD v3.0)
+/// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
+/// </summary>
+public class EnclosurePanelCacheTests : IDisposable
+{
+    public EnclosurePanelCacheTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public async Task EnclosurePanel_DataInitialize_DoesNotCallApi()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockProviderService = new MockDeviceProviderService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+
+        var deviceProvider = new DeviceProvider();
+        var enclosureProvider = new EnclosureDeviceProvider(mockLog, deviceProvider);
+
+        deviceProvider.Add(new EnclosureDeviceModel { Id = 1, DeviceName = "Enclosure-1" });
+        deviceProvider.Add(new EnclosureDeviceModel { Id = 2, DeviceName = "Enclosure-2" });
+
+        var vm = new EnclosureDevicePanelViewModel(
+            ea, mockLog, mockApi, enclosureProvider, mockProviderService);
+
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+    }
+}
+
+/// <summary>
+/// LampPanel Cache-first 테스트 (PRD v3.0)
+/// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
+/// </summary>
+public class LampPanelCacheTests : IDisposable
+{
+    public LampPanelCacheTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public async Task LampPanel_DataInitialize_DoesNotCallApi()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockProviderService = new MockDeviceProviderService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+
+        var deviceProvider = new DeviceProvider();
+        var lampProvider = new LampDeviceProvider(mockLog, deviceProvider);
+
+        deviceProvider.Add(new LampDeviceModel { Id = 1, DeviceName = "Lamp-1" });
+        deviceProvider.Add(new LampDeviceModel { Id = 2, DeviceName = "Lamp-2" });
+
+        var vm = new LampDevicePanelViewModel(
+            ea, mockLog, mockApi, lampProvider, mockProviderService);
+
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+    }
+}
+
+/// <summary>
+/// ControllerPanel Cache-first 테스트 (PRD v3.0)
+/// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
+/// </summary>
+public class ControllerPanelCacheTests : IDisposable
+{
+    public ControllerPanelCacheTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public async Task ControllerPanel_DataInitialize_DoesNotCallApi()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockProviderService = new MockDeviceProviderService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+
+        var deviceProvider = new DeviceProvider();
+        var controllerProvider = new ControllerDeviceProvider(mockLog, deviceProvider);
+
+        // 시작 시 Provider에 미리 데이터 채우기 (DeviceProviderService.StartService가 했을 작업)
+        deviceProvider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" });
+        deviceProvider.Add(new ControllerDeviceModel { Id = 2, DeviceName = "Controller-2" });
+
+        var vm = new ControllerDevicePanelViewModel(
+            ea, mockLog, mockApi, controllerProvider, mockProviderService);
+
+        // Act — OnActivateAsync 트리거 (DataInitialize 호출)
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+
+        // Assert — API 호출 없음, 캐시에서 2개 로딩
+        Assert.False(mockApi.GetControllersCalled, "DataInitialize must not call API when provider has data");
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+    }
+}
+
+/// <summary>
+/// CameraPanel Cache-first 테스트 (PRD v3.0)
+/// DataInitialize는 API를 호출하지 않고 Provider 캐시에서 ViewModelProvider를 구성한다
+/// </summary>
+public class CameraPanelCacheTests : IDisposable
+{
+    public CameraPanelCacheTests()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    public void Dispose()
+    {
+        IoC.GetInstance = null!;
+        IoC.GetAllInstances = null!;
+        IoC.BuildUp = null!;
+    }
+
+    [Fact]
+    public async Task CameraPanel_DataInitialize_DoesNotCallApi()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockProviderService = new MockDeviceProviderService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+
+        var deviceProvider = new DeviceProvider();
+        var cameraProvider = new CameraDeviceProvider(mockLog, deviceProvider);
+
+        // 시작 시 Provider에 미리 데이터 채우기 (DeviceProviderService.StartService가 했을 작업)
+        deviceProvider.Add(new CameraDeviceModel { Id = 1, DeviceName = "Camera-1" });
+        deviceProvider.Add(new CameraDeviceModel { Id = 2, DeviceName = "Camera-2" });
+
+        var vm = new CameraDevicePanelViewModel(
+            ea, mockLog, mockApi, cameraProvider, mockProviderService);
+
+        // Act — OnActivateAsync 트리거 (DataInitialize 호출)
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+
+        // Assert — API 호출 없음, 캐시에서 2개 로딩
+        Assert.False(mockApi.GetCamerasCalled, "DataInitialize must not call API when provider has data");
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+    }
+}
+
+/// <summary>
+/// 메시지를 캡처하는 테스트용 EventAggregator
+/// </summary>
+public class CapturingEventAggregator : IEventAggregator
+{
+    private readonly List<object> _captured;
+
+    public CapturingEventAggregator(List<object> captured)
+    {
+        _captured = captured;
+    }
+
+    public bool HandlerExistsFor(Type messageType) => false;
+    public void Subscribe(object subscriber, Func<Func<Task>, Task>? marshal = null) { }
+    public void Unsubscribe(object subscriber) { }
+
+    public Task PublishAsync(object message, Func<Func<Task>, Task> marshal, CancellationToken cancellationToken = default)
+    {
+        _captured.Add(message);
+        return Task.CompletedTask;
     }
 }

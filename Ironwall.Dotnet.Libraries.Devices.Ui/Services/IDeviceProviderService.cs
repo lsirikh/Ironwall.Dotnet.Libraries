@@ -38,4 +38,9 @@ public interface IDeviceProviderService : IService
     /// <param name="token">취소 토큰</param>
     /// <returns>Task</returns>
     Task FetchAllDevicesAsync(CancellationToken token = default);
+
+    /// <summary>
+    /// DeviceGroup 목록을 GOP API에서 조회하고 DeviceGroupProvider를 업데이트합니다.
+    /// </summary>
+    Task FetchDeviceGroupsAsync(CancellationToken token = default);
 }

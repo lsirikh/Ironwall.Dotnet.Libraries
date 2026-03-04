@@ -28,6 +28,10 @@ public class OpenDeleteAccountDialogMessageModel;
 public class OpenEditAccountDialogMessageModel;
 public class OpenPreEventRemoveAllDialogMessageModel;
 public class OpenOnvifPropertyDialogMessageModel;
+public class OpenCameraDetailDialogMessageModel
+{
+    public object? Dialog { get; set; }
+}
 public class OpenEventReportDialogMessageModel
 {
     public string? EventType { get; set; }
@@ -53,6 +57,10 @@ public class CallDeleteProcessMessageModel : IMessageModel { }
 public class CallDeleteControllerDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteCameraDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteSensorDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteSpeakerDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteEnclosureDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteLampDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteDeviceGroupProcessMessageModel : IMessageModel { }
 public class CallDeleteDetectionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteMalfunctionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteConnectionEventProcessMessageModel : IMessageModel { }

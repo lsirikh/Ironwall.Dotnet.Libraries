@@ -84,8 +84,9 @@
 		<Setter Property="FontWeight" Value="Bold" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="TextAlignment" Value="Center" />
-		<Setter Property="Width" Value="80" />
+		<Setter Property="Width" Value="100" />
 		<Setter Property="Height" Value="50" />
+		<Setter Property="TextWrapping" Value="Wrap" />
 		<Setter Property="Margin" Value="-8,-5,0,0" />
 	</Style>
 

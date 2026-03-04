@@ -904,18 +904,16 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             // 2. CameraDevices 테이블에 특화 정보 삽입
             const string cameraSql = @"
                 INSERT INTO CameraDevices
-                (Id, IpAddress, IpPort, Username, Password, RtspUri, RtspPort, Mode, Category)
-                VALUES (@Id, @IpAddress, @IpPort, @Username, @Password, @RtspUri, @RtspPort, @Mode, @Category);";
+                (Id, IpAddress, IpPort, Username, Password, Mode, Category)
+                VALUES (@Id, @IpAddress, @IpPort, @Username, @Password, @Mode, @Category);";
 
             await _conn.ExecuteAsync(cameraSql, new
             {
                 Id = deviceId,
                 model.IpAddress,
-                IpPort = model.Port,
-                model.Username,
-                model.Password,
-                model.RtspUri,
-                model.RtspPort,
+                IpPort = model.IpPort,
+                model.UserName,
+                model.UserPassword,
                 Mode = model.Mode.ToString(),
                 Category = model.Category.ToString()
             }, transaction);
@@ -972,8 +970,6 @@ internal class DeviceDbService : TaskService, IDeviceDbService
                 IpPort    = @IpPort,
                 Username  = @Username,
                 Password  = @Password,
-                RtspUri   = @RtspUri,
-                RtspPort  = @RtspPort,
                 Mode      = @Mode,
                 Category  = @Category
             WHERE Id = @Id;";
@@ -982,11 +978,9 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             {
                 model.Id,
                 model.IpAddress,
-                IpPort = model.Port,
-                model.Username,
-                model.Password,
-                model.RtspUri,
-                model.RtspPort,
+                IpPort = model.IpPort,
+                model.UserName,
+                model.UserPassword,
                 Mode = model.Mode.ToString(),
                 Category = model.Category.ToString()
             }, transaction);
@@ -1137,11 +1131,9 @@ internal sealed class CameraJoinSQL
         Version = Version,
         Status = Enum.Parse<EnumDeviceStatus>(Status),
         IpAddress = IpAddress,
-        Port = IpPort,
-        Username = Username,
-        Password = Password,
-        RtspUri = RtspUri,
-        RtspPort = RtspPort,
+        IpPort = IpPort,
+        UserName = Username,
+        UserPassword = Password,
         Mode = Enum.TryParse(Mode, out EnumCameraMode m) ? m : EnumCameraMode.NONE,
         Category = Enum.TryParse(Category, out EnumCameraType c) ? c : EnumCameraType.NONE
     };

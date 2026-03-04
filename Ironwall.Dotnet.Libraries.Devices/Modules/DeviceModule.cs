@@ -43,6 +43,8 @@ public class DeviceModule : Module
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
             builder.RegisterType<LampDeviceProvider>().As<LampDeviceProvider>()
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
+            builder.RegisterType<DeviceGroupProvider>().As<DeviceGroupProvider>()
+                .SingleInstance().WithMetadata("Order", _count++);
 
         }
         catch

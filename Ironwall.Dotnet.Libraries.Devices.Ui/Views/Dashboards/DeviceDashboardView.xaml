@@ -37,7 +37,7 @@
 
 	<Grid>
 		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto" />
+			<RowDefinition Height="280" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 		<Border
@@ -621,12 +621,14 @@
 							<ColumnDefinition />
 						</Grid.ColumnDefinitions>
 						<ScrollViewer
+							Height="350"
+							VerticalAlignment="Top"
 							FlowDirection="LeftToRight"
 							HorizontalScrollBarVisibility="Auto"
 							VerticalScrollBarVisibility="Auto">
 							<TabPanel
 								x:Name="HeaderPanel"
-								Width="80"
+								Width="100"
 								Margin="25,0,-5,0"
 								VerticalAlignment="Stretch"
 								Panel.ZIndex="0"
@@ -649,6 +651,17 @@
 					<ContentControl cal:View.Model="{Binding DataContext.TabControlViewModel, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 				</DataTemplate>
 			</TabControl.ContentTemplate>
+
+			<TabItem Content="" Tag="DeviceGroupViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Group" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="그룹 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
 
 			<TabItem Content="" Tag="ControllerDeviceViewModel">
 				<TabItem.Header>

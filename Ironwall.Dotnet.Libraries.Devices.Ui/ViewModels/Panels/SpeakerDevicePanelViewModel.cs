@@ -3,6 +3,8 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
@@ -13,16 +15,19 @@ using System.Windows;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 
 public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<SpeakerDeviceViewModel>
+                                        , IHandle<CallDeleteSpeakerDeviceProcessMessageModel>
 {
     #region - Ctors -
     public SpeakerDevicePanelViewModel(IEventAggregator eventAggregator
                                       , ILogService log
                                       , IDeviceApiService apiService
                                       , SpeakerDeviceProvider deviceProvider
+                                      , IDeviceProviderService deviceProviderService
                                       ) : base(eventAggregator, log)
     {
         _apiService = apiService;
         _deviceProvider = deviceProvider;
+        _deviceProviderService = deviceProviderService;
     }
     #endregion
     #region - Overrides -
@@ -44,9 +49,14 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
         return base.OnDeactivateAsync(close, cancellationToken);
     }
 
-    public override void OnClickDeleteButton(object sender, RoutedEventArgs e)
+    public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
         if (SelectedItemCount == 0) return;
+        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Explain = "선택한 스피커 장비를 정말로 삭제하시겠습니까?",
+            MessageModel = new CallDeleteSpeakerDeviceProcessMessageModel()
+        });
     }
 
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
@@ -67,6 +77,7 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
                 _pCancellationTokenSource.Dispose();
             }
             _pCancellationTokenSource = new CancellationTokenSource();
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource!.Token);
             await DataInitialize(_pCancellationTokenSource!.Token);
             await Task.Delay(2000, _pCancellationTokenSource.Token);
         }
@@ -97,13 +108,22 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             var currentList = _deviceProvider.OfType<SpeakerDeviceModel>().ToList();
             var serverList = await FetchSpeakersAsync(token);
 
-            foreach (var model in currentList.Where(m => m.Id <= 0))
-                await _apiService.CreateSpeakerAsync(model.ToSpeakerDeviceDto(), token);
+            var insertList = currentList.Where(m => m.Id <= 0).ToList();
+            var updateList = currentList
+                .Where(m => m.Id > 0)
+                .Join(serverList, m => m.Id, d => d.Id,
+                    (m, d) => new { updated = m, original = d })
+                .Where(p => !DeviceEquals(p.updated, p.original))
+                .Select(p => p.updated)
+                .ToList();
 
-            foreach (var model in currentList.Where(m => m.Id > 0)
-                .Join(serverList, m => m.Id, d => d.Id, (m, d) => m))
-                await _apiService.UpdateSpeakerAsync(model.Id, model.ToSpeakerDeviceDto(), token);
+            foreach (var model in insertList)
+                await CreateSpeakerAsync(model, token);
 
+            foreach (var model in updateList)
+                await UpdateSpeakerAsync(model, token);
+
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
             await DataInitialize(_pCancellationTokenSource.Token);
             await Task.Delay(2000, token);
         }
@@ -147,12 +167,71 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
         }
     }
     #endregion
+    #region - Binding Methods -
+    internal static bool DeviceEquals(ISpeakerDeviceModel a, ISpeakerDeviceModel b)
+    {
+        return a.DeviceNumber == b.DeviceNumber &&
+        (a.DeviceGroups ?? new()).SequenceEqual(b.DeviceGroups ?? new()) &&
+        a.DeviceName == b.DeviceName &&
+        a.DeviceType == b.DeviceType &&
+        a.Version == b.Version &&
+        a.Status == b.Status &&
+        a.SpeakerType == b.SpeakerType &&
+        a.Description == b.Description &&
+        a.IsEnable == b.IsEnable &&
+        a.Location == b.Location &&
+        a.Latitude == b.Latitude &&
+        a.Longitude == b.Longitude;
+    }
+    #endregion
     #region - Helper Methods -
+    private async Task<bool> CreateSpeakerAsync(SpeakerDeviceModel model, CancellationToken token = default)
+    {
+        try
+        {
+            var dto = model.ToSpeakerDeviceDto();
+            var response = await _apiService.CreateSpeakerAsync(dto, token);
+            if (response.Success)
+            {
+                _log?.Info($"Speaker created successfully: {response.Data?.Id}");
+                return true;
+            }
+            _log?.Error($"Failed to create speaker: {response.Error?.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in CreateSpeakerAsync: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<bool> UpdateSpeakerAsync(SpeakerDeviceModel model, CancellationToken token = default)
+    {
+        try
+        {
+            var dto = model.ToSpeakerDeviceDto();
+            var response = await _apiService.UpdateSpeakerAsync(model.Id, dto, token);
+            if (response.Success)
+            {
+                _log?.Info($"Speaker updated successfully: {model.Id}");
+                return true;
+            }
+            _log?.Error($"Failed to update speaker {model.Id}: {response.Error?.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in UpdateSpeakerAsync: {ex.Message}");
+            return false;
+        }
+    }
+
     private async Task<List<SpeakerDeviceModel>> FetchSpeakersAsync(CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.GetSpeakersAsync(page: 1, limit: 200, token: token);
+            var response = await _apiService.GetSpeakersAsync(page: 1, limit: 100, token: token);
             if (response.Success && response.Data != null)
                 return response.Data.Select(dto => dto.ToSpeakerDeviceModel()).ToList();
 
@@ -169,29 +248,25 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
             try
             {
                 IsVisible = false;
-                var models = await FetchSpeakersAsync(cancellationToken);
+
+                // 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
-                if (cancellationToken.IsCancellationRequested)
-                    throw new TaskCanceledException("Task was cancelled!");
-
-                _deviceProvider.Clear();
-                foreach (var model in models)
-                    _deviceProvider.Add(model);
 
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in models.Select((item, index) => (item, index)))
+                    foreach (var (item, index) in _deviceProvider
+                        .OfType<ISpeakerDeviceModel>()
+                        .Select((item, index) => (item, index)))
                     {
                         if (cancellationToken.IsCancellationRequested)
                             throw new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new SpeakerDeviceViewModel(item) { Index = index + 1 });
+                        ViewModelProvider.Add(new SpeakerDeviceViewModel((SpeakerDeviceModel)item) { Index = index + 1 });
                     }
                     NotifyOfPropertyChange(() => ViewModelProvider);
                 });
@@ -206,11 +281,44 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
         });
     }
     #endregion
+    #region - IHandles -
+    public async Task HandleAsync(CallDeleteSpeakerDeviceProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        await _eventAggregator.PublishOnCurrentThreadAsync(
+            new OpenProgressPopupMessageModel(), cancellationToken);
+
+        await Task.Run(async () =>
+        {
+            foreach (var item in SelectedItems.ToList())
+            {
+                var model = (ISpeakerDeviceModel)item.Model;
+                var response = await _apiService.DeleteSpeakerAsync(model.Id, cancellationToken);
+                if (!response.Success)
+                    _log?.Error($"Failed to delete speaker {model.Id}: {response.Error?.Message}");
+            }
+        }, cancellationToken);
+
+        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
+        await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
+        UpdateAction?.Invoke();
+
+        await _eventAggregator.PublishOnCurrentThreadAsync(
+            new ClosePopupMessageModel(), cancellationToken);
+    }
+    #endregion
     #region - Properties -
     public event System.Action? UpdateAction;
     #endregion
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
     private readonly SpeakerDeviceProvider _deviceProvider;
+    private readonly IDeviceProviderService _deviceProviderService;
     #endregion
 }

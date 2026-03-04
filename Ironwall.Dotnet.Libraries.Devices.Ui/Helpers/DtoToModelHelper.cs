@@ -30,22 +30,49 @@ public static class DtoToModelHelper
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status),
             IpAddress = dto.IpAddress ?? string.Empty,
-            Port = dto.IpPort,
-            Username = dto.UserName,
-            Password = dto.UserPassword,
-            RtspUri = dto.RtspUri,
-            RtspPort = dto.RtspPort ?? 0,
+            IpPort = dto.IpPort,
+            UserName = dto.UserName,
+            UserPassword = dto.UserPassword,
             Mode = ParseCameraMode(dto.Mode),
             Category = ParseCameraType(dto.Category),
             IsRecord = dto.IsRecord
         };
 
+        MapGeolocationToModel(dto, model);
+
         if (dto.HardwareSpec != null)
-            model.Identification = ToCameraInfoModel(dto.HardwareSpec);
+            model.HardwareSpec = ToCameraInfoModel(dto.HardwareSpec);
         if (dto.Urls != null)
             model.Urls = ToCameraUrlsModel(dto.Urls);
 
         return model;
+    }
+
+    // ────────────────────────── Geolocation 공통 매핑 ──────────────────────────
+
+    private static void MapGeolocationToModel(BaseDeviceDto dto, BaseDeviceModel model)
+    {
+        model.IsEnable = dto.IsEnable;
+        if (dto.Geolocation != null)
+        {
+            model.Location = dto.Geolocation.Location;
+            model.Latitude = dto.Geolocation.Latitude;
+            model.Longitude = dto.Geolocation.Longitude;
+        }
+    }
+
+    private static void MapGeolocationToDto(BaseDeviceModel model, BaseDeviceDto dto)
+    {
+        dto.IsEnable = model.IsEnable;
+        if (!string.IsNullOrEmpty(model.Location) || model.Latitude != 0 || model.Longitude != 0)
+        {
+            dto.Geolocation = new GeolocationDto
+            {
+                Location = model.Location,
+                Latitude = model.Latitude,
+                Longitude = model.Longitude
+            };
+        }
     }
 
     // ────────────────────────── Enum 파싱 헬퍼 ──────────────────────────
@@ -115,24 +142,27 @@ public static class DtoToModelHelper
     {
         if (model == null) throw new ArgumentNullException(nameof(model));
 
-        return new CameraDeviceDto
+        var dto = new CameraDeviceDto
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             IpAddress = model.IpAddress ?? string.Empty,
-            IpPort = model.Port,
-            UserName = model.Username ?? string.Empty,
-            UserPassword = model.Password ?? string.Empty,
-            RtspUri = model.RtspUri ?? string.Empty,
-            RtspPort = model.RtspPort,
+            IpPort = model.IpPort,
+            UserName = model.UserName ?? string.Empty,
+            UserPassword = model.UserPassword ?? string.Empty,
             Mode = model.Mode.ToString(),
-            Category = model.Category.ToString()
+            Category = model.Category.ToString(),
+            IsRecord = model.IsRecord
         };
+        MapGeolocationToDto(model, dto);
+        if (model.Urls != null)
+            dto.Urls = ToCameraUrlsDto(model.Urls);
+        return dto;
     }
 
     /// <summary>
@@ -152,6 +182,8 @@ public static class DtoToModelHelper
             Version = dto.Version ?? string.Empty,
             Status = ParseDeviceStatus(dto.Status)
         };
+
+        MapGeolocationToModel(dto, model);
 
         // Controller 정보가 포함된 경우 변환
         if (dto.Controller != null)
@@ -173,13 +205,15 @@ public static class DtoToModelHelper
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
             Status = model.Status.ToString(),
             ControllerId = model.Controller?.Id ?? 0
         };
+
+        MapGeolocationToDto(model, dto);
 
         // Controller 정보가 있는 경우 변환
         if (model.Controller != null)
@@ -197,7 +231,7 @@ public static class DtoToModelHelper
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
 
-        return new ControllerDeviceModel
+        var model = new ControllerDeviceModel
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
@@ -209,6 +243,8 @@ public static class DtoToModelHelper
             IpAddress = dto.IpAddress ?? string.Empty,
             Port = dto.IpPort
         };
+        MapGeolocationToModel(dto, model);
+        return model;
     }
 
     /// <summary>
@@ -218,11 +254,11 @@ public static class DtoToModelHelper
     {
         if (model == null) throw new ArgumentNullException(nameof(model));
 
-        return new ControllerDeviceDto
+        var dto = new ControllerDeviceDto
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -230,6 +266,8 @@ public static class DtoToModelHelper
             IpAddress = model.IpAddress ?? string.Empty,
             IpPort = model.Port
         };
+        MapGeolocationToDto(model, dto);
+        return dto;
     }
 
     // ────────────────────────── Speaker ──────────────────────────
@@ -250,6 +288,8 @@ public static class DtoToModelHelper
             SpeakerType = dto.SpeakerType ?? "NORMAL",
             Description = dto.Description
         };
+
+        MapGeolocationToModel(dto, model);
 
         if (dto.Server != null)
         {
@@ -278,7 +318,7 @@ public static class DtoToModelHelper
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -286,6 +326,8 @@ public static class DtoToModelHelper
             SpeakerType = model.SpeakerType ?? "NORMAL",
             Description = model.Description
         };
+
+        MapGeolocationToDto(model, dto);
 
         if (model.Server != null)
         {
@@ -312,7 +354,7 @@ public static class DtoToModelHelper
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
 
-        return new EnclosureDeviceModel
+        var model = new EnclosureDeviceModel
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
@@ -325,17 +367,19 @@ public static class DtoToModelHelper
             HeaterEnabled = dto.HeaterEnabled,
             FanEnabled = dto.FanEnabled
         };
+        MapGeolocationToModel(dto, model);
+        return model;
     }
 
     public static EnclosureDeviceDto ToEnclosureDeviceDto(this EnclosureDeviceModel model)
     {
         if (model == null) throw new ArgumentNullException(nameof(model));
 
-        return new EnclosureDeviceDto
+        var dto = new EnclosureDeviceDto
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -344,6 +388,8 @@ public static class DtoToModelHelper
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled
         };
+        MapGeolocationToDto(model, dto);
+        return dto;
     }
 
     // ────────────────────────── Camera Sub-Model 변환 ──────────────────────────
@@ -381,6 +427,33 @@ public static class DtoToModelHelper
         };
     }
 
+    public static CameraUrlsDto ToCameraUrlsDto(ICameraUrlsModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        var dto = new CameraUrlsDto();
+
+        if (!string.IsNullOrEmpty(model.HomepageUrl))
+            dto.Homepage = new CameraHomepageDto { Url = model.HomepageUrl };
+
+        if (!string.IsNullOrEmpty(model.OnvifDeviceService))
+            dto.Onvif = new CameraOnvifDto { DeviceService = model.OnvifDeviceService };
+
+        if (!string.IsNullOrEmpty(model.RtspMain) || !string.IsNullOrEmpty(model.RtspSub) || !string.IsNullOrEmpty(model.WebrtcMain))
+        {
+            dto.Streams = new CameraStreamsDto();
+            if (!string.IsNullOrEmpty(model.RtspMain) || !string.IsNullOrEmpty(model.RtspSub))
+                dto.Streams.Rtsp = new CameraRtspDto { Main = model.RtspMain ?? string.Empty, Sub = model.RtspSub ?? string.Empty };
+            if (!string.IsNullOrEmpty(model.WebrtcMain))
+                dto.Streams.Webrtc = new CameraWebrtcDto { Main = model.WebrtcMain };
+        }
+
+        if (!string.IsNullOrEmpty(model.SnapshotCh1))
+            dto.Snapshot = new CameraSnapshotDto { Ch1 = model.SnapshotCh1 };
+
+        return dto;
+    }
+
     public static CameraSettingModel ToCameraSettingModel(CameraSettingDto dto)
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
@@ -414,13 +487,41 @@ public static class DtoToModelHelper
         };
     }
 
+    // ────────────────────────── DeviceGroup ──────────────────────────
+
+    public static DeviceGroupModel ToDeviceGroupModel(this DeviceGroupDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        return new DeviceGroupModel
+        {
+            Id = dto.Id,
+            Name = dto.Name ?? string.Empty,
+            Description = dto.Description,
+            DeviceCount = dto.DeviceCount
+        };
+    }
+
+    public static DeviceGroupDto ToDeviceGroupDto(this IDeviceGroupModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        return new DeviceGroupDto
+        {
+            Id = model.Id,
+            Name = model.Name ?? string.Empty,
+            Description = model.Description,
+            DeviceCount = model.DeviceCount
+        };
+    }
+
     // ────────────────────────── Lamp ──────────────────────────
 
     public static LampDeviceModel ToLampDeviceModel(this LampDeviceDto dto)
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
 
-        return new LampDeviceModel
+        var model = new LampDeviceModel
         {
             Id = dto.Id,
             DeviceNumber = dto.NumberDevice,
@@ -435,17 +536,19 @@ public static class DtoToModelHelper
             UserPassword = dto.UserPassword,
             Description = dto.Description
         };
+        MapGeolocationToModel(dto, model);
+        return model;
     }
 
     public static LampDeviceDto ToLampDeviceDto(this LampDeviceModel model)
     {
         if (model == null) throw new ArgumentNullException(nameof(model));
 
-        return new LampDeviceDto
+        var dto = new LampDeviceDto
         {
             Id = model.Id,
             NumberDevice = model.DeviceNumber,
-            DeviceGroups = model.DeviceGroups?.Select(id => new DeviceGroupDto { Id = id }).ToList(),
+            GroupIds = model.DeviceGroups,
             NameDevice = model.DeviceName ?? string.Empty,
             TypeDevice = model.DeviceType.ToString(),
             Version = model.Version ?? string.Empty,
@@ -456,5 +559,7 @@ public static class DtoToModelHelper
             UserPassword = model.UserPassword,
             Description = model.Description
         };
+        MapGeolocationToDto(model, dto);
+        return dto;
     }
 }

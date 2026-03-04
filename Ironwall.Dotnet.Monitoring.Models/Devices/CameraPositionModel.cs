@@ -21,8 +21,4 @@ public class CameraPositionModel : BaseModel, ICameraPositionModel
 
     [JsonProperty("altitude", Order = 4)]
     public double Altitude { get; set; }
-
-    [JsonProperty("heading", Order = 5)]
-    public float Heading { get; set; }  // 방향 (0 ~ 360)
-
 }

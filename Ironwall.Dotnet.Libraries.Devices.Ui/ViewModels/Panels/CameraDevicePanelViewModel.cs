@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -28,11 +29,13 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         IEventAggregator eventAggregator,
         ILogService log,
         IDeviceApiService apiService,
-        CameraDeviceProvider deviceProvider)
+        CameraDeviceProvider deviceProvider,
+        IDeviceProviderService deviceProviderService)
         : base(eventAggregator, log)
     {
         _apiService = apiService;
         _deviceProvider = deviceProvider;
+        _deviceProviderService = deviceProviderService;
     }
     #endregion
     #region - Implementation of Interface -
@@ -87,6 +90,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             _pCancellationTokenSource = new CancellationTokenSource();
             var token = _pCancellationTokenSource!.Token;
 
+            await _deviceProviderService.FetchAllDevicesAsync(token);
             await DataInitialize(token);
             await Task.Delay(2000, token);
         }
@@ -149,6 +153,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
             }
 
             // 재조회
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
             await DataInitialize(_pCancellationTokenSource.Token);
             await Task.Delay(2000, token);
         }
@@ -219,7 +224,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     }
     #endregion
     #region - Binding Methods -
-    private static bool DeviceEquals(ICameraDeviceModel a, ICameraDeviceModel b)
+    internal static bool DeviceEquals(ICameraDeviceModel a, ICameraDeviceModel b)
     {
         return a.DeviceNumber == b.DeviceNumber &&
         (a.DeviceGroups ?? new()).SequenceEqual(b.DeviceGroups ?? new()) &&
@@ -228,13 +233,29 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         a.Version == b.Version &&
         a.Status == b.Status &&
         a.IpAddress == b.IpAddress &&
-        a.Port == b.Port &&
-        a.Username == b.Username &&
-        a.Password == b.Password &&
-        a.RtspUri == b.RtspUri &&
-        a.RtspPort == b.RtspPort &&
+        a.IpPort == b.IpPort &&
+        a.UserName == b.UserName &&
+        a.UserPassword == b.UserPassword &&
         a.Mode == b.Mode &&
-        a.Category == b.Category;
+        a.Category == b.Category &&
+        a.IsRecord == b.IsRecord &&
+        a.IsEnable == b.IsEnable &&
+        a.Location == b.Location &&
+        a.Latitude == b.Latitude &&
+        a.Longitude == b.Longitude &&
+        CameraUrlsEquals(a.Urls, b.Urls);
+    }
+
+    internal static bool CameraUrlsEquals(ICameraUrlsModel? a, ICameraUrlsModel? b)
+    {
+        if (a is null && b is null) return true;
+        if (a is null || b is null) return false;
+        return a.HomepageUrl == b.HomepageUrl &&
+            a.OnvifDeviceService == b.OnvifDeviceService &&
+            a.RtspMain == b.RtspMain &&
+            a.RtspSub == b.RtspSub &&
+            a.WebrtcMain == b.WebrtcMain &&
+            a.SnapshotCh1 == b.SnapshotCh1;
     }
 
     #endregion
@@ -329,38 +350,26 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
             try
             {
                 IsVisible = false;
 
-                // API Fetching (DBService → ApiService 마이그레이션)
-                var models = await FetchCamerasAsync(cancellationToken);
-
+                // 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
-                if (cancellationToken.IsCancellationRequested)
-                    throw new TaskCanceledException("Task was cancelled!");
-
-                // Provider 업데이트
-                _deviceProvider.Clear();
-                foreach (var model in models)
-                {
-                    _deviceProvider.Add(model);
-                }
-
-                // ViewModelProvider 업데이트
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in models.Select((item, index) => (item, index)))
+                    foreach (var (item, index) in _deviceProvider
+                        .OfType<ICameraDeviceModel>()
+                        .Select((item, index) => (item, index)))
                     {
                         if (cancellationToken.IsCancellationRequested)
                             throw new TaskCanceledException("Task was cancelled!");
 
-                        var viewModel = new CameraDeviceViewModel(item) { Index = index + 1 };
-                        ViewModelProvider.Add(viewModel);
+                        ViewModelProvider.Add(new CameraDeviceViewModel((CameraDeviceModel)item) { Index = index + 1 });
                     }
                     NotifyOfPropertyChange(() => ViewModelProvider);
                 });
@@ -409,6 +418,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         }
 
         // 재조회
+        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
         await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
         UpdateAction?.Invoke();
 
@@ -424,5 +434,6 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
     private readonly CameraDeviceProvider _deviceProvider;
+    private readonly IDeviceProviderService _deviceProviderService;
     #endregion
 }

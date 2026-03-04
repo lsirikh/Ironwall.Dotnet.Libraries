@@ -39,8 +39,4 @@ public class CameraInfoModel : BaseModel, ICameraInfoModel
 
     [JsonProperty("onvif_version", Order = 9)]
     public string? OnvifVersion { get; set; }
-
-    [JsonProperty("uri", Order = 10)]
-    public string? Uri { get; set; }
-
 }

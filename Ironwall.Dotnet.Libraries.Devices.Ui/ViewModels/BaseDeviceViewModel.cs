@@ -109,6 +109,46 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
             NotifyOfPropertyChange(() => Status);
         }
     }
+
+    public string? Location
+    {
+        get { return _model.Location; }
+        set
+        {
+            _model.Location = value;
+            NotifyOfPropertyChange(() => Location);
+        }
+    }
+
+    public double Latitude
+    {
+        get { return _model.Latitude; }
+        set
+        {
+            _model.Latitude = Math.Clamp(value, -90.0, 90.0);
+            NotifyOfPropertyChange(() => Latitude);
+        }
+    }
+
+    public double Longitude
+    {
+        get { return _model.Longitude; }
+        set
+        {
+            _model.Longitude = Math.Clamp(value, -180.0, 180.0);
+            NotifyOfPropertyChange(() => Longitude);
+        }
+    }
+
+    public bool IsEnable
+    {
+        get { return _model.IsEnable; }
+        set
+        {
+            _model.IsEnable = value;
+            NotifyOfPropertyChange(() => IsEnable);
+        }
+    }
     #endregion
     #region - Attributes -
     private int _index;

@@ -47,7 +47,8 @@ public class DeviceProviderService : IDeviceProviderService
         DeviceProvider deviceProvider,
         ControllerDeviceProvider controllerProvider,
         SensorDeviceProvider sensorProvider,
-        CameraDeviceProvider cameraProvider)
+        CameraDeviceProvider cameraProvider,
+        DeviceGroupProvider deviceGroupProvider)
     {
         _log = logService;
         _eventAggregator = eventAggregator;
@@ -56,6 +57,7 @@ public class DeviceProviderService : IDeviceProviderService
         _controllerProvider = controllerProvider;
         _sensorProvider = sensorProvider;
         _cameraProvider = cameraProvider;
+        _deviceGroupProvider = deviceGroupProvider;
     }
     #endregion
 
@@ -141,6 +143,30 @@ public class DeviceProviderService : IDeviceProviderService
             _log?.Info($"Cameras loaded: {cameras.Count} items");
             await PublishSplashMessage("CameraProvider의 정보를 모두 불러왔습니다...");
 
+            // ──────────── 4. Speakers ────────────
+            var speakers = await FetchSpeakersAsync(token);
+            UpdateOrAddDevices(_deviceProvider, speakers);
+
+            _log?.Info($"Speakers loaded: {speakers.Count} items");
+            await PublishSplashMessage("SpeakerProvider의 정보를 모두 불러왔습니다...");
+
+            // ──────────── 5. Enclosures ────────────
+            var enclosures = await FetchEnclosuresAsync(token);
+            UpdateOrAddDevices(_deviceProvider, enclosures);
+
+            _log?.Info($"Enclosures loaded: {enclosures.Count} items");
+            await PublishSplashMessage("EnclosureProvider의 정보를 모두 불러왔습니다...");
+
+            // ──────────── 6. Lamps ────────────
+            var lamps = await FetchLampsAsync(token);
+            UpdateOrAddDevices(_deviceProvider, lamps);
+
+            _log?.Info($"Lamps loaded: {lamps.Count} items");
+            await PublishSplashMessage("LampProvider의 정보를 모두 불러왔습니다...");
+
+            // ──────────── 7. DeviceGroups ────────────
+            await FetchDeviceGroupsAsync(token);
+
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
         }
         catch (Exception ex)
@@ -150,6 +176,55 @@ public class DeviceProviderService : IDeviceProviderService
         }
     }
     #endregion
+
+    /// <summary>
+    /// DeviceGroup 목록을 GOP API에서 조회하고 DeviceGroupProvider를 업데이트합니다.
+    /// </summary>
+    public async Task FetchDeviceGroupsAsync(CancellationToken token = default)
+    {
+        var allGroups = new List<DeviceGroupModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+
+        try
+        {
+            _log?.Info("FetchDeviceGroupsAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetDeviceGroupsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch device groups at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                    allGroups.Add(dto.ToDeviceGroupModel());
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _deviceGroupProvider.Clear();
+            foreach (var group in allGroups)
+                _deviceGroupProvider.Add(group);
+
+            _log?.Info($"DeviceGroups loaded: {allGroups.Count} items");
+            await PublishSplashMessage("DeviceGroupProvider의 정보를 모두 불러왔습니다...");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchDeviceGroupsAsync: {ex.Message}");
+        }
+    }
 
     #region - Private Methods -
     /// <summary>
@@ -332,6 +407,171 @@ public class DeviceProviderService : IDeviceProviderService
     }
 
     /// <summary>
+    /// GOP API를 통해 Speaker 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<SpeakerDeviceModel>> FetchSpeakersAsync(
+        CancellationToken token = default)
+    {
+        var allSpeakers = new List<SpeakerDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchSpeakersAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetSpeakersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch speakers at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var speaker = dto.ToSpeakerDeviceModel();
+                    allSpeakers.Add(speaker);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Speakers loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchSpeakersAsync() completed: {totalFetched} items");
+            return allSpeakers;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchSpeakersAsync: {ex.Message}");
+            return allSpeakers;
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Enclosure 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<EnclosureDeviceModel>> FetchEnclosuresAsync(
+        CancellationToken token = default)
+    {
+        var allEnclosures = new List<EnclosureDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchEnclosuresAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetEnclosuresAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch enclosures at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var enclosure = dto.ToEnclosureDeviceModel();
+                    allEnclosures.Add(enclosure);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Enclosures loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchEnclosuresAsync() completed: {totalFetched} items");
+            return allEnclosures;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchEnclosuresAsync: {ex.Message}");
+            return allEnclosures;
+        }
+    }
+
+    /// <summary>
+    /// GOP API를 통해 Lamp 목록을 조회합니다 (Pagination 지원).
+    /// </summary>
+    private async Task<List<LampDeviceModel>> FetchLampsAsync(
+        CancellationToken token = default)
+    {
+        var allLamps = new List<LampDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchLampsAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetLampsAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch lamps at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var lamp = dto.ToLampDeviceModel();
+                    allLamps.Add(lamp);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Lamps loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchLampsAsync() completed: {totalFetched} items");
+            return allLamps;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchLampsAsync: {ex.Message}");
+            return allLamps;
+        }
+    }
+
+    /// <summary>
     /// Splash Screen 메시지를 발행합니다.
     /// </summary>
     private async Task PublishSplashMessage(string message)
@@ -404,26 +644,65 @@ public class DeviceProviderService : IDeviceProviderService
             existingController.IpAddress = newController.IpAddress;
             existingController.Port = newController.Port;
             existingController.Devices = newController.Devices;
+            existingController.IsEnable = newController.IsEnable;
+            existingController.Location = newController.Location;
+            existingController.Latitude = newController.Latitude;
+            existingController.Longitude = newController.Longitude;
         }
         else if (existing is SensorDeviceModel existingSensor && newDevice is SensorDeviceModel newSensor)
         {
             existingSensor.Controller = newSensor.Controller;
+            existingSensor.IsEnable = newSensor.IsEnable;
+            existingSensor.Location = newSensor.Location;
+            existingSensor.Latitude = newSensor.Latitude;
+            existingSensor.Longitude = newSensor.Longitude;
         }
         else if (existing is CameraDeviceModel existingCamera && newDevice is CameraDeviceModel newCamera)
         {
             existingCamera.IpAddress = newCamera.IpAddress;
-            existingCamera.Port = newCamera.Port;
-            existingCamera.Username = newCamera.Username;
-            existingCamera.Password = newCamera.Password;
-            existingCamera.RtspUri = newCamera.RtspUri;
-            existingCamera.RtspPort = newCamera.RtspPort;
+            existingCamera.IpPort = newCamera.IpPort;
+            existingCamera.UserName = newCamera.UserName;
+            existingCamera.UserPassword = newCamera.UserPassword;
             existingCamera.Mode = newCamera.Mode;
             existingCamera.Category = newCamera.Category;
-            existingCamera.Identification = newCamera.Identification;
-            existingCamera.PtzCapability = newCamera.PtzCapability;
-            existingCamera.Position = newCamera.Position;
-            existingCamera.Presets = newCamera.Presets;
-            existingCamera.Optics = newCamera.Optics;
+            existingCamera.HardwareSpec = newCamera.HardwareSpec;
+            existingCamera.IsRecord = newCamera.IsRecord;
+            existingCamera.Urls = newCamera.Urls;
+            existingCamera.IsEnable = newCamera.IsEnable;
+            existingCamera.Location = newCamera.Location;
+            existingCamera.Latitude = newCamera.Latitude;
+            existingCamera.Longitude = newCamera.Longitude;
+        }
+        else if (existing is SpeakerDeviceModel existingSpeaker && newDevice is SpeakerDeviceModel newSpeaker)
+        {
+            existingSpeaker.SpeakerType = newSpeaker.SpeakerType;
+            existingSpeaker.Description = newSpeaker.Description;
+            existingSpeaker.IsEnable = newSpeaker.IsEnable;
+            existingSpeaker.Location = newSpeaker.Location;
+            existingSpeaker.Latitude = newSpeaker.Latitude;
+            existingSpeaker.Longitude = newSpeaker.Longitude;
+        }
+        else if (existing is EnclosureDeviceModel existingEnclosure && newDevice is EnclosureDeviceModel newEnclosure)
+        {
+            existingEnclosure.DoorStatus = newEnclosure.DoorStatus;
+            existingEnclosure.HeaterEnabled = newEnclosure.HeaterEnabled;
+            existingEnclosure.FanEnabled = newEnclosure.FanEnabled;
+            existingEnclosure.IsEnable = newEnclosure.IsEnable;
+            existingEnclosure.Location = newEnclosure.Location;
+            existingEnclosure.Latitude = newEnclosure.Latitude;
+            existingEnclosure.Longitude = newEnclosure.Longitude;
+        }
+        else if (existing is LampDeviceModel existingLamp && newDevice is LampDeviceModel newLamp)
+        {
+            existingLamp.IpAddress = newLamp.IpAddress;
+            existingLamp.IpPort = newLamp.IpPort;
+            existingLamp.UserName = newLamp.UserName;
+            existingLamp.UserPassword = newLamp.UserPassword;
+            existingLamp.Description = newLamp.Description;
+            existingLamp.IsEnable = newLamp.IsEnable;
+            existingLamp.Location = newLamp.Location;
+            existingLamp.Latitude = newLamp.Latitude;
+            existingLamp.Longitude = newLamp.Longitude;
         }
     }
 
@@ -434,5 +713,6 @@ public class DeviceProviderService : IDeviceProviderService
     private readonly ControllerDeviceProvider _controllerProvider;
     private readonly SensorDeviceProvider _sensorProvider;
     private readonly CameraDeviceProvider _cameraProvider;
+    private readonly DeviceGroupProvider _deviceGroupProvider;
     #endregion
 }

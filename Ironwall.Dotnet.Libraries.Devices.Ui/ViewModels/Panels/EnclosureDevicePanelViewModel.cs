@@ -3,6 +3,8 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
@@ -13,16 +15,19 @@ using System.Windows;
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 
 public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<EnclosureDeviceViewModel>
+                                           , IHandle<CallDeleteEnclosureDeviceProcessMessageModel>
 {
     #region - Ctors -
     public EnclosureDevicePanelViewModel(IEventAggregator eventAggregator
                                         , ILogService log
                                         , IDeviceApiService apiService
                                         , EnclosureDeviceProvider deviceProvider
+                                        , IDeviceProviderService deviceProviderService
                                         ) : base(eventAggregator, log)
     {
         _apiService = apiService;
         _deviceProvider = deviceProvider;
+        _deviceProviderService = deviceProviderService;
     }
     #endregion
     #region - Overrides -
@@ -44,9 +49,14 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         return base.OnDeactivateAsync(close, cancellationToken);
     }
 
-    public override void OnClickDeleteButton(object sender, RoutedEventArgs e)
+    public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
         if (SelectedItemCount == 0) return;
+        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Explain = "선택한 함체 장비를 정말로 삭제하시겠습니까?",
+            MessageModel = new CallDeleteEnclosureDeviceProcessMessageModel()
+        });
     }
 
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
@@ -67,6 +77,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
                 _pCancellationTokenSource.Dispose();
             }
             _pCancellationTokenSource = new CancellationTokenSource();
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource!.Token);
             await DataInitialize(_pCancellationTokenSource!.Token);
             await Task.Delay(2000, _pCancellationTokenSource.Token);
         }
@@ -97,13 +108,22 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
             var currentList = _deviceProvider.OfType<EnclosureDeviceModel>().ToList();
             var serverList = await FetchEnclosuresAsync(token);
 
-            foreach (var model in currentList.Where(m => m.Id <= 0))
-                await _apiService.CreateEnclosureAsync(model.ToEnclosureDeviceDto(), token);
+            var insertList = currentList.Where(m => m.Id <= 0).ToList();
+            var updateList = currentList
+                .Where(m => m.Id > 0)
+                .Join(serverList, m => m.Id, d => d.Id,
+                    (m, d) => new { updated = m, original = d })
+                .Where(p => !DeviceEquals(p.updated, p.original))
+                .Select(p => p.updated)
+                .ToList();
 
-            foreach (var model in currentList.Where(m => m.Id > 0)
-                .Join(serverList, m => m.Id, d => d.Id, (m, d) => m))
-                await _apiService.UpdateEnclosureAsync(model.Id, model.ToEnclosureDeviceDto(), token);
+            foreach (var model in insertList)
+                await CreateEnclosureAsync(model, token);
 
+            foreach (var model in updateList)
+                await UpdateEnclosureAsync(model, token);
+
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
             await DataInitialize(_pCancellationTokenSource.Token);
             await Task.Delay(2000, token);
         }
@@ -147,12 +167,72 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         }
     }
     #endregion
+    #region - Binding Methods -
+    internal static bool DeviceEquals(IEnclosureDeviceModel a, IEnclosureDeviceModel b)
+    {
+        return a.DeviceNumber == b.DeviceNumber &&
+        (a.DeviceGroups ?? new()).SequenceEqual(b.DeviceGroups ?? new()) &&
+        a.DeviceName == b.DeviceName &&
+        a.DeviceType == b.DeviceType &&
+        a.Version == b.Version &&
+        a.Status == b.Status &&
+        a.DoorStatus == b.DoorStatus &&
+        a.HeaterEnabled == b.HeaterEnabled &&
+        a.FanEnabled == b.FanEnabled &&
+        a.IsEnable == b.IsEnable &&
+        a.Location == b.Location &&
+        a.Latitude == b.Latitude &&
+        a.Longitude == b.Longitude;
+    }
+    #endregion
     #region - Helper Methods -
+    private async Task<bool> CreateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
+    {
+        try
+        {
+            var dto = model.ToEnclosureDeviceDto();
+            var response = await _apiService.CreateEnclosureAsync(dto, token);
+            if (response.Success)
+            {
+                _log?.Info($"Enclosure created successfully: {response.Data?.Id}");
+                return true;
+            }
+            _log?.Error($"Failed to create enclosure: {response.Error?.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in CreateEnclosureAsync: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<bool> UpdateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
+    {
+        try
+        {
+            var dto = model.ToEnclosureDeviceDto();
+            var response = await _apiService.UpdateEnclosureAsync(model.Id, dto, token);
+            if (response.Success)
+            {
+                _log?.Info($"Enclosure updated successfully: {model.Id}");
+                return true;
+            }
+            _log?.Error($"Failed to update enclosure {model.Id}: {response.Error?.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in UpdateEnclosureAsync: {ex.Message}");
+            return false;
+        }
+    }
+
     private async Task<List<EnclosureDeviceModel>> FetchEnclosuresAsync(CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.GetEnclosuresAsync(page: 1, limit: 200, token: token);
+            var response = await _apiService.GetEnclosuresAsync(page: 1, limit: 100, token: token);
             if (response.Success && response.Data != null)
                 return response.Data.Select(dto => dto.ToEnclosureDeviceModel()).ToList();
 
@@ -169,29 +249,25 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
             try
             {
                 IsVisible = false;
-                var models = await FetchEnclosuresAsync(cancellationToken);
+
+                // 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
-                if (cancellationToken.IsCancellationRequested)
-                    throw new TaskCanceledException("Task was cancelled!");
-
-                _deviceProvider.Clear();
-                foreach (var model in models)
-                    _deviceProvider.Add(model);
 
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in models.Select((item, index) => (item, index)))
+                    foreach (var (item, index) in _deviceProvider
+                        .OfType<IEnclosureDeviceModel>()
+                        .Select((item, index) => (item, index)))
                     {
                         if (cancellationToken.IsCancellationRequested)
                             throw new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new EnclosureDeviceViewModel(item) { Index = index + 1 });
+                        ViewModelProvider.Add(new EnclosureDeviceViewModel((EnclosureDeviceModel)item) { Index = index + 1 });
                     }
                     NotifyOfPropertyChange(() => ViewModelProvider);
                 });
@@ -206,11 +282,44 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         });
     }
     #endregion
+    #region - IHandles -
+    public async Task HandleAsync(CallDeleteEnclosureDeviceProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        await _eventAggregator.PublishOnCurrentThreadAsync(
+            new OpenProgressPopupMessageModel(), cancellationToken);
+
+        await Task.Run(async () =>
+        {
+            foreach (var item in SelectedItems.ToList())
+            {
+                var model = (IEnclosureDeviceModel)item.Model;
+                var response = await _apiService.DeleteEnclosureAsync(model.Id, cancellationToken);
+                if (!response.Success)
+                    _log?.Error($"Failed to delete enclosure {model.Id}: {response.Error?.Message}");
+            }
+        }, cancellationToken);
+
+        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
+        await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
+        UpdateAction?.Invoke();
+
+        await _eventAggregator.PublishOnCurrentThreadAsync(
+            new ClosePopupMessageModel(), cancellationToken);
+    }
+    #endregion
     #region - Properties -
     public event System.Action? UpdateAction;
     #endregion
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
     private readonly EnclosureDeviceProvider _deviceProvider;
+    private readonly IDeviceProviderService _deviceProviderService;
     #endregion
 }

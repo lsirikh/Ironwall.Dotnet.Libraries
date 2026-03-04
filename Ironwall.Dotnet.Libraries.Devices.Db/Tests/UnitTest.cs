@@ -167,11 +167,9 @@ public sealed class DeviceDbFixture : IAsyncLifetime
                 Version = "v2.0.1",
                 Status = cam % 7 == 0 ? EnumDeviceStatus.ERROR : EnumDeviceStatus.ACTIVATED, // 7번째마다 ERROR
                 IpAddress = $"192.168.200.{cam}",
-                Port =80, // 열화상 카메라는 다른 포트
-                Username = "admin",
-                Password = "sensorway123",
-                RtspUri = $"rtsp://192.168.200.{cam}/stream1",
-                RtspPort = 554, // 어안 카메라는 다른 RTSP 포트
+                IpPort =80, // 열화상 카메라는 다른 포트
+                UserName = "admin",
+                UserPassword = "sensorway123",
                 Mode = cameraMode,
                 Category = cameraType
             };
@@ -355,11 +353,9 @@ public class CameraDeviceDbTests
                 Version = "v1.0",
                 Status = EnumDeviceStatus.ACTIVATED,
                 IpAddress = $"192.168.100.{i}",
-                Port = 8554,
-                Username = "admin",
-                Password = "sensorway1",
-                RtspUri = $"rtsp://192.168.100.{i}/stream1",
-                RtspPort = 554,
+                IpPort = 8554,
+                UserName = "admin",
+                UserPassword = "sensorway1",
                 Mode = EnumCameraMode.ONVIF,
                 Category = EnumCameraType.FIXED
             };

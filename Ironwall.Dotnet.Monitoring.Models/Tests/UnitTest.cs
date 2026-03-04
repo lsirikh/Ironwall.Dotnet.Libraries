@@ -751,3 +751,127 @@ public class Phase21_EnclosureModelThresholdTests
 }
 
 #endregion
+
+#region Phase Camera-1.10: Camera Model Rename Serialization Tests
+
+public class CameraModelRenameSerializationTests
+{
+    [Fact(DisplayName = "Tidy-1.10-1: CameraDeviceModel IpPort → JSON 'ip_port'")]
+    public void CameraDeviceModel_IpPort_MapsToJsonProperty()
+    {
+        var model = new CameraDeviceModel { IpPort = 8080 };
+        var json = JsonConvert.SerializeObject(model);
+        var jobj = JObject.Parse(json);
+
+        Assert.NotNull(jobj["ip_port"]);
+        Assert.Equal(8080, jobj["ip_port"]!.Value<int>());
+    }
+
+    [Fact(DisplayName = "Tidy-1.10-2: CameraDeviceModel UserName → JSON 'user_name'")]
+    public void CameraDeviceModel_UserName_MapsToJsonProperty()
+    {
+        var model = new CameraDeviceModel { UserName = "admin" };
+        var json = JsonConvert.SerializeObject(model);
+        var jobj = JObject.Parse(json);
+
+        Assert.NotNull(jobj["user_name"]);
+        Assert.Equal("admin", jobj["user_name"]!.Value<string>());
+    }
+
+    [Fact(DisplayName = "Tidy-1.10-3: CameraDeviceModel UserPassword → JSON 'user_password'")]
+    public void CameraDeviceModel_UserPassword_MapsToJsonProperty()
+    {
+        var model = new CameraDeviceModel { UserPassword = "secret123" };
+        var json = JsonConvert.SerializeObject(model);
+        var jobj = JObject.Parse(json);
+
+        Assert.NotNull(jobj["user_password"]);
+        Assert.Equal("secret123", jobj["user_password"]!.Value<string>());
+    }
+
+    [Fact(DisplayName = "Tidy-1.10-4: CameraDeviceModel HardwareSpec → JSON 'hardware_spec'")]
+    public void CameraDeviceModel_HardwareSpec_MapsToJsonProperty()
+    {
+        var model = new CameraDeviceModel
+        {
+            HardwareSpec = new CameraInfoModel { Name = "TestCam", Manufacturer = "Sensorway" }
+        };
+        var json = JsonConvert.SerializeObject(model);
+        var jobj = JObject.Parse(json);
+
+        Assert.NotNull(jobj["hardware_spec"]);
+        Assert.Equal("TestCam", jobj["hardware_spec"]!["name"]!.Value<string>());
+    }
+}
+
+#endregion
+
+#region Phase Camera-2.12: Ghost Model Removal Verification Tests
+
+public class CameraGhostRemovalVerificationTests
+{
+    [Fact(DisplayName = "Tidy-2.12-1: CameraDeviceModel has no Optics property")]
+    public void CameraDeviceModel_NoOpticsProperty()
+    {
+        Assert.Null(typeof(CameraDeviceModel).GetProperty("Optics"));
+    }
+
+    [Fact(DisplayName = "Tidy-2.12-2: CameraDeviceModel has no PtzCapability property")]
+    public void CameraDeviceModel_NoPtzCapabilityProperty()
+    {
+        Assert.Null(typeof(CameraDeviceModel).GetProperty("PtzCapability"));
+    }
+
+    [Fact(DisplayName = "Tidy-2.12-3: CameraDeviceModel has no Presets property")]
+    public void CameraDeviceModel_NoPresetsProperty()
+    {
+        Assert.Null(typeof(CameraDeviceModel).GetProperty("Presets"));
+    }
+
+    [Fact(DisplayName = "Tidy-2.12-4: CameraInfoModel has 9 properties (Uri removed)")]
+    public void CameraInfoModel_Has9Properties()
+    {
+        var props = typeof(CameraInfoModel)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly);
+        Assert.Equal(9, props.Length);
+        Assert.Null(typeof(CameraInfoModel).GetProperty("Uri"));
+    }
+}
+
+#endregion
+
+#region Phase Camera-3.7: RtspUri/RtspPort Removal Verification Tests
+
+public class CameraRtspRemovalVerificationTests
+{
+    [Fact(DisplayName = "Tidy-3.7-1: CameraDeviceModel has no RtspUri property")]
+    public void CameraDeviceModel_NoRtspUriProperty()
+    {
+        Assert.Null(typeof(CameraDeviceModel).GetProperty("RtspUri"));
+    }
+
+    [Fact(DisplayName = "Tidy-3.7-2: CameraDeviceModel has no RtspPort property")]
+    public void CameraDeviceModel_NoRtspPortProperty()
+    {
+        Assert.Null(typeof(CameraDeviceModel).GetProperty("RtspPort"));
+    }
+
+    [Fact(DisplayName = "Tidy-3.7-3: CameraDeviceModel JSON has no rtsp_uri/rtsp_port keys")]
+    public void CameraDeviceModel_Json_NoRtspKeys()
+    {
+        var model = new CameraDeviceModel
+        {
+            IpAddress = "192.168.1.100",
+            IpPort = 80,
+            UserName = "admin",
+            UserPassword = "pass"
+        };
+        var json = JsonConvert.SerializeObject(model);
+        var jobj = JObject.Parse(json);
+
+        Assert.Null(jobj["rtsp_uri"]);
+        Assert.Null(jobj["rtsp_port"]);
+    }
+}
+
+#endregion

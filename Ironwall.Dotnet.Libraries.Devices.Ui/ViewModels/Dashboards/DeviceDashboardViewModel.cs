@@ -1,7 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -24,7 +23,6 @@ public class DeviceDashboardViewModel : BasePanelViewModel
     #region - Ctors -
     public DeviceDashboardViewModel(IEventAggregator eventAggregator
                                 , ILogService log
-                                , IDeviceProviderService deviceProviderService
                                 , DeviceTabControlViewModel tabControlViewModel
                                 , ControllerDevicePanelViewModel controllerDevicePanelViewModel
                                 , SensorDevicePanelViewModel sensorDevicePanelViewModel
@@ -32,9 +30,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel
                                 , SpeakerDevicePanelViewModel speakerDevicePanelViewModel
                                 , EnclosureDevicePanelViewModel enclosureDevicePanelViewModel
                                 , LampDevicePanelViewModel lampDevicePanelViewModel
+                                , DeviceGroupPanelViewModel deviceGroupPanelViewModel
                                 ) : base(eventAggregator, log)
     {
-        _deviceProviderService = deviceProviderService;
         TabControlViewModel = tabControlViewModel;
         ControllerPanelViewModel = controllerDevicePanelViewModel;
         SensorPanelViewModel = sensorDevicePanelViewModel;
@@ -42,6 +40,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SpeakerPanelViewModel = speakerDevicePanelViewModel;
         EnclosurePanelViewModel = enclosureDevicePanelViewModel;
         LampPanelViewModel = lampDevicePanelViewModel;
+        DeviceGroupPanelViewModel = deviceGroupPanelViewModel;
     }
     #endregion
     #region - Implementation of Interface -
@@ -63,10 +62,11 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         EnclosurePanelViewModel.UpdateAction += EnclosurePanelViewModel_UpdateAction;
         LampPanelViewModel.CheckSelectedItems += LampPanelViewModel_CheckSelectedItems;
         LampPanelViewModel.UpdateAction += LampPanelViewModel_UpdateAction;
-        await _deviceProviderService.FetchAllDevicesAsync(cancellationToken);
+        DeviceGroupPanelViewModel.CheckSelectedItems += DeviceGroupPanelViewModel_CheckSelectedItems;
+        DeviceGroupPanelViewModel.UpdateAction += DeviceGroupPanelViewModel_UpdateAction;
         await TabControlViewModel.ActivateAsync();
 
-        await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
+        await TabControlViewModel.ActivateItemAsync(DeviceGroupPanelViewModel);
 
         await DataInitialize(cancellationToken);
         await GetDeviceType(cancellationToken);
@@ -94,6 +94,8 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         EnclosurePanelViewModel.UpdateAction -= EnclosurePanelViewModel_UpdateAction;
         LampPanelViewModel.CheckSelectedItems -= LampPanelViewModel_CheckSelectedItems;
         LampPanelViewModel.UpdateAction -= LampPanelViewModel_UpdateAction;
+        DeviceGroupPanelViewModel.CheckSelectedItems -= DeviceGroupPanelViewModel_CheckSelectedItems;
+        DeviceGroupPanelViewModel.UpdateAction -= DeviceGroupPanelViewModel_UpdateAction;
 
         ClearData();
         SelectedItemEditor = null;
@@ -229,6 +231,24 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         await GetDeviceType();
     }
 
+    private void DeviceGroupPanelViewModel_CheckSelectedItems(IList<DeviceGroupViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new DeviceGroupSelectionViewModel(selectedItems);
+            (SelectedItemEditor as DeviceGroupSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private void DeviceGroupPanelViewModel_UpdateAction()
+    {
+    }
 
     #endregion
     #region - Processes -
@@ -261,6 +281,10 @@ public class DeviceDashboardViewModel : BasePanelViewModel
 
             switch (tab.Tag)
             {
+                case "DeviceGroupViewModel":
+                    await TabControlViewModel.ActivateItemAsync(DeviceGroupPanelViewModel);
+                    break;
+
                 case "ControllerDeviceViewModel":
                     await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
                     break;
@@ -465,8 +489,6 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         set { _selectedItemEditor = value; NotifyOfPropertyChange(() => SelectedItemEditor); }
     }
 
-    private IDeviceProviderService _deviceProviderService;
-
     public DeviceTabControlViewModel TabControlViewModel { get; }
     public ControllerDevicePanelViewModel ControllerPanelViewModel { get; }
     public SensorDevicePanelViewModel SensorPanelViewModel { get; }
@@ -505,6 +527,7 @@ public class DeviceDashboardViewModel : BasePanelViewModel
     public SpeakerDevicePanelViewModel SpeakerPanelViewModel { get; }
     public EnclosureDevicePanelViewModel EnclosurePanelViewModel { get; }
     public LampDevicePanelViewModel LampPanelViewModel { get; }
+    public DeviceGroupPanelViewModel DeviceGroupPanelViewModel { get; }
     #endregion
     #region - Attributes -
     private int _controller;

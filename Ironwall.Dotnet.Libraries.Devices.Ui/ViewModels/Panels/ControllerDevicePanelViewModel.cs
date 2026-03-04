@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -28,10 +29,12 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                                         , ILogService log
                                         , IDeviceApiService apiService
                                         , ControllerDeviceProvider deviceProvider
+                                        , IDeviceProviderService deviceProviderService
                                         ) : base(eventAggregator, log)
     {
         _apiService = apiService;
         _deviceProvider = deviceProvider;
+        _deviceProviderService = deviceProviderService;
     }
     #endregion
     #region - Implementation of Interface -
@@ -86,6 +89,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             _pCancellationTokenSource = new CancellationTokenSource();
             var token = _pCancellationTokenSource!.Token;
 
+            await _deviceProviderService.FetchAllDevicesAsync(token);
             await DataInitialize(token);
             await Task.Delay(2000, token);
         }
@@ -148,6 +152,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             }
 
             // 재조회
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
             await DataInitialize(_pCancellationTokenSource.Token);
             await Task.Delay(2000, token);
         }
@@ -227,7 +232,11 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                a.Version == b.Version &&
                a.Status == b.Status &&
                a.IpAddress == b.IpAddress &&
-               a.Port == b.Port;
+               a.Port == b.Port &&
+               a.Location == b.Location &&
+               a.Latitude == b.Latitude &&
+               a.Longitude == b.Longitude &&
+               a.IsEnable == b.IsEnable;
     }
 
     #endregion
@@ -322,38 +331,26 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
             try
             {
                 IsVisible = false;
 
-                // API Fetching (DBService → ApiService 마이그레이션)
-                var models = await FetchControllersAsync(cancellationToken);
-
+                // 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
-                if (cancellationToken.IsCancellationRequested)
-                    throw new TaskCanceledException("Task was cancelled!");
-
-                // Provider 업데이트
-                _deviceProvider.Clear();
-                foreach (var model in models)
-                {
-                    _deviceProvider.Add(model);
-                }
-
-                // ViewModelProvider 업데이트
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in models.Select((item, index) => (item, index)))
+                    foreach (var (item, index) in _deviceProvider
+                        .OfType<IControllerDeviceModel>()
+                        .Select((item, index) => (item, index)))
                     {
                         if (cancellationToken.IsCancellationRequested)
                             throw new TaskCanceledException("Task was cancelled!");
 
-                        var viewModel = new ControllerDeviceViewModel(item) { Index = index + 1 };
-                        ViewModelProvider.Add(viewModel);
+                        ViewModelProvider.Add(new ControllerDeviceViewModel((ControllerDeviceModel)item) { Index = index + 1 });
                     }
                     NotifyOfPropertyChange(() => ViewModelProvider);
                 });
@@ -402,6 +399,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         }
 
         // 재조회
+        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
         await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
         UpdateAction?.Invoke();
 
@@ -417,6 +415,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
     private readonly ControllerDeviceProvider _deviceProvider;
+    private readonly IDeviceProviderService _deviceProviderService;
     #endregion
 
 }

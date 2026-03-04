@@ -12,4 +12,8 @@ public interface IBaseDeviceModel : IBaseModel
     EnumDeviceType DeviceType { get; set; }
     EnumDeviceStatus Status { get; set; }
     string? Version { get; set; }
+    string? Location { get; set; }
+    double Latitude { get; set; }
+    double Longitude { get; set; }
+    bool IsEnable { get; set; }
 }
