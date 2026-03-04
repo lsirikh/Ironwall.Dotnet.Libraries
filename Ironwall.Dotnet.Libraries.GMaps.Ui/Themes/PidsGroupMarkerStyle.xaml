@@ -149,14 +149,27 @@
 
 						<!--  Normal 상태 (정상) - MainPolyline 표시, EventPolyline 숨김  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Normal}">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="{Binding MarkerStroke, RelativeSource={RelativeSource TemplatedParent}}" />
 							<Setter TargetName="PART_MainPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
 						</DataTrigger>
 
-						<!--  Detecting 상태 (침입 감지) - EventPolyline(Red) 표시  -->
+						<!--  OperationState 기반 Indicator 색상 (이벤트 DataTrigger보다 앞에 배치 → 이벤트가 우선)  -->
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ACTIVE}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVE}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.NONE}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Gray" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.FAULT}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+						</Trigger>
+
+					<!--  Detecting 상태 (침입 감지) - EventPolyline(Red) 표시  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />

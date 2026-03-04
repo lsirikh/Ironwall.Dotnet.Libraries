@@ -587,10 +587,23 @@
 							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 
-						<!--  Event Status Colors  -->
+						<!--  Event Status Colors (Normal 기본값)  -->
 						<Trigger Property="EventStatus" Value="Normal">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
 						</Trigger>
+
+						<!--  OperationState 기반 Indicator 색상 (Normal 뒤, 이벤트 Trigger 앞 → 이벤트가 우선)  -->
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVE}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.NONE}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Gray" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.FAULT}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+						</Trigger>
+
+						<!--  이벤트 발생 시 Indicator 색 덮어씀 (우선순위 최고)  -->
 						<Trigger Property="EventStatus" Value="Detecting">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 						</Trigger>
