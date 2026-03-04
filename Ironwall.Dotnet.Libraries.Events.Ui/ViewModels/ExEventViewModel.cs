@@ -70,6 +70,8 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
         }
     }
 
+    public bool IsActionReported => Status == EnumTrueFalse.True;
+
     public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
     public int? ControllerDeviceNumber => (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
     public string? DeviceTypeName => Device?.DeviceType switch

@@ -330,25 +330,7 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
-				<!--  DeviceGroups  -->
-				<DataGridTextColumn
-					Binding="{Binding Device.DeviceGroupsText}"
-					Header="구역"
-					IsReadOnly="True">
-					<DataGridTextColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridTextColumn.HeaderStyle>
-					<DataGridTextColumn.ElementStyle>
-						<Style TargetType="{x:Type TextBlock}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridTextColumn.ElementStyle>
-				</DataGridTextColumn>
-
+	
 				<!--  Reason  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
@@ -510,50 +492,25 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
-				<!--  Status  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					Header="Status"
-					SortMemberPath="Status">
+				<!--  조치보고  -->
+				<DataGridCheckBoxColumn
+					Binding="{Binding IsActionReported, Mode=OneWay}"
+					Header="조치보고"
+					IsReadOnly="True">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
 							<Setter Property="HorizontalAlignment" Value="Center" />
 							<Setter Property="VerticalAlignment" Value="Center" />
 						</Style>
 					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<ComboBox
-								VerticalAlignment="Center"
-								HorizontalContentAlignment="Center"
-								IsEditable="False"
-								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
-								SelectedItem="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-								<ComboBox.ItemsPanel>
-									<ItemsPanelTemplate>
-										<VirtualizingStackPanel />
-									</ItemsPanelTemplate>
-								</ComboBox.ItemsPanel>
-								<ComboBox.ItemTemplate>
-									<DataTemplate>
-										<TextBlock Text="{Binding}" TextAlignment="Center" />
-									</DataTemplate>
-								</ComboBox.ItemTemplate>
-								<ComboBox.ItemContainerStyle>
-									<Style TargetType="{x:Type ComboBoxItem}" />
-								</ComboBox.ItemContainerStyle>
-							</ComboBox>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
+					<DataGridCheckBoxColumn.ElementStyle>
+						<Style TargetType="{x:Type CheckBox}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+							<Setter Property="IsEnabled" Value="False" />
+						</Style>
+					</DataGridCheckBoxColumn.ElementStyle>
+				</DataGridCheckBoxColumn>
 
 
 

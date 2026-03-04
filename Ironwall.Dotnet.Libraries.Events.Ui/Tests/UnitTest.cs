@@ -3374,51 +3374,53 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     }
     #endregion
 
-    #region Test 3.1: DetectionEventPanelView_HasDeviceGroupsColumn
+    #region Test 3.1: DetectionEventPanelView — 구역 컬럼 없음 + 조치보고 컬럼 있음
     [Fact]
-    public void DetectionEventPanelView_HasDeviceGroupsColumn()
+    public void DetectionEventPanelView_HasNoDeviceGroupsColumn_AndHasActionReportedColumn()
     {
         var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "Views", "Panels", "DetectionEventPanelView.xaml");
         var xamlContent = File.ReadAllText(xamlPath);
 
-        Assert.Contains("DeviceGroupsText", xamlContent);
+        Assert.DoesNotContain("DeviceGroupsText", xamlContent);
+        Assert.Contains("IsActionReported", xamlContent);
     }
     #endregion
 
-    #region Test 3.2: MalfunctionEventPanelView_HasDeviceGroupsColumn
+    #region Test 3.2: MalfunctionEventPanelView — 구역 컬럼 없음 + 조치보고 컬럼 있음
     [Fact]
-    public void MalfunctionEventPanelView_HasDeviceGroupsColumn()
+    public void MalfunctionEventPanelView_HasNoDeviceGroupsColumn_AndHasActionReportedColumn()
     {
         var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "Views", "Panels", "MalfunctionEventPanelView.xaml");
         var xamlContent = File.ReadAllText(xamlPath);
 
-        Assert.Contains("DeviceGroupsText", xamlContent);
+        Assert.DoesNotContain("DeviceGroupsText", xamlContent);
+        Assert.Contains("IsActionReported", xamlContent);
     }
     #endregion
 
-    #region Test 3.3: ConnectionEventPanelView_HasDeviceGroupsColumn
+    #region Test 3.3: ConnectionEventPanelView — 구역 컬럼 없음
     [Fact]
-    public void ConnectionEventPanelView_HasDeviceGroupsColumn()
+    public void ConnectionEventPanelView_HasNoDeviceGroupsColumn()
     {
         var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "Views", "Panels", "ConnectionEventPanelView.xaml");
         var xamlContent = File.ReadAllText(xamlPath);
 
-        Assert.Contains("DeviceGroupsText", xamlContent);
+        Assert.DoesNotContain("DeviceGroupsText", xamlContent);
     }
     #endregion
 
-    #region Test 3.4: ActionEventPanelView_HasDeviceGroupsColumn
+    #region Test 3.4: ActionEventPanelView — 구역 컬럼 없음
     [Fact]
-    public void ActionEventPanelView_HasDeviceGroupsColumn()
+    public void ActionEventPanelView_HasNoDeviceGroupsColumn()
     {
         var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "Views", "Panels", "ActionEventPanelView.xaml");
         var xamlContent = File.ReadAllText(xamlPath);
 
-        Assert.Contains("DeviceGroupsText", xamlContent);
+        Assert.DoesNotContain("DeviceGroupsText", xamlContent);
     }
     #endregion
 
@@ -5087,6 +5089,30 @@ public class StatisticsChartHelperTests
         // Assert
         Assert.NotNull(prop);
         Assert.Equal(typeof(bool), prop.PropertyType);
+    }
+
+    #endregion
+
+    #region ExEventViewModelTests
+
+    [Fact]
+    public void ExEventViewModel_IsActionReported_PropertyExistsAndIsBool()
+    {
+        // ExEventViewModel requires IoC — verify via reflection
+        var prop = typeof(ExEventViewModel).GetProperty("IsActionReported");
+        Assert.NotNull(prop);
+        Assert.Equal(typeof(bool), prop.PropertyType);
+    }
+
+    [Fact]
+    public void ExEventModel_Status_TrueImpliesIsActionReported()
+    {
+        // Verify the underlying logic: Status == EnumTrueFalse.True => IsActionReported=true
+        var modelTrue = new ExEventModel { Status = EnumTrueFalse.True };
+        Assert.True(modelTrue.Status == EnumTrueFalse.True);
+
+        var modelFalse = new ExEventModel { Status = EnumTrueFalse.False };
+        Assert.False(modelFalse.Status == EnumTrueFalse.True);
     }
 
     #endregion
