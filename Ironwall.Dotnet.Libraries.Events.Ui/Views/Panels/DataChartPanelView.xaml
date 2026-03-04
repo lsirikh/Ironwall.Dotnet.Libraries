@@ -104,10 +104,18 @@
 			</Grid>
 		</StackPanel>
 		<Grid Grid.Row="1" Margin="10">
+			<ProgressBar
+				Width="50"
+				Height="50"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+				Value="44" />
 			<lvc:CartesianChart
 				LegendPosition="Right"
 				Series="{Binding Series}"
 				TooltipTextSize="12"
+				Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}"
 				XAxes="{Binding XAxes}"
 				YAxes="{Binding YAxes}"
 				ZoomMode="X" />

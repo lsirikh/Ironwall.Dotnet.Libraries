@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -9,6 +10,7 @@ using System;
 using System.Collections.Specialized;
 using System.Threading;
 using System.Windows;
+using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -31,6 +33,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     {
         _providerService = providerService;
         EventProvider = eventProvider;
+        LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
     #endregion
     #region - Implementation of Interface -
@@ -39,9 +42,16 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        await DataInitialize(cancellationToken).ConfigureAwait(false);
-        //UpdateAction?.Invoke(_startDate, _endDate);
-        IsVisible = true;
+        if (IsCacheValid())
+        {
+            LoadFromCache();
+            IsVisible = true;
+            UpdateAction?.Invoke(_startDate, _endDate);
+        }
+        else
+        {
+            await DataInitialize(cancellationToken);
+        }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -214,6 +224,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             if (_cancellationTokenSource != null)
                 _cancellationTokenSource.Cancel();
 
+            InvalidateCache();
             _cancellationTokenSource = new CancellationTokenSource();
             await DataInitialize(_cancellationTokenSource.Token).ConfigureAwait(false);
         }
@@ -253,20 +264,73 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             {
                 IsVisible = false;
 
-                //API Fetching with server-side date filtering
-                var filteredEvents = await _providerService.FetchActionEventsAsync(_startDate, _endDate, cancellationToken);
-                if (filteredEvents == null) return;
+                // 페이지네이션 상태 초기화
+                _currentPage = 0;
+                _totalPages = 1;
+                _totalCount = 0;
 
-                // Update EventProvider (shared collection)
+                // 기존 Action 이벤트 제거
                 var existingActionEvents = EventProvider.OfType<IActionEventModel>().ToList();
                 foreach (var item in existingActionEvents)
                 {
                     EventProvider.Remove(item);
                 }
-                foreach (var item in filteredEvents)
+
+                ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+
+                DispatcherService.Invoke(() =>
                 {
-                    // ActionEvent 추가
-                    EventProvider.Add(item);
+                    ViewModelProvider.Clear();
+                });
+
+                // CollectionChanged 구독을 LoadNextPageAsync 전에 설정
+                // → VP.Add 시 CollectionChanged가 EP 동기화 담당 (double-add 방지)
+                ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 첫 페이지 로드
+                await LoadNextPageAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 캐시 날짜범위 기록
+                SetCachedDate(_startDate, _endDate);
+            }
+            catch (OperationCanceledException ex)
+            {
+                _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
+            }
+            finally
+            {
+                IsVisible = true;
+                UpdateAction?.Invoke(_startDate, _endDate);
+            }
+        });
+    }
+
+    public async Task LoadNextPageAsync(CancellationToken token = default)
+    {
+        if (_isLoadingMore || !HasMorePages) return;
+
+        token.ThrowIfCancellationRequested();
+
+        _isLoadingMore = true;
+        IsLoadingMore = true;
+
+        try
+        {
+            var result = await _providerService.FetchActionEventsPageAsync(
+                _startDate, _endDate, _currentPage + 1, 100, token);
+
+            _currentPage = result.Page;
+            _totalPages = result.TotalPages;
+            _totalCount = result.Total;
+
+            DispatcherService.Invoke(() =>
+            {
+                foreach (var item in result.Items)
+                {
+                    // EventProvider 동기화는 CollectionChanged 핸들러가 담당
 
                     // OriginEvent도 EventProvider에 추가 (중복 방지)
                     if (item.OriginEvent != null)
@@ -282,47 +346,64 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                         }
                         else
                         {
-                            // EventProvider에 이미 있는 OriginEvent 사용 (참조 통일)
                             item.OriginEvent = existingOrigin;
                         }
                     }
-                }
 
-                ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
-                //ViewModelProvider Setting
-                if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-
-
-                DispatcherService.Invoke(() =>
-                {
-                    ViewModelProvider.Clear();
-                    foreach (var (item, index) in EventProvider.OfType<IActionEventModel>().OrderBy(entity => entity.Id).Select((item, index) => (item, index)))
+                    ViewModelProvider.Add(new ActionEventViewModel(item)
                     {
-                        if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-
-                        // OriginEvent는 이미 FetchActionEventsAsync()에서 설정됨
-                        // (ToActionEventModel → ResolveOriginEvent 통해 자동 매칭)
-                        ViewModelProvider.Add(new ActionEventViewModel(item) { Index = index + 1 });
-                    }
-
-                    NotifyOfPropertyChange(() => ViewModelProvider);
-                });
-
-                ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
-            }
-            catch (TaskCanceledException ex)
-            {
-                _log?.Warning($"Raised {nameof(TaskCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
-            }
-            finally
-            {
-                UpdateAction?.Invoke(_startDate, _endDate);
-            }
-        });
+                        Index = ViewModelProvider.Count + 1
+                    });
+                }
+                NotifyOfPropertyChange(() => LoadedCountText);
+                NotifyOfPropertyChange(() => HasMorePages);
+            });
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex) { _log?.Error($"LoadNextPageAsync failed: {ex.Message}"); }
+        finally
+        {
+            _isLoadingMore = false;
+            IsLoadingMore = false;
+        }
     }
 
+    private void LoadFromCache()
+    {
+        ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+        DispatcherService.Invoke(() =>
+        {
+            ViewModelProvider.Clear();
+            foreach (var (item, index) in EventProvider.OfType<IActionEventModel>().OrderBy(entity => entity.Id).Select((item, index) => (item, index)))
+            {
+                ViewModelProvider.Add(new ActionEventViewModel(item) { Index = index + 1 });
+            }
+            NotifyOfPropertyChange(() => ViewModelProvider);
+            NotifyOfPropertyChange(() => LoadedCountText);
+            NotifyOfPropertyChange(() => HasMorePages);
+        });
+        ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+    }
+
+    internal bool IsCacheValid()
+    {
+        return _isCacheValid
+            && _cachedStartDate == _startDate
+            && _cachedEndDate == _endDate
+            && EventProvider.OfType<IActionEventModel>().Any();
+    }
+
+    public void SetCachedDate(DateTime startDate, DateTime endDate)
+    {
+        _cachedStartDate = startDate;
+        _cachedEndDate = endDate;
+        _isCacheValid = true;
+    }
+
+    public void InvalidateCache()
+    {
+        _isCacheValid = false;
+    }
 
     #endregion
     #region - IHanldes -
@@ -382,11 +463,32 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
     public delegate void SendDate(DateTime start, DateTime end);
     public event SendDate? UpdateAction;
+
+    // ─── Pagination Properties ───
+    public bool IsLoadingMore
+    {
+        get => _isLoadingMore;
+        set { _isLoadingMore = value; NotifyOfPropertyChange(() => IsLoadingMore); }
+    }
+
+    public string LoadedCountText => $"{ViewModelProvider.Count} / {_totalCount}건";
+    public bool HasMorePages => _currentPage < _totalPages;
+
+    public ICommand LoadMoreCommand { get; }
     #endregion
     #region - Attributes -
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
     private EventProviderService _providerService;
+    private DateTime _cachedStartDate;
+    private DateTime _cachedEndDate;
+    private bool _isCacheValid;
+
+    // ─── Pagination State ───
+    private int _currentPage;
+    private int _totalPages = 1;
+    private int _totalCount;
+    private bool _isLoadingMore;
     #endregion
 }

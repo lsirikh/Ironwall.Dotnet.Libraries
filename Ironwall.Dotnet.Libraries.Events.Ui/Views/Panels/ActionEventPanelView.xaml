@@ -216,6 +216,7 @@
 			<i:Interaction.Behaviors>
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:ActionEventSelectedItemBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
+				<behavior_inner:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 
@@ -446,6 +447,23 @@
 
 			<TextBlock Text="선택된 항목 : " />
 			<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
+		</StackPanel>
+		<StackPanel
+			Grid.Row="3"
+			Margin="10,5,10,5"
+			Orientation="Horizontal"
+			HorizontalAlignment="Right">
+			<ProgressBar
+				Width="16"
+				Height="16"
+				Margin="0,0,8,0"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Visibility="{Binding IsLoadingMore, Converter={StaticResource BooleanToVisibilityConverter}}"
+				Value="44" />
+			<TextBlock
+				VerticalAlignment="Center"
+				Text="{Binding LoadedCountText, UpdateSourceTrigger=PropertyChanged}" />
 		</StackPanel>
 	</Grid>
 </UserControl>

@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Monitoring.Models.Devices;
+﻿using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 
@@ -147,6 +148,37 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                     return (double)count;
                 })
                 .ToList();
+        }
+
+        /// <summary>
+        /// 센서 Detection 이벤트만 Device별로 카운트 (IpCamera 제외)
+        /// </summary>
+        public static List<double> GetSensorDetectionCountsByDevice(
+            DateTime startDate, DateTime endDate,
+            IEnumerable<IBaseDeviceModel> devices,
+            IEnumerable<IDetectionEventModel> allEvents)
+        {
+            var evInRange = allEvents
+                .Where(ev => ev.DateTime >= startDate && ev.DateTime < endDate)
+                .Where(ev => ev.Device?.DeviceType != EnumDeviceType.IpCamera)
+                .ToList();
+
+            return devices
+                .OrderBy(d => d.DeviceNumber)
+                .Select(device => (double)evInRange.Count(ev => IsDeviceMatch(ev.Device, device)))
+                .ToList();
+        }
+
+        /// <summary>
+        /// 카메라 Detection 이벤트 총 건수 (IpCamera만)
+        /// </summary>
+        public static int GetCameraDetectionCount(
+            DateTime startDate, DateTime endDate,
+            IEnumerable<IDetectionEventModel> allEvents)
+        {
+            return allEvents
+                .Where(ev => ev.DateTime >= startDate && ev.DateTime < endDate)
+                .Count(ev => ev.Device?.DeviceType == EnumDeviceType.IpCamera);
         }
 
         #endregion

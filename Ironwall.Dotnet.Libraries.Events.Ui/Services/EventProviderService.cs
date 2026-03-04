@@ -1,6 +1,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
@@ -268,6 +269,188 @@ public class EventProviderService
         catch (Exception ex)
         {
             _log?.Error($"FetchActionEventsAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // Single Page Fetch (Infinite Scroll 용)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    public async Task<PagedResult<IDetectionEventModel>> FetchDetectionEventsPageAsync(
+        DateTime startDate, DateTime endDate,
+        int page = 1, int limit = 100,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetDetectionEventsAsync(
+                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                page: page, limit: limit, token: token);
+
+            if (!response.Success || response.Data == null || response.Data.Count == 0)
+            {
+                if (!response.Success)
+                    _log?.Error($"FetchDetectionEventsPageAsync failed at page {page}: {response.Error?.Message}");
+
+                return new PagedResult<IDetectionEventModel>
+                {
+                    Page = page,
+                    TotalPages = response.Pagination?.TotalPages ?? 1,
+                    Total = response.Pagination?.Total ?? 0
+                };
+            }
+
+            var models = response.Data
+                .Select(dto => dto.ToDetectionEventModel(_deviceProvider))
+                .ToList();
+
+            return new PagedResult<IDetectionEventModel>
+            {
+                Items = models,
+                Page = response.Pagination?.Page ?? page,
+                TotalPages = response.Pagination?.TotalPages ?? 1,
+                Total = response.Pagination?.Total ?? models.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchDetectionEventsPageAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<PagedResult<IMalfunctionEventModel>> FetchMalfunctionEventsPageAsync(
+        DateTime startDate, DateTime endDate,
+        int page = 1, int limit = 100,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetMalfunctionEventsAsync(
+                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                page: page, limit: limit, token: token);
+
+            if (!response.Success || response.Data == null || response.Data.Count == 0)
+            {
+                if (!response.Success)
+                    _log?.Error($"FetchMalfunctionEventsPageAsync failed at page {page}: {response.Error?.Message}");
+
+                return new PagedResult<IMalfunctionEventModel>
+                {
+                    Page = page,
+                    TotalPages = response.Pagination?.TotalPages ?? 1,
+                    Total = response.Pagination?.Total ?? 0
+                };
+            }
+
+            var models = response.Data
+                .Select(dto => dto.ToMalfunctionEventModel(_deviceProvider))
+                .ToList();
+
+            return new PagedResult<IMalfunctionEventModel>
+            {
+                Items = models,
+                Page = response.Pagination?.Page ?? page,
+                TotalPages = response.Pagination?.TotalPages ?? 1,
+                Total = response.Pagination?.Total ?? models.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchMalfunctionEventsPageAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<PagedResult<IConnectionEventModel>> FetchConnectionEventsPageAsync(
+        DateTime startDate, DateTime endDate,
+        int page = 1, int limit = 100,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetConnectionEventsAsync(
+                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                page: page, limit: limit, token: token);
+
+            if (!response.Success || response.Data == null || response.Data.Count == 0)
+            {
+                if (!response.Success)
+                    _log?.Error($"FetchConnectionEventsPageAsync failed at page {page}: {response.Error?.Message}");
+
+                return new PagedResult<IConnectionEventModel>
+                {
+                    Page = page,
+                    TotalPages = response.Pagination?.TotalPages ?? 1,
+                    Total = response.Pagination?.Total ?? 0
+                };
+            }
+
+            var models = response.Data
+                .Select(dto => dto.ToConnectionEventModel(_deviceProvider))
+                .ToList();
+
+            return new PagedResult<IConnectionEventModel>
+            {
+                Items = models,
+                Page = response.Pagination?.Page ?? page,
+                TotalPages = response.Pagination?.TotalPages ?? 1,
+                Total = response.Pagination?.Total ?? models.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchConnectionEventsPageAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<PagedResult<IActionEventModel>> FetchActionEventsPageAsync(
+        DateTime startDate, DateTime endDate,
+        int page = 1, int limit = 100,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetActionEventsAsync(
+                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                page: page, limit: limit, token: token);
+
+            if (!response.Success || response.Data == null || response.Data.Count == 0)
+            {
+                if (!response.Success)
+                    _log?.Error($"FetchActionEventsPageAsync failed at page {page}: [{response.Error?.Code}] {response.Error?.Message} | {response.Error?.Details}");
+
+                return new PagedResult<IActionEventModel>
+                {
+                    Page = page,
+                    TotalPages = response.Pagination?.TotalPages ?? 1,
+                    Total = response.Pagination?.Total ?? 0
+                };
+            }
+
+            _log?.Info($"FetchActionEventsPageAsync page {page}: {response.Data.Count} items (total: {response.Pagination?.Total})");
+
+            var models = response.Data
+                .Select(dto => dto.ToActionEventModel(_eventProvider, _deviceProvider))
+                .ToList();
+
+            return new PagedResult<IActionEventModel>
+            {
+                Items = models,
+                Page = response.Pagination?.Page ?? page,
+                TotalPages = response.Pagination?.TotalPages ?? 1,
+                Total = response.Pagination?.Total ?? models.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchActionEventsPageAsync() failed: {ex.Message}");
             throw;
         }
     }
@@ -658,6 +841,85 @@ public class EventProviderService
         catch (Exception ex)
         {
             _log?.Error($"DeleteActionEventAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    // ────────────────────────── Event Statistics (§6.7) ──────────────────────────
+
+    public async Task<EventDashboardDto?> FetchEventDashboardAsync(
+        DateTime startDate, DateTime endDate, string interval = "hour", CancellationToken token = default)
+    {
+        try
+        {
+            _log?.Info($"FetchEventDashboardAsync() started: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}, interval={interval}");
+            var response = await _apiService.GetEventStatisticsDashboardAsync(
+                startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                interval, token);
+
+            if (!response.Success || response.Data == null)
+            {
+                _log?.Error($"FetchEventDashboardAsync() failed: {response.Error?.Message}");
+                return null;
+            }
+
+            _log?.Info($"FetchEventDashboardAsync() completed: total={response.Data.Summary.Total}");
+            return response.Data;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchEventDashboardAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<EventSummaryDto?> FetchEventSummaryAsync(
+        DateTime startDate, DateTime endDate, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetEventStatisticsSummaryAsync(
+                startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                token);
+
+            if (!response.Success || response.Data == null)
+            {
+                _log?.Error($"FetchEventSummaryAsync() failed: {response.Error?.Message}");
+                return null;
+            }
+
+            return response.Data;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchEventSummaryAsync() failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<EventByDeviceDto?> FetchEventByDeviceAsync(
+        DateTime startDate, DateTime endDate, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetEventStatisticsByDeviceAsync(
+                startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                token);
+
+            if (!response.Success || response.Data == null)
+            {
+                _log?.Error($"FetchEventByDeviceAsync() failed: {response.Error?.Message}");
+                return null;
+            }
+
+            return response.Data;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchEventByDeviceAsync() failed: {ex.Message}");
             throw;
         }
     }

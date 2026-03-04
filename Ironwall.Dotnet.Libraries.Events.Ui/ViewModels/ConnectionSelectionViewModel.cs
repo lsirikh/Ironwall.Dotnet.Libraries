@@ -43,7 +43,6 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
         foreach (var item in _selection)
         {
             item.MessageType = MessageType ?? item.MessageType;
-            item.EventGroup = EventGroup ?? item.EventGroup;
             item.Device = Device ?? item.Device;
             item.Status = Status ?? item.Status;
             item.DateTime = DateTime ?? item.DateTime;
@@ -121,7 +120,6 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
     public void RefreshAll()
     {
         MessageType = CommonOrNullValue(_selection, m => m.MessageType);
-        EventGroup = CommonOrNullString(_selection, m => m.EventGroup);
         Device = CommonOrNullReference(_selection, DeviceProvider, _log);
         Status = CommonOrNullValue(_selection, m => m.Status);
         DateTime = CommonOrNullValue(_selection, m => m.DateTime);
@@ -131,7 +129,6 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
     #endregion
     #region - Properties -
     public EnumEventType? MessageType { get; set; }
-    public string? EventGroup { get; set; }
     public IBaseDeviceModel? Device { get; set; }
     public EnumTrueFalse? Status { get; set; }
     public DateTime? DateTime { get; set; }

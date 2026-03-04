@@ -1105,6 +1105,96 @@ public class EventApiService : IEventApiService
     }
     #endregion
 
+    #region - Event Statistics (§6.7) -
+
+    public async Task<ApiResponse<EventDashboardDto>> GetEventStatisticsDashboardAsync(
+        string startDate, string endDate, string? interval = "hour", CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                { "start_date", startDate },
+                { "end_date", endDate }
+            };
+            if (!string.IsNullOrEmpty(interval)) parameters.Add("interval", interval);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/statistics/dashboard", parameters);
+            return await response.ToApiResponseAsync<EventDashboardDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEventStatisticsDashboardAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventDashboardDto>.CreateError("INTERNAL_ERROR", "Failed to get event statistics dashboard", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventTrendDto>> GetEventStatisticsTrendAsync(
+        string startDate, string endDate, string? interval = "hour", CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                { "start_date", startDate },
+                { "end_date", endDate }
+            };
+            if (!string.IsNullOrEmpty(interval)) parameters.Add("interval", interval);
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/statistics/trend", parameters);
+            return await response.ToApiResponseAsync<EventTrendDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEventStatisticsTrendAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventTrendDto>.CreateError("INTERNAL_ERROR", "Failed to get event statistics trend", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventSummaryDto>> GetEventStatisticsSummaryAsync(
+        string startDate, string endDate, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                { "start_date", startDate },
+                { "end_date", endDate }
+            };
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/statistics/summary", parameters);
+            return await response.ToApiResponseAsync<EventSummaryDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEventStatisticsSummaryAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventSummaryDto>.CreateError("INTERNAL_ERROR", "Failed to get event statistics summary", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<EventByDeviceDto>> GetEventStatisticsByDeviceAsync(
+        string startDate, string endDate, CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                { "start_date", startDate },
+                { "end_date", endDate }
+            };
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/statistics/by-device", parameters);
+            return await response.ToApiResponseAsync<EventByDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetEventStatisticsByDeviceAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventByDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to get event statistics by device", ex.Message);
+        }
+    }
+
+    #endregion
+
     #region - Attributes -
     private readonly ILogService _log;
     private readonly IApiService _apiService;

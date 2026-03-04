@@ -492,4 +492,28 @@ public interface IEventApiService : IService
         int mappingId,
         int configId,
         CancellationToken token = default);
+
+    // ────────────────────────── Event Statistics (§6.7) ──────────────────────────
+
+    Task<ApiResponse<EventDashboardDto>> GetEventStatisticsDashboardAsync(
+        string startDate,
+        string endDate,
+        string? interval = "hour",
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventTrendDto>> GetEventStatisticsTrendAsync(
+        string startDate,
+        string endDate,
+        string? interval = "hour",
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventSummaryDto>> GetEventStatisticsSummaryAsync(
+        string startDate,
+        string endDate,
+        CancellationToken token = default);
+
+    Task<ApiResponse<EventByDeviceDto>> GetEventStatisticsByDeviceAsync(
+        string startDate,
+        string endDate,
+        CancellationToken token = default);
 }

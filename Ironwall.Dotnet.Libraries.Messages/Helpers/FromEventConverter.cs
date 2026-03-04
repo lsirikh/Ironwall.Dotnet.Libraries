@@ -26,7 +26,7 @@ public class FromEventConverter : JsonConverter<IEventDto>
         {
             "intrusion" or "detection" => jsonObject.ToObject<DetectionEventDto>(serializer),
             "fault" or "malfunction" => jsonObject.ToObject<MalfunctionEventDto>(serializer),
-            _ => throw new JsonSerializationException($"Unknown event type: {typeEvent}")
+            _ => null
         };
 
         return result;

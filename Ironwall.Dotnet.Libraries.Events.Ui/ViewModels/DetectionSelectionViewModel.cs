@@ -40,7 +40,6 @@ public class DetectionSelectionViewModel : BasePanelViewModel
         foreach (var item in _selection)
         {
             item.MessageType = MessageType ?? item.MessageType;
-            item.EventGroup = EventGroup ?? item.EventGroup;
             item.Device = Device ?? item.Device;
             item.Result = Result ?? item.Result;
             item.Status = Status ?? item.Status;
@@ -117,7 +116,6 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     public void RefreshAll()
     {
         MessageType = CommonOrNullValue(_selection, m => m.MessageType);
-        EventGroup = CommonOrNullString(_selection, m => m.EventGroup);
         Device = CommonOrNullReference(_selection, DeviceProvider, _log);
         Result = CommonOrNullValue(_selection, m => m.Result);
         Status = CommonOrNullValue(_selection, m => m.Status);
@@ -136,7 +134,6 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     #endregion
     #region - Properties -
     public EnumEventType? MessageType { get; set; }
-    public string? EventGroup { get; set; }
     public IBaseDeviceModel? Device { get; set; }
     public EnumTrueFalse? Status { get; set; }
     public EnumDetectionType? Result { get; set; }

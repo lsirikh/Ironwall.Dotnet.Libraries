@@ -1535,17 +1535,15 @@ public class AuxiliaryDtoTests
     [Trait("Category", "DTO")]
     public void DeviceGroupDto_Serialization_RoundTrip()
     {
-        var dto = new DeviceGroupDto { Id = 1, Name = "경계구역-A", TypeDeviceGroup = "FENCE", Description = "동측 펜스" };
+        var dto = new DeviceGroupDto { Id = 1, Name = "경계구역-A", Description = "동측 펜스" };
         var json = JsonConvert.SerializeObject(dto);
         var d = JsonConvert.DeserializeObject<DeviceGroupDto>(json);
 
         Assert.Contains("\"name\":", json);
-        Assert.Contains("\"type_device_group\":", json);
         Assert.Contains("\"description\":", json);
         Assert.NotNull(d);
         Assert.Equal(1, d.Id);
         Assert.Equal("경계구역-A", d.Name);
-        Assert.Equal("FENCE", d.TypeDeviceGroup);
         Assert.Equal("동측 펜스", d.Description);
     }
 
@@ -4202,6 +4200,565 @@ public class ServerApiDtoSerializationTests
         Assert.Equal(2, response.Data.Items.Count);
         Assert.Equal("Home", response.Data.Items[0].PresetName);
         Assert.Equal("Gate", response.Data.Items[1].PresetName);
+    }
+
+    #endregion
+}
+
+#endregion
+
+#region - FromEventConverter 테스트 -
+
+public class FromEventConverterTests
+{
+    private static readonly JsonSerializerSettings _settings = new()
+    {
+        NullValueHandling = NullValueHandling.Ignore,
+        MissingMemberHandling = MissingMemberHandling.Ignore,
+        DateParseHandling = DateParseHandling.None
+    };
+
+    [Fact]
+    [Trait("Category", "Converter")]
+    public void FromEventConverter_NullTypeEvent_ReturnsNull()
+    {
+        // Arrange — from_event에 type_event가 없는 경우
+        var json = """
+        {
+            "id": 1,
+            "type_event": "Action",
+            "content": "test",
+            "user": "admin",
+            "from_event": {
+                "id": 100,
+                "created_at": "2025-01-01T00:00:00Z"
+            }
+        }
+        """;
+
+        // Act — throw 없이 역직렬화 성공
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json, _settings);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(1, dto.Id);
+        Assert.Null(dto.FromEvent);
+    }
+
+    [Fact]
+    [Trait("Category", "Converter")]
+    public void FromEventConverter_UnknownTypeEvent_ReturnsNull()
+    {
+        // Arrange — from_event에 알 수 없는 type_event
+        var json = """
+        {
+            "id": 2,
+            "type_event": "Action",
+            "content": "test",
+            "user": "admin",
+            "from_event": {
+                "id": 200,
+                "type_event": "Connection",
+                "created_at": "2025-01-01T00:00:00Z"
+            }
+        }
+        """;
+
+        // Act — "Connection"은 매핑 대상이 아니지만 throw 하지 않음
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json, _settings);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(2, dto.Id);
+        Assert.Null(dto.FromEvent);
+    }
+
+    [Fact]
+    [Trait("Category", "Converter")]
+    public void FromEventConverter_Intrusion_ReturnsDetectionEventDto()
+    {
+        // Arrange
+        var json = """
+        {
+            "id": 3,
+            "type_event": "Action",
+            "content": "침입 확인",
+            "user": "operator",
+            "from_event": {
+                "id": 1001,
+                "type_event": "Intrusion",
+                "action_reported": "True",
+                "device": {
+                    "id": 5,
+                    "type_device": "Fence",
+                    "name_device": "Sensor-A"
+                },
+                "result": "PIR_SENSOR",
+                "created_at": "2025-01-10T10:00:00Z"
+            }
+        }
+        """;
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json, _settings);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.NotNull(dto.FromEvent);
+        Assert.IsType<DetectionEventDto>(dto.FromEvent);
+        var detection = (DetectionEventDto)dto.FromEvent;
+        Assert.Equal(1001, detection.Id);
+        Assert.Equal("Intrusion", detection.TypeEvent);
+    }
+
+    [Fact]
+    [Trait("Category", "Converter")]
+    public void FromEventConverter_Fault_ReturnsMalfunctionEventDto()
+    {
+        // Arrange
+        var json = """
+        {
+            "id": 4,
+            "type_event": "Action",
+            "content": "장애 확인",
+            "user": "operator",
+            "from_event": {
+                "id": 2001,
+                "type_event": "Fault",
+                "action_reported": "True",
+                "device": {
+                    "id": 10,
+                    "type_device": "Multi",
+                    "name_device": "Sensor-B"
+                },
+                "reason": "FAULT_ETC",
+                "created_at": "2025-01-10T10:00:00Z"
+            }
+        }
+        """;
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json, _settings);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.NotNull(dto.FromEvent);
+        Assert.IsType<MalfunctionEventDto>(dto.FromEvent);
+        var malfunction = (MalfunctionEventDto)dto.FromEvent;
+        Assert.Equal(2001, malfunction.Id);
+        Assert.Equal("Fault", malfunction.TypeEvent);
+    }
+
+    [Fact]
+    [Trait("Category", "Converter")]
+    public void FromEventConverter_NullFromEvent_ReturnsNull()
+    {
+        // Arrange — from_event가 null
+        var json = """
+        {
+            "id": 5,
+            "type_event": "Action",
+            "content": "test",
+            "user": "admin",
+            "from_event": null
+        }
+        """;
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<ActionEventDto>(json, _settings);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(5, dto.Id);
+        Assert.Null(dto.FromEvent);
+    }
+
+    [Fact]
+    [Trait("Category", "Converter")]
+    public void FromEventConverter_ApiListResponse_WithMixedFromEvents_DeserializesAll()
+    {
+        // Arrange — 실제 API 응답 형식: 일부는 정상, 일부는 null type_event
+        var json = """
+        {
+            "success": true,
+            "message": "3 action events retrieved",
+            "data": [
+                {
+                    "id": 10,
+                    "type_event": "Action",
+                    "content": "정상 조치",
+                    "user": "admin",
+                    "from_event": {
+                        "id": 100,
+                        "type_event": "Intrusion",
+                        "created_at": "2025-01-01T00:00:00Z"
+                    }
+                },
+                {
+                    "id": 11,
+                    "type_event": "Action",
+                    "content": "type_event 없는 조치",
+                    "user": "admin",
+                    "from_event": {
+                        "id": 101,
+                        "created_at": "2025-01-01T00:00:00Z"
+                    }
+                },
+                {
+                    "id": 12,
+                    "type_event": "Action",
+                    "content": "from_event null 조치",
+                    "user": "admin",
+                    "from_event": null
+                }
+            ],
+            "pagination": {
+                "page": 1,
+                "limit": 100,
+                "total": 3,
+                "total_pages": 1
+            }
+        }
+        """;
+
+        // Act — 전체 응답 역직렬화 성공 (이전에는 두 번째 항목에서 throw)
+        var response = JsonConvert.DeserializeObject<ApiListResponse<ActionEventDto>>(json, _settings);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success);
+        Assert.NotNull(response.Data);
+        Assert.Equal(3, response.Data.Count);
+
+        // 첫 번째: 정상 from_event
+        Assert.NotNull(response.Data[0].FromEvent);
+        Assert.IsType<DetectionEventDto>(response.Data[0].FromEvent);
+
+        // 두 번째: type_event 없음 → null (이전에는 여기서 throw → 전체 실패)
+        Assert.Null(response.Data[1].FromEvent);
+
+        // 세 번째: from_event null → null
+        Assert.Null(response.Data[2].FromEvent);
+    }
+}
+
+#endregion
+
+#region - EventStatistics DTO 테스트 -
+
+public class EventStatisticsDtoTests
+{
+    #region - EventTrendItemDto -
+
+    [Fact]
+    [Trait("Category", "API")]
+    public void EventTrendItemDto_Deserialization_ShouldMapAllFields()
+    {
+        // Arrange
+        var json = @"{
+            ""time_bucket"": ""2025-01-15 10"",
+            ""sensor_detection"": 3,
+            ""camera_detection"": 1,
+            ""malfunction"": 30,
+            ""connection"": 0,
+            ""action"": 2
+        }";
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<EventTrendItemDto>(json);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal("2025-01-15 10", dto.TimeBucket);
+        Assert.Equal(3, dto.SensorDetection);
+        Assert.Equal(1, dto.CameraDetection);
+        Assert.Equal(30, dto.Malfunction);
+        Assert.Equal(0, dto.Connection);
+        Assert.Equal(2, dto.Action);
+    }
+
+    #endregion
+
+    #region - EventTrendDto -
+
+    [Fact]
+    [Trait("Category", "API")]
+    public void EventTrendDto_Deserialization_ShouldMapSeriesArray()
+    {
+        // Arrange
+        var json = @"{
+            ""interval"": ""hour"",
+            ""start_date"": ""2025-01-15T00:00:00"",
+            ""end_date"": ""2025-01-16T00:00:00"",
+            ""series"": [
+                {
+                    ""time_bucket"": ""2025-01-15 00"",
+                    ""sensor_detection"": 3,
+                    ""camera_detection"": 1,
+                    ""malfunction"": 30,
+                    ""connection"": 0,
+                    ""action"": 2
+                },
+                {
+                    ""time_bucket"": ""2025-01-15 01"",
+                    ""sensor_detection"": 0,
+                    ""camera_detection"": 5,
+                    ""malfunction"": 28,
+                    ""connection"": 0,
+                    ""action"": 0
+                }
+            ]
+        }";
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<EventTrendDto>(json);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal("hour", dto.Interval);
+        Assert.Equal("2025-01-15T00:00:00", dto.StartDate);
+        Assert.Equal("2025-01-16T00:00:00", dto.EndDate);
+        Assert.Equal(2, dto.Series.Count);
+        Assert.Equal("2025-01-15 00", dto.Series[0].TimeBucket);
+        Assert.Equal(3, dto.Series[0].SensorDetection);
+        Assert.Equal("2025-01-15 01", dto.Series[1].TimeBucket);
+        Assert.Equal(5, dto.Series[1].CameraDetection);
+    }
+
+    #endregion
+
+    #region - EventSummaryDto -
+
+    [Fact]
+    [Trait("Category", "API")]
+    public void EventSummaryDto_Deserialization_ShouldMapNestedObjects()
+    {
+        // Arrange
+        var json = @"{
+            ""start_date"": ""2025-01-15T00:00:00"",
+            ""end_date"": ""2025-01-22T00:00:00"",
+            ""days_in_range"": 7,
+            ""total"": 275,
+            ""sensor_detection"": 150,
+            ""camera_detection"": 30,
+            ""malfunction"": 45,
+            ""connection"": 30,
+            ""action"": 20,
+            ""daily_averages"": {
+                ""sensor_detection"": 21.4,
+                ""camera_detection"": 4.3,
+                ""malfunction"": 6.4,
+                ""connection"": 4.3,
+                ""action"": 2.9
+            },
+            ""active_devices"": {
+                ""sensors"": 25,
+                ""cameras"": 15,
+                ""controllers"": 5
+            }
+        }";
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<EventSummaryDto>(json);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(275, dto.Total);
+        Assert.Equal(150, dto.SensorDetection);
+        Assert.Equal(30, dto.CameraDetection);
+        Assert.Equal(45, dto.Malfunction);
+        Assert.Equal(7, dto.DaysInRange);
+
+        Assert.NotNull(dto.DailyAverages);
+        Assert.Equal(21.4, dto.DailyAverages.SensorDetection);
+        Assert.Equal(4.3, dto.DailyAverages.CameraDetection);
+
+        Assert.NotNull(dto.ActiveDevices);
+        Assert.Equal(25, dto.ActiveDevices.Sensors);
+        Assert.Equal(15, dto.ActiveDevices.Cameras);
+        Assert.Equal(5, dto.ActiveDevices.Controllers);
+    }
+
+    #endregion
+
+    #region - EventByDeviceDto -
+
+    [Fact]
+    [Trait("Category", "API")]
+    public void EventByDeviceDto_Deserialization_ShouldMapControllerAndCamera()
+    {
+        // Arrange
+        var json = @"{
+            ""start_date"": ""2025-01-15T00:00:00"",
+            ""end_date"": ""2025-01-16T00:00:00"",
+            ""controllers"": [
+                {
+                    ""controller_id"": 1,
+                    ""controller_name"": ""Controller-A"",
+                    ""controller_number"": 1,
+                    ""sensor_detection"": 45,
+                    ""malfunction"": 12,
+                    ""connection"": 3
+                },
+                {
+                    ""controller_id"": 2,
+                    ""controller_name"": ""Controller-B"",
+                    ""controller_number"": 2,
+                    ""sensor_detection"": 30,
+                    ""malfunction"": 8,
+                    ""connection"": 1
+                }
+            ],
+            ""cameras"": [
+                {
+                    ""camera_id"": 101,
+                    ""camera_name"": ""AI-Camera-Front"",
+                    ""camera_number"": 10,
+                    ""camera_detection"": 25
+                }
+            ]
+        }";
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<EventByDeviceDto>(json);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(2, dto.Controllers.Count);
+        Assert.Equal(1, dto.Controllers[0].ControllerId);
+        Assert.Equal("Controller-A", dto.Controllers[0].ControllerName);
+        Assert.Equal(45, dto.Controllers[0].SensorDetection);
+        Assert.Equal(12, dto.Controllers[0].Malfunction);
+        Assert.Equal(30, dto.Controllers[1].SensorDetection);
+
+        Assert.Single(dto.Cameras);
+        Assert.Equal(101, dto.Cameras[0].CameraId);
+        Assert.Equal("AI-Camera-Front", dto.Cameras[0].CameraName);
+        Assert.Equal(25, dto.Cameras[0].CameraDetection);
+    }
+
+    #endregion
+
+    #region - EventDashboardDto -
+
+    [Fact]
+    [Trait("Category", "API")]
+    public void EventDashboardDto_Deserialization_ShouldMapAllSections()
+    {
+        // Arrange
+        var json = @"{
+            ""summary"": {
+                ""total"": 275,
+                ""days_in_range"": 7,
+                ""sensor_detection"": 150,
+                ""camera_detection"": 30,
+                ""malfunction"": 45,
+                ""connection"": 30,
+                ""action"": 20,
+                ""daily_averages"": { ""sensor_detection"": 21.4, ""camera_detection"": 4.3, ""malfunction"": 6.4, ""connection"": 4.3, ""action"": 2.9 },
+                ""active_devices"": { ""sensors"": 25, ""cameras"": 15, ""controllers"": 5 }
+            },
+            ""trend"": {
+                ""interval"": ""hour"",
+                ""start_date"": ""2025-01-15T00:00:00"",
+                ""end_date"": ""2025-01-16T00:00:00"",
+                ""series"": [
+                    { ""time_bucket"": ""2025-01-15 00"", ""sensor_detection"": 3, ""camera_detection"": 1, ""malfunction"": 30, ""connection"": 0, ""action"": 2 }
+                ]
+            },
+            ""by_device"": {
+                ""start_date"": ""2025-01-15T00:00:00"",
+                ""end_date"": ""2025-01-16T00:00:00"",
+                ""controllers"": [
+                    { ""controller_id"": 1, ""controller_name"": ""Controller-A"", ""controller_number"": 1, ""sensor_detection"": 45, ""malfunction"": 12, ""connection"": 3 }
+                ],
+                ""cameras"": [
+                    { ""camera_id"": 101, ""camera_name"": ""AI-Camera-Front"", ""camera_number"": 10, ""camera_detection"": 25 }
+                ]
+            }
+        }";
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<EventDashboardDto>(json);
+
+        // Assert
+        Assert.NotNull(dto);
+
+        // Summary
+        Assert.Equal(275, dto.Summary.Total);
+        Assert.Equal(150, dto.Summary.SensorDetection);
+        Assert.Equal(21.4, dto.Summary.DailyAverages.SensorDetection);
+        Assert.Equal(25, dto.Summary.ActiveDevices.Sensors);
+
+        // Trend
+        Assert.Equal("hour", dto.Trend.Interval);
+        Assert.Single(dto.Trend.Series);
+        Assert.Equal("2025-01-15 00", dto.Trend.Series[0].TimeBucket);
+
+        // ByDevice
+        Assert.Single(dto.ByDevice.Controllers);
+        Assert.Equal(45, dto.ByDevice.Controllers[0].SensorDetection);
+        Assert.Single(dto.ByDevice.Cameras);
+        Assert.Equal(25, dto.ByDevice.Cameras[0].CameraDetection);
+    }
+
+    #endregion
+
+    #region - ApiResponse<EventDashboardDto> 통합 -
+
+    [Fact]
+    [Trait("Category", "API")]
+    public void ApiResponse_EventDashboardDto_FullRoundtrip()
+    {
+        // Arrange
+        var json = @"{
+            ""success"": true,
+            ""message"": ""Event dashboard statistics retrieved"",
+            ""data"": {
+                ""summary"": {
+                    ""total"": 275,
+                    ""days_in_range"": 7,
+                    ""sensor_detection"": 150,
+                    ""camera_detection"": 30,
+                    ""malfunction"": 45,
+                    ""connection"": 30,
+                    ""action"": 20,
+                    ""daily_averages"": { ""sensor_detection"": 21.4, ""camera_detection"": 4.3, ""malfunction"": 6.4, ""connection"": 4.3, ""action"": 2.9 },
+                    ""active_devices"": { ""sensors"": 25, ""cameras"": 15, ""controllers"": 5 }
+                },
+                ""trend"": {
+                    ""interval"": ""hour"",
+                    ""start_date"": ""2025-01-15T00:00:00"",
+                    ""end_date"": ""2025-01-16T00:00:00"",
+                    ""series"": [
+                        { ""time_bucket"": ""2025-01-15 10"", ""sensor_detection"": 3, ""camera_detection"": 1, ""malfunction"": 30, ""connection"": 0, ""action"": 2 }
+                    ]
+                },
+                ""by_device"": {
+                    ""start_date"": ""2025-01-15T00:00:00"",
+                    ""end_date"": ""2025-01-16T00:00:00"",
+                    ""controllers"": [
+                        { ""controller_id"": 1, ""controller_name"": ""Controller-A"", ""controller_number"": 1, ""sensor_detection"": 45, ""malfunction"": 12, ""connection"": 3 }
+                    ],
+                    ""cameras"": [
+                        { ""camera_id"": 101, ""camera_name"": ""AI-Camera-Front"", ""camera_number"": 10, ""camera_detection"": 25 }
+                    ]
+                }
+            }
+        }";
+
+        // Act
+        var response = ApiMessageHelper.FromJsonResponse<EventDashboardDto>(json);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success);
+        Assert.Equal("Event dashboard statistics retrieved", response.Message);
+        Assert.NotNull(response.Data);
+        Assert.Equal(275, response.Data.Summary.Total);
+        Assert.Equal("hour", response.Data.Trend.Interval);
+        Assert.Single(response.Data.Trend.Series);
+        Assert.Equal(45, response.Data.ByDevice.Controllers[0].SensorDetection);
     }
 
     #endregion

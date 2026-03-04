@@ -57,9 +57,17 @@
 					</Style.Triggers>
 				</Style>
 			</Border.Resources>
-			<Grid Margin="20">
-				<ContentControl x:Name="EventInfoViewModel" />
-			</Grid>
+			<TabControl Style="{StaticResource MaterialDesignTabControl}"
+					TabStripPlacement="Top"
+					Margin="5"
+					Padding="0">
+				<TabItem Header="센서 이벤트" Padding="10,4">
+					<ContentControl x:Name="EventInfoViewModel" />
+				</TabItem>
+				<TabItem Header="카메라 이벤트" Padding="10,4">
+					<ContentControl x:Name="CameraEventInfoViewModel" />
+				</TabItem>
+			</TabControl>
 		</Border>
 		<Border
 			Grid.Row="0"

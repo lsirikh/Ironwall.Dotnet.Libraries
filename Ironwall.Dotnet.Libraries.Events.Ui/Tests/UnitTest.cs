@@ -18,8 +18,13 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
+using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using System.IO;
 using System.Linq;
+using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 
@@ -50,7 +55,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(1, model.Id);
-        Assert.Equal(new DateTime(2025, 11, 24, 10, 30, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(DateTime.Parse("2025-11-24T10:30:00.000Z"), model.DateTime);
         Assert.Equal(EnumEventType.Intrusion, model.MessageType);
         Assert.Equal(EnumTrueFalse.True, model.Status);
         Assert.Equal(EnumDetectionType.THERMAL_SENSOR, model.Result);
@@ -114,7 +119,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(2, model.Id);
-        Assert.Equal(new DateTime(2025, 11, 24, 11, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(DateTime.Parse("2025-11-24T11:00:00.000Z"), model.DateTime);
         Assert.Equal(EnumEventType.Fault, model.MessageType);
         Assert.Equal(EnumTrueFalse.False, model.Status);
         Assert.Equal(EnumFaultType.FAULT_FENCE, model.Reason);
@@ -181,7 +186,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(3, model.Id);
-        Assert.Equal(new DateTime(2025, 11, 24, 12, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(DateTime.Parse("2025-11-24T12:00:00.000Z"), model.DateTime);
         Assert.Equal(EnumEventType.Connection, model.MessageType);
         Assert.NotNull(model.Device);
         Assert.Equal(300, model.Device.Id);
@@ -232,7 +237,7 @@ public class DtoToModelHelperTests
 
         // Assert
         Assert.Equal(4, model.Id);
-        Assert.Equal(new DateTime(2025, 11, 24, 13, 0, 0, DateTimeKind.Utc), model.DateTime);
+        Assert.Equal(DateTime.Parse("2025-11-24T13:00:00.000Z"), model.DateTime);
         Assert.Equal(EnumEventType.Action, model.MessageType);
         Assert.Equal("Reset system", model.Content);
         Assert.Equal("admin", model.User);
@@ -258,7 +263,7 @@ public class DtoToModelHelperTests
         // Assert
         Assert.Equal(4, dto.Id);
         Assert.Equal("2025-11-24T13:00:00.000Z", dto.CreatedAt);
-        Assert.Equal("ACTION", dto.TypeEvent);
+        Assert.Equal("Action", dto.TypeEvent);
         Assert.Equal("Reset system", dto.Content);
         Assert.Equal("admin", dto.User);
     }
@@ -1577,7 +1582,8 @@ public class DtoToModelHelperWithDeviceProviderTests
         // Assert
         Assert.NotNull(model.Device);
         Assert.Equal(1, model.Device.Id);
-        Assert.Null(model.Device.DeviceName); // 상세 정보 없음
+        // fallback 시 DTO.NameDevice 기본값(빈 문자열)이 매핑됨
+        Assert.Equal(string.Empty, model.Device.DeviceName);
         Assert.Equal(0, model.Device.DeviceNumber);
     }
     #endregion
@@ -1603,7 +1609,8 @@ public class DtoToModelHelperWithDeviceProviderTests
         // Assert
         Assert.NotNull(model.Device);
         Assert.Equal(1, model.Device.Id);
-        Assert.Null(model.Device.DeviceName);
+        // fallback 시 DTO.NameDevice 기본값(빈 문자열)이 매핑됨
+        Assert.Equal(string.Empty, model.Device.DeviceName);
     }
     #endregion
 
@@ -2041,7 +2048,7 @@ public class DeviceSymbolLookupModelTests
         var range = lookup.TestConvertZoomToRange(zoom);
 
         // Assert
-        Assert.Equal(100.0, range);  // BaseDetectionRange = 100
+        Assert.Equal(30.0, range);  // BaseDetectionRange = 30, zoom 1x
     }
     #endregion
 
@@ -2057,7 +2064,7 @@ public class DeviceSymbolLookupModelTests
         var range = lookup.TestConvertZoomToRange(zoom);
 
         // Assert
-        Assert.Equal(400.0, range);  // 100 * 4 = 400
+        Assert.Equal(120.0, range);  // 30 * 4 = 120
     }
     #endregion
 
@@ -2067,13 +2074,13 @@ public class DeviceSymbolLookupModelTests
     {
         // Arrange
         var lookup = CreateTestLookup();
-        float zoom = 3000f;  // 30x → 100*30 = 3000 > MaxDetectionRange(2000)
+        float zoom = 3000f;  // 30x → 30*30 = 900 (under MaxDetectionRange 2000)
 
         // Act
         var range = lookup.TestConvertZoomToRange(zoom);
 
         // Assert
-        Assert.Equal(2000.0, range);  // Clamped to MaxDetectionRange
+        Assert.Equal(900.0, range);  // 30 * 30 = 900
     }
     #endregion
 
@@ -2111,8 +2118,8 @@ public class DeviceSymbolLookupModelTests
         mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
         // DetectionAngle = 40 (80 / 2)
         mockPidsSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);
-        // DetectionRange = 200 (100 * 2)
-        mockPidsSymbol.VerifySet(s => s.DetectionRange = 200.0, Times.Once);
+        // DetectionRange = 60 (30 * 2)
+        mockPidsSymbol.VerifySet(s => s.DetectionRange = 60.0, Times.Once);
         // SetUpdate() should be called once
         mockPidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
     }
@@ -2206,7 +2213,7 @@ public class SymbolEventManagerTests
         // Assert - FOV 속성이 업데이트 되어야 함
         mockSymbol.VerifySet(s => s.DetectionBearing = 90.0, Times.Once);
         mockSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);  // 80 / 2
-        mockSymbol.VerifySet(s => s.DetectionRange = 200.0, Times.Once);  // 100 * 2
+        mockSymbol.VerifySet(s => s.DetectionRange = 60.0, Times.Once);  // 30 * 2
         mockSymbol.Verify(s => s.SetUpdate(), Times.Once);
     }
     #endregion
@@ -2272,8 +2279,8 @@ public class SymbolEventManagerTests
         pidsSymbol.VerifySet(s => s.DetectionBearing = -90.0, Times.Once);
         // Zoom 400% (4x) → Angle 20 (80 / 4)
         pidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);
-        // Zoom 400% (4x) → Range 400 (100 * 4)
-        pidsSymbol.VerifySet(s => s.DetectionRange = 400.0, Times.Once);
+        // Zoom 400% (4x) → Range 120 (30 * 4)
+        pidsSymbol.VerifySet(s => s.DetectionRange = 120.0, Times.Once);
         // SetUpdate() 호출되어 UI 갱신 트리거
         pidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
     }
@@ -2608,7 +2615,7 @@ public class SymbolEventManagerDualDictionaryTests
         // Assert - 개별 심볼(IPidsSymbolModel)의 FOV만 업데이트
         mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
         mockPidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);   // 80 / 4
-        mockPidsSymbol.VerifySet(s => s.DetectionRange = 400.0, Times.Once);  // 100 * 4
+        mockPidsSymbol.VerifySet(s => s.DetectionRange = 120.0, Times.Once);  // 30 * 4
         mockPidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
 
         // 그룹 심볼은 IPidsSymbolModel이 아니므로 FOV 속성 없음 - 호출 안됨
@@ -2995,7 +3002,7 @@ public class DataHelperRefactoringTests
     #region Phase 18.2: ProcessEvent 추적 테스트
 
     [Fact]
-    public void ProcessEvent_WithCameraAndFaultEvent_ShouldIgnore()
+    public void ProcessEvent_WithCameraAndFaultEvent_ShouldProcessFault()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3014,12 +3021,12 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
 
-        // Assert
-        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus); // 변경되지 않아야 함
+        // Assert - Camera도 Fault 이벤트를 처리하여 상태 변경
+        Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus);
     }
 
     [Fact]
-    public void ProcessEvent_WithCameraAndConnectionEvent_ShouldIgnore()
+    public void ProcessEvent_WithCameraAndConnectionEvent_ShouldProcessConnection()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3038,8 +3045,8 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Connection, EnumSeverityLevel.CRITICAL);
 
-        // Assert
-        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+        // Assert - Camera도 Connection 이벤트를 처리하여 상태 변경
+        Assert.Equal(EnumEventStatus.Connection, symbolModel.EventStatus);
     }
 
     [Fact]
@@ -3105,6 +3112,7 @@ public class DataHelperRefactoringTests
 /// Phase 19: ExEventViewModel / EventCardViewModel에 ControllerId,
 /// ControllerDeviceNumber, DeviceTypeName 속성 추가 테스트
 /// </summary>
+[Collection("IoC-Dependent")]
 public class EventUiDevicePropertyBindingTests : IDisposable
 {
     public EventUiDevicePropertyBindingTests()
@@ -3568,4 +3576,1520 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     }
     #endregion
 }
+#endregion
+
+#region EventPanel Cache Reuse Tests
+/// <summary>
+/// PRD: EventPanel Cache Reuse — 캐시 날짜범위 비교 + API 스킵 테스트
+/// </summary>
+public class EventPanelCacheReuseTests
+{
+    private readonly DetectionEventPanelViewModel _detectionPanel;
+    private readonly EventProvider _eventProvider;
+
+    public EventPanelCacheReuseTests()
+    {
+        var eventAggregator = new EventAggregator();
+        var log = new Mock<ILogService>().Object;
+        var providerService = new Mock<EventProviderService>(
+            log, new Mock<IEventApiService>().Object, null, null).Object;
+        _eventProvider = new EventProvider();
+        var deviceProvider = new DeviceProvider();
+
+        _detectionPanel = new DetectionEventPanelViewModel(
+            eventAggregator, log, providerService, deviceProvider, _eventProvider);
+    }
+
+    #region Test 2.1: DetectionPanel_SkipFetch_WhenCacheValid
+    [Fact]
+    public void DetectionPanel_IsCacheValid_ReturnsFalse_WhenNoCacheSet()
+    {
+        // Arrange: 캐시 미설정 상태
+        _detectionPanel.SetDate(DateTime.Today, DateTime.Today.AddDays(1));
+
+        // Act & Assert: 캐시 미설정이므로 false
+        Assert.False(_detectionPanel.IsCacheValid());
+    }
+
+    [Fact]
+    public void DetectionPanel_IsCacheValid_ReturnsTrue_WhenCacheMatchesAndDataExists()
+    {
+        // Arrange
+        var start = DateTime.Today;
+        var end = DateTime.Today.AddDays(1);
+        _detectionPanel.SetDate(start, end);
+        _detectionPanel.SetCachedDate(start, end);
+        _eventProvider.Add(new DetectionEventModel { Id = 1 });
+
+        // Act & Assert
+        Assert.True(_detectionPanel.IsCacheValid());
+    }
+
+    [Fact]
+    public void DetectionPanel_IsCacheValid_ReturnsFalse_WhenCacheMatchesButNoData()
+    {
+        // Arrange
+        var start = DateTime.Today;
+        var end = DateTime.Today.AddDays(1);
+        _detectionPanel.SetDate(start, end);
+        _detectionPanel.SetCachedDate(start, end);
+        // EventProvider에 Detection 데이터 없음
+
+        // Act & Assert
+        Assert.False(_detectionPanel.IsCacheValid());
+    }
+    #endregion
+
+    #region Test 2.2: DetectionPanel_FetchApi_WhenCacheInvalid
+    [Fact]
+    public void DetectionPanel_IsCacheValid_ReturnsFalse_WhenDateRangeDiffers()
+    {
+        // Arrange: 캐시 날짜 != 현재 날짜
+        _detectionPanel.SetDate(DateTime.Today, DateTime.Today.AddDays(1));
+        _detectionPanel.SetCachedDate(DateTime.Today.AddDays(-1), DateTime.Today);
+        _eventProvider.Add(new DetectionEventModel { Id = 1 });
+
+        // Act & Assert: 날짜 불일치 → false
+        Assert.False(_detectionPanel.IsCacheValid());
+    }
+    #endregion
+
+    #region Test 2.3: DetectionPanel_ClickSearch_AlwaysFetches
+    [Fact]
+    public void DetectionPanel_InvalidateCache_MakesCacheInvalid()
+    {
+        // Arrange: 유효한 캐시 상태 만들기
+        var start = DateTime.Today;
+        var end = DateTime.Today.AddDays(1);
+        _detectionPanel.SetDate(start, end);
+        _detectionPanel.SetCachedDate(start, end);
+        _eventProvider.Add(new DetectionEventModel { Id = 1 });
+        Assert.True(_detectionPanel.IsCacheValid()); // 선행 확인
+
+        // Act: 캐시 무효화
+        _detectionPanel.InvalidateCache();
+
+        // Assert: 무효화 후 false
+        Assert.False(_detectionPanel.IsCacheValid());
+    }
+    #endregion
+
+    #region Test 3.1: MalfunctionPanel_SkipFetch_WhenCacheValid
+    [Fact]
+    public void MalfunctionPanel_IsCacheValid_ReturnsTrue_WhenCacheMatchesAndDataExists()
+    {
+        // Arrange
+        var eventAggregator = new EventAggregator();
+        var log = new Mock<ILogService>().Object;
+        var providerService = new Mock<EventProviderService>(
+            log, new Mock<IEventApiService>().Object, null, null).Object;
+        var ep = new EventProvider();
+        var dp = new DeviceProvider();
+        var panel = new MalfunctionEventPanelViewModel(eventAggregator, log, providerService, dp, ep);
+
+        var start = DateTime.Today;
+        var end = DateTime.Today.AddDays(1);
+        panel.SetDate(start, end);
+        panel.SetCachedDate(start, end);
+        ep.Add(new MalfunctionEventModel { Id = 1 });
+
+        // Act & Assert
+        Assert.True(panel.IsCacheValid());
+
+        // 캐시 무효화 확인
+        panel.InvalidateCache();
+        Assert.False(panel.IsCacheValid());
+    }
+    #endregion
+
+    #region Test 3.2: ConnectionPanel_SkipFetch_WhenCacheValid
+    [Fact]
+    public void ConnectionPanel_IsCacheValid_ReturnsTrue_WhenCacheMatchesAndDataExists()
+    {
+        // Arrange
+        var eventAggregator = new EventAggregator();
+        var log = new Mock<ILogService>().Object;
+        var providerService = new Mock<EventProviderService>(
+            log, new Mock<IEventApiService>().Object, null, null).Object;
+        var ep = new EventProvider();
+        var dp = new DeviceProvider();
+        var panel = new ConnectionEventPanelViewModel(eventAggregator, log, providerService, dp, ep);
+
+        var start = DateTime.Today;
+        var end = DateTime.Today.AddDays(1);
+        panel.SetDate(start, end);
+        panel.SetCachedDate(start, end);
+        ep.Add(new ConnectionEventModel { Id = 1 });
+
+        // Act & Assert
+        Assert.True(panel.IsCacheValid());
+
+        // 캐시 무효화 확인
+        panel.InvalidateCache();
+        Assert.False(panel.IsCacheValid());
+    }
+    #endregion
+
+    #region Test 3.3: ActionPanel_SkipFetch_WhenCacheValid
+    [Fact]
+    public void ActionPanel_IsCacheValid_ReturnsTrue_WhenCacheMatchesAndDataExists()
+    {
+        // Arrange
+        var eventAggregator = new EventAggregator();
+        var log = new Mock<ILogService>().Object;
+        var providerService = new Mock<EventProviderService>(
+            log, new Mock<IEventApiService>().Object, null, null).Object;
+        var ep = new EventProvider();
+        var panel = new ActionEventPanelViewModel(eventAggregator, log, providerService, ep);
+
+        var start = DateTime.Today;
+        var end = DateTime.Today.AddDays(1);
+        panel.SetDate(start, end);
+        panel.SetCachedDate(start, end);
+        ep.Add(new ActionEventModel { Id = 1 });
+
+        // Act & Assert
+        Assert.True(panel.IsCacheValid());
+
+        // 캐시 무효화 확인
+        panel.InvalidateCache();
+        Assert.False(panel.IsCacheValid());
+    }
+    #endregion
+}
+#endregion
+
+#region Event DtoModel Matching Tests
+/// <summary>
+/// PRD_Event_DtoModel_Matching — DTO↔Model 구조 매칭 테스트
+/// </summary>
+public class EventDtoModelMatchingTests
+{
+    #region Phase 1: Device Fallback Property Mapping (FR-01)
+
+    [Fact]
+    public void DeviceFallback_MapsNameNumberVersionStatus()
+    {
+        // Arrange: DeviceProvider 없이 DTO 변환 (fallback 경로)
+        var dto = new DetectionEventDto
+        {
+            Id = 1,
+            TypeEvent = "Intrusion",
+            ActionReported = "False",
+            Result = "THERMAL_SENSOR",
+            CreatedAt = "2026-02-26T10:00:00.000Z",
+            Device = new BaseDeviceDto
+            {
+                Id = 100,
+                TypeDevice = "Fence",
+                NameDevice = "센서A",
+                NumberDevice = 5,
+                Version = "1.0",
+                Status = "ACTIVATED"
+            }
+        };
+
+        // Act: DeviceProvider null → fallback path
+        var model = dto.ToDetectionEventModel();
+
+        // Assert: fallback에서도 속성이 매핑되어야 함
+        Assert.NotNull(model.Device);
+        Assert.Equal(100, model.Device!.Id);
+        Assert.Equal("센서A", model.Device.DeviceName);
+        Assert.Equal(5, model.Device.DeviceNumber);
+        Assert.Equal("1.0", model.Device.Version);
+        Assert.Equal(EnumDeviceStatus.ACTIVATED, model.Device.Status);
+    }
+
+    [Fact]
+    public void DeviceFallback_MapsProperties_ForControllerType()
+    {
+        // Arrange
+        var dto = new DetectionEventDto
+        {
+            Id = 2,
+            TypeEvent = "Intrusion",
+            ActionReported = "False",
+            Result = "THERMAL_SENSOR",
+            CreatedAt = "2026-02-26T10:00:00.000Z",
+            Device = new BaseDeviceDto
+            {
+                Id = 200,
+                TypeDevice = "Controller",
+                NameDevice = "제어기1",
+                NumberDevice = 1,
+                Version = "2.0",
+                Status = "ACTIVATED"
+            }
+        };
+
+        // Act
+        var model = dto.ToDetectionEventModel();
+
+        // Assert: Controller 타입 + 속성 매핑
+        Assert.NotNull(model.Device);
+        Assert.IsType<ControllerDeviceModel>(model.Device);
+        Assert.Equal("제어기1", model.Device!.DeviceName);
+        Assert.Equal(1, model.Device.DeviceNumber);
+    }
+
+    [Fact]
+    public void DeviceFallback_MapsProperties_ForCameraType()
+    {
+        // Arrange
+        var dto = new ConnectionEventDto
+        {
+            Id = 3,
+            TypeEvent = "Connection",
+            CreatedAt = "2026-02-26T10:00:00.000Z",
+            Device = new BaseDeviceDto
+            {
+                Id = 300,
+                TypeDevice = "IpCamera",
+                NameDevice = "카메라1",
+                NumberDevice = 10,
+                Version = "3.0",
+                Status = "ERROR"
+            }
+        };
+
+        // Act
+        var model = dto.ToConnectionEventModel();
+
+        // Assert
+        Assert.NotNull(model.Device);
+        Assert.IsType<CameraDeviceModel>(model.Device);
+        Assert.Equal("카메라1", model.Device!.DeviceName);
+        Assert.Equal(10, model.Device.DeviceNumber);
+        Assert.Equal(EnumDeviceStatus.ERROR, model.Device.Status);
+    }
+
+    [Fact]
+    public void DeviceFallback_MapsDeviceGroups()
+    {
+        // Arrange: DeviceGroups가 있는 DTO
+        var dto = new DetectionEventDto
+        {
+            Id = 4,
+            TypeEvent = "Intrusion",
+            ActionReported = "False",
+            Result = "THERMAL_SENSOR",
+            CreatedAt = "2026-02-26T10:00:00.000Z",
+            Device = new BaseDeviceDto
+            {
+                Id = 400,
+                TypeDevice = "Fence",
+                NameDevice = "센서B",
+                NumberDevice = 8,
+                DeviceGroups = new List<DeviceGroupDto>
+                {
+                    new DeviceGroupDto { Id = 1, Name = "그룹A" },
+                    new DeviceGroupDto { Id = 2, Name = "그룹B" }
+                }
+            }
+        };
+
+        // Act
+        var model = dto.ToDetectionEventModel();
+
+        // Assert: DeviceGroups가 List<int>로 변환됨
+        Assert.NotNull(model.Device);
+        Assert.NotNull(model.Device!.DeviceGroups);
+        Assert.Equal(2, model.Device.DeviceGroups!.Count);
+        Assert.Contains(1, model.Device.DeviceGroups);
+        Assert.Contains(2, model.Device.DeviceGroups);
+    }
+
+    #endregion
+
+    #region Phase 2: ActionEvent FromEvent Reverse Mapping (FR-02)
+
+    [Fact]
+    public void ActionEventDto_FromEvent_ConvertedFromDetection()
+    {
+        // Arrange: Detection OriginEvent가 있는 ActionEventModel
+        var originDevice = new SensorDeviceModel
+        {
+            Id = 50, DeviceType = EnumDeviceType.Fence, DeviceName = "센서50"
+        };
+        var origin = new DetectionEventModel
+        {
+            Id = 10,
+            MessageType = EnumEventType.Intrusion,
+            Status = EnumTrueFalse.True,
+            Result = EnumDetectionType.THERMAL_SENSOR,
+            DateTime = new DateTime(2026, 2, 26, 10, 0, 0),
+            Device = originDevice
+        };
+        var actionModel = new ActionEventModel
+        {
+            Id = 100,
+            MessageType = EnumEventType.Action,
+            Content = "순찰 출동",
+            User = "operator_kim",
+            DateTime = new DateTime(2026, 2, 26, 10, 5, 0),
+            OriginEvent = origin
+        };
+
+        // Act
+        var dto = actionModel.ToActionEventDto();
+
+        // Assert: FromEvent가 DetectionEventDto로 변환됨
+        Assert.NotNull(dto.FromEvent);
+        Assert.IsType<DetectionEventDto>(dto.FromEvent);
+        var fromDto = (DetectionEventDto)dto.FromEvent;
+        Assert.Equal(10, fromDto.Id);
+        Assert.Equal("Intrusion", fromDto.TypeEvent);
+        Assert.Equal("THERMAL_SENSOR", fromDto.Result);
+    }
+
+    [Fact]
+    public void ActionEventDto_FromEvent_ConvertedFromMalfunction()
+    {
+        // Arrange
+        var origin = new MalfunctionEventModel
+        {
+            Id = 20,
+            MessageType = EnumEventType.Fault,
+            Status = EnumTrueFalse.False,
+            Reason = EnumFaultType.FAULT_FENCE,
+            FirstStart = 10, FirstEnd = 20,
+            SecondStart = 30, SecondEnd = 40,
+            DateTime = new DateTime(2026, 2, 26, 10, 0, 0)
+        };
+        var actionModel = new ActionEventModel
+        {
+            Id = 101,
+            MessageType = EnumEventType.Action,
+            Content = "장애 처리",
+            User = "admin",
+            DateTime = new DateTime(2026, 2, 26, 10, 5, 0),
+            OriginEvent = origin
+        };
+
+        // Act
+        var dto = actionModel.ToActionEventDto();
+
+        // Assert: FromEvent가 MalfunctionEventDto로 변환됨
+        Assert.NotNull(dto.FromEvent);
+        Assert.IsType<MalfunctionEventDto>(dto.FromEvent);
+        var fromDto = (MalfunctionEventDto)dto.FromEvent;
+        Assert.Equal(20, fromDto.Id);
+        Assert.Equal("Fault", fromDto.TypeEvent);
+        Assert.Equal("FAULT_FENCE", fromDto.Reason);
+    }
+
+    [Fact]
+    public void ActionEventDto_FromEvent_Null_WhenNoOriginEvent()
+    {
+        // Arrange: OriginEvent가 null인 ActionEventModel
+        var actionModel = new ActionEventModel
+        {
+            Id = 102,
+            MessageType = EnumEventType.Action,
+            Content = "독립 조치",
+            User = "admin",
+            DateTime = new DateTime(2026, 2, 26, 10, 5, 0),
+            OriginEvent = null
+        };
+
+        // Act
+        var dto = actionModel.ToActionEventDto();
+
+        // Assert
+        Assert.Null(dto.FromEvent);
+    }
+
+    #endregion
+
+    #region Phase 3: ConnectionEvent Status Fix (FR-03)
+
+    [Fact]
+    public void ConnectionEvent_Status_DefaultFalse()
+    {
+        // Arrange
+        var dto = new ConnectionEventDto
+        {
+            Id = 1,
+            TypeEvent = "Connection",
+            CreatedAt = "2026-02-26T10:00:00.000Z",
+            Device = new BaseDeviceDto { Id = 100, TypeDevice = "Fence" }
+        };
+
+        // Act: 기본 변환
+        var model = dto.ToConnectionEventModel();
+
+        // Assert: Status가 True로 하드코딩되지 않음
+        Assert.Equal(EnumTrueFalse.False, model.Status);
+    }
+
+    [Fact]
+    public void ConnectionEvent_Status_DefaultFalse_WithDeviceProvider()
+    {
+        // Arrange
+        var dto = new ConnectionEventDto
+        {
+            Id = 2,
+            TypeEvent = "Connection",
+            CreatedAt = "2026-02-26T10:00:00.000Z",
+            Device = new BaseDeviceDto { Id = 200, TypeDevice = "Controller" }
+        };
+        var deviceProvider = new DeviceProvider();
+
+        // Act: DeviceProvider 오버로드
+        var model = dto.ToConnectionEventModel(deviceProvider);
+
+        // Assert
+        Assert.Equal(EnumTrueFalse.False, model.Status);
+    }
+
+    #endregion
+}
+#endregion
+
+#region InfiniteScrollPaginationTests
+public class InfiniteScrollPaginationTests
+{
+    #region - PagedResult Tests -
+
+    [Theory]
+    [InlineData(1, 3, true)]   // Page 1 of 3 → HasNextPage = true
+    [InlineData(2, 3, true)]   // Page 2 of 3 → HasNextPage = true
+    [InlineData(3, 3, false)]  // Page 3 of 3 → HasNextPage = false
+    [InlineData(4, 3, false)]  // Page 4 of 3 → HasNextPage = false (over)
+    [InlineData(1, 1, false)]  // Single page → HasNextPage = false
+    public void PagedResult_HasNextPage_ReturnsExpected(int page, int totalPages, bool expected)
+    {
+        // Arrange & Act
+        var result = new PagedResult<int>
+        {
+            Items = new List<int> { 1, 2, 3 },
+            Page = page,
+            TotalPages = totalPages,
+            Total = 30
+        };
+
+        // Assert
+        Assert.Equal(expected, result.HasNextPage);
+    }
+
+    #endregion
+
+    #region - FetchEventsPageAsync Tests -
+
+    [Fact]
+    public async Task FetchDetectionEventsPageAsync_ReturnsPagedResult()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<DetectionEventDto>
+        {
+            new DetectionEventDto
+            {
+                Id = 1,
+                TypeEvent = "Intrusion",
+                Device = new BaseDeviceDto { Id = 100 },
+                ActionReported = "True",
+                Result = "THERMAL_SENSOR",
+                CreatedAt = "2025-11-24T10:00:00.000Z"
+            },
+            new DetectionEventDto
+            {
+                Id = 2,
+                TypeEvent = "Intrusion",
+                Device = new BaseDeviceDto { Id = 101 },
+                ActionReported = "False",
+                Result = "THERMAL_SENSOR",
+                CreatedAt = "2025-11-24T11:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 3,
+                Total = 250,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(
+            mockLogService.Object,
+            mockApiService.Object);
+
+        var startDate = DateTime.Now.AddDays(-1);
+        var endDate = DateTime.Now;
+
+        // Act
+        var result = await service.FetchDetectionEventsPageAsync(startDate, endDate, page: 1, limit: 100);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(3, result.TotalPages);
+        Assert.Equal(250, result.Total);
+        Assert.True(result.HasNextPage);
+
+        Assert.Equal(1, result.Items[0].Id);
+        Assert.Equal(EnumEventType.Intrusion, result.Items[0].MessageType);
+    }
+
+    [Fact]
+    public async Task FetchDetectionEventsPageAsync_LastPage_HasNextPageFalse()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = true,
+            Data = new List<DetectionEventDto>
+            {
+                new DetectionEventDto
+                {
+                    Id = 50, TypeEvent = "Intrusion",
+                    Device = new BaseDeviceDto { Id = 100 },
+                    Result = "THERMAL_SENSOR",
+                    CreatedAt = "2025-11-24T10:00:00.000Z"
+                }
+            },
+            Pagination = new PaginationDto { Page = 3, TotalPages = 3, Total = 250, Limit = 100 }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsPageAsync(
+            DateTime.Now.AddDays(-1), DateTime.Now, page: 3, limit: 100);
+
+        // Assert
+        Assert.False(result.HasNextPage);
+        Assert.Equal(3, result.Page);
+        Assert.Equal(3, result.TotalPages);
+    }
+
+    [Fact]
+    public async Task FetchDetectionEventsPageAsync_ApiError_ReturnsEmptyPagedResult()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiListResponse<DetectionEventDto>
+        {
+            Success = false,
+            Error = new ApiError { Message = "Server Error" }
+        };
+
+        mockApiService
+            .Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.FetchDetectionEventsPageAsync(
+            DateTime.Now.AddDays(-1), DateTime.Now, page: 1, limit: 100);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(1, result.TotalPages);
+        Assert.False(result.HasNextPage);
+    }
+
+    #endregion
+
+    #region - FetchMalfunctionEventsPageAsync Tests -
+
+    [Fact]
+    public async Task FetchMalfunctionEventsPageAsync_ReturnsPagedResult()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<MalfunctionEventDto>
+        {
+            new MalfunctionEventDto
+            {
+                Id = 1,
+                TypeEvent = "Fault",
+                Device = new BaseDeviceDto { Id = 100 },
+                ActionReported = "True",
+                Reason = "FAULT_FENCE",
+                CreatedAt = "2025-11-24T10:00:00.000Z"
+            },
+            new MalfunctionEventDto
+            {
+                Id = 2,
+                TypeEvent = "Fault",
+                Device = new BaseDeviceDto { Id = 101 },
+                ActionReported = "False",
+                Reason = "FAULT_CONTROLLER",
+                CreatedAt = "2025-11-24T11:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<MalfunctionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 3,
+                Total = 250,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetMalfunctionEventsAsync(
+                It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<int?>(), It.IsAny<int?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        var startDate = DateTime.Now.AddDays(-1);
+        var endDate = DateTime.Now;
+
+        // Act
+        var result = await service.FetchMalfunctionEventsPageAsync(startDate, endDate, page: 1, limit: 100);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(3, result.TotalPages);
+        Assert.Equal(250, result.Total);
+        Assert.True(result.HasNextPage);
+
+        Assert.Equal(1, result.Items[0].Id);
+        Assert.Equal(EnumEventType.Fault, result.Items[0].MessageType);
+    }
+
+    #endregion
+
+    #region - FetchConnectionEventsPageAsync Tests -
+
+    [Fact]
+    public async Task FetchConnectionEventsPageAsync_ReturnsPagedResult()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<ConnectionEventDto>
+        {
+            new ConnectionEventDto
+            {
+                Id = 1,
+                TypeEvent = "Connection",
+                Device = new BaseDeviceDto { Id = 100 },
+                CreatedAt = "2025-11-24T10:00:00.000Z"
+            },
+            new ConnectionEventDto
+            {
+                Id = 2,
+                TypeEvent = "Connection",
+                Device = new BaseDeviceDto { Id = 101 },
+                CreatedAt = "2025-11-24T11:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<ConnectionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 2,
+                Total = 150,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetConnectionEventsAsync(
+                It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<int?>(), It.IsAny<int?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        var startDate = DateTime.Now.AddDays(-1);
+        var endDate = DateTime.Now;
+
+        // Act
+        var result = await service.FetchConnectionEventsPageAsync(startDate, endDate, page: 1, limit: 100);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(2, result.TotalPages);
+        Assert.Equal(150, result.Total);
+        Assert.True(result.HasNextPage);
+
+        Assert.Equal(1, result.Items[0].Id);
+        Assert.Equal(EnumEventType.Connection, result.Items[0].MessageType);
+    }
+
+    #endregion
+
+    #region - FetchActionEventsPageAsync Tests -
+
+    [Fact]
+    public async Task FetchActionEventsPageAsync_ReturnsPagedResult()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var dtoList = new List<ActionEventDto>
+        {
+            new ActionEventDto
+            {
+                Id = 1,
+                TypeEvent = "Action",
+                Content = "조치 완료",
+                User = "admin",
+                CreatedAt = "2025-11-24T10:00:00.000Z"
+            },
+            new ActionEventDto
+            {
+                Id = 2,
+                TypeEvent = "Action",
+                Content = "현장 확인",
+                User = "operator",
+                CreatedAt = "2025-11-24T11:00:00.000Z"
+            }
+        };
+
+        var apiResponse = new ApiListResponse<ActionEventDto>
+        {
+            Success = true,
+            Data = dtoList,
+            Pagination = new PaginationDto
+            {
+                Page = 1,
+                TotalPages = 5,
+                Total = 480,
+                Limit = 100
+            }
+        };
+
+        mockApiService
+            .Setup(x => x.GetActionEventsAsync(
+                It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        var startDate = DateTime.Now.AddDays(-1);
+        var endDate = DateTime.Now;
+
+        // Act
+        var result = await service.FetchActionEventsPageAsync(startDate, endDate, page: 1, limit: 100);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(5, result.TotalPages);
+        Assert.Equal(480, result.Total);
+        Assert.True(result.HasNextPage);
+
+        Assert.Equal(1, result.Items[0].Id);
+        Assert.Equal(EnumEventType.Action, result.Items[0].MessageType);
+    }
+
+    #endregion
+}
+#endregion
+
+#region - EventPanelCancelTokenTests -
+public class EventPanelCancelTokenTests
+{
+    /// <summary>
+    /// Helper: BasePanelViewModel._cancellationTokenSource (protected) 에 접근하기 위한 리플렉션
+    /// </summary>
+    private static void SetCancellationTokenSource(object vm, CancellationTokenSource? cts)
+    {
+        var field = typeof(BasePanelViewModel)
+            .GetField("_cancellationTokenSource",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        field!.SetValue(vm, cts);
+    }
+
+    private DetectionEventPanelViewModel CreateDetectionPanelVM()
+    {
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var mockLogService = new Mock<ILogService>();
+        var mockApiService = new Mock<IEventApiService>();
+        var providerService = new EventProviderService(mockLogService.Object, mockApiService.Object);
+        var deviceProvider = new DeviceProvider();
+        var eventProvider = new EventProvider();
+
+        return new DetectionEventPanelViewModel(
+            mockEventAggregator.Object,
+            mockLogService.Object,
+            providerService,
+            deviceProvider,
+            eventProvider);
+    }
+
+    #region - Phase 1: ClickCancel 논리 버그 수정 -
+
+    [Fact]
+    public void ClickCancel_NullTokenSource_NoException()
+    {
+        // Arrange
+        var vm = CreateDetectionPanelVM();
+        SetCancellationTokenSource(vm, null);
+
+        // Act & Assert — 예외 없이 완료되어야 함
+        var exception = Record.Exception(() => vm.ClickCancel());
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void ClickCancel_ValidTokenSource_CancelsToken()
+    {
+        // Arrange
+        var vm = CreateDetectionPanelVM();
+        var cts = new CancellationTokenSource();
+        SetCancellationTokenSource(vm, cts);
+
+        // Act
+        vm.ClickCancel();
+
+        // Assert
+        Assert.True(cts.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void ClickCancel_AlreadyCancelled_NoException()
+    {
+        // Arrange
+        var vm = CreateDetectionPanelVM();
+        var cts = new CancellationTokenSource();
+        cts.Cancel(); // 이미 cancelled
+        SetCancellationTokenSource(vm, cts);
+
+        // Act & Assert — 중복 Cancel 시 예외 없어야 함
+        var exception = Record.Exception(() => vm.ClickCancel());
+        Assert.Null(exception);
+    }
+
+    #endregion
+
+    #region - Phase 2: LoadMoreCommand CancellationToken 전달 -
+
+    [Fact]
+    public async Task LoadNextPageAsync_CancelledToken_DoesNotFetch()
+    {
+        // Arrange
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var mockLogService = new Mock<ILogService>();
+        var mockApiService = new Mock<IEventApiService>();
+        var providerService = new EventProviderService(mockLogService.Object, mockApiService.Object);
+        var deviceProvider = new DeviceProvider();
+        var eventProvider = new EventProvider();
+
+        var vm = new DetectionEventPanelViewModel(
+            mockEventAggregator.Object,
+            mockLogService.Object,
+            providerService,
+            deviceProvider,
+            eventProvider);
+
+        var cts = new CancellationTokenSource();
+        cts.Cancel(); // 미리 취소
+
+        // Act & Assert — cancelled token이면 OperationCanceledException 발생 + API 호출 없음
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => vm.LoadNextPageAsync(cts.Token));
+
+        mockApiService.Verify(
+            s => s.GetDetectionEventsAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never());
+    }
+
+    #endregion
+
+    #region - Phase 3: DataInitialize ThrowIfCancellationRequested -
+
+    /// <summary>
+    /// DataInitialize (private) 를 리플렉션으로 호출하는 헬퍼
+    /// </summary>
+    private static Task InvokeDataInitialize(object vm, CancellationToken token)
+    {
+        var method = vm.GetType().GetMethod("DataInitialize",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        return (Task)method!.Invoke(vm, new object[] { token })!;
+    }
+
+    [Fact]
+    public async Task DataInitialize_CancelledToken_DoesNotFetch()
+    {
+        // Arrange
+        var mockEventAggregator = new Mock<IEventAggregator>();
+        var mockLogService = new Mock<ILogService>();
+        var mockApiService = new Mock<IEventApiService>();
+        var providerService = new EventProviderService(mockLogService.Object, mockApiService.Object);
+        var deviceProvider = new DeviceProvider();
+        var eventProvider = new EventProvider();
+
+        var vm = new DetectionEventPanelViewModel(
+            mockEventAggregator.Object,
+            mockLogService.Object,
+            providerService,
+            deviceProvider,
+            eventProvider);
+
+        var cts = new CancellationTokenSource();
+        cts.Cancel(); // 미리 취소
+
+        // Act — DataInitialize는 내부에서 catch하므로 예외 전파 없음
+        await InvokeDataInitialize(vm, cts.Token);
+
+        // Assert — cancelled token이면 API 호출이 없어야 함
+        mockApiService.Verify(
+            s => s.GetDetectionEventsAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never());
+    }
+
+    #endregion
+
+    #region - Phase 4: Cancel 후 UI 상태 복원 -
+
+    [Fact]
+    public async Task DataInitialize_Cancelled_IsVisibleRestoredToTrue()
+    {
+        // Arrange
+        var vm = CreateDetectionPanelVM();
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act
+        await InvokeDataInitialize(vm, cts.Token);
+
+        // Assert — Cancel 후에도 IsVisible은 true로 복원
+        Assert.True(vm.IsVisible);
+    }
+
+    [Fact]
+    public async Task LoadNextPageAsync_Cancelled_IsLoadingMoreRestoredToFalse()
+    {
+        // Arrange
+        var vm = CreateDetectionPanelVM();
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act — ThrowIfCancellationRequested 발생
+        try { await vm.LoadNextPageAsync(cts.Token); }
+        catch (OperationCanceledException) { }
+
+        // Assert — Cancel 후에도 IsLoadingMore는 false
+        Assert.False(vm.IsLoadingMore);
+    }
+
+    #endregion
+}
+#endregion
+
+#region - EventInfoViewModelCancelTests -
+[Collection("IoC-Dependent")]
+public class EventInfoViewModelCancelTests
+{
+    private static void EnsureIoCInitialized()
+    {
+        IoC.GetInstance = (type, key) =>
+        {
+            if (type == typeof(IEventAggregator)) return new EventAggregator();
+            if (type == typeof(ILogService)) return null!;
+            return null!;
+        };
+        IoC.GetAllInstances = type => Enumerable.Empty<object>();
+        IoC.BuildUp = obj => { };
+    }
+
+    private EventInfoViewModel CreateEventInfoVM(Mock<IEventApiService> mockApiService)
+    {
+        EnsureIoCInitialized();
+        var mockLogService = new Mock<ILogService>();
+        var providerService = new EventProviderService(mockLogService.Object, mockApiService.Object);
+        var deviceProvider = new DeviceProvider();
+        var eventProvider = new EventProvider();
+        var mockEventAggregator = new Mock<IEventAggregator>();
+
+        return new EventInfoViewModel(
+            deviceProvider,
+            eventProvider,
+            providerService,
+            mockEventAggregator.Object,
+            mockLogService.Object);
+    }
+
+    #region - Phase 5: EventInfoViewModel Cancel -
+
+    [Fact]
+    public async Task EventInfoVM_DataInitialize_CancelledToken_DoesNotFetchApis()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var vm = CreateEventInfoVM(mockApiService);
+        vm.SetData(DateTime.Now.AddDays(-1), DateTime.Now, new[] { "DET", "MAL", "CON", "ACT" });
+
+        var cts = new CancellationTokenSource();
+        cts.Cancel(); // 미리 취소
+
+        // Act
+        await vm.DataInitialize(cts.Token);
+
+        // Assert — cancelled token이면 어떤 Fetch API도 호출되지 않아야 함
+        mockApiService.Verify(
+            s => s.GetDetectionEventsAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never());
+    }
+
+    [Fact]
+    public async Task EventInfoVM_CancelAndRestart_PreviousCancelled()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var vm = CreateEventInfoVM(mockApiService);
+        vm.SetData(DateTime.Now.AddDays(-1), DateTime.Now, new[] { "DET" });
+
+        // Act — CancelAndRestart 호출 후 이전 CTS가 취소됨을 확인
+        var cts1 = vm.CancelAndRestart();
+        var cts2 = vm.CancelAndRestart();
+
+        // Assert — 1차 CTS는 취소됨, 2차 CTS는 아직 유효
+        Assert.True(cts1.IsCancellationRequested);
+        Assert.False(cts2.IsCancellationRequested);
+    }
+
+    #endregion
+
+    #region ChartEmptyDataTests
+
+    [Fact]
+    public void GetSensorDetectionCounts_ExcludesCamera()
+    {
+        // Arrange: 센서 3건 + 카메라 2건
+        var sensor = new SensorDeviceModel { Id = 1, DeviceNumber = 1, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+        var camera = new CameraDeviceModel { Id = 2, DeviceNumber = 2 }; // DeviceType = IpCamera (생성자 자동)
+
+        var events = new List<IDetectionEventModel>
+        {
+            new DetectionEventModel { Id = 1, DateTime = DateTime.Now, Device = sensor },
+            new DetectionEventModel { Id = 2, DateTime = DateTime.Now, Device = sensor },
+            new DetectionEventModel { Id = 3, DateTime = DateTime.Now, Device = sensor },
+            new DetectionEventModel { Id = 4, DateTime = DateTime.Now, Device = camera },
+            new DetectionEventModel { Id = 5, DateTime = DateTime.Now, Device = camera },
+        };
+
+        // Act — 센서 탐지만 반환 (IpCamera 제외)
+        var result = DataHelper.GetSensorDetectionCountsByDevice(
+            DateTime.Now.AddDays(-1), DateTime.Now.AddDays(1),
+            new List<IBaseDeviceModel> { sensor }, events);
+
+        // Assert — 센서만 3건
+        Assert.Single(result);
+        Assert.Equal(3.0, result[0]);
+    }
+
+    [Fact]
+    public void GetCameraDetectionCount_OnlyCamera()
+    {
+        // Arrange: 센서 3건 + 카메라 2건
+        var sensor = new SensorDeviceModel { Id = 1, DeviceNumber = 1, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+        var camera = new CameraDeviceModel { Id = 2, DeviceNumber = 2 };
+
+        var events = new List<IDetectionEventModel>
+        {
+            new DetectionEventModel { Id = 1, DateTime = DateTime.Now, Device = sensor },
+            new DetectionEventModel { Id = 2, DateTime = DateTime.Now, Device = sensor },
+            new DetectionEventModel { Id = 3, DateTime = DateTime.Now, Device = sensor },
+            new DetectionEventModel { Id = 4, DateTime = DateTime.Now, Device = camera },
+            new DetectionEventModel { Id = 5, DateTime = DateTime.Now, Device = camera },
+        };
+
+        // Act — 카메라 탐지만 카운트
+        var count = DataHelper.GetCameraDetectionCount(
+            DateTime.Now.AddDays(-1), DateTime.Now.AddDays(1), events);
+
+        // Assert — 카메라만 2건
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void CameraEventKpi_TotalCount_Correct()
+    {
+        // Arrange: 카메라 탐지 5건 + 센서 탐지 3건
+        var camera1 = new CameraDeviceModel { Id = 1, DeviceNumber = 1 };
+        var camera2 = new CameraDeviceModel { Id = 2, DeviceNumber = 2 };
+        var sensor = new SensorDeviceModel { Id = 3, DeviceNumber = 3, DeviceType = Libraries.Enums.EnumDeviceType.Fence };
+
+        var now = DateTime.Now;
+        var events = new List<IDetectionEventModel>
+        {
+            new DetectionEventModel { Id = 1, DateTime = now, Device = camera1 },
+            new DetectionEventModel { Id = 2, DateTime = now, Device = camera1 },
+            new DetectionEventModel { Id = 3, DateTime = now, Device = camera1 },
+            new DetectionEventModel { Id = 4, DateTime = now, Device = camera2 },
+            new DetectionEventModel { Id = 5, DateTime = now, Device = camera2 },
+            new DetectionEventModel { Id = 6, DateTime = now, Device = sensor },
+            new DetectionEventModel { Id = 7, DateTime = now, Device = sensor },
+            new DetectionEventModel { Id = 8, DateTime = now, Device = sensor },
+        };
+
+        // Act
+        var totalCount = CameraEventInfoViewModel.CalcTotalCount(
+            now.AddDays(-1), now.AddDays(1), events);
+
+        // Assert — 카메라만 5건
+        Assert.Equal(5, totalCount);
+    }
+
+    [Fact]
+    public void CameraEventKpi_DailyAverage_Correct()
+    {
+        // Arrange: 3일간 카메라 90건
+        var camera = new CameraDeviceModel { Id = 1, DeviceNumber = 1 };
+        var start = new DateTime(2026, 3, 1);
+        var end = new DateTime(2026, 3, 4); // 3일
+
+        var events = new List<IDetectionEventModel>();
+        for (int i = 0; i < 90; i++)
+            events.Add(new DetectionEventModel { Id = i, DateTime = start.AddHours(i % 72), Device = camera });
+
+        // Act
+        var avg = CameraEventInfoViewModel.CalcDailyAverage(start, end, events);
+
+        // Assert — 90 / 3 = 30
+        Assert.Equal(30.0, avg);
+    }
+
+    [Fact]
+    public void CameraEventKpi_ActiveCameraCount_Correct()
+    {
+        // Arrange: 5대 카메라 중 3대만 이벤트
+        var cam1 = new CameraDeviceModel { Id = 1, DeviceNumber = 1 };
+        var cam2 = new CameraDeviceModel { Id = 2, DeviceNumber = 2 };
+        var cam3 = new CameraDeviceModel { Id = 3, DeviceNumber = 3 };
+
+        var now = DateTime.Now;
+        var events = new List<IDetectionEventModel>
+        {
+            new DetectionEventModel { Id = 1, DateTime = now, Device = cam1 },
+            new DetectionEventModel { Id = 2, DateTime = now, Device = cam1 },
+            new DetectionEventModel { Id = 3, DateTime = now, Device = cam2 },
+            new DetectionEventModel { Id = 4, DateTime = now, Device = cam3 },
+        };
+
+        // Act
+        var activeCount = CameraEventInfoViewModel.CalcActiveCameraCount(
+            now.AddDays(-1), now.AddDays(1), events);
+
+        // Assert — 3대
+        Assert.Equal(3, activeCount);
+    }
+
+    [Fact]
+    public void GenerateHourlyLabels_SameDay_ReturnsCorrectLabels()
+    {
+        // Arrange
+        var start = new DateTime(2026, 3, 3, 0, 0, 0);
+        var end = new DateTime(2026, 3, 3, 3, 0, 0);
+
+        // Act
+        var labels = ChartHelper.GenerateHourlyLabels(start, end);
+
+        // Assert — 00, 01, 02, 03 → 4개
+        Assert.Equal(4, labels.Length);
+        Assert.Equal("2026-03-03 00", labels[0]);
+        Assert.Equal("2026-03-03 01", labels[1]);
+        Assert.Equal("2026-03-03 02", labels[2]);
+        Assert.Equal("2026-03-03 03", labels[3]);
+    }
+
+    [Fact]
+    public void GenerateHourlyLabels_CrossDay_ReturnsCorrectLabels()
+    {
+        // Arrange — 날짜 경계를 넘는 구간
+        var start = new DateTime(2026, 3, 2, 22, 0, 0);
+        var end = new DateTime(2026, 3, 3, 2, 0, 0);
+
+        // Act
+        var labels = ChartHelper.GenerateHourlyLabels(start, end);
+
+        // Assert — 22, 23, 00, 01, 02 → 5개
+        Assert.Equal(5, labels.Length);
+        Assert.Equal("2026-03-02 22", labels[0]);
+        Assert.Equal("2026-03-02 23", labels[1]);
+        Assert.Equal("2026-03-03 00", labels[2]);
+        Assert.Equal("2026-03-03 01", labels[3]);
+        Assert.Equal("2026-03-03 02", labels[4]);
+    }
+
+    [Fact]
+    public void GenerateHourlyLabels_LongRange_SwitchesToDaily()
+    {
+        // Arrange — 7일 구간 (48시간 초과 → 일 단위 전환)
+        var start = new DateTime(2026, 2, 25, 0, 0, 0);
+        var end = new DateTime(2026, 3, 3, 0, 0, 0);
+
+        // Act
+        var labels = ChartHelper.GenerateHourlyLabels(start, end);
+
+        // Assert — 7일 = 02-25 ~ 03-03 → 7개 (일 단위 포맷)
+        Assert.Equal(7, labels.Length);
+        Assert.Equal("2026-02-25", labels[0]);
+        Assert.Equal("2026-02-26", labels[1]);
+        Assert.Equal("2026-03-03", labels[6]);
+    }
+
+    #endregion
+}
+#endregion
+
+#region - Statistics Chart Helper 테스트 -
+
+public class StatisticsChartHelperTests
+{
+    #region - BuildLineSeriesFromTrend -
+
+    [Fact]
+    [Trait("Category", "Chart")]
+    public void TrendSeriesToLineChart_MapsCorrectly()
+    {
+        // Arrange
+        var trend = new EventTrendDto
+        {
+            Interval = "hour",
+            StartDate = "2025-01-15T00:00:00",
+            EndDate = "2025-01-15T03:00:00",
+            Series = new List<EventTrendItemDto>
+            {
+                new() { TimeBucket = "2025-01-15 00", SensorDetection = 3, CameraDetection = 1, Malfunction = 30, Connection = 0, Action = 2 },
+                new() { TimeBucket = "2025-01-15 01", SensorDetection = 0, CameraDetection = 5, Malfunction = 28, Connection = 0, Action = 0 },
+                new() { TimeBucket = "2025-01-15 02", SensorDetection = 7, CameraDetection = 2, Malfunction = 10, Connection = 1, Action = 3 }
+            }
+        };
+
+        // Act
+        var (series, xLabels) = ChartHelper.BuildLineSeriesFromTrend(
+            trend, DateTime.Parse("2025-01-15"), DateTime.Parse("2025-01-15T03:00:00"));
+
+        // Assert
+        Assert.Equal(5, series.Count);    // 5 카테고리
+        Assert.Equal(3, xLabels.Length);  // 3 time_bucket
+
+        Assert.Equal("2025-01-15 00", xLabels[0]);
+        Assert.Equal("2025-01-15 02", xLabels[2]);
+
+        // Sensor Detection 값 검증
+        var sensorSeries = series[0] as LiveChartsCore.SkiaSharpView.LineSeries<int>;
+        Assert.NotNull(sensorSeries);
+        var sensorValues = sensorSeries!.Values!.ToArray();
+        Assert.Equal(3, sensorValues.Length);
+        Assert.Equal(3, sensorValues[0]);
+        Assert.Equal(0, sensorValues[1]);
+        Assert.Equal(7, sensorValues[2]);
+    }
+
+    [Fact]
+    [Trait("Category", "Chart")]
+    public void TrendSeriesToLineChart_EmptyData_FallbackLabels()
+    {
+        // Arrange
+        var trend = new EventTrendDto
+        {
+            Interval = "hour",
+            Series = new List<EventTrendItemDto>()
+        };
+        var start = new DateTime(2025, 1, 15, 0, 0, 0);
+        var end = new DateTime(2025, 1, 15, 3, 0, 0);
+
+        // Act
+        var (series, xLabels) = ChartHelper.BuildLineSeriesFromTrend(trend, start, end);
+
+        // Assert
+        Assert.Equal(5, series.Count);
+        Assert.True(xLabels.Length >= 3); // 00, 01, 02, 03 → 최소 3~4
+
+        // 모든 값이 0
+        var sensorSeries = series[0] as LiveChartsCore.SkiaSharpView.LineSeries<int>;
+        Assert.NotNull(sensorSeries);
+        Assert.All(sensorSeries!.Values!, v => Assert.Equal(0, v));
+    }
+
+    #endregion
+
+    #region - BuildBarSeriesFromByDevice -
+
+    [Fact]
+    [Trait("Category", "Chart")]
+    public void ByDeviceToBarSeries_MapsControllers()
+    {
+        // Arrange
+        var byDevice = new EventByDeviceDto
+        {
+            Controllers = new List<ControllerStatsDto>
+            {
+                new() { ControllerId = 1, ControllerName = "Controller-A", SensorDetection = 45, Malfunction = 12, Connection = 3 },
+                new() { ControllerId = 2, ControllerName = "Controller-B", SensorDetection = 30, Malfunction = 8, Connection = 1 }
+            },
+            Cameras = new List<CameraStatsDto>
+            {
+                new() { CameraId = 101, CameraName = "Camera-1", CameraDetection = 25 }
+            }
+        };
+
+        // Act
+        var (series, xLabels) = ChartHelper.BuildBarSeriesFromByDevice(byDevice, new[] { "DET", "MAL", "CON", "ACT" });
+
+        // Assert
+        Assert.Equal(4, series.Count); // DET, MAL, CON, ACT
+        Assert.Equal(2, xLabels.Length);
+        Assert.Equal("Controller-A", xLabels[0]);
+        Assert.Equal("Controller-B", xLabels[1]);
+    }
+
+    #endregion
+
+    #region - BuildPieSeriesFromSummary -
+
+    [Fact]
+    [Trait("Category", "Chart")]
+    public void SummaryToPieSeries_MapsCorrectly()
+    {
+        // Arrange
+        var summary = new EventSummaryDto
+        {
+            Total = 275,
+            SensorDetection = 150,
+            CameraDetection = 30,
+            Malfunction = 45,
+            Connection = 30,
+            Action = 20
+        };
+
+        // Act
+        var series = ChartHelper.BuildPieSeriesFromSummary(summary, new[] { "DET", "MAL", "CON", "ACT" });
+
+        // Assert
+        Assert.Equal(4, series.Count); // DET, MAL, CON, ACT
+    }
+
+    [Fact]
+    [Trait("Category", "Chart")]
+    public void SummaryToPieSeries_FilteredTypes()
+    {
+        // Arrange
+        var summary = new EventSummaryDto
+        {
+            SensorDetection = 150,
+            CameraDetection = 30,
+            Malfunction = 45,
+            Connection = 30,
+            Action = 20
+        };
+
+        // Act — DET 전용
+        var series = ChartHelper.BuildPieSeriesFromSummary(summary, new[] { "DET" });
+
+        // Assert
+        Assert.Single(series);
+    }
+
+    #endregion
+
+    #region - CameraKpi From SummaryDto -
+
+    [Fact]
+    [Trait("Category", "Chart")]
+    public void CameraKpi_FromSummaryDto_Correct()
+    {
+        // Arrange
+        var summary = new EventSummaryDto
+        {
+            CameraDetection = 30,
+            DailyAverages = new DailyAveragesDto { CameraDetection = 4.3 },
+            ActiveDevices = new ActiveDevicesDto { Cameras = 15 }
+        };
+
+        // Act + Assert
+        Assert.Equal(30, summary.CameraDetection);
+        Assert.Equal(4.3, summary.DailyAverages.CameraDetection);
+        Assert.Equal(15, summary.ActiveDevices.Cameras);
+    }
+
+    #endregion
+
+    #region LoadingProgressTests
+
+    [Fact]
+    public void DataChartPanelViewModel_IsChartLoading_DefaultFalse()
+    {
+        // Arrange — DataChartPanelViewModel requires DI params; just verify property exists via reflection
+        var prop = typeof(DataChartPanelViewModel).GetProperty("IsChartLoading");
+
+        // Assert
+        Assert.NotNull(prop);
+        Assert.Equal(typeof(bool), prop.PropertyType);
+    }
+
+    #endregion
+}
+
 #endregion

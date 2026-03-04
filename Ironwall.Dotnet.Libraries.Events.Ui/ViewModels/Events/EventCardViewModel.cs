@@ -67,7 +67,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Properties -
         public string? IdUser { get; set; } 
         public string? Contents { get; set; }
-        public string? EventGroup => _model.EventGroup;  
         public IBaseDeviceModel? Device => _model.Device;
         public EnumTrueFalse Status => _model.Status;
         public EnumEventType MessageType => _model.MessageType;

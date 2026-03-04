@@ -216,6 +216,7 @@
 			<i:Interaction.Behaviors>
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:MalfunctionEventSelectedItemBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
+				<behavior_inner:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 
@@ -237,35 +238,6 @@
 						</Style>
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>
-
-				<!--  EventGroup  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					Header="Event Group"
-					SortMemberPath="EventGroup">
-					<DataGridColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding EventGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<TextBox
-								VerticalAlignment="Center"
-								Text="{Binding EventGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
 
 				<!--  MessageType  -->
 				<DataGridTemplateColumn
@@ -625,6 +597,23 @@
 
 			<TextBlock Text="선택된 항목 : " />
 			<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
+		</StackPanel>
+		<StackPanel
+			Grid.Row="3"
+			Margin="10,5,10,5"
+			Orientation="Horizontal"
+			HorizontalAlignment="Right">
+			<ProgressBar
+				Width="16"
+				Height="16"
+				Margin="0,0,8,0"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Visibility="{Binding IsLoadingMore, Converter={StaticResource BooleanToVisibilityConverter}}"
+				Value="44" />
+			<TextBlock
+				VerticalAlignment="Center"
+				Text="{Binding LoadedCountText, UpdateSourceTrigger=PropertyChanged}" />
 		</StackPanel>
 	</Grid>
 </UserControl>

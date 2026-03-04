@@ -20,6 +20,7 @@ using LiveChartsCore.Measure;
 using LiveChartsCore.Drawing;
 using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using System.Xml.Linq;
 using LiveChartsCore.Kernel;
 using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
@@ -152,12 +153,28 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
 
 
+        /// <summary>
+        /// 이전 DataInitialize를 취소하고 새 CancellationToken을 반환
+        /// </summary>
+        public CancellationToken CancelAndRestart()
+        {
+            if (_infoCts != null && !_infoCts.IsCancellationRequested)
+            {
+                _infoCts.Cancel();
+                _infoCts.Dispose();
+            }
+            _infoCts = new CancellationTokenSource();
+            return _infoCts.Token;
+        }
+
         public Task DataInitialize(CancellationToken cancellationToken = default)
         {
             return Task.Run(async () =>
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     /*──────────────────────────────────────────────────────────────
                        *  ★ 수정: SetData()에서 설정한 _startDate, _endDate 사용
                     *──────────────────────────────────────────────────────────────*/
@@ -236,10 +253,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     var devices = _deviceProvider.OfType<IControllerDeviceModel>()
                                                 .OrderBy(d => d.DeviceNumber);          // 보기 좋게 정렬
 
+                    // ★ 빈 데이터 폴백: devices가 비어있으면 "No Data" 라벨로 대체
+                    var deviceLabels = devices.Any()
+                        ? devices.Select(d => d.DeviceNumber.ToString()).ToArray()
+                        : new[] { "No Data" };
 
                     var xLabel = new Axis
                     {
-                        Labels = devices.Select(d => d.DeviceNumber.ToString()).ToArray(),
+                        Labels = deviceLabels,
                         Name = "controller",
                         Position = AxisPosition.Start,
                         NameTextSize = 15,
@@ -279,6 +300,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                             /* 1) 데이터 계산 */
                             var counts = m.Counter(_startDate, _endDate, devices, _eventProvider);
 
+                            // ★ 빈 데이터 폴백: counts가 비어있으면 0값으로 채움
+                            if (counts.Count == 0)
+                                counts = new List<double> { 0 };
+
                             /* 2) Bar + Pie 시리즈 */
                             var bar = ChartHelper.MakeBar(
                                 m.DisplayName, counts, m.BarColor, SKColors.White);
@@ -293,12 +318,91 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     });
 
                 }
-                catch (TaskCanceledException ex)
+                catch (OperationCanceledException ex)
                 {
-                    _log?.Warning($"Raised {nameof(TaskCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
+                    _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
                 }
                 finally
                 {
+                }
+            });
+        }
+
+        /// <summary>
+        /// Statistics API DTO를 직접 받아 Bar/Pie 차트를 생성한다.
+        /// EventDashboardViewModel → DataChartPanelViewModel.LastDashboardDto 경유.
+        /// </summary>
+        public Task DataInitializeFromStats(EventSummaryDto summary, EventByDeviceDto byDevice,
+                                            CancellationToken ct = default)
+        {
+            IsChartLoading = true;
+            return Task.Run(() =>
+            {
+                try
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    // Bar chart — by-device 기반
+                    var (barSeries, xLabels) = ChartHelper.BuildBarSeriesFromByDevice(byDevice, _names);
+
+                    // Pie chart — summary 기반
+                    var pieSeries = ChartHelper.BuildPieSeriesFromSummary(summary, _names);
+
+                    // 디버그: API에서 받은 제어기 이름 확인
+                    _log?.Info($"[EventInfoViewModel] xLabels: [{string.Join(", ", xLabels)}]");
+
+                    var koreanTypeface = SKTypeface.FromFamilyName("Malgun Gothic");
+
+                    var xAxis = new Axis
+                    {
+                        Labels = xLabels,
+                        Name = "controller",
+                        Position = AxisPosition.Start,
+                        NameTextSize = 15,
+                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2)
+                        {
+                            SKTypeface = koreanTypeface
+                        },
+                        UnitWidth = 1,
+                        NamePadding = new Padding(0, -10, 0, 5),
+                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 2)
+                        {
+                            SKTypeface = koreanTypeface
+                        },
+                        ShowSeparatorLines = false
+                    };
+
+                    var yAxis = new Axis
+                    {
+                        Name = "events",
+                        Position = AxisPosition.Start,
+                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        NameTextSize = 15,
+                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 0),
+                        NamePadding = new Padding(0, 5, 0, -10),
+                        MinLimit = 0
+                    };
+
+                    DispatcherService.Invoke(() =>
+                    {
+                        LSeries.Clear();
+                        DSeries.Clear();
+                        XAxes.Clear();
+                        XAxes.Add(xAxis);
+                        YAxes.Clear();
+                        YAxes.Add(yAxis);
+
+                        foreach (var s in barSeries) LSeries.Add(s);
+                        foreach (var s in pieSeries) DSeries.Add(s);
+                    });
+                }
+                catch (OperationCanceledException ex)
+                {
+                    _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitializeFromStats)}) : {ex.Message}");
+                }
+                finally
+                {
+                    DispatcherService.Invoke(() => IsChartLoading = false);
                 }
             });
         }
@@ -338,12 +442,18 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         new SolidColorPaint
         {
             Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Caliber")
+            SKTypeface = SKTypeface.FromFamilyName("Malgun Gothic")
         };
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
+        public SolidColorPaint TooltipTextPaint { get; set; } =
+        new SolidColorPaint
+        {
+            Color = new SKColor(50, 50, 50),
+            SKTypeface = SKTypeface.FromFamilyName("Malgun Gothic")
+        };
 
         public ObservableCollection<ISeries> LSeries { get; private set; }
         public ObservableCollection<ISeries> DSeries { get; private set; }
@@ -400,12 +510,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             private set => SetFlag(ref _isActionActive, value, nameof(IsActionActive));
         }
 
+        public bool IsChartLoading
+        {
+            get => _isChartLoading;
+            set { _isChartLoading = value; NotifyOfPropertyChange(() => IsChartLoading); }
+        }
+
         #endregion
         #region - Attributes -
         private EventProviderService _providerService;
         private DeviceProvider _deviceProvider;
         private EventProvider _eventProvider;
+        private CancellationTokenSource? _infoCts;
         private string[] _names;
+        private bool _isChartLoading;
         private DateTime _startDate;
         private DateTime _endDate;
 

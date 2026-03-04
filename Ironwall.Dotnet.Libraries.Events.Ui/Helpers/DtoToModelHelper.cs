@@ -1,6 +1,7 @@
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
@@ -63,7 +64,7 @@ public static class DtoToModelHelper
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            Status = EnumTrueFalse.True,
+            Status = EnumTrueFalse.False,
             Device = ConvertDeviceFromDto(dto.Device, null)
         };
     }
@@ -156,7 +157,7 @@ public static class DtoToModelHelper
             TypeEvent = model.MessageType.ToString(),
             Content = model.Content ?? string.Empty,
             User = model.User ?? string.Empty,
-            FromEvent = null
+            FromEvent = ConvertOriginEventToDto(model.OriginEvent)
         };
     }
 
@@ -216,7 +217,7 @@ public static class DtoToModelHelper
             Id = dto.Id,
             DateTime = ParseDateTime(dto.CreatedAt),
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
-            Status = EnumTrueFalse.True,
+            Status = EnumTrueFalse.False,
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
     }
@@ -259,31 +260,59 @@ public static class DtoToModelHelper
         if (deviceDto == null)
             return null;
 
-        // DeviceProvider가 있으면 ID로 실제 Device 조회
+        // DeviceProvider가 있으면 ID + TypeDevice로 실제 Device 조회
         if (deviceProvider != null)
         {
+            // TypeDevice가 있으면 ID + TypeDevice 우선 매칭
+            if (!string.IsNullOrEmpty(deviceDto.TypeDevice) &&
+                Enum.TryParse<EnumDeviceType>(deviceDto.TypeDevice, out var filterType))
+            {
+                var matched = deviceProvider.FirstOrDefault(d => d.Id == deviceDto.Id && d.DeviceType == filterType);
+                if (matched != null)
+                    return matched;
+            }
+
+            // TypeDevice 없거나 매칭 실패 시 ID만으로 조회
             var existing = deviceProvider.FirstOrDefault(d => d.Id == deviceDto.Id);
             if (existing != null)
                 return existing;
         }
 
-        // Fallback: DTO에서 최소 모델 생성
+        // Fallback: DTO에서 가용 속성을 모두 매핑하여 모델 생성
         if (!string.IsNullOrEmpty(deviceDto.TypeDevice) &&
             Enum.TryParse<EnumDeviceType>(deviceDto.TypeDevice, out var deviceType))
         {
-            switch (deviceType)
+            BaseDeviceModel model = deviceType switch
             {
-                case EnumDeviceType.Controller:
-                    return new ControllerDeviceModel { Id = deviceDto.Id, DeviceType = deviceType };
-                case EnumDeviceType.IpCamera:
-                    return new CameraDeviceModel { Id = deviceDto.Id, DeviceType = deviceType };
-                default:
-                    // Sensor 계열 (Fence, Multi, PIR, etc.)
-                    return new SensorDeviceModel { Id = deviceDto.Id, DeviceType = deviceType };
-            }
+                EnumDeviceType.Controller => new ControllerDeviceModel(),
+                EnumDeviceType.IpCamera => new CameraDeviceModel(),
+                _ => new SensorDeviceModel()  // Sensor 계열 (Fence, Multi, PIR, etc.)
+            };
+            model.Id = deviceDto.Id;
+            model.DeviceType = deviceType;
+            PopulateDeviceFromDto(model, deviceDto);
+            return model;
         }
 
-        return new SensorDeviceModel { Id = deviceDto.Id };
+        var fallback = new SensorDeviceModel { Id = deviceDto.Id };
+        PopulateDeviceFromDto(fallback, deviceDto);
+        return fallback;
+    }
+
+    /// <summary>
+    /// DTO의 가용 속성을 BaseDeviceModel에 매핑
+    /// </summary>
+    private static void PopulateDeviceFromDto(BaseDeviceModel model, BaseDeviceDto dto)
+    {
+        model.DeviceName = dto.NameDevice;
+        model.DeviceNumber = dto.NumberDevice;
+        model.Version = dto.Version;
+        if (!string.IsNullOrEmpty(dto.Status) &&
+            Enum.TryParse<EnumDeviceStatus>(dto.Status, out var status))
+        {
+            model.Status = status;
+        }
+        model.DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList();
     }
 
     /// <summary>
@@ -304,7 +333,28 @@ public static class DtoToModelHelper
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // OriginEvent 변환 헬퍼
+    // OriginEvent 역변환 헬퍼 (Model → DTO)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// IExEventModel → IEventDto 변환 (ActionEvent의 FromEvent 역변환용)
+    /// </summary>
+    private static IEventDto? ConvertOriginEventToDto(IExEventModel? originEvent)
+    {
+        if (originEvent == null)
+            return null;
+
+        return originEvent switch
+        {
+            IDetectionEventModel detection => detection.ToDetectionEventDto(),
+            IMalfunctionEventModel malfunction => malfunction.ToMalfunctionEventDto(),
+            IConnectionEventModel connection => connection.ToConnectionEventDto(),
+            _ => null
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // OriginEvent 변환 헬퍼 (DTO → Model)
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -318,41 +368,32 @@ public static class DtoToModelHelper
         if (fromEvent == null)
             return null;
 
-        try
+        switch (fromEvent)
         {
-            var eventSnapshot = eventProvider?.ToList();
+            case DetectionEventDto detectionDto:
+                if (eventProvider != null)
+                {
+                    var existing = eventProvider
+                        .OfType<IDetectionEventModel>()
+                        .FirstOrDefault(e => e.Id == detectionDto.Id);
+                    if (existing != null)
+                        return existing;
+                }
+                return detectionDto.ToDetectionEventModel(deviceProvider);
 
-            switch (fromEvent)
-            {
-                case DetectionEventDto detectionDto:
-                    if (eventProvider != null)
-                    {
-                        var existing = eventSnapshot?
-                            .OfType<IDetectionEventModel>()
-                            .FirstOrDefault(e => e.Id == detectionDto.Id);
-                        if (existing != null)
-                            return existing;
-                    }
-                    return detectionDto.ToDetectionEventModel(deviceProvider);
+            case MalfunctionEventDto malfunctionDto:
+                if (eventProvider != null)
+                {
+                    var existing = eventProvider
+                        .OfType<IMalfunctionEventModel>()
+                        .FirstOrDefault(e => e.Id == malfunctionDto.Id);
+                    if (existing != null)
+                        return existing;
+                }
+                return malfunctionDto.ToMalfunctionEventModel(deviceProvider);
 
-                case MalfunctionEventDto malfunctionDto:
-                    if (eventProvider != null)
-                    {
-                        var existing = eventSnapshot?
-                            .OfType<IMalfunctionEventModel>()
-                            .FirstOrDefault(e => e.Id == malfunctionDto.Id);
-                        if (existing != null)
-                            return existing;
-                    }
-                    return malfunctionDto.ToMalfunctionEventModel(deviceProvider);
-
-                default:
-                    return null;
-            }
-        }
-        catch (Exception)
-        {
-            throw;
+            default:
+                return null;
         }
     }
 

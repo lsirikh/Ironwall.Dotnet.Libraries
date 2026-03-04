@@ -59,6 +59,7 @@ public class EventUiModule : Module
             builder.RegisterType<ConnectionEventPanelViewModel>().SingleInstance();
             builder.RegisterType<ActionEventPanelViewModel>().SingleInstance();
             builder.RegisterType<EventInfoViewModel>().SingleInstance();
+            builder.RegisterType<CameraEventInfoViewModel>().SingleInstance();
             builder.RegisterType<DataChartPanelViewModel>().SingleInstance();
             builder.RegisterType<EventCardListPanelViewModel>().SingleInstance();
             builder.RegisterType<SymbolEventManager>().SingleInstance();
