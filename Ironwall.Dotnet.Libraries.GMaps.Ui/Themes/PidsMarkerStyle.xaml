@@ -525,6 +525,117 @@
 							</Border>
 						</Grid>
 
+						<!--  === Speaker Section ===  -->
+						<Grid Name="PART_SpeakerSection" Visibility="Collapsed">
+							<!--  Speaker 아이콘 (크기 조절됨)  -->
+							<Viewbox
+								Name="PART_ViewboxSpeakerContainer"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								Stretch="Fill"
+								ToolTip="{TemplateBinding MarkerTitle}">
+
+								<Grid
+									Name="PART_SpeakerIconContainer"
+									Width="40"
+									Height="40">
+
+									<!--  스피커 캐비닛 본체  -->
+									<Rectangle
+										Width="8"
+										Height="22"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										Fill="{TemplateBinding MarkerFill}"
+										RadiusX="2"
+										RadiusY="2"
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
+
+									<!--  스피커 드라이버 외부 서라운드  -->
+									<Ellipse
+										Width="26"
+										Height="26"
+										Margin="8,0,0,0"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										Fill="{TemplateBinding MarkerFill}"
+										Stroke="{TemplateBinding MarkerStroke}"
+										StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
+										<Ellipse.Effect>
+											<DropShadowEffect
+												BlurRadius="6"
+												Opacity="0.4"
+												ShadowDepth="3"
+												Color="Black" />
+										</Ellipse.Effect>
+									</Ellipse>
+
+									<!--  드라이버 중간 서라운드  -->
+									<Ellipse
+										Width="18"
+										Height="18"
+										Margin="8,0,0,0"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										Fill="DimGray"
+										Opacity="0.85" />
+
+									<!--  드라이버 콘  -->
+									<Ellipse
+										Width="10"
+										Height="10"
+										Margin="8,0,0,0"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										Fill="#1A1A1A" />
+
+									<!--  더스트 캡 (중심)  -->
+									<Ellipse
+										Width="4"
+										Height="4"
+										Margin="8,0,0,0"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										Fill="White"
+										Opacity="0.55" />
+
+								</Grid>
+							</Viewbox>
+
+							<!--  Speaker Label (독립적 크기)  -->
+							<Border
+								Name="PART_SpeakerLabelContainer"
+								MinWidth="20"
+								MaxWidth="150"
+								Margin="0,0,0,-25"
+								Padding="2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_SpeakerLabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+							</Border>
+						</Grid>
+
 						<!--  Event Status Indicator (모든 타입 공통)  -->
 						<Border
 							Name="PART_EventStatusIndicator"
@@ -585,6 +696,9 @@
 						</Trigger>
 						<Trigger Property="DeviceType" Value="IpCamera">
 							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="DeviceType" Value="IpSpeaker">
+							<Setter TargetName="PART_SpeakerSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 
 						<!--  Event Status Colors (Normal 기본값)  -->
@@ -707,6 +821,29 @@
 							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
 						</MultiTrigger>
 
+						<!--  Speaker 라벨  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="IpSpeaker" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="IpSpeaker" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="IpSpeaker" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+
 						<!--  Mouse Over Effects  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
@@ -718,6 +855,7 @@
 							<Setter TargetName="PART_MultiSection" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_FenceSection" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_SpeakerSection" Property="Visibility" Value="Collapsed" />
 							<Setter Property="IsHitTestVisible" Value="False" />
 						</Trigger>
 
@@ -728,6 +866,7 @@
 							<Setter TargetName="PART_MultiSection" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_FenceSection" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_CameraSection" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_SpeakerSection" Property="Opacity" Value="0.5" />
 						</Trigger>
 
 						<!--  Pulse Animation for Detecting State  -->
