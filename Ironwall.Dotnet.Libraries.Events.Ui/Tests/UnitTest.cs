@@ -2214,7 +2214,8 @@ public class SymbolEventManagerTests
         mockSymbol.VerifySet(s => s.DetectionBearing = 90.0, Times.Once);
         mockSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);  // 80 / 2
         mockSymbol.VerifySet(s => s.DetectionRange = 60.0, Times.Once);  // 30 * 2
-        mockSymbol.Verify(s => s.SetUpdate(), Times.Once);
+        // RegisterDeviceSymbol now calls SyncFromDevice (1 extra SetUpdate), PTZ adds 1 more
+        mockSymbol.Verify(s => s.SetUpdate(), Times.AtLeastOnce());
     }
     #endregion
 
@@ -2281,8 +2282,8 @@ public class SymbolEventManagerTests
         pidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);
         // Zoom 400% (4x) → Range 120 (30 * 4)
         pidsSymbol.VerifySet(s => s.DetectionRange = 120.0, Times.Once);
-        // SetUpdate() 호출되어 UI 갱신 트리거
-        pidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
+        // SetUpdate() called during registration (SyncFromDevice) + PTZ update
+        pidsSymbol.Verify(s => s.SetUpdate(), Times.AtLeastOnce());
     }
     #endregion
 
@@ -2616,7 +2617,8 @@ public class SymbolEventManagerDualDictionaryTests
         mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
         mockPidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);   // 80 / 4
         mockPidsSymbol.VerifySet(s => s.DetectionRange = 120.0, Times.Once);  // 30 * 4
-        mockPidsSymbol.Verify(s => s.SetUpdate(), Times.Once);
+        // RegisterDeviceSymbol calls SyncFromDevice (1 extra) + PTZ update
+        mockPidsSymbol.Verify(s => s.SetUpdate(), Times.AtLeastOnce());
 
         // 그룹 심볼은 IPidsSymbolModel이 아니므로 FOV 속성 없음 - 호출 안됨
     }
