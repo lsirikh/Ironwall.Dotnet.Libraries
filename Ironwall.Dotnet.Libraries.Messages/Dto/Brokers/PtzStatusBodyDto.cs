@@ -8,11 +8,11 @@ public class PtzStatusBodyDto
     public int CameraId { get; set; }
 
     [JsonProperty("pan")]
-    public double Pan { get; set; }
+    public int Pan { get; set; }
 
     [JsonProperty("tilt")]
-    public double Tilt { get; set; }
+    public int Tilt { get; set; }
 
     [JsonProperty("zoom")]
-    public double Zoom { get; set; }
+    public int Zoom { get; set; }
 }

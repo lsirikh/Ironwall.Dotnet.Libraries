@@ -1147,8 +1147,7 @@ public class BaseDeviceDtoTests
         Assert.NotNull(dto.DeviceGroups);
         Assert.Equal(3, dto.DeviceGroups.Count);
         Assert.Contains(dto.DeviceGroups, g => g.Id == 3);
-        Assert.Equal("2025-12-01T10:00:00.000+09:00", dto.CreatedAt);
-        Assert.Equal("2025-12-01T12:00:00.000+09:00", dto.UpdatedAt);
+        // 설계 문서 원칙: nested device 객체에서 created_at/updated_at 제외 → 역직렬화 시도해도 무시됨
     }
 
     #region A9.3: BaseDeviceDto version/group_device/geolocation 추가 (§14.2.2~4)
@@ -1290,6 +1289,29 @@ public class BaseDeviceDtoTests
 
         Assert.NotNull(dto);
         Assert.Null(dto.DeviceGroups);
+    }
+
+    #endregion
+
+    #region A9.5: BaseDeviceDto nested 직렬화 시 created_at/updated_at 제외
+
+    [Fact(DisplayName = "A9.5: BaseDeviceDto 직렬화 시 created_at/updated_at 제외 (설계 문서 Nested 객체 원칙)")]
+    [Trait("Category", "DTO")]
+    public void BaseDeviceDto_Serialization_ShouldNotIncludeCreatedAtUpdatedAt()
+    {
+        var dto = new BaseDeviceDto
+        {
+            Id = 101,
+            TypeDevice = "Fence",
+            NameDevice = "Sensor-A-1",
+            Status = "ACTIVATED"
+        };
+
+        var json = JsonConvert.SerializeObject(dto);
+
+        Assert.DoesNotContain("created_at", json);
+        Assert.DoesNotContain("updated_at", json);
+        Assert.Contains("\"id\":101", json);
     }
 
     #endregion
@@ -2003,8 +2025,18 @@ public class NatsBodyDtoTests
         Assert.Contains("\"pan_tilt_speed\":5", ptzJson);
         Assert.Contains("\"timeout_ms\":3000", ptzJson);
 
-        var ptzStatus = new Dto.Brokers.PtzStatusBodyDto { CameraId = 109, Pan = 45.0, Tilt = -10.0, Zoom = 2.0 };
-        Assert.Contains("\"pan\":45", JsonConvert.SerializeObject(ptzStatus));
+        var ptzStatus = new Dto.Brokers.PtzStatusBodyDto { CameraId = 109, Pan = 1000, Tilt = 5000, Zoom = 2000 };
+        var ptzStatusJson = JsonConvert.SerializeObject(ptzStatus);
+        Assert.Contains("\"pan\":1000", ptzStatusJson);
+        Assert.Contains("\"tilt\":5000", ptzStatusJson);
+        Assert.Contains("\"zoom\":2000", ptzStatusJson);
+
+        // A2.17-1b: PtzStatusBodyDto pan/tilt/zoom는 int 타입 (설계 문서 §8.3.1)
+        var deserialized = JsonConvert.DeserializeObject<Dto.Brokers.PtzStatusBodyDto>(
+            "{\"camera_id\":201,\"pan\":1000,\"tilt\":5000,\"zoom\":2000}");
+        Assert.Equal(typeof(int), deserialized!.Pan.GetType());
+        Assert.Equal(typeof(int), deserialized.Tilt.GetType());
+        Assert.Equal(typeof(int), deserialized.Zoom.GetType());
 
         var trackSet = new Dto.Brokers.TrackingSetBodyDto { CameraId = 109, Tracking = "on" };
         Assert.Contains("\"tracking\":\"on\"", JsonConvert.SerializeObject(trackSet));
@@ -2722,24 +2754,22 @@ public class EventDtoRestructureTests
     }
     #endregion
 
-    #region A6.5: ActionEventDto device 추가
-    [Fact(DisplayName = "A6.5: ActionEventDto device + device_description 추가")]
+    #region A6.5: ActionEventDto 설계 문서 기준 필드 검증
+    [Fact(DisplayName = "A6.5: ActionEventDto는 설계 문서 기준 필드만 포함 (device/device_description 제외)")]
     [Trait("Category", "Event")]
-    public void ActionEventDto_ShouldHaveDeviceAndDeviceDescription()
+    public void ActionEventDto_ShouldNotHaveDeviceOrDeviceDescription()
     {
         var dto = new ActionEventDto
         {
             Id = 4001,
             TypeEvent = "Action",
             Content = "침입 탐지 확인",
-            User = "operator_01",
-            Device = new BaseDeviceDto { Id = 2, TypeDevice = "Sensor" },
-            DeviceDescription = "1구역 센서 2번"
+            User = "operator_01"
         };
 
         var json = JsonConvert.SerializeObject(dto);
-        Assert.Contains("\"device\":{", json);
-        Assert.Contains("\"device_description\":\"1구역 센서 2번\"", json);
+        Assert.DoesNotContain("\"device\":", json);
+        Assert.DoesNotContain("\"device_description\"", json);
         Assert.Contains("\"content\":\"침입 탐지 확인\"", json);
     }
     #endregion
