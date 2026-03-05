@@ -2462,6 +2462,47 @@ public class SymbolEventManagerDualDictionaryTests
     }
     #endregion
 
+    #region Test 13.2.3: Fault 이벤트 - 개별 + 그룹 모두 처리
+    [Fact]
+    public void ProcessDeviceEvent_Fault_ShouldProcessBothDeviceAndGroupSymbols()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
+        mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        var mockGroupSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsGroupSymbolModel>();
+        mockGroupSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
+        manager.RegisterGroupSymbol(deviceGroup: 1, mockDevice.Object, mockGroupSymbol.Object);
+
+        // Act - Fault 이벤트 (FAULT_FENCE)
+        manager.ProcessDeviceEvent(
+            deviceId: 5,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            deviceGroups: new List<int> { 1 },
+            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
+            severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
+
+        // Assert - 개별 심볼 EventStatus = Fault 로 변경됨
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+
+        // Assert - 그룹 심볼도 EventStatus = Fault 로 변경됨 (버그 수정 검증)
+        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+    }
+    #endregion
+
     #region Test 13.3.1: Fence 타입 제어기 장애 - 그룹 처리
     [Fact]
     public void ProcessControllerEvent_FenceType_ShouldProcessGroupSymbol()

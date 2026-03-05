@@ -234,11 +234,11 @@ public class SymbolEventManager : IDisposable,
     }
 
     /// <summary>
-    /// 그룹 심볼 처리 대상 이벤트인지 확인 (Intrusion 이벤트만)
+    /// 그룹 심볼 처리 대상 이벤트인지 확인 (Intrusion + Fault 이벤트)
     /// </summary>
     private bool ShouldProcessGroupSymbol(EnumEventType eventType)
     {
-        return eventType == EnumEventType.Intrusion;
+        return eventType == EnumEventType.Intrusion || eventType == EnumEventType.Fault;
     }
 
     /// <summary>
