@@ -36,13 +36,13 @@ public abstract class MessageService<T> : IMessageService<T>
 
     public async Task StopAsync(CancellationToken token = default)
     {
-        await Task.Run(() => UnregisterSubscribers(), token);
+        await UnregisterSubscribersAsync();
     }
     #endregion
 
     #region - Processes -
     /// <summary>
-    /// Subject 구독을 등록합니다 (와일드카드 지원)
+    /// Subject 구독을 등록합니다 (와일드카드 지원, 복수 Subject 병렬 구독)
     /// </summary>
     protected virtual async Task RegisterSubscribers(CancellationToken token = default)
     {
@@ -56,46 +56,53 @@ public abstract class MessageService<T> : IMessageService<T>
                 return;
             }
 
-            _log?.Info($"[RegisterSubscribers] Starting subscription to: {_defaultSubject}");
+            // 구독할 전체 subject 목록 (primary + additional)
+            var subjects = new List<string> { _defaultSubject };
+            if (_additionalSubjects.Count > 0)
+                subjects.AddRange(_additionalSubjects);
 
-            // NATS v2 API: SubscribeAsync로 직접 IAsyncEnumerable 반환
-            // 백그라운드에서 메시지 수신 처리
-            _subscriptionTask = Task.Run(async () =>
+            _log?.Info($"[RegisterSubscribers] Starting subscription to {subjects.Count} subject(s): {string.Join(", ", subjects)}");
+
+            foreach (var subject in subjects)
             {
-                try
+                var capturedSubject = subject;
+                var task = Task.Run(async () =>
                 {
-                    _log?.Info("[SubscriptionTask] Starting subscription loop");
-                    await foreach (var msg in Connection.SubscribeAsync<string>(_defaultSubject, cancellationToken: token))
+                    try
                     {
-                        try
+                        _log?.Info($"[SubscriptionTask] Starting loop for '{capturedSubject}'");
+                        await foreach (var msg in Connection.SubscribeAsync<string>(capturedSubject, cancellationToken: token))
                         {
-                            var data = msg.Data ?? string.Empty;
-                            _log?.Info($"[SubscriptionTask] Received message from '{msg.Subject}': {data}");
-
-                            // 비동기 이벤트 핸들러 호출
-                            await OnNatsSubscribeEventAsync(new MessageArgsModel(msg.Subject, _defaultSubject, data));
+                            try
+                            {
+                                var data = msg.Data ?? string.Empty;
+                                _log?.Info($"[SubscriptionTask] Received from '{msg.Subject}': {data}");
+                                await OnNatsSubscribeEventAsync(new MessageArgsModel(msg.Subject, capturedSubject, data));
+                            }
+                            catch (Exception ex)
+                            {
+                                _log?.Error($"[SubscriptionTask] Error processing message: {ex.Message}");
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            _log?.Error($"[SubscriptionTask] Error processing message: {ex.Message}");
-                        }
+                        _log?.Info($"[SubscriptionTask] Loop ended for '{capturedSubject}'");
                     }
-                    _log?.Info("[SubscriptionTask] Subscription loop ended");
-                }
-                catch (OperationCanceledException)
-                {
-                    _log?.Info("[SubscriptionTask] Subscription cancelled");
-                }
-                catch (Exception ex)
-                {
-                    _log?.Error($"[SubscriptionTask] Subscription error: {ex.Message}");
-                }
-            }, token);
+                    catch (OperationCanceledException)
+                    {
+                        _log?.Info($"[SubscriptionTask] Subscription cancelled for '{capturedSubject}'");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log?.Error($"[SubscriptionTask] Subscription error for '{capturedSubject}': {ex.Message}");
+                    }
+                }, token);
+
+                _subscriptionTasks.Add(task);
+            }
 
             // 구독이 준비될 때까지 잠시 대기
             await Task.Delay(100, token);
 
-            _log?.Info($"[RegisterSubscribers] Subscription started for: {_defaultSubject}");
+            _log?.Info($"[RegisterSubscribers] All subscriptions started.");
         }
         catch (Exception ex)
         {
@@ -134,18 +141,18 @@ public abstract class MessageService<T> : IMessageService<T>
     /// <summary>
     /// 구독 해제 및 연결 종료
     /// </summary>
-    protected virtual async void UnregisterSubscribers()
+    protected virtual async Task UnregisterSubscribersAsync()
     {
         try
         {
             _log?.Info("[MessageService] Disposing NATS Connection...");
 
-            // 구독 Task 취소 대기
-            if (_subscriptionTask != null)
+            // 모든 구독 Task 완료 대기
+            foreach (var task in _subscriptionTasks)
             {
                 try
                 {
-                    await _subscriptionTask;
+                    await task;
                 }
                 catch (OperationCanceledException)
                 {
@@ -156,6 +163,7 @@ public abstract class MessageService<T> : IMessageService<T>
                     _log?.Error($"[MessageService] Subscription task error: {ex.Message}");
                 }
             }
+            _subscriptionTasks.Clear();
 
             // Connection 종료
             if (Connection != null)
@@ -197,7 +205,8 @@ public abstract class MessageService<T> : IMessageService<T>
     public event Func<MessageArgsModel, Task>? NatsSubscribeEventAsync;
 
     protected string _defaultSubject = string.Empty;
+    protected List<string> _additionalSubjects = new();
     protected ILogService? _log;
-    protected Task? _subscriptionTask;
+    protected List<Task> _subscriptionTasks = new();
     #endregion
 }
