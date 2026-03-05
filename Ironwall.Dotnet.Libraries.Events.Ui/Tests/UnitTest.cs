@@ -5119,3 +5119,56 @@ public class StatisticsChartHelperTests
 }
 
 #endregion
+
+#region - DeviceSymbolLookupModel.SyncFromDevice Tests -
+public class DeviceSymbolLookupModelSyncTests
+{
+    private DeviceSymbolLookupModel CreateLookup()
+    {
+        var log = new Mock<ILogService>().Object;
+        var ea = new Mock<IEventAggregator>().Object;
+        var eventSetupSource = new Mock<IEventSetupModel>().Object;
+        var eventSetup = new EventSetupModel(eventSetupSource);
+        return new DeviceSymbolLookupModel(log, ea, eventSetup);
+    }
+
+    [Fact]
+    public void SyncFromDevice_Activated_SetsOperationStateActivated()
+    {
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        lookup.SyncFromDevice(EnumDeviceStatus.ACTIVATED);
+
+        symbolMock.VerifySet(s => s.OperationState = EnumOperationState.ACTIVATED);
+    }
+
+    [Fact]
+    public void SyncFromDevice_Deactivated_SetsOperationStateDeactivated()
+    {
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        lookup.SyncFromDevice(EnumDeviceStatus.DEACTIVATED);
+
+        symbolMock.VerifySet(s => s.OperationState = EnumOperationState.DEACTIVATED);
+    }
+
+    [Fact]
+    public void SyncFromDevice_Error_SetsOperationStateError()
+    {
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        lookup.SyncFromDevice(EnumDeviceStatus.ERROR);
+
+        symbolMock.VerifySet(s => s.OperationState = EnumOperationState.ERROR);
+    }
+}
+#endregion

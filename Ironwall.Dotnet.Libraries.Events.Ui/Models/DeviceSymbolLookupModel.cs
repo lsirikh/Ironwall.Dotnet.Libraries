@@ -37,6 +37,23 @@ public class DeviceSymbolLookupModel : BaseModel
     #endregion
     #region - Processes -
     // 이벤트 처리 메서드들
+    /// <summary>
+    /// Device.Status → Symbol.OperationState 동기화
+    /// </summary>
+    public void SyncFromDevice(EnumDeviceStatus status)
+    {
+        if (SymbolModel == null) return;
+
+        SymbolModel.OperationState = status switch
+        {
+            EnumDeviceStatus.ACTIVATED   => EnumOperationState.ACTIVATED,
+            EnumDeviceStatus.DEACTIVATED => EnumOperationState.DEACTIVATED,
+            EnumDeviceStatus.ERROR       => EnumOperationState.ERROR,
+            _                            => EnumOperationState.NONE,
+        };
+        SymbolModel.SetUpdate();
+    }
+
     public void ProcessEvent(EnumEventType eventType, EnumSeverityLevel severity)
     {
         try
