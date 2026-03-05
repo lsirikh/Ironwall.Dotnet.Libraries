@@ -17,7 +17,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class SymbolEventManager : IDisposable,
+public class SymbolEventManager : ISymbolEventManager, IDisposable,
     IHandle<AllDevicesLoadedMessage>,
     IHandle<DeviceStatusChangedMessage>
 {

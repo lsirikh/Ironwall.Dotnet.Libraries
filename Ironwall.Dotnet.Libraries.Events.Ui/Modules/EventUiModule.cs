@@ -62,7 +62,10 @@ public class EventUiModule : Module
             builder.RegisterType<CameraEventInfoViewModel>().SingleInstance();
             builder.RegisterType<DataChartPanelViewModel>().SingleInstance();
             builder.RegisterType<EventCardListPanelViewModel>().SingleInstance();
-            builder.RegisterType<SymbolEventManager>().SingleInstance();
+            builder.RegisterType<SymbolEventManager>()
+                   .AsSelf()
+                   .As<ISymbolEventManager>()
+                   .SingleInstance();
             builder.RegisterType<DeviceNatsSyncService>()
                    .As<IDeviceNatsSyncService>()
                    .SingleInstance();
