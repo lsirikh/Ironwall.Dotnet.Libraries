@@ -4225,7 +4225,7 @@ public class MapViewModel : BasePanelViewModel
                 EnumMarkerCategory.GEOMETRICS => System.Enum.GetValues<EnumShapeType>().Cast<object>(),
                 EnumMarkerCategory.VEHICLES => new[] { "Car" },
                 EnumMarkerCategory.MILITARY_SYMBOLS => new[] { "Register" },
-                EnumMarkerCategory.PIDS_EQUIPMENT => new[] {"Controller","Multi", "Fence", "IpCamera", "Fence_Group" },
+                EnumMarkerCategory.PIDS_EQUIPMENT => new[] {"Controller","Multi", "Fence", "IpCamera", "SmartSensor", "IpSpeaker", "Fence_Group" },
                 EnumMarkerCategory.AREA_BOUNDARY => new[] { "Area","Line" },
                 EnumMarkerCategory.INFRASTRUCTURE => new[] { "Factory" },
                 _ => Array.Empty<object>()

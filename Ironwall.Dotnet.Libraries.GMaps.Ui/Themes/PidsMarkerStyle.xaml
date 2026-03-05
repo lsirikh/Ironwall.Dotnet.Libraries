@@ -28,32 +28,91 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Grid
+								<Canvas
 									Name="PART_ControllerIconContainer"
-									Width="40"
-									Height="40">
-									<!--  Controller Icon Content  -->
-									<Border
-										Background="{TemplateBinding MarkerFill}"
-										BorderBrush="{TemplateBinding MarkerStroke}"
-										BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
-										CornerRadius="4">
-										<Border.Effect>
-											<DropShadowEffect
-												BlurRadius="8"
-												Opacity="0.5"
-												ShadowDepth="4"
-												Color="Black" />
-										</Border.Effect>
-										<TextBlock
-											HorizontalAlignment="Center"
-											VerticalAlignment="Center"
-											FontSize="20"
-											FontWeight="Bold"
-											Foreground="White"
-											Text="C" />
-									</Border>
-								</Grid>
+									Width="250"
+									Height="90">
+									<Canvas.RenderTransform>
+										<TranslateTransform Y="-79"/>
+									</Canvas.RenderTransform>
+									<!--  Main body outer  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="2.5" StrokeMiterLimit="10" Data="M 240.77,102.2 L 221.08,83.66 C 218.71,81.41 216.79,81 212.48,81 H 36.83 C 32.71,81 30.42,82.56 28.78,84.21 L 10.71,102.2 C 7.76,105.15 7,107.81 7,111.14 V 151.7 C 7,158.28 12.06,162.79 18.02,162.79 H 22.42 V 165.18 C 22.42,167.28 23.71,168.38 25.69,168.38 H 41.49 C 43.77,168.38 45.09,167.28 45.09,164.71 V 162.79 H 206.26 V 164.71 C 206.26,167.15 207.57,168.38 209.72,168.38 H 223.16 C 225.69,168.38 226.92,167.28 226.92,164.91 V 162.79 H 232.06 C 239.13,162.79 243.52,157.26 243.52,151.7 V 111.14 C 243.52,107.31 242.66,104.61 240.77,102.2 Z"/>
+									<!--  Main body panel  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="2.5" StrokeMiterLimit="10" Data="M 232.06,160.76 H 17.88 C 11.92,160.76 8.97,155.16 8.97,151.7 V 111.14 C 8.97,105.31 12.91,101.25 18.02,101.25 H 232.06 C 237.89,101.25 241.55,105.95 241.55,110.71 V 151.28 C 241.55,156.98 237.34,160.76 232.06,160.76 Z"/>
+									<!--  Right panel box  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="1.5" StrokeMiterLimit="10" Data="M 227.82,114.09 V 143.81 C 227.82,145.11 227.13,145.76 225.82,145.76 H 207.61 C 206.42,145.76 206.01,144.91 206.01,143.81 V 115.01 C 206.01,113.78 206.56,113.37 207.61,113.37 H 226.31 C 227.41,113.37 227.82,113.78 227.82,114.09 Z"/>
+									<!--  Right panel inner screen  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 224.73,118.22 V 140.31 C 224.73,141.13 224.22,141.61 223.33,141.61 H 210.62 C 209.73,141.61 209.22,141.13 209.22,140.31 V 118.22 C 209.22,117.4 209.73,117.16 210.62,117.16 H 223.33 C 224.22,117.16 224.73,117.4 224.73,118.22 Z"/>
+									<!--  Right panel LED line  -->
+									<Path Stroke="#FEFFFE" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 217.4,124.22 V 128.92"/>
+									<!--  Right panel circle  -->
+									<Path Fill="#262626" Stroke="#FEFFFE" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 217.4,139.11 C 219.45,139.11 219.91,137.63 219.91,136.61 C 219.91,135.41 218.72,134.28 217.4,134.28 C 216.07,134.28 215.05,135.41 215.05,136.61 C 215.05,137.71 215.91,139.11 217.4,139.11 Z"/>
+									<!--  Top header  -->
+									<Path Fill="#4A4A4A" Stroke="Black" StrokeThickness="1.5" StrokeMiterLimit="10" Data="M 234.62,99.22 L 219.01,84.88 C 217.02,82.84 214.81,81.71 211.72,81.71 H 37.24 C 33.26,81.71 31.11,83.01 28.96,85.16 L 14.35,99.22 H 234.62 Z"/>
+									<!--  Text paths: PIDController  -->
+									<Path Fill="#FEFFFE" Data="M 22.92,115.19 V 117.71 H 19.72 V 110.01 H 23.41 C 25.44,110.01 26.22,111.24 26.22,112.59 C 26.22,114.02 25.23,115.19 23.62,115.19 H 22.92 Z M 22.92,113.89 C 23.91,113.89 24.42,113.47 24.42,112.54 C 24.42,111.72 23.91,111.31 23.06,111.31 H 21.33 V 113.89 H 22.92 Z"/>
+									<Path Fill="#FEFFFE" Data="M 27.32,110.01 H 28.88 V 117.71 H 27.32 V 110.01 Z"/>
+									<Path Fill="#FEFFFE" Data="M 29.98,110.01 H 32.33 C 34.92,110.01 35.84,111.62 35.84,113.71 C 35.84,115.93 34.61,117.71 32.46,117.71 H 29.98 V 110.01 Z M 32.19,116.41 C 33.62,116.41 34.27,115.25 34.27,113.75 C 34.27,112.32 33.69,111.31 32.26,111.31 H 31.41 V 116.41 H 32.19 Z"/>
+									<Path Fill="#FEFFFE" Data="M 36.66,115.42 H 38.16 C 38.23,116.14 38.64,116.62 39.63,116.62 C 40.55,116.62 41.03,116.21 41.03,115.56 C 41.03,114.94 40.21,114.67 39.32,114.39 C 38.23,114.02 36.93,113.54 36.93,112.13 C 36.93,110.76 38.09,109.94 39.59,109.94 C 41.16,109.94 42.15,110.69 42.36,112.19 H 40.89 C 40.76,111.44 40.28,111.1 39.53,111.1 C 38.78,111.1 38.36,111.44 38.36,112.06 C 38.36,112.68 39.12,112.95 39.94,113.23 C 41.03,113.61 42.46,114.02 42.46,115.49 C 42.46,116.89 41.23,117.78 39.66,117.78 C 37.88,117.78 36.86,116.82 36.66,115.42 Z"/>
+									<Path Fill="#FEFFFE" Data="M 46.31,114.02 C 46.31,111.72 47.54,109.87 49.62,109.87 C 51.4,109.87 52.46,111.03 52.73,112.68 H 51.23 C 51.02,111.65 50.41,111.17 49.55,111.17 C 48.26,111.17 47.71,112.54 47.71,113.95 C 47.71,115.56 48.46,116.62 49.55,116.62 C 50.41,116.62 51.09,116.07 51.3,115.01 H 52.73 C 52.46,116.75 51.29,117.85 49.62,117.85 C 47.61,117.78 46.31,116.21 46.31,114.02 Z"/>
+									<Path Fill="#FEFFFE" Data="M 53.28,114.94 C 53.28,113.16 54.34,112.06 55.84,112.06 C 57.41,112.06 58.39,113.16 58.39,114.87 C 58.39,116.55 57.33,117.71 55.84,117.71 C 54.34,117.78 53.28,116.69 53.28,114.94 Z M 57.06,114.87 C 57.06,113.75 56.51,113.16 55.76,113.16 C 55.01,113.16 54.53,113.81 54.53,114.87 C 54.53,115.93 55.08,116.62 55.76,116.62 C 56.58,116.69 57.06,115.93 57.06,114.87 Z"/>
+									<Path Fill="#FEFFFE" Data="M 63.69,113.95 V 117.64 H 62.39 V 114.36 C 62.39,113.61 62.05,113.23 61.47,113.23 C 60.78,113.23 60.31,113.81 60.31,114.81 V 117.64 H 59.01 V 112.2 H 60.1 L 60.17,113.02 C 60.58,112.4 61.13,112.06 61.88,112.06 C 62.94,112.06 63.69,112.75 63.69,113.95 Z"/>
+									<Path Fill="#FEFFFE" Data="M 67.61,116.55 V 117.64 C 67.33,117.71 67.06,117.78 66.65,117.78 C 65.66,117.78 65.01,117.23 65.01,115.93 V 113.23 H 64.26 V 112.2 H 65.08 L 65.35,110.62 H 66.31 V 112.2 H 67.54 V 113.23 H 66.31 V 115.76 C 66.31,116.34 66.58,116.55 67.06,116.55 C 67.27,116.62 67.47,116.62 67.61,116.55 Z"/>
+									<Path Fill="#FEFFFE" Data="M 70.89,112.13 V 113.44 C 70.75,113.37 70.55,113.37 70.34,113.37 C 69.52,113.37 68.91,113.95 68.84,115.01 V 117.71 H 67.54 V 112.27 H 68.63 L 68.77,113.23 C 69.18,112.47 69.73,112.13 70.48,112.13 C 70.62,112.06 70.75,112.06 70.89,112.13 Z"/>
+									<Path Fill="#FEFFFE" Data="M 71.37,114.94 C 71.37,113.16 72.43,112.06 73.93,112.06 C 75.5,112.06 76.49,113.16 76.49,114.87 C 76.49,116.55 75.43,117.71 73.93,117.71 C 72.36,117.78 71.37,116.69 71.37,114.94 Z M 75.16,114.87 C 75.16,113.75 74.61,113.16 73.86,113.16 C 73.11,113.16 72.63,113.81 72.63,114.87 C 72.63,115.93 73.18,116.62 73.86,116.62 C 74.68,116.69 75.16,115.93 75.16,114.87 Z"/>
+									<Path Fill="#FEFFFE" Data="M 77.54,109.73 H 78.84 V 117.64 H 77.54 V 109.73 Z"/>
+									<Path Fill="#FEFFFE" Data="M 79.96,109.73 H 81.26 V 117.64 H 79.96 V 109.73 Z"/>
+									<Path Fill="#FEFFFE" Data="M 86.78,115.32 H 83.22 C 83.36,116.21 83.84,116.69 84.52,116.69 C 85.14,116.69 85.55,116.41 85.76,115.93 L 86.71,116.34 C 86.3,117.23 85.48,117.78 84.42,117.78 C 82.85,117.78 81.83,116.69 81.83,114.94 C 81.83,113.23 82.85,112.06 84.35,112.06 C 85.89,112.06 86.78,113.16 86.78,114.87 V 115.32 Z M 83.22,114.43 H 85.62 C 85.55,113.54 85.07,113.09 84.39,113.09 C 83.74,113.09 83.36,113.61 83.22,114.43 Z"/>
+									<Path Fill="#FEFFFE" Data="M 90.93,112.13 V 113.44 C 90.79,113.37 90.59,113.37 90.38,113.37 C 89.56,113.37 88.95,113.95 88.88,115.01 V 117.71 H 87.58 V 112.27 H 88.67 L 88.81,113.23 C 89.22,112.47 89.77,112.13 90.52,112.13 C 90.66,112.06 90.79,112.06 90.93,112.13 Z"/>
+									<!--  Display panel  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 110.02,129.81 V 145.21 C 110.02,146.03 109.51,146.44 108.62,146.44 H 54.67 C 53.78,146.44 53.27,146.03 53.27,145.21 V 130.43 C 53.27,129.61 53.78,129.13 54.67,129.13 H 79.91 C 80.66,129.13 81.01,129.47 81.01,129.81 V 130.63 H 85.15 V 129.61 C 85.15,129.26 85.42,128.99 86.04,128.99 H 108.62 C 109.51,128.99 110.02,129.33 110.02,129.81 Z"/>
+									<!--  Display panel inner  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 108.14,131.05 V 144.32 H 55.15 V 131.05 H 79.16 V 132.55 H 86.59 V 131.05 H 108.14 Z"/>
+									<!--  LED Power (dark green)  -->
+									<Path Fill="#479C54" Stroke="Black" StrokeThickness="0.5" StrokeMiterLimit="10" Data="M 122.92,126.85 C 125.55,126.85 126.17,125.04 126.17,123.81 C 126.17,122.34 124.81,120.94 122.92,120.94 C 121.11,120.94 119.78,122.34 119.78,123.81 C 119.78,125.25 121.04,126.85 122.92,126.85 Z"/>
+									<!--  LED GET (light green)  -->
+									<Path Fill="#89B55B" Stroke="Black" StrokeThickness="0.5" StrokeMiterLimit="10" Data="M 122.92,136.08 C 125.55,136.08 126.17,134.27 126.17,133.04 C 126.17,131.57 124.81,130.17 122.92,130.17 C 121.11,130.17 119.78,131.57 119.78,133.04 C 119.78,134.48 121.04,136.08 122.92,136.08 Z"/>
+									<!--  LED USB (red)  -->
+									<Path Fill="#CE3232" Stroke="Black" StrokeThickness="0.5" StrokeMiterLimit="10" Data="M 122.92,145.76 C 125.55,145.76 126.17,143.95 126.17,142.72 C 126.17,141.25 124.81,139.85 122.92,139.85 C 121.11,139.85 119.78,141.25 119.78,142.72 C 119.78,144.16 121.04,145.76 122.92,145.76 Z"/>
+									<!--  Ethernet panel  -->
+									<Path Fill="#CDCDCD" Stroke="Black" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 139.95,122.07 V 143.61 C 139.95,144.56 140.43,145.04 141.49,145.04 H 167.31 C 168.37,145.04 168.85,144.56 168.85,143.61 V 122.07 C 168.85,121.11 168.37,120.63 167.31,120.63 H 141.49 C 140.43,120.63 139.95,121.11 139.95,122.07 Z"/>
+									<!--  Ethernet port inner  -->
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.5" StrokeMiterLimit="10" Data="M 143.17,125.16 V 137.78 H 147.12 V 139.9 L 148.83,142.31 H 158.13 L 159.7,139.9 H 165.13 V 125.16 H 143.17 Z"/>
+									<!--  Ethernet pins  -->
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 146.84,126.56 V 129.88"/>
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 148.76,126.56 V 129.88"/>
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 150.61,126.56 V 129.88"/>
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 152.53,126.56 V 129.88"/>
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 154.45,126.56 V 129.88"/>
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 156.37,126.56 V 129.88"/>
+									<Path Stroke="#B08242" StrokeThickness="0.75" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 158.29,126.56 V 129.88"/>
+									<!--  RS485 connector  -->
+									<Path Fill="#47B15D" Stroke="Black" StrokeThickness="1.5" StrokeMiterLimit="10" Data="M 181.82,131.05 V 133.65 H 177.42 V 145.11 H 196.81 V 133.65 H 192.73 V 131.05 H 181.82 Z"/>
+									<!--  RS485 inner body  -->
+									<Path Fill="#278E4A" Stroke="Black" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 179.13,135.74 V 143.41 H 195.03 V 135.74 H 190.63 V 133.1 H 183.13 V 135.74 H 179.13 Z"/>
+									<Path Fill="#278E4A" Stroke="Black" StrokeThickness="0.5" StrokeMiterLimit="10" Data="M 182.85,137.31 H 185.81 V 141.83 H 182.85 V 137.31 Z"/>
+									<Path Fill="#278E4A" Stroke="Black" StrokeThickness="0.5" StrokeMiterLimit="10" Data="M 188.12,137.31 H 191.07 V 141.83 H 188.12 V 137.31 Z"/>
+									<Path Stroke="#47B15D" StrokeThickness="0.5" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 184.05,138.81 L 184.67,139.43 L 184.05,140.11"/>
+									<Path Stroke="#47B15D" StrokeThickness="0.5" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 189.31,138.81 L 189.93,139.43 L 189.31,140.11"/>
+									<!--  Dotted lines  -->
+									<Path Stroke="#B08242" StrokeThickness="1.5" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeDashArray="0.1 4" Data="M 61.19,135.46 H 102.54"/>
+									<Path Stroke="#B08242" StrokeThickness="1.5" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeDashArray="0.1 4" Data="M 61.19,139.15 H 102.54"/>
+									<!--  Debug connector  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 23.91,141.11 V 142.75 C 23.91,143.23 24.05,143.51 24.32,143.85 L 25.96,145.73 C 26.16,145.93 26.43,146.07 26.85,146.07 H 41.71 C 42.26,146.07 42.53,145.93 42.74,145.66 L 43.73,144.32 C 44.07,143.85 43.93,143.71 43.93,143.23 V 141.11 C 43.93,140.63 43.45,140.35 42.74,140.35 H 25.04 C 24.32,140.35 23.91,140.63 23.91,141.11 Z"/>
+									<Path Fill="#262626" Stroke="#FEFFFE" StrokeThickness="0.75" StrokeMiterLimit="10" Data="M 24.83,141.83 L 26.64,143.92 H 41.23 L 42.73,141.83 H 24.83 Z"/>
+									<!--  Mounting brackets  -->
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="2" StrokeMiterLimit="10" Data="M 25.69,162.79 V 164.16 C 25.69,165.32 26.23,165.8 27.53,165.8 H 40.83 C 42.12,165.8 42.74,165.18 42.74,163.95 V 162.79 H 25.69 Z"/>
+									<Path Fill="#262626" Stroke="Black" StrokeThickness="2" StrokeMiterLimit="10" Data="M 207.16,163.95 V 164.84 C 207.16,165.73 207.81,166.28 208.94,166.28 H 223.14 C 224.54,166.28 225.22,165.59 225.22,164.43 V 163.33 H 207.16 V 163.95 Z"/>
+									<!--  Text labels  -->
+									<TextBlock Canvas.Left="25.4199" Canvas.Top="148.739" FontFamily="Arial" FontSize="5" Foreground="White">Debug</TextBlock>
+									<TextBlock Canvas.Left="75.6465" Canvas.Top="148.739" FontFamily="Arial" FontSize="5" Foreground="White">SWD</TextBlock>
+									<TextBlock Canvas.Left="143.797" Canvas.Top="148.739" FontFamily="Arial" FontSize="5" Foreground="White">Ethernet</TextBlock>
+									<TextBlock Canvas.Left="179.613" Canvas.Top="148.401" FontFamily="Arial" FontSize="5" Foreground="White">RS46S</TextBlock>
+									<TextBlock Canvas.Left="201.438" Canvas.Top="148.401" FontFamily="Arial" FontSize="5" Foreground="White">SENSORWAY</TextBlock>
+									<TextBlock Canvas.Left="127.781" Canvas.Top="122.131" FontFamily="Arial" FontSize="3" Foreground="Black">Power</TextBlock>
+									<TextBlock Canvas.Left="127.781" Canvas.Top="131.361" FontFamily="Arial" FontSize="3" Foreground="Black">GET</TextBlock>
+									<TextBlock Canvas.Left="127.781" Canvas.Top="140.731" FontFamily="Arial" FontSize="3" Foreground="Black">USB</TextBlock>
+								</Canvas>
 							</Viewbox>
 
 							<!--  Controller Label (독립적 크기)  -->
@@ -188,113 +247,66 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Grid
-									Name="PART_FenceIconContainer"
-									Width="40"
-									Height="12">
-									<!--  Fence Icon Content - 가로형 담장 디자인  -->
-									<Border
-										Background="{TemplateBinding MarkerFill}"
-										BorderBrush="{TemplateBinding MarkerStroke}"
-										BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
-										CornerRadius="2">
-										<Border.Effect>
-											<DropShadowEffect
-												BlurRadius="8"
-												Opacity="0.5"
-												ShadowDepth="4"
-												Color="Black" />
-										</Border.Effect>
+									<Canvas
+										Name="PART_FenceIconContainer"
+										Width="200"
+										Height="200">
 
-										<!--  벽돌 담장 패턴 (가로형)  -->
-										<Grid Name="PART_FenceBrickGrid" Margin="1">
-											<Grid.Resources>
-												<SolidColorBrush x:Key="BrickBrush" Color="White" />
-											</Grid.Resources>
-											<Grid.RowDefinitions>
-												<RowDefinition Height="*" />
-												<RowDefinition Height="*" />
-												<RowDefinition Height="*" />
-											</Grid.RowDefinitions>
+										<!--  펜스 SVG 기반 아이콘  -->
 
-											<!--  첫 번째 줄 벽돌  -->
-											<StackPanel Grid.Row="0" Orientation="Horizontal">
-												<Rectangle
-													Width="10"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="12"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="8"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="6"
-													Height="3"
-													Fill="White" />
-											</StackPanel>
+										<Path Fill="#A2A6A8" Stroke="Black" StrokeThickness="4.3" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 184.36,177.31 V 13.7 C 184.36,9.97 181.81,8.67 179.31,8.67 C 176.25,8.67 173.98,10.76 173.98,14.21 V 177.31 Z" />
+										<Path Fill="#A2A6A8" Stroke="Black" StrokeThickness="4.3" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 194.39,191.95 L 163.79,192.09 C 164.21,184.09 167.97,178.18 171.84,178.18 H 186.98 C 190.85,178.18 194.04,185.13 194.39,191.95 Z" />
+										<Path Fill="#A2A6A8" Stroke="Black" StrokeThickness="4.3" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 14.88,177.31 V 13.7 C 14.88,9.97 17.43,8.67 19.93,8.67 C 22.99,8.67 25.26,10.76 25.26,14.21 V 177.31 Z" />
+										<Path Fill="#A2A6A8" Stroke="Black" StrokeThickness="4.3" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 6.01,191.95 L 36.61,192.09 C 36.19,184.09 32.43,178.18 28.56,178.18 H 13.42 C 9.55,178.18 6.36,185.13 6.01,191.95 Z" />
+										<Path Fill="Transparent" Stroke="Black" StrokeThickness="4.3" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 25.98,22.03 L 173.68,22.01 V 167.74 L 26.18,167.91 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 26.38,37.96 L 40.71,22.01 L 53.71,36.34 C 55.6,38.49 55.28,40.86 53.41,43.01 L 40.71,57.33 L 28.08,43.51 C 26.41,41.58 25.78,39.28 26.38,37.96 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 43.19,22.01 L 68.97,22.01 L 55.09,37.81 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 69.96,22.01 L 72.26,22.01 L 83.48,36.34 C 85.01,38.49 84.71,40.43 82.84,42.58 L 70.51,56.91 L 58.77,43.09 C 57.1,41.16 56.72,39.18 58.27,37.31 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 73.47,22.01 H 99.25 L 85.36,37.81 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 99.71,22.01 L 100.81,22.01 L 112.03,36.34 C 113.56,38.49 112.96,40.43 111.09,42.58 L 99.71,56.01 L 88.28,42.58 C 86.61,40.65 86.23,38.29 87.78,36.41 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 102.32,22.01 H 128.1 L 114.21,37.81 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 129.09,22.01 L 130.19,22.01 L 141.98,36.34 C 143.81,38.49 143.51,40.43 141.36,42.88 L 129.57,56.41 L 117.78,42.88 C 115.95,40.73 115.35,38.79 117.22,36.64 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 132.3,22.01 H 156.22 L 144.43,36.94 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 158.83,22.01 L 172.72,37.81 V 42.28 L 158.83,58.08 L 147.61,44.95 C 145.78,42.81 145.48,40.25 147.35,38.11 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 172.72,42.88 V 72.71 L 162.71,61.89 C 160.88,59.74 160.28,57.21 162.15,55.06 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 158.53,58.08 L 172.72,73.88 V 78.94 L 158.53,95.34 L 147.61,82.51 C 145.78,80.36 145.18,78.11 147.05,75.96 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 144.34,40.48 L 156.72,54.81 C 158.55,56.96 157.02,59.41 155.15,61.56 L 144.34,74.69 L 133.22,61.56 C 131.39,59.41 130.79,57.47 132.66,55.32 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 116.65,73.88 L 129.03,59.28 L 141.71,73.88 C 143.54,76.03 142.61,78.48 140.44,80.93 L 129.03,94.14 L 117.81,80.93 C 115.98,78.78 114.78,76.03 116.65,73.88 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 103.06,54.81 L 114.54,40.48 L 126.92,55.11 C 128.75,57.26 127.82,59.41 125.65,61.86 L 114.54,75.09 L 103.32,61.86 C 101.49,59.71 101.19,56.96 103.06,54.81 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 74.17,54.81 L 85.39,41.08 L 97.18,54.81 C 99.01,56.96 97.78,59.71 95.61,62.16 L 85.39,74.39 L 74.47,61.56 C 72.64,59.41 72.3,56.96 74.17,54.81 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 43.79,54.81 L 55.27,41.08 L 67.95,55.71 C 69.78,57.86 68.55,60.01 66.38,62.46 L 55.56,75.01 L 43.77,61.48 C 41.94,59.33 41.92,56.96 43.79,54.81 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 26.68,39.88 L 40.57,55.68 V 60.16 L 26.68,75.96 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 87.84,74.49 L 99.63,59.86 L 111.42,74.19 C 113.25,76.34 112.02,78.79 109.85,81.24 L 99.63,93.47 L 88.71,80.64 C 86.88,78.49 86.28,76.64 87.84,74.49 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 58.66,74.78 L 70.75,59.86 L 82.23,74.19 C 83.76,76.04 82.83,78.49 80.66,80.94 L 70.44,93.17 L 59.22,79.94 C 57.69,77.79 57.09,76.94 58.66,74.78 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 27.28,74.78 L 40.87,59.28 L 52.95,73.01 C 54.78,75.16 55.08,77.41 53.21,79.56 L 40.87,93.89 L 28.18,79.56 C 26.65,77.71 26.35,76.66 27.28,74.78 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 172.72,79.56 V 108.79 L 163.61,98.54 C 161.78,96.39 161.48,94.24 163.35,92.09 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 43.47,92.69 L 55.26,78.96 L 67.34,93.29 C 68.87,95.14 68.57,97.09 66.7,99.24 L 55.26,111.47 L 43.77,98.34 C 42.24,96.49 41.6,94.86 43.47,92.69 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 27.28,80.16 L 39.67,93.59 C 41.2,95.44 39.67,97.89 37.8,100.04 L 26.68,112.27 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 73.05,93.59 L 85.13,78.96 L 96.62,92.69 C 98.45,94.84 97.52,97.29 95.35,99.74 L 85.13,111.37 L 74.21,98.54 C 72.38,96.39 71.78,95.44 73.05,93.59 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 103.32,92.09 L 114.54,78.36 L 126.33,92.69 C 128.16,94.84 127.23,97.29 125.06,99.74 L 114.54,111.97 L 103.06,98.54 C 101.49,96.39 101.19,94.54 103.32,92.09 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 88.53,111.07 L 100.01,97.34 L 111.5,111.67 C 113.03,113.52 112.42,115.47 110.25,117.92 L 100.03,130.15 L 88.81,116.92 C 86.98,114.77 86.66,113.22 88.53,111.07 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 132.61,93.29 L 144.4,78.96 L 155.88,92.69 C 157.71,94.84 156.78,97.09 154.61,99.54 L 144.39,111.17 L 133.21,97.94 C 131.38,95.79 131.08,95.14 132.61,93.29 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 117.51,110.77 L 129.6,96.44 L 141.68,110.77 C 143.51,112.92 143.21,115.07 141.04,117.52 L 129.56,130.65 L 117.77,116.92 C 116.24,114.77 115.64,112.92 117.51,110.77 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 147.4,111.37 L 158.88,97.64 L 172.77,112.27 V 116.15 L 158.58,131.65 L 147.66,118.82 C 145.83,116.67 145.53,113.92 147.4,111.37 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 172.72,116.15 V 147.76 L 162.71,136.93 C 160.88,134.78 160.28,132.53 162.15,130.38 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 27.28,111.67 L 40.57,95.87 L 52.95,110.2 C 54.78,112.35 54.78,114.6 52.91,116.75 L 40.57,131.08 L 28.48,116.75 C 26.65,114.6 26.05,113.82 27.28,111.67 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 26.68,116.15 L 37.5,128.08 C 39.33,130.23 39.63,132.78 37.76,134.93 L 26.68,147.76 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 27.28,149.86 L 40.87,134.06 L 52.95,148.39 C 54.78,150.54 55.08,152.49 53.21,154.64 L 40.87,168.07 L 28.18,154.24 C 26.65,152.39 26.35,152.01 27.28,149.86 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 41.47,167.47 L 55.36,153.14 L 67.74,167.47 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 57.66,148.99 L 70.65,133.76 L 82.73,148.09 C 84.26,150.24 83.66,152.19 81.49,154.64 L 70.67,167.47 L 58.56,153.64 C 57.03,151.79 56.13,150.86 57.66,148.99 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 43.77,131.25 L 55.26,116.32 L 67.34,131.25 C 68.87,133.1 68.57,134.75 66.7,136.9 L 55.26,149.14 L 43.77,135.91 C 42.24,133.76 41.94,133.41 43.77,131.25 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 73.74,131.25 L 85.53,115.75 L 96.75,130.08 C 98.28,132.23 97.35,134.68 95.18,137.13 L 85.26,149.06 L 74.14,135.83 C 72.31,133.68 72.26,132.81 73.74,131.25 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 58.26,111.67 L 70.95,96.44 L 82.74,110.77 C 84.57,112.92 83.64,115.07 81.47,117.52 L 70.65,130.05 L 59.17,116.52 C 57.34,114.37 56.74,113.82 58.26,111.67 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 87.63,148.99 L 99.71,134.66 L 111.5,148.99 C 113.03,150.84 112.03,153.29 109.86,155.74 L 100.01,167.47 L 88.53,154.04 C 86.98,152.01 86.11,150.86 87.63,148.99 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 102.42,167.47 L 114.51,153.14 L 126.3,167.47 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 73.47,167.47 L 85.26,153.14 L 97.35,167.47 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 103.32,130.15 L 114.54,115.52 L 126.33,129.85 C 128.16,132 127.23,134.15 125.06,136.6 L 114.54,148.84 L 103.32,135.61 C 101.49,133.46 101.49,132.3 103.32,130.15 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 117.51,149.26 L 129.6,134.93 L 141.08,148.66 C 142.91,150.81 142.61,152.76 140.44,155.21 L 129.32,167.44 L 117.84,154.01 C 116.24,152.06 116.24,150.81 117.51,149.26 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 132.3,167.47 L 144.39,153.74 L 156.18,167.47 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 133.21,130.05 L 144.69,116.32 L 156.18,130.65 C 157.71,132.5 156.78,134.65 154.61,137.1 L 144.39,149.34 L 133.21,136.11 C 131.38,133.96 131.08,132.2 133.21,130.05 Z" />
+										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 147.4,149.26 L 158.88,135.53 L 171.57,149.26 C 173.4,151.41 172.47,153.86 170.3,156.31 L 158.82,168.54 L 147.9,155.71 C 146.07,153.56 145.53,151.41 147.4,149.26 Z" />
 
-											<!--  두 번째 줄 벽돌 (어긋난 패턴)  -->
-											<StackPanel
-												Grid.Row="1"
-												Margin="0,0.5,0,0"
-												Orientation="Horizontal">
-												<Rectangle
-													Width="6"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="11"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="9"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="9"
-													Height="3"
-													Fill="White" />
-											</StackPanel>
-
-											<!--  세 번째 줄 벽돌  -->
-											<StackPanel
-												Grid.Row="2"
-												Margin="0,0.5,0,0"
-												Orientation="Horizontal">
-												<Rectangle
-													Width="10"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="12"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="8"
-													Height="3"
-													Margin="0,0,0.5,0"
-													Fill="White" />
-												<Rectangle
-													Width="6"
-													Height="3"
-													Fill="White" />
-											</StackPanel>
-										</Grid>
-									</Border>
-								</Grid>
-							</Viewbox>
+									</Canvas>							</Viewbox>
 
 							<!--  Fence Label (독립적 크기)  -->
 							<Border
@@ -535,72 +547,60 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Grid
+								<Canvas
 									Name="PART_SpeakerIconContainer"
-									Width="40"
-									Height="40">
+									Width="256"
+									Height="256">
 
-									<!--  스피커 캐비닛 본체  -->
-									<Rectangle
-										Width="8"
-										Height="22"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										Fill="{TemplateBinding MarkerFill}"
-										RadiusX="2"
-										RadiusY="2"
-										Stroke="{TemplateBinding MarkerStroke}"
-										StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
+									<!--  혼 스피커 SVG 기반 아이콘  -->
 
-									<!--  스피커 드라이버 외부 서라운드  -->
-									<Ellipse
-										Width="26"
-										Height="26"
-										Margin="8,0,0,0"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										Fill="{TemplateBinding MarkerFill}"
-										Stroke="{TemplateBinding MarkerStroke}"
-										StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
-										<Ellipse.Effect>
-											<DropShadowEffect
-												BlurRadius="6"
-												Opacity="0.4"
-												ShadowDepth="3"
-												Color="Black" />
-										</Ellipse.Effect>
-									</Ellipse>
+									<!--  메인 바디 (혼/배플)  -->
+									<Path Fill="#BAD8F8" Data="M 176.22,19.64 C 157.66,43.73 127.31,71.71 86.91,87.03 L 39.66,99.95 C 19.29,105.96 6.97,125.76 8.07,145.31 C 9.43,170.68 30.83,188.73 51.24,188.46 C 61.43,188.33 70.13,185.42 76.99,183.74 L 98.31,178.62 C 132.36,170.76 169.14,171.66 206.76,183.15 L 220.22,185.98 L 223.85,186.25 L 231.97,183.74 L 241.89,172.08 L 248.19,147.13 L 247.92,124.98 L 243.76,100.02 L 235.41,72.4 L 222.42,44.78 L 206.23,20.46 L 195.68,13.41 L 187.49,12.12 L 181.82,13.71 Z" />
 
-									<!--  드라이버 중간 서라운드  -->
-									<Ellipse
-										Width="18"
-										Height="18"
-										Margin="8,0,0,0"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										Fill="DimGray"
-										Opacity="0.85" />
+									<!--  스피커 콘 전면 (타원형)  -->
+									<Path Data="M 247.99,136.11 C 247.99,169.19 237.41,186.91 224.39,186.91 C 203.41,186.91 183.11,157.07 170.97,116.18 C 166.02,99.08 166.02,87.48 166.02,63.49 C 166.02,38.11 173.62,12.31 189.06,12.31 C 212.45,12.31 238.72,53.78 246.68,102.74 C 247.88,111.45 247.99,124.68 247.99,136.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="166,99.6" EndPoint="248,99.6">
+												<GradientStop Color="#76B0DF" Offset="0" />
+												<GradientStop Color="#88BCE6" Offset="1" />
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
 
-									<!--  드라이버 콘  -->
-									<Ellipse
-										Width="10"
-										Height="10"
-										Margin="8,0,0,0"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										Fill="#1A1A1A" />
+									<!--  드라이버 섹션  -->
+									<Path Data="M 203.74,81.61 L 167.08,84.65 C 169.32,101.14 172.81,117.91 180.86,136.85 L 212.83,123.15 L 216.73,118.39 L 220.43,108.81 L 218.97,97.86 L 211.72,85.13 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="193.8,81.6" EndPoint="193.8,136.8">
+												<GradientStop Color="#113961" Offset="0" />
+												<GradientStop Color="#1E4474" Offset="1" />
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
 
-									<!--  더스트 캡 (중심)  -->
-									<Ellipse
-										Width="4"
-										Height="4"
-										Margin="8,0,0,0"
-										HorizontalAlignment="Left"
-										VerticalAlignment="Center"
-										Fill="White"
-										Opacity="0.55" />
+									<!--  더스트 캡  -->
+									<Path Data="M 219.99,107.11 C 219.99,117.47 215.41,123.43 209.72,123.43 C 201.42,123.43 194.94,110.06 194.94,97.78 C 194.94,87.42 198.81,81.61 204.5,81.61 C 212.81,81.61 219.99,94.83 219.99,107.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="194.9,102.5" EndPoint="220,102.5">
+												<GradientStop Color="#395D82" Offset="0" />
+												<GradientStop Color="#375A7F" Offset="1" />
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
 
-								</Grid>
+									<!--  뒷면 캐비닛  -->
+									<Path Data="M 39.66,99.95 C 19.29,105.96 6.97,125.76 8.07,145.31 C 9.43,170.68 30.83,188.73 51.24,188.46 C 65.82,188.26 76.71,182.97 89.95,178.86 L 98.31,178.62 C 84.07,178.62 70.44,153.11 67.31,127.1 C 65.91,115.21 67.11,94.42 76.99,90.18 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="35.7,90.2" EndPoint="65,189.1">
+												<GradientStop Color="#F75B4B" Offset="0" />
+												<GradientStop Color="#F36151" Offset="1" />
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+
+									<!--  핸들/커넥터  -->
+									<Path Fill="#76B0DF" Data="M 104.78,221.69 L 87.61,182.12 C 84.44,174.74 76.57,171.48 69.86,174.91 L 69.52,175.08 C 62.81,178.51 60.04,187.47 63.72,195.12 L 75.68,218.81 L 80.02,236.35 C 84.49,244.16 93.66,246.28 100.37,241.4 C 107.08,236.52 107.95,229.07 104.78,221.69 Z" />
+
+								</Canvas>
 							</Viewbox>
 
 							<!--  Speaker Label (독립적 크기)  -->
@@ -626,6 +626,66 @@
 								</Border.Effect>
 								<TextBlock
 									Name="PART_SpeakerLabelText"
+									FontSize="{TemplateBinding TitleSize}"
+									FontWeight="SemiBold"
+									Foreground="Black"
+									Text="{TemplateBinding MarkerTitle}"
+									TextAlignment="Center"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+							</Border>
+						</Grid>
+
+						<!--  === SmartSensor Section ===  -->
+						<Grid Name="PART_SmartSensorSection" Visibility="Collapsed">
+							<!--  SmartSensor 아이콘 (크기 조절됨)  -->
+							<Viewbox
+								Name="PART_ViewboxSmartSensorContainer"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								Stretch="Fill"
+								ToolTip="{TemplateBinding MarkerTitle}">
+
+								<Grid Width="256" Height="256">
+									<!--  배경 원형  -->
+									<Ellipse
+										Fill="#4CAF50"
+										Stroke="#2E7D32"
+										StrokeThickness="8" />
+									<!--  SS 텍스트  -->
+									<TextBlock
+										FontSize="96"
+										FontWeight="Bold"
+										Foreground="White"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Text="SS" />
+								</Grid>
+							</Viewbox>
+
+							<!--  SmartSensor Label (독립적 크기)  -->
+							<Border
+								Name="PART_SmartSensorLabelContainer"
+								MinWidth="20"
+								MaxWidth="150"
+								Margin="0,0,0,-25"
+								Padding="2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="White"
+								BorderBrush="Gray"
+								BorderThickness="1"
+								CornerRadius="4"
+								Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="3"
+										Opacity="0.3"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<TextBlock
+									Name="PART_SmartSensorLabelText"
 									FontSize="{TemplateBinding TitleSize}"
 									FontWeight="SemiBold"
 									Foreground="Black"
@@ -699,6 +759,9 @@
 						</Trigger>
 						<Trigger Property="DeviceType" Value="IpSpeaker">
 							<Setter TargetName="PART_SpeakerSection" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="DeviceType" Value="SmartSensor">
+							<Setter TargetName="PART_SmartSensorSection" Property="Visibility" Value="Visible" />
 						</Trigger>
 
 						<!--  Event Status Colors (Normal 기본값)  -->
@@ -844,6 +907,29 @@
 							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
 						</MultiTrigger>
 
+						<!--  SmartSensor 라벨  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartSensor" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartSensor" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartSensor" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+
 						<!--  Mouse Over Effects  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
@@ -856,6 +942,7 @@
 							<Setter TargetName="PART_FenceSection" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_SpeakerSection" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_SmartSensorSection" Property="Visibility" Value="Collapsed" />
 							<Setter Property="IsHitTestVisible" Value="False" />
 						</Trigger>
 
@@ -867,6 +954,7 @@
 							<Setter TargetName="PART_FenceSection" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_CameraSection" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_SpeakerSection" Property="Opacity" Value="0.5" />
+							<Setter TargetName="PART_SmartSensorSection" Property="Opacity" Value="0.5" />
 						</Trigger>
 
 						<!--  Pulse Animation for Detecting State  -->

@@ -57,6 +57,8 @@ public static class SymbolTypeHelper
     
         // PIDS_EQUIPMENT
         { "PIR_Sensor", "PIR 센서" },
+        { "SmartSensor", "스마트센서" },
+        { "IpSpeaker", "스피커" },
         //{ "Fence_Sensor", "펜스 센서" },
         //{ "Camera", "카메라" },
         //{ "Radar", "레이더" },
