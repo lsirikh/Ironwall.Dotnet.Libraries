@@ -11,7 +11,9 @@ public enum EnumGopCommand
     NONE,
     // 센서 연결보고 
     CONNECTION,
-    // 센서 탐지
+    // 센서 탐지 (설계 문서 기준 cmd 값)
+    DETECT,
+    // 센서 탐지 (레거시 REQ 메시지 호환)
     DETECTION,
     // 센서 장애보고
     MALFUNCTION,
