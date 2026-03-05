@@ -5301,3 +5301,101 @@ public class SymbolEventManagerPhase4Tests
     }
 }
 #endregion
+
+#region Test 14: CameraPtzNatsSyncService 테스트
+/// <summary>
+/// Test 14.1~14.3: CameraPtzNatsSyncService — PTZ_STATUS NATS 수신 처리
+/// </summary>
+public class CameraPtzNatsSyncServiceTests
+{
+    private Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>? _capturedHandler;
+
+    private Ironwall.Dotnet.Libraries.Events.Ui.Services.CameraPtzNatsSyncService CreateService(
+        out Mock<Ironwall.Dotnet.Libraries.Nats.Services.INatsService> mockNats,
+        out Mock<Ironwall.Dotnet.Libraries.Events.Ui.Managers.ISymbolEventManager> mockManager)
+    {
+        mockNats = new Mock<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>();
+        mockManager = new Mock<Ironwall.Dotnet.Libraries.Events.Ui.Managers.ISymbolEventManager>();
+
+        mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>>())
+                .Callback<Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>>(h => _capturedHandler = h);
+
+        return new Ironwall.Dotnet.Libraries.Events.Ui.Services.CameraPtzNatsSyncService(
+            null, mockNats.Object, mockManager.Object);
+    }
+
+    private static string MakePtzStatusJson(int cameraId, int pan, int tilt, int zoom, string cmd = "PTZ_STATUS")
+        => Newtonsoft.Json.JsonConvert.SerializeObject(new
+        {
+            id = "test-uuid",
+            m_type = "PUB",
+            cmd,
+            from = "NVRManager",
+            body = new { camera_id = cameraId, pan, tilt, zoom },
+            created = "2026-03-05T00:00:00.000Z"
+        });
+
+    #region Test 14.1: PTZ_STATUS 정상 수신 → ProcessCameraPtz 호출
+    [Fact(DisplayName = "Test 14.1: PTZ_STATUS 수신 시 ProcessCameraPtz 호출")]
+    public async System.Threading.Tasks.Task CameraPtzNatsSyncService_ValidPtzStatus_ShouldCallProcessCameraPtz()
+    {
+        // Arrange
+        var svc = CreateService(out _, out var mockManager);
+        await svc.StartService();
+
+        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
+            subject: "sensorway.unit001.nvr_manager.ptz-status",
+            subscriptionSubject: "sensorway.*.nvr_manager.ptz-status",
+            data: MakePtzStatusJson(201, 1000, 5000, 2000));
+
+        // Act
+        await _capturedHandler!(args);
+
+        // Assert
+        mockManager.Verify(m => m.ProcessCameraPtz(201, 1000f, 5000f, 2000f), Times.Once);
+    }
+    #endregion
+
+    #region Test 14.2: wrong subject → ProcessCameraPtz 미호출
+    [Fact(DisplayName = "Test 14.2: ptz-status 외 subject 수신 시 무시")]
+    public async System.Threading.Tasks.Task CameraPtzNatsSyncService_WrongSubject_ShouldNotCallProcessCameraPtz()
+    {
+        // Arrange
+        var svc = CreateService(out _, out var mockManager);
+        await svc.StartService();
+
+        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
+            subject: "sensorway.unit001.all.sync.device",
+            subscriptionSubject: null,
+            data: MakePtzStatusJson(201, 1000, 5000, 2000));
+
+        // Act
+        await _capturedHandler!(args);
+
+        // Assert
+        mockManager.Verify(m => m.ProcessCameraPtz(It.IsAny<int>(), It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()), Times.Never);
+    }
+    #endregion
+
+    #region Test 14.3: wrong cmd → ProcessCameraPtz 미호출
+    [Fact(DisplayName = "Test 14.3: cmd != PTZ_STATUS 수신 시 무시")]
+    public async System.Threading.Tasks.Task CameraPtzNatsSyncService_WrongCmd_ShouldNotCallProcessCameraPtz()
+    {
+        // Arrange
+        var svc = CreateService(out _, out var mockManager);
+        await svc.StartService();
+
+        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
+            subject: "sensorway.unit001.nvr_manager.ptz-status",
+            subscriptionSubject: null,
+            data: MakePtzStatusJson(201, 1000, 5000, 2000, cmd: "SYNC_DEVICE"));
+
+        // Act
+        await _capturedHandler!(args);
+
+        // Assert
+        mockManager.Verify(m => m.ProcessCameraPtz(It.IsAny<int>(), It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()), Times.Never);
+    }
+    #endregion
+}
+#endregion
