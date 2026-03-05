@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
+using Ironwall.Dotnet.Libraries.Enums;
 using System;
 
 namespace Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -79,6 +80,12 @@ public class CallAllEventReportMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }
+/// <summary>디바이스 초기 로딩 완료 알림 — SymbolEventManager 일괄 동기화 트리거</summary>
+public record AllDevicesLoadedMessage();
+
+/// <summary>NatsSync 기반 단일 디바이스 Status 변경 알림</summary>
+public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType, EnumDeviceStatus Status);
+
 public class StatusMessageModel
 {
     public StatusMessageModel()
