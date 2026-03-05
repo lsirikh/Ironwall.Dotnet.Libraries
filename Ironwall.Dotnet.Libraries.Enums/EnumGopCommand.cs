@@ -29,6 +29,8 @@ public enum EnumGopCommand
     PTZ_STATUS = 9,
     // RtspPopup 요청/닫기
     RTSP_EVENTCALL = 10,
+    // 이벤트 조치보고 (설계 문서 기준 cmd 값 — PUB 메시지용)
+    ACTION_REPORT = 11,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }
