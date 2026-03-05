@@ -66,6 +66,29 @@ public static class BrokerMessageHelper
     }
     #endregion
 
+    #region - Publish 생성 (PUB) -
+    /// <summary>
+    /// DTO → BrokerRequest&lt;TDto&gt; 변환 (PUB 전용)
+    /// 설계 문서 기준 이벤트 알림 메시지에 사용 (응답 불필요)
+    /// REQ와 달리 수신 시스템에서 응답(RSP)을 기대하지 않음
+    /// </summary>
+    public static BrokerRequest<TDto> ToBrokerPublish<TDto>(
+        this TDto dto,
+        string command,
+        string from) where TDto : class
+    {
+        return new BrokerRequest<TDto>
+        {
+            Id = Guid.NewGuid().ToString(),
+            TypeMessage = "PUB",
+            Command = command,
+            From = from,
+            Data = dto,
+            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        };
+    }
+    #endregion
+
     #region - Response 생성 -
     /// <summary>
     /// 성공 응답 생성
