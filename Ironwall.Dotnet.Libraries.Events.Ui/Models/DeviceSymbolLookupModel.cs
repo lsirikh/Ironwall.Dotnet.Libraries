@@ -57,21 +57,21 @@ public class DeviceSymbolLookupModel : BaseModel
                 case EnumEventType.Intrusion:
                     DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
                     SymbolModel.EventStatus = EnumEventStatus.Detecting;
-                    SymbolModel.OperationState = EnumOperationState.ACTIVE;
+                    SymbolModel.OperationState = EnumOperationState.ACTIVATED;
                     _log?.Info($"DeviceModel의 Status({DeviceModel.Status}),SymbolModel의 EventStatus({SymbolModel.EventStatus}) ");
                     SymbolModel.SetUpdate();
                     break;
                 case EnumEventType.Fault:
                     DeviceModel.Status = EnumDeviceStatus.ERROR;
                     SymbolModel.EventStatus = EnumEventStatus.Fault;
-                    SymbolModel.OperationState = EnumOperationState.FAULT;
+                    SymbolModel.OperationState = EnumOperationState.ERROR;
                     _log?.Info($"DeviceModel의 Status({DeviceModel.Status}),SymbolModel의 EventStatus({SymbolModel.EventStatus}) ");
                     SymbolModel.SetUpdate();
                     break;
                 case EnumEventType.Connection:
                     DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
                     SymbolModel.EventStatus = EnumEventStatus.Connection;
-                    SymbolModel.OperationState = EnumOperationState.ACTIVE;
+                    SymbolModel.OperationState = EnumOperationState.ACTIVATED;
                     _log?.Info($"DeviceModel의 Status({DeviceModel.Status}),SymbolModel의 EventStatus({SymbolModel.EventStatus}) ");
                     SymbolModel.SetUpdate();
                     break;
@@ -107,7 +107,7 @@ public class DeviceSymbolLookupModel : BaseModel
         {
             DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
             SymbolModel.EventStatus = EnumEventStatus.Normal;
-            SymbolModel.OperationState = EnumOperationState.ACTIVE;
+            SymbolModel.OperationState = EnumOperationState.ACTIVATED;
             SymbolModel.SetUpdate();
 
             _log?.Info($"상태 복원: {SymbolModel.Title}");
@@ -124,17 +124,17 @@ public class DeviceSymbolLookupModel : BaseModel
             case EnumEventType.Intrusion:
                 DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
                 SymbolModel.EventStatus = EnumEventStatus.Detecting;
-                SymbolModel.OperationState = EnumOperationState.ACTIVE;
+                SymbolModel.OperationState = EnumOperationState.ACTIVATED;
                 break;
             case EnumEventType.Fault:
                 DeviceModel.Status = EnumDeviceStatus.ERROR;
                 SymbolModel.EventStatus = EnumEventStatus.Fault;
-                SymbolModel.OperationState = EnumOperationState.FAULT;
+                SymbolModel.OperationState = EnumOperationState.ERROR;
                 break;
             case EnumEventType.Connection:
                 DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
                 SymbolModel.EventStatus = EnumEventStatus.Connection;
-                SymbolModel.OperationState = EnumOperationState.ACTIVE;
+                SymbolModel.OperationState = EnumOperationState.ACTIVATED;
                 break;
         }
     }

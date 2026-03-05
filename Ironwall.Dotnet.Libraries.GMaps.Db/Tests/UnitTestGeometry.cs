@@ -106,7 +106,7 @@ public sealed class GMapDbGeometrySymbolFixture : GMapBaseSymbolFixture
             {
                 Pid = 6000 + i,
                 Title = $"{shapeType}_심볼_{i:00}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.55 + random.NextDouble() * 0.05,
                 Longitude = 126.95 + random.NextDouble() * 0.05,
                 Altitude = 0,
@@ -202,7 +202,7 @@ public class GMapDbGeometrySymbol_BasicCrudTests
 
         /* 수정 */
         geometrySymbol!.Title = "업데이트된_기하심볼";
-        geometrySymbol.OperationState = EnumOperationState.FAULT;
+        geometrySymbol.OperationState = EnumOperationState.ERROR;
         geometrySymbol.Latitude = 35.654321;
         geometrySymbol.Longitude = 129.123456;
         geometrySymbol.Bearing = 270.0;
@@ -222,7 +222,7 @@ public class GMapDbGeometrySymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(geometrySymbol.Id, updated!.Id);
         Assert.Equal("업데이트된_기하심볼", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.654321, updated.Latitude);
         Assert.Equal(129.123456, updated.Longitude);
         Assert.Equal(270.0, updated.Bearing);
@@ -349,7 +349,7 @@ public class GMapDbGeometrySymbol_SpecializedTests
             {
                 Pid = 7000 + i,
                 Title = $"투명도테스트_{opacityValues[i]:F1}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.5,
                 Longitude = 126.9,
                 Altitude = 0,
@@ -427,7 +427,7 @@ public class GMapDbGeometrySymbol_IntegrationTests
         {
             Pid = 8888,
             Title = "통합테스트_기하심볼",
-            OperationState = EnumOperationState.DEACTIVE,
+            OperationState = EnumOperationState.DEACTIVATED,
             Latitude = 37.5665,
             Longitude = 126.9780,
             Altitude = 100,
@@ -452,20 +452,20 @@ public class GMapDbGeometrySymbol_IntegrationTests
         Assert.NotNull(fetchedSymbol);
         Assert.Equal("통합테스트_기하심볼", fetchedSymbol!.Title);
         Assert.Equal(8888, fetchedSymbol.Pid);
-        Assert.Equal(EnumOperationState.DEACTIVE, fetchedSymbol.OperationState);
+        Assert.Equal(EnumOperationState.DEACTIVATED, fetchedSymbol.OperationState);
         Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, fetchedSymbol.Category);
         Assert.Equal(EnumShapeType.Circle, fetchedSymbol.ShapeType);
         Assert.Equal(0.7, fetchedSymbol.Opacity, 2);
 
         // 3. GeometrySymbol 변경 (Circle → Triangle, 상태 변경)
-        fetchedSymbol.OperationState = EnumOperationState.ACTIVE;
+        fetchedSymbol.OperationState = EnumOperationState.ACTIVATED;
         fetchedSymbol.Title = "활성화된_삼각형";
         fetchedSymbol.ShowTitle = true;
         fetchedSymbol.ShapeType = EnumShapeType.Triangle;
         fetchedSymbol.Opacity = 1.0;
 
         var updatedSymbol = await _fx.Svc.UpdateGeometrySymbolAsync(fetchedSymbol);
-        Assert.Equal(EnumOperationState.ACTIVE, updatedSymbol!.OperationState);
+        Assert.Equal(EnumOperationState.ACTIVATED, updatedSymbol!.OperationState);
         Assert.Equal("활성화된_삼각형", updatedSymbol.Title);
         Assert.True(updatedSymbol.ShowTitle);
         Assert.Equal(EnumShapeType.Triangle, updatedSymbol.ShapeType);

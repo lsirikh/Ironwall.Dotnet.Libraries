@@ -593,13 +593,13 @@
 						</Trigger>
 
 						<!--  OperationState 기반 Indicator 색상 (Normal 뒤, 이벤트 Trigger 앞 → 이벤트가 우선)  -->
-						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVE}">
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVATED}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
 						</Trigger>
 						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.NONE}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Gray" />
 						</Trigger>
-						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.FAULT}">
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ERROR}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 						</Trigger>
 

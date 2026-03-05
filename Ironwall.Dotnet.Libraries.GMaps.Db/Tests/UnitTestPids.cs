@@ -106,7 +106,7 @@ public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
             {
                 Pid = 11000 + i,
                 Title = $"{deviceType}_장비_{i:00}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.55 + random.NextDouble() * 0.05,
                 Longitude = 126.95 + random.NextDouble() * 0.05,
                 Altitude = 0,
@@ -207,7 +207,7 @@ public class GMapDbPidsSymbol_BasicCrudTests
 
         /* 수정 */
         pidsSymbol!.Title = "업데이트된_PIDS장비";
-        pidsSymbol.OperationState = EnumOperationState.FAULT;
+        pidsSymbol.OperationState = EnumOperationState.ERROR;
         pidsSymbol.Latitude = 35.654321;
         pidsSymbol.Longitude = 129.123456;
         pidsSymbol.Bearing = 270.0;
@@ -231,7 +231,7 @@ public class GMapDbPidsSymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(pidsSymbol.Id, updated!.Id);
         Assert.Equal("업데이트된_PIDS장비", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.654321, updated.Latitude);
         Assert.Equal(129.123456, updated.Longitude);
         Assert.Equal(270.0, updated.Bearing);
@@ -359,7 +359,7 @@ public class GMapDbPidsSymbol_SpecializedTests
                 {
                     Pid = 12000 + i,
                     Title = $"상태테스트_{status}_{i}",
-                    OperationState = EnumOperationState.ACTIVE,
+                    OperationState = EnumOperationState.ACTIVATED,
                     Latitude = 37.5,
                     Longitude = 126.9,
                     Category = EnumMarkerCategory.PIDS_EQUIPMENT,
@@ -443,7 +443,7 @@ public class GMapDbPidsSymbol_SpecializedTests
             {
                 Pid = 13000 + i,
                 Title = $"FOV투명도테스트_{opacityValues[i]:F1}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.5,
                 Longitude = 126.9,
                 Category = EnumMarkerCategory.PIDS_EQUIPMENT,
@@ -526,7 +526,7 @@ public class GMapDbPidsSymbol_IntegrationTests
         {
             Pid = 14000,
             Title = "통합테스트_PIDS장비",
-            OperationState = EnumOperationState.DEACTIVE,
+            OperationState = EnumOperationState.DEACTIVATED,
             Latitude = 37.5665,
             Longitude = 126.9780,
             Altitude = 100,
@@ -556,7 +556,7 @@ public class GMapDbPidsSymbol_IntegrationTests
         Assert.NotNull(fetchedSymbol);
         Assert.Equal("통합테스트_PIDS장비", fetchedSymbol!.Title);
         Assert.Equal(14000, fetchedSymbol.Pid);
-        Assert.Equal(EnumOperationState.DEACTIVE, fetchedSymbol.OperationState);
+        Assert.Equal(EnumOperationState.DEACTIVATED, fetchedSymbol.OperationState);
         Assert.Equal(EnumMarkerCategory.PIDS_EQUIPMENT, fetchedSymbol.Category);
         Assert.Equal(24000, fetchedSymbol.LinkedDeviceId);
         Assert.Equal(EnumDeviceType.Fence, fetchedSymbol.DeviceType);
@@ -565,7 +565,7 @@ public class GMapDbPidsSymbol_IntegrationTests
         Assert.Equal(EnumEventStatus.Normal, fetchedSymbol.EventStatus);
 
         // 3. PidsSymbol 변경 (Fence → IpCamera, 상태 변경)
-        fetchedSymbol.OperationState = EnumOperationState.ACTIVE;
+        fetchedSymbol.OperationState = EnumOperationState.ACTIVATED;
         fetchedSymbol.Title = "활성화된_카메라";
         fetchedSymbol.ShowTitle = true;
         fetchedSymbol.DeviceType = EnumDeviceType.IpCamera;
@@ -575,7 +575,7 @@ public class GMapDbPidsSymbol_IntegrationTests
         fetchedSymbol.EventStatus = EnumEventStatus.Detecting;
 
         var updatedSymbol = await _fx.Svc.UpdatePidsSymbolAsync(fetchedSymbol);
-        Assert.Equal(EnumOperationState.ACTIVE, updatedSymbol!.OperationState);
+        Assert.Equal(EnumOperationState.ACTIVATED, updatedSymbol!.OperationState);
         Assert.Equal("활성화된_카메라", updatedSymbol.Title);
         Assert.True(updatedSymbol.ShowTitle);
         Assert.Equal(EnumDeviceType.IpCamera, updatedSymbol.DeviceType);

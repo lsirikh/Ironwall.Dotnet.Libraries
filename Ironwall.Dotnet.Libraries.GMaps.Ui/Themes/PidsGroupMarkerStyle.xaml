@@ -156,16 +156,16 @@
 						</DataTrigger>
 
 						<!--  OperationState 기반 Indicator 색상 (이벤트 DataTrigger보다 앞에 배치 → 이벤트가 우선)  -->
-						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ACTIVE}">
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ACTIVATED}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
 						</Trigger>
-						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVE}">
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVATED}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
 						</Trigger>
 						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.NONE}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Gray" />
 						</Trigger>
-						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.FAULT}">
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ERROR}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 						</Trigger>
 

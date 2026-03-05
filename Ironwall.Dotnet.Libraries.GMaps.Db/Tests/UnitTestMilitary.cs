@@ -112,7 +112,7 @@ public sealed class GMapDbMilitarySymbolFixture : GMapBaseSymbolFixture
             {
                 Pid = 31000 + i,
                 Title = $"{affiliation}_부대_{i:00}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.55 + random.NextDouble() * 0.05,
                 Longitude = 126.95 + random.NextDouble() * 0.05,
                 Altitude = 0,
@@ -163,7 +163,7 @@ public sealed class GMapDbMilitarySymbolFixture : GMapBaseSymbolFixture
             {
                 Pid = 32000 + i,
                 Title = $"{unitType}_부대_{i:00}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.50 + random.NextDouble() * 0.10,
                 Longitude = 126.90 + random.NextDouble() * 0.10,
                 Altitude = 0,
@@ -269,7 +269,7 @@ public class GMapDbMilitarySymbol_BasicCrudTests
 
         /* 수정 */
         militarySymbol!.Title = "업데이트된_군사부대";
-        militarySymbol.OperationState = EnumOperationState.FAULT;
+        militarySymbol.OperationState = EnumOperationState.ERROR;
         militarySymbol.Latitude = 35.654321;
         militarySymbol.Longitude = 129.123456;
         militarySymbol.Bearing = 270.0;
@@ -297,7 +297,7 @@ public class GMapDbMilitarySymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(militarySymbol.Id, updated!.Id);
         Assert.Equal("업데이트된_군사부대", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.654321, updated.Latitude);
         Assert.Equal(129.123456, updated.Longitude);
         Assert.Equal(270.0, updated.Bearing);

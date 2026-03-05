@@ -70,9 +70,9 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         // OperationState → EventStatus 매핑
         _model.EventStatus = status switch
         {
-            EnumOperationState.ACTIVE => EnumEventStatus.Normal,
-            EnumOperationState.DEACTIVE => EnumEventStatus.Fault,
-            EnumOperationState.FAULT => EnumEventStatus.Fault,
+            EnumOperationState.ACTIVATED => EnumEventStatus.Normal,
+            EnumOperationState.DEACTIVATED => EnumEventStatus.Fault,
+            EnumOperationState.ERROR => EnumEventStatus.Fault,
             _ => EnumEventStatus.Normal
         };
     }

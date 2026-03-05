@@ -1936,7 +1936,7 @@ public class MapViewModel : BasePanelViewModel
                 Category = EnumMarkerCategory.BASIC_SHAPES,
                 ShowShape = true,
                 ShowTitle = false,
-                OperationState = EnumOperationState.ACTIVE
+                OperationState = EnumOperationState.ACTIVATED
             };
 
             var symbolId = await _gMapDbSymbolService.InsertSymbolAsync(symbolModel);
@@ -1974,7 +1974,7 @@ public class MapViewModel : BasePanelViewModel
                 Category = EnumMarkerCategory.GEOMETRICS,
                 ShowShape = true,
                 ShowTitle = false,
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Opacity = 0.7,
                 ShapeType = shapeType
             };
@@ -2059,7 +2059,7 @@ public class MapViewModel : BasePanelViewModel
                 Category = EnumMarkerCategory.PIDS_EQUIPMENT,
                 ShowShape = true,
                 ShowTitle = false,
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 LinkedDeviceId = 2,
                 DeviceType = deviceType,
                 FOVOpacity = 0.7,
@@ -2221,7 +2221,7 @@ public class MapViewModel : BasePanelViewModel
                 Category = EnumMarkerCategory.INFRASTRUCTURE,
                 ShowShape = true,
                 ShowTitle = false,
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 FillColor = EnumColorType.Brown,
                 StrokeColor = EnumColorType.Gray,
                 StrokeThickness = 2,

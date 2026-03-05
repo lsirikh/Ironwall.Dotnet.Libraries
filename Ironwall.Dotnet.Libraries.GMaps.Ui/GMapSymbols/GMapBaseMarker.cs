@@ -159,10 +159,10 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     {
         switch (status)
         {
-            case EnumOperationState.ACTIVE:
+            case EnumOperationState.ACTIVATED:
                 StartTimer();
                 break;
-            case EnumOperationState.DEACTIVE:
+            case EnumOperationState.DEACTIVATED:
                 StopTimer();
                 break;
         }
@@ -307,7 +307,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     {
         if (DateTime.Now > _refreshTime + TimeSpan.FromSeconds(TIMEOUT))
         {
-            OperationState = EnumOperationState.DEACTIVE;
+            OperationState = EnumOperationState.DEACTIVATED;
         }
     }
 

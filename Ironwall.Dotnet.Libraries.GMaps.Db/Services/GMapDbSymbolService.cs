@@ -3779,9 +3779,26 @@ internal sealed class ImageSQL
 /// </summary>
 internal static class EnumParseHelper
 {
+    // DB에 저장된 구 EnumOperationState 값 → 신규 값 매핑 (SQL 마이그레이션 없이 호환)
+    private static readonly Dictionary<string, string> _legacyOperationStateMap
+        = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "ACTIVE",   "ACTIVATED"   },
+            { "DEACTIVE", "DEACTIVATED" },
+            { "FAULT",    "ERROR"       },
+        };
+
     internal static T TryParseEnum<T>(string value, T fallback)
         where T : struct, Enum
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        // EnumOperationState: 구 DB 값 → 신규 값 정규화
+        if (typeof(T) == typeof(EnumOperationState)
+            && _legacyOperationStateMap.TryGetValue(value, out var normalized))
+            value = normalized;
+
         if (Enum.TryParse<T>(value, ignoreCase: true, out var result))
             return result;
         return fallback;

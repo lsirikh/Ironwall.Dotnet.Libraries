@@ -118,7 +118,7 @@ public sealed class GMapDbSymbolFixture : GMapBaseSymbolFixture
                 Pid = 2000 + i,
                 Title = $"{category}_심볼_{i:00}",
                 TitleSize = 13,
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.5 + random.NextDouble() * 0.1,
                 Longitude = 126.9 + random.NextDouble() * 0.1,
                 Altitude = 0,
@@ -221,7 +221,7 @@ public class GMapDbSymbol_BasicCrudTests
 
         /* 수정 */
         symbol!.Title = "UPDATED_SYMBOL_TITLE";
-        symbol.OperationState = EnumOperationState.FAULT;
+        symbol.OperationState = EnumOperationState.ERROR;
         symbol.Latitude = 35.123456;
         symbol.Longitude = 129.987654;
         symbol.Bearing = 180.5;
@@ -239,7 +239,7 @@ public class GMapDbSymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(symbol.Id, updated!.Id);
         Assert.Equal("UPDATED_SYMBOL_TITLE", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.123456, updated.Latitude);
         Assert.Equal(129.987654, updated.Longitude);
         Assert.Equal(180.5, updated.Bearing);
@@ -421,7 +421,7 @@ public class GMapDbSymbol_IntegrationTests
         {
             Pid = 9999,
             Title = "통합테스트_심볼",
-            OperationState = EnumOperationState.DEACTIVE,
+            OperationState = EnumOperationState.DEACTIVATED,
             Latitude = 37.5665,
             Longitude = 126.9780,
             Altitude = 50,
@@ -444,16 +444,16 @@ public class GMapDbSymbol_IntegrationTests
         Assert.NotNull(fetchedSymbol);
         Assert.Equal("통합테스트_심볼", fetchedSymbol!.Title);
         Assert.Equal(9999, fetchedSymbol.Pid);
-        Assert.Equal(EnumOperationState.DEACTIVE, fetchedSymbol.OperationState);
+        Assert.Equal(EnumOperationState.DEACTIVATED, fetchedSymbol.OperationState);
         Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, fetchedSymbol.Category);
 
         // 3. Symbol 상태 변경 (DEACTIVE → ACTIVE)
-        fetchedSymbol.OperationState = EnumOperationState.ACTIVE;
+        fetchedSymbol.OperationState = EnumOperationState.ACTIVATED;
         fetchedSymbol.Title = "활성화된_심볼";
         fetchedSymbol.ShowTitle = true;
 
         var updatedSymbol = await _fx.Svc.UpdateSymbolAsync(fetchedSymbol);
-        Assert.Equal(EnumOperationState.ACTIVE, updatedSymbol!.OperationState);
+        Assert.Equal(EnumOperationState.ACTIVATED, updatedSymbol!.OperationState);
         Assert.Equal("활성화된_심볼", updatedSymbol.Title);
         Assert.True(updatedSymbol.ShowTitle);
 
@@ -522,7 +522,7 @@ public class GMapDbSymbol_IntegrationTests
             {
                 Pid = 10000 + i,
                 Title = $"대량테스트_{i:000}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.0 + random.NextDouble(),
                 Longitude = 126.0 + random.NextDouble(),
                 Altitude = 0,

@@ -148,7 +148,7 @@ public sealed class GMapDbLineSymbolFixture : GMapBaseSymbolFixture
                 Pid = 41000 + i,
                 Title = $"{linePattern}_LINE_{i:00}",
                 TitleSize = 12,
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.51 + i * 0.01,  // 중심점
                 Longitude = 127.01,  // 중심점
                 Altitude = 0,
@@ -203,7 +203,7 @@ public sealed class GMapDbLineSymbolFixture : GMapBaseSymbolFixture
             Pid = 42000,
             Title = "COMPLEX_ROUTE",
             TitleSize = 14,
-            OperationState = EnumOperationState.ACTIVE,
+            OperationState = EnumOperationState.ACTIVATED,
             Latitude = baseLat,
             Longitude = baseLng + (pointCount * 0.001 / 2), // 중간점
             Altitude = 50,
@@ -310,7 +310,7 @@ public class GMapDbLineSymbol_BasicCrudTests
 
         /* 수정 */
         lineSymbol!.Title = "업데이트된_경로";
-        lineSymbol.OperationState = EnumOperationState.FAULT;
+        lineSymbol.OperationState = EnumOperationState.ERROR;
         lineSymbol.Latitude = 35.654321;
         lineSymbol.Longitude = 129.123456;
         lineSymbol.Bearing = 90.0;
@@ -342,7 +342,7 @@ public class GMapDbLineSymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(lineSymbol.Id, updated!.Id);
         Assert.Equal("업데이트된_경로", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.654321, updated.Latitude);
         Assert.Equal(129.123456, updated.Longitude);
         Assert.Equal(90.0, updated.Bearing);
@@ -431,7 +431,7 @@ public class GMapDbLineSymbol_BasicCrudTests
         {
             Pid = 43000,
             Title = "EMPTY_LINE",
-            OperationState = EnumOperationState.ACTIVE,
+            OperationState = EnumOperationState.ACTIVATED,
             Latitude = 37.5,
             Longitude = 127.0,
             Category = EnumMarkerCategory.AREA_BOUNDARY,

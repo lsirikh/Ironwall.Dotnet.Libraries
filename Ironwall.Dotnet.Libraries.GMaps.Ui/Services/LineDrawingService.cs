@@ -467,7 +467,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                     Category = _parameters.Model.Category,
                     ShowShape = true,
                     ShowTitle = false,
-                    OperationState = EnumOperationState.ACTIVE,
+                    OperationState = EnumOperationState.ACTIVATED,
                     StrokeColor = _parameters.Model.StrokeColor,
                     StrokeThickness = _parameters.Model.StrokeThickness,
                     FillColor = _parameters.Model.FillColor,
@@ -514,7 +514,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                     Category = EnumMarkerCategory.AREA_BOUNDARY,
                     ShowShape = true,
                     ShowTitle = _parameters.Model.ShowTitle,
-                    OperationState = EnumOperationState.ACTIVE,
+                    OperationState = EnumOperationState.ACTIVATED,
 
                     // 스타일 속성
                     StrokeColor = _parameters.Model.StrokeColor,

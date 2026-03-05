@@ -151,7 +151,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     public static readonly DependencyProperty MarkerStateProperty =
         DependencyProperty.Register("MarkerState", typeof(EnumOperationState), typeof(GMapMarkerBaseControl<T>),
-            new PropertyMetadata(EnumOperationState.ACTIVE, OnMarkerStateChanged));
+            new PropertyMetadata(EnumOperationState.ACTIVATED, OnMarkerStateChanged));
 
     /// <summary>
     /// 라벨 표시 여부
@@ -407,8 +407,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         MarkerFill = MarkerState switch
         {
-            EnumOperationState.ACTIVE => Brushes.Green,
-            EnumOperationState.DEACTIVE => Brushes.Gray,
+            EnumOperationState.ACTIVATED => Brushes.Green,
+            EnumOperationState.DEACTIVATED => Brushes.Gray,
             _ => Brushes.Red
         };
     }
