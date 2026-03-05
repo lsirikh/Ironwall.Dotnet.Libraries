@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -16,7 +17,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class SymbolEventManager : IDisposable
+public class SymbolEventManager : IDisposable,
+    IHandle<AllDevicesLoadedMessage>,
+    IHandle<DeviceStatusChangedMessage>
 {
     // 개별 마커: (Device.Id, DeviceType) → GMapPidsMarker/PidsSymbolModel
     // 복합 키를 사용하여 같은 ID라도 DeviceType이 다르면 별도 등록
@@ -55,6 +58,9 @@ public class SymbolEventManager : IDisposable
         var key = (deviceModel.Id, deviceModel.DeviceType);
         _deviceSymbolLookup[key] = lookup;
         _log?.Info($"개별 심볼 등록: Device({deviceModel.Id}, {deviceModel.DeviceType}) → {symbolModel.GetType().Name}");
+
+        // FR-08c: 등록 즉시 Device.Status → Symbol.OperationState 동기화
+        lookup.SyncFromDevice(deviceModel.Status);
     }
 
     // 그룹 심볼 매핑 등록 (그룹 마커용)
@@ -179,6 +185,46 @@ public class SymbolEventManager : IDisposable
         {
             _log?.Warning($"PTZ 업데이트 실패 - 매핑되지 않은 카메라: Camera({cameraId})");
         }
+    }
+
+    /// <summary>
+    /// NatsSync: 단일 Device Status 변경 → Symbol OperationState 갱신 (FR-09)
+    /// </summary>
+    public void SyncDeviceStatus(int deviceId, EnumDeviceType deviceType, EnumDeviceStatus status)
+    {
+        var key = (deviceId, deviceType);
+        if (_deviceSymbolLookup.TryGetValue(key, out var lookup))
+        {
+            lookup.SyncFromDevice(status);
+            _log?.Info($"Device 상태 동기화: Device({deviceId}, {deviceType}) → {status}");
+        }
+        else
+        {
+            _log?.Warning($"상태 동기화 실패 - 미등록 Device({deviceId}, {deviceType})");
+        }
+    }
+
+    /// <summary>
+    /// AllDevicesLoadedMessage 수신 시 등록된 전체 Symbol 일괄 동기화 (FR-08b)
+    /// </summary>
+    public Task HandleAsync(AllDevicesLoadedMessage message, CancellationToken cancellationToken)
+    {
+        foreach (var lookup in _deviceSymbolLookup.Values)
+        {
+            if (lookup.DeviceModel != null)
+                lookup.SyncFromDevice(lookup.DeviceModel.Status);
+        }
+        _log?.Info($"전체 Symbol OperationState 동기화 완료: {_deviceSymbolLookup.Count}개");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// DeviceStatusChangedMessage 수신 시 해당 Symbol 갱신 (FR-09)
+    /// </summary>
+    public Task HandleAsync(DeviceStatusChangedMessage message, CancellationToken cancellationToken)
+    {
+        SyncDeviceStatus(message.DeviceId, message.DeviceType, message.Status);
+        return Task.CompletedTask;
     }
 
     public void Dispose()

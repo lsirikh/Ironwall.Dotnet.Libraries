@@ -5172,3 +5172,89 @@ public class DeviceSymbolLookupModelSyncTests
     }
 }
 #endregion
+
+#region - SymbolEventManager Phase 4 Tests -
+public class SymbolEventManagerPhase4Tests
+{
+    private static EventSetupModel CreateEventSetup()
+    {
+        var mock = new Mock<IEventSetupModel>();
+        mock.SetupAllProperties();
+        return new EventSetupModel(mock.Object);
+    }
+
+    private static Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager CreateManager(out Mock<IEventAggregator> eaMock)
+    {
+        eaMock = new Mock<IEventAggregator>();
+        var log = new Mock<ILogService>().Object;
+        return new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(eaMock.Object, log, CreateEventSetup());
+    }
+
+    private static (Mock<IBaseDeviceModel> device, Mock<IPidsEventCapable> symbol) CreatePair(int id, EnumDeviceType type, EnumDeviceStatus status = EnumDeviceStatus.ACTIVATED)
+    {
+        var device = new Mock<IBaseDeviceModel>();
+        device.Setup(d => d.Id).Returns(id);
+        device.Setup(d => d.DeviceType).Returns(type);
+        device.Setup(d => d.Status).Returns(status);
+        var symbol = new Mock<IPidsEventCapable>();
+        symbol.SetupAllProperties();
+        return (device, symbol);
+    }
+
+    // Test 4.1: SyncDeviceStatus 호출 시 해당 Symbol OperationState 갱신
+    [Fact]
+    public void SyncDeviceStatus_ExistingDevice_UpdatesSymbolOperationState()
+    {
+        var manager = CreateManager(out _);
+        var (device, symbol) = CreatePair(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED);
+        manager.RegisterDeviceSymbol(device.Object, symbol.Object);
+
+        manager.SyncDeviceStatus(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED);
+
+        Assert.Equal(EnumOperationState.DEACTIVATED, symbol.Object.OperationState);
+    }
+
+    // Test 4.2: RegisterDeviceSymbol 시 즉시 동기화
+    [Fact]
+    public void RegisterDeviceSymbol_ImmediatelySyncsOperationState()
+    {
+        var manager = CreateManager(out _);
+        var (device, symbol) = CreatePair(2, EnumDeviceType.Fence, EnumDeviceStatus.ERROR);
+
+        manager.RegisterDeviceSymbol(device.Object, symbol.Object);
+
+        Assert.Equal(EnumOperationState.ERROR, symbol.Object.OperationState);
+    }
+
+    // Test 4.3: AllDevicesLoadedMessage 수신 시 전체 Symbol 일괄 동기화
+    [Fact]
+    public async System.Threading.Tasks.Task HandleAllDevicesLoadedMessage_SyncsAllSymbols()
+    {
+        var manager = CreateManager(out _);
+        var (d1, s1) = CreatePair(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED);
+        var (d2, s2) = CreatePair(2, EnumDeviceType.IpCamera, EnumDeviceStatus.ERROR);
+        manager.RegisterDeviceSymbol(d1.Object, s1.Object);
+        manager.RegisterDeviceSymbol(d2.Object, s2.Object);
+
+        await manager.HandleAsync(new Ironwall.Dotnet.Libraries.ViewModel.Models.AllDevicesLoadedMessage(), System.Threading.CancellationToken.None);
+
+        Assert.Equal(EnumOperationState.DEACTIVATED, s1.Object.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, s2.Object.OperationState);
+    }
+
+    // Test 4.4: DeviceStatusChangedMessage 수신 시 해당 Symbol 갱신
+    [Fact]
+    public async System.Threading.Tasks.Task HandleDeviceStatusChangedMessage_UpdatesCorrectSymbol()
+    {
+        var manager = CreateManager(out _);
+        var (d1, s1) = CreatePair(1, EnumDeviceType.Fence, EnumDeviceStatus.ACTIVATED);
+        manager.RegisterDeviceSymbol(d1.Object, s1.Object);
+
+        await manager.HandleAsync(
+            new Ironwall.Dotnet.Libraries.ViewModel.Models.DeviceStatusChangedMessage(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED),
+            System.Threading.CancellationToken.None);
+
+        Assert.Equal(EnumOperationState.DEACTIVATED, s1.Object.OperationState);
+    }
+}
+#endregion
