@@ -1129,6 +1129,9 @@ public class MockDeviceProviderService : IDeviceProviderService
         FetchDeviceGroupsAsyncCalled = true;
         return Task.CompletedTask;
     }
+
+    public Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
+        => Task.FromResult<IBaseDeviceModel?>(null);
 }
 #endregion
 

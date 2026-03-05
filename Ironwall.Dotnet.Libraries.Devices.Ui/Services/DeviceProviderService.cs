@@ -4,6 +4,8 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
@@ -168,6 +170,9 @@ public class DeviceProviderService : IDeviceProviderService
             await FetchDeviceGroupsAsync(token);
 
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
+
+            // FR-08a: 전체 Device 로딩 완료 → SymbolEventManager 일괄 동기화 트리거
+            await _eventAggregator.PublishOnUIThreadAsync(new AllDevicesLoadedMessage());
         }
         catch (Exception ex)
         {
@@ -176,6 +181,79 @@ public class DeviceProviderService : IDeviceProviderService
         }
     }
     #endregion
+
+    /// <summary>
+    /// 단일 Device를 API에서 재조회하여 Provider 캐시를 갱신합니다.
+    /// NatsSync SYNC_DEVICE 메시지 수신 시 호출됩니다.
+    /// </summary>
+    public async Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
+    {
+        try
+        {
+            IBaseDeviceModel? updated = typeDevice switch
+            {
+                "Controller" => await FetchSingleControllerAsync(resourceId, token),
+                "Fence" or "Underground" => await FetchSingleSensorAsync(resourceId, token),
+                "IpCamera" => await FetchSingleCameraAsync(resourceId, token),
+                "Speaker" => await FetchSingleSpeakerAsync(resourceId, token),
+                "Enclosure" => await FetchSingleEnclosureAsync(resourceId, token),
+                "Lamp" => await FetchSingleLampAsync(resourceId, token),
+                _ => null
+            };
+
+            if (updated != null)
+            {
+                var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d.DeviceType == updated.DeviceType);
+                if (existing is IBaseDeviceModel e)
+                    UpdateDeviceProperties(e, updated);
+                else
+                    _deviceProvider.Add(updated);
+                _log?.Info($"FetchDeviceByIdAsync: {typeDevice}({resourceId}) 갱신 완료 → Status={updated.Status}");
+            }
+            return updated;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchDeviceByIdAsync({typeDevice}, {resourceId}) 실패: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleControllerAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetControllerByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToControllerDeviceModel() : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetSensorByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel() : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleCameraAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetCameraByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToCameraDeviceModel() : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleSpeakerAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetSpeakerByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToSpeakerDeviceModel() : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleEnclosureAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetEnclosureByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToEnclosureDeviceModel() : null;
+    }
+
+    private async Task<IBaseDeviceModel?> FetchSingleLampAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetLampByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToLampDeviceModel() : null;
+    }
 
     /// <summary>
     /// DeviceGroup 목록을 GOP API에서 조회하고 DeviceGroupProvider를 업데이트합니다.
