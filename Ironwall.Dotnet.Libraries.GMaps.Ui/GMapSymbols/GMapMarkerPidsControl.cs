@@ -373,21 +373,23 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     private void ApplyDeviceTypeDefaults()
     {
-        switch (DeviceType)
+        var size = GetSizeForDeviceType(DeviceType);
+        Width = Height = size;
+    }
+
+    /// <summary>
+    /// DeviceType별 기본 크기 반환 (단위 테스트용 internal static)
+    /// </summary>
+    internal static double GetSizeForDeviceType(EnumDeviceType deviceType)
+    {
+        return deviceType switch
         {
-            case EnumDeviceType.IpCamera:
-                Width = Height = 40;
-                break;
-            case EnumDeviceType.PIR:
-                Width = Height = 35;
-                break;
-            case EnumDeviceType.Fence:
-                Width = Height = 30;
-                break;
-            default:
-                Width = Height = 32;
-                break;
-        }
+            EnumDeviceType.IpCamera  => 40,
+            EnumDeviceType.PIR       => 35,
+            EnumDeviceType.Fence     => 30,
+            EnumDeviceType.IpSpeaker => 36,
+            _                        => 32,
+        };
     }
 
     /// <summary>
