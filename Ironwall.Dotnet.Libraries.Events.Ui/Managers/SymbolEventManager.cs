@@ -107,6 +107,41 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         }
     }
 
+    // 탐지 이벤트 처리 (deviceId로 검색 — NATS DETECTION 메시지용)
+    public void ProcessDetectionById(int deviceId, List<int>? deviceGroups, EnumEventType eventType)
+    {
+        // 1. 개별 심볼 처리 - deviceId로 모든 타입 검색
+        var found = false;
+        foreach (var kvp in _deviceSymbolLookup)
+        {
+            if (kvp.Key.Id == deviceId)
+            {
+                kvp.Value.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
+                _log?.Info($"탐지 이벤트 처리 (ById): Device({deviceId}, {kvp.Key.Type}) -> {eventType}");
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            _log?.Warning($"매핑되지 않은 장비 (ById): Device({deviceId})");
+        }
+
+        // 2. 그룹 심볼 처리
+        if (ShouldProcessGroupSymbol(eventType) && deviceGroups != null)
+        {
+            foreach (var groupId in deviceGroups)
+            {
+                if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+                {
+                    groupLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
+                    _log?.Info($"그룹 이벤트 처리 (ById): DeviceGroup({groupId}) -> {eventType}");
+                }
+            }
+        }
+    }
+
     // 컨트롤러 이벤트 처리 (복합 키 사용)
     public void ProcessControllerEvent(int controllerId, List<int>? deviceGroups, EnumDeviceType deviceType, EnumEventType eventType, EnumSeverityLevel severity = EnumSeverityLevel.WARNING)
     {
@@ -223,6 +258,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     /// </summary>
     public Task HandleAsync(DeviceStatusChangedMessage message, CancellationToken cancellationToken)
     {
+        _log?.Info($"[SYNC→Symbol] DeviceStatusChangedMessage 수신: id={message.DeviceId}, type={message.DeviceType}, status={message.Status} (등록 심볼 수={_deviceSymbolLookup.Count})");
         SyncDeviceStatus(message.DeviceId, message.DeviceType, message.Status);
         return Task.CompletedTask;
     }

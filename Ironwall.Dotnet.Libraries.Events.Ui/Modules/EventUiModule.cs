@@ -72,6 +72,9 @@ public class EventUiModule : Module
             builder.RegisterType<CameraPtzNatsSyncService>()
                    .As<ICameraPtzNatsSyncService>()
                    .SingleInstance();
+            builder.RegisterType<DetectionNatsSyncService>()
+                   .As<IDetectionNatsSyncService>()
+                   .SingleInstance();
          
             builder.RegisterType<DetectionReportDialogViewModel>().AsSelf()//  new DetectionReportDialogViewModel() 로도 해결 가능
                                                                   .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환

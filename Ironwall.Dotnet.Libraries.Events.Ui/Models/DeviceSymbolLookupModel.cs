@@ -42,8 +42,16 @@ public class DeviceSymbolLookupModel : BaseModel
     /// </summary>
     public void SyncFromDevice(EnumDeviceStatus status)
     {
-        if (SymbolModel == null) return;
+        if (SymbolModel == null)
+        {
+            _log?.Warning($"[SYNC→Symbol] SyncFromDevice: SymbolModel null (Id={Id})");
+            return;
+        }
 
+        var prevState     = SymbolModel.OperationState;
+        var prevEvent     = SymbolModel.EventStatus;
+
+        // OperationState 동기화
         SymbolModel.OperationState = status switch
         {
             EnumDeviceStatus.ACTIVATED   => EnumOperationState.ACTIVATED,
@@ -51,54 +59,44 @@ public class DeviceSymbolLookupModel : BaseModel
             EnumDeviceStatus.ERROR       => EnumOperationState.ERROR,
             _                            => EnumOperationState.NONE,
         };
+
+        // EventStatus도 명시적으로 설정 (GMapBaseMarker.OperationState 세터를 우회하기 때문)
+        // OnStatusChanged는 세터에서만 호출되므로 여기서 직접 설정
+        SymbolModel.EventStatus = status switch
+        {
+            EnumDeviceStatus.ACTIVATED   => EnumEventStatus.Normal,
+            EnumDeviceStatus.DEACTIVATED => EnumEventStatus.Normal,  // 깜빡임 없음
+            EnumDeviceStatus.ERROR       => EnumEventStatus.Fault,   // 깜빡임 유지
+            _                            => EnumEventStatus.Normal,
+        };
+
+        // 애니메이션 상태 관리: ERROR → 깜빡임 시작, 그 외 → 기존 애니메이션 정지
+        if (status == EnumDeviceStatus.ERROR)
+        {
+            _animationManager.ProcessNewEvent(EnumEventType.Fault);
+        }
+        else
+        {
+            _animationManager.ReportCurrentEvent();
+        }
+
+        _log?.Info($"[SYNC→Symbol] SyncFromDevice: '{SymbolModel.Title}' DeviceStatus={status} → OperationState: {prevState}→{SymbolModel.OperationState}, EventStatus: {prevEvent}→{SymbolModel.EventStatus}");
         SymbolModel.SetUpdate();
     }
 
     public void ProcessEvent(EnumEventType eventType, EnumSeverityLevel severity)
     {
-        try
+        if (SymbolModel == null) return;
+
+        // 탐지(Intrusion) 이벤트만 ProcessEvent 경로에서 심볼 비주얼 처리
+        // 장애(Fault)는 Device.Status=ERROR → SyncFromDevice 경로에서 처리
+        if (eventType == EnumEventType.Intrusion)
         {
-
-            // 1. 기존 비즈니스 상태 업데이트 (기존 로직 유지)
-            UpdateDeviceAndSymbolState(eventType, severity);
-
-            // 2. 애니메이션 상태 처리 (신규)
-            _animationManager.ProcessNewEvent(eventType);
-
-            // 3. 심볼 업데이트 알림
+            SymbolModel.EventStatus = EnumEventStatus.Detecting;
             SymbolModel.SetUpdate();
-
-
-            switch (eventType)
-            {
-                case EnumEventType.Intrusion:
-                    DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
-                    SymbolModel.EventStatus = EnumEventStatus.Detecting;
-                    SymbolModel.OperationState = EnumOperationState.ACTIVATED;
-                    _log?.Info($"DeviceModel의 Status({DeviceModel.Status}),SymbolModel의 EventStatus({SymbolModel.EventStatus}) ");
-                    SymbolModel.SetUpdate();
-                    break;
-                case EnumEventType.Fault:
-                    DeviceModel.Status = EnumDeviceStatus.ERROR;
-                    SymbolModel.EventStatus = EnumEventStatus.Fault;
-                    SymbolModel.OperationState = EnumOperationState.ERROR;
-                    _log?.Info($"DeviceModel의 Status({DeviceModel.Status}),SymbolModel의 EventStatus({SymbolModel.EventStatus}) ");
-                    SymbolModel.SetUpdate();
-                    break;
-                case EnumEventType.Connection:
-                    DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
-                    SymbolModel.EventStatus = EnumEventStatus.Connection;
-                    SymbolModel.OperationState = EnumOperationState.ACTIVATED;
-                    _log?.Info($"DeviceModel의 Status({DeviceModel.Status}),SymbolModel의 EventStatus({SymbolModel.EventStatus}) ");
-                    SymbolModel.SetUpdate();
-                    break;
-            }
+            _animationManager.ProcessNewEvent(eventType);
+            _log?.Info($"탐지 이벤트 → Detecting: {SymbolModel.Title}");
         }
-        catch (Exception ex)
-        {
-            _log?.Error(ex.Message);
-        }
-
     }
 
     public void ProcessEventReport()
@@ -119,51 +117,20 @@ public class DeviceSymbolLookupModel : BaseModel
 
     private void OnEventRestored()
     {
-        // 정상 상태로 복원
-        if (DeviceModel != null && SymbolModel != null)
-        {
-            DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
-            SymbolModel.EventStatus = EnumEventStatus.Normal;
-            SymbolModel.OperationState = EnumOperationState.ACTIVATED;
-            SymbolModel.SetUpdate();
+        if (SymbolModel == null) return;
 
-            _log?.Info($"상태 복원: {SymbolModel.Title}");
-        }
-    }
-
-    private void UpdateDeviceAndSymbolState(EnumEventType eventType, EnumSeverityLevel severity)
-    {
-        if(DeviceModel == null || SymbolModel == null) return;
-
-        // 기존 switch 문 로직 유지
-        switch (eventType)
-        {
-            case EnumEventType.Intrusion:
-                DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
-                SymbolModel.EventStatus = EnumEventStatus.Detecting;
-                SymbolModel.OperationState = EnumOperationState.ACTIVATED;
-                break;
-            case EnumEventType.Fault:
-                DeviceModel.Status = EnumDeviceStatus.ERROR;
-                SymbolModel.EventStatus = EnumEventStatus.Fault;
-                SymbolModel.OperationState = EnumOperationState.ERROR;
-                break;
-            case EnumEventType.Connection:
-                DeviceModel.Status = EnumDeviceStatus.ACTIVATED;
-                SymbolModel.EventStatus = EnumEventStatus.Connection;
-                SymbolModel.OperationState = EnumOperationState.ACTIVATED;
-                break;
-        }
+        SymbolModel.EventStatus = EnumEventStatus.Normal;
+        SymbolModel.SetUpdate();
+        _log?.Info($"OnEventRestored → Normal 복원: {SymbolModel.Title}");
     }
 
     #region - PTZ → FOV Conversion Methods -
     // FOV 변환 상수
-    private const double BaseDetectionAngle = 80.0;   // 기본 검출 각도 (1x 줌)
-    private const double MinDetectionAngle = 5.0;     // 최소 검출 각도
-    private const double MaxDetectionAngle = 120.0;   // 최대 검출 각도
-    private const double BaseDetectionRange = 30.0;  // 기본 검출 거리 (미터, 1x 줌)
-    private const double MinDetectionRange = 10.0;    // 최소 검출 거리
-    private const double MaxDetectionRange = 2000.0;  // 최대 검출 거리
+    // zoom 입력: 0~100 (normalized, 100 = NVR 최대 줌 = 3km)
+    private const double MaxDetectionAngle = 80.0;    // zoom=0 일 때 최대 검출 각도
+    private const double MinDetectionAngle = 5.0;     // zoom=100 일 때 최소 검출 각도
+    private const double MinDetectionRange = 10.0;    // zoom=0 일 때 최소 검출 거리 (m)
+    private const double MaxDetectionRange = 3000.0;  // zoom=100 일 때 최대 검출 거리 (3km)
 
     /// <summary>
     /// Pan 각도를 FOV Bearing으로 변환
@@ -181,37 +148,25 @@ public class DeviceSymbolLookupModel : BaseModel
     /// <summary>
     /// Zoom 값을 FOV Angle으로 변환 (줌 ↑ → 각도 ↓)
     /// </summary>
-    /// <param name="zoom">줌 백분율 (100 = 1x, 200 = 2x, ...)</param>
-    /// <returns>검출 각도</returns>
+    /// <param name="zoom">정규화된 줌 (0~100, 100=NVR 최대줌)</param>
+    /// <returns>검출 각도 (°): zoom=0 → 80°, zoom=100 → 5°</returns>
     protected double ConvertZoomToAngle(float zoom)
     {
-        // 줌 배율 계산 (100% = 1x)
-        var zoomMultiplier = zoom / 100.0;
-        if (zoomMultiplier < 1.0) zoomMultiplier = 1.0;
-
-        // 줌이 높을수록 각도는 좁아짐 (역비례)
-        var angle = BaseDetectionAngle / zoomMultiplier;
-
-        // 최소/최대 제한
-        return Math.Max(MinDetectionAngle, Math.Min(MaxDetectionAngle, angle));
+        // 선형 보간: zoom 0→MaxAngle(80°), zoom 100→MinAngle(5°)
+        var ratio = Math.Clamp(zoom / 100.0, 0.0, 1.0);
+        return MaxDetectionAngle - ratio * (MaxDetectionAngle - MinDetectionAngle);
     }
 
     /// <summary>
     /// Zoom 값을 FOV Range로 변환 (줌 ↑ → 거리 ↑)
     /// </summary>
-    /// <param name="zoom">줌 백분율 (100 = 1x, 200 = 2x, ...)</param>
-    /// <returns>검출 거리 (미터)</returns>
+    /// <param name="zoom">정규화된 줌 (0~100, 100=NVR 최대줌=3km)</param>
+    /// <returns>검출 거리 (m): zoom=0 → 10m, zoom=100 → 3000m</returns>
     protected double ConvertZoomToRange(float zoom)
     {
-        // 줌 배율 계산 (100% = 1x)
-        var zoomMultiplier = zoom / 100.0;
-        if (zoomMultiplier < 1.0) zoomMultiplier = 1.0;
-
-        // 줌이 높을수록 거리는 늘어남 (정비례)
-        var range = BaseDetectionRange * zoomMultiplier;
-
-        // 최소/최대 제한
-        return Math.Max(MinDetectionRange, Math.Min(MaxDetectionRange, range));
+        // 선형 보간: zoom 0→MinRange(10m), zoom 100→MaxRange(3000m)
+        var ratio = Math.Clamp(zoom / 100.0, 0.0, 1.0);
+        return MinDetectionRange + ratio * (MaxDetectionRange - MinDetectionRange);
     }
 
     /// <summary>

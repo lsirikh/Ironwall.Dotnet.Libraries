@@ -2413,10 +2413,8 @@ public class SymbolEventManagerDualDictionaryTests
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
 
-        // Assert - 개별 심볼 EventStatus 변경됨
+        // Assert - Intrusion 이벤트는 ProcessEvent 경로에서 EventStatus=Detecting 설정
         mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
-
-        // Assert - 그룹 심볼도 EventStatus 변경됨
         mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
     }
     #endregion
@@ -2454,11 +2452,8 @@ public class SymbolEventManagerDualDictionaryTests
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Connection,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
 
-        // Assert - 개별 심볼만 처리됨
-        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Connection, Times.AtLeastOnce);
-
-        // Assert - 그룹 심볼은 처리 안됨 (Connection은 개별만)
-        mockGroupSymbol.VerifySet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(), Times.Never);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Connection, Times.Never);
     }
     #endregion
 
@@ -2495,11 +2490,9 @@ public class SymbolEventManagerDualDictionaryTests
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
 
-        // Assert - 개별 심볼 EventStatus = Fault 로 변경됨
-        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
-
-        // Assert - 그룹 심볼도 EventStatus = Fault 로 변경됨 (버그 수정 검증)
-        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.Never);
+        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.Never);
     }
     #endregion
 
@@ -2536,11 +2529,9 @@ public class SymbolEventManagerDualDictionaryTests
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
 
-        // Assert - 개별 심볼 처리됨
-        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
-
-        // Assert - Fence 타입이므로 그룹 심볼도 처리됨
-        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.Never);
+        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.Never);
     }
     #endregion
 
@@ -2577,11 +2568,8 @@ public class SymbolEventManagerDualDictionaryTests
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.CRITICAL);
 
-        // Assert - 개별 심볼만 처리됨
-        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.AtLeastOnce);
-
-        // Assert - Non-Fence이므로 그룹 심볼 처리 안됨
-        mockGroupSymbol.VerifySet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(), Times.Never);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Fault, Times.Never);
     }
     #endregion
 
@@ -2623,6 +2611,57 @@ public class SymbolEventManagerDualDictionaryTests
 
         // Note: 실제 EventStatus 복원은 EventAnimationManager의 비동기 콜백에서 수행됨
         // 따라서 동기 테스트에서는 직접 검증 불가
+    }
+    #endregion
+
+    #region Test 13.4.2: Intrusion → ProcessEventReport → EventStatus=Normal 복원
+    [Fact]
+    public void ProcessEventReport_AfterIntrusion_ShouldRestoreEventStatusToNormal()
+    {
+        // Arrange
+        var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
+        var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
+        var eventSetupModel = CreateMockEventSetupModel();
+        // 자동조치보고 비활성화 (타이머 없이 수동 조치보고만 테스트)
+        eventSetupModel.IsAutoEventDiscard = false;
+
+        var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
+            mockEa.Object, mockLog.Object, eventSetupModel);
+
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(5);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1 });
+        mockDevice.Setup(d => d.DeviceType).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
+        mockDevice.Setup(d => d.Status).Returns(Ironwall.Dotnet.Libraries.Enums.EnumDeviceStatus.ACTIVATED);
+
+        var mockPidsSymbol = new Mock<Ironwall.Dotnet.Monitoring.Models.Symbols.IPidsSymbolModel>();
+        mockPidsSymbol.SetupAllProperties();
+
+        manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
+
+        // Act 1: Intrusion 이벤트 → Detecting
+        manager.ProcessDeviceEvent(
+            deviceId: 5,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            deviceGroups: null,
+            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion);
+
+        // Verify: EventStatus=Detecting
+        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
+
+        // EventStatus 변경 이력 추적: Detecting 이후 Normal이 설정되는지 확인
+        var statusHistory = new List<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>();
+        mockPidsSymbol.SetupSet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>())
+            .Callback<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(v => statusHistory.Add(v));
+
+        // Act 2: 조치보고 → Normal 복원
+        manager.ProcessEventReport(
+            deviceId: 5,
+            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
+            deviceGroups: null);
+
+        // Assert: 조치보고 이후 EventStatus=Normal이 설정됨
+        Assert.Contains(Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Normal, statusHistory);
     }
     #endregion
 
@@ -3045,7 +3084,7 @@ public class DataHelperRefactoringTests
     #region Phase 18.2: ProcessEvent 추적 테스트
 
     [Fact]
-    public void ProcessEvent_WithCameraAndFaultEvent_ShouldProcessFault()
+    public void ProcessEvent_WithCameraAndFaultEvent_ShouldNotChangeSymbolState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3064,12 +3103,12 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
 
-        // Assert - Camera도 Fault 이벤트를 처리하여 상태 변경
-        Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
     }
 
     [Fact]
-    public void ProcessEvent_WithCameraAndConnectionEvent_ShouldProcessConnection()
+    public void ProcessEvent_WithCameraAndConnectionEvent_ShouldNotChangeSymbolState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3088,12 +3127,12 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Connection, EnumSeverityLevel.CRITICAL);
 
-        // Assert - Camera도 Connection 이벤트를 처리하여 상태 변경
-        Assert.Equal(EnumEventStatus.Connection, symbolModel.EventStatus);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
     }
 
     [Fact]
-    public void ProcessEvent_WithCameraAndIntrusionEvent_ShouldProcess()
+    public void ProcessEvent_WithCameraAndIntrusionEvent_ShouldNotChangeSymbolState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3112,12 +3151,12 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Intrusion, EnumSeverityLevel.CRITICAL);
 
-        // Assert
-        Assert.Equal(EnumEventStatus.Detecting, symbolModel.EventStatus);
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
     }
 
     [Fact]
-    public void ProcessEvent_WithSensorAndFaultEvent_ShouldProcess()
+    public void ProcessEvent_WithSensorAndFaultEvent_ShouldNotChangeSymbolState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3141,8 +3180,8 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
 
-        // Assert
-        Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus); // Sensor는 정상 처리
+        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
+        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
     }
 
     #endregion
@@ -5213,6 +5252,68 @@ public class DeviceSymbolLookupModelSyncTests
 
         symbolMock.VerifySet(s => s.OperationState = EnumOperationState.ERROR);
     }
+
+    [Fact]
+    public void SyncFromDevice_Error_SetsEventStatusFault()
+    {
+        // SyncFromDevice(ERROR) → EventStatus=Fault (깜빡임 트리거)
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        lookup.SyncFromDevice(EnumDeviceStatus.ERROR);
+
+        symbolMock.VerifySet(s => s.EventStatus = EnumEventStatus.Fault);
+    }
+
+    [Fact]
+    public void SyncFromDevice_Activated_SetsEventStatusNormal()
+    {
+        // SyncFromDevice(ACTIVATED) → EventStatus=Normal (깜빡임 정지)
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        lookup.SyncFromDevice(EnumDeviceStatus.ACTIVATED);
+
+        symbolMock.VerifySet(s => s.EventStatus = EnumEventStatus.Normal);
+    }
+
+    [Fact]
+    public void SyncFromDevice_Activated_AfterError_RestoresNormalState()
+    {
+        // ERROR → ACTIVATED 전환 시 정상 복원 확인
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        lookup.SyncFromDevice(EnumDeviceStatus.ERROR);
+        lookup.SyncFromDevice(EnumDeviceStatus.ACTIVATED);
+
+        Assert.Equal(EnumOperationState.ACTIVATED, symbolMock.Object.OperationState);
+        Assert.Equal(EnumEventStatus.Normal, symbolMock.Object.EventStatus);
+    }
+
+    [Fact]
+    public void ProcessEvent_DoesNotChangeSymbolState()
+    {
+        // ProcessEvent는 더 이상 심볼 비주얼을 변경하지 않음
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        symbolMock.Object.EventStatus = EnumEventStatus.Normal;
+        symbolMock.Object.OperationState = EnumOperationState.ACTIVATED;
+        lookup.SymbolModel = symbolMock.Object;
+        lookup.DeviceModel = new CameraDeviceModel { Id = 1, DeviceType = EnumDeviceType.IpCamera };
+
+        lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
+
+        Assert.Equal(EnumEventStatus.Normal, symbolMock.Object.EventStatus);
+        Assert.Equal(EnumOperationState.ACTIVATED, symbolMock.Object.OperationState);
+    }
 }
 #endregion
 
@@ -5298,6 +5399,18 @@ public class SymbolEventManagerPhase4Tests
             System.Threading.CancellationToken.None);
 
         Assert.Equal(EnumOperationState.DEACTIVATED, s1.Object.OperationState);
+    }
+
+    // Test 4.5: lookup에 없는 ID → 예외 없이 무시 (SYNC_DEVICE CREATED 케이스 대비)
+    [Fact]
+    public void SyncDeviceStatus_MissingDevice_DoesNotThrow()
+    {
+        var manager = CreateManager(out _);
+        // 아무것도 등록하지 않은 상태에서 존재하지 않는 id=999 호출
+        var ex = Record.Exception(() =>
+            manager.SyncDeviceStatus(999, EnumDeviceType.IpCamera, EnumDeviceStatus.ERROR));
+
+        Assert.Null(ex);
     }
 }
 #endregion
@@ -5395,6 +5508,102 @@ public class CameraPtzNatsSyncServiceTests
 
         // Assert
         mockManager.Verify(m => m.ProcessCameraPtz(It.IsAny<int>(), It.IsAny<float>(), It.IsAny<float>(), It.IsAny<float>()), Times.Never);
+    }
+    #endregion
+}
+#endregion
+
+#region Test 15: DetectionNatsSyncService 테스트
+public class DetectionNatsSyncServiceTests
+{
+    private Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>? _capturedHandler;
+
+    private Ironwall.Dotnet.Libraries.Events.Ui.Services.DetectionNatsSyncService CreateService(
+        out Mock<Ironwall.Dotnet.Libraries.Nats.Services.INatsService> mockNats,
+        out Mock<Ironwall.Dotnet.Libraries.Events.Ui.Managers.ISymbolEventManager> mockManager)
+    {
+        mockNats = new Mock<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>();
+        mockManager = new Mock<Ironwall.Dotnet.Libraries.Events.Ui.Managers.ISymbolEventManager>();
+
+        mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>>())
+                .Callback<Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>>(h => _capturedHandler = h);
+
+        return new Ironwall.Dotnet.Libraries.Events.Ui.Services.DetectionNatsSyncService(
+            null, mockNats.Object, mockManager.Object);
+    }
+
+    #region Test 15.1: DETECTION 메시지 수신 → ProcessDetectionById 호출
+    [Fact]
+    public async Task OnNatsDetection_ValidMessage_ShouldCallProcessDetectionById()
+    {
+        // Arrange
+        var service = CreateService(out var mockNats, out var mockManager);
+        await service.StartService();
+
+        var json = """
+        {
+          "id": "test-uuid",
+          "m_type": "REQ",
+          "cmd": "DETECTION",
+          "from": "pids-proxy",
+          "body": {
+            "id": 1,
+            "type_event": "Intrusion",
+            "device_id": 5,
+            "device": {
+              "id": 5,
+              "type_device": "Sensor",
+              "device_groups": [{ "id": 1, "name": "A구역" }, { "id": 3, "name": "C구역" }]
+            },
+            "result": "PIR_SENSOR"
+          }
+        }
+        """;
+
+        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
+            subject: "sensorway.unit001.gis.event.detect",
+            subscriptionSubject: null,
+            data: json);
+
+        // Act
+        await _capturedHandler!(args);
+
+        // Assert
+        mockManager.Verify(m => m.ProcessDetectionById(
+            5,
+            It.Is<List<int>>(g => g.Contains(1) && g.Contains(3)),
+            Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion),
+            Times.Once);
+    }
+    #endregion
+
+    #region Test 15.2: 비-DETECTION cmd → 무시
+    [Fact]
+    public async Task OnNatsDetection_NonDetectionCmd_ShouldIgnore()
+    {
+        // Arrange
+        var service = CreateService(out var mockNats, out var mockManager);
+        await service.StartService();
+
+        var json = """
+        {
+          "cmd": "SYNC_DEVICE",
+          "body": { "action": "UPDATED" }
+        }
+        """;
+
+        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
+            subject: "sensorway.unit001.gis.event.detect",
+            subscriptionSubject: null,
+            data: json);
+
+        // Act
+        await _capturedHandler!(args);
+
+        // Assert
+        mockManager.Verify(m => m.ProcessDetectionById(
+            It.IsAny<int>(), It.IsAny<List<int>?>(), It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventType>()),
+            Times.Never);
     }
     #endregion
 }
