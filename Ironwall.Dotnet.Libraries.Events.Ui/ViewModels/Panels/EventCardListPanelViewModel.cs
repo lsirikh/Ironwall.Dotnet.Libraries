@@ -173,21 +173,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
-
-                    model.Status = Enums.EnumTrueFalse.True;
-                    await _providerService.UpdateDetectionEventAsync((IDetectionEventModel)model!, cancellationToken);
-
-                    var actionRequest = new SendActionRequestMessage
-                    {
-                        EventId = model.Id,
-                        EventType = EnumEventType.Intrusion,
-                        ActionDetails = message.Content,
-                        ActionUser = message.User,
-                        ActionTime = DateTime.Now
-                    };
-
-                    // EventAggregator를 통해 메시지 발행
-                    await _eventAggregator.PublishOnBackgroundThreadAsync(actionRequest);
+                    // 서버가 Action 생성 시 action_reported=True를 자동으로 처리하므로 별도 Update 불필요
                 }
             }
             catch (Exception ex)
@@ -217,21 +203,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
-
-                    model.Status = Enums.EnumTrueFalse.True;
-                    await _providerService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)model!, cancellationToken);
-
-                    var actionRequest = new SendActionRequestMessage
-                    {
-                        EventId = model.Id,
-                        EventType = EnumEventType.Fault,
-                        ActionDetails = message.Content,
-                        ActionUser = message.User,
-                        ActionTime = DateTime.Now
-                    };
-
-                    // EventAggregator를 통해 메시지 발행
-                    await _eventAggregator.PublishOnBackgroundThreadAsync(actionRequest);
+                    // 서버가 Action 생성 시 action_reported=True를 자동으로 처리하므로 별도 Update 불필요
                 }
             }
             catch (Exception ex)
@@ -261,7 +233,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
-                            User = $"{_userModel.Username}({_userModel.EmployeeNumber})",
+                            User = _userModel.Name,
                             OriginEvent = model,
                         };
                         model.Status = Enums.EnumTrueFalse.True;
@@ -272,7 +244,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             EventId = model.Id,
                             EventType = EnumEventType.Intrusion,
                             ActionDetails = "자동 조치보고",
-                            ActionUser = $"{_userModel.Username}({_userModel.EmployeeNumber})",
+                            ActionUser = _userModel.Name,
                             ActionTime = DateTime.Now
                         };
 
@@ -288,7 +260,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         action = new ActionEventModel()
                         {
                             Content = "자동 조치보고",
-                            User = $"{_userModel.Username}({_userModel.EmployeeNumber})",
+                            User = _userModel.Name,
                             OriginEvent = model,
                         };
                         model.Status = Enums.EnumTrueFalse.True;
@@ -299,7 +271,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                             EventId = model.Id,
                             EventType = EnumEventType.Fault,
                             ActionDetails = "자동 조치보고",
-                            ActionUser = $"{_userModel.Username}({_userModel.EmployeeNumber})",
+                            ActionUser = _userModel.Name,
                             ActionTime = DateTime.Now
                         };
 

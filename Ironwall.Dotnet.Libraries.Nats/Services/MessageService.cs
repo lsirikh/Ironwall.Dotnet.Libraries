@@ -194,6 +194,11 @@ public abstract class MessageService<T> : IMessageService<T>
     /// 메시지 발행 (자식 클래스에서 구현)
     /// </summary>
     public abstract Task PublishAsync(string subject, string data);
+
+    /// <summary>
+    /// NATS Request-Reply 패턴 (자식 클래스에서 구현)
+    /// </summary>
+    public abstract Task<string?> RequestAsync(string subject, string data, TimeSpan? timeout = null);
     #endregion
 
     #region - Properties -

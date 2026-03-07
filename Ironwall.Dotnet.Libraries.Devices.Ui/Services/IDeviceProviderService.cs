@@ -54,4 +54,24 @@ public interface IDeviceProviderService : IService
     /// <param name="token">취소 토큰</param>
     /// <returns>갱신된 IBaseDeviceModel (실패 시 null)</returns>
     Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default);
+
+    /// <summary>
+    /// Device를 Provider 캐시에서 제거합니다.
+    /// NatsSync SYNC_DEVICE action="DELETED" 수신 시 호출됩니다.
+    /// </summary>
+    /// <param name="typeDevice">NATS body의 type_device 문자열</param>
+    /// <param name="resourceId">삭제된 Device ID</param>
+    Task RemoveDeviceByIdAsync(string typeDevice, int resourceId);
+
+    /// <summary>
+    /// 단일 DeviceGroup을 API에서 재조회하여 DeviceGroupProvider를 갱신합니다.
+    /// NatsSync SYNC_DEVICE_GROUP action="CREATED" / "UPDATED" 수신 시 호출됩니다.
+    /// </summary>
+    Task FetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default);
+
+    /// <summary>
+    /// DeviceGroup을 DeviceGroupProvider 캐시에서 제거합니다.
+    /// NatsSync SYNC_DEVICE_GROUP action="DELETED" 수신 시 호출됩니다.
+    /// </summary>
+    Task RemoveDeviceGroupByIdAsync(int resourceId);
 }

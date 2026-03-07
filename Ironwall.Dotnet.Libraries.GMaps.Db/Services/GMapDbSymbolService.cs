@@ -1548,6 +1548,12 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             _log?.Info($"PidsSymbol 업데이트 완료 - Id={model.Id}");
             return await FetchPidsSymbolAsync(model.Id, token);
         }
+        catch (MySqlException mex) when (mex.Message.Contains("Record has changed"))
+        {
+            await transaction.RollbackAsync(token);
+            _log?.Warning($"PidsSymbol 동시 업데이트 충돌 (무시됨): Id={model.Id} — 다른 업데이트가 먼저 커밋됨");
+            return null;
+        }
         catch (Exception ex)
         {
             await transaction.RollbackAsync(token);

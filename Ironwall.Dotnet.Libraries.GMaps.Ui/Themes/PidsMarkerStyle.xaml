@@ -28,6 +28,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
+								<Border Background="#4DFFFFFF" CornerRadius="100">
 								<Canvas
 									Name="PART_ControllerIconContainer"
 									Width="250"
@@ -113,6 +114,7 @@
 									<TextBlock Canvas.Left="127.781" Canvas.Top="131.361" FontFamily="Arial" FontSize="3" Foreground="Black">GET</TextBlock>
 									<TextBlock Canvas.Left="127.781" Canvas.Top="140.731" FontFamily="Arial" FontSize="3" Foreground="Black">USB</TextBlock>
 								</Canvas>
+								</Border>
 							</Viewbox>
 
 							<!--  Controller Label (독립적 크기)  -->
@@ -158,50 +160,145 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Grid
+																<Border Background="#4DFFFFFF" CornerRadius="100">
+								<Canvas
 									Name="PART_MultiIconContainer"
-									Width="40"
-									Height="40">
-
-									<!--  Multi Icon Content - 사각형 배경  -->
-									<Border
-										Background="{TemplateBinding MarkerFill}"
-										BorderBrush="{TemplateBinding MarkerStroke}"
-										BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
-										CornerRadius="4">
-										<Border.Effect>
-											<DropShadowEffect
-												BlurRadius="8"
-												Opacity="0.5"
-												ShadowDepth="4"
-												Color="Black" />
-										</Border.Effect>
-
-										<Grid>
-											<!--  왼쪽 작은 검은 원  -->
-											<Ellipse
-												Width="10"
-												Height="10"
-												Margin="4,0,0,0"
-												HorizontalAlignment="Left"
-												VerticalAlignment="Center"
-												Fill="Black"
-												Stroke="{TemplateBinding MarkerStroke}"
-												StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
-
-											<!--  오른쪽 큰 흰 원  -->
-											<Ellipse
-												Width="16"
-												Height="16"
-												Margin="0,0,4,0"
-												HorizontalAlignment="Right"
-												VerticalAlignment="Center"
-												Fill="White"
-												Stroke="{TemplateBinding MarkerStroke}"
-												StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}" />
-										</Grid>
-									</Border>
-								</Grid>
+									Width="200"
+									Height="200">
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 187.99,14.06 L 92.15,5.75 L 91.17,5.66 L 90.21,5.75 L 10.33,20.09 C 6.79,20.48 6,25.18 6,27.53 V 73.8 C 6,79.28 8.35,83.31 14.01,84.83 L 30.92,89.5 C 33.46,90.23 34.78,91.21 34.78,94.05 V 162.86 C 34.78,167.04 37.78,170.18 40.88,170.71 L 138.02,194.24 C 140.89,194.81 143.14,193.93 145.19,192.66 L 189.12,168.29 C 192.01,166.84 192.53,163.71 192.53,160.84 L 194,23.73 C 194,19.67 191.18,14.67 187.99,14.06 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 10.72,20.31 L 90.87,6.01 L 91.73,5.92 L 187.72,14.23 C 191.42,14.61 193.66,18.76 193.49,20.06 L 121.14,38.74 L 120.04,36.71 L 117.06,33.36 L 82.53,30.22 L 81.81,31.49 L 79.86,33.85 L 76.11,35.01 L 71.46,34.34 L 66.06,28.07 L 10.33,20.82 L 10.72,20.31 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="10.0569,5.89071" EndPoint="110.62,50.8361">
+												<GradientStop Color="#282828" Offset="0"/>
+												<GradientStop Color="#595959" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 11.85,22.71 L 65.14,27.78 C 67.49,32.22 70.12,34.37 74.77,34.37 C 78.89,34.37 80.74,32.12 82.69,29.77 L 114.78,33.01 C 118.74,33.41 120.69,36.75 120.69,40.1 V 92.81 C 120.69,97.88 122.73,101.23 126.68,102.81 L 140.72,108.27 C 143.96,109.33 145.34,111.98 145.34,115.72 V 187.68 C 145.34,192.23 142.41,194.58 138.45,193.8 L 41.01,170.44 C 37.57,169.76 35.43,166.22 35.43,162.97 V 93.83 C 35.43,91.09 34.05,89.92 31.91,89.24 L 13.53,84.27 C 9.31,82.9 7.17,78.94 7.17,73.87 V 27.6 C 7.17,24.96 8.74,22.61 11.85,22.71 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="81.6031,22.6856" EndPoint="96.8481,188.111">
+												<GradientStop Color="#0A0A0A" Offset="0"/>
+												<GradientStop Color="#373636" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 11.31,21.91 L 65.04,27.39 C 67.29,31.44 70.02,33.89 74.77,33.89 C 78.22,33.89 79.97,32.12 81.91,29.48 L 114.29,32.62 C 118.84,33.01 120.41,36.75 120.41,40.1 V 92.81 C 120.41,97.98 122.16,101.52 127.02,103.29 L 139.84,108.17 C 141.5,108.85 141.88,109.91 141.88,113.26 L 144.52,113.65 C 145.39,113.84 145.49,114.91 145.49,116.68 V 187.68 C 145.49,191.82 142.94,194.57 139.08,193.99 L 138.98,193.96 C 141.98,193.66 144.13,191.41 144.13,187.26 V 116.26 C 144.13,114.31 143.74,113.92 142.66,113.83 L 140.12,113.54 C 140.12,110.29 139.45,109.13 137.21,108.26 L 125.07,103.49 C 119.32,101.43 117.85,97.78 117.85,91.92 V 41.36 C 117.85,37.72 116.19,36.15 112.95,35.76 L 82.11,32.72 C 79.76,35.56 77.91,36.93 73.96,36.93 C 69.21,36.93 65.76,34.78 63.61,30.73 L 11.11,23.88 C 8.76,23.59 7.79,25.74 7.79,28.28 V 73.45 C 7.79,78.21 9.26,82.16 13.61,83.92 L 12.74,83.63 C 8.78,82.16 7.12,78.41 7.12,73.65 V 27.48 C 7.12,24.44 8.48,21.8 11.31,21.91 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="76.4063,21.8892" EndPoint="76.4063,194.091">
+												<GradientStop Color="#FF919191" Offset="0"/>
+												<GradientStop Color="#36919191" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 12.61,20.26 L 90.87,6.91 L 91.73,6.81 L 188.77,14.92 C 190.72,15.11 191.99,16.97 192.38,18.83 L 118.34,35.17 C 117.27,33.9 116.1,33.12 113.85,32.83 L 82.79,29.68 L 82.11,29.59 L 81.43,30.46 C 79.48,32.91 77.72,34.18 74.48,34.18 C 70.73,34.18 68.19,32.12 66.34,28.57 L 65.85,27.8 L 12.61,21.42 V 20.26 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="99.9697,6.76074" EndPoint="101.626,36.8368">
+												<GradientStop Color="#1E1E1E" Offset="0"/>
+												<GradientStop Color="#B4B4B4" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Fill="Black" Data="M 63.41,27.98 L 131.61,12.12 L 145.55,13.49 L 82.4,29.34 L 81.72,30.12 C 79.77,32.57 77.72,33.74 74.68,33.74 C 71.23,33.74 68.59,31.78 66.64,28.64 L 65.96,27.77 L 63.41,27.98 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 117.86,61.17 L 111.12,60.2 C 104.18,59.42 100.03,66.92 100.03,73.4 C 100.03,81.29 105.79,89.97 112.92,89.97 H 117.86 V 61.17 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="108.943,59.9906" EndPoint="108.943,89.9708">
+												<GradientStop Color="#000000" Offset="0"/>
+												<GradientStop Color="#343434" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 117.86,64.72 C 112.1,63.65 107.95,67.99 107.95,73.65 C 107.95,78.92 112.1,83.78 117.86,84.36 V 64.72 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="112.907,64.4156" EndPoint="112.907,84.3615">
+												<GradientStop Color="#181825" Offset="0"/>
+												<GradientStop Color="#050505" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 117.47,68.76 C 113.82,67.89 111.68,70.73 111.68,73.77 C 111.68,76.71 113.92,79.35 117.47,79.74 V 68.76 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="114.577,68.5201" EndPoint="114.577,79.7373">
+												<GradientStop Color="#0E4E2B" Offset="0"/>
+												<GradientStop Color="#151A18" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 115.22,72.71 C 116.38,72.71 116.97,71.75 116.97,70.97 C 116.97,70.09 116.19,69.61 115.22,69.61 C 114.15,69.61 113.57,70.38 113.57,71.06 C 113.57,72.03 114.35,72.71 115.22,72.71 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="115.273,69.606" EndPoint="115.273,72.7066">
+												<GradientStop Color="#38AC56" Offset="0"/>
+												<GradientStop Color="#388248" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 71.42,39.87 C 58.31,39.87 48.47,50.85 48.47,67.99 C 48.47,82.95 59.27,99.1 73.71,99.1 C 86.24,99.1 94.24,86.06 94.24,72.03 C 94.24,58.49 83.95,39.87 71.42,39.87 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="71.3551,39.8672" EndPoint="71.3551,99.0966">
+												<GradientStop Color="#000000" Offset="0"/>
+												<GradientStop Color="#131313" Offset="0.510417"/>
+												<GradientStop Color="#919191" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 73.27,45.34 C 63.32,45.34 56.58,55.61 56.58,67.21 C 56.58,79.32 65.67,92.66 76.57,92.66 C 85.85,92.66 93.08,82.39 93.08,71.41 C 93.08,60.34 83.71,45.34 73.27,45.34 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="65.0861,46.3028" EndPoint="80.8128,92.2174">
+												<GradientStop Color="#FEFFFE" Offset="0"/>
+												<GradientStop Color="#A6CDEE" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 44.72,49.49 L 49.92,49.87 L 53.06,48.9 L 48.91,59.27 L 47.06,72.12 L 48.23,79.23 L 44.08,83.28 L 38.42,96.81 V 28.07 L 44.72,28.75 V 49.49 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="45.7311,28.0664" EndPoint="45.7311,96.8104">
+												<GradientStop Color="#080808" Offset="0"/>
+												<GradientStop Color="#8C080808" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 52.72,113.36 L 123.41,127.19 C 125.75,127.67 126.62,129.24 126.62,131.49 V 166.95 C 126.62,169.69 124.77,170.18 122.83,169.79 L 52.72,154.45 C 50.77,153.96 50.09,152.79 50.09,150.34 V 116.1 C 50.09,114.14 50.77,112.97 52.72,113.36 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="88.3548,113.258" EndPoint="88.3548,170.002">
+												<GradientStop Color="#353535" Offset="0"/>
+												<GradientStop Color="#383838" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 67.68,126.31 C 62.12,126.31 58.78,131.28 58.78,136.75 C 58.78,142.71 63.43,148.57 68.64,148.57 C 73.39,148.57 76.53,143.2 76.53,138.43 C 76.53,133.26 72.32,126.31 67.68,126.31 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="67.6561,126.313" EndPoint="67.6561,148.57">
+												<GradientStop Color="#000000" Offset="0"/>
+												<GradientStop Color="#474747" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 69.43,128.17 C 65.47,128.17 65.86,134.23 65.86,135.9 C 65.86,139.94 69.01,143.39 72.86,143.39 C 75.79,143.39 76.28,140.75 76.28,138.1 C 76.28,133.95 73.29,128.17 69.43,128.17 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="71.0705,128.121" EndPoint="71.0705,143.386">
+												<GradientStop Color="#201E2B" Offset="0"/>
+												<GradientStop Color="#2B2937" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 102.78,130.06 C 95.36,129.28 91.51,135.93 91.51,143.03 C 91.51,150.92 97.46,158.91 104.2,158.91 C 110.74,158.91 115.29,152.06 115.29,145.8 C 115.29,139.33 110.09,130.84 102.78,130.06 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="103.398,129.971" EndPoint="103.398,158.913">
+												<GradientStop Color="#000000" Offset="0"/>
+												<GradientStop Color="#474747" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.3" StrokeMiterLimit="10" Data="M 105.03,132.9 C 99.82,132.32 97.58,138.77 97.58,143.12 C 97.58,149.48 102.13,154.95 107.33,154.95 C 111.78,154.95 114.23,150.1 114.23,145.85 C 114.23,140.78 110.28,133.48 105.03,132.9 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="105.903,132.811" EndPoint="105.903,154.951">
+												<GradientStop Color="#3A3849" Offset="0"/>
+												<GradientStop Color="#11121B" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Fill="#F4F2F0" Opacity="0.3" Data="M 102.04,142.05 C 101.75,137.19 103.99,135.52 107.13,136.11 C 108.6,136.4 109.67,137.27 110.64,138.34 C 107.3,138.92 102.92,142.16 103.21,147.13 C 102.43,146.06 102.14,144.3 102.04,142.05 Z"/>
+								</Canvas>
+								</Border>
 							</Viewbox>
 
 							<!--  Multi Label (독립적 크기)  -->
@@ -247,6 +344,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
+									<Border Background="#4DFFFFFF" CornerRadius="100">
 									<Canvas
 										Name="PART_FenceIconContainer"
 										Width="200"
@@ -306,7 +404,9 @@
 										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 133.21,130.05 L 144.69,116.32 L 156.18,130.65 C 157.71,132.5 156.78,134.65 154.61,137.1 L 144.39,149.34 L 133.21,136.11 C 131.38,133.96 131.08,132.2 133.21,130.05 Z" />
 										<Path Fill="White" Stroke="Black" StrokeThickness="3.7" StrokeMiterLimit="10" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M 147.4,149.26 L 158.88,135.53 L 171.57,149.26 C 173.4,151.41 172.47,153.86 170.3,156.31 L 158.82,168.54 L 147.9,155.71 C 146.07,153.56 145.53,151.41 147.4,149.26 Z" />
 
-									</Canvas>							</Viewbox>
+									</Canvas>
+									</Border>
+							</Viewbox>
 
 							<!--  Fence Label (독립적 크기)  -->
 							<Border
@@ -356,108 +456,32 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Grid
+																<Border Background="#4DFFFFFF" CornerRadius="100">
+								<Canvas
 									Name="PART_CameraIconContainer"
-									Width="50"
-									Height="30">
-									<!--  카메라 본체 (브라켓 포함)  -->
-									<Grid Name="PART_CameraBody">
-										<!--  카메라 브라켓 (벽면 연결부)  -->
-										<Rectangle
-											Width="8"
-											Height="25"
-											HorizontalAlignment="Left"
-											VerticalAlignment="Center"
-											Fill="{TemplateBinding MarkerFill}"
-											RadiusX="2"
-											RadiusY="2"
-											Stroke="{TemplateBinding MarkerStroke}"
-											StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
-
-										<!--  브라켓 조인트  -->
-										<Ellipse
-											Width="10"
-											Height="10"
-											Margin="8,0,0,0"
-											HorizontalAlignment="Left"
-											VerticalAlignment="Center"
-											Fill="{TemplateBinding MarkerFill}"
-											Stroke="{TemplateBinding MarkerStroke}"
-											StrokeThickness="{TemplateBinding MarkerStrokeThickness}" />
-
-										<!--  카메라 헤드 (메인 몸체)  -->
-										<Border
-											Width="35"
-											Height="20"
-											Margin="15,0,0,0"
-											HorizontalAlignment="Left"
-											VerticalAlignment="Center"
-											Background="{TemplateBinding MarkerFill}"
-											BorderBrush="{TemplateBinding MarkerStroke}"
-											BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
-											CornerRadius="4">
-											<!--<Border.Effect>
-												<DropShadowEffect
-													BlurRadius="8"
-													Opacity="0.5"
-													ShadowDepth="4"
-													Color="Black" />
-											</Border.Effect>-->
-
-											<Grid>
-												<!--  카메라 렌즈  -->
-												<Ellipse
-													Width="12"
-													Height="12"
-													Margin="0,0,3,0"
-													HorizontalAlignment="Right"
-													VerticalAlignment="Center"
-													Fill="Black"
-													Stroke="DarkGray"
-													StrokeThickness="1" />
-
-												<!--  렌즈 내부 반사  -->
-												<Ellipse
-													Width="8"
-													Height="8"
-													Margin="0,0,5,0"
-													HorizontalAlignment="Right"
-													VerticalAlignment="Center"
-													Fill="DarkBlue"
-													Opacity="0.7" />
-
-												<!--  렌즈 하이라이트  -->
-												<Ellipse
-													Width="3"
-													Height="3"
-													Margin="0,0,7,-2"
-													HorizontalAlignment="Right"
-													VerticalAlignment="Center"
-													Fill="White"
-													Opacity="0.8" />
-
-												<!--  상태 LED  -->
-												<Ellipse
-													Width="4"
-													Height="4"
-													Margin="5,3,0,0"
-													HorizontalAlignment="Left"
-													VerticalAlignment="Top"
-													Fill="Lime" />
-
-												<!--  브랜드 로고 영역  -->
-												<Rectangle
-													Width="8"
-													Height="3"
-													Margin="5,0,0,0"
-													HorizontalAlignment="Left"
-													VerticalAlignment="Center"
-													Fill="White"
-													Opacity="0.3" />
-											</Grid>
-										</Border>
-									</Grid>
-								</Grid>
+									Width="200"
+									Height="200">
+									<Path Fill="#F2F2F2" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 100.09,6.44 C 49.81,6.44 10,15.73 10,29.66 V 69.29 C 10,74.76 15.01,78.36 20.09,80.73 C 20.42,93.82 22.62,125.86 34.98,151.1 C 36.93,155.21 38.78,154.82 42.72,154.31 C 52.88,172.93 72.91,189.38 100.09,189.38 H 109.08 L 176.27,110.93 C 178.21,100.94 179.21,90.06 179.76,80.73 C 184.84,78.13 189.85,74.24 189.85,69.29 V 29.66 C 189.85,16.86 158.19,6.44 100.09,6.44 Z"/>
+									<Path Fill="#F0F0F0" Stroke="Black" StrokeThickness="1.08" StrokeMiterLimit="10" Data="M 10.19,43.04 C 10.19,31.77 41.07,20.66 98.92,20.66 C 156.77,20.66 189.66,33.71 189.66,43.04 V 66.19 C 189.66,57.23 161.97,45.69 100.09,45.69 C 38.21,45.69 10.19,57.98 10.19,66.19 V 43.04 Z"/>
+									<Path Fill="#C6C6C6" Stroke="Black" StrokeThickness="1.08" StrokeMiterLimit="10" Data="M 10.19,69.12 C 10.19,74.84 15.96,78.51 20.09,80.51 C 20.09,77.73 20.09,75.94 20.09,75.01 C 20.09,66.04 42.69,55.11 98.19,55.11 C 153.68,55.11 179.39,66.04 179.39,75.01 C 179.39,76.31 179.42,78.77 179.62,80.31 C 184.41,77.96 189.66,73.83 189.66,69.12 C 189.66,60.16 169.96,45.91 100.09,45.69 C 38.21,45.49 10.19,58.91 10.19,69.12 Z"/>
+									<Path Fill="#26000000" Data="M 10.69,29.72 C 10.69,18.18 35.03,10.21 54.15,8.94 V 24.71 C 31.62,28.82 13.02,35.09 10.69,42.39 V 29.72 Z"/>
+									<Path Fill="#26000000" Data="M 43.94,154.31 C 54.07,171.93 72.61,188.88 100.09,188.88 H 107.98 L 105.88,187.28 C 98.66,184.15 91.61,177.15 91.61,161.63 C 80.99,169.2 64.48,155.21 64.48,153.21 C 77.99,148.71 90.91,134.72 99.89,113.67 C 108.88,92.62 121.24,84.66 135.16,83.66 C 149.07,82.66 156.05,85.66 162.77,92.12 C 157.95,81.66 148.67,73.69 141.15,69.19 C 127.24,72.69 112.32,82.16 103.34,100.18 C 94.35,118.2 86.86,135.72 63.98,146.68 C 54.87,150.41 50.18,152.81 43.94,154.31 Z"/>
+									<Path Fill="#595959" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 142.65,68.91 C 146.66,68.02 155.64,67.02 163.63,71.69 C 171.62,76.36 176.8,86.26 175.11,101.11 L 175.61,108.57 L 174.36,110.57 L 166.64,98.11 C 162.13,86.66 153.15,75.69 142.65,68.91 Z"/>
+									<Path Fill="#333333" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 178.39,122.84 C 178.39,145.89 156.65,185.52 124.03,193.05 C 108.08,195.91 91.11,186.28 91.11,162.13 C 91.11,137.98 111.82,102.11 139.7,93.15 C 160.41,86.06 178.39,97.64 178.39,122.84 Z"/>
+									<Path Fill="#212121" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 173.87,123.24 C 173.87,144.62 155.15,179.98 125.23,187.72 C 111.12,191.61 101.63,182.15 101.63,167.69 C 101.63,146.32 117.58,114.47 143.25,103.51 C 161.72,95.55 173.87,102.01 173.87,123.24 Z"/>
+									<Path Fill="#1A1A1A" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 156.65,133.71 C 156.65,144.91 144.79,165.76 130.22,168.19 C 121.73,168.93 119.23,162.06 119.23,156.21 C 119.23,145.01 129.72,124.16 146.69,121.23 C 153.68,120.46 156.65,127.16 156.65,133.71 Z"/>
+									<Path Fill="#333333" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 152.66,135.72 C 152.66,145.31 142.17,161.76 131.22,163.7 C 125.23,164.76 123.23,158.7 123.23,154.71 C 123.23,145.11 132.72,128.66 145.69,126.19 C 150.68,125.19 152.66,130.72 152.66,135.72 Z"/>
+									<Path Fill="#2D444A" Stroke="Black" StrokeThickness="0.72" StrokeMiterLimit="10" Data="M 145.67,137.72 C 145.67,144.69 137.68,154.65 132.69,155.15 C 128.7,155.65 127.7,151.65 127.7,148.65 C 127.7,142.19 134.69,133.22 141.18,132.22 C 145.17,131.72 145.67,135.22 145.67,137.72 Z"/>
+									<Path Fill="#FEFFFE" Opacity="0.2" Data="M 121.73,100.61 L 131.22,108.57 C 135.21,105.57 136.21,105.07 138.71,103.58 L 129.22,96.61 C 126.23,98.11 124.73,99.11 121.73,100.61 Z"/>
+									<Path Fill="#4D4D4D" Opacity="0.2" Data="M 96.11,139.22 L 105.1,146.18 C 109.59,133.22 117.58,117.77 133.02,106.31 L 124.53,99.34 C 111.57,107.31 101.11,122.76 96.11,139.22 Z"/>
+									<Path Fill="#FEFFFE" Opacity="0.3" Data="M 137.71,137.22 C 138.62,138.12 137.21,141.19 135.71,142.19 C 134.21,143.19 133.19,142.69 132.72,141.69 C 132.22,140.22 133.72,138.22 134.72,137.22 C 135.71,136.72 136.71,136.22 137.71,137.22 Z"/>
+									<Path Fill="Transparent" Stroke="Black" StrokeThickness="1.2" StrokeMiterLimit="10" Data="M 20.09,74.94 C 20.09,65.97 43.69,56.51 98.19,56.51 C 152.68,56.51 179.39,66.47 179.39,75.44 C 179.39,79.44 178.89,93.9 176.89,108.86 L 175.64,107.36 C 176.64,97.39 175.64,80.43 162.13,70.97 C 156.64,68.01 150.15,67.48 142.16,68.98 C 128.25,72.48 113.33,82.44 103.34,101.46 C 92.85,123.48 82.36,139.43 60.45,148.9 C 53.96,151.9 47.47,153.9 41.48,154.4 C 37.98,154.9 37.48,153.9 34.98,148.9 C 24.49,128.42 20.5,101.46 20.09,74.94 Z"/>
+									<Path Fill="Transparent" Stroke="Black" StrokeThickness="0.72" StrokeMiterLimit="10" Data="M 20.09,75.01 C 20.09,66.04 43.69,56.58 98.19,56.58 C 152.68,56.58 179.39,66.54 179.39,75.51"/>
+									<Path Fill="Transparent" Stroke="Black" StrokeThickness="1.08" StrokeMiterLimit="10" Data="M 10.19,43.11 C 10.19,32.65 37.11,20.69 98.99,20.69 C 160.87,20.69 189.66,33.65 189.66,43.11"/>
+									<Path Fill="#26000000" Data="M 55.91,9.44 V 24.4 C 35.91,27.9 12.52,34.42 10.19,42.39 V 29.72 C 10.19,20.26 26.63,12.29 55.91,9.44 Z"/>
+									<Path Fill="#26000000" Data="M 20.59,75.44 C 20.59,87.4 21.59,121.26 32.08,145.91 C 35.58,153.37 36.58,154.37 39.57,153.87 C 45.06,152.87 53.55,150.87 60.54,146.88 C 77.49,138.91 86.98,131.45 98.94,104.49 C 107.43,86.47 119.89,73.51 139.81,68.52 L 141.3,68.91 C 130.31,70.41 114.86,79.88 103.87,100.4 C 93.88,121.45 85.89,137.41 65.45,147.37 C 57.96,151.37 49.97,153.87 43.48,154.37 C 39.48,154.87 38.48,154.87 35.49,148.88 C 24.53,126.83 21.04,103.78 20.59,75.44 Z"/>
+								</Canvas>
+								</Border>
 							</Viewbox>
 
 							<!--  FOV 부채꼴 영역 (ViewBox 밖, 독립적 크기)  -->
@@ -495,8 +519,8 @@
 								<!--  중심점도 해당 위치에  -->
 								<Ellipse
 									Name="PART_FOVCenter"
-									Canvas.Left="38"
-									Canvas.Top="13"
+									Canvas.Left="18"
+									Canvas.Top="7"
 									Width="4"
 									Height="4"
 									Fill="Black"
@@ -547,60 +571,247 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
+																<Border Background="#4DFFFFFF" CornerRadius="100">
 								<Canvas
 									Name="PART_SpeakerIconContainer"
-									Width="256"
-									Height="256">
-
-									<!--  혼 스피커 SVG 기반 아이콘  -->
-
-									<!--  메인 바디 (혼/배플)  -->
-									<Path Fill="#BAD8F8" Data="M 176.22,19.64 C 157.66,43.73 127.31,71.71 86.91,87.03 L 39.66,99.95 C 19.29,105.96 6.97,125.76 8.07,145.31 C 9.43,170.68 30.83,188.73 51.24,188.46 C 61.43,188.33 70.13,185.42 76.99,183.74 L 98.31,178.62 C 132.36,170.76 169.14,171.66 206.76,183.15 L 220.22,185.98 L 223.85,186.25 L 231.97,183.74 L 241.89,172.08 L 248.19,147.13 L 247.92,124.98 L 243.76,100.02 L 235.41,72.4 L 222.42,44.78 L 206.23,20.46 L 195.68,13.41 L 187.49,12.12 L 181.82,13.71 Z" />
-
-									<!--  스피커 콘 전면 (타원형)  -->
-									<Path Data="M 247.99,136.11 C 247.99,169.19 237.41,186.91 224.39,186.91 C 203.41,186.91 183.11,157.07 170.97,116.18 C 166.02,99.08 166.02,87.48 166.02,63.49 C 166.02,38.11 173.62,12.31 189.06,12.31 C 212.45,12.31 238.72,53.78 246.68,102.74 C 247.88,111.45 247.99,124.68 247.99,136.11 Z">
+									Width="250"
+									Height="250">
+									<Path Data="M 210.69,86.72 L 190.07,81.08 L 187.48,80.68 L 192.22,86.72 H 210.69 Z">
 										<Path.Fill>
-											<LinearGradientBrush MappingMode="Absolute" StartPoint="166,99.6" EndPoint="248,99.6">
-												<GradientStop Color="#76B0DF" Offset="0" />
-												<GradientStop Color="#88BCE6" Offset="1" />
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="201.111,80.6758" EndPoint="200.411,87.105">
+												<GradientStop Color="#FF88959A" Offset="0"/>
+												<GradientStop Color="#FF6A787D" Offset="1"/>
 											</LinearGradientBrush>
 										</Path.Fill>
 									</Path>
-
-									<!--  드라이버 섹션  -->
-									<Path Data="M 203.74,81.61 L 167.08,84.65 C 169.32,101.14 172.81,117.91 180.86,136.85 L 212.83,123.15 L 216.73,118.39 L 220.43,108.81 L 218.97,97.86 L 211.72,85.13 Z">
+									<Path Data="M 226.12,88.04 C 217.32,87.23 209.18,86.86 203.92,86.09 L 191.02,83.48 L 186.78,78.86 C 183.91,76.19 178.13,74.52 175.47,74.52 C 155.91,74.12 125.56,72.28 103.28,56.75 C 97.98,53.21 94.12,50.07 91.25,46.9 L 93.14,199.17 C 101.74,188.76 118.47,177.71 136.83,172.38 C 148.07,168.91 163.62,166.08 175.72,164.34 C 179.91,163.75 185.01,162.01 187.88,158.86 L 190.11,163.94 L 208.22,161.22 L 234.02,143.05 C 242.42,137.11 244.01,126.99 244,117.47 C 243.99,106.39 238.82,93.89 226.12,88.04 Z">
 										<Path.Fill>
-											<LinearGradientBrush MappingMode="Absolute" StartPoint="193.8,81.6" EndPoint="193.8,136.8">
-												<GradientStop Color="#113961" Offset="0" />
-												<GradientStop Color="#1E4474" Offset="1" />
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="167.625,46.8965" EndPoint="167.625,199.168">
+												<GradientStop Color="#FFC5CBCF" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="1"/>
 											</LinearGradientBrush>
 										</Path.Fill>
 									</Path>
-
-									<!--  더스트 캡  -->
-									<Path Data="M 219.99,107.11 C 219.99,117.47 215.41,123.43 209.72,123.43 C 201.42,123.43 194.94,110.06 194.94,97.78 C 194.94,87.42 198.81,81.61 204.5,81.61 C 212.81,81.61 219.99,94.83 219.99,107.11 Z">
+									<Path Data="M 234.84,153.12 L 234.34,142.7 L 213.16,147.91 V 158.12 L 234.84,155.31 V 153.12 Z">
 										<Path.Fill>
-											<LinearGradientBrush MappingMode="Absolute" StartPoint="194.9,102.5" EndPoint="220,102.5">
-												<GradientStop Color="#395D82" Offset="0" />
-												<GradientStop Color="#375A7F" Offset="1" />
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="223.999,142.696" EndPoint="223.999,158.125">
+												<GradientStop Color="#FF79858B" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="1"/>
 											</LinearGradientBrush>
 										</Path.Fill>
 									</Path>
-
-									<!--  뒷면 캐비닛  -->
-									<Path Data="M 39.66,99.95 C 19.29,105.96 6.97,125.76 8.07,145.31 C 9.43,170.68 30.83,188.73 51.24,188.46 C 65.82,188.26 76.71,182.97 89.95,178.86 L 98.31,178.62 C 84.07,178.62 70.44,153.11 67.31,127.1 C 65.91,115.21 67.11,94.42 76.99,90.18 Z">
+									<Path Data="M 234.84,153.12 L 213.16,155.96 V 157.32 L 234.84,155.31 V 153.12 Z">
 										<Path.Fill>
-											<LinearGradientBrush MappingMode="Absolute" StartPoint="35.7,90.2" EndPoint="65,189.1">
-												<GradientStop Color="#F75B4B" Offset="0" />
-												<GradientStop Color="#F36151" Offset="1" />
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="223.999,153.125" EndPoint="223.999,157.325">
+												<GradientStop Color="#FF828D92" Offset="0"/>
+												<GradientStop Color="#FF6A787D" Offset="1"/>
 											</LinearGradientBrush>
 										</Path.Fill>
 									</Path>
-
-									<!--  핸들/커넥터  -->
-									<Path Fill="#76B0DF" Data="M 104.78,221.69 L 87.61,182.12 C 84.44,174.74 76.57,171.48 69.86,174.91 L 69.52,175.08 C 62.81,178.51 60.04,187.47 63.72,195.12 L 75.68,218.81 L 80.02,236.35 C 84.49,244.16 93.66,246.28 100.37,241.4 C 107.08,236.52 107.95,229.07 104.78,221.69 Z" />
-
+									<Path Data="M 223.13,158.53 L 218.13,158.98 L 218.49,173.66 L 221.91,174.01 L 223.83,170.71 L 223.13,158.53 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="220.983,158.526" EndPoint="220.983,174.011">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 221.91,170.71 L 218.49,171.72 V 174.01 L 221.91,172.76 V 170.71 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="220.199,170.711" EndPoint="220.199,174.011">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 178.39,163.07 L 188.98,164.18 L 201.92,161.72 L 202.78,158.53 L 186.41,161.72 L 178.39,163.07 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="190.585,158.526" EndPoint="190.585,164.276">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 176.36,74.61 C 187.78,74.61 198.85,93.19 198.85,114.82 V 126.28 C 198.85,139.06 190.92,160.78 179.5,163.07 L 181.37,163.32 C 190.92,161.62 199.91,142.46 199.91,125.06 V 112.78 C 199.91,95.23 189.08,74.52 177.22,74.52 L 176.36,74.61 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="188.135,74.5156" EndPoint="188.135,163.326">
+												<GradientStop Color="#FF566065" Offset="0"/>
+												<GradientStop Color="#FF79858B" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 54.71,15 C 30.02,15 6,51.76 6,120.09 C 6,176.96 28.72,233.33 57.78,233.67 C 75.09,233.89 88.98,218.61 95.83,200.06 C 104.43,182.92 107.91,158.47 107.91,127.11 C 107.91,68.19 84.41,15 54.71,15 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="56.9541,15" EndPoint="56.9541,233.674">
+												<GradientStop Color="#FFA8B0B5" Offset="0"/>
+												<GradientStop Color="#FF79858B" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 54.86,19.11 C 31.02,19.11 7.27,57.79 7.27,121.13 C 7.27,178.75 29.71,228.96 57.17,228.96 C 80.86,228.96 102.49,186.76 102.49,129.14 C 102.49,71.52 81.71,19.11 54.86,19.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="54.8841,19.1055" EndPoint="54.8841,228.961">
+												<GradientStop Color="#FF59676D" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="0.563"/>
+												<GradientStop Color="#FF98A3AA" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.2" Data="M 37.88,25.11 C 23.63,36.11 9.78,65.92 9.78,116.63 C 9.78,169.96 27.99,214.96 46.11,223.96 C 49.19,225.49 57.27,217.26 62.19,202.09 C 65.98,190.38 68.81,168.15 70.22,158.02 C 71.02,152.21 70.02,147.06 66.13,147.06 L 59.08,145.61 L 50.02,126.28 L 54.71,103.19 L 64.86,100.61 L 64.71,86.72 L 56.92,50.17 C 51.72,39.51 44.11,25.11 37.88,25.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="26.4966,25.1055" EndPoint="60.4284,208.858">
+												<GradientStop Color="#FF51595D" Offset="0"/>
+												<GradientStop Color="#03828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.2" Data="M 54.11,21.11 C 52.58,25.11 53.71,37.11 56.61,50.17 L 36.78,25.11 C 41.01,21.11 44.81,20.11 49.11,20.11 C 52.01,20.11 54.41,20.26 54.11,21.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="44.6196,20.0703" EndPoint="49.7863,46.8012">
+												<GradientStop Color="#FF828D92" Offset="0"/>
+												<GradientStop Color="#03828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.2" Data="M 93.14,49.11 C 101.74,65.11 108.89,99.11 108.89,117.11 L 111.39,119.11 C 112.14,126.11 111.39,139.11 114.74,144.61 C 119.29,152.01 127.21,153.11 136.41,152.61 C 148.72,151.91 170.9,148.11 184.86,142.61 C 192.22,139.61 196.26,133.61 197.86,127.61 L 197.21,139.11 C 194.07,147.11 191.37,153.11 187.07,154.61 L 177.52,161.61 L 161.11,165.11 L 145.21,169.61 L 131.41,173.11 L 103.03,181.11 C 105.48,171.11 107.91,157.11 107.91,131.61 C 107.91,106.11 102.93,71.61 93.14,49.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="145.521,49.1055" EndPoint="145.521,181.106">
+												<GradientStop Color="#FFC5CBCF" Offset="0"/>
+												<GradientStop Color="#0399A4AA" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.3" Data="M 155.91,90.11 L 188.12,91.11 C 191.92,91.11 196.26,96.11 196.26,99.11 L 174.62,99.61 C 167.92,99.61 156.91,102.11 155.91,99.11 C 155.16,96.61 152.41,90.11 155.91,90.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="176.083,90.1055" EndPoint="176.083,100.106">
+												<GradientStop Color="#FFC5CBCF" Offset="0"/>
+												<GradientStop Color="#03C5CBCF" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.3" Data="M 47.11,156.11 C 49.81,153.11 51.22,148.11 56.12,148.11 H 65.12 C 68.42,148.11 70.42,149.11 69.12,154.61 C 68.37,158.11 62.92,161.11 57.12,162.11 C 52.72,162.86 45.21,158.61 47.11,156.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="58.3174,148.106" EndPoint="58.3174,162.321">
+												<GradientStop Color="#FFC5CBCF" Offset="0"/>
+												<GradientStop Color="#03C5CBCF" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.15" Data="M 73.32,78.06 C 73.92,76.06 75.62,75.11 78.12,75.61 C 81.12,76.26 82.92,77.86 82.62,81.11 C 82.32,84.11 79.92,85.11 77.62,84.11 C 74.82,82.91 72.72,80.06 73.32,78.06 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="77.8539,75.4409" EndPoint="80.1639,84.6311">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#03626C70" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.15" Data="M 53.21,172.61 C 54.81,170.11 56.82,167.11 61.72,168.11 C 66.27,169.11 67.42,172.61 70.72,172.61 C 75.82,172.61 76.77,168.11 77.72,168.11 C 78.67,168.11 77.72,166.11 78.67,167.11 C 79.92,168.41 80.12,166.11 81.42,167.11 C 84.12,169.26 85.07,172.61 83.77,174.61 C 81.72,177.91 77.62,178.11 72.72,178.61 C 68.27,179.11 66.12,177.61 62.92,177.61 C 59.22,177.61 51.22,175.61 53.21,172.61 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="68.7174,166.477" EndPoint="68.7174,178.831">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#03626C70" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.3" Data="M 216.93,124.91 L 226.93,125.61 L 224.28,128.11 L 217.58,129.11 L 216.93,124.91 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="221.931,124.911" EndPoint="221.931,129.106">
+												<GradientStop Color="#FF828D92" Offset="0"/>
+												<GradientStop Color="#03828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 210.84,112.11 C 206.04,112.11 204.19,115.76 204.19,121.01 V 220.11 L 162.01,209.61 C 160.11,209.11 159.31,208.11 159.31,205.11 V 166.61 L 145.21,169.11 V 207.61 C 145.21,211.11 146.21,213.61 148.71,213.96 L 198.91,225.91 L 215.23,224.11 C 217.93,223.61 217.93,220.61 217.93,217.61 V 120.11 C 217.93,115.61 215.63,112.11 210.84,112.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="181.57,112.106" EndPoint="181.57,225.911">
+												<GradientStop Color="#FF706D69" Offset="0"/>
+												<GradientStop Color="#FF9A968E" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 146.21,209.61 L 159.11,208.61 C 158.91,209.91 159.31,210.61 160.71,211.11 L 200.61,220.61 C 201.91,221.01 202.11,219.61 202.11,218.11 L 202.76,224.61 L 199.91,225.11 L 147.71,212.61 C 146.06,212.11 145.71,210.61 146.21,209.61 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="174.161,208.606" EndPoint="174.161,225.106">
+												<GradientStop Color="#FF47443D" Offset="0"/>
+												<GradientStop Color="#FF706D69" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 174.72,216.11 C 174.82,215.31 177.02,214.91 179.72,215.01 C 182.42,215.16 184.62,215.81 184.52,216.56 C 184.42,217.36 182.22,217.76 179.52,217.61 C 176.82,217.51 174.62,216.86 174.72,216.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="179.62,214.938" EndPoint="179.62,217.68">
+												<GradientStop Color="#FF47443D" Offset="0"/>
+												<GradientStop Color="#FF36332E" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 201.11,97.01 L 202.11,97.61 L 202.61,101.11 L 201.11,100.11 V 97.01 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="201.861,97.0059" EndPoint="201.861,101.106">
+												<GradientStop Color="#FF828D92" Offset="0"/>
+												<GradientStop Color="#FF566065" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 194.61,152.61 L 195.61,152.11 V 154.61 L 194.61,155.11 V 152.61 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="195.111,152.106" EndPoint="195.111,155.106">
+												<GradientStop Color="#FF566065" Offset="0"/>
+												<GradientStop Color="#FF474E52" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 201.61,161.61 L 202.61,161.11 V 167.11 L 201.61,167.61 V 161.61 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="202.111,161.106" EndPoint="202.111,167.606">
+												<GradientStop Color="#FF566065" Offset="0"/>
+												<GradientStop Color="#FF474E52" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 213.53,115.11 C 209.69,115.11 207.74,117.61 207.74,121.11 C 207.74,124.61 210.24,127.11 213.53,127.11 C 216.83,127.11 218.93,124.61 218.93,121.11 C 218.93,117.61 216.83,115.11 213.53,115.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="213.334,115.106" EndPoint="213.334,127.106">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#FF828D92" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 214.28,117.11 C 211.43,117.11 210.24,119.11 210.24,121.61 C 210.24,124.11 212.08,126.11 214.28,126.11 C 216.63,126.11 218.13,124.11 218.13,121.61 C 218.13,119.11 216.63,117.11 214.28,117.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="214.185,117.106" EndPoint="214.185,126.106">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#FFB3B8BB" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 214.43,118.61 C 212.73,118.61 211.78,119.91 211.78,121.61 C 211.78,123.31 213.03,124.61 214.43,124.61 C 216.03,124.61 217.08,123.31 217.08,121.61 C 217.08,119.91 215.93,118.61 214.43,118.61 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="214.43,118.606" EndPoint="214.43,124.606">
+												<GradientStop Color="#FF626C70" Offset="0"/>
+												<GradientStop Color="#FFB3B8BB" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Data="M 60.07,101.11 L 99.68,97.61 C 101.23,106.11 101.78,115.11 101.78,126.11 C 101.78,132.61 101.23,139.61 100.43,146.61 L 61.42,145.61 C 53.71,145.61 48.11,135.61 48.11,123.11 C 48.11,112.11 52.36,101.11 60.07,101.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="74.9471,97.6055" EndPoint="74.9471,146.606">
+												<GradientStop Color="#FF828D92" Offset="0"/>
+												<GradientStop Color="#FF485459" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Opacity="0.3" Fill="White" Data="M 65.12,108.11 C 68.32,108.11 70.22,116.11 70.22,123.61 C 70.22,132.11 66.12,140.11 62.12,140.11 C 64.12,137.61 66.72,133.61 66.72,124.11 C 66.72,116.61 64.72,110.61 62.12,108.61 C 62.92,108.11 63.72,108.11 65.12,108.11 Z"/>
+									<Path Data="M 57.12,109.11 C 52.07,109.11 49.61,117.11 49.61,124.11 C 49.61,132.11 52.61,139.11 57.12,139.11 C 61.62,139.11 64.12,131.61 64.12,124.11 C 64.12,116.61 61.12,109.11 57.12,109.11 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="56.8641,109.106" EndPoint="56.8641,139.106">
+												<GradientStop Color="#FF918B87" Offset="0"/>
+												<GradientStop Color="#FFA19997" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
 								</Canvas>
+								</Border>
 							</Viewbox>
 
 							<!--  Speaker Label (독립적 크기)  -->
@@ -646,21 +857,71 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Grid Width="256" Height="256">
-									<!--  배경 원형  -->
-									<Ellipse
-										Fill="#4CAF50"
-										Stroke="#2E7D32"
-										StrokeThickness="8" />
-									<!--  SS 텍스트  -->
-									<TextBlock
-										FontSize="96"
-										FontWeight="Bold"
-										Foreground="White"
-										HorizontalAlignment="Center"
-										VerticalAlignment="Center"
-										Text="SS" />
-								</Grid>
+								<Border Background="#4DFFFFFF" CornerRadius="100">
+								<Canvas Name="PART_SmartSensorIconContainer" Width="200" Height="200">
+									<!--  SmartSensor SVG 아이콘  -->
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 150.79,94.19 L 147.77,92.06 L 147.43,91.11 V 73.08 L 149.12,71.42 V 68.42 L 147.08,67.02 V 51.81 L 149.01,50.15 V 47.29 L 146.86,45.63 V 37.7 C 146.86,33.23 144.06,29.87 141.18,28.48 L 97.01,5.21 C 95.14,4.26 93.71,4.01 92.05,4.71 L 79.75,9.92 L 78.26,9.11 C 76.79,8.31 75.02,8.23 73.47,8.97 L 51.99,18.13 C 49.11,19.25 48.78,22.91 48.78,24.96 V 31.17 L 48.21,32.12 V 34.72 L 48.78,35.78 V 54.67 L 48.21,56.06 V 57.93 L 48.78,58.88 V 67.11 C 48.78,68.91 49.26,69.72 50.02,70.91 L 61.69,88.39 C 62.35,89.41 63.22,90.08 64.41,90.56 V 100.08 C 64.41,103.08 65.92,105.38 67.96,106.86 V 143.75 L 65.36,146.47 V 158.66 C 65.36,161.93 67.31,164.68 69.91,165.99 L 119.81,195.13 C 122.2,196.49 124.72,196.11 126.12,195.31 L 127.78,195.8 C 128.89,196.11 129.98,195.76 130.82,194.92 L 134.02,192.71 L 135.13,193.02 L 148.97,184.01 C 150.44,182.96 151.01,180.91 151.01,179.11 L 150.79,94.19 Z"/>
+									<Path Fill="#6B7642" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 135.13,191.15 L 148.06,182.22 C 149.38,181.27 149.82,179.91 149.82,177.91 L 149.71,94.63 L 147.22,92.76 L 146.38,92.28 V 72.72 L 148.11,71.33 V 68.88 L 146.07,67.52 V 50.76 L 148.11,49.23 V 47.29 L 146.12,45.72 V 37.92 C 146.12,33.72 143.69,30.53 140.63,29.05 L 96.66,6.01 C 95.01,5.16 93.58,4.85 91.71,5.61 L 78.26,11.6 L 76.9,10.79 C 75.72,10.18 74.32,10.09 73.06,10.71 L 53.11,19.21 C 50.72,20.16 49.72,22.07 49.72,25.11 V 32.12 L 49.24,32.61 V 34.41 L 49.81,35.12 V 55.62 L 49.24,56.33 V 57.63 L 49.72,58.3 V 67.11 C 49.72,68.55 50.11,69.5 50.87,70.73 L 61.81,87.81 C 62.61,89.08 63.31,89.65 64.86,90.18 V 99.77 C 64.86,102.77 66.33,105.08 68.61,106.56 V 144.7 L 66.33,146.96 V 158.44 C 66.33,161.29 67.76,163.74 70.25,165.1 L 119.96,193.98 C 122.31,195.31 125.22,195.13 127.09,193.43 L 128.96,193.82 L 133.42,190.63 L 135.13,191.15 Z"/>
+									<Path Fill="#6B7642" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 107.12,47.2 L 55.04,18.22 C 52.48,16.83 49.72,18.99 49.72,22.91 V 67.06 C 49.72,68.59 50.06,69.46 50.91,70.82 L 62.91,90.01 C 63.52,91.02 64.82,91.15 65.39,90.72 L 109.64,63.11 V 56.06 C 109.64,52.41 108.98,48.26 107.12,47.2 Z"/>
+									<Path Fill="#424A35" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 51.87,26.73 V 67.11 C 51.87,68.42 52.12,69.33 52.83,70.47 L 66.07,92.11 V 29.82 L 56.13,23.92 C 53.93,22.61 51.87,23.83 51.87,26.73 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 106.08,46.67 L 55.17,18.4 C 58.28,19.21 106.17,46.05 106.17,46.05 C 108.73,47.45 110.44,50.72 110.44,54.37 V 60.01 L 108.91,57.41 C 108.91,53.03 108.73,48.09 106.08,46.67 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="81.0099,17.5979" EndPoint="81.0099,50.6091">
+												<GradientStop Color="#6B7642" Offset="0"/>
+												<GradientStop Color="#909969" Offset="0.489583"/>
+												<GradientStop Color="#6B7642" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Fill="#6B7642" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 125.21,36.22 L 78.71,11.12 L 91.93,5.61 C 93.54,4.9 94.89,5.12 96.66,6.01 L 140.76,29.1 C 143.82,30.62 146.16,33.66 146.16,37.87 V 45.67 L 130.82,54.72 V 47.71 C 130.82,43.24 128.54,38.01 125.21,36.22 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 143.82,35.08 L 129.51,43.71 L 128.32,41.11 L 141.06,32.87 C 142.11,32.16 143.33,33.31 143.82,35.08 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="135.966,32.6074" EndPoint="135.966,43.7069">
+												<GradientStop Color="#C6C6A0" Offset="0"/>
+												<GradientStop Color="#6B7642" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 127.61,38.92 L 106.94,49.72 L 105.99,47.62 L 125.51,36.82 C 126.46,37.26 127.22,38.16 127.61,38.92 Z">
+										<Path.Fill>
+											<LinearGradientBrush MappingMode="Absolute" StartPoint="116.796,36.8242" EndPoint="116.796,49.7207">
+												<GradientStop Color="#C6C6A0" Offset="0"/>
+												<GradientStop Color="#6B7642" Offset="1"/>
+											</LinearGradientBrush>
+										</Path.Fill>
+									</Path>
+									<Path Fill="#959B62" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 148.76,94.28 L 135.78,101.68 L 134.42,100.02 L 146.91,92.32 L 148.76,93.72 V 94.28 Z"/>
+									<Path Fill="#4F5937" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 135.78,101.68 L 135.61,190.63 L 133.42,191.81 L 132.2,190.63 V 100.38 L 134.42,99.71 L 135.78,101.68 Z"/>
+									<Path Fill="#3A442D" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 125.76,122.16 L 129.09,124.42 V 129.02 L 125.09,132.12 L 125.76,122.16 Z"/>
+									<Path Fill="#60693D" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 129.62,100.02 L 146.03,90.72 V 72.23 L 131.68,80.25 V 119.9 L 127.09,122.9 L 122.28,120.41 L 109.42,100.64 V 68.11 L 110.91,67.52 L 113.31,69.23 L 132.71,57.76 L 132.14,56.23 L 146.56,46.84 L 147.82,47.71 V 49.41 L 132.14,59.01 V 76.91 L 147.22,68.24 L 147.71,68.82 V 70.82 L 132.14,80.42 V 82.21 L 114.49,92.02 H 111.81 L 112.21,93.07 L 111.36,93.72 V 100.81 L 124.61,121.46 L 129.62,119.11 V 100.02 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 112.21,68.11 L 132.71,55.71"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 112.78,89.02 L 132.14,77.68"/>
+									<Path Fill="#222222" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 75.56,35.12 L 108.61,53.84 V 86.06 L 78.71,69.23 C 76.42,67.83 74.61,65.12 74.61,62.08 V 36.91 C 74.61,35.73 75.01,34.83 75.56,35.12 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 76.64,64.48 L 77.44,65.43"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 108.43,63.25 C 105.78,63.25 102.72,59.23 102.72,55.62 C 102.72,52.62 103.62,51.72 105.49,51.72 C 107.83,51.72 108.43,54.02 108.43,57.15 V 63.25 Z"/>
+									<Path Fill="#A3A3A3" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 107.72,62.48 C 105.73,62.48 103.62,58.96 103.62,56.06 C 103.62,53.71 104.28,52.62 105.64,52.62 C 107.3,52.62 107.72,54.72 107.72,57.28 V 62.48 Z"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 108.43,79.38 C 105.78,79.38 102.72,75.36 102.72,71.75 C 102.72,68.75 103.62,67.85 105.49,67.85 C 107.83,67.85 108.43,70.15 108.43,73.28 V 79.38 Z"/>
+									<Path Fill="#A3A3A3" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 107.72,78.61 C 105.73,78.61 103.62,75.09 103.62,72.19 C 103.62,69.84 104.28,68.75 105.64,68.75 C 107.3,68.75 107.72,70.85 107.72,73.41 V 78.61 Z"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 94.82,49.93 C 90.48,48.09 88.32,51.27 88.32,57.28 C 88.32,63.29 91.71,68.71 95.71,69.23 C 99.41,69.72 101.74,66.41 101.74,61.99 C 101.74,57.56 98.68,51.45 94.82,49.93 Z"/>
+									<Path Fill="#333333" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 95.58,51.98 C 92.29,50.41 90.28,52.81 90.28,57.32 C 90.28,61.83 93.04,66.62 96.21,67.02 C 99.01,67.37 100.52,64.42 100.52,60.9 C 100.52,57.37 98.28,53.26 95.58,51.98 Z"/>
+									<Path Fill="#424242" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 96.06,55.12 C 93.91,54.02 92.61,55.62 92.61,58.52 C 92.61,61.43 94.48,64.83 96.63,65.13 C 98.59,65.43 99.63,63.38 99.63,60.82 C 99.63,58.26 98.07,56.06 96.06,55.12 Z"/>
+									<Path Fill="#282828" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 96.06,57.28 C 95.12,56.8 94.52,57.5 94.52,58.81 C 94.52,60.12 95.41,61.69 96.36,61.82 C 97.21,61.95 97.74,60.95 97.74,59.72 C 97.74,58.48 97.01,57.67 96.06,57.28 Z"/>
+									<Path Fill="#545454" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 96.06,58.18 C 95.76,58.01 95.54,58.26 95.54,58.74 C 95.54,59.22 95.89,59.84 96.23,59.88 C 96.53,59.92 96.71,59.53 96.71,59.05 C 96.71,58.57 96.41,58.31 96.06,58.18 Z"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 84.71,39.72 C 82.11,38.58 80.92,40.63 80.92,43.62 C 80.92,47.28 83.48,50.63 85.77,50.63 C 87.63,50.63 88.44,48.58 88.44,46.53 C 88.44,44.48 87.01,40.72 84.71,39.72 Z"/>
+									<Path Fill="#A3A3A3" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 84.71,40.42 C 82.72,39.52 81.83,41.04 81.83,43.4 C 81.83,46.3 83.78,48.92 85.65,48.92 C 87.12,48.92 87.77,47.4 87.77,45.74 C 87.77,44.08 86.61,41.26 84.71,40.42 Z"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 84.71,55.62 C 82.11,54.72 80.92,56.51 80.92,59.27 C 80.92,62.92 83.48,66.06 85.77,66.06 C 87.63,66.06 88.44,64.27 88.44,62.22 C 88.44,60.17 87.01,56.51 84.71,55.62 Z"/>
+									<Path Fill="#A3A3A3" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 84.71,56.42 C 82.72,55.62 81.83,56.93 81.83,59.07 C 81.83,61.97 83.78,64.42 85.65,64.42 C 87.12,64.42 87.77,62.94 87.77,61.28 C 87.77,59.62 86.61,57.23 84.71,56.42 Z"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 95.32,70.51 C 94.21,70.11 93.71,70.91 93.71,72.23 C 93.71,73.75 94.65,74.79 95.45,74.79 C 96.21,74.79 96.61,73.98 96.61,72.94 C 96.61,71.9 96.13,70.82 95.32,70.51 Z"/>
+									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 91.13,86.82 C 85.98,86.2 84.22,90.18 84.22,94.98 C 84.22,102.16 90.32,111.89 96.71,112.11 C 101.12,112.24 102.72,108.13 102.72,103.88 C 102.72,97.73 96.92,87.51 91.13,86.82 Z"/>
+									<Path Fill="#CDCDCD" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 92.11,88.03 C 87.77,87.18 87.12,91.81 87.12,94.9 C 87.12,101.38 92.61,109.09 97.91,109.31 C 101.61,109.44 102.27,105.96 102.27,103.62 C 102.27,97.9 97.01,88.98 92.11,88.03 Z"/>
+									<Path Fill="#60693D" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 69.91,104.52 L 119.81,134.46 L 123.47,132.12 V 120.76 L 122.03,120.01 L 109.42,99.99 V 86.06 L 78.93,69.01 C 76.28,67.53 74.62,64.82 74.62,61.64 V 36.91 L 75.73,35.6 L 73.74,34.5 L 73.52,61.82 C 73.52,64.82 75.27,67.86 78.11,69.38 L 108.73,86.06 V 100.6 L 121.61,120.76 V 132.78 L 69.86,103.88 V 104.52 H 69.91 Z"/>
+									<Path Fill="#60693D" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 74.61,109.79 V 145.65 L 71.32,145.3 V 154.31 L 116.61,179.73 L 117.37,170.22 L 114.93,168.78 V 133.72 L 74.61,109.79 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 77.17,111.19 V 145.61 L 74.61,146.13"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 71.32,150.91 L 117.11,177.28 V 183.92 L 70.52,158.18 V 156.03 L 116.61,181.82"/>
+									<Path Fill="#545D3A" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 125.09,170.22 L 129.31,177.87 L 126.02,179.73 L 122.86,178.12 L 119.71,172.22 L 125.09,170.22 Z"/>
+									<Path Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 122.99,178.42 V 193.91"/>
+								</Canvas>
+								</Border>
 							</Viewbox>
 
 							<!--  SmartSensor Label (독립적 크기)  -->
@@ -771,13 +1032,58 @@
 
 						<!--  OperationState 기반 Indicator 색상 (Normal 뒤, 이벤트 Trigger 앞 → 이벤트가 우선)  -->
 						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVATED}">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+							<Setter TargetName="PART_EventStatusIndicator"      Property="Background" Value="Gray" />
+							<Setter TargetName="PART_ControllerIconContainer"   Property="Opacity"    Value="0.3" />
+							<Setter TargetName="PART_MultiIconContainer"         Property="Opacity"    Value="0.3" />
+							<Setter TargetName="PART_FenceIconContainer"         Property="Opacity"    Value="0.3" />
+							<Setter TargetName="PART_CameraIconContainer"        Property="Opacity"    Value="0.3" />
+							<Setter TargetName="PART_SpeakerIconContainer"       Property="Opacity"    Value="0.3" />
+							<Setter TargetName="PART_SmartSensorIconContainer"   Property="Opacity"    Value="0.3" />
 						</Trigger>
 						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.NONE}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Gray" />
 						</Trigger>
 						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ERROR}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+							<Trigger.EnterActions>
+								<BeginStoryboard Name="ErrorBlinkStoryboard_Begin">
+									<Storyboard RepeatBehavior="Forever">
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxControllerContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1" To="0.3" Duration="0:0:0.3" />
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxSmartSensorContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1" To="0.3" Duration="0:0:0.3" />
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxFenceContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1" To="0.3" Duration="0:0:0.3" />
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxMultiContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1" To="0.3" Duration="0:0:0.3" />
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxCameraContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1" To="0.3" Duration="0:0:0.3" />
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxSpeakerContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1" To="0.3" Duration="0:0:0.3" />
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="ErrorBlinkStoryboard_Begin" />
+							</Trigger.ExitActions>
 						</Trigger>
 
 						<!--  이벤트 발생 시 Indicator 색 덮어씀 (우선순위 최고)  -->
@@ -786,9 +1092,90 @@
 						</Trigger>
 						<Trigger Property="EventStatus" Value="Fault">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+							<Trigger.EnterActions>
+								<BeginStoryboard Name="FaultBlinkStoryboard_Begin">
+									<Storyboard RepeatBehavior="Forever">
+										<!--  제어기 아이콘 깜빡임  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxControllerContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+										<!--  스마트센서 아이콘 깜빡임  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxSmartSensorContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+										<!--  펜스 아이콘 깜빡임  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxFenceContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+										<!--  멀티센서 아이콘 깜빡임  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxMultiContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+										<!--  카메라 아이콘 깜빡임  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxCameraContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+										<!--  스피커 아이콘 깜빡임  -->
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_ViewboxSpeakerContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.3"
+											Duration="0:0:0.3" />
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="FaultBlinkStoryboard_Begin" />
+							</Trigger.ExitActions>
 						</Trigger>
 						<Trigger Property="EventStatus" Value="Connection">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
+						</Trigger>
+
+						<!--  스피커 방송 동작중 — 부드러운 Opacity 펄스 (Fault blink보다 느리고 부드럽게)  -->
+						<Trigger Property="IsBroadcasting" Value="True">
+							<Trigger.EnterActions>
+								<BeginStoryboard Name="BroadcastingStoryboard_Begin">
+									<Storyboard RepeatBehavior="Forever">
+										<DoubleAnimation
+											Storyboard.TargetName="PART_ViewboxSpeakerContainer"
+											Storyboard.TargetProperty="Opacity"
+											From="1.0"
+											To="0.35"
+											Duration="0:0:0.9"
+											AutoReverse="True">
+											<DoubleAnimation.EasingFunction>
+												<SineEase EasingMode="EaseInOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="BroadcastingStoryboard_Begin" />
+							</Trigger.ExitActions>
 						</Trigger>
 
 						<!--  라벨 표시 조건들 (각 타입별)  -->
@@ -989,6 +1376,7 @@
 								<StopStoryboard BeginStoryboardName="PulseStoryboard_Begin" />
 							</DataTrigger.ExitActions>
 						</DataTrigger>
+
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>

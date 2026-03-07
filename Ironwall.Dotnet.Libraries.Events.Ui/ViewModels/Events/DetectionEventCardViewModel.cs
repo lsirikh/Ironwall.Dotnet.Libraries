@@ -38,9 +38,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public override async Task SendAction(string? content, string? idUser)
         {
             var account = IoC.Get<IAccountModel>();
-            IdUser = $"{account.Username}({account.EmployeeNumber})";
+            IdUser = account.Name;
             Contents = content ?? "자동 조치보고";
+
+            // UI 업데이트 (카드 제거, 상태 변경) - EventCardListPanelViewModel이 구독 중일 때 처리
             await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
+
+            // NatsDomainService에 직접 발행 (EventCardListPanelViewModel 구독 여부 무관)
+            await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+            {
+                EventId = Model.Id,
+                EventType = EnumEventType.Intrusion,
+                ActionDetails = Contents,
+                ActionUser = IdUser,
+                ActionTime = DateTime.Now
+            });
 
             await base.SendAction(content, idUser);
         }

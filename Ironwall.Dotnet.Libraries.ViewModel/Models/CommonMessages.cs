@@ -36,6 +36,7 @@ public class OpenCameraDetailDialogMessageModel
 public class OpenDeviceAssignDialogMessageModel
 {
     public object? Dialog { get; set; }
+    public Action? OnCompleted { get; set; }
 }
 public class OpenEventReportDialogMessageModel
 {
@@ -80,6 +81,9 @@ public class CallAllEventReportMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }
+/// <summary>WindyMode NATS REQ 요청 트리거 — WindyPanelViewModel → NatsDomainService</summary>
+public record SendWindyModeMessage(EnumWindyMode Mode);
+
 /// <summary>디바이스 초기 로딩 완료 알림 — SymbolEventManager 일괄 동기화 트리거</summary>
 public record AllDevicesLoadedMessage();
 

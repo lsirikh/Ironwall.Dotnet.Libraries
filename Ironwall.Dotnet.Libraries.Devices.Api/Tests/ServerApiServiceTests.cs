@@ -651,4 +651,28 @@ public class ServerApiServiceTests
     }
 
     #endregion
+
+    #region - Proxy Settings API Tests (§8.8) -
+
+    [Fact(DisplayName = "5.1: GetProxySettingsAsync — 프록시 설정 조회 (server_id=1)")]
+    public async Task GetProxySettingsAsync_ShouldReturnProxySetting()
+    {
+        // Arrange
+        var service = await CreateServiceAsync();
+
+        // Act — 시드 서버 id=1
+        var response = await service.GetProxySettingsAsync(1);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.True(response.Success, $"API 호출 실패: {response.Message}");
+        Assert.NotNull(response.Data);
+        Assert.Equal(1, response.Data.ServerId);
+        Assert.False(string.IsNullOrEmpty(response.Data.WindyMode), "WindyMode 값이 비어있음");
+        Assert.False(string.IsNullOrEmpty(response.Data.OperationMode), "OperationMode 값이 비어있음");
+
+        _logService.Info($"[Test] ProxySetting: ServerId={response.Data.ServerId}, WindyMode={response.Data.WindyMode}, OperationMode={response.Data.OperationMode}");
+    }
+
+    #endregion
 }

@@ -344,6 +344,26 @@ public class ServerApiService : IServerApiService
     }
     #endregion
 
+    #region - Proxy Settings (§8.8) -
+    public async Task<ApiResponse<ProxySettingDto>> GetProxySettingsAsync(
+        int serverId, CancellationToken token = default)
+    {
+        try
+        {
+            var url = $"{_setupModel.Url}/servers/{serverId}/proxy-settings";
+            _log?.Info($"[{nameof(GetProxySettingsAsync)}] GET {url}");
+
+            var response = await _apiService.GetRequestAsync(url);
+            return await response.ToApiResponseAsync<ProxySettingDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetProxySettingsAsync)}] Error: {ex.Message}");
+            return ApiResponse<ProxySettingDto>.CreateError("INTERNAL_ERROR", "Failed to get proxy settings", ex.Message);
+        }
+    }
+    #endregion
+
     #region - Attributes -
     private readonly ILogService? _log;
     private readonly IApiService _apiService;

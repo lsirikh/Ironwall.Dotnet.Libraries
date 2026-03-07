@@ -280,19 +280,19 @@
 							IsReadOnly="True">
 							<TextBox.Style>
 								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding ControllerId}" />
+									<Setter Property="Text" Value="{Binding ControllerId, Mode=OneWay}" />
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CONTROLLER}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CABLE_CUTTING}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>
@@ -323,20 +323,20 @@
 							IsReadOnly="True">
 							<TextBox.Style>
 								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding ControllerDeviceNumber}" />
+									<Setter Property="Text" Value="{Binding ControllerDeviceNumber, Mode=OneWay}" />
 
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_FENCE}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_MULTI}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>

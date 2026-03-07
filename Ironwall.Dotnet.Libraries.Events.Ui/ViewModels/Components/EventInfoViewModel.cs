@@ -285,8 +285,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
 
                     DispatcherService.Invoke(() => {
-                        LSeries.Clear();
-                        DSeries.Clear();
+                        var newLSeries = new ObservableCollection<ISeries>();
+                        var newDSeries = new ObservableCollection<ISeries>();
+
                         XAxes.Clear();
                         XAxes.Add(xLabel);
                         YAxes.Clear();
@@ -312,9 +313,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                                 m.DisplayName, counts.Sum(), m.PieColor, SKColors.White);
 
                             /* 3) 추가 */
-                            LSeries.Add(bar);
-                            DSeries.Add(pie);
+                            newLSeries.Add(bar);
+                            newDSeries.Add(pie);
                         }
+
+                        LSeries = newLSeries;
+                        DSeries = newDSeries;
+                        NotifyOfPropertyChange(() => LSeries);
+                        NotifyOfPropertyChange(() => DSeries);
                     });
 
                 }
@@ -385,15 +391,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
                     DispatcherService.Invoke(() =>
                     {
-                        LSeries.Clear();
-                        DSeries.Clear();
                         XAxes.Clear();
                         XAxes.Add(xAxis);
                         YAxes.Clear();
                         YAxes.Add(yAxis);
 
-                        foreach (var s in barSeries) LSeries.Add(s);
-                        foreach (var s in pieSeries) DSeries.Add(s);
+                        LSeries = new ObservableCollection<ISeries>(barSeries);
+                        DSeries = new ObservableCollection<ISeries>(pieSeries);
+                        NotifyOfPropertyChange(() => LSeries);
+                        NotifyOfPropertyChange(() => DSeries);
                     });
                 }
                 catch (OperationCanceledException ex)

@@ -23,7 +23,9 @@ public class NatsSetupModel : INatsSetupModel
         IpAddressNats = model.IpAddressNats;
         PortNats = model.PortNats;
         DefaultSubjectNats = model.DefaultSubjectNats;
-        ClientNameNats = model.ClientNameNats;
+        DomainNats = model.DomainNats;
+        GroupNats = model.GroupNats;
+        SubsystemNats = model.SubsystemNats;
         UsernameNats = model.UsernameNats;
         PasswordNats = model.PasswordNats;
         ConnectionTimeoutNats = model.ConnectionTimeoutNats;
@@ -32,8 +34,17 @@ public class NatsSetupModel : INatsSetupModel
     public string IpAddressNats { get; set; } = "localhost";
     public int PortNats { get; set; } = 4222;
     public string? DefaultSubjectNats { get; set; }
-    public string? ClientNameNats { get; set; }
+    public string? DomainNats { get; set; }
+    public string? GroupNats { get; set; }
+    public string? SubsystemNats { get; set; }
     public string? UsernameNats { get; set; }
     public string? PasswordNats { get; set; }
     public int ConnectionTimeoutNats { get; set; } = 5000;
+
+    public string EffectiveSubject =>
+        !string.IsNullOrEmpty(DomainNats) &&
+        !string.IsNullOrEmpty(GroupNats) &&
+        !string.IsNullOrEmpty(SubsystemNats)
+            ? $"{DomainNats}.{GroupNats}.{SubsystemNats}.>"
+            : DefaultSubjectNats ?? "default.>";
 }

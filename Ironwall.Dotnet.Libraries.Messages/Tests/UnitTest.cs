@@ -4795,3 +4795,147 @@ public class EventStatisticsDtoTests
 }
 
 #endregion
+
+#region - WindyMode NATS 연동 테스트 -
+/// <summary>
+/// WindyMode NATS 연동: Enum, BrokerRequest/Response, ProxySettingDto 테스트
+/// </summary>
+public class WindyModeNatsTests
+{
+    #region - Phase 1: Enum + BrokerResponse -
+
+    [Fact(DisplayName = "1.2: EnumGopCommand.WINDY 값 = 5 보존")]
+    [Trait("Category", "Enum")]
+    public void EnumGopCommand_WINDY_Equals5()
+    {
+        Assert.Equal(5, (int)EnumGopCommand.WINDY);
+    }
+
+    [Fact(DisplayName = "1.3: TryParse(\"WINDY\") → EnumGopCommand.WINDY 매칭")]
+    [Trait("Category", "Enum")]
+    public void EnumGopCommand_TryParse_WINDY_Matches()
+    {
+        var result = Enum.TryParse<EnumGopCommand>("WINDY", ignoreCase: true, out var cmd);
+        Assert.True(result);
+        Assert.Equal(EnumGopCommand.WINDY, cmd);
+    }
+
+    [Fact(DisplayName = "1.4: BrokerResponse<WindyBodyDto> RSP JSON 역직렬화")]
+    [Trait("Category", "Broker")]
+    public void BrokerResponse_WindyBodyDto_RSP_Deserialization()
+    {
+        // Arrange — 설계 문서 §7.1.2 RSP 형식
+        var json = @"{
+            ""id"": ""uuid-v4"",
+            ""m_type"": ""RSP"",
+            ""cmd"": ""WINDY"",
+            ""from"": ""PidsProxy"",
+            ""body"": { ""mode"": ""wind2"" },
+            ""success"": true,
+            ""message"": ""풍량 모드 변경 완료"",
+            ""req_id"": ""original-request-uuid"",
+            ""created"": ""2026-02-05T10:30:00.100Z""
+        }";
+
+        // Act
+        var rsp = JsonConvert.DeserializeObject<BrokerResponse<Dto.Brokers.WindyBodyDto>>(json);
+
+        // Assert
+        Assert.NotNull(rsp);
+        Assert.True(rsp!.Success);
+        Assert.Equal("풍량 모드 변경 완료", rsp.Message);
+        Assert.Equal("original-request-uuid", rsp.RequestId);
+        Assert.Equal("RSP", rsp.TypeMessage);
+        Assert.Equal("WINDY", rsp.Command);
+        Assert.Equal("PidsProxy", rsp.From);
+        Assert.NotNull(rsp.Data);
+        Assert.Equal("wind2", rsp.Data!.Mode);
+    }
+
+    #endregion
+
+    #region - Phase 2: ProxySettingDto -
+
+    [Fact(DisplayName = "2.1: ProxySettingDto §8.8.1 응답 JSON 역직렬화")]
+    [Trait("Category", "DTO")]
+    public void ProxySettingDto_Deserialization()
+    {
+        // Arrange — REST API §8.8.1 응답 data
+        var json = @"{
+            ""id"": 1,
+            ""server_id"": 1,
+            ""operation_mode"": ""NORMAL"",
+            ""windy_mode"": ""wind2"",
+            ""created_at"": ""2026-02-06T12:00:00.000Z"",
+            ""updated_at"": ""2026-02-06T12:30:00.150Z""
+        }";
+
+        // Act
+        var dto = JsonConvert.DeserializeObject<ProxySettingDto>(json);
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(1, dto!.Id);
+        Assert.Equal(1, dto.ServerId);
+        Assert.Equal("NORMAL", dto.OperationMode);
+        Assert.Equal("wind2", dto.WindyMode);
+        Assert.Equal("2026-02-06T12:00:00.000Z", dto.CreatedAt);
+        Assert.Equal("2026-02-06T12:30:00.150Z", dto.UpdatedAt);
+    }
+
+    [Fact(DisplayName = "2.1b: ProxySettingDto 기본값 확인")]
+    [Trait("Category", "DTO")]
+    public void ProxySettingDto_DefaultValues()
+    {
+        var dto = new ProxySettingDto();
+        Assert.Equal("NORMAL", dto.OperationMode);
+        Assert.Equal("wind0", dto.WindyMode);
+    }
+
+    #endregion
+
+    #region - Phase 4: BrokerRequest + WindyBodyDto -
+
+    [Fact(DisplayName = "4.1: BrokerRequest<WindyBodyDto> REQ JSON 구조 검증")]
+    [Trait("Category", "Broker")]
+    public void BrokerRequest_WindyBodyDto_REQ_Format()
+    {
+        // Arrange
+        var req = new BrokerRequest<Dto.Brokers.WindyBodyDto>
+        {
+            Id = "test-uuid",
+            Command = EnumGopCommand.WINDY.ToString(),
+            From = "GIS",
+            Data = new Dto.Brokers.WindyBodyDto { Mode = "wind2" }
+        };
+
+        // Act
+        var json = JsonConvert.SerializeObject(req);
+
+        // Assert
+        Assert.Contains("\"m_type\":\"REQ\"", json);
+        Assert.Contains("\"cmd\":\"WINDY\"", json);
+        Assert.Contains("\"from\":\"GIS\"", json);
+        Assert.Contains("\"mode\":\"wind2\"", json);
+    }
+
+    [Fact(DisplayName = "4.2: WindyBodyDto wind0~wind3 전체 직렬화/역직렬화")]
+    [Trait("Category", "DTO")]
+    public void WindyBodyDto_AllModes_Serialization()
+    {
+        var modes = new[] { "wind0", "wind1", "wind2", "wind3" };
+        foreach (var mode in modes)
+        {
+            var dto = new Dto.Brokers.WindyBodyDto { Mode = mode };
+            var json = JsonConvert.SerializeObject(dto);
+            Assert.Contains($"\"mode\":\"{mode}\"", json);
+
+            var roundTrip = JsonConvert.DeserializeObject<Dto.Brokers.WindyBodyDto>(json);
+            Assert.NotNull(roundTrip);
+            Assert.Equal(mode, roundTrip!.Mode);
+        }
+    }
+
+    #endregion
+}
+#endregion

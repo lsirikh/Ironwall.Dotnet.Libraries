@@ -38,6 +38,13 @@ internal static class DeviceFilterHelper
             EnumDeviceType.Lamp =>
                 devices.Where(d => d.DeviceType == EnumDeviceType.Lamp),
 
+            // SmartSensor 계열
+            EnumDeviceType.SmartSensor or
+            EnumDeviceType.SmartSensor2 =>
+                devices.Where(d =>
+                    d.DeviceType == EnumDeviceType.SmartSensor ||
+                    d.DeviceType == EnumDeviceType.SmartSensor2),
+
             // Fence 계열 센서들
             EnumDeviceType.Fence or
             EnumDeviceType.Underground or

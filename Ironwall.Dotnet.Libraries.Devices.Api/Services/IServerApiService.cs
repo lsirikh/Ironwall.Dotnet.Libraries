@@ -103,4 +103,10 @@ public interface IServerApiService : IService
         int serverId,
         string? beforeDate = null,
         CancellationToken token = default);
+
+    // ────────────────────────── Proxy Settings (§8.8) ──────────────────────────
+
+    Task<ApiResponse<ProxySettingDto>> GetProxySettingsAsync(
+        int serverId,
+        CancellationToken token = default);
 }

@@ -63,6 +63,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
         if (SelectedItemCount == 0) return;
+        _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = "선택한 이벤트를 정말로 삭제하시겠습니까?",
@@ -415,10 +416,11 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in SelectedItems.ToList())
+            foreach (var item in _pendingDeleteItems)
             {
                 var ret = await _providerService.DeleteActionEventAsync(item.Model.Id, cancellationToken);
             }
+            _pendingDeleteItems = [];
         }, cancellationToken);
 
         await DataInitialize().ConfigureAwait(false);
@@ -490,5 +492,6 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     private int _totalPages = 1;
     private int _totalCount;
     private bool _isLoadingMore;
+    private IList<ActionEventViewModel> _pendingDeleteItems = [];
     #endregion
 }

@@ -6,6 +6,7 @@
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
@@ -42,6 +43,7 @@
 					<ColumnDefinition Width="2*" MinWidth="80" />
 					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="Auto" />
 				</Grid.ColumnDefinitions>
@@ -89,26 +91,57 @@
 				<!--  추가 버튼  -->
 				<Button
 					Grid.Column="6"
-					Margin="0,0,4,0"
-					cal:Message.Attach="AddDeviceButton"
 					IsEnabled="{Binding IsSingleSelected}"
-					Style="{StaticResource MaterialDesignRaisedButton}">
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon Kind="Plus" VerticalAlignment="Center" />
-						<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" Text="추가" />
-					</StackPanel>
+					Style="{StaticResource IconButtonStyle}"
+					ToolTip="추가하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="AddDeviceButton" />
+					</i:Interaction.Behaviors>
+					<md:PackIcon
+						Width="30"
+						Height="30"
+						Kind="AddBox" />
 				</Button>
 
 				<!--  제거 버튼  -->
 				<Button
 					Grid.Column="7"
-					cal:Message.Attach="RemoveDeviceButton"
 					IsEnabled="{Binding CanRemoveDeviceButton}"
-					Style="{StaticResource MaterialDesignOutlinedButton}">
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon Kind="Minus" VerticalAlignment="Center" />
-						<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" Text="제거" />
-					</StackPanel>
+					Style="{StaticResource IconButtonStyle}"
+					ToolTip="삭제하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="RemoveDeviceButton" />
+					</i:Interaction.Behaviors>
+					<md:PackIcon
+						Width="30"
+						Height="30"
+						Kind="MinusBox" />
+				</Button>
+
+				<!--  새로고침 버튼  -->
+				<Button
+					Grid.Column="8"
+					IsEnabled="{Binding IsSingleSelected}"
+					Style="{StaticResource IconButtonStyle}"
+					ToolTip="갱신하기">
+					<i:Interaction.Behaviors>
+						<behavior:ButtonClickBehavior MethodName="RefreshButton" />
+					</i:Interaction.Behaviors>
+					<Button.Content>
+						<Grid>
+							<ProgressBar
+								Width="30"
+								Height="30"
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+							<md:PackIcon
+								Width="30"
+								Height="30"
+								Kind="CircleArrows"
+								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						</Grid>
+					</Button.Content>
 				</Button>
 			</Grid>
 
@@ -123,9 +156,13 @@
 					IsReadOnly="True"
 					ItemsSource="{Binding AssignedDevices}"
 					MinHeight="110"
-					SelectedItem="{Binding SelectedAssignedDevice, Mode=TwoWay}"
-					SelectionMode="Single"
+					SelectionMode="Extended"
 					Style="{StaticResource MaterialDesignDataGrid}">
+					<i:Interaction.Behaviors>
+						<behavior:ClearSelectionOnEscBehavior />
+						<behavior_inner:DeviceAssignSelectedItemsBehavior
+							SelectedItems="{Binding SelectedAssignedDevices, Mode=OneWay}" />
+					</i:Interaction.Behaviors>
 					<DataGrid.Columns>
 						<DataGridTextColumn
 							Binding="{Binding DeviceNumber}"

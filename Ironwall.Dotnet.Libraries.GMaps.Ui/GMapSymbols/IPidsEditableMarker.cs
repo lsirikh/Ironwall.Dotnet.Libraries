@@ -27,5 +27,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         double DetectionAngle { get; set; }
         double DetectionBearing { get; set; }
         double BaseBearing { get; set; }
+
+        /// <summary>
+        /// 방송(음원/TTS) 동작 중 여부 — XAML Opacity 펄스 애니메이션 트리거
+        /// </summary>
+        bool IsBroadcasting { get; set; }
     }
 }

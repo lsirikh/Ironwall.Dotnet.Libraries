@@ -179,6 +179,19 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DependencyProperty.Register("DetectionBearing", typeof(double), typeof(GMapMarkerPidsControl),
             new PropertyMetadata(0.0, OnFOVParameterChanged));
 
+    /// <summary>
+    /// 방송(음원/TTS) 동작 중 여부 — Opacity 펄스 애니메이션 트리거
+    /// </summary>
+    public bool IsBroadcasting
+    {
+        get => (bool)GetValue(IsBroadcastingProperty);
+        set => SetValue(IsBroadcastingProperty, value);
+    }
+
+    public static readonly DependencyProperty IsBroadcastingProperty =
+        DependencyProperty.Register("IsBroadcasting", typeof(bool), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(false));
+
     #endregion
 
     #region Constructors
@@ -275,6 +288,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         SetupPropertyBinding(DetectionRangeProperty, nameof(Marker.DetectionRange));
         SetupPropertyBinding(DetectionAngleProperty, nameof(Marker.DetectionAngle));
         SetupPropertyBinding(DetectionBearingProperty, nameof(Marker.DetectionBearing));
+        SetupPropertyBinding(IsBroadcastingProperty, nameof(Marker.IsBroadcasting));
 
         var colorConverter = new ColorTypeToBrushConverter();
         var visibilityConverter = new System.Windows.Controls.BooleanToVisibilityConverter();
@@ -331,6 +345,17 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     protected override void OnMarkerDoubleClicked(MouseButtonEventArgs e)
     {
         base.OnMarkerDoubleClicked(e);
+    }
+
+    /// <summary>
+    /// 우클릭 처리 — 컨텍스트 메뉴 트리거 (지도 드래그 방지를 위해 Handled=true)
+    /// </summary>
+    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseRightButtonDown(e);
+        if (Marker == null) return;
+        e.Handled = true;
+        _mapControl?.TriggerMarkerRightClicked(Marker);
     }
 
     /// <summary>
@@ -441,8 +466,10 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 GetTemplateChild("PART_FOVTransform") is TranslateTransform transform)
             {
                 // 1. 캔버스 및 중심점 설정
-                transform.X = ActualWidth / 2.0;
-                transform.Y = ActualHeight / 2.0;
+                // IpCamera: 하우징 중심(SVG y=43.6/200) 을 FOV 꼭지점으로 사용
+                double fovOriginY = DeviceType == EnumDeviceType.IpCamera ? (43.6 / 200.0) : 0.5;
+                transform.X = ActualWidth  * 0.5;
+                transform.Y = ActualHeight * fovOriginY;
 
                 fovCanvas.Width = ActualWidth;
                 fovCanvas.Height = ActualHeight;

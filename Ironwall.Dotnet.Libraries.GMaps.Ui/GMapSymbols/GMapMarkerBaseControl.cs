@@ -354,6 +354,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             SetupPropertyBinding(WidthProperty, nameof(Marker.Width));
             SetupPropertyBinding(HeightProperty, nameof(Marker.Height));
             SetupPropertyBinding(IsSelectedProperty, nameof(Marker.IsSelected));
+            SetupPropertyBinding(MarkerStateProperty, nameof(Marker.OperationState));
             SetupPropertyBinding(RotationAngleProperty, nameof(Marker.Bearing));
             SetupPropertyBinding(ShowShapeProperty, nameof(Marker.ShowShape));
             SetupPropertyBinding(ShowTitleProperty, nameof(Marker.ShowTitle));

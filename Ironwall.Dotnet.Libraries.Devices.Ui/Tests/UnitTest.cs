@@ -899,8 +899,13 @@ public class MockDeviceApiService : IDeviceApiService
         return Task.FromResult(ApiListResponse<SensorDeviceDto>.CreateSuccess(new List<SensorDeviceDto>()));
     }
 
+    public SensorDeviceDto? SensorByIdDto { get; set; }
     public Task<ApiResponse<SensorDeviceDto>> GetSensorByIdAsync(int id, bool includeController = false, CancellationToken token = default)
-        => Task.FromResult(ApiResponse<SensorDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+    {
+        if (SensorByIdDto != null)
+            return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateSuccess(SensorByIdDto));
+        return Task.FromResult(ApiResponse<SensorDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
+    }
 
     public Task<ApiResponse<SensorDeviceDto>> CreateSensorAsync(SensorDeviceDto dto, CancellationToken token = default)
         => Task.FromResult(ApiResponse<SensorDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
@@ -1132,6 +1137,15 @@ public class MockDeviceProviderService : IDeviceProviderService
 
     public Task<IBaseDeviceModel?> FetchDeviceByIdAsync(string typeDevice, int resourceId, CancellationToken token = default)
         => Task.FromResult<IBaseDeviceModel?>(null);
+
+    public Task RemoveDeviceByIdAsync(string typeDevice, int resourceId)
+        => Task.CompletedTask;
+
+    public Task FetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default)
+        => Task.CompletedTask;
+
+    public Task RemoveDeviceGroupByIdAsync(int resourceId)
+        => Task.CompletedTask;
 }
 #endregion
 
@@ -2068,5 +2082,70 @@ public sealed class DeviceAssignDialogViewModelTests
         Assert.DoesNotContain(vm.AllDevices, d => d.Id == 3);
     }
 }
+#endregion
+
+#region - Phase 21: FetchDeviceByIdAsync SensorSubType Tests -
+/// <summary>
+/// FR-01: SYNC_DEVICE 센서 sub-type 전체 처리 검증
+/// PRD: Docs/prd/PRD_SyncDevice_SensorAllTypes_And_DeviceGroup.md
+/// </summary>
+public class FetchDeviceByIdAsync_SensorSubTypeTests
+{
+    private static MockDeviceApiService CreateMockWithSensor(int id, EnumDeviceType deviceType) =>
+        new MockDeviceApiService
+        {
+            SensorByIdDto = new SensorDeviceDto
+            {
+                Id = id,
+                NameDevice = $"Sensor-{deviceType}-{id}",
+                TypeDevice = deviceType.ToString(),
+                Status = "ACTIVATED"
+            }
+        };
+
+    private static DeviceProviderService CreateService(MockDeviceApiService mock)
+    {
+        var log = new MockLogService();
+        var dp = new DeviceProvider();
+        return new DeviceProviderService(
+            logService: null,
+            eventAggregator: new MockEventAggregator(),
+            apiService: mock,
+            deviceProvider: dp,
+            controllerProvider: new ControllerDeviceProvider(log, dp),
+            sensorProvider: new SensorDeviceProvider(log, dp),
+            cameraProvider: new CameraDeviceProvider(log, dp),
+            deviceGroupProvider: new DeviceGroupProvider(log));
+    }
+
+    [Theory]
+    [InlineData("Multi")]
+    [InlineData("Contact")]
+    [InlineData("PIR")]
+    [InlineData("IoController")]
+    [InlineData("Laser")]
+    [InlineData("Cable")]
+    [InlineData("SmartSensor")]
+    [InlineData("SmartSensor2")]
+    [InlineData("SmartCompound")]
+    [InlineData("Radar")]
+    [InlineData("OpticalCable")]
+    [InlineData("Fence")]
+    [InlineData("Underground")]
+    [InlineData("Sensor")]
+    public async Task FetchDeviceByIdAsync_AllSensorSubTypes_ReturnsNonNull(string typeDevice)
+    {
+        // Arrange
+        var mock = CreateMockWithSensor(id: 10, EnumDeviceType.Multi);
+        var service = CreateService(mock);
+
+        // Act
+        var result = await service.FetchDeviceByIdAsync(typeDevice, resourceId: 10);
+
+        // Assert
+        Assert.NotNull(result);
+    }
+}
+
 #endregion
 #endregion

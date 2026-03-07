@@ -25,6 +25,11 @@ public interface IMessageService<T> : IService
     Task PublishAsync(string subject, string data);
 
     /// <summary>
+    /// NATS Request-Reply 패턴 (REQ 전송 후 RSP 대기)
+    /// </summary>
+    Task<string?> RequestAsync(string subject, string data, TimeSpan? timeout = null);
+
+    /// <summary>
     /// 동기식 메시지 수신 이벤트
     /// </summary>
     event EventHandler<MessageArgsModel> NatsSubscribeEvent;

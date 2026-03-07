@@ -26,7 +26,7 @@ public class NatsServiceTests
             IpAddressNats = "192.168.202.195",
             PortNats = 4222,
             DefaultSubjectNats = "test.>",
-            ClientNameNats = "NatsServiceTests",
+            SubsystemNats = "NatsServiceTests",
             ConnectionTimeoutNats = 5000
         };
 
@@ -78,7 +78,7 @@ public class NatsServiceTests
             IpAddressNats = "192.168.202.195",
             PortNats = 4222,
             DefaultSubjectNats = "test.wildcard.>", // 다중 레벨 와일드카드
-            ClientNameNats = "WildcardTest"
+            SubsystemNats = "WildcardTest"
         };
 
         await natsService.ConnectAsync(setupModel);
@@ -115,5 +115,18 @@ public class NatsServiceTests
         Assert.Contains("test.wildcard.one", receivedMessages);
         Assert.Contains("test.wildcard.two", receivedMessages);
         Assert.Contains("test.wildcard.three.deep", receivedMessages);
+    }
+
+    [Fact(DisplayName = "3.3: RequestAsync — Connection null → null 반환")]
+    public async Task NatsService_RequestAsync_ConnectionNull_ReturnsNull()
+    {
+        // Arrange — Connect 호출 없이 생성
+        var service = new NatsService(_log);
+
+        // Act
+        var result = await service.RequestAsync("test.subject", "test data");
+
+        // Assert
+        Assert.Null(result);
     }
 }

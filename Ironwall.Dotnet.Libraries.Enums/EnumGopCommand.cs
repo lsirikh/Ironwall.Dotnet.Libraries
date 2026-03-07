@@ -18,7 +18,7 @@ public enum EnumGopCommand
     // 이벤트 조치보고
     ACTION = 4,
     // 풍량모드
-    WINDYMODE_SETUP = 5,
+    WINDY = 5,
     // Ai분석서버 저조도
     AI_LOWLIGHT = 6,
     // Ai분석서버 탐지 (레거시)
@@ -31,6 +31,10 @@ public enum EnumGopCommand
     RTSP_EVENTCALL = 10,
     // 이벤트 조치보고 (설계 문서 기준 cmd 값 — PUB 메시지용)
     ACTION_REPORT = 11,
+    // 장치 동기화 알림 (DBApi가 장치 CRUD 시 발행)
+    SYNC_DEVICE = 12,
+    // 장치 그룹 동기화 알림 (DBApi가 DeviceGroup CRUD 시 발행)
+    SYNC_DEVICE_GROUP = 13,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

@@ -63,4 +63,13 @@ public class BaseDeviceDto : BaseDto
     /// </summary>
     [JsonProperty("geolocation", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
     public GeolocationDto? Geolocation { get; set; }
+
+    /// <summary>
+    /// 설계 문서 원칙: Event body의 nested device 객체에서는 created_at/updated_at 제외
+    /// </summary>
+    [JsonIgnore]
+    public override string? CreatedAt { get => base.CreatedAt; set => base.CreatedAt = value; }
+
+    [JsonIgnore]
+    public override string? UpdatedAt { get => base.UpdatedAt; set => base.UpdatedAt = value; }
 }

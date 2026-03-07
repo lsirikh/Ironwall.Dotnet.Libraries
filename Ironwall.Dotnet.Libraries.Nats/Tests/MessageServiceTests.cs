@@ -24,6 +24,8 @@ public class MessageServiceTests
         public override Task<TestMessageService?> ConnectAsync(INatsSetupModel setupModel)
             => Task.FromResult<TestMessageService?>(this);
         public override Task PublishAsync(string subject, string data) => Task.CompletedTask;
+        public override Task<string?> RequestAsync(string subject, string data, TimeSpan? timeout = null)
+            => Task.FromResult<string?>(null);
 
         /// <summary>테스트에서 구독 태스크를 직접 주입</summary>
         public void AddSubscriptionTask(Task task) => _subscriptionTasks.Add(task);
@@ -77,5 +79,21 @@ public class MessageServiceTests
         // Act + Assert — OperationCanceledException이 외부로 전파되지 않아야 함
         var ex = await Record.ExceptionAsync(() => service.StopAsync());
         Assert.Null(ex);
+    }
+
+    [Fact(DisplayName = "3.1: IMessageService에 RequestAsync 시그니처 존재")]
+    public void IMessageService_RequestAsync_MethodExists()
+    {
+        var method = typeof(IMessageService<INatsService>).GetMethod("RequestAsync");
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task<string?>), method!.ReturnType);
+    }
+
+    [Fact(DisplayName = "3.2: MessageService에 RequestAsync abstract 존재")]
+    public void MessageService_RequestAsync_AbstractExists()
+    {
+        var method = typeof(MessageService<INatsService>).GetMethod("RequestAsync");
+        Assert.NotNull(method);
+        Assert.True(method!.IsAbstract);
     }
 }

@@ -39,7 +39,7 @@
 			Style="{StaticResource MaterialDesignDataGrid}">
 			<i:Interaction.Behaviors>
 				<behavior:ClearSelectionOnEscBehavior />
-				<behavior_inner:DeviceAssignSelectedItemsBehavior SelectedItems="{Binding SelectedDevices, Mode=TwoWay}" />
+				<behavior_inner:DeviceAssignSelectedItemsBehavior SelectedItems="{Binding SelectedDevices, Mode=OneWay}" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 				<DataGridTextColumn

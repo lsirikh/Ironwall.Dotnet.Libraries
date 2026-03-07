@@ -30,6 +30,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             _apiService = apiService;
             _deviceProvider = deviceProvider;
             AssignedDevices = new BindableCollection<DeviceAssignItemViewModel>();
+            SelectedAssignedDevices = new BindableCollection<DeviceAssignItemViewModel>();
+            SelectedAssignedDevices.CollectionChanged += (_, _) => NotifyOfPropertyChange(nameof(CanRemoveDeviceButton));
+            _eventAggregator.SubscribeOnUIThread(this);
+            _log?.Info($"[DeviceGroupSelectionVM] Constructed, subscribed to EventAggregator");
             RefreshAll();
             _ = LoadAssignedDevicesAsync();
         }
@@ -72,6 +76,21 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             return Task.CompletedTask;
         }
 
+        public async Task RefreshButton()
+        {
+            ReloadButtonEnable = false;
+            NotifyOfPropertyChange(nameof(ReloadButtonEnable));
+            try
+            {
+                await LoadAssignedDevicesAsync();
+            }
+            finally
+            {
+                ReloadButtonEnable = true;
+                NotifyOfPropertyChange(nameof(ReloadButtonEnable));
+            }
+        }
+
         public async Task AddDeviceButton()
         {
             if (!IsSingleSelected) return;
@@ -82,17 +101,22 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             dialog.Initialize(groupId, assignedIds);
 
             await _eventAggregator.PublishOnUIThreadAsync(
-                new OpenDeviceAssignDialogMessageModel { Dialog = dialog });
-
-            await LoadAssignedDevicesAsync();
+                new OpenDeviceAssignDialogMessageModel
+                {
+                    Dialog = dialog,
+                    OnCompleted = () => _ = LoadAssignedDevicesAsync()
+                });
         }
 
         public async Task RemoveDeviceButton()
         {
-            if (!IsSingleSelected || SelectedAssignedDevice == null) return;
+            _log?.Info($"[DeviceGroupSelectionVM] RemoveDeviceButton called, IsSingleSelected={IsSingleSelected}, SelectedCount={SelectedAssignedDevices.Count}");
+            if (!IsSingleSelected || SelectedAssignedDevices.Count == 0) return;
+            _pendingRemoveTargets = SelectedAssignedDevices.ToList();
+            _log?.Info($"[DeviceGroupSelectionVM] _pendingRemoveTargets saved: {_pendingRemoveTargets.Count} items (Ids: {string.Join(",", _pendingRemoveTargets.Select(d => d.Id))})");
             await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
             {
-                Explain = "선택한 장비를 그룹에서 제거하시겠습니까?",
+                Explain = $"선택한 장비 {_pendingRemoveTargets.Count}개를 그룹에서 제거하시겠습니까?",
                 MessageModel = new CallRemoveDeviceFromGroupProcessMessageModel()
             });
         }
@@ -119,16 +143,40 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         #region - IHandles -
         public async Task HandleAsync(CallRemoveDeviceFromGroupProcessMessageModel message, CancellationToken cancellationToken)
         {
-            if (!IsSingleSelected || SelectedAssignedDevice == null) return;
+            var targets = _pendingRemoveTargets;
+            _pendingRemoveTargets = null;
+            _log?.Info($"[DeviceGroupSelectionVM] HandleAsync entered, IsSingleSelected={IsSingleSelected}, targets={targets?.Count ?? -1}");
+            if (!IsSingleSelected || targets == null || targets.Count == 0)
+            {
+                _log?.Warning($"[DeviceGroupSelectionVM] HandleAsync early return — no targets");
+                return;
+            }
             try
             {
                 var groupId = _selection[0].Id;
-                var resp = await _apiService.RemoveDeviceFromGroupAsync(groupId, SelectedAssignedDevice.Id);
-                if (!resp.Success) _log?.Warning($"RemoveDevice failed: {resp.Message}");
-                SelectedAssignedDevice = null;
+                _log?.Info($"[DeviceGroupSelectionVM] Removing {targets.Count} devices from group {groupId}");
+                foreach (var device in targets)
+                {
+                    _log?.Info($"[DeviceGroupSelectionVM] API RemoveDeviceFromGroupAsync(groupId={groupId}, deviceId={device.Id})");
+                    var resp = await _apiService.RemoveDeviceFromGroupAsync(groupId, device.Id);
+                    if (!resp.Success)
+                        _log?.Warning($"RemoveDevice failed (Id={device.Id}): {resp.Message}");
+                    else
+                    {
+                        _log?.Info($"[DeviceGroupSelectionVM] Removed device {device.Id} from group {groupId} OK");
+                        var model = _deviceProvider.OfType<IBaseDeviceModel>().FirstOrDefault(m => m.Id == device.Id);
+                        model?.DeviceGroups?.Remove(groupId);
+                    }
+                }
+                SelectedAssignedDevices.Clear();
                 await LoadAssignedDevicesAsync();
+                _log?.Info($"[DeviceGroupSelectionVM] Remove completed, AssignedDevices.Count={AssignedDevices.Count}");
             }
-            catch (Exception ex) { _log?.Error($"RemoveDeviceButton: {ex.Message}"); }
+            catch (Exception ex) { _log?.Error($"[DeviceGroupSelectionVM] RemoveDeviceButton exception: {ex.Message}"); }
+            finally
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+            }
         }
         #endregion
 
@@ -137,26 +185,17 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public string? Description { get; set; }
         public DeviceGroupPanelViewModel DevicePanelViewModel { get; }
         public BindableCollection<DeviceAssignItemViewModel> AssignedDevices { get; }
+        public BindableCollection<DeviceAssignItemViewModel> SelectedAssignedDevices { get; }
         public bool IsSingleSelected => _selection.Count == 1;
-        public bool CanRemoveDeviceButton => IsSingleSelected && SelectedAssignedDevice != null;
-
-        private DeviceAssignItemViewModel? _selectedAssignedDevice;
-        public DeviceAssignItemViewModel? SelectedAssignedDevice
-        {
-            get => _selectedAssignedDevice;
-            set
-            {
-                _selectedAssignedDevice = value;
-                NotifyOfPropertyChange(() => SelectedAssignedDevice);
-                NotifyOfPropertyChange(nameof(CanRemoveDeviceButton));
-            }
-        }
+        public bool CanRemoveDeviceButton => IsSingleSelected && SelectedAssignedDevices.Count > 0;
+        public bool ReloadButtonEnable { get; set; } = true;
         #endregion
 
         #region - Attributes -
         private readonly IList<DeviceGroupViewModel> _selection;
         private readonly IDeviceApiService _apiService;
         private readonly DeviceProvider _deviceProvider;
+        private List<DeviceAssignItemViewModel>? _pendingRemoveTargets;
         #endregion
     }
 }

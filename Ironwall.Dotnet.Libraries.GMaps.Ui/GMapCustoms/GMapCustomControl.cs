@@ -131,9 +131,14 @@ public class GMapCustomControl : GMapControl
     public event Action<PointLatLng, Point> OnMapClicked;
 
     /// <summary>
-    /// 마커 클릭 이벤트 - ViewModel에 클릭된 마커 전달  
+    /// 마커 클릭 이벤트 - ViewModel에 클릭된 마커 전달
     /// </summary>
     public event Action<IEditableMarker> OnMarkerClicked;
+
+    /// <summary>
+    /// 마커 우클릭 이벤트 - ViewModel에 우클릭된 마커 전달 (컨텍스트 메뉴용)
+    /// </summary>
+    public event Action<IEditableMarker>? OnMarkerRightClicked;
 
     /// <summary>
     /// 이미지 클릭 이벤트 - ViewModel에 클릭된 이미지 전달
@@ -518,6 +523,19 @@ public class GMapCustomControl : GMapControl
         catch (Exception ex)
         {
             _log?.Error($"TriggerMarkerClicked 실패: {ex.Message}");
+        }
+    }
+
+    public void TriggerMarkerRightClicked(GMapMarker marker)
+    {
+        try
+        {
+            if (marker is IEditableMarker editableMarker)
+                OnMarkerRightClicked?.Invoke(editableMarker);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"TriggerMarkerRightClicked 실패: {ex.Message}");
         }
     }
 

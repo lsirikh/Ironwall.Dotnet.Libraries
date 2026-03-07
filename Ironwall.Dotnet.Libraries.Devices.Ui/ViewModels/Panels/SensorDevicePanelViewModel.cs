@@ -45,6 +45,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     {
         await base.OnActivateAsync(cancellationToken);
         _pCancellationTokenSource = new CancellationTokenSource();
+        await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource!.Token);
         await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
     }
 

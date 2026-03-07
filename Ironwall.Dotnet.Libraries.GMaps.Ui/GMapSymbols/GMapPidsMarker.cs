@@ -34,6 +34,8 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
 
     private void PidsModel_Update(object? sender, EventArgs e)
     {
+        _log?.Info($"[SYNC→Symbol] PidsModel_Update 수신: '{_model.Title}' OperationState={_model.OperationState}, EventStatus={_model.EventStatus}");
+
         OnPropertyChanged(nameof(EventStatus));
         OnPropertyChanged(nameof(OperationState));
 
@@ -68,13 +70,15 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         base.OnStatusChanged(status);
 
         // OperationState → EventStatus 매핑
+        var prevEventStatus = _model.EventStatus;
         _model.EventStatus = status switch
         {
-            EnumOperationState.ACTIVATED => EnumEventStatus.Normal,
-            EnumOperationState.DEACTIVATED => EnumEventStatus.Fault,
-            EnumOperationState.ERROR => EnumEventStatus.Fault,
-            _ => EnumEventStatus.Normal
+            EnumOperationState.ACTIVATED   => EnumEventStatus.Normal,
+            EnumOperationState.DEACTIVATED => EnumEventStatus.Normal,  // 깜빡임 없음 (DEACTIVATED는 비활성 상태)
+            EnumOperationState.ERROR       => EnumEventStatus.Fault,   // 깜빡임 유지
+            _                              => EnumEventStatus.Normal
         };
+        _log?.Info($"[SYNC→Symbol] OnStatusChanged: '{_model.Title}' OperationState={status} → EventStatus: {prevEventStatus} → {_model.EventStatus}");
     }
 
     /// <summary>
@@ -249,5 +253,22 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     /// </summary>
     public bool IsAnimating => _isAnimating;
 
+    /// <summary>
+    /// 방송(음원/TTS) 동작 중 여부 — XAML Opacity 펄스 애니메이션 트리거
+    /// </summary>
+    public bool IsBroadcasting
+    {
+        get => _isBroadcasting;
+        set
+        {
+            _isBroadcasting = value;
+            OnPropertyChanged(nameof(IsBroadcasting));
+        }
+    }
+
+    #endregion
+
+    #region - Attributes -
+    private bool _isBroadcasting;
     #endregion
 }

@@ -190,10 +190,14 @@ public class DeviceProviderService : IDeviceProviderService
     {
         try
         {
-            IBaseDeviceModel? updated = typeDevice switch
+            var normalized = NormalizeTypeDevice(typeDevice);
+            IBaseDeviceModel? updated = normalized switch
             {
                 "Controller" => await FetchSingleControllerAsync(resourceId, token),
-                "Fence" or "Underground" => await FetchSingleSensorAsync(resourceId, token),
+                "Sensor" or "Fence" or "Underground" or "Multi" or "Contact" or "PIR"
+                    or "IoController" or "Laser" or "Cable" or "SmartSensor"
+                    or "SmartSensor2" or "SmartCompound" or "Radar" or "OpticalCable"
+                    => await FetchSingleSensorAsync(resourceId, token),
                 "IpCamera" => await FetchSingleCameraAsync(resourceId, token),
                 "Speaker" => await FetchSingleSpeakerAsync(resourceId, token),
                 "Enclosure" => await FetchSingleEnclosureAsync(resourceId, token),
@@ -302,6 +306,64 @@ public class DeviceProviderService : IDeviceProviderService
         {
             _log?.Error($"Exception in FetchDeviceGroupsAsync: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 단일 DeviceGroup을 API에서 재조회하여 DeviceGroupProvider를 갱신합니다.
+    /// NatsSync SYNC_DEVICE_GROUP action="CREATED" / "UPDATED" 수신 시 호출됩니다.
+    /// </summary>
+    public async Task FetchDeviceGroupByIdAsync(int resourceId, CancellationToken token = default)
+    {
+        try
+        {
+            var resp = await _apiService.GetDeviceGroupByIdAsync(resourceId, token: token);
+            if (resp.Success && resp.Data != null)
+            {
+                var model = resp.Data.ToDeviceGroupModel();
+                var existing = _deviceGroupProvider.FirstOrDefault(g => g.Id == resourceId);
+                if (existing != null)
+                {
+                    existing.Name = model.Name;
+                    existing.Description = model.Description;
+                    existing.DeviceCount = model.DeviceCount;
+                }
+                else
+                {
+                    _deviceGroupProvider.Add(model);
+                }
+                _log?.Info($"FetchDeviceGroupByIdAsync: DeviceGroup({resourceId}) 갱신 완료");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"FetchDeviceGroupByIdAsync({resourceId}) 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// DeviceGroup을 DeviceGroupProvider 캐시에서 제거합니다.
+    /// NatsSync SYNC_DEVICE_GROUP action="DELETED" 수신 시 호출됩니다.
+    /// </summary>
+    public Task RemoveDeviceGroupByIdAsync(int resourceId)
+    {
+        try
+        {
+            var group = _deviceGroupProvider.FirstOrDefault(g => g.Id == resourceId);
+            if (group != null)
+            {
+                _deviceGroupProvider.Remove(group);
+                _log?.Info($"RemoveDeviceGroupByIdAsync: DeviceGroup({resourceId}) 제거 완료");
+            }
+            else
+            {
+                _log?.Warning($"RemoveDeviceGroupByIdAsync: DeviceGroup({resourceId}) 를 Provider에서 찾지 못함");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"RemoveDeviceGroupByIdAsync({resourceId}) 실패: {ex.Message}");
+        }
+        return Task.CompletedTask;
     }
 
     #region - Private Methods -
@@ -783,6 +845,55 @@ public class DeviceProviderService : IDeviceProviderService
             existingLamp.Longitude = newLamp.Longitude;
         }
     }
+
+    /// <summary>
+    /// Device를 Provider 캐시에서 제거합니다.
+    /// NatsSync SYNC_DEVICE action="DELETED" 수신 시 호출됩니다.
+    /// </summary>
+    public Task RemoveDeviceByIdAsync(string typeDevice, int resourceId)
+    {
+        try
+        {
+            var normalized = NormalizeTypeDevice(typeDevice);
+            // "Sensor" is a generic type_device — DeviceType is always a specific sub-type (Fence, Multi, etc.)
+            // so match by ID only when the generic "Sensor" type is received.
+            var device = normalized == "Sensor"
+                ? _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d is ISensorDeviceModel)
+                : _deviceProvider.FirstOrDefault(d => d.Id == resourceId
+                    && d.DeviceType.ToString().Equals(normalized, StringComparison.OrdinalIgnoreCase));
+            if (device != null)
+            {
+                _deviceProvider.Remove(device);
+                _log?.Info($"RemoveDeviceByIdAsync: {normalized}({resourceId}) 제거 완료");
+            }
+            else
+            {
+                _log?.Warning($"RemoveDeviceByIdAsync: {normalized}({resourceId}) 를 Provider에서 찾지 못함");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"RemoveDeviceByIdAsync({typeDevice}, {resourceId}) 실패: {ex.Message}");
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// NATS body의 type_device 문자열을 내부 타입명으로 정규화합니다.
+    /// DBApi는 대문자("CAMERA")를 쓰고 API는 PascalCase("IpCamera")를 사용하므로 변환이 필요합니다.
+    /// </summary>
+    private static string NormalizeTypeDevice(string typeDevice) =>
+        typeDevice.ToUpperInvariant() switch
+        {
+            "CONTROLLER" => "Controller",
+            "FENCE" => "Fence",
+            "UNDERGROUND" => "Underground",
+            "IPCAMERA" or "CAMERA" => "IpCamera",
+            "SPEAKER" => "Speaker",
+            "ENCLOSURE" => "Enclosure",
+            "LAMP" => "Lamp",
+            _ => typeDevice  // 이미 정규화된 경우 그대로
+        };
 
     private readonly ILogService? _log;
     private readonly IEventAggregator _eventAggregator;

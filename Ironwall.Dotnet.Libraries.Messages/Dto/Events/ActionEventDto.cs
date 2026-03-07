@@ -1,6 +1,5 @@
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Bases;
-using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Newtonsoft.Json;
 
@@ -41,16 +40,4 @@ public class ActionEventDto : BaseDto
     [JsonProperty("from_event", Order = 5, NullValueHandling = NullValueHandling.Ignore)]
     [JsonConverter(typeof(FromEventConverter))]
     public IEventDto? FromEvent { get; set; }
-
-    /// <summary>
-    /// 조치 대상 장비 (공통 Base 타입)
-    /// </summary>
-    [JsonProperty("device", Order = 6, NullValueHandling = NullValueHandling.Ignore)]
-    public BaseDeviceDto? Device { get; set; }
-
-    /// <summary>
-    /// 장비 설명
-    /// </summary>
-    [JsonProperty("device_description", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
-    public string? DeviceDescription { get; set; }
 }

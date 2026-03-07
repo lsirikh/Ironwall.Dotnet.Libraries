@@ -34,9 +34,20 @@ internal class NatsService : MessageService<INatsService>, INatsService
         try
         {
             var serverUrl = $"nats://{setupModel.IpAddressNats}:{setupModel.PortNats}";
-            _log?.Info($"[Connect] Connecting to {serverUrl}, Subject: {setupModel.DefaultSubjectNats}");
+            _log?.Info($"[Connect] Connecting to {serverUrl}, Subject: {setupModel.EffectiveSubject}");
 
-            _defaultSubject = setupModel.DefaultSubjectNats ?? "default.>";
+            _defaultSubject = setupModel.EffectiveSubject;
+
+            // DomainNats + GroupNats가 설정된 경우 "all" 브로드캐스트 subject 자동 추가
+            _additionalSubjects.Clear();
+            if (!string.IsNullOrEmpty(setupModel.DomainNats) && !string.IsNullOrEmpty(setupModel.GroupNats))
+            {
+                var broadcastSubject = $"{setupModel.DomainNats}.{setupModel.GroupNats}.all.>";
+                if (broadcastSubject != _defaultSubject)
+                    _additionalSubjects.Add(broadcastSubject);
+            }
+
+            _log?.Info($"[Connect] Additional subjects: [{string.Join(", ", _additionalSubjects)}]");
 
             // Create NatsOpts using the 'with' operator for immutable record
             var opts = NatsOpts.Default with
@@ -46,9 +57,9 @@ internal class NatsService : MessageService<INatsService>, INatsService
             };
 
             // Set optional properties only if they have values
-            if (!string.IsNullOrEmpty(setupModel.ClientNameNats))
+            if (!string.IsNullOrEmpty(setupModel.SubsystemNats))
             {
-                opts = opts with { Name = setupModel.ClientNameNats };
+                opts = opts with { Name = setupModel.SubsystemNats };
             }
 
             if (!string.IsNullOrEmpty(setupModel.UsernameNats))
@@ -80,11 +91,21 @@ internal class NatsService : MessageService<INatsService>, INatsService
         try
         {
             var serverUrl = $"nats://{setupModel.IpAddressNats}:{setupModel.PortNats}";
-            _log?.Info($"[ConnectAsync] Connecting to {serverUrl}, Subject: {setupModel.DefaultSubjectNats}");
+            _log?.Info($"[ConnectAsync] Connecting to {serverUrl}, Subject: {setupModel.EffectiveSubject}");
 
-            _defaultSubject = setupModel.DefaultSubjectNats ?? "default.>";
+            _defaultSubject = setupModel.EffectiveSubject;
 
-            _log?.Info($"[ConnectAsync] Creating NatsOpts - URL: {serverUrl}, Name: {setupModel.ClientNameNats ?? "null"}, Username: {setupModel.UsernameNats ?? "null"}");
+            // DomainNats + GroupNats가 설정된 경우 "all" 브로드캐스트 subject 자동 추가
+            _additionalSubjects.Clear();
+            if (!string.IsNullOrEmpty(setupModel.DomainNats) && !string.IsNullOrEmpty(setupModel.GroupNats))
+            {
+                var broadcastSubject = $"{setupModel.DomainNats}.{setupModel.GroupNats}.all.>";
+                if (broadcastSubject != _defaultSubject)
+                    _additionalSubjects.Add(broadcastSubject);
+            }
+
+            _log?.Info($"[ConnectAsync] Additional subjects: [{string.Join(", ", _additionalSubjects)}]");
+            _log?.Info($"[ConnectAsync] Creating NatsOpts - URL: {serverUrl}, Name: {setupModel.SubsystemNats ?? "null"}, Username: {setupModel.UsernameNats ?? "null"}");
 
             // Create NatsOpts using the 'with' operator for immutable record
             var opts = NatsOpts.Default with
@@ -94,9 +115,9 @@ internal class NatsService : MessageService<INatsService>, INatsService
             };
 
             // Set optional properties only if they have values
-            if (!string.IsNullOrEmpty(setupModel.ClientNameNats))
+            if (!string.IsNullOrEmpty(setupModel.SubsystemNats))
             {
-                opts = opts with { Name = setupModel.ClientNameNats };
+                opts = opts with { Name = setupModel.SubsystemNats };
             }
 
             if (!string.IsNullOrEmpty(setupModel.UsernameNats))
@@ -151,6 +172,37 @@ internal class NatsService : MessageService<INatsService>, INatsService
         catch (Exception ex)
         {
             _log?.Error($"[PublishAsync] Error: {ex.Message}");
+        }
+    }
+
+    public override async Task<string?> RequestAsync(string subject, string data, TimeSpan? timeout = null)
+    {
+        try
+        {
+            if (Connection == null)
+            {
+                _log?.Warning("[RequestAsync] Connection is null!");
+                return null;
+            }
+
+            var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
+            using var cts = new CancellationTokenSource(effectiveTimeout);
+
+            var reply = await Connection.RequestAsync<string, string>(
+                subject, data, cancellationToken: cts.Token);
+
+            _log?.Info($"[RequestAsync] Reply from '{subject}': {reply.Data}");
+            return reply.Data;
+        }
+        catch (OperationCanceledException)
+        {
+            _log?.Warning($"[RequestAsync] Timeout for '{subject}'");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[RequestAsync] Error: {ex.Message}");
+            return null;
         }
     }
     #endregion

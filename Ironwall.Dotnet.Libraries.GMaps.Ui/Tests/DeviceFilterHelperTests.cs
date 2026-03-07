@@ -26,6 +26,8 @@ public class DeviceFilterHelperTests
             new SpeakerDeviceModel { DeviceNumber = 6, DeviceType = EnumDeviceType.IpSpeaker },
             new EnclosureDeviceModel { DeviceNumber = 7, DeviceType = EnumDeviceType.Enclosure },
             new LampDeviceModel { DeviceNumber = 8, DeviceType = EnumDeviceType.Lamp },
+            new SensorDeviceModel { DeviceNumber = 9, DeviceType = EnumDeviceType.SmartSensor },
+            new SensorDeviceModel { DeviceNumber = 10, DeviceType = EnumDeviceType.SmartSensor2 },
         };
     }
 
@@ -126,6 +128,26 @@ public class DeviceFilterHelperTests
         Assert.Single(result);
         Assert.Equal(EnumDeviceType.Enclosure, result[0].DeviceType);
         Assert.Equal(7, result[0].DeviceNumber);
+    }
+
+    #endregion
+
+    #region A42.3b: SmartSensor 필터링
+
+    [Fact]
+    public void FilterDevicesByType_SmartSensor_ShouldReturnSmartSensorFamily()
+    {
+        // Arrange
+        var devices = CreateMixedDeviceList();
+
+        // Act
+        var result = DeviceFilterHelper.FilterDevicesByType(devices, EnumDeviceType.SmartSensor).ToList();
+
+        // Assert — SmartSensor + SmartSensor2 = 2
+        Assert.Equal(2, result.Count);
+        Assert.All(result, d => Assert.True(
+            d.DeviceType == EnumDeviceType.SmartSensor ||
+            d.DeviceType == EnumDeviceType.SmartSensor2));
     }
 
     #endregion

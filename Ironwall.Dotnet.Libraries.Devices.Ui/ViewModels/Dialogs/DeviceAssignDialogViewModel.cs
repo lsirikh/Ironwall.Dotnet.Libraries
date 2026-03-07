@@ -59,7 +59,20 @@ public class DeviceAssignDialogViewModel : Screen
         {
             var dto = new DeviceGroupAssignRequestDto { DeviceIds = newIds };
             var resp = await _apiService.AssignDevicesToGroupAsync(_groupId, dto, token);
-            if (!resp.Success) _log?.Warning($"AssignDevicesToGroup failed: {resp.Message}");
+            if (!resp.Success)
+            {
+                _log?.Warning($"AssignDevicesToGroup failed: {resp.Message}");
+            }
+            else
+            {
+                foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>()
+                             .Where(m => newIds.Contains(m.Id)))
+                {
+                    model.DeviceGroups ??= new List<int>();
+                    if (!model.DeviceGroups.Contains(_groupId))
+                        model.DeviceGroups.Add(_groupId);
+                }
+            }
         }
         catch (Exception ex) { _log?.Error($"ConfirmButton: {ex.Message}"); }
 

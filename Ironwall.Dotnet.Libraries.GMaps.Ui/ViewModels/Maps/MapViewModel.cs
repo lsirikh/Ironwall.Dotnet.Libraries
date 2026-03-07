@@ -15,6 +15,8 @@ using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Libraries.Enums;
 using GMap.NET.MapProviders.Custom;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Dialogs;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Dialogs;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using System.Windows.Controls;
 using GMap.NET.WindowsPresentation;
@@ -40,6 +42,7 @@ using System.Windows.Data;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
 using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -52,7 +55,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class MapViewModel : BasePanelViewModel
+public class MapViewModel : BasePanelViewModel,
+                            IHandle<AllDevicesLoadedMessage>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
 {
@@ -84,6 +88,8 @@ public class MapViewModel : BasePanelViewModel
                         , MarkerFactory markerFactory
                         , PropertyPanelFactory propertyPanelFactory
                         , SymbolEventManager symbolEventManager
+                        , IDeviceDetailUrlService deviceDetailUrlService
+                        , IBroadcastControlService broadcastControlService
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
@@ -98,6 +104,8 @@ public class MapViewModel : BasePanelViewModel
         _markerFactory = markerFactory;
         _propertyPanelFactory = propertyPanelFactory;
         _symbolEventManager = symbolEventManager;
+        _deviceDetailUrlService = deviceDetailUrlService;
+        _broadcastControlService = broadcastControlService;
         DeviceProvider = deviceProvider;
         InitializeCommands();
     }
@@ -231,6 +239,15 @@ public class MapViewModel : BasePanelViewModel
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 전체 Device 로딩 완료 시 Device-Symbol 매핑을 재실행합니다.
+    /// 지도 활성화 시점보다 Device 로딩이 늦게 완료되는 경우를 대비합니다.
+    /// </summary>
+    public async Task HandleAsync(AllDevicesLoadedMessage message, CancellationToken cancellationToken)
+    {
+        await InitializeDeviceSymbolIntegration();
+    }
+
     private void InitializeLineDrawingService()
     {
         if (MainMap == null) return;
@@ -271,6 +288,7 @@ public class MapViewModel : BasePanelViewModel
             _log?.Info("Adorner 시스템 통합 시작");
             // GMapCustomControl 이벤트 구독
             MainMap.OnMarkerClicked += OnMapMarkerClicked;
+            MainMap.OnMarkerRightClicked += OnMapMarkerRightClicked;
             MainMap.OnImageClicked += OnMapImageClicked;
             MainMap.OnMapClicked += OnMapClicked;
 
@@ -306,6 +324,7 @@ public class MapViewModel : BasePanelViewModel
         {
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
+            MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
             MainMap.OnImageClicked -= OnMapImageClicked;
             MainMap.OnMapClicked -= OnMapClicked;
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
@@ -358,6 +377,21 @@ public class MapViewModel : BasePanelViewModel
         catch (Exception ex)
         {
             _log?.Error($"마커 클릭 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 지도 마커 우클릭 이벤트 핸들러 — 컨텍스트 메뉴 표시
+    /// </summary>
+    private void OnMapMarkerRightClicked(IEditableMarker marker)
+    {
+        try
+        {
+            ShowMarkerContextMenu(marker, new Point());
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"마커 우클릭 처리 실패: {ex.Message}");
         }
     }
 
@@ -2691,27 +2725,157 @@ public class MapViewModel : BasePanelViewModel
     }
 
     /// <summary>
-    /// 마커 우클릭 메뉴 생성 (향후 확장용)
+    /// 마커 우클릭 메뉴 생성 — PIDS 마커 상세보기 및 제어기 페이지
     /// </summary>
     public void ShowMarkerContextMenu(IEditableMarker marker, Point screenPosition)
     {
         try
         {
             if (marker == null) return;
+            if (marker is not IPidsEditableMarker pidsMarker) return;
 
             _log?.Info($"마커 컨텍스트 메뉴 표시: {marker.Title}");
 
-            // TODO: 실제 컨텍스트 메뉴 구현
-            // - 속성 편집
-            // - 복제
-            // - 삭제
-            // - 회전 초기화
-            // - 크기 초기화
+            var menu = new ContextMenu();
+
+            // SSW-SVMS 메뉴 (공통) — 목록/상세/수정
+            var devName = pidsMarker.DeviceType switch
+            {
+                EnumDeviceType.Controller  => "제어기",
+                EnumDeviceType.SmartSensor => "감지센서",
+                EnumDeviceType.IpCamera    => "감시카메라",
+                EnumDeviceType.IpSpeaker   => "스피커",
+                EnumDeviceType.Lamp        => "경광등",
+                EnumDeviceType.Enclosure   => "함체",
+                _                          => "장치",
+            };
+            var hasDevice = pidsMarker.LinkedDeviceId > 0;
+
+            var listUrl = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, 0, null);
+            var listItem = new MenuItem { Header = $"{devName}페이지", IsEnabled = !string.IsNullOrEmpty(listUrl) };
+            listItem.Click += (s, e) => _deviceDetailUrlService.OpenInChrome(listUrl);
+            menu.Items.Add(listItem);
+
+            var detailItem = new MenuItem { Header = $"{devName}상세", IsEnabled = hasDevice };
+            detailItem.Click += (s, e) =>
+            {
+                var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "detail");
+                _deviceDetailUrlService.OpenInChrome(url);
+            };
+            menu.Items.Add(detailItem);
+
+            var editItem = new MenuItem { Header = $"{devName}수정", IsEnabled = hasDevice };
+            editItem.Click += (s, e) =>
+            {
+                var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "edit");
+                _deviceDetailUrlService.OpenInChrome(url);
+            };
+            menu.Items.Add(editItem);
+
+            // 제어기 홈페이지 (Controller 전용)
+            if (pidsMarker.DeviceType == EnumDeviceType.Controller)
+            {
+                var ctrlItem = new MenuItem { Header = "제어기 홈페이지" };
+                var controllerModel = pidsMarker.LinkedDevice as IControllerDeviceModel;
+                ctrlItem.IsEnabled = controllerModel != null;
+                ctrlItem.Click += (s, e) =>
+                {
+                    if (controllerModel != null)
+                    {
+                        var url = $"http://{controllerModel.IpAddress}:{controllerModel.Port}";
+                        _deviceDetailUrlService.OpenInChrome(url);
+                    }
+                };
+                menu.Items.Add(ctrlItem);
+            }
+
+            // 스피커 방송 제어 (IpSpeaker 전용)
+            if (pidsMarker.DeviceType == EnumDeviceType.IpSpeaker)
+            {
+                var isEnabled = pidsMarker.LinkedDeviceId > 0;
+
+                // 음원 실행
+                var playItem = new MenuItem { Header = "음원 실행", IsEnabled = isEnabled };
+                playItem.Click += async (s, e) =>
+                {
+                    var vm = new BroadcastPlayDialogViewModel();
+                    var dlg = new BroadcastPlayDialogView { DataContext = vm };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        await _broadcastControlService.PublishPlayAsync(
+                            pidsMarker.LinkedDeviceId, vm.FileGroupId, vm.Repeat);
+                        _ = StartBroadcastTimer(pidsMarker, Math.Max(1.0, 3.0 * vm.Repeat));
+                    }
+                };
+                menu.Items.Add(playItem);
+
+                // TTS 실행
+                var ttsItem = new MenuItem { Header = "TTS 실행", IsEnabled = isEnabled };
+                ttsItem.Click += async (s, e) =>
+                {
+                    var vm = new TtsDialogViewModel();
+                    var dlg = new TtsDialogView { DataContext = vm };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        await _broadcastControlService.PublishTtsAsync(
+                            pidsMarker.LinkedDeviceId, vm.Message);
+                        _ = StartBroadcastTimer(pidsMarker, Math.Max(1.0, 0.2 * vm.Message.Length));
+                    }
+                };
+                menu.Items.Add(ttsItem);
+
+                // Stop
+                var stopItem = new MenuItem { Header = "Stop", IsEnabled = isEnabled };
+                stopItem.Click += async (s, e) =>
+                {
+                    StopBroadcast(pidsMarker);
+                    await _broadcastControlService.PublishStopAsync(pidsMarker.LinkedDeviceId);
+                };
+                menu.Items.Add(stopItem);
+            }
+
+            menu.IsOpen = true;
         }
         catch (Exception ex)
         {
             _log?.Error($"마커 컨텍스트 메뉴 표시 실패: {ex.Message}");
         }
+    }
+
+    private async Task StartBroadcastTimer(IPidsEditableMarker marker, double seconds)
+    {
+        var speakerId = marker.LinkedDeviceId;
+        if (_broadcastTimers.TryGetValue(speakerId, out var existing))
+            existing.Cancel();
+
+        var cts = new CancellationTokenSource();
+        _broadcastTimers[speakerId] = cts;
+        marker.IsBroadcasting = true;
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(seconds), cts.Token);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                marker.IsBroadcasting = false;
+                _broadcastTimers.Remove(speakerId);
+            });
+        }
+    }
+
+    private void StopBroadcast(IPidsEditableMarker marker)
+    {
+        var id = marker.LinkedDeviceId;
+        if (_broadcastTimers.TryGetValue(id, out var cts))
+        {
+            cts.Cancel();
+            _broadcastTimers.Remove(id);
+        }
+        marker.IsBroadcasting = false;
     }
 
     /// <summary>
@@ -4383,6 +4547,9 @@ public class MapViewModel : BasePanelViewModel
     //private GMapPropertyCustomControl? _customPropertyPanel;
     private bool _isPropertyPanelVisible;
     private SymbolEventManager _symbolEventManager;
+    private IDeviceDetailUrlService _deviceDetailUrlService;
+    private IBroadcastControlService _broadcastControlService;
+    private readonly Dictionary<int, CancellationTokenSource> _broadcastTimers = new();
 
     // UI 상태 필드
     private string? _scale;
