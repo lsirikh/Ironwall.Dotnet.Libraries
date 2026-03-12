@@ -11,6 +11,7 @@ using System;
 using System.Collections.Specialized;
 using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -331,13 +332,17 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             try
             {
-                IsVisible = false;
+                // 1. UI 스레드에서 IsVisible = false 설정
+                DispatcherService.Invoke(() => IsVisible = false);
 
-                // 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
+                // 2. Render 우선순위까지 큐 소진 — ProgressCircle 렌더링 보장
+                await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+
+                // 3. 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
                 DispatcherService.Invoke(() =>
@@ -356,7 +361,9 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 });
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
+
+                // 4. UI 스레드에서 IsVisible = true 설정
+                DispatcherService.Invoke(() => IsVisible = true);
             }
             catch (TaskCanceledException ex)
             {

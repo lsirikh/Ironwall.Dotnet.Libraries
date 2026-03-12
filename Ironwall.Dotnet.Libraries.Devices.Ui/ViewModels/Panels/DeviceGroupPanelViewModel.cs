@@ -10,6 +10,7 @@ using System;
 using System.Collections.Specialized;
 using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 
@@ -212,7 +213,9 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
         {
             try
             {
-                IsVisible = false;
+                DispatcherService.Invoke(() => IsVisible = false);
+                await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+
                 var models = await FetchDeviceGroupsAsync(cancellationToken);
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
@@ -236,7 +239,7 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
                 });
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
+                DispatcherService.Invoke(() => IsVisible = true);
             }
             catch (TaskCanceledException ex)
             {

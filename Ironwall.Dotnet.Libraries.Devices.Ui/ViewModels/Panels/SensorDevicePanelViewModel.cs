@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -332,13 +333,13 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     #region - Processes -
     private Task DataInitialize(CancellationToken cancellationToken = default)
     {
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             try
             {
-                IsVisible = false;
+                DispatcherService.Invoke(() => IsVisible = false);
+                await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
-                // 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
                 DispatcherService.Invoke(() =>
@@ -357,7 +358,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                 });
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
+                DispatcherService.Invoke(() => IsVisible = true);
             }
             catch (TaskCanceledException ex)
             {
