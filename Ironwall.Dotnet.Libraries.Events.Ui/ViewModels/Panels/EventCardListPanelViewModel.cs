@@ -32,6 +32,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
     public class EventCardListPanelViewModel: BaseEventPanelViewModel<EventCardBaseViewModel>
                                             , IHandle<DetectionReportedMessageModel>
                                             , IHandle<MalfunctionReportedMessageModel>
+                                            , IHandle<CallAllEventReportMessageModel>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -164,30 +165,53 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
         public async Task ExecuteBatchReportAsync()
         {
-            var cards = ViewModelProvider.ToList();
-            foreach (var card in cards)
+            IsVisible = false;
+            try
             {
-                var eventModel = card.Model;
-                var dto = new ActionEventCreateDto
+                var cards = ViewModelProvider.ToList();
+                foreach (var card in cards)
                 {
-                    User = _userModel.Username,
-                    Content = "일괄처리",
-                    FromEventId = eventModel?.Id ?? 0
-                };
+                    var eventModel = card.Model;
+                    var dto = new ActionEventCreateDto
+                    {
+                        User = _userModel.Username,
+                        Content = "일괄처리",
+                        FromEventId = eventModel?.Id ?? 0
+                    };
 
-                var response = await _apiService.CreateActionEventAsync(dto);
-                if (!response.Success) break;
+                    var response = await _apiService.CreateActionEventAsync(dto);
+                    if (!response.Success)
+                    {
+                        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                        {
+                            Title = "전체 조치보고 오류",
+                            Explain = $"처리 중 장애가 발생했습니다.\n{response.Message}"
+                        });
+                        break;
+                    }
 
-                ViewModelProvider.Remove(card);
+                    if (eventModel?.Device != null)
+                    {
+                        _symbolEventManager.ProcessEventReport(eventModel.Device.Id, eventModel.Device.DeviceType, eventModel.Device.DeviceGroups);
+                    }
 
-                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
-                {
-                    EventId = eventModel?.Id ?? 0,
-                    EventType = eventModel?.MessageType ?? EnumEventType.Intrusion,
-                    ActionDetails = "일괄처리",
-                    ActionUser = _userModel.Username,
-                    ActionTime = DateTime.Now
-                });
+                    ViewModelProvider.Remove(card);
+
+                    await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+                    {
+                        EventId = eventModel?.Id ?? 0,
+                        EventType = eventModel?.MessageType ?? EnumEventType.Intrusion,
+                        ActionDetails = "일괄처리",
+                        ActionUser = _userModel.Username,
+                        ActionTime = DateTime.Now
+                    });
+                }
+
+                _eventQueueManager.DequeueAll();
+            }
+            finally
+            {
+                IsVisible = true;
             }
         }
 
@@ -279,6 +303,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
         #endregion
         #region - IHanldes -
+        public async Task HandleAsync(CallAllEventReportMessageModel message, CancellationToken cancellationToken)
+        {
+            await ExecuteBatchReportAsync();
+        }
         #endregion
         #region - Properties -
         public EventCardBaseViewModel SelectedEventCardViewModel
@@ -293,6 +321,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             get { return _isAnimationEnabled; }
             set { _isAnimationEnabled = value; NotifyOfPropertyChange(() => IsAnimationEnabled); }
         }
+
+        public bool IsVisible
+        {
+            get { return _isVisible; }
+            set { _isVisible = value; NotifyOfPropertyChange(() => IsVisible); }
+        }
         #endregion
         #region - Attributes -
         private const int ANIMATION_THRESHOLD = 20;
@@ -306,6 +340,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;
+        private bool _isVisible = true;
         #endregion
     }
 }

@@ -53,21 +53,30 @@
 						Grid.Column="1"
 						VerticalAlignment="Center"
 						Stretch="UniformToFill">
-						<Button
-							x:Name="ButtonActionAll"
-							md:RippleAssist.IsCentered="True"
-							Foreground="WhiteSmoke"
-							IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
-							Style="{StaticResource MaterialDesignIconForegroundButton}"
-							ToolTip="전체지우기">
-							<cal:Message.Attach>
-								[Event Click] = [Action OnClickButtonActionAll($source, $eventArgs]
-							</cal:Message.Attach>
-							<md:PackIcon
+						<Grid>
+							<Button
+								x:Name="ButtonActionAll"
+								md:RippleAssist.IsCentered="True"
+								Foreground="WhiteSmoke"
+								IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
+								Style="{StaticResource MaterialDesignIconForegroundButton}"
+								ToolTip="전체 조치보고"
+								Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibleConverter}}">
+								<cal:Message.Attach>
+									[Event Click] = [Action OnClickButtonActionAll($source, $eventArgs]
+								</cal:Message.Attach>
+								<md:PackIcon
+									Width="23"
+									Height="23"
+									Kind="TrashCanOutline" />
+							</Button>
+							<ProgressBar
 								Width="23"
 								Height="23"
-								Kind="TrashCanOutline" />
-						</Button>
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding IsVisible, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+						</Grid>
 					</Viewbox>
 
 					<StackPanel
@@ -132,14 +141,7 @@
 					</ListBox.ItemsPanel>
 					<ListBox.ItemTemplate>
 						<DataTemplate>
-							<md:TransitioningContent>
-								<md:TransitioningContent.OpeningEffects>
-									<md:TransitionEffect Kind="SlideInFromRight" Duration="0:0:0.3" />
-								</md:TransitioningContent.OpeningEffects>
-								<Viewbox Stretch="Uniform" StretchDirection="DownOnly">
-									<ContentControl cal:View.Model="{Binding}" />
-								</Viewbox>
-							</md:TransitioningContent>
+							<ContentControl cal:View.Model="{Binding}" />
 						</DataTemplate>
 					</ListBox.ItemTemplate>
 				</ListBox>

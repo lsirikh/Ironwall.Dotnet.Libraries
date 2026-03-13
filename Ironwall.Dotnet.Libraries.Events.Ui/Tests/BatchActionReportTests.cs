@@ -214,4 +214,169 @@ public class BatchActionReportTests
     }
 
     #endregion
+
+    #region - Phase 3: ConfirmPopup → 배치 처리 연결 -
+
+    [Fact]
+    public async Task HandleAsync_CallAllEventReport_CallsExecuteBatchReport()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        SetupApiSuccess();
+        var sut = CreateSut();
+        sut.ViewModelProvider.Add(CreateDetectionCard(10));
+
+        // Act — ConfirmPopup에서 CallAllEventReportMessageModel 발행 시뮬레이션
+        await sut.HandleAsync(new Ironwall.Dotnet.Libraries.ViewModel.Models.CallAllEventReportMessageModel(), CancellationToken.None);
+
+        // Assert — ExecuteBatchReportAsync가 실행되어 카드가 제거됨
+        Assert.Empty(sut.ViewModelProvider);
+        _mockApiService.Verify(a => a.CreateActionEventAsync(
+            It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    #region - Phase 4: UI ProgressCircle 전환 -
+
+    [Fact]
+    public async Task BatchReport_IsVisible_FalseDuringProcess()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        bool? isVisibleDuringApi = null;
+        _mockApiService
+            .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
+            .Returns<ActionEventCreateDto, CancellationToken>((dto, ct) =>
+            {
+                // API 호출 시점의 IsVisible 값 캡처
+                isVisibleDuringApi = _currentSut!.IsVisible;
+                return Task.FromResult(new ApiResponse<ActionEventDto> { Success = true, Data = new ActionEventDto() });
+            });
+        var sut = CreateSut();
+        _currentSut = sut;
+        sut.ViewModelProvider.Add(CreateDetectionCard());
+
+        // Act
+        await sut.ExecuteBatchReportAsync();
+
+        // Assert
+        Assert.False(isVisibleDuringApi);
+    }
+
+    [Fact]
+    public async Task BatchReport_IsVisible_TrueAfterComplete()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        SetupApiSuccess();
+        var sut = CreateSut();
+        sut.ViewModelProvider.Add(CreateDetectionCard());
+
+        // Act
+        await sut.ExecuteBatchReportAsync();
+
+        // Assert
+        Assert.True(sut.IsVisible);
+    }
+
+    [Fact]
+    public async Task BatchReport_IsVisible_TrueAfterFailure()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockApiService
+            .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult(new ApiResponse<ActionEventDto> { Success = false, Message = "Error" }));
+        var sut = CreateSut();
+        sut.ViewModelProvider.Add(CreateDetectionCard());
+
+        // Act
+        await sut.ExecuteBatchReportAsync();
+
+        // Assert — 실패해도 IsVisible은 true로 복원
+        Assert.True(sut.IsVisible);
+    }
+
+    private EventCardListPanelViewModel? _currentSut;
+
+    #endregion
+
+    #region - Phase 5: 에러 처리 (InformDialog) -
+
+    [Fact]
+    public async Task BatchReport_Failure_PublishesInfoPopup()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockApiService
+            .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult(new ApiResponse<ActionEventDto> { Success = false, Message = "Internal Server Error" }));
+        var sut = CreateSut();
+        sut.ViewModelProvider.Add(CreateDetectionCard());
+
+        // Act
+        await sut.ExecuteBatchReportAsync();
+
+        // Assert — 실패 시 OpenInfoPopupMessageModel 발행
+        _mockEa.Verify(
+            ea => ea.PublishAsync(
+                It.Is<Ironwall.Dotnet.Libraries.ViewModel.Models.OpenInfoPopupMessageModel>(
+                    msg => msg.Title == "전체 조치보고 오류"),
+                It.IsAny<Func<Func<Task>, Task>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    #region - Phase 6: 심볼 상태 복원 + 완료 처리 -
+
+    [Fact]
+    public async Task BatchReport_Success_CallsProcessEventReport()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        SetupApiSuccess();
+
+        var mockModel = new Mock<IDetectionEventModel>();
+        mockModel.Setup(m => m.Id).Returns(1);
+        mockModel.Setup(m => m.MessageType).Returns(EnumEventType.Intrusion);
+        var mockDevice = new Mock<Ironwall.Dotnet.Monitoring.Models.Devices.IBaseDeviceModel>();
+        mockDevice.Setup(d => d.Id).Returns(100);
+        mockDevice.Setup(d => d.DeviceType).Returns(EnumDeviceType.Fence);
+        mockDevice.Setup(d => d.DeviceGroups).Returns(new List<int> { 1, 2 });
+        mockModel.Setup(m => m.Device).Returns(mockDevice.Object);
+
+        var sut = CreateSut();
+        sut.ViewModelProvider.Add(new DetectionEventCardViewModel(mockModel.Object));
+
+        // Act
+        await sut.ExecuteBatchReportAsync();
+
+        // Assert
+        _mockSymbolEventManager.Verify(
+            s => s.ProcessEventReport(100, EnumDeviceType.Fence, It.Is<List<int>>(g => g.Contains(1) && g.Contains(2))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task BatchReport_Complete_CallsDequeueAll()
+    {
+        // Arrange
+        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        SetupApiSuccess();
+        var sut = CreateSut();
+        sut.ViewModelProvider.Add(CreateDetectionCard(1));
+        sut.ViewModelProvider.Add(CreateDetectionCard(2));
+
+        // Act
+        await sut.ExecuteBatchReportAsync();
+
+        // Assert
+        _mockEventQueueManager.Verify(q => q.DequeueAll(), Times.Once);
+    }
+
+    #endregion
 }
