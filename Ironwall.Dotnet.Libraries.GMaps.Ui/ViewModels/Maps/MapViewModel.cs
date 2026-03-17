@@ -40,9 +40,11 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 using Newtonsoft.Json.Linq;
 using System.Windows.Data;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapRoi;
 using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
+using System.Collections.ObjectModel;
 
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -56,7 +58,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
 public class MapViewModel : BasePanelViewModel,
-                            IHandle<AllDevicesLoadedMessage>
+                            IHandle<AllDevicesLoadedMessage>,
+                            IHandle<CallDeleteMapRoiProcessMessageModel>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
 {
@@ -90,6 +93,7 @@ public class MapViewModel : BasePanelViewModel,
                         , SymbolEventManager symbolEventManager
                         , IDeviceDetailUrlService deviceDetailUrlService
                         , IBroadcastControlService broadcastControlService
+                        , IGMapDbService gMapDbService
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
@@ -97,6 +101,7 @@ public class MapViewModel : BasePanelViewModel,
         _definedMapProvider = definedMapProvider;
         _customMapProvider = customMapProvider;
         _gMapDbSymbolService = gMapDbSymbolService;
+        _gMapDbService = gMapDbService;
         _symbolProvider = symbolProvider;
         _setupModel = setupModel;
         _customMapService = customMapService;
@@ -682,6 +687,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         MoveHomeLocationCommand = new RelayCommand(ExecuteMoveHomeLocation, CanExecuteMoveHomeLocation);
         SetHomeLocationCommand = new RelayCommand(ExecuteSetHomeLocation, CanExecuteSetHomeLocation);
+        ShowMapRoiPanelCommand = new RelayCommand(_ => ShowMapRoiPanel());
     }
 
     /// <summary>
@@ -4142,6 +4148,7 @@ public class MapViewModel : BasePanelViewModel,
     // 네비게이션 관련 명령어
     public RelayCommand? MoveHomeLocationCommand { get; private set; }
     public RelayCommand? SetHomeLocationCommand { get; private set; }
+    public RelayCommand? ShowMapRoiPanelCommand { get; private set; }
 
     // 편집 관련 명령어
     public RelayCommand? ClearSelectionCommand { get; private set; }
@@ -4587,7 +4594,212 @@ public class MapViewModel : BasePanelViewModel,
     private bool _isMilitarySymbolRegisterVisible;
     private GMapMilitarySymbolRegisterControl? _militarySymbolRegisterPanel;
 
+    // ROI 관련 필드
+    private IGMapDbService _gMapDbService;
+    private bool _isMapRoiPanelVisible;
+    private MapRoiControl? _mapRoiPanel;
+    private ObservableCollection<IMapRoiModel> _roiItems = new();
+
     // 지도 선택 관련 필드
+
+    #endregion
+
+    #region - ROI 관심지역 Properties -
+
+    public bool IsMapRoiPanelVisible
+    {
+        get => _isMapRoiPanelVisible;
+        set
+        {
+            _isMapRoiPanelVisible = value;
+            NotifyOfPropertyChange(nameof(IsMapRoiPanelVisible));
+        }
+    }
+
+    public MapRoiControl? MapRoiPanel
+    {
+        get => _mapRoiPanel;
+        set
+        {
+            _mapRoiPanel = value;
+            NotifyOfPropertyChange(nameof(MapRoiPanel));
+        }
+    }
+
+    #endregion
+
+    #region - ROI 관심지역 Methods -
+
+    public void ShowMapRoiPanel()
+    {
+        if (IsMapRoiPanelVisible) return;
+
+        _log?.Info("관심지역 패널 표시");
+
+        HideMapRoiPanel();
+
+        MapRoiPanel = new MapRoiControl();
+        MapRoiPanel.RoiItems = _roiItems;
+        MapRoiPanel.MoveRequested += OnRoiMoveRequested;
+        MapRoiPanel.RegisterRequested += OnRoiRegisterRequested;
+        MapRoiPanel.DeleteRequested += OnRoiDeleteRequested;
+        MapRoiPanel.CloseRequested += OnRoiCloseRequested;
+        MapRoiPanel.TitleEdited += OnRoiTitleEdited;
+
+        IsMapRoiPanelVisible = true;
+
+        // DB에서 관심지역 로드 + Canvas 정 가운데 배치
+        MapRoiPanel.Loaded += async (s, e) =>
+        {
+            await LoadMapRoisAsync();
+            MapRoiPanel?.CenterInCanvas();
+        };
+    }
+
+    public void HideMapRoiPanel()
+    {
+        if (MapRoiPanel != null)
+        {
+            MapRoiPanel.MoveRequested -= OnRoiMoveRequested;
+            MapRoiPanel.RegisterRequested -= OnRoiRegisterRequested;
+            MapRoiPanel.DeleteRequested -= OnRoiDeleteRequested;
+            MapRoiPanel.CloseRequested -= OnRoiCloseRequested;
+            MapRoiPanel.TitleEdited -= OnRoiTitleEdited;
+            MapRoiPanel = null;
+        }
+
+        IsMapRoiPanelVisible = false;
+    }
+
+    private void OnRoiMoveRequested(object? sender, MapRoiEventArgs e)
+    {
+        _log?.Info($"관심지역 이동: {e.Roi.Title} → ({e.Roi.Latitude}, {e.Roi.Longitude}), Zoom={e.Roi.Zoom}");
+        MainMap!.Position = new PointLatLng(e.Roi.Latitude, e.Roi.Longitude);
+        MainMap.Zoom = e.Roi.Zoom;
+    }
+
+    private async void OnRoiRegisterRequested(object? sender, EventArgs e)
+    {
+        try
+        {
+            var position = MainMap!.Position;
+            var zoom = (int)MainMap.Zoom;
+
+            // 간단한 Title 입력 (InputBox)
+            var title = $"관심지역_{DateTime.Now:HHmmss}";
+
+            var roi = new MapRoiModel
+            {
+                Title = title,
+                Latitude = position.Lat,
+                Longitude = position.Lng,
+                Altitude = 0,
+                Zoom = zoom,
+                MapId = SelectedMap?.Id ?? 1
+            };
+
+            int id = await _gMapDbService.InsertMapRoiAsync(roi);
+            roi.Id = id;
+            _roiItems.Add(roi);
+
+            _log?.Info($"관심지역 등록 완료: {title} (Id={id})");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"관심지역 등록 실패: {ex.Message}");
+        }
+    }
+
+    private async void OnRoiDeleteRequested(object? sender, MapRoiEventArgs e)
+    {
+        try
+        {
+            _pendingDeleteRoiId = e.Roi.Id;
+
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+            {
+                Title = "관심지역 삭제",
+                Explain = $"'{e.Roi.Title}' 관심지역을 삭제하시겠습니까?",
+                MessageModel = new CallDeleteMapRoiProcessMessageModel()
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"관심지역 삭제 요청 실패: {ex.Message}");
+        }
+    }
+
+    private void OnRoiCloseRequested(object? sender, EventArgs e)
+    {
+        _log?.Info("관심지역 패널 닫기");
+        HideMapRoiPanel();
+    }
+
+    private async void OnRoiTitleEdited(object? sender, MapRoiTitleEditedEventArgs e)
+    {
+        try
+        {
+            bool updated = await _gMapDbService.UpdateMapRoiTitleAsync(e.Roi.Id, e.NewTitle);
+            if (updated)
+                _log?.Info($"관심지역 이름 변경 완료: Id={e.Roi.Id}, '{e.NewTitle}'");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"관심지역 이름 변경 실패: {ex.Message}");
+        }
+    }
+
+    public async Task LoadMapRoisAsync()
+    {
+        try
+        {
+            var mapId = SelectedMap?.Id ?? 1;
+            var list = await _gMapDbService.FetchMapRoisAsync(mapId);
+            _roiItems.Clear();
+            if (list != null)
+            {
+                foreach (var roi in list)
+                    _roiItems.Add(roi);
+            }
+            _log?.Info($"관심지역 {_roiItems.Count}건 로드 완료 (MapId={mapId})");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"관심지역 로드 실패: {ex.Message}");
+        }
+    }
+
+    private int _pendingDeleteRoiId;
+
+    public async Task HandleAsync(CallDeleteMapRoiProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken); //내가 추가
+            await Task.Delay(500, cancellationToken);//내가 추가
+
+            if (_pendingDeleteRoiId <= 0) return;
+
+            bool deleted = await _gMapDbService.DeleteMapRoiAsync(_pendingDeleteRoiId);
+            if (deleted)
+            {
+                var target = _roiItems.FirstOrDefault(r => r.Id == _pendingDeleteRoiId);
+                if (target != null)
+                    _roiItems.Remove(target);
+
+                _log?.Info($"관심지역 삭제 완료 (Id={_pendingDeleteRoiId})");
+            }
+
+            _pendingDeleteRoiId = 0;
+
+            await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"관심지역 삭제 실패: {ex.Message}");
+            await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
+    }
 
     #endregion
 

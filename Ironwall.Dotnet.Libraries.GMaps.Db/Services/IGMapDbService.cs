@@ -202,4 +202,49 @@ public interface IGMapDbService
     /// <returns>삭제 성공 여부</returns>
     Task<bool> DeleteControlPointAsync(
         IGeoControlPointModel model, CancellationToken token = default);
+
+    /*────────────────────── MapRoi (관심지역) ──────────────*/
+
+    /// <summary>
+    /// 특정 지도의 관심지역 목록을 조회한다.
+    /// </summary>
+    /// <param name="mapId">Maps.Id</param>
+    /// <param name="token">작업 취소 토큰</param>
+    Task<List<IMapRoiModel>?> FetchMapRoisAsync(
+        int mapId, CancellationToken token = default);
+
+    /// <summary>
+    /// PK 로 관심지역 한 건을 조회한다.
+    /// </summary>
+    /// <param name="id">MapRois.Id</param>
+    /// <param name="token">작업 취소 토큰</param>
+    Task<IMapRoiModel?> FetchMapRoiAsync(
+        int id, CancellationToken token = default);
+
+    /// <summary>
+    /// 관심지역을 INSERT 하고 PK 를 반환한다.
+    /// </summary>
+    /// <param name="model">삽입할 관심지역</param>
+    /// <param name="token">작업 취소 토큰</param>
+    Task<int> InsertMapRoiAsync(
+        IMapRoiModel model, CancellationToken token = default);
+
+    /// <summary>
+    /// 관심지역 Title 을 UPDATE 한다.
+    /// </summary>
+    /// <param name="id">MapRois.Id</param>
+    /// <param name="title">변경할 제목</param>
+    /// <param name="token">작업 취소 토큰</param>
+    /// <returns>업데이트 성공 여부</returns>
+    Task<bool> UpdateMapRoiTitleAsync(
+        int id, string title, CancellationToken token = default);
+
+    /// <summary>
+    /// PK 로 관심지역을 삭제한다.
+    /// </summary>
+    /// <param name="id">MapRois.Id</param>
+    /// <param name="token">작업 취소 토큰</param>
+    /// <returns>삭제 성공 여부</returns>
+    Task<bool> DeleteMapRoiAsync(
+        int id, CancellationToken token = default);
 }

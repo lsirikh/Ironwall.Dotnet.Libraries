@@ -293,6 +293,28 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "GeoControlPoints 테이블 생성…" });
 
+            const string createMapRoisSql = @"
+                CREATE TABLE IF NOT EXISTS `MapRois` (
+                    `Id`          INT AUTO_INCREMENT PRIMARY KEY,
+                    `Title`       VARCHAR(100) NOT NULL,
+                    `Latitude`    DECIMAL(10,8) NOT NULL,
+                    `Longitude`   DECIMAL(11,8) NOT NULL,
+                    `Altitude`    DECIMAL(10,2) DEFAULT 0,
+                    `Zoom`        INT DEFAULT 15,
+                    `MapId`       INT NOT NULL,
+                    `CreatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    CONSTRAINT `FK_MapRois_Maps`
+                        FOREIGN KEY (`MapId`) REFERENCES `Maps` (`Id`)
+                        ON DELETE CASCADE,
+                    INDEX `IX_MapRois_MapId` (`MapId`)
+                );";
+
+            await _conn.ExecuteAsync(createMapRoisSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MapRois 테이블 생성…" });
+
             _log?.Info("Map 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)
@@ -1139,9 +1161,146 @@ internal class GMapDbService : TaskService, IGMapDbService
     private DefinedMapProvider _definedMapProvider;
     private CancellationTokenSource? _cancellationTokenSource;
 
-    // GeoControlPointProvider 제거! 
+    // GeoControlPointProvider 제거!
     private MySqlConnection? _conn;
     private readonly SemaphoreSlim _processGate = new(1, 1);
+    #endregion
+
+    #region - MapRoi CRUD -
+
+    public async Task<List<IMapRoiModel>?> FetchMapRoisAsync(int mapId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT Id, Title, Latitude, Longitude, Altitude, Zoom, MapId, CreatedAt, UpdatedAt
+                FROM MapRois
+                WHERE MapId = @MapId
+                ORDER BY Id ASC;";
+
+            var rows = await conn.QueryAsync<MapRoiSQL>(sql, new { MapId = mapId });
+
+            return rows.Select(r => (IMapRoiModel)new MapRoiModel
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                Altitude = (double)r.Altitude,
+                Zoom = r.Zoom,
+                MapId = r.MapId,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 조회 실패 (MapId={mapId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<IMapRoiModel?> FetchMapRoiAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT Id, Title, Latitude, Longitude, Altitude, Zoom, MapId, CreatedAt, UpdatedAt
+                FROM MapRois
+                WHERE Id = @Id;";
+
+            var r = await conn.QueryFirstOrDefaultAsync<MapRoiSQL>(sql, new { Id = id });
+            if (r == null) return null;
+
+            return new MapRoiModel
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                Altitude = (double)r.Altitude,
+                Zoom = r.Zoom,
+                MapId = r.MapId,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 단건 조회 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<int> InsertMapRoiAsync(IMapRoiModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO MapRois (Title, Latitude, Longitude, Altitude, Zoom, MapId)
+                VALUES (@Title, @Latitude, @Longitude, @Altitude, @Zoom, @MapId);
+                SELECT LAST_INSERT_ID();";
+
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Title,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.MapId
+            });
+
+            model.Id = id;
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> UpdateMapRoiTitleAsync(int id, string title, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "UPDATE MapRois SET Title = @Title WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id, Title = title });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi Title 변경 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> DeleteMapRoiAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "DELETE FROM MapRois WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 삭제 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
     #endregion
 }
 
@@ -1312,5 +1471,21 @@ internal sealed class GeoControlPointSQL
         AccuracyMeters = (double?)AccuracyMeters,
         Description = Description
     };
+}
+
+/// <summary>
+/// MapRois 테이블 DTO
+/// </summary>
+internal sealed class MapRoiSQL
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public decimal Altitude { get; set; }
+    public int Zoom { get; set; }
+    public int MapId { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
 #endregion

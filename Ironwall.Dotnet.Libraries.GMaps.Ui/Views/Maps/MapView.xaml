@@ -249,6 +249,10 @@
 					<md:PackIcon Kind="HomeEdit" />
 				</Button>
 
+				<Button Command="{Binding ShowMapRoiPanelCommand}" ToolTip="관심지역 관리">
+					<md:PackIcon Kind="MapMarkerRadius" />
+				</Button>
+
 				<Button
 					Command="{Binding FineRotateCommand}"
 					CommandParameter="5"
@@ -869,6 +873,12 @@
 					Canvas.Top="50"
 					Content="{Binding MilitarySymbolRegisterPanel}"
 					Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  관심지역(ROI) 패널  -->
+				<ContentPresenter
+					x:Name="MapRoiPresenter"
+					Content="{Binding MapRoiPanel}"
+					Visibility="{Binding IsMapRoiPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 			</Canvas>
 		</Grid>
 	</Grid>

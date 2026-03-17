@@ -78,6 +78,7 @@ public class OpenConfirmPopupMessageModel : CommonMessageModel { }
 public class OpenInfoPopupMessageModel : CommonMessageModel { }
 public class OpenProgressPopupMessageModel : IMessageModel { }
 public class CallAllEventReportMessageModel : IMessageModel { }
+public class CallDeleteMapRoiProcessMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }
