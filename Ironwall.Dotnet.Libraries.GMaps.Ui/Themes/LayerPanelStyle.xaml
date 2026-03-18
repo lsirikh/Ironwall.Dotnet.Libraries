@@ -1,0 +1,279 @@
+<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<utils:LayerTypeToSliderVisibilityConverter x:Key="LayerTypeToSliderVisibility" />
+	<utils:OpacityToPercentConverter x:Key="OpacityToPercent" />
+
+	<!--  체크박스 컴팩트  -->
+	<Style x:Key="LayerCheckBox" TargetType="CheckBox">
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="LayoutTransform">
+			<Setter.Value>
+				<ScaleTransform ScaleX="0.8" ScaleY="0.8" />
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!--  섹션 헤더 스타일  -->
+	<Style x:Key="SectionHeader" TargetType="Border">
+		<Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+		<Setter Property="CornerRadius" Value="3" />
+		<Setter Property="Padding" Value="6,3" />
+		<Setter Property="Margin" Value="0,6,0,3" />
+	</Style>
+
+	<!--  레이어 아이템 (심볼용: 체크 + 이름)  -->
+	<DataTemplate x:Key="SymbolLayerItem">
+		<Grid Margin="0,1">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+			<CheckBox
+				Grid.Column="0"
+				Margin="0,0,4,0"
+				IsChecked="{Binding IsVisible, Mode=TwoWay}"
+				Style="{StaticResource LayerCheckBox}" />
+			<TextBlock
+				Grid.Column="1"
+				VerticalAlignment="Center"
+				FontSize="10"
+				TextTrimming="CharacterEllipsis">
+				<TextBlock.Style>
+					<Style TargetType="TextBlock">
+						<Setter Property="Foreground" Value="#333333" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsVisible}" Value="False">
+								<Setter Property="Foreground" Value="#BBBBBB" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</TextBlock.Style>
+				<Run Text="{Binding Name, Mode=OneWay}" />
+			</TextBlock>
+		</Grid>
+	</DataTemplate>
+
+	<!--  레이어 아이템 (오버레이용: 체크 + 이름 + 슬라이더)  -->
+	<DataTemplate x:Key="OverlayLayerItem">
+		<Grid Margin="0,2">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="50" />
+				<ColumnDefinition Width="24" />
+			</Grid.ColumnDefinitions>
+			<CheckBox
+				Grid.Column="0"
+				Margin="0,0,4,0"
+				IsChecked="{Binding IsVisible, Mode=TwoWay}"
+				Style="{StaticResource LayerCheckBox}" />
+			<TextBlock
+				Grid.Column="1"
+				VerticalAlignment="Center"
+				FontSize="10"
+				Foreground="#333333"
+				Text="{Binding Name}"
+				TextTrimming="CharacterEllipsis" />
+			<Slider
+				Grid.Column="2"
+				VerticalAlignment="Center"
+				IsEnabled="{Binding IsVisible}"
+				Maximum="100"
+				Minimum="0"
+				SmallChange="5"
+				Value="{Binding Opacity, Mode=TwoWay, Converter={StaticResource OpacityToPercent}}" />
+			<TextBlock
+				Grid.Column="3"
+				VerticalAlignment="Center"
+				FontSize="8"
+				Foreground="#999999"
+				Text="{Binding Opacity, StringFormat={}{0:P0}}" />
+		</Grid>
+	</DataTemplate>
+
+	<!--  메인 스타일  -->
+	<Style TargetType="{x:Type ctrl:LayerPanelControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ctrl:LayerPanelControl}">
+					<Border
+						Width="220"
+						Background="White"
+						BorderBrush="{StaticResource BorderGrayBrush}"
+						BorderThickness="1"
+						CornerRadius="10">
+						<Border.Effect>
+							<DropShadowEffect
+								BlurRadius="8"
+								Opacity="0.12"
+								ShadowDepth="2"
+								Color="Black" />
+						</Border.Effect>
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="36" />
+								<RowDefinition Height="*" MaxHeight="350" />
+							</Grid.RowDefinitions>
+
+							<!--  헤더  -->
+							<Border
+								Grid.Row="0"
+								Background="{StaticResource PrimaryBlueBrush}"
+								CornerRadius="9,9,0,0"
+								Cursor="SizeAll">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="30" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="30" />
+									</Grid.ColumnDefinitions>
+									<md:PackIcon
+										Grid.Column="0"
+										Width="14"
+										Height="14"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Foreground="White"
+										Kind="Layers" />
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="12"
+										FontWeight="Bold"
+										Foreground="White"
+										Text="{TemplateBinding PanelTitle}" />
+									<Button
+										x:Name="PART_CloseButton"
+										Grid.Column="2"
+										Style="{StaticResource PanelCloseButtonStyle}" />
+								</Grid>
+							</Border>
+
+							<!--  바디  -->
+							<ScrollViewer
+								Grid.Row="1"
+								HorizontalScrollBarVisibility="Auto"
+								VerticalScrollBarVisibility="Auto">
+								<StackPanel
+									x:Name="PART_LayerItemsControl"
+									Margin="8,4,8,8">
+
+									<!--  OVERLAY MAP 섹션  -->
+									<Border Style="{StaticResource SectionHeader}">
+										<TextBlock
+											FontSize="9"
+											FontWeight="Bold"
+											Foreground="White"
+											Text="OVERLAY MAP" />
+									</Border>
+									<ItemsControl
+										ItemTemplate="{StaticResource OverlayLayerItem}"
+										ItemsSource="{Binding OverlayMapLayers, RelativeSource={RelativeSource TemplatedParent}}" />
+
+									<!--  OVERLAY IMAGE 섹션  -->
+									<Border Style="{StaticResource SectionHeader}">
+										<TextBlock
+											FontSize="9"
+											FontWeight="Bold"
+											Foreground="White"
+											Text="OVERLAY IMAGE" />
+									</Border>
+									<ItemsControl
+										ItemTemplate="{StaticResource OverlayLayerItem}"
+										ItemsSource="{Binding OverlayImageLayers, RelativeSource={RelativeSource TemplatedParent}}" />
+
+									<!--  SYMBOLS 섹션  -->
+									<Border Style="{StaticResource SectionHeader}">
+										<TextBlock
+											FontSize="9"
+											FontWeight="Bold"
+											Foreground="White"
+											Text="SYMBOLS" />
+									</Border>
+
+									<!--  PIDS 장비 그룹  -->
+									<Expander Margin="0,2,0,0" IsExpanded="True">
+										<Expander.Header>
+											<StackPanel Orientation="Horizontal">
+												<TextBlock
+													FontSize="10"
+													FontWeight="SemiBold"
+													Foreground="#333"
+													Text="📷 PIDS 장비" />
+												<Border
+													Margin="6,0,0,0"
+													Padding="4,1"
+													Background="{StaticResource LightBlueBrush}"
+													CornerRadius="6">
+													<TextBlock
+														FontSize="8"
+														Foreground="{StaticResource PrimaryBlueBrush}"
+														Text="{Binding PidsEquipmentLayers.Count, RelativeSource={RelativeSource TemplatedParent}, FallbackValue=0}" />
+												</Border>
+											</StackPanel>
+										</Expander.Header>
+										<ItemsControl
+											Margin="12,0,0,0"
+											ItemTemplate="{StaticResource SymbolLayerItem}"
+											ItemsSource="{Binding PidsEquipmentLayers, RelativeSource={RelativeSource TemplatedParent}}" />
+									</Expander>
+
+									<!--  PIDS 그룹  -->
+									<ItemsControl
+										Margin="0,2,0,0"
+										ItemTemplate="{StaticResource SymbolLayerItem}"
+										ItemsSource="{Binding PidsGroupLayers, RelativeSource={RelativeSource TemplatedParent}}" />
+
+									<!--  군사부호 그룹  -->
+									<ItemsControl
+										Margin="0,2,0,0"
+										ItemTemplate="{StaticResource SymbolLayerItem}"
+										ItemsSource="{Binding MilitaryLayers, RelativeSource={RelativeSource TemplatedParent}}" />
+
+									<!--  기하학/인프라 그룹  -->
+									<Expander Margin="0,2,0,0" IsExpanded="False">
+										<Expander.Header>
+											<StackPanel Orientation="Horizontal">
+												<TextBlock
+													FontSize="10"
+													FontWeight="SemiBold"
+													Foreground="#333"
+													Text="📐 기하학/인프라" />
+												<Border
+													Margin="6,0,0,0"
+													Padding="4,1"
+													Background="{StaticResource LightBlueBrush}"
+													CornerRadius="6">
+													<TextBlock
+														FontSize="8"
+														Foreground="{StaticResource PrimaryBlueBrush}"
+														Text="{Binding GeometricInfraLayers.Count, RelativeSource={RelativeSource TemplatedParent}, FallbackValue=0}" />
+												</Border>
+											</StackPanel>
+										</Expander.Header>
+										<ItemsControl
+											Margin="12,0,0,0"
+											ItemTemplate="{StaticResource SymbolLayerItem}"
+											ItemsSource="{Binding GeometricInfraLayers, RelativeSource={RelativeSource TemplatedParent}}" />
+									</Expander>
+
+								</StackPanel>
+							</ScrollViewer>
+						</Grid>
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>

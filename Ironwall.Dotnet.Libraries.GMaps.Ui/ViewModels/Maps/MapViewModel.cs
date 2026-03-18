@@ -689,6 +689,7 @@ public class MapViewModel : BasePanelViewModel,
         ShowMapRoiPanelCommand = new RelayCommand(_ => ShowMapRoiPanel());
         ZoomInCommand = new RelayCommand(_ => { if (ZoomMax > MainMap?.Zoom) MainMap.Zoom++; });
         ZoomOutCommand = new RelayCommand(_ => { if (ZoomMin < MainMap?.Zoom) MainMap.Zoom--; });
+        ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
     }
 
     /// <summary>
@@ -4888,6 +4889,133 @@ public class MapViewModel : BasePanelViewModel,
         {
             _log?.Error($"관심지역 삭제 실패: {ex.Message}");
             await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
+    }
+
+    #endregion
+
+    #region - Layer Panel Properties & Methods -
+
+    private LayerPanelControl? _layerPanel;
+    private bool _isLayerPanelVisible;
+    private ObservableCollection<IMapLayerModel> _layerItems = new();
+
+    public LayerPanelControl? LayerPanel
+    {
+        get => _layerPanel;
+        set { _layerPanel = value; NotifyOfPropertyChange(nameof(LayerPanel)); }
+    }
+
+    public bool IsLayerPanelVisible
+    {
+        get => _isLayerPanelVisible;
+        set { _isLayerPanelVisible = value; NotifyOfPropertyChange(nameof(IsLayerPanelVisible)); }
+    }
+
+    public RelayCommand? ShowLayerPanelCommand { get; private set; }
+
+    public void ShowLayerPanel()
+    {
+        if (IsLayerPanelVisible) return;
+
+        HideLayerPanel();
+        LayerPanel = new LayerPanelControl { Layers = _layerItems };
+        LayerPanel.LayerVisibilityChanged += OnLayerVisibilityChanged;
+        LayerPanel.LayerOpacityChanged += OnLayerOpacityChanged;
+        LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
+        IsLayerPanelVisible = true;
+        LayerPanel.Loaded += async (s, e) =>
+        {
+            await LoadLayersFromDbAsync();
+            LayerPanel?.CenterInCanvas();
+        };
+    }
+
+    public void HideLayerPanel()
+    {
+        if (LayerPanel != null)
+        {
+            LayerPanel.LayerVisibilityChanged -= OnLayerVisibilityChanged;
+            LayerPanel.LayerOpacityChanged -= OnLayerOpacityChanged;
+            LayerPanel = null;
+        }
+        IsLayerPanelVisible = false;
+    }
+
+    private async Task LoadLayersFromDbAsync()
+    {
+        try
+        {
+            await _gMapDbService.SeedDefaultSymbolLayersAsync();
+            var list = await _gMapDbService.FetchMapLayersAsync();
+            _layerItems.Clear();
+            if (list != null)
+                foreach (var layer in list)
+                    _layerItems.Add(layer);
+
+            // 로드된 레이어 상태를 맵에 반영
+            foreach (var layer in _layerItems)
+                ApplyLayerVisibility(layer);
+
+            _log?.Info($"레이어 {_layerItems.Count}개 로드 완료");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"레이어 로드 실패: {ex.Message}");
+        }
+    }
+
+    private async void OnLayerVisibilityChanged(object? sender, LayerChangedEventArgs e)
+    {
+        try
+        {
+            ApplyLayerVisibility(e.Layer);
+            await _gMapDbService.UpdateMapLayerVisibilityAsync(e.Layer.Id, e.IsVisible);
+            _log?.Info($"레이어 '{e.Layer.Name}' Visibility={e.IsVisible}");
+        }
+        catch (Exception ex) { _log?.Error($"레이어 Visibility 변경 실패: {ex.Message}"); }
+    }
+
+    private async void OnLayerOpacityChanged(object? sender, LayerOpacityChangedEventArgs e)
+    {
+        try
+        {
+            await _gMapDbService.UpdateMapLayerOpacityAsync(e.Layer.Id, e.Opacity);
+            _log?.Info($"레이어 '{e.Layer.Name}' Opacity={e.Opacity:F2}");
+        }
+        catch (Exception ex) { _log?.Error($"레이어 Opacity 변경 실패: {ex.Message}"); }
+    }
+
+    private void ApplyLayerVisibility(IMapLayerModel layer)
+    {
+        if (layer.LayerType != "Symbol" || string.IsNullOrEmpty(layer.Category)) return;
+
+        var visibility = layer.IsVisible
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
+
+        foreach (var marker in MainMap!.Markers)
+        {
+            if (marker.Shape == null) continue;
+
+            bool match = layer.Category switch
+            {
+                "PidsCamera" => marker.Tag is GMapSymbols.GMapPidsMarker pm && pm.DeviceType == Enums.EnumDeviceType.IpCamera,
+                "PidsSensor" => marker.Tag is GMapSymbols.GMapPidsMarker ps && (ps.DeviceType == Enums.EnumDeviceType.SmartSensor || ps.DeviceType == Enums.EnumDeviceType.SmartSensor2 || ps.DeviceType == Enums.EnumDeviceType.PIR || ps.DeviceType == Enums.EnumDeviceType.Fence || ps.DeviceType == Enums.EnumDeviceType.Underground || ps.DeviceType == Enums.EnumDeviceType.Contact || ps.DeviceType == Enums.EnumDeviceType.Laser || ps.DeviceType == Enums.EnumDeviceType.Cable || ps.DeviceType == Enums.EnumDeviceType.Radar || ps.DeviceType == Enums.EnumDeviceType.OpticalCable),
+                "PidsSpeaker" => marker.Tag is GMapSymbols.GMapPidsMarker psp && psp.DeviceType == Enums.EnumDeviceType.IpSpeaker,
+                "PidsController" => marker.Tag is GMapSymbols.GMapPidsMarker pc && pc.DeviceType == Enums.EnumDeviceType.Controller,
+                "PidsLamp" => marker.Tag is GMapSymbols.GMapPidsMarker pl && pl.DeviceType == Enums.EnumDeviceType.Lamp,
+                "PidsEnclosure" => marker.Tag is GMapSymbols.GMapPidsMarker pe && pe.DeviceType == Enums.EnumDeviceType.Enclosure,
+                "PidsGroup" => marker.Tag is GMapSymbols.GMapPidsGroupMarker,
+                "Military" => marker.Tag is GMapSymbols.GMapMilitarySymbolMarker,
+                "Geometric" => marker.Tag is GMapSymbols.GMapGeometricMarker,
+                "Line" => marker.Tag is GMapSymbols.GMapLineMarker,
+                "Infra" => marker.Tag is GMapSymbols.GMapInfraMarker,
+                _ => false
+            };
+
+            if (match)
+                marker.Shape.Visibility = visibility;
         }
     }
 

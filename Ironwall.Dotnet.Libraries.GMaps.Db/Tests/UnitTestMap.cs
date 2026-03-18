@@ -41,6 +41,7 @@ public sealed class GMapDbFixture : IAsyncLifetime
     /* 테스트용 지도 테이블 목록 */
     private static readonly string[] _mapTables =
     {
+        "MapLayers",
         "MapRois",
         "GeoControlPoints",
         "CustomMaps",

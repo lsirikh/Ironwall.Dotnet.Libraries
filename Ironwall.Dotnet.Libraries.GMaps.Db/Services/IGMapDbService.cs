@@ -247,4 +247,13 @@ public interface IGMapDbService
     /// <returns>삭제 성공 여부</returns>
     Task<bool> DeleteMapRoiAsync(
         int id, CancellationToken token = default);
+
+    /*────────────────────── MapLayer (레이어 관리) ─────────────*/
+
+    Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default);
+    Task<int> InsertMapLayerAsync(IMapLayerModel model, CancellationToken token = default);
+    Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default);
+    Task<bool> UpdateMapLayerOpacityAsync(int id, double opacity, CancellationToken token = default);
+    Task<bool> DeleteMapLayerAsync(int id, CancellationToken token = default);
+    Task SeedDefaultSymbolLayersAsync(CancellationToken token = default);
 }

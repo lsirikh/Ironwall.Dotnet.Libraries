@@ -254,6 +254,9 @@
 						<Button Command="{Binding ShowMapRoiPanelCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="관심지역 관리">
 							<md:PackIcon Foreground="{StaticResource PrimaryBlueBrush}" Kind="MapMarkerRadius" />
 						</Button>
+						<Button Command="{Binding ShowLayerPanelCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="레이어 관리">
+							<md:PackIcon Foreground="{StaticResource PrimaryBlueBrush}" Kind="Layers" />
+						</Button>
 					</StackPanel>
 				</Border>
 
@@ -696,6 +699,12 @@
 					x:Name="TtsBroadcastPresenter"
 					Content="{Binding TtsBroadcastPanel}"
 					Visibility="{Binding IsTtsBroadcastPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  레이어 관리 패널  -->
+				<ContentPresenter
+					x:Name="LayerPanelPresenter"
+					Content="{Binding LayerPanel}"
+					Visibility="{Binding IsLayerPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 			</Canvas>
 		</Grid>
 	</Grid>
