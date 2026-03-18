@@ -4,6 +4,7 @@
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
 
 	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 		<ResourceDictionary Source="BasePropertyStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
@@ -133,7 +134,7 @@
 					<Border
 						Margin="0,10,0,0"
 						Padding="8,4"
-						Background="#4A8BC8"
+						Background="{StaticResource PrimaryBlueBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock

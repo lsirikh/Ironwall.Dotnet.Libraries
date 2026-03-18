@@ -15,8 +15,6 @@ using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Libraries.Enums;
 using GMap.NET.MapProviders.Custom;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
-using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Dialogs;
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Dialogs;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using System.Windows.Controls;
 using GMap.NET.WindowsPresentation;
@@ -40,6 +38,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 using Newtonsoft.Json.Linq;
 using System.Windows.Data;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapRoi;
 using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
@@ -688,6 +687,8 @@ public class MapViewModel : BasePanelViewModel,
         MoveHomeLocationCommand = new RelayCommand(ExecuteMoveHomeLocation, CanExecuteMoveHomeLocation);
         SetHomeLocationCommand = new RelayCommand(ExecuteSetHomeLocation, CanExecuteSetHomeLocation);
         ShowMapRoiPanelCommand = new RelayCommand(_ => ShowMapRoiPanel());
+        ZoomInCommand = new RelayCommand(_ => { if (ZoomMax > MainMap?.Zoom) MainMap.Zoom++; });
+        ZoomOutCommand = new RelayCommand(_ => { if (ZoomMin < MainMap?.Zoom) MainMap.Zoom--; });
     }
 
     /// <summary>
@@ -2802,32 +2803,12 @@ public class MapViewModel : BasePanelViewModel,
 
                 // 음원 실행
                 var playItem = new MenuItem { Header = "음원 실행", IsEnabled = isEnabled };
-                playItem.Click += async (s, e) =>
-                {
-                    var vm = new BroadcastPlayDialogViewModel();
-                    var dlg = new BroadcastPlayDialogView { DataContext = vm };
-                    if (dlg.ShowDialog() == true)
-                    {
-                        await _broadcastControlService.PublishPlayAsync(
-                            pidsMarker.LinkedDeviceId, vm.FileGroupId, vm.Repeat);
-                        _ = StartBroadcastTimer(pidsMarker, Math.Max(1.0, 3.0 * vm.Repeat));
-                    }
-                };
+                playItem.Click += (s, e) => ShowBroadcastPlayPanel(pidsMarker.LinkedDeviceId);
                 menu.Items.Add(playItem);
 
                 // TTS 실행
                 var ttsItem = new MenuItem { Header = "TTS 실행", IsEnabled = isEnabled };
-                ttsItem.Click += async (s, e) =>
-                {
-                    var vm = new TtsDialogViewModel();
-                    var dlg = new TtsDialogView { DataContext = vm };
-                    if (dlg.ShowDialog() == true)
-                    {
-                        await _broadcastControlService.PublishTtsAsync(
-                            pidsMarker.LinkedDeviceId, vm.Message);
-                        _ = StartBroadcastTimer(pidsMarker, Math.Max(1.0, 0.2 * vm.Message.Length));
-                    }
-                };
+                ttsItem.Click += (s, e) => ShowTtsBroadcastPanel(pidsMarker.LinkedDeviceId);
                 menu.Items.Add(ttsItem);
 
                 // Stop
@@ -4149,6 +4130,8 @@ public class MapViewModel : BasePanelViewModel,
     public RelayCommand? MoveHomeLocationCommand { get; private set; }
     public RelayCommand? SetHomeLocationCommand { get; private set; }
     public RelayCommand? ShowMapRoiPanelCommand { get; private set; }
+    public RelayCommand? ZoomInCommand { get; private set; }
+    public RelayCommand? ZoomOutCommand { get; private set; }
 
     // 편집 관련 명령어
     public RelayCommand? ClearSelectionCommand { get; private set; }
@@ -4770,6 +4753,113 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     private int _pendingDeleteRoiId;
+
+    #endregion
+
+    #region - Broadcast Panel Properties & Methods -
+
+    private BroadcastPlayControl? _broadcastPlayPanel;
+    private bool _isBroadcastPlayPanelVisible;
+    private TtsBroadcastControl? _ttsBroadcastPanel;
+    private bool _isTtsBroadcastPanelVisible;
+
+    public BroadcastPlayControl? BroadcastPlayPanel
+    {
+        get => _broadcastPlayPanel;
+        set { _broadcastPlayPanel = value; NotifyOfPropertyChange(nameof(BroadcastPlayPanel)); }
+    }
+
+    public bool IsBroadcastPlayPanelVisible
+    {
+        get => _isBroadcastPlayPanelVisible;
+        set { _isBroadcastPlayPanelVisible = value; NotifyOfPropertyChange(nameof(IsBroadcastPlayPanelVisible)); }
+    }
+
+    public TtsBroadcastControl? TtsBroadcastPanel
+    {
+        get => _ttsBroadcastPanel;
+        set { _ttsBroadcastPanel = value; NotifyOfPropertyChange(nameof(TtsBroadcastPanel)); }
+    }
+
+    public bool IsTtsBroadcastPanelVisible
+    {
+        get => _isTtsBroadcastPanelVisible;
+        set { _isTtsBroadcastPanelVisible = value; NotifyOfPropertyChange(nameof(IsTtsBroadcastPanelVisible)); }
+    }
+
+    public void ShowBroadcastPlayPanel(int linkedDeviceId)
+    {
+        HideBroadcastPlayPanel();
+
+        BroadcastPlayPanel = new BroadcastPlayControl { LinkedDeviceId = linkedDeviceId };
+        BroadcastPlayPanel.SendRequested += OnBroadcastPlaySendRequested;
+        BroadcastPlayPanel.CancelRequested += (s, e) => HideBroadcastPlayPanel();
+        IsBroadcastPlayPanelVisible = true;
+        BroadcastPlayPanel.Loaded += (s, e) => BroadcastPlayPanel?.CenterInCanvas();
+    }
+
+    public void HideBroadcastPlayPanel()
+    {
+        if (BroadcastPlayPanel != null)
+        {
+            BroadcastPlayPanel.SendRequested -= OnBroadcastPlaySendRequested;
+            BroadcastPlayPanel = null;
+        }
+        IsBroadcastPlayPanelVisible = false;
+    }
+
+    private async void OnBroadcastPlaySendRequested(object? sender, BroadcastSendEventArgs e)
+    {
+        try
+        {
+            await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat);
+            _log?.Info($"음원 실행: DeviceId={e.LinkedDeviceId}, FileGroup={e.FileGroupId}, Repeat={e.Repeat}");
+            HideBroadcastPlayPanel();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"음원 실행 실패: {ex.Message}");
+        }
+    }
+
+    public void ShowTtsBroadcastPanel(int linkedDeviceId)
+    {
+        HideTtsBroadcastPanel();
+
+        TtsBroadcastPanel = new TtsBroadcastControl { LinkedDeviceId = linkedDeviceId };
+        TtsBroadcastPanel.SendRequested += OnTtsSendRequested;
+        TtsBroadcastPanel.CancelRequested += (s, e) => HideTtsBroadcastPanel();
+        IsTtsBroadcastPanelVisible = true;
+        TtsBroadcastPanel.Loaded += (s, e) => TtsBroadcastPanel?.CenterInCanvas();
+    }
+
+    public void HideTtsBroadcastPanel()
+    {
+        if (TtsBroadcastPanel != null)
+        {
+            TtsBroadcastPanel.SendRequested -= OnTtsSendRequested;
+            TtsBroadcastPanel = null;
+        }
+        IsTtsBroadcastPanelVisible = false;
+    }
+
+    private async void OnTtsSendRequested(object? sender, TtsSendEventArgs e)
+    {
+        try
+        {
+            await _broadcastControlService.PublishTtsAsync(e.LinkedDeviceId, e.Message);
+            _log?.Info($"TTS 실행: DeviceId={e.LinkedDeviceId}, Message={e.Message}");
+            HideTtsBroadcastPanel();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"TTS 실행 실패: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+    #region - ROI IHandle -
 
     public async Task HandleAsync(CallDeleteMapRoiProcessMessageModel message, CancellationToken cancellationToken)
     {

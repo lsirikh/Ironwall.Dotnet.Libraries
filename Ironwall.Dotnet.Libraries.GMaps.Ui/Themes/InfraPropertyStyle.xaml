@@ -4,6 +4,7 @@
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
 
 	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 		<ResourceDictionary Source="BasePropertyStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 

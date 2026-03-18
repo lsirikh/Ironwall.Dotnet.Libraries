@@ -6,6 +6,7 @@
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
 
 	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 		<ResourceDictionary Source="BasePropertyStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
@@ -26,7 +27,7 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="#4A8BC8"
+						Background="{StaticResource PrimaryBlueBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
@@ -43,10 +44,12 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="포인트 수" />
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="1"
 									VerticalAlignment="Center"
 									Text="{Binding PointCount, StringFormat='{}{0}개'}" />
@@ -59,10 +62,12 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="총 거리" />
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="1"
 									VerticalAlignment="Center"
 									Text="{Binding TotalDistance, StringFormat='{}{0:F2}m'}" />
@@ -74,7 +79,7 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="#4A8BC8"
+						Background="{StaticResource PrimaryBlueBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
@@ -91,6 +96,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="패턴" />
@@ -114,6 +120,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="투명도" />
@@ -126,6 +133,7 @@
 										Value="{Binding LineOpacity, Mode=TwoWay}" />
 									<TextBlock
 										Margin="5,0,0,0"
+                                        Foreground="WhiteSmoke"
 										VerticalAlignment="Center"
 										Text="{Binding LineOpacity, StringFormat='{}{0:P0}'}" />
 								</StackPanel>
@@ -138,7 +146,7 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="#4A8BC8"
+						Background="{StaticResource PrimaryBlueBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
@@ -155,6 +163,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="장비 그룹" />

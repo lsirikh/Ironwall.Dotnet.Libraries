@@ -4,6 +4,7 @@
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
 
 	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 		<ResourceDictionary Source="BasePropertyStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
@@ -117,7 +118,7 @@
 					<Border
 						Margin="0,10,0,0"
 						Padding="8,4"
-						Background="#4A8BC8"
+						Background="{StaticResource PrimaryBlueBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
@@ -135,6 +136,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="탐지범위" />
@@ -162,6 +164,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="탐지각도" />
@@ -189,6 +192,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="탐지방향" />
@@ -216,6 +220,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="WhiteSmoke"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="기준방향" />
