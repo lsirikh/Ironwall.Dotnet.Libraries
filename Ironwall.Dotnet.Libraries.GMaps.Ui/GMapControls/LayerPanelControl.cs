@@ -1,9 +1,9 @@
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -25,93 +25,43 @@ public class LayerPanelControl : Control
 
     #region Dependency Properties
 
-    public ObservableCollection<IMapLayerModel> Layers
+    /// <summary>
+    /// 트리 노드 컬렉션 (3-Tier: Section → Group → Leaf)
+    /// </summary>
+    public ObservableCollection<LayerTreeNode> TreeNodes
     {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(LayersProperty); }
-        set { SetValue(LayersProperty, value); }
+        get { return (ObservableCollection<LayerTreeNode>)GetValue(TreeNodesProperty); }
+        set { SetValue(TreeNodesProperty, value); }
     }
 
-    public static readonly DependencyProperty LayersProperty =
-        DependencyProperty.Register("Layers", typeof(ObservableCollection<IMapLayerModel>),
-            typeof(LayerPanelControl), new PropertyMetadata(null, OnLayersChanged));
+    public static readonly DependencyProperty TreeNodesProperty =
+        DependencyProperty.Register("TreeNodes", typeof(ObservableCollection<LayerTreeNode>),
+            typeof(LayerPanelControl), new PropertyMetadata(null, OnTreeNodesChanged));
 
-    private static void OnLayersChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    private static void OnTreeNodesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is LayerPanelControl ctrl && e.NewValue is ObservableCollection<IMapLayerModel> layers)
+        if (d is LayerPanelControl ctrl && e.NewValue is ObservableCollection<LayerTreeNode> nodes)
         {
-            ctrl.OverlayMapLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => l.LayerType == "OverlayMap"));
-            ctrl.OverlayImageLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => l.LayerType == "OverlayImage"));
-            ctrl.SymbolLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => l.LayerType == "Symbol"));
-
-            // SYMBOLS 서브 그룹
-            var pidsCategories = new[] { "PidsCamera", "PidsSensor", "PidsSpeaker", "PidsController", "PidsLamp", "PidsEnclosure" };
-            ctrl.PidsEquipmentLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => pidsCategories.Contains(l.Category)));
-            ctrl.PidsGroupLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => l.Category == "PidsGroup"));
-            ctrl.MilitaryLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => l.Category == "Military"));
-            var geoCategories = new[] { "Geometric", "Line", "Infra" };
-            ctrl.GeometricInfraLayers = new ObservableCollection<IMapLayerModel>(layers.Where(l => geoCategories.Contains(l.Category)));
+            ctrl.SubscribeLeafCheckChanged(nodes);
         }
     }
 
-    public ObservableCollection<IMapLayerModel> OverlayMapLayers
+    private void SubscribeLeafCheckChanged(IEnumerable<LayerTreeNode> nodes)
     {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(OverlayMapLayersProperty); }
-        set { SetValue(OverlayMapLayersProperty, value); }
+        foreach (var leaf in LayerTreeBuilder.Flatten(nodes))
+        {
+            leaf.CheckChanged -= OnLeafCheckChanged;
+            leaf.CheckChanged += OnLeafCheckChanged;
+        }
     }
-    public static readonly DependencyProperty OverlayMapLayersProperty =
-        DependencyProperty.Register("OverlayMapLayers", typeof(ObservableCollection<IMapLayerModel>),
-            typeof(LayerPanelControl), new PropertyMetadata(null));
 
-    public ObservableCollection<IMapLayerModel> OverlayImageLayers
+    private void OnLeafCheckChanged(object? sender, EventArgs e)
     {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(OverlayImageLayersProperty); }
-        set { SetValue(OverlayImageLayersProperty, value); }
+        if (sender is LayerTreeNode node && node.Model != null)
+        {
+            LayerVisibilityChanged?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked ?? true));
+        }
     }
-    public static readonly DependencyProperty OverlayImageLayersProperty =
-        DependencyProperty.Register("OverlayImageLayers", typeof(ObservableCollection<IMapLayerModel>),
-            typeof(LayerPanelControl), new PropertyMetadata(null));
-
-    public ObservableCollection<IMapLayerModel> SymbolLayers
-    {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(SymbolLayersProperty); }
-        set { SetValue(SymbolLayersProperty, value); }
-    }
-    public static readonly DependencyProperty SymbolLayersProperty =
-        DependencyProperty.Register("SymbolLayers", typeof(ObservableCollection<IMapLayerModel>),
-            typeof(LayerPanelControl), new PropertyMetadata(null));
-
-    // SYMBOLS 서브 그룹
-    public ObservableCollection<IMapLayerModel> PidsEquipmentLayers
-    {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(PidsEquipmentLayersProperty); }
-        set { SetValue(PidsEquipmentLayersProperty, value); }
-    }
-    public static readonly DependencyProperty PidsEquipmentLayersProperty =
-        DependencyProperty.Register("PidsEquipmentLayers", typeof(ObservableCollection<IMapLayerModel>), typeof(LayerPanelControl));
-
-    public ObservableCollection<IMapLayerModel> PidsGroupLayers
-    {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(PidsGroupLayersProperty); }
-        set { SetValue(PidsGroupLayersProperty, value); }
-    }
-    public static readonly DependencyProperty PidsGroupLayersProperty =
-        DependencyProperty.Register("PidsGroupLayers", typeof(ObservableCollection<IMapLayerModel>), typeof(LayerPanelControl));
-
-    public ObservableCollection<IMapLayerModel> MilitaryLayers
-    {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(MilitaryLayersProperty); }
-        set { SetValue(MilitaryLayersProperty, value); }
-    }
-    public static readonly DependencyProperty MilitaryLayersProperty =
-        DependencyProperty.Register("MilitaryLayers", typeof(ObservableCollection<IMapLayerModel>), typeof(LayerPanelControl));
-
-    public ObservableCollection<IMapLayerModel> GeometricInfraLayers
-    {
-        get { return (ObservableCollection<IMapLayerModel>)GetValue(GeometricInfraLayersProperty); }
-        set { SetValue(GeometricInfraLayersProperty, value); }
-    }
-    public static readonly DependencyProperty GeometricInfraLayersProperty =
-        DependencyProperty.Register("GeometricInfraLayers", typeof(ObservableCollection<IMapLayerModel>), typeof(LayerPanelControl));
 
     public string PanelTitle
     {
@@ -155,6 +105,8 @@ public class LayerPanelControl : Control
         InitializeDragSupport();
         _opacityDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _opacityDebounceTimer.Tick += OnOpacityDebounce;
+
+        // CheckBox 이벤트는 LayerTreeNode.CheckChanged로 직접 구독 (OnTreeNodesChanged에서)
     }
 
     #endregion
@@ -167,26 +119,11 @@ public class LayerPanelControl : Control
 
         if (GetTemplateChild("PART_CloseButton") is Button closeButton)
             closeButton.Click += (s, e) => OnCloseRequested();
-
-        if (GetTemplateChild("PART_LayerItemsControl") is ItemsControl itemsControl)
-            itemsControl.AddHandler(CheckBox.CheckedEvent, new RoutedEventHandler(OnLayerCheckChanged));
-
-        if (GetTemplateChild("PART_LayerItemsControl") is ItemsControl ic2)
-            ic2.AddHandler(CheckBox.UncheckedEvent, new RoutedEventHandler(OnLayerCheckChanged));
     }
 
     #endregion
 
     #region Layer Event Handlers
-
-    private void OnLayerCheckChanged(object sender, RoutedEventArgs e)
-    {
-        if (e.OriginalSource is CheckBox cb && cb.DataContext is IMapLayerModel layer)
-        {
-            layer.IsVisible = cb.IsChecked ?? false;
-            LayerVisibilityChanged?.Invoke(this, new LayerChangedEventArgs(layer, layer.IsVisible));
-        }
-    }
 
     public void NotifyOpacityChanged(IMapLayerModel layer, double opacity)
     {
@@ -271,10 +208,9 @@ public class LayerPanelControl : Control
         var cp = FindParent<ContentPresenter>(this);
         var canvas = cp?.Parent as Canvas;
         if (canvas == null || cp == null) return;
-        var pw = cp.ActualWidth > 0 ? cp.ActualWidth : 220;
-        var ph = cp.ActualHeight > 0 ? cp.ActualHeight : 350;
-        Canvas.SetLeft(cp, (canvas.ActualWidth - pw) / 2);
-        Canvas.SetTop(cp, (canvas.ActualHeight - ph) / 2);
+        // 좌상단 고정 위치 (툴바 아래, 좌표 표시 옆)
+        Canvas.SetLeft(cp, 50);
+        Canvas.SetTop(cp, 60);
     }
 
     private T? FindParent<T>(DependencyObject child) where T : DependencyObject

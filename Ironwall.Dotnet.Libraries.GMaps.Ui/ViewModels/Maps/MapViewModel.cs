@@ -3337,6 +3337,22 @@ public class MapViewModel : BasePanelViewModel,
     {
         CreateScaleBar();
         ClearAllSelections();
+        ReapplyLayerVisibilityForZoom();
+    }
+
+    /// <summary>
+    /// 줌 변경 시 모든 레이어의 Visibility를 재평가.
+    /// AND 조건: layerON && (currentZoom >= marker.Zoom)
+    /// </summary>
+    private void ReapplyLayerVisibilityForZoom()
+    {
+        if (_layerTreeNodes == null || _layerTreeNodes.Count == 0) return;
+
+        foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes))
+        {
+            if (leaf.Model != null)
+                ApplyLayerVisibility(leaf.Model);
+        }
     }
     #endregion
 
@@ -4898,7 +4914,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private LayerPanelControl? _layerPanel;
     private bool _isLayerPanelVisible;
-    private ObservableCollection<IMapLayerModel> _layerItems = new();
+    private ObservableCollection<LayerTreeNode> _layerTreeNodes = new();
 
     public LayerPanelControl? LayerPanel
     {
@@ -4919,7 +4935,7 @@ public class MapViewModel : BasePanelViewModel,
         if (IsLayerPanelVisible) return;
 
         HideLayerPanel();
-        LayerPanel = new LayerPanelControl { Layers = _layerItems };
+        LayerPanel = new LayerPanelControl { TreeNodes = _layerTreeNodes };
         LayerPanel.LayerVisibilityChanged += OnLayerVisibilityChanged;
         LayerPanel.LayerOpacityChanged += OnLayerOpacityChanged;
         LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
@@ -4948,16 +4964,26 @@ public class MapViewModel : BasePanelViewModel,
         {
             await _gMapDbService.SeedDefaultSymbolLayersAsync();
             var list = await _gMapDbService.FetchMapLayersAsync();
-            _layerItems.Clear();
-            if (list != null)
-                foreach (var layer in list)
-                    _layerItems.Add(layer);
 
-            // 로드된 레이어 상태를 맵에 반영
-            foreach (var layer in _layerItems)
-                ApplyLayerVisibility(layer);
+            // DB flat 목록 → 3-Tier 트리 구조 변환
+            _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>());
 
-            _log?.Info($"레이어 {_layerItems.Count}개 로드 완료");
+            // LayerPanel에 트리 바인딩
+            if (LayerPanel != null)
+                LayerPanel.TreeNodes = _layerTreeNodes;
+
+            // 로드된 레이어 상태를 맵에 반영 (Leaf 노드만)
+            foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes))
+            {
+                if (leaf.Model != null)
+                    ApplyLayerVisibility(leaf.Model);
+            }
+
+            // 마커 개수 집계
+            UpdateLayerItemCounts();
+
+            var leafCount = LayerTreeBuilder.Flatten(_layerTreeNodes).Count();
+            _log?.Info($"레이어 트리 빌드 완료 ({leafCount}개 Leaf 노드)");
         }
         catch (Exception ex)
         {
@@ -4986,37 +5012,95 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Error($"레이어 Opacity 변경 실패: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// 레이어 Visibility를 맵 마커에 적용.
+    /// 우선순위: 레이어 OFF → 무조건 숨김 > Zoom 범위 밖 → 숨김 > 표시
+    /// </summary>
     private void ApplyLayerVisibility(IMapLayerModel layer)
     {
         if (layer.LayerType != "Symbol" || string.IsNullOrEmpty(layer.Category)) return;
-
-        var visibility = layer.IsVisible
-            ? System.Windows.Visibility.Visible
-            : System.Windows.Visibility.Collapsed;
 
         foreach (var marker in MainMap!.Markers)
         {
             if (marker.Shape == null) continue;
 
-            bool match = layer.Category switch
-            {
-                "PidsCamera" => marker.Tag is GMapSymbols.GMapPidsMarker pm && pm.DeviceType == Enums.EnumDeviceType.IpCamera,
-                "PidsSensor" => marker.Tag is GMapSymbols.GMapPidsMarker ps && (ps.DeviceType == Enums.EnumDeviceType.SmartSensor || ps.DeviceType == Enums.EnumDeviceType.SmartSensor2 || ps.DeviceType == Enums.EnumDeviceType.PIR || ps.DeviceType == Enums.EnumDeviceType.Fence || ps.DeviceType == Enums.EnumDeviceType.Underground || ps.DeviceType == Enums.EnumDeviceType.Contact || ps.DeviceType == Enums.EnumDeviceType.Laser || ps.DeviceType == Enums.EnumDeviceType.Cable || ps.DeviceType == Enums.EnumDeviceType.Radar || ps.DeviceType == Enums.EnumDeviceType.OpticalCable),
-                "PidsSpeaker" => marker.Tag is GMapSymbols.GMapPidsMarker psp && psp.DeviceType == Enums.EnumDeviceType.IpSpeaker,
-                "PidsController" => marker.Tag is GMapSymbols.GMapPidsMarker pc && pc.DeviceType == Enums.EnumDeviceType.Controller,
-                "PidsLamp" => marker.Tag is GMapSymbols.GMapPidsMarker pl && pl.DeviceType == Enums.EnumDeviceType.Lamp,
-                "PidsEnclosure" => marker.Tag is GMapSymbols.GMapPidsMarker pe && pe.DeviceType == Enums.EnumDeviceType.Enclosure,
-                "PidsGroup" => marker.Tag is GMapSymbols.GMapPidsGroupMarker,
-                "Military" => marker.Tag is GMapSymbols.GMapMilitarySymbolMarker,
-                "Geometric" => marker.Tag is GMapSymbols.GMapGeometricMarker,
-                "Line" => marker.Tag is GMapSymbols.GMapLineMarker,
-                "Infra" => marker.Tag is GMapSymbols.GMapInfraMarker,
-                _ => false
-            };
+            bool match = MatchMarkerToCategory(marker, layer.Category);
+            if (!match) continue;
 
-            if (match)
-                marker.Shape.Visibility = visibility;
+            if (!layer.IsVisible)
+            {
+                marker.Shape.Visibility = System.Windows.Visibility.Collapsed;
+            }
+            else
+            {
+                double markerZoom = marker switch
+                {
+                    GMapSymbols.GMapPidsMarker pm => pm.Zoom,
+                    GMapSymbols.GMapPidsGroupMarker gm => gm.Zoom,
+                    GMapSymbols.GMapMilitarySymbolMarker mm => mm.Zoom,
+                    GMapSymbols.GMapGeometricMarker geo => geo.Zoom,
+                    GMapSymbols.GMapLineMarker lm => lm.Zoom,
+                    GMapSymbols.GMapInfraMarker im => im.Zoom,
+                    _ => 0
+                };
+
+                bool zoomOk = MainMap!.Zoom >= markerZoom;
+                marker.Shape.Visibility = zoomOk
+                    ? System.Windows.Visibility.Visible
+                    : System.Windows.Visibility.Collapsed;
+            }
         }
+    }
+
+    /// <summary>
+    /// 각 Leaf 노드의 ItemCount를 맵 마커 개수 기준으로 업데이트
+    /// </summary>
+    private void UpdateLayerItemCounts()
+    {
+        if (_layerTreeNodes == null || MainMap == null) return;
+
+        foreach (var node in _layerTreeNodes)
+        {
+            UpdateNodeCounts(node);
+        }
+    }
+
+    private int UpdateNodeCounts(LayerTreeNode node)
+    {
+        if (node.NodeType == LayerNodeType.Leaf && !string.IsNullOrEmpty(node.Category))
+        {
+            // 심볼 Leaf: 맵에서 해당 카테고리 마커 개수
+            node.ItemCount = MainMap!.Markers.Count(m => MatchMarkerToCategory(m, node.Category));
+            return node.ItemCount;
+        }
+
+        // Group/Section: 자식 합계
+        int total = 0;
+        foreach (var child in node.Children)
+        {
+            total += UpdateNodeCounts(child);
+        }
+        node.ItemCount = total;
+        return total;
+    }
+
+    private static bool MatchMarkerToCategory(GMap.NET.WindowsPresentation.GMapMarker marker, string category)
+    {
+        return category switch
+        {
+            "PidsCamera" => marker is GMapSymbols.GMapPidsMarker pm && pm.DeviceType == Enums.EnumDeviceType.IpCamera,
+            "PidsSensor" => marker is GMapSymbols.GMapPidsMarker ps && (ps.DeviceType == Enums.EnumDeviceType.SmartSensor || ps.DeviceType == Enums.EnumDeviceType.SmartSensor2 || ps.DeviceType == Enums.EnumDeviceType.PIR || ps.DeviceType == Enums.EnumDeviceType.Fence || ps.DeviceType == Enums.EnumDeviceType.Underground || ps.DeviceType == Enums.EnumDeviceType.Contact || ps.DeviceType == Enums.EnumDeviceType.Laser || ps.DeviceType == Enums.EnumDeviceType.Cable || ps.DeviceType == Enums.EnumDeviceType.Radar || ps.DeviceType == Enums.EnumDeviceType.OpticalCable),
+            "PidsSpeaker" => marker is GMapSymbols.GMapPidsMarker psp && psp.DeviceType == Enums.EnumDeviceType.IpSpeaker,
+            "PidsController" => marker is GMapSymbols.GMapPidsMarker pc && pc.DeviceType == Enums.EnumDeviceType.Controller,
+            "PidsLamp" => marker is GMapSymbols.GMapPidsMarker pl && pl.DeviceType == Enums.EnumDeviceType.Lamp,
+            "PidsEnclosure" => marker is GMapSymbols.GMapPidsMarker pe && pe.DeviceType == Enums.EnumDeviceType.Enclosure,
+            "PidsGroup" => marker is GMapSymbols.GMapPidsGroupMarker,
+            "Military" => marker is GMapSymbols.GMapMilitarySymbolMarker,
+            "Geometric" => marker is GMapSymbols.GMapGeometricMarker,
+            "Line" => marker is GMapSymbols.GMapLineMarker,
+            "Infra" => marker is GMapSymbols.GMapInfraMarker,
+            _ => false
+        };
     }
 
     #endregion

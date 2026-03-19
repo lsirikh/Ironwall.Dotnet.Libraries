@@ -3,56 +3,85 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:models="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Models"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
 
 	<ResourceDictionary.MergedDictionaries>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
-	<utils:LayerTypeToSliderVisibilityConverter x:Key="LayerTypeToSliderVisibility" />
 	<utils:OpacityToPercentConverter x:Key="OpacityToPercent" />
+	<BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-	<!--  체크박스 컴팩트  -->
+	<!-- 체크박스 -->
 	<Style x:Key="LayerCheckBox" TargetType="CheckBox">
 		<Setter Property="VerticalAlignment" Value="Center" />
-		<Setter Property="LayoutTransform">
-			<Setter.Value>
-				<ScaleTransform ScaleX="0.8" ScaleY="0.8" />
-			</Setter.Value>
-		</Setter>
+		<Setter Property="Margin" Value="0,0,3,0" />
 	</Style>
 
-	<!--  섹션 헤더 스타일  -->
-	<Style x:Key="SectionHeader" TargetType="Border">
-		<Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
-		<Setter Property="CornerRadius" Value="3" />
-		<Setter Property="Padding" Value="6,3" />
-		<Setter Property="Margin" Value="0,6,0,3" />
-	</Style>
+	<!-- 개수 배지 -->
+	<DataTemplate x:Key="CountBadge">
+		<Border
+			MinWidth="20"
+			Margin="6,0,0,0"
+			Padding="5,1"
+            VerticalAlignment="Center"
+			Background="{StaticResource LightBlueBrush}"
+			CornerRadius="8">
+			<TextBlock
+				HorizontalAlignment="Center"
+				FontSize="9"
+				FontWeight="Bold"
+				Foreground="{StaticResource PrimaryBlueBrush}"
+				Text="{Binding}" />
+		</Border>
+	</DataTemplate>
 
-	<!--  레이어 아이템 (심볼용: 체크 + 이름)  -->
-	<DataTemplate x:Key="SymbolLayerItem">
-		<Grid Margin="0,1">
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Leaf 노드 (심볼: 체크 + 아이콘 + 이름)             -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="LeafNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<Grid Height="20" Margin="10,3,0,3" ToolTip="{Binding Name}">
 			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
 			</Grid.ColumnDefinitions>
 			<CheckBox
 				Grid.Column="0"
-				Margin="0,0,4,0"
-				IsChecked="{Binding IsVisible, Mode=TwoWay}"
+				IsChecked="{Binding IsChecked, Mode=TwoWay}"
 				Style="{StaticResource LayerCheckBox}" />
-			<TextBlock
+			<md:PackIcon
 				Grid.Column="1"
+				Width="14"
+				Height="14"
+				Margin="0,0,5,0"
 				VerticalAlignment="Center"
-				FontSize="10"
-				TextTrimming="CharacterEllipsis">
+				Kind="{Binding IconKind}">
+				<md:PackIcon.Style>
+					<Style TargetType="md:PackIcon">
+						<Setter Property="Foreground" Value="#444" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsChecked}" Value="False">
+								<Setter Property="Foreground" Value="#CCC" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</md:PackIcon.Style>
+			</md:PackIcon>
+			<TextBlock
+				Grid.Column="2"
+				VerticalAlignment="Center"
+				FontSize="12"
+				TextTrimming="CharacterEllipsis"
+				TextOptions.TextRenderingMode="ClearType"
+				TextOptions.TextFormattingMode="Display">
 				<TextBlock.Style>
 					<Style TargetType="TextBlock">
-						<Setter Property="Foreground" Value="#333333" />
+						<Setter Property="Foreground" Value="#222" />
 						<Style.Triggers>
-							<DataTrigger Binding="{Binding IsVisible}" Value="False">
-								<Setter Property="Foreground" Value="#BBBBBB" />
+							<DataTrigger Binding="{Binding IsChecked}" Value="False">
+								<Setter Property="Foreground" Value="#AAA" />
 							</DataTrigger>
 						</Style.Triggers>
 					</Style>
@@ -62,31 +91,34 @@
 		</Grid>
 	</DataTemplate>
 
-	<!--  레이어 아이템 (오버레이용: 체크 + 이름 + 슬라이더)  -->
-	<DataTemplate x:Key="OverlayLayerItem">
-		<Grid Margin="0,2">
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Leaf 노드 (오버레이: 체크 + 이름 + 슬라이더)       -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="OverlayLeafTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<Grid Height="26" Margin="0,1" ToolTip="{Binding Name}">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
-				<ColumnDefinition Width="50" />
-				<ColumnDefinition Width="24" />
+				<ColumnDefinition Width="60" />
+				<ColumnDefinition Width="30" />
 			</Grid.ColumnDefinitions>
 			<CheckBox
 				Grid.Column="0"
-				Margin="0,0,4,0"
-				IsChecked="{Binding IsVisible, Mode=TwoWay}"
+				IsChecked="{Binding IsChecked, Mode=TwoWay}"
 				Style="{StaticResource LayerCheckBox}" />
 			<TextBlock
 				Grid.Column="1"
 				VerticalAlignment="Center"
-				FontSize="10"
-				Foreground="#333333"
+				FontSize="12"
+				Foreground="#222"
 				Text="{Binding Name}"
+				TextOptions.TextRenderingMode="ClearType"
+				TextOptions.TextFormattingMode="Display"
 				TextTrimming="CharacterEllipsis" />
 			<Slider
 				Grid.Column="2"
 				VerticalAlignment="Center"
-				IsEnabled="{Binding IsVisible}"
+				IsEnabled="{Binding IsChecked}"
 				Maximum="100"
 				Minimum="0"
 				SmallChange="5"
@@ -94,38 +126,279 @@
 			<TextBlock
 				Grid.Column="3"
 				VerticalAlignment="Center"
-				FontSize="8"
-				Foreground="#999999"
+				FontSize="9"
+				Foreground="#888"
 				Text="{Binding Opacity, StringFormat={}{0:P0}}" />
 		</Grid>
 	</DataTemplate>
 
-	<!--  메인 스타일  -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Group 노드 (Expander 제거 → 직접 구현, 공간 최소화) -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="GroupNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<StackPanel Margin="0,2,0,0">
+			<!-- 그룹 헤더 (클릭 시 접기/펼치기) -->
+			<Grid Height="24" Margin="10,0,4,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+				</Grid.ColumnDefinitions>
+				<CheckBox
+					Grid.Column="0"
+					IsChecked="{Binding IsChecked, Mode=TwoWay}"
+					IsThreeState="True"
+					Style="{StaticResource LayerCheckBox}" />
+				<md:PackIcon
+					Grid.Column="1"
+					Width="15"
+					Height="15"
+					Margin="0,0,4,0"
+					VerticalAlignment="Center"
+					Foreground="{StaticResource PrimaryBlueBrush}"
+					Kind="{Binding IconKind}" />
+				<TextBlock
+					Grid.Column="2"
+					VerticalAlignment="Center"
+					FontSize="12"
+					FontWeight="SemiBold"
+					Foreground="#222"
+					Text="{Binding Name}"
+					TextOptions.TextRenderingMode="ClearType"
+					TextOptions.TextFormattingMode="Display" />
+				<ContentPresenter
+					Grid.Column="4"
+					Content="{Binding ItemCount}"
+					ContentTemplate="{StaticResource CountBadge}" />
+				<!-- 접기/펼치기 토글 -->
+				<ToggleButton
+					Grid.Column="5"
+					Width="18"
+					Height="18"
+					Margin="4,0,0,0"
+					IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+					Background="Transparent"
+					BorderThickness="0"
+					Cursor="Hand">
+					<ToggleButton.Style>
+						<Style TargetType="ToggleButton">
+							<Setter Property="Template">
+								<Setter.Value>
+									<ControlTemplate TargetType="ToggleButton">
+										<Border Background="Transparent">
+											<md:PackIcon
+												x:Name="Arrow"
+												Width="14"
+												Height="14"
+												HorizontalAlignment="Center"
+												VerticalAlignment="Center"
+												Foreground="#888"
+												Kind="ChevronDown"
+												RenderTransformOrigin="0.5,0.5">
+												<md:PackIcon.RenderTransform>
+													<RotateTransform Angle="0" />
+												</md:PackIcon.RenderTransform>
+											</md:PackIcon>
+										</Border>
+										<ControlTemplate.Triggers>
+											<Trigger Property="IsChecked" Value="False">
+												<Setter TargetName="Arrow" Property="RenderTransform">
+													<Setter.Value>
+														<RotateTransform Angle="-90" />
+													</Setter.Value>
+												</Setter>
+											</Trigger>
+										</ControlTemplate.Triggers>
+									</ControlTemplate>
+								</Setter.Value>
+							</Setter>
+						</Style>
+					</ToggleButton.Style>
+				</ToggleButton>
+			</Grid>
+			<!-- 자식 Leaf 노드 (접기 가능) -->
+			<ItemsControl Margin="20,0,0,0" ItemsSource="{Binding Children}">
+				<ItemsControl.Style>
+					<Style TargetType="ItemsControl">
+						<Setter Property="Visibility" Value="Visible" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsExpanded}" Value="False">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</ItemsControl.Style>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate DataType="{x:Type models:LayerTreeNode}">
+						<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource LeafNodeTemplate}" />
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</StackPanel>
+	</DataTemplate>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Section 자식 자동 선택 (Group / Leaf / Overlay)     -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="SectionChildTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<ContentPresenter Content="{Binding}">
+			<ContentPresenter.Style>
+				<Style TargetType="ContentPresenter">
+					<Setter Property="ContentTemplate" Value="{StaticResource LeafNodeTemplate}" />
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding NodeType}" Value="Group">
+							<Setter Property="ContentTemplate" Value="{StaticResource GroupNodeTemplate}" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding HasOpacitySlider}" Value="True">
+							<Setter Property="ContentTemplate" Value="{StaticResource OverlayLeafTemplate}" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</ContentPresenter.Style>
+		</ContentPresenter>
+	</DataTemplate>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Section 노드 (블루 헤더 Expander + 자식 / 빈 메시지) -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="SectionNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<StackPanel Margin="0,4,0,0">
+			<!-- 섹션 헤더 바 (클릭 시 접기/펼치기) -->
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="Auto" />
+				</Grid.ColumnDefinitions>
+				<Border
+					Grid.Column="0"
+					Padding="8,4"
+					Background="{StaticResource PrimaryBlueBrush}"
+					CornerRadius="4">
+					<TextBlock
+						VerticalAlignment="Center"
+						FontSize="10.5"
+						FontWeight="Bold"
+						Foreground="White"
+						Text="{Binding Name}"
+						TextOptions.TextRenderingMode="ClearType"
+						TextOptions.TextFormattingMode="Display" />
+				</Border>
+				<ToggleButton
+					Grid.Column="1"
+					Width="20"
+					Height="20"
+					Margin="2,0,0,0"
+					IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+					Background="Transparent"
+					BorderThickness="0"
+					Cursor="Hand">
+					<ToggleButton.Style>
+						<Style TargetType="ToggleButton">
+							<Setter Property="Template">
+								<Setter.Value>
+									<ControlTemplate TargetType="ToggleButton">
+										<Border Background="Transparent">
+											<md:PackIcon
+												x:Name="Arrow"
+												Width="14"
+												Height="14"
+												Foreground="#888"
+												Kind="ChevronDown"
+												RenderTransformOrigin="0.5,0.5">
+												<md:PackIcon.RenderTransform>
+													<RotateTransform Angle="0" />
+												</md:PackIcon.RenderTransform>
+											</md:PackIcon>
+										</Border>
+										<ControlTemplate.Triggers>
+											<Trigger Property="IsChecked" Value="False">
+												<Setter TargetName="Arrow" Property="RenderTransform">
+													<Setter.Value>
+														<RotateTransform Angle="-90" />
+													</Setter.Value>
+												</Setter>
+											</Trigger>
+										</ControlTemplate.Triggers>
+									</ControlTemplate>
+								</Setter.Value>
+							</Setter>
+						</Style>
+					</ToggleButton.Style>
+				</ToggleButton>
+			</Grid>
+			<!-- 자식 목록 (접기 가능) -->
+			<StackPanel Margin="4,2,0,0">
+				<StackPanel.Style>
+					<Style TargetType="StackPanel">
+						<Setter Property="Visibility" Value="Visible" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsExpanded}" Value="False">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</StackPanel.Style>
+				<ItemsControl
+					ItemTemplate="{StaticResource SectionChildTemplate}"
+					ItemsSource="{Binding Children}" />
+				<!-- 빈 상태 메시지 -->
+				<TextBlock
+					Margin="4,2,0,2"
+					FontSize="10"
+					FontStyle="Italic"
+					Foreground="#999"
+					Text="등록된 항목이 없습니다">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding Children.Count}" Value="0">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+			</StackPanel>
+		</StackPanel>
+	</DataTemplate>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- 메인 스타일                                         -->
+	<!-- ═══════════════════════════════════════════════════ -->
 	<Style TargetType="{x:Type ctrl:LayerPanelControl}">
+		<Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+		<Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+		<Setter Property="UseLayoutRounding" Value="True" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type ctrl:LayerPanelControl}">
 					<Border
-						Width="220"
+						Width="250"
 						Background="White"
 						BorderBrush="{StaticResource BorderGrayBrush}"
 						BorderThickness="1"
 						CornerRadius="10">
 						<Border.Effect>
 							<DropShadowEffect
-								BlurRadius="8"
-								Opacity="0.12"
-								ShadowDepth="2"
+								BlurRadius="10"
+								Opacity="0.15"
+								ShadowDepth="3"
 								Color="Black" />
 						</Border.Effect>
 
 						<Grid>
 							<Grid.RowDefinitions>
-								<RowDefinition Height="36" />
-								<RowDefinition Height="*" MaxHeight="350" />
+								<RowDefinition Height="38" />
+								<RowDefinition Height="*" MaxHeight="500" />
 							</Grid.RowDefinitions>
 
-							<!--  헤더  -->
+							<!-- 헤더 -->
 							<Border
 								Grid.Row="0"
 								Background="{StaticResource PrimaryBlueBrush}"
@@ -133,14 +406,14 @@
 								Cursor="SizeAll">
 								<Grid>
 									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="30" />
+										<ColumnDefinition Width="34" />
 										<ColumnDefinition Width="*" />
-										<ColumnDefinition Width="30" />
+										<ColumnDefinition Width="34" />
 									</Grid.ColumnDefinitions>
 									<md:PackIcon
 										Grid.Column="0"
-										Width="14"
-										Height="14"
+										Width="16"
+										Height="16"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
 										Foreground="White"
@@ -149,7 +422,7 @@
 										Grid.Column="1"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										FontSize="12"
+										FontSize="13"
 										FontWeight="Bold"
 										Foreground="White"
 										Text="{TemplateBinding PanelTitle}" />
@@ -160,115 +433,17 @@
 								</Grid>
 							</Border>
 
-							<!--  바디  -->
+							<!-- 바디: 트리 구조 -->
 							<ScrollViewer
+								x:Name="PART_TreeView"
 								Grid.Row="1"
+								Padding="0,0,2,0"
 								HorizontalScrollBarVisibility="Auto"
 								VerticalScrollBarVisibility="Auto">
-								<StackPanel
-									x:Name="PART_LayerItemsControl"
-									Margin="8,4,8,8">
-
-									<!--  OVERLAY MAP 섹션  -->
-									<Border Style="{StaticResource SectionHeader}">
-										<TextBlock
-											FontSize="9"
-											FontWeight="Bold"
-											Foreground="White"
-											Text="OVERLAY MAP" />
-									</Border>
-									<ItemsControl
-										ItemTemplate="{StaticResource OverlayLayerItem}"
-										ItemsSource="{Binding OverlayMapLayers, RelativeSource={RelativeSource TemplatedParent}}" />
-
-									<!--  OVERLAY IMAGE 섹션  -->
-									<Border Style="{StaticResource SectionHeader}">
-										<TextBlock
-											FontSize="9"
-											FontWeight="Bold"
-											Foreground="White"
-											Text="OVERLAY IMAGE" />
-									</Border>
-									<ItemsControl
-										ItemTemplate="{StaticResource OverlayLayerItem}"
-										ItemsSource="{Binding OverlayImageLayers, RelativeSource={RelativeSource TemplatedParent}}" />
-
-									<!--  SYMBOLS 섹션  -->
-									<Border Style="{StaticResource SectionHeader}">
-										<TextBlock
-											FontSize="9"
-											FontWeight="Bold"
-											Foreground="White"
-											Text="SYMBOLS" />
-									</Border>
-
-									<!--  PIDS 장비 그룹  -->
-									<Expander Margin="0,2,0,0" IsExpanded="True">
-										<Expander.Header>
-											<StackPanel Orientation="Horizontal">
-												<TextBlock
-													FontSize="10"
-													FontWeight="SemiBold"
-													Foreground="#333"
-													Text="📷 PIDS 장비" />
-												<Border
-													Margin="6,0,0,0"
-													Padding="4,1"
-													Background="{StaticResource LightBlueBrush}"
-													CornerRadius="6">
-													<TextBlock
-														FontSize="8"
-														Foreground="{StaticResource PrimaryBlueBrush}"
-														Text="{Binding PidsEquipmentLayers.Count, RelativeSource={RelativeSource TemplatedParent}, FallbackValue=0}" />
-												</Border>
-											</StackPanel>
-										</Expander.Header>
-										<ItemsControl
-											Margin="12,0,0,0"
-											ItemTemplate="{StaticResource SymbolLayerItem}"
-											ItemsSource="{Binding PidsEquipmentLayers, RelativeSource={RelativeSource TemplatedParent}}" />
-									</Expander>
-
-									<!--  PIDS 그룹  -->
-									<ItemsControl
-										Margin="0,2,0,0"
-										ItemTemplate="{StaticResource SymbolLayerItem}"
-										ItemsSource="{Binding PidsGroupLayers, RelativeSource={RelativeSource TemplatedParent}}" />
-
-									<!--  군사부호 그룹  -->
-									<ItemsControl
-										Margin="0,2,0,0"
-										ItemTemplate="{StaticResource SymbolLayerItem}"
-										ItemsSource="{Binding MilitaryLayers, RelativeSource={RelativeSource TemplatedParent}}" />
-
-									<!--  기하학/인프라 그룹  -->
-									<Expander Margin="0,2,0,0" IsExpanded="False">
-										<Expander.Header>
-											<StackPanel Orientation="Horizontal">
-												<TextBlock
-													FontSize="10"
-													FontWeight="SemiBold"
-													Foreground="#333"
-													Text="📐 기하학/인프라" />
-												<Border
-													Margin="6,0,0,0"
-													Padding="4,1"
-													Background="{StaticResource LightBlueBrush}"
-													CornerRadius="6">
-													<TextBlock
-														FontSize="8"
-														Foreground="{StaticResource PrimaryBlueBrush}"
-														Text="{Binding GeometricInfraLayers.Count, RelativeSource={RelativeSource TemplatedParent}, FallbackValue=0}" />
-												</Border>
-											</StackPanel>
-										</Expander.Header>
-										<ItemsControl
-											Margin="12,0,0,0"
-											ItemTemplate="{StaticResource SymbolLayerItem}"
-											ItemsSource="{Binding GeometricInfraLayers, RelativeSource={RelativeSource TemplatedParent}}" />
-									</Expander>
-
-								</StackPanel>
+								<ItemsControl
+									Margin="8,2,8,8"
+									ItemTemplate="{StaticResource SectionNodeTemplate}"
+									ItemsSource="{Binding TreeNodes, RelativeSource={RelativeSource TemplatedParent}}" />
 							</ScrollViewer>
 						</Grid>
 					</Border>
