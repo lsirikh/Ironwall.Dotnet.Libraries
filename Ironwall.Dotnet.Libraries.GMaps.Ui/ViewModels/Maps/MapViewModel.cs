@@ -1537,10 +1537,23 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            // MBTiles 기본 맵 등록 (최초 1회 — Datas/ 폴더 스캔)
+            await SeedMBTilesMapsAsync();
+
             if (_mapProvider.Any())
             {
-                var mapName = _setupModel.MapName ?? throw new NullReferenceException("MapName was not found.");
-                SelectedMap = _mapProvider.Where(entity => entity.Name == mapName).FirstOrDefault();
+                var mapName = _setupModel.MapName;
+                if (!string.IsNullOrEmpty(mapName))
+                    SelectedMap = _mapProvider.Where(entity => entity.Name == mapName).FirstOrDefault();
+
+                // 설정된 맵이 없으면 MBTiles 맵 중 첫 번째 선택 (폴백)
+                if (SelectedMap == null)
+                    SelectedMap = _mapProvider.OfType<DefinedMapModel>()
+                        .FirstOrDefault(m => m.Vendor == EnumMapVendor.MBTiles);
+
+                // 그래도 없으면 아무 맵이나
+                if (SelectedMap == null)
+                    SelectedMap = _mapProvider.FirstOrDefault();
             }
 
             if (SelectedMap == null) return;
@@ -1575,6 +1588,10 @@ public class MapViewModel : BasePanelViewModel,
         {
             switch (definedMap.Vendor)
             {
+                case EnumMapVendor.MBTiles:
+                    ConfigureMBTilesMap(definedMap);
+                    return; // 온라인 모드 설정 불필요
+
                 case EnumMapVendor.Google:
                     GoogleMapProvider.Instance.ApiKey = definedMap.ApiKey;
                     ConfigureGoogleMap(definedMap.Style);
@@ -1650,15 +1667,163 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
+    /// Datas/ 폴더의 .mbtiles 파일을 스캔하여 DB에 DefinedMap으로 자동 등록.
+    /// MBTiles 메타데이터(bounds, zoom)를 읽어 정확한 값으로 Insert.
+    /// </summary>
+    private async Task SeedMBTilesMapsAsync()
+    {
+        try
+        {
+            // 이미 MBTiles 맵이 DB에 있으면 건너뜀
+            var existing = await _gMapDbService.FetchDefinedMapsAsync();
+            if (existing?.Any(m => m.Vendor == EnumMapVendor.MBTiles) == true) return;
+
+            // Datas/ 폴더 스캔
+            var datasPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Datas");
+            if (!System.IO.Directory.Exists(datasPath))
+            {
+                _log?.Info($"Datas 폴더 없음: {datasPath}");
+                return;
+            }
+
+            var mbtilesFiles = System.IO.Directory.GetFiles(datasPath, "*.mbtiles");
+            if (mbtilesFiles.Length == 0)
+            {
+                _log?.Info("Datas 폴더에 .mbtiles 파일 없음");
+                return;
+            }
+
+            var provider = MBTilesMapProvider.Instance;
+
+            foreach (var filePath in mbtilesFiles)
+            {
+                var fileName = System.IO.Path.GetFileName(filePath);
+
+                // MBTiles 열어서 메타데이터 읽기
+                if (!provider.Open(filePath))
+                {
+                    _log?.Error($"MBTiles 열기 실패: {fileName}");
+                    continue;
+                }
+
+                // 파일명으로 Style 결정
+                var isSatellite = fileName.Contains("satellite", StringComparison.OrdinalIgnoreCase);
+                var style = isSatellite ? EnumMapStyle.Satellite : EnumMapStyle.Normal;
+                var category = isSatellite ? EnumMapCategory.Satellite : EnumMapCategory.Standard;
+                var displayName = isSatellite ? "위성지도" : "일반지도";
+
+                // 메타데이터에 이름이 있으면 사용
+                if (!string.IsNullOrEmpty(provider.DataName))
+                    displayName = provider.DataName;
+
+                var model = new DefinedMapModel
+                {
+                    Name = displayName,
+                    Description = $"MBTiles 오프라인 지도 ({fileName})",
+                    Category = category,
+                    DataType = EnumMapData.Raster,
+                    CoordinateSystem = "WGS84",
+                    EpsgCode = "EPSG:3857",
+                    MinZoomLevel = provider.MinZoom >= 0 ? provider.MinZoom : 10,
+                    MaxZoomLevel = provider.MaxZoom >= 0 ? provider.MaxZoom : 18,
+                    TileSize = 256,
+                    Status = EnumMapStatus.Active,
+                    CreatedBy = "System",
+                    GMapProviderName = "MBTilesMapProvider",
+                    ProviderGuid = provider.Id.ToString(),
+                    Vendor = EnumMapVendor.MBTiles,
+                    Style = style,
+                    RequiresApiKey = false,
+                    ServiceUrl = fileName,
+                };
+
+                // Bounds 설정
+                if (provider.Bounds != null && provider.Bounds.Length == 2)
+                {
+                    model.MinLatitude = provider.Bounds[1].Lat;
+                    model.MaxLatitude = provider.Bounds[0].Lat;
+                    model.MinLongitude = provider.Bounds[0].Lng;
+                    model.MaxLongitude = provider.Bounds[1].Lng;
+                }
+
+                int id = await _gMapDbService.InsertDefinedMapAsync(model);
+                model.Id = id;
+
+                // Provider 목록에 즉시 추가 (FetchInstanceAsync 재호출 대신)
+                _mapProvider.Add(model);
+                _definedMapProvider.Add(model);
+
+                _log?.Info($"MBTiles 맵 등록: {displayName} ({fileName}), Id={id}, " +
+                           $"Zoom={model.MinZoomLevel}~{model.MaxZoomLevel}, " +
+                           $"Bounds=[{model.MinLatitude:F4}~{model.MaxLatitude:F4}, {model.MinLongitude:F4}~{model.MaxLongitude:F4}]");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MBTiles 맵 Seed 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// MBTiles DefinedMap 설정 — Datas 폴더에서 파일명으로 로드
+    /// </summary>
+    private void ConfigureMBTilesMap(DefinedMapModel definedMap)
+    {
+        if (MainMap == null || string.IsNullOrEmpty(definedMap.ServiceUrl)) return;
+
+        var mbtilesPath = System.IO.Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "Datas", definedMap.ServiceUrl);
+
+        if (!System.IO.File.Exists(mbtilesPath))
+        {
+            _log?.Error($"MBTiles 파일 없음: {mbtilesPath}");
+            return;
+        }
+
+        var provider = MBTilesMapProvider.Instance;
+        if (!provider.Open(mbtilesPath))
+        {
+            _log?.Error($"MBTiles 열기 실패: {mbtilesPath}");
+            return;
+        }
+
+        MainMap.MapProvider = provider;
+        MainMap.Manager.Mode = AccessMode.ServerOnly;
+
+        if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
+        if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
+
+        // MBTiles center로 이동
+        if (provider.CenterLocation != PointLatLng.Empty)
+            MainMap.Position = provider.CenterLocation;
+        if (provider.CenterZoom >= 0)
+            MainMap.Zoom = provider.CenterZoom;
+
+        _log?.Info($"MBTiles 로드 완료: {definedMap.Name} ({definedMap.ServiceUrl}), " +
+                   $"Zoom={provider.MinZoom}~{provider.MaxZoom}, Center={provider.CenterLocation}");
+    }
+
+    /// <summary>
     /// 공통 지도 설정 - 위치, 줌, 이벤트 핸들러 등
     /// </summary>
     private void ConfigureCommonMapSettings()
     {
         if (MainMap == null || SelectedMap == null) return;
-        MainMap.Position = _setupModel.HomePosition?.PointLatLng ?? new PointLatLng(37.648425, 126.904284);
-        MainMap.MinZoom = SelectedMap.MinZoomLevel;
-        MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
-        MainMap.Zoom = _setupModel.HomePosition?.Zoom ?? DEFAULT_ZOOM;
+
+        // MBTiles는 ConfigureMBTilesMap에서 이미 Position/Zoom 설정됨 → 덮어쓰지 않음
+        if (SelectedMap is DefinedMapModel dm && dm.Vendor == EnumMapVendor.MBTiles)
+        {
+            // MinZoom/MaxZoom만 DB 값으로 보정
+            MainMap.MinZoom = SelectedMap.MinZoomLevel;
+            MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
+        }
+        else
+        {
+            MainMap.Position = _setupModel.HomePosition?.PointLatLng ?? new PointLatLng(37.648425, 126.904284);
+            MainMap.MinZoom = SelectedMap.MinZoomLevel;
+            MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
+            MainMap.Zoom = _setupModel.HomePosition?.Zoom ?? DEFAULT_ZOOM;
+        }
 
         MainMap.ShowCenter = false;
         MainMap.MultiTouchEnabled = false;

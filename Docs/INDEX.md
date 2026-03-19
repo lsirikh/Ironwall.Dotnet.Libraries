@@ -29,6 +29,7 @@
 | [PRD_GMap_UI_Design_Renewal.md](prd/PRD_GMap_UI_Design_Renewal.md) | [plan](prd/PRD_GMap_UI_Design_Renewal.plan.md) | GMap UI 디자인 통합 리뉴얼 — 컨셉1 블루헤더+화이트바디 + 툴바 그룹화 |
 | [PRD_Broadcast_Panel_Embedded.md](prd/PRD_Broadcast_Panel_Embedded.md) | [plan](prd/PRD_Broadcast_Panel_Embedded.plan.md) | 방송 패널 임베디드 전환 — Window→Canvas CustomControl (음원+TTS) |
 | [PRD_Layer_Panel_Tree_Redesign.md](prd/PRD_Layer_Panel_Tree_Redesign.md) | [plan](prd/PRD_Layer_Panel_Tree_Redesign.plan.md) | 레이어 패널 트리 재설계 — 카테고리 중심 3-Tier + Zoom AND + 이벤트 이중발생 수정 |
+| [PRD_MBTiles_DefinedMap_Integration.md](prd/PRD_MBTiles_DefinedMap_Integration.md) | [plan](prd/PRD_MBTiles_DefinedMap_Integration.plan.md) | MBTiles DefinedMap 통합 — 오프라인 MBTiles를 DefinedMap으로 등록, CustomMap 오버레이 전용 |
 | [PRD_Layer_Management_System.md](prd/PRD_Layer_Management_System.md) | [plan](prd/PRD_Layer_Management_System.plan.md) | 레이어 관리 시스템 — 3-Tier 레이어 + DB 상태 저장 + 카테고리별 ON/OFF |
 ## 완료 (Report 있음) — 57건
 > 상세 목록: [INDEX_ARCHIVE.md](INDEX_ARCHIVE.md)

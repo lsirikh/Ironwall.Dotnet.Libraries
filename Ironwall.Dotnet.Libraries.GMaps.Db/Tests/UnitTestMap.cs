@@ -97,9 +97,11 @@ public sealed class GMapDbFixture : IAsyncLifetime
         await using var conn = new MySqlConnection(csb.ToString());
         await conn.OpenAsync();
 
-        // 외래키 제약조건 때문에 순서가 중요
+        // FK 제약조건 무시하고 DROP
+        await conn.ExecuteAsync("SET FOREIGN_KEY_CHECKS = 0;");
         foreach (var t in _mapTables)
             await conn.ExecuteAsync($"DROP TABLE IF EXISTS `{t}`;");
+        await conn.ExecuteAsync("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
     [Fact(DisplayName = "Dispose GMap DB Service")]
@@ -566,6 +568,59 @@ public class GMapDb_DefinedMapCrudTests
 
         var fetched = await _fx.Svc.FetchDefinedMapAsync(definedMap!.Id);
         Assert.Null(fetched);
+    }
+}
+
+/*======================================================================
+ *  MBTiles DefinedMap 테스트
+ *====================================================================*/
+[Collection(nameof(GMapDbCollection))]
+public class GMapDb_MBTilesDefinedMapTests
+{
+    private readonly GMapDbFixture _fx;
+    public GMapDb_MBTilesDefinedMapTests(GMapDbFixture fx) => _fx = fx;
+
+    [Fact(DisplayName = "MBTiles DefinedMap – Insert & Fetch with MBTilesFileName")]
+    public async Task Insert_And_Fetch_MBTiles_DefinedMap()
+    {
+        var model = new DefinedMapModel
+        {
+            Name = "테스트 위성지도",
+            Category = EnumMapCategory.Satellite,
+            CoordinateSystem = "WGS84",
+            MinZoomLevel = 15,
+            MaxZoomLevel = 18,
+            TileSize = 256,
+            Status = EnumMapStatus.Active,
+            CreatedBy = "Test",
+            GMapProviderName = "MBTilesMapProvider",
+            Vendor = EnumMapVendor.MBTiles,
+            Style = EnumMapStyle.Satellite,
+            ServiceUrl = "map_satellite.mbtiles"
+        };
+
+        int id = await _fx.Svc.InsertDefinedMapAsync(model);
+        Assert.True(id > 0);
+
+        var fetched = await _fx.Svc.FetchDefinedMapAsync(id);
+        Assert.NotNull(fetched);
+        Assert.Equal(EnumMapVendor.MBTiles, fetched!.Vendor);
+        Assert.Equal("map_satellite.mbtiles", fetched.ServiceUrl);
+        Assert.Equal("테스트 위성지도", fetched.Name);
+        Assert.Equal(15, fetched.MinZoomLevel);
+        Assert.Equal(18, fetched.MaxZoomLevel);
+    }
+
+    [Fact(DisplayName = "MBTiles DefinedMap – Fetch by Vendor")]
+    public async Task Fetch_MBTiles_ByVendor()
+    {
+        // Insert에서 등록한 MBTiles 맵 Fetch
+        var all = await _fx.Svc.FetchDefinedMapsAsync();
+        var mbtilesMaps = all?.Where(m => m.Vendor == EnumMapVendor.MBTiles).ToList();
+
+        Assert.NotNull(mbtilesMaps);
+        Assert.True(mbtilesMaps!.Count >= 1);
+        Assert.Contains(mbtilesMaps, m => m.ServiceUrl == "map_satellite.mbtiles");
     }
 }
 
