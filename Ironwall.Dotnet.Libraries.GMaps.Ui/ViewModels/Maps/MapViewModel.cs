@@ -1571,6 +1571,9 @@ public class MapViewModel : BasePanelViewModel,
             // 공통 지도 설정
             ConfigureCommonMapSettings();
 
+            // 콤보박스 바인딩 갱신
+            NotifyOfPropertyChange(nameof(SelectedMapItem));
+
             _log?.Info($"지도 설정 완료: {SelectedMap.Name}");
         }
         catch (Exception ex)
