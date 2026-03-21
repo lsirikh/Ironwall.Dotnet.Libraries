@@ -86,16 +86,39 @@
 
 ---
 
-## Phase 7: 최종 검증
+## Phase 8: 맵 전환 시 위치/줌 유지 (MS-08)
 
-- [ ] **7.1**: 전체 빌드 확인 — 오류 0개
-- [ ] **7.2**: UI 수동 검증
+- [ ] **8.1**: ConfigureMBTilesMap에 isInitialLoad 파라미터 추가
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+  - 구현:
+    - `ConfigureMBTilesMap(DefinedMapModel definedMap, bool isInitialLoad = false)`
+    - isInitialLoad=true: Position/Zoom을 MBTiles center에서 설정
+    - isInitialLoad=false: 전환 전 현재 Position/Zoom 저장 → 캐시 클리어 후 복원
+    - MinZoom/MaxZoom만 새 MBTiles 범위로 업데이트
+  - 빌드 확인
+
+- [ ] **8.2**: MapConfigureAsync에서 초기 로드 구분
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+  - 구현:
+    - `MapConfigureAsync(bool isInitialLoad = false)`
+    - OnActivateAsync에서 호출 시: `MapConfigureAsync(isInitialLoad: true)`
+    - ChangeMapAsync에서 호출 시: `MapConfigureAsync(isInitialLoad: false)`
+    - ConfigureDefinedMapAsync에 isInitialLoad 전달
+  - 빌드 확인
+
+---
+
+## Phase 9: 최종 검증
+
+- [ ] **9.1**: 전체 빌드 확인 — 오류 0개
+- [ ] **9.2**: UI 수동 검증
   - 위성↔일반 10회 전환 → 타일 겹침 없음
+  - **전환 시 현재 위치/줌 유지 ✅**
+  - 초기 로드 시 MBTiles center로 이동 ✅
   - 전환 시 이전 맵 완전히 사라짐
   - 이벤트 중복 없음 (로그 확인)
   - 빠른 연속 클릭 → 정상 동작
   - 전환 전후 심볼 마커 유지 확인
-  - 디버깅 로그 정상 출력
 
 ---
 

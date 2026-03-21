@@ -51,11 +51,23 @@ MainMap.MapProvider = MBTilesMapProvider.Instance       // 같은 참조!
 → 현재 코드는 파일명 기준이지만, DB에 남은 옛 데이터
 ```
 
+**Bug #6: 맵 전환 시 위치/줌 리셋 (MEDIUM)**
+```
+위성지도 zoom=18 서울 보고 있음
+→ 일반지도 전환
+→ ConfigureMBTilesMap: Position = MBTiles center, Zoom = centerZoom
+→ zoom=13 + 전혀 다른 위치로 이동 ❌
+
+원인: ConfigureMBTilesMap에서 매번 provider.CenterLocation/CenterZoom으로 설정
+초기 로드 시에만 center를 사용하고, 전환 시에는 현재 위치/줌을 유지해야 함
+```
+
 ### 동기
 - 맵 전환 시 이벤트 중복으로 성능 저하 및 예상치 못한 동작 발생 가능
 - 연속 전환 시 Race condition으로 잘못된 맵이 로드될 수 있음
 - 장시간 운용 시 SQLite 연결 누수로 "database locked" 발생 가능
 - **싱글턴 Provider에서 MBTiles 전환 시 타일이 겹침 (가장 심각)**
+- **맵 전환 시 현재 보고 있는 위치/줌이 리셋됨**
 
 ## 2. Goals (목표)
 
@@ -63,8 +75,9 @@ MainMap.MapProvider = MBTilesMapProvider.Instance       // 같은 참조!
 - [x] 맵 전환 시 이벤트 핸들러 누적 방지 (always 1개 구독) — Phase 1 완료
 - [x] 연속 빠른 전환 시 Race condition 방지 — Phase 2 완료
 - [x] MBTiles 전환 시 이전 SQLite 연결 명시적 해제 — Phase 3 완료
-- [ ] **MBTiles 전환 시 타일 캐시 초기화 + 강제 리로드** — Phase 5 (신규)
-- [ ] **디버깅 로그 추가 (전환 과정 추적)** — Phase 6 (신규)
+- [x] **MBTiles 전환 시 타일 캐시 초기화 + 강제 리로드** — Phase 5 완료
+- [x] **디버깅 로그 추가 (전환 과정 추적)** — Phase 6 완료
+- [ ] **맵 전환 시 현재 위치/줌 유지 (초기 로드만 center 사용)** — Phase 8 (신규)
 
 ### 비목표 (Out of Scope)
 - 맵 전환 애니메이션/트랜지션 효과
@@ -81,8 +94,9 @@ MainMap.MapProvider = MBTilesMapProvider.Instance       // 같은 참조!
 | MS-03 | MBTilesMapProvider.Open() 전 이전 source 명시적 Close | Must | ✅ 완료 |
 | MS-04 | MBTiles 클래스에 Close()/Dispose() 메서드 추가 | Must | ✅ 완료 |
 | MS-05 | 맵 전환 후 기존 마커 유지 검증 | Should | 미검증 |
-| **MS-06** | **ConfigureMBTilesMap에서 캐시 초기화 + 강제 리로드** | **Must** | 신규 |
-| **MS-07** | **맵 전환 디버깅 로그 추가** | **Must** | 신규 |
+| **MS-06** | **ConfigureMBTilesMap에서 캐시 초기화 + 강제 리로드** | **Must** | ✅ 완료 |
+| **MS-07** | **맵 전환 디버깅 로그 추가** | **Must** | ✅ 완료 |
+| **MS-08** | **맵 전환 시 현재 위치/줌 유지 (초기 로드만 center 사용)** | **Must** | 신규 |
 
 ### MS-06 근본 원인 및 해결
 
@@ -155,6 +169,51 @@ ConfigureMBTilesMap 진입 시:
 - 성능: 맵 전환 시간 기존과 동일 (캐시 클리어 ~10ms 추가)
 - 안정성: 100회 연속 전환에도 타일 겹침 없음
 - 호환성: GMap.NET 내부 수정은 최소화
+
+### MS-08 구현 상세
+
+```
+[현재 동작 — Bug #6]
+ConfigureMBTilesMap:
+  Position = provider.CenterLocation  ← 매번 MBTiles center로 이동
+  Zoom = provider.CenterZoom           ← 매번 MBTiles centerZoom으로 변경
+
+[수정 후]
+ConfigureMBTilesMap(definedMap, isInitialLoad):
+  if (isInitialLoad)                   ← 최초 로드 시만
+    Position = provider.CenterLocation
+    Zoom = provider.CenterZoom
+  else                                 ← 전환 시
+    // Position/Zoom 유지 (변경 안 함)
+    // MinZoom/MaxZoom만 새 MBTiles에 맞게 업데이트
+```
+
+```
+[전환 흐름]
+
+앱 시작 (isInitialLoad = true):
+  → SeedMBTilesMapsAsync
+  → ConfigureMBTilesMap(satellite, isInitialLoad=true)
+  → Position = MBTiles center ✅ (처음이니까)
+
+콤보박스 전환 (isInitialLoad = false):
+  → ChangeMapAsync → MapConfigureAsync
+  → ConfigureMBTilesMap(base, isInitialLoad=false)
+  → 현재 Position 저장 → 캐시 클리어 → Open → Provider 설정
+  → Position/Zoom 복원 ✅ (보고 있던 위치 유지)
+```
+
+### isInitialLoad 판별 방법
+
+```csharp
+// 방법 A: MapConfigureAsync 호출원 구분
+// MapConfigureAsync(isInitialLoad: true)  ← OnActivateAsync에서 호출
+// MapConfigureAsync(isInitialLoad: false) ← ChangeMapAsync에서 호출
+
+// 방법 B: 현재 Provider가 Empty/null이면 초기 로드
+var isInitialLoad = MainMap.MapProvider == null
+                 || MainMap.MapProvider == GMapProviders.EmptyProvider;
+```
 
 ## 4. Technical Approach (기술 접근)
 

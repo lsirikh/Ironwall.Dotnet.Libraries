@@ -154,8 +154,8 @@ public class MapViewModel : BasePanelViewModel,
             // 1. 저장된 커스텀 맵들 로드
             await _customMapService.LoadCustomMapsAsync();
 
-            // 2. 지도 설정
-            await MapConfigureAsync();
+            // 2. 지도 설정 (초기 로드 — MBTiles center로 이동)
+            await MapConfigureAsync(isInitialLoad: true);
 
             // 3. 심볼 설정
             await SymbolConfigureAsync();
@@ -1534,7 +1534,7 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 비동기 지도 설정 - 선택된 맵 타입에 따라 구성
     /// </summary>
-    private async Task MapConfigureAsync()
+    private async Task MapConfigureAsync(bool isInitialLoad = false)
     {
         try
         {
@@ -1561,7 +1561,7 @@ public class MapViewModel : BasePanelViewModel,
 
             if (SelectedMap is DefinedMapModel definedMap)
             {
-                await ConfigureDefinedMapAsync(definedMap);
+                await ConfigureDefinedMapAsync(definedMap, isInitialLoad);
             }
             else if (SelectedMap is CustomMapModel customMap)
             {
@@ -1583,14 +1583,14 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 기존 제공자 지도 설정 (Google, Bing, OpenStreetMap 등)
     /// </summary>
-    private async Task ConfigureDefinedMapAsync(DefinedMapModel definedMap)
+    private async Task ConfigureDefinedMapAsync(DefinedMapModel definedMap, bool isInitialLoad = false)
     {
         try
         {
             switch (definedMap.Vendor)
             {
                 case EnumMapVendor.MBTiles:
-                    ConfigureMBTilesMap(definedMap);
+                    ConfigureMBTilesMap(definedMap, isInitialLoad);
                     return; // 온라인 모드 설정 불필요
 
                 case EnumMapVendor.Google:
@@ -1807,7 +1807,7 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// MBTiles DefinedMap 설정 — Datas 폴더에서 파일명으로 로드
     /// </summary>
-    private void ConfigureMBTilesMap(DefinedMapModel definedMap)
+    private void ConfigureMBTilesMap(DefinedMapModel definedMap, bool isInitialLoad = false)
     {
         if (MainMap == null || string.IsNullOrEmpty(definedMap.ServiceUrl)) return;
 
@@ -1820,7 +1820,12 @@ public class MapViewModel : BasePanelViewModel,
             return;
         }
 
-        _log?.Info($"[MapSwitch] 전환 시작: {MainMap.MapProvider?.Name ?? "null"} → {definedMap.ServiceUrl}");
+        // 전환 전 현재 위치/줌 저장 (전환 시 복원용)
+        var savedPosition = MainMap.Position;
+        var savedZoom = MainMap.Zoom;
+
+        _log?.Info($"[MapSwitch] 전환 시작: {MainMap.MapProvider?.Name ?? "null"} → {definedMap.ServiceUrl}" +
+                   $" (isInitialLoad={isInitialLoad}, savedPos={savedPosition}, savedZoom={savedZoom})");
 
         // Step 1: 임시 빈 Provider로 전환 (GMap.NET에 참조 변경 알림)
         MainMap.MapProvider = GMapProviders.EmptyProvider;
@@ -1839,7 +1844,7 @@ public class MapViewModel : BasePanelViewModel,
         }
         _log?.Info($"[MapSwitch] Step 3: Open({definedMap.ServiceUrl}) 성공");
 
-        // Step 4: MBTiles Provider 설정 (참조가 변경되었으므로 GMap.NET이 인식)
+        // Step 4: MBTiles Provider 설정
         MainMap.MapProvider = provider;
         MainMap.Manager.Mode = AccessMode.ServerOnly;
         _log?.Info($"[MapSwitch] Step 4: MapProvider 설정 완료");
@@ -1848,17 +1853,29 @@ public class MapViewModel : BasePanelViewModel,
         if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
         if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
 
-        if (provider.CenterLocation != PointLatLng.Empty)
-            MainMap.Position = provider.CenterLocation;
-        if (provider.CenterZoom >= 0)
-            MainMap.Zoom = provider.CenterZoom;
+        if (isInitialLoad)
+        {
+            // 초기 로드: MBTiles center로 이동
+            if (provider.CenterLocation != PointLatLng.Empty)
+                MainMap.Position = provider.CenterLocation;
+            if (provider.CenterZoom >= 0)
+                MainMap.Zoom = provider.CenterZoom;
+            _log?.Info($"[MapSwitch] Step 5: 초기 로드 → MBTiles center ({provider.CenterLocation}, zoom={provider.CenterZoom})");
+        }
+        else
+        {
+            // 전환: 이전 위치/줌 복원
+            MainMap.Position = savedPosition;
+            MainMap.Zoom = savedZoom;
+            _log?.Info($"[MapSwitch] Step 5: 전환 → 위치/줌 복원 ({savedPosition}, zoom={savedZoom})");
+        }
 
         // Step 6: 강제 리로드
         MainMap.ReloadMap();
         _log?.Info($"[MapSwitch] Step 6: ReloadMap 완료");
 
         _log?.Info($"[MapSwitch] 전환 완료: {definedMap.Name} ({definedMap.ServiceUrl}), " +
-                   $"Zoom={provider.MinZoom}~{provider.MaxZoom}, Center={provider.CenterLocation}");
+                   $"Zoom={provider.MinZoom}~{provider.MaxZoom}, Position={MainMap.Position}");
     }
 
     /// <summary>
