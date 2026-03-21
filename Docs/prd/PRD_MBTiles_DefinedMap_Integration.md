@@ -63,6 +63,31 @@ AvailableMaps ComboBox
 | MB-07 | 기존 온라인 DefinedMap 데이터 삭제 기능 (또는 SeedDefault에서 MBTiles만 등록) | Should | |
 | MB-08 | MBTiles 파일 경로 유효성 검사 (File.Exists) | Must | |
 | MB-09 | 앱 시작 시 MBTiles맵이 기본 선택되도록 설정 | Should | appsettings |
+| MB-11 | Datas/ 폴더↔DB 동기화 (고아 정리 + 신규 등록 + 변경 감지) | Must | SeedMBTilesMapsAsync |
+| MB-12 | 파일 없는 DB 엔트리 자동 삭제 (고아 정리) | Must | ServiceUrl 기준 비교 |
+| MB-13 | 파일 수정일 > DB UpdatedAt 시 메타데이터 자동 갱신 | Must | bounds/zoom UPDATE |
+| MB-14 | UpdateDefinedMapMetadataAsync DB 메서드 | Must | IGMapDbService 인터페이스 |
+
+### SeedMBTilesMapsAsync 상세 흐름
+
+```
+앱 시작 → SeedMBTilesMapsAsync()
+│
+├── [1] Datas/ 폴더 스캔 → *.mbtiles 파일 목록
+│
+├── [2] DB에서 기존 MBTiles DefinedMap 조회 (Vendor==MBTiles)
+│
+├── [3] 고아 정리 (MB-12)
+│      DB에 있지만 폴더에 파일 없음 → DELETE + Provider 제거
+│
+├── [4] 변경 감지 (MB-13)
+│      DB에 있고 폴더에도 있음 + 파일수정일 > DB.UpdatedAt
+│      → MBTiles Open → bounds/zoom 재읽기 → UpdateDefinedMapMetadataAsync
+│
+└── [5] 신규 등록
+       폴더에 있지만 DB에 없음 → MBTiles Open → InsertDefinedMapAsync
+       파일명으로 Style 결정: *satellite* → 위성지도, 나머지 → 일반지도
+```
 
 ### 비기능 요구사항
 

@@ -1017,6 +1017,34 @@ internal class GMapDbService : TaskService, IGMapDbService
             throw;
         }
     }
+
+    public async Task UpdateDefinedMapMetadataAsync(
+        int mapId,
+        double minLat, double maxLat,
+        double minLng, double maxLng,
+        int minZoom, int maxZoom,
+        CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE Maps SET
+                    MinLatitude = @MinLat, MaxLatitude = @MaxLat,
+                    MinLongitude = @MinLng, MaxLongitude = @MaxLng,
+                    MinZoomLevel = @MinZoom, MaxZoomLevel = @MaxZoom,
+                    UpdatedAt = NOW()
+                WHERE Id = @MapId;";
+
+            await conn.ExecuteAsync(sql, new { MapId = mapId, MinLat = minLat, MaxLat = maxLat, MinLng = minLng, MaxLng = maxLng, MinZoom = minZoom, MaxZoom = maxZoom });
+            _log?.Info($"UpdateDefinedMapMetadataAsync 완료 - MapId={mapId}, Zoom={minZoom}~{maxZoom}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"DefinedMap 메타데이터 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
     #endregion
 
     #region - GeoControlPoint CRUD -

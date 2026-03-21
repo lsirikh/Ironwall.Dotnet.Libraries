@@ -165,6 +165,16 @@ public interface IGMapDbService
     Task<bool> DeleteDefinedMapAsync(
         IDefinedMapModel model, CancellationToken token = default);
 
+    /// <summary>
+    /// DefinedMap 메타데이터 업데이트 (MBTiles 파일 변경 시 bounds/zoom 갱신)
+    /// </summary>
+    Task UpdateDefinedMapMetadataAsync(
+        int mapId,
+        double minLat, double maxLat,
+        double minLng, double maxLng,
+        int minZoom, int maxZoom,
+        CancellationToken token = default);
+
     /*───────────────────── GeoControlPoint ────────────────*/
 
     /// <summary>

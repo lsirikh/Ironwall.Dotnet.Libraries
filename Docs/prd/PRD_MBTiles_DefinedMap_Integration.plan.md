@@ -136,4 +136,45 @@ Phase 4 (SeedDefault + 콤보박스 연동)
 Phase 5 (빌드 복사 + 검증)
 ```
 
-**총 10개 체크박스 | 수정 6개 + 신규 0개 파일**
+---
+
+## Phase 6: Datas↔DB 동기화 (고아 정리 + 변경 감지)
+
+> MB-11, MB-12, MB-13, MB-14
+
+- [ ] **6.1**: IGMapDbService — UpdateDefinedMapMetadataAsync 인터페이스 추가
+  - Target: `GMaps.Db/Services/IGMapDbService.cs`
+  - 구현: `Task UpdateDefinedMapMetadataAsync(int mapId, double minLat, double maxLat, double minLng, double maxLng, int minZoom, int maxZoom)`
+  - 빌드 확인
+
+- [ ] **6.2**: GMapDbService — UpdateDefinedMapMetadataAsync 구현
+  - Target: `GMaps.Db/Services/GMapDbService.cs`
+  - 구현: Maps 테이블 UPDATE (MinLatitude, MaxLatitude, MinLongitude, MaxLongitude, MinZoomLevel, MaxZoomLevel, UpdatedAt)
+  - 빌드 확인
+
+- [ ] **6.3**: SeedMBTilesMapsAsync 리팩토링 — 3단계 동기화 로직
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+  - 구현:
+    1. 고아 정리: DB에 있지만 폴더에 파일 없는 엔트리 → DELETE
+    2. 변경 감지: 파일 수정일 > DB UpdatedAt → 메타데이터 UPDATE
+    3. 신규 등록: 폴더에 있지만 DB에 없는 파일 → INSERT
+  - ~~기존 `if (existing MBTiles) return;` 전체 스킵 제거~~
+  - 빌드 확인
+
+- [ ] **6.4**: 빌드 + UI 검증
+  - 앱 시작 → "고양시일부" 엔트리 자동 삭제 (파일 없음)
+  - map_satellite.mbtiles, map_base.mbtiles 자동 등록
+  - 콤보박스에 "위성지도", "일반지도" 표시
+  - 파일 교체 후 재시작 → 메타데이터 갱신 확인
+
+---
+
+## 실행 순서
+
+```
+Phase 1~5 (기존 — 완료됨)
+    ↓
+Phase 6 (Datas↔DB 동기화 — 진행 중)
+```
+
+**총 14개 체크박스 | Phase 6: 신규 4개**

@@ -1674,10 +1674,6 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
-            // 이미 MBTiles 맵이 DB에 있으면 건너뜀
-            var existing = await _gMapDbService.FetchDefinedMapsAsync();
-            if (existing?.Any(m => m.Vendor == EnumMapVendor.MBTiles) == true) return;
-
             // Datas/ 폴더 스캔
             var datasPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Datas");
             if (!System.IO.Directory.Exists(datasPath))
@@ -1693,13 +1689,60 @@ public class MapViewModel : BasePanelViewModel,
                 return;
             }
 
+            // DB에서 기존 MBTiles 맵 목록 조회
+            var existing = await _gMapDbService.FetchDefinedMapsAsync();
+            var existingMBTiles = existing?
+                .Where(m => m.Vendor == EnumMapVendor.MBTiles)
+                .ToList() ?? new List<IDefinedMapModel>();
+
+            var folderFileNames = mbtilesFiles
+                .Select(f => System.IO.Path.GetFileName(f))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // 1. 폴더에 파일이 없는 DB 엔트리 삭제 (고아 정리)
+            foreach (var dbMap in existingMBTiles)
+            {
+                if (!folderFileNames.Contains(dbMap.ServiceUrl))
+                {
+                    await _gMapDbService.DeleteDefinedMapAsync(new DefinedMapModel { Id = dbMap.Id });
+                    var toRemove = _mapProvider.FirstOrDefault(m => m.Name == dbMap.Name);
+                    if (toRemove != null) _mapProvider.Remove(toRemove);
+                    var toRemoveDef = _definedMapProvider.FirstOrDefault(m => m.Name == dbMap.Name);
+                    if (toRemoveDef != null) _definedMapProvider.Remove(toRemoveDef);
+                    _log?.Info($"MBTiles DB 엔트리 삭제 (파일 없음): {dbMap.ServiceUrl}");
+                }
+            }
+
             var provider = MBTilesMapProvider.Instance;
 
             foreach (var filePath in mbtilesFiles)
             {
                 var fileName = System.IO.Path.GetFileName(filePath);
+                var fileInfo = new System.IO.FileInfo(filePath);
 
-                // MBTiles 열어서 메타데이터 읽기
+                // 2. 이미 DB에 있는 파일 → 변경 감지
+                var dbEntry = existingMBTiles.FirstOrDefault(
+                    m => string.Equals(m.ServiceUrl, fileName, StringComparison.OrdinalIgnoreCase));
+
+                if (dbEntry != null)
+                {
+                    // 파일 수정일이 DB보다 새로우면 메타데이터 업데이트
+                    if (fileInfo.LastWriteTime > dbEntry.UpdatedAt)
+                    {
+                        if (provider.Open(filePath) && provider.Bounds != null && provider.Bounds.Length == 2)
+                        {
+                            await _gMapDbService.UpdateDefinedMapMetadataAsync(
+                                dbEntry.Id,
+                                provider.Bounds[1].Lat, provider.Bounds[0].Lat,
+                                provider.Bounds[0].Lng, provider.Bounds[1].Lng,
+                                provider.MinZoom, provider.MaxZoom);
+                            _log?.Info($"MBTiles 메타데이터 갱신: {fileName}");
+                        }
+                    }
+                    continue; // 이미 등록된 파일은 스킵
+                }
+
+                // 3. 새 파일 → DB에 등록
                 if (!provider.Open(filePath))
                 {
                     _log?.Error($"MBTiles 열기 실패: {fileName}");
@@ -1711,10 +1754,6 @@ public class MapViewModel : BasePanelViewModel,
                 var style = isSatellite ? EnumMapStyle.Satellite : EnumMapStyle.Normal;
                 var category = isSatellite ? EnumMapCategory.Satellite : EnumMapCategory.Standard;
                 var displayName = isSatellite ? "위성지도" : "일반지도";
-
-                // 메타데이터에 이름이 있으면 사용
-                if (!string.IsNullOrEmpty(provider.DataName))
-                    displayName = provider.DataName;
 
                 var model = new DefinedMapModel
                 {
@@ -1749,7 +1788,7 @@ public class MapViewModel : BasePanelViewModel,
                 int id = await _gMapDbService.InsertDefinedMapAsync(model);
                 model.Id = id;
 
-                // Provider 목록에 즉시 추가 (FetchInstanceAsync 재호출 대신)
+                // Provider 목록에 즉시 추가
                 _mapProvider.Add(model);
                 _definedMapProvider.Add(model);
 
