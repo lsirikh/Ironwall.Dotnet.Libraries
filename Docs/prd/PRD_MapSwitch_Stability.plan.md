@@ -52,18 +52,70 @@
 
 ---
 
-## Phase 4: 최종 검증
+## Phase 4: ~~최종 검증~~ → Phase 5로 이동
 
-- [ ] **4.1**: 전체 빌드 확인 — 오류 0개
-- [ ] **4.2**: UI 수동 검증
-  - 맵 전환 10회 반복 → 이벤트 중복 없음 (로그 확인)
-  - 빠른 연속 클릭 → 정상 동작 (Race condition 없음)
-  - 위성↔일반 전환 → SQLite 에러 없음
+*(Phase 1~3 완료됨, Bug #4 발견으로 Phase 5~7 추가)*
+
+---
+
+## Phase 5: 싱글턴 캐시 겹침 수정 (MS-06) — 핵심 버그
+
+- [ ] **5.1**: ConfigureMBTilesMap 리팩토링 — 캐시 초기화 + 강제 리로드
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+  - 구현:
+    1. `MainMap.MapProvider = EmptyProvider.Instance` (임시 전환)
+    2. `GMaps.Instance.MemoryCache.Clear()` (타일 캐시 초기화)
+    3. `source?.Close()` (이전 SQLite 해제)
+    4. `MBTilesMapProvider.Instance.Open(path)` (새 MBTiles 열기)
+    5. `MainMap.MapProvider = MBTilesMapProvider.Instance` (Provider 재설정)
+    6. `MainMap.ReloadMap()` (강제 리로드)
+  - 빌드 확인
+
+---
+
+## Phase 6: 디버깅 로그 추가 (MS-07)
+
+- [ ] **6.1**: ConfigureMBTilesMap 내부에 Step별 로그 추가
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+  - 구현:
+    - 전환 시작/완료, 각 Step 로그
+    - MemoryCache 삭제 타일 수
+    - Provider 참조 변경 확인
+    - 파일명, Zoom, Center 기록
+  - 빌드 확인
+
+---
+
+## Phase 7: 최종 검증
+
+- [ ] **7.1**: 전체 빌드 확인 — 오류 0개
+- [ ] **7.2**: UI 수동 검증
+  - 위성↔일반 10회 전환 → 타일 겹침 없음
+  - 전환 시 이전 맵 완전히 사라짐
+  - 이벤트 중복 없음 (로그 확인)
+  - 빠른 연속 클릭 → 정상 동작
   - 전환 전후 심볼 마커 유지 확인
+  - 디버깅 로그 정상 출력
 
 ---
 
 ## 실행 순서
+
+```
+Phase 1~3 (완료 — 이벤트/Race/SQLite)
+    ↓
+Phase 5 (캐시 겹침 수정 — 핵심)
+    ↓
+Phase 6 (디버깅 로그)
+    ↓
+Phase 7 (최종 검증)
+```
+
+**총 Phase 1~3 완료, Phase 5~7 신규 (5개 체크박스)**
+
+---
+
+*(아래는 이전 Phase 4 기록)*
 
 ```
 Phase 1 (이벤트 핸들러 -= 추가)

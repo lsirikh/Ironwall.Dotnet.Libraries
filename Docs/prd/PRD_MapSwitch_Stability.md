@@ -35,38 +35,125 @@ source = new MBTiles(MBTilesFilePath);  // 이전 source Close 없이 교체
 // → 이전 SQLite 연결이 GC 의존, 명시적 해제 안 됨
 ```
 
+**Bug #4: 싱글턴 Provider 참조 미변경 → 타일 리로드 안 됨 (CRITICAL)**
+```
+MBTilesMapProvider.Instance.Open("map_base.mbtiles")  // 내부 source 교체
+MainMap.MapProvider = MBTilesMapProvider.Instance       // 같은 참조!
+→ GMap.NET: "MapProvider 안 바뀌었으니 리로드 안 함"
+→ KiberTileCache: 이전 타일 유지
+→ 결과: 새 타일 + 옛 캐시 = 겹침
+```
+
+**Bug #5: 콤보박스 이름 "고양시일부" 잔존**
+```
+이전 MBTiles 메타데이터 name="고양시일부"로 DB 생성됨
+→ DB 삭제 후 재시작해도 이전 세션 코드가 provider.DataName 사용
+→ 현재 코드는 파일명 기준이지만, DB에 남은 옛 데이터
+```
+
 ### 동기
 - 맵 전환 시 이벤트 중복으로 성능 저하 및 예상치 못한 동작 발생 가능
 - 연속 전환 시 Race condition으로 잘못된 맵이 로드될 수 있음
 - 장시간 운용 시 SQLite 연결 누수로 "database locked" 발생 가능
+- **싱글턴 Provider에서 MBTiles 전환 시 타일이 겹침 (가장 심각)**
 
 ## 2. Goals (목표)
 
 ### 핵심 목표
-- [ ] 맵 전환 시 이벤트 핸들러 누적 방지 (always 1개 구독)
-- [ ] 연속 빠른 전환 시 Race condition 방지
-- [ ] MBTiles 전환 시 이전 SQLite 연결 명시적 해제
+- [x] 맵 전환 시 이벤트 핸들러 누적 방지 (always 1개 구독) — Phase 1 완료
+- [x] 연속 빠른 전환 시 Race condition 방지 — Phase 2 완료
+- [x] MBTiles 전환 시 이전 SQLite 연결 명시적 해제 — Phase 3 완료
+- [ ] **MBTiles 전환 시 타일 캐시 초기화 + 강제 리로드** — Phase 5 (신규)
+- [ ] **디버깅 로그 추가 (전환 과정 추적)** — Phase 6 (신규)
 
 ### 비목표 (Out of Scope)
 - 맵 전환 애니메이션/트랜지션 효과
-- 온라인↔오프라인 전환 (현재 MBTiles 오프라인만 사용)
 - 맵 전환 시 심볼 재배치 로직 (현재 마커는 유지됨)
 
 ## 3. Requirements (요구사항)
 
 ### 기능 요구사항
 
-| ID | 요구사항 | 우선순위 | 비고 |
+| ID | 요구사항 | 우선순위 | 상태 |
 |----|---------|---------|------|
-| MS-01 | ConfigureCommonMapSettings에서 += 전에 -= 선행 | Must | 4개 이벤트 핸들러 |
-| MS-02 | ChangeMapAsync에 SemaphoreSlim(1,1) 적용 | Must | 동시 실행 방지 |
-| MS-03 | MBTilesMapProvider.Open() 전 이전 source 명시적 Close | Must | GMap.NET 코드 수정 |
-| MS-04 | MBTiles 클래스에 Close()/Dispose() 메서드 추가 | Must | 리소스 정리 |
-| MS-05 | 맵 전환 후 기존 마커 유지 검증 | Should | 회귀 테스트 |
+| MS-01 | ConfigureCommonMapSettings에서 += 전에 -= 선행 | Must | ✅ 완료 |
+| MS-02 | ChangeMapAsync에 SemaphoreSlim(1,1) 적용 | Must | ✅ 완료 |
+| MS-03 | MBTilesMapProvider.Open() 전 이전 source 명시적 Close | Must | ✅ 완료 |
+| MS-04 | MBTiles 클래스에 Close()/Dispose() 메서드 추가 | Must | ✅ 완료 |
+| MS-05 | 맵 전환 후 기존 마커 유지 검증 | Should | 미검증 |
+| **MS-06** | **ConfigureMBTilesMap에서 캐시 초기화 + 강제 리로드** | **Must** | 신규 |
+| **MS-07** | **맵 전환 디버깅 로그 추가** | **Must** | 신규 |
+
+### MS-06 근본 원인 및 해결
+
+```
+[근본 원인]
+MBTilesMapProvider는 싱글턴 → 참조(주소)가 항상 동일
+MainMap.MapProvider = 같은 참조 → GMap.NET이 변경 감지 못함
+KiberTileCache(22MB)에 이전 맵 타일이 남아 → 겹침
+
+[해결 방안]
+ConfigureMBTilesMap() 내부에서:
+1. MainMap.MapProvider = EmptyProvider.Instance  ← 임시 빈 Provider
+2. GMaps.Instance.MemoryCache.Clear()            ← 타일 캐시 초기화
+3. MBTilesMapProvider.Instance.Open(newPath)      ← 새 MBTiles 열기
+4. MainMap.MapProvider = MBTilesMapProvider.Instance  ← Provider 재설정
+5. MainMap.ReloadMap()                            ← 강제 리로드
+```
+
+### MS-06 전환 흐름 (수정 후)
+
+```
+[사용자: "위성지도" → "일반지도" 선택]
+    │
+    ▼
+ChangeMapAsync("일반지도")
+    │ _mapSwitchLock.WaitAsync(0) = true ✅
+    │
+    ▼
+MapConfigureAsync()
+    │
+    ▼
+ConfigureMBTilesMap(definedMap)
+    │
+    ├── [Step 1] MainMap.MapProvider = EmptyProvider.Instance
+    │   └── GMap.NET: "Provider 바뀜! 기존 렌더링 중단"
+    │
+    ├── [Step 2] GMaps.Instance.MemoryCache.Clear()
+    │   └── KiberTileCache: 위성 타일 22MB 전부 삭제
+    │
+    ├── [Step 3] source?.Close()
+    │   └── map_satellite.mbtiles SQLite 연결 해제
+    │
+    ├── [Step 4] MBTilesMapProvider.Instance.Open("map_base.mbtiles")
+    │   └── 새 SQLite 연결 + 메타데이터 읽기
+    │
+    ├── [Step 5] MainMap.MapProvider = MBTilesMapProvider.Instance
+    │   └── GMap.NET: "Provider 바뀜! 새 타일 요청 시작"
+    │
+    ├── [Step 6] MainMap.ReloadMap()
+    │   └── 화면 전체 타일 재요청 → map_base.mbtiles에서 로드
+    │
+    └── Position / Zoom 설정
+```
+
+### MS-07 디버깅 로그
+
+```
+ConfigureMBTilesMap 진입 시:
+  [MapSwitch] 전환 시작: {현재Provider} → {새파일명}
+  [MapSwitch] Step 1: EmptyProvider 전환
+  [MapSwitch] Step 2: MemoryCache 클리어 ({N}개 타일 삭제)
+  [MapSwitch] Step 3: 이전 source Close
+  [MapSwitch] Step 4: Open({파일명}) = {결과}
+  [MapSwitch] Step 5: MapProvider 설정
+  [MapSwitch] Step 6: ReloadMap 호출
+  [MapSwitch] 전환 완료: {새Provider}, Zoom={min}~{max}, Center=({lat},{lng})
+```
 
 ### 비기능 요구사항
-- 성능: 맵 전환 시간 기존과 동일 (추가 오버헤드 없음)
-- 안정성: 100회 연속 전환에도 이벤트 1회만 실행
+- 성능: 맵 전환 시간 기존과 동일 (캐시 클리어 ~10ms 추가)
+- 안정성: 100회 연속 전환에도 타일 겹침 없음
 - 호환성: GMap.NET 내부 수정은 최소화
 
 ## 4. Technical Approach (기술 접근)

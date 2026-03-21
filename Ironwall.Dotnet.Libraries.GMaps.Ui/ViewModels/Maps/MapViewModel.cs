@@ -1816,30 +1816,48 @@ public class MapViewModel : BasePanelViewModel,
 
         if (!System.IO.File.Exists(mbtilesPath))
         {
-            _log?.Error($"MBTiles 파일 없음: {mbtilesPath}");
+            _log?.Error($"[MapSwitch] MBTiles 파일 없음: {mbtilesPath}");
             return;
         }
 
+        _log?.Info($"[MapSwitch] 전환 시작: {MainMap.MapProvider?.Name ?? "null"} → {definedMap.ServiceUrl}");
+
+        // Step 1: 임시 빈 Provider로 전환 (GMap.NET에 참조 변경 알림)
+        MainMap.MapProvider = GMapProviders.EmptyProvider;
+        _log?.Info($"[MapSwitch] Step 1: EmptyProvider 전환");
+
+        // Step 2: 메모리 타일 캐시 초기화 (이전 맵 타일 제거)
+        GMap.NET.GMaps.Instance.MemoryCache.Clear();
+        _log?.Info($"[MapSwitch] Step 2: MemoryCache 클리어");
+
+        // Step 3: 새 MBTiles 열기 (Open 내부에서 이전 source Close 수행)
         var provider = MBTilesMapProvider.Instance;
         if (!provider.Open(mbtilesPath))
         {
-            _log?.Error($"MBTiles 열기 실패: {mbtilesPath}");
+            _log?.Error($"[MapSwitch] Step 3: MBTiles 열기 실패: {mbtilesPath}");
             return;
         }
+        _log?.Info($"[MapSwitch] Step 3: Open({definedMap.ServiceUrl}) 성공");
 
+        // Step 4: MBTiles Provider 설정 (참조가 변경되었으므로 GMap.NET이 인식)
         MainMap.MapProvider = provider;
         MainMap.Manager.Mode = AccessMode.ServerOnly;
+        _log?.Info($"[MapSwitch] Step 4: MapProvider 설정 완료");
 
+        // Step 5: Zoom/Position 설정
         if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
         if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
 
-        // MBTiles center로 이동
         if (provider.CenterLocation != PointLatLng.Empty)
             MainMap.Position = provider.CenterLocation;
         if (provider.CenterZoom >= 0)
             MainMap.Zoom = provider.CenterZoom;
 
-        _log?.Info($"MBTiles 로드 완료: {definedMap.Name} ({definedMap.ServiceUrl}), " +
+        // Step 6: 강제 리로드
+        MainMap.ReloadMap();
+        _log?.Info($"[MapSwitch] Step 6: ReloadMap 완료");
+
+        _log?.Info($"[MapSwitch] 전환 완료: {definedMap.Name} ({definedMap.ServiceUrl}), " +
                    $"Zoom={provider.MinZoom}~{provider.MaxZoom}, Center={provider.CenterLocation}");
     }
 
