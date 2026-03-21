@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
 using System.IO;
+using System.Threading;
 using Ironwall.Dotnet.Libraries.GMaps.Providers;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -1867,7 +1868,12 @@ public class MapViewModel : BasePanelViewModel,
         MainMap.ShowCenter = false;
         MainMap.MultiTouchEnabled = false;
 
-        // 이벤트 핸들러 등록
+        // 이벤트 핸들러 해제 (누적 방지) → 재구독
+        MainMap.OnPositionChanged -= MainMap_OnCurrentPositionChanged;
+        MainMap.MouseMove -= MainMap_MouseMove;
+        MainMap.MouseLeftButtonDown -= MainMap_MouseLeftButtonDown;
+        MainMap.OnMapZoomChanged -= MainMap_OnMapZoomChanged;
+
         MainMap.OnPositionChanged += MainMap_OnCurrentPositionChanged;
         MainMap.MouseMove += MainMap_MouseMove;
         MainMap.MouseLeftButtonDown += MainMap_MouseLeftButtonDown;
@@ -4518,10 +4524,17 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async Task ChangeMapAsync(IMapModel targetMap)
     {
+        if (targetMap == null) return;
+
+        // Race condition 방지: 이미 전환 중이면 스킵
+        if (!await _mapSwitchLock.WaitAsync(0))
+        {
+            _log?.Info($"지도 변경 스킵 (전환 진행 중): {targetMap.Name}");
+            return;
+        }
+
         try
         {
-            if (targetMap == null) return;
-
             _log?.Info($"지도 변경 요청: {SelectedMap?.Name} → {targetMap.Name}");
 
             // 편집 모드 해제
@@ -4534,8 +4547,6 @@ public class MapViewModel : BasePanelViewModel,
             _setupModel.MapName = targetMap.Name;
             _setupModel.MapType = targetMap.ProviderType.ToString();
 
-            // 기존 SwitchToMapAsync 사용하거나, 직접 MapConfigureAsync 호출
-            // MapConfigureAsync가 setupModel.MapName을 사용하므로 직접 호출
             await MapConfigureAsync();
 
             // UI 업데이트
@@ -4549,8 +4560,11 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"지도 변경 실패: {ex.Message}");
-            // 실패 시 UI 복원
             NotifyOfPropertyChange(nameof(SelectedMapItem));
+        }
+        finally
+        {
+            _mapSwitchLock.Release();
         }
     }
     #endregion
@@ -4741,6 +4755,9 @@ public class MapViewModel : BasePanelViewModel,
     }
     #endregion
     #region - 필드 (Private Fields) -
+    // 맵 전환 동시 실행 방지
+    private readonly SemaphoreSlim _mapSwitchLock = new(1, 1);
+
     // 서비스 및 의존성
     private CancellationTokenSource _cts;
     private MapProvider _mapProvider;
