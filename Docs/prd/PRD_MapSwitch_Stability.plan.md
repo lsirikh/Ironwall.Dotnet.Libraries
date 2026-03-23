@@ -88,7 +88,7 @@
 
 ## Phase 8: 맵 전환 시 위치/줌 유지 (MS-08)
 
-- [ ] **8.1**: ConfigureMBTilesMap에 isInitialLoad 파라미터 추가
+- [x] **8.1**: ConfigureMBTilesMap에 isInitialLoad 파라미터 추가 ✅ (abfd24e)
   - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
   - 구현:
     - `ConfigureMBTilesMap(DefinedMapModel definedMap, bool isInitialLoad = false)`
@@ -97,7 +97,7 @@
     - MinZoom/MaxZoom만 새 MBTiles 범위로 업데이트
   - 빌드 확인
 
-- [ ] **8.2**: MapConfigureAsync에서 초기 로드 구분
+- [x] **8.2**: MapConfigureAsync에서 초기 로드 구분 ✅ (abfd24e)
   - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
   - 구현:
     - `MapConfigureAsync(bool isInitialLoad = false)`
@@ -108,13 +108,35 @@
 
 ---
 
+## Phase 8.5: 초기 로드 시 HomePosition 시작 + 콤보박스 빈칸 (Bug #7)
+
+- [x] **8.5.1**: ConfigureCommonMapSettings에 isInitialLoad 파라미터 전달 ✅
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs`
+  - 구현:
+    - isInitialLoad=true: HomePosition으로 이동 (else 분기)
+    - isInitialLoad=false: Position 유지 (MBTiles 분기)
+
+- [x] **8.5.2**: isInitialLoad=true일 때 ReloadMap 스킵
+  - Target: `GMaps.Ui/ViewModels/Maps/MapViewModel.cs` — ConfigureMBTilesMap
+  - 원인: OnActivateAsync 시점에 WPF 폼 미로드 → ReloadMap 예외
+    → ConfigureCommonMapSettings + NotifyOfPropertyChange 실행 안 됨
+    → HomePosition 이동 안 됨 + 콤보박스 빈칸
+  - 구현:
+    - `if (!isInitialLoad) MainMap.ReloadMap();` — 초기 로드 시 ReloadMap 스킵
+    - 폼 로드 후 GMap.NET이 자동으로 타일 로드하므로 불필요
+  - 빌드 확인
+    - HomePosition이 MBTiles bounds 밖이면 MBTiles center로 폴백
+  - 빌드 확인
+
+---
+
 ## Phase 9: 최종 검증
 
 - [ ] **9.1**: 전체 빌드 확인 — 오류 0개
 - [ ] **9.2**: UI 수동 검증
   - 위성↔일반 10회 전환 → 타일 겹침 없음
   - **전환 시 현재 위치/줌 유지 ✅**
-  - 초기 로드 시 MBTiles center로 이동 ✅
+  - **초기 로드 시 HomePosition에서 시작 ✅**
   - 전환 시 이전 맵 완전히 사라짐
   - 이벤트 중복 없음 (로그 확인)
   - 빠른 연속 클릭 → 정상 동작

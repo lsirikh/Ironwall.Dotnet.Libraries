@@ -1568,8 +1568,8 @@ public class MapViewModel : BasePanelViewModel,
                 await ConfigureCustomMapAsync(customMap);
             }
 
-            // 공통 지도 설정
-            ConfigureCommonMapSettings();
+            // 공통 지도 설정 (초기 로드 시 HomePosition으로 이동)
+            ConfigureCommonMapSettings(isInitialLoad);
 
             // 콤보박스 바인딩 갱신
             NotifyOfPropertyChange(nameof(SelectedMapItem));
@@ -1593,7 +1593,10 @@ public class MapViewModel : BasePanelViewModel,
             switch (definedMap.Vendor)
             {
                 case EnumMapVendor.MBTiles:
-                    ConfigureMBTilesMap(definedMap, isInitialLoad);
+                    if (isInitialLoad)
+                        InitializeMBTilesMap(definedMap);
+                    else
+                        SwitchMBTilesMap(definedMap);
                     return; // 온라인 모드 설정 불필요
 
                 case EnumMapVendor.Google:
@@ -1808,9 +1811,51 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// MBTiles DefinedMap 설정 — Datas 폴더에서 파일명으로 로드
+    /// 초기 로드 전용 — MBTiles Open + Provider 설정만
+    /// ReloadMap 호출 안 함 (GMapControl_Loaded → OnMapOpen이 타일 자동 로드)
+    /// Position/Zoom 설정 안 함 (ConfigureCommonMapSettings에서 HomePosition 적용)
     /// </summary>
-    private void ConfigureMBTilesMap(DefinedMapModel definedMap, bool isInitialLoad = false)
+    private void InitializeMBTilesMap(DefinedMapModel definedMap)
+    {
+        if (MainMap == null || string.IsNullOrEmpty(definedMap.ServiceUrl)) return;
+
+        var mbtilesPath = System.IO.Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "Datas", definedMap.ServiceUrl);
+
+        if (!System.IO.File.Exists(mbtilesPath))
+        {
+            _log?.Error($"[MapInit] MBTiles 파일 없음: {mbtilesPath}");
+            return;
+        }
+
+        // 1. MBTiles 열기
+        var provider = MBTilesMapProvider.Instance;
+        if (!provider.Open(mbtilesPath))
+        {
+            _log?.Error($"[MapInit] MBTiles 열기 실패: {mbtilesPath}");
+            return;
+        }
+
+        // 2. Provider 설정 (EmptyProvider 불필요 — 최초이므로 참조 변경 자연 발생)
+        MainMap.MapProvider = provider;
+        MainMap.Manager.Mode = AccessMode.ServerOnly;
+
+        // 3. Zoom 범위만 설정 (Position/Zoom은 ConfigureCommonMapSettings에서 HomePosition 적용)
+        if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
+        if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
+
+        // ReloadMap 호출하지 않음 — IsStarted=false 상태 (폼 미로드)
+        // GMapControl_Loaded → OnMapOpen에서 타일 자동 로드됨
+
+        _log?.Info($"[MapInit] 초기화 완료: {definedMap.Name} ({definedMap.ServiceUrl}), " +
+                   $"Zoom={provider.MinZoom}~{provider.MaxZoom}");
+    }
+
+    /// <summary>
+    /// 맵 전환 전용 — EmptyProvider → CacheClear → Open → Provider → ReloadMap → Position 복원
+    /// IsStarted=true 보장 (폼 이미 로드됨)
+    /// </summary>
+    private void SwitchMBTilesMap(DefinedMapModel definedMap)
     {
         if (MainMap == null || string.IsNullOrEmpty(definedMap.ServiceUrl)) return;
 
@@ -1823,59 +1868,40 @@ public class MapViewModel : BasePanelViewModel,
             return;
         }
 
-        // 전환 전 현재 위치/줌 저장 (전환 시 복원용)
+        // 0. 현재 위치/줌 저장
         var savedPosition = MainMap.Position;
         var savedZoom = MainMap.Zoom;
 
-        _log?.Info($"[MapSwitch] 전환 시작: {MainMap.MapProvider?.Name ?? "null"} → {definedMap.ServiceUrl}" +
-                   $" (isInitialLoad={isInitialLoad}, savedPos={savedPosition}, savedZoom={savedZoom})");
+        _log?.Info($"[MapSwitch] 전환 시작: {MainMap.MapProvider?.Name ?? "null"} → {definedMap.ServiceUrl}");
 
-        // Step 1: 임시 빈 Provider로 전환 (GMap.NET에 참조 변경 알림)
+        // 1. EmptyProvider 전환 (싱글턴 참조 변경 강제)
         MainMap.MapProvider = GMapProviders.EmptyProvider;
-        _log?.Info($"[MapSwitch] Step 1: EmptyProvider 전환");
 
-        // Step 2: 메모리 타일 캐시 초기화 (이전 맵 타일 제거)
+        // 2. 메모리 타일 캐시 초기화
         GMap.NET.GMaps.Instance.MemoryCache.Clear();
-        _log?.Info($"[MapSwitch] Step 2: MemoryCache 클리어");
 
-        // Step 3: 새 MBTiles 열기 (Open 내부에서 이전 source Close 수행)
+        // 3. 새 MBTiles 열기 (Open 내부에서 이전 source Close)
         var provider = MBTilesMapProvider.Instance;
         if (!provider.Open(mbtilesPath))
         {
-            _log?.Error($"[MapSwitch] Step 3: MBTiles 열기 실패: {mbtilesPath}");
+            _log?.Error($"[MapSwitch] MBTiles 열기 실패: {mbtilesPath}");
             return;
         }
-        _log?.Info($"[MapSwitch] Step 3: Open({definedMap.ServiceUrl}) 성공");
 
-        // Step 4: MBTiles Provider 설정
+        // 4. Provider 설정
         MainMap.MapProvider = provider;
         MainMap.Manager.Mode = AccessMode.ServerOnly;
-        _log?.Info($"[MapSwitch] Step 4: MapProvider 설정 완료");
 
-        // Step 5: Zoom/Position 설정
+        // 5. Zoom 범위 설정
         if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
         if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
 
-        if (isInitialLoad)
-        {
-            // 초기 로드: MBTiles center로 이동
-            if (provider.CenterLocation != PointLatLng.Empty)
-                MainMap.Position = provider.CenterLocation;
-            if (provider.CenterZoom >= 0)
-                MainMap.Zoom = provider.CenterZoom;
-            _log?.Info($"[MapSwitch] Step 5: 초기 로드 → MBTiles center ({provider.CenterLocation}, zoom={provider.CenterZoom})");
-        }
-        else
-        {
-            // 전환: 이전 위치/줌 복원
-            MainMap.Position = savedPosition;
-            MainMap.Zoom = savedZoom;
-            _log?.Info($"[MapSwitch] Step 5: 전환 → 위치/줌 복원 ({savedPosition}, zoom={savedZoom})");
-        }
+        // 6. 위치/줌 복원
+        MainMap.Position = savedPosition;
+        MainMap.Zoom = savedZoom;
 
-        // Step 6: 강제 리로드
+        // 7. 강제 리로드 (IsStarted=true 보장)
         MainMap.ReloadMap();
-        _log?.Info($"[MapSwitch] Step 6: ReloadMap 완료");
 
         _log?.Info($"[MapSwitch] 전환 완료: {definedMap.Name} ({definedMap.ServiceUrl}), " +
                    $"Zoom={provider.MinZoom}~{provider.MaxZoom}, Position={MainMap.Position}");
@@ -1884,24 +1910,21 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 공통 지도 설정 - 위치, 줌, 이벤트 핸들러 등
     /// </summary>
-    private void ConfigureCommonMapSettings()
+    private void ConfigureCommonMapSettings(bool isInitialLoad = false)
     {
         if (MainMap == null || SelectedMap == null) return;
 
-        // MBTiles는 ConfigureMBTilesMap에서 이미 Position/Zoom 설정됨 → 덮어쓰지 않음
-        if (SelectedMap is DefinedMapModel dm && dm.Vendor == EnumMapVendor.MBTiles)
+        // MinZoom/MaxZoom는 항상 DB 값으로 설정
+        MainMap.MinZoom = SelectedMap.MinZoomLevel;
+        MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
+
+        if (isInitialLoad)
         {
-            // MinZoom/MaxZoom만 DB 값으로 보정
-            MainMap.MinZoom = SelectedMap.MinZoomLevel;
-            MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
-        }
-        else
-        {
+            // 초기 로드: HomePosition으로 이동
             MainMap.Position = _setupModel.HomePosition?.PointLatLng ?? new PointLatLng(37.648425, 126.904284);
-            MainMap.MinZoom = SelectedMap.MinZoomLevel;
-            MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
             MainMap.Zoom = _setupModel.HomePosition?.Zoom ?? DEFAULT_ZOOM;
         }
+        // 맵 전환: Position/Zoom은 SwitchMBTilesMap에서 이미 복원됨 → 건드리지 않음
 
         MainMap.ShowCenter = false;
         MainMap.MultiTouchEnabled = false;
