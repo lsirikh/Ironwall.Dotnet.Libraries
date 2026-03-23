@@ -345,6 +345,47 @@ private void ConfigureCommonMapSettings(bool isInitialLoad = false)
 
 ---
 
+## 5.5 초기 로드 빈 타일 버그 — 시도 및 결과 (2026-03-23)
+
+### 증상
+- 앱 시작 시 zoom 18에서 타일이 안 보임 (흰 배경)
+- 줌 17로 갔다가 18로 돌아오면 정상 표시
+- 맵 전환(위성↔일반)은 정상 동작
+- **타일은 MBTiles에 존재함** (줌 변경 시 정상 로드 확인)
+
+### 근본 원인 (확인됨)
+GMap.NET `Position` setter에서 `IsStarted=false`일 때 `_positionPixel`이 갱신되지 않음:
+```csharp
+// GMapControl.cs — Position setter
+if (_core.IsStarted)  // ← false일 때 _positionPixel 갱신 안 됨
+    _core._positionPixel = Projection.FromLatLngToPixel(value, Zoom);
+```
+- OnActivateAsync에서 Position = HomePosition 설정 시 IsStarted=false
+- OnMapOpen 시 GoToCurrentPosition() → stale _positionPixel(0,0) 사용
+- 잘못된 좌표로 타일 요청 → 타일 없음
+- 이후 줌 변경 시 IsStarted=true → _positionPixel 정상 계산 → 타일 정상
+
+### 시도한 해결 방법 및 결과
+
+| # | 방법 | 결과 | 이유 |
+|---|------|------|------|
+| 1 | MainMap.Loaded 이벤트에서 Position 재설정 | ❌ 실패 | Loaded가 OnViewAttached 시점에 이미 발생 → 이벤트 안 잡힘 |
+| 2 | Dispatcher.BeginInvoke(DispatcherPriority.Loaded) | ❌ 실패 | 실행 안 됨 (원인 미상) |
+| 3 | OnTileLoadComplete 이벤트에서 Position 재설정 + ReloadMap | ❌ 실패 | 실행됐지만 동일 좌표 → 여전히 0MB |
+| 4 | isInitialLoad=true일 때 ReloadMap 스킵 | ❌ 실패 | 타일 로드 자체가 안 됨 |
+| 5 | isInitialLoad=true일 때 ReloadMap try-catch | ❌ 실패 | 예외 무시해도 타일 안 뜸 |
+
+### 원복 사항
+- 시도 1~3의 코드 (MainMap_OnLoaded, Dispatcher.BeginInvoke, OnInitialTileLoadComplete) 전부 제거
+- InitializeMBTilesMap/SwitchMBTilesMap 분리 구조는 유지 (맵 전환 정상 동작)
+
+### 다음 세션에서 시도할 방향
+1. **GMap.NET Core 직접 수정**: `OnMapOpen()` 내부에서 `GoToCurrentPosition()` 호출 전에 `_positionPixel` 강제 재계산
+2. **GMapControl.cs Position setter 수정**: `IsStarted` 체크 제거하고 항상 `_positionPixel` 갱신
+3. **InitializeMBTilesMap에서 Position 설정 안 함**: ConfigureCommonMapSettings의 Position 설정을 OnMapOpen 이후로 지연
+
+---
+
 ## 6. Risks & Mitigations (리스크)
 
 | 리스크 | 영향 | 완화 방안 |

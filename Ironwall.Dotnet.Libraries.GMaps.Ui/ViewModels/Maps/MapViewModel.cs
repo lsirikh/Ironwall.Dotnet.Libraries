@@ -167,6 +167,10 @@ public class MapViewModel : BasePanelViewModel,
             NotifyOfPropertyChange(nameof(AvailableMaps));
             NotifyOfPropertyChange(nameof(SelectedMapItem));
 
+            // TODO: 초기 로드 시 빈 타일 버그 미해결 — PRD_Map_Init_Switch_Redesign.md 섹션 5.5 참조
+            // 원인: IsStarted=false 상태에서 Position 설정 시 _positionPixel 미갱신
+            // 다음 세션에서 GMap.NET Core 직접 수정 필요
+
             _eventAggregator.SubscribeOnPublishedThread(this);
 
         }
@@ -215,7 +219,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     _symbolEventManager.RegisterDeviceSymbol(device, symbol.Model);
 
-                    _log?.Info($"장비-심볼 매핑: {device.DeviceName} <-> {symbol.Title}");
+                    //_log?.Info($"장비-심볼 매핑: {device.DeviceName} <-> {symbol.Title}");
                 }
 
                 // 복수 그룹 지원: 각 DeviceGroup에 대해 그룹 심볼 매핑
@@ -228,13 +232,13 @@ public class MapViewModel : BasePanelViewModel,
                         if (groupSymbol != null)
                         {
                             _symbolEventManager.RegisterGroupSymbol(groupId, device, groupSymbol.Model);
-                            _log?.Info($"그룹-심볼 매핑: DeviceGroup({groupId}) <-> {groupSymbol.Title}");
+                            //_log?.Info($"그룹-심볼 매핑: DeviceGroup({groupId}) <-> {groupSymbol.Title}");
                         }
                     }
                 }
             }
 
-            _log?.Info($"장비-심볼 매핑 완료: {devices.Count}개 장비");
+            //_log?.Info($"장비-심볼 매핑 완료: {devices.Count}개 장비");
         }
         catch (Exception ex)
         {
