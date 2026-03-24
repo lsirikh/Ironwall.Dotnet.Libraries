@@ -136,6 +136,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="White"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="부대 지시자" />
@@ -152,6 +153,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="White"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="상급 부대명" />
@@ -168,6 +170,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="White"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="콜사인" />
@@ -184,6 +187,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
+                                    Foreground="White"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="국가 코드" />

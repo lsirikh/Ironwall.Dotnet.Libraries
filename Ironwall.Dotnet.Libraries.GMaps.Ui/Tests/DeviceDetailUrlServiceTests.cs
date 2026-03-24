@@ -57,9 +57,20 @@ public class DeviceDetailUrlServiceTests
     {
         var svc = new DeviceDetailUrlService(CreateSetup());
 
-        var url = svc.BuildUrl(EnumDeviceType.PIR, 3);
+        var url = svc.BuildUrl(EnumDeviceType.NONE, 3);
 
         Assert.Equal(string.Empty, url);
+    }
+
+    [Fact]
+    [Trait("Category", "DeviceDetailUrl")]
+    public void BuildUrl_PIR_ReturnsSensorUrl()
+    {
+        var svc = new DeviceDetailUrlService(CreateSetup());
+
+        var url = svc.BuildUrl(EnumDeviceType.PIR, 3);
+
+        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-sensor&device=PIDS_SENSOR&panel=detail&panelId=3", url);
     }
 
     [Fact]
@@ -101,6 +112,43 @@ public class DeviceDetailUrlServiceTests
         Assert.Equal($"{b}?node=svms-device-speaker&device=SPEAKER&panel=detail&panelId=4",            svc.BuildUrl(EnumDeviceType.IpSpeaker,   4));
         Assert.Equal($"{b}?node=svms-device-lamp&device=LAMP&panel=detail&panelId=5",                  svc.BuildUrl(EnumDeviceType.Lamp,        5));
         Assert.Equal($"{b}?node=svms-device-enclosure&device=ENCLOSURE&panel=detail&panelId=6",        svc.BuildUrl(EnumDeviceType.Enclosure,   6));
+    }
+
+    [Theory]
+    [Trait("Category", "DeviceDetailUrl")]
+    [InlineData(EnumDeviceType.Multi)]
+    [InlineData(EnumDeviceType.Fence)]
+    [InlineData(EnumDeviceType.Underground)]
+    [InlineData(EnumDeviceType.Contact)]
+    [InlineData(EnumDeviceType.PIR)]
+    [InlineData(EnumDeviceType.IoController)]
+    [InlineData(EnumDeviceType.Laser)]
+    [InlineData(EnumDeviceType.Cable)]
+    [InlineData(EnumDeviceType.SmartSensor)]
+    [InlineData(EnumDeviceType.SmartSensor2)]
+    [InlineData(EnumDeviceType.SmartCompound)]
+    [InlineData(EnumDeviceType.Radar)]
+    [InlineData(EnumDeviceType.OpticalCable)]
+    public void BuildUrl_AllSensorTypes_MapToSensorPage(EnumDeviceType sensorType)
+    {
+        var svc = new DeviceDetailUrlService(CreateSetup());
+
+        var url = svc.BuildUrl(sensorType, 99);
+
+        Assert.Contains("node=svms-device-sensor", url);
+        Assert.Contains("device=PIDS_SENSOR", url);
+        Assert.Contains("panelId=99", url);
+    }
+
+    [Fact]
+    [Trait("Category", "DeviceDetailUrl")]
+    public void BuildUrl_IpWithTrailingColon_StripsColon()
+    {
+        var svc = new DeviceDetailUrlService(CreateSetup(ip: "192.168.1.1:"));
+
+        var url = svc.BuildUrl(EnumDeviceType.Controller, 1);
+
+        Assert.StartsWith("http://192.168.1.1:8080/", url);
     }
 
     #endregion

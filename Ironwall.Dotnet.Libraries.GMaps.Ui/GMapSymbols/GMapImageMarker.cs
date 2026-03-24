@@ -111,7 +111,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
 
             // Shape 설정
             Shape = markerControl;
-            _log?.Info($"GMapImageMarker Shape 생성 완료 (GMapMarkerImageControl): {Title}");
+            //_log?.Info($"GMapImageMarker Shape 생성 완료 (GMapMarkerImageControl): {Title}");
         }
         catch (Exception ex)
         {

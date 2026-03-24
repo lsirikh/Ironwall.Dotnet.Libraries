@@ -138,7 +138,7 @@
 				Height="50"
 				Margin="16"
 				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
 				Visibility="{Binding IsVisible, Converter={StaticResource BoolToInverseVisibleConverter}}"
 				Value="44" />
 		</Grid>

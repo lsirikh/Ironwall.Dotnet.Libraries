@@ -97,10 +97,21 @@
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="AddDeviceButton" />
 					</i:Interaction.Behaviors>
-					<md:PackIcon
-						Width="30"
-						Height="30"
-						Kind="AddBox" />
+					<Button.Content>
+						<Grid>
+							<ProgressBar
+								Width="30"
+								Height="30"
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding AddButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+							<md:PackIcon
+								Width="30"
+								Height="30"
+								Kind="AddBox"
+								Visibility="{Binding AddButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						</Grid>
+					</Button.Content>
 				</Button>
 
 				<!--  제거 버튼  -->
@@ -112,10 +123,21 @@
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="RemoveDeviceButton" />
 					</i:Interaction.Behaviors>
-					<md:PackIcon
-						Width="30"
-						Height="30"
-						Kind="MinusBox" />
+					<Button.Content>
+						<Grid>
+							<ProgressBar
+								Width="30"
+								Height="30"
+								IsIndeterminate="True"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding RemoveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+							<md:PackIcon
+								Width="30"
+								Height="30"
+								Kind="MinusBox"
+								Visibility="{Binding RemoveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						</Grid>
+					</Button.Content>
 				</Button>
 
 				<!--  새로고침 버튼  -->
@@ -149,6 +171,14 @@
 			<Grid
 				Grid.Row="1"
 				Visibility="{Binding IsSingleSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<ProgressBar
+					Width="50"
+					Height="50"
+					Margin="16"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsVisible, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 				<DataGrid
 					AutoGenerateColumns="False"
 					CanUserAddRows="False"
@@ -157,7 +187,8 @@
 					ItemsSource="{Binding AssignedDevices}"
 					MinHeight="110"
 					SelectionMode="Extended"
-					Style="{StaticResource MaterialDesignDataGrid}">
+					Style="{StaticResource MaterialDesignDataGrid}"
+					Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<i:Interaction.Behaviors>
 						<behavior:ClearSelectionOnEscBehavior />
 						<behavior_inner:DeviceAssignSelectedItemsBehavior

@@ -1,10 +1,11 @@
 # Project Index
 
-> Last updated: 2026-03-13
+> Last updated: 2026-03-24
 
 ## 현재 컨텍스트
 | 파일 | 주제 | 날짜 |
 |------|------|------|
+| [2026-03-24_MapViewModel_Provider_Cleanup_And_CLAUDE_Workflow_Update.md](context/2026-03-24_MapViewModel_Provider_Cleanup_And_CLAUDE_Workflow_Update.md) | MapViewModel Provider 정리 + CLAUDE 워크플로우 개편 | 2026-03-24 |
 | [2026-03-18_GMap_UI_Renewal_ROI_Broadcast_OfflineMap.md](context/2026-03-18_GMap_UI_Renewal_ROI_Broadcast_OfflineMap.md) | GMap UI 리뉴얼 + ROI + 방송패널 + 오프라인맵전략 (커밋 3건, PRD 4개) | 2026-03-18 |
 | [2026-03-13_EventQueue_Symbol_Unification_Complete.md](context/2026-03-13_EventQueue_Symbol_Unification_Complete.md) | EventQueue 심볼 상태 일원화 완료 (13 Phases, 28/28, 31 tests) | 2026-03-13 |
 | [2026-03-12_PIDS_Symbol_Status_Verification.md](context/2026-03-12_PIDS_Symbol_Status_Verification.md) | PIDS 심볼 상태 검증 (SYNC_DEVICE 3상태 매핑 확인, 타PC 오류 진단 로깅) | 2026-03-12 |
@@ -31,11 +32,19 @@
 | [PRD_Layer_Panel_Tree_Redesign.md](prd/PRD_Layer_Panel_Tree_Redesign.md) | [plan](prd/PRD_Layer_Panel_Tree_Redesign.plan.md) | 레이어 패널 트리 재설계 — 카테고리 중심 3-Tier + Zoom AND + 이벤트 이중발생 수정 |
 | [PRD_MBTiles_DefinedMap_Integration.md](prd/PRD_MBTiles_DefinedMap_Integration.md) | [plan](prd/PRD_MBTiles_DefinedMap_Integration.plan.md) | MBTiles DefinedMap 통합 — 오프라인 MBTiles를 DefinedMap으로 등록, CustomMap 오버레이 전용 |
 | [PRD_Layer_Management_System.md](prd/PRD_Layer_Management_System.md) | [plan](prd/PRD_Layer_Management_System.plan.md) | 레이어 관리 시스템 — 3-Tier 레이어 + DB 상태 저장 + 카테고리별 ON/OFF |
-## 완료 (Report 있음) — 57건
+| [PRD_MapSwitch_Stability.md](prd/PRD_MapSwitch_Stability.md) | [plan](prd/PRD_MapSwitch_Stability.plan.md) | 맵 전환 안정성 개선 |
+| [PRD_CustomMap_Overlay_System.md](prd/PRD_CustomMap_Overlay_System.md) | - | CustomMap 오버레이 시스템 전환 (마스터 PRD — 하위 3건) |
+| [PRD_CustomMap_Overlay_Migration.md](prd/PRD_CustomMap_Overlay_Migration.md) | - | CustomMap 베이스맵→오버레이 전환 (GMapOverlay 기반) |
+| [PRD_CustomMap_Registration_Progress.md](prd/PRD_CustomMap_Registration_Progress.md) | - | TIF 등록 프로그레스 임베디드 패널 UI |
+| [PRD_Map_Init_Switch_Redesign.md](prd/PRD_Map_Init_Switch_Redesign.md) | - | 맵 초기화/전환 프로세스 재설계 (초기 로드 빈 타일 버그 미해결) |
+
+## 완료 (Report 있음) — 59건
 > 상세 목록: [INDEX_ARCHIVE.md](INDEX_ARCHIVE.md)
 
 | PRD | Plan | Report | 완료일 |
 |-----|------|--------|-------|
+| [PRD_MBTiles_ZoomLevel_Shadowing_Fix.md](prd/PRD_MBTiles_ZoomLevel_Shadowing_Fix.md) | [plan](prd/PRD_MBTiles_ZoomLevel_Shadowing_Fix.plan.md) | [report](reports/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md) | 2026-03-24 |
+| [PRD_MapViewModel_Provider_Cleanup.plan.md](prd/PRD_MapViewModel_Provider_Cleanup.plan.md) | [plan](prd/PRD_MapViewModel_Provider_Cleanup.plan.md) | [report](reports/REPORT_MapViewModel_Provider_Cleanup.md) | 2026-03-24 |
 | [PRD_CollectionChanged_BatchReset.md](prd/PRD_CollectionChanged_BatchReset.md) | [plan](prd/PRD_CollectionChanged_BatchReset.plan.md) | [report](reports/REPORT_CollectionChanged_BatchReset.md) | 2026-03-13 |
 | [PRD_SharedTimer_Chunk_Dequeue.md](prd/PRD_SharedTimer_Chunk_Dequeue.md) | [plan](prd/PRD_SharedTimer_Chunk_Dequeue.plan.md) | [report](reports/REPORT_SharedTimer_Chunk_Dequeue.md) | 2026-03-13 |
 | [PRD_EntryId_Nats_Uuid_DirectMatch.md](prd/PRD_EntryId_Nats_Uuid_DirectMatch.md) | [plan](prd/PRD_EntryId_Nats_Uuid_DirectMatch.plan.md) | [report](reports/REPORT_EntryId_Nats_Uuid_DirectMatch.md) | 2026-03-13 |

@@ -344,8 +344,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
         try
         {
-            _log?.Info($"[SetupDataBindings] 바인딩 전 ShowTitle: {ShowTitle}");
-            _log?.Info($"[SetupDataBindings] 바인딩 전 Marker.ShowTitle: {Marker.ShowTitle}");
+            //_log?.Info($"[SetupDataBindings] 바인딩 전 ShowTitle: {ShowTitle}");
+            //_log?.Info($"[SetupDataBindings] 바인딩 전 Marker.ShowTitle: {Marker.ShowTitle}");
 
 
             // 공통 바인딩 (GMapCustomMarker 기본 속성)
@@ -359,7 +359,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             SetupPropertyBinding(ShowShapeProperty, nameof(Marker.ShowShape));
             SetupPropertyBinding(ShowTitleProperty, nameof(Marker.ShowTitle));
 
-            _log?.Info($"[SetupDataBindings] 바인딩 후 ShowTitle: {ShowTitle}");
+            //_log?.Info($"[SetupDataBindings] 바인딩 후 ShowTitle: {ShowTitle}");
 
             var colorConverter = new ColorTypeToBrushConverter();
             var visibilityConverter = new System.Windows.Controls.BooleanToVisibilityConverter();

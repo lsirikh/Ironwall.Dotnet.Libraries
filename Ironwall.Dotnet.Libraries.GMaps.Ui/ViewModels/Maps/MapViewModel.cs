@@ -1746,7 +1746,7 @@ public class MapViewModel : BasePanelViewModel,
                                 dbEntry.Id,
                                 provider.Bounds[1].Lat, provider.Bounds[0].Lat,
                                 provider.Bounds[0].Lng, provider.Bounds[1].Lng,
-                                provider.MinZoom, provider.MaxZoom);
+                                provider.MinZoom, provider.MaxZoom ?? 18);
                             _log?.Info($"MBTiles 메타데이터 갱신: {fileName}");
                         }
                     }
@@ -1775,7 +1775,7 @@ public class MapViewModel : BasePanelViewModel,
                     CoordinateSystem = "WGS84",
                     EpsgCode = "EPSG:3857",
                     MinZoomLevel = provider.MinZoom >= 0 ? provider.MinZoom : 10,
-                    MaxZoomLevel = provider.MaxZoom >= 0 ? provider.MaxZoom : 18,
+                    MaxZoomLevel = provider.MaxZoom ?? 18,
                     TileSize = 256,
                     Status = EnumMapStatus.Active,
                     CreatedBy = "System",
@@ -1846,7 +1846,7 @@ public class MapViewModel : BasePanelViewModel,
 
         // 3. Zoom 범위만 설정 (Position/Zoom은 ConfigureCommonMapSettings에서 HomePosition 적용)
         if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
-        if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
+        if (provider.MaxZoom.HasValue) MainMap.MaxZoom = provider.MaxZoom.Value;
 
         // ReloadMap 호출하지 않음 — IsStarted=false 상태 (폼 미로드)
         // GMapControl_Loaded → OnMapOpen에서 타일 자동 로드됨
@@ -1898,7 +1898,7 @@ public class MapViewModel : BasePanelViewModel,
 
         // 5. Zoom 범위 설정
         if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
-        if (provider.MaxZoom >= 0) MainMap.MaxZoom = provider.MaxZoom;
+        if (provider.MaxZoom.HasValue) MainMap.MaxZoom = provider.MaxZoom.Value;
 
         // 6. 위치/줌 복원
         MainMap.Position = savedPosition;

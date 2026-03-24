@@ -46,7 +46,6 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     {
         await base.OnActivateAsync(cancellationToken);
         _pCancellationTokenSource = new CancellationTokenSource();
-        await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource!.Token);
         await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
     }
 
@@ -341,21 +340,24 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                 await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+                await DispatcherService.BeginInvoke(() => ViewModelProvider.Clear());
 
-                DispatcherService.Invoke(() =>
+                var items = _deviceProvider.OfType<ISensorDeviceModel>().ToList();
+                const int batchSize = 50;
+                for (int i = 0; i < items.Count; i += batchSize)
                 {
-                    ViewModelProvider.Clear();
-                    foreach (var (item, index) in _deviceProvider
-                        .OfType<ISensorDeviceModel>()
-                        .Select((item, index) => (item, index)))
+                    if (cancellationToken.IsCancellationRequested)
+                        throw new TaskCanceledException("Task was cancelled!");
+                    var batch = items.Skip(i).Take(batchSize).ToList();
+                    var startIndex = i;
+                    await DispatcherService.BeginInvoke(() =>
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                            throw new TaskCanceledException("Task was cancelled!");
-
-                        ViewModelProvider.Add(new SensorDeviceViewModel((SensorDeviceModel)item) { Index = index + 1 });
-                    }
-                    NotifyOfPropertyChange(() => ViewModelProvider);
-                });
+                        foreach (var (item, idx) in batch.Select((item, idx) => (item, idx)))
+                            ViewModelProvider.Add(new SensorDeviceViewModel((SensorDeviceModel)item) { Index = startIndex + idx + 1 });
+                    });
+                    await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+                }
+                await DispatcherService.BeginInvoke(() => NotifyOfPropertyChange(() => ViewModelProvider));
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
                 DispatcherService.Invoke(() => IsVisible = true);
@@ -382,6 +384,11 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
             foreach (var item in SelectedItems.ToList())
             {
                 var model = (ISensorDeviceModel)item.Model;
+                if (model.Id <= 0)
+                {
+                    _deviceProvider.Remove(model);
+                    continue;
+                }
                 var response = await _apiService.DeleteSensorAsync(model.Id, cancellationToken);
 
                 if (!response.Success)

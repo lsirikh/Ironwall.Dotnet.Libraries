@@ -3,7 +3,6 @@ using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
-using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
@@ -20,13 +19,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Models;
 public class DeviceSymbolLookupModel : BaseModel
 {
     #region - Ctors -
-    public DeviceSymbolLookupModel(ILogService log
-                                , IEventAggregator ea
-                                , EventSetupModel eventSetupModel)
+    public DeviceSymbolLookupModel(ILogService log)
     {
         _log = log;
-        _animationManager = new EventAnimationManager(log, ea, eventSetupModel);
-        _animationManager.OnEventRestored += OnEventRestored;
     }
     #endregion
     #region - Implementation of Interface -
@@ -70,16 +65,6 @@ public class DeviceSymbolLookupModel : BaseModel
             _                            => EnumEventStatus.Normal,
         };
 
-        // 애니메이션 상태 관리: ERROR → 깜빡임 시작, 그 외 → 기존 애니메이션 정지
-        if (status == EnumDeviceStatus.ERROR)
-        {
-            _animationManager.ProcessNewEvent(EnumEventType.Fault);
-        }
-        else
-        {
-            _animationManager.ReportCurrentEvent();
-        }
-
         _log?.Info($"[SYNC→Symbol] SyncFromDevice: '{SymbolModel.Title}' DeviceStatus={status} → OperationState: {prevState}→{SymbolModel.OperationState}, EventStatus: {prevEvent}→{SymbolModel.EventStatus}");
         SymbolModel.SetUpdate();
     }
@@ -94,14 +79,17 @@ public class DeviceSymbolLookupModel : BaseModel
         {
             SymbolModel.EventStatus = EnumEventStatus.Detecting;
             SymbolModel.SetUpdate();
-            _animationManager.ProcessNewEvent(eventType);
             _log?.Info($"탐지 이벤트 → Detecting: {SymbolModel.Title}");
         }
     }
 
     public void ProcessEventReport()
     {
-        _animationManager.ReportCurrentEvent();
+        if (SymbolModel == null) return;
+
+        SymbolModel.EventStatus = EnumEventStatus.Normal;
+        SymbolModel.SetUpdate();
+        _log?.Info($"ProcessEventReport → Normal 복원: {SymbolModel.Title}");
     }
 
     /// <summary>
@@ -113,15 +101,6 @@ public class DeviceSymbolLookupModel : BaseModel
     public void ProcessPtz(float pan, float tilt, float zoom)
     {
         UpdateFOV(pan, tilt, zoom);
-    }
-
-    private void OnEventRestored()
-    {
-        if (SymbolModel == null) return;
-
-        SymbolModel.EventStatus = EnumEventStatus.Normal;
-        SymbolModel.SetUpdate();
-        _log?.Info($"OnEventRestored → Normal 복원: {SymbolModel.Title}");
     }
 
     #region - PTZ → FOV Conversion Methods -
@@ -214,6 +193,5 @@ public class DeviceSymbolLookupModel : BaseModel
     #endregion
     #region - Attributes -
     private ILogService _log;
-    private EventAnimationManager _animationManager;
     #endregion
 }

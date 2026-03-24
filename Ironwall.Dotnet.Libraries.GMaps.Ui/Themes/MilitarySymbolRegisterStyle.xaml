@@ -51,8 +51,9 @@
 	</Style>
 
 	<Style x:Key="CommonButton" TargetType="Button">
-		<Setter Property="Background" Value="Transparent" />
-		<Setter Property="Template">
+        <Setter Property="Background" Value="{StaticResource LightBlueBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+        <Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="Button">
 					<Border Background="{TemplateBinding Background}" CornerRadius="3">
@@ -177,19 +178,10 @@
 
 									<!--  닫기 버튼  -->
 									<Button
+										x:Name="PART_CloseButton"
 										Grid.Column="2"
-										Width="30"
-										Height="30"
-										BorderThickness="0"
 										Command="{TemplateBinding CancelCommand}"
-										Cursor="Hand"
-										Style="{StaticResource CommonButton}">
-										<md:PackIcon
-											Width="16"
-											Height="16"
-											Foreground="White"
-											Kind="Close" />
-									</Button>
+										Style="{StaticResource PanelCloseButtonStyle}" />
 								</Grid>
 							</Border>
 
@@ -492,38 +484,30 @@
 							</Grid>
 
 							<!--  하단 버튼 영역  -->
-							<Border Grid.Row="3" CornerRadius="0,0,8,8">
-								<StackPanel
-									HorizontalAlignment="Center"
-									VerticalAlignment="Center"
-									Orientation="Horizontal">
+							<Border
+								Grid.Row="3"
+								Padding="10,5"
+								CornerRadius="0,0,8,8">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
 									<Button
-										Width="80"
-										Height="32"
-										Margin="5"
-										BorderThickness="0"
+										Grid.Column="0"
+										Height="30"
+										Margin="0,0,4,0"
 										Command="{TemplateBinding CancelCommand}"
-										Foreground="White"
-										Style="{StaticResource CommonButton}">
-										<md:PackIcon
-											Width="25"
-											Height="25"
-											Kind="Cancel" />
-									</Button>
+										Content="취소"
+										Style="{StaticResource PanelDangerButtonStyle}" />
 									<Button
-										Width="80"
-										Height="32"
-										Margin="5"
-										BorderThickness="0"
+										Grid.Column="1"
+										Height="30"
+										Margin="4,0,0,0"
 										Command="{TemplateBinding RegisterCommand}"
-										Foreground="White"
-										Style="{StaticResource CommonButton}">
-										<md:PackIcon
-											Width="25"
-											Height="25"
-											Kind="Add" />
-									</Button>
-								</StackPanel>
+										Content="등록"
+										Style="{StaticResource PanelPrimaryButtonStyle}" />
+								</Grid>
 							</Border>
 						</Grid>
 					</Border>

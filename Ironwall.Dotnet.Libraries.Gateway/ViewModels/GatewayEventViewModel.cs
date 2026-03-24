@@ -1,8 +1,11 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.GatewayEvents;
 using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Gateway.ViewModels;
 /****************************************************************************
@@ -64,8 +67,14 @@ public class GatewayEventViewModel : BaseCustomViewModel<IGatewayEventModel>, IG
         {
             _model.Group = value;
             NotifyOfPropertyChange(() => Group);
+            NotifyOfPropertyChange(() => GroupName);
         }
     }
+
+    public string GroupName =>
+        DeviceGroups?.FirstOrDefault(g => g.Id == Group)?.Name ?? Group.ToString();
+
+    public ObservableCollection<IDeviceGroupModel>? DeviceGroups { get; set; }
 
     public bool IsEnable
     {

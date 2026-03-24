@@ -76,6 +76,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public int Id { get; set; }
         public DateTime DateTime => Model.DateTime;
         public int TimeDiscardSec { get; set; }
+        /// <summary>EventQueueManager의 entryId — Dequeue 호출 시 사용</summary>
+        public string? EntryId { get; set; }
         #endregion
         #region - Attributes -
         public CancellationTokenSource? Cts;

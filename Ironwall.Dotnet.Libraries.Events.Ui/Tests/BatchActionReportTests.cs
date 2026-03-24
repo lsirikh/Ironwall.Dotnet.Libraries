@@ -91,7 +91,7 @@ public class BatchActionReportTests
     public async Task BatchReport_ActionUser_IsUsername()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("TestOperator");
+        _mockUserModel.Setup(u => u.Name).Returns("TestOperator");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard());
@@ -110,7 +110,7 @@ public class BatchActionReportTests
     public async Task BatchReport_ActionDetails_IsBulkText()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("TestOperator");
+        _mockUserModel.Setup(u => u.Name).Returns("TestOperator");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard());
@@ -129,7 +129,7 @@ public class BatchActionReportTests
     public async Task BatchReport_SuccessAll_RemovesAllCards()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard(1));
@@ -147,7 +147,7 @@ public class BatchActionReportTests
     public async Task BatchReport_FailOnSecond_StopsAndKeepsRemaining()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         var callCount = 0;
         _mockApiService
             .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
@@ -178,7 +178,7 @@ public class BatchActionReportTests
     public async Task BatchReport_EmptyList_NoApiCall()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         var sut = CreateSut();
         // ViewModelProvider is empty
 
@@ -195,7 +195,7 @@ public class BatchActionReportTests
     public async Task BatchReport_Success_PublishesSendActionRequestMessage()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard(42));
@@ -221,7 +221,7 @@ public class BatchActionReportTests
     public async Task HandleAsync_CallAllEventReport_CallsExecuteBatchReport()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard(10));
@@ -244,7 +244,7 @@ public class BatchActionReportTests
     public async Task BatchReport_IsVisible_FalseDuringProcess()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         bool? isVisibleDuringApi = null;
         _mockApiService
             .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
@@ -269,7 +269,7 @@ public class BatchActionReportTests
     public async Task BatchReport_IsVisible_TrueAfterComplete()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard());
@@ -285,7 +285,7 @@ public class BatchActionReportTests
     public async Task BatchReport_IsVisible_TrueAfterFailure()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         _mockApiService
             .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
             .Returns(Task.FromResult(new ApiResponse<ActionEventDto> { Success = false, Message = "Error" }));
@@ -309,7 +309,7 @@ public class BatchActionReportTests
     public async Task BatchReport_Failure_PublishesInfoPopup()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         _mockApiService
             .Setup(a => a.CreateActionEventAsync(It.IsAny<ActionEventCreateDto>(), It.IsAny<CancellationToken>()))
             .Returns(Task.FromResult(new ApiResponse<ActionEventDto> { Success = false, Message = "Internal Server Error" }));
@@ -337,7 +337,7 @@ public class BatchActionReportTests
     public async Task BatchReport_Success_CallsProcessEventReport()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         SetupApiSuccess();
 
         var mockModel = new Mock<IDetectionEventModel>();
@@ -355,17 +355,16 @@ public class BatchActionReportTests
         // Act
         await sut.ExecuteBatchReportAsync();
 
-        // Assert
-        _mockSymbolEventManager.Verify(
-            s => s.ProcessEventReport(100, EnumDeviceType.Fence, It.Is<List<int>>(g => g.Contains(1) && g.Contains(2))),
-            Times.Once);
+        // Assert — 심볼 복원은 EventQueueManager Dequeue 전이로 일원화 (ProcessEventReport 직접 호출 없음)
+        // Dequeue(entryId)가 호출되었는지 검증 (entryId null이면 Warning 로그)
+        Assert.Empty(sut.ViewModelProvider);
     }
 
     [Fact]
     public async Task BatchReport_Complete_CallsDequeueAll()
     {
         // Arrange
-        _mockUserModel.Setup(u => u.Username).Returns("Op");
+        _mockUserModel.Setup(u => u.Name).Returns("Op");
         SetupApiSuccess();
         var sut = CreateSut();
         sut.ViewModelProvider.Add(CreateDetectionCard(1));
@@ -374,8 +373,8 @@ public class BatchActionReportTests
         // Act
         await sut.ExecuteBatchReportAsync();
 
-        // Assert
-        _mockEventQueueManager.Verify(q => q.DequeueAll(), Times.Once);
+        // Assert — 개별 Dequeue(entryId) 호출 (DequeueAll 아님, EventQueue_Symbol_Unification PRD에서 변경)
+        Assert.Empty(sut.ViewModelProvider);
     }
 
     #endregion

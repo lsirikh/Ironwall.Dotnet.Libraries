@@ -9,7 +9,7 @@
 	<!-- ═══════════════════ Colors ═══════════════════ -->
 	<Color x:Key="PrimaryBlue">#2C5F9E</Color>
 	<Color x:Key="LightBlue">#EEF3FB</Color>
-	<Color x:Key="SurfaceGray">#F5F7F9</Color>
+	<Color x:Key="SurfaceGray">Transparent</Color>
 	<Color x:Key="PanelWhite">#FFFFFF</Color>
 	<Color x:Key="BorderGray">#E8ECF1</Color>
 	<Color x:Key="DangerRed">#C0392B</Color>

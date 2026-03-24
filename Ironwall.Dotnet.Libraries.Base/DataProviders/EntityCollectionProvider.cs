@@ -76,6 +76,25 @@ public abstract class EntityCollectionProvider<T> : ICollector<T>
 
     }
 
+    public virtual void AddRange(IEnumerable<T> items)
+    {
+        try
+        {
+            DispatcherService.Invoke((System.Action)(() =>
+            {
+                lock (_locker)
+                {
+                    foreach (var item in items)
+                        CollectionEntity.Add(item);
+                }
+            }));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Provider Exception : {ex.Message}");
+        }
+    }
+
     public virtual void Remove(T item)
     {
         try
@@ -86,6 +105,25 @@ public abstract class EntityCollectionProvider<T> : ICollector<T>
                 lock (_locker)
                 {
                     result = CollectionEntity.Remove(item);
+                }
+            }));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Provider Exception : {ex.Message}");
+        }
+    }
+
+    public virtual void RemoveRange(IEnumerable<T> items)
+    {
+        try
+        {
+            DispatcherService.Invoke((System.Action)(() =>
+            {
+                lock (_locker)
+                {
+                    foreach (var item in items.ToList())
+                        CollectionEntity.Remove(item);
                 }
             }));
         }

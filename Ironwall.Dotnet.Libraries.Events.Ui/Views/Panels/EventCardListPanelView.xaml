@@ -17,6 +17,12 @@
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+	<!--  전체 조치보고 버튼 ↔ ProgressCircle 전환용 컨버터 (PRD_Batch_Action_Report)
+	      IsVisible=true → 버튼 표시 / IsVisible=false → ProgressCircle 표시
+	      BoolToInverseVisibleConverter는 Events.Ui/Resources/Resources.xaml에 정의됨  -->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BoolToVisibleConverter" />
+	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />

@@ -17,30 +17,32 @@
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+	
 	mc:Ignorable="d">
 
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
-		Background="#88FFFFFF"
+		Background="Transparent"
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border
+				Background="White"
 				BorderBrush="#33000000"
 				BorderThickness="2"
 				CornerRadius="5">
-				<Grid Width="250" Height="200">
+				<Grid Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="4*" />
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
 					</Grid.RowDefinitions>
-
 					<md:ColorZone
 						Grid.Row="0"
 						Padding="5"
 						Mode="PrimaryMid">
-						<StackPanel Orientation="Horizontal">
+						<StackPanel Orientation="Horizontal"
+									Width="260">
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
@@ -226,11 +228,11 @@
 
 		<md:Flipper.BackContent>
 			<Border
+				Background="White"
 				BorderBrush="#33000000"
 				BorderThickness="2"
 				CornerRadius="5">
-
-				<Grid Width="250" Height="200">
+				<Grid Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="3*" />
@@ -240,7 +242,8 @@
 						Padding="5"
 						CornerRadius="5,5,0,0"
 						Mode="PrimaryMid">
-						<StackPanel Orientation="Horizontal">
+						<StackPanel Orientation="Horizontal"
+									Width="260">
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
@@ -324,7 +327,7 @@
 							Grid.Column="0"
 							Margin="5,0,0,0"
 							VerticalAlignment="Center"
-							Text="이벤트 시간"
+							Text="시간"
 							TextWrapping="Wrap" />
 						<TextBox
 							Grid.Row="3"

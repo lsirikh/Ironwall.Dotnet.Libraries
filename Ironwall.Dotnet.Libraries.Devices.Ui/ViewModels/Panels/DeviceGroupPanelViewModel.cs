@@ -216,27 +216,30 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
                 DispatcherService.Invoke(() => IsVisible = false);
                 await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
-                var models = await FetchDeviceGroupsAsync(cancellationToken);
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
-                if (cancellationToken.IsCancellationRequested)
-                    throw new TaskCanceledException("Task was cancelled!");
+                await DispatcherService.BeginInvoke(() => ViewModelProvider.Clear());
 
-                _deviceGroupProvider.Clear();
-                foreach (var model in models)
-                    _deviceGroupProvider.Add(model);
+                var items = _deviceGroupProvider.OfType<IDeviceGroupModel>()
+                    .Where(m => m.Id > 0).ToList();
+                const int batchSize = 50;
 
-                DispatcherService.Invoke(() =>
+                for (int i = 0; i < items.Count; i += batchSize)
                 {
-                    ViewModelProvider.Clear();
-                    foreach (var (item, index) in models.Select((item, index) => (item, index)))
+                    if (cancellationToken.IsCancellationRequested)
+                        throw new TaskCanceledException("Task was cancelled!");
+
+                    var batch = items.Skip(i).Take(batchSize).ToList();
+                    var startIndex = i;
+                    await DispatcherService.BeginInvoke(() =>
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                            throw new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new DeviceGroupViewModel(item) { Index = index + 1 });
-                    }
-                    NotifyOfPropertyChange(() => ViewModelProvider);
-                });
+                        foreach (var (item, idx) in batch.Select((item, idx) => (item, idx)))
+                            ViewModelProvider.Add(new DeviceGroupViewModel(item) { Index = startIndex + idx + 1 });
+                    });
+                    await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+                }
+
+                await DispatcherService.BeginInvoke(() => NotifyOfPropertyChange(() => ViewModelProvider));
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
                 DispatcherService.Invoke(() => IsVisible = true);
@@ -260,6 +263,11 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
             foreach (var item in SelectedItems.ToList())
             {
                 var model = (IDeviceGroupModel)item.Model;
+                if (model.Id <= 0)
+                {
+                    _deviceGroupProvider.Remove(model);
+                    continue;
+                }
                 var response = await _apiService.DeleteDeviceGroupAsync(model.Id, cancellationToken);
 
                 if (!response.Success)

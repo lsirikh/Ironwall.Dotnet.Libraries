@@ -199,9 +199,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
         protected override UIElement CreateMarkerControl()
         {
-            _log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 시작");
+            //_log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 시작");
             var control = new GMapMarkerLineControl(this);
-            _log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 완료 - Type: {control.GetType().Name}");
+            //_log?.Info($"[CreateMarkerControl] GMapMarkerLineControl 생성 완료 - Type: {control.GetType().Name}");
             return control;
         }
 

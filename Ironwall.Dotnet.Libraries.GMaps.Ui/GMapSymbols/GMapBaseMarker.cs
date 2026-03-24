@@ -132,7 +132,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
             //기본적으로 시현하는 것을 기본으로 한다.
             IsVisible = true;
             EnableShapeAnimation = false;
-            _log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
+            //_log?.Info($"마커 '{_model.Title}' Shape 생성 완료");
         }
         catch (Exception ex)
         {
@@ -196,7 +196,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
             };
 
             Shape = rect;
-            _log?.Info($"마커 '{_model.Title}' 대체 Shape 생성 완료");
+            //_log?.Info($"마커 '{_model.Title}' 대체 Shape 생성 완료");
         }
         catch (Exception ex)
         {

@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
 {
@@ -49,11 +50,14 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             }
         }
 
-        public Task LoadAssignedDevicesAsync(CancellationToken token = default)
+        public async Task LoadAssignedDevicesAsync(CancellationToken token = default)
         {
-            if (!IsSingleSelected) { AssignedDevices.Clear(); return Task.CompletedTask; }
+            if (!IsSingleSelected) { AssignedDevices.Clear(); return; }
             try
             {
+                DispatcherService.Invoke(() => IsVisible = false);
+                await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+
                 var groupId = _selection[0].Id;
                 AssignedDevices.Clear();
                 foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>()
@@ -73,7 +77,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 }
             }
             catch (Exception ex) { _log?.Error($"LoadAssignedDevicesAsync: {ex.Message}"); }
-            return Task.CompletedTask;
+            finally
+            {
+                DispatcherService.Invoke(() => IsVisible = true);
+            }
         }
 
         public async Task RefreshButton()
@@ -94,6 +101,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public async Task AddDeviceButton()
         {
             if (!IsSingleSelected) return;
+            AddButtonEnable = false;
+            NotifyOfPropertyChange(nameof(AddButtonEnable));
+
             var groupId = _selection[0].Id;
             var assignedIds = AssignedDevices.Select(d => d.Id);
 
@@ -104,7 +114,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 new OpenDeviceAssignDialogMessageModel
                 {
                     Dialog = dialog,
-                    OnCompleted = () => _ = LoadAssignedDevicesAsync()
+                    OnCompleted = () =>
+                    {
+                        _ = LoadAssignedDevicesAsync();
+                        AddButtonEnable = true;
+                        NotifyOfPropertyChange(nameof(AddButtonEnable));
+                    }
                 });
         }
 
@@ -153,6 +168,11 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             }
             try
             {
+                RemoveButtonEnable = false;
+                NotifyOfPropertyChange(nameof(RemoveButtonEnable));
+                DispatcherService.Invoke(() => IsVisible = false);
+                await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+
                 var groupId = _selection[0].Id;
                 _log?.Info($"[DeviceGroupSelectionVM] Removing {targets.Count} devices from group {groupId}");
                 foreach (var device in targets)
@@ -175,6 +195,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             catch (Exception ex) { _log?.Error($"[DeviceGroupSelectionVM] RemoveDeviceButton exception: {ex.Message}"); }
             finally
             {
+                RemoveButtonEnable = true;
+                NotifyOfPropertyChange(nameof(RemoveButtonEnable));
                 await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
             }
         }
@@ -188,6 +210,9 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public BindableCollection<DeviceAssignItemViewModel> SelectedAssignedDevices { get; }
         public bool IsSingleSelected => _selection.Count == 1;
         public bool CanRemoveDeviceButton => IsSingleSelected && SelectedAssignedDevices.Count > 0;
+        public bool IsVisible { get; set; } = true;
+        public bool AddButtonEnable { get; set; } = true;
+        public bool RemoveButtonEnable { get; set; } = true;
         public bool ReloadButtonEnable { get; set; } = true;
         #endregion
 

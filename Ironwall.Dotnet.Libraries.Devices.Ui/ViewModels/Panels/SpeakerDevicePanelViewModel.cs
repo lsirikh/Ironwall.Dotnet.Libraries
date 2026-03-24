@@ -258,19 +258,27 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
-                DispatcherService.Invoke(() =>
+                await DispatcherService.BeginInvoke(() => ViewModelProvider.Clear());
+
+                var items = _deviceProvider.OfType<ISpeakerDeviceModel>().ToList();
+                const int batchSize = 50;
+
+                for (int i = 0; i < items.Count; i += batchSize)
                 {
-                    ViewModelProvider.Clear();
-                    foreach (var (item, index) in _deviceProvider
-                        .OfType<ISpeakerDeviceModel>()
-                        .Select((item, index) => (item, index)))
+                    if (cancellationToken.IsCancellationRequested)
+                        throw new TaskCanceledException("Task was cancelled!");
+
+                    var batch = items.Skip(i).Take(batchSize).ToList();
+                    var startIndex = i;
+                    await DispatcherService.BeginInvoke(() =>
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                            throw new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new SpeakerDeviceViewModel((SpeakerDeviceModel)item) { Index = index + 1 });
-                    }
-                    NotifyOfPropertyChange(() => ViewModelProvider);
-                });
+                        foreach (var (item, idx) in batch.Select((item, idx) => (item, idx)))
+                            ViewModelProvider.Add(new SpeakerDeviceViewModel((SpeakerDeviceModel)item) { Index = startIndex + idx + 1 });
+                    });
+                    await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+                }
+
+                await DispatcherService.BeginInvoke(() => NotifyOfPropertyChange(() => ViewModelProvider));
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
                 DispatcherService.Invoke(() => IsVisible = true);
@@ -293,6 +301,11 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             foreach (var item in SelectedItems.ToList())
             {
                 var model = (ISpeakerDeviceModel)item.Model;
+                if (model.Id <= 0)
+                {
+                    _deviceProvider.Remove(model);
+                    continue;
+                }
                 var response = await _apiService.DeleteSpeakerAsync(model.Id, cancellationToken);
                 if (!response.Success)
                     _log?.Error($"Failed to delete speaker {model.Id}: {response.Error?.Message}");

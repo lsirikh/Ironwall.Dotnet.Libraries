@@ -34,11 +34,8 @@ internal class NatsService : MessageService<INatsService>, INatsService
         try
         {
             var serverUrl = $"nats://{setupModel.IpAddressNats}:{setupModel.PortNats}";
-            _log?.Info($"[Connect] Connecting to {serverUrl}, Subject: {setupModel.EffectiveSubject}");
-
             _defaultSubject = setupModel.EffectiveSubject;
 
-            // DomainNats + GroupNats가 설정된 경우 "all" 브로드캐스트 subject 자동 추가
             _additionalSubjects.Clear();
             if (!string.IsNullOrEmpty(setupModel.DomainNats) && !string.IsNullOrEmpty(setupModel.GroupNats))
             {
@@ -47,16 +44,12 @@ internal class NatsService : MessageService<INatsService>, INatsService
                     _additionalSubjects.Add(broadcastSubject);
             }
 
-            _log?.Info($"[Connect] Additional subjects: [{string.Join(", ", _additionalSubjects)}]");
-
-            // Create NatsOpts using the 'with' operator for immutable record
             var opts = NatsOpts.Default with
             {
                 Url = serverUrl,
                 ConnectTimeout = TimeSpan.FromMilliseconds(setupModel.ConnectionTimeoutNats)
             };
 
-            // Set optional properties only if they have values
             if (!string.IsNullOrEmpty(setupModel.SubsystemNats))
             {
                 opts = opts with { Name = setupModel.SubsystemNats };
@@ -75,8 +68,6 @@ internal class NatsService : MessageService<INatsService>, INatsService
             }
 
             Connection = new NatsConnection(opts);
-            _log?.Info($"[Connect] NATS Connection established to {serverUrl}");
-
             return this;
         }
         catch (Exception ex)
@@ -91,11 +82,8 @@ internal class NatsService : MessageService<INatsService>, INatsService
         try
         {
             var serverUrl = $"nats://{setupModel.IpAddressNats}:{setupModel.PortNats}";
-            _log?.Info($"[ConnectAsync] Connecting to {serverUrl}, Subject: {setupModel.EffectiveSubject}");
-
             _defaultSubject = setupModel.EffectiveSubject;
 
-            // DomainNats + GroupNats가 설정된 경우 "all" 브로드캐스트 subject 자동 추가
             _additionalSubjects.Clear();
             if (!string.IsNullOrEmpty(setupModel.DomainNats) && !string.IsNullOrEmpty(setupModel.GroupNats))
             {
@@ -104,17 +92,12 @@ internal class NatsService : MessageService<INatsService>, INatsService
                     _additionalSubjects.Add(broadcastSubject);
             }
 
-            _log?.Info($"[ConnectAsync] Additional subjects: [{string.Join(", ", _additionalSubjects)}]");
-            _log?.Info($"[ConnectAsync] Creating NatsOpts - URL: {serverUrl}, Name: {setupModel.SubsystemNats ?? "null"}, Username: {setupModel.UsernameNats ?? "null"}");
-
-            // Create NatsOpts using the 'with' operator for immutable record
             var opts = NatsOpts.Default with
             {
                 Url = serverUrl,
                 ConnectTimeout = TimeSpan.FromMilliseconds(setupModel.ConnectionTimeoutNats)
             };
 
-            // Set optional properties only if they have values
             if (!string.IsNullOrEmpty(setupModel.SubsystemNats))
             {
                 opts = opts with { Name = setupModel.SubsystemNats };
@@ -132,24 +115,13 @@ internal class NatsService : MessageService<INatsService>, INatsService
                 };
             }
 
-            _log?.Info("[ConnectAsync] NatsOpts created, creating NatsConnection...");
             Connection = new NatsConnection(opts);
-            _log?.Info("[ConnectAsync] NatsConnection created, pinging server...");
-
-            // NATS v2: 연결은 지연 초기화됨 - Ping으로 연결 확인
             await Connection.PingAsync();
-
-            _log?.Info("[ConnectAsync] Connection successful!");
             return this;
         }
         catch (Exception ex)
         {
             _log?.Error($"[ConnectAsync] Connection failed: {ex.Message}");
-            _log?.Error($"[ConnectAsync] Stack trace: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                _log?.Error($"[ConnectAsync] Inner exception: {ex.InnerException.Message}");
-            }
             return null;
         }
     }
@@ -158,16 +130,9 @@ internal class NatsService : MessageService<INatsService>, INatsService
     {
         try
         {
-            _log?.Info($"[PublishAsync] Attempting to publish to '{subject}': {msg}");
-
-            if (Connection == null)
-            {
-                _log?.Warning("[PublishAsync] Connection is null! Cannot publish.");
-                return;
-            }
+            if (Connection == null) return;
 
             await Connection.PublishAsync(subject, msg);
-            _log?.Info($"[PublishAsync] Successfully published to '{subject}': {msg}");
         }
         catch (Exception ex)
         {
@@ -179,11 +144,7 @@ internal class NatsService : MessageService<INatsService>, INatsService
     {
         try
         {
-            if (Connection == null)
-            {
-                _log?.Warning("[RequestAsync] Connection is null!");
-                return null;
-            }
+            if (Connection == null) return null;
 
             var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
             using var cts = new CancellationTokenSource(effectiveTimeout);
@@ -191,12 +152,10 @@ internal class NatsService : MessageService<INatsService>, INatsService
             var reply = await Connection.RequestAsync<string, string>(
                 subject, data, cancellationToken: cts.Token);
 
-            _log?.Info($"[RequestAsync] Reply from '{subject}': {reply.Data}");
             return reply.Data;
         }
         catch (OperationCanceledException)
         {
-            _log?.Warning($"[RequestAsync] Timeout for '{subject}'");
             return null;
         }
         catch (Exception ex)

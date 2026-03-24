@@ -28,4 +28,24 @@ public interface ISymbolEventManager
     /// 조치보고 처리 (개별 심볼 + 그룹 심볼 복원)
     /// </summary>
     void ProcessEventReport(int deviceId, Enums.EnumDeviceType deviceType, List<int>? deviceGroups);
+
+    /// <summary>
+    /// 개별 심볼 Detecting 상태 설정 (EventQueueManager OnDeviceFirstEvent 0→1 전이 시 호출)
+    /// </summary>
+    void SetDeviceDetecting(int deviceId, Enums.EnumDeviceType deviceType, Enums.EnumEventType eventType);
+
+    /// <summary>
+    /// 개별 심볼 Normal 복원 (EventQueueManager OnDeviceEmpty N→0 전이 시 호출)
+    /// </summary>
+    void RestoreDeviceSymbol(int deviceId, Enums.EnumDeviceType deviceType);
+
+    /// <summary>
+    /// 그룹 심볼 Detecting 상태 설정 (EventQueueManager 0→1 전이 시 호출)
+    /// </summary>
+    void SetGroupDetecting(int groupId, Enums.EnumEventType eventType);
+
+    /// <summary>
+    /// 그룹 심볼 Normal 복원 (EventQueueManager N→0 전이 시 호출)
+    /// </summary>
+    void RestoreGroupSymbol(int groupId);
 }

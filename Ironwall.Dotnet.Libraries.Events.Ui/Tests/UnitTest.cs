@@ -2138,10 +2138,11 @@ public class DeviceSymbolLookupModelTests
 /// </summary>
 public class TestableDeviceSymbolLookupModel : Ironwall.Dotnet.Libraries.Events.Ui.Models.DeviceSymbolLookupModel
 {
-    public TestableDeviceSymbolLookupModel() : base(null!, null!, CreateMockEventSetupModel())
+    public TestableDeviceSymbolLookupModel() : base(null!)
     {
     }
 
+    // 하위 호환성 유지용 (기존 EventSetupModel 참조 제거)
     private static Ironwall.Dotnet.Libraries.Events.Models.EventSetupModel CreateMockEventSetupModel()
     {
         var mockModel = new Mock<Ironwall.Dotnet.Libraries.Events.Models.IEventSetupModel>();
@@ -2207,13 +2208,14 @@ public class SymbolEventManagerTests
         // 장비-심볼 매핑 등록
         manager.RegisterDeviceSymbol(cameraDevice.Object, mockSymbol.Object);
 
-        // Act
-        manager.ProcessCameraPtz(cameraId: 1, pan: 90f, tilt: 45f, zoom: 200f);
+        // Act — zoom 0~100 정규화 (50 = 중간 줌)
+        manager.ProcessCameraPtz(cameraId: 1, pan: 90f, tilt: 45f, zoom: 50f);
 
         // Assert - FOV 속성이 업데이트 되어야 함
+        // zoom=50 → ratio=0.5 → Angle=80-0.5*75=42.5, Range=10+0.5*2990=1505
         mockSymbol.VerifySet(s => s.DetectionBearing = 90.0, Times.Once);
-        mockSymbol.VerifySet(s => s.DetectionAngle = 40.0, Times.Once);  // 80 / 2
-        mockSymbol.VerifySet(s => s.DetectionRange = 60.0, Times.Once);  // 30 * 2
+        mockSymbol.VerifySet(s => s.DetectionAngle = 42.5, Times.Once);
+        mockSymbol.VerifySet(s => s.DetectionRange = 1505.0, Times.Once);
         // RegisterDeviceSymbol now calls SyncFromDevice (1 extra SetUpdate), PTZ adds 1 more
         mockSymbol.Verify(s => s.SetUpdate(), Times.AtLeastOnce());
     }
@@ -2273,15 +2275,15 @@ public class SymbolEventManagerTests
 
         // Act - PTZ 메시지 수신 시뮬레이션
         // NatsDomainService.ProcessCurrentPtz() → SymbolEventManager.ProcessCameraPtz()
-        manager.ProcessCameraPtz(cameraId: 100, pan: 270f, tilt: 30f, zoom: 400f);
+        manager.ProcessCameraPtz(cameraId: 100, pan: 270f, tilt: 30f, zoom: 75f);
 
         // Assert - FOV 속성이 올바르게 업데이트 되어야 함
         // Pan 270 → Bearing -90 (270 - 360)
         pidsSymbol.VerifySet(s => s.DetectionBearing = -90.0, Times.Once);
-        // Zoom 400% (4x) → Angle 20 (80 / 4)
-        pidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);
-        // Zoom 400% (4x) → Range 120 (30 * 4)
-        pidsSymbol.VerifySet(s => s.DetectionRange = 120.0, Times.Once);
+        // zoom=75 → ratio=0.75 → Angle=80-0.75*75=23.75
+        pidsSymbol.VerifySet(s => s.DetectionAngle = 23.75, Times.Once);
+        // zoom=75 → ratio=0.75 → Range=10+0.75*2990=2252.5
+        pidsSymbol.VerifySet(s => s.DetectionRange = 2252.5, Times.Once);
         // SetUpdate() called during registration (SyncFromDevice) + PTZ update
         pidsSymbol.Verify(s => s.SetUpdate(), Times.AtLeastOnce());
     }
@@ -2609,20 +2611,18 @@ public class SymbolEventManagerDualDictionaryTests
         // Assert - 예외 없이 정상 호출됨
         Assert.Null(ex);
 
-        // Note: 실제 EventStatus 복원은 EventAnimationManager의 비동기 콜백에서 수행됨
-        // 따라서 동기 테스트에서는 직접 검증 불가
+        // Note: EventStatus 복원은 EventQueueManager.Dequeue → ProcessEventReport 경로에서 수행됨
     }
     #endregion
 
     #region Test 13.4.2: Intrusion → ProcessEventReport → EventStatus=Normal 복원
     [Fact]
-    public void ProcessEventReport_AfterIntrusion_ShouldRestoreEventStatusToNormal()
+    public void RestoreDeviceSymbol_AfterIntrusion_ShouldRestoreEventStatusToNormal()
     {
-        // Arrange
+        // Arrange — ProcessEventReport는 no-op (심볼 복원은 RestoreDeviceSymbol로 일원화)
         var mockEa = new Mock<Caliburn.Micro.IEventAggregator>();
         var mockLog = new Mock<Ironwall.Dotnet.Libraries.Base.Services.ILogService>();
         var eventSetupModel = CreateMockEventSetupModel();
-        // 자동조치보고 비활성화 (타이머 없이 수동 조치보고만 테스트)
         eventSetupModel.IsAutoEventDiscard = false;
 
         var manager = new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(
@@ -2639,28 +2639,21 @@ public class SymbolEventManagerDualDictionaryTests
 
         manager.RegisterDeviceSymbol(mockDevice.Object, mockPidsSymbol.Object);
 
-        // Act 1: Intrusion 이벤트 → Detecting
-        manager.ProcessDeviceEvent(
-            deviceId: 5,
-            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
-            deviceGroups: null,
-            eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion);
+        // Act 1: Intrusion 이벤트 → Detecting (SetDeviceDetecting 경유)
+        manager.SetDeviceDetecting(5, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence, Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion);
 
         // Verify: EventStatus=Detecting
         mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
 
-        // EventStatus 변경 이력 추적: Detecting 이후 Normal이 설정되는지 확인
+        // EventStatus 변경 이력 추적
         var statusHistory = new List<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>();
         mockPidsSymbol.SetupSet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>())
             .Callback<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(v => statusHistory.Add(v));
 
-        // Act 2: 조치보고 → Normal 복원
-        manager.ProcessEventReport(
-            deviceId: 5,
-            deviceType: Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence,
-            deviceGroups: null);
+        // Act 2: RestoreDeviceSymbol → Normal 복원 (EventQueueManager OnDeviceEmpty 경유)
+        manager.RestoreDeviceSymbol(5, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
 
-        // Assert: 조치보고 이후 EventStatus=Normal이 설정됨
+        // Assert: 복원 후 EventStatus=Normal
         Assert.Contains(Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Normal, statusHistory);
     }
     #endregion
@@ -2690,13 +2683,14 @@ public class SymbolEventManagerDualDictionaryTests
         manager.RegisterDeviceSymbol(mockCamera.Object, mockPidsSymbol.Object);
         manager.RegisterGroupSymbol(deviceGroup: 1, mockCamera.Object, mockGroupSymbol.Object);
 
-        // Act - PTZ 업데이트 (개별 심볼만 FOV 변경)
-        manager.ProcessCameraPtz(cameraId: 1, pan: 180f, tilt: 0f, zoom: 400f);
+        // Act - PTZ 업데이트 (개별 심볼만 FOV 변경, zoom 0~100 정규화)
+        manager.ProcessCameraPtz(cameraId: 1, pan: 180f, tilt: 0f, zoom: 75f);
 
         // Assert - 개별 심볼(IPidsSymbolModel)의 FOV만 업데이트
+        // zoom=75 → ratio=0.75 → Angle=80-0.75*75=23.75, Range=10+0.75*2990=2252.5
         mockPidsSymbol.VerifySet(s => s.DetectionBearing = 180.0, Times.Once);
-        mockPidsSymbol.VerifySet(s => s.DetectionAngle = 20.0, Times.Once);   // 80 / 4
-        mockPidsSymbol.VerifySet(s => s.DetectionRange = 120.0, Times.Once);  // 30 * 4
+        mockPidsSymbol.VerifySet(s => s.DetectionAngle = 23.75, Times.Once);
+        mockPidsSymbol.VerifySet(s => s.DetectionRange = 2252.5, Times.Once);
         // RegisterDeviceSymbol calls SyncFromDevice (1 extra) + PTZ update
         mockPidsSymbol.Verify(s => s.SetUpdate(), Times.AtLeastOnce());
 
@@ -3069,7 +3063,7 @@ public class DataHelperRefactoringTests
         var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
         var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
 
-        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        var lookup = new DeviceSymbolLookupModel(log)
         {
             DeviceModel = cameraDevice,
             SymbolModel = symbolModel
@@ -3094,7 +3088,7 @@ public class DataHelperRefactoringTests
         var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
         var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
 
-        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        var lookup = new DeviceSymbolLookupModel(log)
         {
             DeviceModel = cameraDevice,
             SymbolModel = symbolModel
@@ -3118,7 +3112,7 @@ public class DataHelperRefactoringTests
         var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
         var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
 
-        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        var lookup = new DeviceSymbolLookupModel(log)
         {
             DeviceModel = cameraDevice,
             SymbolModel = symbolModel
@@ -3142,7 +3136,7 @@ public class DataHelperRefactoringTests
         var cameraDevice = new CameraDeviceModel { Id = 100, DeviceType = EnumDeviceType.IpCamera };
         var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
 
-        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        var lookup = new DeviceSymbolLookupModel(log)
         {
             DeviceModel = cameraDevice,
             SymbolModel = symbolModel
@@ -3171,7 +3165,7 @@ public class DataHelperRefactoringTests
         };
         var symbolModel = new PidsSymbolModel { EventStatus = EnumEventStatus.Normal };
 
-        var lookup = new DeviceSymbolLookupModel(log, ea, eventSetup)
+        var lookup = new DeviceSymbolLookupModel(log)
         {
             DeviceModel = sensorDevice,
             SymbolModel = symbolModel
@@ -5211,7 +5205,7 @@ public class DeviceSymbolLookupModelSyncTests
         var ea = new Mock<IEventAggregator>().Object;
         var eventSetupSource = new Mock<IEventSetupModel>().Object;
         var eventSetup = new EventSetupModel(eventSetupSource);
-        return new DeviceSymbolLookupModel(log, ea, eventSetup);
+        return new DeviceSymbolLookupModel(log);
     }
 
     [Fact]
@@ -5413,6 +5407,60 @@ public class SymbolEventManagerPhase4Tests
         Assert.Null(ex);
     }
 }
+
+public class SymbolEventManagerDeviceTransitionTests
+{
+    private static EventSetupModel CreateEventSetup()
+    {
+        var mock = new Mock<IEventSetupModel>();
+        mock.SetupAllProperties();
+        return new EventSetupModel(mock.Object);
+    }
+
+    private static Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager CreateManager()
+    {
+        var ea = new Mock<IEventAggregator>();
+        var log = new Mock<ILogService>().Object;
+        return new Ironwall.Dotnet.Libraries.Events.Ui.Managers.SymbolEventManager(ea.Object, log, CreateEventSetup());
+    }
+
+    private static (Mock<IBaseDeviceModel> device, Mock<IPidsEventCapable> symbol) CreatePair(int id, EnumDeviceType type)
+    {
+        var device = new Mock<IBaseDeviceModel>();
+        device.Setup(d => d.Id).Returns(id);
+        device.Setup(d => d.DeviceType).Returns(type);
+        device.Setup(d => d.Status).Returns(EnumDeviceStatus.ACTIVATED);
+        var symbol = new Mock<IPidsEventCapable>();
+        symbol.SetupAllProperties();
+        return (device, symbol);
+    }
+
+    [Fact]
+    public void SetDeviceDetecting_ShouldSetSymbolToDetecting()
+    {
+        var manager = CreateManager();
+        var (device, symbol) = CreatePair(1, EnumDeviceType.Fence);
+        manager.RegisterDeviceSymbol(device.Object, symbol.Object);
+
+        manager.SetDeviceDetecting(1, EnumDeviceType.Fence, EnumEventType.Intrusion);
+
+        Assert.Equal(EnumEventStatus.Detecting, symbol.Object.EventStatus);
+    }
+
+    [Fact]
+    public void RestoreDeviceSymbol_ShouldSetSymbolToNormal()
+    {
+        var manager = CreateManager();
+        var (device, symbol) = CreatePair(1, EnumDeviceType.Fence);
+        manager.RegisterDeviceSymbol(device.Object, symbol.Object);
+
+        // Detecting 상태로 설정 후 복원
+        manager.SetDeviceDetecting(1, EnumDeviceType.Fence, EnumEventType.Intrusion);
+        manager.RestoreDeviceSymbol(1, EnumDeviceType.Fence);
+
+        Assert.Equal(EnumEventStatus.Normal, symbol.Object.EventStatus);
+    }
+}
 #endregion
 
 #region Test 14: CameraPtzNatsSyncService 테스트
@@ -5513,98 +5561,7 @@ public class CameraPtzNatsSyncServiceTests
 }
 #endregion
 
-#region Test 15: DetectionNatsSyncService 테스트
-public class DetectionNatsSyncServiceTests
-{
-    private Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>? _capturedHandler;
-
-    private Ironwall.Dotnet.Libraries.Events.Ui.Services.DetectionNatsSyncService CreateService(
-        out Mock<Ironwall.Dotnet.Libraries.Nats.Services.INatsService> mockNats,
-        out Mock<Ironwall.Dotnet.Libraries.Events.Ui.Managers.ISymbolEventManager> mockManager)
-    {
-        mockNats = new Mock<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>();
-        mockManager = new Mock<Ironwall.Dotnet.Libraries.Events.Ui.Managers.ISymbolEventManager>();
-
-        mockNats.SetupAdd(m => m.NatsSubscribeEventAsync += It.IsAny<Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>>())
-                .Callback<Func<Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel, System.Threading.Tasks.Task>>(h => _capturedHandler = h);
-
-        return new Ironwall.Dotnet.Libraries.Events.Ui.Services.DetectionNatsSyncService(
-            null, mockNats.Object, mockManager.Object);
-    }
-
-    #region Test 15.1: DETECTION 메시지 수신 → ProcessDetectionById 호출
-    [Fact]
-    public async Task OnNatsDetection_ValidMessage_ShouldCallProcessDetectionById()
-    {
-        // Arrange
-        var service = CreateService(out var mockNats, out var mockManager);
-        await service.StartService();
-
-        var json = """
-        {
-          "id": "test-uuid",
-          "m_type": "REQ",
-          "cmd": "DETECTION",
-          "from": "pids-proxy",
-          "body": {
-            "id": 1,
-            "type_event": "Intrusion",
-            "device_id": 5,
-            "device": {
-              "id": 5,
-              "type_device": "Sensor",
-              "device_groups": [{ "id": 1, "name": "A구역" }, { "id": 3, "name": "C구역" }]
-            },
-            "result": "PIR_SENSOR"
-          }
-        }
-        """;
-
-        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
-            subject: "sensorway.unit001.gis.event.detect",
-            subscriptionSubject: null,
-            data: json);
-
-        // Act
-        await _capturedHandler!(args);
-
-        // Assert
-        mockManager.Verify(m => m.ProcessDetectionById(
-            5,
-            It.Is<List<int>>(g => g.Contains(1) && g.Contains(3)),
-            Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion),
-            Times.Once);
-    }
-    #endregion
-
-    #region Test 15.2: 비-DETECTION cmd → 무시
-    [Fact]
-    public async Task OnNatsDetection_NonDetectionCmd_ShouldIgnore()
-    {
-        // Arrange
-        var service = CreateService(out var mockNats, out var mockManager);
-        await service.StartService();
-
-        var json = """
-        {
-          "cmd": "SYNC_DEVICE",
-          "body": { "action": "UPDATED" }
-        }
-        """;
-
-        var args = new Ironwall.Dotnet.Libraries.Nats.Models.MessageArgsModel(
-            subject: "sensorway.unit001.gis.event.detect",
-            subscriptionSubject: null,
-            data: json);
-
-        // Act
-        await _capturedHandler!(args);
-
-        // Assert
-        mockManager.Verify(m => m.ProcessDetectionById(
-            It.IsAny<int>(), It.IsAny<List<int>?>(), It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventType>()),
-            Times.Never);
-    }
-    #endregion
-}
+#region Test 15: DetectionNatsSyncService 테스트 (moved to DetectionNatsSyncServiceTests.cs)
+// 기존 Test 15.1, 15.2는 ProcessDetectionById 제거로 인해 삭제됨.
+// 새 테스트: Tests/DetectionNatsSyncServiceTests.cs (Enqueue + EventAggregator 발행 검증)
 #endregion

@@ -126,7 +126,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
                 _currentPropertyPanel.CloseRequested += OnCloseRequested;
                 _currentPropertyPanel.MarkerPropertyChanged += OnMarkerPropertyChanged;
 
-                System.Diagnostics.Debug.WriteLine($"PropertyPanel 이벤트 연결: {_currentPropertyPanel.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"PropertyPanel 이벤트 연결: {_currentPropertyPanel.GetType().Name}");
 
                 // 구체적인 타입별 추가 설정
                 if (_currentPropertyPanel is GMapPropertyGeometricControl geometricControl)
@@ -147,7 +147,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
                 _currentPropertyPanel.CloseRequested -= OnCloseRequested;
                 _currentPropertyPanel.MarkerPropertyChanged -= OnMarkerPropertyChanged;
 
-                System.Diagnostics.Debug.WriteLine($"PropertyPanel 이벤트 해제: {_currentPropertyPanel.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"PropertyPanel 이벤트 해제: {_currentPropertyPanel.GetType().Name}");
                 _currentPropertyPanel = null;
             }
         }
@@ -175,7 +175,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
         {
             if (sender is GMapPropertyBaseControl propertyControl)
             {
-                System.Diagnostics.Debug.WriteLine($"PropertyPanel 닫기 요청: {propertyControl.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"PropertyPanel 닫기 요청: {propertyControl.GetType().Name}");
 
                 // EventAggregator 사용
                 var eventAggregator = IoC.Get<IEventAggregator>();
@@ -185,7 +185,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
 
         private async void OnMarkerPropertyChanged(object sender, MarkerPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"(Behavior)마커 속성 변경: {e.PropertyName} = {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"(Behavior)마커 속성 변경: {e.PropertyName} = {e.OldValue} → {e.NewValue}");
 
             // EventAggregator 사용
             var eventAggregator = IoC.Get<IEventAggregator>();

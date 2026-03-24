@@ -335,6 +335,8 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             var result = await _providerService.FetchDetectionEventsPageAsync(
                 StartDate, EndDate, _currentPage + 1, 100, token);
 
+            if (token.IsCancellationRequested) return;
+
             _currentPage = result.Page;
             _totalPages = result.TotalPages;
             _totalCount = result.Total;

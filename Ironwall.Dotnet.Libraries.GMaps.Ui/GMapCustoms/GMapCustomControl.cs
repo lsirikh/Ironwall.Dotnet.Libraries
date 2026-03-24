@@ -466,7 +466,7 @@ public class GMapCustomControl : GMapControl
                 foreach (var newItem in e.NewItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>())
                 {
                     RegisterMarkerForAdorner(newItem);
-                    _log?.Info($"마커 Adorner 등록: {newItem.Title}");
+                    //_log?.Info($"마커 Adorner 등록: {newItem.Title}");
                 }
                 _log?.Info($"Markers 최종 개수: {Markers.Count}");
                 break;
@@ -475,7 +475,7 @@ public class GMapCustomControl : GMapControl
                 foreach (var oldItem in e.OldItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>())
                 {
                     UnregisterMarkerFromAdorner(oldItem);
-                    _log?.Info($"마커 Adorner 해제: {oldItem.Title}");
+                    //_log?.Info($"마커 Adorner 해제: {oldItem.Title}");
                 }
                 break;
 
@@ -738,13 +738,11 @@ public class GMapCustomControl : GMapControl
                 // 마커 크기 고려한 클릭 반경 (마커 크기의 절반 + 여유분)
                 var markerRadius = Math.Max(marker.Width, marker.Height) / 2.0 + 10; // 10px 여유분
 
-                _log?.Info($"마커 '{marker.Title}': 화면위치({markerScreenPoint.X:F2}, {markerScreenPoint.Y:F2}), " +
-                          $"화면거리: {screenDistance:F2}px, 클릭반경: {markerRadius:F2}px, " +
-                          $"마커크기: {marker.Width}x{marker.Height}");
+                //_log?.Info($"마커 '{marker.Title}': 화면위치({markerScreenPoint.X:F2}, {markerScreenPoint.Y:F2}), 화면거리: {screenDistance:F2}px, 클릭반경: {markerRadius:F2}px, 마커크기: {marker.Width}x{marker.Height}");
 
                 if (screenDistance <= markerRadius)
                 {
-                    _log?.Info($"마커 '{marker.Title}' 선택됨 (화면거리: {screenDistance:F2}px <= 반경: {markerRadius:F2}px)");
+                    //_log?.Info($"마커 '{marker.Title}' 선택됨 (화면거리: {screenDistance:F2}px <= 반경: {markerRadius:F2}px)");
                     return marker;
                 }
             }

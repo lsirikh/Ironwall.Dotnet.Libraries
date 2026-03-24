@@ -167,6 +167,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             });
         }
 
+        /// <summary>
+        /// Statistics API를 재호출하여 LastDashboardDto를 갱신한다.
+        /// 이벤트 삭제/추가 후 차트를 최신 상태로 유지하기 위해 사용.
+        /// </summary>
+        public async Task<EventDashboardDto?> RefreshDashboardDtoAsync(CancellationToken ct = default)
+        {
+            var dto = await _providerService.FetchEventDashboardAsync(
+                StartDate, EndDate, "hour", ct);
+            if (dto != null)
+                LastDashboardDto = dto;
+            return LastDashboardDto;
+        }
+
         #endregion
         #region - IHanldes -
         #endregion

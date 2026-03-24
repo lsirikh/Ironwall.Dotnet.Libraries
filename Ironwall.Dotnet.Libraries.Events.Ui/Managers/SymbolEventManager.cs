@@ -48,7 +48,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     // 복합 키 (Id, DeviceType)를 사용하여 같은 ID라도 타입이 다르면 별도 등록
     public void RegisterDeviceSymbol(IBaseDeviceModel deviceModel, IPidsEventCapable symbolModel)
     {
-        var lookup = new DeviceSymbolLookupModel(_log, _ea, _eventSetupModel)
+        var lookup = new DeviceSymbolLookupModel(_log)
         {
             Id = deviceModel.Id,
             DeviceModel = deviceModel,
@@ -57,7 +57,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 
         var key = (deviceModel.Id, deviceModel.DeviceType);
         _deviceSymbolLookup[key] = lookup;
-        _log?.Info($"개별 심볼 등록: Device({deviceModel.Id}, {deviceModel.DeviceType}) → {symbolModel.GetType().Name}");
+        //_log?.Info($"개별 심볼 등록: Device({deviceModel.Id}, {deviceModel.DeviceType}) → {symbolModel.GetType().Name}");
 
         // FR-08c: 등록 즉시 Device.Status → Symbol.OperationState 동기화
         lookup.SyncFromDevice(deviceModel.Status);
@@ -66,7 +66,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     // 그룹 심볼 매핑 등록 (그룹 마커용)
     public void RegisterGroupSymbol(int deviceGroup, IBaseDeviceModel deviceModel, IPidsEventCapable symbolModel)
     {
-        var lookup = new DeviceSymbolLookupModel(_log, _ea, _eventSetupModel)
+        var lookup = new DeviceSymbolLookupModel(_log)
         {
             Id = deviceGroup,
             DeviceModel = deviceModel,
@@ -75,7 +75,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 
         _groupSymbolLookup[deviceGroup] = lookup;
 
-        _log?.Info($"그룹 심볼 등록: Group({deviceGroup}) → {symbolModel.GetType().Name} ");
+        //_log?.Info($"그룹 심볼 등록: Group({deviceGroup}) → {symbolModel.GetType().Name} ");
     }
 
     // 센서 이벤트 처리 (deviceId + deviceType: 개별 마커, deviceGroups: 그룹 마커)
@@ -86,7 +86,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         if (_deviceSymbolLookup.TryGetValue(key, out var deviceLookup))
         {
             deviceLookup.ProcessEvent(eventType, severity);
-            _log?.Info($"센서 이벤트 처리: Device({deviceId}, {deviceType}) -> {eventType}");
+            //_log?.Info($"센서 이벤트 처리: Device({deviceId}, {deviceType}) -> {eventType}");
         }
         else
         {
@@ -108,38 +108,12 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     }
 
     // 탐지 이벤트 처리 (deviceId로 검색 — NATS DETECTION 메시지용)
+    // NOTE: 심볼 Detecting은 EventQueueManager 전이 이벤트로 일원화됨
+    //   - 개별 심볼: OnDeviceFirstEvent → SetDeviceDetecting()
+    //   - 그룹 심볼: OnGroupFirstEvent → SetGroupDetecting()
     public void ProcessDetectionById(int deviceId, List<int>? deviceGroups, EnumEventType eventType)
     {
-        // 1. 개별 심볼 처리 - deviceId로 모든 타입 검색
-        var found = false;
-        foreach (var kvp in _deviceSymbolLookup)
-        {
-            if (kvp.Key.Id == deviceId)
-            {
-                kvp.Value.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
-                _log?.Info($"탐지 이벤트 처리 (ById): Device({deviceId}, {kvp.Key.Type}) -> {eventType}");
-                found = true;
-                break;
-            }
-        }
-
-        if (!found)
-        {
-            _log?.Warning($"매핑되지 않은 장비 (ById): Device({deviceId})");
-        }
-
-        // 2. 그룹 심볼 처리
-        if (ShouldProcessGroupSymbol(eventType) && deviceGroups != null)
-        {
-            foreach (var groupId in deviceGroups)
-            {
-                if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
-                {
-                    groupLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
-                    _log?.Info($"그룹 이벤트 처리 (ById): DeviceGroup({groupId}) -> {eventType}");
-                }
-            }
-        }
+        _log?.Info($"ProcessDetectionById 호출됨 (no-op): Device({deviceId}), EventType={eventType} — 심볼 상태는 EventQueueManager 전이로 처리");
     }
 
     // 컨트롤러 이벤트 처리 (복합 키 사용)
@@ -172,32 +146,12 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         }
     }
 
+    // NOTE: 심볼 복원은 EventQueueManager 전이 이벤트로 일원화됨
+    //   - 개별 심볼: OnDeviceEmpty → RestoreDeviceSymbol()
+    //   - 그룹 심볼: OnGroupEmpty → RestoreGroupSymbol()
     public void ProcessEventReport(int deviceId, EnumDeviceType deviceType, List<int>? deviceGroups)
     {
-        // 1. 개별 심볼 복원 - 복합 키 (Id, DeviceType) 사용
-        var key = (deviceId, deviceType);
-        if (_deviceSymbolLookup.TryGetValue(key, out var deviceLookup))
-        {
-            deviceLookup.ProcessEventReport();
-            _log?.Info($"조치보고 처리: Device({deviceId}, {deviceType})");
-        }
-        else
-        {
-            _log?.Warning($"조치보고 실패 - 매핑되지 않은 장비: Device({deviceId}, {deviceType})");
-        }
-
-        // 2. 그룹 심볼 복원 - 복수 그룹 지원
-        if (deviceGroups != null)
-        {
-            foreach (var groupId in deviceGroups)
-            {
-                if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
-                {
-                    groupLookup.ProcessEventReport();
-                    _log?.Info($"조치보고 처리 (그룹): DeviceGroup({groupId})");
-                }
-            }
-        }
+        _log?.Info($"ProcessEventReport 호출됨 (no-op): Device({deviceId}, {deviceType}) — 심볼 복원은 EventQueueManager Dequeue 전이로 처리");
     }
 
     /// <summary>
@@ -261,6 +215,56 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         _log?.Info($"[SYNC→Symbol] DeviceStatusChangedMessage 수신: id={message.DeviceId}, type={message.DeviceType}, status={message.Status} (등록 심볼 수={_deviceSymbolLookup.Count})");
         SyncDeviceStatus(message.DeviceId, message.DeviceType, message.Status);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 개별 심볼 Detecting 상태 설정 — EventQueueManager의 OnDeviceFirstEvent에서 호출
+    /// </summary>
+    public void SetDeviceDetecting(int deviceId, EnumDeviceType deviceType, EnumEventType eventType)
+    {
+        var key = (deviceId, deviceType);
+        if (_deviceSymbolLookup.TryGetValue(key, out var deviceLookup))
+        {
+            deviceLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
+            _log?.Info($"개별 심볼 Detecting 설정: Device({deviceId}, {deviceType}) -> {eventType}");
+        }
+    }
+
+    /// <summary>
+    /// 개별 심볼 Normal 복원 — EventQueueManager의 OnDeviceEmpty에서 호출
+    /// </summary>
+    public void RestoreDeviceSymbol(int deviceId, EnumDeviceType deviceType)
+    {
+        var key = (deviceId, deviceType);
+        if (_deviceSymbolLookup.TryGetValue(key, out var deviceLookup))
+        {
+            deviceLookup.ProcessEventReport();
+            _log?.Info($"개별 심볼 복원: Device({deviceId}, {deviceType}) → Normal");
+        }
+    }
+
+    /// <summary>
+    /// 그룹 심볼 Detecting 상태 설정 — EventQueueManager의 OnGroupFirstEvent에서 호출
+    /// </summary>
+    public void SetGroupDetecting(int groupId, EnumEventType eventType)
+    {
+        if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+        {
+            groupLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
+            _log?.Info($"그룹 Detecting 설정: DeviceGroup({groupId}) -> {eventType}");
+        }
+    }
+
+    /// <summary>
+    /// 그룹 심볼 Normal 복원 — EventQueueManager의 OnGroupEmpty에서 호출
+    /// </summary>
+    public void RestoreGroupSymbol(int groupId)
+    {
+        if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+        {
+            groupLookup.ProcessEventReport();
+            _log?.Info($"그룹 심볼 복원: DeviceGroup({groupId}) → Normal");
+        }
     }
 
     public void Dispose()

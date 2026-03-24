@@ -50,7 +50,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
 
             BindingOperations.SetBinding(this, SelectedMarkerProperty, binding);
 
-            System.Diagnostics.Debug.WriteLine("PreventBindingContamination Behavior 연결됨");
+            //System.Diagnostics.Debug.WriteLine("PreventBindingContamination Behavior 연결됨");
         }
 
         protected override void OnDetaching()
@@ -58,7 +58,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             BindingOperations.ClearBinding(this, SelectedMarkerProperty);
             base.OnDetaching();
 
-            System.Diagnostics.Debug.WriteLine("PreventBindingContamination Behavior 해제됨");
+            //System.Diagnostics.Debug.WriteLine("PreventBindingContamination Behavior 해제됨");
         }
 
         #endregion
@@ -77,9 +77,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== Behavior: SelectedMarker 변경 감지 ===");
-                System.Diagnostics.Debug.WriteLine($"이전 마커: {oldMarker?.Title ?? "null"}");
-                System.Diagnostics.Debug.WriteLine($"새 마커: {newMarker?.Title ?? "null"}");
+                //System.Diagnostics.Debug.WriteLine("=== Behavior: SelectedMarker 변경 감지 ===");
+                //System.Diagnostics.Debug.WriteLine($"이전 마커: {oldMarker?.Title ?? "null"}");
+                //System.Diagnostics.Debug.WriteLine($"새 마커: {newMarker?.Title ?? "null"}");
 
                 // 핵심: 새 마커 설정 전에 바인딩 정리
                 if (oldMarker != null && newMarker != null && oldMarker != newMarker)
@@ -110,7 +110,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"이전 마커 '{oldMarker.Title}' 연결 해제");
+                //System.Diagnostics.Debug.WriteLine($"이전 마커 '{oldMarker.Title}' 연결 해제");
 
                 // 필요시 이전 마커의 PropertyChanged 이벤트 구독 해제
                 if (oldMarker is INotifyPropertyChanged notifyObj)

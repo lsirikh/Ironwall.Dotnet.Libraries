@@ -48,20 +48,12 @@ public abstract class MessageService<T> : IMessageService<T>
     {
         try
         {
-            _log?.Info($"[RegisterSubscribers] Called - Connection: {Connection != null}, Subject: {_defaultSubject}");
-
             if (Connection == null || string.IsNullOrEmpty(_defaultSubject))
-            {
-                _log?.Warning("[RegisterSubscribers] Connection or Subject is null - skipping subscription.");
                 return;
-            }
 
-            // 구독할 전체 subject 목록 (primary + additional)
             var subjects = new List<string> { _defaultSubject };
             if (_additionalSubjects.Count > 0)
                 subjects.AddRange(_additionalSubjects);
-
-            _log?.Info($"[RegisterSubscribers] Starting subscription to {subjects.Count} subject(s): {string.Join(", ", subjects)}");
 
             foreach (var subject in subjects)
             {
@@ -70,13 +62,11 @@ public abstract class MessageService<T> : IMessageService<T>
                 {
                     try
                     {
-                        _log?.Info($"[SubscriptionTask] Starting loop for '{capturedSubject}'");
                         await foreach (var msg in Connection.SubscribeAsync<string>(capturedSubject, cancellationToken: token))
                         {
                             try
                             {
                                 var data = msg.Data ?? string.Empty;
-                                _log?.Info($"[SubscriptionTask] Received from '{msg.Subject}': {data}");
                                 await OnNatsSubscribeEventAsync(new MessageArgsModel(msg.Subject, capturedSubject, data));
                             }
                             catch (Exception ex)
@@ -84,11 +74,10 @@ public abstract class MessageService<T> : IMessageService<T>
                                 _log?.Error($"[SubscriptionTask] Error processing message: {ex.Message}");
                             }
                         }
-                        _log?.Info($"[SubscriptionTask] Loop ended for '{capturedSubject}'");
                     }
                     catch (OperationCanceledException)
                     {
-                        _log?.Info($"[SubscriptionTask] Subscription cancelled for '{capturedSubject}'");
+                        // 정상 취소
                     }
                     catch (Exception ex)
                     {
@@ -99,10 +88,7 @@ public abstract class MessageService<T> : IMessageService<T>
                 _subscriptionTasks.Add(task);
             }
 
-            // 구독이 준비될 때까지 잠시 대기
             await Task.Delay(100, token);
-
-            _log?.Info($"[RegisterSubscribers] All subscriptions started.");
         }
         catch (Exception ex)
         {
@@ -116,8 +102,6 @@ public abstract class MessageService<T> : IMessageService<T>
     /// </summary>
     protected virtual async Task OnNatsSubscribeEventAsync(MessageArgsModel e)
     {
-        _log?.Info($"[OnNatsSubscribeEventAsync] Invoking event handlers for subject: {e.Subject}");
-
         // 동기 이벤트 핸들러 실행
         NatsSubscribeEvent?.Invoke(this, e);
 
@@ -125,16 +109,10 @@ public abstract class MessageService<T> : IMessageService<T>
         if (NatsSubscribeEventAsync != null)
         {
             var handlers = NatsSubscribeEventAsync.GetInvocationList();
-            _log?.Info($"[OnNatsSubscribeEventAsync] Found {handlers.Length} async handlers");
-
             foreach (var handler in handlers)
             {
                 await ((Func<MessageArgsModel, Task>)handler)(e);
             }
-        }
-        else
-        {
-            _log?.Warning("[OnNatsSubscribeEventAsync] No async event handlers registered");
         }
     }
 
@@ -145,9 +123,6 @@ public abstract class MessageService<T> : IMessageService<T>
     {
         try
         {
-            _log?.Info("[MessageService] Disposing NATS Connection...");
-
-            // 모든 구독 Task 완료 대기
             foreach (var task in _subscriptionTasks)
             {
                 try
@@ -165,14 +140,11 @@ public abstract class MessageService<T> : IMessageService<T>
             }
             _subscriptionTasks.Clear();
 
-            // Connection 종료
             if (Connection != null)
             {
                 await Connection.DisposeAsync();
                 Connection = null;
             }
-
-            _log?.Info("[MessageService] NATS Connection disposed successfully.");
         }
         catch (Exception ex)
         {

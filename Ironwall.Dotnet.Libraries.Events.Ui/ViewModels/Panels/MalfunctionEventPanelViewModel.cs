@@ -338,6 +338,8 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             var result = await _providerService.FetchMalfunctionEventsPageAsync(
                 StartDate, EndDate, _currentPage + 1, 100, token);
 
+            if (token.IsCancellationRequested) return;
+
             _currentPage = result.Page;
             _totalPages = result.TotalPages;
             _totalCount = result.Total;

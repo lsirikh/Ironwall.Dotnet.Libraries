@@ -36,6 +36,7 @@ public class GatewayModule : Module
 
             // Provider 등록
             builder.RegisterType<GatewayEventProvider>().SingleInstance();
+            // DeviceGroupProvider는 DeviceModule에서 이미 등록됨 — Autofac 자동 해석
             // ViewModel 등록
             builder.RegisterType<GatewaySetupViewModel>().SingleInstance();
 

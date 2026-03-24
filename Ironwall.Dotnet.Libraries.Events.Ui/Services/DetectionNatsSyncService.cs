@@ -1,6 +1,9 @@
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Newtonsoft.Json.Linq;
 using Ironwall.Dotnet.Libraries.Nats.Models;
@@ -22,11 +25,17 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
     public DetectionNatsSyncService(
         ILogService? log,
         INatsService natsService,
-        ISymbolEventManager symbolEventManager)
+        ISymbolEventManager symbolEventManager,
+        IEventQueueManager eventQueueManager,
+        IEventSetupModel eventSetupModel,
+        IEventAggregator? eventAggregator = null)
     {
         _log = log;
         _natsService = natsService;
         _symbolEventManager = symbolEventManager;
+        _eventQueueManager = eventQueueManager;
+        _eventSetupModel = eventSetupModel;
+        _eventAggregator = eventAggregator;
     }
     #endregion
 
@@ -54,13 +63,16 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
             if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
 
             var jObj = JObject.Parse(e.Data);
+            var natsMessageId = jObj.Value<string>("id"); // NATS 메시지 고유 UUID
             var cmd = jObj.Value<string>("cmd");
-            if (cmd != "DETECTION") return Task.CompletedTask;
+            if (cmd != "DETECT") return Task.CompletedTask;
 
             var body = jObj["body"]?.ToObject<DetectionEventDto>();
             if (body == null) return Task.CompletedTask;
 
-            var deviceId = body.DeviceId;
+            // NATS JSON: body.device.id에 실제 ID가 있음 (body.device_id는 0일 수 있음)
+            var deviceId = body.Device?.Id ?? body.DeviceId;
+            var eventId = body.Id; // 서버 이벤트 ID (1:1 카드 매칭 키)
             var typeEvent = body.TypeEvent;
 
             // type_event → EnumEventType 매핑
@@ -78,8 +90,25 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
 
             _log?.Info($"DETECTION 수신: deviceId={deviceId}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
 
-            // deviceId로 검색 (NATS DETECTION은 generic "Sensor" 타입만 전송하므로 복합키 대신 ID 검색)
-            _symbolEventManager.ProcessDetectionById(deviceId, deviceGroups, eventType);
+            // EventQueue에 이벤트 등록
+            // 심볼 Detecting은 EventQueueManager 전이 이벤트로 일원화:
+            //   - 개별 심볼: OnDeviceFirstEvent → SetDeviceDetecting()
+            //   - 그룹 심볼: OnGroupFirstEvent → SetGroupDetecting()
+            var entryId = _eventQueueManager.Enqueue(new EventEntry
+            {
+                DeviceId = deviceId,
+                DeviceType = EnumDeviceType.Fence, // NATS DETECTION은 Fence 센서만 전송
+                GroupIds = deviceGroups,
+                EventType = eventType,
+                TimeoutSeconds = _eventSetupModel.TimeDiscardSec,
+                IsAutoReportEnabled = _eventSetupModel.IsAutoEventDiscard
+            }, natsMessageId); // NATS UUID를 entryId로 사용
+
+            _log?.Info($"DETECTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
+
+            // entryId + eventId를 EventAggregator로 발행 → 카드 1:1 매칭에 사용
+            _eventAggregator?.PublishOnBackgroundThreadAsync(
+                new EventEntryEnqueuedMessage(entryId, eventId, deviceId, EnumDeviceType.Fence, eventType));
         }
         catch (Exception ex)
         {
@@ -94,5 +123,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
     private readonly ILogService? _log;
     private readonly INatsService _natsService;
     private readonly ISymbolEventManager _symbolEventManager;
+    private readonly IEventQueueManager _eventQueueManager;
+    private readonly IEventSetupModel _eventSetupModel;
+    private readonly IEventAggregator? _eventAggregator;
     #endregion
 }

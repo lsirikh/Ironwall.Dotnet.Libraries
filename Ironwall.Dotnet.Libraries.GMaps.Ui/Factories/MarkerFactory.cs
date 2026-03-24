@@ -58,25 +58,25 @@ public class MarkerFactory : IMarkerFactory
 
     private GMapPidsGroupMarker CreatePidsGroupMarker(IPidsGroupSymbolModel pidsGroupSymbol)
     {
-        _log?.Info($"GMapPidsGroupMarker 생성: {pidsGroupSymbol.Title}");
+        //_log?.Info($"GMapPidsGroupMarker 생성: {pidsGroupSymbol.Title}");
         return new GMapPidsGroupMarker(_log!, pidsGroupSymbol);
     }
 
     private GMapInfraMarker CreateInfraMarker(IInfraSymbolModel symbol)
     {
-        _log?.Info($"GMapInfraMarker 생성: {symbol.Title}");
+        //_log?.Info($"GMapInfraMarker 생성: {symbol.Title}");
         return new GMapInfraMarker(_log!, symbol);
     }
 
     private GMapLineMarker CreateLineMarker(ILineSymbolModel symbol)
     {
-        _log?.Info($"GMapLineMarker 생성: {symbol.Title}");
+        //_log?.Info($"GMapLineMarker 생성: {symbol.Title}");
         return new GMapLineMarker(_log!, symbol);
     }
 
     private GMapMilitarySymbolMarker CreateMilitaryMarker(IMilitarySymbolModel symbol)
     {
-        _log?.Info($"GMapMilitarySymbolMarker 생성: {symbol.Title}, UnitType: {symbol.UnitType}");
+        //_log?.Info($"GMapMilitarySymbolMarker 생성: {symbol.Title}, UnitType: {symbol.UnitType}");
         return new GMapMilitarySymbolMarker(_log!, symbol);
     }
 
@@ -92,7 +92,7 @@ public class MarkerFactory : IMarkerFactory
             // 해당 심볼의 DeviceType과 일치하는 디바이스만 검색해야 함
             var filteredDevices = FilterDevicesByType(allDevices, symbol.DeviceType).ToList();
 
-            _log?.Info($"GMapPidsMarker - DeviceProvider 전체: {allDevices.Count}개, 필터링(DeviceType={symbol.DeviceType}): {filteredDevices.Count}개, 검색 대상 LinkedDeviceId={symbol.LinkedDeviceId}");
+            //_log?.Info($"GMapPidsMarker - DeviceProvider 전체: {allDevices.Count}개, 필터링(DeviceType={symbol.DeviceType}): {filteredDevices.Count}개, 검색 대상 LinkedDeviceId={symbol.LinkedDeviceId}");
 
             symbol.BindToDeviceList(filteredDevices);
 
@@ -102,11 +102,11 @@ public class MarkerFactory : IMarkerFactory
             }
             else
             {
-                _log?.Info($"GMapPidsMarker - LinkedDevice 바인딩 성공: DeviceId={symbol.LinkedDeviceId}, Device={symbol.LinkedDevice.DeviceName}");
+                //_log?.Info($"GMapPidsMarker - LinkedDevice 바인딩 성공: DeviceId={symbol.LinkedDeviceId}, Device={symbol.LinkedDevice.DeviceName}");
             }
         }
 
-        _log?.Info($"GMapPidsMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}, LinkedDeviceId: {symbol.LinkedDeviceId}");
+        //_log?.Info($"GMapPidsMarker 생성: {symbol.Title}, DeviceType: {symbol.DeviceType}, LinkedDeviceId: {symbol.LinkedDeviceId}");
         return new GMapPidsMarker(_log!, symbol);
     }
 
@@ -119,13 +119,13 @@ public class MarkerFactory : IMarkerFactory
 
     private GMapGeometricMarker CreateGeometricMarker(IGeometricSymbolModel symbol)
     {
-        _log?.Info($"GMapGeometricMarker 생성: {symbol.Title}, ShapeType: {symbol.ShapeType}");
+        //_log?.Info($"GMapGeometricMarker 생성: {symbol.Title}, ShapeType: {symbol.ShapeType}");
         return new GMapGeometricMarker(_log!, symbol);
     }
 
     private GMapCustomMarker CreateCustomMarker(ISymbolModel symbol)
     {
-        _log?.Info($"GMapCustomMarker 생성: {symbol.Title}");
+        //_log?.Info($"GMapCustomMarker 생성: {symbol.Title}");
         return new GMapCustomMarker(_log!, symbol);
     }
 
@@ -139,7 +139,7 @@ public class MarkerFactory : IMarkerFactory
         if (imageModel == null)
             throw new ArgumentNullException(nameof(imageModel));
 
-        _log?.Info($"GMapImageMarker 생성: {imageModel.Title}");
+        //_log?.Info($"GMapImageMarker 생성: {imageModel.Title}");
         return new GMapImageMarker(_log!, imageModel);
     }
 }

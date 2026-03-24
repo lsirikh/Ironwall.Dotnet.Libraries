@@ -110,7 +110,7 @@
 										FontSize="12"
 										Text="{Binding Repeat, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>
-								<Grid>
+								<Grid Margin="0 20 0 0">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="*" />

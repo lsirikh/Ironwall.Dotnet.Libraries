@@ -331,6 +331,8 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
             var result = await _providerService.FetchConnectionEventsPageAsync(
                 StartDate, EndDate, _currentPage + 1, 100, token);
 
+            if (token.IsCancellationRequested) return;
+
             _currentPage = result.Page;
             _totalPages = result.TotalPages;
             _totalCount = result.Total;

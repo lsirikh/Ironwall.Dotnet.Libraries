@@ -342,27 +342,27 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 // 2. Render 우선순위까지 큐 소진 — ProgressCircle 렌더링 보장
                 await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
-                // 3. 캐시에서 바로 ViewModelProvider 구성 (API 호출 없음)
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+                await DispatcherService.BeginInvoke(() => ViewModelProvider.Clear());
 
-                DispatcherService.Invoke(() =>
+                var items = _deviceProvider.OfType<IControllerDeviceModel>().ToList();
+                const int batchSize = 50;
+                for (int i = 0; i < items.Count; i += batchSize)
                 {
-                    ViewModelProvider.Clear();
-                    foreach (var (item, index) in _deviceProvider
-                        .OfType<IControllerDeviceModel>()
-                        .Select((item, index) => (item, index)))
+                    if (cancellationToken.IsCancellationRequested)
+                        throw new TaskCanceledException("Task was cancelled!");
+                    var batch = items.Skip(i).Take(batchSize).ToList();
+                    var startIndex = i;
+                    await DispatcherService.BeginInvoke(() =>
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                            throw new TaskCanceledException("Task was cancelled!");
-
-                        ViewModelProvider.Add(new ControllerDeviceViewModel((ControllerDeviceModel)item) { Index = index + 1 });
-                    }
-                    NotifyOfPropertyChange(() => ViewModelProvider);
-                });
+                        foreach (var (item, idx) in batch.Select((item, idx) => (item, idx)))
+                            ViewModelProvider.Add(new ControllerDeviceViewModel((ControllerDeviceModel)item) { Index = startIndex + idx + 1 });
+                    });
+                    await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
+                }
+                await DispatcherService.BeginInvoke(() => NotifyOfPropertyChange(() => ViewModelProvider));
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-
-                // 4. UI 스레드에서 IsVisible = true 설정
                 DispatcherService.Invoke(() => IsVisible = true);
             }
             catch (TaskCanceledException ex)
@@ -388,6 +388,11 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             foreach (var item in SelectedItems.ToList())
             {
                 var model = (IControllerDeviceModel)item.Model;
+                if (model.Id <= 0)
+                {
+                    _deviceProvider.Remove(model);
+                    continue;
+                }
                 var response = await _apiService.DeleteControllerAsync(model.Id, cancellationToken);
 
                 if (!response.Success)

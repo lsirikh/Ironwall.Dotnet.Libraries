@@ -107,12 +107,7 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void DataChartPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
-        // 차트 fetch 완료 → 각 이벤트 패널에 캐시 날짜 설정
-        DetectionPanelViewModel.SetCachedDate(start, end);
-        MalfunctionPanelViewModel.SetCachedDate(start, end);
-        ConnectionPanelViewModel.SetCachedDate(start, end);
-        ActionPanelViewModel.SetCachedDate(start, end);
-
+        // SetCachedDate는 각 패널의 DataInitialize() 완료 시점에만 호출 (캐시 오유효화 방지)
         var dashboard = DataChartPanelViewModel.LastDashboardDto;
         if (dashboard == null)
         {
@@ -146,7 +141,7 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void ActionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
-        var dashboard = DataChartPanelViewModel.LastDashboardDto;
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
         if (dashboard == null) { IsButtonEnable = true; return; }
 
         EventInfoViewModel.IsChartLoading = true;
@@ -176,7 +171,7 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void ConnectionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
-        var dashboard = DataChartPanelViewModel.LastDashboardDto;
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
         if (dashboard == null) { IsButtonEnable = true; return; }
 
         EventInfoViewModel.IsChartLoading = true;
@@ -206,7 +201,7 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void MalfunctionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
-        var dashboard = DataChartPanelViewModel.LastDashboardDto;
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
         if (dashboard == null) { IsButtonEnable = true; return; }
 
         EventInfoViewModel.IsChartLoading = true;
@@ -237,7 +232,8 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void DetectionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
-        var dashboard = DataChartPanelViewModel.LastDashboardDto;
+        // ⭐ 이벤트 삭제/추가 후 차트가 stale 데이터를 표시하지 않도록 통계 재조회
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
         if (dashboard == null) { IsButtonEnable = true; return; }
 
         EventInfoViewModel.IsChartLoading = true;
@@ -266,10 +262,74 @@ public class EventDashboardViewModel : BasePanelViewModel
     }
     #endregion
     #region - Binding Methods -
+    public bool CanClickSearch => true;
+    public void ClickSearch()
+    {
+        try
+        {
+            IsButtonEnable = false;
+
+            // 1. 모든 자식 패널에 동일 날짜 전파
+            DataChartPanelViewModel.SetDate(StartDate, EndDate);
+            DetectionPanelViewModel.SetDate(StartDate, EndDate);
+            MalfunctionPanelViewModel.SetDate(StartDate, EndDate);
+            ConnectionPanelViewModel.SetDate(StartDate, EndDate);
+            ActionPanelViewModel.SetDate(StartDate, EndDate);
+
+            // 2. 모든 이벤트 패널 캐시 무효화
+            DetectionPanelViewModel.InvalidateCache();
+            MalfunctionPanelViewModel.InvalidateCache();
+            ConnectionPanelViewModel.InvalidateCache();
+            ActionPanelViewModel.InvalidateCache();
+
+            // 3. 활성 탭의 ClickSearch() 직접 호출
+            //    View를 Visual Tree에서 분리하지 않으므로
+            //    DataGridScrollEndBehavior의 ScrollViewer 구독이 유지됨
+            var activeItem = TabControlViewModel.ActiveItem;
+            if (activeItem == DataChartPanelViewModel)
+                DataChartPanelViewModel.ClickSearch();
+            else if (activeItem == DetectionPanelViewModel)
+                DetectionPanelViewModel.ClickSearch();
+            else if (activeItem == MalfunctionPanelViewModel)
+                MalfunctionPanelViewModel.ClickSearch();
+            else if (activeItem == ConnectionPanelViewModel)
+                ConnectionPanelViewModel.ClickSearch();
+            else if (activeItem == ActionPanelViewModel)
+                ActionPanelViewModel.ClickSearch();
+            else
+                DataChartPanelViewModel.ClickSearch();
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            _log?.Error($"ClickSearch: {ex.Message}");
+        }
+        finally
+        {
+            IsButtonEnable = true;
+        }
+    }
+
+    public bool CanClickCancel => true;
+    public void ClickCancel()
+    {
+        try
+        {
+            if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
+                return;
+            _cancellationTokenSource.Cancel();
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            _log?.Error($"ClickCancel: {ex.Message}");
+        }
+    }
+
     private void ClearData()
     {
 
-        
+
     }
 
     #endregion
@@ -377,13 +437,45 @@ public class EventDashboardViewModel : BasePanelViewModel
     public CameraEventInfoViewModel CameraEventInfoViewModel { get; }
     public DataChartPanelViewModel DataChartPanelViewModel { get; }
     public EventProvider EventProvider { get; private set; }
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
+
+    public DateTime StartDate
+    {
+        get => _startDate;
+        set
+        {
+            _startDate = value;
+            NotifyOfPropertyChange(() => StartDate);
+            EndDateDisplay = _startDate;
+        }
+    }
+
+    public DateTime EndDate
+    {
+        get => _endDate;
+        set
+        {
+            _endDate = value;
+            NotifyOfPropertyChange(() => EndDate);
+        }
+    }
+
+    public DateTime EndDateDisplay
+    {
+        get => _endDateDisplay;
+        set
+        {
+            _endDateDisplay = value;
+            NotifyOfPropertyChange(() => EndDateDisplay);
+        }
+    }
     #endregion
     #region - Attributes -
     private bool _isButtonEnable;
     private const int TIMEOUT = 30000;
     private bool _isSelected;
     private BasePanelViewModel? _selectedItemEditor;
+    private DateTime _startDate;
+    private DateTime _endDate;
+    private DateTime _endDateDisplay;
     #endregion
 }
