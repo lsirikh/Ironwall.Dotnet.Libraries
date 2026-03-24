@@ -1,9 +1,11 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels;
 /****************************************************************************
@@ -43,13 +45,29 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         set { _index = value; NotifyOfPropertyChange(() => Index); }
     }
 
-    public int DeviceGroup
+    public List<int>? DeviceGroups
     {
-        get { return _model.DeviceGroup; }
+        get { return _model.DeviceGroups; }
         set
         {
-            _model.DeviceGroup = value;
-            NotifyOfPropertyChange(() => DeviceGroup);
+            _model.DeviceGroups = value;
+            NotifyOfPropertyChange(() => DeviceGroups);
+            NotifyOfPropertyChange(() => DeviceGroupsText);
+        }
+    }
+
+    public string DeviceGroupsText
+    {
+        get
+        {
+            if (DeviceGroups == null || DeviceGroups.Count == 0) return "";
+            try
+            {
+                var provider = IoC.Get<DeviceGroupProvider>();
+                return string.Join(", ", DeviceGroups.Select(id =>
+                    provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+            }
+            catch { return string.Join(", ", DeviceGroups); }
         }
     }
 
@@ -101,6 +119,46 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
         {
             _model.Status = value;
             NotifyOfPropertyChange(() => Status);
+        }
+    }
+
+    public string? Location
+    {
+        get { return _model.Location; }
+        set
+        {
+            _model.Location = value;
+            NotifyOfPropertyChange(() => Location);
+        }
+    }
+
+    public double Latitude
+    {
+        get { return _model.Latitude; }
+        set
+        {
+            _model.Latitude = Math.Clamp(value, -90.0, 90.0);
+            NotifyOfPropertyChange(() => Latitude);
+        }
+    }
+
+    public double Longitude
+    {
+        get { return _model.Longitude; }
+        set
+        {
+            _model.Longitude = Math.Clamp(value, -180.0, 180.0);
+            NotifyOfPropertyChange(() => Longitude);
+        }
+    }
+
+    public bool IsEnable
+    {
+        get { return _model.IsEnable; }
+        set
+        {
+            _model.IsEnable = value;
+            NotifyOfPropertyChange(() => IsEnable);
         }
     }
     #endregion

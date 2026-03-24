@@ -37,7 +37,7 @@
 
 	<Grid>
 		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto" />
+			<RowDefinition Height="280" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 		<Border
@@ -67,6 +67,7 @@
 					<ColumnDefinition Width="1*" />
 				</Grid.ColumnDefinitions>
 				<Grid.RowDefinitions>
+					<RowDefinition Height="1*" />
 					<RowDefinition Height="1*" />
 					<RowDefinition Height="1*" />
 				</Grid.RowDefinitions>
@@ -399,7 +400,7 @@
 					</GroupBox.Header>
 					<TextBlock
 						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
-						Text="{Binding PIRSensor, FallbackValue=10}"
+						Text="{Binding IOController, FallbackValue=10}"
 						TextAlignment="Center" />
 				</GroupBox>
 				<!--<md:Card
@@ -515,6 +516,69 @@
 					</Grid>
 				</md:Card>-->
 
+				<GroupBox
+					Grid.Row="2"
+					Grid.Column="0"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="Speaker" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="스피커" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding Speaker, FallbackValue=0}"
+						TextAlignment="Center" />
+				</GroupBox>
+
+				<GroupBox
+					Grid.Row="2"
+					Grid.Column="1"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="Locker" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="함체" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding Enclosure, FallbackValue=0}"
+						TextAlignment="Center" />
+				</GroupBox>
+
+				<GroupBox
+					Grid.Row="2"
+					Grid.Column="2"
+					Margin="5"
+					Style="{StaticResource MaterialDesignGroupBox}"
+					UseLayoutRounding="True">
+					<GroupBox.Header>
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+							<md:PackIcon Kind="LightbulbOn" />
+							<TextBlock
+								Margin="5,0"
+								VerticalAlignment="Center"
+								Text="경광등" />
+						</StackPanel>
+					</GroupBox.Header>
+					<TextBlock
+						Style="{StaticResource MaterialDesignTitleLargeTextBlock}"
+						Text="{Binding Lamp, FallbackValue=0}"
+						TextAlignment="Center" />
+				</GroupBox>
+
 			</Grid>
 		</Border>
 		<Border
@@ -557,12 +621,14 @@
 							<ColumnDefinition />
 						</Grid.ColumnDefinitions>
 						<ScrollViewer
+							Height="350"
+							VerticalAlignment="Top"
 							FlowDirection="LeftToRight"
 							HorizontalScrollBarVisibility="Auto"
 							VerticalScrollBarVisibility="Auto">
 							<TabPanel
 								x:Name="HeaderPanel"
-								Width="80"
+								Width="100"
 								Margin="25,0,-5,0"
 								VerticalAlignment="Stretch"
 								Panel.ZIndex="0"
@@ -585,6 +651,17 @@
 					<ContentControl cal:View.Model="{Binding DataContext.TabControlViewModel, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 				</DataTemplate>
 			</TabControl.ContentTemplate>
+
+			<TabItem Content="" Tag="DeviceGroupViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Group" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="그룹 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
 
 			<TabItem Content="" Tag="ControllerDeviceViewModel">
 				<TabItem.Header>
@@ -614,6 +691,39 @@
 						<StackPanel>
 							<md:PackIcon Kind="Video" Style="{StaticResource SetupContentIcon}" />
 							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="카메라 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem Content="" Tag="SpeakerDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Speaker" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="스피커 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem Content="" Tag="EnclosureDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="Locker" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="함체 설정" />
+						</StackPanel>
+					</Border>
+				</TabItem.Header>
+			</TabItem>
+
+			<TabItem Content="" Tag="LampDeviceViewModel">
+				<TabItem.Header>
+					<Border Margin="2">
+						<StackPanel>
+							<md:PackIcon Kind="LightbulbOn" Style="{StaticResource SetupContentIcon}" />
+							<TextBlock Style="{StaticResource SetupTextBlockTitle}" Text="경광등 설정" />
 						</StackPanel>
 					</Border>
 				</TabItem.Header>

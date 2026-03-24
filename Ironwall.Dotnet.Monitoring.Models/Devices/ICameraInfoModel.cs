@@ -13,5 +13,4 @@ public interface ICameraInfoModel : IBaseModel
     string? Model { get; set; }
     string? Name { get; set; }
     string? OnvifVersion { get; set; }
-    string? Uri { get; set; }
 }

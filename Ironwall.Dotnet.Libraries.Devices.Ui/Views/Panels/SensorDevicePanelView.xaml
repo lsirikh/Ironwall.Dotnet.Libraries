@@ -23,7 +23,6 @@
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
@@ -87,10 +86,10 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
+								Width="30"
+								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
 								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 							<md:PackIcon
 								Width="30"
@@ -116,13 +115,14 @@
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
-						<Grid>
+						<Grid IsEnabled="{Binding IsButtonEnable}">
 							<ProgressBar
-								Width="100"
-								Height="20"
+								Width="30"
+								Height="30"
 								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+								Style="{DynamicResource MaterialDesignCircularProgressBar}"
+								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+								Value="44" />
 							<md:PackIcon
 								Width="30"
 								Height="30"
@@ -137,20 +137,22 @@
 		<Grid
 			Grid.Row="1"
 			Width="800"
-			Height="310">
+			Height="260">
 			<ProgressBar
 				Width="100"
 				Height="20"
 				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
 				Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 		</Grid>
 		<DataGrid
 			x:Name="DataGridUsers"
 			Grid.Row="1"
-			Height="310"
+			Height="260"
+			VerticalAlignment="Top"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
+			ScrollViewer.HorizontalScrollBarVisibility="Auto"
 			ItemsSource="{Binding ViewModelProvider}"
 			SelectionMode="Extended"
 			Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -204,35 +206,6 @@
 							<TextBox
 								VerticalAlignment="Center"
 								Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
-
-				<!--  DeviceGroup  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					Header="Device Group"
-					SortMemberPath="DeviceGroup">
-					<DataGridColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<TextBox
-								VerticalAlignment="Center"
-								Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
@@ -431,7 +404,122 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
+				<!--  Location  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Location"
+					SortMemberPath="Location">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
 
+				<!--  Latitude  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Lat"
+					SortMemberPath="Latitude">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  Longitude  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="Lng"
+					SortMemberPath="Longitude">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<TextBox
+								VerticalAlignment="Center"
+								Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+								TextAlignment="Center" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  IsEnable  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="활성화"
+					SortMemberPath="IsEnable">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<CheckBox
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								IsChecked="{Binding IsEnable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								IsHitTestVisible="False" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+					<DataGridTemplateColumn.CellEditingTemplate>
+						<DataTemplate>
+							<CheckBox
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								IsChecked="{Binding IsEnable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						</DataTemplate>
+					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
 
 			</DataGrid.Columns>
 		</DataGrid>

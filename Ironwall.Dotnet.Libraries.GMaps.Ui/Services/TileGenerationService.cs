@@ -263,7 +263,7 @@ public class TileGenerationService
         catch (Exception ex)
         {
             _log?.Error($"수동 좌표 TIF 변환 실패: {ex.Message}");
-            //await _eventAggregator.PublishOnUIThreadAsync(new TileGenerationFailedEvent(ex.Message));
+            //await _ea.PublishOnUIThreadAsync(new TileGenerationFailedEvent(ex.Message));
             throw;
         }
     }
@@ -725,7 +725,7 @@ public class TileGenerationService
 
                                 if (srcOffset < scanlineBuffer.Length)
                                 {
-                                    // 🔧 색상 처리 개선
+                                    //색상 처리 개선
                                     ExtractPixelColor(scanlineBuffer, srcOffset, destPtr + destOffset, tifInfo);
                                 }
                             }

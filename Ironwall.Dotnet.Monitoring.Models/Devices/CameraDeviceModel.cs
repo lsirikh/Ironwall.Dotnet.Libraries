@@ -15,7 +15,6 @@ public class CameraDeviceModel : BaseDeviceModel, ICameraDeviceModel
 {
     public CameraDeviceModel()
     {
-        Presets = new List<ICameraPresetModel>();
         DeviceType = EnumDeviceType.IpCamera;
     }
 
@@ -28,19 +27,13 @@ public class CameraDeviceModel : BaseDeviceModel, ICameraDeviceModel
     public string IpAddress { get; set; } = string.Empty;
 
     [JsonProperty("ip_port", Order = 8)]
-    public int Port { get; set; }
+    public int IpPort { get; set; }
 
     [JsonProperty("user_name", Order = 9)]
-    public string? Username { get; set; }
+    public string? UserName { get; set; }
 
     [JsonProperty("user_password", Order = 10)]
-    public string? Password { get; set; }
-
-    [JsonProperty("rtsp_uri", Order = 11)]
-    public string? RtspUri { get; set; }
-
-    [JsonProperty("rtsp_port", Order = 12)]
-    public int RtspPort { get; set; }
+    public string? UserPassword { get; set; }
 
     [JsonProperty("mode", Order = 13)]
     public EnumCameraMode Mode { get; set; } = EnumCameraMode.NONE;
@@ -48,18 +41,15 @@ public class CameraDeviceModel : BaseDeviceModel, ICameraDeviceModel
     [JsonProperty("category", Order = 14)]
     public EnumCameraType Category { get; set; } = EnumCameraType.NONE;
 
-    [JsonProperty("identification", Order = 15)]
-    public ICameraInfoModel? Identification { get; set; }
+    [JsonProperty("hardware_spec", Order = 15)]
+    public ICameraInfoModel? HardwareSpec { get; set; }
 
-    [JsonProperty("ptz_capability", Order = 16)]
-    public ICameraPtzCapabilityModel? PtzCapability { get; set; }
+    [JsonProperty("urls", Order = 16)]
+    public ICameraUrlsModel? Urls { get; set; }
 
-    [JsonProperty("position", Order = 17)]
-    public ICameraPositionModel? Position { get; set; }
+    [JsonProperty("setting", Order = 21)]
+    public ICameraSettingModel? Setting { get; set; }
 
-    [JsonProperty("presets", Order = 18)]
-    public List<ICameraPresetModel>? Presets { get; set; }
-
-    [JsonProperty("optics", Order = 19)]
-    public ICameraOpticsModel? Optics { get; set; }
+    [JsonProperty("is_record", Order = 22)]
+    public bool? IsRecord { get; set; }
 }

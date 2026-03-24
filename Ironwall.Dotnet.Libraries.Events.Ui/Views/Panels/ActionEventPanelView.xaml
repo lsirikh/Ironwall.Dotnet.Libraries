@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.ActionEventPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -26,19 +26,19 @@
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 		<StackPanel Grid.Row="0" Orientation="Vertical">
+			<!--  날짜 피커: EventDashboardView로 이관 — Column 0~7 숨김  -->
 			<Grid Grid.Row="0" Margin="10,0">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="50" />
-					<ColumnDefinition Width="1*" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
-					<ColumnDefinition Width="70" />
-					<ColumnDefinition Width="10" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
+					<ColumnDefinition Width="0" />
 					<ColumnDefinition Width="70" />
 					<ColumnDefinition Width="10" />
 					<ColumnDefinition Width="70" />
@@ -50,24 +50,28 @@
 				<TextBlock
 					Grid.Row="0"
 					Grid.Column="0"
+					Visibility="Collapsed"
 					Style="{StaticResource TextBlockTitle}"
 					Text="From" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="1"
 					Margin="5"
+					Visibility="Collapsed"
 					FontSize="15"
 					FontWeight="Bold"
 					SelectedDateTime="{Binding StartDate, Mode=TwoWay, StringFormat={}{yyyy-MM-dd HH:mm:ss}, UpdateSourceTrigger=PropertyChanged}" />
 				<TextBlock
 					Grid.Row="0"
 					Grid.Column="2"
+					Visibility="Collapsed"
 					Style="{StaticResource TextBlockTitle}"
 					Text="To" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="3"
 					Margin="5"
+					Visibility="Collapsed"
 					DisplayDateStart="{Binding EndDateDisplay, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					FontSize="15"
 					FontWeight="Bold"
@@ -77,6 +81,7 @@
 					x:Name="ClickSearch"
 					Grid.Row="0"
 					Grid.Column="4"
+					Visibility="Collapsed"
 					Style="{StaticResource IconButtonStyle}">
 					<Button.Content>
 						<md:PackIcon
@@ -89,6 +94,7 @@
 					x:Name="ClickCancel"
 					Grid.Row="0"
 					Grid.Column="6"
+					Visibility="Collapsed"
 					Style="{StaticResource IconButtonStyle}">
 					<Button.Content>
 						<md:PackIcon
@@ -141,17 +147,18 @@
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-								Width="100"
-								Height="20"
-								IsIndeterminate="True"
-								Style="{DynamicResource MaterialDesignLinearProgressBar}"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="30"
+					Height="30"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="CircleArrows"
-								ToolTip="갱신하기"
-								Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="30"
+					Height="30"
+					Kind="CircleArrows"
+					ToolTip="갱신하기"
+					Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						</Grid>
 					</Button.Content>
 
@@ -168,21 +175,23 @@
 					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
+						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
 					</i:Interaction.Behaviors>
 					<Button.Content>
 						<Grid>
 							<ProgressBar
-				Width="100"
-				Height="20"
-				IsIndeterminate="True"
-				Style="{DynamicResource MaterialDesignLinearProgressBar}"
-				Visibility="{Binding ReloadButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+					Width="30"
+					Height="30"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+					Value="44" />
 							<md:PackIcon
-								Width="30"
-								Height="30"
-								Kind="Floppy"
-								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					Width="30"
+					Height="30"
+					Kind="Floppy"
+					ToolTip="저장하기"
+					Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						</Grid>
 					</Button.Content>
 				</Button>
@@ -191,7 +200,8 @@
 		<Grid
 			Grid.Row="1"
 			Width="800"
-			Height="310">
+			VerticalAlignment="Top"
+			Height="280">
 			<ProgressBar
 				Width="50"
 				Height="50"
@@ -204,7 +214,8 @@
 		<DataGrid
 			x:Name="DataGridUsers"
 			Grid.Row="1"
-			Height="310"
+			Height="280"
+			VerticalAlignment="Top"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
 			ItemsSource="{Binding ViewModelProvider}"
@@ -213,6 +224,7 @@
 			<i:Interaction.Behaviors>
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:ActionEventSelectedItemBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
+				<behavior_inner:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 
@@ -326,6 +338,7 @@
 					</DataGridTemplateColumn.CellEditingTemplate>
 				</DataGridTemplateColumn>
 
+	
 				<!--  User  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
@@ -417,14 +430,27 @@
 
 			</DataGrid.Columns>
 		</DataGrid>
-		<StackPanel
+		<DockPanel
 			Grid.Row="2"
-			Margin="0,10,0,0"
-			Orientation="Horizontal">
-
-			<TextBlock Text="선택된 항목 : " />
-			<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
-		</StackPanel>
+			Margin="10,5,10,5">
+			<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+				<TextBlock VerticalAlignment="Center" Text="선택된 항목 : " />
+				<TextBlock VerticalAlignment="Center" Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+			<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+				<ProgressBar
+					Width="16"
+					Height="16"
+					Margin="0,0,8,0"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsLoadingMore, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
+				<TextBlock
+					VerticalAlignment="Center"
+					Text="{Binding LoadedCountText, UpdateSourceTrigger=PropertyChanged}" />
+			</StackPanel>
+		</DockPanel>
 	</Grid>
 </UserControl>
 

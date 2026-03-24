@@ -1,0 +1,126 @@
+<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!-- Image Overlay Marker Style -->
+	<Style x:Key="ImageMarkerStyle" TargetType="{x:Type control:GMapMarkerImageControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type control:GMapMarkerImageControl}">
+					<Grid Name="PART_MainContainer">
+
+						<!-- Image Container with Rotation -->
+						<Grid Name="PART_ImageContainer"
+							  Width="{TemplateBinding Width}"
+							  Height="{TemplateBinding Height}"
+							  RenderTransformOrigin="0.5,0.5">
+
+							<!-- Image Display: Phase 32 수정 - OnRender()에서 직접 렌더링하므로 숨김 처리
+							 이중 렌더링 방지 (XAML Image 0° + OnRender Image Bearing°) -->
+							<Image Name="PART_Image"
+								   Source="{TemplateBinding ImageSource}"
+								   Opacity="{TemplateBinding ImageOpacity}"
+								   Stretch="Fill"
+								   Visibility="Collapsed"
+								   ToolTip="{TemplateBinding MarkerTitle}" />
+
+							<!-- Selection Border -->
+							<Border Name="PART_SelectionBorder"
+									BorderBrush="#007ACC"
+									BorderThickness="2"
+									Background="Transparent"
+									Visibility="Collapsed">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="4"
+										Opacity="0.6"
+										ShadowDepth="0"
+										Color="#007ACC" />
+								</Border.Effect>
+							</Border>
+
+							<!-- Hover Border -->
+							<Border Name="PART_HoverBorder"
+									BorderBrush="#40007ACC"
+									BorderThickness="1"
+									Background="Transparent"
+									Visibility="Collapsed" />
+
+							
+						</Grid>
+
+						<!-- Label Container -->
+						<Border Name="PART_LabelContainer"
+								MinWidth="40"
+								MaxWidth="200"
+								Margin="0,0,0,-25"
+								Padding="4,2"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom"
+								Background="#E0FFFFFF"
+								BorderBrush="#808080"
+								BorderThickness="1"
+								CornerRadius="3"
+								Visibility="Collapsed">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="3"
+									Opacity="0.3"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+							<TextBlock Name="PART_LabelText"
+									   FontSize="10"
+									   FontWeight="SemiBold"
+									   Foreground="#333333"
+									   Text="{TemplateBinding MarkerTitle}"
+									   TextAlignment="Center"
+									   TextTrimming="CharacterEllipsis"
+									   TextWrapping="NoWrap" />
+						</Border>
+					</Grid>
+
+					<ControlTemplate.Triggers>
+						<!-- Selected State -->
+						<Trigger Property="IsSelected" Value="True">
+							<Setter TargetName="PART_SelectionBorder" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!-- ShowTitle=True -->
+						<Trigger Property="ShowTitle" Value="True">
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!-- Mouse Over State -->
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_HoverBorder" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+						</Trigger>
+
+						<!-- Disabled State -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter TargetName="PART_Image" Property="Opacity" Value="0.3" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+
+		<!-- Default Property Values -->
+		<Setter Property="IsHitTestVisible" Value="True" />
+		<Setter Property="Focusable" Value="True" />
+		<Setter Property="Width" Value="100" />
+		<Setter Property="Height" Value="100" />
+		<Setter Property="ImageOpacity" Value="0.8" />
+	</Style>
+
+	<!-- Apply Default Style -->
+	<Style BasedOn="{StaticResource ImageMarkerStyle}" TargetType="{x:Type control:GMapMarkerImageControl}" />
+
+</ResourceDictionary>

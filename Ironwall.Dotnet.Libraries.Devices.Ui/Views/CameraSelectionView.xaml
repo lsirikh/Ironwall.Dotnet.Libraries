@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraSelectionView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -33,288 +33,315 @@
 					Text="카메라 속성" />
 			</StackPanel>
 		</GroupBox.Header>
-		<Grid>
+		<Grid Margin="5,0">
 			<Grid.RowDefinitions>
-				<RowDefinition Height="*" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
 			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+			</Grid.ColumnDefinitions>
 
-			<Grid Grid.Row="0" >
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" />
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" />
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" />
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="2*" />
-				</Grid.ColumnDefinitions>
+			<!--  ========== Row 0: DeviceNo / Name / DeviceType(RO) / IP / Port ========  -->
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Device No" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="1"
+				md:HintAssist.Hint="1"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-				<!--  Row 0  -->
-				<!--  ───────────── ① DeviceNumber ─────────────  -->
-				<TextBlock
-					Grid.Row="0"
-					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Device No" />
-				<TextBox
-					Grid.Row="0"
-					Grid.Column="1"
-					md:HintAssist.Hint="1"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Name" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="3"
+				md:HintAssist.Hint="카메라001"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-				<!--  ───────────── ② DeviceGroup ─────────────  -->
-				<TextBlock
-					Grid.Row="0"
-					Grid.Column="2"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Group" />
-				<TextBox
-					Grid.Row="0"
-					Grid.Column="3"
-					md:HintAssist.Hint="100"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding DeviceGroup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Device Type" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="5"
+				IsReadOnly="True"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding DeviceType, Mode=OneWay}" />
 
-				<!--  ───────────── ③ DeviceName ─────────────  -->
-				<TextBlock
-					Grid.Row="0"
-					Grid.Column="4"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Name" />
-				<TextBox
-					Grid.Row="0"
-					Grid.Column="5"
-					md:HintAssist.Hint="카메라001"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="6"
+				Style="{StaticResource TextBlockTitle}"
+				Text="IP" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="7"
+				md:HintAssist.Hint="192.168.0.10"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding IpAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-				<!--  ───────────── ⑥ DeviceType ─────────────  -->
-				<TextBlock
-					Grid.Row="0"
-					Grid.Column="6"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Device Type" />
-				<ComboBox
-					Grid.Row="0"
-					Grid.Column="7"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceType}}}"
-					SelectedItem="{Binding DeviceType, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding}" />
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="8"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Port" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="9"
+				md:HintAssist.Hint="9000"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding IpPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+				<i:Interaction.Behaviors>
+					<behavior:NumericOnlyBehavior />
+				</i:Interaction.Behaviors>
+			</TextBox>
 
-				<!--  ───────────── ⑦ Version ─────────────  -->
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Ver." />
-				<TextBox
-					Grid.Row="1"
-					Grid.Column="1"
-					md:HintAssist.Hint="v1.0"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<!--  ========== Row 1: Ver / Status / Username / Password / Mode ========  -->
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Ver." />
+			<TextBox
+				Grid.Row="1"
+				Grid.Column="1"
+				md:HintAssist.Hint="v1.0"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-				<!--  ───────────── ⑧ Status ─────────────  -->
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="2"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Status" />
-				<ComboBox
-					Grid.Row="1"
-					Grid.Column="3"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
-					SelectedItem="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding}" />
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Status" />
+			<ComboBox
+				Grid.Row="1"
+				Grid.Column="3"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
+				SelectedItem="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
 
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Username" />
+			<TextBox
+				Grid.Row="1"
+				Grid.Column="5"
+				md:HintAssist.Hint="admin"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding UserName, Mode=TwoWay}" />
 
-				<!--  ───────────── ④ IpAddress ─────────────  -->
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="4"
-					Style="{StaticResource TextBlockTitle}"
-					Text="IP" />
-				<TextBox
-					Grid.Row="1"
-					Grid.Column="5"
-					md:HintAssist.Hint="192.168.0.10"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding IpAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="6"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Password" />
+			<PasswordBox
+				Grid.Row="1"
+				Grid.Column="7"
+				md:HintAssist.Hint="*******"
+				PasswordChar="*"
+				Style="{StaticResource PasswordBoxInput}">
+				<i:Interaction.Behaviors>
+					<behavior:PasswordBehavior Password="{Binding UserPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+				</i:Interaction.Behaviors>
+			</PasswordBox>
 
-				<!--  ───────────── ⑤ Port ─────────────  -->
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="6"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Port" />
-				<TextBox
-					Grid.Row="1"
-					Grid.Column="7"
-					md:HintAssist.Hint="9000"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-					<i:Interaction.Behaviors>
-						<!--  숫자만 입력 강제용 Behavior  -->
-						<behavior:NumericOnlyBehavior />
-					</i:Interaction.Behaviors>
-				</TextBox>
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="8"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Mode" />
+			<ComboBox
+				Grid.Row="1"
+				Grid.Column="9"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumCameraMode}}}"
+				SelectedItem="{Binding Mode, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
 
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Username" />
-				<TextBox
-					Grid.Row="2"
-					Grid.Column="1"
-					md:HintAssist.Hint="admin"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding Username, Mode=TwoWay}" />
+			<!--  ========== Row 2: Category / Location / Lat / Lng / 활성화 ========  -->
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Category" />
+			<ComboBox
+				Grid.Row="2"
+				Grid.Column="1"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumCameraType}}}"
+				SelectedItem="{Binding Category, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}" />
 
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="2"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Password" />
-				<PasswordBox
-					Grid.Row="2"
-					Grid.Column="3"
-					md:HintAssist.Hint="*******"
-					PasswordChar="*"
-					Style="{StaticResource PasswordBoxInput}">
-					<i:Interaction.Behaviors>
-						<behavior:PasswordBehavior Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-					</i:Interaction.Behaviors>
-				</PasswordBox>
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Location" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="3"
+				md:HintAssist.Hint="설치 위치"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="4"
-					Style="{StaticResource TextBlockTitle}"
-					Text="RTSP URI" />
-				<TextBox
-					Grid.Row="2"
-					Grid.Column="5"
-					md:HintAssist.Hint="rtsp://"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding RtspUri, Mode=TwoWay}" />
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Lat" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="5"
+				md:HintAssist.Hint="위도"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="6"
-					Style="{StaticResource TextBlockTitle}"
-					Text="RTSP Port" />
-				<TextBox
-					Grid.Row="2"
-					Grid.Column="7"
-					md:HintAssist.Hint="554"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding RtspPort, Mode=TwoWay}" />
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="6"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Lng" />
+			<TextBox
+				Grid.Row="2"
+				Grid.Column="7"
+				md:HintAssist.Hint="경도"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
-				<TextBlock
-					Grid.Row="3"
-					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Mode" />
-				<ComboBox
-					Grid.Row="3"
-					Grid.Column="1"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumCameraMode}}}"
-					SelectedItem="{Binding Mode, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding}" />
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="8"
+				Style="{StaticResource TextBlockTitle}"
+				Text="활성화" />
+			<ComboBox
+				Grid.Row="2"
+				Grid.Column="9"
+				SelectedItem="{Binding IsEnable, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<sys:Boolean>True</sys:Boolean>
+				<sys:Boolean>False</sys:Boolean>
+			</ComboBox>
 
-				<TextBlock
-					Grid.Row="3"
-					Grid.Column="2"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Category" />
-				<ComboBox
-					Grid.Row="3"
-					Grid.Column="3"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumCameraType}}}"
-					SelectedItem="{Binding Category, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}" />
+			<!--  ========== Row 3~4: Groups Vertical + 상세보기 + 적용 버튼 ========  -->
+			<TextBlock
+				Grid.Row="3"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Groups" />
+			<ListBox
+				Grid.Row="3"
+				Grid.RowSpan="2"
+				Grid.Column="1"
+				Grid.ColumnSpan="3"
+				MaxHeight="80"
+				BorderThickness="0"
+				ScrollViewer.VerticalScrollBarVisibility="Auto"
+				ItemsSource="{Binding GroupItems}">
+				<ListBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<StackPanel Orientation="Vertical" />
+					</ItemsPanelTemplate>
+				</ListBox.ItemsPanel>
+				<ListBox.ItemTemplate>
+					<DataTemplate>
+						<CheckBox
+							Margin="4,2"
+							Content="{Binding GroupName}"
+							IsChecked="{Binding IsChecked, Mode=TwoWay}"
+							IsThreeState="True" />
+					</DataTemplate>
+				</ListBox.ItemTemplate>
+			</ListBox>
 
-				<!--  Button Row  -->
-				<Grid
-					Grid.Row="3"
-					Grid.Column="4"
-					Grid.ColumnSpan="4">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="1*" />
-						<ColumnDefinition Width="1*" />
+			<TextBlock
+				Grid.Row="3"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Record" />
+			<ComboBox
+				Grid.Row="3"
+				Grid.Column="5"
+				SelectedItem="{Binding IsRecord, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<sys:Boolean>True</sys:Boolean>
+				<sys:Boolean>False</sys:Boolean>
+			</ComboBox>
 
-					</Grid.ColumnDefinitions>
-					<Button
-						x:Name="OnvifButton"
-						Grid.Column="0"
-						Margin="15,0"
-						IsEnabled="{Binding IsOnvifButtonEnable}"
-						Style="{StaticResource MaterialDesignFlatButton}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Video" Style="{StaticResource ButtonIcon}" />
-								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="Onvif" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
-					<Button
-						x:Name="ApplyButton"
-						Grid.Column="1"
-						Margin="15,0"
-						Style="{StaticResource MaterialDesignFlatButton}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
-								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
-				</Grid>
-			</Grid>
-
+			<Button
+				x:Name="DetailButton"
+				Grid.Row="4"
+				Grid.Column="6"
+				Grid.ColumnSpan="2"
+				IsEnabled="{Binding IsSingleSelected}"
+				Style="{StaticResource MaterialDesignFlatButton}">
+				<Button.Content>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="InformationOutline" Style="{StaticResource ButtonIcon}" />
+						<TextBlock Style="{StaticResource ButtonTextBlock}" Text="상세보기" />
+					</StackPanel>
+				</Button.Content>
+			</Button>
+			<Button
+				x:Name="ApplyButton"
+				Grid.Row="4"
+				Grid.Column="8"
+				Grid.ColumnSpan="2"
+				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+				Style="{StaticResource MaterialDesignFlatButton}">
+				<Button.Content>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
+						<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
+					</StackPanel>
+				</Button.Content>
+			</Button>
 		</Grid>
 	</GroupBox>
-
 </UserControl>

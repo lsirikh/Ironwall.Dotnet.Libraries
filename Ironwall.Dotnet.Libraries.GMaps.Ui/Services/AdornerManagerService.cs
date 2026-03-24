@@ -201,17 +201,29 @@ public class AdornerManagerService : IDisposable
     /// <returns>성공 여부</returns>
     public bool SelectMarker(IEditableMarker marker, IMarkerControl markerControl, GMapControl mapControl = null)
     {
-        if (marker == null || markerControl == null) return false;
+        if (marker == null || markerControl == null)
+        {
+            _log?.Warning($"SelectMarker: marker 또는 markerControl이 null (marker: {marker != null}, markerControl: {markerControl != null})");
+            return false;
+        }
 
         var targetMapControl = mapControl ?? _mapControl;
-        if (targetMapControl == null) return false;
+        if (targetMapControl == null)
+        {
+            _log?.Warning("SelectMarker: targetMapControl이 null");
+            return false;
+        }
 
         lock (_lock)
         {
             try
             {
                 var adornerLayer = GetAdornerLayer(targetMapControl);
-                if (adornerLayer == null) return false;
+                if (adornerLayer == null)
+                {
+                    _log?.Warning($"SelectMarker: AdornerLayer를 찾을 수 없음 (등록된 컨트롤 수: {_adornerLayers.Count})");
+                    return false;
+                }
 
                 // 다중 선택이 비활성화된 경우 다른 마커들 선택 해제
                 if (!_multiSelectEnabled)
@@ -619,7 +631,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// Adorner 생성 이벤트 핸들러
     /// </summary>
-    private void OnAdornerCreated(object sender, AdornerLifecycleEventArgs e)
+    private void OnAdornerCreated(object? sender, AdornerLifecycleEventArgs e)
     {
         _log?.Info($"Adorner 생성됨: {e.Marker.Title}");
         AdornerCreated?.Invoke(this, e);
@@ -628,7 +640,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// Adorner 제거 이벤트 핸들러
     /// </summary>
-    private void OnAdornerRemoved(object sender, AdornerLifecycleEventArgs e)
+    private void OnAdornerRemoved(object? sender, AdornerLifecycleEventArgs e)
     {
         _log?.Info($"Adorner 제거됨: {e.Marker.Title}");
         AdornerRemoved?.Invoke(this, e);
@@ -637,7 +649,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// 편집 시작 이벤트 핸들러
     /// </summary>
-    private void OnEditStarted(object sender, MarkerEditStartedEventArgs e)
+    private void OnEditStarted(object? sender, MarkerEditStartedEventArgs e)
     {
         _log?.Info($"편집 시작: {e.Marker.Title}, 핸들: {e.Handle}");
         MarkerEditStarted?.Invoke(this, e);
@@ -646,7 +658,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// 편집 완료 이벤트 핸들러
     /// </summary>
-    private void OnEditCompleted(object sender, MarkerEditCompletedEventArgs e)
+    private void OnEditCompleted(object? sender, MarkerEditCompletedEventArgs e)
     {
         _log?.Info($"편집 완료: {e.Marker.Title}, 변경: {e.GetChangesSummary()}");
         MarkerEditCompleted?.Invoke(this, e);
@@ -655,7 +667,7 @@ public class AdornerManagerService : IDisposable
     /// <summary>
     /// 편집 취소 이벤트 핸들러
     /// </summary>
-    private void OnEditCancelled(object sender, MarkerEditCancelledEventArgs e)
+    private void OnEditCancelled(object? sender, MarkerEditCancelledEventArgs e)
     {
         _log?.Info($"편집 취소: {e.Marker.Title}, 이유: {e.Reason}");
         MarkerEditCancelled?.Invoke(this, e);

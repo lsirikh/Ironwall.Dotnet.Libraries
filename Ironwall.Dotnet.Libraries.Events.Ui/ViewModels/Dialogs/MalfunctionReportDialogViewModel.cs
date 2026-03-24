@@ -7,7 +7,6 @@ using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Security.Principal;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
     /****************************************************************************

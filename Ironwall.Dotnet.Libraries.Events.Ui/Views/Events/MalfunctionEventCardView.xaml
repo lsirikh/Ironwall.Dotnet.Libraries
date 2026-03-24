@@ -118,7 +118,7 @@
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
 								Opacity="1"
-								Text="{Binding Device.DeviceGroup}"
+								Text="{Binding Device.DeviceGroupsText}"
 								TextAlignment="Center" />
 							<TextBlock
 								Grid.Column="2"
@@ -134,21 +134,8 @@
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
 								Opacity="1"
-								TextAlignment="Center">
-								<TextBlock.Style>
-									<Style BasedOn="{StaticResource MaterialDesignTextBlock}" TargetType="TextBlock">
-										<Setter Property="Text" Value="센서" />
-										<Style.Triggers>
-											<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CONTROLLER}">
-												<Setter Property="Text" Value="제어기" />
-											</DataTrigger>
-											<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CABLE_CUTTING}">
-												<Setter Property="Text" Value="제어기" />
-											</DataTrigger>
-										</Style.Triggers>
-									</Style>
-								</TextBlock.Style>
-							</TextBlock>
+								Text="{Binding DeviceTypeName, FallbackValue=센서}"
+								TextAlignment="Center" />
 							<TextBlock
 								Grid.Column="4"
 								Margin="5,0"
@@ -285,15 +272,6 @@
 							Margin="5,0,0,0"
 							VerticalAlignment="Center"
 							Text="제어기" />
-						<!--<TextBox
-							Grid.Row="0"
-							Grid.Column="1"
-							Margin="10,10,0,0"
-							md:HintAssist.Hint="제어기 아이디"
-							md:HintAssist.IsFloating="True"
-							IsReadOnly="True"
-							Opacity="1"
-							Text="{Binding Device.Controller.Id, Mode=TwoWay}" />-->
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="1"
@@ -302,19 +280,19 @@
 							IsReadOnly="True">
 							<TextBox.Style>
 								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding Device.Controller.Id}" />
+									<Setter Property="Text" Value="{Binding ControllerId, Mode=OneWay}" />
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CONTROLLER}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CABLE_CUTTING}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>
@@ -345,20 +323,20 @@
 							IsReadOnly="True">
 							<TextBox.Style>
 								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding Device.Controller.DeviceNumber}" />
+									<Setter Property="Text" Value="{Binding ControllerDeviceNumber, Mode=OneWay}" />
 
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_FENCE}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_MULTI}">
 											<Setter Property="Text">
 												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" />
+													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
 												</Setter.Value>
 											</Setter>
 										</DataTrigger>

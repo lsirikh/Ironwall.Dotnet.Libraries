@@ -15,6 +15,9 @@
         Controller,
         Sensor,
         Camera,
+        Speaker,
+        Enclosure,
+        Lamp,
         Etc,
     }
 }

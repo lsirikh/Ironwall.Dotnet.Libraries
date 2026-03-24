@@ -9,7 +9,6 @@ using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Db.Modules;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
-using Ironwall.Dotnet.Libraries.GMaps.Ui.Events;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 /****************************************************************************
@@ -23,12 +22,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 public class GMapUiModule: Module
 {
     #region - Ctors -
-    public GMapUiModule(IGMapSetupModel gMapSetup, IMariaDbSetupModel gMapDbSetup, ILogService? log = default, int count = default)
+    public GMapUiModule(IGMapSetupModel gMapSetup, IMariaDbSetupModel gMapDbSetup, IMainControlWebSetupModel webSetup, ILogService? log = default, int count = default)
     {
         _log = log;
         _count = count;
         _gMapSetup = gMapSetup;
         _gMapDbSetup = gMapDbSetup;
+        _webSetup = webSetup;
     }
     #endregion
     #region - Implementation of Interface -
@@ -40,15 +40,18 @@ public class GMapUiModule: Module
 
         builder.RegisterModule(new GMapDbModule(_gMapSetup, _gMapDbSetup, _log, _count)); // 4
 
+        builder.RegisterInstance(_webSetup).As<IMainControlWebSetupModel>().SingleInstance();
+        builder.RegisterType<DeviceDetailUrlService>().As<IDeviceDetailUrlService>().SingleInstance();
+        builder.RegisterType<BroadcastControlService>().As<IBroadcastControlService>().SingleInstance();
+
         builder.RegisterType<MarkerFactory>().SingleInstance();
+        builder.RegisterType<PropertyPanelFactory>().SingleInstance();
         builder.RegisterType<GMapControl>().SingleInstance();
         builder.RegisterType<GMapCustomControl>().SingleInstance();
         builder.RegisterType<MapViewModel>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<ImageOverlayService>().SingleInstance();
-
-        builder.RegisterType<SymbolEventManager>().SingleInstance();
         //builder.RegisterType<MGRSGridOverlayService>().SingleInstance();
     }
     #endregion
@@ -65,5 +68,6 @@ public class GMapUiModule: Module
     private int _count;
     private IGMapSetupModel _gMapSetup;
     private IMariaDbSetupModel _gMapDbSetup;
+    private IMainControlWebSetupModel _webSetup;
     #endregion
 }

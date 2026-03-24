@@ -23,8 +23,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapImages;
    ****************************************************************************/
 public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
 {
-    
-
     #region - Constructor -
     public GMapCustomImage(ILogService log, ImageModel imageModel)
     {
@@ -51,7 +49,6 @@ public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
         _log?.Info($"GMapCustomImage 생성: _imageBounds = ({_imageBounds.Left:F6}, {_imageBounds.Bottom:F6}) to ({_imageBounds.Right:F6}, {_imageBounds.Top:F6})");
     }
     #endregion
-
 
     #region - Overrides -
     protected virtual void Dispose(bool disposing)
@@ -87,8 +84,6 @@ public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
         return GetSummary();
     }
     #endregion
-
-    
    
     #region - Public Methods -
     /// <summary>
@@ -291,6 +286,7 @@ public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
         CoordinateSystem = "WGS84";
     }
     #endregion
+
     #region - INotifyPropertyChanged Implementation -
     public event PropertyChangedEventHandler? PropertyChanged;
 

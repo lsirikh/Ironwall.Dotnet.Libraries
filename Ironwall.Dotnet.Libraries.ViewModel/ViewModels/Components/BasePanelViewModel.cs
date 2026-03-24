@@ -42,8 +42,9 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
             _eventAggregator?.SubscribeOnUIThread(this);
             _cancellationTokenSource = new CancellationTokenSource();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _log?.Error($"[{_className}] OnActivateAsync Exception: {ex.Message}\n{ex.StackTrace}");
         }
 
         return Task.CompletedTask;
@@ -61,8 +62,9 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
             _cancellationTokenSource?.Dispose();
             GC.Collect();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _log?.Error($"[{_className}] OnDeactivateAsync Exception: {ex.Message}\n{ex.StackTrace}");
         }
 
         return Task.CompletedTask;

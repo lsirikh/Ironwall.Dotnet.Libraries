@@ -1,44 +1,60 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
-using Ironwall.Dotnet.Libraries.Events.Modules;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
+using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.Specialized;
-using System.Reflection.Metadata;
 using System.Windows;
+using System.Windows.Threading;
 using Action = System.Action;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
     /****************************************************************************
-       Purpose      :                                                          
-       Created By   : GHLee                                                
-       Created On   : 7/1/2025 7:13:26 PM                                                    
-       Department   : SW Team                                                   
-       Company      : Sensorway Co., Ltd.                                       
-       Email        : lsirikh@naver.com                                         
+       Purpose      : 이벤트 카드 목록 패널 — 개별/전체 조치보고 처리
+                       [전체 조치보고] ConfirmPopup 확인 → 순차 API 호출
+                       → 성공 시 카드 제거 + 심볼 복원 + NATS 발행
+                       → 실패 시 즉시 중단 + InformDialog 표시
+                       (PRD: Docs/prd/PRD_Batch_Action_Report.md)
+       Created By   : GHLee
+       Created On   : 7/1/2025 7:13:26 PM
+       Department   : SW Team
+       Company      : Sensorway Co., Ltd.
+       Email        : lsirikh@naver.com
     ****************************************************************************/
     public class EventCardListPanelViewModel: BaseEventPanelViewModel<EventCardBaseViewModel>
                                             , IHandle<DetectionReportedMessageModel>
                                             , IHandle<MalfunctionReportedMessageModel>
                                             , IHandle<CallAllEventReportMessageModel>
+                                            , IHandle<EventEntryEnqueuedMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
                                           , ILogService log
-                                          , IEventDbService dbService
-                                          , IAccountModel userModel)
+                                          , EventProviderService providerService
+                                          , IAccountModel userModel
+                                          , IEventApiService apiService
+                                          , ISymbolEventManager symbolEventManager
+                                          , IEventQueueManager eventQueueManager)
                                         : base(ea, log)
         {
-            _dbService = dbService;
+            _providerService = providerService;
             _userModel = userModel;
+            _apiService = apiService;
+            _symbolEventManager = symbolEventManager;
+            _eventQueueManager = eventQueueManager;
+            _batchBuffer = new EventCardBatchBuffer<EventCardBaseViewModel>();
         }
         #endregion
         #region - Implementation of Interface -
@@ -47,12 +63,27 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         protected override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+            _batchTimer = new Timer(FlushPendingCards, null, BATCH_INTERVAL_MS, BATCH_INTERVAL_MS);
             return base.OnActivateAsync(cancellationToken);
         }
 
         protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
         {
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+            _batchTimer?.Dispose();
+            _batchTimer = null;
+            _pendingEntries.Clear();
+
+            // 잔여 큐 즉시 flush
+            var remaining = _batchBuffer.DrainQueue();
+            if (remaining.Count > 0)
+            {
+                DispatcherService.Invoke(() =>
+                {
+                    foreach (var card in remaining)
+                        ViewModelProvider.Add(card);
+                });
+            }
             return base.OnDeactivateAsync(close, cancellationToken);
         }
         #endregion
@@ -61,14 +92,83 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Processes -
         private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
+            IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
+
+            // Reset은 배치 서스펜드 패턴에서 수동 발행 — entryId 매칭은 배치에서 이미 처리
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                UpdateAction?.Invoke();
+                return;
+            }
+
+            // 카드 추가 시 미연결 entryId 자동 매칭
+            if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
+            {
+                foreach (var item in e.NewItems)
+                {
+                    if (item is EventCardBaseViewModel card)
+                        TryAssignEntryId(card);
+                }
+            }
+
             UpdateAction?.Invoke();
         }
 
+        /// <summary>
+        /// 카드 추가 시 _pendingEntries에서 eventId 기반 1:1 매칭 (폴백)
+        /// (PRD_EntryId_Nats_Uuid_DirectMatch FR-05, FR-06)
+        /// </summary>
+        private void TryAssignEntryId(EventCardBaseViewModel card)
+        {
+            if (card.EntryId != null) return;
+            if (card.Model == null) return;
+
+            if (_pendingEntries.TryGetValue(card.Model.Id, out var entryId))
+            {
+                card.EntryId = entryId;
+                _pendingEntries.Remove(card.Model.Id);
+                _log?.Info($"EntryId 지연 매칭: Card({card.Model.Id}) → Entry({entryId})");
+            }
+        }
+
+        private async void FlushPendingCards(object? state)
+        {
+            var batch = _batchBuffer.DrainQueue();
+            if (batch.Count == 0) return;
+
+            // 적응형 간격 조정
+            var newInterval = _batchBuffer.CalculateInterval(batch.Count);
+            _batchTimer?.Change(newInterval, newInterval);
+
+            await DispatcherService.BeginInvoke(() =>
+            {
+                // CollectionChanged 서스펜드 → 배치 Add → 재등록 (핸들러 폭주 방지)
+                ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+                try
+                {
+                    foreach (var card in batch)
+                        ViewModelProvider.Add(card);
+                }
+                finally
+                {
+                    ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+                    // 배치 entryId 매칭
+                    foreach (var card in batch)
+                        TryAssignEntryId(card);
+                    IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
+                    UpdateAction?.Invoke();
+                }
+            }, DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// 전체 조치보고 버튼 클릭 → ConfirmPopup 표시
+        /// 확인 시 ConfirmPopupDialogViewModel이 CallAllEventReportMessageModel을 재발행하여
+        /// HandleAsync(CallAllEventReportMessageModel)에서 ExecuteBatchReportAsync() 실행
+        /// </summary>
         public async void OnClickButtonActionAll(object sender, RoutedEventArgs e)
         {
             await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel() { Title = "전체 조치보고", Explain = "전체 조치보고를 수행하시겠습니까?", MessageModel = new CallAllEventReportMessageModel() });
-
-
         }
 
         public void OnClickEventCard(object sender, RoutedEventArgs e)
@@ -121,6 +221,83 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
         }
 
+        /// <summary>
+        /// 전체 조치보고 배치 처리 (PRD_Batch_Action_Report)
+        /// 흐름: IsVisible=false(ProgressCircle 표시) → 카드 순차 순회
+        ///   → ① API 조치보고(CreateActionEventAsync) — 실패 시 즉시 중단 + InformDialog
+        ///   → ② 심볼 상태 복원(ProcessEventReport)
+        ///   → ③ 카드 UI 제거
+        ///   → ④ NATS 발행(SendActionRequestMessage)
+        ///   → 전체 완료 후 DequeueAll()로 큐 정리
+        /// 주의: 클라이언트에서 status/action_reported 직접 변경 금지 — 서버가 Action 생성 시 자동 처리
+        /// </summary>
+        public async Task ExecuteBatchReportAsync()
+        {
+            IsVisible = false;
+            try
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+
+                var cards = ViewModelProvider.ToList();
+
+                foreach (var card in cards)
+                {
+                    var eventModel = card.Model;
+
+                    // ① 서버 API로 조치보고 생성 (ActionUser: Username만, Content: "일괄처리" 고정)
+                    var dto = new ActionEventCreateDto
+                    {
+                        User = _userModel.Name,
+                        Content = "일괄처리",
+                        FromEventId = eventModel?.Id ?? 0
+                    };
+
+                    var response = await _apiService.CreateActionEventAsync(dto);
+                    if (!response.Success)
+                    {
+                        throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
+                    }
+
+                    // ② 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
+                    if (card.EntryId != null)
+                        _eventQueueManager.Dequeue(card.EntryId);
+                    else
+                        _log?.Warning($"EntryId null — Dequeue 스킵: Event({eventModel?.Id}), Device({eventModel?.Device?.Id})");
+
+                    // ③ 즉시 제거 (하나씩 사라지는 애니메이션 효과)
+                    ViewModelProvider.Remove(card);
+                    card.Dispose();
+
+                    // ④ NATS로 조치보고 발행 (NatsDomainService 경유)
+                    await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+                    {
+                        EventId = eventModel?.Id ?? 0,
+                        EventType = eventModel?.MessageType ?? EnumEventType.Intrusion,
+                        ActionDetails = "일괄처리",
+                        ActionUser = _userModel.Name,
+                        ActionTime = DateTime.Now
+                    });
+
+                    await Task.Delay(20);
+                }
+            }
+            catch (Exception ex)
+            {
+                // API 실패 시 즉시 중단하고 에러 팝업 표시 (남은 카드는 유지)
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "전체 조치보고 오류",
+                    Explain = $"{ex}"
+                });
+            }
+            finally
+            {
+                IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
+                UpdateAction?.Invoke();
+                IsVisible = true;
+            }
+        }
+
         public void OnButtonCameraPopup(object sender, RoutedEventArgs e)
         {
             //if (!SetupModel.IsServer)
@@ -154,26 +331,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 if (message != null && message.ViewModel != null)
                 {
                     var vm = message.ViewModel;
-                    var eventModel = vm.Model;
-                    if (eventModel == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
-                    
-                                        
-                    var action = new ActionEventModel()
-                    {
-                        Content = message.Content,
-                        User = message.User,
-                        OriginEvent = eventModel,
-                    };
+                    var model = vm.Model;
+                    if (model == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
 
-                    DispatcherService.Invoke(() => 
+                    // 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
+                    if (vm.EntryId != null)
+                        _eventQueueManager.Dequeue(vm.EntryId);
+                    else
+                        _log?.Warning($"EntryId null — Dequeue 스킵: Event({vm.Model?.Id}), Device({vm.Model?.Device?.Id})");
+
+                    await DispatcherService.BeginInvoke(() =>
                     {
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
-
-                    await _dbService.InsertActionEventAsync(action, cancellationToken);
-                    eventModel.Status = Enums.EnumTrueFalse.True;
-                    await _dbService.UpdateDetectionEventAsync((IDetectionEventModel)eventModel!, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -189,26 +360,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 if (message != null && message.ViewModel != null)
                 {
                     var vm = message.ViewModel;
-                    var eventModel = vm.Model;
-                    if (eventModel == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
+                    var model = vm.Model;
+                    if (model == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
 
+                    // 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
+                    if (vm.EntryId != null)
+                        _eventQueueManager.Dequeue(vm.EntryId);
+                    else
+                        _log?.Warning($"EntryId null — Dequeue 스킵: Event({vm.Model?.Id}), Device({vm.Model?.Device?.Id})");
 
-                    var action = new ActionEventModel()
-                    {
-                        Content = message.Content,
-                        User = message.User,
-                        OriginEvent = eventModel,
-                    };
-
-                    DispatcherService.Invoke(() =>
+                    await DispatcherService.BeginInvoke(() =>
                     {
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
-
-                    await _dbService.InsertActionEventAsync(action, cancellationToken);
-                    eventModel.Status = Enums.EnumTrueFalse.True;
-                    await _dbService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)eventModel!, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -217,85 +382,36 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
         }
 
-        public async Task HandleAsync(CallAllEventReportMessageModel message, CancellationToken cancellationToken)
-        {
-            try
-            {
-                foreach (var item in ViewModelProvider.ToList())
-                {
-                    ActionEventModel action;
-
-                    if (item is DetectionEventCardViewModel dEventCardViewModel)
-                    {
-                        var vm = dEventCardViewModel.Model;
-                        action = new ActionEventModel()
-                        {
-                            Content = "자동 조치보고",
-                            User = $"{_userModel.Username}({_userModel.EmployeeNumber})",
-                            OriginEvent = vm,
-                        };
-                        vm.Status = Enums.EnumTrueFalse.True;
-                        await _dbService.UpdateDetectionEventAsync((IDetectionEventModel)vm!, cancellationToken);
-                    }
-                    else if(item is MalfunctionEventCardViewModel mEventCardViewModel)
-                    {
-                        var vm = mEventCardViewModel.Model;
-                        action = new ActionEventModel()
-                        {
-                            Content = "자동 조치보고",
-                            User = $"{_userModel.Username}({_userModel.EmployeeNumber})",
-                            OriginEvent = vm,
-                        };
-                        vm.Status = Enums.EnumTrueFalse.True;
-                        await _dbService.UpdateMalfunctionEventAsync((IMalfunctionEventModel)vm!, cancellationToken);
-                    }
-                    else
-                    {
-                        continue;
-                    }
-
-                    DispatcherService.Invoke(() =>
-                    {
-                        ViewModelProvider.Remove(item);
-                        item.Dispose();
-                    });
-
-                    await _dbService.InsertActionEventAsync(action, cancellationToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log?.Error(ex.Message);
-            }
-            finally
-            {
-                await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
-            }
-        }
-
-        //private async void SendAction(EventCardViewModel viewModel)
-        //{
-        //    BrkAction brkAction = new BrkAction
-        //    {
-        //        IdCommand = (int)EnumEventType.Action,
-        //        IdGroup = viewModel.IdGroup,
-        //        IdController = viewModel.IdController,
-        //        IdSensor = viewModel.IdSensor,
-        //        TypeDevice = (int)viewModel.TypeDevice,
-        //        TypeMessage = (int)EnumEventType.Action,
-        //        Content = EnumLanguageHelper.GetAutoActionType(SetupModel.Language),
-        //    };
-        //    var json = JsonConvert.SerializeObject(brkAction);
-        //    json = $"[{json}]";
-        //    if (SetupModel.IsServer)
-        //    {
-        //        var channel = RedisChannel.Literal(SetupModel.NameChannel2);
-        //        await Subscriber.PublishAsync(channel, json);
-        //    }
-
-        //}
         #endregion
         #region - IHanldes -
+        /// <summary>
+        /// ConfirmPopup 확인 시 CallAllEventReportMessageModel을 수신하여 배치 처리 실행
+        /// (ConfirmPopupDialogViewModel.ClickOk() → PublishOnCurrentThread(MessageModel) → 여기로 도달)
+        /// </summary>
+        public async Task HandleAsync(CallAllEventReportMessageModel message, CancellationToken cancellationToken)
+        {
+            await ExecuteBatchReportAsync();
+        }
+
+        /// <summary>
+        /// EventEntryEnqueuedMessage 수신 → eventId로 카드 검색하여 entryId 1:1 직접 매칭
+        /// (PRD_EntryId_Nats_Uuid_DirectMatch FR-04)
+        /// </summary>
+        public Task HandleAsync(EventEntryEnqueuedMessage message, CancellationToken cancellationToken)
+        {
+            var card = ViewModelProvider.FirstOrDefault(c => c.Model?.Id == message.EventId && c.EntryId == null);
+            if (card != null)
+            {
+                card.EntryId = message.EntryId;
+                _log?.Info($"EntryId 직접 매칭: Card({message.EventId}) → Entry({message.EntryId})");
+            }
+            else
+            {
+                // 카드가 아직 추가되지 않음 → 보류 큐에 저장
+                _pendingEntries[message.EventId] = message.EntryId;
+            }
+            return Task.CompletedTask;
+        }
         #endregion
         #region - Properties -
         public EventCardBaseViewModel SelectedEventCardViewModel
@@ -304,11 +420,33 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             set { _selectedEventCardViewModel = value; NotifyOfPropertyChange(() => SelectedEventCardViewModel); }
         }
         public event Action? UpdateAction;
+
+        public bool IsAnimationEnabled
+        {
+            get { return _isAnimationEnabled; }
+            set { _isAnimationEnabled = value; NotifyOfPropertyChange(() => IsAnimationEnabled); }
+        }
+
+        public bool IsVisible
+        {
+            get { return _isVisible; }
+            set { _isVisible = value; NotifyOfPropertyChange(() => IsVisible); }
+        }
         #endregion
         #region - Attributes -
-        private IEventDbService _dbService;
+        private const int ANIMATION_THRESHOLD = 20;
+        private const int BATCH_INTERVAL_MS = 150;
+        private EventProviderService _providerService;
         private IAccountModel _userModel;
+        private IEventApiService _apiService;
+        private ISymbolEventManager _symbolEventManager;
+        private IEventQueueManager _eventQueueManager;
+        private EventCardBatchBuffer<EventCardBaseViewModel> _batchBuffer;
+        private readonly Dictionary<int, string> _pendingEntries = new();
+        private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
+        private bool _isAnimationEnabled = true;
+        private bool _isVisible = true;
         #endregion
     }
 }

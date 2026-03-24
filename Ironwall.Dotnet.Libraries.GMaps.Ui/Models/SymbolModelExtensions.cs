@@ -130,4 +130,84 @@ public static class SymbolModelExtensions
     private const double MAX_SIZE = 200;
 
     #endregion
+
+
+    #region Copy
+    public static SymbolModel Clone(this SymbolModel original)
+    {
+        return new SymbolModel
+        {
+            Title = original.Title,
+            TitleSize = original.TitleSize,
+            Latitude = original.Latitude,
+            Longitude = original.Longitude,
+            Zoom = original.Zoom,
+            Width = original.Width,
+            Height = original.Height,
+            Bearing = original.Bearing,
+            Category = original.Category,
+            ShowShape = original.ShowShape,
+            ShowTitle = original.ShowTitle,
+            OperationState = original.OperationState,
+            FillColor = original.FillColor,
+            StrokeColor = original.StrokeColor,
+            StrokeThickness = original.StrokeThickness
+        };
+    }
+
+    public static GeometricSymbolModel Clone(this GeometricSymbolModel original)
+    {
+        return new GeometricSymbolModel
+        {
+            Title = original.Title,
+            TitleSize = original.TitleSize,
+            Latitude = original.Latitude,
+            Longitude = original.Longitude,
+            Zoom = original.Zoom,
+            Width = original.Width,
+            Height = original.Height,
+            Bearing = original.Bearing,
+            Category = original.Category,
+            ShowShape = original.ShowShape,
+            ShowTitle = original.ShowTitle,
+            OperationState = original.OperationState,
+            FillColor = original.FillColor,
+            StrokeColor = original.StrokeColor,
+            StrokeThickness = original.StrokeThickness,
+            Opacity = original.Opacity,
+            ShapeType = original.ShapeType
+        };
+    }
+
+    public static PidsSymbolModel Clone(this PidsSymbolModel original)
+    {
+        return new PidsSymbolModel
+        {
+            Title = original.Title,
+            TitleSize = original.TitleSize,
+            Latitude = original.Latitude,
+            Longitude = original.Longitude,
+            Zoom = original.Zoom,
+            Width = original.Width,
+            Height = original.Height,
+            Bearing = original.Bearing,
+            Category = original.Category,
+            ShowShape = original.ShowShape,
+            ShowTitle = original.ShowTitle,
+            OperationState = original.OperationState,
+            FillColor = original.FillColor,
+            StrokeColor = original.StrokeColor,
+            StrokeThickness = original.StrokeThickness,
+            LinkedDeviceId = original.LinkedDeviceId + 1000, // 중복 방지를 위해 다른 값
+            DeviceType = original.DeviceType,
+            DetectionRange = original.DetectionRange,
+            DetectionAngle = original.DetectionAngle,
+            DetectionBearing = original.DetectionBearing,
+            ShowFOV = original.ShowFOV,
+            EventStatus = original.EventStatus,
+            FOVColor = original.FOVColor,
+            FOVOpacity = original.FOVOpacity
+        };
+    }
+    #endregion
 }

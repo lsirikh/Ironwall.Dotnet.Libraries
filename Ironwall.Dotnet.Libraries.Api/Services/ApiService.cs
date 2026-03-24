@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Api.Services;
 /****************************************************************************
@@ -18,7 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Api.Services;
 public class ApiService : IApiService
 {
     #region - Ctors -
-    public ApiService(ILogService log
+    public ApiService(ILogService? log
                     , ApiSetupModel setupModel)
     {
         _log = log;
@@ -102,7 +103,8 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonSerializer.Serialize(body);
+            var json = JsonConvert.SerializeObject(body);
+            //var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             return await _client.PostAsync(endpoint, content);
@@ -176,7 +178,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonSerializer.Serialize(body);
+            var json = JsonConvert.SerializeObject(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var request = new HttpRequestMessage(HttpMethod.Patch, endpoint)
             {
@@ -208,7 +210,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonSerializer.Serialize(body);
+            var json = JsonConvert.SerializeObject(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             return await _client.PutAsync(endpoint, content);
         }
@@ -228,7 +230,7 @@ public class ApiService : IApiService
     public string Phone => _setupModel.Phone;
     #endregion
     #region - Attributes -
-    private readonly ILogService _log;
+    private readonly ILogService? _log;
     private readonly ApiSetupModel _setupModel;
     private HttpClient? _client;
     private const int TIMEOUT = 10;

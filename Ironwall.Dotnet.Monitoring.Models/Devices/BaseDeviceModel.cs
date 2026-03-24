@@ -1,6 +1,7 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Enums;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Devices;
 /****************************************************************************
@@ -20,18 +21,27 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
 
     public BaseDeviceModel(IBaseDeviceModel model) : base(model)
     {
-        DeviceGroup = model.DeviceGroup;
+        DeviceGroups = model.DeviceGroups;
         DeviceNumber = model.DeviceNumber;
         DeviceName = model.DeviceName;
         DeviceType = model.DeviceType;
         Version = model.Version;
         Status = model.Status;
+        Location = model.Location;
+        Latitude = model.Latitude;
+        Longitude = model.Longitude;
+        IsEnable = model.IsEnable;
     }
 
     [JsonProperty("device_number", Order = 2)]
     public int DeviceNumber { get; set; }
-    [JsonProperty("device_group", Order = 3)]
-    public int DeviceGroup { get; set; }
+    [JsonProperty("device_groups", Order = 3, NullValueHandling = NullValueHandling.Ignore)]
+    public List<int>? DeviceGroups { get; set; }
+    [JsonIgnore]
+    public string DeviceGroupsText =>
+        DeviceGroups != null && DeviceGroups.Count > 0
+            ? string.Join(", ", DeviceGroups)
+            : "";
     [JsonProperty("device_name", Order = 4)]
     public string? DeviceName { get; set; }
     [JsonProperty("device_type", Order = 5)]
@@ -40,4 +50,12 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
     public string? Version { get; set; } 
     [JsonIgnore]
     public EnumDeviceStatus Status { get; set; } = EnumDeviceStatus.DEACTIVATED;
+    [JsonProperty("location", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
+    public string? Location { get; set; }
+    [JsonProperty("latitude", Order = 11)]
+    public double Latitude { get; set; }
+    [JsonProperty("longitude", Order = 12)]
+    public double Longitude { get; set; }
+    [JsonProperty("is_enable", Order = 13)]
+    public bool IsEnable { get; set; }
 }

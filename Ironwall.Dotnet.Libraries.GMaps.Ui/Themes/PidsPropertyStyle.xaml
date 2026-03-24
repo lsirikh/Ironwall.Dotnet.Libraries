@@ -1,0 +1,248 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+		<ResourceDictionary Source="BasePropertyStyle.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsControl}">
+
+		<Setter Property="HasSpecificProperties" Value="True" />
+		<Setter Property="SpecificPropertiesTitle" Value="PIDS 속성" />
+		<!--  PIDS 특화 UI  -->
+		<Setter Property="SpecificContent">
+			<Setter.Value>
+				<StackPanel>
+					<!--  연결된 디바이스  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="연결디바이스" />
+						<ComboBox
+							Grid.Column="1"
+							ItemsSource="{Binding FilteredDeviceList}"
+							SelectedItem="{Binding LinkedDevice, Mode=TwoWay}"
+							Style="{StaticResource CompactComboBox}"
+							DisplayMemberPath="DeviceName">
+						</ComboBox>
+					</Grid>
+
+					<!--  FOV 표시  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 표시" />
+						<CheckBox
+							Grid.Column="1"
+							VerticalAlignment="Center"
+							Content="FOV 영역 표시"
+							Foreground="White"
+							IsChecked="{Binding ShowFOV}" />
+					</Grid>
+
+					<!--  FOV 색상  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 색상" />
+						<ComboBox
+							Grid.Column="1"
+							ItemsSource="{Binding AvailableColors}"
+							SelectedItem="{Binding FOVColor}"
+							Style="{StaticResource CompactComboBox}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<Rectangle
+											Width="40"
+											Height="12"
+											Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
+											Stroke="Gray"
+											StrokeThickness="0.5" />
+										<TextBlock
+											Margin="10,0"
+											FontSize="10"
+											Text="{Binding}" />
+									</StackPanel>
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
+
+					<!--  FOV 투명도  -->
+					<Grid Margin="0,5">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="30" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							Grid.Column="0"
+							Style="{StaticResource PropertyLabel}"
+							Text="FOV 투명도" />
+						<Slider
+							x:Name="FOVOpacitySlider"
+							Grid.Column="1"
+							Margin="5,0"
+							VerticalAlignment="Center"
+							Maximum="1.0"
+							Minimum="0.1"
+							TickFrequency="0.1"
+							Value="{Binding FOVOpacity}" />
+						<TextBlock
+							Grid.Column="2"
+							VerticalAlignment="Center"
+							Foreground="White"
+							Text="{Binding FOVOpacity, StringFormat='{}{0:P0}'}" />
+					</Grid>
+
+					<!--  탐지 설정 섹션  -->
+					<Border
+						Margin="0,10,0,0"
+						Padding="8,4"
+						Background="{StaticResource PrimaryBlueBrush}"
+						CornerRadius="5">
+						<StackPanel>
+							<TextBlock
+								HorizontalAlignment="Center"
+								FontSize="12"
+								FontWeight="Bold"
+								Foreground="White"
+								Text="탐지 영역 설정" />
+
+							<!--  탐지 범위  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="WhiteSmoke"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="탐지범위" />
+								<Slider
+									x:Name="DetectionRangeSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="1000"
+									Minimum="10"
+									TickFrequency="5"
+									Value="{Binding DetectionRange}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="{Binding DetectionRange, StringFormat='{}{0:F0}m'}" />
+							</Grid>
+
+							<!--  탐지 각도  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="WhiteSmoke"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="탐지각도" />
+								<Slider
+									x:Name="DetectionAngleSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="180"
+									Minimum="5"
+									TickFrequency="5"
+									Value="{Binding DetectionAngle}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="{Binding DetectionAngle, StringFormat='{}{0:F0}°'}" />
+							</Grid>
+
+							<!--  탐지 방향  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="WhiteSmoke"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="탐지방향" />
+								<Slider
+									x:Name="DetectionBearingSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="180"
+									Minimum="-180"
+									TickFrequency="5"
+									Value="{Binding DetectionBearing}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="{Binding DetectionBearing, StringFormat='{}{0:F0}°'}" />
+							</Grid>
+
+							<!--  기준 방향 (BaseBearing)  -->
+							<Grid Margin="0,5">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="60" />
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="35" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+                                    Foreground="WhiteSmoke"
+									Grid.Column="0"
+									Style="{StaticResource PropertyLabel}"
+									Text="기준방향" />
+								<Slider
+									x:Name="BaseBearingSlider"
+									Grid.Column="1"
+									Margin="5,0"
+									VerticalAlignment="Center"
+									Maximum="360"
+									Minimum="0"
+									TickFrequency="5"
+									Value="{Binding BaseBearing}" />
+								<TextBlock
+									Grid.Column="2"
+									VerticalAlignment="Center"
+									Foreground="White"
+									Text="{Binding BaseBearing, StringFormat='{}{0:F0}°'}" />
+							</Grid>
+						</StackPanel>
+					</Border>
+				</StackPanel>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>

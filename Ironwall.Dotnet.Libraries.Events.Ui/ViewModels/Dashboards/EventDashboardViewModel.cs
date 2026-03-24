@@ -29,6 +29,7 @@ public class EventDashboardViewModel : BasePanelViewModel
                                 , ConnectionEventPanelViewModel connectionEventPanelViewModel
                                 , ActionEventPanelViewModel actionEventPanelViewModel
                                 , EventInfoViewModel eventInfoViewModel
+                                , CameraEventInfoViewModel cameraEventInfoViewModel
                                 , DataChartPanelViewModel dataChartPanelViewModel
                                 ) : base(eventAggregator, log)
     {
@@ -38,6 +39,7 @@ public class EventDashboardViewModel : BasePanelViewModel
         ConnectionPanelViewModel = connectionEventPanelViewModel;
         ActionPanelViewModel = actionEventPanelViewModel;
         EventInfoViewModel = eventInfoViewModel;
+        CameraEventInfoViewModel = cameraEventInfoViewModel;
         DataChartPanelViewModel = dataChartPanelViewModel;
     }
     #endregion
@@ -100,31 +102,55 @@ public class EventDashboardViewModel : BasePanelViewModel
         TabControlViewModel.Items.Clear();
         await TabControlViewModel.DeactivateAsync(true);
         await EventInfoViewModel.DeactivateAsync(true);
+        await CameraEventInfoViewModel.DeactivateAsync(true);
     }
 
     private async void DataChartPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
+        // SetCachedDate는 각 패널의 DataInitialize() 완료 시점에만 호출 (캐시 오유효화 방지)
+        var dashboard = DataChartPanelViewModel.LastDashboardDto;
+        if (dashboard == null)
+        {
+            IsButtonEnable = true;
+            return;
+        }
+
+        // 로딩 상태 선제 설정 — Activate 시점부터 스피너 표시
+        EventInfoViewModel.IsChartLoading = true;
+        CameraEventInfoViewModel.IsChartLoading = true;
+
+        // EventInfoViewModel — Statistics API (전체 4종)
         if (EventInfoViewModel.IsActive)
             await EventInfoViewModel.DeactivateAsync(true);
-
         await EventInfoViewModel.ActivateAsync();
-
-
         EventInfoViewModel.SetData(startDate: start, endDate: end, new[] { "DET", "MAL", "CON", "ACT" });
-        await EventInfoViewModel.DataInitialize();
+        var token = EventInfoViewModel.CancelAndRestart();
+        await EventInfoViewModel.DataInitializeFromStats(dashboard.Summary, dashboard.ByDevice, token);
+
+        // 카메라 KPI — Statistics API
+        if (CameraEventInfoViewModel.IsActive)
+            await CameraEventInfoViewModel.DeactivateAsync(true);
+        await CameraEventInfoViewModel.ActivateAsync();
+        CameraEventInfoViewModel.SetData(start, end);
+        var cameraToken = CameraEventInfoViewModel.CancelAndRestart();
+        await CameraEventInfoViewModel.DataInitializeFromStats(dashboard.Summary, cameraToken);
+
         IsButtonEnable = true;
     }
 
 
     private async void ActionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
+        if (dashboard == null) { IsButtonEnable = true; return; }
+
+        EventInfoViewModel.IsChartLoading = true;
         if (EventInfoViewModel.IsActive)
             await EventInfoViewModel.DeactivateAsync(true);
-
         await EventInfoViewModel.ActivateAsync();
-
         EventInfoViewModel.SetData(startDate: start, endDate: end, new[] { "ACT" });
-        await EventInfoViewModel.DataInitialize();
+        var token = EventInfoViewModel.CancelAndRestart();
+        await EventInfoViewModel.DataInitializeFromStats(dashboard.Summary, dashboard.ByDevice, token);
         IsButtonEnable = true;
     }
 
@@ -145,12 +171,16 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void ConnectionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
+        if (dashboard == null) { IsButtonEnable = true; return; }
+
+        EventInfoViewModel.IsChartLoading = true;
         if (EventInfoViewModel.IsActive)
             await EventInfoViewModel.DeactivateAsync(true);
-
         await EventInfoViewModel.ActivateAsync();
         EventInfoViewModel.SetData(startDate: start, endDate: end, new[] { "CON" });
-        await EventInfoViewModel.DataInitialize();
+        var token = EventInfoViewModel.CancelAndRestart();
+        await EventInfoViewModel.DataInitializeFromStats(dashboard.Summary, dashboard.ByDevice, token);
         IsButtonEnable = true;
     }
 
@@ -171,13 +201,16 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void MalfunctionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
+        if (dashboard == null) { IsButtonEnable = true; return; }
+
+        EventInfoViewModel.IsChartLoading = true;
         if (EventInfoViewModel.IsActive)
             await EventInfoViewModel.DeactivateAsync(true);
-
         await EventInfoViewModel.ActivateAsync();
-
         EventInfoViewModel.SetData(startDate: start, endDate: end, new[] { "MAL" });
-        await EventInfoViewModel.DataInitialize();
+        var token = EventInfoViewModel.CancelAndRestart();
+        await EventInfoViewModel.DataInitializeFromStats(dashboard.Summary, dashboard.ByDevice, token);
         IsButtonEnable = true;
     }
 
@@ -199,13 +232,17 @@ public class EventDashboardViewModel : BasePanelViewModel
 
     private async void DetectionPanelViewModel_UpdateAction(DateTime start, DateTime end)
     {
+        // ⭐ 이벤트 삭제/추가 후 차트가 stale 데이터를 표시하지 않도록 통계 재조회
+        var dashboard = await DataChartPanelViewModel.RefreshDashboardDtoAsync();
+        if (dashboard == null) { IsButtonEnable = true; return; }
+
+        EventInfoViewModel.IsChartLoading = true;
         if (EventInfoViewModel.IsActive)
             await EventInfoViewModel.DeactivateAsync(true);
-
         await EventInfoViewModel.ActivateAsync();
-
-        EventInfoViewModel.SetData(startDate: start, endDate: end, new[] { "DET"});
-        await EventInfoViewModel.DataInitialize();
+        EventInfoViewModel.SetData(startDate: start, endDate: end, new[] { "DET" });
+        var token = EventInfoViewModel.CancelAndRestart();
+        await EventInfoViewModel.DataInitializeFromStats(dashboard.Summary, dashboard.ByDevice, token);
         IsButtonEnable = true;
     }
 
@@ -225,10 +262,74 @@ public class EventDashboardViewModel : BasePanelViewModel
     }
     #endregion
     #region - Binding Methods -
+    public bool CanClickSearch => true;
+    public void ClickSearch()
+    {
+        try
+        {
+            IsButtonEnable = false;
+
+            // 1. 모든 자식 패널에 동일 날짜 전파
+            DataChartPanelViewModel.SetDate(StartDate, EndDate);
+            DetectionPanelViewModel.SetDate(StartDate, EndDate);
+            MalfunctionPanelViewModel.SetDate(StartDate, EndDate);
+            ConnectionPanelViewModel.SetDate(StartDate, EndDate);
+            ActionPanelViewModel.SetDate(StartDate, EndDate);
+
+            // 2. 모든 이벤트 패널 캐시 무효화
+            DetectionPanelViewModel.InvalidateCache();
+            MalfunctionPanelViewModel.InvalidateCache();
+            ConnectionPanelViewModel.InvalidateCache();
+            ActionPanelViewModel.InvalidateCache();
+
+            // 3. 활성 탭의 ClickSearch() 직접 호출
+            //    View를 Visual Tree에서 분리하지 않으므로
+            //    DataGridScrollEndBehavior의 ScrollViewer 구독이 유지됨
+            var activeItem = TabControlViewModel.ActiveItem;
+            if (activeItem == DataChartPanelViewModel)
+                DataChartPanelViewModel.ClickSearch();
+            else if (activeItem == DetectionPanelViewModel)
+                DetectionPanelViewModel.ClickSearch();
+            else if (activeItem == MalfunctionPanelViewModel)
+                MalfunctionPanelViewModel.ClickSearch();
+            else if (activeItem == ConnectionPanelViewModel)
+                ConnectionPanelViewModel.ClickSearch();
+            else if (activeItem == ActionPanelViewModel)
+                ActionPanelViewModel.ClickSearch();
+            else
+                DataChartPanelViewModel.ClickSearch();
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            _log?.Error($"ClickSearch: {ex.Message}");
+        }
+        finally
+        {
+            IsButtonEnable = true;
+        }
+    }
+
+    public bool CanClickCancel => true;
+    public void ClickCancel()
+    {
+        try
+        {
+            if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
+                return;
+            _cancellationTokenSource.Cancel();
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            _log?.Error($"ClickCancel: {ex.Message}");
+        }
+    }
+
     private void ClearData()
     {
 
-        
+
     }
 
     #endregion
@@ -285,10 +386,13 @@ public class EventDashboardViewModel : BasePanelViewModel
                 default:
                     break;
             }
+
+            IsButtonEnable = true;
         }
         catch (Exception ex)
         {
             _log?.Error($"{ex.Message}");
+            IsButtonEnable = true;
         }
     }
 
@@ -330,15 +434,48 @@ public class EventDashboardViewModel : BasePanelViewModel
     public ConnectionEventPanelViewModel ConnectionPanelViewModel { get; private set; }
     public ActionEventPanelViewModel ActionPanelViewModel { get; private set; }
     public EventInfoViewModel EventInfoViewModel { get; }
+    public CameraEventInfoViewModel CameraEventInfoViewModel { get; }
     public DataChartPanelViewModel DataChartPanelViewModel { get; }
     public EventProvider EventProvider { get; private set; }
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
+
+    public DateTime StartDate
+    {
+        get => _startDate;
+        set
+        {
+            _startDate = value;
+            NotifyOfPropertyChange(() => StartDate);
+            EndDateDisplay = _startDate;
+        }
+    }
+
+    public DateTime EndDate
+    {
+        get => _endDate;
+        set
+        {
+            _endDate = value;
+            NotifyOfPropertyChange(() => EndDate);
+        }
+    }
+
+    public DateTime EndDateDisplay
+    {
+        get => _endDateDisplay;
+        set
+        {
+            _endDateDisplay = value;
+            NotifyOfPropertyChange(() => EndDateDisplay);
+        }
+    }
     #endregion
     #region - Attributes -
     private bool _isButtonEnable;
     private const int TIMEOUT = 30000;
     private bool _isSelected;
     private BasePanelViewModel? _selectedItemEditor;
+    private DateTime _startDate;
+    private DateTime _endDate;
+    private DateTime _endDateDisplay;
     #endregion
 }

@@ -13,119 +13,107 @@
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type control:GMapMarkerCustomControl}">
-					<Viewbox
-						Name="PART_ViewboxContainer"
-						Width="{TemplateBinding Width}"
-						Height="{TemplateBinding Height}"
-						Stretch="Fill"
-						ToolTip="{TemplateBinding MarkerTitle}">
+					<Grid Name="PART_MainContainer">
 
-						<Grid
-							Name="PART_MarkerContainer"
-							Width="32"
-							Height="46"
+						<!--  마커 본체 (크기 연동)  -->
+						<Viewbox
+							Name="PART_ViewboxContainer"
+							Width="{TemplateBinding Width}"
+							Height="{TemplateBinding Height}"
+							Stretch="Fill"
+							ToolTip="{TemplateBinding MarkerTitle}">
+
+							<Grid
+								Name="PART_MarkerContainer"
+								Width="32"
+								Height="46"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Bottom">
+
+								<!--  Map Pin Shape (기준 크기: 32x32)  -->
+								<Path
+									Name="PART_PinShape"
+									Data="M16,0 C24.8,0 32,7.2 32,16 C32,24 22,32 16,46 C10,32 0,24 0,16 C0,7.2 7.2,0 16,0 Z"
+									Stretch="Fill"
+									Fill="{TemplateBinding MarkerFill}"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
+									<Path.Effect>
+										<DropShadowEffect
+											BlurRadius="8"
+											Opacity="0.5"
+											ShadowDepth="4"
+											Color="Black" />
+									</Path.Effect>
+								</Path>
+
+								<!--  Inner Circle (기준 크기: 20x20)  -->
+								<Ellipse
+									Name="PART_InnerCircle"
+									Width="20"
+									Height="20"
+									Margin="0,6,0,0"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Top"
+									Fill="White"
+									Stroke="{TemplateBinding MarkerStroke}"
+									StrokeThickness="1" />
+
+								<!--  Hover Highlight (기준 크기: 20x20)  -->
+								<Ellipse
+									Name="PART_HoverHighlight"
+									Width="20"
+									Height="20"
+									Margin="0,6,0,0"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Top"
+									Fill="White"
+									Opacity="0" />
+							</Grid>
+						</Viewbox>
+
+						<!--  Label Container - Viewbox 외부, 독립적 크기  -->
+						<Border
+							Name="PART_LabelContainer"
+							MinWidth="40"
+							MaxWidth="150"
+							Margin="0,0,0,-25"
+							Padding="2"
 							HorizontalAlignment="Center"
-							VerticalAlignment="Bottom">
-
-							<!--  Map Pin Shape (기준 크기: 32x32)  -->
-							<Path
-								Name="PART_PinShape"
-								Data="M16,0 C24.8,0 32,7.2 32,16 C32,24 22,32 16,46 C10,32 0,24 0,16 C0,7.2 7.2,0 16,0 Z"
-								Fill="{TemplateBinding MarkerFill}"
-								Stretch="Fill"
-								Stroke="{TemplateBinding MarkerStroke}"
-								StrokeThickness="{TemplateBinding MarkerStrokeThickness}">
-								<Path.Effect>
-									<DropShadowEffect
-										BlurRadius="8"
-										Opacity="0.5"
-										ShadowDepth="4"
-										Color="Black" />
-								</Path.Effect>
-							</Path>
-
-							<!--  Inner Circle (기준 크기: 20x20)  -->
-							<Ellipse
-								Name="PART_InnerCircle"
-								Width="20"
-								Height="20"
-								Margin="0,6,0,0"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Top"
-								Fill="White"
-								Stroke="{TemplateBinding MarkerStroke}"
-								StrokeThickness="1" />
-
-							<!--  Center Point (기준 크기: 6x6)  -->
-							<Ellipse
-								Name="PART_CenterPoint"
-								Width="6"
-								Height="6"
-								Margin="0,13,0,0"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Top"
-								Fill="{TemplateBinding MarkerFill}"
-								Opacity="0.8" />
-
-							<!--  Status Indicator (기준 크기: 8x8)  -->
-							<Ellipse
-								Name="PART_StatusIndicator"
-								Width="8"
-								Height="8"
-								Margin="0,-2,-2,0"
-								HorizontalAlignment="Right"
-								VerticalAlignment="Top"
-								Fill="Lime" />
-
-							<!--  Label Container - 기본값 Collapsed  -->
-							<Border
-								Name="PART_LabelContainer"
-								Margin="0,0,0,-70"
-								Padding="2"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								Background="White"
-								BorderBrush="Gray"
-								BorderThickness="1"
-								CornerRadius="4"
-								Visibility="Collapsed">
-								<Border.Effect>
-									<DropShadowEffect
-										BlurRadius="3"
-										Opacity="0.3"
-										ShadowDepth="2"
-										Color="Black" />
-								</Border.Effect>
-								<TextBlock
-									Name="PART_LabelText"
-									FontSize="{TemplateBinding TitleSize}"
-									FontWeight="SemiBold"
-									Foreground="Black"
-									Text="{TemplateBinding MarkerTitle}"
-									TextAlignment="Center" />
-							</Border>
-
-							<!--  Hover Highlight (기준 크기: 20x20)  -->
-							<Ellipse
-								Name="PART_HoverHighlight"
-								Width="20"
-								Height="20"
-								Margin="0,6,0,0"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Top"
-								Fill="White"
-								Opacity="0" />
-						</Grid>
-					</Viewbox>
+							VerticalAlignment="Bottom"
+							Background="White"
+							BorderBrush="Gray"
+							BorderThickness="1"
+							CornerRadius="4"
+							Visibility="Collapsed">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="3"
+									Opacity="0.3"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+							<TextBlock
+								Name="PART_LabelText"
+								FontSize="{TemplateBinding TitleSize}"
+								FontWeight="SemiBold"
+								Foreground="Black"
+								Text="{TemplateBinding MarkerTitle}"
+								TextAlignment="Center"
+								TextTrimming="CharacterEllipsis"
+								TextWrapping="NoWrap" />
+						</Border>
+					</Grid>
 
 					<ControlTemplate.Triggers>
-						<!--  🔧 ShowShape=False일 때만 숨김 (단일 트리거)  -->
+						<!--  ShowShape=False일 때만 숨김 (단일 트리거)  -->
 						<Trigger Property="ShowShape" Value="False">
 							<Setter TargetName="PART_ViewboxContainer" Property="Visibility" Value="Collapsed" />
 							<Setter Property="IsHitTestVisible" Value="False" />
+							<Setter TargetName="PART_LabelContainer" Property="Margin" Value="0,0,0,0" />
 						</Trigger>
 
-						<!--  🔧 라벨 표시 조건들 (OR 로직)  -->
+						<!--  라벨 표시 조건들 (OR 로직)  -->
 
 						<!--  IsSelected=True일 때 라벨 표시  -->
 						<Trigger Property="IsSelected" Value="True">
@@ -152,27 +140,10 @@
 							</Setter>
 						</Trigger>
 
-						<!--  Marker State Colors  -->
-						<Trigger Property="MarkerState" Value="ACTIVE">
-							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#4CAF50" />
-							<Setter TargetName="PART_PinShape" Property="Fill" Value="#2196F3" />
-						</Trigger>
-
-						<Trigger Property="MarkerState" Value="DEACTIVE">
-							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#9E9E9E" />
-							<Setter TargetName="PART_PinShape" Property="Fill" Value="#9E9E9E" />
-						</Trigger>
-
-						<Trigger Property="MarkerState" Value="FAULT">
-							<Setter TargetName="PART_StatusIndicator" Property="Fill" Value="#F44336" />
-							<Setter TargetName="PART_PinShape" Property="Fill" Value="#F44336" />
-						</Trigger>
-
 						<!--  Disabled State  -->
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter TargetName="PART_PinShape" Property="Opacity" Value="0.5" />
 							<Setter TargetName="PART_InnerCircle" Property="Opacity" Value="0.5" />
-							<Setter TargetName="PART_StatusIndicator" Property="Opacity" Value="0.5" />
 						</Trigger>
 
 					</ControlTemplate.Triggers>
@@ -181,17 +152,13 @@
 		</Setter>
 
 		<!--  Default Property Values  -->
-		<Setter Property="MarkerFill" Value="#2196F3" />
-		<Setter Property="MarkerStroke" Value="White" />
-		<Setter Property="MarkerStrokeThickness" Value="2" />
-		<Setter Property="MarkerTitle" Value="Marker" />
-		<Setter Property="ShowTitle" Value="False" />
-		<Setter Property="ShowShape" Value="True" />
-		<Setter Property="TitleSize" Value="10" />
-		<Setter Property="Width" Value="32" />
-		<Setter Property="Height" Value="46" />
 		<Setter Property="IsHitTestVisible" Value="True" />
 		<Setter Property="Focusable" Value="True" />
+		<!--  기본 마커 크기  -->
+		<Setter Property="Width" Value="32" />
+		<Setter Property="Height" Value="46" />
+		<!--  라벨 관련 기본값  -->
+		<Setter Property="TitleSize" Value="11" />
 	</Style>
 
 	<!--  Apply Default Style  -->

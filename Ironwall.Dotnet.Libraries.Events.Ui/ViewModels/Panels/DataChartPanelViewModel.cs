@@ -1,17 +1,16 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
-using Ironwall.Dotnet.Monitoring.Models.Events;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 using System;
 using System.Collections.ObjectModel;
-using System.Windows.Shapes;
-using Ironwall.Dotnet.Monitoring.Models.Devices;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
     /****************************************************************************
@@ -28,12 +27,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Ctors -
         public DataChartPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
-                                       , EventProvider eventProvider)
+                                       , EventProviderService providerService)
                                        : base(eventAggregator, log)
         {
-            _dbService = eventDbService;
-            _eventProvider = eventProvider;
+            _providerService = providerService;
 
             // 차트용 컬렉션 초기화
             Series = new ObservableCollection<ISeries>();
@@ -103,60 +100,31 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
         private Task DataInitialize(CancellationToken ct = default)
         {
+            IsChartLoading = true;
             return Task.Run(async () =>
             {
                 try
                 {
-                    await _dbService.FetchInstanceAsync(StartDate, EndDate, ct);
+                    /*──────────────────────────────────────────────────────────────
+                     *  Statistics API 단일 호출 → 라인 차트 생성
+                     *──────────────────────────────────────────────────────────────*/
+                    var dashboardDto = await _providerService.FetchEventDashboardAsync(
+                        StartDate, EndDate, "hour", ct);
 
-                    var eventTypes = new[]
+                    if (dashboardDto == null)
                     {
-                        new CategoryMeta("Detection",  new SKColor(255, 205, 0), _eventProvider.OfType<IDetectionEventModel>()),
-                        new CategoryMeta("Malfunction", new SKColor(30, 144, 255), _eventProvider.OfType<IMalfunctionEventModel>()),
-                        new CategoryMeta("Connection", new SKColor(155, 89, 182), _eventProvider.OfType<IConnectionEventModel>()),
-                        new CategoryMeta("Action", new SKColor(50, 205, 50), _eventProvider.OfType<IActionEventModel>())
-                    };
-
-                    var xLabels = new SortedSet<string>();
-                    var seriesList = new List<ISeries>();
-
-                    foreach (var type in eventTypes)
-                    {
-                        var grouped = type.Events
-                            .Where(ev => ev.DateTime >= StartDate && ev.DateTime <= EndDate)
-                            .GroupBy(ev => ev.DateTime.ToString("yyyy-MM-dd HH"))
-                            .OrderBy(g => g.Key)
-                            .Select(g => new { Time = g.Key, Count = g.Count() })
-                            .ToList();
-
-                        xLabels.UnionWith(grouped.Select(g => g.Time));
-
-                        var values = xLabels.Select(label =>
-                            grouped.FirstOrDefault(g => g.Time == label)?.Count ?? 0).ToArray();
-
-                        seriesList.Add(new LineSeries<int>
-                        {
-                            Name = type.Name,
-                            LineSmoothness = 0.5,
-                            GeometrySize = 8,
-
-                            // 선 색상
-                            Stroke = new SolidColorPaint(type.Color, 3),
-
-                            // 포인트 테두리 색 (더 진한 색상)
-                            GeometryStroke = new SolidColorPaint(type.Color, 3),
-
-                            // 포인트 내부 색 (더 진한 색상)
-                            GeometryFill = new SolidColorPaint(Darken(type.Color, 0.5f)),
-
-                            Fill = null,
-                            Values = values
-                        });
+                        _log?.Warning("FetchEventDashboardAsync returned null — skip chart update");
+                        return;
                     }
+
+                    LastDashboardDto = dashboardDto;
+
+                    var (seriesList, xLabels) = ChartHelper.BuildLineSeriesFromTrend(
+                        dashboardDto.Trend, StartDate, EndDate);
 
                     var xAxis = new Axis
                     {
-                        Labels = xLabels.ToArray(),
+                        Labels = xLabels,
                         LabelsRotation = 15,
                         TextSize = 12,
                         UnitWidth = 1,
@@ -187,20 +155,29 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 {
                     _log?.Warning($"TaskCanceledException in DataInitialize: {ex.Message}");
                 }
+                catch (Exception ex)
+                {
+                    _log?.Error($"Exception in DataInitialize: {ex.GetType().Name} - {ex.Message}");
+                }
                 finally
                 {
+                    DispatcherService.Invoke(() => IsChartLoading = false);
                     UpdateAction?.Invoke(StartDate, EndDate);
                 }
             });
         }
 
-        private SKColor Darken(SKColor color, float factor)
+        /// <summary>
+        /// Statistics API를 재호출하여 LastDashboardDto를 갱신한다.
+        /// 이벤트 삭제/추가 후 차트를 최신 상태로 유지하기 위해 사용.
+        /// </summary>
+        public async Task<EventDashboardDto?> RefreshDashboardDtoAsync(CancellationToken ct = default)
         {
-            return new SKColor(
-                (byte)(color.Red * factor),
-                (byte)(color.Green * factor),
-                (byte)(color.Blue * factor),
-                color.Alpha);
+            var dto = await _providerService.FetchEventDashboardAsync(
+                StartDate, EndDate, "hour", ct);
+            if (dto != null)
+                LastDashboardDto = dto;
+            return LastDashboardDto;
         }
 
         #endregion
@@ -246,12 +223,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         new SolidColorPaint
         {
             Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Caliber")
+            SKTypeface = SKTypeface.FromFamilyName("Malgun Gothic")
         };
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
+
+        public EventDashboardDto? LastDashboardDto { get; private set; }
+
+        public bool IsChartLoading
+        {
+            get => _isChartLoading;
+            set { _isChartLoading = value; NotifyOfPropertyChange(() => IsChartLoading); }
+        }
 
         #endregion
         #region - Attributes -
@@ -260,14 +245,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         protected DateTime _startDate;
         protected DateTime _endDate;
         protected DateTime _endDateDisplay;
-        private EventProvider _eventProvider;
-        private IEventDbService _dbService;
+        private EventProviderService _providerService;
+        private bool _isChartLoading;
         #endregion
     }
-
-    readonly record struct CategoryMeta(
-       string Name,          // ← displayName 으로 선언
-       SKColor Color,
-       IEnumerable<IBaseEventModel> Events);
-
 }

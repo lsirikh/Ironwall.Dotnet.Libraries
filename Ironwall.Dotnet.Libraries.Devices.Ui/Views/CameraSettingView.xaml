@@ -1,0 +1,170 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.CameraSettingView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	d:DesignHeight="500"
+	d:DesignWidth="800"
+	mc:Ignorable="d">
+	<Grid Height="500" Margin="16">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="3*" />
+			<ColumnDefinition Width="7*" />
+		</Grid.ColumnDefinitions>
+
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<!--  WeatherMode  -->
+		<TextBlock
+			Grid.Row="0"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Weather Mode" />
+		<TextBox
+			Grid.Row="0"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="NORMAL / FOG / RAIN"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding WeatherMode, Mode=OneWay}" />
+
+		<!--  CameraMode  -->
+		<TextBlock
+			Grid.Row="1"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Camera Mode" />
+		<TextBox
+			Grid.Row="1"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="NORMAL / PATROL / STABILIZATION"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding CameraMode, Mode=OneWay}" />
+
+		<!--  Heater  -->
+		<TextBlock
+			Grid.Row="2"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Heater" />
+		<TextBox
+			Grid.Row="2"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="on / off"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Heater, Mode=OneWay}" />
+
+		<!--  Fan  -->
+		<TextBlock
+			Grid.Row="3"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Fan" />
+		<TextBox
+			Grid.Row="3"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="on / off"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Fan, Mode=OneWay}" />
+
+		<!--  Headlight  -->
+		<TextBlock
+			Grid.Row="4"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Headlight" />
+		<TextBox
+			Grid.Row="4"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="on / off"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Headlight, Mode=OneWay}" />
+
+		<!--  DayNightMode  -->
+		<TextBlock
+			Grid.Row="5"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Day/Night Mode" />
+		<TextBox
+			Grid.Row="5"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="DAY / NIGHT / AUTO"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding DayNightMode, Mode=OneWay}" />
+
+		<!--  FocusMode  -->
+		<TextBlock
+			Grid.Row="6"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Focus Mode" />
+		<TextBox
+			Grid.Row="6"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="AUTO / MANUAL"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding FocusMode, Mode=OneWay}" />
+
+		<!--  IrisMode  -->
+		<TextBlock
+			Grid.Row="7"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Iris Mode" />
+		<TextBox
+			Grid.Row="7"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="AUTO / MANUAL"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding IrisMode, Mode=OneWay}" />
+
+		<!--  Tracking  -->
+		<TextBlock
+			Grid.Row="8"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Tracking" />
+		<TextBox
+			Grid.Row="8"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="ACTIVE / INACTIVE"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Tracking, Mode=OneWay}" />
+
+		<!--  Palette  -->
+		<TextBlock
+			Grid.Row="9"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="Palette" />
+		<TextBox
+			Grid.Row="9"
+			Grid.Column="1"
+			IsReadOnly="True"
+			md:HintAssist.Hint="WHITE_HOT / BLACK_HOT"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding Palette, Mode=OneWay}" />
+	</Grid>
+</UserControl>

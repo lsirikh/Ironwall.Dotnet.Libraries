@@ -7,7 +7,7 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
+using System.Collections.ObjectModel;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
     /****************************************************************************
@@ -38,12 +38,33 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         #region - Overrides -
         #endregion
         #region - Binding Methods -
+        public void DetailButton()
+        {
+            try
+            {
+                if (!IsSingleSelected) return;
+
+                var selectedCam = _selection.FirstOrDefault();
+                if (selectedCam == null) return;
+
+                var model = selectedCam.Model as ICameraDeviceModel;
+                if (model == null) return;
+
+                var dialog = new CameraDetailDialogViewModel(model);
+                _eventAggregator?.PublishOnUIThreadAsync(new OpenCameraDetailDialogMessageModel { Dialog = dialog });
+            }
+            catch (Exception ex)
+            {
+                _log?.Error(ex.Message);
+            }
+        }
         #endregion
         #region - Processes -
         private void CheckCondition()
         {
             try
             {
+                NotifyOfPropertyChange(nameof(IsSingleSelected));
                 if (_selection.Count == 1)
                 {
                     var selectedCam = _selection.FirstOrDefault();
@@ -78,64 +99,104 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             }
             catch (Exception ex)
             {
-                _log.Error($"{ex.Message}");
+                _log?.Error($"{ex.Message}");
                 IsOnvifButtonEnable = false;
             }
         }
-        public void OnvifButton()
-        {
-            try
-            {
-                if (!IsOnvifButtonEnable) return;
 
-                var onvifDialog = IoC.Get<OnvifDialogViewModel>();
-                if (_selection.FirstOrDefault() == null) throw new NullReferenceException("OnvifProperty를 확인하기 위한 인스턴스 설정에 문제가 있습니다.");
-                onvifDialog.UpdateModel(model: (ICameraDeviceModel)_selection.FirstOrDefault()!.Model);
-                _eventAggregator?.PublishOnUIThreadAsync(new OpenOnvifPropertyDialogMessageModel());
-            }
-            catch (Exception ex)  
-            {
-                _log?.Error(ex.Message);
-            }
-        }
+        //public void OnvifButton()
+        //{
+        //    try
+        //    {
+        //        if (!IsOnvifButtonEnable) return;
+
+        //        var onvifDialog = IoC.Get<OnvifDialogViewModel>();
+        //        if (_selection.FirstOrDefault() == null) throw new NullReferenceException("OnvifProperty를 확인하기 위한 인스턴스 설정에 문제가 있습니다.");
+        //        onvifDialog.UpdateModel(model: (ICameraDeviceModel)_selection.FirstOrDefault()!.Model);
+        //        _eventAggregator?.PublishOnUIThreadAsync(new OpenOnvifPropertyDialogMessageModel());
+        //    }
+        //    catch (Exception ex)  
+        //    {
+        //        _log?.Error(ex.Message);
+        //    }
+        //}
 
         public void ApplyButton()
         {
             foreach (var item in _selection)
             {
-                item.DeviceGroup = DeviceGroup ?? item.DeviceGroup;
                 item.DeviceNumber = DeviceNumber ?? item.DeviceNumber;
                 item.DeviceName = DeviceName ?? item.DeviceName;
                 item.DeviceType = DeviceType ?? item.DeviceType;
                 item.Version = Version ?? item.Version;
                 item.Status = Status ?? item.Status;
                 item.IpAddress = IpAddress ?? item.IpAddress;
-                item.Port = Port ?? item.Port;
-                item.Username = Username ?? item.Username;
-                item.Password = Password ?? item.Password;
-                item.RtspUri = RtspUri ?? item.RtspUri;
-                item.RtspPort = RtspPort ?? item.RtspPort;
+                item.IpPort = IpPort ?? item.IpPort;
+                item.UserName = UserName ?? item.UserName;
+                item.UserPassword = UserPassword ?? item.UserPassword;
                 item.Mode = Mode ?? item.Mode;
                 item.Category = Category ?? item.Category;
+                item.Location = Location ?? item.Location;
+                if (Latitude.HasValue) item.Latitude = Math.Clamp(Latitude.Value, -90.0, 90.0);
+                if (Longitude.HasValue) item.Longitude = Math.Clamp(Longitude.Value, -180.0, 180.0);
+                if (IsEnable.HasValue) item.IsEnable = IsEnable.Value;
+                if (IsRecord.HasValue) item.IsRecord = IsRecord.Value;
             }
+            ApplyGroups();
         }
 
         public void RefreshAll()
         {
-            DeviceGroup = CommonOrNullValue(_selection, m => m.DeviceGroup);
             DeviceNumber = CommonOrNullValue(_selection, m => m.DeviceNumber);
             DeviceName = CommonOrNullString(_selection, m => m.DeviceName);
             DeviceType = CommonOrNullValue(_selection, m => m.DeviceType);
             Version = CommonOrNullString(_selection, m => m.Version);
             IpAddress = CommonOrNullString(_selection, m => m.IpAddress);
-            Port = CommonOrNullValue(_selection, m => m.Port);
-            Username = CommonOrNullString(_selection, m => m.Username);
-            Password = CommonOrNullString(_selection, m => m.Password);
-            RtspUri = CommonOrNullString(_selection, m => m.RtspUri);
-            RtspPort = CommonOrNullValue(_selection, m => m.RtspPort);
+            IpPort = CommonOrNullValue(_selection, m => m.IpPort);
+            UserName = CommonOrNullString(_selection, m => m.UserName);
+            UserPassword = CommonOrNullString(_selection, m => m.UserPassword);
             Mode = CommonOrNullValue(_selection, m => m.Mode);
             Category = CommonOrNullValue(_selection, m => m.Category);
             Status = CommonOrNullValue(_selection, m => m.Status);
+            Location = CommonOrNullString(_selection, m => m.Location);
+            Latitude = CommonOrNullValue(_selection, m => m.Latitude);
+            Longitude = CommonOrNullValue(_selection, m => m.Longitude);
+            IsEnable = CommonOrNullValue(_selection, m => m.IsEnable);
+            IsRecord = CommonOrNullValue(_selection, m => m.IsRecord ?? false);
+            RefreshGroupItems();
+        }
+
+        private void RefreshGroupItems()
+        {
+            var provider = IoC.Get<DeviceGroupProvider>();
+            GroupItems = new ObservableCollection<DeviceGroupItemViewModel>(
+                provider.OfType<IDeviceGroupModel>().Select(g =>
+                {
+                    var state = ComputeGroupCheckState(g.Id);
+                    return new DeviceGroupItemViewModel
+                    {
+                        GroupId = g.Id,
+                        GroupName = g.Name,
+                        IsChecked = state,
+                        OriginalState = state
+                    };
+                }));
+            NotifyOfPropertyChange(nameof(GroupItems));
+        }
+
+        private bool? ComputeGroupCheckState(int groupId)
+        {
+            var count = _selection.Count(item => item.DeviceGroups?.Contains(groupId) == true);
+            if (count == 0) return false;
+            if (count == _selection.Count) return true;
+            return null;
+        }
+
+        private void ApplyGroups()
+        {
+            var checkedIds = GroupItems.Where(g => g.IsChecked == true).Select(g => g.GroupId).ToList();
+            foreach (var item in _selection)
+                item.DeviceGroups = new List<int>(checkedIds);
         }
 
 
@@ -197,19 +258,21 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             set { _isOnvifButtonEnable = value; NotifyOfPropertyChange(() => IsOnvifButtonEnable); }
         }
 
-        public int? DeviceGroup { get; set; }
         public int? DeviceNumber { get; set; }
         public string? DeviceName { get; set; }
         public EnumDeviceType? DeviceType { get; set; }
         public string? Version { get; set; }
         public string? IpAddress { get; set; }
-        public int? Port { get; set; }
-        public string? Username { get; set; }
-        public string? Password { get; set; }
-        public string? RtspUri { get; set; }
-        public int? RtspPort { get; set; }
+        public int? IpPort { get; set; }
+        public string? UserName { get; set; }
+        public string? UserPassword { get; set; }
         public EnumCameraMode? Mode { get; set; }
         public EnumCameraType? Category { get; set; }
+        public string? Location { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public bool? IsEnable { get; set; }
+        public bool? IsRecord { get; set; }
 
         public EnumDeviceStatus? Status
         {
@@ -220,6 +283,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
                 CheckCondition();
             }
         }
+
+        public bool IsSingleSelected => _selection.Count == 1;
+
+        public ObservableCollection<DeviceGroupItemViewModel> GroupItems { get; set; } = new();
 
         public CameraDevicePanelViewModel DevicePanelViewModel { get; }
         #endregion

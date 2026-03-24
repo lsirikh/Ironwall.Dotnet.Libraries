@@ -19,4 +19,5 @@ public enum EnumDetectionType : int
     VIBRATION_SENSOR = 6,   //5
     CONTACT_SENSOR = 10,     //10
     DISTANCE_SENSOR = 11,    //11
+    AI_DETECT = 12,          //12
 }

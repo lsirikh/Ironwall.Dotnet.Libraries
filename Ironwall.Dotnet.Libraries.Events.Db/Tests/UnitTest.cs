@@ -84,7 +84,7 @@ public sealed class EventDbFixture : IAsyncLifetime
             var ctrl = new ControllerDeviceModel
             {
                 Id = conIndex++,
-                DeviceGroup = c,
+                DeviceGroups = new List<int> { c },
                 DeviceNumber = 1,
                 DeviceName = $"제어기_{c:00}",
                 DeviceType = EnumDeviceType.Controller,
@@ -99,7 +99,7 @@ public sealed class EventDbFixture : IAsyncLifetime
                 var sensor = new SensorDeviceModel
                 {
                     Id = sensorIndex++,
-                    DeviceGroup = c,
+                    DeviceGroups = new List<int> { c },
                     DeviceNumber = s,
                     DeviceName = $"펜스센서_{c:00}-{s:000}",
                     DeviceType = EnumDeviceType.Fence,
@@ -346,8 +346,10 @@ public class EventDb_DetectionCrudTests
     public async Task Update_Detection_Event_Works()
     {
         var all = await _fx.Svc.FetchDetectionEventsAsync();
+        Assert.NotNull(all);
         var det = all.FirstOrDefault();
         /* 수정 */
+        Assert.NotNull(det);
         det.EventGroup = "UPDATED";
         det.Status = EnumTrueFalse.False;
         det.Result = EnumDetectionType.PIR_SENSOR;
@@ -367,7 +369,9 @@ public class EventDb_DetectionCrudTests
     {
         /* 삽입 */
         var all = await _fx.Svc.FetchDetectionEventsAsync();
+        Assert.NotNull(all);
         var det = all.FirstOrDefault();
+        Assert.NotNull(det);
 
         /* 삭제 */
         bool ok = await _fx.Svc.DeleteDetectionEventAsync(det);
@@ -391,12 +395,12 @@ public class EventDb_MalfunctionCrudTests
     {
         await _fx.SeedMalfunctionAsync();
 
-        /* ② FetchAll */
+        /* FetchAll */
         var all = await _fx.Svc.FetchMalfunctionEventsAsync();
         Assert.NotNull(all);
         Assert.True(all!.Count >= _fx.EventCount);
 
-        /* ③ FetchSingle & 검증 */
+        /* FetchSingle & 검증 */
         foreach (var id in _fx.InsertedIds)
         {
             var one = await _fx.Svc.FetchMalfunctionEventAsync(id);
@@ -459,12 +463,12 @@ public class EventDb_ConnectionCrudTests
     {
         await _fx.SeedConnectionAsync();
 
-        /* ② FetchAll */
+        /* FetchAll */
         var all = await _fx.Svc.FetchConnectionEventsAsync();
         Assert.NotNull(all);
         Assert.True(all!.Count >= _fx.EventCount);
 
-        /* ③ FetchSingle & 검증 */
+        /* FetchSingle & 검증 */
         foreach (var id in _fx.InsertedIds)
         {
             var one = await _fx.Svc.FetchConnectionEventAsync(id);
@@ -516,18 +520,18 @@ public class EventDb_ConnectionCrudTests
         [Fact(DisplayName = "ActionEvents – Insert & Fetch")]
         public async Task Insert_And_Fetch_Action_Events()
         {
-            /* ① 시드(Action) – Detection 시드가 먼저 있어야 OriginEventId 를 참조할 수 있다 */
+            /* 시드(Action) – Detection 시드가 먼저 있어야 OriginEventId 를 참조할 수 있다 */
             //await _fx.SeedDetectionAsync();   // OriginEvent 생성 (10건)
             await _fx.SeedMalfunctionAsync();   // OriginEvent 생성 (10건)
             //await _fx.SeedConnectionAsync();   // OriginEvent 생성 (10건)
             await _fx.SeedActionAsync();      // ActionEvent 10건 삽입  → InsertedActionIds 채움
 
-            /* ② FetchAll */
+            /* FetchAll */
             var all = await _fx.Svc.FetchActionEventsAsync();
             Assert.NotNull(all);
             Assert.True(all!.Count >= _fx.EventCount);          // 최소 10건
 
-            /* ③ FetchSingle & 필드 검증 */
+            /* FetchSingle & 필드 검증 */
             foreach (var id in _fx.InsertedActionIds)
             {
                 var one = await _fx.Svc.FetchActionEventAsync(id);

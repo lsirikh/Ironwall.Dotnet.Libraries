@@ -110,8 +110,7 @@ public class ActionSelectionViewModel : BasePanelViewModel
             return null;
         else
             return events
-                .Where(entity => entity.Id == ret.Id)
-                .Where(entity => entity.EventGroup == ret.EventGroup).FirstOrDefault();
+                .Where(entity => entity.Id == ret.Id).FirstOrDefault();
     }
 
     public void RefreshAll()

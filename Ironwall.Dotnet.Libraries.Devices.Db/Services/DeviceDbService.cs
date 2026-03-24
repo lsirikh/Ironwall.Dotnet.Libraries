@@ -88,7 +88,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
         }
     }
 
-    private string BuildConnStr(bool includeDb = true)
+    public string BuildConnStr(bool includeDb = true)
     {
         var csb = new MySqlConnectionStringBuilder
         {
@@ -174,76 +174,80 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn == null || _conn.State != ConnectionState.Open)
                 throw new Exception("DB 연결이 이루어지지 않았습니다.");
 
-            // ControllerDevices
+            // 1. 공통 Device 테이블
+            var createDeviceTable = @"
+                CREATE TABLE IF NOT EXISTS `Devices` (
+                    `Id`            INT AUTO_INCREMENT PRIMARY KEY,
+                    `DeviceNumber`  INT          NOT NULL,
+                    `DeviceGroup`   INT          NOT NULL,
+                    `DeviceName`    VARCHAR(255),
+                    `DeviceType`    VARCHAR(20)  NOT NULL,
+                    `Version`       VARCHAR(50),
+                    `Status`        VARCHAR(15)  NOT NULL,
+                    `CreatedAt`     DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    `UpdatedAt`     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY `UK_Device_GroupNumberType` (`DeviceGroup`, `DeviceNumber`, `DeviceType`)
+                );";
+
+            // 2. Controller 특화 속성
             var createControllerTable = @"
-                            CREATE TABLE IF NOT EXISTS `ControllerDevices` (
-                                `Id`            INT AUTO_INCREMENT PRIMARY KEY,
-                                `DeviceNumber`  INT          NOT NULL,
-                                `DeviceGroup`   INT          NOT NULL,
-                                `DeviceName`    VARCHAR(255),
-                                `DeviceType`    VARCHAR(20)  NOT NULL,   -- EnumDeviceType.ToString()
-                                `Version`       VARCHAR(50),
-                                `Status`        VARCHAR(15)  NOT NULL,   -- EnumDeviceStatus.ToString()
-                                `IpAddress`     VARCHAR(45)  NOT NULL,
-                                `IpPort`        SMALLINT     NOT NULL,
-                                `CreatedAt`     DATETIME     DEFAULT CURRENT_TIMESTAMP,
-                                `UpdatedAt`     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                                UNIQUE KEY `UK_Controller_Device` (`DeviceGroup`,`DeviceNumber`)
-                            );";
+                CREATE TABLE IF NOT EXISTS `ControllerDevices` (
+                    `Id`            INT PRIMARY KEY,
+                    `IpAddress`     VARCHAR(45)  NOT NULL,
+                    `IpPort`        SMALLINT     NOT NULL,
+                    CONSTRAINT `FK_Controller_Device`
+                        FOREIGN KEY (`Id`) REFERENCES `Devices` (`Id`)
+                        ON DELETE CASCADE
+                );";
 
-            // ─────────────────── SensorDevices ───────────────────────────────
+            // 3. Sensor 특화 속성
             var createSensorTable = @"
-                            CREATE TABLE IF NOT EXISTS `SensorDevices` (
-                                `Id`            INT AUTO_INCREMENT PRIMARY KEY,
-                                `ControllerId`  INT          NOT NULL,
-                                `DeviceNumber`  INT          NOT NULL,
-                                `DeviceGroup`   INT          NOT NULL,
-                                `DeviceName`    VARCHAR(255),
-                                `DeviceType`    VARCHAR(20)  NOT NULL,   -- EnumDeviceType.ToString()
-                                `Version`       VARCHAR(50),
-                                `Status`        VARCHAR(15)  NOT NULL,   -- EnumDeviceStatus.ToString()
-                                `CreatedAt`     DATETIME     DEFAULT CURRENT_TIMESTAMP,
-                                `UpdatedAt`     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                                CONSTRAINT `FK_Sensor_Controller`
-                                    FOREIGN KEY (`ControllerId`) REFERENCES `ControllerDevices` (`Id`)
-                                    ON DELETE CASCADE,
-                                INDEX `IX_Sensor_Controller` (`ControllerId`)
-                            );";
+                CREATE TABLE IF NOT EXISTS `SensorDevices` (
+                    `Id`            INT PRIMARY KEY,
+                    `ControllerId`  INT          NOT NULL,
+                    CONSTRAINT `FK_Sensor_Device`
+                        FOREIGN KEY (`Id`) REFERENCES `Devices` (`Id`)
+                        ON DELETE CASCADE,
+                    CONSTRAINT `FK_Sensor_Controller`
+                        FOREIGN KEY (`ControllerId`) REFERENCES `Devices` (`Id`)
+                        ON DELETE CASCADE,
+                    INDEX `IX_Sensor_Controller` (`ControllerId`)
+                );";
 
-            var createCameraTableSql = @"
-                            CREATE TABLE IF NOT EXISTS `CameraDevices` (
-                                `Id`              INT AUTO_INCREMENT PRIMARY KEY,
-                                `DeviceNumber`    INT NOT NULL,
-                                `DeviceGroup`     INT NOT NULL,
-                                `DeviceName`      VARCHAR(255),
-                                `DeviceType`      VARCHAR(20) NOT NULL,
-                                `Version`         VARCHAR(50),
-                                `Status`          VARCHAR(15) NOT NULL,
-                                `IpAddress`       VARCHAR(45) NOT NULL,
-                                `IpPort`          SMALLINT NOT NULL,
-                                `Username`        VARCHAR(100) NOT NULL,
-                                `Password`        VARCHAR(255) NOT NULL,
-                                `RtspUri`         VARCHAR(255),
-                                `RtspPort`        SMALLINT,
-                                `Mode`            VARCHAR(20),
-                                `Category`        VARCHAR(20),
-                                `CreatedAt`       DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                `UpdatedAt`      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                                UNIQUE KEY `UK_Camera_Device` (`DeviceGroup`, `DeviceNumber`)
-                            );";
+            // 4. Camera 특화 속성
+            var createCameraTable = @"
+                CREATE TABLE IF NOT EXISTS `CameraDevices` (
+                    `Id`              INT PRIMARY KEY,
+                    `IpAddress`       VARCHAR(45)  NOT NULL,
+                    `IpPort`          SMALLINT     NOT NULL,
+                    `Username`        VARCHAR(100) NOT NULL,
+                    `Password`        VARCHAR(255) NOT NULL,
+                    `RtspUri`         VARCHAR(255),
+                    `RtspPort`        SMALLINT,
+                    `Mode`            VARCHAR(20),
+                    `Category`        VARCHAR(20),
+                    CONSTRAINT `FK_Camera_Device`
+                        FOREIGN KEY (`Id`) REFERENCES `Devices` (`Id`)
+                        ON DELETE CASCADE
+                );";
 
+            await _conn.ExecuteAsync(createDeviceTable);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "Devices 공통 테이블을 생성합니다..." });
 
             await _conn.ExecuteAsync(createControllerTable);
             if (_eventAggregator != null)
-                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "ControllerDevices DB테이블을 생성합니다..." });
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "ControllerDevices 특화 테이블을 생성합니다..." });
+
             await _conn.ExecuteAsync(createSensorTable);
             if (_eventAggregator != null)
-                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "SensorDevices DB테이블을 생성합니다..." });
-            await _conn.ExecuteAsync(createCameraTableSql);
-            if (_eventAggregator != null)
-                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "CameraDevices DB테이블을 생성합니다..." });
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "SensorDevices 특화 테이블을 생성합니다..." });
 
-            _log?.Info("테이블 생성/확인 완료.");
+            await _conn.ExecuteAsync(createCameraTable);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage() { Title = this.GetType().Name.ToString(), Message = "CameraDevices 특화 테이블을 생성합니다..." });
+
+            _log?.Info("정규화된 테이블 생성/확인 완료.");
         }
         catch (Exception ex)
         {
@@ -312,13 +316,29 @@ internal class DeviceDbService : TaskService, IDeviceDbService
                 throw new Exception("DB not connected.");
 
             const string sql = @"
-                            SELECT * FROM ControllerDevices;
-                            SELECT * FROM SensorDevices;";
+            SELECT 
+                d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType, 
+                d.Version, d.Status, c.IpAddress, c.IpPort
+            FROM Devices d
+            JOIN ControllerDevices c ON d.Id = c.Id
+            WHERE d.DeviceType = 'Controller';
+    
+            SELECT 
+                d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                d.Version, d.Status, s.ControllerId
+            FROM Devices d
+            JOIN SensorDevices s ON d.Id = s.Id
+            WHERE s.ControllerId IN (
+                SELECT d2.Id 
+                FROM Devices d2 
+                JOIN ControllerDevices c2 ON d2.Id = c2.Id 
+                WHERE d2.DeviceType = 'Controller'
+            );";
 
             using var multi = await _conn.QueryMultipleAsync(new CommandDefinition(sql, cancellationToken: token));
 
-            var ctrlRows = (await multi.ReadAsync<ControllerSQL>()).ToList();
-            var snsRows = (await multi.ReadAsync<SensorSQL>()).ToList();
+            var ctrlRows = (await multi.ReadAsync<ControllerJoinSQL>()).ToList();
+            var snsRows = (await multi.ReadAsync<SensorJoinSQL>()).ToList();
 
             var dict = ctrlRows
                        .Select(r => r.ToDomain())
@@ -365,18 +385,29 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (!(id > 0)) throw new Exception($"Input parameter \"id\" is 0, which is not acceptable.");
 
             const string sql = @"
-                            SELECT * FROM ControllerDevices WHERE Id = @Id;
-                            SELECT * FROM SensorDevices    WHERE ControllerId = @Id;";
+            SELECT 
+                d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                d.Version, d.Status, c.IpAddress, c.IpPort
+            FROM Devices d
+            JOIN ControllerDevices c ON d.Id = c.Id
+            WHERE d.Id = @Id;
+            
+            SELECT 
+                d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                d.Version, d.Status, s.ControllerId
+            FROM Devices d
+            JOIN SensorDevices s ON d.Id = s.Id
+            WHERE s.ControllerId = @Id;";
 
             using var multi = await _conn.QueryMultipleAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: token));
 
-            var ctrlRow = await multi.ReadFirstOrDefaultAsync<ControllerSQL>();
+            var ctrlRow = await multi.ReadFirstOrDefaultAsync<ControllerJoinSQL>();
             if (ctrlRow == null) return null;
 
             var controller = ctrlRow.ToDomain();
             controller.Devices = new List<IBaseDeviceModel>();
 
-            foreach (var sRow in await multi.ReadAsync<SensorSQL>())
+            foreach (var sRow in await multi.ReadAsync<SensorJoinSQL>())
             {
                 var sensor = sRow.ToDomain();
                 sensor.Controller = controller;
@@ -393,98 +424,122 @@ internal class DeviceDbService : TaskService, IDeviceDbService
         }
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="model"></param>
-    /// <param name="token"></param>
-    /// <returns></returns>
+
     public async Task<int> InsertControllerAsync(IControllerDeviceModel model, CancellationToken token = default)
     {
+        using var transaction = await _conn.BeginTransactionAsync(token);
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            // 1. Devices 테이블에 먼저 삽입
+            const string deviceSql = @"
+                INSERT INTO Devices
+                (DeviceNumber, DeviceGroup, DeviceName, DeviceType, Version, Status)
+                VALUES (@DeviceNumber, @DeviceGroup, @DeviceName, @DeviceType, @Version, @Status);
+                SELECT LAST_INSERT_ID();";
 
-            const string sql = @"
-                    INSERT INTO ControllerDevices
-                    (DeviceNumber, DeviceGroup, DeviceName, DeviceType, Version, Status, IpAddress, IpPort)
-                    VALUES (@DeviceNumber,@DeviceGroup,@DeviceName,@DeviceType,@Version,@Status,@IpAddress,@Port);
-                    SELECT LAST_INSERT_ID();";
-
-            var id = await _conn.ExecuteScalarAsync<int>(sql, new
+            var deviceId = await _conn.ExecuteScalarAsync<int>(deviceSql, new
             {
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
-                Status = model.Status.ToString(),
+                Status = model.Status.ToString()
+            }, transaction);
+
+            // 2. ControllerDevices 테이블에 특화 정보 삽입
+            const string controllerSql = @"
+                INSERT INTO ControllerDevices (Id, IpAddress, IpPort)
+                VALUES (@Id, @IpAddress, @IpPort);";
+
+            await _conn.ExecuteAsync(controllerSql, new
+            {
+                Id = deviceId,
                 model.IpAddress,
-                Port = model.Port
-            });
+                IpPort = model.Port
+            }, transaction);
 
-            model.Id = id;
+            model.Id = deviceId;
 
-            // 하위 센서 동시 저장
+            // 3. 하위 센서들 동시 저장
             if (model.Devices is { Count: > 0 })
             {
                 foreach (ISensorDeviceModel s in model.Devices)
-                    await InsertSensorAsync(s, token);
+                {
+                    s.Controller = model; // 부모 설정
+                    await InsertSensorInternalAsync(s, transaction, token);
+                }
             }
-            return id;
+
+            await transaction.CommitAsync(token);
+            return deviceId;
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(token);
             _log?.Error($"InsertControllerAsync Error: {ex}");
             throw;
         }
-
     }
+
 
     public async Task<IControllerDeviceModel?> UpdateControllerAsync(IControllerDeviceModel model, CancellationToken token = default)
     {
+        using var transaction = await _conn.BeginTransactionAsync(token);
         try
         {
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
-            // 기본 필드 업데이트
-            const string sql = @"
-                        UPDATE ControllerDevices SET
-                            DeviceNumber = @DeviceNumber,
-                            DeviceGroup  = @DeviceGroup,
-                            DeviceName   = @DeviceName,
-                            DeviceType   = @DeviceType,
-                            Version      = @Version,
-                            Status       = @Status,
-                            IpAddress    = @IpAddress,
-                            IpPort       = @Port
-                        WHERE Id = @Id;";
+            if (!(model.Id > 0))
+                throw new Exception($"Input parameter \"id\" is 0, which is not acceptable.");
 
+            // 1. Devices 테이블 업데이트
+            const string deviceSql = @"
+            UPDATE Devices SET
+                DeviceNumber = @DeviceNumber,
+                DeviceGroup  = @DeviceGroup,
+                DeviceName   = @DeviceName,
+                DeviceType   = @DeviceType,
+                Version      = @Version,
+                Status       = @Status
+            WHERE Id = @Id;";
 
-            if (!(model.Id > 0)) throw new Exception($"Input parameter \"id\" is 0, which is not acceptable.");
-            int affected = await _conn.ExecuteAsync(sql, new
+            await _conn.ExecuteAsync(deviceSql, new
             {
                 model.Id,
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
-                Status = model.Status.ToString(),
+                Status = model.Status.ToString()
+            }, transaction);
+
+            // 2. ControllerDevices 테이블 업데이트
+            const string controllerSql = @"
+            UPDATE ControllerDevices SET
+                IpAddress = @IpAddress,
+                IpPort    = @IpPort
+            WHERE Id = @Id;";
+
+            int affected = await _conn.ExecuteAsync(controllerSql, new
+            {
+                model.Id,
                 model.IpAddress,
-                Port = model.Port
-            });
+                IpPort = model.Port
+            }, transaction);
+
+            await transaction.CommitAsync(token);
+
             if (affected == 0) return null;
 
             _log?.Info($"UpdateControllerAsync 완료 - Id={model.Id}, Rows={affected}");
-
-            // 변경 후 최신 레코드 반환
             return await FetchControllerAsync(model.Id, token);
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(token);
             _log?.Error($"UpdateControllerAsync Error: {ex}");
             throw;
         }
@@ -497,16 +552,16 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
-            const string sql = @"DELETE FROM ControllerDevices WHERE Id = @Id;";
+            // CASCADE 설정이 되어 있다면 Devices만 삭제해도 됨
+            const string sql = @"DELETE FROM Devices WHERE Id = @Id;";
 
             int ret = await _conn.ExecuteAsync(sql, new { model.Id });
 
             if (ret > 0)
                 _log?.Info($"DeleteControllerAsync 완료 - Rows={ret}");
             else
-                _log?.Warning($"DeleteControllerAsync 대상 없음 - Controller");
+                _log?.Warning($"DeleteControllerAsync 대상 없음 - Id={model.Id}");
 
-            // FK ON DELETE CASCADE 로 센서 자동 삭제
             return ret > 0;
         }
         catch (Exception ex)
@@ -527,43 +582,44 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
-            // ── 다중 결과셋 한 번에 받기 ─────────────────────────────────────
             const string sql = @"
-                        SELECT * FROM ControllerDevices;
-                        SELECT * FROM SensorDevices;";
+                SELECT 
+                    d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                    d.Version, d.Status, c.IpAddress, c.IpPort
+                FROM Devices d
+                JOIN ControllerDevices c ON d.Id = c.Id
+                WHERE d.DeviceType = 'Controller';
+                
+                SELECT 
+                    d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                    d.Version, d.Status, s.ControllerId
+                FROM Devices d
+                JOIN SensorDevices s ON d.Id = s.Id;";
 
             using var multi = await _conn.QueryMultipleAsync(new CommandDefinition(sql, cancellationToken: token));
 
-            // 1. 컨트롤러 행들 → 도메인 + 딕셔너리
-            var ctrlDict = (await multi.ReadAsync<ControllerSQL>())
+            var ctrlDict = (await multi.ReadAsync<ControllerJoinSQL>())
                            .Select(r => r.ToDomain())
                            .ToDictionary(c => c.Id);
 
-            // 2. 센서 행들
             var sensors = new List<ISensorDeviceModel>();
-            var sibRows = (await multi.ReadAsync<SensorSQL>()).ToList();
+            var sensorRows = (await multi.ReadAsync<SensorJoinSQL>()).ToList();
 
-            foreach (var sRow in sibRows)
+            foreach (var sRow in sensorRows)
             {
-                // 도메인 변환
                 var sensor = sRow.ToDomain();
 
-                // 부모 연결
                 if (ctrlDict.TryGetValue(sRow.ControllerId, out var parent))
                 {
                     sensor.Controller = parent;
                     parent.Devices ??= new List<IBaseDeviceModel>();
-                    parent.Devices.Add(sensor);          // 형제까지 모두 채워짐
-                }
-                else
-                {
-                    _log?.Warning($"[FetchSensors] ControllerId={sRow.ControllerId} 누락");
+                    parent.Devices.Add(sensor);
                 }
 
                 sensors.Add(sensor);
             }
 
-            _log?.Info($"FetchSensorsAsync 완료 - SensorCount={sensors.Count}, ControllerCount={ctrlDict.Count}");
+            _log?.Info($"FetchSensorsAsync 완료 - SensorCount={sensors.Count}");
             return sensors;
         }
         catch (Exception ex)
@@ -571,7 +627,6 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             _log?.Error($"FetchSensorsAsync Error: {ex}");
             throw;
         }
-
     }
 
     /// <summary>
@@ -585,40 +640,25 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
+            const string sqlSensor = @"
+            SELECT 
+                d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                d.Version, d.Status, s.ControllerId
+            FROM Devices d
+            JOIN SensorDevices s ON d.Id = s.Id
+            WHERE s.Id = @Id;";
 
-            const string sql = @"
-                            SELECT * FROM SensorDevices WHERE Id = @Id;
-                            SELECT * FROM ControllerDevices WHERE Id = (
-                                SELECT ControllerId FROM SensorDevices WHERE Id = @Id
-                            );
-                            SELECT * FROM SensorDevices WHERE ControllerId = (
-                                SELECT ControllerId FROM SensorDevices WHERE Id = @Id
-                            );";
+            var sensorRow = await _conn.QueryFirstOrDefaultAsync<SensorJoinSQL>(
+                new CommandDefinition(sqlSensor, new { Id = id }, cancellationToken: token));
 
-            using var multi = await _conn.QueryMultipleAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: token));
+            if (sensorRow == null) return null;
 
-            var sRow = await multi.ReadFirstOrDefaultAsync<SensorSQL>();
-            var cRow = await multi.ReadFirstOrDefaultAsync<ControllerSQL>();
-            var sibRows = (await multi.ReadAsync<SensorSQL>()).ToList();  // 형제 센서
+            var sensor = sensorRow.ToDomain();
+            var controller = await FetchControllerAsync(sensorRow.ControllerId, token);
 
-            if (sRow == null || cRow == null) throw new Exception($"Controller or Sensor records were not found, matched with ControllerId of SensorSQL");
+            if (controller == null) return null;
 
-            var controller = cRow.ToDomain();
-            controller.Devices = new List<IBaseDeviceModel>();
-
-            foreach (var sib in sibRows)
-            {
-                var sn = sib.ToDomain();
-                sn.Controller = controller;
-                controller.Devices.Add(sn);
-                if (sn.Id == id)          // 요청한 센서 찾기
-                    sRow = sib;
-            }
-
-            var sensor = controller.Devices.OfType<SensorDeviceModel>()
-                                           .First(s => s.Id == id);
-
-            _log?.Info($"FetchSensorAsync 완료 - SensorId={sensor.Id}, ControllerId={sensor.Controller?.Id}");
+            sensor.Controller = controller;
             return sensor;
         }
         catch (Exception ex)
@@ -626,48 +666,73 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             _log?.Error($"FetchSensorAsync Error: {ex}");
             return null;
         }
-
     }
+
 
     /// <summary>
     /// 센서 단일 저장(FK 필요)
     /// </summary>
     public async Task<ISensorDeviceModel?> InsertSensorAsync(ISensorDeviceModel model, CancellationToken token = default)
     {
+        using var transaction = await _conn.BeginTransactionAsync(token);
         try
         {
-            const string sql = @"
-                    INSERT INTO SensorDevices
-                    (ControllerId, DeviceNumber, DeviceGroup, DeviceName, DeviceType, Version, Status)
-                    VALUES (@ControllerId, @DeviceNumber, @DeviceGroup, @DeviceName, @DeviceType, @Version, @Status);
-                    SELECT LAST_INSERT_ID();";
+            if (model.Controller == null)
+                throw new Exception($"Sensor doesn't have a controller instance.");
 
-            if (model.Controller == null) throw new Exception($"Sensor doesn't have a controller instance.");
+            var id = await InsertSensorInternalAsync(model, transaction, token);
 
-            var id = await _conn.ExecuteScalarAsync<int>(new CommandDefinition(sql, new
-            {
-                ControllerId = model.Controller!.Id,
-                model.DeviceNumber,
-                model.DeviceGroup,
-                model.DeviceName,
-                DeviceType = model.DeviceType.ToString(),
-                model.Version,
-                Status = model.Status.ToString()
-            }, cancellationToken: token));
-
-            model.Id = id;
-            return model;
+            return await FetchSensorAsync(id, token);
+            // 또는 InsertSensorInternalAsync 로직을 여기서 직접 구현
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(token);
             _log?.Error($"InsertSensorAsync Error: {ex}");
             throw;
         }
+    }
 
+    /// <summary>
+    /// 센서 단일 저장(FK 필요)
+    /// </summary>
+    private async Task<int> InsertSensorInternalAsync(ISensorDeviceModel model, MySqlTransaction transaction, CancellationToken token = default)
+    {
+        // 1. Devices 테이블에 먼저 삽입
+        const string deviceSql = @"
+            INSERT INTO Devices
+            (DeviceNumber, DeviceGroup, DeviceName, DeviceType, Version, Status)
+            VALUES (@DeviceNumber, @DeviceGroup, @DeviceName, @DeviceType, @Version, @Status);
+            SELECT LAST_INSERT_ID();";
+
+        var deviceId = await _conn.ExecuteScalarAsync<int>(deviceSql, new
+        {
+            model.DeviceNumber,
+            DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
+            model.DeviceName,
+            DeviceType = model.DeviceType.ToString(),
+            model.Version,
+            Status = model.Status.ToString()
+        }, transaction);
+
+        // 2. SensorDevices 테이블에 특화 정보 삽입
+        const string sensorSql = @"
+            INSERT INTO SensorDevices (Id, ControllerId)
+            VALUES (@Id, @ControllerId);";
+
+        await _conn.ExecuteAsync(sensorSql, new
+        {
+            Id = deviceId,
+            ControllerId = model.Controller!.Id
+        }, transaction);
+
+        model.Id = deviceId;
+        return deviceId;
     }
 
     public async Task<ISensorDeviceModel?> UpdateSensorAsync(ISensorDeviceModel model, CancellationToken token = default)
     {
+        using var transaction = await _conn.BeginTransactionAsync(token);
         try
         {
             if (_conn?.State != ConnectionState.Open)
@@ -679,28 +744,41 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (model.Controller?.Id is null or <= 0)
                 throw new Exception("Sensor.Controller.Id is missing.");
 
-            const string sql = @"
-                            UPDATE SensorDevices SET
-                                ControllerId = @ControllerId,
-                                DeviceNumber = @DeviceNumber,
-                                DeviceGroup  = @DeviceGroup,
-                                DeviceName   = @DeviceName,
-                                DeviceType   = @DeviceType,
-                                Version      = @Version,
-                                Status       = @Status
-                            WHERE Id = @Id;";
+            // 1. Devices 테이블 업데이트
+            const string deviceSql = @"
+            UPDATE Devices SET
+                DeviceNumber = @DeviceNumber,
+                DeviceGroup  = @DeviceGroup,
+                DeviceName   = @DeviceName,
+                DeviceType   = @DeviceType,
+                Version      = @Version,
+                Status       = @Status
+            WHERE Id = @Id;";
 
-            var affected = await _conn.ExecuteAsync(new CommandDefinition(sql, new
+            await _conn.ExecuteAsync(deviceSql, new
             {
                 model.Id,
-                ControllerId = model.Controller!.Id,
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
                 Status = model.Status.ToString()
-            }, cancellationToken: token));
+            }, transaction);
+
+            // 2. SensorDevices 테이블 업데이트
+            const string sensorSql = @"
+            UPDATE SensorDevices SET
+                ControllerId = @ControllerId
+            WHERE Id = @Id;";
+
+            var affected = await _conn.ExecuteAsync(sensorSql, new
+            {
+                model.Id,
+                ControllerId = model.Controller!.Id
+            }, transaction);
+
+            await transaction.CommitAsync(token);
 
             if (affected == 0) return null;
 
@@ -709,6 +787,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(token);
             _log?.Error($"UpdateSensorAsync Error: {ex}");
             throw;
         }
@@ -721,14 +800,13 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
-            if (model.Id <= 0)
-                throw new Exception("Sensor.Id is not set.");
+            // CASCADE 설정이 되어 있다면 Devices만 삭제해도 됨
+            const string sql = @"DELETE FROM Devices WHERE Id = @Id;";
 
-            const string sql = @"DELETE FROM SensorDevices WHERE Id = @Id;";
-            var ret = await _conn.ExecuteAsync(new CommandDefinition(sql, new { model.Id }, cancellationToken: token));
+            int ret = await _conn.ExecuteAsync(sql, new { model.Id });
 
             if (ret > 0)
-                _log?.Info($"DeleteSensorAsync 완료 - Id={model.Id}");
+                _log?.Info($"DeleteSensorAsync 완료 - Rows={ret}");
             else
                 _log?.Warning($"DeleteSensorAsync 대상 없음 - Id={model.Id}");
 
@@ -748,8 +826,16 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
-            const string sql = "SELECT * FROM CameraDevices;";
-            var rows = (await _conn.QueryAsync<CameraSQL>(sql)).ToList();
+            const string sql = @"
+                SELECT 
+                    d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                    d.Version, d.Status, c.IpAddress, c.IpPort, c.Username, c.Password,
+                    c.RtspUri, c.RtspPort, c.Mode, c.Category
+                FROM Devices d
+                JOIN CameraDevices c ON d.Id = c.Id
+                WHERE d.DeviceType = @DeviceType;";
+
+            var rows = (await _conn.QueryAsync<CameraJoinSQL>(sql, new { DeviceType = EnumDeviceType.IpCamera.ToString() })).ToList();
             var list = rows.Select(r => (ICameraDeviceModel)r.ToDomain()).ToList();
 
             _log?.Info($"FetchCamerasAsync 완료 - Cameras {list.Count}");
@@ -760,7 +846,6 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             _log?.Error($"FetchCamerasAsync Error: {ex}");
             throw;
         }
-
     }
 
     public async Task<ICameraDeviceModel?> FetchCameraAsync(int id, CancellationToken token = default)
@@ -772,8 +857,15 @@ internal class DeviceDbService : TaskService, IDeviceDbService
 
             if (!(id > 0)) throw new Exception($"Input parameter \"id\" is 0, which is not acceptable.");
 
-            const string sql = "SELECT * FROM CameraDevices WHERE Id = @Id;";
-            var row = await _conn.QueryFirstOrDefaultAsync<CameraSQL>(sql, new { Id = id });
+            const string sql = @"
+                SELECT 
+                    d.Id, d.DeviceNumber, d.DeviceGroup, d.DeviceName, d.DeviceType,
+                    d.Version, d.Status, c.IpAddress, c.IpPort, c.Username, c.Password,
+                    c.RtspUri, c.RtspPort, c.Mode, c.Category
+                FROM Devices d
+                JOIN CameraDevices c ON d.Id = c.Id
+                WHERE d.Id = @Id;";
+            var row = await _conn.QueryFirstOrDefaultAsync<CameraJoinSQL>(sql, new { Id = id });
             if (row == null) throw new NullReferenceException();
 
             var item = row?.ToDomain();
@@ -789,106 +881,123 @@ internal class DeviceDbService : TaskService, IDeviceDbService
 
     public async Task<ICameraDeviceModel?> InsertCameraAsync(ICameraDeviceModel model, CancellationToken token = default)
     {
+        using var transaction = await _conn.BeginTransactionAsync(token);
         try
         {
-            if (_conn?.State != ConnectionState.Open)
-                throw new Exception("DB not connected.");
+            // 1. Devices 테이블에 먼저 삽입
+            const string deviceSql = @"
+                INSERT INTO Devices
+                (DeviceNumber, DeviceGroup, DeviceName, DeviceType, Version, Status)
+                VALUES (@DeviceNumber, @DeviceGroup, @DeviceName, @DeviceType, @Version, @Status);
+                SELECT LAST_INSERT_ID();";
 
-            const string sql = @"
-                    INSERT INTO CameraDevices
-                    (DeviceNumber, DeviceGroup, DeviceName, DeviceType, Version, Status, IpAddress, IpPort, Username, Password, RtspUri, RtspPort, Mode, Category)
-                    VALUES
-                    (@DeviceNumber, @DeviceGroup, @DeviceName, @DeviceType, @Version, @Status, @IpAddress, @IpPort, @Username, @Password, @RtspUri, @RtspPort, @Mode, @Category);
-                    SELECT LAST_INSERT_ID();";
-
-            var id = await _conn.ExecuteScalarAsync<int>(sql, new
+            var deviceId = await _conn.ExecuteScalarAsync<int>(deviceSql, new
             {
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
-                Status = model.Status.ToString(),
+                Status = model.Status.ToString()
+            }, transaction);
+
+            // 2. CameraDevices 테이블에 특화 정보 삽입
+            const string cameraSql = @"
+                INSERT INTO CameraDevices
+                (Id, IpAddress, IpPort, Username, Password, Mode, Category)
+                VALUES (@Id, @IpAddress, @IpPort, @Username, @Password, @Mode, @Category);";
+
+            await _conn.ExecuteAsync(cameraSql, new
+            {
+                Id = deviceId,
                 model.IpAddress,
-                IpPort = model.Port,
-                Username = model.Username,
-                Password = model.Password,
-                model.RtspUri,
-                model.RtspPort,
+                IpPort = model.IpPort,
+                model.UserName,
+                model.UserPassword,
                 Mode = model.Mode.ToString(),
                 Category = model.Category.ToString()
-            });
+            }, transaction);
 
-            model.Id = id;
+            model.Id = deviceId;
+            await transaction.CommitAsync(token);
             return model;
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(token);
             _log?.Error($"InsertCameraAsync Error: {ex}");
-            return null;
+            throw;
         }
-
     }
 
     public async Task<ICameraDeviceModel?> UpdateCameraAsync(ICameraDeviceModel model, CancellationToken token = default)
     {
+        using var transaction = await _conn.BeginTransactionAsync(token);
         try
         {
-
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
-            const string sql = @"
-                    UPDATE CameraDevices SET
-                        DeviceNumber = @DeviceNumber,
-                        DeviceGroup  = @DeviceGroup,
-                        DeviceName   = @DeviceName,
-                        DeviceType   = @DeviceType,
-                        Version      = @Version,
-                        Status       = @Status,
-                        IpAddress    = @IpAddress,
-                        IpPort       = @IpPort,
-                        Username     = @Username,
-                        Password     = @Password,
-                        RtspUri      = @RtspUri,
-                        RtspPort     = @RtspPort,
-                        Mode         = @Mode,
-                        Category     = @Category
-                    WHERE Id = @Id;";
+            if (!(model.Id > 0))
+                throw new Exception($"Input parameter \"id\" is 0, which is not acceptable.");
 
-            if (!(model.Id > 0)) throw new Exception($"Input parameter \"id\" is 0, which is not acceptable.");
+            // 1. Devices 테이블 업데이트
+            const string deviceSql = @"
+            UPDATE Devices SET
+                DeviceNumber = @DeviceNumber,
+                DeviceGroup  = @DeviceGroup,
+                DeviceName   = @DeviceName,
+                DeviceType   = @DeviceType,
+                Version      = @Version,
+                Status       = @Status
+            WHERE Id = @Id;";
 
-            int affected = await _conn.ExecuteAsync(sql, new
+            await _conn.ExecuteAsync(deviceSql, new
             {
                 model.Id,
                 model.DeviceNumber,
-                model.DeviceGroup,
+                DeviceGroup = model.DeviceGroups?.FirstOrDefault() ?? 0,
                 model.DeviceName,
                 DeviceType = model.DeviceType.ToString(),
                 model.Version,
-                Status = model.Status.ToString(),
+                Status = model.Status.ToString()
+            }, transaction);
+
+            // 2. CameraDevices 테이블 업데이트
+            const string cameraSql = @"
+            UPDATE CameraDevices SET
+                IpAddress = @IpAddress,
+                IpPort    = @IpPort,
+                Username  = @Username,
+                Password  = @Password,
+                Mode      = @Mode,
+                Category  = @Category
+            WHERE Id = @Id;";
+
+            int affected = await _conn.ExecuteAsync(cameraSql, new
+            {
+                model.Id,
                 model.IpAddress,
-                IpPort = model.Port,
-                Username = model.Username,
-                Password = model.Password,
-                model.RtspUri,
-                model.RtspPort,
+                IpPort = model.IpPort,
+                model.UserName,
+                model.UserPassword,
                 Mode = model.Mode.ToString(),
                 Category = model.Category.ToString()
-            });
+            }, transaction);
+
+            await transaction.CommitAsync(token);
 
             if (affected == 0) return null;
 
             _log?.Info($"UpdateCameraAsync 완료 - Id={model.Id}, Rows={affected}");
-
             return await FetchCameraAsync(model.Id, token);
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(token);
             _log?.Error($"UpdateCameraAsync Error: {ex}");
             return null;
         }
-
     }
 
     public async Task<bool> DeleteCameraAsync(ICameraDeviceModel model, CancellationToken token = default)
@@ -898,12 +1007,13 @@ internal class DeviceDbService : TaskService, IDeviceDbService
             if (_conn?.State != ConnectionState.Open)
                 throw new Exception("DB not connected.");
 
+            // CASCADE 설정이 되어 있다면 Devices만 삭제해도 됨
+            const string sql = @"DELETE FROM Devices WHERE Id = @Id;";
 
-            const string sql = "DELETE FROM CameraDevices WHERE Id = @Id;";
             int ret = await _conn.ExecuteAsync(sql, new { model.Id });
 
             if (ret > 0)
-                _log?.Info($"DeleteCameraAsync 완료 - Id={model.Id}");
+                _log?.Info($"DeleteCameraAsync 완료 - Rows={ret}");
             else
                 _log?.Warning($"DeleteCameraAsync 대상 없음 - Id={model.Id}");
 
@@ -912,7 +1022,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
         catch (Exception ex)
         {
             _log?.Error($"DeleteCameraAsync Error: {ex}");
-            return false;
+            throw;
         }
     }
 
@@ -931,7 +1041,7 @@ internal class DeviceDbService : TaskService, IDeviceDbService
     private SensorDeviceProvider _sensorProvider;
     private ControllerDeviceProvider _controllerProvider;
     private CameraDeviceProvider _cameraProvider;
-    private MySqlConnection _conn;
+    private MySqlConnection? _conn;
     #endregion
 
 }
@@ -943,7 +1053,8 @@ internal class DeviceDbService : TaskService, IDeviceDbService
 //  DB 레코드 구조에 1:1 대응하도록 만든 POCO
 //  컬럼명·타입 그대로 보존해 Dapper/ADO.NET이 자동 매핑하기 쉽도록 설계
 
-internal sealed class ControllerSQL
+// 정규화된 스키마에 맞는 SQL 매핑 클래스들
+internal sealed class ControllerJoinSQL
 {
     public int Id { get; set; }
     public int DeviceNumber { get; set; }
@@ -959,7 +1070,7 @@ internal sealed class ControllerSQL
     {
         Id = Id,
         DeviceNumber = DeviceNumber,
-        DeviceGroup = DeviceGroup,
+        DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
         DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
         Version = Version,
@@ -969,7 +1080,7 @@ internal sealed class ControllerSQL
     };
 }
 
-internal sealed class SensorSQL
+internal sealed class SensorJoinSQL
 {
     public int Id { get; set; }
     public int ControllerId { get; set; }
@@ -984,15 +1095,15 @@ internal sealed class SensorSQL
     {
         Id = Id,
         DeviceNumber = DeviceNumber,
-        DeviceGroup = DeviceGroup,
+        DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
         DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
         Version = Version,
-        Status = Enum.Parse<EnumDeviceStatus>(Status),
+        Status = Enum.Parse<EnumDeviceStatus>(Status)
     };
 }
 
-internal sealed class CameraSQL
+internal sealed class CameraJoinSQL
 {
     public int Id { get; set; }
     public int DeviceNumber { get; set; }
@@ -1014,17 +1125,15 @@ internal sealed class CameraSQL
     {
         Id = Id,
         DeviceNumber = DeviceNumber,
-        DeviceGroup = DeviceGroup,
+        DeviceGroups = new List<int> { DeviceGroup },
         DeviceName = DeviceName,
         DeviceType = Enum.Parse<EnumDeviceType>(DeviceType),
         Version = Version,
         Status = Enum.Parse<EnumDeviceStatus>(Status),
         IpAddress = IpAddress,
-        Port = IpPort,
-        Username = Username,
-        Password = Password,
-        RtspUri = RtspUri,
-        RtspPort = RtspPort,
+        IpPort = IpPort,
+        UserName = Username,
+        UserPassword = Password,
         Mode = Enum.TryParse(Mode, out EnumCameraMode m) ? m : EnumCameraMode.NONE,
         Category = Enum.TryParse(Category, out EnumCameraType c) ? c : EnumCameraType.NONE
     };

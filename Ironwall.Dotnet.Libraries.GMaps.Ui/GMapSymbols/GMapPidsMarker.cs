@@ -1,5 +1,6 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Windows;
@@ -15,7 +16,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
   Company      : Sensorway Co., Ltd.                                       
   Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
+public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMarker
 {
     #region - Ctors -
     public GMapPidsMarker(ILogService log, IPidsSymbolModel pidsModel)
@@ -23,8 +24,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     {
         pidsModel.Update += PidsModel_Update;
     }
-
-    
     #endregion
 
     #region - Animation System -
@@ -35,113 +34,16 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
 
     private void PidsModel_Update(object? sender, EventArgs e)
     {
+        _log?.Info($"[SYNC→Symbol] PidsModel_Update 수신: '{_model.Title}' OperationState={_model.OperationState}, EventStatus={_model.EventStatus}");
+
         OnPropertyChanged(nameof(EventStatus));
         OnPropertyChanged(nameof(OperationState));
+
+        // FOV 속성 알림 추가 (v1.3 - PTZ → FOV 연동)
+        OnPropertyChanged(nameof(DetectionRange));
+        OnPropertyChanged(nameof(DetectionAngle));
+        OnPropertyChanged(nameof(DetectionBearing));
     }
-
-    /// <summary>
-    /// 모델 속성 변경 감지 (EventStatus 변경 시 자동 애니메이션)
-    /// </summary>
-    private void OnModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IPidsSymbolModel.EventStatus))
-        {
-            UpdateAnimationFromEventStatus();
-        }
-    }
-
-    /// <summary>
-    /// EventStatus에 따른 애니메이션 자동 업데이트
-    /// </summary>
-    private void UpdateAnimationFromEventStatus()
-    {
-        try
-        {
-            switch (_model.EventStatus)
-            {
-                case EnumEventStatus.Normal:
-                    StopAnimation();
-                    SetStaticColor(_originalColor);
-                    break;
-
-                case EnumEventStatus.Detecting:
-                    StartBlinkAnimation(EnumColorType.Green, TimeSpan.FromMilliseconds(500));
-                    break;
-
-                case EnumEventStatus.Fault:
-                    StartBlinkAnimation(EnumColorType.Red, TimeSpan.FromMilliseconds(200));
-                    break;
-
-                case EnumEventStatus.Connection:
-                    SetStaticColor(EnumColorType.Blue);
-                    break;
-
-                default:
-                    SetStaticColor(EnumColorType.Gray);
-                    break;
-            }
-
-            _log?.Info($"애니메이션 상태 변경: {_model.Title} → {_model.EventStatus}");
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"애니메이션 업데이트 실패: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 깜빡임 애니메이션 시작
-    /// </summary>
-    private void StartBlinkAnimation(EnumColorType targetColor, TimeSpan interval)
-    {
-        StopAnimation();
-
-        _isAnimating = true;
-        bool isHighlighted = false;
-
-        _animationTimer = new DispatcherTimer
-        {
-            Interval = interval
-        };
-
-        _animationTimer.Tick += (s, e) =>
-        {
-            try
-            {
-                FillColor = isHighlighted ? _originalColor : targetColor;
-                isHighlighted = !isHighlighted;
-            }
-            catch (Exception ex)
-            {
-                _log?.Error($"애니메이션 틱 오류: {ex.Message}");
-            }
-        };
-
-        _animationTimer.Start();
-    }
-
-    /// <summary>
-    /// 정적 색상 설정
-    /// </summary>
-    private void SetStaticColor(EnumColorType color)
-    {
-        StopAnimation();
-        FillColor = color;
-    }
-
-    /// <summary>
-    /// 애니메이션 중지
-    /// </summary>
-    private void StopAnimation()
-    {
-        if (_animationTimer != null)
-        {
-            _animationTimer.Stop();
-            _animationTimer = null;
-        }
-        _isAnimating = false;
-    }
-
     #endregion
 
     #region - Overrides -
@@ -155,6 +57,11 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         return markerControl;
     }
 
+    protected override void ConfigureMarkerControl(UIElement marker)
+    {
+        base.ConfigureMarkerControl(marker);
+    }
+
     /// <summary>
     /// 상태 변경 시 EventStatus 동기화
     /// </summary>
@@ -163,13 +70,15 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         base.OnStatusChanged(status);
 
         // OperationState → EventStatus 매핑
+        var prevEventStatus = _model.EventStatus;
         _model.EventStatus = status switch
         {
-            EnumOperationState.ACTIVE => EnumEventStatus.Normal,
-            EnumOperationState.DEACTIVE => EnumEventStatus.Fault,
-            EnumOperationState.FAULT => EnumEventStatus.Fault,
-            _ => EnumEventStatus.Normal
+            EnumOperationState.ACTIVATED   => EnumEventStatus.Normal,
+            EnumOperationState.DEACTIVATED => EnumEventStatus.Normal,  // 깜빡임 없음 (DEACTIVATED는 비활성 상태)
+            EnumOperationState.ERROR       => EnumEventStatus.Fault,   // 깜빡임 유지
+            _                              => EnumEventStatus.Normal
         };
+        _log?.Info($"[SYNC→Symbol] OnStatusChanged: '{_model.Title}' OperationState={status} → EventStatus: {prevEventStatus} → {_model.EventStatus}");
     }
 
     /// <summary>
@@ -177,10 +86,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     /// </summary>
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
-        {
-            StopAnimation();
-        }
         base.Dispose(disposing);
     }
     #endregion
@@ -213,11 +118,13 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         _model.ShowFOV = !_model.ShowFOV;
         _log?.Info($"FOV 표시 토글: {_model.ShowFOV}");
     }
+
+    
     #endregion
 
     #region - Properties -
     /// <summary>
-    /// 연결된 장치 ID
+    /// 연결된 장치 ID (하위 호환성 유지)
     /// </summary>
     public int LinkedDeviceId
     {
@@ -226,6 +133,21 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         {
             _model.LinkedDeviceId = value;
             OnPropertyChanged(nameof(LinkedDeviceId));
+        }
+    }
+
+    /// <summary>
+    /// 연결된 디바이스 객체 (런타임 바인딩용)
+    /// <para>설정 시 LinkedDeviceId가 자동 동기화됩니다.</para>
+    /// </summary>
+    public IBaseDeviceModel? LinkedDevice
+    {
+        get => _model.LinkedDevice;
+        set
+        {
+            _model.LinkedDevice = value;
+            OnPropertyChanged(nameof(LinkedDevice));
+            OnPropertyChanged(nameof(LinkedDeviceId));  // ID도 동기화되므로 알림
         }
     }
 
@@ -239,6 +161,20 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         {
             _model.DeviceType = value;
             OnPropertyChanged(nameof(DeviceType));
+        }
+    }
+
+    /// <summary>
+    /// 이벤트 상태 (애니메이션 트리거)
+    /// </summary>
+    public EnumEventStatus EventStatus
+    {
+        get => _model.EventStatus;
+        set
+        {
+            _model.EventStatus = value;
+            OnPropertyChanged(nameof(EventStatus));
+            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
         }
     }
 
@@ -269,6 +205,16 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
         {
             _model.DetectionBearing = value;
             OnPropertyChanged(nameof(DetectionBearing));
+        }
+    }
+
+    public double BaseBearing
+    {
+        get => _model.BaseBearing;
+        set
+        {
+            _model.BaseBearing = value;
+            OnPropertyChanged(nameof(BaseBearing));
         }
     }
 
@@ -303,23 +249,26 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>
     }
 
     /// <summary>
-    /// 이벤트 상태 (애니메이션 트리거)
-    /// </summary>
-    public EnumEventStatus EventStatus
-    {
-        get => _model.EventStatus;
-        set
-        {
-            _model.EventStatus = value;
-            OnPropertyChanged(nameof(EventStatus));
-            // PropertyChanged 이벤트로 자동 애니메이션 처리됨
-        }
-    }
-
-    /// <summary>
     /// 애니메이션 실행 중 여부
     /// </summary>
     public bool IsAnimating => _isAnimating;
 
+    /// <summary>
+    /// 방송(음원/TTS) 동작 중 여부 — XAML Opacity 펄스 애니메이션 트리거
+    /// </summary>
+    public bool IsBroadcasting
+    {
+        get => _isBroadcasting;
+        set
+        {
+            _isBroadcasting = value;
+            OnPropertyChanged(nameof(IsBroadcasting));
+        }
+    }
+
+    #endregion
+
+    #region - Attributes -
+    private bool _isBroadcasting;
     #endregion
 }

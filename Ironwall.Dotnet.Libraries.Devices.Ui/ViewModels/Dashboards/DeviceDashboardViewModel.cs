@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Api.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -27,13 +28,20 @@ public class DeviceDashboardViewModel : BasePanelViewModel
                                 , ControllerDevicePanelViewModel controllerDevicePanelViewModel
                                 , SensorDevicePanelViewModel sensorDevicePanelViewModel
                                 , CameraDevicePanelViewModel cameraDevicePanelViewModel
+                                , SpeakerDevicePanelViewModel speakerDevicePanelViewModel
+                                , EnclosureDevicePanelViewModel enclosureDevicePanelViewModel
+                                , LampDevicePanelViewModel lampDevicePanelViewModel
+                                , DeviceGroupPanelViewModel deviceGroupPanelViewModel
                                 ) : base(eventAggregator, log)
     {
         TabControlViewModel = tabControlViewModel;
         ControllerPanelViewModel = controllerDevicePanelViewModel;
         SensorPanelViewModel = sensorDevicePanelViewModel;
         CameraPanelViewModel = cameraDevicePanelViewModel;
-
+        SpeakerPanelViewModel = speakerDevicePanelViewModel;
+        EnclosurePanelViewModel = enclosureDevicePanelViewModel;
+        LampPanelViewModel = lampDevicePanelViewModel;
+        DeviceGroupPanelViewModel = deviceGroupPanelViewModel;
     }
     #endregion
     #region - Implementation of Interface -
@@ -49,10 +57,17 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SensorPanelViewModel.UpdateAction += SensorPanelViewModel_UpdateAction;
         CameraPanelViewModel.CheckSelectedItems += CameraPanelViewModel_CheckSelectedItems;
         CameraPanelViewModel.UpdateAction += CameraPanelViewModel_UpdateAction;
-
+        SpeakerPanelViewModel.CheckSelectedItems += SpeakerPanelViewModel_CheckSelectedItems;
+        SpeakerPanelViewModel.UpdateAction += SpeakerPanelViewModel_UpdateAction;
+        EnclosurePanelViewModel.CheckSelectedItems += EnclosurePanelViewModel_CheckSelectedItems;
+        EnclosurePanelViewModel.UpdateAction += EnclosurePanelViewModel_UpdateAction;
+        LampPanelViewModel.CheckSelectedItems += LampPanelViewModel_CheckSelectedItems;
+        LampPanelViewModel.UpdateAction += LampPanelViewModel_UpdateAction;
+        DeviceGroupPanelViewModel.CheckSelectedItems += DeviceGroupPanelViewModel_CheckSelectedItems;
+        DeviceGroupPanelViewModel.UpdateAction += DeviceGroupPanelViewModel_UpdateAction;
         await TabControlViewModel.ActivateAsync();
 
-        await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
+        await TabControlViewModel.ActivateItemAsync(DeviceGroupPanelViewModel);
 
         await DataInitialize(cancellationToken);
         await GetDeviceType(cancellationToken);
@@ -74,6 +89,14 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         SensorPanelViewModel.UpdateAction -= SensorPanelViewModel_UpdateAction;
         CameraPanelViewModel.CheckSelectedItems -= CameraPanelViewModel_CheckSelectedItems;
         CameraPanelViewModel.UpdateAction -= CameraPanelViewModel_UpdateAction;
+        SpeakerPanelViewModel.CheckSelectedItems -= SpeakerPanelViewModel_CheckSelectedItems;
+        SpeakerPanelViewModel.UpdateAction -= SpeakerPanelViewModel_UpdateAction;
+        EnclosurePanelViewModel.CheckSelectedItems -= EnclosurePanelViewModel_CheckSelectedItems;
+        EnclosurePanelViewModel.UpdateAction -= EnclosurePanelViewModel_UpdateAction;
+        LampPanelViewModel.CheckSelectedItems -= LampPanelViewModel_CheckSelectedItems;
+        LampPanelViewModel.UpdateAction -= LampPanelViewModel_UpdateAction;
+        DeviceGroupPanelViewModel.CheckSelectedItems -= DeviceGroupPanelViewModel_CheckSelectedItems;
+        DeviceGroupPanelViewModel.UpdateAction -= DeviceGroupPanelViewModel_UpdateAction;
 
         ClearData();
         SelectedItemEditor = null;
@@ -133,7 +156,52 @@ public class DeviceDashboardViewModel : BasePanelViewModel
             IsSelected = true;
         }
     }
-    
+
+    private void SpeakerPanelViewModel_CheckSelectedItems(IList<SpeakerDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new SpeakerSelectionViewModel(selectedItems);
+            (SelectedItemEditor as SpeakerSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private void EnclosurePanelViewModel_CheckSelectedItems(IList<EnclosureDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new EnclosureSelectionViewModel(selectedItems);
+            (SelectedItemEditor as EnclosureSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private void LampPanelViewModel_CheckSelectedItems(IList<LampDeviceViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new LampSelectionViewModel(selectedItems);
+            (SelectedItemEditor as LampSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
     private async void SensorPanelViewModel_UpdateAction()
     {
         await GetDeviceType();
@@ -149,7 +217,45 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         await GetDeviceType();
     }
 
-   
+    private async void SpeakerPanelViewModel_UpdateAction()
+    {
+        await GetDeviceType();
+    }
+
+    private async void EnclosurePanelViewModel_UpdateAction()
+    {
+        await GetDeviceType();
+    }
+
+    private async void LampPanelViewModel_UpdateAction()
+    {
+        await GetDeviceType();
+    }
+
+    private void DeviceGroupPanelViewModel_CheckSelectedItems(IList<DeviceGroupViewModel> selectedItems)
+    {
+        if (!(selectedItems.Count > 0))
+        {
+            SelectedItemEditor = null;
+            IsSelected = false;
+        }
+        else
+        {
+            SelectedItemEditor = new DeviceGroupSelectionViewModel(
+                selectedItems,
+                IoC.Get<IEventAggregator>(),
+                IoC.Get<IDeviceApiService>(),
+                IoC.Get<DeviceProvider>(),
+                IoC.Get<ILogService>());
+            (SelectedItemEditor as DeviceGroupSelectionViewModel)!.RefreshAll();
+            IsSelected = true;
+        }
+    }
+
+    private void DeviceGroupPanelViewModel_UpdateAction()
+    {
+    }
+
     #endregion
     #region - Processes -
     /// <summary>
@@ -181,6 +287,10 @@ public class DeviceDashboardViewModel : BasePanelViewModel
 
             switch (tab.Tag)
             {
+                case "DeviceGroupViewModel":
+                    await TabControlViewModel.ActivateItemAsync(DeviceGroupPanelViewModel);
+                    break;
+
                 case "ControllerDeviceViewModel":
                     await TabControlViewModel.ActivateItemAsync(ControllerPanelViewModel);
                     break;
@@ -191,6 +301,18 @@ public class DeviceDashboardViewModel : BasePanelViewModel
 
                 case "CameraDeviceViewModel":
                     await TabControlViewModel.ActivateItemAsync(CameraPanelViewModel);
+                    break;
+
+                case "SpeakerDeviceViewModel":
+                    await TabControlViewModel.ActivateItemAsync(SpeakerPanelViewModel);
+                    break;
+
+                case "EnclosureDeviceViewModel":
+                    await TabControlViewModel.ActivateItemAsync(EnclosurePanelViewModel);
+                    break;
+
+                case "LampDeviceViewModel":
+                    await TabControlViewModel.ActivateItemAsync(LampPanelViewModel);
                     break;
 
                 default:
@@ -224,6 +346,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel
         IOController = 0;
         LaserSensor = 0;
         IPCamera = 0;
+        Speaker = 0;
+        Enclosure = 0;
+        Lamp = 0;
     }
 
     private Task GetDeviceType(CancellationToken cancellationToken = default)
@@ -249,6 +374,12 @@ public class DeviceDashboardViewModel : BasePanelViewModel
             LaserSensor = DeviceProvider.OfType<ISensorDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.Laser).Count();
             await Task.Delay(100, cancellationToken);
             IPCamera = DeviceProvider.OfType<ICameraDeviceModel>().Where(t => t.DeviceType == EnumDeviceType.IpCamera).Count();
+            await Task.Delay(100, cancellationToken);
+            Speaker = DeviceProvider.OfType<ISpeakerDeviceModel>().Count();
+            await Task.Delay(100, cancellationToken);
+            Enclosure = DeviceProvider.OfType<IEnclosureDeviceModel>().Count();
+            await Task.Delay(100, cancellationToken);
+            Lamp = DeviceProvider.OfType<ILampDeviceModel>().Count();
             await Task.Delay(100, cancellationToken);
         });
     }
@@ -368,7 +499,41 @@ public class DeviceDashboardViewModel : BasePanelViewModel
     public ControllerDevicePanelViewModel ControllerPanelViewModel { get; }
     public SensorDevicePanelViewModel SensorPanelViewModel { get; }
     public CameraDevicePanelViewModel CameraPanelViewModel { get; }
+    public int Speaker
+    {
+        get { return _speaker; }
+        set
+        {
+            _speaker = value;
+            NotifyOfPropertyChange(() => Speaker);
+        }
+    }
+
+    public int Enclosure
+    {
+        get { return _enclosure; }
+        set
+        {
+            _enclosure = value;
+            NotifyOfPropertyChange(() => Enclosure);
+        }
+    }
+
+    public int Lamp
+    {
+        get { return _lamp; }
+        set
+        {
+            _lamp = value;
+            NotifyOfPropertyChange(() => Lamp);
+        }
+    }
+
     public DeviceProvider DeviceProvider { get; private set; }
+    public SpeakerDevicePanelViewModel SpeakerPanelViewModel { get; }
+    public EnclosureDevicePanelViewModel EnclosurePanelViewModel { get; }
+    public LampDevicePanelViewModel LampPanelViewModel { get; }
+    public DeviceGroupPanelViewModel DeviceGroupPanelViewModel { get; }
     #endregion
     #region - Attributes -
     private int _controller;
@@ -381,6 +546,9 @@ public class DeviceDashboardViewModel : BasePanelViewModel
     private int _ioController;
     private int _laserSensor;
     private int _ipCamera;
+    private int _speaker;
+    private int _enclosure;
+    private int _lamp;
 
     private bool _isSelected;
     private BasePanelViewModel? _selectedItemEditor;

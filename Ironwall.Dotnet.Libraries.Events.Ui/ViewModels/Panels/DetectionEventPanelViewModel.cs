@@ -1,7 +1,8 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -11,6 +12,7 @@ using System;
 using System.Collections.Specialized;
 using System.Threading;
 using System.Windows;
+using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -28,14 +30,15 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     #region - Ctors -
     public DetectionEventPanelViewModel(IEventAggregator eventAggregator
                                         , ILogService log
-                                        , IEventDbService eventDbService
+                                        , EventProviderService providerService
                                         , DeviceProvider deviceProvider
-                                        , EventProvider eventProvider) 
+                                        , EventProvider eventProvider)
                                         : base(eventAggregator, log)
     {
-        _dbService = eventDbService;
+        _providerService = providerService;
         _eventProvider = eventProvider;
         DeviceProvider = deviceProvider;
+        LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
     #endregion
     #region - Implementation of Interface -
@@ -43,11 +46,18 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        
-        await DataInitialize(cancellationToken).ConfigureAwait(false);
         await base.OnActivateAsync(cancellationToken);
-        IsVisible = true;
-        //UpdateAction?.Invoke(_startDate, _endDate);
+        if (IsCacheValid())
+        {
+            // 캐시 유효: EventProvider에서 필터링만 수행 (API 미호출)
+            LoadFromCache();
+            IsVisible = true;
+            UpdateAction?.Invoke(_startDate, _endDate);
+        }
+        else
+        {
+            await DataInitialize(cancellationToken);  // DataInitialize 내부에서 false→true 관리
+        }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -60,6 +70,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
         if (SelectedItemCount == 0) return;
+        _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = "선택한 이벤트를 정말로 삭제하시겠습니까? 해당이벤트의 조치보고도 함께 삭제 됩니다.",
@@ -120,8 +131,6 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             var token = _pCancellationTokenSource.Token;
             var currentList = _eventProvider;
 
-            var dbList = await _dbService.FetchDetectionEventsAsync(startDate:StartDate, endDate:EndDate, token:token);
-
             var insertList = currentList
                             .Where(m => m.Id <= 0)
                             .ToList();
@@ -131,10 +140,10 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                             .ToList();
 
             foreach (var model in updateList)
-                await _dbService.UpdateDetectionEventAsync(model, token);
+                await _providerService.UpdateDetectionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IDetectionEventModel>())
-                await _dbService.InsertDetectionEventAsync(model, token);
+                await _providerService.InsertDetectionEventAsync(model, token);
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -208,8 +217,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
     private static bool EventEquals(IDetectionEventModel a, IDetectionEventModel b)
     {
-        return a.EventGroup == b.EventGroup &&
-               a?.Device?.Id == b?.Device?.Id &&
+        return a?.Device?.Id == b?.Device?.Id &&
                a.MessageType == b.MessageType &&
                a.Status == b.Status && 
                a.Result == b.Result &&
@@ -232,6 +240,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             if (_cancellationTokenSource != null)
                 _cancellationTokenSource.Cancel();
 
+            InvalidateCache();
             _cancellationTokenSource = new CancellationTokenSource();
             await DataInitialize(_cancellationTokenSource.Token).ConfigureAwait(false);
         }
@@ -251,7 +260,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     {
         try
         {
-            if (_cancellationTokenSource == null && _cancellationTokenSource.IsCancellationRequested)
+            if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
                 return;
 
             _cancellationTokenSource.Cancel();
@@ -271,49 +280,140 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             {
                 IsVisible = false;
 
-                //DB Fetching
-                var events = await _dbService.FetchDetectionEventsAsync(startDate:StartDate, endDate:EndDate, token:cancellationToken);
-                if (events == null) return;
-                _eventProvider.Clear();
-                foreach (var item in events)
-                {
-                    _eventProvider.Add(item);
-                }
+                // 페이지네이션 상태 초기화
+                _currentPage = 0;
+                _totalPages = 1;
+                _totalCount = 0;
 
-                if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
+                // 기존 Detection 이벤트 제거
+                var existingDetection = _eventProvider.OfType<IDetectionEventModel>().ToList();
+                foreach (var e in existingDetection) _eventProvider.Remove(e);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
-                //ViewModelProvider Setting
-                if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-
 
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in _eventProvider.OfType<IDetectionEventModel>().OrderBy(item => item.Id).Select((item, index) => (item, index)))
-                    {
-                        if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new DetectionEventViewModel(item) { Index = index + 1 });
-                    }
-
-                    NotifyOfPropertyChange(() => ViewModelProvider);
                 });
 
+                // CollectionChanged 구독을 LoadNextPageAsync 전에 설정
+                // → VP.Add 시 CollectionChanged가 EP 동기화 담당 (double-add 방지)
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 첫 페이지 로드
+                await LoadNextPageAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 캐시 날짜범위 기록
+                SetCachedDate(_startDate, _endDate);
             }
-            catch (TaskCanceledException ex)
+            catch (OperationCanceledException ex)
             {
-                _log?.Warning($"Raised {nameof(TaskCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
+                _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
             }
             finally
             {
+                IsVisible = true;
                 UpdateAction?.Invoke(_startDate, _endDate);
             }
         });
     }
 
+    public async Task LoadNextPageAsync(CancellationToken token = default)
+    {
+        if (_isLoadingMore || !HasMorePages) return;
+
+        token.ThrowIfCancellationRequested();
+
+        _isLoadingMore = true;
+        IsLoadingMore = true;
+
+        try
+        {
+            var result = await _providerService.FetchDetectionEventsPageAsync(
+                StartDate, EndDate, _currentPage + 1, 100, token);
+
+            if (token.IsCancellationRequested) return;
+
+            _currentPage = result.Page;
+            _totalPages = result.TotalPages;
+            _totalCount = result.Total;
+
+            DispatcherService.Invoke(() =>
+            {
+                foreach (var item in result.Items)
+                {
+                    // _eventProvider 동기화는 CollectionChanged 핸들러가 담당
+                    ViewModelProvider.Add(new DetectionEventViewModel(item)
+                    {
+                        Index = ViewModelProvider.Count + 1
+                    });
+                }
+                NotifyOfPropertyChange(() => LoadedCountText);
+                NotifyOfPropertyChange(() => HasMorePages);
+            });
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex) { _log?.Error($"LoadNextPageAsync failed: {ex.Message}"); }
+        finally
+        {
+            _isLoadingMore = false;
+            IsLoadingMore = false;
+        }
+    }
+
+    /// <summary>
+    /// EventProvider 캐시에서 Detection 이벤트를 필터링하여 ViewModelProvider에 채움 (API 미호출)
+    /// </summary>
+    private void LoadFromCache()
+    {
+        ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+
+        DispatcherService.Invoke(() =>
+        {
+            ViewModelProvider.Clear();
+            foreach (var (item, index) in _eventProvider.OfType<IDetectionEventModel>().OrderBy(item => item.Id).Select((item, index) => (item, index)))
+            {
+                ViewModelProvider.Add(new DetectionEventViewModel(item) { Index = index + 1 });
+            }
+            NotifyOfPropertyChange(() => ViewModelProvider);
+            NotifyOfPropertyChange(() => LoadedCountText);
+            NotifyOfPropertyChange(() => HasMorePages);
+        });
+
+        ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+    }
+
+    /// <summary>
+    /// 캐시 유효성 검증: 현재 날짜범위와 캐시된 날짜범위가 동일하고 EventProvider에 데이터가 있으면 유효
+    /// </summary>
+    internal bool IsCacheValid()
+    {
+        return _isCacheValid
+            && _cachedStartDate == _startDate
+            && _cachedEndDate == _endDate
+            && _eventProvider.OfType<IDetectionEventModel>().Any();
+    }
+
+    /// <summary>
+    /// 캐시 날짜범위를 설정하고 캐시를 유효 상태로 전환
+    /// </summary>
+    public void SetCachedDate(DateTime startDate, DateTime endDate)
+    {
+        _cachedStartDate = startDate;
+        _cachedEndDate = endDate;
+        _isCacheValid = true;
+    }
+
+    /// <summary>
+    /// 캐시를 무효화 (ClickSearch, 날짜 변경 시 호출)
+    /// </summary>
+    public void InvalidateCache()
+    {
+        _isCacheValid = false;
+    }
 
     #endregion
     #region - IHanldes -
@@ -325,10 +425,11 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in SelectedItems.ToList())
+            foreach (var item in _pendingDeleteItems)
             {
-                var ret = await _dbService.DeleteDetectionEventAsync((IDetectionEventModel)item.Model, cancellationToken);
+                var ret = await _providerService.DeleteDetectionEventAsync(item.Model.Id, cancellationToken);
             }
+            _pendingDeleteItems = [];
         }, cancellationToken);
 
         await DataInitialize().ConfigureAwait(false);
@@ -372,13 +473,35 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
     public DeviceProvider DeviceProvider { get; }
     public delegate void SendDate(DateTime start, DateTime end);
     public event SendDate? UpdateAction;
+
+    // ─── Pagination Properties ───
+    public bool IsLoadingMore
+    {
+        get => _isLoadingMore;
+        set { _isLoadingMore = value; NotifyOfPropertyChange(() => IsLoadingMore); }
+    }
+
+    public string LoadedCountText => $"{ViewModelProvider.Count} / {_totalCount}건";
+    public bool HasMorePages => _currentPage < _totalPages;
+
+    public ICommand LoadMoreCommand { get; }
     #endregion
     #region - Attributes -
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
-    private IEventDbService _dbService;
+    private EventProviderService _providerService;
     private EventProvider _eventProvider;
+    private DateTime _cachedStartDate;
+    private DateTime _cachedEndDate;
+    private bool _isCacheValid;
+
+    // ─── Pagination State ───
+    private int _currentPage;
+    private int _totalPages = 1;
+    private int _totalCount;
+    private bool _isLoadingMore;
+    private IList<DetectionEventViewModel> _pendingDeleteItems = [];
     #endregion
 
 }

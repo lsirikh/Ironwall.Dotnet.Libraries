@@ -1,0 +1,249 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.EnclosureSelectionView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Views"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	d:Background="WhiteSmoke"
+	mc:Ignorable="d">
+
+	<GroupBox
+		Margin="5"
+		Style="{StaticResource MaterialDesignGroupBox}"
+		UseLayoutRounding="True">
+		<GroupBox.Header>
+			<StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal">
+				<md:PackIcon Kind="Settings" />
+				<TextBlock
+					Margin="5,0"
+					VerticalAlignment="Center"
+					Text="함체 속성" />
+			</StackPanel>
+		</GroupBox.Header>
+		<Grid Margin="5,0">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="2*" MinWidth="50" />
+			</Grid.ColumnDefinitions>
+
+			<!--  ========== Row 0: DeviceNo / Name / DoorStatus / Status / Heater ========  -->
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Device No" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="1"
+				md:HintAssist.Hint="1"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Name" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="3"
+				md:HintAssist.Hint="함체_01"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Door" />
+			<TextBox
+				Grid.Row="0"
+				Grid.Column="5"
+				md:HintAssist.Hint="CLOSED"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding DoorStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="6"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Status" />
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="7"
+				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
+				SelectedItem="{Binding Status, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<ComboBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<VirtualizingStackPanel />
+					</ItemsPanelTemplate>
+				</ComboBox.ItemsPanel>
+				<ComboBox.ItemTemplate>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" />
+					</DataTemplate>
+				</ComboBox.ItemTemplate>
+			</ComboBox>
+
+			<TextBlock
+				Grid.Row="0"
+				Grid.Column="8"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Heater" />
+			<ComboBox
+				Grid.Row="0"
+				Grid.Column="9"
+				SelectedItem="{Binding HeaterEnabled, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<sys:Boolean>True</sys:Boolean>
+				<sys:Boolean>False</sys:Boolean>
+			</ComboBox>
+
+			<!--  ========== Row 1: Fan / Ver / Location / Lat / Lng ========  -->
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Fan" />
+			<ComboBox
+				Grid.Row="1"
+				Grid.Column="1"
+				SelectedItem="{Binding FanEnabled, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<sys:Boolean>True</sys:Boolean>
+				<sys:Boolean>False</sys:Boolean>
+			</ComboBox>
+
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="2"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Ver." />
+			<TextBox
+				Grid.Row="1"
+				Grid.Column="3"
+				md:HintAssist.Hint="v1.0"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="4"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Location" />
+			<TextBox
+				Grid.Row="1"
+				Grid.Column="5"
+				md:HintAssist.Hint="설치 위치"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="6"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Lat" />
+			<TextBox
+				Grid.Row="1"
+				Grid.Column="7"
+				md:HintAssist.Hint="위도"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+			<TextBlock
+				Grid.Row="1"
+				Grid.Column="8"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Lng" />
+			<TextBox
+				Grid.Row="1"
+				Grid.Column="9"
+				md:HintAssist.Hint="경도"
+				Style="{StaticResource TextBoxInput}"
+				Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+			<!--  ========== Row 2~3: 활성화 + Groups Vertical + 적용 버튼 ========  -->
+			<TextBlock
+				Grid.Row="2"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="활성화" />
+			<ComboBox
+				Grid.Row="2"
+				Grid.Column="1"
+				SelectedItem="{Binding IsEnable, Mode=TwoWay}"
+				Style="{StaticResource ComboBoxContent}">
+				<sys:Boolean>True</sys:Boolean>
+				<sys:Boolean>False</sys:Boolean>
+			</ComboBox>
+
+			<TextBlock
+				Grid.Row="3"
+				Grid.Column="0"
+				Style="{StaticResource TextBlockTitle}"
+				Text="Groups" />
+			<ListBox
+				Grid.Row="3"
+				Grid.RowSpan="2"
+				Grid.Column="1"
+				Grid.ColumnSpan="3"
+				MaxHeight="80"
+				BorderThickness="0"
+				ScrollViewer.VerticalScrollBarVisibility="Auto"
+				ItemsSource="{Binding GroupItems}">
+				<ListBox.ItemsPanel>
+					<ItemsPanelTemplate>
+						<StackPanel Orientation="Vertical" />
+					</ItemsPanelTemplate>
+				</ListBox.ItemsPanel>
+				<ListBox.ItemTemplate>
+					<DataTemplate>
+						<CheckBox
+							Margin="4,2"
+							Content="{Binding GroupName}"
+							IsChecked="{Binding IsChecked, Mode=TwoWay}"
+							IsThreeState="True" />
+					</DataTemplate>
+				</ListBox.ItemTemplate>
+			</ListBox>
+
+			<Button
+				x:Name="ApplyButton"
+				Grid.Row="3"
+				Grid.Column="8"
+				Grid.ColumnSpan="2"
+				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+				Style="{StaticResource MaterialDesignFlatButton}">
+				<Button.Content>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
+						<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
+					</StackPanel>
+				</Button.Content>
+			</Button>
+		</Grid>
+	</GroupBox>
+</UserControl>

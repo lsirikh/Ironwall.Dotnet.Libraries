@@ -15,80 +15,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Tests;
 /// <summary>
 /// GMapDbSymbolService GeometrySymbol 전용 Fixture
 /// </summary>
-public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
+public sealed class GMapDbGeometrySymbolFixture : GMapBaseSymbolFixture
 {
     #region - Properties -
-    /// <summary>Symbol DB 서비스 인스턴스</summary>
-    public IGMapDbSymbolService Svc { get; private set; } = null!;
-
-    /// <summary>Symbol 데이터 제공자</summary>
-    public SymbolProvider SymbolProvider = new();
-    public GeometricSymbolProvider GeometrySymbolProvider { get; private set; }
-
-    /// <summary>취소 토큰 소스</summary>
-    internal CancellationTokenSource Cts { get; } = new();
-
-    /// <summary>테스트용 GeometrySymbol 생성 개수</summary>
-    public int GeometrySymbolCount = 15;
-
-    /// <summary>삽입된 GeometrySymbol ID 목록</summary>
-    public List<int> InsertedGeometrySymbolIds = new List<int>();
     #endregion
 
     #region - Constants -
-    /// <summary>테스트용 테이블 목록</summary>
-    private static readonly string[] _tables = { "GeometrySymbols", "Symbols" };
-
-    /// <summary>DB 설정</summary>
-    private readonly GMapDbSetupModel _setup = new()
-    {
-        IpDbServer = "127.0.0.1",
-        PortDbServer = 3306,
-        DbDatabase = "monitor_db",
-        UidDbServer = "root",
-        PasswordDbServer = "root"
-    };
-    #endregion
-
-    #region - IAsyncLifetime Implementation -
-    /// <summary>
-    /// 테스트 픽스처 초기화 - DB 서비스 시작
-    /// </summary>
-    [Fact(DisplayName = "Initialize GeometrySymbol DB Service")]
-    public async Task InitializeAsync()
-    {
-        var log = new LogService();
-        var ea = new EventAggregator();
-        GeometrySymbolProvider  =new GeometricSymbolProvider(log, SymbolProvider);
-        Svc = new GMapDbSymbolService(log, ea, SymbolProvider, GeometrySymbolProvider, _setup);
-
-        await DropTablesAsync();               // 깨끗한 DB 확보
-        await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance
-
-        Assert.True(Svc.IsConnected);
-    }
-
-    /// <summary>
-    /// 테스트 픽스처 정리 - DB 서비스 중지
-    /// </summary>
-    [Fact(DisplayName = "Dispose GeometrySymbol DB Service")]
-    public async Task DisposeAsync()
-    {
-        await Svc.StopService(Cts.Token);
-        await DropTablesAsync();
-
-        if (!Cts.IsCancellationRequested)
-            Cts.Cancel();
-
-        Assert.False(Svc.IsConnected);
-    }
+    
     #endregion
 
     #region - Private Methods -
     /// <summary>
     /// DB 내부 테이블 삭제 (CASCADE 순서 고려)
     /// </summary>
-    private async Task DropTablesAsync()
+    protected override async Task DropTablesAsync()
     {
         var csb = new MySqlConnectionStringBuilder
         {
@@ -120,7 +60,7 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
         var shapeTypes = Enum.GetValues<EnumShapeType>();
         var operationStates = Enum.GetValues<EnumOperationState>();
 
-        for (int i = 1; i <= GeometrySymbolCount; i++)
+        for (int i = 1; i <= SymbolCount; i++)
         {
             var geometrySymbol = new GeometricSymbolModel
             {
@@ -145,7 +85,7 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
             };
 
             int id = await Svc.InsertGeometrySymbolAsync(geometrySymbol);
-            InsertedGeometrySymbolIds.Add(id);
+            InsertedSymbolIds.Add(id);
         }
     }
 
@@ -166,7 +106,7 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
             {
                 Pid = 6000 + i,
                 Title = $"{shapeType}_심볼_{i:00}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.55 + random.NextDouble() * 0.05,
                 Longitude = 126.95 + random.NextDouble() * 0.05,
                 Altitude = 0,
@@ -185,7 +125,7 @@ public sealed class GMapDbGeometrySymbolFixture : IAsyncLifetime
             };
 
             int id = await Svc.InsertGeometrySymbolAsync(geometrySymbol);
-            InsertedGeometrySymbolIds.Add(id);
+            InsertedSymbolIds.Add(id);
             createdIds.Add(id);
         }
 
@@ -225,10 +165,10 @@ public class GMapDbGeometrySymbol_BasicCrudTests
         /* 1) FetchGeometrySymbolsAsync → 전체 개수 일치 */
         var all = await _fx.Svc.FetchGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
         Assert.NotNull(all);
-        Assert.True(all!.Count >= _fx.GeometrySymbolCount);
+        Assert.True(all!.Count >= _fx.SymbolCount);
 
         /* 2) 각각 FetchGeometrySymbolAsync로 필드 검증 */
-        foreach (var id in _fx.InsertedGeometrySymbolIds)
+        foreach (var id in _fx.InsertedSymbolIds)
         {
             var one = await _fx.Svc.FetchGeometrySymbolAsync(id);
             Assert.NotNull(one);
@@ -258,11 +198,11 @@ public class GMapDbGeometrySymbol_BasicCrudTests
     {
         await _fx.SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
         await _fx.Svc.FetchGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle);
-        var geometrySymbol = await _fx.Svc.FetchGeometrySymbolAsync(_fx.InsertedGeometrySymbolIds.First());
+        var geometrySymbol = await _fx.Svc.FetchGeometrySymbolAsync(_fx.InsertedSymbolIds.First());
 
         /* 수정 */
         geometrySymbol!.Title = "업데이트된_기하심볼";
-        geometrySymbol.OperationState = EnumOperationState.FAULT;
+        geometrySymbol.OperationState = EnumOperationState.ERROR;
         geometrySymbol.Latitude = 35.654321;
         geometrySymbol.Longitude = 129.123456;
         geometrySymbol.Bearing = 270.0;
@@ -282,7 +222,7 @@ public class GMapDbGeometrySymbol_BasicCrudTests
         Assert.NotNull(updated);
         Assert.Equal(geometrySymbol.Id, updated!.Id);
         Assert.Equal("업데이트된_기하심볼", updated.Title);
-        Assert.Equal(EnumOperationState.FAULT, updated.OperationState);
+        Assert.Equal(EnumOperationState.ERROR, updated.OperationState);
         Assert.Equal(35.654321, updated.Latitude);
         Assert.Equal(129.123456, updated.Longitude);
         Assert.Equal(270.0, updated.Bearing);
@@ -303,7 +243,7 @@ public class GMapDbGeometrySymbol_BasicCrudTests
     public async Task Delete_GeometrySymbol_Works()
     {
         await _fx.SeedGeometrySymbolsAsync();
-        var geometrySymbol = await _fx.Svc.FetchGeometrySymbolAsync(_fx.InsertedGeometrySymbolIds.First());
+        var geometrySymbol = await _fx.Svc.FetchGeometrySymbolAsync(_fx.InsertedSymbolIds.First());
 
         /* 삭제 */
         bool ok = await _fx.Svc.DeleteGeometrySymbolAsync(geometrySymbol!);
@@ -409,7 +349,7 @@ public class GMapDbGeometrySymbol_SpecializedTests
             {
                 Pid = 7000 + i,
                 Title = $"투명도테스트_{opacityValues[i]:F1}",
-                OperationState = EnumOperationState.ACTIVE,
+                OperationState = EnumOperationState.ACTIVATED,
                 Latitude = 37.5,
                 Longitude = 126.9,
                 Altitude = 0,
@@ -487,7 +427,7 @@ public class GMapDbGeometrySymbol_IntegrationTests
         {
             Pid = 8888,
             Title = "통합테스트_기하심볼",
-            OperationState = EnumOperationState.DEACTIVE,
+            OperationState = EnumOperationState.DEACTIVATED,
             Latitude = 37.5665,
             Longitude = 126.9780,
             Altitude = 100,
@@ -512,20 +452,20 @@ public class GMapDbGeometrySymbol_IntegrationTests
         Assert.NotNull(fetchedSymbol);
         Assert.Equal("통합테스트_기하심볼", fetchedSymbol!.Title);
         Assert.Equal(8888, fetchedSymbol.Pid);
-        Assert.Equal(EnumOperationState.DEACTIVE, fetchedSymbol.OperationState);
+        Assert.Equal(EnumOperationState.DEACTIVATED, fetchedSymbol.OperationState);
         Assert.Equal(EnumMarkerCategory.BASIC_SHAPES, fetchedSymbol.Category);
         Assert.Equal(EnumShapeType.Circle, fetchedSymbol.ShapeType);
         Assert.Equal(0.7, fetchedSymbol.Opacity, 2);
 
         // 3. GeometrySymbol 변경 (Circle → Triangle, 상태 변경)
-        fetchedSymbol.OperationState = EnumOperationState.ACTIVE;
+        fetchedSymbol.OperationState = EnumOperationState.ACTIVATED;
         fetchedSymbol.Title = "활성화된_삼각형";
         fetchedSymbol.ShowTitle = true;
         fetchedSymbol.ShapeType = EnumShapeType.Triangle;
         fetchedSymbol.Opacity = 1.0;
 
         var updatedSymbol = await _fx.Svc.UpdateGeometrySymbolAsync(fetchedSymbol);
-        Assert.Equal(EnumOperationState.ACTIVE, updatedSymbol!.OperationState);
+        Assert.Equal(EnumOperationState.ACTIVATED, updatedSymbol!.OperationState);
         Assert.Equal("활성화된_삼각형", updatedSymbol.Title);
         Assert.True(updatedSymbol.ShowTitle);
         Assert.Equal(EnumShapeType.Triangle, updatedSymbol.ShapeType);
@@ -558,21 +498,21 @@ public class GMapDbGeometrySymbol_IntegrationTests
         _fx.SymbolProvider.Clear();
 
         // DB에 GeometrySymbol 데이터 삽입
-        await _fx.SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle, _fx.GeometrySymbolCount);
+        await _fx.SeedGeometrySymbolsByShapeTypeAsync(EnumShapeType.Circle, _fx.SymbolCount);
 
         // FetchInstance로 Provider에 로드 (GeometrySymbol 포함)
         await _fx.Svc.FetchInstanceAsync();
         await _fx.Svc.FetchGeometrySymbolsAsync();
 
         // Provider 검증
-        Assert.True(_fx.SymbolProvider.Count >= _fx.GeometrySymbolCount);
+        Assert.True(_fx.SymbolProvider.Count >= _fx.SymbolCount);
 
         // Provider 내 GeometrySymbol 데이터 검증
         var geometrySymbols = _fx.SymbolProvider.CollectionEntity
             .OfType<GeometricSymbolModel>()
             .ToList();
 
-        Assert.True(geometrySymbols.Count >= _fx.GeometrySymbolCount);
+        Assert.True(geometrySymbols.Count >= _fx.SymbolCount);
         Assert.All(geometrySymbols, s =>
         {
             Assert.True(s.Id > 0);

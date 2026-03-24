@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
@@ -41,6 +42,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 Cts.Cancel();
                 Cts.Dispose();
             }
+
+            //var message = new SendActionRequestMessage
+            //{
+            //    EventId = Model.Id,
+            //    EventType = EnumEventType.Intrusion,
+            //    ActionDetails = Contents,
+            //    ActionUser = idUser,
+            //    ActionTime = DateTime.Now
+            //};
+
+            //// EventAggregator를 통해 메시지 발행
+            //await _eventAggregator.PublishOnBackgroundThreadAsync(message);
+
             await CloseDialog();
         }
         #endregion
@@ -53,11 +67,22 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Properties -
         public string? IdUser { get; set; } 
         public string? Contents { get; set; }
-        public string? EventGroup => _model.EventGroup;  
         public IBaseDeviceModel? Device => _model.Device;
         public EnumTrueFalse Status => _model.Status;
         public EnumEventType MessageType => _model.MessageType;
         public override IExEventModel Model => _model;
+        public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
+        public int? ControllerDeviceNumber => (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
+        public string? DeviceTypeName => Device?.DeviceType switch
+        {
+            EnumDeviceType.Controller => "제어기",
+            EnumDeviceType.IpCamera => "카메라",
+            EnumDeviceType.IpSpeaker => "스피커",
+            EnumDeviceType.Enclosure => "함체",
+            EnumDeviceType.Lamp => "경고등",
+            not null => "센서",
+            null => null
+        };
         #endregion
         #region - Attributes -
         protected readonly T _model;

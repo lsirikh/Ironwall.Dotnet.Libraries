@@ -293,6 +293,50 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "GeoControlPoints 테이블 생성…" });
 
+            const string createMapRoisSql = @"
+                CREATE TABLE IF NOT EXISTS `MapRois` (
+                    `Id`          INT AUTO_INCREMENT PRIMARY KEY,
+                    `Title`       VARCHAR(100) NOT NULL,
+                    `Latitude`    DECIMAL(10,8) NOT NULL,
+                    `Longitude`   DECIMAL(11,8) NOT NULL,
+                    `Altitude`    DECIMAL(10,2) DEFAULT 0,
+                    `Zoom`        INT DEFAULT 15,
+                    `MapId`       INT NOT NULL,
+                    `CreatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    CONSTRAINT `FK_MapRois_Maps`
+                        FOREIGN KEY (`MapId`) REFERENCES `Maps` (`Id`)
+                        ON DELETE CASCADE,
+                    INDEX `IX_MapRois_MapId` (`MapId`)
+                );";
+
+            await _conn.ExecuteAsync(createMapRoisSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MapRois 테이블 생성…" });
+
+            const string createMapLayersSql = @"
+                CREATE TABLE IF NOT EXISTS `MapLayers` (
+                    `Id`          INT AUTO_INCREMENT PRIMARY KEY,
+                    `Name`        VARCHAR(100) NOT NULL,
+                    `LayerType`   VARCHAR(20) NOT NULL,
+                    `Category`    VARCHAR(50),
+                    `IsVisible`   BOOLEAN DEFAULT TRUE,
+                    `Opacity`     DECIMAL(3,2) DEFAULT 1.0,
+                    `ZOrder`      INT DEFAULT 0,
+                    `MapId`       INT,
+                    `FilePath`    VARCHAR(500),
+                    `CreatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `IX_MapLayers_Type` (`LayerType`),
+                    INDEX `IX_MapLayers_Category` (`Category`)
+                );";
+
+            await _conn.ExecuteAsync(createMapLayersSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "MapLayers 테이블 생성…" });
+
             _log?.Info("Map 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)
@@ -973,6 +1017,34 @@ internal class GMapDbService : TaskService, IGMapDbService
             throw;
         }
     }
+
+    public async Task UpdateDefinedMapMetadataAsync(
+        int mapId,
+        double minLat, double maxLat,
+        double minLng, double maxLng,
+        int minZoom, int maxZoom,
+        CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE Maps SET
+                    MinLatitude = @MinLat, MaxLatitude = @MaxLat,
+                    MinLongitude = @MinLng, MaxLongitude = @MaxLng,
+                    MinZoomLevel = @MinZoom, MaxZoomLevel = @MaxZoom,
+                    UpdatedAt = NOW()
+                WHERE Id = @MapId;";
+
+            await conn.ExecuteAsync(sql, new { MapId = mapId, MinLat = minLat, MaxLat = maxLat, MinLng = minLng, MaxLng = maxLng, MinZoom = minZoom, MaxZoom = maxZoom });
+            _log?.Info($"UpdateDefinedMapMetadataAsync 완료 - MapId={mapId}, Zoom={minZoom}~{maxZoom}");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"DefinedMap 메타데이터 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
     #endregion
 
     #region - GeoControlPoint CRUD -
@@ -1139,9 +1211,255 @@ internal class GMapDbService : TaskService, IGMapDbService
     private DefinedMapProvider _definedMapProvider;
     private CancellationTokenSource? _cancellationTokenSource;
 
-    // GeoControlPointProvider 제거! 
+    // GeoControlPointProvider 제거!
     private MySqlConnection? _conn;
     private readonly SemaphoreSlim _processGate = new(1, 1);
+    #endregion
+
+    #region - MapRoi CRUD -
+
+    public async Task<List<IMapRoiModel>?> FetchMapRoisAsync(int mapId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT Id, Title, Latitude, Longitude, Altitude, Zoom, MapId, CreatedAt, UpdatedAt
+                FROM MapRois
+                WHERE MapId = @MapId
+                ORDER BY Id ASC;";
+
+            var rows = await conn.QueryAsync<MapRoiSQL>(sql, new { MapId = mapId });
+
+            return rows.Select(r => (IMapRoiModel)new MapRoiModel
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                Altitude = (double)r.Altitude,
+                Zoom = r.Zoom,
+                MapId = r.MapId,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 조회 실패 (MapId={mapId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<IMapRoiModel?> FetchMapRoiAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT Id, Title, Latitude, Longitude, Altitude, Zoom, MapId, CreatedAt, UpdatedAt
+                FROM MapRois
+                WHERE Id = @Id;";
+
+            var r = await conn.QueryFirstOrDefaultAsync<MapRoiSQL>(sql, new { Id = id });
+            if (r == null) return null;
+
+            return new MapRoiModel
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                Altitude = (double)r.Altitude,
+                Zoom = r.Zoom,
+                MapId = r.MapId,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 단건 조회 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<int> InsertMapRoiAsync(IMapRoiModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO MapRois (Title, Latitude, Longitude, Altitude, Zoom, MapId)
+                VALUES (@Title, @Latitude, @Longitude, @Altitude, @Zoom, @MapId);
+                SELECT LAST_INSERT_ID();";
+
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Title,
+                model.Latitude,
+                model.Longitude,
+                model.Altitude,
+                model.Zoom,
+                model.MapId
+            });
+
+            model.Id = id;
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 삽입 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> UpdateMapRoiTitleAsync(int id, string title, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "UPDATE MapRois SET Title = @Title WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id, Title = title });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi Title 변경 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<bool> DeleteMapRoiAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "DELETE FROM MapRois WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = id });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"MapRoi 삭제 실패 (Id={id}): {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region - MapLayer CRUD -
+
+    public async Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "SELECT * FROM MapLayers ORDER BY ZOrder DESC, LayerType, Name;";
+            var rows = await conn.QueryAsync<MapLayerSQL>(sql);
+            return rows.Select(r => (IMapLayerModel)new MapLayerModel
+            {
+                Id = r.Id, Name = r.Name, LayerType = r.LayerType, Category = r.Category,
+                IsVisible = r.IsVisible, Opacity = (double)r.Opacity, ZOrder = r.ZOrder,
+                MapId = r.MapId, FilePath = r.FilePath, CreatedAt = r.CreatedAt, UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 조회 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<int> InsertMapLayerAsync(IMapLayerModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO MapLayers (Name, LayerType, Category, IsVisible, Opacity, ZOrder, MapId, FilePath)
+                VALUES (@Name, @LayerType, @Category, @IsVisible, @Opacity, @ZOrder, @MapId, @FilePath);
+                SELECT LAST_INSERT_ID();";
+            var id = await conn.ExecuteScalarAsync<int>(sql, new
+            {
+                model.Name, model.LayerType, model.Category, model.IsVisible,
+                model.Opacity, model.ZOrder, model.MapId, model.FilePath
+            });
+            model.Id = id;
+            return id;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 삽입 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "UPDATE MapLayers SET IsVisible = @IsVisible WHERE Id = @Id;";
+            return await conn.ExecuteAsync(sql, new { Id = id, IsVisible = isVisible }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer Visibility 변경 실패 (Id={id}): {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> UpdateMapLayerOpacityAsync(int id, double opacity, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "UPDATE MapLayers SET Opacity = @Opacity WHERE Id = @Id;";
+            return await conn.ExecuteAsync(sql, new { Id = id, Opacity = opacity }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer Opacity 변경 실패 (Id={id}): {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> DeleteMapLayerAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            return await conn.ExecuteAsync("DELETE FROM MapLayers WHERE Id = @Id;", new { Id = id }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 삭제 실패 (Id={id}): {ex.Message}"); throw; }
+    }
+
+    public async Task SeedDefaultSymbolLayersAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            // 이미 존재하면 스킵
+            var existing = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM MapLayers WHERE LayerType = 'Symbol';");
+            if (existing > 0) return;
+
+            var defaults = new[]
+            {
+                ("카메라",       "PidsCamera",     50),
+                ("센서",         "PidsSensor",     50),
+                ("스피커",       "PidsSpeaker",    50),
+                ("컨트롤러",     "PidsController", 50),
+                ("조명",         "PidsLamp",       50),
+                ("함체",         "PidsEnclosure",  50),
+                ("PIDS 그룹",   "PidsGroup",      40),
+                ("군사부호",     "Military",       30),
+                ("기하학 도형",  "Geometric",      20),
+                ("선/경계",      "Line",           20),
+                ("인프라",       "Infra",          20),
+            };
+
+            const string sql = @"INSERT INTO MapLayers (Name, LayerType, Category, IsVisible, Opacity, ZOrder)
+                                 VALUES (@Name, 'Symbol', @Category, TRUE, 1.0, @ZOrder);";
+
+            foreach (var (name, category, zorder) in defaults)
+                await conn.ExecuteAsync(sql, new { Name = name, Category = category, ZOrder = zorder });
+
+            _log?.Info($"기본 심볼 레이어 {defaults.Length}개 생성 완료");
+        }
+        catch (Exception ex) { _log?.Error($"기본 레이어 생성 실패: {ex.Message}"); throw; }
+    }
+
     #endregion
 }
 
@@ -1312,5 +1630,36 @@ internal sealed class GeoControlPointSQL
         AccuracyMeters = (double?)AccuracyMeters,
         Description = Description
     };
+}
+
+/// <summary>
+/// MapRois 테이블 DTO
+/// </summary>
+internal sealed class MapRoiSQL
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
+    public decimal Altitude { get; set; }
+    public int Zoom { get; set; }
+    public int MapId { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+internal sealed class MapLayerSQL
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string LayerType { get; set; } = string.Empty;
+    public string? Category { get; set; }
+    public bool IsVisible { get; set; }
+    public decimal Opacity { get; set; }
+    public int ZOrder { get; set; }
+    public int? MapId { get; set; }
+    public string? FilePath { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }
 #endregion

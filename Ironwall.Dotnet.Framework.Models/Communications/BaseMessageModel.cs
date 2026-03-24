@@ -39,7 +39,7 @@ public class BaseMessageModel : IBaseMessageModel
     public EnumCmdType Command { get; set; }
 
     [JsonProperty("time", Order = 99)]
-    public DateTime? Datetime { get; set; }
+    public DateTime Datetime { get; set; }
 
 }
 

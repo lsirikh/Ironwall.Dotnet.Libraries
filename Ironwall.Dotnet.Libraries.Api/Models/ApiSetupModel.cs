@@ -9,9 +9,22 @@ namespace Ironwall.Dotnet.Libraries.Api.Models;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class ApiSetupModel
+public partial class ApiSetupModel : IApiSetupModel
 {
     #region - Ctors -
+    public ApiSetupModel()
+    {
+        
+    }
+    public ApiSetupModel(IApiSetupModel model)
+    {
+        Url = model.Url;
+        Username = model.Username;
+        Password = model.Password;
+        ApiKey = model.ApiKey;
+        Phone = model.Phone;
+        Timeout = model.Timeout;
+    }
     #endregion
     #region - Implementation of Interface -
     #endregion
@@ -29,6 +42,11 @@ public class ApiSetupModel
     public string Password { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
+
+    /// <summary>
+    /// HTTP 요청 타임아웃 (초 단위, 기본값: 10초)
+    /// </summary>
+    public int Timeout { get; set; } = 10;
     #endregion
     #region - Attributes -
     #endregion

@@ -93,7 +93,14 @@ public static class ScaleHelper
                 scaleX = 56.7;
                 scale = "15m";
                 break;
-
+            case 20:
+                scaleX = 56.7;
+                scale = "7m";
+                break;
+            case 21:
+                scaleX = 50.0;
+                scale = "3m";
+                break;
             default:
                 break;
         }

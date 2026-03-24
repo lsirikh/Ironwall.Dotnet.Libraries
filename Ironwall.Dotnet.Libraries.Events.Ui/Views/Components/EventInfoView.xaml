@@ -28,59 +28,69 @@
 			md:ThemeAssist.Theme="Inherit"
 			Background="#22111188">
 			<Grid Margin="0">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="1*" />
-				</Grid.ColumnDefinitions>
-				<StackPanel
-					Grid.Column="0"
-					Margin="5,0,5,0"
-					VerticalAlignment="Center"
-					Orientation="Vertical">
-					<CheckBox
-						Margin="0,3"
-						Content="DET"
-						FontSize="15"
-						FontWeight="Bold"
-						Foreground="WhiteSmoke"
-						IsChecked="{Binding IsDetectionEnable}"
-						Visibility="{Binding IsDetectionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
-					<CheckBox
-						Margin="0,3"
-						Content="MAL"
-						FontSize="15"
-						FontWeight="Bold"
-						Foreground="WhiteSmoke"
-						IsChecked="{Binding IsMalfunctionEnable}"
-						Visibility="{Binding IsMalfunctionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
-					<CheckBox
-						Margin="0,3"
-						Content="CON"
-						FontSize="15"
-						FontWeight="Bold"
-						Foreground="WhiteSmoke"
-						IsChecked="{Binding IsConnectionEnable}"
-						Visibility="{Binding IsConnectionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
-					<CheckBox
-						Margin="0,3"
-						Content="ACT"
-						FontSize="15"
-						FontWeight="Bold"
-						Foreground="WhiteSmoke"
-						IsChecked="{Binding IsActionEnable}"
-						Visibility="{Binding IsActionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
-				</StackPanel>
-				<lvc:CartesianChart
-					Grid.Column="1"
-					LegendBackgroundPaint="{Binding LedgendBackgroundPaint}"
-					LegendPosition="Right"
-					LegendTextPaint="{Binding LegendTextPaint}"
-					LegendTextSize="12"
-					Series="{Binding LSeries}"
-					TooltipTextSize="10"
-					XAxes="{Binding XAxes}"
-					YAxes="{Binding YAxes}"
-					ZoomMode="X" />
+				<ProgressBar
+					Width="50"
+					Height="50"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
+				<Grid Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="1*" />
+					</Grid.ColumnDefinitions>
+					<StackPanel
+						Grid.Column="0"
+						Margin="5,0,5,0"
+						VerticalAlignment="Center"
+						Orientation="Vertical">
+						<CheckBox
+							Margin="0,3"
+							Content="DET"
+							FontSize="15"
+							FontWeight="Bold"
+							Foreground="WhiteSmoke"
+							IsChecked="{Binding IsDetectionEnable}"
+							Visibility="{Binding IsDetectionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						<CheckBox
+							Margin="0,3"
+							Content="MAL"
+							FontSize="15"
+							FontWeight="Bold"
+							Foreground="WhiteSmoke"
+							IsChecked="{Binding IsMalfunctionEnable}"
+							Visibility="{Binding IsMalfunctionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						<CheckBox
+							Margin="0,3"
+							Content="CON"
+							FontSize="15"
+							FontWeight="Bold"
+							Foreground="WhiteSmoke"
+							IsChecked="{Binding IsConnectionEnable}"
+							Visibility="{Binding IsConnectionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+						<CheckBox
+							Margin="0,3"
+							Content="ACT"
+							FontSize="15"
+							FontWeight="Bold"
+							Foreground="WhiteSmoke"
+							IsChecked="{Binding IsActionEnable}"
+							Visibility="{Binding IsActionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+					</StackPanel>
+					<lvc:CartesianChart
+						Grid.Column="1"
+						LegendBackgroundPaint="{Binding LedgendBackgroundPaint}"
+						LegendPosition="Right"
+						LegendTextPaint="{Binding LegendTextPaint}"
+						LegendTextSize="12"
+						Series="{Binding LSeries}"
+						TooltipTextPaint="{Binding TooltipTextPaint}"
+						TooltipTextSize="10"
+						XAxes="{Binding XAxes}"
+						YAxes="{Binding YAxes}"
+						ZoomMode="X" />
+				</Grid>
 			</Grid>
 		</md:Card>
 		<md:Card
@@ -88,12 +98,22 @@
 			Grid.Column="3"
 			md:ThemeAssist.Theme="Inherit"
 			Background="#22118811">
-			<lvc:PieChart
-				LegendBackgroundPaint="{Binding LedgendBackgroundPaint}"
-				LegendPosition="Right"
-				LegendTextPaint="{Binding LegendTextPaint}"
-				LegendTextSize="12"
-				Series="{Binding DSeries}" />
+			<Grid>
+				<ProgressBar
+					Width="50"
+					Height="50"
+					IsIndeterminate="True"
+					Style="{DynamicResource MaterialDesignCircularProgressBar}"
+					Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+					Value="44" />
+				<lvc:PieChart
+					LegendBackgroundPaint="{Binding LedgendBackgroundPaint}"
+					LegendPosition="Right"
+					LegendTextPaint="{Binding LegendTextPaint}"
+					LegendTextSize="12"
+					Series="{Binding DSeries}"
+					Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}" />
+			</Grid>
 		</md:Card>
 
 	</Grid>

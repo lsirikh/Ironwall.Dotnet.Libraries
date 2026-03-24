@@ -39,53 +39,33 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             }
         }
 
-        public int Port
+        public int IpPort
         {
-            get => (_model as ICameraDeviceModel)!.Port;
+            get => (_model as ICameraDeviceModel)!.IpPort;
             set
             {
-                (_model as ICameraDeviceModel)!.Port = value;
-                NotifyOfPropertyChange(() => Port);
+                (_model as ICameraDeviceModel)!.IpPort = value;
+                NotifyOfPropertyChange(() => IpPort);
             }
         }
 
-        public string? Username
+        public string? UserName
         {
-            get => (_model as ICameraDeviceModel)!.Username;
+            get => (_model as ICameraDeviceModel)!.UserName;
             set
             {
-                (_model as ICameraDeviceModel)!.Username = value;
-                NotifyOfPropertyChange(() => Username);
+                (_model as ICameraDeviceModel)!.UserName = value;
+                NotifyOfPropertyChange(() => UserName);
             }
         }
 
-        public string? Password
+        public string? UserPassword
         {
-            get => (_model as ICameraDeviceModel)!.Password;
+            get => (_model as ICameraDeviceModel)!.UserPassword;
             set
             {
-                (_model as ICameraDeviceModel)!.Password = value;
-                NotifyOfPropertyChange(() => Password);
-            }
-        }
-
-        public string? RtspUri
-        {
-            get => (_model as ICameraDeviceModel)!.RtspUri;
-            set
-            {
-                (_model as ICameraDeviceModel)!.RtspUri = value;
-                NotifyOfPropertyChange(() => RtspUri);
-            }
-        }
-
-        public int RtspPort
-        {
-            get => (_model as ICameraDeviceModel)!.RtspPort;
-            set
-            {
-                (_model as ICameraDeviceModel)!.RtspPort = value;
-                NotifyOfPropertyChange(() => RtspPort);
+                (_model as ICameraDeviceModel)!.UserPassword = value;
+                NotifyOfPropertyChange(() => UserPassword);
             }
         }
 
@@ -109,53 +89,43 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             }
         }
 
-        public ICameraInfoModel? Identification
+        public ICameraInfoModel? HardwareSpec
         {
-            get => (_model as ICameraDeviceModel)!.Identification;
+            get => (_model as ICameraDeviceModel)!.HardwareSpec;
             set
             {
-                (_model as ICameraDeviceModel)!.Identification = value;
-                NotifyOfPropertyChange(() => Identification);
+                (_model as ICameraDeviceModel)!.HardwareSpec = value;
+                NotifyOfPropertyChange(() => HardwareSpec);
             }
         }
 
-        public ICameraPtzCapabilityModel? PtzCapability
+        public ICameraUrlsModel? Urls
         {
-            get => (_model as ICameraDeviceModel)!.PtzCapability;
+            get => (_model as ICameraDeviceModel)!.Urls;
             set
             {
-                (_model as ICameraDeviceModel)!.PtzCapability = value;
-                NotifyOfPropertyChange(() => PtzCapability);
+                (_model as ICameraDeviceModel)!.Urls = value;
+                NotifyOfPropertyChange(() => Urls);
             }
         }
 
-        public ICameraPositionModel? Position
+        public ICameraSettingModel? Setting
         {
-            get => (_model as ICameraDeviceModel)!.Position;
+            get => (_model as ICameraDeviceModel)!.Setting;
             set
             {
-                (_model as ICameraDeviceModel)!.Position = value;
-                NotifyOfPropertyChange(() => Position);
+                (_model as ICameraDeviceModel)!.Setting = value;
+                NotifyOfPropertyChange(() => Setting);
             }
         }
 
-        public List<ICameraPresetModel>? Presets
+        public bool? IsRecord
         {
-            get => (_model as ICameraDeviceModel)!.Presets;
+            get => (_model as ICameraDeviceModel)!.IsRecord;
             set
             {
-                (_model as ICameraDeviceModel)!.Presets = value;
-                NotifyOfPropertyChange(() => Presets);
-            }
-        }
-
-        public ICameraOpticsModel? Optics
-        {
-            get => (_model as ICameraDeviceModel)!.Optics;
-            set
-            {
-                (_model as ICameraDeviceModel)!.Optics = value;
-                NotifyOfPropertyChange(() => Optics);
+                (_model as ICameraDeviceModel)!.IsRecord = value;
+                NotifyOfPropertyChange(() => IsRecord);
             }
         }
         #endregion

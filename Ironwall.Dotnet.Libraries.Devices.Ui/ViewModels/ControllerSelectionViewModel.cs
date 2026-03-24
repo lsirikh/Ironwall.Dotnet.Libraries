@@ -1,10 +1,12 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
+using System.Collections.ObjectModel;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
     /****************************************************************************
@@ -36,7 +38,6 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         {
             foreach (var item in _selection)
             {
-                item.DeviceGroup = DeviceGroup ?? item.DeviceGroup;
                 item.DeviceNumber = DeviceNumber ?? item.DeviceNumber;
                 item.DeviceName = DeviceName ?? item.DeviceName;
                 item.DeviceType = DeviceType ?? item.DeviceType;
@@ -44,7 +45,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
                 item.Status = Status ?? item.Status;
                 item.IpAddress = IpAddress ?? item.IpAddress;
                 item.Port = Port ?? item.Port;
+                item.Location = Location ?? item.Location;
+                if (Latitude.HasValue) item.Latitude = Math.Clamp(Latitude.Value, -90.0, 90.0);
+                if (Longitude.HasValue) item.Longitude = Math.Clamp(Longitude.Value, -180.0, 180.0);
+                if (IsEnable.HasValue) item.IsEnable = IsEnable.Value;
             }
+            ApplyGroups();
         }
 
 
@@ -97,7 +103,6 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
 
         public void RefreshAll()
         {
-            DeviceGroup = CommonOrNullValue(_selection, m => m.DeviceGroup);
             DeviceNumber = CommonOrNullValue(_selection, m => m.DeviceNumber);
             DeviceName = CommonOrNullString(_selection, m => m.DeviceName);
             DeviceType = CommonOrNullValue(_selection, m => m.DeviceType);
@@ -105,12 +110,49 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             Status = CommonOrNullValue(_selection, m => m.Status);
             IpAddress = CommonOrNullString(_selection, m => m.IpAddress);
             Port = CommonOrNullValue(_selection, m => m.Port);
+            Location = CommonOrNullString(_selection, m => m.Location);
+            Latitude = CommonOrNullValue(_selection, m => m.Latitude);
+            Longitude = CommonOrNullValue(_selection, m => m.Longitude);
+            IsEnable = CommonOrNullValue(_selection, m => m.IsEnable);
+            RefreshGroupItems();
+        }
+
+        private void RefreshGroupItems()
+        {
+            var provider = IoC.Get<DeviceGroupProvider>();
+            GroupItems = new ObservableCollection<DeviceGroupItemViewModel>(
+                provider.OfType<IDeviceGroupModel>().Select(g =>
+                {
+                    var state = ComputeGroupCheckState(g.Id);
+                    return new DeviceGroupItemViewModel
+                    {
+                        GroupId = g.Id,
+                        GroupName = g.Name,
+                        IsChecked = state,
+                        OriginalState = state
+                    };
+                }));
+            NotifyOfPropertyChange(nameof(GroupItems));
+        }
+
+        private bool? ComputeGroupCheckState(int groupId)
+        {
+            var count = _selection.Count(item => item.DeviceGroups?.Contains(groupId) == true);
+            if (count == 0) return false;
+            if (count == _selection.Count) return true;
+            return null;
+        }
+
+        private void ApplyGroups()
+        {
+            var checkedIds = GroupItems.Where(g => g.IsChecked == true).Select(g => g.GroupId).ToList();
+            foreach (var item in _selection)
+                item.DeviceGroups = new List<int>(checkedIds);
         }
         #endregion
         #region - IHanldes -
         #endregion
         #region - Properties -
-        public int? DeviceGroup { get; set; }
         public int? DeviceNumber { get; set; }
         public string? DeviceName { get; set; }
         public EnumDeviceType? DeviceType { get; set; }
@@ -118,6 +160,11 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         public EnumDeviceStatus? Status { get; set; }
         public string? IpAddress { get; set; }
         public int? Port { get; set; }
+        public string? Location { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public bool? IsEnable { get; set; }
+        public ObservableCollection<DeviceGroupItemViewModel> GroupItems { get; set; } = new();
         public ControllerDevicePanelViewModel DevicePanelViewModel { get; }
         #endregion
         #region - Attributes -

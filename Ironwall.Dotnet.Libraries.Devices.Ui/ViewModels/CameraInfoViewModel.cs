@@ -77,10 +77,5 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             set { _model.OnvifVersion = value; NotifyOfPropertyChange(() => OnvifVersion); }
         }
 
-        public string? Uri
-        {
-            get => _model.Uri;
-            set { _model.Uri = value; NotifyOfPropertyChange(() => Uri); }
-        }
     }
 }

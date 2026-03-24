@@ -25,9 +25,7 @@ public class MarkerCategoryToIconConverter : IValueConverter
         { EnumMarkerCategory.MILITARY_SYMBOLS, PackIconKind.Shield },
         { EnumMarkerCategory.PIDS_EQUIPMENT, PackIconKind.Security },
         { EnumMarkerCategory.AREA_BOUNDARY, PackIconKind.MapOutline },
-        { EnumMarkerCategory.ANALYSIS, PackIconKind.ChartLine },
         { EnumMarkerCategory.INFRASTRUCTURE, PackIconKind.Factory },
-        { EnumMarkerCategory.EVENT_SYMBOLS, PackIconKind.Alert }
     };
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

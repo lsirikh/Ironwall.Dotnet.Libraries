@@ -1,14 +1,17 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
-using Ironwall.Dotnet.Libraries.Events.Db.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.Specialized;
+using System.Threading;
 using System.Windows;
+using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -26,15 +29,15 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     #region - Ctors -
     public MalfunctionEventPanelViewModel(IEventAggregator eventAggregator
                                        , ILogService log
-                                       , IEventDbService eventDbService
+                                       , EventProviderService providerService
                                        , DeviceProvider deviceProvider
                                        , EventProvider eventProvider)
                                        : base(eventAggregator, log)
     {
-        _dbService = eventDbService;
+        _providerService = providerService;
         _eventProvider = eventProvider;
         DeviceProvider = deviceProvider;
-
+        LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
     #endregion
     #region - Implementation of Interface -
@@ -42,10 +45,17 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        await DataInitialize(cancellationToken).ConfigureAwait(false);
         await base.OnActivateAsync(cancellationToken);
-        IsVisible = true;
-        //UpdateAction?.Invoke(_startDate, _endDate);
+        if (IsCacheValid())
+        {
+            LoadFromCache();
+            IsVisible = true;
+            UpdateAction?.Invoke(_startDate, _endDate);
+        }
+        else
+        {
+            await DataInitialize(cancellationToken);
+        }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -95,6 +105,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
         if (SelectedItemCount == 0) return;
+        _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = "선택한 이벤트를 정말로 삭제하시겠습니까? 해당이벤트의 조치보고도 함께 삭제 됩니다.",
@@ -121,8 +132,6 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             var token = _pCancellationTokenSource.Token;
             var currentList = _eventProvider;
 
-            var dbList = await _dbService.FetchMalfunctionEventsAsync(startDate: StartDate, endDate: EndDate, token: token);
-
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
             var updateList = ViewModelProvider
                              .Where(vm => vm.IsEdited && vm.Model.Id > 0)
@@ -130,10 +139,10 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                              .ToList();
 
             foreach (var model in updateList)
-                await _dbService.UpdateMalfunctionEventAsync(model, token);
+                await _providerService.UpdateMalfunctionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IMalfunctionEventModel>())
-                await _dbService.InsertMalfunctionEventAsync(model, token);
+                await _providerService.InsertMalfunctionEventAsync(model, token);
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -208,8 +217,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
     private static bool EventEquals(IMalfunctionEventModel a, IMalfunctionEventModel b)
     {
-        return a.EventGroup == b.EventGroup &&
-               a?.Device?.Id == b?.Device?.Id &&
+        return a?.Device?.Id == b?.Device?.Id &&
                a.MessageType == b.MessageType &&
                a.Status == b.Status &&
                a.Reason == b.Reason &&
@@ -236,6 +244,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             if (_cancellationTokenSource != null)
                 _cancellationTokenSource.Cancel();
 
+            InvalidateCache();
             _cancellationTokenSource = new CancellationTokenSource();
             await DataInitialize(_cancellationTokenSource.Token).ConfigureAwait(false);
         }
@@ -255,7 +264,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     {
         try
         {
-            if (_cancellationTokenSource == null && _cancellationTokenSource.IsCancellationRequested)
+            if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
                 return;
 
             _cancellationTokenSource.Cancel();
@@ -273,47 +282,126 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             try
             {
                 IsVisible = false;
-                //await Task.Delay(300, cancellationToken);
 
-                //DB Fetching
-                var events = await _dbService.FetchMalfunctionEventsAsync(startDate: StartDate, endDate: EndDate, token: cancellationToken);
-                if (events == null) return;
-                _eventProvider.Clear();
-                foreach (var item in events)
-                {
-                    _eventProvider.Add(item);
-                }
+                // 페이지네이션 상태 초기화
+                _currentPage = 0;
+                _totalPages = 1;
+                _totalCount = 0;
+
+                // 기존 Malfunction 이벤트 제거
+                var existingMalfunction = _eventProvider.OfType<IMalfunctionEventModel>().ToList();
+                foreach (var e in existingMalfunction) _eventProvider.Remove(e);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
-                //ViewModelProvider Setting
-                if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-
 
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
-                    foreach (var (item, index) in _eventProvider.OfType<IMalfunctionEventModel>().OrderBy(item => item.Id).Select((item, index) => (item, index)))
-                    {
-                        if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new MalfunctionEventViewModel(item) { Index = index + 1 });
-                    }
-
-                    NotifyOfPropertyChange(() => ViewModelProvider);
                 });
 
+                // CollectionChanged 구독을 LoadNextPageAsync 전에 설정
+                // → VP.Add 시 CollectionChanged가 EP 동기화 담당 (double-add 방지)
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                IsVisible = true;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 첫 페이지 로드
+                await LoadNextPageAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 캐시 날짜범위 기록
+                SetCachedDate(_startDate, _endDate);
             }
-            catch (TaskCanceledException ex)
+            catch (OperationCanceledException ex)
             {
-                _log?.Warning($"Raised {nameof(TaskCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
+                _log?.Warning($"Raised {nameof(OperationCanceledException)}({nameof(DataInitialize)}) : {ex.Message}");
             }
             finally
             {
+                IsVisible = true;
                 UpdateAction?.Invoke(_startDate, _endDate);
             }
         });
+    }
+
+    public async Task LoadNextPageAsync(CancellationToken token = default)
+    {
+        if (_isLoadingMore || !HasMorePages) return;
+
+        token.ThrowIfCancellationRequested();
+
+        _isLoadingMore = true;
+        IsLoadingMore = true;
+
+        try
+        {
+            var result = await _providerService.FetchMalfunctionEventsPageAsync(
+                StartDate, EndDate, _currentPage + 1, 100, token);
+
+            if (token.IsCancellationRequested) return;
+
+            _currentPage = result.Page;
+            _totalPages = result.TotalPages;
+            _totalCount = result.Total;
+
+            DispatcherService.Invoke(() =>
+            {
+                foreach (var item in result.Items)
+                {
+                    // _eventProvider 동기화는 CollectionChanged 핸들러가 담당
+                    ViewModelProvider.Add(new MalfunctionEventViewModel(item)
+                    {
+                        Index = ViewModelProvider.Count + 1
+                    });
+                }
+                NotifyOfPropertyChange(() => LoadedCountText);
+                NotifyOfPropertyChange(() => HasMorePages);
+            });
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex) { _log?.Error($"LoadNextPageAsync failed: {ex.Message}"); }
+        finally
+        {
+            _isLoadingMore = false;
+            IsLoadingMore = false;
+        }
+    }
+
+    private void LoadFromCache()
+    {
+        ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+        DispatcherService.Invoke(() =>
+        {
+            ViewModelProvider.Clear();
+            foreach (var (item, index) in _eventProvider.OfType<IMalfunctionEventModel>().OrderBy(item => item.Id).Select((item, index) => (item, index)))
+            {
+                ViewModelProvider.Add(new MalfunctionEventViewModel(item) { Index = index + 1 });
+            }
+            NotifyOfPropertyChange(() => ViewModelProvider);
+            NotifyOfPropertyChange(() => LoadedCountText);
+            NotifyOfPropertyChange(() => HasMorePages);
+        });
+        ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+    }
+
+    internal bool IsCacheValid()
+    {
+        return _isCacheValid
+            && _cachedStartDate == _startDate
+            && _cachedEndDate == _endDate
+            && _eventProvider.OfType<IMalfunctionEventModel>().Any();
+    }
+
+    public void SetCachedDate(DateTime startDate, DateTime endDate)
+    {
+        _cachedStartDate = startDate;
+        _cachedEndDate = endDate;
+        _isCacheValid = true;
+    }
+
+    public void InvalidateCache()
+    {
+        _isCacheValid = false;
     }
     #endregion
     #region - IHanldes -
@@ -325,10 +413,11 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in SelectedItems.ToList())
+            foreach (var item in _pendingDeleteItems)
             {
-                var ret = await _dbService.DeleteMalfunctionEventAsync((IMalfunctionEventModel)item.Model, cancellationToken);
+                var ret = await _providerService.DeleteMalfunctionEventAsync(item.Model.Id, cancellationToken);
             }
+            _pendingDeleteItems = [];
         }, cancellationToken);
 
         await DataInitialize().ConfigureAwait(false);
@@ -373,12 +462,34 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
     public delegate void SendDate(DateTime start, DateTime end);
     public event SendDate? UpdateAction;
+
+    // ─── Pagination Properties ───
+    public bool IsLoadingMore
+    {
+        get => _isLoadingMore;
+        set { _isLoadingMore = value; NotifyOfPropertyChange(() => IsLoadingMore); }
+    }
+
+    public string LoadedCountText => $"{ViewModelProvider.Count} / {_totalCount}건";
+    public bool HasMorePages => _currentPage < _totalPages;
+
+    public ICommand LoadMoreCommand { get; }
     #endregion
     #region - Attributes -
     protected DateTime _startDate;
     protected DateTime _endDate;
     protected DateTime _endDateDisplay;
-    private IEventDbService _dbService;
+    private EventProviderService _providerService;
     private EventProvider _eventProvider;
+    private DateTime _cachedStartDate;
+    private DateTime _cachedEndDate;
+    private bool _isCacheValid;
+
+    // ─── Pagination State ───
+    private int _currentPage;
+    private int _totalPages = 1;
+    private int _totalCount;
+    private bool _isLoadingMore;
+    private IList<MalfunctionEventViewModel> _pendingDeleteItems = [];
     #endregion
 }

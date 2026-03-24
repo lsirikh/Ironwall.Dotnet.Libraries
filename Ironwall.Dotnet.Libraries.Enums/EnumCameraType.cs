@@ -10,8 +10,6 @@ namespace Ironwall.Dotnet.Libraries.Enums
     {
         NONE,
         FIXED,
-        PTZ,
-        FISHEYES,
-        THERMAL
+        PTZ
     }
 }

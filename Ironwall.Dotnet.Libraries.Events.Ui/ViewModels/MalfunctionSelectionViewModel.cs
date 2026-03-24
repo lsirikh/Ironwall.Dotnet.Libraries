@@ -40,7 +40,6 @@ public class MalfunctionSelectionViewModel : BasePanelViewModel
         foreach (var item in _selection)
         {
             item.MessageType = MessageType ?? item.MessageType;
-            item.EventGroup = EventGroup ?? item.EventGroup;
             item.Device = Device ?? item.Device;
             item.Reason = Reason ?? item.Reason;
             item.FirstStart = FirstStart ?? item.FirstStart;
@@ -121,7 +120,6 @@ public class MalfunctionSelectionViewModel : BasePanelViewModel
     public void RefreshAll()
     {
         MessageType = CommonOrNullValue(_selection, m => m.MessageType);
-        EventGroup = CommonOrNullString(_selection, m => m.EventGroup);
         Device = CommonOrNullReference(_selection, DeviceProvider, _log);
         Reason = CommonOrNullValue(_selection, m => m.Reason);
         FirstStart = CommonOrNullValue(_selection, m => m.FirstStart);
@@ -136,7 +134,6 @@ public class MalfunctionSelectionViewModel : BasePanelViewModel
     #endregion
     #region - Properties -
     public EnumEventType? MessageType { get; set; }
-    public string? EventGroup { get; set; }
     public IBaseDeviceModel? Device { get; set; }
     public EnumTrueFalse? Status { get; set; }
     public EnumFaultType? Reason { get; set; }

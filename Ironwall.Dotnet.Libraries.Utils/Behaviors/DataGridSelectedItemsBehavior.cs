@@ -32,7 +32,7 @@ public class DataGridSelectedItemsBehavior<TItemVm> : Behavior<DataGrid>
     protected override void OnDetaching()
         => AssociatedObject.SelectionChanged -= OnSelectionChanged;
 
-    private void OnSelectionChanged(object? s, SelectionChangedEventArgs e)
+    protected virtual void OnSelectionChanged(object? s, SelectionChangedEventArgs e)
         => SelectedItems = AssociatedObject.SelectedItems
                            .OfType<TItemVm>()
                            .ToList();

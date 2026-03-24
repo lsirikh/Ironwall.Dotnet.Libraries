@@ -155,19 +155,5 @@
 			Style="{StaticResource TextBoxInput}"
 			Text="{Binding OnvifVersion}" />
 
-		<!--  Service URI  -->
-		<TextBlock
-			Grid.Row="9"
-			Grid.Column="0"
-			Style="{StaticResource TextBlockTitle}"
-			Text="Device Service URI" />
-		<TextBox
-			Grid.Row="9"
-			Grid.Column="1"
-			md:HintAssist.Hint="SOAP 서비스 엔드포인트"
-			IsReadOnly="True"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding Uri}"
-			TextWrapping="Wrap" />
 	</Grid>
 </UserControl>

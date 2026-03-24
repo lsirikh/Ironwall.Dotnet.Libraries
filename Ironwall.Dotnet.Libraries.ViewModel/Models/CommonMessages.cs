@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
+using Ironwall.Dotnet.Libraries.Enums;
 using System;
 
 namespace Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -28,6 +29,15 @@ public class OpenDeleteAccountDialogMessageModel;
 public class OpenEditAccountDialogMessageModel;
 public class OpenPreEventRemoveAllDialogMessageModel;
 public class OpenOnvifPropertyDialogMessageModel;
+public class OpenCameraDetailDialogMessageModel
+{
+    public object? Dialog { get; set; }
+}
+public class OpenDeviceAssignDialogMessageModel
+{
+    public object? Dialog { get; set; }
+    public Action? OnCompleted { get; set; }
+}
 public class OpenEventReportDialogMessageModel
 {
     public string? EventType { get; set; }
@@ -53,18 +63,34 @@ public class CallDeleteProcessMessageModel : IMessageModel { }
 public class CallDeleteControllerDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteCameraDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteSensorDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteSpeakerDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteEnclosureDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteLampDeviceProcessMessageModel : IMessageModel { }
+public class CallDeleteDeviceGroupProcessMessageModel : IMessageModel { }
+public class CallRemoveDeviceFromGroupProcessMessageModel : IMessageModel { }
 public class CallDeleteDetectionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteMalfunctionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteConnectionEventProcessMessageModel : IMessageModel { }
 public class CallDeleteActionEventProcessMessageModel : IMessageModel { }
+public class CallDelete3rdEventProcessMessageModel : IMessageModel { }
 public class ExitProgramMessageModel : IMessageModel { }
 public class OpenConfirmPopupMessageModel : CommonMessageModel { }
 public class OpenInfoPopupMessageModel : CommonMessageModel { }
 public class OpenProgressPopupMessageModel : IMessageModel { }
 public class CallAllEventReportMessageModel : IMessageModel { }
+public class CallDeleteMapRoiProcessMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }
+/// <summary>WindyMode NATS REQ 요청 트리거 — WindyPanelViewModel → NatsDomainService</summary>
+public record SendWindyModeMessage(EnumWindyMode Mode);
+
+/// <summary>디바이스 초기 로딩 완료 알림 — SymbolEventManager 일괄 동기화 트리거</summary>
+public record AllDevicesLoadedMessage();
+
+/// <summary>NatsSync 기반 단일 디바이스 Status 변경 알림</summary>
+public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType, EnumDeviceStatus Status);
+
 public class StatusMessageModel
 {
     public StatusMessageModel()

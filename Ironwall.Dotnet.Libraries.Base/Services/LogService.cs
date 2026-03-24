@@ -69,8 +69,17 @@ public class LogService : ILogService
         hierarchy.Root.AddAppender(debugAppender); // Debug 모드에서만 활성화
 #endif
 
+        // BufferingForwardingAppender로 래핑 — 호출 스레드 디스크 I/O 블로킹 제거
+        var bufferingAppender = new BufferingForwardingAppender();
+        bufferingAppender.AddAppender(roller);
+        bufferingAppender.BufferSize = 50;
+        bufferingAppender.Lossy = false;
+        bufferingAppender.Fix = FixFlags.All;
+        bufferingAppender.Evaluator = new LevelEvaluator(Level.Error); // ERROR 즉시 flush
+        bufferingAppender.ActivateOptions();
+
         // Appender 추가 및 기본 설정
-        hierarchy.Root.AddAppender(roller);
+        hierarchy.Root.AddAppender(bufferingAppender);
         hierarchy.Root.Level = Level.All;
         hierarchy.Configured = true;
 
@@ -137,37 +146,9 @@ public class LogService : ILogService
         OnLogEvent(new LogEventArgs(msg, level: effectiveLevel));
     }
 
-    private async void OnLogEvent(LogEventArgs e)
+    private void OnLogEvent(LogEventArgs e)
     {
-
-        await OnLogEventAsync(e);
-    }
-
-    private async Task OnLogEventAsync(LogEventArgs e)
-    {
-        if (LogEvent != null)
-        {
-            var eventHandlers = LogEvent.GetInvocationList().Cast<EventHandler<LogEventArgs>>();
-
-            foreach (var handler in eventHandlers)
-            {
-                try
-                {
-                    // 비동기로 각 이벤트 핸들러 실행
-                    await Task.Run(() => handler.Invoke(this, e));
-                }
-                catch (TaskCanceledException)
-                {
-                    // 작업 취소 처리
-                    _iLog?.Warn($"Log event handler was canceled: {handler.Method.Name}");
-                }
-                catch (Exception ex)
-                {
-                    // 기타 예외 처리
-                    _iLog?.Error($"Exception in log event handler ({handler.Method.Name}): {ex.Message}");
-                }
-            }
-        }
+        LogEvent?.Invoke(this, e);
     }
     #endregion
     #region - IHanldes -

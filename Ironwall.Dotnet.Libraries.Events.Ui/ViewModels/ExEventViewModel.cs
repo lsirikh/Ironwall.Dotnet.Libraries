@@ -4,7 +4,6 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 /****************************************************************************
@@ -70,6 +69,21 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
             SetModelProperty(value, _model.Status, v => _model.Status = v);
         }
     }
+
+    public bool IsActionReported => Status == EnumTrueFalse.True;
+
+    public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
+    public int? ControllerDeviceNumber => (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
+    public string? DeviceTypeName => Device?.DeviceType switch
+    {
+        EnumDeviceType.Controller => "제어기",
+        EnumDeviceType.IpCamera => "카메라",
+        EnumDeviceType.IpSpeaker => "스피커",
+        EnumDeviceType.Enclosure => "함체",
+        EnumDeviceType.Lamp => "경고등",
+        not null => "센서",
+        null => null
+    };
     #endregion
     #region - Attributes -
     #endregion

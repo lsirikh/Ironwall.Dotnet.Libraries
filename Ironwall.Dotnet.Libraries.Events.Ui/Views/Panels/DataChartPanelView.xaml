@@ -26,10 +26,9 @@
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
-		<StackPanel Grid.Row="0" Orientation="Vertical">
+		<!--  날짜 피커: EventDashboardView로 이관 — Collapsed  -->
+		<StackPanel Grid.Row="0" Orientation="Vertical" Visibility="Collapsed">
 			<Grid Grid.Row="0" Margin="10,0">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="50" />
@@ -98,16 +97,21 @@
 							Kind="Cancel" />
 					</Button.Content>
 				</Button>
-
-
-
 			</Grid>
 		</StackPanel>
-		<Grid Grid.Row="1" Margin="10">
+		<Grid Grid.Row="1" Margin="10, 0">
+			<ProgressBar
+				Width="50"
+				Height="50"
+				IsIndeterminate="True"
+				Style="{DynamicResource MaterialDesignCircularProgressBar}"
+				Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+				Value="44" />
 			<lvc:CartesianChart
 				LegendPosition="Right"
 				Series="{Binding Series}"
 				TooltipTextSize="12"
+				Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}"
 				XAxes="{Binding XAxes}"
 				YAxes="{Binding YAxes}"
 				ZoomMode="X" />
