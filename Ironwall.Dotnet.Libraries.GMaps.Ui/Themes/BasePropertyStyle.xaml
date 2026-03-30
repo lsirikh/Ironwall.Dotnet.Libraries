@@ -140,7 +140,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 									</Grid>
 
 									<!--  제목크기  -->
@@ -157,7 +157,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding TitleSize, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+											Text="{Binding TitleSize, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 									</Grid>
 
 									<!--  크기  -->
@@ -176,7 +176,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerWidth, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+											Text="{Binding MarkerWidth, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 										<md:PackIcon
 											Grid.Column="2"
 											Width="10"
@@ -188,7 +188,7 @@
 										<TextBox
 											Grid.Column="3"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 									</Grid>
 
 									<!--  회전  -->
@@ -205,7 +205,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 										<TextBlock
 											Grid.Column="2"
 											Margin="5,0,0,0"

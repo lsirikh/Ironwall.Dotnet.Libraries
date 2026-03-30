@@ -52,6 +52,13 @@ public class LayerPanelControl : Control
         {
             leaf.CheckChanged -= OnLeafCheckChanged;
             leaf.CheckChanged += OnLeafCheckChanged;
+            leaf.OpacityChanged -= OnLeafOpacityChanged;
+            leaf.OpacityChanged += OnLeafOpacityChanged;
+
+            // ContextMenu Command → 이벤트 라우팅
+            leaf.OnDeleteAction = RaiseLayerDeleteRequested;
+            leaf.OnMoveUpAction = RaiseLayerMoveUpRequested;
+            leaf.OnMoveDownAction = RaiseLayerMoveDownRequested;
         }
     }
 
@@ -60,6 +67,14 @@ public class LayerPanelControl : Control
         if (sender is LayerTreeNode node && node.Model != null)
         {
             LayerVisibilityChanged?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked ?? true));
+        }
+    }
+
+    private void OnLeafOpacityChanged(object? sender, EventArgs e)
+    {
+        if (sender is LayerTreeNode node && node.Model != null)
+        {
+            NotifyOpacityChanged(node.Model, node.Opacity);
         }
     }
 
@@ -94,6 +109,27 @@ public class LayerPanelControl : Control
     public event EventHandler<LayerChangedEventArgs>? LayerVisibilityChanged;
     public event EventHandler<LayerOpacityChangedEventArgs>? LayerOpacityChanged;
     public event EventHandler? CloseRequested;
+    public event EventHandler<LayerChangedEventArgs>? LayerDeleteRequested;
+    public event EventHandler<LayerChangedEventArgs>? LayerMoveUpRequested;
+    public event EventHandler<LayerChangedEventArgs>? LayerMoveDownRequested;
+
+    internal void RaiseLayerDeleteRequested(LayerTreeNode node)
+    {
+        if (node.Model != null)
+            LayerDeleteRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
+    }
+
+    internal void RaiseLayerMoveUpRequested(LayerTreeNode node)
+    {
+        if (node.Model != null)
+            LayerMoveUpRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
+    }
+
+    internal void RaiseLayerMoveDownRequested(LayerTreeNode node)
+    {
+        if (node.Model != null)
+            LayerMoveDownRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
+    }
 
     #endregion
 

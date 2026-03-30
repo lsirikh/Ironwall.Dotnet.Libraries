@@ -51,6 +51,8 @@ public class GMapUiModule: Module
         builder.RegisterType<MapViewModel>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
+        builder.RegisterType<CustomMapOverlayService>().SingleInstance();
+        builder.RegisterType<LruTileCache>().SingleInstance();
         builder.RegisterType<ImageOverlayService>().SingleInstance();
         //builder.RegisterType<MGRSGridOverlayService>().SingleInstance();
     }

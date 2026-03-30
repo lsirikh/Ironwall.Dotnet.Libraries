@@ -367,7 +367,7 @@ public class ImageOverlayService
                 _activeOverlays.TryRemove(kvp.Key, out _);
             }
 
-            _log?.Info($"모든 오버레이 제거 완료: {overlaysToRemove.Count}개");
+            //_log?.Info($"모든 오버레이 제거 완료: {overlaysToRemove.Count}개");
         }
         catch (Exception ex)
         {

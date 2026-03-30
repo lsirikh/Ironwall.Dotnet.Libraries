@@ -700,6 +700,14 @@
 					Content="{Binding TtsBroadcastPanel}"
 					Visibility="{Binding IsTtsBroadcastPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+				<!--  오버레이 맵 등록 패널  -->
+				<ContentPresenter
+					x:Name="MapRegistrationPresenter"
+					Canvas.Left="350"
+					Canvas.Top="80"
+					Content="{Binding MapRegistrationPanel}"
+					Visibility="{Binding IsMapRegistrationPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 				<!--  레이어 관리 패널  -->
 				<ContentPresenter
 					x:Name="LayerPanelPresenter"

@@ -1,9 +1,11 @@
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 
@@ -80,6 +82,7 @@ public class LayerTreeNode : INotifyPropertyChanged
     /// Leaf 노드의 IsChecked가 변경될 때 발생 (routed event 대체)
     /// </summary>
     public event EventHandler? CheckChanged;
+    public event EventHandler? OpacityChanged;
 
     public double Opacity
     {
@@ -90,7 +93,10 @@ public class LayerTreeNode : INotifyPropertyChanged
             _opacity = value;
             OnPropertyChanged();
             if (Model != null)
+            {
                 Model.Opacity = value;
+                OpacityChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 
@@ -221,6 +227,31 @@ public class LayerTreeNode : INotifyPropertyChanged
             HasOpacitySlider = false
         };
     }
+
+    #endregion
+
+    #region ContextMenu Commands
+
+    /// <summary>삭제 가능 여부 — OverlayMap/OverlayImage Leaf만</summary>
+    public bool CanDelete => NodeType == LayerNodeType.Leaf
+        && Model?.LayerType != "Symbol";
+
+    /// <summary>위로 이동 가능 여부 — Parent.Children 내 첫 번째가 아닌 경우</summary>
+    public bool CanMoveUp => Parent != null
+        && Parent.Children.IndexOf(this) > 0;
+
+    /// <summary>아래로 이동 가능 여부 — Parent.Children 내 마지막이 아닌 경우</summary>
+    public bool CanMoveDown => Parent != null
+        && Parent.Children.IndexOf(this) < Parent.Children.Count - 1;
+
+    /// <summary>삭제/위로/아래로 이벤트를 LayerPanelControl로 라우팅하기 위한 참조</summary>
+    internal Action<LayerTreeNode>? OnDeleteAction { get; set; }
+    internal Action<LayerTreeNode>? OnMoveUpAction { get; set; }
+    internal Action<LayerTreeNode>? OnMoveDownAction { get; set; }
+
+    public ICommand DeleteCommand => new RelayCommand(_ => OnDeleteAction?.Invoke(this), _ => CanDelete);
+    public ICommand MoveUpCommand => new RelayCommand(_ => OnMoveUpAction?.Invoke(this), _ => CanMoveUp);
+    public ICommand MoveDownCommand => new RelayCommand(_ => OnMoveDownAction?.Invoke(this), _ => CanMoveDown);
 
     #endregion
 

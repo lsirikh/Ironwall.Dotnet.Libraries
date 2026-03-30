@@ -80,8 +80,6 @@ public class MapViewModel : BasePanelViewModel,
                         , IEventAggregator eventAggregator
                         , GMapSetupModel setupModel
                         , MapProvider mapProvider
-                        , DefinedMapProvider definedMapProvider
-                        , Providers.CustomMapProvider customMapProvider
                         , CustomMapService customMapService
                         , IGMapDbSymbolService gMapDbSymbolService
                         , SymbolProvider symbolProvider
@@ -94,12 +92,11 @@ public class MapViewModel : BasePanelViewModel,
                         , IDeviceDetailUrlService deviceDetailUrlService
                         , IBroadcastControlService broadcastControlService
                         , IGMapDbService gMapDbService
+                        , CustomMapOverlayService customMapOverlayService
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
         _mapProvider = mapProvider;
-        _definedMapProvider = definedMapProvider;
-        _customMapProvider = customMapProvider;
         _gMapDbSymbolService = gMapDbSymbolService;
         _gMapDbService = gMapDbService;
         _symbolProvider = symbolProvider;
@@ -111,6 +108,7 @@ public class MapViewModel : BasePanelViewModel,
         _symbolEventManager = symbolEventManager;
         _deviceDetailUrlService = deviceDetailUrlService;
         _broadcastControlService = broadcastControlService;
+        _customMapOverlayService = customMapOverlayService;
         DeviceProvider = deviceProvider;
         InitializeCommands();
     }
@@ -138,6 +136,12 @@ public class MapViewModel : BasePanelViewModel,
             // 회전 속성 동기화
             SyncRotationProperties();
 
+            // 오버레이 맵 Canvas — GMapCustomControl.OnRender에서 DrawingContext로 렌더링
+            // base.OnRender(타일) → RenderOverlayMapTiles(오버레이) → 심볼(ItemsPresenter)
+            var overlayCanvas = new Canvas { IsHitTestVisible = false };
+            MainMap.OverlayMapCanvas = overlayCanvas;
+            _customMapOverlayService.Initialize(overlayCanvas);
+
             _log?.Info("MapViewModel과 뷰 연결 완료");
         }
     }
@@ -163,13 +167,37 @@ public class MapViewModel : BasePanelViewModel,
             // 4. 이미지 오버레이 설정 (Phase 28)
             await ImageConfigureAsync();
 
+            // 4.5. 기존 CustomMap → MapLayers 마이그레이션 + 오버레이 복원
+            await SeedAndRestoreOverlayMapsAsync();
+
+            // 4.5.1. OverlayImage → MapLayers Seed
+            await SeedOverlayImageLayersAsync();
+
+            // 4.6. 오버레이 첫 렌더링 — 맵 로드 완료 후 실행
+            if (_customMapOverlayService.ActiveOverlays.Any())
+            {
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Loaded,
+                    new System.Action(() =>
+                    {
+                        if (MainMap?.ViewArea.WidthLng > 0)
+                        {
+                            _log?.Info($"[Overlay] 초기 렌더링 트리거 — ViewArea={MainMap.ViewArea}");
+                            _customMapOverlayService.RefreshVisibleTiles(MainMap);
+                        }
+                        else
+                        {
+                            _log?.Info("[Overlay] ViewArea 아직 미유효 — OnTileLoadComplete 대기");
+                            MainMap.OnTileLoadComplete += OnFirstTileLoadForOverlay;
+                        }
+                    }));
+            }
+
             // 5. ComboBox 초기 선택 알림
             NotifyOfPropertyChange(nameof(AvailableMaps));
             NotifyOfPropertyChange(nameof(SelectedMapItem));
 
-            // TODO: 초기 로드 시 빈 타일 버그 미해결 — PRD_Map_Init_Switch_Redesign.md 섹션 5.5 참조
-            // 원인: IsStarted=false 상태에서 Position 설정 시 _positionPixel 미갱신
-            // 다음 세션에서 GMap.NET Core 직접 수정 필요
+            // 빈 타일 버그 해결됨 — MBTilesMapProvider MinZoom/MaxZoom shadowing 제거 (2026-03-24)
 
             _eventAggregator.SubscribeOnPublishedThread(this);
 
@@ -635,7 +663,7 @@ public class MapViewModel : BasePanelViewModel,
 
             HidePropertyPanel();
 
-            _log?.Info("모든 선택 해제 완료");
+            //_log?.Info("모든 선택 해제 완료");
         }
         catch (Exception ex)
         {
@@ -790,9 +818,10 @@ public class MapViewModel : BasePanelViewModel,
             {
                 var filePath = openFileDialog.FileName;
                 var title = System.IO.Path.GetFileNameWithoutExtension(filePath);
-                var currentPosition = ClickedCurrentPosition.IsEmpty ? MainMap.CenterPosition : ClickedCurrentPosition;
+                // 항상 현재 지도 중심점 기준으로 배치
+                var currentPosition = MainMap.Position;
 
-                // Phase 30: 이미지 실제 크기 로드
+                // 이미지 실제 크기 로드
                 double imageWidth = 200;  // 기본값
                 double imageHeight = 200; // 기본값
                 try
@@ -804,27 +833,28 @@ public class MapViewModel : BasePanelViewModel,
                     bitmap.EndInit();
                     imageWidth = bitmap.PixelWidth;
                     imageHeight = bitmap.PixelHeight;
-                    _log?.Info($"이미지 크기 로드: {imageWidth}x{imageHeight}");
+                    _log?.Info($"이미지 원본 크기: {imageWidth}x{imageHeight}");
                 }
                 catch (Exception ex)
                 {
                     _log?.Warning($"이미지 크기 로드 실패, 기본값 사용: {ex.Message}");
                 }
 
-                // Phase 30: 현재 줌 레벨에서 픽셀 → degree 변환
-                // 중심점의 화면 좌표를 구하고, 이미지 크기만큼 떨어진 지점의 지리 좌표 계산
+                // 현재 줌 레벨에서 원본 픽셀 크기 → degree 변환
                 var centerScreen = MainMap.FromLatLngToLocal(currentPosition);
+                _log?.Info($"[DEBUG-LOAD] 지도중심={currentPosition.Lat:F6},{currentPosition.Lng:F6} → 화면좌표=({centerScreen.X},{centerScreen.Y}), Zoom={MainMap.Zoom}");
+
                 var topLeftScreen = new GMap.NET.GPoint(
                     (long)(centerScreen.X - imageWidth / 2),
                     (long)(centerScreen.Y - imageHeight / 2));
                 var bottomRightScreen = new GMap.NET.GPoint(
                     (long)(centerScreen.X + imageWidth / 2),
                     (long)(centerScreen.Y + imageHeight / 2));
+                _log?.Info($"[DEBUG-LOAD] imageW={imageWidth}, imageH={imageHeight} → topLeftScreen=({topLeftScreen.X},{topLeftScreen.Y}), bottomRightScreen=({bottomRightScreen.X},{bottomRightScreen.Y})");
 
                 var topLeftGeo = MainMap.FromLocalToLatLng((int)topLeftScreen.X, (int)topLeftScreen.Y);
                 var bottomRightGeo = MainMap.FromLocalToLatLng((int)bottomRightScreen.X, (int)bottomRightScreen.Y);
-
-                _log?.Info($"Phase 30 ImageBounds 계산: TopLeft=({topLeftGeo.Lat:F6}, {topLeftGeo.Lng:F6}), BottomRight=({bottomRightGeo.Lat:F6}, {bottomRightGeo.Lng:F6})");
+                _log?.Info($"[DEBUG-LOAD] → Geo: TopLeft=({topLeftGeo.Lat:F6},{topLeftGeo.Lng:F6}), BottomRight=({bottomRightGeo.Lat:F6},{bottomRightGeo.Lng:F6})");
 
                 // ImageModel 생성
                 var imageModel = new Ironwall.Dotnet.Monitoring.Models.Symbols.ImageModel
@@ -837,12 +867,12 @@ public class MapViewModel : BasePanelViewModel,
                     Rotation = 0.0,
                     Width = imageWidth,
                     Height = imageHeight,
-                    // Phase 30: 줌 레벨 기반 정확한 경계 설정
                     Left = topLeftGeo.Lng,
                     Right = bottomRightGeo.Lng,
                     Top = topLeftGeo.Lat,
                     Bottom = bottomRightGeo.Lat
                 };
+                _log?.Info($"[DEBUG-LOAD] ImageModel: W={imageModel.Width},H={imageModel.Height}, Bounds=L:{imageModel.Left:F6},T:{imageModel.Top:F6},R:{imageModel.Right:F6},B:{imageModel.Bottom:F6}");
 
                 // MarkerFactory로 마커 생성
                 var marker = _markerFactory.CreateImageMarker(imageModel);
@@ -851,6 +881,9 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     // 지도에 마커 추가
                     MainMap.Markers.Add(marker);
+                    // EditMode 상태에 맞게 IsHitTestVisible 동기화
+                    if (marker is GMapMarker gm && gm.Shape is UIElement shape)
+                        shape.IsHitTestVisible = IsEditModeEnabled;
 
                     // DB에 저장
                     var savedId = await DbSaveProcess(marker);
@@ -858,6 +891,20 @@ public class MapViewModel : BasePanelViewModel,
                     {
                         imageModel.Id = savedId;
                         _log?.Info($"이미지 오버레이 추가 및 DB 저장 완료: {title} (Id={savedId})");
+
+                        // MapLayers에 OverlayImage 레코드 INSERT (레이어 패널 연동)
+                        var nextZOrder = await _gMapDbService.GetNextZOrderAsync("OverlayImage");
+                        await _gMapDbService.InsertMapLayerAsync(new MapLayerModel
+                        {
+                            Name = title,
+                            LayerType = "OverlayImage",
+                            Category = "OverlayImage",
+                            IsVisible = true,
+                            Opacity = imageModel.Opacity,
+                            ZOrder = nextZOrder,
+                            FilePath = filePath,
+                        });
+                        await LoadLayersFromDbAsync();
                     }
                     else
                     {
@@ -948,29 +995,13 @@ public class MapViewModel : BasePanelViewModel,
     private bool CanExecuteCreateCustomMap(object arg) => SelectedImage != null;
 
     /// <summary>
-    /// 커스텀 맵 생성 실행 - 선택된 이미지를 타일 맵으로 변환
+    /// 커스텀 맵 생성 실행 — 등록 임베디드 패널 표시
     /// </summary>
-    private async void ExecuteCreateCustomMap(object obj)
+    private void ExecuteCreateCustomMap(object obj)
     {
         try
         {
-            _log?.Info("커스텀 맵 생성하기 시작");
-
-            // 1단계: 선택된 이미지 확인
-            if (SelectedImage == null)
-            {
-                _log?.Warning("커스텀 지도로 변환할 이미지가 선택되지 않았습니다.");
-                return;
-            }
-
-            _log?.Info($"선택된 이미지: {SelectedImage.Title}");
-
-            // 2단계: 이미지 파일 경로 확인
-            if (SelectedImage.Img == null)
-            {
-                _log?.Error("선택된 이미지의 소스 파일을 찾을 수 없습니다.");
-                return;
-            }
+            if (SelectedImage == null) return;
 
             var imageFilePath = SelectedImage.FilePath;
             if (string.IsNullOrEmpty(imageFilePath) || !File.Exists(imageFilePath))
@@ -979,47 +1010,311 @@ public class MapViewModel : BasePanelViewModel,
                 return;
             }
 
-            // 3단계: 현재 이미지 경계에서 GIS 좌표 추출
-            var imageBounds = SelectedImage.ImageBounds;
-            var geoOptions = CreateGeoOptionsFromImageBounds(imageBounds, SelectedImage.Title);
+            var fileInfo = new FileInfo(imageFilePath);
 
-            _log?.Info($"지리참조 좌표:");
-            _log?.Info($"  - 좌상단: ({geoOptions.ManualMinLongitude:F6}, {geoOptions.ManualMaxLatitude:F6})");
-            _log?.Info($"  - 우하단: ({geoOptions.ManualMaxLongitude:F6}, {geoOptions.ManualMinLatitude:F6})");
-            geoOptions.MaxZoom = (int)Zoom;
-
-            // 4단계: 사용자 확인
-            var userConfirmed = await ShowCustomMapConfirmationAsync(SelectedImage, geoOptions);
-            if (!userConfirmed)
+            // 등록 패널 생성 (Register Phase)
+            var panel = new MapRegistrationControl
             {
-                _log?.Info("사용자가 커스텀 지도 생성을 취소했습니다.");
-                return;
-            }
+                Phase = RegistrationPhase.Register,
+                FileName = Path.GetFileName(imageFilePath),
+                FileSize = FormatFileSize(fileInfo.Length),
+                ImageResolution = $"{SelectedImage.Width} x {SelectedImage.Height} px",
+                LayerName = SelectedImage.Title ?? "새 오버레이 맵",
+                MinZoom = 10,
+                MaxZoom = (int)Zoom,
+            };
 
-            // 5단계: 진행률 모니터링 설정
-            var progress = CreateProgressReporter();
+            // "등록" 이벤트 구독
+            panel.RegisterRequested += async (s, args) =>
+            {
+                panel.Phase = RegistrationPhase.Progress;
+                var cts = new CancellationTokenSource();
+                panel.CancelRequested += (_, __) => cts.Cancel();
 
-            // 6단계: 실제 커스텀 지도 변환 실행
-            _log?.Info("이미지를 커스텀 지도로 변환 중...");
-            var startTime = DateTime.Now;
+                var startTime = DateTime.Now;
+                var timer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(1)
+                };
+                timer.Tick += (_, __) =>
+                {
+                    var elapsed = DateTime.Now - startTime;
+                    panel.ElapsedTime = $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
+                };
+                timer.Start();
 
-            var customMap = await _customMapService.ProcessTifFileAsync(
-                imageFilePath,
-                $"{SelectedImage.Title}_CustomMap",
-                geoOptions,
-                progress);
+                var progress = new Progress<TileConversionProgress>(p =>
+                {
+                    panel.ProgressPercentage = p.ProgressPercentage;
+                    panel.CurrentZoom = p.CurrentZoomLevel;
+                    panel.ProcessedTiles = p.ProcessedTiles;
+                    panel.TotalTiles = p.TotalTiles;
+                });
 
-            var elapsedTime = DateTime.Now - startTime;
+                try
+                {
+                    var imageBounds = SelectedImage.ImageBounds;
+                    var geoOptions = CreateGeoOptionsFromImageBounds(imageBounds, args.LayerName);
+                    geoOptions.MinZoom = args.MinZoom;
+                    geoOptions.MaxZoom = args.MaxZoom;
 
-            // 7단계: 변환 완료 후 처리
-            _log?.Info($"커스텀 지도 생성 완료!");
-            _log?.Info($"소요 시간: {elapsedTime.TotalMinutes:F1}분");
-            _log?.Info($"생성된 타일: {customMap.TotalTileCount:N0}개");
-            _log?.Info($"타일 크기: {customMap.TilesDirectorySize / (1024 * 1024):N0} MB");
+                    var customMap = await _customMapService.ProcessTifFileAsync(
+                        imageFilePath, args.LayerName, geoOptions, progress);
+
+                    timer.Stop();
+                    var elapsed = DateTime.Now - startTime;
+                    panel.ElapsedTime = $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
+                    panel.TotalTiles = customMap.TotalTileCount;
+
+                    // 오버레이로 활성화
+                    _customMapOverlayService.ActivateOverlay(customMap, MainMap);
+
+                    // 원본 TIF 이미지 오버레이 제거
+                    if (SelectedImage != null)
+                    {
+                        MainMap.RemoveImageOverlay(SelectedImage);
+                        SelectedImage = null;
+                    }
+
+                    // MapLayers DB에 등록
+                    var overlayMapZOrder = await _gMapDbService.GetNextZOrderAsync("OverlayMap");
+                    await _gMapDbService.InsertMapLayerAsync(new MapLayerModel
+                    {
+                        Name = args.LayerName,
+                        LayerType = "OverlayMap",
+                        Category = "OverlayMap",
+                        IsVisible = true,
+                        Opacity = 1.0,
+                        ZOrder = overlayMapZOrder,
+                        MapId = customMap.Id,
+                    });
+
+                    // 레이어 패널 트리 갱신
+                    await LoadLayersFromDbAsync();
+
+                    panel.Phase = RegistrationPhase.Complete;
+                }
+                catch (OperationCanceledException)
+                {
+                    timer.Stop();
+                    HideMapRegistrationPanel();
+                }
+                catch (Exception ex)
+                {
+                    timer.Stop();
+                    panel.ErrorMessage = ex.Message;
+                    panel.Phase = RegistrationPhase.Error;
+                }
+            };
+
+            // "취소"/"닫기" 이벤트 구독
+            panel.CancelRequested += (s, e) => HideMapRegistrationPanel();
+            panel.CloseRequested += (s, e) => HideMapRegistrationPanel();
+
+            // 패널 표시
+            MapRegistrationPanel = panel;
+            IsMapRegistrationPanelVisible = true;
         }
         catch (Exception ex)
         {
-            _log?.Error($"커스텀 맵 생성 실패: {ex.Message}");
+            _log?.Error($"커스텀 맵 등록 패널 생성 실패: {ex.Message}");
+        }
+    }
+
+    private void HideMapRegistrationPanel()
+    {
+        IsMapRegistrationPanelVisible = false;
+        MapRegistrationPanel = null;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes >= 1_073_741_824) return $"{bytes / 1_073_741_824.0:F1} GB";
+        if (bytes >= 1_048_576) return $"{bytes / 1_048_576.0:F1} MB";
+        if (bytes >= 1_024) return $"{bytes / 1_024.0:F1} KB";
+        return $"{bytes} B";
+    }
+
+    /// <summary>
+    /// 앱 시작 시 기존 CustomMap → MapLayers Seed + 오버레이 자동 복원
+    ///
+    /// ■ 호출 시점:
+    ///   OnActivateAsync → [2.1] LoadCustomMapsAsync 완료 후 → [4.5] 이 메서드 호출
+    ///
+    /// ■ 전제 조건:
+    ///   - _customMapService.LoadCustomMapsAsync() 완료 → CustomMapProvider에 CustomMap 로드됨
+    ///   - MainMap != null (OnViewAttached에서 설정됨)
+    ///   - _customMapOverlayService.Initialize(Canvas) 완료 (OnViewAttached에서 설정됨)
+    ///
+    /// ■ 역할 2가지:
+    ///   [Seed]    CustomMaps 테이블에는 있지만 MapLayers에 OverlayMap 레코드가 없는 경우 자동 INSERT
+    ///   [Restore] MapLayers(LayerType='OverlayMap') → CustomMap 매칭 → ActivateOverlay 호출
+    ///
+    /// ■ ActivateOverlay 내부 동작:
+    ///   1. CustomMapService.ActivateCustomMap → FileBasedCustomMapProvider 생성 (타일 폴더 연결)
+    ///   2. Canvas 생성 → _overlayCanvas에 추가
+    ///   3. RefreshVisibleTilesForState → 현재 뷰포트에 해당하는 타일 로드 + Canvas에 Image 배치
+    ///      ※ 이 시점에 MainMap.ViewArea가 아직 (0,0)이면 타일 렌더링은 지연됨
+    ///         → 맵 로드 완료 후 OnMapZoomChanged/OnPositionChanged에서 RefreshVisibleTiles 재호출
+    ///
+    /// ■ 주의:
+    ///   - 이 메서드는 OnActivateAsync에서 GMapControl_Loaded 이전에 실행될 수 있음
+    ///   - 따라서 ViewArea가 유효하지 않을 수 있고, 첫 타일 렌더링은 지연될 수 있음
+    ///   - OnActivateAsync에서 이 메서드 이후 Dispatcher.BeginInvoke로 초기 렌더링 예약
+    /// </summary>
+    /// <summary>
+    /// Images DB → MapLayers Seed (OverlayImage 레코드 자동 생성)
+    /// Images 테이블에 있지만 MapLayers에 OverlayImage 레코드가 없으면 INSERT
+    /// </summary>
+    private async Task SeedOverlayImageLayersAsync()
+    {
+        try
+        {
+            var images = await _gMapDbSymbolService.FetchImagesAsync();
+            if (images == null || !images.Any()) return;
+
+            var layers = await _gMapDbService.FetchMapLayersAsync();
+            var existingFilePaths = layers?
+                .Where(l => l.LayerType == "OverlayImage")
+                .Select(l => l.FilePath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var image in images)
+            {
+                if (string.IsNullOrEmpty(image.FilePath)) continue;
+                if (existingFilePaths.Contains(image.FilePath)) continue;
+
+                var imgSeedZOrder = await _gMapDbService.GetNextZOrderAsync("OverlayImage");
+                await _gMapDbService.InsertMapLayerAsync(new MapLayerModel
+                {
+                    Name = image.Title ?? System.IO.Path.GetFileName(image.FilePath),
+                    LayerType = "OverlayImage",
+                    Category = "OverlayImage",
+                    IsVisible = image.Visibility,
+                    Opacity = image.Opacity,
+                    ZOrder = imgSeedZOrder,
+                    FilePath = image.FilePath,
+                });
+                _log?.Info($"[OverlayImage] MapLayers Seed: {image.Title} ({image.FilePath})");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[OverlayImage] Seed 실패: {ex.Message}");
+        }
+    }
+
+    private async Task SeedAndRestoreOverlayMapsAsync()
+    {
+        try
+        {
+            if (MainMap == null) return;
+
+            // ──────────────────────────────────────────────────────
+            // [데이터 수집] CustomMapService에서 메모리에 로드된 CustomMap 목록
+            // LoadCustomMapsAsync()가 OnActivateAsync 초반에 이미 실행됨
+            // 이 목록은 DB CustomMaps 테이블 기반 (타일 폴더 유효한 것만)
+            // ──────────────────────────────────────────────────────
+            var customMaps = _customMapService.LoadedCustomMaps.ToList();
+
+            // ──────────────────────────────────────────────────────
+            // [데이터 수집] MapLayers 테이블 전체 조회 (1회)
+            // LayerType: 'Symbol', 'OverlayMap', 'OverlayImage' 등
+            // ──────────────────────────────────────────────────────
+            var layers = await _gMapDbService.FetchMapLayersAsync();
+
+            _log?.Info($"[Overlay] Seed+Restore 시작 — CustomMaps {customMaps.Count}건, MapLayers {layers?.Count ?? 0}건");
+
+            // ═══════════════════════════════════════════════════════
+            // [Phase 1: Seed] CustomMap이 있는데 MapLayers에 없으면 INSERT
+            //
+            // 왜 필요한가?
+            //   이전 버전에서 등록된 CustomMap은 Maps/CustomMaps 테이블에만 있고
+            //   MapLayers 테이블에 OverlayMap 레코드가 없음 (이번 세션에서 추가된 기능)
+            //   → 마이그레이션: 기존 CustomMap에 대한 MapLayers 레코드 자동 생성
+            // ═══════════════════════════════════════════════════════
+            var existingMapIds = layers?
+                .Where(l => l.LayerType == "OverlayMap" && l.MapId.HasValue)
+                .Select(l => l.MapId!.Value)
+                .ToHashSet() ?? new HashSet<int>();
+
+            bool seeded = false;
+            foreach (var customMap in customMaps)
+            {
+                // 이미 MapLayers에 해당 CustomMap의 레코드가 있으면 스킵
+                if (existingMapIds.Contains(customMap.Id)) continue;
+
+                // MapLayers에 OverlayMap 레코드 INSERT
+                var mapSeedZOrder = await _gMapDbService.GetNextZOrderAsync("OverlayMap");
+                await _gMapDbService.InsertMapLayerAsync(new MapLayerModel
+                {
+                    Name = customMap.Name ?? $"오버레이 맵 {customMap.Id}",
+                    LayerType = "OverlayMap",
+                    Category = "OverlayMap",
+                    IsVisible = true,
+                    Opacity = 1.0,
+                    ZOrder = mapSeedZOrder,
+                    MapId = customMap.Id,
+                });
+                seeded = true;
+                _log?.Info($"[Overlay] Seed: {customMap.Name} (MapId={customMap.Id})");
+            }
+
+            // Seed로 새 레코드가 추가됐으면 다시 조회 (INSERT된 레이어 포함)
+            if (seeded)
+                layers = await _gMapDbService.FetchMapLayersAsync();
+
+            // ═══════════════════════════════════════════════════════
+            // [Phase 2: Restore] MapLayers에서 OverlayMap 레이어 → 오버레이 활성화
+            //
+            // 각 OverlayMap 레이어에 대해:
+            //   1. MapId로 CustomMap 매칭
+            //   2. ActivateOverlay → FileBasedCustomMapProvider 생성 + Canvas 등록
+            //   3. DB에 저장된 IsVisible/Opacity 적용
+            // ═══════════════════════════════════════════════════════
+            var overlayLayers = layers?.Where(l => l.LayerType == "OverlayMap").ToList()
+                ?? new List<IMapLayerModel>();
+
+            _log?.Info($"[Overlay] 복원 대상: {overlayLayers.Count}건");
+
+            foreach (var layer in overlayLayers)
+            {
+                _log?.Info($"[Overlay] 매칭: layer.MapId={layer.MapId}, layer.Name={layer.Name}");
+
+                // MapLayers.MapId로 CustomMap 찾기
+                var customMap = customMaps.FirstOrDefault(m => m.Id == layer.MapId);
+
+                if (customMap == null)
+                {
+                    // CustomMap이 삭제됐거나 타일 폴더가 없어서 LoadCustomMapsAsync에서 제외된 경우
+                    _log?.Warning($"[Overlay] 매칭 실패 — CustomMap Id={layer.MapId} 없음");
+                    continue;
+                }
+
+                // ──────────────────────────────────────────────────
+                // ActivateOverlay 내부:
+                //   1. CustomMapService.ActivateCustomMap(customMap)
+                //      → FileBasedCustomMapProvider 생성 (타일 폴더: D:/Tiles/xxx)
+                //      → provider.GetTileImage(GPoint, zoom)으로 PNG 로드 가능
+                //   2. Canvas 생성 (이 CustomMap 전용, Opacity/Visibility 개별 제어)
+                //   3. _overlayCanvas.Children.Add(canvas)
+                //   4. RefreshVisibleTilesForState(state, mainMap)
+                //      → ViewArea 유효 시: 교차 영역 타일 계산 → LoadTileImage → Canvas에 Image 배치
+                //      → ViewArea 미유효 시 (맵 미로드): 스킵 → 이후 이벤트에서 렌더링
+                // ──────────────────────────────────────────────────
+                _customMapOverlayService.ActivateOverlay(customMap, MainMap);
+
+                // DB에 저장된 Visibility/Opacity 적용
+                _customMapOverlayService.SetVisibility(customMap.Id, layer.IsVisible);
+                _customMapOverlayService.SetOpacity(customMap.Id, layer.Opacity);
+
+                _log?.Info($"[Overlay] 복원 완료: {layer.Name}, Visible={layer.IsVisible}, Opacity={layer.Opacity}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[Overlay] Seed+Restore 실패: {ex.Message}");
         }
     }
 
@@ -1147,9 +1442,32 @@ public class MapViewModel : BasePanelViewModel,
         {
             if (SelectedImage != null)
             {
+                var deletedFilePath = SelectedImage.FilePath;
                 MainMap.RemoveImageOverlay(SelectedImage);
                 SelectedImage = null;
                 _log?.Info("선택된 이미지 삭제 완료");
+
+                // MapLayers에서 OverlayImage 레코드 삭제 (레이어 패널 연동)
+                if (!string.IsNullOrEmpty(deletedFilePath))
+                {
+                    try
+                    {
+                        var layers = await _gMapDbService.FetchMapLayersAsync();
+                        var layer = layers?.FirstOrDefault(l =>
+                            l.LayerType == "OverlayImage" &&
+                            string.Equals(l.FilePath, deletedFilePath, StringComparison.OrdinalIgnoreCase));
+                        if (layer != null)
+                        {
+                            await _gMapDbService.DeleteMapLayerAsync(layer.Id);
+                            await LoadLayersFromDbAsync();
+                            _log?.Info($"[OverlayImage] MapLayers 삭제: {layer.Name}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log?.Error($"[OverlayImage] MapLayers 삭제 실패: {ex.Message}");
+                    }
+                }
             }
 
             if (SelectedMarker != null)
@@ -1644,34 +1962,16 @@ public class MapViewModel : BasePanelViewModel,
         {
             if (MainMap == null) return Task.CompletedTask;
 
-            _log?.Info($"커스텀 지도 설정 시작: {customMap.Name}");
+            _log?.Info($"커스텀 지도 오버레이 설정: {customMap.Name}");
 
-            // 1. 커스텀 맵 활성화
-            var customProvider = _customMapService.ActivateCustomMap(customMap);
+            // 오버레이로 활성화 (베이스맵 유지, MainMap.MapProvider 변경 안 함)
+            _customMapOverlayService.ActivateOverlay(customMap, MainMap);
 
-            // 2. GMap에 Provider 설정
-            MainMap.MapProvider = customProvider;
-
-            // 3. 서버 전용 모드로 설정
-            MainMap.Manager.Mode = AccessMode.ServerOnly;
-
-            // 4. 경계 영역이 있으면 해당 영역으로 이동
-            if (customProvider.GeographicBounds.HasValue)
-            {
-                var bounds = customProvider.GeographicBounds.Value;
-                var centerLat = bounds.Lat - bounds.HeightLat / 2;
-                var centerLng = bounds.Lng + bounds.WidthLng / 2;
-                MainMap.Position = new PointLatLng(centerLat, centerLng);
-
-                _log?.Info($"커스텀 지도 중심점 설정: {centerLat:F6}, {centerLng:F6}");
-            }
-
-            CurrentCustomMapProvider = customProvider;
-            _log?.Info($"커스텀 지도 설정 완료: {customMap.Name}, 타일 수: {customMap.TotalTileCount}");
+            _log?.Info($"커스텀 지도 오버레이 완료: {customMap.Name}, 타일 수: {customMap.TotalTileCount}");
         }
         catch (Exception ex)
         {
-            _log?.Error($"커스텀 지도 설정 실패: {customMap.Name}, 오류: {ex.Message}");
+            _log?.Error($"커스텀 지도 오버레이 실패: {customMap.Name}, 오류: {ex.Message}");
             throw;
         }
         return Task.CompletedTask;
@@ -1938,11 +2238,13 @@ public class MapViewModel : BasePanelViewModel,
         MainMap.MouseMove -= MainMap_MouseMove;
         MainMap.MouseLeftButtonDown -= MainMap_MouseLeftButtonDown;
         MainMap.OnMapZoomChanged -= MainMap_OnMapZoomChanged;
+        MainMap.SizeChanged -= MainMap_SizeChanged;
 
         MainMap.OnPositionChanged += MainMap_OnCurrentPositionChanged;
         MainMap.MouseMove += MainMap_MouseMove;
         MainMap.MouseLeftButtonDown += MainMap_MouseLeftButtonDown;
         MainMap.OnMapZoomChanged += MainMap_OnMapZoomChanged;
+        MainMap.SizeChanged += MainMap_SizeChanged;
 
         MainMap.ShowCenter = true;
         MainMap_OnMapZoomChanged();
@@ -2089,6 +2391,9 @@ public class MapViewModel : BasePanelViewModel,
             if (MainMap != null && marker != null)
             {
                 MainMap.Markers.Add(marker);
+                // EditMode 상태에 맞게 IsHitTestVisible 동기화
+                if (marker is GMapMarker gm && gm.Shape is UIElement shapeEl)
+                    shapeEl.IsHitTestVisible = IsEditModeEnabled;
                 _log?.Info($"이미지 마커 추가 완료: {imageModel.Title}");
             }
             else
@@ -2618,6 +2923,9 @@ public class MapViewModel : BasePanelViewModel,
 
         // GMap에 추가
         MainMap?.Markers.Add(gMapMarker);
+        // EditMode 상태에 맞게 IsHitTestVisible 동기화
+        if (gMapMarker.Shape is UIElement shapeElement)
+            shapeElement.IsHitTestVisible = IsEditModeEnabled;
 
         // Shape 확인 로그
         var shapeType = gMapMarker.Shape?.GetType().Name ?? "null";
@@ -3008,102 +3316,297 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// 마커 우클릭 메뉴 생성 — PIDS 마커 상세보기 및 제어기 페이지
+    /// 마커 우클릭 메뉴 생성 — 모든 마커 타입 지원, PIDS 전용 항목은 타입 체크 후 추가
     /// </summary>
     public void ShowMarkerContextMenu(IEditableMarker marker, Point screenPosition)
     {
         try
         {
             if (marker == null) return;
-            if (marker is not IPidsEditableMarker pidsMarker) return;
 
             _log?.Info($"마커 컨텍스트 메뉴 표시: {marker.Title}");
 
             var menu = new ContextMenu();
 
-            // SSW-SVMS 메뉴 (공통) — 목록/상세/수정
-            var devName = pidsMarker.DeviceType switch
+            // ── PIDS 전용 메뉴 ──
+            if (marker is IPidsEditableMarker pidsMarker)
             {
-                EnumDeviceType.Controller  => "제어기",
-                EnumDeviceType.SmartSensor => "감지센서",
-                EnumDeviceType.IpCamera    => "감시카메라",
-                EnumDeviceType.IpSpeaker   => "스피커",
-                EnumDeviceType.Lamp        => "경광등",
-                EnumDeviceType.Enclosure   => "함체",
-                _                          => "장치",
-            };
-            var hasDevice = pidsMarker.LinkedDeviceId > 0;
-
-            var listUrl = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, 0, null);
-            var listItem = new MenuItem { Header = $"{devName}페이지", IsEnabled = !string.IsNullOrEmpty(listUrl) };
-            listItem.Click += (s, e) => _deviceDetailUrlService.OpenInChrome(listUrl);
-            menu.Items.Add(listItem);
-
-            var detailItem = new MenuItem { Header = $"{devName}상세", IsEnabled = hasDevice };
-            detailItem.Click += (s, e) =>
-            {
-                var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "detail");
-                _deviceDetailUrlService.OpenInChrome(url);
-            };
-            menu.Items.Add(detailItem);
-
-            var editItem = new MenuItem { Header = $"{devName}수정", IsEnabled = hasDevice };
-            editItem.Click += (s, e) =>
-            {
-                var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "edit");
-                _deviceDetailUrlService.OpenInChrome(url);
-            };
-            menu.Items.Add(editItem);
-
-            // 제어기 홈페이지 (Controller 전용)
-            if (pidsMarker.DeviceType == EnumDeviceType.Controller)
-            {
-                var ctrlItem = new MenuItem { Header = "제어기 홈페이지" };
-                var controllerModel = pidsMarker.LinkedDevice as IControllerDeviceModel;
-                ctrlItem.IsEnabled = controllerModel != null;
-                ctrlItem.Click += (s, e) =>
+                var devName = pidsMarker.DeviceType switch
                 {
-                    if (controllerModel != null)
+                    EnumDeviceType.Controller  => "제어기",
+                    EnumDeviceType.SmartSensor => "감지센서",
+                    EnumDeviceType.IpCamera    => "감시카메라",
+                    EnumDeviceType.IpSpeaker   => "스피커",
+                    EnumDeviceType.Lamp        => "경광등",
+                    EnumDeviceType.Enclosure   => "함체",
+                    _                          => "장치",
+                };
+                var hasDevice = pidsMarker.LinkedDeviceId > 0;
+
+                var listUrl = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, 0, null);
+                var listItem = new MenuItem
+                {
+                    Header = $"{devName}페이지",
+                    IsEnabled = !string.IsNullOrEmpty(listUrl),
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ViewList, Width = 16, Height = 16 }
+                };
+                listItem.Click += (s, e) => _deviceDetailUrlService.OpenInChrome(listUrl);
+                menu.Items.Add(listItem);
+
+                var detailItem = new MenuItem
+                {
+                    Header = $"{devName}상세",
+                    IsEnabled = hasDevice,
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.InformationOutline, Width = 16, Height = 16 }
+                };
+                detailItem.Click += (s, e) =>
+                {
+                    var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "detail");
+                    _deviceDetailUrlService.OpenInChrome(url);
+                };
+                menu.Items.Add(detailItem);
+
+                var editItem = new MenuItem
+                {
+                    Header = $"{devName}수정",
+                    IsEnabled = hasDevice,
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Pencil, Width = 16, Height = 16 }
+                };
+                editItem.Click += (s, e) =>
+                {
+                    var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "edit");
+                    _deviceDetailUrlService.OpenInChrome(url);
+                };
+                menu.Items.Add(editItem);
+
+                // 제어기 홈페이지 (Controller 전용)
+                if (pidsMarker.DeviceType == EnumDeviceType.Controller)
+                {
+                    var ctrlItem = new MenuItem
                     {
-                        var url = $"http://{controllerModel.IpAddress}:{controllerModel.Port}";
-                        _deviceDetailUrlService.OpenInChrome(url);
-                    }
-                };
-                menu.Items.Add(ctrlItem);
-            }
+                        Header = "제어기 홈페이지",
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Web, Width = 16, Height = 16 }
+                    };
+                    var controllerModel = pidsMarker.LinkedDevice as IControllerDeviceModel;
+                    ctrlItem.IsEnabled = controllerModel != null;
+                    ctrlItem.Click += (s, e) =>
+                    {
+                        if (controllerModel != null)
+                        {
+                            var url = $"http://{controllerModel.IpAddress}:{controllerModel.Port}";
+                            _deviceDetailUrlService.OpenInChrome(url);
+                        }
+                    };
+                    menu.Items.Add(ctrlItem);
+                }
 
-            // 스피커 방송 제어 (IpSpeaker 전용)
-            if (pidsMarker.DeviceType == EnumDeviceType.IpSpeaker)
-            {
-                var isEnabled = pidsMarker.LinkedDeviceId > 0;
-
-                // 음원 실행
-                var playItem = new MenuItem { Header = "음원 실행", IsEnabled = isEnabled };
-                playItem.Click += (s, e) => ShowBroadcastPlayPanel(pidsMarker.LinkedDeviceId);
-                menu.Items.Add(playItem);
-
-                // TTS 실행
-                var ttsItem = new MenuItem { Header = "TTS 실행", IsEnabled = isEnabled };
-                ttsItem.Click += (s, e) => ShowTtsBroadcastPanel(pidsMarker.LinkedDeviceId);
-                menu.Items.Add(ttsItem);
-
-                // Stop
-                var stopItem = new MenuItem { Header = "Stop", IsEnabled = isEnabled };
-                stopItem.Click += async (s, e) =>
+                // 스피커 방송 제어 (IpSpeaker 전용)
+                if (pidsMarker.DeviceType == EnumDeviceType.IpSpeaker)
                 {
-                    StopBroadcast(pidsMarker);
-                    await _broadcastControlService.PublishStopAsync(pidsMarker.LinkedDeviceId);
-                };
-                menu.Items.Add(stopItem);
+                    var isEnabled = pidsMarker.LinkedDeviceId > 0;
+
+                    var playItem = new MenuItem
+                    {
+                        Header = "음원 실행",
+                        IsEnabled = isEnabled,
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Play, Width = 16, Height = 16 }
+                    };
+                    playItem.Click += (s, e) => ShowBroadcastPlayPanel(pidsMarker.LinkedDeviceId);
+                    menu.Items.Add(playItem);
+
+                    var ttsItem = new MenuItem
+                    {
+                        Header = "TTS 실행",
+                        IsEnabled = isEnabled,
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Microphone, Width = 16, Height = 16 }
+                    };
+                    ttsItem.Click += (s, e) => ShowTtsBroadcastPanel(pidsMarker.LinkedDeviceId);
+                    menu.Items.Add(ttsItem);
+
+                    var stopItem = new MenuItem
+                    {
+                        Header = "Stop",
+                        IsEnabled = isEnabled,
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Stop, Width = 16, Height = 16 }
+                    };
+                    stopItem.Click += async (s, e) =>
+                    {
+                        StopBroadcast(pidsMarker);
+                        await _broadcastControlService.PublishStopAsync(pidsMarker.LinkedDeviceId);
+                    };
+                    menu.Items.Add(stopItem);
+                }
             }
 
-            menu.IsOpen = true;
+            // ── 레이어 순서 제어 (모든 마커 공통) ──
+            if (menu.Items.Count > 0)
+                menu.Items.Add(new Separator());
+
+            var moveTopItem = new MenuItem
+            {
+                Header = "맨 위로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseUp, Width = 16, Height = 16 }
+            };
+            moveTopItem.Click += (s, e) => MoveMarkerToTop(marker);
+            menu.Items.Add(moveTopItem);
+
+            var moveUpItem = new MenuItem
+            {
+                Header = "한 칸 위로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowUp, Width = 16, Height = 16 }
+            };
+            moveUpItem.Click += (s, e) => MoveMarkerUp(marker);
+            menu.Items.Add(moveUpItem);
+
+            var moveDownItem = new MenuItem
+            {
+                Header = "한 칸 아래로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowDown, Width = 16, Height = 16 }
+            };
+            moveDownItem.Click += (s, e) => MoveMarkerDown(marker);
+            menu.Items.Add(moveDownItem);
+
+            var moveBottomItem = new MenuItem
+            {
+                Header = "맨 아래로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseDown, Width = 16, Height = 16 }
+            };
+            moveBottomItem.Click += (s, e) => MoveMarkerToBottom(marker);
+            menu.Items.Add(moveBottomItem);
+
+            if (menu.Items.Count > 0)
+                menu.IsOpen = true;
         }
         catch (Exception ex)
         {
             _log?.Error($"마커 컨텍스트 메뉴 표시 실패: {ex.Message}");
         }
     }
+
+    #region Marker ZOrder Control
+
+    /// <summary>
+    /// 심볼 마커를 한 칸 위로 이동 — Panel.ZIndex +1
+    /// </summary>
+    private void MoveMarkerUp(IEditableMarker marker)
+    {
+        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape) return;
+        var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
+        var newZ = oldZ + 1;
+        ApplyMarkerZIndex(gMarker, shape, newZ);
+        _log?.Info($"[ZOrder] MoveUp: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        LogAllMarkerZIndex();
+    }
+
+    /// <summary>
+    /// 심볼 마커를 한 칸 아래로 이동 — Panel.ZIndex -1
+    /// </summary>
+    private void MoveMarkerDown(IEditableMarker marker)
+    {
+        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape) return;
+        var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
+        var newZ = oldZ - 1;
+        ApplyMarkerZIndex(gMarker, shape, newZ);
+        _log?.Info($"[ZOrder] MoveDown: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        LogAllMarkerZIndex();
+    }
+
+    /// <summary>
+    /// 심볼 마커를 맨 위로 이동 — 전체 심볼 중 최대 ZIndex + 1
+    /// </summary>
+    private void MoveMarkerToTop(IEditableMarker marker)
+    {
+        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape || MainMap == null) return;
+
+        int maxZ = 0;
+        foreach (var m in MainMap.Markers)
+        {
+            if (m is IEditableMarker && m.Shape is UIElement s)
+                maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
+        }
+        var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
+        var newZ = maxZ + 1;
+        ApplyMarkerZIndex(gMarker, shape, newZ);
+        _log?.Info($"[ZOrder] MoveToTop: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        LogAllMarkerZIndex();
+    }
+
+    /// <summary>
+    /// 심볼 마커를 맨 아래로 이동 — 전체 심볼 중 최소 ZIndex - 1
+    /// </summary>
+    private void MoveMarkerToBottom(IEditableMarker marker)
+    {
+        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape || MainMap == null) return;
+
+        int minZ = int.MaxValue;
+        foreach (var m in MainMap.Markers)
+        {
+            if (m is IEditableMarker && m.Shape is UIElement s)
+                minZ = Math.Min(minZ, System.Windows.Controls.Panel.GetZIndex(s));
+        }
+        if (minZ == int.MaxValue) minZ = 0;
+        var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
+        var newZ = minZ - 1;
+        ApplyMarkerZIndex(gMarker, shape, newZ);
+        _log?.Info($"[ZOrder] MoveToBottom: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        LogAllMarkerZIndex();
+    }
+
+    /// <summary>
+    /// ZIndex를 Shape + GMapMarker + Model + DB에 동시 적용
+    /// </summary>
+    private void ApplyMarkerZIndex(GMapMarker gMarker, UIElement shape, int newZ)
+    {
+        // 1. Shape 즉시 반영
+        System.Windows.Controls.Panel.SetZIndex(shape, newZ);
+        // 2. GMapMarker.ZIndex 동기화
+        gMarker.ZIndex = newZ;
+        // 3. 모델 업데이트
+        if (gMarker is IEditableMarker em)
+        {
+            // IEditableMarker → GMapBaseMarker<T> → Model 접근
+            var modelProp = gMarker.GetType().GetProperty("Model");
+            if (modelProp?.GetValue(gMarker) is ISymbolModel symbolModel)
+                symbolModel.ZIndex = newZ;
+        }
+        // 4. DB 비동기 저장
+        if (gMarker is IEditableMarker editableMarker && editableMarker.Id > 0)
+            _ = SaveMarkerZIndexAsync(editableMarker.Id, newZ);
+    }
+
+    private async Task SaveMarkerZIndexAsync(int symbolId, int zIndex)
+    {
+        try
+        {
+            await _gMapDbSymbolService.UpdateSymbolZIndexAsync(symbolId, zIndex);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ZOrder] DB 저장 실패: Id={symbolId} ZIndex={zIndex} — {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 모든 마커의 현재 ZIndex 상태를 로그로 덤프
+    /// </summary>
+    private void LogAllMarkerZIndex()
+    {
+        if (MainMap == null) return;
+        _log?.Info("[ZOrder] ── 전체 마커 ZIndex 현황 ──");
+        foreach (var m in MainMap.Markers)
+        {
+            if (m is IEditableMarker em)
+            {
+                var shapeType = m.Shape?.GetType().Name ?? "null";
+                var z = m.Shape is UIElement s ? System.Windows.Controls.Panel.GetZIndex(s) : -1;
+                var hitTest = m.Shape is UIElement ht ? ht.IsHitTestVisible : false;
+                _log?.Info($"  [{z,4}] {em.Title,-20} Shape={shapeType,-35} HitTest={hitTest} Marker.ZIndex={m.ZIndex}");
+            }
+        }
+        _log?.Info("[ZOrder] ── 끝 ──");
+    }
+
+    #endregion
 
     private async Task StartBroadcastTimer(IPidsEditableMarker marker, double seconds)
     {
@@ -3576,6 +4079,7 @@ public class MapViewModel : BasePanelViewModel,
     private void MainMap_OnCurrentPositionChanged(PointLatLng point)
     {
         MainMap.Position = point;
+        _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 
     /// <summary>
@@ -3608,11 +4112,31 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 줌 변경 이벤트 핸들러 - 스케일바 업데이트
     /// </summary>
+    /// <summary>
+    /// 맵 타일 최초 로드 완료 시 오버레이 렌더링 (1회성)
+    /// </summary>
+    private void OnFirstTileLoadForOverlay(long elapsedMilliseconds)
+    {
+        MainMap.OnTileLoadComplete -= OnFirstTileLoadForOverlay;
+        _log?.Info($"[Overlay] OnTileLoadComplete 수신 — 초기 렌더링 실행");
+        _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+    }
+
     private void MainMap_OnMapZoomChanged()
     {
         CreateScaleBar();
         ClearAllSelections();
         ReapplyLayerVisibilityForZoom();
+        _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+    }
+
+    /// <summary>
+    /// 맵 컨트롤 크기 변경 이벤트 핸들러 (전체화면 전환, 윈도우 리사이즈)
+    /// 뷰포트 확장 시 새 영역의 OverlayMap 타일 로드 트리거
+    /// </summary>
+    private void MainMap_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 
     /// <summary>
@@ -3994,7 +4518,7 @@ public class MapViewModel : BasePanelViewModel,
                 await _gMapDbSymbolService.UpdatePidsGroupSymbolAsync(pidsGroupMarker.Model);
                 break;
             case GMapImageMarker imageMarker:
-                // GMapImageMarker 전용 로직 (Phase 28)
+                _log?.Info($"[DEBUG-DBUPDATE] ImageModel Id={imageMarker.ImageModel.Id}, W={imageMarker.ImageModel.Width},H={imageMarker.ImageModel.Height}, Bounds=L:{imageMarker.ImageModel.Left:F6},T:{imageMarker.ImageModel.Top:F6},R:{imageMarker.ImageModel.Right:F6},B:{imageMarker.ImageModel.Bottom:F6}");
                 await _gMapDbSymbolService.UpdateImageAsync(imageMarker.ImageModel);
                 break;
             default:
@@ -4029,8 +4553,29 @@ public class MapViewModel : BasePanelViewModel,
                 // GMapPidsGroupMarker 전용 로직
                 return await _gMapDbSymbolService.DeletePidsGroupSymbolAsync(pidsGroupMarker.Model);
             case GMapImageMarker imageMarker:
-                // GMapImageMarker 전용 로직 (Phase 28)
-                return await _gMapDbSymbolService.DeleteImageAsync(imageMarker.ImageModel.Id);
+                var imgDeleted = await _gMapDbSymbolService.DeleteImageAsync(imageMarker.ImageModel.Id);
+                // MapLayers OverlayImage 레코드도 함께 삭제
+                if (imgDeleted && !string.IsNullOrEmpty(imageMarker.FilePath))
+                {
+                    try
+                    {
+                        var layers = await _gMapDbService.FetchMapLayersAsync();
+                        var layer = layers?.FirstOrDefault(l =>
+                            l.LayerType == "OverlayImage" &&
+                            string.Equals(l.FilePath, imageMarker.FilePath, StringComparison.OrdinalIgnoreCase));
+                        if (layer != null)
+                        {
+                            await _gMapDbService.DeleteMapLayerAsync(layer.Id);
+                            await LoadLayersFromDbAsync();
+                            _log?.Info($"[OverlayImage] MapLayers 삭제: {layer.Name}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log?.Error($"[OverlayImage] MapLayers 삭제 실패: {ex.Message}");
+                    }
+                }
+                return imgDeleted;
             default:
                 // 공통 로직
                 return false;
@@ -4508,7 +5053,58 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
             // DB 업데이트
             await DbUpdateProcess(e.Marker);
+
+            // OverlayImage Title/Opacity/Visibility 변경 → MapLayers 동기화
+            if (e.Marker is GMapSymbols.GMapImageMarker imgMarker
+                && (e.PropertyName == "Title" || e.PropertyName == "Opacity" || e.PropertyName == "Visibility"))
+            {
+                await SyncOverlayImageLayer(imgMarker.FilePath, e.PropertyName, e.NewValue);
+            }
         }
+    }
+
+    private async Task SyncOverlayImageLayer(string? filePath, string propertyName, object? newValue)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+        try
+        {
+            var layers = await _gMapDbService.FetchMapLayersAsync();
+            var layer = layers?.FirstOrDefault(l =>
+                l.LayerType == "OverlayImage" &&
+                string.Equals(l.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+            if (layer == null) return;
+
+            switch (propertyName)
+            {
+                case "Title":
+                    layer.Name = newValue?.ToString() ?? layer.Name;
+                    break;
+                case "Opacity":
+                    if (newValue is double opacity) layer.Opacity = opacity;
+                    break;
+                case "Visibility":
+                    if (newValue is bool visible) layer.IsVisible = visible;
+                    break;
+            }
+
+            await _gMapDbService.UpdateMapLayerAsync(layer);
+            await LoadLayersFromDbAsync();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[OverlayImage] MapLayers 동기화 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// MainMap.Markers에서 FilePath로 GMapImageMarker 검색
+    /// (이미지는 CustomImages가 아닌 Markers 컬렉션에 저장됨)
+    /// </summary>
+    private GMapSymbols.GMapImageMarker? FindImageMarkerByFilePath(string filePath)
+    {
+        return MainMap?.Markers
+            .OfType<GMapSymbols.GMapImageMarker>()
+            .FirstOrDefault(m => string.Equals(m.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
     }
 
     private void OnPropertyPanelCloseRequested(object? sender, EventArgs e)
@@ -4802,7 +5398,8 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 사용 가능한 지도 목록
     /// </summary>
-    public IEnumerable<IMapModel> AvailableMaps => _mapProvider;
+    public IEnumerable<IMapModel> AvailableMaps => _mapProvider
+        .Where(m => m is not CustomMapModel);
 
     /// <summary>
     /// ComboBox에서 선택된 지도
@@ -4827,11 +5424,11 @@ public class MapViewModel : BasePanelViewModel,
     private CancellationTokenSource _cts;
     private MapProvider _mapProvider;
     private DefinedMapProvider _definedMapProvider;
-    private Providers.CustomMapProvider _customMapProvider;
     private IGMapDbSymbolService _gMapDbSymbolService;
     private SymbolProvider _symbolProvider;
     private GMapSetupModel _setupModel;
     private CustomMapService _customMapService;
+    private CustomMapOverlayService _customMapOverlayService;
     private ImageOverlayService _imageOverlayService;
     private MarkerFactory _markerFactory;
 
@@ -4886,7 +5483,35 @@ public class MapViewModel : BasePanelViewModel,
     private MapRoiControl? _mapRoiPanel;
     private ObservableCollection<IMapRoiModel> _roiItems = new();
 
+    // 오버레이 맵 등록 패널
+    private bool _isMapRegistrationPanelVisible;
+    private MapRegistrationControl? _mapRegistrationPanel;
+
     // 지도 선택 관련 필드
+
+    #endregion
+
+    #region - 오버레이 맵 등록 Properties -
+
+    public bool IsMapRegistrationPanelVisible
+    {
+        get => _isMapRegistrationPanelVisible;
+        set
+        {
+            _isMapRegistrationPanelVisible = value;
+            NotifyOfPropertyChange(nameof(IsMapRegistrationPanelVisible));
+        }
+    }
+
+    public MapRegistrationControl? MapRegistrationPanel
+    {
+        get => _mapRegistrationPanel;
+        set
+        {
+            _mapRegistrationPanel = value;
+            NotifyOfPropertyChange(nameof(MapRegistrationPanel));
+        }
+    }
 
     #endregion
 
@@ -5224,6 +5849,9 @@ public class MapViewModel : BasePanelViewModel,
         LayerPanel = new LayerPanelControl { TreeNodes = _layerTreeNodes };
         LayerPanel.LayerVisibilityChanged += OnLayerVisibilityChanged;
         LayerPanel.LayerOpacityChanged += OnLayerOpacityChanged;
+        LayerPanel.LayerDeleteRequested += OnLayerDeleteRequested;
+        LayerPanel.LayerMoveUpRequested += OnLayerMoveUpRequested;
+        LayerPanel.LayerMoveDownRequested += OnLayerMoveDownRequested;
         LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
         IsLayerPanelVisible = true;
         LayerPanel.Loaded += async (s, e) =>
@@ -5281,7 +5909,36 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
-            ApplyLayerVisibility(e.Layer);
+            if (e.Layer.LayerType == "OverlayMap" && e.Layer.MapId.HasValue && e.Layer.MapId.Value > 0)
+            {
+                // 아직 Activate 안 된 오버레이면 먼저 활성화
+                if (e.IsVisible && !_customMapOverlayService.IsActive(e.Layer.MapId.Value))
+                {
+                    var customMap = _customMapService.LoadedCustomMaps
+                        .FirstOrDefault(m => m.Id == e.Layer.MapId.Value);
+                    if (customMap != null && MainMap != null)
+                    {
+                        _customMapOverlayService.ActivateOverlay(customMap, MainMap);
+                        _log?.Info($"[Overlay] 레이어 체크 시 활성화: {e.Layer.Name} (MapId={e.Layer.MapId})");
+                    }
+                }
+                _customMapOverlayService.SetVisibility(e.Layer.MapId.Value, e.IsVisible);
+            }
+            else if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
+            {
+                var marker = FindImageMarkerByFilePath(e.Layer.FilePath);
+                if (marker != null && marker.Shape != null)
+                {
+                    marker.Shape.Visibility = e.IsVisible
+                        ? System.Windows.Visibility.Visible
+                        : System.Windows.Visibility.Collapsed;
+                    MainMap.InvalidateVisual();
+                }
+            }
+            else
+            {
+                ApplyLayerVisibility(e.Layer);
+            }
             await _gMapDbService.UpdateMapLayerVisibilityAsync(e.Layer.Id, e.IsVisible);
             _log?.Info($"레이어 '{e.Layer.Name}' Visibility={e.IsVisible}");
         }
@@ -5292,10 +5949,142 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            if (e.Layer.LayerType == "OverlayMap" && e.Layer.MapId.HasValue && e.Layer.MapId.Value > 0)
+            {
+                _customMapOverlayService.SetOpacity(e.Layer.MapId.Value, e.Opacity);
+            }
+            else if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
+            {
+                var marker = FindImageMarkerByFilePath(e.Layer.FilePath);
+                if (marker != null)
+                {
+                    marker.Opacity = e.Opacity;
+                    MainMap.InvalidateVisual();
+                }
+            }
             await _gMapDbService.UpdateMapLayerOpacityAsync(e.Layer.Id, e.Opacity);
             _log?.Info($"레이어 '{e.Layer.Name}' Opacity={e.Opacity:F2}");
         }
         catch (Exception ex) { _log?.Error($"레이어 Opacity 변경 실패: {ex.Message}"); }
+    }
+
+    private async void OnLayerDeleteRequested(object? sender, LayerChangedEventArgs e)
+    {
+        try
+        {
+            var layer = e.Layer;
+            _log?.Info($"[레이어 삭제] 시작: {layer.Name} (LayerType={layer.LayerType}, Id={layer.Id})");
+
+            switch (layer.LayerType)
+            {
+                case "OverlayMap":
+                    if (layer.MapId.HasValue)
+                        _customMapOverlayService.DeactivateOverlay(layer.MapId.Value);
+                    break;
+
+                case "OverlayImage":
+                    if (!string.IsNullOrEmpty(layer.FilePath))
+                    {
+                        var marker = FindImageMarkerByFilePath(layer.FilePath);
+                        if (marker != null)
+                        {
+                            MainMap?.DeselectMarker(marker);
+                            MainMap?.Markers?.Remove(marker);
+                            await _gMapDbSymbolService.DeleteImageAsync(marker.ImageModel.Id);
+                        }
+                    }
+                    break;
+            }
+
+            await _gMapDbService.DeleteMapLayerAsync(layer.Id);
+            await LoadLayersFromDbAsync();
+            _log?.Info($"[레이어 삭제] 완료: {layer.Name}");
+        }
+        catch (Exception ex) { _log?.Error($"레이어 삭제 실패: {ex.Message}"); }
+    }
+
+    private async void OnLayerMoveUpRequested(object? sender, LayerChangedEventArgs e)
+    {
+        try
+        {
+            await SwapZOrderWithSibling(e.Layer, -1); // 위 노드와 스왑
+        }
+        catch (Exception ex) { _log?.Error($"레이어 위로 이동 실패: {ex.Message}"); }
+    }
+
+    private async void OnLayerMoveDownRequested(object? sender, LayerChangedEventArgs e)
+    {
+        try
+        {
+            await SwapZOrderWithSibling(e.Layer, +1); // 아래 노드와 스왑
+        }
+        catch (Exception ex) { _log?.Error($"레이어 아래로 이동 실패: {ex.Message}"); }
+    }
+
+    private async Task SwapZOrderWithSibling(IMapLayerModel layer, int direction)
+    {
+        var layers = await _gMapDbService.FetchMapLayersAsync();
+        var sametype = layers?.Where(l => l.LayerType == layer.LayerType).ToList();
+        if (sametype == null) return;
+
+        var idx = sametype.FindIndex(l => l.Id == layer.Id);
+        var siblingIdx = idx + direction;
+        if (idx < 0 || siblingIdx < 0 || siblingIdx >= sametype.Count) return;
+
+        var sibling = sametype[siblingIdx];
+        _log?.Info($"[레이어 순서] 스왑 시작: {layer.Name}(Z={layer.ZOrder}) ↔ {sibling.Name}(Z={sibling.ZOrder}), direction={direction}");
+
+        if (layer.ZOrder != sibling.ZOrder)
+        {
+            // ZOrder가 다르면 단순 스왑
+            (layer.ZOrder, sibling.ZOrder) = (sibling.ZOrder, layer.ZOrder);
+        }
+        else
+        {
+            // ZOrder 동일 (기존 데이터 ZOrder=0) — 위치 기반 강제 분리
+            // ORDER BY ZOrder ASC이므로 낮은 값 = 위에 표시
+            // layer가 siblingIdx 위치로, sibling이 idx 위치로
+            layer.ZOrder = siblingIdx;
+            sibling.ZOrder = idx;
+        }
+
+        _log?.Info($"[레이어 순서] 스왑 결과: {layer.Name}(Z={layer.ZOrder}) ↔ {sibling.Name}(Z={sibling.ZOrder})");
+
+        await _gMapDbService.UpdateMapLayerAsync(layer);
+        await _gMapDbService.UpdateMapLayerAsync(sibling);
+
+        // 맵 위 렌더링 순서 동기화
+        SyncMapRenderingOrder(layer);
+        SyncMapRenderingOrder(sibling);
+
+        await LoadLayersFromDbAsync();
+    }
+
+    /// <summary>
+    /// 맵 위 렌더링 순서를 DB ZOrder와 동기화
+    /// </summary>
+    private void SyncMapRenderingOrder(IMapLayerModel layer)
+    {
+        switch (layer.LayerType)
+        {
+            case "OverlayMap":
+                if (layer.MapId.HasValue)
+                    _customMapOverlayService.SetZOrder(layer.MapId.Value, layer.ZOrder);
+                break;
+
+            case "OverlayImage":
+                if (!string.IsNullOrEmpty(layer.FilePath))
+                {
+                    var marker = FindImageMarkerByFilePath(layer.FilePath);
+                    if (marker != null)
+                    {
+                        marker.ZIndex = layer.ZOrder;
+                        // Edit 모드 OFF에서도 GMap.NET 마커 재정렬 트리거
+                        MainMap?.InvalidateVisual();
+                    }
+                }
+                break;
+        }
     }
 
     /// <summary>

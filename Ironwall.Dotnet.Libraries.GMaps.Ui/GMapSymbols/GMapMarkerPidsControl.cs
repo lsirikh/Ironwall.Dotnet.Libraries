@@ -347,16 +347,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         base.OnMarkerDoubleClicked(e);
     }
 
-    /// <summary>
-    /// 우클릭 처리 — 컨텍스트 메뉴 트리거 (지도 드래그 방지를 위해 Handled=true)
-    /// </summary>
-    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
-    {
-        base.OnMouseRightButtonDown(e);
-        if (Marker == null) return;
-        e.Handled = true;
-        _mapControl?.TriggerMarkerRightClicked(Marker);
-    }
+    // OnMouseRightButtonDown은 GMapMarkerBaseControl에서 공통 처리
 
     /// <summary>
     /// 클릭으로 선택과 비선택에 따른 이벤트 콜백

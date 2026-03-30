@@ -537,6 +537,11 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         base.OnMouseLeftButtonDown(e);
 
+        // EditMode OFF 시 이벤트 투과 — 맵 패닝/줌 허용 (방어적 안전장치)
+        var mapControl = FindParentMapControl();
+        if (mapControl != null && !mapControl.IsEditMode)
+            return;
+
         try
         {
             Focus();
@@ -545,7 +550,6 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             // Generic 이벤트 발생
             MarkerClick?.Invoke(this, new MarkerClickEventArgs(Marker, e));
 
-            var mapControl = FindParentMapControl();
             if (mapControl != null && Marker != null)
             {
                 _log?.Info($"마커 컨트롤에서 부모에게 클릭 이벤트 전달: {Marker.Title} ({Marker.Width} x {Marker.Height})");
@@ -558,6 +562,21 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         {
             _log?.Error($"마커 클릭 처리 중 오류: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 우클릭 처리 — 컨텍스트 메뉴 트리거 (모든 마커 타입 공통)
+    /// EditMode OFF 시 IsHitTestVisible=false이므로 호출 안 됨 → GMapCustomControl 수동 히트테스트가 처리
+    /// </summary>
+    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseRightButtonDown(e);
+
+        var mapControl = FindParentMapControl();
+        if (mapControl == null || Marker == null) return;
+
+        e.Handled = true;
+        mapControl.TriggerMarkerRightClicked(Marker);
     }
 
     protected void TriggerClickAnimation()

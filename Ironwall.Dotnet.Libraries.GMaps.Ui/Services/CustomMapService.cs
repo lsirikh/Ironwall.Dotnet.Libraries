@@ -342,6 +342,9 @@ public class CustomMapService {
         {
             if (_activeProviders.TryRemove(customMapId, out var provider))
             {
+                // GMap.NET static MapProviders 리스트에서 제거 (GUID 충돌 방지)
+                GMap.NET.MapProviders.GMapProvider.UnregisterProvider(provider);
+
                 // FileBasedCustomMapProvider에 Dispose 메서드가 있다면 호출
                 if (provider is IDisposable disposable)
                     disposable.Dispose();
@@ -633,6 +636,12 @@ public class CustomMapService {
     /// 활성화된 커스텀 맵 Provider 목록
     /// </summary>
     public IReadOnlyDictionary<int, FileBasedCustomMapProvider> ActiveProviders => _activeProviders;
+
+    /// <summary>
+    /// 로드된 CustomMap 목록 (메모리)
+    /// </summary>
+    public IEnumerable<CustomMapModel> LoadedCustomMaps =>
+        _customMapProvider.CollectionEntity.OfType<CustomMapModel>();
 
     /// <summary>
     /// 활성화된 커스텀 맵 개수

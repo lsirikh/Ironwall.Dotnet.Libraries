@@ -96,6 +96,26 @@
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="OverlayLeafTemplate" DataType="{x:Type models:LayerTreeNode}">
 		<Grid Height="26" Margin="0,1" ToolTip="{Binding Name}">
+			<Grid.ContextMenu>
+				<ContextMenu>
+					<MenuItem Header="삭제" Command="{Binding DeleteCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="Delete" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
+					<Separator />
+					<MenuItem Header="위로" Command="{Binding MoveUpCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="ArrowUp" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
+					<MenuItem Header="아래로" Command="{Binding MoveDownCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="ArrowDown" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
+				</ContextMenu>
+			</Grid.ContextMenu>
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
@@ -121,7 +141,10 @@
 				IsEnabled="{Binding IsChecked}"
 				Maximum="100"
 				Minimum="0"
-				SmallChange="5"
+				SmallChange="10"
+				LargeChange="10"
+				TickFrequency="10"
+				IsSnapToTickEnabled="True"
 				Value="{Binding Opacity, Mode=TwoWay, Converter={StaticResource OpacityToPercent}}" />
 			<TextBlock
 				Grid.Column="3"
@@ -383,6 +406,7 @@
 						Background="White"
 						BorderBrush="{StaticResource BorderGrayBrush}"
 						BorderThickness="1"
+						ClipToBounds="True"
 						CornerRadius="10">
 						<Border.Effect>
 							<DropShadowEffect
@@ -395,7 +419,7 @@
 						<Grid>
 							<Grid.RowDefinitions>
 								<RowDefinition Height="38" />
-								<RowDefinition Height="*" MaxHeight="500" />
+								<RowDefinition Height="*" />
 							</Grid.RowDefinitions>
 
 							<!-- 헤더 -->
@@ -438,7 +462,7 @@
 								x:Name="PART_TreeView"
 								Grid.Row="1"
 								Padding="0,0,2,0"
-								HorizontalScrollBarVisibility="Auto"
+								HorizontalScrollBarVisibility="Disabled"
 								VerticalScrollBarVisibility="Auto">
 								<ItemsControl
 									Margin="8,2,8,8"

@@ -272,10 +272,11 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
                 var oldWidth = _imageModel.Width;
                 _imageModel.Width = value;
 
-                // Phase 33.3: ImageBounds도 비율에 맞게 업데이트
-                if (oldWidth > 0.001)
+                // OnRender에서 호출된 경우 bounds 재계산 억제
+                if (oldWidth > 0.001 && !SuppressBoundsUpdate)
                 {
                     var scale = value / oldWidth;
+                    _log?.Info($"[DEBUG-WIDTH] '{Title}' Width: {oldWidth}→{value}, scale={scale:F4}");
                     UpdateBoundsFromPixelScale(scale, 1.0);
                 }
 
@@ -299,10 +300,11 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
                 var oldHeight = _imageModel.Height;
                 _imageModel.Height = value;
 
-                // Phase 33.3: ImageBounds도 비율에 맞게 업데이트
-                if (oldHeight > 0.001)
+                // OnRender에서 호출된 경우 bounds 재계산 억제
+                if (oldHeight > 0.001 && !SuppressBoundsUpdate)
                 {
                     var scale = value / oldHeight;
+                    _log?.Info($"[DEBUG-HEIGHT] '{Title}' Height: {oldHeight}→{value}, scale={scale:F4}");
                     UpdateBoundsFromPixelScale(1.0, scale);
                 }
 
@@ -808,6 +810,8 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             double newTop = center.Lat + newHeightLat / 2.0;
             double newBottom = center.Lat - newHeightLat / 2.0;
 
+            _log?.Info($"[DEBUG-SCALE] 입력: scaleX={scaleX:F4}, scaleY={scaleY:F4}, 기존Bounds=L:{_imageModel.Left:F6},T:{_imageModel.Top:F6},R:{_imageModel.Right:F6},B:{_imageModel.Bottom:F6}");
+
             // ImageBounds 업데이트
             _imageBounds = new RectLatLng(newTop, newLeft, newWidthLng, newHeightLat);
 
@@ -817,6 +821,8 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             _imageModel.Top = newTop;
             _imageModel.Bottom = newBottom;
 
+            _log?.Info($"[DEBUG-SCALE] 결과: newBounds=L:{newLeft:F6},T:{newTop:F6},R:{newRight:F6},B:{newBottom:F6}, W={_imageModel.Width},H={_imageModel.Height}");
+
             // PropertyChanged 알림
             OnPropertyChanged(nameof(ImageBounds));
             OnPropertyChanged(nameof(Left));
@@ -824,8 +830,6 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             OnPropertyChanged(nameof(Top));
             OnPropertyChanged(nameof(Bottom));
             OnPropertyChanged(nameof(AspectRatio));
-
-            _log?.Info($"GMapImageMarker '{Title}' 픽셀 스케일 업데이트: scaleX={scaleX:F2}, scaleY={scaleY:F2}");
         }
         catch (Exception ex)
         {
@@ -874,6 +878,9 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     private readonly ILogService? _log;
     private readonly IImageModel _imageModel;
     private RectLatLng _imageBounds;
+
+    /// <summary>OnRender에서 Width/Height 설정 시 bounds 재계산 억제 플래그</summary>
+    internal bool SuppressBoundsUpdate { get; set; }
     private ImageSource? _imageSource;
     private bool _isSelected;
     private bool _maintainAspectRatio = true;

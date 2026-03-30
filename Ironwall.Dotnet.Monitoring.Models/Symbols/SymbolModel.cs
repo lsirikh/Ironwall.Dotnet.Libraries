@@ -94,4 +94,8 @@ public class SymbolModel : BaseModel, ISymbolModel
     public double StrokeThickness { get; set; } = 1.0;
     #endregion
 
+    #region - 레이어 순서 -
+    public int ZIndex { get; set; } = 10;
+    #endregion
+
 }

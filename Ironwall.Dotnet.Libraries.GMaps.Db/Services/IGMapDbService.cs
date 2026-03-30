@@ -262,8 +262,10 @@ public interface IGMapDbService
 
     Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default);
     Task<int> InsertMapLayerAsync(IMapLayerModel model, CancellationToken token = default);
+    Task<bool> UpdateMapLayerAsync(IMapLayerModel model, CancellationToken token = default);
     Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default);
     Task<bool> UpdateMapLayerOpacityAsync(int id, double opacity, CancellationToken token = default);
     Task<bool> DeleteMapLayerAsync(int id, CancellationToken token = default);
+    Task<int> GetNextZOrderAsync(string layerType, CancellationToken token = default);
     Task SeedDefaultSymbolLayersAsync(CancellationToken token = default);
 }

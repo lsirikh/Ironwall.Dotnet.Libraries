@@ -146,8 +146,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         ImageOpacity = Marker.Opacity;
         ImageSource = Marker.ImageSource;
 
-        // Phase 29: 초기 크기 설정 (OnRender에서 실제 크기 계산)
-        // 지도 컨트롤이 있으면 정확한 크기 계산
+        // Phase 6.1: 초기 크기 설정 (OnRender에서 ImageBounds 기반 실제 크기 계산)
         var mapControl = FindParentMapControl();
         if (mapControl != null)
         {
@@ -155,7 +154,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         }
         else
         {
-            // 지도 컨트롤 없으면 기본 크기 사용
+            // 지도 컨트롤 없으면 임시 크기 (Loaded 후 재계산됨)
             Width = Math.Max(Marker.Width, 50);
             Height = Math.Max(Marker.Height, 50);
         }
@@ -193,12 +192,12 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
     }
 
     /// <summary>
-    /// 직접 렌더링 (Phase 29) - GMapCustomImage와 동일한 방식
+    /// 직접 렌더링 — ImageBounds 기반 줌 스케일링 (Phase 6.1 복원)
     /// </summary>
     /// <remarks>
     /// GMapCustomControl.RenderSingleImageOverlay()와 동일한 원리:
-    /// 1. ImageBounds의 TopLeft, BottomRight를 화면 좌표로 변환
-    /// 2. 변환된 화면 좌표로 Rect 계산
+    /// 1. ImageBounds의 TopLeft, BottomRight를 FromLatLngToLocal로 화면 좌표 변환
+    /// 2. 줌 레벨에 따라 화면 크기가 자동으로 달라짐
     /// 3. DrawingContext.DrawImage()로 직접 그리기
     /// </remarks>
     protected override void OnRender(DrawingContext dc)
@@ -213,11 +212,13 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
 
         try
         {
-            // Phase 34: 픽셀 고정 모드 - Marker.Width/Height를 직접 사용
-            // 변경 전: ImageBounds → FromLatLngToLocal() → 줌에 따라 다른 크기
-            // 변경 후: Marker.Width/Height (사용자 설정 픽셀 값) 직접 사용
-            double screenWidth = Marker.Width;
-            double screenHeight = Marker.Height;
+            // Phase 6.1: ImageBounds → FromLatLngToLocal 기반 줌 스케일링
+            var bounds = Marker.ImageBounds;
+            var topLeft = mapControl.FromLatLngToLocal(bounds.LocationTopLeft);
+            var bottomRight = mapControl.FromLatLngToLocal(bounds.LocationRightBottom);
+
+            double screenWidth = bottomRight.X - topLeft.X;
+            double screenHeight = bottomRight.Y - topLeft.Y;
 
             // 크기 제한 적용 (최소 10px)
             const double MinSize = 10.0;
@@ -225,11 +226,13 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
             if (screenHeight < MinSize) screenHeight = MinSize;
 
             // 컨트롤 크기 동기화 (Adorner 선택 영역용)
+            // SuppressBoundsUpdate: OnRender → Width setter → bounds 재계산 루프 차단
+            Marker.SuppressBoundsUpdate = true;
             Width = screenWidth;
             Height = screenHeight;
+            Marker.SuppressBoundsUpdate = false;
 
-            // Phase 34: Offset은 Marker.Width/Height 기준으로 계산
-            // Position(Center)에서 좌상단까지의 거리 = (-Width/2, -Height/2)
+            // Position(Center)에서 좌상단까지의 거리
             Marker.Offset = new Point(-screenWidth / 2, -screenHeight / 2);
 
             // 이미지 그리기 영역 (컨트롤 로컬 좌표 기준)
@@ -256,7 +259,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
             // Transform 스택 정리
             if (ImageOpacity < 1.0) dc.Pop();
             if (Marker.Bearing != 0) dc.Pop();
-            
+
         }
         catch (Exception ex)
         {
@@ -310,7 +313,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
     }
 
     /// <summary>
-    /// ImageBounds 기반 크기 계산 (Phase 29)
+    /// ImageBounds 기반 크기 계산 — FromLatLngToLocal 줌 스케일링 (Phase 6.1)
     /// </summary>
     private void UpdateGeometryFromBounds(GMapControl mapControl)
     {
@@ -318,11 +321,13 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
 
         try
         {
-            // Phase 34: 픽셀 고정 모드 - Marker.Width/Height를 직접 사용
-            // 변경 전: ImageBounds → FromLatLngToLocal() → 줌에 따라 다른 크기
-            // 변경 후: Marker.Width/Height (사용자 설정 픽셀 값) 직접 사용
-            double screenWidth = Marker.Width;
-            double screenHeight = Marker.Height;
+            // Phase 6.1: ImageBounds → FromLatLngToLocal 기반 줌 스케일링
+            var bounds = Marker.ImageBounds;
+            var topLeft = mapControl.FromLatLngToLocal(bounds.LocationTopLeft);
+            var bottomRight = mapControl.FromLatLngToLocal(bounds.LocationRightBottom);
+
+            double screenWidth = bottomRight.X - topLeft.X;
+            double screenHeight = bottomRight.Y - topLeft.Y;
 
             // 크기 제한
             const double MinSize = 10.0;
@@ -331,7 +336,6 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
             Width = screenWidth;
             Height = screenHeight;
 
-            // Phase 34: Offset은 Marker.Width/Height 기준으로 계산
             Marker.Offset = new Point(-screenWidth / 2, -screenHeight / 2);
         }
         catch (Exception ex)

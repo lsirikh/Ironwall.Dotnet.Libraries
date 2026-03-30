@@ -30,14 +30,18 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         _log = log;
         _model = symbolModel;
 
-        // 기본 설정
-        ZIndex = 10;
+        // 기본 설정 — 모델의 ZIndex 사용
+        ZIndex = symbolModel.ZIndex;
         UpdateOffset();
 
         // 가상 메서드들 호출
         InitializeMarker();
         CreateMarkerShape();
         InitializeCommands();
+
+        // Shape 생성 후 Panel.ZIndex 동기화
+        if (Shape is System.Windows.UIElement shapeElement)
+            System.Windows.Controls.Panel.SetZIndex(shapeElement, ZIndex);
 
         _log?.Info($"마커 생성: {symbolModel.Title} ({symbolModel.Latitude:F6}, {symbolModel.Longitude:F6})");
     }

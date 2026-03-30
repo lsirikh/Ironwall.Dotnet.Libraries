@@ -1360,7 +1360,7 @@ internal class GMapDbService : TaskService, IGMapDbService
         try
         {
             await using var conn = await OpenConnectionAsync(token);
-            const string sql = "SELECT * FROM MapLayers ORDER BY ZOrder DESC, LayerType, Name;";
+            const string sql = "SELECT * FROM MapLayers ORDER BY LayerType, ZOrder ASC, Id ASC;";
             var rows = await conn.QueryAsync<MapLayerSQL>(sql);
             return rows.Select(r => (IMapLayerModel)new MapLayerModel
             {
@@ -1390,6 +1390,24 @@ internal class GMapDbService : TaskService, IGMapDbService
             return id;
         }
         catch (Exception ex) { _log?.Error($"MapLayer 삽입 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<bool> UpdateMapLayerAsync(IMapLayerModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"UPDATE MapLayers
+                                 SET Name = @Name, IsVisible = @IsVisible, Opacity = @Opacity,
+                                     ZOrder = @ZOrder, FilePath = @FilePath
+                                 WHERE Id = @Id;";
+            return await conn.ExecuteAsync(sql, new
+            {
+                model.Id, model.Name, model.IsVisible,
+                model.Opacity, model.ZOrder, model.FilePath
+            }) > 0;
+        }
+        catch (Exception ex) { _log?.Error($"MapLayer 업데이트 실패 (Id={model.Id}): {ex.Message}"); throw; }
     }
 
     public async Task<bool> UpdateMapLayerVisibilityAsync(int id, bool isVisible, CancellationToken token = default)
@@ -1458,6 +1476,17 @@ internal class GMapDbService : TaskService, IGMapDbService
             _log?.Info($"기본 심볼 레이어 {defaults.Length}개 생성 완료");
         }
         catch (Exception ex) { _log?.Error($"기본 레이어 생성 실패: {ex.Message}"); throw; }
+    }
+
+    public async Task<int> GetNextZOrderAsync(string layerType, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "SELECT COALESCE(MAX(ZOrder), 0) + 1 FROM MapLayers WHERE LayerType = @LayerType;";
+            return await conn.ExecuteScalarAsync<int>(sql, new { LayerType = layerType });
+        }
+        catch (Exception ex) { _log?.Error($"GetNextZOrder 실패: {ex.Message}"); return 1; }
     }
 
     #endregion

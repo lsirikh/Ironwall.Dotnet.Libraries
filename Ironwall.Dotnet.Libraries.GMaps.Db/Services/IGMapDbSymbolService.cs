@@ -86,6 +86,9 @@ public interface IGMapDbSymbolService
     /// <returns>업데이트된 Symbol 모델</returns>
     Task<ISymbolModel?> UpdateSymbolAsync(ISymbolModel model, CancellationToken token = default);
 
+    /// <summary>Symbol의 ZIndex만 업데이트합니다</summary>
+    Task UpdateSymbolZIndexAsync(int symbolId, int zIndex, CancellationToken token = default);
+
     /// <summary>Symbol을 삭제합니다</summary>
     /// <param name="model">Symbol 모델</param>
     /// <param name="token">취소 토큰</param>

@@ -574,311 +574,386 @@ dotnet test Ironwall.Dotnet.Libraries.Events.Api/Ironwall.Dotnet.Libraries.Event
 dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --output nupkgs
 ```
 
-## 변경 이력
+## 변경 이력 (Version History by Branch)
 
-### v1.5.0 (2025-11-21)
-
-**작업자:** GH.LEE
-
-#### 주요 변경사항
-
-**Ironwall.Dotnet.Libraries.Devices.Ui**
-- **목적**: Navigation Mapping 로직을 DeviceProviderService에서 독립적인 Helper 클래스로 추출
-- **동기**: 단일 책임 원칙(SRP) 준수, 재사용성 향상, 테스트 가능성 개선
-
-**NavigationMappingHelper.cs (신규)**
-- **위치**: `Ironwall.Dotnet.Libraries.Devices.Ui/Helpers/NavigationMappingHelper.cs`
-- **역할**: Controller ↔ Sensor 간 양방향 Navigation 참조 설정
-- **핵심 메서드**:
-  - `SetupBidirectionalReferences()`: Sensor → Controller 참조 매핑 및 Controller → Sensor 역방향 참조 설정
-  - `GetOrphanedSensors()`: 유효하지 않은 Controller 참조를 가진 Sensor 목록 반환 (진단용)
-
-**주요 기능**:
-1. **양방향 Navigation Mapping**
-   - Sensor → Controller: `sensor.Controller`를 Dictionary의 실제 Controller 인스턴스로 교체
-   - Controller → Sensor: `controller.Devices` 리스트에 Sensor 추가
-   - 이유: `DtoToModelHelper`가 새 Controller 인스턴스를 생성하므로 참조 교체 필요
-
-2. **Orphaned Sensor 처리**
-   - Null Controller 감지 및 경고 로그
-   - 유효하지 않은 Controller.Id 감지 및 경고 로그
-   - 서비스 중단 없이 graceful degradation 지원
-
-3. **로깅 통합**
-   - `ILogService` nullable 파라미터로 null-safe 호출
-   - 구조화된 경고 메시지 (Sensor ID, DeviceName, Controller.Id 포함)
-
-**DeviceProviderService.cs (리팩토링)**
-- **변경**: `FetchSensorsAsync()` 메서드 간결화
-- **Before**: 28줄의 inline Navigation Mapping 로직
-- **After**: 5줄의 Helper 호출
-- **코드 절감**: 287줄 → 271줄 (16줄 감소)
-- **가독성**: Navigation 로직 분리로 Service 책임 명확화
-
-**UnitTest.cs (테스트 추가)**
-- **위치**: `Ironwall.Dotnet.Libraries.Devices.Ui/Tests/UnitTest.cs` (542~716줄)
-- **테스트 수**: 7개 NavigationMappingHelper 전용 테스트 추가
-- **테스트 항목**:
-  - `SetupBidirectionalReferences_ShouldMapSensorToController`: Sensor → Controller 매핑 검증
-  - `SetupBidirectionalReferences_ShouldAddSensorToControllerDevices`: Controller.Devices 리스트 추가 검증
-  - `SetupBidirectionalReferences_ShouldReplaceControllerInstance`: Controller 인스턴스 교체 검증
-  - `SetupBidirectionalReferences_ShouldHandleOrphanedSensors`: Orphaned Sensor 카운팅 검증
-  - `SetupBidirectionalReferences_ShouldHandleNullController`: Null Controller 처리 검증
-  - `SetupBidirectionalReferences_ShouldWorkWithEmptySensorList`: 빈 리스트 처리 검증
-  - `GetOrphanedSensors_ShouldReturnOnlyInvalidReferences`: Orphaned Sensor 필터링 검증
----
-
-### v1.4.0 (2025-11-12)
-
-**작업자:** GH.LEE
-
-#### 주요 변경사항
-
-##### GOP RESTful API 통합 라이브러리 신규 개발
-
-**Ironwall.Dotnet.Libraries.Api.Messages**
-- **목적**: GOP RESTful API와의 데이터 교환을 위한 DTO(Data Transfer Object) 정의
-- **구조**:
-  - `Common/`: 공통 응답 타입 (`ApiResponse<T>`, `ApiListResponse<T>`, `PaginationDto`, `MetaDto`, `ApiError`)
-  - `Devices/`: 장치 DTO (`ControllerDeviceDto`, `SensorDeviceDto`, `CameraDeviceDto`)
-  - `Events/`: 이벤트 DTO (`DetectionEventDto`, `MalfunctionEventDto`, `ConnectionEventDto`, `ActionEventDto`, `ActionEventCreateDto`)
-  - `Integrations/`: 3rd party 연동 DTO (`EventMappingDto`)
-  - `Defines/`: 공통 인터페이스 (`IEventDto`)
-  - `Helpers/`: JSON 변환기 (`FromEventConverter`)
-
-**핵심 기능**:
-1. **다형성 JSON 직렬화/역직렬화**
-   - `IEventDto` 인터페이스로 `DetectionEventDto`, `MalfunctionEventDto` 통합
-   - `FromEventConverter`: `type_event` 필드 기반 자동 타입 결정
-   - `ActionEventDto.FromEvent` 필드에서 다중 이벤트 타입 지원
-
-2. **Request/Response DTO 분리**
-   - `ActionEventCreateDto`: POST 요청용 (flat 구조, integer `from_event`)
-   - `ActionEventDto`: GET 응답용 (nested 구조, `IEventDto FromEvent`)
-   - GOP API 요구사항 준수 (`from_event`, `from_event_type` 필드)
-
-3. **공통 응답 래퍼**
-   - `ApiResponse<T>`: 단일 엔티티 응답
-   - `ApiListResponse<T>`: 페이지네이션 목록 응답 (meta, pagination 포함)
-   - 일관된 에러 처리 (`ApiError` 구조)
-
-**Ironwall.Dotnet.Libraries.Devices.Api**
-- **목적**: Device 관련 GOP RESTful API 호출 서비스
-- **주요 클래스**:
-  - `IDeviceApiService` / `DeviceApiService`: Device API 인터페이스 및 구현
-  - `ResponseHelper`: HTTP 응답 변환 헬퍼
-  - `DeviceApiModule`: Autofac 의존성 주입 모듈
-  - `UnitTest`: xUnit 단위 테스트 (15개 테스트, 100% 통과)
-
-**제공 기능**:
-- **Controller Device CRUD**
-  - `GetControllersAsync()`: Controller 목록 조회 (필터: group, status, includeSensors)
-  - `GetControllerByIdAsync()`: ID로 Controller 조회
-  - `CreateControllerAsync()`: 새 Controller 생성
-  - `PatchControllerAsync()`: 부분 업데이트 (PATCH)
-  - `UpdateControllerAsync()`: 전체 교체 (PUT)
-  - `DeleteControllerAsync()`: Controller 삭제
-
-- **Sensor Device CRUD**
-  - `GetSensorsAsync()`: Sensor 목록 조회 (필터: controller, group, type, status)
-  - `GetSensorByIdAsync()`: ID로 Sensor 조회
-  - `CreateSensorAsync()`: 새 Sensor 생성
-  - `PatchSensorAsync()`: 부분 업데이트
-  - `UpdateSensorAsync()`: 전체 교체
-  - `DeleteSensorAsync()`: Sensor 삭제
-
-- **Camera Device CRUD**
-  - `GetCamerasAsync()`: Camera 목록 조회 (필터: group, mode, category, status)
-  - `GetCameraByIdAsync()`: ID로 Camera 조회
-  - `CreateCameraAsync()`: 새 Camera 생성
-  - `PatchCameraAsync()`: 부분 업데이트
-  - `UpdateCameraAsync()`: 전체 교체
-  - `DeleteCameraAsync()`: Camera 삭제
-
-**Ironwall.Dotnet.Libraries.Events.Api**
-- **목적**: Event 관련 GOP RESTful API 호출 서비스
-- **주요 클래스**:
-  - `IEventApiService` / `EventApiService`: Event API 인터페이스 및 구현
-  - `ResponseHelper`: HTTP 응답 변환 헬퍼
-  - `EventApiModule`: Autofac 의존성 주입 모듈
-  - `UnitTest`: xUnit 단위 테스트 (15개 테스트, 100% 통과)
-
-**제공 기능**:
-- **Detection Event (침입 탐지)**
-  - `GetDetectionEventsAsync()`: 날짜 범위, controller, sensor, status 필터링
-  - `GetDetectionEventByIdAsync()`: ID로 이벤트 조회
-  - `CreateDetectionEventAsync()`: 새 Detection 이벤트 생성
-
-- **Malfunction Event (장애/고장)**
-  - `GetMalfunctionEventsAsync()`: 날짜 범위, controller, sensor 필터링
-  - `GetMalfunctionEventByIdAsync()`: ID로 이벤트 조회
-  - `CreateMalfunctionEventAsync()`: 새 Malfunction 이벤트 생성
-
-- **Connection Event (연결/해제)**
-  - `GetConnectionEventsAsync()`: 날짜 범위, controller, sensor 필터링
-  - `CreateConnectionEventAsync()`: 새 Connection 이벤트 생성
-
-- **Action Event (사용자 조치)**
-  - `GetActionEventsAsync()`: 날짜 범위 필터링
-  - `CreateActionEventAsync()`: 새 Action 이벤트 생성 (ActionEventCreateDto 사용)
-
-#### 기술 상세
-
-**1. RESTful API 표준 네이밍 컨벤션**
-- `Get{Resource}Async()`: 목록 조회 (GET)
-- `Get{Resource}ByIdAsync()`: 단일 조회 (GET)
-- `Create{Resource}Async()`: 생성 (POST)
-- `Patch{Resource}Async()`: 부분 업데이트 (PATCH)
-- `Update{Resource}Async()`: 전체 교체 (PUT)
-- `Delete{Resource}Async()`: 삭제 (DELETE)
-
-**2. 페이지네이션 및 필터링**
-```csharp
-Task<ApiListResponse<T>> GetResourcesAsync(
-    int? filter1 = null,
-    string? filter2 = null,
-    int page = 1,
-    int limit = 20,
-    CancellationToken token = default);
-```
-
-**3. 응답 구조**
-```json
-{
-  "data": [...],
-  "meta": {
-    "code": 200,
-    "message": "Success"
-  },
-  "pagination": {
-    "total": 100,
-    "page": 1,
-    "limit": 20,
-    "total_pages": 5
-  }
-}
-```
-
-**4. 다형성 이벤트 처리**
-```csharp
-public class ActionEventDto
-{
-    [JsonProperty("from_event", Order = 5)]
-    [JsonConverter(typeof(FromEventConverter))]
-    public IEventDto? FromEvent { get; set; }  // DetectionEventDto 또는 MalfunctionEventDto
-}
-```
-
-#### 테스트 커버리지
-- **Devices.Api**: 15개 테스트 ✅ (Controllers: 5, Sensors: 5, Cameras: 5)
-- **Events.Api**: 15개 테스트 ✅ (Detection: 3, Malfunction: 3, Connection: 2, Action: 2, Integration: 5)
-- **빌드**: 0 errors, 0 warnings ✅
-
-#### 문서화
-- `GOP_Restful_Api_연동설계.md`: API 연동 설계 문서 (Design 폴더)
-- `README_FromEvent.md`: FromEvent 다형성 사용법 문서
-- 각 메서드에 XML 주석을 통한 상세 설명 포함
+> 각 버전은 git branch 기준으로 정리되었습니다. 최신 버전이 상단에 위치합니다.
 
 ---
 
-### v1.3.1 (2025-10-28)
+### v2.2 (2026-03 ~)
 
-**작업자:** GH.LEE
+**작업자:** GH.LEE | **브랜치:** `v2.2` (현재)
 
 #### 주요 변경사항
-
-##### Ironwall.Dotnet.Libraries.GMaps
-- **MapSetupViewModel 개선**
-  - `MapTypes` 속성: EnumMapProvider 기반으로 "Defined", "Custom" 제공
-  - `MapNames` 속성: MapProvider에서 실제 지도 이름 목록 제공 (ObservableCollection)
-  - `ButtonTileDirectory()` 메서드: FolderBrowserDialog 기반 타일 디렉토리 선택
-  - HomePosition 복합 객체 저장 헬퍼 메서드 추가
-
-- **MapSetupModel 확장**
-  - MapType, MapMode, MapName, TileDirectory 속성 관리
-  - HomePosition 객체 (위도, 경도, 고도, 줌 레벨, 사용 여부)
-
-##### Ironwall.Dotnet.Libraries.Nats
-- **NatsSetupModel 확장**
-  - IpAddressNats: NATS 서버 IP 주소
-  - PortNats: NATS 서버 포트
-  - UserName: NATS 인증 사용자명 (선택적)
-  - Password: NATS 인증 비밀번호 (선택적)
-
-##### Ironwall.Dotnet.Libraries.Redis
-- **RedisSetupModel 추가**
-  - IpAddressRedis: Redis 서버 IP 주소
-  - PortRedis: Redis 서버 포트
-  - PasswordRedis: Redis 인증 비밀번호 (선택적)
-  - NameChannel: Redis Pub/Sub 채널 이름
-
-##### Ironwall.Dotnet.Libraries.Gateway
-- **Behavior 패턴 도입**
-  - `GatewayEventSelectedItemsBehavior` 구현
-  - DataGrid 선택 항목 동기화 개선
-  - TwoWay 바인딩 지원
-
-#### 버그 수정
-- MaterialDesign PackIconKind "MountainAltitude" → "ImageFilterHdr" 변경
-- MapSetupView XAML 바인딩 오류 수정
-
-#### 설계 개선
-- MapType과 MapName의 명확한 구분
-  - MapType: 제공자 타입 (Defined/Custom)
-  - MapName: 실제 지도 이름 (Google 위성지도, OpenStreetMap 등)
-- 타일 디렉토리 선택 UI 패턴 표준화 (읽기 전용 TextBox + 버튼)
+- v2.1 기반 소규모 업데이트
 
 ---
 
-### v1.2.4 (2025-08-28)
+### v2.1 (2026-02 ~ 2026-03)
 
-**작업자:** GH.LEE
+**작업자:** GH.LEE | **브랜치:** `v2.1`
 
-#### 추가된 파일
-- `Ironwall.Dotnet.Libraries.Enums/EnumColorType.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Providers/PidsSymbolProvider.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/ColorHelper.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Helpers/SymbolTypeHelper.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Models/DeviceSymbolLookupModel.cs`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/controller01.png`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Images/fence01.png`
-- `Ironwall.Dotnet.Libraries.GMaps.Ui/Themes/PidsMarkerStyle.xaml`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/IPidsSymbolModel.cs`
-- `Ironwall.Dotnet.Monitoring.Models/Symbols/PidsSymbolModel.cs`
+#### 주요 변경사항 — 맵 시스템 대규모 개선
 
-#### 주요 개선사항
+**MBTiles 오프라인 맵 통합**
+- MBTiles DefinedMap 통합 — 인터넷 없이 사용 가능한 오프라인 맵 지원
+- 맵 초기화/전환 프로세스 분리 (`InitializeMBTilesMap` + `SwitchMBTilesMap`)
+- 맵 전환 시 위치/줌 유지, 타일 겹침 수정, 전환 안정성 개선
+- MBTiles Datas ↔ DB 동기화
+
+**레이어 관리 시스템**
+- 레이어 관리 시스템 신규 구현 — DB CRUD 연동
+- 레이어 패널 트리 재설계 + 10 xUnit tests
+
+**GMap UI 리뉴얼**
+- GMap UI 디자인 리뉴얼 + 방송 패널 추가
+- 관심지역(ROI) 관리 기능 + 5 xUnit tests
+
+**조치보고 시스템**
+- 전체 조치보고 완성
+- `ExecuteBatchReportAsync` — 배치 처리 (6 tests)
+
+**버그 수정**
+- 콤보박스 초기 선택 빈칸 수정 (`NotifyOfPropertyChange` 추가)
+- DevicePanel ProgressCircle 미표시 수정
+
+---
+
+### v2.0 (2025-12 ~ 2026-02)
+
+**작업자:** GH.LEE | **브랜치:** `v2.0`
+
+#### 주요 변경사항 — GOP v2.0 대규모 리뉴얼
+
+**신규 디바이스 타입**
+- Speaker, Enclosure, Lamp 디바이스 모델 및 API 서비스 추가
+- Camera 하위 모델 확장 (PTZ, Thermal 등)
+- GOP v2.0 Enum 타입 대거 추가
+
+**NATS 실시간 동기화 서비스**
+- `DetectionNatsSyncService` — NATS DETECTION 수신 서비스
+- `CameraPtzNatsSyncService` — PTZ_STATUS NATS 수신 서비스
+- `DeviceNatsSyncService` — SYNC_DEVICE NATS 수신 서비스
+- `SymbolEventManager` NATS Sync 연동 확장
+
+**PIDS 심볼 확장**
+- SmartSensor, IpSpeaker PIDS 심볼 추가
+- `DeviceSymbolLookupModel.SyncFromDevice()` 구현
+
+**Event API 서비스**
+- Event API 서비스 및 통합 테스트 (20/20 green)
+
+**UI 개선**
+- `DeviceAssignDialog` 다중 선택 DataGrid로 재설계
+- 구역 column 제거 + 조치보고 checkbox 추가
+- FAULT_FENCE 장애 색깔 버그 수정
+
+---
+
+### v1.9.2 (2025-12)
+
+**작업자:** GH.LEE | **브랜치:** `v1.9.2`
+
+#### 주요 변경사항
+- Image 컴포넌트 기능 구현
+
+---
+
+### v1.9.1 (2025-12)
+
+**작업자:** GH.LEE | **브랜치:** `v1.9.1`
+
+#### 주요 변경사항
+- Image Object Property 및 Symbol 생성 (DB 업데이트 미완성)
+
+---
+
+### v1.9 (2025-11 ~ 2025-12)
+
+**작업자:** GH.LEE | **브랜치:** `v1.9`
+
+#### 주요 변경사항 — BaseBearing, FOV, 안정성 개선
+
+**BaseBearing 속성 추가 (Phase 20)**
+- `PidsSymbolModel`에 BaseBearing 속성 추가 (STRUCTURAL)
+- Database 스키마 BaseBearing 컬럼 추가 (STRUCTURAL)
+- FOV BaseBearing 초기화 테스트 (BEHAVIORAL)
+- BaseBearing UI 컨트롤 구현 (BEHAVIORAL)
+
+**버그 수정**
+- DB 로드 시 `DetectionBearing → BaseBearing` 초기화 수정
+- 런타임 전용 FOV 속성 DB 저장 방지
+- MySQL concurrency error — UPDATE 쿼리 `UpdatedAt` 명시로 해결
+- 이벤트 탐지/조치보고 이중 조치보고 버그 수정
+
+**기타**
+- ISO6301 파싱 로직 추가
+- 카메라 FOV 업데이트
+
+---
+
+### v1.8 (2025-11)
+
+**작업자:** GH.LEE | **브랜치:** `v1.8`
+
+#### 주요 변경사항
+- `SymbolEventManager` 그룹/싱글 lookup 구분 로직 구현
+- PidsSymbol 장비매칭 Dropdown + GroupLine 탐지 색상 변경
+
+---
+
+### v1.7 (2025-11)
+
+**작업자:** GH.LEE | **브랜치:** `v1.7`
+
+#### 주요 변경사항
+- 소규모 업데이트 및 안정화
+
+---
+
+### v1.6 (2025-11)
+
+**작업자:** GH.LEE | **브랜치:** `v1.6`
+
+#### 주요 변경사항 — Events.Ui API 마이그레이션
+
+**Events.Db → Events.Api 전환**
+- Events.Ui에서 Events.Db 의존성 완전 제거
+- Panel ViewModel 및 보조 ViewModel을 Events.Api 기반으로 마이그레이션
+- `EventProviderService` 신규 구현 (`FetchDetectionEventsAsync` TDD GREEN)
+
+**DTO 정비**
+- DTO를 GOP API 스펙에 맞게 수정
+- Connection & Action 이벤트 변환 로직 구현
+- Detection, Malfunction 이벤트 DTO/모델 정비
+
+---
+
+### v1.5 (2025-11)
+
+**작업자:** GH.LEE | **브랜치:** `v1.5`
+
+#### 주요 변경사항 — Device API 마이그레이션 (Db → Api)
+
+**Devices.Ui API 전환**
+- `CameraDevicePanelViewModel` — ApiService 기반으로 마이그레이션
+- `SensorDevicePanelViewModel` — ApiService 기반으로 마이그레이션
+- `ControllerDevicePanelViewModel` — ApiService 기반으로 마이그레이션
+
+**DeviceProviderService 신규 구현**
+- Controller/Sensor/Camera 디바이스 fetching with pagination (Phase 2~4)
+- `includeSensors`, `includeController` 속성 추가
+
+**NavigationMappingHelper (TDD)**
+- Controller ↔ Sensor 양방향 Navigation 참조 설정
+- `SetupBidirectionalReferences()`, `GetOrphanedSensors()` 구현
+- 7개 xUnit 테스트 (TDD Red → Green → Refactor)
+
+**DtoToModelHelper**
+- DTO ↔ Model 변환 헬퍼 (전체 테스트 커버리지)
+
+**기타**
+- Message 통합, API 관련 문서 작성
+
+---
+
+### v1.4 (2025-11)
+
+**작업자:** GH.LEE | **브랜치:** `v1.4`
+
+#### 주요 변경사항 — GOP RESTful API 통합 라이브러리
+
+**Ironwall.Dotnet.Libraries.Api.Messages** (신규)
+- 공통 응답 타입: `ApiResponse<T>`, `ApiListResponse<T>`, `PaginationDto`, `MetaDto`, `ApiError`
+- Device DTO: `ControllerDeviceDto`, `SensorDeviceDto`, `CameraDeviceDto`
+- Event DTO: `DetectionEventDto`, `MalfunctionEventDto`, `ConnectionEventDto`, `ActionEventDto`
+- 다형성 JSON 직렬화 (`FromEventConverter`)
+
+**Ironwall.Dotnet.Libraries.Devices.Api** (신규)
+- Device CRUD API 서비스 (Controller, Sensor, Camera)
+- 필터링, 페이지네이션, 정렬 지원
+- xUnit 15개 테스트 (100% 통과)
+
+**Ironwall.Dotnet.Libraries.Events.Api** (신규)
+- Event CRUD API 서비스 (Detection, Malfunction, Connection, Action)
+- 날짜 범위 검색, 다중 필터 지원
+- xUnit 15개 테스트 (100% 통과)
+
+**GOP API 연동 메시지 시스템 구축**
+
+---
+
+### v1.3.3 ~ v1.3.4 (2025-10)
+
+**작업자:** GH.LEE | **브랜치:** `v1.3.3`, `v1.3.4`
+
+#### 주요 변경사항
+- Gateway(3rd party 이벤트 정의) 라이브러리 추가
+- NATS 라이브러리 수정
+- 팝업 관련 프로세스 업데이트
+
+---
+
+### v1.3.2 (2025-10)
+
+**작업자:** GH.LEE | **브랜치:** `v1.3.2`
+
+#### 주요 변경사항
+- NATS 라이브러리 개발
+- Redis 라이브러리 업데이트
+- 카메라 모델 수정
+
+---
+
+### v1.3.1 (2025-10)
+
+**작업자:** GH.LEE | **브랜치:** `v1.3.1`
+
+#### 주요 변경사항
+- 스트리밍 라이브러리 업데이트 및 구현
+- **MapSetupViewModel 개선**: EnumMapProvider 기반 MapTypes/MapNames, 타일 디렉토리 선택
+- **MapSetupModel 확장**: MapType, MapMode, MapName, TileDirectory, HomePosition
+- **NatsSetupModel 확장**: IP, Port, 인증 정보
+- **RedisSetupModel 추가**: IP, Port, 비밀번호, 채널 이름
+- **Gateway Behavior 패턴** 도입: `GatewayEventSelectedItemsBehavior`
+
+---
+
+### v1.3.0 (2025-10)
+
+**작업자:** GH.LEE | **브랜치:** `v1.3.0`
+
+#### 주요 변경사항
+- v1.2.9와 동일 (안정화 버전 태깅)
+
+---
+
+### v1.2.9 (2025-09 ~ 2025-10)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.9`
+
+#### 주요 변경사항
+- 이벤트 연결 및 이벤트 서비스 구현
+- RTSP 팝업 이벤트 설정 UI 및 DB 구현
+- RTSP 팝업을 서버 기반으로 전환하여 개발
+
+---
+
+### v1.2.81 (2025-09)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.81`
+
+#### 주요 변경사항
+- 카메라 팝업 기능 구현 및 CustomControl 구현
+- Streaming Libraries 심각한 버그 발견 → 롤백 후 재작업
+
+---
+
+### v1.2.8 (2025-09)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.8`
+
+#### 주요 변경사항
+- RTSP 스트리밍 라이브러리 구축 및 안정화
+- RTSP 감시 금지 구역 추가
+- 유지보수/에러 이벤트 연동
+
+---
+
+### v1.2.7 (2025-09)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.7`
+
+#### 주요 변경사항
+- `PidsGroupSymbol` 구축 및 DB 연동
+- `InfraSymbol` 추가 및 DB 등록
+- Line/Area 계열 심볼 추가, Adorner 추가
+- 카메라 View 영역 애니메이션 디버깅
+- Infra 마커 버그 수정
+
+---
+
+### v1.2.6 (2025-08 ~ 2025-09)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.6`
+
+#### 주요 변경사항 — 군대부호 시스템 전체 구현
+- 군대부호 UI 구현, DB 구축, 미리보기 기능
+- 군대부호 이미지 수정 및 기능 수정
+- 군대부호 필수 속성 구현
+- 군대부호 전환 로직 수정 및 디버깅
+- Line 계열 PIDS 심볼 추가 구성 준비
+- LineMarker 에러 수정 및 Adorner 연동 버그 수정
+
+---
+
+### v1.2.5 (2025-08)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.5`
+
+#### 주요 변경사항 — PidsSymbol 시스템 구축
+- PidsSymbol DB 스키마 구성 및 DB CRUD 로직 구성, 단위 테스트 완료
+- Pids 심볼 카메라 앵글 구현
+- Adorner 회전 컨트롤러 진동 버그 수정
+- 심볼 속성 추가/변경 및 UI XAML 수정
+- PidsMarker 속성 창 구성
+- `GeometricProperty` 디버깅 완료
+- PropertyWindow Marker 전환 시 버그 수정
+- PropertyWindow Binding 작업 및 상호 연동 버그 수정
+
+---
+
+### v1.2.4 (2025-08)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.4`
+
+#### 주요 변경사항
 - PIDS 심볼 시각화 시스템 구현
-- 장치 타입별 색상 코딩
-- 마커 스타일 테마 추가
+- 장치 타입별 색상 코딩 (`EnumColorType`)
+- 마커 스타일 테마 추가 (`PidsMarkerStyle.xaml`)
+- `PidsSymbolModel`, `DeviceSymbolLookupModel` 등 신규 모델
+- 다수 기능 추가 및 기존 파일 수정
 
 ---
 
-### v1.2.0 이전 (2025-08-01)
+### v1.2.3 (2025-08)
 
-**작업자:** GH.LEE
+**작업자:** GH.LEE | **브랜치:** `v1.2.3`
 
-#### 작업내용
+#### 주요 변경사항
+- Sensorway 관련 수정 및 업데이트
 
-##### 1. WPF Property Panel 바인딩 오염 문제 해결
-- **문제**: 마커 선택 시 이전 Property Panel의 바인딩이 새 마커 속성을 오염시키는 현상
-- **증상**: 두 번째, 세 번째 마커 선택 시 Title이 빈 문자열로, Size가 32x32로 변경
-- **원인**: XAML 바인딩(`SelectedMarker="{Binding SelectedMarker}"`)이 자동으로 `OnSelectedMarkerChanged` 트리거
+---
 
-##### 2. 근본 원인 파악
-- `GMapPropertyBaseControl`의 `OnSelectedMarkerChanged`에서 중복된 `SetupMarkerBindings()` 호출
-- XAML에서 SelectedMarker 변경 시 기존 Property Panel의 기본값이 새 마커에 즉시 적용
-- WPF 바인딩 타이밍 문제: PropertyChanged 콜백이 Behavior보다 먼저 실행
+### v1.2.2 (2025-08)
 
-##### 3. 해결 방법
-- 이전 마커와의 연결을 완전히 차단
-- Property Panel 완전 재생성을 통한 바인딩 오염 근본 차단
-- `DisconnectFromMarker()` 메서드로 이전 마커 참조 무효화
-- 새 Property Panel 인스턴스 생성으로 깨끗한 상태 보장
+**작업자:** GH.LEE | **브랜치:** `v1.2.2`
 
-##### 4. 학습 내용
-- WPF 바인딩 시스템의 내부 동작 원리와 타이밍 이슈
-- PropertyChanged 콜백과 Behavior의 실행 순서
-- 바인딩 오염 문제의 근본적 해결을 위한 설계 패턴
+#### 주요 변경사항
+- 소규모 업데이트
+
+---
+
+### v1.2.1 (2025-08)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.1`
+
+#### 주요 변경사항
+- Adorner 업데이트 및 GMap.NET 관련 업데이트
+
+---
+
+### v1.2.0 (2025-08)
+
+**작업자:** GH.LEE | **브랜치:** `v1.2.0`
+
+#### 주요 변경사항 — 프로젝트 초기 구축
+- GMap.NET 적용
+- 불필요 참조 라이브러리 삭제
+- WPF Property Panel 바인딩 오염 문제 해결
+  - 마커 선택 시 이전 Property Panel의 바인딩이 새 마커 속성을 오염시키는 현상 수정
+  - `DisconnectFromMarker()` 메서드로 이전 마커 참조 무효화
+  - Property Panel 완전 재생성을 통한 바인딩 오염 근본 차단
 
 ---
 
@@ -907,5 +982,5 @@ Copyright (C) 2023-2025 Sensorway Co., Ltd. All rights reserved.
 ---
 
 **문서 버전**: 2.2.0
-**최종 업데이트**: 2025-11-21
+**최종 업데이트**: 2026-03-24
 **문서 상태**: ✅ 최종 승인

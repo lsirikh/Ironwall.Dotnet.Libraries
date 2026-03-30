@@ -84,7 +84,10 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
         // 시각적 요소 초기화
         InitializeVisualElements();
-       
+
+        // 줌 변경 시 Adorner 재렌더링 (Phase 7.1)
+        _mapControl.OnMapZoomChanged += OnMapZoomChanged;
+
         // 키보드 포커스 가능하도록 설정
         this.Focusable = true;
 
@@ -118,6 +121,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 {
                     CancelEditing();
                 }
+
+                // 줌 이벤트 구독 해제 (Phase 7.1)
+                _mapControl.OnMapZoomChanged -= OnMapZoomChanged;
 
                 // 리소스 정리
                 _handlePen?.Freeze();
@@ -284,21 +290,14 @@ public class MarkerEditAdorner : Adorner, IDisposable
     }
 
     /// <summary>
-    /// 편집 핸들들 렌더링 (마커 크기 기준)
+    /// 편집 핸들들 렌더링 (AdornedElement 실제 렌더 크기 기준 — 줌 스케일링 반영)
     /// </summary>
     private void RenderEditHandles(DrawingContext drawingContext, Point markerCenter, double editRadius)
     {
         var handleSize = MarkerEditSettings.HandleSize;
 
-        // 실제 마커 크기를 기준으로 사각형 계산 (편집 영역과 동일)
-        var markerWidth = _targetMarker.Width;
-        var markerHeight = _targetMarker.Height;
-
-        var markerBounds = new Rect(
-            markerCenter.X - markerWidth / 2 - PADDING,
-            markerCenter.Y - markerHeight / 2 - PADDING,
-            markerWidth + PADDING * 2,
-            markerHeight + PADDING * 2);
+        // AdornedElement.RenderSize 기준 사각형 (줌 레벨에 따라 자동 스케일링)
+        var markerBounds = CalculateEditBounds(markerCenter);
 
         // 라인 마커 체크
         bool isLineMarker = _targetMarker is GMapLineMarker || _targetMarker is GMapPidsGroupMarker;
@@ -611,6 +610,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
         var deltaX = currentPos.X - _dragStartPoint.X;
         var deltaY = currentPos.Y - _dragStartPoint.Y;
 
+        if (_activeHandle != MarkerHandle.Move)
+            _log?.Info($"[DEBUG-DRAG] handle={_activeHandle}, dragStart=({_dragStartPoint.X:F1},{_dragStartPoint.Y:F1}), cur=({currentPos.X:F1},{currentPos.Y:F1}), delta=({deltaX:F1},{deltaY:F1})");
+
         switch (_activeHandle)
         {
             case MarkerHandle.Move:
@@ -918,13 +920,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
             var currentHeight = _targetMarker.Height;
             var aspectRatio = currentWidth / currentHeight;
 
-            // 더 직관적인 크기 계산
             double sizeChange = 0;
 
             switch (_activeHandle)
             {
                 case MarkerHandle.ResizeTopLeft:
-                    sizeChange = -(deltaX + deltaY) / 2; // 축소/확대
+                    sizeChange = -(deltaX + deltaY) / 2;
                     break;
                 case MarkerHandle.ResizeTopRight:
                     sizeChange = (deltaX - deltaY) / 2;
@@ -933,23 +934,21 @@ public class MarkerEditAdorner : Adorner, IDisposable
                     sizeChange = (-deltaX + deltaY) / 2;
                     break;
                 case MarkerHandle.ResizeBottomRight:
-                    sizeChange = (deltaX + deltaY) / 2;  // 확대/축소
+                    sizeChange = (deltaX + deltaY) / 2;
                     break;
             }
 
-            // 새로운 크기 계산
-            double newWidth = MarkerEditUtils.Clamp(currentWidth + sizeChange, 10, 500);
-            double newHeight = MarkerEditUtils.Clamp(newWidth / aspectRatio, 10, 500);
+            double newWidth = MarkerEditUtils.Clamp(currentWidth + sizeChange, 10, double.MaxValue);
+            double newHeight = MarkerEditUtils.Clamp(newWidth / aspectRatio, 10, double.MaxValue);
 
-            // 비율 재조정
             if (newHeight * aspectRatio != newWidth)
             {
                 newWidth = newHeight * aspectRatio;
-                newWidth = MarkerEditUtils.Clamp(newWidth, 10, 500);
+                newWidth = MarkerEditUtils.Clamp(newWidth, 10, double.MaxValue);
             }
 
+            _log?.Info($"[DEBUG-RESIZE] deltaX={deltaX:F1},deltaY={deltaY:F1} → sizeChange={sizeChange:F1}, cur={currentWidth:F0}x{currentHeight:F0} → new={newWidth:F0}x{newHeight:F0}, ratio={aspectRatio:F4}");
             _targetMarker.UpdateSize(newWidth, newHeight);
-            _log?.Info($"비율 유지 크기 조정: {newWidth:F0}×{newHeight:F0}");
         }
         catch (Exception ex)
         {
@@ -975,8 +974,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 _ => currentHeight
             };
 
-            newHeight = MarkerEditUtils.Clamp(newHeight, 10, 500);
+            newHeight = MarkerEditUtils.Clamp(newHeight, 10, double.MaxValue);
 
+            _log?.Info($"[DEBUG-VRESIZE] deltaY={deltaY:F1}, curH={currentHeight:F0} → newH={newHeight:F0}");
             _targetMarker.UpdateSize(_targetMarker.Width, newHeight);
 
             if (AdornedElement is GMapMarkerCustomControl markerControl)
@@ -985,8 +985,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 markerControl.Height = newHeight;
                 markerControl.InvalidateVisual();
             }
-
-            _log?.Info($"높이 자유 조정: {_targetMarker.Width:F0}×{newHeight:F0}");
         }
         catch (Exception ex)
         {
@@ -1012,8 +1010,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 _ => currentWidth
             };
 
-            newWidth = MarkerEditUtils.Clamp(newWidth, 10, 500);
+            newWidth = MarkerEditUtils.Clamp(newWidth, 10, double.MaxValue);
 
+            _log?.Info($"[DEBUG-HRESIZE] deltaX={deltaX:F1}, curW={currentWidth:F0} → newW={newWidth:F0}");
             _targetMarker.UpdateSize(newWidth, _targetMarker.Height);
 
             if (AdornedElement is GMapMarkerCustomControl markerControl)
@@ -1022,8 +1021,6 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 markerControl.Height = _targetMarker.Height;
                 markerControl.InvalidateVisual();
             }
-
-            _log?.Info($"너비 자유 조정: {newWidth:F0}×{_targetMarker.Height:F0}");
         }
         catch (Exception ex)
         {
@@ -1111,14 +1108,12 @@ public class MarkerEditAdorner : Adorner, IDisposable
     }
 
     /// <summary>
-    /// 편집 반경 계산 (호환성 유지)
+    /// 편집 반경 계산 — AdornedElement 실제 렌더 크기 기준 (줌 스케일링 반영)
     /// </summary>
     private double CalculateEditRadius()
     {
-        // 실제 마커 크기 기반으로 계산 (기존 로직 변경)
-        var markerWidth = _targetMarker.Width;
-        var markerHeight = _targetMarker.Height;
-        return Math.Max(markerWidth, markerHeight) / 2.0 + PADDING; // padding 1과 일치
+        var elementSize = AdornedElement.RenderSize;
+        return Math.Max(elementSize.Width, elementSize.Height) / 2.0 + PADDING;
     }
 
     /// <summary>
@@ -1278,7 +1273,13 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
     public const int PADDING = 5;
 
-    
+    /// <summary>
+    /// 줌 변경 시 Adorner 재렌더링 (Phase 7.1)
+    /// </summary>
+    private void OnMapZoomChanged()
+    {
+        InvalidateVisual();
+    }
 
     #endregion
 

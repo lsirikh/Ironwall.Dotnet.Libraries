@@ -1,10 +1,15 @@
 # Project Index
 
-> Last updated: 2026-03-24
+> Last updated: 2026-03-30
 
 ## 현재 컨텍스트
 | 파일 | 주제 | 날짜 |
 |------|------|------|
+| [2026-03-30_README_Version_History_Cleanup.md](context/2026-03-30_README_Version_History_Cleanup.md) | README 변경 이력 git branch별 전체 정리 (v1.2.0~v2.2, 26개 버전) | 2026-03-30 |
+| [2026-03-30_Map_Mouse_Interaction_And_Symbol_ZIndex.md](context/2026-03-30_Map_Mouse_Interaction_And_Symbol_ZIndex.md) | 맵 마우스 상호작용 + 심볼 ZIndex 전체 파이프라인 (PRD 4건 + 핫픽스 2건) | 2026-03-30 |
+| [2026-03-24_CustomMap_Overlay_Final.md](context/2026-03-24_CustomMap_Overlay_Final.md) | CustomMap 오버레이 최종 완성 (복수 등록, 15건 버그 수정) | 2026-03-24 |
+| [2026-03-24_CustomMap_Overlay_Rendering_Complete.md](context/2026-03-24_CustomMap_Overlay_Rendering_Complete.md) | CustomMap 오버레이 렌더링 완성 (OnRender 기반) | 2026-03-24 |
+| [2026-03-24_CustomMap_Overlay_System_Debug.md](context/2026-03-24_CustomMap_Overlay_System_Debug.md) | CustomMap 오버레이 시스템 구현 + 디버깅 | 2026-03-24 |
 | [2026-03-24_MapViewModel_Provider_Cleanup_And_CLAUDE_Workflow_Update.md](context/2026-03-24_MapViewModel_Provider_Cleanup_And_CLAUDE_Workflow_Update.md) | MapViewModel Provider 정리 + CLAUDE 워크플로우 개편 | 2026-03-24 |
 | [2026-03-18_GMap_UI_Renewal_ROI_Broadcast_OfflineMap.md](context/2026-03-18_GMap_UI_Renewal_ROI_Broadcast_OfflineMap.md) | GMap UI 리뉴얼 + ROI + 방송패널 + 오프라인맵전략 (커밋 3건, PRD 4개) | 2026-03-18 |
 | [2026-03-13_EventQueue_Symbol_Unification_Complete.md](context/2026-03-13_EventQueue_Symbol_Unification_Complete.md) | EventQueue 심볼 상태 일원화 완료 (13 Phases, 28/28, 31 tests) | 2026-03-13 |
@@ -34,15 +39,32 @@
 | [PRD_Layer_Management_System.md](prd/PRD_Layer_Management_System.md) | [plan](prd/PRD_Layer_Management_System.plan.md) | 레이어 관리 시스템 — 3-Tier 레이어 + DB 상태 저장 + 카테고리별 ON/OFF |
 | [PRD_MapSwitch_Stability.md](prd/PRD_MapSwitch_Stability.md) | [plan](prd/PRD_MapSwitch_Stability.plan.md) | 맵 전환 안정성 개선 |
 | [PRD_CustomMap_Overlay_System.md](prd/PRD_CustomMap_Overlay_System.md) | - | CustomMap 오버레이 시스템 전환 (마스터 PRD — 하위 3건) |
-| [PRD_CustomMap_Overlay_Migration.md](prd/PRD_CustomMap_Overlay_Migration.md) | - | CustomMap 베이스맵→오버레이 전환 (GMapOverlay 기반) |
-| [PRD_CustomMap_Registration_Progress.md](prd/PRD_CustomMap_Registration_Progress.md) | - | TIF 등록 프로그레스 임베디드 패널 UI |
+| [PRD_CustomMap_Overlay_Migration.md](prd/PRD_CustomMap_Overlay_Migration.md) | [plan](prd/PRD_CustomMap_Overlay_Migration.plan.md) | CustomMap 베이스맵→오버레이 전환 (WPF Canvas Overlay) |
+| [PRD_CustomMap_Registration_Progress.md](prd/PRD_CustomMap_Registration_Progress.md) | [plan](prd/PRD_CustomMap_Registration_Progress.plan.md) | 등록/진행 임베디드 패널 (4-Phase CustomControl) |
+| [PRD_CustomMap_Overlay_Persistence.md](prd/PRD_CustomMap_Overlay_Persistence.md) | [plan](prd/PRD_CustomMap_Overlay_Persistence.plan.md) | 오버레이 등록 후 동작 + 영속화 (9/10 — 삭제 미구현) |
+| [PRD_OverlayImage_Layer_Integration.md](prd/PRD_OverlayImage_Layer_Integration.md) | [plan](prd/PRD_OverlayImage_Layer_Integration.plan.md) | OverlayImage 레이어 시스템 연동 (Seed + Visibility + Opacity) |
 | [PRD_Map_Init_Switch_Redesign.md](prd/PRD_Map_Init_Switch_Redesign.md) | - | 맵 초기화/전환 프로세스 재설계 (초기 로드 빈 타일 버그 미해결) |
+| [PRD_ImageOverlay_Load_BugFix.md](prd/PRD_ImageOverlay_Load_BugFix.md) | - | 이미지 오버레이 불러오기 버그 수정 (사이즈/위치/경계좌표/OnRender 루프) |
+| [PRD_OverlayMap_Visibility_Activate.md](prd/PRD_OverlayMap_Visibility_Activate.md) | - | OverlayMap 레이어 Visibility 활성화 버그 수정 (코드 적용 완료) |
+| [PRD_Layer_Panel_Enhancement.md](prd/PRD_Layer_Panel_Enhancement.md) | [plan](prd/PRD_Layer_Panel_Enhancement.plan.md) | 레이어 패널 기능 개선 (등록순 정렬 + 스크롤 클리핑 + 우클릭 컨텍스트 메뉴) |
 
-## 완료 (Report 있음) — 59건
+## 최근 핫픽스 (2026-03-30)
+| 수정 | 파일 | 내용 |
+|------|------|------|
+| OverlayImage ZOrder 비반영 | MapViewModel.cs:5860 | Edit 모드 OFF에서 레이어 순서 변경 시 `InvalidateVisual()` 누락 → 추가 |
+| OverlayMap 리사이즈 타일 누락 | MapViewModel.cs:2237,3935 | `SizeChanged` 이벤트 미구독 → 전체화면 전환 시 새 영역 타일 미로드 → `MainMap_SizeChanged` 핸들러 추가 |
+
+> 조사 보고서: [REPORT_OverlayImage_ZOrder_EditMode.md](reports/REPORT_OverlayImage_ZOrder_EditMode.md)
+
+## 완료 (Report 있음) — 63건
 > 상세 목록: [INDEX_ARCHIVE.md](INDEX_ARCHIVE.md)
 
 | PRD | Plan | Report | 완료일 |
 |-----|------|--------|-------|
+| [PRD_GetMarkerAtScreen_Priority_Fix.md](prd/PRD_GetMarkerAtScreen_Priority_Fix.md) | [plan](prd/PRD_GetMarkerAtScreen_Priority_Fix.plan.md) | [report](reports/REPORT_GetMarkerAtScreen_Priority_Fix.md) | 2026-03-30 |
+| [PRD_Symbol_ZOrder_Control.md](prd/PRD_Symbol_ZOrder_Control.md) | [plan](prd/PRD_Symbol_ZOrder_Control.plan.md) | [report](reports/REPORT_Symbol_ZOrder_Control.md) | 2026-03-30 |
+| [PRD_Map_DragButton_LeftMouse.md](prd/PRD_Map_DragButton_LeftMouse.md) | [plan](prd/PRD_Map_DragButton_LeftMouse.plan.md) | [report](reports/REPORT_Map_DragButton_LeftMouse.md) | 2026-03-30 |
+| [PRD_EditMode_HitTest_Passthrough.md](prd/PRD_EditMode_HitTest_Passthrough.md) | [plan](prd/PRD_EditMode_HitTest_Passthrough.plan.md) | [report](reports/REPORT_EditMode_HitTest_Passthrough.md) | 2026-03-30 |
 | [PRD_MBTiles_ZoomLevel_Shadowing_Fix.md](prd/PRD_MBTiles_ZoomLevel_Shadowing_Fix.md) | [plan](prd/PRD_MBTiles_ZoomLevel_Shadowing_Fix.plan.md) | [report](reports/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md) | 2026-03-24 |
 | [PRD_MapViewModel_Provider_Cleanup.plan.md](prd/PRD_MapViewModel_Provider_Cleanup.plan.md) | [plan](prd/PRD_MapViewModel_Provider_Cleanup.plan.md) | [report](reports/REPORT_MapViewModel_Provider_Cleanup.md) | 2026-03-24 |
 | [PRD_CollectionChanged_BatchReset.md](prd/PRD_CollectionChanged_BatchReset.md) | [plan](prd/PRD_CollectionChanged_BatchReset.plan.md) | [report](reports/REPORT_CollectionChanged_BatchReset.md) | 2026-03-13 |

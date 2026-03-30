@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapImages;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Input;
@@ -34,6 +35,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 public class GMapCustomControl : GMapControl
 {
     #region Constructor
+
+    /// <summary>
+    /// 오버레이 맵 타일 Canvas — OnRender에서 base(타일) 후, 심볼(ItemsPresenter) 전에 렌더링
+    /// CustomMapOverlayService가 이 Canvas에 Image를 배치
+    /// </summary>
+    public System.Windows.Controls.Canvas? OverlayMapCanvas { get; set; }
 
     public GMapCustomControl()
     {
@@ -316,6 +323,10 @@ public class GMapCustomControl : GMapControl
     protected override void OnInitialized(EventArgs e)
     {
         _eventAggregator?.SubscribeOnUIThread(this);
+
+        // 맵 패닝을 좌클릭으로 변경 (GMap.NET 기본: Right)
+        DragButton = System.Windows.Input.MouseButton.Left;
+
         base.OnInitialized(e);
     }
 
@@ -325,6 +336,9 @@ public class GMapCustomControl : GMapControl
     protected override void OnRender(DrawingContext drawingContext)
     {
         base.OnRender(drawingContext);
+
+        // 오버레이 맵 타일 렌더링 (베이스맵 위, 심볼 아래)
+        RenderOverlayMapTiles(drawingContext);
 
         RenderImageOverlays(drawingContext);
 
@@ -684,6 +698,26 @@ public class GMapCustomControl : GMapControl
         }
     }
 
+    /// <summary>
+    /// 우클릭 처리 — EditMode OFF 시 수동 히트테스트로 컨텍스트 메뉴 트리거
+    /// (IsHitTestVisible=false 상태에서 마커 Shape가 이벤트를 받지 못하므로)
+    /// </summary>
+    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseRightButtonDown(e);
+
+        if (!IsEditMode)
+        {
+            var mousePos = e.GetPosition(this);
+            var clickedMarker = GetMarkerAtScreen(mousePos);
+            if (clickedMarker != null)
+            {
+                OnMarkerRightClicked?.Invoke(clickedMarker);
+                e.Handled = true;
+            }
+        }
+    }
+
     #endregion
     
     #region Object Detection Methods
@@ -701,49 +735,34 @@ public class GMapCustomControl : GMapControl
     private IEditableMarker? GetMarkerAtScreen(Point screenPosition)
     {
         _log?.Info($"GetMarkerAtScreen 호출: 화면위치({screenPosition.X:F2}, {screenPosition.Y:F2})");
-        //_log?.Info($"총 커스텀 마커 수: {CustomMarkers?.Count ?? 0}");
 
-        //if (CustomMarkers == null || !CustomMarkers.Any())
-        //{
-        //    _log?.Info("커스텀 마커가 없음");
-        //    return null;
-        //}
-
-        _log?.Info($"총 마커 수: {Markers?.Count ?? 0}");
         if (Markers == null || !Markers.Any())
-        {
-            _log?.Info("커스텀 마커가 없음");
             return null;
-        }
 
-        // 안전한 마커 리스트 생성 (null 제거)
-        //var validMarkers = CustomMarkers.Where(m => m != null && !string.IsNullOrEmpty(m.Title)).ToList();
-        var validMarkers = Markers.OfType<IEditableMarker>().Where(m => m != null && !string.IsNullOrEmpty(m.Title)).ToList();
+        var validMarkers = Markers.OfType<IEditableMarker>()
+            .Where(m => m != null && !string.IsNullOrEmpty(m.Title)).ToList();
+
+        // 클릭 범위 내 모든 후보 수집
+        var candidates = new List<(IEditableMarker marker, double distance, int zIndex, double area)>();
 
         foreach (var marker in validMarkers)
         {
             try
             {
-                // 마커 상태 확인
-                if (marker.IsDisposed) continue; // Dispose된 마커 건너뛰기
+                if (marker.IsDisposed) continue;
                 if (!SetMarkerVisibility(marker)) continue;
 
-                // 마커의 화면 좌표 계산
                 var markerScreenPos = FromLatLngToLocal(marker.Position);
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);
-
-                // 화면상에서의 거리 계산
                 var screenDistance = CalculateScreenDistance(screenPosition, markerScreenPoint);
-
-                // 마커 크기 고려한 클릭 반경 (마커 크기의 절반 + 여유분)
-                var markerRadius = Math.Max(marker.Width, marker.Height) / 2.0 + 10; // 10px 여유분
-
-                //_log?.Info($"마커 '{marker.Title}': 화면위치({markerScreenPoint.X:F2}, {markerScreenPoint.Y:F2}), 화면거리: {screenDistance:F2}px, 클릭반경: {markerRadius:F2}px, 마커크기: {marker.Width}x{marker.Height}");
+                var markerRadius = Math.Max(marker.Width, marker.Height) / 2.0 + 10;
 
                 if (screenDistance <= markerRadius)
                 {
-                    //_log?.Info($"마커 '{marker.Title}' 선택됨 (화면거리: {screenDistance:F2}px <= 반경: {markerRadius:F2}px)");
-                    return marker;
+                    var z = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape is UIElement s
+                        ? System.Windows.Controls.Panel.GetZIndex(s) : 0;
+                    var area = marker.Width * marker.Height;
+                    candidates.Add((marker, screenDistance, z, area));
                 }
             }
             catch (Exception ex)
@@ -752,8 +771,21 @@ public class GMapCustomControl : GMapControl
             }
         }
 
-        _log?.Info("클릭 위치에서 마커를 찾을 수 없음");
-        return null;
+        if (candidates.Count == 0)
+        {
+            _log?.Info("클릭 위치에서 마커를 찾을 수 없음");
+            return null;
+        }
+
+        // 우선순위: ZIndex 높은 순 → 면적 작은 순 → 거리 가까운 순
+        var selected = candidates
+            .OrderByDescending(c => c.zIndex)
+            .ThenBy(c => c.area)
+            .ThenBy(c => c.distance)
+            .First();
+
+        _log?.Info($"GetMarkerAtScreen 선택: '{selected.marker.Title}' ZIndex={selected.zIndex} Area={selected.area:F0} Dist={selected.distance:F1}px (후보 {candidates.Count}개)");
+        return selected.marker;
     }
 
     /// <summary>
@@ -1050,7 +1082,7 @@ public class GMapCustomControl : GMapControl
                 {
                     SelectMarker(marker);
                 }
-                _log?.Info($"모든 마커 선택 완료: {Markers.Count}개");
+                //_log?.Info($"모든 마커 선택 완료: {Markers.Count}개");
             }
         }
         catch (Exception ex)
@@ -1192,6 +1224,44 @@ public class GMapCustomControl : GMapControl
     #endregion
     
     #region Rendering Methods
+
+    /// <summary>
+    /// 오버레이 맵 타일 렌더링 (DrawingContext 직접 렌더링)
+    /// base.OnRender(타일) 후, 심볼(ItemsPresenter) 전에 호출됨
+    /// </summary>
+    private void RenderOverlayMapTiles(DrawingContext drawingContext)
+    {
+        if (OverlayMapCanvas == null) return;
+
+        // ZOrder 순으로 렌더링 (낮은 ZOrder = 먼저 그림 = 아래 레이어)
+        foreach (System.Windows.Controls.Canvas childCanvas in
+            OverlayMapCanvas.Children.OfType<System.Windows.Controls.Canvas>()
+                .OrderBy(c => System.Windows.Controls.Panel.GetZIndex(c)))
+        {
+            if (childCanvas.Visibility != Visibility.Visible) continue;
+
+            var opacity = childCanvas.Opacity;
+
+            foreach (var img in childCanvas.Children.OfType<System.Windows.Controls.Image>())
+            {
+                if (img.Source == null) continue;
+
+                var left = System.Windows.Controls.Canvas.GetLeft(img);
+                var top = System.Windows.Controls.Canvas.GetTop(img);
+                if (double.IsNaN(left) || double.IsNaN(top)) continue;
+
+                var rect = new Rect(left, top, img.Width, img.Height);
+
+                if (opacity < 1.0)
+                    drawingContext.PushOpacity(opacity);
+
+                drawingContext.DrawImage(img.Source, rect);
+
+                if (opacity < 1.0)
+                    drawingContext.Pop();
+            }
+        }
+    }
 
     /// <summary>
     /// 이미지 오버레이 렌더링
@@ -1600,6 +1670,15 @@ public class GMapCustomControl : GMapControl
 
         IsEditMode = enabled;
 
+        // 마커 Shape IsHitTestVisible 토글 — EditMode OFF 시 맵 패닝/줌 투과
+        foreach (var marker in Markers)
+        {
+            if (marker is GMapMarker gMarker && gMarker.Shape is UIElement shape)
+            {
+                shape.IsHitTestVisible = enabled;
+            }
+        }
+
         if (!IsEditMode)
         {
             // 편집 모드 해제 시 모든 선택 해제
@@ -1614,7 +1693,7 @@ public class GMapCustomControl : GMapControl
             InvalidateVisual();
         }
 
-        _log?.Info($"편집 모드: {(enabled ? "활성화" : "비활성화")}");
+        _log?.Info($"편집 모드: {(enabled ? "활성화" : "비활성화")}, 마커 HitTest={enabled}");
     }
 
     /// <summary>
