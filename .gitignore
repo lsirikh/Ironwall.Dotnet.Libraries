@@ -378,3 +378,29 @@ healthchecksdb
 /Dotnet.Streaming.UI/Exts/OpenCvSharpExtern.dll
 /Dotnet.Streaming.UI/Exts/opencv_world4110.dll
  
+
+# ── Claude Skill Harness ──
+# 이 섹션은 claude-skill-harness install.js가 자동 생성합니다.
+# 하네스/스킬/MCP 관련 파일을 git 추적에서 제외합니다.
+
+# Harness core
+.claude/
+CLAUDE.md
+CHANGELOG.md
+UPGRADE.md
+
+# Harness documents
+docs/memory/
+docs/analysis/
+docs/prds/
+docs/plans/
+docs/tests/
+docs/reports/
+docs/INDEX.md
+docs/Manual.md
+
+# Harness installer / backup
+install.js
+claude-skill-harness*/
+.skill-set-backup*
+# ── /Claude Skill Harness ──

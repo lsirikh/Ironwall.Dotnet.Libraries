@@ -15,6 +15,18 @@ public class LayerChangedEventArgs : EventArgs
     }
 }
 
+public class LayerRenameEventArgs : EventArgs
+{
+    public IMapLayerModel Layer { get; }
+    public string NewName { get; }
+
+    public LayerRenameEventArgs(IMapLayerModel layer, string newName)
+    {
+        Layer = layer;
+        NewName = newName;
+    }
+}
+
 public class LayerOpacityChangedEventArgs : EventArgs
 {
     public IMapLayerModel Layer { get; }

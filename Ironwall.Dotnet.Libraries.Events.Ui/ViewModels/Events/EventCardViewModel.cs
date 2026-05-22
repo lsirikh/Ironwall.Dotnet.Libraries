@@ -32,29 +32,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Implementation of Interface -
         #endregion
         #region - Overrides -
-        public override Task TaskFinal() => SendAction(content: Contents, idUser: IdUser);
         protected abstract Task CloseDialog();
         public async virtual Task SendAction(string? content, string? idUser)
         {
             _log?.Info($"CardViewModel SendAction : User({IdUser}), Content({Contents}), Device({Device?.DeviceName}), DateTime({DateTime})");
-            if (Cts != null && !Cts.IsCancellationRequested)
-            {
-                Cts.Cancel();
-                Cts.Dispose();
-            }
-
-            //var message = new SendActionRequestMessage
-            //{
-            //    EventId = Model.Id,
-            //    EventType = EnumEventType.Intrusion,
-            //    ActionDetails = Contents,
-            //    ActionUser = idUser,
-            //    ActionTime = DateTime.Now
-            //};
-
-            //// EventAggregator를 통해 메시지 발행
-            //await _eventAggregator.PublishOnBackgroundThreadAsync(message);
-
             await CloseDialog();
         }
         #endregion

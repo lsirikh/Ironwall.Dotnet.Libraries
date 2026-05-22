@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 using Moq;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Managers;
@@ -7,7 +7,7 @@ using Ironwall.Dotnet.Monitoring.Models.Events;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
 /****************************************************************************
-   Purpose      : EventQueueManager 단위 테스트
+   Purpose      : EventQueueManager ?⑥쐞 ?뚯뒪??
    Created By   : GHLee
    Created On   : 2026-03-08
    Department   : SW Team
@@ -101,7 +101,7 @@ public class EventQueueManagerTests
         sut.Enqueue(entry2);
 
         // Assert
-        Assert.Equal(1, raisedCount); // 첫 번째만 발행
+        Assert.Equal(1, raisedCount); // 泥?踰덉㎏留?諛쒗뻾
     }
 
     [Fact]
@@ -179,18 +179,18 @@ public class EventQueueManagerTests
     {
         // Arrange
         var sut = CreateSut();
-        // Group1에 ev1, Group2에 ev2
+        // Group1??ev1, Group2??ev2
         var ev1 = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 1 }));
         var ev2 = sut.Enqueue(CreateEntry(deviceId: 15, groupIds: new List<int> { 2 }));
         var emptyGroupIds = new List<int>();
         sut.OnGroupEmpty += (groupId) => emptyGroupIds.Add(groupId);
 
-        // Act — Group1만 비우기
+        // Act ??Group1留?鍮꾩슦湲?
         sut.Dequeue(ev1);
 
         // Assert
-        Assert.Contains(1, emptyGroupIds);       // Group1 복원
-        Assert.DoesNotContain(2, emptyGroupIds);  // Group2 유지
+        Assert.Contains(1, emptyGroupIds);       // Group1 蹂듭썝
+        Assert.DoesNotContain(2, emptyGroupIds);  // Group2 ?좎?
         Assert.False(sut.HasEventsForGroup(1));
         Assert.True(sut.HasEventsForGroup(2));
     }
@@ -221,7 +221,7 @@ public class EventQueueManagerTests
         // Arrange
         var sut = CreateSut();
 
-        // Act & Assert — 예외 없이 무시
+        // Act & Assert ???덉쇅 ?놁씠 臾댁떆
         var exception = Record.Exception(() => sut.Dequeue("non-existent-uuid"));
         Assert.Null(exception);
     }
@@ -239,12 +239,12 @@ public class EventQueueManagerTests
         entry.TimeoutSeconds = 10;
         var entryId = sut.Enqueue(entry);
 
-        // 과거로 EnqueuedAt 조작 (11초 전 → 10초 타임아웃 초과)
+        // 怨쇨굅濡?EnqueuedAt 議곗옉 (11珥?????10珥???꾩븘??珥덇낵)
         var retrieved = sut.GetEntry(entryId)!;
         retrieved.EnqueuedAt = DateTime.Now.AddSeconds(-11);
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
         // Act
         sut.OnSharedTimerTick();
@@ -260,7 +260,7 @@ public class EventQueueManagerTests
         // Arrange
         var sut = CreateSut();
         var entry = CreateEntry();
-        entry.TimeoutSeconds = 60; // 60초 타임아웃 — 방금 등록했으므로 초과 안 됨
+        entry.TimeoutSeconds = 60; // 60珥???꾩븘????諛⑷툑 ?깅줉?덉쑝誘濡?珥덇낵 ????
         var entryId = sut.Enqueue(entry);
 
         // Act
@@ -278,17 +278,17 @@ public class EventQueueManagerTests
         var sut = CreateSut();
         var entry = CreateEntry();
         entry.TimeoutSeconds = 10;
-        entry.IsAutoReportEnabled = false; // 자동 조치보고 비활성
+        entry.IsAutoReportEnabled = false; // ?먮룞 議곗튂蹂닿퀬 鍮꾪솢??
         var entryId = sut.Enqueue(entry);
 
-        // 과거로 조작 (타임아웃 초과)
+        // 怨쇨굅濡?議곗옉 (??꾩븘??珥덇낵)
         var retrieved = sut.GetEntry(entryId)!;
         retrieved.EnqueuedAt = DateTime.Now.AddSeconds(-11);
 
         // Act
         sut.OnSharedTimerTick();
 
-        // Assert — 제거되지 않아야 함
+        // Assert ???쒓굅?섏? ?딆븘????
         Assert.Equal(1, sut.GetTotalQueueCount());
         Assert.NotNull(sut.GetEntry(entryId));
     }
@@ -300,42 +300,42 @@ public class EventQueueManagerTests
     [Fact]
     public void PRD_Scenario_FullLifecycle_ShouldTrackGroupTransitionsCorrectly()
     {
-        // PRD §4.5: 센서1(G1), 센서2(G1), 센서1(G1), 센서15(G2) 순차 도착
-        // → ev1~ev4 순차 Dequeue → 그룹별 심볼 전이 검증
+        // PRD 짠4.5: ?쇱꽌1(G1), ?쇱꽌2(G1), ?쇱꽌1(G1), ?쇱꽌15(G2) ?쒖감 ?꾩갑
+        // ??ev1~ev4 ?쒖감 Dequeue ??洹몃９蹂??щ낵 ?꾩씠 寃利?
         var sut = CreateSut();
         var firstEvents = new List<int>();
         var emptyGroups = new List<int>();
         sut.OnGroupFirstEvent += (gid, _) => firstEvents.Add(gid);
         sut.OnGroupEmpty += (gid) => emptyGroups.Add(gid);
 
-        // ── Enqueue Phase ──
+        // ?? Enqueue Phase ??
         var ev1 = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 1 }));
-        Assert.Contains(1, firstEvents); // Group1 첫 이벤트 → Detecting
+        Assert.Contains(1, firstEvents); // Group1 泥??대깽????Detecting
 
         var ev2 = sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 1 }));
-        Assert.Equal(1, firstEvents.Count(g => g == 1)); // Group1 중복 발행 안 됨
+        Assert.Equal(1, firstEvents.Count(g => g == 1)); // Group1 以묐났 諛쒗뻾 ????
 
         var ev3 = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 1 }));
 
         var ev4 = sut.Enqueue(CreateEntry(deviceId: 15, groupIds: new List<int> { 2 }));
-        Assert.Contains(2, firstEvents); // Group2 첫 이벤트 → Detecting
+        Assert.Contains(2, firstEvents); // Group2 泥??대깽????Detecting
 
         Assert.Equal(4, sut.GetTotalQueueCount());
 
-        // ── Dequeue Phase ──
-        sut.Dequeue(ev1); // Group1에 ev2, ev3 남음
+        // ?? Dequeue Phase ??
+        sut.Dequeue(ev1); // Group1??ev2, ev3 ?⑥쓬
         Assert.True(sut.HasEventsForGroup(1));
         Assert.Empty(emptyGroups);
 
-        sut.Dequeue(ev2); // Group1에 ev3 남음
+        sut.Dequeue(ev2); // Group1??ev3 ?⑥쓬
         Assert.True(sut.HasEventsForGroup(1));
         Assert.Empty(emptyGroups);
 
-        sut.Dequeue(ev3); // Group1 비어짐 → Normal 복원
+        sut.Dequeue(ev3); // Group1 鍮꾩뼱吏???Normal 蹂듭썝
         Assert.False(sut.HasEventsForGroup(1));
         Assert.Contains(1, emptyGroups);
 
-        sut.Dequeue(ev4); // Group2 비어짐 → Normal 복원
+        sut.Dequeue(ev4); // Group2 鍮꾩뼱吏???Normal 蹂듭썝
         Assert.False(sut.HasEventsForGroup(2));
         Assert.Contains(2, emptyGroups);
 
@@ -348,12 +348,12 @@ public class EventQueueManagerTests
         // Arrange
         var sut = CreateSut();
         var entry = CreateEntry();
-        Assert.NotNull(entry.SourceEvent); // Mock object 설정 확인
+        Assert.NotNull(entry.SourceEvent); // Mock object ?ㅼ젙 ?뺤씤
 
         // Act
         var entryId = sut.Enqueue(entry);
 
-        // Assert — GetEntry로 조회한 SourceEvent가 원본과 동일
+        // Assert ??GetEntry濡?議고쉶??SourceEvent媛 ?먮낯怨??숈씪
         var retrieved = sut.GetEntry(entryId)!;
         Assert.NotNull(retrieved.SourceEvent);
         Assert.Same(entry.SourceEvent, retrieved.SourceEvent);
@@ -361,12 +361,12 @@ public class EventQueueManagerTests
 
     #endregion
 
-    #region - Phase BatchUI: 배치 Dequeue 검증 (FR-08) -
+    #region - Phase BatchUI: 諛곗튂 Dequeue 寃利?(FR-08) -
 
     [Fact]
     public void OnSharedTimerTick_BatchExpired_ShouldDequeueAllExpired()
     {
-        // Arrange — 3건 모두 만료
+        // Arrange ??3嫄?紐⑤몢 留뚮즺
         var sut = CreateSut();
         var e1 = CreateEntry(deviceId: 1, groupIds: new List<int> { 1 });
         e1.TimeoutSeconds = 5;
@@ -379,18 +379,18 @@ public class EventQueueManagerTests
         var id2 = sut.Enqueue(e2);
         var id3 = sut.Enqueue(e3);
 
-        // 과거로 조작 (모두 만료)
+        // 怨쇨굅濡?議곗옉 (紐⑤몢 留뚮즺)
         sut.GetEntry(id1)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
         sut.GetEntry(id2)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
         sut.GetEntry(id3)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
         // Act
         sut.OnSharedTimerTick();
 
-        // Assert — 3건 모두 Dequeue + AutoReport
+        // Assert ??3嫄?紐⑤몢 Dequeue + AutoReport
         Assert.Equal(0, sut.GetTotalQueueCount());
         Assert.Equal(3, reportedIds.Count);
         Assert.Contains(id1, reportedIds);
@@ -401,7 +401,7 @@ public class EventQueueManagerTests
     [Fact]
     public void OnSharedTimerTick_BatchExpired_ShouldPreserveGroupEmptyOrder()
     {
-        // Arrange — Group1에 2건, Group2에 1건 → 모두 만료
+        // Arrange ??Group1??2嫄? Group2??1嫄???紐⑤몢 留뚮즺
         var sut = CreateSut();
         var e1 = CreateEntry(deviceId: 1, groupIds: new List<int> { 1 });
         e1.TimeoutSeconds = 5;
@@ -414,18 +414,20 @@ public class EventQueueManagerTests
         var id2 = sut.Enqueue(e2);
         var id3 = sut.Enqueue(e3);
 
-        // 과거로 조작
+        // 怨쇨굅濡?議곗옉
         sut.GetEntry(id1)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
         sut.GetEntry(id2)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
         sut.GetEntry(id3)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
 
         var emptyGroupIds = new List<int>();
         sut.OnGroupEmpty += (gid) => emptyGroupIds.Add(gid);
+        // OnAutoReport ?몃뱾?ш? Dequeue 梨낆엫 (HandleAutoReport ??븷 ?쒕??덉씠??
+        sut.OnAutoReport += (entry) => { sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
         // Act
         sut.OnSharedTimerTick();
 
-        // Assert — 두 그룹 모두 OnGroupEmpty 발행
+        // Assert ????洹몃９ 紐⑤몢 OnGroupEmpty 諛쒗뻾
         Assert.Contains(1, emptyGroupIds);
         Assert.Contains(2, emptyGroupIds);
         Assert.Equal(0, sut.GetTotalQueueCount());
@@ -481,7 +483,7 @@ public class EventQueueManagerTests
         sut.Enqueue(entry2);
 
         // Assert
-        Assert.Equal(1, raisedCount); // 첫 번째만 발행
+        Assert.Equal(1, raisedCount); // 泥?踰덉㎏留?諛쒗뻾
     }
 
     #endregion
@@ -533,7 +535,7 @@ public class EventQueueManagerTests
         var emptyDevices = new List<int>();
         sut.OnDeviceEmpty += (id, type) => emptyDevices.Add(id);
 
-        // Act — Device1만 비우기
+        // Act ??Device1留?鍮꾩슦湲?
         sut.Dequeue(ev1);
 
         // Assert
@@ -546,7 +548,7 @@ public class EventQueueManagerTests
     [Fact]
     public void Dequeue_DeviceEmptyButGroupRemains_ShouldRaiseOnDeviceEmptyOnly()
     {
-        // Arrange — 같은 그룹에 Device1, Device8 각 1건
+        // Arrange ??媛숈? 洹몃９??Device1, Device8 媛?1嫄?
         var sut = CreateSut();
         var ev1 = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 1 }));
         var ev2 = sut.Enqueue(CreateEntry(deviceId: 8, groupIds: new List<int> { 1 }));
@@ -555,12 +557,12 @@ public class EventQueueManagerTests
         sut.OnDeviceEmpty += (id, type) => { if (id == 1) deviceEmptyRaised = true; };
         sut.OnGroupEmpty += (gid) => groupEmptyRaised = true;
 
-        // Act — Device1 Dequeue → Group1에 ev2 남아있음
+        // Act ??Device1 Dequeue ??Group1??ev2 ?⑥븘?덉쓬
         sut.Dequeue(ev1);
 
         // Assert
-        Assert.True(deviceEmptyRaised);   // Device1 비어짐
-        Assert.False(groupEmptyRaised);   // Group1에 ev2 남아있으므로 미발행
+        Assert.True(deviceEmptyRaised);   // Device1 鍮꾩뼱吏?
+        Assert.False(groupEmptyRaised);   // Group1??ev2 ?⑥븘?덉쑝誘濡?誘몃컻??
         Assert.True(sut.HasEventsForGroup(1));
     }
 
@@ -589,8 +591,8 @@ public class EventQueueManagerTests
     #region - Phase: E2E Scenario (PRD_EventQueue_Symbol_Unification) -
 
     /// <summary>
-    /// PRD §4.8 동작 예시 시나리오:
-    /// 센서1 탐지 2회 + 센서8 탐지 1회 → ev1 Dequeue → ev2 Dequeue (Device1 Empty, GroupA 유지) → ev3 Dequeue (GroupA Empty)
+    /// PRD 짠4.8 ?숈옉 ?덉떆 ?쒕굹由ъ삤:
+    /// ?쇱꽌1 ?먯? 2??+ ?쇱꽌8 ?먯? 1????ev1 Dequeue ??ev2 Dequeue (Device1 Empty, GroupA ?좎?) ??ev3 Dequeue (GroupA Empty)
     /// </summary>
     [Fact]
     public void PRD_Scenario_DeviceAndGroupTransitions()
@@ -607,37 +609,37 @@ public class EventQueueManagerTests
         sut.OnGroupFirstEvent += (gid, evt) => groupFirstEvents.Add((gid, evt));
         sut.OnGroupEmpty += (gid) => groupEmptyEvents.Add(gid);
 
-        // 센서1 탐지 1회 → Device1 FirstEvent + GroupA FirstEvent
+        // ?쇱꽌1 ?먯? 1????Device1 FirstEvent + GroupA FirstEvent
         var ev1 = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 1 }));
         Assert.Single(deviceFirstEvents);
         Assert.Equal(1, deviceFirstEvents[0].Id);
         Assert.Single(groupFirstEvents);
         Assert.Equal(1, groupFirstEvents[0].GroupId);
 
-        // 센서1 탐지 2회 → Device1 중복 (FirstEvent 미발행)
+        // ?쇱꽌1 ?먯? 2????Device1 以묐났 (FirstEvent 誘몃컻??
         var ev2 = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 1 }));
-        Assert.Single(deviceFirstEvents); // 여전히 1회
-        Assert.Single(groupFirstEvents);  // 여전히 1회
+        Assert.Single(deviceFirstEvents); // ?ъ쟾??1??
+        Assert.Single(groupFirstEvents);  // ?ъ쟾??1??
 
-        // 센서8 탐지 1회 → Device8 FirstEvent (GroupA는 이미 있으므로 미발행)
+        // ?쇱꽌8 ?먯? 1????Device8 FirstEvent (GroupA???대? ?덉쑝誘濡?誘몃컻??
         var ev3 = sut.Enqueue(CreateEntry(deviceId: 8, groupIds: new List<int> { 1 }));
         Assert.Equal(2, deviceFirstEvents.Count);
         Assert.Equal(8, deviceFirstEvents[1].Id);
-        Assert.Single(groupFirstEvents); // GroupA 이미 존재
+        Assert.Single(groupFirstEvents); // GroupA ?대? 議댁옱
 
-        // ev1 Dequeue → Device1에 아직 ev2 남음 → DeviceEmpty 미발행
+        // ev1 Dequeue ??Device1???꾩쭅 ev2 ?⑥쓬 ??DeviceEmpty 誘몃컻??
         sut.Dequeue(ev1);
         Assert.Empty(deviceEmptyEvents);
         Assert.Empty(groupEmptyEvents);
 
-        // ev2 Dequeue → Device1 Empty, GroupA에 ev3 남음 → GroupEmpty 미발행
+        // ev2 Dequeue ??Device1 Empty, GroupA??ev3 ?⑥쓬 ??GroupEmpty 誘몃컻??
         sut.Dequeue(ev2);
         Assert.Single(deviceEmptyEvents);
         Assert.Equal(1, deviceEmptyEvents[0].Id);
         Assert.Empty(groupEmptyEvents);
-        Assert.True(sut.HasEventsForGroup(1)); // GroupA 유지
+        Assert.True(sut.HasEventsForGroup(1)); // GroupA ?좎?
 
-        // ev3 Dequeue → Device8 Empty + GroupA Empty
+        // ev3 Dequeue ??Device8 Empty + GroupA Empty
         sut.Dequeue(ev3);
         Assert.Equal(2, deviceEmptyEvents.Count);
         Assert.Equal(8, deviceEmptyEvents[1].Id);
@@ -647,7 +649,7 @@ public class EventQueueManagerTests
     }
 
     /// <summary>
-    /// 그룹 미소속 심볼: GroupIds = null → OnDeviceFirstEvent/OnDeviceEmpty만 발행
+    /// 洹몃９ 誘몄냼???щ낵: GroupIds = null ??OnDeviceFirstEvent/OnDeviceEmpty留?諛쒗뻾
     /// </summary>
     [Fact]
     public void GrouplessDevice_ShouldWorkWithDeviceIndexOnly()
@@ -700,7 +702,7 @@ public class EventQueueManagerTests
         // Act
         var entryId = sut.Enqueue(entry, "nats-uuid-123");
 
-        // Assert — 자체 UUID 대신 외부 entryId 사용
+        // Assert ???먯껜 UUID ????몃? entryId ?ъ슜
         Assert.Equal("nats-uuid-123", entryId);
         Assert.Equal("nats-uuid-123", entry.EntryId);
         Assert.NotNull(sut.GetEntry("nats-uuid-123"));
@@ -716,7 +718,7 @@ public class EventQueueManagerTests
         // Act
         var entryId = sut.Enqueue(entry, null);
 
-        // Assert — Guid 형식 UUID 자동 생성
+        // Assert ??Guid ?뺤떇 UUID ?먮룞 ?앹꽦
         Assert.False(string.IsNullOrWhiteSpace(entryId));
         Assert.True(Guid.TryParse(entryId, out _));
         Assert.NotNull(sut.GetEntry(entryId));
@@ -732,9 +734,149 @@ public class EventQueueManagerTests
         // Act
         var entryId = sut.Enqueue(entry, "");
 
-        // Assert — 빈 문자열도 폴백
+        // Assert ??鍮?臾몄옄?대룄 ?대갚
         Assert.False(string.IsNullOrWhiteSpace(entryId));
         Assert.True(Guid.TryParse(entryId, out _));
+    }
+
+    #endregion
+
+    #region - Device_CompositeState_SSOT: BUG-01, BUG-02, REQ-01 -
+
+    // BUG-01: ?숈씪 ?쇱꽌 Detection ??Fault ?꾪솚 ??OnDeviceStateChanged 諛쒗솕 寃利?
+    [Fact]
+    public void should_fire_DeviceStateChanged_FaultedDetecting_when_fault_added_to_detecting_device()
+    {
+        var sut = CreateSut();
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        var deviceTransitions = new List<(int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnDeviceStateChanged += (id, type, prev, next) => deviceTransitions.Add((id, type, prev, next));
+
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        Assert.Single(deviceTransitions);
+        Assert.Equal((1, EnumDeviceType.Fence, EnumCompositeEventStatus.Detecting, EnumCompositeEventStatus.FaultedDetecting), deviceTransitions[0]);
+    }
+
+    // BUG-01: 洹몃９???숈씪?섍쾶 FaultedDetecting?쇰줈 ?꾩씠?섏뼱????(湲곗〈 洹몃９ 濡쒖쭅 ?좎? ?뺤씤)
+    [Fact]
+    public void should_fire_GroupStateChanged_FaultedDetecting_when_same_device_fault_after_detection()
+    {
+        var sut = CreateSut();
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        var groupTransitions = new List<(int, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => groupTransitions.Add((gid, prev, next));
+
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        Assert.Single(groupTransitions);
+        Assert.Equal((10, EnumCompositeEventStatus.Detecting, EnumCompositeEventStatus.FaultedDetecting), groupTransitions[0]);
+    }
+
+    // BUG-02 Scenario A: FaultedDetecting ??Fault 議곗튂蹂닿퀬 ??Detecting ?꾩씠
+    // Detection??癒쇱? ?꾩갑?댁빞 auto-recovery 誘몃컻??(Fault ?꾩갑 ?쒖뿉??auto-recovery ?놁쓬)
+    [Fact]
+    public void should_fire_DeviceStateChanged_Detecting_when_fault_dequeued_from_FaultedDetecting_device()
+    {
+        var sut = CreateSut();
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var deviceTransitions = new List<(int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnDeviceStateChanged += (id, type, prev, next) => deviceTransitions.Add((id, type, prev, next));
+
+        sut.Dequeue(faultId);
+
+        Assert.Single(deviceTransitions);
+        Assert.Equal((1, EnumDeviceType.Fence, EnumCompositeEventStatus.FaultedDetecting, EnumCompositeEventStatus.Detecting), deviceTransitions[0]);
+    }
+
+    // BUG-02 Scenario B: FaultedDetecting ??Detection 議곗튂蹂닿퀬 ??Faulted ?꾩씠
+    // Detection??癒쇱? ?꾩갑?댁빞 auto-recovery 誘몃컻??
+    [Fact]
+    public void should_fire_DeviceStateChanged_Faulted_when_detection_dequeued_from_FaultedDetecting_device()
+    {
+        var sut = CreateSut();
+        var detectId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var deviceTransitions = new List<(int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnDeviceStateChanged += (id, type, prev, next) => deviceTransitions.Add((id, type, prev, next));
+
+        sut.Dequeue(detectId);
+
+        Assert.Single(deviceTransitions);
+        Assert.Equal((1, EnumDeviceType.Fence, EnumCompositeEventStatus.FaultedDetecting, EnumCompositeEventStatus.Faulted), deviceTransitions[0]);
+    }
+
+    // REQ-01: Fault ?쒖꽦 以?Detection ?꾩갑 ??OnAutoRecovery 諛쒗솕 + Fault ?먯뿉???쒓굅
+    [Fact]
+    public void should_fire_OnAutoRecovery_and_remove_fault_when_detection_arrives_for_faulted_device()
+    {
+        var sut = CreateSut();
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var recoveredIds = new List<string>();
+        sut.OnAutoRecovery += id => recoveredIds.Add(id);
+
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        Assert.Single(recoveredIds);
+        Assert.Equal(faultId, recoveredIds[0]);
+        Assert.Null(sut.GetEntry(faultId));    // Fault ?뷀듃由??쒓굅??
+        Assert.Equal(1, sut.GetTotalQueueCount()); // Detection留??⑥쓬
+    }
+
+    // REQ-01: ?먮룞蹂듦뎄 ???붾컮?댁뒪 ?곹깭媛 Faulted?묭etecting?쇰줈 ?꾩씠
+    [Fact]
+    public void should_fire_DeviceStateChanged_Faulted_to_Detecting_on_auto_recovery()
+    {
+        var sut = CreateSut();
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var deviceTransitions = new List<(int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnDeviceStateChanged += (id, type, prev, next) => deviceTransitions.Add((id, type, prev, next));
+
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        Assert.Single(deviceTransitions);
+        Assert.Equal((1, EnumDeviceType.Fence, EnumCompositeEventStatus.Faulted, EnumCompositeEventStatus.Detecting), deviceTransitions[0]);
+    }
+
+    // REQ-01: ?먮룞蹂듦뎄 ??洹몃９ ?곹깭??Faulted?묭etecting ?꾩씠
+    [Fact]
+    public void should_fire_GroupStateChanged_Faulted_to_Detecting_on_auto_recovery()
+    {
+        var sut = CreateSut();
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var groupTransitions = new List<(int, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => groupTransitions.Add((gid, prev, next));
+
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        Assert.Single(groupTransitions);
+        Assert.Equal((10, EnumCompositeEventStatus.Faulted, EnumCompositeEventStatus.Detecting), groupTransitions[0]);
+    }
+
+    // V-05: ?ㅻⅨ ?쇱꽌??Fault???먮룞蹂듦뎄 誘몄쟻??
+    [Fact]
+    public void should_not_auto_recover_fault_of_different_device()
+    {
+        var sut = CreateSut();
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var recoveredIds = new List<string>();
+        sut.OnAutoRecovery += id => recoveredIds.Add(id);
+
+        // Device 1 (?ㅻⅨ ?쇱꽌) Detection ?꾩갑
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        Assert.Empty(recoveredIds);                          // ?먮룞蹂듦뎄 誘몃컻??
+        Assert.NotNull(sut.GetEntry(faultId));               // Device 2 Fault ?좎?
+        Assert.Equal(2, sut.GetTotalQueueCount());           // Fault + Detection 紐⑤몢 ?좎?
     }
 
     #endregion
@@ -744,7 +886,7 @@ public class EventQueueManagerTests
     [Fact]
     public void FindEntryByDevice_ShouldReturnOldestEntry()
     {
-        // Arrange — 같은 device에 3건 등록
+        // Arrange ??媛숈? device??3嫄??깅줉
         var sut = CreateSut();
         var e1 = CreateEntry(deviceId: 5);
         var e2 = CreateEntry(deviceId: 5);
@@ -757,7 +899,7 @@ public class EventQueueManagerTests
         // Act
         var result = sut.FindEntryByDevice(5, EnumDeviceType.Fence);
 
-        // Assert — 가장 먼저 등록된 entry 반환
+        // Assert ??媛??癒쇱? ?깅줉??entry 諛섑솚
         Assert.NotNull(result);
         Assert.Equal(id1, result.EntryId);
     }
@@ -786,7 +928,7 @@ public class EventQueueManagerTests
         // Act
         var result = sut.FindEntryByDevice(5, EnumDeviceType.Fence);
 
-        // Assert — 조회 후 큐 상태 변경 없음
+        // Assert ??議고쉶 ?????곹깭 蹂寃??놁쓬
         Assert.NotNull(result);
         Assert.Equal(countBefore, sut.GetTotalQueueCount());
         Assert.True(sut.HasEventsForDevice(5, EnumDeviceType.Fence));
@@ -794,12 +936,12 @@ public class EventQueueManagerTests
 
     #endregion
 
-    #region - Phase: Timer 청크 분할 (PRD_SharedTimer_Chunk_Dequeue) -
+    #region - Phase: Timer 泥?겕 遺꾪븷 (PRD_SharedTimer_Chunk_Dequeue) -
 
     [Fact]
     public void OnSharedTimerTick_50Expired_ShouldDequeueOnlyChunkSize()
     {
-        // Arrange — 50건 모두 즉시 만료
+        // Arrange ??50嫄?紐⑤몢 利됱떆 留뚮즺
         var sut = CreateSut();
         sut.MaxDequeuePerTick = 5;
 
@@ -812,12 +954,12 @@ public class EventQueueManagerTests
         }
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
-        // Act — 1 tick
+        // Act ??1 tick
         sut.OnSharedTimerTick();
 
-        // Assert — 5건만 Dequeue, 45건 잔여
+        // Assert ??5嫄대쭔 Dequeue, 45嫄??붿뿬
         Assert.Equal(5, reportedIds.Count);
         Assert.Equal(45, sut.GetTotalQueueCount());
     }
@@ -825,7 +967,7 @@ public class EventQueueManagerTests
     [Fact]
     public void OnSharedTimerTick_MultipleTicks_ShouldDrainAll()
     {
-        // Arrange — 12건 만료
+        // Arrange ??12嫄?留뚮즺
         var sut = CreateSut();
         sut.MaxDequeuePerTick = 5;
 
@@ -838,9 +980,9 @@ public class EventQueueManagerTests
         }
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
-        // Act — Tick 1회(5건) + Tick 2회(5건) + Tick 3회(2건)
+        // Act ??Tick 1??5嫄? + Tick 2??5嫄? + Tick 3??2嫄?
         sut.OnSharedTimerTick();
         Assert.Equal(5, reportedIds.Count);
         Assert.Equal(7, sut.GetTotalQueueCount());
@@ -857,7 +999,7 @@ public class EventQueueManagerTests
     [Fact]
     public void OnSharedTimerTick_LessThanChunk_ShouldDequeueAll()
     {
-        // Arrange — 3건 만료 < ChunkSize 5
+        // Arrange ??3嫄?留뚮즺 < ChunkSize 5
         var sut = CreateSut();
         sut.MaxDequeuePerTick = 5;
 
@@ -870,12 +1012,12 @@ public class EventQueueManagerTests
         }
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
         // Act
         sut.OnSharedTimerTick();
 
-        // Assert — 3건 전부 처리
+        // Assert ??3嫄??꾨? 泥섎━
         Assert.Equal(3, reportedIds.Count);
         Assert.Equal(0, sut.GetTotalQueueCount());
     }
@@ -883,7 +1025,7 @@ public class EventQueueManagerTests
     [Fact]
     public void OnSharedTimerTick_OrderByEnqueuedAt()
     {
-        // Arrange — 3건, 서로 다른 EnqueuedAt, MaxDequeuePerTick=1
+        // Arrange ??3嫄? ?쒕줈 ?ㅻⅨ EnqueuedAt, MaxDequeuePerTick=1
         var sut = CreateSut();
         sut.MaxDequeuePerTick = 1;
 
@@ -892,7 +1034,7 @@ public class EventQueueManagerTests
         var eA = CreateEntry(deviceId: 401, groupIds: new List<int> { 1 });
         eA.TimeoutSeconds = 0;
         var idA = sut.Enqueue(eA);
-        sut.GetEntry(idA)!.EnqueuedAt = baseTime; // 가장 오래된
+        sut.GetEntry(idA)!.EnqueuedAt = baseTime; // 媛???ㅻ옒??
 
         var eB = CreateEntry(deviceId: 402, groupIds: new List<int> { 1 });
         eB.TimeoutSeconds = 0;
@@ -905,12 +1047,12 @@ public class EventQueueManagerTests
         sut.GetEntry(idC)!.EnqueuedAt = baseTime.AddSeconds(2);
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
-        // Act — 1 tick, MaxDequeuePerTick=1
+        // Act ??1 tick, MaxDequeuePerTick=1
         sut.OnSharedTimerTick();
 
-        // Assert — 가장 오래된 A만 Dequeue
+        // Assert ??媛???ㅻ옒??A留?Dequeue
         Assert.Single(reportedIds);
         Assert.Equal(idA, reportedIds[0]);
         Assert.Equal(2, sut.GetTotalQueueCount());
@@ -919,7 +1061,7 @@ public class EventQueueManagerTests
     [Fact]
     public void MaxDequeuePerTick_Configurable()
     {
-        // Arrange — 50건 만료, MaxDequeuePerTick=10
+        // Arrange ??50嫄?留뚮즺, MaxDequeuePerTick=10
         var sut = CreateSut();
         sut.MaxDequeuePerTick = 10;
 
@@ -932,7 +1074,7 @@ public class EventQueueManagerTests
         }
 
         var reportedIds = new List<string>();
-        sut.OnAutoReport += (id) => reportedIds.Add(id);
+        sut.OnAutoReport += (entry) => { reportedIds.Add(entry.EntryId!); sut.Dequeue(entry.EntryId!); entry.AutoReportInFlight = false; };
 
         // Act
         sut.OnSharedTimerTick();
@@ -942,5 +1084,206 @@ public class EventQueueManagerTests
         Assert.Equal(40, sut.GetTotalQueueCount());
     }
 
+    [Fact]
+    public void OnSharedTimerTick_AutoReportInFlight_ShouldNotRefireEntry()
+    {
+        // Arrange — AutoReportInFlight=true 상태에서 두 번째 tick 발화 금지
+        var sut = CreateSut();
+        var entry = CreateEntry();
+        entry.TimeoutSeconds = 0;
+        var entryId = sut.Enqueue(entry);
+        sut.GetEntry(entryId)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
+
+        var reportedCount = 0;
+        sut.OnAutoReport += (e) =>
+        {
+            reportedCount++;
+            // AutoReportInFlight 리셋하지 않음 → 두 번째 tick에서 skip 되어야 함
+        };
+
+        sut.OnSharedTimerTick();
+        sut.OnSharedTimerTick();
+
+        Assert.Equal(1, reportedCount);
+    }
+
+    [Fact]
+    public void OnSharedTimerTick_NextRetryAfter_ShouldSkipEntryUntilBackoffExpires()
+    {
+        // Arrange — API 실패 시나리오: NextRetryAfter 설정 후 두 번째 tick skip
+        var sut = CreateSut();
+        var entry = CreateEntry();
+        entry.TimeoutSeconds = 0;
+        var entryId = sut.Enqueue(entry);
+        sut.GetEntry(entryId)!.EnqueuedAt = DateTime.Now.AddSeconds(-10);
+
+        var reportedCount = 0;
+        sut.OnAutoReport += (e) =>
+        {
+            reportedCount++;
+            e.AutoReportInFlight = false;
+            e.NextRetryAfter = DateTime.Now.AddSeconds(30); // 30초 backoff
+        };
+
+        sut.OnSharedTimerTick(); // 첫 tick: 발화 + NextRetryAfter 설정
+        sut.OnSharedTimerTick(); // 두 번째 tick: NextRetryAfter < now → skip
+
+        Assert.Equal(1, reportedCount); // 두 번째 tick에서 발화되지 않아야 함
+    }
+
+    #endregion
+
+    #region - Malfunction CompositeState Tests (NFR-01, NFR-02, NFR-03) -
+
+    // NFR-01: 蹂듯빀 ?곹깭 ?낅┰????Fault + Detection ?좏샇 議고빀 OnGroupStateChanged ?쒗??寃利?
+    [Fact]
+    public void should_fire_Faulted_when_fault_entry_enqueued_to_empty_group()
+    {
+        var sut = CreateSut();
+        var transitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => transitions.Add((gid, prev, next));
+
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        Assert.Single(transitions);
+        Assert.Equal((10, EnumCompositeEventStatus.Normal, EnumCompositeEventStatus.Faulted), transitions[0]);
+    }
+
+    [Fact]
+    public void should_fire_FaultedDetecting_when_detection_added_to_faulted_group()
+    {
+        var sut = CreateSut();
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+        var transitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => transitions.Add((gid, prev, next));
+
+        sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        Assert.Single(transitions);
+        Assert.Equal((10, EnumCompositeEventStatus.Faulted, EnumCompositeEventStatus.FaultedDetecting), transitions[0]);
+    }
+
+    [Fact]
+    public void should_fire_Faulted_when_detection_dequeued_from_FaultedDetecting_group()
+    {
+        var sut = CreateSut();
+        sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+        var detectId = sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        var transitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => transitions.Add((gid, prev, next));
+
+        sut.Dequeue(detectId);
+
+        Assert.Single(transitions);
+        Assert.Equal((10, EnumCompositeEventStatus.FaultedDetecting, EnumCompositeEventStatus.Faulted), transitions[0]);
+    }
+
+    [Fact]
+    public void should_fire_Normal_when_last_fault_dequeued_from_Faulted_group()
+    {
+        var sut = CreateSut();
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+
+        var transitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => transitions.Add((gid, prev, next));
+
+        sut.Dequeue(faultId);
+
+        Assert.Single(transitions);
+        Assert.Equal((10, EnumCompositeEventStatus.Faulted, EnumCompositeEventStatus.Normal), transitions[0]);
+    }
+
+    [Fact]
+    public void should_complete_full_FaultedDetecting_sequence_correctly()
+    {
+        // Full NFR-01 ?쒗?? Normal?묯aulted?묯aultedDetecting?묯aulted?묿ormal
+        var sut = CreateSut();
+        var transitions = new List<(int, EnumCompositeEventStatus, EnumCompositeEventStatus)>();
+        sut.OnGroupStateChanged += (gid, prev, next) => transitions.Add((gid, prev, next));
+
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+        var detectId = sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+        sut.Dequeue(detectId);
+        sut.Dequeue(faultId);
+
+        Assert.Equal(4, transitions.Count);
+        Assert.Equal(EnumCompositeEventStatus.Normal,          transitions[0].Item2);
+        Assert.Equal(EnumCompositeEventStatus.Faulted,         transitions[0].Item3);
+        Assert.Equal(EnumCompositeEventStatus.Faulted,         transitions[1].Item2);
+        Assert.Equal(EnumCompositeEventStatus.FaultedDetecting,transitions[1].Item3);
+        Assert.Equal(EnumCompositeEventStatus.FaultedDetecting,transitions[2].Item2);
+        Assert.Equal(EnumCompositeEventStatus.Faulted,         transitions[2].Item3);
+        Assert.Equal(EnumCompositeEventStatus.Faulted,         transitions[3].Item2);
+        Assert.Equal(EnumCompositeEventStatus.Normal,          transitions[3].Item3);
+    }
+
+    // NFR-02: 硫?곗뒪?덈뱶 ?ㅽ듃?덉뒪 ??2?ㅻ젅??횞 100???덉쇅 0嫄?
+    [Fact]
+    public async Task should_not_throw_when_concurrent_enqueue_dequeue()
+    {
+        var sut = CreateSut();
+        var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+
+        var t1 = Task.Run(() =>
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                try
+                {
+                    var id = sut.Enqueue(CreateEntry(deviceId: i, groupIds: new List<int> { i % 5 }));
+                    sut.Dequeue(id);
+                }
+                catch (Exception ex) { exceptions.Add(ex); }
+            }
+        });
+
+        var t2 = Task.Run(() =>
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                try
+                {
+                    var id = sut.Enqueue(CreateEntry(deviceId: 1000 + i, groupIds: new List<int> { i % 5 }));
+                    sut.Dequeue(id);
+                }
+                catch (Exception ex) { exceptions.Add(ex); }
+            }
+        });
+
+        await Task.WhenAll(t1, t2);
+        Assert.Empty(exceptions);
+    }
+
+    // NFR-03: 蹂듭썝 ?덉쟾????Fault+Detection 以??섎굹 Dequeue ???섎㉧吏 ?곹깭 ?좎?
+    [Fact]
+    public void should_preserve_Fault_state_after_dequeuing_detection_only()
+    {
+        var sut = CreateSut();
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+        var detectId = sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        sut.Dequeue(detectId);
+
+        // Fault ?대깽?멸? 洹몃９???ъ쟾???⑥븘 ?덉뼱????
+        Assert.True(sut.HasEventsForGroup(10));
+        Assert.NotNull(sut.GetEntry(faultId));
+    }
+
+    [Fact]
+    public void should_preserve_Detection_state_after_dequeuing_fault_only()
+    {
+        var sut = CreateSut();
+        var faultId = sut.Enqueue(CreateEntry(deviceId: 1, groupIds: new List<int> { 10 }, eventType: EnumEventType.Fault));
+        var detectId = sut.Enqueue(CreateEntry(deviceId: 2, groupIds: new List<int> { 10 }, eventType: EnumEventType.Intrusion));
+
+        sut.Dequeue(faultId);
+
+        // Detection ?대깽?멸? 洹몃９???ъ쟾???⑥븘 ?덉뼱????
+        Assert.True(sut.HasEventsForGroup(10));
+        Assert.NotNull(sut.GetEntry(detectId));
+    }
+
     #endregion
 }
+

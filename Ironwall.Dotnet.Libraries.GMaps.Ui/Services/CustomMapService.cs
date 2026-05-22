@@ -381,12 +381,8 @@ public class CustomMapService {
             var memoryMap = _customMapProvider.CollectionEntity.FirstOrDefault(m => m.Id == customMap.Id);
             if (memoryMap != null)
             {
-                // 기존 항목 제거 후 업데이트된 항목 추가
-                _customMapProvider.Clear();
-                var otherMaps = _customMapProvider.CollectionEntity.Where(m => m.Id != customMap.Id).ToList();
-                foreach (var map in otherMaps)
-                    _customMapProvider.Add(map);
-
+                // 기존 항목만 교체 (Remove 후 Add — 나머지 보존)
+                _customMapProvider.Remove(memoryMap);
                 _customMapProvider.Add(updatedMap);
             }
 
@@ -435,13 +431,8 @@ public class CustomMapService {
                 return false;
             }
 
-            // 3. 메모리에서 제거
-            _customMapProvider.Clear();
-            var remainingMaps = _customMapProvider.CollectionEntity.Where(m => m.Id != customMapId).ToList();
-            foreach (var map in remainingMaps)
-            {
-                _customMapProvider.Add(map);
-            }
+            // 3. 메모리에서 해당 항목만 제거 (line 413에서 이미 조회한 customMap 재사용)
+            _customMapProvider.Remove(customMap);
 
             // 4. 파일 삭제 (선택사항)
             if (deleteFiles && !string.IsNullOrEmpty(customMap.TilesDirectoryPath) &&

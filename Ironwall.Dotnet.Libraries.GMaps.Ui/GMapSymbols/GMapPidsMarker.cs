@@ -4,7 +4,6 @@ using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -27,16 +26,12 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     #endregion
 
     #region - Animation System -
-    private DispatcherTimer? _animationTimer;
-    private EnumColorType _originalColor = EnumColorType.Blue;
-    private bool _isAnimating = false;
-
-
     private void PidsModel_Update(object? sender, EventArgs e)
     {
         _log?.Info($"[SYNC→Symbol] PidsModel_Update 수신: '{_model.Title}' OperationState={_model.OperationState}, EventStatus={_model.EventStatus}");
 
         OnPropertyChanged(nameof(EventStatus));
+        OnPropertyChanged(nameof(CompositeStatus));
         OnPropertyChanged(nameof(OperationState));
 
         // FOV 속성 알림 추가 (v1.3 - PTZ → FOV 연동)
@@ -62,23 +57,10 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         base.ConfigureMarkerControl(marker);
     }
 
-    /// <summary>
-    /// 상태 변경 시 EventStatus 동기화
-    /// </summary>
     protected override void OnStatusChanged(EnumOperationState status)
     {
         base.OnStatusChanged(status);
-
-        // OperationState → EventStatus 매핑
-        var prevEventStatus = _model.EventStatus;
-        _model.EventStatus = status switch
-        {
-            EnumOperationState.ACTIVATED   => EnumEventStatus.Normal,
-            EnumOperationState.DEACTIVATED => EnumEventStatus.Normal,  // 깜빡임 없음 (DEACTIVATED는 비활성 상태)
-            EnumOperationState.ERROR       => EnumEventStatus.Fault,   // 깜빡임 유지
-            _                              => EnumEventStatus.Normal
-        };
-        _log?.Info($"[SYNC→Symbol] OnStatusChanged: '{_model.Title}' OperationState={status} → EventStatus: {prevEventStatus} → {_model.EventStatus}");
+        // EventStatus는 CompositeStatus setter를 통해서만 설정됨 — 여기서 직접 설정 금지 (SSOT)
     }
 
     /// <summary>
@@ -86,6 +68,10 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     /// </summary>
     protected override void Dispose(bool disposing)
     {
+        if (disposing)
+        {
+            _model.Update -= PidsModel_Update;
+        }
         base.Dispose(disposing);
     }
     #endregion
@@ -178,6 +164,16 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         }
     }
 
+    public EnumCompositeEventStatus CompositeStatus
+    {
+        get => _model.CompositeStatus;
+        set
+        {
+            _model.CompositeStatus = value;
+            OnPropertyChanged(nameof(CompositeStatus));
+        }
+    }
+
     public double DetectionRange
     {
         get => _model.DetectionRange;
@@ -247,11 +243,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
             OnPropertyChanged(nameof(FOVOpacity));
         }
     }
-
-    /// <summary>
-    /// 애니메이션 실행 중 여부
-    /// </summary>
-    public bool IsAnimating => _isAnimating;
 
     /// <summary>
     /// 방송(음원/TTS) 동작 중 여부 — XAML Opacity 펄스 애니메이션 트리거

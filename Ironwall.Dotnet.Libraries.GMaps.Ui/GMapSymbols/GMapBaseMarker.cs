@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Windows;
-using System.Windows.Threading;
 using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -62,21 +61,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
             if (!_disposed && disposing)
 
             {
-                // Managable resources was disposed...
-                if (_monitorTimer != null)
-                {
-                    _monitorTimer.Stop();
-                    _monitorTimer.Tick -= MonitorTick;
-                    _monitorTimer = null;
-                }
-
-                if (_eventToken != null)
-                {
-                    _eventToken.Cancel();
-                    _eventToken.Dispose();
-                    _eventToken = null;
-                }
-
                 // 관리 리소스 정리
                 _model = default(T);
                 Clear();
@@ -112,14 +96,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     /// </summary>
     protected virtual void InitializeMarker()
     {
-        if (Category == EnumMarkerCategory.PIDS_EQUIPMENT)
-        {
-            _eventToken = new CancellationTokenSource();
-            _monitorTimer = new DispatcherTimer();
-            _monitorTimer.Interval = TimeSpan.FromSeconds(1);
-            _monitorTimer.Tick += MonitorTick;
-            StartTimer();
-        }
     }
 
     /// <summary>
@@ -161,15 +137,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     /// </summary>
     protected virtual void OnStatusChanged(EnumOperationState status)
     {
-        switch (status)
-        {
-            case EnumOperationState.ACTIVATED:
-                StartTimer();
-                break;
-            case EnumOperationState.DEACTIVATED:
-                StopTimer();
-                break;
-        }
     }
 
     /// <summary>
@@ -287,34 +254,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
 
     #endregion
     #region - Processes -
-    #endregion
-    #region - Timer Methods -
-
-    protected virtual void StartTimer()
-    {
-        if (_monitorTimer != null && !_monitorTimer.IsEnabled)
-        {
-            _monitorTimer.Start();
-            _refreshTime = DateTime.Now;
-        }
-    }
-
-    protected virtual void StopTimer()
-    {
-        if (_monitorTimer != null && _monitorTimer.IsEnabled)
-        {
-            _monitorTimer.Stop();
-        }
-    }
-
-    private void MonitorTick(object? sender, EventArgs e)
-    {
-        if (DateTime.Now > _refreshTime + TimeSpan.FromSeconds(TIMEOUT))
-        {
-            OperationState = EnumOperationState.DEACTIVATED;
-        }
-    }
-
     #endregion
     #region - Command Methods -
 
@@ -576,12 +515,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     protected ILogService? _log;
     protected T _model;
 
-    protected DispatcherTimer? _monitorTimer;
-    protected const int TIMEOUT = 60 * 60;
-    protected DateTime _refreshTime;
     protected bool _disposed = false;
-
-    protected CancellationTokenSource? _eventToken;
     protected bool _isSelected;
     private bool _enableShapeAnimation;
     private bool _isVisible;

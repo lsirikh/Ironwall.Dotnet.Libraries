@@ -125,9 +125,10 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     /// </summary>
     private void LoadImageSource()
     {
-        if (string.IsNullOrEmpty(_imageModel.FilePath) || !System.IO.File.Exists(_imageModel.FilePath))
+        var resolvedPath = ResolveFilePath(_imageModel.FilePath);
+        if (string.IsNullOrEmpty(resolvedPath) || !System.IO.File.Exists(resolvedPath))
         {
-            _log?.Warning($"이미지 파일 없음: {_imageModel.FilePath}");
+            _log?.Warning($"이미지 파일 없음: {_imageModel.FilePath} (resolved: {resolvedPath})");
             return;
         }
 
@@ -136,7 +137,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(_imageModel.FilePath);
+            bitmap.UriSource = new Uri(resolvedPath);
             bitmap.EndInit();
             bitmap.Freeze();
 
@@ -600,11 +601,12 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             {
                 try
                 {
-                    if (System.IO.File.Exists(FilePath))
+                    var resolvedPath = ResolveFilePath(FilePath);
+                    if (!string.IsNullOrEmpty(resolvedPath) && System.IO.File.Exists(resolvedPath))
                     {
                         var bitmap = new BitmapImage();
                         bitmap.BeginInit();
-                        bitmap.UriSource = new Uri(FilePath, UriKind.Absolute);
+                        bitmap.UriSource = new Uri(resolvedPath, UriKind.Absolute);
                         bitmap.CacheOption = BitmapCacheOption.OnLoad;
                         bitmap.EndInit();
                         bitmap.Freeze(); // Thread-safe
@@ -869,6 +871,20 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         {
             markerControl.RefreshFromMarker();
         }
+    }
+
+    /// <summary>
+    /// 상대 경로를 절대 경로로 변환 (절대 경로면 그대로 반환 — 하위 호환)
+    /// </summary>
+    private static string? ResolveFilePath(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return filePath;
+
+        if (System.IO.Path.IsPathRooted(filePath))
+            return filePath;
+
+        return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filePath);
     }
 
     #endregion

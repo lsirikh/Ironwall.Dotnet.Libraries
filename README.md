@@ -580,12 +580,134 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 ---
 
-### v2.2 (2026-03 ~)
+### [Unreleased] — v2.6.2 (2026-05-22 기준)
 
-**작업자:** GH.LEE | **브랜치:** `v2.2` (현재)
+**이벤트 파이프라인 전체 성능 최적화** (Event_Performance_Optimization)
+- `ApplyCompositeStatus` — `MarshalUpdate()` 코얼레싱으로 NATS 스레드→WPF STA 위반 해소
+- `DetectionNatsSyncService` / `MalfunctionNatsSyncService` — `PublishOnUIThreadAsync` 전환 (EA BackgroundThread ObservableCollection 접근 Blocker 제거)
+- `SymbolEventManager._deviceLookupById` — `ConcurrentDictionary<int, DeviceSymbolLookupModel>` O(1) 보조 인덱스 추가 (O(N) fallback 3곳 제거) + `TryResolveDevice` 헬퍼
+- `EventCardListPanelViewModel._cardByEntryId` — `Dictionary<string, EventCardBaseViewModel>` O(1) 인덱스 (기존 O(N) `ViewModelProvider.FirstOrDefault` 대체)
+- `HandleAutoReportAsync` / `HandleAutoRecoveryAsync` — `async void` → `async Task` 전환 + `EventUiModule` ContinueWith 래퍼 (`AutoReportInFlight = false` 성공/실패 모든 경로 보장)
+- API 실패 시 `entry.NextRetryAfter = Now + 30s` 설정 — 무한 재시도 차단 (`BACKOFF_SECONDS = 30`)
+- `SoundAlarmController.OnQueueCleared` — `State = Idle` + `_lastEventTime = default` 완전 리셋 (일괄 조치보고 후 Playing 고착 해소)
+- `EventQueueManager` — `_scratchPrevGroupStates.Clear()` 재사용 (Dequeue 매회 `new Dictionary<>()` 할당 제거) + `FindEntryByDevice` foreach min 단일 패스
+- `EventCardBaseViewModel` — `IsFlipped`, `_actionInProgress` 필드 추가 (VirtualizingStackPanel 가상화 IMPL-10 준비)
+- TEST: 4개 신규 (ApplyCompositeStatus STA 검증, OnQueueCleared 3개) — 302 pass, 0 errors
 
-#### 주요 변경사항
-- v2.1 기반 소규모 업데이트
+**자동조치보고 이중경로 통합** (AutoActionReport_DualPath_Fix)
+- `EventCardBaseViewModel` per-card `System.Timers.Timer` 완전 제거 — Path A 타이머 삭제 (이중 API 호출 / 20초 무한재시도 / `GC.Collect()` 안티패턴 동시 해소)
+- `EventEntry.EventId` 필드 추가 — NATS 수신 시점에 서버 이벤트 ID 보관 (`SourceEvent` 대체)
+- `EventQueueManager.OnSharedTimerTick` 재설계 — kill-switch + `AutoReportInFlight` 가드
+- `EventCardListPanelViewModel.HandleAutoReport(EventEntry)` — API → Dequeue → UI 카드 제거 → NATS 단일 경로 구현 (Path B 완성)
+- `EventUiModule.eqm.OnAutoReport += elp.HandleAutoReport` 와이어링 완성
+- **BUG-C1 해결**: `OnAutoReport` 구독자 0개 → UI 카드 영구 좀비화 차단
+- **BUG-C2 해결**: `_timer.AutoReset=true` → 20초 무한 재시도 제거
+- **BUG-C3 해결**: Double Dispose + `GC.Collect()` 안티패턴 제거
+
+**사운드 타입 즉시 전환** (SoundTypeSwitch_ImmediateStop_Fix)
+- `ISoundService.StopAndPlayAsync(EnumEventType, CancellationToken)` 추가 — 재생 중 타입 전환 시 이전 사운드 즉시 중지
+- `SoundService._switchSemaphore` — 동시 전환 직렬화 (`SemaphoreSlim maxCount=1`)
+- `PlayWith*` / `PlayContinuously*` / `PlayOnce*` — per-item `CancellationToken.ThrowIfCancellationRequested` 추가
+- `SoundAlarmController` 3-Action → 1-Action `stopAndPlay` 리팩터 (인터페이스 대칭 단순화)
+- `SoundAlarmControllerTests` 14개 테스트 (기존 10개 갱신 + 신규 타입 전환 시나리오 4개)
+
+---
+
+**개별 디바이스 복합 상태 SSOT 전환 + Fault 자동복구** (BUG-01, BUG-02, REQ-01)
+- `EventQueueManager.ComputeDeviceState()` 신규 — `_entries` SSOT 기반 디바이스 복합 상태 계산 (`ComputeGroupState()` 대칭 구조)
+- `OnDeviceStateChanged(deviceId, deviceType, prev, next)` 이벤트 추가 — `Enqueue`/`Dequeue`/`DequeueAll` 전 위치에서 발화
+- `Enqueue()` 자동복구 원자 처리: Detection 도착 시 동일 디바이스의 Fault 엔트리를 단일 lock 내에서 원자 제거
+- `OnAutoRecovery(faultEntryId)` 이벤트 추가 — 자동복구 발생 시 상위 레이어(서버 API + UI + NATS) 통지
+- `SymbolEventManager.HandleDeviceStateChanged()` 추가 — `ApplyCompositeStatus(next)` 멱등 직접 세팅
+- `DeviceSymbolLookupModel.ApplyCompositeStatus(status)` 추가 — 누적 추론 방식(`ProcessEvent`) 대체
+- `EventCardListPanelViewModel.HandleAutoRecovery()` 추가 — `"etc 자동복구"` API 보고 + 카드 제거 + NATS 발행
+- **BUG-01 해결**: 동일 센서 Detection→Fault 전환 시 개별 심볼 미갱신 → `OnDeviceStateChanged` 구독으로 해결
+- **BUG-02 해결**: FaultedDetecting 부분 Dequeue 시 잘못된 심볼 상태 → SSOT 재계산으로 해결
+- **REQ-01 구현**: Fault 활성 중 Detection 도착 → Fault 자동조치보고 + Detection 정상 처리
+- `EventQueueManagerTests` +8 (55개 전체 통과, BUG-01/BUG-02/REQ-01/V-05 검증)
+
+**브랜치:** `v2.2` | **작업자:** GH.LEE
+
+#### ⚠️ Breaking Changes
+
+**GatewayEvent Group N:N 마이그레이션**
+- `GatewayEvents.Group (int)` → `GatewayEventGroups` 연결 테이블 + `List<int> DeviceGroups` 구조로 전환
+- DB 스키마 변경: `GatewayEventGroups(EventId, GroupId)` 신규 테이블 + `ON DELETE CASCADE`
+- 기존 `Group` 컬럼은 마이그레이션 기간 유지 (`[Obsolete]` 브리지 프로퍼티) — 다음 릴리스에서 DROP 예정
+- `BuildSchemeAsync` 자동 마이그레이션: 기존 `Group` 값을 `GatewayEventGroups`로 INSERT IGNORE
+- `IGatewayEventModel.DeviceGroups: List<int>` 추가, `Group: int` Obsolete 처리
+- `NatsDomainService` Intersect 매칭 변경: `Contains(entity.Group)` → `DeviceGroups.Intersect(...).Any()`
+
+#### 개선 및 버그 수정
+
+**GatewaySetupView ComboBox 인라인 그룹 선택** (Breaking Change 동반)
+- 그룹 컬럼: 팝업 다이얼로그 방식 → DataGrid 인라인 ComboBox (BindingProxy 패턴)
+- `GatewayGroupPickerViewModel` 삭제, `GatewayEventViewModel.SelectedGroup` 어댑터 프로퍼티 추가
+
+**Detection 사운드 시스템 + 이중 경로 정리**
+- `SoundAlarmController` 슬라이딩 타이머 구현 — EventQueueManager와 SoundService 연동
+- `NatsDomainService.ProcessDetection`에서 `ProcessDeviceEvent` 직접 호출 제거 (BUG-02)
+- `EventUiModule`에 `SoundAlarmController` DI 와이어링 완료
+
+**배치 조치보고 이중 INSERT 및 Malfunction 심볼 복원 수정** (BUG-01 + BUG-03)
+- `NatsDomainService.HandleAsync(SendActionRequestMessage)` INSERT 제거 — NATS 발행 전용 transport adapter로 전환 (BUG-01)
+- `DetectionEventCardViewModel.SendAction()` / `MalfunctionEventCardViewModel.SendAction()` — 단일 조치보고 INSERT 직접 수행 (V-01 확인 결과 적용)
+- `MalfunctionNatsSyncService` 신규: NATS MALFUNCTION 구독 → `EventQueueManager.Enqueue()` → EntryId 부여 → 심볼 복원 체인 (BUG-03)
+- `NatsDomainService.ProcessFault()` `ProcessDeviceEvent()` 직접 호출 제거 — EventQueue 단일 경로로 통일
+
+**Malfunction 복합 상태 및 FenceGroup 3-레이어 시각화** (FR-01~FR-10)
+- `EnumCompositeEventStatus` 신규 enum: Normal / Detecting / Faulted / FaultedDetecting / Connection
+- `IPidsEventCapable.CompositeStatus` 프로퍼티 추가 — EventStatus 병행 운영
+- `EventQueueManager.ComputeGroupState()` — `_entries` HashSet 파생 계산 (별도 카운터 금지, SSOT)
+- `OnGroupStateChanged(groupId, prev, next)` 이벤트 — OnGroupFirstEvent/OnGroupEmpty 대체
+- `EventQueueManager` lock _gate 스레드 안전화 — 이벤트 발화 lock 외부 로컬 캡처 패턴
+- `SymbolEventManager.HandleGroupStateChanged()` — Normal/Detecting/Faulted/FaultedDetecting 라우팅
+- `DeviceSymbolLookupModel.ProcessEvent(Fault)` 분기 추가 — CompositeStatus.Faulted 직접 설정
+- `DeviceSymbolLookupModel.ProcessEventReport()` — CompositeStatus Normal 복원 추가
+- `PidsGroupMarkerStyle.xaml` 3-레이어 재설계: BasePolyline(기본) + FaultOverlay(Orange) + DetectionOverlay(Red blink)
+- `MalfunctionNatsSyncService` fan-out 검증 — Controller/Cable cut → GroupIds 전체 Enqueue
+- `EventUiModule` 와이어링 교체: `OnGroupStateChanged += sem.HandleGroupStateChanged`
+
+**GMapCustomControl 이미지 드래그/리사이즈 버그 수정**
+- 이미지 마커 드래그 → 리사이즈 핸들 반응 개선
+- ZIndex DB 영속화 연동 안정화
+
+---
+
+### v2.2 (2026-03-24 ~)
+
+**작업자:** GH.LEE | **브랜치:** `v2.2` (현재) | **완료 PRD 6건 + 핫픽스 2건 + 진행중 PRD 24건**
+
+#### 주요 변경사항 — CustomMap 오버레이 + 맵 상호작용 재설계
+
+**CustomMap 오버레이 시스템** (마스터 PRD + 하위 3건)
+- CustomMap 베이스맵 → 오버레이 전환 (WPF Canvas Overlay 기반)
+- 등록/진행 임베디드 패널 (4-Phase `MapRegistrationControl`)
+- 오버레이 영속화 + 복수 등록/삭제 지원 (15건 버그 수정)
+- `CustomMapOverlayService` 신규 — OnRender 기반 타일 렌더링
+- `LruTileCache` 타일 캐시 + xUnit 테스트
+- OverlayImage 레이어 시스템 연동 (Seed + Visibility + Opacity)
+
+**맵 마우스 상호작용 재설계** (PRD 4건)
+- 맵 패닝 우클릭 → 좌클릭 전환 (`DragButton=Left`)
+- EditMode OFF 시 심볼/이미지 `IsHitTestVisible=false` (패닝 투과)
+- EditMode ON 시 빈 공간 좌클릭 패닝 유지 (WPF 이벤트 버블링)
+- 우클릭 컨텍스트 메뉴 전체 마커 타입 통합 (베이스 클래스 기반)
+
+**심볼 ZIndex/ZOrder 제어 시스템** (PRD 2건)
+- 심볼 ZIndex 전체 파이프라인: `ISymbolModel → DB → DTO → Marker → Shape`
+- `GetMarkerAtScreen` 우선순위 정렬 (ZIndex DESC → 면적 ASC → 거리 ASC)
+- 우클릭 메뉴 레이어 순서 제어 (맨위로/위로/아래로/맨아래로)
+- ZIndex DB 영속화 (`Symbols` 테이블 `ZIndex` 컬럼 추가)
+
+**MapViewModel 정리**
+- MapViewModel Provider 정리 및 의존성 정비
+- MBTiles ZoomLevel Shadowing 버그 수정
+
+**핫픽스**
+- OverlayImage ZOrder Edit 모드 OFF 비반영 → `InvalidateVisual()` 추가
+- OverlayMap 리사이즈 타일 누락 → `MainMap_SizeChanged` 핸들러 추가
+- 레이어 패널 MaxHeight 제거 + 스크롤 잘림 해결
 
 ---
 
@@ -961,7 +1083,7 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 **Private/Proprietary License**
 
-Copyright (C) 2023-2025 Sensorway Co., Ltd. All rights reserved.
+Copyright (C) 2023-2026 Sensorway Co., Ltd. All rights reserved.
 
 이 소프트웨어는 Sensorway Co., Ltd.의 독점 소유이며 무단 복제, 배포, 수정을 금지합니다.
 
@@ -981,6 +1103,6 @@ Copyright (C) 2023-2025 Sensorway Co., Ltd. All rights reserved.
 
 ---
 
-**문서 버전**: 2.2.0
-**최종 업데이트**: 2026-03-24
+**문서 버전**: 2.6.2
+**최종 업데이트**: 2026-05-22
 **문서 상태**: ✅ 최종 승인

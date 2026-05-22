@@ -103,6 +103,11 @@
 							<md:PackIcon Kind="Delete" Width="16" Height="16" />
 						</MenuItem.Icon>
 					</MenuItem>
+					<MenuItem Header="이름 바꾸기" Command="{Binding RenameCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="RenameBox" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
 					<Separator />
 					<MenuItem Header="위로" Command="{Binding MoveUpCommand}">
 						<MenuItem.Icon>
@@ -112,6 +117,12 @@
 					<MenuItem Header="아래로" Command="{Binding MoveDownCommand}">
 						<MenuItem.Icon>
 							<md:PackIcon Kind="ArrowDown" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
+					<Separator />
+					<MenuItem Header="이동" Command="{Binding NavigateCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="CrosshairsGps" Width="16" Height="16" />
 						</MenuItem.Icon>
 					</MenuItem>
 				</ContextMenu>
@@ -126,15 +137,46 @@
 				Grid.Column="0"
 				IsChecked="{Binding IsChecked, Mode=TwoWay}"
 				Style="{StaticResource LayerCheckBox}" />
-			<TextBlock
-				Grid.Column="1"
-				VerticalAlignment="Center"
-				FontSize="12"
-				Foreground="#222"
-				Text="{Binding Name}"
-				TextOptions.TextRenderingMode="ClearType"
-				TextOptions.TextFormattingMode="Display"
-				TextTrimming="CharacterEllipsis" />
+			<!-- 이름 표시 / 인라인 편집 -->
+			<Grid Grid.Column="1">
+				<TextBlock
+					VerticalAlignment="Center"
+					FontSize="12"
+					Foreground="#222"
+					Text="{Binding Name}"
+					TextOptions.TextRenderingMode="ClearType"
+					TextOptions.TextFormattingMode="Display"
+					TextTrimming="CharacterEllipsis">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Visibility" Value="Visible" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsEditing}" Value="True">
+									<Setter Property="Visibility" Value="Collapsed" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+				<TextBox
+					VerticalAlignment="Center"
+					FontSize="12"
+					Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					utils:TextBoxRenameHelper.IsRenaming="{Binding IsEditing}"
+					utils:TextBoxRenameHelper.CommitCommand="{Binding CommitRenameCommand}"
+					utils:TextBoxRenameHelper.CancelCommand="{Binding CancelRenameCommand}">
+					<TextBox.Style>
+						<Style TargetType="TextBox">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsEditing}" Value="True">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBox.Style>
+				</TextBox>
+			</Grid>
 			<Slider
 				Grid.Column="2"
 				VerticalAlignment="Center"

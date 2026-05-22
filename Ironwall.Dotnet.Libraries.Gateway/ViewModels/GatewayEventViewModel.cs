@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.GatewayEvents;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
@@ -60,21 +61,37 @@ public class GatewayEventViewModel : BaseCustomViewModel<IGatewayEventModel>, IG
         }
     }
 
-    public int Group
+    public List<int> DeviceGroups
     {
-        get => _model.Group;
+        get => _model.DeviceGroups;
         set
         {
-            _model.Group = value;
-            NotifyOfPropertyChange(() => Group);
-            NotifyOfPropertyChange(() => GroupName);
+            _model.DeviceGroups = value;
+            NotifyOfPropertyChange(() => DeviceGroups);
+            NotifyOfPropertyChange(() => GroupNames);
         }
     }
 
-    public string GroupName =>
-        DeviceGroups?.FirstOrDefault(g => g.Id == Group)?.Name ?? Group.ToString();
+    public string GroupNames =>
+        _model.DeviceGroups.Count == 0
+            ? "미지정"
+            : string.Join(", ", _model.DeviceGroups
+                .Select(id => AllGroups?.FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
 
-    public ObservableCollection<IDeviceGroupModel>? DeviceGroups { get; set; }
+    public ObservableCollection<IDeviceGroupModel>? AllGroups { get; set; }
+
+    public IDeviceGroupModel? SelectedGroup
+    {
+        get => AllGroups?.FirstOrDefault(g => g.Id == DeviceGroups.FirstOrDefault());
+        set
+        {
+            var newList = new List<int>();
+            if (value != null && value.Id > 0)
+                newList.Add(value.Id);
+            DeviceGroups = newList;
+            NotifyOfPropertyChange();
+        }
+    }
 
     public bool IsEnable
     {
@@ -106,7 +123,9 @@ public interface IGatewayEventViewModel : IBaseCustomViewModel<IGatewayEventMode
 {
     int Index { get; set; }
     string EventName { get; set; }
-    int Group { get; set; }
+    List<int> DeviceGroups { get; set; }
+    string GroupNames { get; }
+    IDeviceGroupModel? SelectedGroup { get; set; }
     bool IsEnable { get; set; }
     string? Description { get; set; }
 }

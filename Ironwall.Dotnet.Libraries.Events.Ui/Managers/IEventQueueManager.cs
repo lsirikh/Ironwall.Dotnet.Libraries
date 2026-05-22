@@ -38,4 +38,19 @@ public interface IEventQueueManager
 
     /// <summary>Timer 틱당 최대 Dequeue 건수 (기본 5)</summary>
     int MaxDequeuePerTick { get; set; }
+
+    /// <summary>Enqueue 호출 시마다 발생 (0→1 전이 여부와 무관). EventType 전달.</summary>
+    event Action<EnumEventType>? OnAnyEnqueue;
+
+    /// <summary>그룹 복합 상태 전이 시 (groupId, prev, next)</summary>
+    event Action<int, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnGroupStateChanged;
+
+    /// <summary>개별 디바이스 복합 상태 전이 시 (deviceId, deviceType, prev, next)</summary>
+    event Action<int, EnumDeviceType, EnumCompositeEventStatus, EnumCompositeEventStatus>? OnDeviceStateChanged;
+
+    /// <summary>자동 조치보고 타임아웃 시 발화 (EventEntry 전달). Dequeue는 핸들러 책임.</summary>
+    event Action<EventEntry>? OnAutoReport;
+
+    /// <summary>Fault 자동복구 완료 시 발화 (faultEntryId). EventQueueManager는 이미 Dequeue 처리 완료.</summary>
+    event Action<string>? OnAutoRecovery;
 }

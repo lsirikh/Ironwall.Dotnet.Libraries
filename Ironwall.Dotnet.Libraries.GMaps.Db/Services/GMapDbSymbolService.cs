@@ -923,6 +923,25 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         }
     }
 
+    public async Task BatchUpdateZIndexAsync(List<(int id, int zIndex)> changes, CancellationToken token = default)
+    {
+        if (changes == null || changes.Count == 0) return;
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            var cases = string.Join("\n", changes.Select(c => $"WHEN {c.id} THEN {c.zIndex}"));
+            var ids = string.Join(",", changes.Select(c => c.id));
+            var sql = $"UPDATE Symbols SET ZIndex = CASE Id\n{cases}\nEND\nWHERE Id IN ({ids});";
+            await conn.ExecuteAsync(sql);
+            _log?.Info($"[ZIndex] Batch UPDATE 완료 — {changes.Count}건");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ZIndex] Batch UPDATE 실패 — {changes.Count}건: {ex.Message}");
+        }
+    }
+
     public async Task<bool> DeleteSymbolAsync(ISymbolModel model, CancellationToken token = default)
     {
         try

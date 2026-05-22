@@ -60,7 +60,6 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
                 _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
-            GC.Collect();
         }
         catch (Exception ex)
         {

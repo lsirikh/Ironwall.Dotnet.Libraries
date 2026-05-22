@@ -1,5 +1,7 @@
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Monitoring.Models.GatewayEvents;
 /****************************************************************************
@@ -19,7 +21,7 @@ public class GatewayEventModel : BaseModel, IGatewayEventModel
     public GatewayEventModel(IGatewayEventModel model) : base(model)
     {
         EventName = model.EventName;
-        Group = model.Group;
+        DeviceGroups = new List<int>(model.DeviceGroups);
         IsEnable = model.IsEnable;
         Description = model.Description;
     }
@@ -27,8 +29,16 @@ public class GatewayEventModel : BaseModel, IGatewayEventModel
     [JsonProperty("event_name", Order = 2)]
     public string EventName { get; set; } = string.Empty;
 
-    [JsonProperty("group", Order = 3)]
-    public int Group { get; set; }
+    [JsonProperty("groups", Order = 3)]
+    public List<int> DeviceGroups { get; set; } = new();
+
+    [JsonIgnore]
+    [Obsolete("Use DeviceGroups. Kept for migration period only.")]
+    public int Group
+    {
+        get => DeviceGroups.FirstOrDefault();
+        set { if (value > 0 && !DeviceGroups.Contains(value)) DeviceGroups.Add(value); }
+    }
 
     [JsonProperty("is_enable", Order = 4)]
     public bool IsEnable { get; set; } = true;

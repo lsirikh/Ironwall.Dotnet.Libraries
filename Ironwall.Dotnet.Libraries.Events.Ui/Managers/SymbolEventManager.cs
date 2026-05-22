@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
+using System.Collections.Concurrent;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 /****************************************************************************
@@ -23,10 +24,13 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 {
     // 개별 마커: (Device.Id, DeviceType) → GMapPidsMarker/PidsSymbolModel
     // 복합 키를 사용하여 같은 ID라도 DeviceType이 다르면 별도 등록
-    private readonly Dictionary<(int Id, EnumDeviceType Type), DeviceSymbolLookupModel> _deviceSymbolLookup;
+    private readonly ConcurrentDictionary<(int Id, EnumDeviceType Type), DeviceSymbolLookupModel> _deviceSymbolLookup;
 
     // 그룹 마커: DeviceGroup → GMapPidsGroupMarker/PidsGroupSymbolModel
-    private readonly Dictionary<int, DeviceSymbolLookupModel> _groupSymbolLookup;
+    private readonly ConcurrentDictionary<int, DeviceSymbolLookupModel> _groupSymbolLookup;
+
+    // 보조 인덱스: DeviceId → DeviceSymbolLookupModel (DeviceType 불일치 fallback용 O(1) 검색)
+    private readonly ConcurrentDictionary<int, DeviceSymbolLookupModel> _deviceLookupById;
 
     private readonly IEventAggregator _ea;
     private readonly ILogService _log;
@@ -40,8 +44,9 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         _log = log;
         _eventSetupModel = eventSetupModel;
 
-        _deviceSymbolLookup = new Dictionary<(int, EnumDeviceType), DeviceSymbolLookupModel>();
-        _groupSymbolLookup = new Dictionary<int, DeviceSymbolLookupModel>();
+        _deviceSymbolLookup = new ConcurrentDictionary<(int, EnumDeviceType), DeviceSymbolLookupModel>();
+        _groupSymbolLookup = new ConcurrentDictionary<int, DeviceSymbolLookupModel>();
+        _deviceLookupById = new ConcurrentDictionary<int, DeviceSymbolLookupModel>();
     }
 
     // 센서 장비-심볼 매핑 등록 (개별 마커용)
@@ -57,6 +62,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 
         var key = (deviceModel.Id, deviceModel.DeviceType);
         _deviceSymbolLookup[key] = lookup;
+        _deviceLookupById[deviceModel.Id] = lookup;
         //_log?.Info($"개별 심볼 등록: Device({deviceModel.Id}, {deviceModel.DeviceType}) → {symbolModel.GetType().Name}");
 
         // FR-08c: 등록 즉시 Device.Status → Symbol.OperationState 동기화
@@ -222,12 +228,13 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     /// </summary>
     public void SetDeviceDetecting(int deviceId, EnumDeviceType deviceType, EnumEventType eventType)
     {
-        var key = (deviceId, deviceType);
-        if (_deviceSymbolLookup.TryGetValue(key, out var deviceLookup))
+        if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup))
         {
-            deviceLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
-            _log?.Info($"개별 심볼 Detecting 설정: Device({deviceId}, {deviceType}) -> {eventType}");
+            _log?.Warning($"SetDeviceDetecting: 미등록 Device({deviceId},{deviceType})");
+            return;
         }
+        deviceLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
+        _log?.Info($"개별 심볼 Detecting 설정: Device({deviceId}, {deviceType}) -> {eventType}");
     }
 
     /// <summary>
@@ -235,12 +242,9 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     /// </summary>
     public void RestoreDeviceSymbol(int deviceId, EnumDeviceType deviceType)
     {
-        var key = (deviceId, deviceType);
-        if (_deviceSymbolLookup.TryGetValue(key, out var deviceLookup))
-        {
-            deviceLookup.ProcessEventReport();
-            _log?.Info($"개별 심볼 복원: Device({deviceId}, {deviceType}) → Normal");
-        }
+        if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup)) return;
+        deviceLookup.ProcessEventReport();
+        _log?.Info($"개별 심볼 복원: Device({deviceId}, {deviceType}) → Normal");
     }
 
     /// <summary>
@@ -267,10 +271,63 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         }
     }
 
+    /// <summary>
+    /// 개별 디바이스 복합 상태 전이 처리 — EventQueueManager의 OnDeviceStateChanged에서 호출
+    /// </summary>
+    public void HandleDeviceStateChanged(int deviceId, EnumDeviceType deviceType, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
+    {
+        if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup))
+        {
+            _log?.Warning($"HandleDeviceStateChanged: 미등록 Device({deviceId},{deviceType})");
+            return;
+        }
+        deviceLookup.ApplyCompositeStatus(next);
+        _log?.Info($"개별 심볼 상태 전이: Device({deviceId},{deviceType}) {prev}→{next}");
+    }
+
+    /// <summary>
+    /// 그룹 복합 상태 전이 처리 — EventQueueManager의 OnGroupStateChanged에서 호출
+    /// </summary>
+    public void HandleGroupStateChanged(int groupId, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
+    {
+        switch (next)
+        {
+            case EnumCompositeEventStatus.Normal:
+                RestoreGroupSymbol(groupId);
+                break;
+            case EnumCompositeEventStatus.Detecting:
+            case EnumCompositeEventStatus.Faulted:
+            case EnumCompositeEventStatus.FaultedDetecting:
+                SetGroupCompositeStatus(groupId, next);
+                break;
+            case EnumCompositeEventStatus.Connection:
+            default:
+                break;
+        }
+    }
+
     public void Dispose()
     {
+        _ea.Unsubscribe(this);
         _deviceSymbolLookup.Clear();
         _groupSymbolLookup.Clear();
+        _deviceLookupById.Clear();
+    }
+
+    /// <summary>
+    /// 복합 키(Id,Type) → 실패 시 보조 인덱스(Id 단독) 순서로 O(1) 검색.
+    /// </summary>
+    private bool TryResolveDevice(int deviceId, EnumDeviceType deviceType,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out DeviceSymbolLookupModel? lookup)
+    {
+        if (_deviceSymbolLookup.TryGetValue((deviceId, deviceType), out lookup)) return true;
+        if (_deviceLookupById.TryGetValue(deviceId, out lookup))
+        {
+            _log?.Warning($"TryResolveDevice: DeviceType 불일치 Device({deviceId},{deviceType}) → ID 재검색으로 대체");
+            return true;
+        }
+        lookup = null;
+        return false;
     }
 
     /// <summary>
@@ -287,6 +344,15 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     private bool IsFenceType(EnumDeviceType deviceType)
     {
         return deviceType == EnumDeviceType.Fence || deviceType == EnumDeviceType.Underground;
+    }
+
+    private void SetGroupCompositeStatus(int groupId, EnumCompositeEventStatus status)
+    {
+        if (_groupSymbolLookup.TryGetValue(groupId, out var groupLookup))
+        {
+            groupLookup.ApplyCompositeStatus(status);
+            _log?.Info($"그룹 복합 상태 설정: DeviceGroup({groupId}) → {status}");
+        }
     }
 
     // 테스트용 접근자 - 복합 키 (Id, DeviceType) 사용

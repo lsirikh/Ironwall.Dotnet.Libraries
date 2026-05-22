@@ -59,7 +59,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 ****************************************************************************/
 public class MapViewModel : BasePanelViewModel,
                             IHandle<AllDevicesLoadedMessage>,
-                            IHandle<CallDeleteMapRoiProcessMessageModel>
+                            IHandle<CallDeleteMapRoiProcessMessageModel>,
+                            IHandle<CallDeleteMapLayerProcessMessageModel>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
 {
@@ -93,6 +94,7 @@ public class MapViewModel : BasePanelViewModel,
                         , IBroadcastControlService broadcastControlService
                         , IGMapDbService gMapDbService
                         , CustomMapOverlayService customMapOverlayService
+                        , IImageFileService imageFileService
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
@@ -109,6 +111,7 @@ public class MapViewModel : BasePanelViewModel,
         _deviceDetailUrlService = deviceDetailUrlService;
         _broadcastControlService = broadcastControlService;
         _customMapOverlayService = customMapOverlayService;
+        _imageFileService = imageFileService;
         DeviceProvider = deviceProvider;
         InitializeCommands();
     }
@@ -283,6 +286,7 @@ public class MapViewModel : BasePanelViewModel,
     public async Task HandleAsync(AllDevicesLoadedMessage message, CancellationToken cancellationToken)
     {
         await InitializeDeviceSymbolIntegration();
+        EnsureUniqueZIndex();
     }
 
     private void InitializeLineDrawingService()
@@ -816,12 +820,15 @@ public class MapViewModel : BasePanelViewModel,
 
             if (openFileDialog.ShowDialog() == true)
             {
-                var filePath = openFileDialog.FileName;
-                var title = System.IO.Path.GetFileNameWithoutExtension(filePath);
+                var originalPath = openFileDialog.FileName;
+                // 이미지를 Images/Overlays/에 복사하고 상대 경로 획득
+                var filePath = _imageFileService.CopyImageToLocal(originalPath);
+                var title = System.IO.Path.GetFileNameWithoutExtension(originalPath);
                 // 항상 현재 지도 중심점 기준으로 배치
                 var currentPosition = MainMap.Position;
 
-                // 이미지 실제 크기 로드
+                // 이미지 실제 크기 로드 (절대 경로로 변환하여 사용)
+                var absolutePath = _imageFileService.GetAbsolutePath(filePath);
                 double imageWidth = 200;  // 기본값
                 double imageHeight = 200; // 기본값
                 try
@@ -829,7 +836,7 @@ public class MapViewModel : BasePanelViewModel,
                     var bitmap = new System.Windows.Media.Imaging.BitmapImage();
                     bitmap.BeginInit();
                     bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                    bitmap.UriSource = new Uri(filePath);
+                    bitmap.UriSource = new Uri(absolutePath);
                     bitmap.EndInit();
                     imageWidth = bitmap.PixelWidth;
                     imageHeight = bitmap.PixelHeight;
@@ -2925,7 +2932,18 @@ public class MapViewModel : BasePanelViewModel,
         MainMap?.Markers.Add(gMapMarker);
         // EditMode 상태에 맞게 IsHitTestVisible 동기화
         if (gMapMarker.Shape is UIElement shapeElement)
+        {
             shapeElement.IsHitTestVisible = IsEditModeEnabled;
+
+            // 새 마커는 최상위 ZIndex 부여
+            int maxZ = 0;
+            foreach (var m in MainMap.Markers)
+            {
+                if (m is IEditableMarker && m.Shape is UIElement s)
+                    maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
+            }
+            ApplyMarkerZIndex(gMapMarker, shapeElement, maxZ + 1);
+        }
 
         // Shape 확인 로그
         var shapeType = gMapMarker.Shape?.GetType().Name ?? "null";
@@ -3438,41 +3456,44 @@ public class MapViewModel : BasePanelViewModel,
                 }
             }
 
-            // ── 레이어 순서 제어 (모든 마커 공통) ──
-            if (menu.Items.Count > 0)
-                menu.Items.Add(new Separator());
-
-            var moveTopItem = new MenuItem
+            // ── 레이어 순서 제어 (편집 모드에서만) ──
+            if (IsEditModeEnabled)
             {
-                Header = "맨 위로",
-                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseUp, Width = 16, Height = 16 }
-            };
-            moveTopItem.Click += (s, e) => MoveMarkerToTop(marker);
-            menu.Items.Add(moveTopItem);
+                if (menu.Items.Count > 0)
+                    menu.Items.Add(new Separator());
 
-            var moveUpItem = new MenuItem
-            {
-                Header = "한 칸 위로",
-                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowUp, Width = 16, Height = 16 }
-            };
-            moveUpItem.Click += (s, e) => MoveMarkerUp(marker);
-            menu.Items.Add(moveUpItem);
+                var moveTopItem = new MenuItem
+                {
+                    Header = "맨 위로",
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseUp, Width = 16, Height = 16 }
+                };
+                moveTopItem.Click += (s, e) => MoveMarkerToTop(marker);
+                menu.Items.Add(moveTopItem);
 
-            var moveDownItem = new MenuItem
-            {
-                Header = "한 칸 아래로",
-                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowDown, Width = 16, Height = 16 }
-            };
-            moveDownItem.Click += (s, e) => MoveMarkerDown(marker);
-            menu.Items.Add(moveDownItem);
+                var moveUpItem = new MenuItem
+                {
+                    Header = "한 칸 위로",
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowUp, Width = 16, Height = 16 }
+                };
+                moveUpItem.Click += (s, e) => MoveMarkerUp(marker);
+                menu.Items.Add(moveUpItem);
 
-            var moveBottomItem = new MenuItem
-            {
-                Header = "맨 아래로",
-                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseDown, Width = 16, Height = 16 }
-            };
-            moveBottomItem.Click += (s, e) => MoveMarkerToBottom(marker);
-            menu.Items.Add(moveBottomItem);
+                var moveDownItem = new MenuItem
+                {
+                    Header = "한 칸 아래로",
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowDown, Width = 16, Height = 16 }
+                };
+                moveDownItem.Click += (s, e) => MoveMarkerDown(marker);
+                menu.Items.Add(moveDownItem);
+
+                var moveBottomItem = new MenuItem
+                {
+                    Header = "맨 아래로",
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseDown, Width = 16, Height = 16 }
+                };
+                moveBottomItem.Click += (s, e) => MoveMarkerToBottom(marker);
+                menu.Items.Add(moveBottomItem);
+            }
 
             if (menu.Items.Count > 0)
                 menu.IsOpen = true;
@@ -3486,33 +3507,110 @@ public class MapViewModel : BasePanelViewModel,
     #region Marker ZOrder Control
 
     /// <summary>
-    /// 심볼 마커를 한 칸 위로 이동 — Panel.ZIndex +1
+    /// 앱 시작 시 모든 심볼 마커에 고유 ZIndex 할당
+    /// 중복 ZIndex가 있으면 컬렉션 순서대로 순차 재할당 + Batch DB 저장
+    /// </summary>
+    private void EnsureUniqueZIndex()
+    {
+        if (MainMap?.Markers == null) return;
+
+        var editableMarkers = MainMap.Markers
+            .OfType<GMapMarker>()
+            .Where(m => m is IEditableMarker && m.Shape is UIElement)
+            .ToList();
+
+        if (editableMarkers.Count == 0) return;
+
+        // 중복 ZIndex 검출
+        var zValues = editableMarkers
+            .Select(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
+            .ToList();
+
+        bool hasDuplicates = zValues.Count != zValues.Distinct().Count();
+        if (!hasDuplicates)
+        {
+            _log?.Info($"[ZIndex] 고유값 확인 완료 — {editableMarkers.Count}개 마커, 중복 없음");
+            return;
+        }
+
+        // 순차 재할당 + Batch DB
+        _log?.Info($"[ZIndex] 중복 감지 — {editableMarkers.Count}개 마커에 고유 ZIndex 할당 시작");
+        var changes = new List<(int id, int zIndex)>();
+        for (int i = 0; i < editableMarkers.Count; i++)
+        {
+            var gMarker = editableMarkers[i];
+            if (gMarker.Shape is UIElement shape)
+            {
+                ApplyMarkerZIndexLocal(gMarker, shape, i);
+                if (gMarker is IEditableMarker em && em.Id > 0)
+                    changes.Add((em.Id, i));
+            }
+        }
+        if (changes.Count > 0)
+            _ = _gMapDbSymbolService.BatchUpdateZIndexAsync(changes);
+
+        _log?.Info($"[ZIndex] 고유 ZIndex 할당 완료 (0 ~ {editableMarkers.Count - 1}), DB Batch {changes.Count}건");
+        LogAllMarkerZIndex();
+    }
+
+    /// <summary>
+    /// 심볼 마커를 한 칸 위로 이동 — 바로 위 마커와 ZIndex 스왑
     /// </summary>
     private void MoveMarkerUp(IEditableMarker marker)
     {
-        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape) return;
-        var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        var newZ = oldZ + 1;
-        ApplyMarkerZIndex(gMarker, shape, newZ);
-        _log?.Info($"[ZOrder] MoveUp: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape || MainMap == null) return;
+
+        int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
+
+        // 바로 위: 가장 작은 ZIndex > currentZ 인 마커 찾기
+        GMapMarker? target = null;
+        int targetZ = int.MaxValue;
+        foreach (var m in MainMap.Markers)
+        {
+            if (m == gMarker || m is not IEditableMarker || m.Shape is not UIElement s) continue;
+            int z = System.Windows.Controls.Panel.GetZIndex(s);
+            if (z > currentZ && z < targetZ) { target = m; targetZ = z; }
+        }
+
+        if (target == null) return; // 이미 최상위
+
+        // 스왑
+        ApplyMarkerZIndex(gMarker, shape, targetZ);
+        ApplyMarkerZIndex(target, target.Shape as UIElement, currentZ);
+        _log?.Info($"[ZOrder] SwapUp: '{marker.Title}'({currentZ}→{targetZ}) ↔ '{((IEditableMarker)target).Title}'({targetZ}→{currentZ})");
         LogAllMarkerZIndex();
     }
 
     /// <summary>
-    /// 심볼 마커를 한 칸 아래로 이동 — Panel.ZIndex -1
+    /// 심볼 마커를 한 칸 아래로 이동 — 바로 아래 마커와 ZIndex 스왑
     /// </summary>
     private void MoveMarkerDown(IEditableMarker marker)
     {
-        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape) return;
-        var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        var newZ = oldZ - 1;
-        ApplyMarkerZIndex(gMarker, shape, newZ);
-        _log?.Info($"[ZOrder] MoveDown: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape || MainMap == null) return;
+
+        int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
+
+        // 바로 아래: 가장 큰 ZIndex < currentZ 인 마커 찾기
+        GMapMarker? target = null;
+        int targetZ = int.MinValue;
+        foreach (var m in MainMap.Markers)
+        {
+            if (m == gMarker || m is not IEditableMarker || m.Shape is not UIElement s) continue;
+            int z = System.Windows.Controls.Panel.GetZIndex(s);
+            if (z < currentZ && z > targetZ) { target = m; targetZ = z; }
+        }
+
+        if (target == null) return; // 이미 최하위
+
+        // 스왑
+        ApplyMarkerZIndex(gMarker, shape, targetZ);
+        ApplyMarkerZIndex(target, target.Shape as UIElement, currentZ);
+        _log?.Info($"[ZOrder] SwapDown: '{marker.Title}'({currentZ}→{targetZ}) ↔ '{((IEditableMarker)target).Title}'({targetZ}→{currentZ})");
         LogAllMarkerZIndex();
     }
 
     /// <summary>
-    /// 심볼 마커를 맨 위로 이동 — 전체 심볼 중 최대 ZIndex + 1
+    /// 심볼 마커를 맨 위로 이동 → 정규화 (0~n-1)
     /// </summary>
     private void MoveMarkerToTop(IEditableMarker marker)
     {
@@ -3525,14 +3623,13 @@ public class MapViewModel : BasePanelViewModel,
                 maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
         }
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        var newZ = maxZ + 1;
-        ApplyMarkerZIndex(gMarker, shape, newZ);
-        _log?.Info($"[ZOrder] MoveToTop: '{marker.Title}' ZIndex={oldZ}→{newZ}");
-        LogAllMarkerZIndex();
+        ApplyMarkerZIndexLocal(gMarker, shape, maxZ + 1);
+        _log?.Info($"[ZOrder] MoveToTop: '{marker.Title}' ZIndex={oldZ}→{maxZ + 1}");
+        NormalizeAllZIndex();
     }
 
     /// <summary>
-    /// 심볼 마커를 맨 아래로 이동 — 전체 심볼 중 최소 ZIndex - 1
+    /// 심볼 마커를 맨 아래로 이동 → 정규화 (0~n-1)
     /// </summary>
     private void MoveMarkerToBottom(IEditableMarker marker)
     {
@@ -3546,30 +3643,67 @@ public class MapViewModel : BasePanelViewModel,
         }
         if (minZ == int.MaxValue) minZ = 0;
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        var newZ = minZ - 1;
-        ApplyMarkerZIndex(gMarker, shape, newZ);
-        _log?.Info($"[ZOrder] MoveToBottom: '{marker.Title}' ZIndex={oldZ}→{newZ}");
+        ApplyMarkerZIndexLocal(gMarker, shape, minZ - 1);
+        _log?.Info($"[ZOrder] MoveToBottom: '{marker.Title}' ZIndex={oldZ}→{minZ - 1}");
+        NormalizeAllZIndex();
+    }
+
+    /// <summary>
+    /// 전체 마커를 현재 순서 기준으로 0~n-1 재번호 + Batch DB 저장
+    /// </summary>
+    private void NormalizeAllZIndex()
+    {
+        if (MainMap?.Markers == null) return;
+
+        var sorted = MainMap.Markers
+            .OfType<GMapMarker>()
+            .Where(m => m is IEditableMarker && m.Shape is UIElement)
+            .OrderBy(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
+            .ToList();
+
+        var changes = new List<(int id, int zIndex)>();
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            var gMarker = sorted[i];
+            if (gMarker.Shape is not UIElement shape) continue;
+
+            int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
+            if (currentZ == i) continue; // 변경 없으면 스킵
+
+            ApplyMarkerZIndexLocal(gMarker, shape, i);
+            if (gMarker is IEditableMarker em && em.Id > 0)
+                changes.Add((em.Id, i));
+        }
+
+        if (changes.Count > 0)
+            _ = _gMapDbSymbolService.BatchUpdateZIndexAsync(changes);
+
+        _log?.Info($"[ZIndex] 정규화 완료 (0~{sorted.Count - 1}), DB Batch {changes.Count}건");
         LogAllMarkerZIndex();
     }
 
     /// <summary>
-    /// ZIndex를 Shape + GMapMarker + Model + DB에 동시 적용
+    /// ZIndex를 Shape + GMapMarker + Model에 적용 (DB 저장 없음 — Batch용)
     /// </summary>
-    private void ApplyMarkerZIndex(GMapMarker gMarker, UIElement shape, int newZ)
+    private void ApplyMarkerZIndexLocal(GMapMarker gMarker, UIElement shape, int newZ)
     {
-        // 1. Shape 즉시 반영
         System.Windows.Controls.Panel.SetZIndex(shape, newZ);
-        // 2. GMapMarker.ZIndex 동기화
         gMarker.ZIndex = newZ;
-        // 3. 모델 업데이트
-        if (gMarker is IEditableMarker em)
+        if (gMarker is IEditableMarker)
         {
-            // IEditableMarker → GMapBaseMarker<T> → Model 접근
             var modelProp = gMarker.GetType().GetProperty("Model");
             if (modelProp?.GetValue(gMarker) is ISymbolModel symbolModel)
                 symbolModel.ZIndex = newZ;
         }
-        // 4. DB 비동기 저장
+    }
+
+    /// <summary>
+    /// ZIndex를 Shape + GMapMarker + Model + DB 개별 저장 (스왑용)
+    /// </summary>
+    private void ApplyMarkerZIndex(GMapMarker gMarker, UIElement shape, int newZ)
+    {
+        ApplyMarkerZIndexLocal(gMarker, shape, newZ);
         if (gMarker is IEditableMarker editableMarker && editableMarker.Id > 0)
             _ = SaveMarkerZIndexAsync(editableMarker.Id, newZ);
     }
@@ -4554,6 +4688,11 @@ public class MapViewModel : BasePanelViewModel,
                 return await _gMapDbSymbolService.DeletePidsGroupSymbolAsync(pidsGroupMarker.Model);
             case GMapImageMarker imageMarker:
                 var imgDeleted = await _gMapDbSymbolService.DeleteImageAsync(imageMarker.ImageModel.Id);
+                // 복사된 이미지 파일 정리
+                if (imgDeleted && !string.IsNullOrEmpty(imageMarker.FilePath))
+                {
+                    _imageFileService.DeleteLocalImage(imageMarker.FilePath);
+                }
                 // MapLayers OverlayImage 레코드도 함께 삭제
                 if (imgDeleted && !string.IsNullOrEmpty(imageMarker.FilePath))
                 {
@@ -5051,8 +5190,15 @@ public class MapViewModel : BasePanelViewModel,
         if (IsEditModeEnabled && !_isMarkerEditing)
         {
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
-            // DB 업데이트
             await DbUpdateProcess(e.Marker);
+
+            // LinkedDevice 변경 → _deviceSymbolLookup 즉시 재등록 (AllDevicesLoadedMessage 대기 불필요)
+            if (e.PropertyName == "LinkedDevice"
+                && e.Marker is GMapPidsMarker pidsMarker
+                && pidsMarker.LinkedDevice != null)
+            {
+                _symbolEventManager.RegisterDeviceSymbol(pidsMarker.LinkedDevice, pidsMarker.Model);
+            }
 
             // OverlayImage Title/Opacity/Visibility 변경 → MapLayers 동기화
             if (e.Marker is GMapSymbols.GMapImageMarker imgMarker
@@ -5066,6 +5212,7 @@ public class MapViewModel : BasePanelViewModel,
     private async Task SyncOverlayImageLayer(string? filePath, string propertyName, object? newValue)
     {
         if (string.IsNullOrEmpty(filePath)) return;
+        if (_isSyncingRename && propertyName == "Title") return;
         try
         {
             var layers = await _gMapDbService.FetchMapLayersAsync();
@@ -5430,6 +5577,7 @@ public class MapViewModel : BasePanelViewModel,
     private CustomMapService _customMapService;
     private CustomMapOverlayService _customMapOverlayService;
     private ImageOverlayService _imageOverlayService;
+    private IImageFileService _imageFileService;
     private MarkerFactory _markerFactory;
 
     private PropertyPanelFactory _propertyPanelFactory;
@@ -5681,6 +5829,7 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     private int _pendingDeleteRoiId;
+    private IMapLayerModel? _pendingDeleteLayer;
 
     #endregion
 
@@ -5821,6 +5970,70 @@ public class MapViewModel : BasePanelViewModel,
 
     #endregion
 
+    #region - Layer Delete IHandle -
+
+    public async Task HandleAsync(CallDeleteMapLayerProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+            await Task.Delay(500, cancellationToken);
+
+            var layer = _pendingDeleteLayer;
+            if (layer == null)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+                return;
+            }
+
+            _log?.Info($"[레이어 삭제] 시작: {layer.Name} (LayerType={layer.LayerType}, Id={layer.Id})");
+
+            switch (layer.LayerType)
+            {
+                case "OverlayMap":
+                    if (layer.MapId.HasValue)
+                    {
+                        _customMapOverlayService.DeactivateOverlay(layer.MapId.Value);
+                        await _customMapService.DeleteCustomMapAsync(layer.MapId.Value, deleteFiles: false);
+                    }
+                    break;
+
+                case "OverlayImage":
+                    if (!string.IsNullOrEmpty(layer.FilePath))
+                    {
+                        var marker = FindImageMarkerByFilePath(layer.FilePath);
+                        if (marker != null)
+                        {
+                            MainMap?.DeselectMarker(marker);
+                            MainMap?.Markers?.Remove(marker);
+                            await _gMapDbSymbolService.DeleteImageAsync(marker.ImageModel.Id);
+                        }
+                    }
+                    break;
+            }
+
+            await _gMapDbService.DeleteMapLayerAsync(layer.Id);
+
+            if (layer.LayerType == "OverlayMap")
+                _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+            MainMap?.InvalidateVisual();
+
+            await LoadLayersFromDbAsync();
+
+            _pendingDeleteLayer = null;
+            _log?.Info($"[레이어 삭제] 완료: {layer.Name}");
+
+            await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"레이어 삭제 실패: {ex.Message}");
+            await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
+    }
+
+    #endregion
+
     #region - Layer Panel Properties & Methods -
 
     private LayerPanelControl? _layerPanel;
@@ -5852,6 +6065,8 @@ public class MapViewModel : BasePanelViewModel,
         LayerPanel.LayerDeleteRequested += OnLayerDeleteRequested;
         LayerPanel.LayerMoveUpRequested += OnLayerMoveUpRequested;
         LayerPanel.LayerMoveDownRequested += OnLayerMoveDownRequested;
+        LayerPanel.LayerRenameRequested += OnLayerRenameRequested;
+        LayerPanel.LayerNavigateRequested += OnLayerNavigateRequested;
         LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
         IsLayerPanelVisible = true;
         LayerPanel.Loaded += async (s, e) =>
@@ -5867,6 +6082,11 @@ public class MapViewModel : BasePanelViewModel,
         {
             LayerPanel.LayerVisibilityChanged -= OnLayerVisibilityChanged;
             LayerPanel.LayerOpacityChanged -= OnLayerOpacityChanged;
+            LayerPanel.LayerDeleteRequested -= OnLayerDeleteRequested;
+            LayerPanel.LayerMoveUpRequested -= OnLayerMoveUpRequested;
+            LayerPanel.LayerMoveDownRequested -= OnLayerMoveDownRequested;
+            LayerPanel.LayerRenameRequested -= OnLayerRenameRequested;
+            LayerPanel.LayerNavigateRequested -= OnLayerNavigateRequested;
             LayerPanel = null;
         }
         IsLayerPanelVisible = false;
@@ -5973,34 +6193,62 @@ public class MapViewModel : BasePanelViewModel,
         try
         {
             var layer = e.Layer;
-            _log?.Info($"[레이어 삭제] 시작: {layer.Name} (LayerType={layer.LayerType}, Id={layer.Id})");
+            _pendingDeleteLayer = layer;
 
-            switch (layer.LayerType)
+            var title = layer.LayerType switch
             {
-                case "OverlayMap":
-                    if (layer.MapId.HasValue)
-                        _customMapOverlayService.DeactivateOverlay(layer.MapId.Value);
-                    break;
+                "OverlayMap" => "오버레이 맵 삭제",
+                "OverlayImage" => "오버레이 이미지 삭제",
+                _ => "레이어 삭제"
+            };
 
-                case "OverlayImage":
-                    if (!string.IsNullOrEmpty(layer.FilePath))
-                    {
-                        var marker = FindImageMarkerByFilePath(layer.FilePath);
-                        if (marker != null)
-                        {
-                            MainMap?.DeselectMarker(marker);
-                            MainMap?.Markers?.Remove(marker);
-                            await _gMapDbSymbolService.DeleteImageAsync(marker.ImageModel.Id);
-                        }
-                    }
-                    break;
-            }
-
-            await _gMapDbService.DeleteMapLayerAsync(layer.Id);
-            await LoadLayersFromDbAsync();
-            _log?.Info($"[레이어 삭제] 완료: {layer.Name}");
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+            {
+                Title = title,
+                Explain = $"'{layer.Name}'을(를) 삭제하시겠습니까?",
+                MessageModel = new CallDeleteMapLayerProcessMessageModel()
+            });
         }
-        catch (Exception ex) { _log?.Error($"레이어 삭제 실패: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"레이어 삭제 요청 실패: {ex.Message}"); }
+    }
+
+    private bool _isSyncingRename;
+
+    private async void OnLayerRenameRequested(object? sender, Args.LayerRenameEventArgs e)
+    {
+        if (_isSyncingRename) return;
+        _isSyncingRename = true;
+        try
+        {
+            var layer = e.Layer;
+            var newName = e.NewName;
+            _log?.Info($"[레이어 이름변경] {layer.Name} → {newName} (LayerType={layer.LayerType})");
+
+            // 1. MapLayers DB 갱신
+            layer.Name = newName;
+            await _gMapDbService.UpdateMapLayerAsync(layer);
+
+            // 2. OverlayImage인 경우 Images DB + Property Panel 동기화
+            if (layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(layer.FilePath))
+            {
+                var marker = FindImageMarkerByFilePath(layer.FilePath);
+                if (marker != null)
+                {
+                    marker.Title = newName;
+                    await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
+
+                    // Property Panel 열려있고 해당 마커 선택 중이면 동기화
+                    if (PropertyPanel?.SelectedMarker == marker)
+                        PropertyPanel.MarkerTitle = newName;
+                }
+            }
+            // OverlayMap은 Property Panel 없음 → MapLayers.Name만 갱신 완료
+
+            await LoadLayersFromDbAsync();
+            _log?.Info($"[레이어 이름변경] 완료: {newName}");
+        }
+        catch (Exception ex) { _log?.Error($"레이어 이름변경 실패: {ex.Message}"); }
+        finally { _isSyncingRename = false; }
     }
 
     private async void OnLayerMoveUpRequested(object? sender, LayerChangedEventArgs e)
@@ -6085,6 +6333,46 @@ public class MapViewModel : BasePanelViewModel,
                 }
                 break;
         }
+    }
+
+    private void OnLayerNavigateRequested(object? sender, LayerChangedEventArgs e)
+    {
+        if (MainMap == null) return;
+        try
+        {
+            var layer = e.Layer;
+            _log?.Info($"[레이어 이동] 시작: {layer.Name} (LayerType={layer.LayerType})");
+
+            switch (layer.LayerType)
+            {
+                case "OverlayImage":
+                    if (!string.IsNullOrEmpty(layer.FilePath))
+                    {
+                        var marker = FindImageMarkerByFilePath(layer.FilePath);
+                        if (marker != null)
+                            MainMap.Position = marker.Center;
+                    }
+                    break;
+
+                case "OverlayMap":
+                    if (layer.MapId.HasValue)
+                    {
+                        var customMap = _customMapService.LoadedCustomMaps
+                            .FirstOrDefault(m => m.Id == layer.MapId.Value);
+                        if (customMap?.MinLatitude != null && customMap.MaxLatitude != null
+                            && customMap.MinLongitude != null && customMap.MaxLongitude != null)
+                        {
+                            var centerLat = (customMap.MinLatitude.Value + customMap.MaxLatitude.Value) / 2;
+                            var centerLng = (customMap.MinLongitude.Value + customMap.MaxLongitude.Value) / 2;
+                            MainMap.Position = new GMap.NET.PointLatLng(centerLat, centerLng);
+                        }
+                    }
+                    break;
+            }
+
+            _log?.Info($"[레이어 이동] 완료: {layer.Name}");
+        }
+        catch (Exception ex) { _log?.Error($"레이어 이동 실패: {ex.Message}"); }
     }
 
     /// <summary>

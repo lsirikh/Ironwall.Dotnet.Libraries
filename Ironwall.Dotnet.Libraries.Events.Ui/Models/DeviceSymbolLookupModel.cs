@@ -6,6 +6,9 @@ using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
+using System.Threading;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Models;
 /****************************************************************************
@@ -32,6 +35,31 @@ public class DeviceSymbolLookupModel : BaseModel
     #endregion
     #region - Processes -
     // 이벤트 처리 메서드들
+
+    /// <summary>
+    /// 고빈도 경로(ProcessEvent, ProcessEventReport, UpdateFOV) 전용 dirty flag + Dispatcher 마샬링.
+    /// 이미 큐잉된 콜백 있으면 추가 큐잉 금지 (coalescing). UI 스레드에서만 SetUpdate 발화.
+    /// Application.Current null 또는 HasShutdownStarted 시 동기 fallback.
+    /// </summary>
+    private void MarshalUpdate()
+    {
+        if (Interlocked.Exchange(ref _isFlushPending, 1) == 1) return;
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.HasShutdownStarted)
+        {
+            Interlocked.Exchange(ref _isFlushPending, 0);
+            SymbolModel?.SetUpdate();
+            return;
+        }
+
+        dispatcher.InvokeAsync(() =>
+        {
+            Interlocked.Exchange(ref _isFlushPending, 0);
+            SymbolModel?.SetUpdate();
+        }, DispatcherPriority.Normal);
+    }
+
     /// <summary>
     /// Device.Status → Symbol.OperationState 동기화
     /// </summary>
@@ -43,10 +71,9 @@ public class DeviceSymbolLookupModel : BaseModel
             return;
         }
 
-        var prevState     = SymbolModel.OperationState;
-        var prevEvent     = SymbolModel.EventStatus;
+        var prevState = SymbolModel.OperationState;
 
-        // OperationState 동기화
+        // OperationState 동기화 — EventStatus는 CompositeStatus setter를 통해서만 설정 (SSOT)
         SymbolModel.OperationState = status switch
         {
             EnumDeviceStatus.ACTIVATED   => EnumOperationState.ACTIVATED,
@@ -55,41 +82,52 @@ public class DeviceSymbolLookupModel : BaseModel
             _                            => EnumOperationState.NONE,
         };
 
-        // EventStatus도 명시적으로 설정 (GMapBaseMarker.OperationState 세터를 우회하기 때문)
-        // OnStatusChanged는 세터에서만 호출되므로 여기서 직접 설정
-        SymbolModel.EventStatus = status switch
-        {
-            EnumDeviceStatus.ACTIVATED   => EnumEventStatus.Normal,
-            EnumDeviceStatus.DEACTIVATED => EnumEventStatus.Normal,  // 깜빡임 없음
-            EnumDeviceStatus.ERROR       => EnumEventStatus.Fault,   // 깜빡임 유지
-            _                            => EnumEventStatus.Normal,
-        };
+        _log?.Info($"[SYNC→Symbol] SyncFromDevice: '{SymbolModel.Title}' DeviceStatus={status} → OperationState: {prevState}→{SymbolModel.OperationState}");
+        SymbolModel.SetUpdate(); // 저빈도 상태 전이 — 즉시 SetUpdate 유지
+    }
 
-        _log?.Info($"[SYNC→Symbol] SyncFromDevice: '{SymbolModel.Title}' DeviceStatus={status} → OperationState: {prevState}→{SymbolModel.OperationState}, EventStatus: {prevEvent}→{SymbolModel.EventStatus}");
-        SymbolModel.SetUpdate();
+    /// <summary>복합 상태를 직접 세팅 — EventQueueManager 전이 콜백에서 호출되므로 MarshalUpdate 경유</summary>
+    public void ApplyCompositeStatus(EnumCompositeEventStatus status)
+    {
+        if (SymbolModel == null) return;
+        SymbolModel.CompositeStatus = status;
+        MarshalUpdate();
     }
 
     public void ProcessEvent(EnumEventType eventType, EnumSeverityLevel severity)
     {
         if (SymbolModel == null) return;
 
-        // 탐지(Intrusion) 이벤트만 ProcessEvent 경로에서 심볼 비주얼 처리
-        // 장애(Fault)는 Device.Status=ERROR → SyncFromDevice 경로에서 처리
-        if (eventType == EnumEventType.Intrusion)
+        SymbolModel.CompositeStatus = eventType switch
         {
-            SymbolModel.EventStatus = EnumEventStatus.Detecting;
-            SymbolModel.SetUpdate();
-            _log?.Info($"탐지 이벤트 → Detecting: {SymbolModel.Title}");
-        }
+            EnumEventType.Intrusion => SymbolModel.CompositeStatus switch
+            {
+                EnumCompositeEventStatus.Faulted          => EnumCompositeEventStatus.FaultedDetecting,
+                EnumCompositeEventStatus.FaultedDetecting => EnumCompositeEventStatus.FaultedDetecting, // 다운그레이드 방지
+                _                                         => EnumCompositeEventStatus.Detecting,
+            },
+            EnumEventType.Fault => SymbolModel.CompositeStatus switch
+            {
+                EnumCompositeEventStatus.Detecting => EnumCompositeEventStatus.FaultedDetecting,
+                _                                  => EnumCompositeEventStatus.Faulted,
+            },
+            _ => SymbolModel.CompositeStatus,
+        };
+        MarshalUpdate(); // 고빈도 경로 — dirty flag + Dispatcher 마샬링
+        _log?.Info($"이벤트 처리 → {SymbolModel.CompositeStatus}: {SymbolModel.Title}");
     }
 
     public void ProcessEventReport()
     {
         if (SymbolModel == null) return;
 
-        SymbolModel.EventStatus = EnumEventStatus.Normal;
-        SymbolModel.SetUpdate();
-        _log?.Info($"ProcessEventReport → Normal 복원: {SymbolModel.Title}");
+        SymbolModel.CompositeStatus = SymbolModel.CompositeStatus switch
+        {
+            EnumCompositeEventStatus.FaultedDetecting => EnumCompositeEventStatus.Faulted,
+            _                                         => EnumCompositeEventStatus.Normal,
+        };
+        MarshalUpdate(); // 고빈도 경로 — dirty flag + Dispatcher 마샬링
+        _log?.Info($"ProcessEventReport → {SymbolModel.CompositeStatus} 복원: {SymbolModel.Title}");
     }
 
     /// <summary>
@@ -178,10 +216,10 @@ public class DeviceSymbolLookupModel : BaseModel
 
         _log?.Info($"[UpdateFOV] SetUpdate 호출 전: {pidsSymbol.Title}");
 
-        // 심볼 업데이트 알림
-        pidsSymbol.SetUpdate();
+        // 심볼 업데이트 알림 — 고빈도 PTZ 경로: dirty flag + Dispatcher 마샬링
+        MarshalUpdate();
 
-        _log?.Info($"[UpdateFOV] SetUpdate 완료");
+        _log?.Info($"[UpdateFOV] MarshalUpdate 큐잉");
     }
     #endregion
     #endregion
@@ -193,5 +231,6 @@ public class DeviceSymbolLookupModel : BaseModel
     #endregion
     #region - Attributes -
     private ILogService _log;
+    private int _isFlushPending; // 0=없음, 1=대기 중 (Interlocked, MarshalUpdate 전용)
     #endregion
 }

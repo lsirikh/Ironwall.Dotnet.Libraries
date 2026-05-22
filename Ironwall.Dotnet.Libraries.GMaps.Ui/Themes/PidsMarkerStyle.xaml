@@ -913,6 +913,16 @@
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
 						</Trigger>
 
+						<!--  ACTIVATED → Viewbox Opacity 명시적 복원 (ERROR FillBehavior=Stop 이후 잔류값 방지)  -->
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ACTIVATED}">
+							<Setter TargetName="PART_ViewboxControllerContainer"  Property="Opacity" Value="1" />
+							<Setter TargetName="PART_ViewboxSmartSensorContainer" Property="Opacity" Value="1" />
+							<Setter TargetName="PART_ViewboxFenceContainer"        Property="Opacity" Value="1" />
+							<Setter TargetName="PART_ViewboxMultiContainer"        Property="Opacity" Value="1" />
+							<Setter TargetName="PART_ViewboxCameraContainer"       Property="Opacity" Value="1" />
+							<Setter TargetName="PART_ViewboxSpeakerContainer"      Property="Opacity" Value="1" />
+						</Trigger>
+
 						<!--  OperationState 기반 Indicator 색상 (Normal 뒤, 이벤트 Trigger 앞 → 이벤트가 우선)  -->
 						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVATED}">
 							<Setter TargetName="PART_EventStatusIndicator"      Property="Background" Value="Gray" />
@@ -930,7 +940,7 @@
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 							<Trigger.EnterActions>
 								<BeginStoryboard Name="ErrorBlinkStoryboard_Begin">
-									<Storyboard RepeatBehavior="Forever">
+									<Storyboard RepeatBehavior="Forever" FillBehavior="Stop">
 										<DoubleAnimation
 											AutoReverse="True"
 											Storyboard.TargetName="PART_ViewboxControllerContainer"
@@ -973,65 +983,9 @@
 						<Trigger Property="EventStatus" Value="Detecting">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 						</Trigger>
+						<!--  Fault: 표시등 색상만 변경, Viewbox 깜빡임 없음 (SSOT: 깜빡임은 MarkerState=ERROR만 담당)  -->
 						<Trigger Property="EventStatus" Value="Fault">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
-							<Trigger.EnterActions>
-								<BeginStoryboard Name="FaultBlinkStoryboard_Begin">
-									<Storyboard RepeatBehavior="Forever">
-										<!--  제어기 아이콘 깜빡임  -->
-										<DoubleAnimation
-											AutoReverse="True"
-											Storyboard.TargetName="PART_ViewboxControllerContainer"
-											Storyboard.TargetProperty="Opacity"
-											From="1"
-											To="0.3"
-											Duration="0:0:0.3" />
-										<!--  스마트센서 아이콘 깜빡임  -->
-										<DoubleAnimation
-											AutoReverse="True"
-											Storyboard.TargetName="PART_ViewboxSmartSensorContainer"
-											Storyboard.TargetProperty="Opacity"
-											From="1"
-											To="0.3"
-											Duration="0:0:0.3" />
-										<!--  펜스 아이콘 깜빡임  -->
-										<DoubleAnimation
-											AutoReverse="True"
-											Storyboard.TargetName="PART_ViewboxFenceContainer"
-											Storyboard.TargetProperty="Opacity"
-											From="1"
-											To="0.3"
-											Duration="0:0:0.3" />
-										<!--  멀티센서 아이콘 깜빡임  -->
-										<DoubleAnimation
-											AutoReverse="True"
-											Storyboard.TargetName="PART_ViewboxMultiContainer"
-											Storyboard.TargetProperty="Opacity"
-											From="1"
-											To="0.3"
-											Duration="0:0:0.3" />
-										<!--  카메라 아이콘 깜빡임  -->
-										<DoubleAnimation
-											AutoReverse="True"
-											Storyboard.TargetName="PART_ViewboxCameraContainer"
-											Storyboard.TargetProperty="Opacity"
-											From="1"
-											To="0.3"
-											Duration="0:0:0.3" />
-										<!--  스피커 아이콘 깜빡임  -->
-										<DoubleAnimation
-											AutoReverse="True"
-											Storyboard.TargetName="PART_ViewboxSpeakerContainer"
-											Storyboard.TargetProperty="Opacity"
-											From="1"
-											To="0.3"
-											Duration="0:0:0.3" />
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.EnterActions>
-							<Trigger.ExitActions>
-								<StopStoryboard BeginStoryboardName="FaultBlinkStoryboard_Begin" />
-							</Trigger.ExitActions>
 						</Trigger>
 						<Trigger Property="EventStatus" Value="Connection">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />

@@ -61,6 +61,24 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
     [JsonProperty("event_status", Order = 22)]
     public EnumEventStatus EventStatus { get; set; } = EnumEventStatus.Normal;
 
+    private EnumCompositeEventStatus _compositeStatus = EnumCompositeEventStatus.Normal;
+    public EnumCompositeEventStatus CompositeStatus
+    {
+        get => _compositeStatus;
+        set
+        {
+            _compositeStatus = value;
+            EventStatus = value switch
+            {
+                EnumCompositeEventStatus.Detecting        => EnumEventStatus.Detecting,
+                EnumCompositeEventStatus.Faulted          => EnumEventStatus.Fault,
+                EnumCompositeEventStatus.FaultedDetecting => EnumEventStatus.Fault,
+                EnumCompositeEventStatus.Connection       => EnumEventStatus.Connection,
+                _                                         => EnumEventStatus.Normal,
+            };
+        }
+    }
+
     [JsonProperty("show_fov", Order = 23)]
     public bool ShowFOV { get; set; } = false;
 

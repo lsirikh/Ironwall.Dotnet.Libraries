@@ -224,23 +224,23 @@
 						</DataGridTemplateColumn.CellEditingTemplate>
 					</DataGridTemplateColumn>
 
-					<!--  그룹 (DeviceGroup ComboBox)  -->
+					<!--  그룹  -->
 					<DataGridTemplateColumn Width="140" Header="그룹">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<TextBlock
 									HorizontalAlignment="Center"
 									VerticalAlignment="Center"
-									Text="{Binding GroupName}" />
+									Text="{Binding GroupNames}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 						<DataGridTemplateColumn.CellEditingTemplate>
 							<DataTemplate>
 								<ComboBox
-									DisplayMemberPath="Name"
-									ItemsSource="{Binding Data.DeviceGroups, Source={StaticResource proxy}}"
-									SelectedValue="{Binding Group, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-									SelectedValuePath="Id" />
+									IsEditable="False"
+									ItemsSource="{Binding Data.AllDeviceGroups, Source={StaticResource proxy}}"
+									SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
+									DisplayMemberPath="Name" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellEditingTemplate>
 					</DataGridTemplateColumn>

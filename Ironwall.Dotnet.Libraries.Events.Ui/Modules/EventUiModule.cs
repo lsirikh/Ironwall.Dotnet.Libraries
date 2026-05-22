@@ -12,6 +12,8 @@ using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dashboards;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
+using Ironwall.Dotnet.Libraries.Sounds.Models;
+using Ironwall.Dotnet.Libraries.Sounds.Services;
 using System;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Modules;
@@ -38,9 +40,7 @@ public class EventUiModule : Module
     #region - Implementation of Interface -
     protected override void Load(ContainerBuilder builder)
     {
-        try
-        {
-            builder.RegisterModule(new EventModule(_eventSetup, _log, _count++));
+        builder.RegisterModule(new EventModule(_eventSetup, _log, _count++));
             //builder.RegisterModule(new EventDbModule(_dbSetup, _log, _count++)); // 2
             builder.RegisterModule(new EventApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
 
@@ -80,10 +80,32 @@ public class EventUiModule : Module
                 _eventSetup,
                 c.Resolve<Caliburn.Micro.IEventAggregator>()
             )).As<IDetectionNatsSyncService>().SingleInstance();
-            builder.RegisterType<EventQueueManager>()
+            builder.Register(c => new MalfunctionNatsSyncService(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                c.Resolve<ISymbolEventManager>(),
+                c.Resolve<IEventQueueManager>(),
+                _eventSetup,
+                c.Resolve<Caliburn.Micro.IEventAggregator>()
+            )).As<IMalfunctionNatsSyncService>().SingleInstance();
+            builder.Register(c => new EventQueueManager(
+                       c.ResolveOptional<ILogService>(),
+                       c.ResolveOptional<IEventSetupModel>()))
                    .As<IEventQueueManager>()
                    .AsSelf()
                    .SingleInstance();
+
+            // SoundAlarmController: ISoundService가 컨테이너에 등록된 경우에만 생성
+            builder.Register(ctx =>
+            {
+                var soundService = ctx.ResolveOptional<ISoundService>();
+                var setupModel = ctx.ResolveOptional<SoundSetupModel>();
+                var durationSeconds = setupModel?.DetectionSoundDuration ?? 20;
+                return new SoundAlarmController(
+                    stopAndPlay: (eventType) => { _ = soundService?.StopAndPlayAsync(eventType); },
+                    durationSeconds
+                );
+            }).As<ISoundAlarmController>().SingleInstance();
 
             // EventQueueManager ↔ SymbolEventManager 전이 이벤트 와이어링
             builder.RegisterBuildCallback(scope =>
@@ -91,20 +113,65 @@ public class EventUiModule : Module
                 var eqm = scope.Resolve<EventQueueManager>();
                 var sem = scope.Resolve<SymbolEventManager>();
 
-                // 개별 심볼: 0→1 Detecting, N→0 Normal
+                // 개별 심볼: 0→1 Detecting, N→0 Normal (하위 호환 유지)
                 eqm.OnDeviceFirstEvent += sem.SetDeviceDetecting;
                 eqm.OnDeviceEmpty += sem.RestoreDeviceSymbol;
 
-                // 그룹 심볼: 0→1 Detecting, N→0 Normal
-                eqm.OnGroupFirstEvent += sem.SetGroupDetecting;
-                eqm.OnGroupEmpty += sem.RestoreGroupSymbol;
+                // 개별 심볼: SSOT 복합 상태 전이 (OnDeviceStateChanged)
+                eqm.OnDeviceStateChanged += sem.HandleDeviceStateChanged;
+
+                // 자동복구: Fault 자동 조치보고
+                var elp = scope.Resolve<EventCardListPanelViewModel>();
+                eqm.OnAutoRecovery += faultEntryId =>
+                {
+                    var task = elp.HandleAutoRecoveryAsync(faultEntryId);
+                    task.ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _log?.Error($"[AutoRecovery] 미처리 예외: {t.Exception?.GetBaseException()}");
+                    }, TaskScheduler.Default);
+                };
+
+                // 자동 조치보고: 타임아웃 만료 시 API 보고 → Dequeue → 카드 제거
+                eqm.OnAutoReport += entry =>
+                {
+                    var task = elp.HandleAutoReportAsync(entry);
+                    task.ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _log?.Error($"[AutoReport] 미처리 예외: {t.Exception?.GetBaseException()}");
+                        entry.AutoReportInFlight = false;
+                    }, TaskScheduler.Default);
+                };
+
+                // 그룹 심볼: 복합 상태 전이 (OnGroupStateChanged)
+                eqm.OnGroupStateChanged += sem.HandleGroupStateChanged;
 
                 // 공유 타이머 시작 (1초 간격, 자동 조치보고 타임아웃 체크)
                 eqm.StartSharedTimer();
 
+                // SoundAlarmController 이벤트 와이어링
+                // ISoundService가 미등록 시 SAC 비활성화 (State=Playing 고착 방지)
+                var sac = scope.Resolve<ISoundAlarmController>();
+                var soundService = scope.ResolveOptional<ISoundService>();
+                if (soundService != null)
+                {
+                    eqm.OnAnyEnqueue += sac.OnEventArrived;
+                    soundService.OnDetectionPlaybackCompleted += sac.OnPlaybackStopped;
+                    soundService.OnMalfunctionPlaybackCompleted += sac.OnPlaybackStopped;
+                }
+                else
+                {
+                    _log?.Warning("ISoundService not registered — SoundAlarmController disabled");
+                }
+
                 // DetectionNatsSyncService 시작 — NATS DETECT 구독 등록
                 var dns = scope.Resolve<IDetectionNatsSyncService>();
                 dns.StartService();
+
+                // MalfunctionNatsSyncService 시작 — NATS MALFUNCTION 구독 등록
+                var mns = scope.Resolve<IMalfunctionNatsSyncService>();
+                mns.StartService();
             });
          
             builder.RegisterType<DetectionReportDialogViewModel>().AsSelf()//  new DetectionReportDialogViewModel() 로도 해결 가능
@@ -113,12 +180,6 @@ public class EventUiModule : Module
             builder.RegisterType<MalfunctionReportDialogViewModel>().AsSelf()// new DetectionReportDialogViewModel() 로도 해결 가능
                                                                    .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환
                                                                    .SingleInstance();              // or InstancePerDependency()
-
-        }
-        catch
-        {
-            throw;
-        }
     }
     #endregion
     #region - Overrides -

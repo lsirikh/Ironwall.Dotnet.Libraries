@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.GatewayEvents;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
@@ -43,7 +44,7 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        LoadDeviceGroups();
+        LoadAllDeviceGroups();
         _pCancellationTokenSource = new CancellationTokenSource();
         await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
     }
@@ -70,7 +71,7 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
             var vm = new GatewayEventViewModel(newEvent)
             {
                 Index = ViewModelProvider.Count + 1,
-                DeviceGroups = DeviceGroups
+                AllGroups = AllDeviceGroups
             };
 
             ViewModelProvider.Add(vm);
@@ -88,7 +89,7 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
         {
             Id = 0,
             EventName = $"sensor.event.{DateTime.Now:HHmmss}",
-            Group = 0,
+            DeviceGroups = new System.Collections.Generic.List<int>(),
             IsEnable = true,
             Description = "새 이벤트"
         };
@@ -301,7 +302,7 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
                     foreach (var (item, index) in _eventProvider.Select((item, index) => (item, index)))
                     {
                         if (cancellationToken.IsCancellationRequested) new TaskCanceledException("Task was cancelled!");
-                        ViewModelProvider.Add(new GatewayEventViewModel(item) { Index = index + 1, DeviceGroups = DeviceGroups });
+                        ViewModelProvider.Add(new GatewayEventViewModel(item) { Index = index + 1, AllGroups = AllDeviceGroups });
                     }
 
                     NotifyOfPropertyChange(() => ViewModelProvider);
@@ -360,7 +361,7 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
                     ViewModelProvider.Clear();
                     foreach (var item in _eventProvider)
                     {
-                        ViewModelProvider.Add(new GatewayEventViewModel(item) { DeviceGroups = DeviceGroups });
+                        ViewModelProvider.Add(new GatewayEventViewModel(item) { AllGroups = AllDeviceGroups });
                     }
 
                     break;
@@ -374,13 +375,13 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
         
     }
 
-    public void LoadDeviceGroups()
+    public void LoadAllDeviceGroups()
     {
-        DeviceGroups.Clear();
-        DeviceGroups.Add(new DeviceGroupModel { Id = 0, Name = "미지정" });
+        AllDeviceGroups.Clear();
+        AllDeviceGroups.Add(new DeviceGroupModel { Id = 0, Name = "미지정" });
         foreach (var group in _deviceGroupProvider)
         {
-            DeviceGroups.Add(group);
+            AllDeviceGroups.Add(group);
         }
     }
 
@@ -392,11 +393,13 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
         }
     }
 
-    private bool GatewayEventEquals(IGatewayEventModel a, IGatewayEventModel b)
+    internal bool GatewayEventEquals(IGatewayEventModel a, IGatewayEventModel b)
     {
+        var aNorm = a.DeviceGroups.Where(id => id > 0).ToList();
+        var bNorm = b.DeviceGroups.Where(id => id > 0).ToList();
         return a.Id == b.Id &&
                a.EventName == b.EventName &&
-               a.Group == b.Group &&
+               new System.Collections.Generic.HashSet<int>(aNorm).SetEquals(bNorm) &&
                a.IsEnable == b.IsEnable &&
                a.Description == b.Description;
     }
@@ -405,7 +408,7 @@ public class GatewaySetupViewModel : BaseDataGridMultiPanelViewModel<GatewayEven
     #endregion
 
     #region - Properties -
-    public ObservableCollection<IDeviceGroupModel> DeviceGroups { get; } = new();
+    public ObservableCollection<IDeviceGroupModel> AllDeviceGroups { get; } = new();
     #endregion
 
     #region - Attributes -

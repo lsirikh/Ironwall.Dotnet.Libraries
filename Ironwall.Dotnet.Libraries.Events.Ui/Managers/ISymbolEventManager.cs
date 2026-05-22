@@ -48,4 +48,14 @@ public interface ISymbolEventManager
     /// 그룹 심볼 Normal 복원 (EventQueueManager N→0 전이 시 호출)
     /// </summary>
     void RestoreGroupSymbol(int groupId);
+
+    /// <summary>
+    /// 그룹 복합 상태 전이 처리 (EventQueueManager OnGroupStateChanged 구독용)
+    /// </summary>
+    void HandleGroupStateChanged(int groupId, Enums.EnumCompositeEventStatus prev, Enums.EnumCompositeEventStatus next);
+
+    /// <summary>
+    /// 개별 디바이스 복합 상태 전이 처리 (EventQueueManager OnDeviceStateChanged 구독용)
+    /// </summary>
+    void HandleDeviceStateChanged(int deviceId, Enums.EnumDeviceType deviceType, Enums.EnumCompositeEventStatus prev, Enums.EnumCompositeEventStatus next);
 }

@@ -33,6 +33,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
         Fence_Group = 17,
         Lamp = 18,
         Enclosure = 19,
+        SmartMultisensor2 = 20,
     }
     
 }

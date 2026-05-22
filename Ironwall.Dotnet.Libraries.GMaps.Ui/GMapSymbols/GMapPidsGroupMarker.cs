@@ -135,6 +135,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         private void PidsGroupModel_Update(object? sender, EventArgs e)
         {
             OnPropertyChanged(nameof(EventStatus));
+            OnPropertyChanged(nameof(CompositeStatus));
             OnPropertyChanged(nameof(OperationState));
         }
         #endregion
@@ -363,6 +364,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             }
         }
 
+        public EnumCompositeEventStatus CompositeStatus
+        {
+            get => _model.CompositeStatus;
+            set
+            {
+                _model.CompositeStatus = value;
+                OnPropertyChanged(nameof(CompositeStatus));
+            }
+        }
 
         public double TotalDistance => GeoPointConverter.CalculateTotalDistance(_model.LinePoints);
 

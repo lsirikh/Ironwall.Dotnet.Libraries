@@ -59,6 +59,8 @@ public class LayerPanelControl : Control
             leaf.OnDeleteAction = RaiseLayerDeleteRequested;
             leaf.OnMoveUpAction = RaiseLayerMoveUpRequested;
             leaf.OnMoveDownAction = RaiseLayerMoveDownRequested;
+            leaf.OnRenameAction = RaiseLayerRenameRequested;
+            leaf.OnNavigateAction = RaiseLayerNavigateRequested;
         }
     }
 
@@ -112,6 +114,8 @@ public class LayerPanelControl : Control
     public event EventHandler<LayerChangedEventArgs>? LayerDeleteRequested;
     public event EventHandler<LayerChangedEventArgs>? LayerMoveUpRequested;
     public event EventHandler<LayerChangedEventArgs>? LayerMoveDownRequested;
+    public event EventHandler<LayerRenameEventArgs>? LayerRenameRequested;
+    public event EventHandler<LayerChangedEventArgs>? LayerNavigateRequested;
 
     internal void RaiseLayerDeleteRequested(LayerTreeNode node)
     {
@@ -129,6 +133,18 @@ public class LayerPanelControl : Control
     {
         if (node.Model != null)
             LayerMoveDownRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
+    }
+
+    internal void RaiseLayerRenameRequested(LayerTreeNode node, string newName)
+    {
+        if (node.Model != null)
+            LayerRenameRequested?.Invoke(this, new LayerRenameEventArgs(node.Model, newName));
+    }
+
+    internal void RaiseLayerNavigateRequested(LayerTreeNode node)
+    {
+        if (node.Model != null)
+            LayerNavigateRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
     }
 
     #endregion

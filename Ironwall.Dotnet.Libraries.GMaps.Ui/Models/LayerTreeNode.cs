@@ -25,6 +25,15 @@ public class LayerTreeNode : INotifyPropertyChanged
     private int _itemCount;
     private bool _isUpdatingChildren;
     private bool _isUpdatingParent;
+    private bool _isEditing;
+    private string _editingName = string.Empty;
+    private ICommand? _deleteCommand;
+    private ICommand? _moveUpCommand;
+    private ICommand? _moveDownCommand;
+    private ICommand? _renameCommand;
+    private ICommand? _commitRenameCommand;
+    private ICommand? _cancelRenameCommand;
+    private ICommand? _navigateCommand;
     #endregion
 
     #region Properties
@@ -113,6 +122,15 @@ public class LayerTreeNode : INotifyPropertyChanged
     {
         get => _itemCount;
         set { _itemCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// 인라인 이름 편집 모드 여부
+    /// </summary>
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set { _isEditing = value; OnPropertyChanged(); }
     }
 
     /// <summary>
@@ -236,6 +254,9 @@ public class LayerTreeNode : INotifyPropertyChanged
     public bool CanDelete => NodeType == LayerNodeType.Leaf
         && Model?.LayerType != "Symbol";
 
+    /// <summary>이름 바꾸기 가능 여부 — Overlay Leaf (편집 모드 무관)</summary>
+    public bool CanRename => CanDelete;
+
     /// <summary>위로 이동 가능 여부 — Parent.Children 내 첫 번째가 아닌 경우</summary>
     public bool CanMoveUp => Parent != null
         && Parent.Children.IndexOf(this) > 0;
@@ -244,14 +265,53 @@ public class LayerTreeNode : INotifyPropertyChanged
     public bool CanMoveDown => Parent != null
         && Parent.Children.IndexOf(this) < Parent.Children.Count - 1;
 
-    /// <summary>삭제/위로/아래로 이벤트를 LayerPanelControl로 라우팅하기 위한 참조</summary>
+    /// <summary>이벤트를 LayerPanelControl로 라우팅하기 위한 참조</summary>
     internal Action<LayerTreeNode>? OnDeleteAction { get; set; }
     internal Action<LayerTreeNode>? OnMoveUpAction { get; set; }
     internal Action<LayerTreeNode>? OnMoveDownAction { get; set; }
+    internal Action<LayerTreeNode, string>? OnRenameAction { get; set; }
+    internal Action<LayerTreeNode>? OnNavigateAction { get; set; }
 
-    public ICommand DeleteCommand => new RelayCommand(_ => OnDeleteAction?.Invoke(this), _ => CanDelete);
-    public ICommand MoveUpCommand => new RelayCommand(_ => OnMoveUpAction?.Invoke(this), _ => CanMoveUp);
-    public ICommand MoveDownCommand => new RelayCommand(_ => OnMoveDownAction?.Invoke(this), _ => CanMoveDown);
+    public ICommand DeleteCommand => _deleteCommand ??=
+        new RelayCommand(_ => OnDeleteAction?.Invoke(this), _ => CanDelete);
+
+    public ICommand MoveUpCommand => _moveUpCommand ??=
+        new RelayCommand(_ => OnMoveUpAction?.Invoke(this), _ => CanMoveUp);
+
+    public ICommand MoveDownCommand => _moveDownCommand ??=
+        new RelayCommand(_ => OnMoveDownAction?.Invoke(this), _ => CanMoveDown);
+
+    public ICommand RenameCommand => _renameCommand ??=
+        new RelayCommand(_ =>
+        {
+            _editingName = Name;
+            IsEditing = true;
+        }, _ => CanRename);
+
+    public ICommand CommitRenameCommand => _commitRenameCommand ??=
+        new RelayCommand(_ =>
+        {
+            IsEditing = false;
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                Name = _editingName;
+                return;
+            }
+            if (Name != _editingName)
+                OnRenameAction?.Invoke(this, Name);
+        });
+
+    public ICommand CancelRenameCommand => _cancelRenameCommand ??=
+        new RelayCommand(_ =>
+        {
+            Name = _editingName;
+            IsEditing = false;
+        });
+
+    public ICommand NavigateCommand => _navigateCommand ??=
+        new RelayCommand(
+            _ => OnNavigateAction?.Invoke(this),
+            _ => NodeType == LayerNodeType.Leaf && Model?.LayerType != "Symbol");
 
     #endregion
 

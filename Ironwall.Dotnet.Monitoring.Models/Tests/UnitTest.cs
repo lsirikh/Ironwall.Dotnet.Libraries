@@ -129,7 +129,7 @@ public class UnitTest : IAsyncLifetime
 #region Phase 11: PIDS Device Binding Tests
 /****************************************************************************
    Phase 11: PIDS Device Binding Refactoring Tests
-   PRD: docs/prd/PRD_PIDS_DeviceBinding_Refactoring.md
+   PRD: docs/prds/PRD_PIDS_DeviceBinding_Refactoring.md
 
    Test 11.1.1: IPidsSymbolModel.LinkedDevice property 존재
    Test 11.1.2: LinkedDevice 설정 시 LinkedDeviceId 동기화

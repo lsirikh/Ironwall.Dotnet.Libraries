@@ -46,6 +46,24 @@ public class PidsGroupSymbolModel : LineSymbolModel, IPidsGroupSymbolModel
     [JsonProperty("event_status", Order = 21)]
     public EnumEventStatus EventStatus { get; set; } = EnumEventStatus.Normal;
 
+    private EnumCompositeEventStatus _compositeStatus = EnumCompositeEventStatus.Normal;
+    public EnumCompositeEventStatus CompositeStatus
+    {
+        get => _compositeStatus;
+        set
+        {
+            _compositeStatus = value;
+            EventStatus = value switch
+            {
+                EnumCompositeEventStatus.Detecting        => EnumEventStatus.Detecting,
+                EnumCompositeEventStatus.Faulted          => EnumEventStatus.Fault,
+                EnumCompositeEventStatus.FaultedDetecting => EnumEventStatus.Fault,
+                EnumCompositeEventStatus.Connection       => EnumEventStatus.Connection,
+                _                                         => EnumEventStatus.Normal,
+            };
+        }
+    }
+
     public event EventHandler Update;
 
     public void SetUpdate()

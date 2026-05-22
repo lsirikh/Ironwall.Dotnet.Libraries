@@ -88,7 +88,15 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
                 .Select(g => g.Id)
                 .ToList();
 
-            _log?.Info($"DETECTION 수신: deviceId={deviceId}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
+            // 실제 DeviceType을 NATS 메시지 body에서 파싱 (하드코딩 금지)
+            var deviceTypeStr = body.Device?.TypeDevice ?? string.Empty;
+            if (!Enum.TryParse<EnumDeviceType>(deviceTypeStr, ignoreCase: true, out var deviceType))
+            {
+                _log?.Warning($"DETECTION: DeviceType 파싱 실패 '{deviceTypeStr}' (deviceId={deviceId}), Fence으로 기본값 처리");
+                deviceType = EnumDeviceType.Fence;
+            }
+
+            _log?.Info($"DETECTION 수신: deviceId={deviceId}, deviceType={deviceType}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
 
             // EventQueue에 이벤트 등록
             // 심볼 Detecting은 EventQueueManager 전이 이벤트로 일원화:
@@ -97,9 +105,10 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
             var entryId = _eventQueueManager.Enqueue(new EventEntry
             {
                 DeviceId = deviceId,
-                DeviceType = EnumDeviceType.Fence, // NATS DETECTION은 Fence 센서만 전송
+                DeviceType = deviceType,
                 GroupIds = deviceGroups,
                 EventType = eventType,
+                EventId = eventId,
                 TimeoutSeconds = _eventSetupModel.TimeDiscardSec,
                 IsAutoReportEnabled = _eventSetupModel.IsAutoEventDiscard
             }, natsMessageId); // NATS UUID를 entryId로 사용
@@ -107,8 +116,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
             _log?.Info($"DETECTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
 
             // entryId + eventId를 EventAggregator로 발행 → 카드 1:1 매칭에 사용
-            _eventAggregator?.PublishOnBackgroundThreadAsync(
-                new EventEntryEnqueuedMessage(entryId, eventId, deviceId, EnumDeviceType.Fence, eventType));
+            _eventAggregator?.PublishOnUIThreadAsync(
+                new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType));
         }
         catch (Exception ex)
         {

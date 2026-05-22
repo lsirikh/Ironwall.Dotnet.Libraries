@@ -598,48 +598,42 @@ public class GMapCustomControl : GMapControl
         _log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 시작 ===");
         _log?.Info($"편집 모드: {IsEditMode}");
 
-        base.OnMouseLeftButtonDown(e);
-
         var mousePos = e.GetPosition(this);
         var geoPos = FromLocalToLatLng((int)mousePos.X, (int)mousePos.Y);
 
         _log?.Info($"마우스 위치: 화면({mousePos.X:F2}, {mousePos.Y:F2}) -> 지리({geoPos.Lat:F6}, {geoPos.Lng:F6})");
 
+        // [FP-1] base 호출 전 처리: base.OnMouseLeftButtonDown이 GMap.NET 내부 _core.MouseDown을
+        // 기록하여 팬을 Armed 상태로 만든다. 라인 드로잉·이미지 편집이 이벤트를 소비할 경우
+        // base를 호출하지 않아 팬 Armed를 방지한다.
         if (IsLineDrawing)
         {
-            // OnMapClicked 이벤트 발생
             OnMapClicked?.Invoke(geoPos, mousePos);
-
             e.Handled = true;
             return;
         }
 
-        // 편집 모드일 때만 편집 처리
         if (IsEditMode)
         {
             _log?.Info("편집 모드에서 처리 시작");
 
-            // 이미지 편집 처리 (기존 방식 유지)
             if (HandleImageEdit(mousePos, geoPos, e))
             {
-                _log?.Info("이미지 편집 처리 완료");
+                _log?.Info("이미지 편집 처리 완료 — base 호출 없이 팬 Armed 방지");
                 return;
             }
             _log?.Info("이미지 편집 해당 없음");
-
-            // 마커 편집은 이벤트를 통해 ViewModel에 위임
-            // Adorner는 자동으로 처리됨
         }
 
-        // 클릭된 객체 검색
+        // 이미지/라인 편집 소비 없음 → base 호출하여 팬 및 기타 처리 위임
+        base.OnMouseLeftButtonDown(e);
+
         _log?.Info("클릭된 객체 검색 시작");
         var clickedImage = GetImageAt(geoPos);
-        //var clickedMarker = GetMarkerAt(geoPos);
         var clickedMarker = GetMarkerAtScreen(mousePos);
 
         _log?.Info($"검색 결과 - 이미지: {clickedImage?.Title ?? "없음"}, 마커: {clickedMarker?.Title ?? "없음"}");
 
-        // 이벤트 발생으로 ViewModel에 위임
         if (clickedMarker != null)
         {
             _log?.Info($"마커 클릭 이벤트 발생: {clickedMarker.Title}");
@@ -664,24 +658,23 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        base.OnMouseMove(e);
-
-        if (!IsEditMode || !_isDragging) return;
-
-        Point currentPos = e.GetPosition(this);
-        double deltaX = currentPos.X - _dragStartPoint.X;
-        double deltaY = currentPos.Y - _dragStartPoint.Y;
-
-        if (Math.Abs(deltaX) < 2 && Math.Abs(deltaY) < 2) return;
-
-        // 이미지 드래그 처리 (기존 방식 유지)
-        if (_isImageDrag && _draggedImage != null)
+        // [FP-2] 이미지 드래그 활성 시 base 호출 차단.
+        // base.OnMouseMove가 _core.BeginDrag()를 발동시켜 맵 팬이 이중으로 적용되는 것을 방지.
+        // CaptureMouse() 상태이므로 base 건너뜀이 다른 수신자에 영향을 주지 않는다.
+        if (IsEditMode && _isDragging && _isImageDrag && _draggedImage != null)
         {
-            ProcessImageDrag(currentPos, deltaX, deltaY);
+            Point currentPos = e.GetPosition(this);
+            double deltaX = currentPos.X - _dragStartPoint.X;
+            double deltaY = currentPos.Y - _dragStartPoint.Y;
+
+            if (Math.Abs(deltaX) >= 2 || Math.Abs(deltaY) >= 2)
+            {
+                ProcessImageDrag(currentPos, deltaX, deltaY);
+            }
+            return;
         }
 
-        // 마커 드래그는 Adorner에서 자동 처리됨
-
+        base.OnMouseMove(e);
     }
 
     /// <summary>
@@ -689,6 +682,17 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        // [FP-3] 이미지 드래그 완료 시 ResetDragState() 먼저 실행 후 return.
+        // 팬이 미Armed 상태(FP-1 효과)이므로 base의 GMap.NET EndDrag 처리가 불필요하고,
+        // ReleaseMouseCapture()를 먼저 실행해야 WPF 이벤트 라우팅이 즉시 정상화된다.
+        if (_isDragging && _isImageDrag)
+        {
+            ResetDragState();
+            _log?.Info("이미지 드래그 완료");
+            e.Handled = true;
+            return;
+        }
+
         base.OnMouseLeftButtonUp(e);
 
         if (_isDragging)
@@ -1175,8 +1179,10 @@ public class GMapCustomControl : GMapControl
         {
             _draggedImage.ImageBounds = newBounds;
             InvalidateVisual();
-            _dragStartPoint = currentPos;
         }
+        // [FP-5] bounds 유효성과 무관하게 항상 갱신.
+        // 조건 미충족 프레임에서 갱신이 누락되면 delta가 누적되어 다음 프레임에 점프 현상 발생.
+        _dragStartPoint = currentPos;
     }
 
     #endregion
@@ -1842,12 +1848,19 @@ public class GMapCustomControl : GMapControl
         double diag = Math.Sqrt(curW * curW + curH * curH);
         if (drag < 0.1 || diag < 1.0) return bounds;
 
+        // [FP-4] drag = Math.Max(|deltaX|, |deltaY|) 이므로 지배적 축 크기를 scale에 사용한다.
+        // OR 조건은 비지배적 축의 방향이 expand를 결정해 드래그 방향과 반대로 동작하는 버그를 유발.
+        // 지배적 축의 방향으로 expand를 판정하여 drag 크기와 방향을 일치시킨다.
         bool expand = corner switch
         {
-            ResizeHandle.TopLeft => deltaX < 0 || deltaY < 0,
-            ResizeHandle.TopRight => deltaX > 0 || deltaY < 0,
-            ResizeHandle.BottomLeft => deltaX < 0 || deltaY > 0,
-            ResizeHandle.BottomRight => deltaX > 0 || deltaY > 0,
+            ResizeHandle.TopLeft =>
+                Math.Abs(deltaX) >= Math.Abs(deltaY) ? deltaX < 0 : deltaY < 0,
+            ResizeHandle.TopRight =>
+                Math.Abs(deltaX) >= Math.Abs(deltaY) ? deltaX > 0 : deltaY < 0,
+            ResizeHandle.BottomLeft =>
+                Math.Abs(deltaX) >= Math.Abs(deltaY) ? deltaX < 0 : deltaY > 0,
+            ResizeHandle.BottomRight =>
+                Math.Abs(deltaX) >= Math.Abs(deltaY) ? deltaX > 0 : deltaY > 0,
             _ => false
         };
 
@@ -1892,10 +1905,12 @@ public class GMapCustomControl : GMapControl
         var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
         var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
 
-        if (adjustLeft) topLeft.X += (long)deltaX;
-        if (adjustTop) topLeft.Y += (long)deltaY;
-        if (adjustRight) bottomRight.X += (long)deltaX;
-        if (adjustBottom) bottomRight.Y += (long)deltaY;
+        // [FP-6] (long) 직접 캐스트는 소수점 이하를 항상 버려 천천히 드래그 시 stutter 유발.
+        // Math.Round로 교체하여 오차를 ±0.5px로 분산한다.
+        if (adjustLeft) topLeft.X += (long)Math.Round(deltaX);
+        if (adjustTop) topLeft.Y += (long)Math.Round(deltaY);
+        if (adjustRight) bottomRight.X += (long)Math.Round(deltaX);
+        if (adjustBottom) bottomRight.Y += (long)Math.Round(deltaY);
 
         var minSize = 20;
         if (Math.Abs(bottomRight.X - topLeft.X) < minSize)

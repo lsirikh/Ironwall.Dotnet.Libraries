@@ -1952,7 +1952,7 @@ public class DtoToModelHelperWithOriginEventTests
 /// <summary>
 /// Unit tests for DeviceSymbolLookupModel PTZ → FOV conversion
 /// Following TDD (Red-Green-Refactor) methodology
-/// PRD Reference: docs/prd/PRD_PTZ_FOV_Integration.md
+/// PRD Reference: docs/prds/PRD_PTZ_FOV_Integration.md
 /// </summary>
 public class DeviceSymbolLookupModelTests
 {
@@ -2180,7 +2180,7 @@ public class TestableDeviceSymbolLookupModel : Ironwall.Dotnet.Libraries.Events.
 #region Phase 12.2: SymbolEventManager Tests
 /// <summary>
 /// SymbolEventManager PTZ/FOV 테스트
-/// PRD Reference: docs/prd/PRD_PTZ_FOV_Integration.md
+/// PRD Reference: docs/prds/PRD_PTZ_FOV_Integration.md
 /// </summary>
 public class SymbolEventManagerTests
 {
@@ -2308,7 +2308,7 @@ public class SymbolEventManagerTests
 #region Phase 13: 두 딕셔너리 구조로 심볼 분리 (PRD v1.5)
 /// <summary>
 /// Phase 13: SymbolEventManager 두 딕셔너리 구조 테스트
-/// PRD Reference: docs/prd/PRD_PTZ_FOV_Integration.md (Section 11)
+/// PRD Reference: docs/prds/PRD_PTZ_FOV_Integration.md (Section 11)
 /// 목표: _deviceSymbolLookup + _groupSymbolLookup 분리
 /// </summary>
 public class SymbolEventManagerDualDictionaryTests
@@ -2415,9 +2415,9 @@ public class SymbolEventManagerDualDictionaryTests
             eventType: Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion,
             severity: Ironwall.Dotnet.Libraries.Enums.EnumSeverityLevel.WARNING);
 
-        // Assert - Intrusion 이벤트는 ProcessEvent 경로에서 EventStatus=Detecting 설정
-        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
-        mockGroupSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
+        // Assert - Intrusion 이벤트는 ProcessEvent 경로에서 CompositeStatus=Detecting 설정
+        mockPidsSymbol.VerifySet(s => s.CompositeStatus = Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus.Detecting, Times.AtLeastOnce);
+        mockGroupSymbol.VerifySet(s => s.CompositeStatus = Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus.Detecting, Times.AtLeastOnce);
     }
     #endregion
 
@@ -2642,19 +2642,19 @@ public class SymbolEventManagerDualDictionaryTests
         // Act 1: Intrusion 이벤트 → Detecting (SetDeviceDetecting 경유)
         manager.SetDeviceDetecting(5, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence, Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion);
 
-        // Verify: EventStatus=Detecting
-        mockPidsSymbol.VerifySet(s => s.EventStatus = Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Detecting, Times.AtLeastOnce);
+        // Verify: CompositeStatus=Detecting
+        mockPidsSymbol.VerifySet(s => s.CompositeStatus = Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus.Detecting, Times.AtLeastOnce);
 
-        // EventStatus 변경 이력 추적
-        var statusHistory = new List<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>();
-        mockPidsSymbol.SetupSet(s => s.EventStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>())
-            .Callback<Ironwall.Dotnet.Libraries.Enums.EnumEventStatus>(v => statusHistory.Add(v));
+        // CompositeStatus 변경 이력 추적
+        var statusHistory = new List<Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus>();
+        mockPidsSymbol.SetupSet(s => s.CompositeStatus = It.IsAny<Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus>())
+            .Callback<Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus>(v => statusHistory.Add(v));
 
         // Act 2: RestoreDeviceSymbol → Normal 복원 (EventQueueManager OnDeviceEmpty 경유)
         manager.RestoreDeviceSymbol(5, Ironwall.Dotnet.Libraries.Enums.EnumDeviceType.Fence);
 
-        // Assert: 복원 후 EventStatus=Normal
-        Assert.Contains(Ironwall.Dotnet.Libraries.Enums.EnumEventStatus.Normal, statusHistory);
+        // Assert: 복원 후 CompositeStatus=Normal
+        Assert.Contains(Ironwall.Dotnet.Libraries.Enums.EnumCompositeEventStatus.Normal, statusHistory);
     }
     #endregion
 
@@ -3078,7 +3078,7 @@ public class DataHelperRefactoringTests
     #region Phase 18.2: ProcessEvent 추적 테스트
 
     [Fact]
-    public void ProcessEvent_WithCameraAndFaultEvent_ShouldNotChangeSymbolState()
+    public void ProcessEvent_WithCameraAndFaultEvent_ShouldSetFaultedState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3097,8 +3097,8 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
 
-        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
-        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+        // Assert - Malfunction PRD: ProcessEvent Fault → CompositeStatus=Faulted → EventStatus=Fault
+        Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus);
     }
 
     [Fact]
@@ -3126,7 +3126,7 @@ public class DataHelperRefactoringTests
     }
 
     [Fact]
-    public void ProcessEvent_WithCameraAndIntrusionEvent_ShouldNotChangeSymbolState()
+    public void ProcessEvent_WithCameraAndIntrusionEvent_ShouldSetDetectingState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3145,12 +3145,12 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Intrusion, EnumSeverityLevel.CRITICAL);
 
-        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
-        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+        // Assert - Malfunction PRD: ProcessEvent Intrusion → CompositeStatus=Detecting → EventStatus=Detecting
+        Assert.Equal(EnumEventStatus.Detecting, symbolModel.EventStatus);
     }
 
     [Fact]
-    public void ProcessEvent_WithSensorAndFaultEvent_ShouldNotChangeSymbolState()
+    public void ProcessEvent_WithSensorAndFaultEvent_ShouldSetFaultedState()
     {
         // Arrange
         var log = new Mock<ILogService>().Object;
@@ -3174,8 +3174,8 @@ public class DataHelperRefactoringTests
         // Act
         lookup.ProcessEvent(EnumEventType.Fault, EnumSeverityLevel.CRITICAL);
 
-        // Assert - ProcessEvent는 심볼 비주얼을 변경하지 않음 (SyncFromDevice로 일원화)
-        Assert.Equal(EnumEventStatus.Normal, symbolModel.EventStatus);
+        // Assert - Malfunction PRD: ProcessEvent Fault → CompositeStatus=Faulted → EventStatus=Fault
+        Assert.Equal(EnumEventStatus.Fault, symbolModel.EventStatus);
     }
 
     #endregion
@@ -5308,6 +5308,30 @@ public class DeviceSymbolLookupModelSyncTests
         Assert.Equal(EnumEventStatus.Normal, symbolMock.Object.EventStatus);
         Assert.Equal(EnumOperationState.ACTIVATED, symbolMock.Object.OperationState);
     }
+
+    // TEST-01: ApplyCompositeStatus — 비-UI 스레드에서 호출 시 STA 예외 없음 + SetUpdate 발화 (IMPL-01)
+    [Fact]
+    public async Task ApplyCompositeStatus_FromBackgroundThread_ShouldNotThrowAndSetCompositeStatus()
+    {
+        // Arrange
+        var lookup = CreateLookup();
+        var symbolMock = new Mock<IPidsEventCapable>();
+        symbolMock.SetupAllProperties();
+        lookup.SymbolModel = symbolMock.Object;
+
+        // Act — 백그라운드 스레드에서 호출 (Application.Current == null → MarshalUpdate fallback → 동기 SetUpdate)
+        Exception? caught = null;
+        await Task.Run(() =>
+        {
+            try { lookup.ApplyCompositeStatus(EnumCompositeEventStatus.FaultedDetecting); }
+            catch (Exception ex) { caught = ex; }
+        });
+
+        // Assert: STA 예외 미발생 + CompositeStatus 반영 + SetUpdate 1회 호출 (fallback 경유)
+        Assert.Null(caught);
+        Assert.Equal(EnumCompositeEventStatus.FaultedDetecting, symbolMock.Object.CompositeStatus);
+        symbolMock.Verify(s => s.SetUpdate(), Times.Once);
+    }
 }
 #endregion
 
@@ -5444,7 +5468,7 @@ public class SymbolEventManagerDeviceTransitionTests
 
         manager.SetDeviceDetecting(1, EnumDeviceType.Fence, EnumEventType.Intrusion);
 
-        Assert.Equal(EnumEventStatus.Detecting, symbol.Object.EventStatus);
+        Assert.Equal(EnumCompositeEventStatus.Detecting, symbol.Object.CompositeStatus);
     }
 
     [Fact]

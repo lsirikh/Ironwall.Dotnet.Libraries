@@ -1,9 +1,11 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
@@ -41,10 +43,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             IdUser = account.Name;
             Contents = content ?? "자동 조치보고";
 
-            // UI 업데이트 (카드 제거, 상태 변경) - EventCardListPanelViewModel이 구독 중일 때 처리
-            await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
+            var apiService = IoC.Get<IEventApiService>();
+            var dto = new ActionEventCreateDto
+            {
+                User = IdUser ?? string.Empty,
+                Content = Contents,
+                FromEventId = Model.Id
+            };
+            var response = await apiService.CreateActionEventAsync(dto);
+            if (!response.Success)
+            {
+                _log?.Error($"[ACTION_REPORT] Detection INSERT 실패: {response.Message}");
+                return;
+            }
 
-            // NatsDomainService에 직접 발행 (EventCardListPanelViewModel 구독 여부 무관)
+            await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
             await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
             {
                 EventId = Model.Id,

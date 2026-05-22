@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Gateway.Providers;
 using Ironwall.Dotnet.Libraries.Gateway.ViewModels;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.GatewayEvents;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Xunit;
@@ -35,19 +36,19 @@ public class GatewaySetupViewModelTests
 
     [Fact]
     [Trait("Category", "GatewaySetupVM")]
-    public void LoadDeviceGroups_PopulatesCollection()
+    public void LoadAllDeviceGroups_PopulatesCollection()
     {
         // Arrange
         var dgProvider = CreateDeviceGroupProvider((1, "A구역"), (2, "B구역"));
         var vm = CreateViewModel(dgProvider);
 
         // Act
-        vm.LoadDeviceGroups();
+        vm.LoadAllDeviceGroups();
 
         // Assert — "미지정" + 2개 = 3개
-        Assert.Equal(3, vm.DeviceGroups.Count);
-        Assert.Contains(vm.DeviceGroups, g => g.Id == 1 && g.Name == "A구역");
-        Assert.Contains(vm.DeviceGroups, g => g.Id == 2 && g.Name == "B구역");
+        Assert.Equal(3, vm.AllDeviceGroups.Count);
+        Assert.Contains(vm.AllDeviceGroups, g => g.Id == 1 && g.Name == "A구역");
+        Assert.Contains(vm.AllDeviceGroups, g => g.Id == 2 && g.Name == "B구역");
     }
 
     #endregion
@@ -56,18 +57,18 @@ public class GatewaySetupViewModelTests
 
     [Fact]
     [Trait("Category", "GatewaySetupVM")]
-    public void LoadDeviceGroups_FirstItemIsUnassigned()
+    public void LoadAllDeviceGroups_FirstItemIsUnassigned()
     {
         // Arrange
         var dgProvider = CreateDeviceGroupProvider((1, "A구역"), (2, "B구역"));
         var vm = CreateViewModel(dgProvider);
 
         // Act
-        vm.LoadDeviceGroups();
+        vm.LoadAllDeviceGroups();
 
         // Assert
-        Assert.Equal(0, vm.DeviceGroups[0].Id);
-        Assert.Equal("미지정", vm.DeviceGroups[0].Name);
+        Assert.Equal(0, vm.AllDeviceGroups[0].Id);
+        Assert.Equal("미지정", vm.AllDeviceGroups[0].Name);
     }
 
     #endregion
@@ -85,8 +86,8 @@ public class GatewaySetupViewModelTests
         // Act — OnClickInsertButton은 WPF 인프라 의존 → CreateNewEvent() 분리 후 검증
         var newEvent = vm.CreateNewEvent();
 
-        // Assert — 신규 이벤트 기본 Group은 0 (미지정)
-        Assert.Equal(0, newEvent.Group);
+        // Assert — 신규 이벤트 기본 DeviceGroups는 빈 목록 (미지정)
+        Assert.Empty(newEvent.DeviceGroups);
     }
 
     #endregion
@@ -105,11 +106,11 @@ public class GatewaySetupViewModelTests
             new DeviceGroupModel { Id = 1, Name = "A구역" },
             new DeviceGroupModel { Id = 2, Name = "B구역" }
         };
-        var model = new GatewayEventModel { Group = 1 };
-        var vm = new GatewayEventViewModel(model) { DeviceGroups = deviceGroups };
+        var model = new GatewayEventModel { DeviceGroups = new List<int> { 1 } };
+        var vm = new GatewayEventViewModel(model) { AllGroups = deviceGroups };
 
         // Assert
-        Assert.Equal("A구역", vm.GroupName);
+        Assert.Equal("A구역", vm.GroupNames);
     }
 
     [Fact]
@@ -118,11 +119,92 @@ public class GatewaySetupViewModelTests
     {
         // Arrange — DeviceGroups가 없으면 숫자 표시
         EnsureIoC();
-        var model = new GatewayEventModel { Group = 99 };
+        var model = new GatewayEventModel { DeviceGroups = new List<int> { 99 } };
         var vm = new GatewayEventViewModel(model);
 
         // Assert
-        Assert.Equal("99", vm.GroupName);
+        Assert.Equal("99", vm.GroupNames);
+    }
+
+    // TEST-03: GroupNames 빈 목록 → "미지정"
+    [Fact]
+    [Trait("Category", "GatewaySetupVM")]
+    public void should_return_미지정_when_device_groups_empty()
+    {
+        EnsureIoC();
+        var model = new GatewayEventModel { DeviceGroups = new List<int>() };
+        var vm = new GatewayEventViewModel(model);
+
+        Assert.Equal("미지정", vm.GroupNames);
+    }
+
+    // TEST-03: GroupNames 다중 그룹 콤마 조인
+    [Fact]
+    [Trait("Category", "GatewaySetupVM")]
+    public void should_return_comma_joined_names_for_multiple_groups()
+    {
+        EnsureIoC();
+        var deviceGroups = new ObservableCollection<IDeviceGroupModel>
+        {
+            new DeviceGroupModel { Id = 1, Name = "A구역" },
+            new DeviceGroupModel { Id = 2, Name = "B구역" }
+        };
+        var model = new GatewayEventModel { DeviceGroups = new List<int> { 1, 2 } };
+        var vm = new GatewayEventViewModel(model) { AllGroups = deviceGroups };
+
+        Assert.Equal("A구역, B구역", vm.GroupNames);
+    }
+
+    // TEST-03: 알 수 없는 그룹 Id는 숫자 문자열로 표시
+    [Fact]
+    [Trait("Category", "GatewaySetupVM")]
+    public void should_return_id_string_when_group_not_found_in_all_groups()
+    {
+        EnsureIoC();
+        var model = new GatewayEventModel { DeviceGroups = new List<int> { 42 } };
+        var vm = new GatewayEventViewModel(model);
+
+        Assert.Equal("42", vm.GroupNames);
+    }
+
+    #endregion
+
+    #region - Test 4: GatewayEventEquals —HashSet.SetEquals 비교 -
+
+    // TEST-02: 그룹 목록이 다르면 변경 감지
+    [Fact]
+    [Trait("Category", "GatewaySetupVM")]
+    public void should_detect_change_when_groups_differ()
+    {
+        var vm = CreateViewModel(CreateDeviceGroupProvider());
+        var a = new GatewayEventModel { Id = 1, EventName = "X", IsEnable = true, Description = "", DeviceGroups = new List<int> { 1 } };
+        var b = new GatewayEventModel { Id = 1, EventName = "X", IsEnable = true, Description = "", DeviceGroups = new List<int> { 2 } };
+
+        Assert.False(vm.GatewayEventEquals(a, b));
+    }
+
+    // TEST-02: 순서가 다른 동일 그룹은 변경 없음으로 판단
+    [Fact]
+    [Trait("Category", "GatewaySetupVM")]
+    public void should_not_detect_change_when_groups_same_different_order()
+    {
+        var vm = CreateViewModel(CreateDeviceGroupProvider());
+        var a = new GatewayEventModel { Id = 1, EventName = "X", IsEnable = true, Description = "", DeviceGroups = new List<int> { 1, 2, 3 } };
+        var b = new GatewayEventModel { Id = 1, EventName = "X", IsEnable = true, Description = "", DeviceGroups = new List<int> { 3, 1, 2 } };
+
+        Assert.True(vm.GatewayEventEquals(a, b));
+    }
+
+    // TEST-02: 빈 목록과 비어있지 않은 목록은 변경으로 감지
+    [Fact]
+    [Trait("Category", "GatewaySetupVM")]
+    public void should_detect_change_when_groups_empty_vs_nonempty()
+    {
+        var vm = CreateViewModel(CreateDeviceGroupProvider());
+        var a = new GatewayEventModel { Id = 1, EventName = "X", IsEnable = true, Description = "", DeviceGroups = new List<int>() };
+        var b = new GatewayEventModel { Id = 1, EventName = "X", IsEnable = true, Description = "", DeviceGroups = new List<int> { 1 } };
+
+        Assert.False(vm.GatewayEventEquals(a, b));
     }
 
     #endregion

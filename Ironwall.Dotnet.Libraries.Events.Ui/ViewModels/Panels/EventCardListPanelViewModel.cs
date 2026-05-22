@@ -15,6 +15,7 @@ using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Threading;
@@ -70,20 +71,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
         {
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+
+            // 타이머 안전 정지: Infinite로 먼저 중지 후 Dispose (진행 중 콜백 race 방지)
+            _batchTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _batchTimer?.Dispose();
             _batchTimer = null;
             _pendingEntries.Clear();
+            _cardByEntryId.Clear();
 
-            // 잔여 큐 즉시 flush
+            // 잔여 배치 큐 카드 Dispose
             var remaining = _batchBuffer.DrainQueue();
-            if (remaining.Count > 0)
-            {
-                DispatcherService.Invoke(() =>
-                {
-                    foreach (var card in remaining)
-                        ViewModelProvider.Add(card);
-                });
-            }
+            foreach (var card in remaining)
+                card.Dispose();
+
+            // 현재 표시 중인 카드 전체 Dispose
+            foreach (var card in ViewModelProvider.ToList())
+                card.Dispose();
+            ViewModelProvider.Clear();
+
             return base.OnDeactivateAsync(close, cancellationToken);
         }
         #endregion
@@ -126,7 +131,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (_pendingEntries.TryGetValue(card.Model.Id, out var entryId))
             {
                 card.EntryId = entryId;
-                _pendingEntries.Remove(card.Model.Id);
+                _pendingEntries.TryRemove(card.Model.Id, out _);
+                _cardByEntryId[entryId] = card;
                 _log?.Info($"EntryId 지연 매칭: Card({card.Model.Id}) → Entry({entryId})");
             }
         }
@@ -234,6 +240,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public async Task ExecuteBatchReportAsync()
         {
             IsVisible = false;
+            // CollectionChanged 서스펜드 — Remove × N의 UpdateAction 폭주 방지
+            ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
             try
             {
                 await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
@@ -254,9 +262,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     var response = await _apiService.CreateActionEventAsync(dto);
                     if (!response.Success)
-                    {
                         throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
-                    }
 
                     // ② 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
                     if (card.EntryId != null)
@@ -264,8 +270,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     else
                         _log?.Warning($"EntryId null — Dequeue 스킵: Event({eventModel?.Id}), Device({eventModel?.Device?.Id})");
 
-                    // ③ 즉시 제거 (하나씩 사라지는 애니메이션 효과)
+                    // ③ 제거 + Dispose
                     ViewModelProvider.Remove(card);
+                    if (card.EntryId != null) _cardByEntryId.Remove(card.EntryId);
                     card.Dispose();
 
                     // ④ NATS로 조치보고 발행 (NatsDomainService 경유)
@@ -278,7 +285,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         ActionTime = DateTime.Now
                     });
 
-                    await Task.Delay(20);
+                    await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
                 }
             }
             catch (Exception ex)
@@ -292,6 +299,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
             finally
             {
+                ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
                 IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
                 UpdateAction?.Invoke();
                 IsVisible = true;
@@ -324,6 +332,132 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             //}
         }
 
+        /// <summary>
+        /// 자동 조치보고 핸들러 — EventQueueManager.OnAutoReport 구독용.
+        /// 타임아웃 만료 시 API 조치보고 → Dequeue → UI 카드 제거 → NATS 발행
+        /// AutoReportInFlight 리셋은 EventUiModule ContinueWith에서 처리 (IMPL-07)
+        /// </summary>
+        public async Task HandleAutoReportAsync(EventEntry entry)
+        {
+            var entryId = entry.EntryId!;
+            try
+            {
+                if (!_cardByEntryId.TryGetValue(entryId, out var card))
+                {
+                    _log?.Warning($"AutoReport: entryId({entryId}) 카드 없음 → Dequeue 후 스킵");
+                    _eventQueueManager.Dequeue(entryId);
+                    return;
+                }
+
+                var eventId = card.Model?.Id ?? entry.EventId;
+                if (eventId <= 0)
+                {
+                    _log?.Warning($"AutoReport: entryId({entryId}) eventId 확인 불가 — Dequeue 후 스킵");
+                    _eventQueueManager.Dequeue(entryId);
+                    return;
+                }
+
+                var content = entry.EventType switch
+                {
+                    EnumEventType.Intrusion => AUTO_REPORT_DETECTION,
+                    EnumEventType.Fault     => AUTO_REPORT_MALFUNCTION,
+                    _                       => AUTO_REPORT_DEFAULT
+                };
+
+                var dto = new ActionEventCreateDto
+                {
+                    User = GetActorName(),
+                    Content = content,
+                    FromEventId = eventId
+                };
+
+                var response = await _apiService.CreateActionEventAsync(dto);
+                if (!response.Success)
+                {
+                    _log?.Warning($"AutoReport API 실패: {response.Message}");
+                    entry.NextRetryAfter = DateTime.Now.AddSeconds(BACKOFF_SECONDS);
+                    return;
+                }
+
+                _eventQueueManager.Dequeue(entryId);
+
+                await DispatcherService.BeginInvoke(() =>
+                {
+                    _cardByEntryId.Remove(entryId);
+                    ViewModelProvider.Remove(card);
+                    card.Dispose();
+                });
+
+                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+                {
+                    EventId = eventId,
+                    EventType = entry.EventType,
+                    ActionDetails = content,
+                    ActionUser = GetActorName(),
+                    ActionTime = DateTime.Now
+                });
+
+                _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId})");
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"AutoReport 예외: {ex.Message}");
+                entry.NextRetryAfter = DateTime.Now.AddSeconds(BACKOFF_SECONDS);
+            }
+        }
+
+        /// <summary>
+        /// Fault 자동복구 핸들러 — EventQueueManager.OnAutoRecovery 구독용.
+        /// 서버 API 조치보고 → UI 카드 제거 → NATS 발행
+        /// </summary>
+        public async Task HandleAutoRecoveryAsync(string faultEntryId)
+        {
+            try
+            {
+                if (!_cardByEntryId.TryGetValue(faultEntryId, out var card))
+                {
+                    _log?.Warning($"AutoRecovery: entryId({faultEntryId}) 카드 없음 — API 스킵");
+                    return;
+                }
+
+                var eventModel = card.Model;
+                if (eventModel == null) return;
+
+                var dto = new ActionEventCreateDto
+                {
+                    User = _userModel.Name,
+                    Content = "etc 자동복구",
+                    FromEventId = eventModel.Id
+                };
+
+                var response = await _apiService.CreateActionEventAsync(dto);
+                if (!response.Success)
+                    _log?.Warning($"AutoRecovery API 실패: {response.Message}");
+
+                await DispatcherService.BeginInvoke(() =>
+                {
+                    _cardByEntryId.Remove(faultEntryId);
+                    ViewModelProvider.Remove(card);
+                    card.Dispose();
+                });
+
+                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+                {
+                    EventId = eventModel.Id,
+                    EventType = eventModel.MessageType,
+                    ActionDetails = "etc 자동복구",
+                    ActionUser = _userModel.Name,
+                    ActionTime = DateTime.Now
+                });
+
+                _log?.Info($"AutoRecovery 완료: Event({eventModel.Id}), Entry({faultEntryId})");
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"AutoRecovery 실패: {ex.Message}");
+            }
+        }
+
         public async Task HandleAsync(DetectionReportedMessageModel message, CancellationToken cancellationToken)
         {
             try
@@ -342,6 +476,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     await DispatcherService.BeginInvoke(() =>
                     {
+                        if (vm.EntryId != null) _cardByEntryId.Remove(vm.EntryId);
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
@@ -371,6 +506,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     await DispatcherService.BeginInvoke(() =>
                     {
+                        if (vm.EntryId != null) _cardByEntryId.Remove(vm.EntryId);
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
@@ -403,6 +539,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (card != null)
             {
                 card.EntryId = message.EntryId;
+                _cardByEntryId[message.EntryId] = card;
                 _log?.Info($"EntryId 직접 매칭: Card({message.EventId}) → Entry({message.EntryId})");
             }
             else
@@ -436,13 +573,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Attributes -
         private const int ANIMATION_THRESHOLD = 20;
         private const int BATCH_INTERVAL_MS = 150;
+        private const string AUTO_REPORT_DETECTION   = "탐지 자동 조치보고";
+        private const string AUTO_REPORT_MALFUNCTION = "이상 자동 조치보고";
+        private const string AUTO_REPORT_DEFAULT     = "자동 조치보고";
+        private const int BACKOFF_SECONDS = 30;
+
+        private string GetActorName() =>
+            string.IsNullOrWhiteSpace(_userModel?.Name) ? "SYSTEM" : _userModel.Name;
         private EventProviderService _providerService;
         private IAccountModel _userModel;
         private IEventApiService _apiService;
         private ISymbolEventManager _symbolEventManager;
         private IEventQueueManager _eventQueueManager;
         private EventCardBatchBuffer<EventCardBaseViewModel> _batchBuffer;
-        private readonly Dictionary<int, string> _pendingEntries = new();
+        private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
+        private readonly Dictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;

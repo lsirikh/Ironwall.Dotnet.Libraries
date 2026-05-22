@@ -473,13 +473,25 @@ internal class SoundService : TaskService, ISoundService
     /// </summary>
     private async Task ProcessSingleSoundItem(ISoundScheduleItem item, CancellationToken cancellationToken)
     {
+        var itemPlayCts = new CancellationTokenSource();
+        CancellationTokenSource? oldCts = null;
         try
         {
             _log?.Info($"Processing sound: {item.SoundModel.Name} (EventId: {item.EventId})");
 
-            // 외부 토큰과 내부 토큰 결합
+            // _currentPlayCts를 현재 아이템 CTS로 교체 → StopCurrentSound()가 실제로 취소 가능
+            lock (_currentDeviceLock)
+            {
+                oldCts = _currentPlayCts;
+                _currentPlayCts = itemPlayCts;
+            }
+            // oldCts가 이미 disposed 상태일 수 있으므로 내부 try-catch로 격리
+            // (이전 아이템 finally에서 Dispose됐지만 _currentPlayCts가 여전히 참조하는 경우)
+            try { oldCts?.Cancel(); } catch (ObjectDisposedException) { }
+
+            // 외부 토큰 + 큐 처리 취소 토큰 + 아이템 취소 토큰 결합
             using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken, item.ExternalToken);
+                cancellationToken, item.ExternalToken, itemPlayCts.Token);
 
             // 사운드 타입에 따른 설정 가져오기
             var (duration, autoStop) = GetSoundSettings(item.SoundModel);
@@ -496,6 +508,18 @@ internal class SoundService : TaskService, ISoundService
         catch (Exception ex)
         {
             _log?.Error($"Error processing sound {item.SoundModel.Name} (EventId: {item.EventId}): {ex.Message}");
+        }
+        finally
+        {
+            // _currentPlayCts가 이 아이템을 참조하고 있으면 fresh CTS로 교체
+            // → 다음 ProcessSingleSoundItem 호출 시 disposed CTS를 Cancel()하는 것 방지
+            lock (_currentDeviceLock)
+            {
+                if (ReferenceEquals(_currentPlayCts, itemPlayCts))
+                    _currentPlayCts = new CancellationTokenSource();
+            }
+            try { oldCts?.Dispose(); } catch { }
+            itemPlayCts.Dispose();
         }
     }
 
@@ -584,6 +608,29 @@ internal class SoundService : TaskService, ISoundService
     }
 
     /// <summary>
+    /// 현재 재생을 즉시 중지한 후 지정 이벤트 타입의 사운드를 재생한다.
+    /// _switchSemaphore로 직렬화 — 동시 타입 전환 경쟁 조건 방지.
+    /// </summary>
+    public async Task StopAndPlayAsync(EnumEventType eventType, CancellationToken ct = default)
+    {
+        await _switchSemaphore.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await StopAllSoundsAsync().ConfigureAwait(false);
+            switch (eventType)
+            {
+                case EnumEventType.Intrusion: await DetectionSoundPlayAsync(ct).ConfigureAwait(false); break;
+                case EnumEventType.Fault:     await MalfunctionSoundPlayAsync(ct).ConfigureAwait(false); break;
+                default: break;
+            }
+        }
+        finally
+        {
+            _switchSemaphore.Release();
+        }
+    }
+
+    /// <summary>
     /// 특정 이벤트 타입의 큐 아이템 제거
     /// </summary>
     public int ClearQueueByEventType(EnumEventType eventType)
@@ -625,6 +672,7 @@ internal class SoundService : TaskService, ISoundService
     {
         IWavePlayer? outputDevice = null;
         AudioFileReader? audioFile = null;
+        bool completedNormally = false;
 
         try
         {
@@ -657,6 +705,8 @@ internal class SoundService : TaskService, ISoundService
             {
                 await PlayOnceAsync(outputDevice, audioFile, token);
             }
+
+            completedNormally = true;
         }
         catch (OperationCanceledException)
         {
@@ -672,7 +722,7 @@ internal class SoundService : TaskService, ISoundService
         {
             soundModel.IsPlaying = false;
 
-            // 리소스 정리
+            // 리소스 정리 먼저 수행
             lock (_currentDeviceLock)
             {
                 if (outputDevice != null)
@@ -705,6 +755,18 @@ internal class SoundService : TaskService, ISoundService
                     if (_currentAudioFile == audioFile)
                         _currentAudioFile = null;
                 }
+            }
+
+            // 리소스 정리 완료 후 탐지 사운드 완료 이벤트 발생 (취소 제외)
+            if (completedNormally && soundModel.Type == EnumEventType.Intrusion)
+            {
+                OnDetectionPlaybackCompleted?.Invoke();
+                _log?.Info("OnDetectionPlaybackCompleted event fired");
+            }
+            else if (completedNormally && soundModel.Type == EnumEventType.Fault)
+            {
+                OnMalfunctionPlaybackCompleted?.Invoke();
+                _log?.Info("OnMalfunctionPlaybackCompleted event fired");
             }
         }
     }
@@ -754,6 +816,8 @@ internal class SoundService : TaskService, ISoundService
                 break;
             }
         }
+
+        token.ThrowIfCancellationRequested();
     }
 
     /// <summary>
@@ -798,6 +862,8 @@ internal class SoundService : TaskService, ISoundService
 
             _log?.Info("Sound file completed, restarting...");
         }
+
+        token.ThrowIfCancellationRequested();
     }
 
     /// <summary>
@@ -832,6 +898,7 @@ internal class SoundService : TaskService, ISoundService
         if (token.IsCancellationRequested)
         {
             outputDevice.Stop();
+            token.ThrowIfCancellationRequested();
         }
     }
 
@@ -845,8 +912,14 @@ internal class SoundService : TaskService, ISoundService
     {
         try
         {
-            // 진행 중인 재생 취소
-            _currentPlayCts?.Cancel();
+            // _currentPlayCts를 lock 내에서 읽어 ProcessSingleSoundItem과 일관성 유지
+            CancellationTokenSource? cts;
+            lock (_currentDeviceLock)
+            {
+                cts = _currentPlayCts;
+            }
+            // disposed 상태일 수 있으므로 내부 격리 — 이후 Stop()은 반드시 실행
+            try { cts?.Cancel(); } catch (ObjectDisposedException) { }
 
             // NAudio 디바이스 중지
             _currentOutputDevice?.Stop();
@@ -906,6 +979,7 @@ internal class SoundService : TaskService, ISoundService
             _currentAudioFile?.Dispose();
 
             _soundPlaySemaphore?.Dispose();
+            _switchSemaphore?.Dispose();
         }
         catch (Exception ex)
         {
@@ -924,6 +998,10 @@ internal class SoundService : TaskService, ISoundService
 
     #endregion
     #region - Attributes -
+    /// <inheritdoc/>
+    public event Action? OnDetectionPlaybackCompleted;
+    public event Action? OnMalfunctionPlaybackCompleted;
+
     private ILogService _log;
     private SoundSetupModel _setupModel;
     private SoundSourceProvider _soundProvider;
@@ -938,6 +1016,8 @@ internal class SoundService : TaskService, ISoundService
 
     // 동시 실행 방지를 위한 단일 Semaphore
     private readonly SemaphoreSlim _soundPlaySemaphore;
+    // 타입 전환 직렬화 Semaphore (StopAndPlayAsync)
+    private readonly SemaphoreSlim _switchSemaphore = new SemaphoreSlim(1, 1);
     // 현재 재생 제어를 위한 토큰
     private CancellationTokenSource _currentPlayCts;
 
