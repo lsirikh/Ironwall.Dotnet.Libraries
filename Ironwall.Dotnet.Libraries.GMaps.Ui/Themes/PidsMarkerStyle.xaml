@@ -860,19 +860,50 @@
 							</Border.Effect>
 						</Border>
 
-						<!--  Pulse Animation Element (Detecting 상태용)  -->
+						<!--  Pulse Ripple Rings (Detecting 상태용 — 3링 소나 패턴)  -->
 						<Ellipse
-							Name="PulseEllipse"
-							Width="5"
-							Height="5"
+							Name="PulseRing1"
+							Width="80"
+							Height="80"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
-							CacheMode="BitmapCache"
-							Fill="Red"
+							Fill="Transparent"
+							Stroke="#CCFF0000"
+							StrokeThickness="2"
 							Opacity="0"
 							RenderTransformOrigin="0.5,0.5">
 							<Ellipse.RenderTransform>
-								<ScaleTransform x:Name="PulseScaleTransform" ScaleX="1" ScaleY="1" />
+								<ScaleTransform x:Name="PulseScale1" ScaleX="0.1" ScaleY="0.1" />
+							</Ellipse.RenderTransform>
+						</Ellipse>
+						<Ellipse
+							Name="PulseRing2"
+							Width="80"
+							Height="80"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="Transparent"
+							Stroke="#CCFF0000"
+							StrokeThickness="2"
+							Opacity="0"
+							RenderTransformOrigin="0.5,0.5">
+							<Ellipse.RenderTransform>
+								<ScaleTransform x:Name="PulseScale2" ScaleX="0.1" ScaleY="0.1" />
+							</Ellipse.RenderTransform>
+						</Ellipse>
+						<Ellipse
+							Name="PulseRing3"
+							Width="80"
+							Height="80"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Fill="Transparent"
+							Stroke="#CCFF0000"
+							StrokeThickness="2"
+							Opacity="0"
+							RenderTransformOrigin="0.5,0.5">
+							<Ellipse.RenderTransform>
+								<ScaleTransform x:Name="PulseScale3" ScaleX="0.1" ScaleY="0.1" />
 							</Ellipse.RenderTransform>
 						</Ellipse>
 
@@ -1181,31 +1212,108 @@
 							<Setter TargetName="PART_SmartSensorSection" Property="Opacity" Value="0.5" />
 						</Trigger>
 
-						<!--  Pulse Animation for Detecting State  -->
+						<!--  Pulse Ripple Animation for Detecting State (3링 소나 패턴, 2s 주기)  -->
 						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
 							<DataTrigger.EnterActions>
-								<BeginStoryboard Name="PulseStoryboard_Begin">
+								<BeginStoryboard Name="PulseStoryboard_Begin" HandoffBehavior="SnapshotAndReplace">
 									<Storyboard RepeatBehavior="Forever">
-										<!--  Opacity Animation  -->
+
+										<!--  Ring 1: BeginTime=0s  -->
 										<DoubleAnimation
-											Storyboard.TargetName="PulseEllipse"
+											Storyboard.TargetName="PulseRing1"
 											Storyboard.TargetProperty="Opacity"
-											From="0.8"
-											To="0"
-											Duration="0:0:1" />
-										<!--  Scale Animation  -->
+											From="0.9" To="0"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScaleTransform"
+											Storyboard.TargetName="PulseScale1"
 											Storyboard.TargetProperty="ScaleX"
-											From="1"
-											To="30"
-											Duration="0:0:1" />
+											From="0.1" To="1"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScaleTransform"
+											Storyboard.TargetName="PulseScale1"
 											Storyboard.TargetProperty="ScaleY"
-											From="1"
-											To="30"
-											Duration="0:0:1" />
+											From="0.1" To="1"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+
+										<!--  Ring 2: BeginTime=0.4s  -->
+										<DoubleAnimation
+											Storyboard.TargetName="PulseRing2"
+											Storyboard.TargetProperty="Opacity"
+											From="0.9" To="0"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0.4">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+										<DoubleAnimation
+											Storyboard.TargetName="PulseScale2"
+											Storyboard.TargetProperty="ScaleX"
+											From="0.1" To="1"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0.4">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+										<DoubleAnimation
+											Storyboard.TargetName="PulseScale2"
+											Storyboard.TargetProperty="ScaleY"
+											From="0.1" To="1"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0.4">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+
+										<!--  Ring 3: BeginTime=0.8s  -->
+										<DoubleAnimation
+											Storyboard.TargetName="PulseRing3"
+											Storyboard.TargetProperty="Opacity"
+											From="0.9" To="0"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0.8">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+										<DoubleAnimation
+											Storyboard.TargetName="PulseScale3"
+											Storyboard.TargetProperty="ScaleX"
+											From="0.1" To="1"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0.8">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+										<DoubleAnimation
+											Storyboard.TargetName="PulseScale3"
+											Storyboard.TargetProperty="ScaleY"
+											From="0.1" To="1"
+											Duration="0:0:1.2"
+											BeginTime="0:0:0.8">
+											<DoubleAnimation.EasingFunction>
+												<CubicEase EasingMode="EaseOut" />
+											</DoubleAnimation.EasingFunction>
+										</DoubleAnimation>
+
 									</Storyboard>
 								</BeginStoryboard>
 							</DataTrigger.EnterActions>
