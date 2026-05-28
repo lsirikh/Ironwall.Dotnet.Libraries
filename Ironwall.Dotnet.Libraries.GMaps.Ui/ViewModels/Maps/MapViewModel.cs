@@ -45,6 +45,7 @@ using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
@@ -220,8 +221,22 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
+
             // Adorner 시스템 정리
             CleanupAdornerIntegration();
+
+            if (close)
+            {
+                // WPF 디스패처가 살아있는 동안 오버레이 타일 로드 취소 + Canvas 정리
+                // Autofac 컨테이너 해제(Task.Run 백그라운드)까지 기다리지 않고 즉시 처리하여
+                // Dispatcher.Invoke 셧다운 교착 방지
+                _customMapOverlayService?.Dispose();
+
+                // AdornerManagerService 내부 5분 주기 TrimMemory 타이머 정지
+                // 미호출 시 앱 종료 후에도 백그라운드 스레드에서 계속 발화함
+                MainMap?.AdornerManager?.Dispose();
+            }
 
             // 모든 커스텀 맵 비활성화
             _customMapService.DeactivateAllCustomMaps();
@@ -4213,6 +4228,7 @@ public class MapViewModel : BasePanelViewModel,
     private void MainMap_OnCurrentPositionChanged(PointLatLng point)
     {
         MainMap.Position = point;
+        // 기존 타일 위치 업데이트는 즉시 동기 수행 (async 전환 후 RefreshVisibleTiles는 저렴)
         _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 
@@ -4261,7 +4277,21 @@ public class MapViewModel : BasePanelViewModel,
         CreateScaleBar();
         ClearAllSelections();
         ReapplyLayerVisibilityForZoom();
-        _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+
+        // 줌 변경 시 스테일 타일 로딩 즉시 취소 + 새 CTS 교체 → 즉시 갱신
+        if (_customMapOverlayService != null)
+        {
+            var newZoom = (int)MainMap.Zoom;
+            foreach (var state in _customMapOverlayService.ActiveOverlays.Values)
+            {
+                state.ActiveLoadCts?.Cancel();
+                state.ActiveLoadCts?.Dispose();
+                state.ActiveLoadCts = new System.Threading.CancellationTokenSource();
+                state.CurrentRenderZoom = newZoom;
+            }
+            // debounce 없이 즉시 갱신 — CTS 취소가 연속 줌의 중간 로드를 자동 차단함
+            _customMapOverlayService.RefreshVisibleTiles(MainMap);
+        }
     }
 
     /// <summary>

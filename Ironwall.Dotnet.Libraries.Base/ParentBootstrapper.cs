@@ -1,21 +1,19 @@
-﻿using Autofac.Features.Metadata;
+using Autofac.Features.Metadata;
 using Autofac;
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
-using log4net;
+using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 using System;
-using Autofac.Core.Registration;
-using System.Data;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.Base;
 /****************************************************************************
-   Purpose      :                                                          
-   Created By   : GHLee                                                
-   Created On   : 1/24/2025 11:21:26 AM                                                    
-   Department   : SW Team                                                   
-   Company      : Sensorway Co., Ltd.                                       
-   Email        : lsirikh@naver.com                                         
+   Purpose      :
+   Created By   : GHLee
+   Created On   : 1/24/2025 11:21:26 AM
+   Department   : SW Team
+   Company      : Sensorway Co., Ltd.
+   Email        : lsirikh@naver.com
 ****************************************************************************/
 public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
 {
@@ -28,7 +26,6 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
         string? projectName = System.Reflection.Assembly.GetEntryAssembly()?.GetName()?.Name;
         _log.Info($"############### Program{projectName} was started. ###############");
 
-        // 전역 예외 처리 추가
         AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
         {
             var exception = args.ExceptionObject as Exception;
@@ -43,7 +40,7 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
         {
             _log.Error($"Unobserved task exception: {args.Exception.Message}");
             _log.Error($"Stack Trace: {args.Exception.StackTrace}");
-            args.SetObserved(); // 예외가 전파되지 않도록 설정
+            args.SetObserved();
         };
     }
 
@@ -51,54 +48,63 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
     #region - Implementation of Interface -
     #endregion
     #region - Overrides -
-    /// <summary>
-    /// Register classes, services ,or modules in this method
-    /// </summary>
-    /// <param name="builder"></param>
     protected abstract void ConfigureContainer(ContainerBuilder builder);
 
     /// <summary>
-    /// StartProgram execute ShellViewModel to display after finished running services and providers.
+    /// StartPrograme은 메인 Shell을 표시하는 책임을 갖는다.
     /// </summary>
     protected abstract void StartPrograme();
-    public async Task Start()
+
+    public async Task Start(IProgress<StartupProgress>? progress = null)
     {
-        var token = CancellationTokenSourceHandler.Token;
         if (Container == null) return;
+        var token = CancellationTokenSourceHandler.Token;
         try
         {
-            foreach (var service in Container.Resolve<IEnumerable<Meta<IService>>>()
+            var services = Container.Resolve<IEnumerable<Meta<IService>>>()
                                     .OrderBy(s => s.Metadata["Order"])
-                                    .Select(s => s.Value))
-            {
-                _log.Info($"@@@@Starting Service Instance({service.GetType()})@@@@");
+                                    .Select(s => s.Value).ToList();
+            var providers = Container.Resolve<IEnumerable<Meta<ILoadable>>>()
+                                     .OrderBy(s => s.Metadata["Order"])
+                                     .Select(s => s.Value).ToList();
+            int total = services.Count + providers.Count;
+            int done = 0;
 
-                // 백그라운드 스레드에서 실행 강제
+            foreach (var service in services)
+            {
+                var name = service.GetType().Name;
+                _log.Info($"@@@@Starting Service Instance({name})@@@@");
+                progress?.Report(new StartupProgress(name, "시작 중...", (double)done / total));
                 await Task.Run(async () =>
                 {
                     await service.ExecuteAsync(token).ConfigureAwait(false);
                 });
+                done++;
+                progress?.Report(new StartupProgress(name, "완료", (double)done / total));
             }
 
             await Task.Delay(3000);
 
-            foreach (var service in Container.Resolve<IEnumerable<Meta<ILoadable>>>()
-                                    .OrderBy(s => s.Metadata["Order"])
-                                    .Select(s => s.Value))
+            foreach (var provider in providers)
             {
-                _log.Info($"####Starting Provider Instance({service.GetType()})####");
-
+                var name = provider.GetType().Name;
+                _log.Info($"####Starting Provider Instance({name})####");
+                progress?.Report(new StartupProgress(name, "초기화 중...", (double)done / total));
                 await DispatcherService.BeginInvoke(async () =>
                 {
-                    await service.Initialize(token).ConfigureAwait(false);
+                    await provider.Initialize(token).ConfigureAwait(false);
                 });
+                done++;
+                progress?.Report(new StartupProgress(name, "완료", (double)done / total));
             }
 
+            progress?.Report(new StartupProgress("앱", "시작 완료", 1.0));
             StartPrograme();
         }
         catch (Exception ex)
         {
             _log.Error($"Raised {nameof(Exception)} in {nameof(Start)} : {ex}");
+            throw;
         }
     }
 
@@ -112,6 +118,7 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
             await service.ExecuteAsync(token).ConfigureAwait(false);
         }
     }
+
     public virtual void Stop()
     {
         CancellationTokenSourceHandler?.Cancel();
@@ -122,51 +129,43 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
     #region - Binding Methods -
     #endregion
     #region - Processes -
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
     public async ValueTask DisposeAsync()
     {
         if (Container == null) return;
-
         await Container.DisposeAsync().ConfigureAwait(false);
-
-        // Registries are not likely to have async tasks to dispose of,
-        // so we will leave it as a straight dispose.
-        //ComponentRegistry.Dispose();
-
-        // Do not call the base, otherwise the standard Dispose will fire.
     }
 
-    /// <summary>
-    /// Ons the startup.
-    /// </summary>
-    /// <param name="sender">The sender.</param>
-    /// <param name="e">The e.</param>
     protected override async void OnStartup(object sender, StartupEventArgs e)
     {
-        await Start();
+        try
+        {
+            await Start();
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"[Startup] 서비스 초기화 실패: {ex.Message}");
+            Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown(1));
+        }
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
     protected override void OnExit(object sender, EventArgs e)
     {
         try
         {
             if (Container == null) return;
 
-            foreach (var service in Container.Resolve<IEnumerable<Meta<IService>>>()
+            var services = Container.Resolve<IEnumerable<Meta<IService>>>()
                                     .OrderBy(s => s.Metadata["Order"])
-                                    .Select(s => s.Value))
-            {
+                                    .Select(s => s.Value)
+                                    .ToList();
+
+            foreach (var service in services)
                 _log.Info($"@@@@Uninitializing Service Instance({service.GetType()})@@@@");
-                service.StopAsync();
-            }
+
+            // Task.Run으로 SynchronizationContext 제거 후 WhenAll 동기 대기
+            // → WPF 디스패처 교착 없이 NATS/Redis 정리 완료 보장
+            Task.Run(() => Task.WhenAll(services.Select(s => s.StopAsync())))
+                .GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -188,7 +187,6 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
 
         _container = builder.Build();
     }
-
 
     private void RegisterBaseType(ContainerBuilder builder)
     {
@@ -216,7 +214,6 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
 
     protected override IEnumerable<object>? GetAllInstances(Type service)
     {
-        
         return Container?.Resolve(typeof(IEnumerable<>).MakeGenericType(service)) as IEnumerable<object>;
     }
 
