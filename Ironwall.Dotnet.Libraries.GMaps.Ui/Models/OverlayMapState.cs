@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using GMap.NET;
@@ -42,6 +43,12 @@ public class OverlayMapState
 
     /// <summary>CustomMap의 지리 범위</summary>
     public RectLatLng GeoBounds { get; set; }
+
+    /// <summary>진행 중인 타일 로드 취소 토큰 (줌 변경 시 교체)</summary>
+    public CancellationTokenSource? ActiveLoadCts { get; set; }
+
+    /// <summary>현재 렌더링 대상 줌 레벨</summary>
+    public int CurrentRenderZoom { get; set; }
 
     /// <summary>현재 줌이 표시 범위 내인지</summary>
     public bool IsZoomInRange(int zoom) => zoom >= MinZoom && zoom <= MaxZoom;

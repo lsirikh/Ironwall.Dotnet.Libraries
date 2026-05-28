@@ -228,6 +228,9 @@ public class MapViewModel : BasePanelViewModel,
 
             if (close)
             {
+                // GMap.NET CacheEngine은 IsBackground=false 포그라운드 스레드 → 미호출 시 프로세스 영구 잔존
+                GMap.NET.GMaps.Instance.CancelTileCaching();
+
                 // WPF 디스패처가 살아있는 동안 오버레이 타일 로드 취소 + Canvas 정리
                 // Autofac 컨테이너 해제(Task.Run 백그라운드)까지 기다리지 않고 즉시 처리하여
                 // Dispatcher.Invoke 셧다운 교착 방지
