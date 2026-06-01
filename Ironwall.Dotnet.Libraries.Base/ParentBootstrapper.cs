@@ -164,8 +164,23 @@ public abstract class ParentBootstrapper<T> : BootstrapperBase where T : notnull
 
             // Task.Run으로 SynchronizationContext 제거 후 WhenAll 동기 대기
             // → WPF 디스패처 교착 없이 NATS/Redis 정리 완료 보장
-            Task.Run(() => Task.WhenAll(services.Select(s => s.StopAsync())))
-                .GetAwaiter().GetResult();
+            // 10초 안전망: 서비스 StopAsync가 무한 대기 시 강제 종료
+            using var shutdownCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                Task.Run(async () =>
+                    await Task.WhenAll(services.Select(s => s.StopAsync(shutdownCts.Token)))
+                              .WaitAsync(shutdownCts.Token))
+                    .GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                _log.Warning("서비스 종료 타임아웃(10s) — 강제 종료 진행");
+            }
+            catch (AggregateException ae) when (ae.InnerException is OperationCanceledException)
+            {
+                _log.Warning("서비스 종료 타임아웃(10s) — 강제 종료 진행");
+            }
         }
         catch (Exception ex)
         {

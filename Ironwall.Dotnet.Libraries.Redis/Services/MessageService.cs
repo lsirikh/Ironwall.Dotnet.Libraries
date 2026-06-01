@@ -33,7 +33,7 @@ namespace Ironwall.Dotnet.Libraries.Redis.Services
 
         public async Task StopAsync(CancellationToken token = default)
         {
-            await Task.Run(delegate { UnegisterSubscribers(); }, token);
+            await UnregisterSubscribersAsync(token).ConfigureAwait(false);
         }
 
         #endregion
@@ -143,7 +143,7 @@ namespace Ironwall.Dotnet.Libraries.Redis.Services
         /// 프로그램 종료 시, 혹은 서비스 이용 종료 시, Redis 기능을 Dispose 하고 Redis의 소켓을 
         /// 닫는 종료 메커니즘을 포함하고 있는 메소드이다.
         /// </summary>
-        protected async void UnegisterSubscribers()
+        private async Task UnregisterSubscribersAsync(CancellationToken token = default)
         {
             try
             {
@@ -153,9 +153,8 @@ namespace Ironwall.Dotnet.Libraries.Redis.Services
                 {
                     try
                     {
-                        // 모든 구독을 비동기로 해제하고 완료될 때까지 대기
                         _log?.Info("[MessageService] Unsubscribing from all channels...");
-                        await Subscriber.UnsubscribeAllAsync();
+                        await Subscriber.UnsubscribeAllAsync().ConfigureAwait(false);
                         _log?.Info("[MessageService] Unsubscribed successfully.");
                     }
                     catch (ObjectDisposedException ex)
@@ -169,13 +168,18 @@ namespace Ironwall.Dotnet.Libraries.Redis.Services
 
                     try
                     {
-                        // Multiplexer 종료 (비동기)
+                        // CloseAsync는 CancellationToken 오버로드 없음 — Task.WhenAny로 5초 타임아웃 구현
                         if (Subscriber.Multiplexer != null && Subscriber.Multiplexer.IsConnected)
                         {
                             _log?.Info("[MessageService] Closing Redis connection...");
-                            await Subscriber.Multiplexer.CloseAsync(allowCommandsToComplete: false);
+                            var closeTask = Subscriber.Multiplexer.CloseAsync(allowCommandsToComplete: false);
+                            await Task.WhenAny(closeTask, Task.Delay(5_000, token)).ConfigureAwait(false);
                             _log?.Info("[MessageService] Connection closed.");
                         }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _log?.Warning("[MessageService] CloseAsync timed out (5s) — proceeding to Dispose.");
                     }
                     catch (ObjectDisposedException ex)
                     {
