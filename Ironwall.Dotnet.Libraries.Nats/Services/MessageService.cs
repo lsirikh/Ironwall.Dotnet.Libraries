@@ -31,12 +31,20 @@ public abstract class MessageService<T> : IMessageService<T>
     #region - Implementation of Interface -
     public async Task ExecuteAsync(CancellationToken token = default)
     {
-        await RegisterSubscribers(token);
+        _stopCalled = 0;
+        _subscriptionCts?.Dispose();
+        _subscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        await RegisterSubscribers(_subscriptionCts.Token);
     }
 
     public async Task StopAsync(CancellationToken token = default)
     {
-        await UnregisterSubscribersAsync();
+        if (Interlocked.Exchange(ref _stopCalled, 1) == 1) return;
+
+        try { _subscriptionCts?.Cancel(); }
+        catch (ObjectDisposedException) { }
+
+        await UnregisterSubscribersAsync(token);
     }
     #endregion
 
@@ -119,36 +127,45 @@ public abstract class MessageService<T> : IMessageService<T>
     /// <summary>
     /// 구독 해제 및 연결 종료
     /// </summary>
-    protected virtual async Task UnregisterSubscribersAsync()
+    protected virtual async Task UnregisterSubscribersAsync(CancellationToken token = default)
     {
         try
         {
+            using var taskCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            taskCts.CancelAfter(TimeSpan.FromSeconds(5));
+
             foreach (var task in _subscriptionTasks)
             {
-                try
-                {
-                    await task;
-                }
-                catch (OperationCanceledException)
-                {
-                    // 정상적인 취소
-                }
-                catch (Exception ex)
-                {
-                    _log?.Error($"[MessageService] Subscription task error: {ex.Message}");
-                }
+                try { await task.WaitAsync(taskCts.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+                catch (Exception ex) { _log?.Error($"[MessageService] Subscription task error: {ex.Message}"); }
             }
             _subscriptionTasks.Clear();
 
             if (Connection != null)
             {
-                await Connection.DisposeAsync();
+                using var disposeCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                disposeCts.CancelAfter(TimeSpan.FromSeconds(3));
+                try
+                {
+                    await Connection.DisposeAsync().AsTask()
+                                    .WaitAsync(disposeCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    _log?.Warning("[MessageService] DisposeAsync timed out (3s).");
+                }
                 Connection = null;
             }
         }
         catch (Exception ex)
         {
             _log?.Error($"[MessageService] Dispose error: {ex.Message}");
+        }
+        finally
+        {
+            _subscriptionCts?.Dispose();
+            _subscriptionCts = null;
         }
     }
 
@@ -185,5 +202,7 @@ public abstract class MessageService<T> : IMessageService<T>
     protected List<string> _additionalSubjects = new();
     protected ILogService? _log;
     protected List<Task> _subscriptionTasks = new();
+    private CancellationTokenSource? _subscriptionCts;
+    private int _stopCalled;
     #endregion
 }
