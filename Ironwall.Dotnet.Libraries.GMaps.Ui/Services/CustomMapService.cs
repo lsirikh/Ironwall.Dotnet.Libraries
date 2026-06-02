@@ -167,20 +167,21 @@ public class CustomMapService {
             GeoReferenceMethod = EnumGeoReference.ManualControlPoints
         };
 
-        // 타일 디렉토리 생성
-        var tileDirectoryName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}";
-        var tileDirectory = Path.Combine(_setup.TileDirectory, tileDirectoryName);
-        Directory.CreateDirectory(tileDirectory);
-        customMap.TilesDirectoryPath = tileDirectory;
+        // MBTiles 출력 파일 경로 (id 미확정 → 타임스탬프 사용)
+        var mbtilesName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}.mbtiles";
+        var mbtilesPath = Path.Combine(_setup.TileDirectory, mbtilesName);
+        customMap.MbtilesPath = mbtilesPath;
+        // 하위 호환: TilesDirectoryPath는 빈 문자열로 유지 (NOT NULL 제약 완화 필요)
+        customMap.TilesDirectoryPath = string.Empty;
 
-        // 타일 생성
+        // MBTiles 타일 생성
         var totalTiles = await _tileGenerationService.GenerateTilesFromTifAsync(
-            tifFilePath, tifInfo, geoTransform, tileDirectory,
-            options.MinZoom, options.MaxZoom, options.TileSize, progress);
+            tifFilePath, tifInfo, geoTransform, mbtilesPath,
+            options.MinZoom, options.MaxZoom, options.TileSize, progress, mapName);
 
         // 최종 정보 업데이트
         customMap.TotalTileCount = totalTiles;
-        customMap.TilesDirectorySize = GetDirectorySize(tileDirectory);
+        customMap.TilesDirectorySize = new FileInfo(mbtilesPath).Length;
         customMap.ProcessedAt = DateTime.Now;
         customMap.ProcessingTimeMinutes = (int)(DateTime.Now - startTime).TotalMinutes;
         customMap.Status = EnumMapStatus.Active;
@@ -257,16 +258,16 @@ public class CustomMapService {
     }
 
     /// <summary>
-    /// 커스텀 맵을 GMap.NET Provider로 활성화
+    /// 커스텀 맵을 GMap.NET Provider로 활성화 (MBTiles/PNG 자동 분기)
     /// </summary>
-    public FileBasedCustomMapProvider ActivateCustomMap(CustomMapModel customMap)
+    public GMapProvider ActivateCustomMap(CustomMapModel customMap)
     {
         try
         {
-            _log?.Info($"커스텀 맵 활성화: {customMap.Name}");
+            _log?.Info($"커스텀 맵 활성화: {customMap.Name} [{customMap.StorageType}]");
 
             // 이미 활성화된 경우 기존 것 반환
-            if (_activeProviders.TryGetValue(customMap.Id, out var existingProvider))
+            if (_activeGMapProviders.TryGetValue(customMap.Id, out var existingProvider))
             {
                 _log?.Info($"이미 활성화된 커스텀 맵: {customMap.Name}");
                 return existingProvider;
@@ -278,35 +279,38 @@ public class CustomMapService {
                 throw new InvalidOperationException($"커스텀 맵이 유효하지 않습니다: {customMap.Name}");
             }
 
-            // 경계 좌표 배열 생성
-            double[] bounds = null;
-            if (customMap.MinLatitude.HasValue && customMap.MaxLatitude.HasValue &&
-                customMap.MinLongitude.HasValue && customMap.MaxLongitude.HasValue)
+            GMapProvider provider;
+
+            if (customMap.StorageType == MapStorageType.MBTiles)
             {
-                bounds = new[]
-                {
-                        customMap.MinLatitude.Value,
-                        customMap.MinLongitude.Value,
-                        customMap.MaxLatitude.Value,
-                        customMap.MaxLongitude.Value
-                    };
+                // MBTiles Provider (신규, 인스턴스별 독립 SQLiteConnection)
+                var mbtilesProvider = new GMap.NET.MapProviders.Custom.MBTilesOverlayMapProvider();
+                if (!mbtilesProvider.Open(customMap.MbtilesPath!))
+                    throw new InvalidOperationException($"MBTiles 열기 실패: {customMap.MbtilesPath}");
+                provider = mbtilesProvider;
             }
-
-            // FileBasedCustomMapProvider 생성
-            var provider = new FileBasedCustomMapProvider(
-                customMap.TilesDirectoryPath,
-                customMap.MinZoomLevel,
-                customMap.MaxZoomLevel,
-                bounds);
-
-            // Provider 유효성 확인
-            if (!provider.IsValid())
+            else
             {
-                throw new InvalidOperationException($"Provider가 유효하지 않습니다: {customMap.Name}");
+                // PNG 방식 (기존, 하위 호환)
+                double[]? bounds = null;
+                if (customMap.MinLatitude.HasValue && customMap.MaxLatitude.HasValue &&
+                    customMap.MinLongitude.HasValue && customMap.MaxLongitude.HasValue)
+                {
+                    bounds = new[]
+                    {
+                        customMap.MinLatitude.Value, customMap.MinLongitude.Value,
+                        customMap.MaxLatitude.Value, customMap.MaxLongitude.Value
+                    };
+                }
+                var fileProvider = new FileBasedCustomMapProvider(
+                    customMap.TilesDirectoryPath, customMap.MinZoomLevel, customMap.MaxZoomLevel, bounds);
+                if (!fileProvider.IsValid())
+                    throw new InvalidOperationException($"Provider가 유효하지 않습니다: {customMap.Name}");
+                provider = fileProvider;
             }
 
             // 활성화된 Provider 목록에 추가
-            _activeProviders[customMap.Id] = provider;
+            _activeGMapProviders[customMap.Id] = provider;
 
             // DB에 마지막 접근 시간 기록
             _ = Task.Run(async () =>
@@ -322,7 +326,7 @@ public class CustomMapService {
                 }
             });
 
-            _log?.Info($"커스텀 맵 활성화 완료: {customMap.Name}, 타일 수: {GetProviderTileCount(provider)}");
+            _log?.Info($"커스텀 맵 활성화 완료: {customMap.Name}");
 
             return provider;
         }
@@ -340,16 +344,18 @@ public class CustomMapService {
     {
         try
         {
+            // 신규 GMapProvider 딕셔너리에서 제거 (MBTiles 포함)
+            if (_activeGMapProviders.TryRemove(customMapId, out var gProvider))
+            {
+                GMap.NET.MapProviders.GMapProvider.UnregisterProvider(gProvider);
+                if (gProvider is IDisposable d) d.Dispose();
+                _log?.Info($"커스텀 맵 비활성화 완료: ID {customMapId}");
+            }
+            // 구 FileBasedCustomMapProvider 딕셔너리에서도 제거 (하위 호환)
             if (_activeProviders.TryRemove(customMapId, out var provider))
             {
-                // GMap.NET static MapProviders 리스트에서 제거 (GUID 충돌 방지)
                 GMap.NET.MapProviders.GMapProvider.UnregisterProvider(provider);
-
-                // FileBasedCustomMapProvider에 Dispose 메서드가 있다면 호출
-                if (provider is IDisposable disposable)
-                    disposable.Dispose();
-
-                _log?.Info($"커스텀 맵 비활성화 완료: ID {customMapId}");
+                if (provider is IDisposable disposable) disposable.Dispose();
             }
         }
         catch (Exception ex)
@@ -522,11 +528,31 @@ public class CustomMapService {
         {
             if (customMap == null) return false;
             if (string.IsNullOrEmpty(customMap.Name)) return false;
-            if (string.IsNullOrEmpty(customMap.TilesDirectoryPath)) return false;
-            if (!Directory.Exists(customMap.TilesDirectoryPath)) return false;
             if (customMap.MinZoomLevel > customMap.MaxZoomLevel) return false;
 
-            // 최소한 하나의 타일이 존재하는지 확인
+            // MBTiles 방식
+            if (customMap is CustomMapModel cm && cm.StorageType == MapStorageType.MBTiles)
+            {
+                if (string.IsNullOrEmpty(cm.MbtilesPath)) return false;
+                if (!File.Exists(cm.MbtilesPath)) return false;
+                // SQLite 최소 검증
+                try
+                {
+                    using var conn = new System.Data.SQLite.SQLiteConnection(
+                        $"Data Source=\"{cm.MbtilesPath}\";Read Only=True;Pooling=False;");
+                    conn.Open();
+                    using var cmd = new System.Data.SQLite.SQLiteCommand(
+                        "SELECT COUNT(*) FROM tiles LIMIT 1;", conn);
+                    var count = Convert.ToInt64(cmd.ExecuteScalar());
+                    return count > 0;
+                }
+                catch { return false; }
+            }
+
+            // PNG 방식 (기존)
+            if (string.IsNullOrEmpty(customMap.TilesDirectoryPath)) return false;
+            if (!Directory.Exists(customMap.TilesDirectoryPath)) return false;
+
             for (int zoom = customMap.MinZoomLevel; zoom <= customMap.MaxZoomLevel; zoom++)
             {
                 var zoomDir = Path.Combine(customMap.TilesDirectoryPath, zoom.ToString());
@@ -540,13 +566,9 @@ public class CustomMapService {
                     }
                 }
             }
-
             return false;
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -654,6 +676,7 @@ public class CustomMapService {
     private readonly GMapSetupModel _setup;
 
     private readonly ConcurrentDictionary<int, FileBasedCustomMapProvider> _activeProviders = new();
+    private readonly ConcurrentDictionary<int, GMapProvider> _activeGMapProviders = new();
     #endregion
 
 }

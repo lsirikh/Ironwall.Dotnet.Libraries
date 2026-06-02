@@ -27,7 +27,19 @@ public class EnumToBooleanConverter : IValueConverter
         if (value == null || parameter == null)
             return false;
 
-        // Enum 값 비교
+        if (parameter is string paramStr && value is Enum enumValue)
+        {
+            try
+            {
+                var parsed = Enum.Parse(enumValue.GetType(), paramStr, ignoreCase: true);
+                return enumValue.Equals(parsed);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         return value.Equals(parameter);
     }
 
@@ -43,6 +55,11 @@ public class EnumToBooleanConverter : IValueConverter
     {
         if (value is bool boolValue && boolValue && parameter != null)
         {
+            if (parameter is string paramStr && targetType.IsEnum)
+            {
+                try { return Enum.Parse(targetType, paramStr, ignoreCase: true); }
+                catch { return Binding.DoNothing; }
+            }
             return parameter;
         }
 

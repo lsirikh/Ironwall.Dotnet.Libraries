@@ -3,7 +3,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using GMap.NET;
-using GMap.NET.MapProviders.Custom;
+using GMap.NET.MapProviders;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
@@ -17,8 +17,8 @@ public class OverlayMapState
     /// <summary>DB 모델</summary>
     public CustomMapModel CustomMap { get; set; } = null!;
 
-    /// <summary>타일 제공자 (폴더에서 PNG 로드)</summary>
-    public FileBasedCustomMapProvider Provider { get; set; } = null!;
+    /// <summary>타일 제공자 (MBTiles 또는 PNG 파일 기반)</summary>
+    public GMapProvider Provider { get; set; } = null!;
 
     /// <summary>이 CustomMap 전용 Canvas (Opacity/Visibility 개별 제어)</summary>
     public Canvas Canvas { get; set; } = null!;

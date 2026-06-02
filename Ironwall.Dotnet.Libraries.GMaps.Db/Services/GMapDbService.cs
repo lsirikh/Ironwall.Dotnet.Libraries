@@ -233,6 +233,8 @@ internal class GMapDbService : TaskService, IGMapDbService
                     `ProcessedAt`           DATETIME,
                     `ProcessingTimeMinutes` INT,
                     `QualityScore`          DECIMAL(3,2),
+                    `MbtilesPath`           VARCHAR(500) NULL,
+                    `StorageType`           VARCHAR(20) NULL DEFAULT 'PngDirectory',
                     CONSTRAINT `FK_CustomMaps_Maps`
                         FOREIGN KEY (`MapId`) REFERENCES `Maps` (`Id`)
                         ON DELETE CASCADE
@@ -337,12 +339,37 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "MapLayers 테이블 생성…" });
 
+            // MBTiles 컬럼 마이그레이션 (기존 DB에 컬럼이 없으면 추가)
+            await MigrateCustomMapsTableAsync();
+
             _log?.Info("Map 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)
         {
             _log?.Error($"DB 스키마 생성 실패: {ex.Message}");
             throw;
+        }
+    }
+
+    /// <summary>기존 CustomMaps 테이블에 MBTiles 관련 컬럼 추가 (idempotent)</summary>
+    private async Task MigrateCustomMapsTableAsync()
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync();
+            var columns = (await conn.QueryAsync<string>(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='CustomMaps' AND TABLE_SCHEMA=DATABASE();"))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!columns.Contains("MbtilesPath"))
+                await conn.ExecuteAsync("ALTER TABLE CustomMaps ADD COLUMN MbtilesPath VARCHAR(500) NULL;");
+
+            if (!columns.Contains("StorageType"))
+                await conn.ExecuteAsync("ALTER TABLE CustomMaps ADD COLUMN StorageType VARCHAR(20) NULL DEFAULT 'PngDirectory';");
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"CustomMaps 마이그레이션 경고 (무시 가능): {ex.Message}");
         }
     }
 
@@ -431,7 +458,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                         c.OriginalHeight, c.OriginalFileSize, c.TotalTileCount, c.TilesDirectorySize,
                         c.PixelResolutionX, c.PixelResolutionY, c.ResolutionUnit, c.GeoReferenceMethod,
                         c.GeoTransformMatrix, c.ControlPointCount, c.ProcessedAt, c.ProcessingTimeMinutes,
-                        c.QualityScore
+                        c.QualityScore, c.MbtilesPath, c.StorageType
                 FROM    Maps m
                 JOIN    CustomMaps c ON c.MapId = m.Id
                 WHERE   m.ProviderType = 'Custom'
@@ -488,7 +515,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                         c.OriginalHeight, c.OriginalFileSize, c.TotalTileCount, c.TilesDirectorySize,
                         c.PixelResolutionX, c.PixelResolutionY, c.ResolutionUnit, c.GeoReferenceMethod,
                         c.GeoTransformMatrix, c.ControlPointCount, c.ProcessedAt, c.ProcessingTimeMinutes,
-                        c.QualityScore
+                        c.QualityScore, c.MbtilesPath, c.StorageType
                 FROM    Maps m
                 JOIN    CustomMaps c ON c.MapId = m.Id
                 WHERE   m.Id = @Id AND m.ProviderType = 'Custom';";
@@ -565,11 +592,11 @@ internal class GMapDbService : TaskService, IGMapDbService
                 (MapId, SourceImagePath, TilesDirectoryPath, OriginalWidth, OriginalHeight,
                  OriginalFileSize, TotalTileCount, TilesDirectorySize, PixelResolutionX, PixelResolutionY,
                  ResolutionUnit, GeoReferenceMethod, GeoTransformMatrix, ControlPointCount,
-                 ProcessedAt, ProcessingTimeMinutes, QualityScore)
+                 ProcessedAt, ProcessingTimeMinutes, QualityScore, MbtilesPath, StorageType)
                 VALUES (@MapId, @SourceImagePath, @TilesDirectoryPath, @OriginalWidth, @OriginalHeight,
                         @OriginalFileSize, @TotalTileCount, @TilesDirectorySize, @PixelResolutionX, @PixelResolutionY,
                         @ResolutionUnit, @GeoReferenceMethod, @GeoTransformMatrix, @ControlPointCount,
-                        @ProcessedAt, @ProcessingTimeMinutes, @QualityScore);";
+                        @ProcessedAt, @ProcessingTimeMinutes, @QualityScore, @MbtilesPath, @StorageType);";
 
             await conn.ExecuteAsync(customSql, new
             {
@@ -589,7 +616,9 @@ internal class GMapDbService : TaskService, IGMapDbService
                 model.ControlPointCount,
                 model.ProcessedAt,
                 model.ProcessingTimeMinutes,
-                model.QualityScore
+                model.QualityScore,
+                model.MbtilesPath,
+                StorageType = model.StorageType.ToString()
             }, tx);
 
             // 3. ControlPoints 삽입 (있다면)
@@ -646,7 +675,8 @@ internal class GMapDbService : TaskService, IGMapDbService
                     PixelResolutionY = @PixelResolutionY, ResolutionUnit = @ResolutionUnit,
                     GeoReferenceMethod = @GeoReferenceMethod, GeoTransformMatrix = @GeoTransformMatrix,
                     ControlPointCount = @ControlPointCount, ProcessedAt = @ProcessedAt,
-                    ProcessingTimeMinutes = @ProcessingTimeMinutes, QualityScore = @QualityScore
+                    ProcessingTimeMinutes = @ProcessingTimeMinutes, QualityScore = @QualityScore,
+                    MbtilesPath = @MbtilesPath, StorageType = @StorageType
                 WHERE MapId = @Id;";
 
             var param = new
@@ -682,7 +712,9 @@ internal class GMapDbService : TaskService, IGMapDbService
                 model.ControlPointCount,
                 model.ProcessedAt,
                 model.ProcessingTimeMinutes,
-                model.QualityScore
+                model.QualityScore,
+                model.MbtilesPath,
+                StorageType = model.StorageType.ToString()
             };
 
             int mapAffected = await conn.ExecuteAsync(mapSql, param, tx);
@@ -1541,6 +1573,8 @@ internal sealed class CustomMapSQL
     public DateTime? ProcessedAt { get; set; }
     public int? ProcessingTimeMinutes { get; set; }
     public decimal? QualityScore { get; set; }
+    public string? MbtilesPath { get; set; }
+    public string? StorageType { get; set; }
 
     public CustomMapModel ToDomain(MapSQL mapSql) => new()
     {
@@ -1578,6 +1612,7 @@ internal sealed class CustomMapSQL
         ProcessedAt = ProcessedAt,
         ProcessingTimeMinutes = ProcessingTimeMinutes,
         QualityScore = (double?)QualityScore,
+        MbtilesPath = MbtilesPath,
         ControlPoints = new List<IGeoControlPointModel>() // 별도로 로드
     };
 }

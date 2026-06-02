@@ -65,7 +65,7 @@ public class CustomMapOverlayService : IDisposable
             return;
         }
 
-        // FileBasedCustomMapProvider 생성 (기존 CustomMapService 재활용)
+        // Provider 생성 (MBTiles 또는 PNG — CustomMapService가 StorageType에 따라 분기)
         var provider = _customMapService.ActivateCustomMap(customMap);
 
         // 전용 Canvas 생성 (ClipToBounds=false — 부모 Canvas에서 크기 제한 없이 렌더링)
@@ -313,26 +313,39 @@ public class CustomMapOverlayService : IDisposable
     #region Tile Loading
 
     /// <summary>
-    /// 타일 이미지 로드 — GMapImage.Img(WPF ImageSource)를 직접 사용
-    /// PureImage.Data → 새 BitmapImage 변환 방식은 데이터 손실 발생하여 폐기
+    /// 타일 이미지 로드 — LRU 캐시 우선 조회, 미스 시 Provider에서 로드
     /// </summary>
     private ImageSource? LoadTileImageSource(OverlayMapState state, TileKey key)
     {
-        // 1. FileBasedCustomMapProvider에서 타일 로드
-        var pureImage = state.Provider.GetTileImage(
-            new GPoint(key.X, key.Y), key.Zoom);
-        if (pureImage == null) return null;
+        var cacheKey = $"{state.CustomMap.Id}_{key.Zoom}_{key.X}_{key.Y}";
 
-        // 2. GMapImage.Img (WPF ImageSource) 직접 사용
-        //    GMap.NET WPF: GMapImageProxy.FromStream → BitmapImage 생성 → GMapImage.Img에 저장
-        //    이미 WPF용 ImageSource가 만들어져 있으므로 재변환 불필요
-        if (pureImage is GMap.NET.WindowsPresentation.GMapImage gMapImage && gMapImage.Img != null)
+        // 1. LRU 캐시 히트 (SQLite/파일 I/O 미호출)
+        var cached = _tileCache.Get(cacheKey);
+        if (cached != null) return cached;
+
+        // 2. Provider에서 로드 (MBTiles 또는 PNG)
+        try
         {
-            return gMapImage.Img;
-        }
+            var pureImage = state.Provider.GetTileImage(new GPoint(key.X, key.Y), key.Zoom);
+            if (pureImage == null) return null;
 
-        // 3. Fallback: Data에서 변환 (일반적으로 여기 오지 않음)
-        return ConvertToBitmapImage(pureImage);
+            ImageSource? imageSource = null;
+            if (pureImage is GMap.NET.WindowsPresentation.GMapImage gMapImage && gMapImage.Img != null)
+                imageSource = gMapImage.Img;
+            else
+                imageSource = ConvertToBitmapImage(pureImage);
+
+            // 3. LRU 캐시 Put
+            if (imageSource != null)
+                _tileCache.Put(cacheKey, imageSource);
+
+            return imageSource;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[Overlay] 타일 로드 실패 {cacheKey}: {ex.Message}");
+            return null;
+        }
     }
 
     private static BitmapImage? ConvertToBitmapImage(PureImage pureImage)

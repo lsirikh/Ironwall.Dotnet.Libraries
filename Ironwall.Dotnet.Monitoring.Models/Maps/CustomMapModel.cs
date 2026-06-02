@@ -99,7 +99,22 @@ public class CustomMapModel : MapModel, ICustomMapModel
 
     [JsonProperty("control_points", Order = 36)]
     public List<IGeoControlPointModel> ControlPoints { get; set; }
+
+    [JsonProperty("mbtiles_path", Order = 37)]
+    public string? MbtilesPath { get; set; }
+
+    /// <summary>타일 저장 방식 — MbtilesPath 유무로 자동 판별</summary>
+    [JsonIgnore]
+    public MapStorageType StorageType =>
+        !string.IsNullOrEmpty(MbtilesPath) ? MapStorageType.MBTiles : MapStorageType.PngDirectory;
     #endregion
 
     // 메서드 없음! 오직 데이터만!
+}
+
+/// <summary>타일 저장 방식</summary>
+public enum MapStorageType
+{
+    PngDirectory,
+    MBTiles
 }
