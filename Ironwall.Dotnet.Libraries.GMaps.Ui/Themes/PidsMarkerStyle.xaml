@@ -1213,8 +1213,9 @@
 						</Trigger>
 
 						<!--  Pulse Ripple Animation for Detecting State (3링 소나 패턴, 2s 주기)  -->
-						<DataTrigger Binding="{Binding EventStatus}" Value="{x:Static enum:EnumEventStatus.Detecting}">
-							<DataTrigger.EnterActions>
+						<!--  DataTrigger → Trigger: EventStatus는 DP이므로 DataContext 바인딩 불가 → Trigger Property 사용  -->
+						<Trigger Property="EventStatus" Value="Detecting">
+							<Trigger.EnterActions>
 								<BeginStoryboard Name="PulseStoryboard_Begin" HandoffBehavior="SnapshotAndReplace">
 									<Storyboard RepeatBehavior="Forever">
 
@@ -1316,11 +1317,11 @@
 
 									</Storyboard>
 								</BeginStoryboard>
-							</DataTrigger.EnterActions>
-							<DataTrigger.ExitActions>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
 								<StopStoryboard BeginStoryboardName="PulseStoryboard_Begin" />
-							</DataTrigger.ExitActions>
-						</DataTrigger>
+							</Trigger.ExitActions>
+						</Trigger>
 
 					</ControlTemplate.Triggers>
 				</ControlTemplate>

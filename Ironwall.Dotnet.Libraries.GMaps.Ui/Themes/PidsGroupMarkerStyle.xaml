@@ -162,7 +162,6 @@
 
 						<!--  Normal: 오버레이 모두 숨김  -->
 						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Normal}">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
 						</DataTrigger>
@@ -170,7 +169,6 @@
 						<!--  Detecting: DetectionOverlay(Red blink, 1000ms) 표시  -->
 						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Detecting}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
-							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Visible" />
 							<DataTrigger.EnterActions>
@@ -194,7 +192,6 @@
 						<!--  Faulted: FaultOverlay(Orange solid) 표시  -->
 						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Faulted}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
-							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
 						</DataTrigger>
@@ -202,7 +199,6 @@
 						<!--  FaultedDetecting: Red↔Orange 교차 깜빡임 (1000ms)  -->
 						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.FaultedDetecting}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
-							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Visible" />
 							<DataTrigger.EnterActions>
@@ -233,7 +229,6 @@
 						<!--  Connection: 기존 유지  -->
 						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Connection}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
-							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="#00BCD4" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
