@@ -261,13 +261,24 @@ public class MapViewModel : BasePanelViewModel,
             _symbolEventManager.Dispose();
             foreach (var device in devices)
             {
+                // 1차: DeviceType 완전 일치
                 var symbol = symbols?.OfType<GMapPidsMarker>()
-                    .FirstOrDefault(s => s.LinkedDeviceId == device.Id 
+                    .FirstOrDefault(s => s.LinkedDeviceId == device.Id
                     && s.DeviceType == device.DeviceType);
+
+                // 2차 fallback: DeviceType 불일치(DB 심볼 타입 ≠ NATS 실제 타입) — ID만으로 매칭
+                // 예) DB 심볼=SmartSensor(11), NATS 장비=SmartSensor2(12)
+                if (symbol == null)
+                {
+                    symbol = symbols?.OfType<GMapPidsMarker>()
+                        .FirstOrDefault(s => s.LinkedDeviceId == device.Id);
+                    if (symbol != null)
+                        _log?.Warning($"장비-심볼 매핑 fallback: Device({device.Id},{device.DeviceType}) → Symbol.DeviceType={symbol.DeviceType}");
+                }
+
                 if (symbol != null)
                 {
                     _symbolEventManager.RegisterDeviceSymbol(device, symbol.Model);
-
                     //_log?.Info($"장비-심볼 매핑: {device.DeviceName} <-> {symbol.Title}");
                 }
 
