@@ -284,7 +284,7 @@ public class CustomMapService {
             if (customMap.StorageType == MapStorageType.MBTiles)
             {
                 // MBTiles Provider (신규, 인스턴스별 독립 SQLiteConnection)
-                var mbtilesProvider = new GMap.NET.MapProviders.Custom.MBTilesOverlayMapProvider();
+                var mbtilesProvider = new MBTilesOverlayMapProvider();
                 if (!mbtilesProvider.Open(customMap.MbtilesPath!))
                     throw new InvalidOperationException($"MBTiles 열기 실패: {customMap.MbtilesPath}");
                 provider = mbtilesProvider;
