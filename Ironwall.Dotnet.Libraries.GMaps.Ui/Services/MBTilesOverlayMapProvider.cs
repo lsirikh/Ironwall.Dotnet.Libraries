@@ -78,7 +78,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services
                 var tile = new byte[length];
                 rd.GetBytes(0, 0, tile, 0, tile.Length);
 
-                return GMapProvider.TileImageProxy?.FromArray(tile);
+                return GetTileImageFromArray(tile);
             }
             catch
             {

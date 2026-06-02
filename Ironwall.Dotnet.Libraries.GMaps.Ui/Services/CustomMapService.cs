@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Db.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Providers;
 using GMap.NET.MapProviders.Custom;
+using GMapProvider = GMap.NET.MapProviders.GMapProvider;
 using System;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
