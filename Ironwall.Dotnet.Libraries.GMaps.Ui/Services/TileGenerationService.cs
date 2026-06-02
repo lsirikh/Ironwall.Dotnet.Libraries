@@ -58,19 +58,16 @@ public class TileGenerationService
 {
     private readonly ILogService _log;
     private readonly IEventAggregator _eventAggregator;
-    private readonly GMapSetupModel _setup;
-    private const string DIRECTORY = "c:/Tiles";
 
-    public TileGenerationService(ILogService log
-                                , IEventAggregator ea
-                                , GMapSetupModel setup)
+    private static readonly string MAPS_DIR = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "Sensorway", "PIDS", "maps");
+
+    public TileGenerationService(ILogService log, IEventAggregator ea)
     {
         _log = log;
         _eventAggregator = ea;
-        _setup = setup;
-
-        if (!Directory.Exists(_setup.TileDirectory))
-            Directory.CreateDirectory(_setup.TileDirectory ?? DIRECTORY);
+        Directory.CreateDirectory(MAPS_DIR);
     }
 
     /// <summary>
@@ -235,29 +232,26 @@ public class TileGenerationService
             var customMap = CreateCustomMapModel(mapName, tifFilePath, tifInfo, geoTransform,
                 minZoom, maxZoom, tileSize, EnumGeoReference.ManualControlPoints);
 
+            // 4. MBTiles 출력 경로 설정
+            var mbtilesFileName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}.mbtiles";
+            var mbtilesPath = Path.Combine(MAPS_DIR, mbtilesFileName);
+            customMap.MbtilesPath = mbtilesPath;
+            customMap.TilesDirectoryPath = string.Empty;
 
-            // 4. 타일 디렉토리 생성
-            var tileDirectoryName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}";
-            var tileDirectory = Path.Combine(_setup.TileDirectory ?? DIRECTORY, tileDirectoryName);
-            Directory.CreateDirectory(tileDirectory);
-            customMap.TilesDirectoryPath = tileDirectory;
-                       
             // 5. 타일 생성
             var totalTiles = await GenerateTilesFromTifAsync(
-                tifFilePath, tifInfo, geoTransform, customMap.TilesDirectoryPath,
+                tifFilePath, tifInfo, geoTransform, mbtilesPath,
                 minZoom, maxZoom, tileSize, progress);
 
             // 6. 최종 정보 업데이트
             customMap.TotalTileCount = totalTiles;
-            customMap.TilesDirectorySize = GetDirectorySize(tileDirectory);
+            customMap.TilesDirectorySize = File.Exists(mbtilesPath) ? new FileInfo(mbtilesPath).Length : 0;
             customMap.ProcessedAt = DateTime.Now;
             customMap.ProcessingTimeMinutes = (int)(DateTime.Now - startTime).TotalMinutes;
             customMap.Status = EnumMapStatus.Active;
-            customMap.QualityScore = 0.7; // 수동 입력의 경우 보통 품질
+            customMap.QualityScore = 0.7;
 
             _log?.Info($"수동 좌표 TIF 변환 완료: {totalTiles}개 타일, {customMap.ProcessingTimeMinutes}분 소요");
-
-            UpdateCustomMapAfterTileGeneration(customMap, totalTiles, startTime);
 
             return customMap;
         }
@@ -523,15 +517,11 @@ public class TileGenerationService
         string mapName, string tifFilePath, TifFileInfo tifInfo, GeoTransformInfo geoTransform,
         int minZoom, int maxZoom, int tileSize, EnumGeoReference geoReferenceMethod)
     {
-        var tileDirectoryName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}";
-        var tileDirectory = Path.Combine(_setup.TileDirectory ?? DIRECTORY, tileDirectoryName);
-        Directory.CreateDirectory(tileDirectory);
-
         return new CustomMapModel
         {
             Name = mapName,
             SourceImagePath = tifFilePath,
-            TilesDirectoryPath = tileDirectory,
+            TilesDirectoryPath = string.Empty,
             OriginalFileSize = tifInfo.FileSize,
             OriginalWidth = tifInfo.Width,
             OriginalHeight = tifInfo.Height,
@@ -556,11 +546,13 @@ public class TileGenerationService
     private void UpdateCustomMapAfterTileGeneration(CustomMapModel customMap, int totalTiles, DateTime startTime)
     {
         customMap.TotalTileCount = totalTiles;
-        customMap.TilesDirectorySize = GetDirectorySize(customMap.TilesDirectoryPath);
+        customMap.TilesDirectorySize = !string.IsNullOrEmpty(customMap.MbtilesPath) && File.Exists(customMap.MbtilesPath)
+            ? new FileInfo(customMap.MbtilesPath).Length
+            : GetDirectorySize(customMap.TilesDirectoryPath);
         customMap.ProcessedAt = DateTime.Now;
         customMap.ProcessingTimeMinutes = (int)(DateTime.Now - startTime).TotalMinutes;
         customMap.Status = EnumMapStatus.Active;
-        customMap.QualityScore = 0.7; // 기본 품질 점수
+        customMap.QualityScore = 0.7;
     }
 
     private void CalculateLinearTransform(List<ManualGeoPoint> points, int imageWidth, int imageHeight, GeoTransformInfo geoTransform)

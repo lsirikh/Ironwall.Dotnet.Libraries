@@ -6,5 +6,4 @@ public interface IGMapSetupModel
     string? MapMode { get; set; }
     string? MapName { get; set; }
     string? MapType { get; set; }
-    string? TileDirectory { get; set; }
 }

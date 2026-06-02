@@ -21,7 +21,6 @@ public class GMapSetupModel : IGMapSetupModel
         MapType = "GoogleSatelliteMap";
         MapMode = "Online";
         MapName = "기본 지도";
-        TileDirectory = "c:/";
     }
 
     /// <summary>
@@ -35,14 +34,12 @@ public class GMapSetupModel : IGMapSetupModel
         HomePositionModel? homePosition = null,
         string? mapType = null,
         string? mapMode = null,
-        string? mapName = null,
-        string? tileDirectory = null)
+        string? mapName = null)
     {
         HomePosition = homePosition;
         MapType = mapType;
         MapMode = mapMode;
         MapName = mapName;
-        TileDirectory = tileDirectory;
     }
 
     /// <summary>
@@ -59,7 +56,6 @@ public class GMapSetupModel : IGMapSetupModel
         MapType = source.MapType;
         MapMode = source.MapMode;
         MapName = source.MapName;
-        TileDirectory = source.TileDirectory;
     }
 
     #endregion
@@ -78,7 +74,6 @@ public class GMapSetupModel : IGMapSetupModel
     public string? MapType { get; set; }
     public string? MapMode { get; set; }
     public string? MapName { get; set; }
-    public string? TileDirectory { get; set; }
     #endregion
     #region - Attributes -
     #endregion

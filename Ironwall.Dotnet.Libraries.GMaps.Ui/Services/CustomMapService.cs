@@ -29,15 +29,13 @@ public class CustomMapService {
             IEventAggregator eventAggregator,
             TileGenerationService tileGenerationService,
             CustomMapProvider customMapProvider,
-            IGMapDbService gMapDbService,
-            GMapSetupModel setup)
+            IGMapDbService gMapDbService)
     {
         _log = log;
         _eventAggregator = eventAggregator;
         _tileGenerationService = tileGenerationService;
         _customMapProvider = customMapProvider;
         _gMapDbService = gMapDbService;
-        _setup = setup;
     }
 
     #endregion
@@ -169,7 +167,7 @@ public class CustomMapService {
 
         // MBTiles 출력 파일 경로 (id 미확정 → 타임스탬프 사용)
         var mbtilesName = $"{Path.GetFileNameWithoutExtension(tifFilePath)}_{DateTime.Now:yyyyMMdd_HHmmss}.mbtiles";
-        var mbtilesPath = Path.Combine(_setup.TileDirectory, mbtilesName);
+        var mbtilesPath = Path.Combine(MAPS_DIR, mbtilesName);
         customMap.MbtilesPath = mbtilesPath;
         // 하위 호환: TilesDirectoryPath는 빈 문자열로 유지 (NOT NULL 제약 완화 필요)
         customMap.TilesDirectoryPath = string.Empty;
@@ -441,18 +439,25 @@ public class CustomMapService {
             _customMapProvider.Remove(customMap);
 
             // 4. 파일 삭제 (선택사항)
-            if (deleteFiles && !string.IsNullOrEmpty(customMap.TilesDirectoryPath) &&
-                Directory.Exists(customMap.TilesDirectoryPath))
+            if (deleteFiles)
             {
                 try
                 {
-                    Directory.Delete(customMap.TilesDirectoryPath, true);
-                    _log?.Info($"타일 디렉토리 삭제 완료: {customMap.TilesDirectoryPath}");
+                    if (!string.IsNullOrEmpty(customMap.MbtilesPath) && File.Exists(customMap.MbtilesPath))
+                    {
+                        File.Delete(customMap.MbtilesPath);
+                        _log?.Info($"MBTiles 파일 삭제 완료: {customMap.MbtilesPath}");
+                    }
+                    else if (!string.IsNullOrEmpty(customMap.TilesDirectoryPath) &&
+                             Directory.Exists(customMap.TilesDirectoryPath))
+                    {
+                        Directory.Delete(customMap.TilesDirectoryPath, true);
+                        _log?.Info($"타일 디렉토리 삭제 완료: {customMap.TilesDirectoryPath}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _log?.Error($"타일 디렉토리 삭제 실패: {ex.Message}");
-                    // 파일 삭제 실패는 전체 실패로 보지 않음
+                    _log?.Error($"파일 삭제 실패: {ex.Message}");
                 }
             }
 
@@ -668,12 +673,15 @@ public class CustomMapService {
 
     #endregion
     #region - Attributes -
+    private static readonly string MAPS_DIR = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "Sensorway", "PIDS", "maps");
+
     private readonly ILogService _log;
     private readonly IEventAggregator _eventAggregator;
     private readonly TileGenerationService _tileGenerationService;
     private readonly CustomMapProvider _customMapProvider;
     private readonly IGMapDbService _gMapDbService;
-    private readonly GMapSetupModel _setup;
 
     private readonly ConcurrentDictionary<int, FileBasedCustomMapProvider> _activeProviders = new();
     private readonly ConcurrentDictionary<int, GMapProvider> _activeGMapProviders = new();

@@ -1344,19 +1344,6 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// 맵 타일 폴더 설정 명령어 실행 가능 여부
-    /// </summary>
-    private bool CanExecuteSetMapTileFolder(object arg) => true;
-
-    /// <summary>
-    /// 맵 타일 폴더 설정 실행
-    /// </summary>
-    private void ExecuteSetMapTileFolder(object obj)
-    {
-        SelectTileDirectory();
-    }
-
-    /// <summary>
     /// 애플리케이션 종료 명령어 실행 가능 여부
     /// </summary>
     private bool CanExecuteExitApplication(object arg) => true;
@@ -4443,37 +4430,6 @@ public class MapViewModel : BasePanelViewModel,
         }
     }
 
-    /// <summary>
-    /// 타일 저장 폴더 선택 및 설정
-    /// </summary>
-    public async void SelectTileDirectory()
-    {
-        try
-        {
-            // 폴더 선택 대화상자
-            var folderDialog = new Microsoft.Win32.OpenFolderDialog
-            {
-                Title = "타일 저장 폴더 선택",
-                InitialDirectory = _setupModel.TileDirectory ?? "C:\\Tiles"
-            };
-
-            if (folderDialog.ShowDialog() == true)
-            {
-                var selectedPath = folderDialog.FolderName;
-
-                // JSON에 저장
-                await MapSettingsHelper.SaveTileDirectoryAsync(selectedPath, _log);
-            }
-            else
-            {
-                _log?.Info("타일 폴더 선택이 취소되었습니다.");
-            }
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"타일 폴더 선택 실패: {ex.Message}");
-        }
-    }
     #endregion
 
     #region - 헬퍼 메서드 -
