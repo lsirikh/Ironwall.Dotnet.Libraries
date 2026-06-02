@@ -263,36 +263,17 @@
 							Grid.Column="1"
 							Margin="10,10,0,0"
 							md:HintAssist.Hint="장치 아이디"
-							IsReadOnly="True">
-							<TextBox.Style>
-								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding ControllerDeviceNumber, Mode=OneWay}" />
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CONTROLLER}">
-											<Setter Property="Text">
-												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
-												</Setter.Value>
-											</Setter>
-										</DataTrigger>
-										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CABLE_CUTTING}">
-											<Setter Property="Text">
-												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
-												</Setter.Value>
-											</Setter>
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</TextBox.Style>
-						</TextBox>
+							md:HintAssist.IsFloating="True"
+							IsReadOnly="True"
+							Opacity="1"
+							Text="{Binding ControllerDisplay, Mode=OneWay}" />
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
 							Margin="5,0,0,0"
 							VerticalAlignment="Center"
 							Text="센서" />
-						<!--<TextBox
+						<TextBox
 							Grid.Row="1"
 							Grid.Column="1"
 							Margin="10,10,0,0"
@@ -300,36 +281,7 @@
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
 							Opacity="1"
-							Text="{Binding Device.DeviceNumber, Mode=OneWay}" />-->
-						<TextBox
-							Grid.Row="1"
-							Grid.Column="1"
-							Margin="10,10,0,0"
-							md:HintAssist.Hint="센서 아이디"
-							IsReadOnly="True">
-							<TextBox.Style>
-								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding ControllerDeviceNumber, Mode=OneWay}" />
-
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_FENCE}">
-											<Setter Property="Text">
-												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
-												</Setter.Value>
-											</Setter>
-										</DataTrigger>
-										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_MULTI}">
-											<Setter Property="Text">
-												<Setter.Value>
-													<Binding Path="Device.DeviceNumber" Mode="OneWay" />
-												</Setter.Value>
-											</Setter>
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</TextBox.Style>
-						</TextBox>
+							Text="{Binding SensorDisplay, Mode=OneWay}" />
 						<TextBlock
 							Grid.Row="2"
 							Grid.Column="0"

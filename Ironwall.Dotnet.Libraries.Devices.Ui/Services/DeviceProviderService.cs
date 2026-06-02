@@ -209,7 +209,29 @@ public class DeviceProviderService : IDeviceProviderService
             {
                 var existing = _deviceProvider.FirstOrDefault(d => d.Id == resourceId && d.DeviceType == updated.DeviceType);
                 if (existing is IBaseDeviceModel e)
+                {
                     UpdateDeviceProperties(e, updated);
+
+                    // Sensor 단건 갱신 후 Controller 인스턴스를 Provider 실제 객체로 재연결
+                    if (e is SensorDeviceModel sensor)
+                    {
+                        var controllerId = sensor.Controller?.Id ?? 0;
+                        _log?.Info($"[SYNC-DIAG] Sensor({resourceId}) 갱신 후 Controller.Id={controllerId}, Controller.DeviceNumber={sensor.Controller?.DeviceNumber ?? -1}");
+                        if (controllerId > 0)
+                        {
+                            var ctrl = _deviceProvider.OfType<ControllerDeviceModel>().FirstOrDefault(c => c.Id == controllerId);
+                            if (ctrl != null)
+                            {
+                                sensor.Controller = ctrl;
+                                _log?.Info($"[SYNC-DIAG] Sensor({resourceId}) Controller 재연결 완료: Controller({ctrl.Id}, DeviceNumber={ctrl.DeviceNumber})");
+                            }
+                            else
+                                _log?.Warning($"[SYNC-DIAG] Sensor({resourceId}) Controller({controllerId}) Provider에 없음 — 재연결 실패");
+                        }
+                        else
+                            _log?.Warning($"[SYNC-DIAG] Sensor({resourceId}) Controller.Id=0 — API가 Controller를 미포함하여 반환");
+                    }
+                }
                 else
                     _deviceProvider.Add(updated);
                 _log?.Info($"FetchDeviceByIdAsync: {typeDevice}({resourceId}) 갱신 완료 → Status={updated.Status}");
@@ -231,7 +253,7 @@ public class DeviceProviderService : IDeviceProviderService
 
     private async Task<IBaseDeviceModel?> FetchSingleSensorAsync(int id, CancellationToken token)
     {
-        var resp = await _apiService.GetSensorByIdAsync(id, token: token);
+        var resp = await _apiService.GetSensorByIdAsync(id, includeController: true, token: token);
         return resp.Success && resp.Data != null ? resp.Data.ToSensorDeviceModel() : null;
     }
 

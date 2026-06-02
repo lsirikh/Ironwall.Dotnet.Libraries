@@ -87,6 +87,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public int FirstStart => _model.FirstStart;
         public int SecondEnd => _model.SecondEnd;
         public int SecondStart => _model.SecondStart;
+
+        /// <summary>
+        /// 장애 타입에 따라 제어기 필드에 표시할 번호
+        /// 제어기 장애(FAULT_CONTROLLER, FAULT_CABLE_CUTTING): 장치 자신의 DeviceNumber
+        /// 센서 장애(FAULT_FENCE, FAULT_MULTI 등): 연결된 제어기의 DeviceNumber
+        /// </summary>
+        public int? ControllerDisplay => Reason is EnumFaultType.FAULT_CONTROLLER or EnumFaultType.FAULT_CABLE_CUTTING
+            ? (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber)
+            : ControllerDeviceNumber;
+
+        /// <summary>
+        /// 장애 타입에 따라 센서 필드에 표시할 번호
+        /// 센서 장애(FAULT_FENCE, FAULT_MULTI 등): 장치 자신의 DeviceNumber
+        /// 제어기 장애: null (센서 없음)
+        /// </summary>
+        public int? SensorDisplay => Reason is EnumFaultType.FAULT_FENCE or EnumFaultType.FAULT_MULTI
+            ? (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber)
+            : null;
         #endregion
         #region - Attributes -
         #endregion
