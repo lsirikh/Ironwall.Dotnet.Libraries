@@ -145,7 +145,7 @@
 									<TextBlock
 										HorizontalAlignment="Right"
 										FontSize="11" Foreground="#666" Margin="0,2,0,8">
-										<Run Text="{Binding ProgressPercentage, RelativeSource={RelativeSource TemplatedParent}, StringFormat='{}{0:F0}'}" />
+										<Run Text="{Binding ProgressPercentage, RelativeSource={RelativeSource TemplatedParent}, StringFormat='{}{0:F0}%'}" />
 									</TextBlock>
 
 									<StackPanel Margin="4,0,0,0">

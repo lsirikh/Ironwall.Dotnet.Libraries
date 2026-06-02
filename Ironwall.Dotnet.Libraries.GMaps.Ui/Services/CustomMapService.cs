@@ -675,8 +675,8 @@ public class CustomMapService {
     #endregion
     #region - Attributes -
     private static readonly string MAPS_DIR = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "Sensorway", "PIDS", "maps");
+        AppDomain.CurrentDomain.BaseDirectory,
+        "maps");
 
     private readonly ILogService _log;
     private readonly IEventAggregator _eventAggregator;
