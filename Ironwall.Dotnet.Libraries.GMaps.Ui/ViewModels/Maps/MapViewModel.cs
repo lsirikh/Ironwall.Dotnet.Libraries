@@ -720,7 +720,6 @@ public class MapViewModel : BasePanelViewModel,
         LoadMapImageCommand = new RelayCommand(ExecuteLoadMapImage, CanExecuteLoadImageMap);
         LoadImageOverlayCommand = new RelayCommand(ExecuteLoadImageOverlay, CanExecuteLoadImageOverlay);
         CreateCustomMapCommand = new RelayCommand(ExecuteCreateCustomMap, CanExecuteCreateCustomMap);
-        SetMapTileFolderCommand = new RelayCommand(ExecuteSetMapTileFolder, CanExecuteSetMapTileFolder);
         ExitApplicationCommand = new RelayCommand(ExecuteExitApplication, CanExecuteExitApplication);
     }
 
@@ -5083,7 +5082,6 @@ public class MapViewModel : BasePanelViewModel,
     public RelayCommand? LoadMapImageCommand { get; private set; }
     public RelayCommand? LoadImageOverlayCommand { get; private set; }
     public RelayCommand? CreateCustomMapCommand { get; private set; }
-    public RelayCommand? SetMapTileFolderCommand { get; private set; }
     public RelayCommand? ExitApplicationCommand { get; private set; }
 
     // 지도 표시 관련 명령어

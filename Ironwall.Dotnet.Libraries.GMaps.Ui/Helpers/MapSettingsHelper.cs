@@ -112,8 +112,7 @@ public static class MapSettingsHelper
             HomePosition = mapSettings.HomePosition,
             MapType = mapSettings.MapType,
             MapMode = mapSettings.MapMode,
-            MapName = mapSettings.MapName,
-            TileDirectory = mapSettings.TileDirectory
+            MapName = mapSettings.MapName
         };
 
         await SaveMultipleSettingsAsync(settings, log);
@@ -162,8 +161,7 @@ public static class MapSettingsHelper
                 HomePosition = appSettings["HomePosition"]?.ToObject<HomePositionModel>(),
                 MapType = appSettings["MapType"]?.ToString(),
                 MapMode = appSettings["MapMode"]?.ToString(),
-                MapName = appSettings["MapName"]?.ToString(),
-                TileDirectory = appSettings["TileDirectory"]?.ToString()
+                MapName = appSettings["MapName"]?.ToString()
             };
 
             return mapSettings;
@@ -314,7 +312,6 @@ public static class MapSettingsHelper
             MapType = "GoogleSatelliteMap",
             MapMode = "ServerAndCache",
             MapName = "기본 지도",
-            TileDirectory = "C:/Tiles/",
             HomePosition = new HomePositionModel
             {
                 Position = new CoordinateModel(37.648425, 126.904284, 0.0),
