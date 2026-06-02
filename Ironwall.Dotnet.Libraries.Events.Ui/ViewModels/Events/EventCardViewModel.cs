@@ -53,7 +53,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public EnumEventType MessageType => _model.MessageType;
         public override IExEventModel Model => _model;
         public int? ControllerId => (Device as ISensorDeviceModel)?.Controller?.Id;
-        public int? ControllerDeviceNumber => (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
+        public int? ControllerDeviceNumber
+        {
+            get
+            {
+                var num = (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
+                return num is null or 0 ? null : num;
+            }
+        }
         public string? DeviceTypeName => Device?.DeviceType switch
         {
             EnumDeviceType.Controller => "제어기",

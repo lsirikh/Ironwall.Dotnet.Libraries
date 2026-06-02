@@ -266,7 +266,7 @@
 							IsReadOnly="True">
 							<TextBox.Style>
 								<Style BasedOn="{StaticResource MaterialDesignTextBox}" TargetType="TextBox">
-									<Setter Property="Text" Value="{Binding ControllerId, Mode=OneWay}" />
+									<Setter Property="Text" Value="{Binding ControllerDeviceNumber, Mode=OneWay}" />
 									<Style.Triggers>
 										<DataTrigger Binding="{Binding Reason}" Value="{x:Static enums:EnumFaultType.FAULT_CONTROLLER}">
 											<Setter Property="Text">

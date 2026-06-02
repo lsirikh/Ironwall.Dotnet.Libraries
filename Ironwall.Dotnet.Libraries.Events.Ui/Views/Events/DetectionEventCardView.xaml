@@ -291,7 +291,7 @@
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
 							Opacity="1"
-							Text="{Binding ControllerId, Mode=OneWay}" />
+							Text="{Binding ControllerDeviceNumber, Mode=OneWay}" />
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
