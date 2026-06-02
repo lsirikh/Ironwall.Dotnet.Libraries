@@ -1019,10 +1019,6 @@
 							</Trigger.ExitActions>
 						</Trigger>
 
-						<!--  이벤트 발생 시 Indicator 색 덮어씀 (우선순위 최고)  -->
-						<Trigger Property="EventStatus" Value="Detecting">
-							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
-						</Trigger>
 						<!--  Fault: 표시등 색상만 변경, Viewbox 깜빡임 없음 (SSOT: 깜빡임은 MarkerState=ERROR만 담당)  -->
 						<Trigger Property="EventStatus" Value="Fault">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
@@ -1286,9 +1282,10 @@
 							<Setter TargetName="PART_SmartSensorSection" Property="Opacity" Value="0.5" />
 						</Trigger>
 
-						<!--  Pulse Ripple Animation for Detecting State (3링 소나 패턴, 2s 주기)  -->
-						<!--  DataTrigger → Trigger: EventStatus는 DP이므로 DataContext 바인딩 불가 → Trigger Property 사용  -->
+						<!--  Detecting: Indicator 빨강 + Pulse Ripple Animation (3링 소나 패턴, 2s 주기)  -->
+						<!--  단일 Trigger로 병합 — 중복 Trigger(같은 Property/Value)는 WPF가 두 번째를 무시함  -->
 						<Trigger Property="EventStatus" Value="Detecting">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 							<Trigger.EnterActions>
 								<BeginStoryboard Name="PulseStoryboard_Begin" HandoffBehavior="SnapshotAndReplace">
 									<Storyboard RepeatBehavior="Forever">
