@@ -938,6 +938,15 @@
 						<Trigger Property="DeviceType" Value="SmartSensor">
 							<Setter TargetName="PART_SmartSensorSection" Property="Visibility" Value="Visible" />
 						</Trigger>
+						<Trigger Property="DeviceType" Value="SmartSensor2">
+							<Setter TargetName="PART_SmartSensorSection" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="DeviceType" Value="SmartCompound">
+							<Setter TargetName="PART_SmartSensorSection" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="DeviceType" Value="SmartMultisensor2">
+							<Setter TargetName="PART_MultiSection" Property="Visibility" Value="Visible" />
+						</Trigger>
 
 						<!--  Event Status Colors (Normal 기본값)  -->
 						<Trigger Property="EventStatus" Value="Normal">
@@ -1162,7 +1171,7 @@
 							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
 						</MultiTrigger>
 
-						<!--  SmartSensor 라벨  -->
+						<!--  SmartSensor 라벨 (SmartSensor / SmartSensor2 / SmartCompound)  -->
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartSensor" />
@@ -1183,6 +1192,71 @@
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
 							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartSensor2" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartSensor2" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartSensor2" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartCompound" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartCompound" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartCompound" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+
+						<!--  SmartMultisensor2 라벨 (Multi 섹션 사용)  -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartMultisensor2" />
+								<Condition Property="IsSelected" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartMultisensor2" />
+								<Condition Property="ShowTitle" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+						</MultiTrigger>
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="DeviceType" Value="SmartMultisensor2" />
+								<Condition Property="IsMouseOver" Value="True" />
+							</MultiTrigger.Conditions>
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
 						</MultiTrigger>
 
 						<!--  Mouse Over Effects  -->

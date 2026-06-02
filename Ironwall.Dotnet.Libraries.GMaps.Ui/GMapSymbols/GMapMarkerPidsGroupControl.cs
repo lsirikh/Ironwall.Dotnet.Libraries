@@ -109,6 +109,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             LineOpacity = Marker.LineOpacity;
             IsClosedPath = Marker.IsClosedPath;
             ShowArrowHead = Marker.ShowArrowHead;
+            CompositeStatus = Marker.CompositeStatus;
 
             // Polyline 속성 강제 업데이트 (중요!)
             if (MainPolyline != null)
@@ -135,6 +136,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             SetupPropertyBinding(LineOpacityProperty, nameof(Marker.LineOpacity));
             SetupPropertyBinding(IsClosedPathProperty, nameof(Marker.IsClosedPath));
             SetupPropertyBinding(ShowArrowHeadProperty, nameof(Marker.ShowArrowHead));
+            SetupPropertyBinding(CompositeStatusProperty, nameof(Marker.CompositeStatus));
 
             // Polyline에 직접 바인딩 추가
             if (MainPolyline != null)
@@ -560,6 +562,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             DependencyProperty.Register("EventStatus", typeof(EnumEventStatus), typeof(GMapMarkerPidsGroupControl),
                 new PropertyMetadata(EnumEventStatus.Normal, OnEventStatusChanged));
 
+        public EnumCompositeEventStatus CompositeStatus
+        {
+            get { return (EnumCompositeEventStatus)GetValue(CompositeStatusProperty); }
+            set { SetValue(CompositeStatusProperty, value); }
+        }
+
+        public static readonly DependencyProperty CompositeStatusProperty =
+            DependencyProperty.Register("CompositeStatus", typeof(EnumCompositeEventStatus), typeof(GMapMarkerPidsGroupControl),
+                new PropertyMetadata(EnumCompositeEventStatus.Normal));
 
         public Polyline? MainPolyline { get; private set; }
 

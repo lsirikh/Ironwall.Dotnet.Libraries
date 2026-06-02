@@ -51,6 +51,7 @@ namespace Ironwall.Dotnet.Monitoring.Models.Helpers
                     case EnumDeviceType.SmartSensor:
                     case EnumDeviceType.SmartSensor2:
                     case EnumDeviceType.SmartCompound:
+                    case EnumDeviceType.SmartMultisensor2:
 
                         device = jo.ToObject<SensorDeviceModel>();
                         break;

@@ -158,20 +158,21 @@
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 						</Trigger>
 
-						<!--  CompositeStatus DataTriggers (3-레이어 복합 상태)  -->
+						<!--  CompositeStatus Triggers (3-레이어 복합 상태)  -->
+						<!--  DataTrigger → Trigger: CompositeStatus는 DP이므로 DataContext 바인딩 불가 → Trigger Property 사용  -->
 
 						<!--  Normal: 오버레이 모두 숨김  -->
-						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Normal}">
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Normal}">
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
-						</DataTrigger>
+						</Trigger>
 
 						<!--  Detecting: DetectionOverlay(Red blink, 1000ms) 표시  -->
-						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Detecting}">
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Detecting}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Visible" />
-							<DataTrigger.EnterActions>
+							<Trigger.EnterActions>
 								<BeginStoryboard Name="BS_Detecting">
 									<Storyboard RepeatBehavior="Forever">
 										<DoubleAnimationUsingKeyFrames
@@ -183,25 +184,25 @@
 										</DoubleAnimationUsingKeyFrames>
 									</Storyboard>
 								</BeginStoryboard>
-							</DataTrigger.EnterActions>
-							<DataTrigger.ExitActions>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
 								<StopStoryboard BeginStoryboardName="BS_Detecting" />
-							</DataTrigger.ExitActions>
-						</DataTrigger>
+							</Trigger.ExitActions>
+						</Trigger>
 
 						<!--  Faulted: FaultOverlay(Orange solid) 표시  -->
-						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Faulted}">
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Faulted}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
-						</DataTrigger>
+						</Trigger>
 
 						<!--  FaultedDetecting: Red↔Orange 교차 깜빡임 (1000ms)  -->
-						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.FaultedDetecting}">
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.FaultedDetecting}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Visible" />
-							<DataTrigger.EnterActions>
+							<Trigger.EnterActions>
 								<BeginStoryboard Name="BS_FaultedDetecting">
 									<Storyboard RepeatBehavior="Forever">
 										<DoubleAnimationUsingKeyFrames
@@ -220,19 +221,19 @@
 										</DoubleAnimationUsingKeyFrames>
 									</Storyboard>
 								</BeginStoryboard>
-							</DataTrigger.EnterActions>
-							<DataTrigger.ExitActions>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
 								<StopStoryboard BeginStoryboardName="BS_FaultedDetecting" />
-							</DataTrigger.ExitActions>
-						</DataTrigger>
+							</Trigger.ExitActions>
+						</Trigger>
 
 						<!--  Connection: 기존 유지  -->
-						<DataTrigger Binding="{Binding CompositeStatus}" Value="{x:Static enum:EnumCompositeEventStatus.Connection}">
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Connection}">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
 							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="#00BCD4" />
 							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
-							<DataTrigger.EnterActions>
+							<Trigger.EnterActions>
 								<BeginStoryboard Name="BS_Conn">
 									<Storyboard RepeatBehavior="Forever">
 										<DoubleAnimation
@@ -244,11 +245,11 @@
 											Duration="0:0:1" />
 									</Storyboard>
 								</BeginStoryboard>
-							</DataTrigger.EnterActions>
-							<DataTrigger.ExitActions>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
 								<StopStoryboard BeginStoryboardName="BS_Conn" />
-							</DataTrigger.ExitActions>
-						</DataTrigger>
+							</Trigger.ExitActions>
+						</Trigger>
 
 						<!--  Mouse Over Effect  -->
 						<Trigger Property="IsMouseOver" Value="True">
