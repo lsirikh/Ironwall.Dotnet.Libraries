@@ -27,6 +27,10 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [OverlayMap_MBTiles_Provider-prd.md](prds/OverlayMap_MBTiles_Provider-prd.md) | OverlayMap PNG→MBTiles 전환 — 신규 Provider, TMS 좌표 변환, LRU 활성화, DB 스키마 마이그레이션 (시뮬레이션 S-01~S-15) | Draft | 2026-06-02 |
+| [RedisDomainService_DoubleStop_Fix-prd.md](prds/RedisDomainService_DoubleStop_Fix-prd.md) | RedisBrokerService.StopAsync 이중 호출 NRE 수정 — _redisService.StopAsync 제거, NatsDomainService 패턴 통일 | Approved | 2026-06-01 |
+| [NatsShutdown_SubscriptionHang_Fix-prd.md](prds/NatsShutdown_SubscriptionHang_Fix-prd.md) | NATS 종료 10초 블로킹 — startupToken/shutdownToken 수명주기 불일치, _subscriptionCts + Interlocked 재진입 가드 (시뮬레이션 2회) | Approved | 2026-06-01 |
+| [AppShutdown_Blocking_Fix-prd.md](prds/AppShutdown_Blocking_Fix-prd.md) | 앱 종료 Task.Run 블로킹 — MessageService async void + Redis CloseAsync 토큰 미지원 수정 (시뮬레이션 2회, Fix A/B 검증) | Approved | 2026-05-28 |
 | [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | 자동 조치보고 이중 경로(Path A 타이머 + Path B 공유 타이머) 버그 수정 — 46개 결함, 8단계 안전 구현 시퀀스, 4회 시뮬레이션 검증 | Draft | 2026-05-22 |
 | [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | 이벤트 파이프라인 전체 성능 최적화 — EventCard(FR-01~10) + Symbol STA 위반(FR-11) + EQM lock(FR-12). 4회 시뮬레이션 검증, Blocker 1개 + Critical 12개 반영 | Draft | 2026-05-22 |
 | [BatchReport_Sound_Stop_Fix-prd.md](prds/BatchReport_Sound_Stop_Fix-prd.md) | 일괄 조치보고 시 장애 사운드 즉시 중지 미동작 수정 (OnQueueCleared 이벤트 + _stopAll 추가) | Draft | 2026-05-21 |
