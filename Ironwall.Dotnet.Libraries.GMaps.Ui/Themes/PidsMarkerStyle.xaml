@@ -873,7 +873,7 @@
 							Opacity="0"
 							RenderTransformOrigin="0.5,0.5">
 							<Ellipse.RenderTransform>
-								<ScaleTransform x:Name="PulseScale1" ScaleX="0.1" ScaleY="0.1" />
+								<ScaleTransform ScaleX="0.1" ScaleY="0.1" />
 							</Ellipse.RenderTransform>
 						</Ellipse>
 						<Ellipse
@@ -1284,6 +1284,7 @@
 
 						<!--  Detecting: Indicator 빨강 + Pulse Ripple Animation (3링 소나 패턴, 2s 주기)  -->
 						<!--  단일 Trigger로 병합 — 중복 Trigger(같은 Property/Value)는 WPF가 두 번째를 무시함  -->
+						<!--  ScaleTransform(Freezable)은 TargetName으로 찾기 불안정 → PropertyPath 방식으로 변경  -->
 						<Trigger Property="EventStatus" Value="Detecting">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
 							<Trigger.EnterActions>
@@ -1302,8 +1303,8 @@
 											</DoubleAnimation.EasingFunction>
 										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScale1"
-											Storyboard.TargetProperty="ScaleX"
+											Storyboard.TargetName="PulseRing1"
+											Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
 											From="0.1" To="1"
 											Duration="0:0:1.2"
 											BeginTime="0:0:0">
@@ -1312,8 +1313,8 @@
 											</DoubleAnimation.EasingFunction>
 										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScale1"
-											Storyboard.TargetProperty="ScaleY"
+											Storyboard.TargetName="PulseRing1"
+											Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
 											From="0.1" To="1"
 											Duration="0:0:1.2"
 											BeginTime="0:0:0">
@@ -1334,8 +1335,8 @@
 											</DoubleAnimation.EasingFunction>
 										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScale2"
-											Storyboard.TargetProperty="ScaleX"
+											Storyboard.TargetName="PulseRing2"
+											Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
 											From="0.1" To="1"
 											Duration="0:0:1.2"
 											BeginTime="0:0:0.4">
@@ -1344,8 +1345,8 @@
 											</DoubleAnimation.EasingFunction>
 										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScale2"
-											Storyboard.TargetProperty="ScaleY"
+											Storyboard.TargetName="PulseRing2"
+											Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
 											From="0.1" To="1"
 											Duration="0:0:1.2"
 											BeginTime="0:0:0.4">
@@ -1366,8 +1367,8 @@
 											</DoubleAnimation.EasingFunction>
 										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScale3"
-											Storyboard.TargetProperty="ScaleX"
+											Storyboard.TargetName="PulseRing3"
+											Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
 											From="0.1" To="1"
 											Duration="0:0:1.2"
 											BeginTime="0:0:0.8">
@@ -1376,8 +1377,8 @@
 											</DoubleAnimation.EasingFunction>
 										</DoubleAnimation>
 										<DoubleAnimation
-											Storyboard.TargetName="PulseScale3"
-											Storyboard.TargetProperty="ScaleY"
+											Storyboard.TargetName="PulseRing3"
+											Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
 											From="0.1" To="1"
 											Duration="0:0:1.2"
 											BeginTime="0:0:0.8">
