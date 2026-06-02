@@ -19,6 +19,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services
         public override Guid Id { get; } = Guid.NewGuid();
         public override string Name => $"MBTilesOverlay:{Path.GetFileNameWithoutExtension(_mbtilesPath)}";
         public override GMapProvider[] Overlays => Array.Empty<GMapProvider>();
+        public override GMap.NET.Projections.MercatorProjection Projection => GMap.NET.Projections.MercatorProjection.Instance;
         public override PureImage GetTileImage(GPoint pos, int zoom) => GetTileImageInternal(pos, zoom)!;
 
         /// <summary>MBTiles 파일을 열고 연결한다. 실패 시 false 반환.</summary>
