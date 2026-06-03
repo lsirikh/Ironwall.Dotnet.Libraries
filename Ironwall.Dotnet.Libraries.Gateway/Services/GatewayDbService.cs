@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Gateway.Providers;
 using Ironwall.Dotnet.Monitoring.Models.GatewayEvents;
 using MySql.Data.MySqlClient;
 using System.Collections.Generic;
+using System.IO;
 using System.Data;
 using System.Linq;
 

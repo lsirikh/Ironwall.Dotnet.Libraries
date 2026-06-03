@@ -9,6 +9,7 @@ using Ironwall.Dotnet.Monitoring.Models.Maps;
 using MySql.Data.MySqlClient;
 using System;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Threading;
 

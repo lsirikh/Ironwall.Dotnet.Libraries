@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 using MySql.Data.MySqlClient;
 using System;
 using System.Buffers;
+using System.IO;
 using System.Data;
 using System.Security.Cryptography;
 
