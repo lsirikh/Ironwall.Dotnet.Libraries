@@ -419,6 +419,10 @@ public class CustomMapOverlayService : IDisposable
             foreach (var id in _activeOverlays.Keys.ToList())
                 DeactivateOverlay(id);
         }
+        catch (OperationCanceledException)
+        {
+            // 앱 종료 시 WPF Dispatcher 셧다운으로 발생하는 정상 취소 — 무시
+        }
         catch (Exception ex)
         {
             _log?.Error($"[Overlay] Dispose 중 오류: {ex.Message}");

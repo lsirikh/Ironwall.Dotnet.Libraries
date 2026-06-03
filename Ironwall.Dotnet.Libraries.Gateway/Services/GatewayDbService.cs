@@ -116,6 +116,10 @@ internal class GatewayDbService : TaskService, IGatewayDbService
                 _log?.Info("Gateway DB 연결 종료.");
             }
         }
+        catch (IOException)
+        {
+            // 앱 종료 시 소켓 선종료 후 MySQL close 패킷 전송 실패 — 정상 패턴, 무시
+        }
         catch (Exception ex)
         {
             _log?.Error($"Gateway DB Disconnect Error: {ex}");
