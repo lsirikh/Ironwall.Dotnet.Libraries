@@ -95,6 +95,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Binding Methods -
         #endregion
         #region - Processes -
+        /// <summary>
+        /// NATS 수신 스레드에서 직접 호출 — lock-free ConcurrentQueue에 적재.
+        /// 150ms 타이머(FlushPendingCardsAsync)가 Background BeginInvoke로 배치 처리.
+        /// DispatcherService.Invoke() 직접 호출 금지 — NATS 스레드를 블로킹하지 않는다.
+        /// </summary>
+        public void EnqueueCard(EventCardBaseViewModel card)
+        {
+            if (card == null) return;
+            var accepted = _batchBuffer.Enqueue(card);
+            if (!accepted)
+            {
+                _log?.Warning($"[EnqueueCard] 배치 버퍼 포화 — 카드 폐기: {card.GetType().Name}");
+                card.Dispose();
+            }
+        }
         private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
@@ -137,34 +152,48 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
         }
 
-        private async void FlushPendingCards(object? state)
+        // Timer 콜백: 동기 래퍼 — async void 금지(Timer 콜백에서 예외 시 프로세스 크래시)
+        private void FlushPendingCards(object? state) => _ = FlushPendingCardsAsync();
+
+        private async Task FlushPendingCardsAsync()
         {
-            var batch = _batchBuffer.DrainQueue();
-            if (batch.Count == 0) return;
-
-            // 적응형 간격 조정
-            var newInterval = _batchBuffer.CalculateInterval(batch.Count);
-            _batchTimer?.Change(newInterval, newInterval);
-
-            await DispatcherService.BeginInvoke(() =>
+            try
             {
-                // CollectionChanged 서스펜드 → 배치 Add → 재등록 (핸들러 폭주 방지)
-                ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-                try
+                var batch = _batchBuffer.DrainQueue();
+                if (batch.Count == 0) return;
+
+                // 적응형 간격 조정
+                var newInterval = _batchBuffer.CalculateInterval(batch.Count);
+                _batchTimer?.Change(newInterval, newInterval);
+
+                await DispatcherService.BeginInvoke(() =>
                 {
-                    foreach (var card in batch)
-                        ViewModelProvider.Add(card);
-                }
-                finally
-                {
-                    ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
-                    // 배치 entryId 매칭
-                    foreach (var card in batch)
-                        TryAssignEntryId(card);
-                    IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
-                    UpdateAction?.Invoke();
-                }
-            }, DispatcherPriority.Background);
+                    // CollectionChanged 서스펜드 → 배치 Add → 재등록 (핸들러 폭주 방지)
+                    ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+                    try
+                    {
+                        foreach (var card in batch)
+                            ViewModelProvider.Add(card);
+                    }
+                    finally
+                    {
+                        ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+                        // 배치 entryId 매칭
+                        foreach (var card in batch)
+                            TryAssignEntryId(card);
+                        IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
+                        UpdateAction?.Invoke();
+                    }
+                }, DispatcherPriority.Background);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Deactivate 이후 타이머가 한 번 더 실행된 경우 — 정상 종료 패턴, 무시
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"[FlushPendingCards] 배치 처리 오류: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -272,7 +301,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     // ③ 제거 + Dispose
                     ViewModelProvider.Remove(card);
-                    if (card.EntryId != null) _cardByEntryId.Remove(card.EntryId);
+                    if (card.EntryId != null) _cardByEntryId.TryRemove(card.EntryId, out _);
                     card.Dispose();
 
                     // ④ NATS로 조치보고 발행 (NatsDomainService 경유)
@@ -383,7 +412,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 await DispatcherService.BeginInvoke(() =>
                 {
-                    _cardByEntryId.Remove(entryId);
+                    _cardByEntryId.TryRemove(entryId, out _);
                     ViewModelProvider.Remove(card);
                     card.Dispose();
                 });
@@ -436,7 +465,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                 await DispatcherService.BeginInvoke(() =>
                 {
-                    _cardByEntryId.Remove(faultEntryId);
+                    _cardByEntryId.TryRemove(faultEntryId, out _);
                     ViewModelProvider.Remove(card);
                     card.Dispose();
                 });
@@ -476,7 +505,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     await DispatcherService.BeginInvoke(() =>
                     {
-                        if (vm.EntryId != null) _cardByEntryId.Remove(vm.EntryId);
+                        if (vm.EntryId != null) _cardByEntryId.TryRemove(vm.EntryId, out _);
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
@@ -506,7 +535,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     await DispatcherService.BeginInvoke(() =>
                     {
-                        if (vm.EntryId != null) _cardByEntryId.Remove(vm.EntryId);
+                        if (vm.EntryId != null) _cardByEntryId.TryRemove(vm.EntryId, out _);
                         ViewModelProvider.Remove(vm);
                         vm.Dispose();
                     });
@@ -587,7 +616,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private IEventQueueManager _eventQueueManager;
         private EventCardBatchBuffer<EventCardBaseViewModel> _batchBuffer;
         private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
-        private readonly Dictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
+        private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;

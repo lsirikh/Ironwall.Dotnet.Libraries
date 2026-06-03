@@ -126,7 +126,8 @@
 					ScrollViewer.CanContentScroll="True"
 					SelectedItem="{Binding SelectedEventCardViewModel}"
 					VirtualizingPanel.IsVirtualizing="True"
-					VirtualizingPanel.VirtualizationMode="Recycling">
+					VirtualizingPanel.VirtualizationMode="Recycling"
+					VirtualizingPanel.ScrollUnit="Pixel">
 
 					<ListBox.ItemContainerStyle>
 						<Style BasedOn="{StaticResource MaterialDesignListBoxItem}" TargetType="ListBoxItem">
@@ -136,15 +137,9 @@
 						</Style>
 					</ListBox.ItemContainerStyle>
 
-					<ListBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<StackPanel
-								CanHorizontallyScroll="False"
-								Orientation="Vertical"
-								VirtualizingPanel.IsVirtualizing="True"
-								VirtualizingPanel.VirtualizationMode="Recycling" />
-						</ItemsPanelTemplate>
-					</ListBox.ItemsPanel>
+					<!-- StackPanel 제거 — StackPanel은 VirtualizingPanel 미상속 → IsVirtualizing=True 무시됨
+					     ItemsPanel 오버라이드 삭제 시 ListBox 기본 VirtualizingStackPanel이 복원됨
+					     ScrollUnit=Pixel: Flipper 카드 높이 전환 시 항목 단위 스냅 방지 -->
 					<ListBox.ItemTemplate>
 						<DataTemplate>
 							<ContentControl cal:View.Model="{Binding}" />

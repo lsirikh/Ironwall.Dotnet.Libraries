@@ -36,6 +36,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
                 _cancellationTokenSource.Cancel();
             _cancellationTokenSource?.Dispose();
+            Cts?.Cancel();
+            Cts?.Dispose();
+            Cts = null;
             GC.SuppressFinalize(this);
         }
         #endregion
