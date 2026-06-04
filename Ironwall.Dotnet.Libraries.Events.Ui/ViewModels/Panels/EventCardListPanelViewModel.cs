@@ -304,7 +304,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     // 1차: _pendingEntries 폴백 — entryId가 아직 카드에 할당 안 된 경우
                     if (card.EntryId == null && eventModel?.Id != null)
                     {
-                        if (_pendingEntries.TryRemove(eventModel.Id.Value, out var fallbackEntryId))
+                        if (_pendingEntries.TryRemove(eventModel.Id, out var fallbackEntryId))
                         {
                             card.EntryId = fallbackEntryId;
                             _cardByEntryId[fallbackEntryId] = card;
@@ -319,7 +319,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     else if (eventModel?.Device != null)
                     {
                         // 2차: FindEntryByDevice 안전망 — _pendingEntries에도 없는 경우
-                        var entry = _eventQueueManager.FindEntryByDevice(eventModel.Device.Id, eventModel.Device.TypeDevice);
+                        var entry = _eventQueueManager.FindEntryByDevice(eventModel.Device.Id, eventModel.Device.DeviceType);
                         if (entry != null)
                         {
                             _eventQueueManager.Dequeue(entry.EntryId);
@@ -533,7 +533,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     // 심볼 복원: _pendingEntries 폴백 후 Dequeue (FR-02)
                     if (vm.EntryId == null && vm.Model?.Id != null)
                     {
-                        if (_pendingEntries.TryRemove(vm.Model.Id.Value, out var fallbackEntryId))
+                        if (_pendingEntries.TryRemove(vm.Model.Id, out var fallbackEntryId))
                         {
                             vm.EntryId = fallbackEntryId;
                             _log?.Info($"EntryId 개별 탐지 폴백 매칭: Event({vm.Model.Id}) → Entry({fallbackEntryId})");
@@ -571,7 +571,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     // 심볼 복원: _pendingEntries 폴백 후 Dequeue (FR-02)
                     if (vm.EntryId == null && vm.Model?.Id != null)
                     {
-                        if (_pendingEntries.TryRemove(vm.Model.Id.Value, out var fallbackEntryId))
+                        if (_pendingEntries.TryRemove(vm.Model.Id, out var fallbackEntryId))
                         {
                             vm.EntryId = fallbackEntryId;
                             _log?.Info($"EntryId 개별 장애 폴백 매칭: Event({vm.Model.Id}) → Entry({fallbackEntryId})");
