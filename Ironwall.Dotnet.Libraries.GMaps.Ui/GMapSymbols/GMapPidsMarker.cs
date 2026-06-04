@@ -33,8 +33,6 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         OnPropertyChanged(nameof(EventStatus));
         OnPropertyChanged(nameof(CompositeStatus));
         OnPropertyChanged(nameof(OperationState));
-
-        // FOV 속성 알림 추가 (v1.3 - PTZ → FOV 연동)
         OnPropertyChanged(nameof(DetectionRange));
         OnPropertyChanged(nameof(DetectionAngle));
         OnPropertyChanged(nameof(DetectionBearing));
