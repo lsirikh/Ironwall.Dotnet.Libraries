@@ -268,6 +268,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </summary>
         public async Task ExecuteBatchReportAsync()
         {
+            // FR-03: 인플라이트 가드 — 더블클릭/중복 실행 방지
+            if (!await _batchReportGate.WaitAsync(0))
+            {
+                _log?.Warning("ExecuteBatchReportAsync 이미 실행 중 — 중복 요청 무시");
+                return;
+            }
+
             IsVisible = false;
             // CollectionChanged 서스펜드 — Remove × N의 UpdateAction 폭주 방지
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
@@ -293,11 +300,36 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     if (!response.Success)
                         throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
 
-                    // ② 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
+                    // ② 심볼 복원: EntryId null 폴백 체인 (FR-01)
+                    // 1차: _pendingEntries 폴백 — entryId가 아직 카드에 할당 안 된 경우
+                    if (card.EntryId == null && eventModel?.Id != null)
+                    {
+                        if (_pendingEntries.TryRemove(eventModel.Id.Value, out var fallbackEntryId))
+                        {
+                            card.EntryId = fallbackEntryId;
+                            _cardByEntryId[fallbackEntryId] = card;
+                            _log?.Info($"EntryId 배치 폴백 매칭: Event({eventModel.Id}) → Entry({fallbackEntryId})");
+                        }
+                    }
+
                     if (card.EntryId != null)
+                    {
                         _eventQueueManager.Dequeue(card.EntryId);
-                    else
-                        _log?.Warning($"EntryId null — Dequeue 스킵: Event({eventModel?.Id}), Device({eventModel?.Device?.Id})");
+                    }
+                    else if (eventModel?.Device != null)
+                    {
+                        // 2차: FindEntryByDevice 안전망 — _pendingEntries에도 없는 경우
+                        var entry = _eventQueueManager.FindEntryByDevice(eventModel.Device.Id, eventModel.Device.TypeDevice);
+                        if (entry != null)
+                        {
+                            _eventQueueManager.Dequeue(entry.EntryId);
+                            _log?.Warning($"EntryId null 안전망 — FindEntryByDevice 복원: Device({eventModel.Device.Id})");
+                        }
+                        else
+                        {
+                            _log?.Error($"EntryId null 복원 불가: Event({eventModel?.Id}) — EQM 잔류 가능성");
+                        }
+                    }
 
                     // ③ 제거 + Dispose
                     ViewModelProvider.Remove(card);
@@ -328,6 +360,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
             finally
             {
+                _batchReportGate.Release();
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
                 IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
                 UpdateAction?.Invoke();
@@ -497,7 +530,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var model = vm.Model;
                     if (model == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
 
-                    // 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
+                    // 심볼 복원: _pendingEntries 폴백 후 Dequeue (FR-02)
+                    if (vm.EntryId == null && vm.Model?.Id != null)
+                    {
+                        if (_pendingEntries.TryRemove(vm.Model.Id.Value, out var fallbackEntryId))
+                        {
+                            vm.EntryId = fallbackEntryId;
+                            _log?.Info($"EntryId 개별 탐지 폴백 매칭: Event({vm.Model.Id}) → Entry({fallbackEntryId})");
+                        }
+                    }
                     if (vm.EntryId != null)
                         _eventQueueManager.Dequeue(vm.EntryId);
                     else
@@ -527,7 +568,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var model = vm.Model;
                     if (model == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
 
-                    // 심볼 복원은 EventQueueManager Dequeue 전이로 일원화
+                    // 심볼 복원: _pendingEntries 폴백 후 Dequeue (FR-02)
+                    if (vm.EntryId == null && vm.Model?.Id != null)
+                    {
+                        if (_pendingEntries.TryRemove(vm.Model.Id.Value, out var fallbackEntryId))
+                        {
+                            vm.EntryId = fallbackEntryId;
+                            _log?.Info($"EntryId 개별 장애 폴백 매칭: Event({vm.Model.Id}) → Entry({fallbackEntryId})");
+                        }
+                    }
                     if (vm.EntryId != null)
                         _eventQueueManager.Dequeue(vm.EntryId);
                     else
@@ -617,6 +666,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private EventCardBatchBuffer<EventCardBaseViewModel> _batchBuffer;
         private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
         private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
+        private readonly SemaphoreSlim _batchReportGate = new(1, 1);
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;
