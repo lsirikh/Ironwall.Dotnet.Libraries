@@ -62,6 +62,11 @@ public class DataGridScrollEndBehavior : Behavior<DataGrid>
 
     private void OnDataGridLoaded(object sender, RoutedEventArgs e)
     {
+        // 기존 구독 먼저 해제 — Loaded는 탭 전환 시 재발화하므로 중복 등록 방지
+        // AS-IS: 탭 10회 전환 → OnScrollChanged 10중 등록 → 스크롤 1회에 LoadMoreCommand 10번 실행
+        if (_scrollViewer != null)
+            _scrollViewer.ScrollChanged -= OnScrollChanged;
+
         _scrollViewer = GetVisualChild<ScrollViewer>(AssociatedObject);
         if (_scrollViewer != null)
             _scrollViewer.ScrollChanged += OnScrollChanged;
