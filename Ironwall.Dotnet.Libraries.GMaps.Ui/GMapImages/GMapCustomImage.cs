@@ -389,6 +389,20 @@ public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 이미지가 표시되는 최소 줌 레벨.
+    /// 지도 줌이 이 값 이상일 때만 이미지가 표시됨. 0 = 모든 줌 레벨에서 표시.
+    /// </summary>
+    public double Zoom
+    {
+        get => _model.Zoom;
+        set
+        {
+            _model.Zoom = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
     /// 종횡비 유지 여부
     /// </summary>
     public bool MaintainAspectRatio

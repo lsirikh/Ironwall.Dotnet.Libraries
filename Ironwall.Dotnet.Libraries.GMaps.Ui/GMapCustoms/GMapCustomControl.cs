@@ -1288,7 +1288,7 @@ public class GMapCustomControl : GMapControl
     {
         try
         {
-            foreach (var customImage in CustomImages.Where(img => img.Visibility))
+            foreach (var customImage in CustomImages.Where(img => img.Visibility && (img.Zoom <= 0 || Zoom >= img.Zoom)))
             {
                 RenderSingleImageOverlay(drawingContext, customImage);
             }
