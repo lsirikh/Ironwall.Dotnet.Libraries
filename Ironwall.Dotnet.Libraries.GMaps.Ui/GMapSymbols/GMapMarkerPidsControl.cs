@@ -400,11 +400,13 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         return deviceType switch
         {
-            EnumDeviceType.IpCamera  => 40,
-            EnumDeviceType.PIR       => 35,
-            EnumDeviceType.Fence     => 30,
-            EnumDeviceType.IpSpeaker => 36,
-            _                        => 32,
+            EnumDeviceType.IpCamera           => 40,
+            EnumDeviceType.PIR                => 35,
+            EnumDeviceType.Fence              => 30,
+            EnumDeviceType.IpSpeaker          => 36,
+            EnumDeviceType.Multi              => 32,
+            EnumDeviceType.SmartMultisensor2  => 32,
+            _                                 => 32,
         };
     }
 

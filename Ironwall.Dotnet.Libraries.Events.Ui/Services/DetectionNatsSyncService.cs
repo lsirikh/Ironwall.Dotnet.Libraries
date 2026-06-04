@@ -92,8 +92,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
             var deviceTypeStr = body.Device?.TypeDevice ?? string.Empty;
             if (!Enum.TryParse<EnumDeviceType>(deviceTypeStr, ignoreCase: true, out var deviceType))
             {
-                _log?.Warning($"DETECTION: DeviceType 파싱 실패 '{deviceTypeStr}' (deviceId={deviceId}), Fence으로 기본값 처리");
-                deviceType = EnumDeviceType.Fence;
+                _log?.Error($"DETECTION: DeviceType 파싱 실패 '{deviceTypeStr}' (deviceId={deviceId}) — 이벤트 무시");
+                return Task.CompletedTask;
             }
 
             _log?.Info($"DETECTION 수신: deviceId={deviceId}, deviceType={deviceType}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");

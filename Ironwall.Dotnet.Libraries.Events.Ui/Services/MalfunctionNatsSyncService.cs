@@ -77,8 +77,8 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService
             var deviceTypeStr = body.Device?.TypeDevice ?? string.Empty;
             if (!Enum.TryParse<EnumDeviceType>(deviceTypeStr, ignoreCase: true, out var deviceType))
             {
-                _log?.Warning($"MALFUNCTION: DeviceType 파싱 실패 '{deviceTypeStr}' (deviceId={deviceId}), Fence으로 기본값 처리");
-                deviceType = EnumDeviceType.Fence;
+                _log?.Error($"MALFUNCTION: DeviceType 파싱 실패 '{deviceTypeStr}' (deviceId={deviceId}) — 이벤트 무시");
+                return Task.CompletedTask;
             }
 
             List<int>? deviceGroups = body.Device?.DeviceGroups?

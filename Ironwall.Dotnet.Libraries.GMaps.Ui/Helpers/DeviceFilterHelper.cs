@@ -23,8 +23,11 @@ internal static class DeviceFilterHelper
             EnumDeviceType.Controller =>
                 devices.Where(d => d.DeviceType == EnumDeviceType.Controller),
 
-            EnumDeviceType.Multi =>
-                devices.Where(d => d.DeviceType == EnumDeviceType.Multi),
+            EnumDeviceType.Multi or
+            EnumDeviceType.SmartMultisensor2 =>
+                devices.Where(d =>
+                    d.DeviceType == EnumDeviceType.Multi ||
+                    d.DeviceType == EnumDeviceType.SmartMultisensor2),
 
             EnumDeviceType.IpCamera =>
                 devices.Where(d => d.DeviceType == EnumDeviceType.IpCamera),
