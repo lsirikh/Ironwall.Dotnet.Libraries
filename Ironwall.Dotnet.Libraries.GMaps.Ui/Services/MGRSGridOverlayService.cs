@@ -7,6 +7,7 @@ using System.Windows.Media;
 using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 
