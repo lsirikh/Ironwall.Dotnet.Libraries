@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-06-04 (advance-phase 자동)
-- **총 문서 수**: 162개
+- **총 문서 수**: 165개
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [RapidEventBurst_Stutter_Analysis.md](analysis/RapidEventBurst_Stutter_Analysis.md) | RapidEventBurst_Stutter_Analysis.md | 2026-06-04 |
 | [Multisensor_Symbol_Bug_Analysis.md](analysis/Multisensor_Symbol_Bug_Analysis.md) | Multisensor_Symbol_Bug_Analysis.md | 2026-06-04 |
 | [EventStateSyncArchitecture_Analysis.md](analysis/EventStateSyncArchitecture_Analysis.md) | EventStateSyncArchitecture_Analysis.md | 2026-06-04 |
 | [BatchReport_SymbolLeak_Analysis.md](analysis/BatchReport_SymbolLeak_Analysis.md) | BatchReport_SymbolLeak_Analysis.md | 2026-06-04 |
@@ -25,7 +26,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix — 이중 경로 및 JToken 타입 가드 수정 | Draft | 2026-06-04 |
+| [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix | Completed | 2026-06-04 |
 | [Multisensor_Symbol_Fix-prd.md](prds/Multisensor_Symbol_Fix-prd.md) | Multisensor_Symbol_Fix | Completed | 2026-06-04 |
 | [BatchReport_SymbolRestore_Fix-prd.md](prds/BatchReport_SymbolRestore_Fix-prd.md) | BatchReport_SymbolRestore_Fix | Approved | 2026-06-04 |
 | [EventCardPerformance-prd.md](prds/EventCardPerformance-prd.md) | EventCardPerformance | Draft | 2026-06-04 |
@@ -59,6 +60,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | 20/20 | 2026-06-04 |
 | [Multisensor_Symbol_Fix-prd-plan.md](plans/Multisensor_Symbol_Fix-prd-plan.md) | [PRD](prds/Multisensor_Symbol_Fix-prd.md) | 20/20 | 2026-06-04 |
 | [EventCardPerformance-prd-plan.md](plans/EventCardPerformance-prd-plan.md) | [PRD](prds/EventCardPerformance-prd.md) | 16/29 | 2026-06-04 |
 | [OverlayMap_MBTiles_Provider-prd-plan.md](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) | 22/23 | 2026-06-02 |
@@ -93,6 +95,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) → [Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |
 | [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) → [Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
 | [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) → [Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd-plan.md) | 2026-05-20 |
 | [Detection_Sound_And_DualPath_Fix-report.md](reports/Detection_Sound_And_DualPath_Fix-report.md) | [PRD](prds/Detection_Sound_And_DualPath_Fix-prd.md) → [Plan](plans/Detection_Sound_And_DualPath_Fix-prd-plan.md) | 2026-05-18 |

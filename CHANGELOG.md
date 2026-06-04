@@ -2,6 +2,11 @@
 
 <!-- changelog-entries-start -->
 
+## [2.7.1] - 2026-06-04
+
+### Added
+- **SymbolUpdate_DispatcherFreeze_Fix PRD** ([PRD](docs/prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) · [Plan](docs/plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md))
+
 ## [2.7.0] - 2026-06-04
 
 ### Added
