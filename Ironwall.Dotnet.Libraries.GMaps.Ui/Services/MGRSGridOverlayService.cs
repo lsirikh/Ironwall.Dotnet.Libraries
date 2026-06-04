@@ -446,6 +446,7 @@ public class MGRSGridOverlayService
                     if (!string.IsNullOrEmpty(mgrsText))
                     {
                         // FormattedText 미리 생성 (렌더링 시 성능 향상)
+                        var pixelsPerDip = (_mapControl as GMapCustomControl)?.PixelsPerDip ?? 1.0;
                         var formattedText = new FormattedText(
                             mgrsText,
                             System.Globalization.CultureInfo.CurrentCulture,
@@ -453,7 +454,7 @@ public class MGRSGridOverlayService
                             new Typeface("Arial"),
                             11, // 약간 작은 폰트로 가독성 향상
                             _labelBrush,
-                            96);
+                            pixelsPerDip);
 
                         // 지리 좌표로 저장 (화면 좌표 변환은 렌더링 시에 실시간 처리)
                         _cachedLabels.Add(new CachedGridLabel

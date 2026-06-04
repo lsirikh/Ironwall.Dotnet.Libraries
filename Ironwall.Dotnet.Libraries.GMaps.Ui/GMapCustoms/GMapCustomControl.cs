@@ -320,6 +320,10 @@ public class GMapCustomControl : GMapControl
     
     #region Override Methods
 
+    // OnRender 시점에 항상 Visual Tree에 연결된 상태이므로 null 반환 없음. 폴백 1.0은 96DPI 동작 유지.
+    internal double PixelsPerDip
+        => PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
     protected override void OnInitialized(EventArgs e)
     {
         _eventAggregator?.SubscribeOnUIThread(this);
@@ -328,6 +332,14 @@ public class GMapCustomControl : GMapControl
         DragButton = System.Windows.Input.MouseButton.Left;
 
         base.OnInitialized(e);
+
+        var tier = System.Windows.Media.RenderCapability.Tier >> 16;
+        if (tier == 0)
+            _log?.Warning("[GMapCustomControl] 소프트웨어 렌더링 모드 감지 (Tier=0). RDP/가상화 환경 가능성. 패닝 성능 저하 예상.");
+        else if (tier == 1)
+            _log?.Info("[GMapCustomControl] 부분 하드웨어 가속 모드 (Tier=1).");
+        else
+            _log?.Info($"[GMapCustomControl] 하드웨어 가속 렌더링 (Tier={tier}).");
     }
 
     /// <summary>
@@ -1336,7 +1348,7 @@ public class GMapCustomControl : GMapControl
                 {
                     var nameText = new FormattedText(customImage.Title,
                         CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                        new Typeface("Arial"), 12, Brushes.Red, 96);
+                        new Typeface("Arial"), 12, Brushes.Red, PixelsPerDip);
                     drawingContext.DrawText(nameText, new Point(imageRect.X, imageRect.Y - 15));
                 }
             }
@@ -1408,7 +1420,7 @@ public class GMapCustomControl : GMapControl
             // 회전 각도 텍스트
             var rotationText = new FormattedText($"회전: {MapRotation:F1}°",
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                new Typeface("Arial"), 14, Brushes.Black, 96);
+                new Typeface("Arial"), 14, Brushes.Black, PixelsPerDip);
 
             // 배경 사각형
             var textRect = new Rect(10, 10, rotationText.Width + 10, rotationText.Height + 6);
@@ -1469,7 +1481,7 @@ public class GMapCustomControl : GMapControl
 
             // N 표시
             var nText = new FormattedText("N", CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight, new Typeface("Arial"), 12, Brushes.Black, 96);
+                FlowDirection.LeftToRight, new Typeface("Arial"), 12, Brushes.Black, PixelsPerDip);
 
             var nPos = new Point(
                 center.X + Math.Sin(northAngle) * (radius + 15) - nText.Width / 2,

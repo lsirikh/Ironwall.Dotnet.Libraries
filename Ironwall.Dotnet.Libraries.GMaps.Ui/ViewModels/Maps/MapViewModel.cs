@@ -4228,8 +4228,8 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void MainMap_OnCurrentPositionChanged(PointLatLng point)
     {
-        MainMap.Position = point;
-        // 기존 타일 위치 업데이트는 즉시 동기 수행 (async 전환 후 RefreshVisibleTiles는 저렴)
+        // Position은 GMapControl 내부에서 이미 변경된 후 이벤트가 발화되므로 재설정 불필요.
+        // 재설정하면 PositionChangedCallBack → ForceUpdateOverlays() 이중 호출 유발.
         _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 

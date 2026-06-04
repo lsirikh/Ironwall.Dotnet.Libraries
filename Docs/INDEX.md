@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-06-04 (advance-phase 자동)
-- **총 문서 수**: 165개
+- **총 문서 수**: 168개
 
 ---
 
@@ -26,6 +26,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [RemoteDesktop_PanFollowBug_Fix-prd.md](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | RemoteDesktop_PanFollowBug_Fix | Approved | 2026-06-04 |
+| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Superseded | 2026-06-04 |
 | [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix | Completed | 2026-06-04 |
 | [Multisensor_Symbol_Fix-prd.md](prds/Multisensor_Symbol_Fix-prd.md) | Multisensor_Symbol_Fix | Completed | 2026-06-04 |
 | [BatchReport_SymbolRestore_Fix-prd.md](prds/BatchReport_SymbolRestore_Fix-prd.md) | BatchReport_SymbolRestore_Fix | Approved | 2026-06-04 |
@@ -39,7 +41,6 @@
 | [SymbolUpdate_Threading_And_LeakFix-prd.md](prds/SymbolUpdate_Threading_And_LeakFix-prd.md) | SymbolUpdate_Threading_And_LeakFix | Draft | 2026-05-27 |
 | [OverlayMap_Performance_Optimization-prd.md](prds/OverlayMap_Performance_Optimization-prd.md) | OverlayMap_Performance_Optimization | Draft | 2026-05-27 |
 | [MalfunctionCard_ControllerNumber_BindingFix-prd.md](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | MalfunctionCard_ControllerNumber_BindingFix | Approved | 2026-05-27 |
-| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Superseded | 2026-06-04 |
 | [MapSymbol_PulseAnimation_Performance_Fix-prd.md](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | MapSymbol_PulseAnimation_Performance_Fix | Approved | 2026-05-26 |
 | [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | Event_Performance_Optimization | Draft | 2026-05-22 |
 | [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | AutoActionReport_DualPath_Fix | Draft | 2026-05-22 |
@@ -60,6 +61,8 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [RemoteDesktop_PanFollowBug_Fix-prd-plan.md](plans/RemoteDesktop_PanFollowBug_Fix-prd-plan.md) | [PRD](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | 0/16 | 2026-06-04 |
+| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | 7/15 | 2026-06-04 |
 | [SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | 20/20 | 2026-06-04 |
 | [Multisensor_Symbol_Fix-prd-plan.md](plans/Multisensor_Symbol_Fix-prd-plan.md) | [PRD](prds/Multisensor_Symbol_Fix-prd.md) | 20/20 | 2026-06-04 |
 | [EventCardPerformance-prd-plan.md](plans/EventCardPerformance-prd-plan.md) | [PRD](prds/EventCardPerformance-prd.md) | 16/29 | 2026-06-04 |
@@ -71,7 +74,6 @@
 | [OverlayMap_Performance_Optimization-prd-plan.md](plans/OverlayMap_Performance_Optimization-prd-plan.md) | [PRD](prds/OverlayMap_Performance_Optimization-prd.md) | 56/67 | 2026-05-27 |
 | [PRD_SplashScreen_Startup_Gating-prd-plan.md](plans/PRD_SplashScreen_Startup_Gating-prd-plan.md) | [PRD](prds/PRD_SplashScreen_Startup_Gating-prd.md) | 22/36 | 2026-05-27 |
 | [MalfunctionCard_ControllerNumber_BindingFix-prd-plan.md](plans/MalfunctionCard_ControllerNumber_BindingFix-prd-plan.md) | [PRD](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | 4/8 | 2026-05-27 |
-| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | Superseded | 2026-06-04 |
 | [MapSymbol_PulseAnimation_Performance_Fix-prd-plan.md](plans/MapSymbol_PulseAnimation_Performance_Fix-prd-plan.md) | [PRD](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | 20/24 | 2026-05-26 |
 | [Event_Performance_Optimization-prd-plan.md](plans/Event_Performance_Optimization-prd-plan.md) | [PRD](prds/Event_Performance_Optimization-prd.md) | 49/60 | 2026-05-22 |
 | [SoundTypeSwitch_ImmediateStop_Fix-plan.md](plans/SoundTypeSwitch_ImmediateStop_Fix-plan.md) | [PRD](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | 0/0 | 2026-05-20 |
