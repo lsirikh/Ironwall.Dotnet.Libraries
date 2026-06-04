@@ -62,7 +62,7 @@ public class DetectionNatsSyncServiceTests
             "device_id": 5,
             "device": {
               "id": 5,
-              "type_device": "Sensor",
+              "type_device": "Fence",
               "device_groups": [{ "id": 1, "name": "A구역" }]
             },
             "result": "PIR_SENSOR"
@@ -138,7 +138,7 @@ public class DetectionNatsSyncServiceTests
             "device_id": 7,
             "device": {
               "id": 7,
-              "type_device": "Sensor",
+              "type_device": "Fence",
               "device_groups": [{ "id": 2, "name": "B구역" }]
             }
           }
@@ -176,7 +176,7 @@ public class DetectionNatsSyncServiceTests
             "type_event": "Intrusion",
             "device": {
               "id": 16,
-              "type_device": "Sensor",
+              "type_device": "Fence",
               "device_groups": [{ "id": 2, "name": "B구역" }]
             }
           }
@@ -195,5 +195,41 @@ public class DetectionNatsSyncServiceTests
             e.DeviceType == EnumDeviceType.Fence),
             It.IsAny<string?>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task OnNatsDetection_InvalidDeviceType_ShouldDropEvent()
+    {
+        // Arrange — 파싱 불가능한 type_device가 오면 이벤트 드롭 (Fence 오분류 금지)
+        var service = CreateService(out var mockEa, out var mockQueue);
+        await service.StartService();
+
+        var json = """
+        {
+          "cmd": "DETECT",
+          "body": {
+            "id": 99,
+            "type_event": "Intrusion",
+            "device": {
+              "id": 10,
+              "type_device": "UnknownType",
+              "device_groups": []
+            }
+          }
+        }
+        """;
+
+        var args = new MessageArgsModel(
+            subject: "test", subscriptionSubject: null, data: json);
+
+        // Act
+        await _capturedHandler!(args);
+
+        // Assert — Enqueue 호출 없음 (이벤트 드롭)
+        mockQueue.Verify(q => q.Enqueue(It.IsAny<EventEntry>(), It.IsAny<string?>()), Times.Never);
+        mockEa.Verify(ea => ea.PublishAsync(
+            It.IsAny<EventEntryEnqueuedMessage>(),
+            It.IsAny<Func<Func<Task>, Task>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 }
