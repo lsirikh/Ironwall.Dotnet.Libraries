@@ -39,7 +39,7 @@
 | [SymbolUpdate_Threading_And_LeakFix-prd.md](prds/SymbolUpdate_Threading_And_LeakFix-prd.md) | SymbolUpdate_Threading_And_LeakFix | Draft | 2026-05-27 |
 | [OverlayMap_Performance_Optimization-prd.md](prds/OverlayMap_Performance_Optimization-prd.md) | OverlayMap_Performance_Optimization | Draft | 2026-05-27 |
 | [MalfunctionCard_ControllerNumber_BindingFix-prd.md](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | MalfunctionCard_ControllerNumber_BindingFix | Approved | 2026-05-27 |
-| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Approved | 2026-05-26 |
+| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Superseded | 2026-06-04 |
 | [MapSymbol_PulseAnimation_Performance_Fix-prd.md](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | MapSymbol_PulseAnimation_Performance_Fix | Approved | 2026-05-26 |
 | [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | Event_Performance_Optimization | Draft | 2026-05-22 |
 | [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | AutoActionReport_DualPath_Fix | Draft | 2026-05-22 |
@@ -71,7 +71,7 @@
 | [OverlayMap_Performance_Optimization-prd-plan.md](plans/OverlayMap_Performance_Optimization-prd-plan.md) | [PRD](prds/OverlayMap_Performance_Optimization-prd.md) | 56/67 | 2026-05-27 |
 | [PRD_SplashScreen_Startup_Gating-prd-plan.md](plans/PRD_SplashScreen_Startup_Gating-prd-plan.md) | [PRD](prds/PRD_SplashScreen_Startup_Gating-prd.md) | 22/36 | 2026-05-27 |
 | [MalfunctionCard_ControllerNumber_BindingFix-prd-plan.md](plans/MalfunctionCard_ControllerNumber_BindingFix-prd-plan.md) | [PRD](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | 4/8 | 2026-05-27 |
-| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | 7/15 | 2026-05-26 |
+| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | Superseded | 2026-06-04 |
 | [MapSymbol_PulseAnimation_Performance_Fix-prd-plan.md](plans/MapSymbol_PulseAnimation_Performance_Fix-prd-plan.md) | [PRD](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | 20/24 | 2026-05-26 |
 | [Event_Performance_Optimization-prd-plan.md](plans/Event_Performance_Optimization-prd-plan.md) | [PRD](prds/Event_Performance_Optimization-prd.md) | 49/60 | 2026-05-22 |
 | [SoundTypeSwitch_ImmediateStop_Fix-plan.md](plans/SoundTypeSwitch_ImmediateStop_Fix-plan.md) | [PRD](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | 0/0 | 2026-05-20 |
