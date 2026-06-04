@@ -9,6 +9,8 @@ using Newtonsoft.Json.Linq;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 using System;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -116,8 +118,11 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService
             _log?.Info($"DETECTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
 
             // entryId + eventId를 EventAggregator로 발행 → 카드 1:1 매칭에 사용
-            _eventAggregator?.PublishOnUIThreadAsync(
-                new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType));
+            // Background(4) 우선순위: PublishOnUIThreadAsync(Normal=9)가 Input(5) 기아 유발 → Background로 하강
+            Application.Current?.Dispatcher.InvokeAsync(
+                () => _eventAggregator!.PublishOnCurrentThreadAsync(
+                    new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, eventType)),
+                DispatcherPriority.Background);
         }
         catch (Exception ex)
         {

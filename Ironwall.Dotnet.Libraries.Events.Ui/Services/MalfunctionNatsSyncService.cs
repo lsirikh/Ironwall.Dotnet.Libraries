@@ -9,6 +9,8 @@ using Newtonsoft.Json.Linq;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
 using System;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -101,8 +103,11 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService
 
             _log?.Info($"MALFUNCTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
 
-            _eventAggregator?.PublishOnUIThreadAsync(
-                new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, EnumEventType.Fault));
+            // Background(4) 우선순위: PublishOnUIThreadAsync(Normal=9)가 Input(5) 기아 유발 → Background로 하강
+            Application.Current?.Dispatcher.InvokeAsync(
+                () => _eventAggregator!.PublishOnCurrentThreadAsync(
+                    new EventEntryEnqueuedMessage(entryId, eventId, deviceId, deviceType, EnumEventType.Fault)),
+                DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
