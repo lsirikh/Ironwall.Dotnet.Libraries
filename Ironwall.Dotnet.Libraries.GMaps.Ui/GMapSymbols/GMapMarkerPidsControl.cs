@@ -14,6 +14,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using System.Windows.Data;
 using System.Windows.Shapes;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
