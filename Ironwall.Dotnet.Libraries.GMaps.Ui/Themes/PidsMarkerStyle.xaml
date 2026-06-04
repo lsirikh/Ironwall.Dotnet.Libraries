@@ -859,23 +859,28 @@
 							</Border.Effect>
 						</Border>
 
-						<!--  Pulse Ripple Rings — Canvas 기반 (Grid 30px 제약 우회)  -->
-						<!--  Grid Measure: Ellipse(80px) → 30px 클램핑됨 → 마커와 같은 크기 → 안 보임  -->
-						<!--  Canvas Measure: 자식에게 ∞ 제약 전달 → 80px 유지 → 아이콘 밖으로 팽창 표시  -->
-						<!--  Canvas.Left/Top = -(80-마커크기)/2 = -25: 80px 링을 30px 마커 중심에 정렬  -->
+						<!--  Pulse Ripple Rings — Zero-size Canvas anchor at icon center  -->
+						<!--  Width=0/Height=0 + HA/VA=Center: Canvas origin = outer Grid center = icon center  -->
+						<!--  Canvas.Left/Top = -(EllipseSize/2) = -40: Ellipse center = Canvas origin = icon center  -->
+						<!--  아이콘 크기(TemplateBinding Width/Height)와 무관하게 정확히 중앙 정렬됨  -->
 						<Canvas
-							Width="{TemplateBinding Width}"
-							Height="{TemplateBinding Height}"
+							Width="0"
+							Height="0"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
 							IsHitTestVisible="False">
+							<!--  Opacity + RenderTransform(ScaleTransform) 애니메이션은 WPF 컴포지션 레이어에서  -->
+							<!--  BitmapCache 없이도 GPU 전담 처리됨. BitmapCache + ScaleTransform 조합은  -->
+							<!--  스케일 변경 시 캐시 무효화 루프 발생 → Forever 반복과 결합 시 스턱 원인.  -->
 							<Ellipse
 								Name="PulseRing1"
-								Canvas.Left="-25"
-								Canvas.Top="-25"
+								Canvas.Left="-40"
+								Canvas.Top="-40"
 								Width="80"
 								Height="80"
 								Fill="Transparent"
 								Stroke="#CCFF0000"
-								StrokeThickness="2"
+								StrokeThickness="6"
 								Opacity="0"
 								RenderTransformOrigin="0.5,0.5">
 								<Ellipse.RenderTransform>
@@ -884,13 +889,13 @@
 							</Ellipse>
 							<Ellipse
 								Name="PulseRing2"
-								Canvas.Left="-25"
-								Canvas.Top="-25"
+								Canvas.Left="-40"
+								Canvas.Top="-40"
 								Width="80"
 								Height="80"
 								Fill="Transparent"
 								Stroke="#CCFF0000"
-								StrokeThickness="2"
+								StrokeThickness="6"
 								Opacity="0"
 								RenderTransformOrigin="0.5,0.5">
 								<Ellipse.RenderTransform>
@@ -899,13 +904,13 @@
 							</Ellipse>
 							<Ellipse
 								Name="PulseRing3"
-								Canvas.Left="-25"
-								Canvas.Top="-25"
+								Canvas.Left="-40"
+								Canvas.Top="-40"
 								Width="80"
 								Height="80"
 								Fill="Transparent"
 								Stroke="#CCFF0000"
-								StrokeThickness="2"
+								StrokeThickness="6"
 								Opacity="0"
 								RenderTransformOrigin="0.5,0.5">
 								<Ellipse.RenderTransform>

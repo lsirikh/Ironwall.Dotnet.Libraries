@@ -1,22 +1,20 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-05-22
-- **총 문서 수**: 122개
+- **마지막 갱신**: 2026-06-04 (advance-phase 자동)
+- **총 문서 수**: 162개
 
 ---
-
-## 레퍼런스
-
-| 파일 | 내용 | 날짜 |
-|------|------|------|
-| [EVENT_PIPELINE_LAYERS.md](EVENT_PIPELINE_LAYERS.md) | NATS 이벤트 파이프라인 8개 레이어 명명 체계 ([INGEST]/[QUEUE]/[SYMBOL]/[SOUND]/[CARD]/[ACTION]/[MAP]/[DB]) | 2026-05-21 |
 
 ## 분석 (docs/analysis/)
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [EVENT_PROCESS_VISUALIZATION.md](analysis/EVENT_PROCESS_VISUALIZATION.md) | 이벤트 파이프라인 전체 시각화 — 레이어별 ASCII 흐름도·Mermaid 시퀀스·상태 다이어그램·메서드-클래스 맵 | 2026-05-22 |
+| [Multisensor_Symbol_Bug_Analysis.md](analysis/Multisensor_Symbol_Bug_Analysis.md) | Multisensor_Symbol_Bug_Analysis.md | 2026-06-04 |
+| [EventStateSyncArchitecture_Analysis.md](analysis/EventStateSyncArchitecture_Analysis.md) | EventStateSyncArchitecture_Analysis.md | 2026-06-04 |
+| [BatchReport_SymbolLeak_Analysis.md](analysis/BatchReport_SymbolLeak_Analysis.md) | BatchReport_SymbolLeak_Analysis.md | 2026-06-04 |
+| [OverlayMap-Performance-Analysis.md](analysis/OverlayMap-Performance-Analysis.md) | OverlayMap-Performance-Analysis.md | 2026-05-27 |
+| [EVENT_PROCESS_VISUALIZATION.md](analysis/EVENT_PROCESS_VISUALIZATION.md) | EVENT_PROCESS_VISUALIZATION.md | 2026-05-22 |
 | [ANALYSIS_Skillset_Issues_And_Improvements.md](analysis/ANALYSIS_Skillset_Issues_And_Improvements.md) | ANALYSIS_Skillset_Issues_And_Improvements.md | 2026-05-19 |
 | [ANALYSIS_View_Architecture.md](analysis/ANALYSIS_View_Architecture.md) | ANALYSIS_View_Architecture.md | 2026-05-18 |
 | [ANALYSIS_Detection_Action_Process_Flow.md](analysis/ANALYSIS_Detection_Action_Process_Flow.md) | ANALYSIS_Detection_Action_Process_Flow.md | 2026-05-18 |
@@ -27,18 +25,28 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [OverlayMap_MBTiles_Provider-prd.md](prds/OverlayMap_MBTiles_Provider-prd.md) | OverlayMap PNG→MBTiles 전환 — 신규 Provider, TMS 좌표 변환, LRU 활성화, DB 스키마 마이그레이션 (시뮬레이션 S-01~S-15) | Draft | 2026-06-02 |
-| [RedisDomainService_DoubleStop_Fix-prd.md](prds/RedisDomainService_DoubleStop_Fix-prd.md) | RedisBrokerService.StopAsync 이중 호출 NRE 수정 — _redisService.StopAsync 제거, NatsDomainService 패턴 통일 | Approved | 2026-06-01 |
-| [NatsShutdown_SubscriptionHang_Fix-prd.md](prds/NatsShutdown_SubscriptionHang_Fix-prd.md) | NATS 종료 10초 블로킹 — startupToken/shutdownToken 수명주기 불일치, _subscriptionCts + Interlocked 재진입 가드 (시뮬레이션 2회) | Approved | 2026-06-01 |
-| [AppShutdown_Blocking_Fix-prd.md](prds/AppShutdown_Blocking_Fix-prd.md) | 앱 종료 Task.Run 블로킹 — MessageService async void + Redis CloseAsync 토큰 미지원 수정 (시뮬레이션 2회, Fix A/B 검증) | Approved | 2026-05-28 |
-| [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | 자동 조치보고 이중 경로(Path A 타이머 + Path B 공유 타이머) 버그 수정 — 46개 결함, 8단계 안전 구현 시퀀스, 4회 시뮬레이션 검증 | Draft | 2026-05-22 |
-| [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | 이벤트 파이프라인 전체 성능 최적화 — EventCard(FR-01~10) + Symbol STA 위반(FR-11) + EQM lock(FR-12). 4회 시뮬레이션 검증, Blocker 1개 + Critical 12개 반영 | Draft | 2026-05-22 |
-| [BatchReport_Sound_Stop_Fix-prd.md](prds/BatchReport_Sound_Stop_Fix-prd.md) | 일괄 조치보고 시 장애 사운드 즉시 중지 미동작 수정 (OnQueueCleared 이벤트 + _stopAll 추가) | Draft | 2026-05-21 |
-| [PRD_SplashScreen_Startup_Gating.md](prds/PRD_SplashScreen_Startup_Gating.md) | SplashScreen 기동 시퀀스 + API/NATS 연결 게이팅 (워치독 타이머 제거 전제) | Draft | 2026-05-20 |
-| [PRD_PidsSymbol_Transparency_Blink.md](prds/PRD_PidsSymbol_Transparency_Blink.md) | PIDS 심볼 투명도/깜빡임 버그 수정 (8개 버그, 6파일) | Draft | 2026-05-20 |
-| [SoundTypeSwitch_ImmediateStop_Fix-prd.md](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | 이종 이벤트 사운드 즉시 전환 수정 (Detection↔Fault stop+play 원자화) | Completed | 2026-05-20 |
-| [Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) | 개별 디바이스 복합 상태 SSOT 전환 + Fault 자동복구 | Completed | 2026-05-19 |
-| [FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md](prds/FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md) | FenceGroup 깜빡임 재설계 + 사운드 이중재생 버그 수정 | Completed | 2026-05-19 |
+| [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix — 이중 경로 및 JToken 타입 가드 수정 | Draft | 2026-06-04 |
+| [Multisensor_Symbol_Fix-prd.md](prds/Multisensor_Symbol_Fix-prd.md) | Multisensor_Symbol_Fix | Completed | 2026-06-04 |
+| [BatchReport_SymbolRestore_Fix-prd.md](prds/BatchReport_SymbolRestore_Fix-prd.md) | BatchReport_SymbolRestore_Fix | Approved | 2026-06-04 |
+| [EventCardPerformance-prd.md](prds/EventCardPerformance-prd.md) | EventCardPerformance | Draft | 2026-06-04 |
+| [OverlayMap_MBTiles_Provider-prd.md](prds/OverlayMap_MBTiles_Provider-prd.md) | OverlayMap_MBTiles_Provider | Approved | 2026-06-02 |
+| [RedisDomainService_DoubleStop_Fix-prd.md](prds/RedisDomainService_DoubleStop_Fix-prd.md) | RedisDomainService_DoubleStop_Fix | Approved | 2026-06-01 |
+| [NatsShutdown_SubscriptionHang_Fix-prd.md](prds/NatsShutdown_SubscriptionHang_Fix-prd.md) | NatsShutdown_SubscriptionHang_Fix | Approved | 2026-06-01 |
+| [AppShutdown_Blocking_Fix-prd.md](prds/AppShutdown_Blocking_Fix-prd.md) | AppShutdown_Blocking_Fix | Approved | 2026-06-01 |
+| [DetectionPulse_Ripple_Enlargement-prd.md](prds/DetectionPulse_Ripple_Enlargement-prd.md) | DetectionPulse_Ripple_Enlargement | Approved | 2026-05-28 |
+| [PRD_SplashScreen_Startup_Gating.md](prds/PRD_SplashScreen_Startup_Gating.md) | PRD_SplashScreen_Startup_Gating.md | Draft | 2026-05-27 |
+| [SymbolUpdate_Threading_And_LeakFix-prd.md](prds/SymbolUpdate_Threading_And_LeakFix-prd.md) | SymbolUpdate_Threading_And_LeakFix | Draft | 2026-05-27 |
+| [OverlayMap_Performance_Optimization-prd.md](prds/OverlayMap_Performance_Optimization-prd.md) | OverlayMap_Performance_Optimization | Draft | 2026-05-27 |
+| [MalfunctionCard_ControllerNumber_BindingFix-prd.md](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | MalfunctionCard_ControllerNumber_BindingFix | Approved | 2026-05-27 |
+| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Approved | 2026-05-26 |
+| [MapSymbol_PulseAnimation_Performance_Fix-prd.md](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | MapSymbol_PulseAnimation_Performance_Fix | Approved | 2026-05-26 |
+| [Event_Performance_Optimization-prd.md](prds/Event_Performance_Optimization-prd.md) | Event_Performance_Optimization | Draft | 2026-05-22 |
+| [AutoActionReport_DualPath_Fix-prd.md](prds/AutoActionReport_DualPath_Fix-prd.md) | AutoActionReport_DualPath_Fix | Draft | 2026-05-22 |
+| [BatchReport_Sound_Stop_Fix-prd.md](prds/BatchReport_Sound_Stop_Fix-prd.md) | BatchReport_Sound_Stop_Fix | Draft | 2026-05-21 |
+| [PRD_PidsSymbol_Transparency_Blink.md](prds/PRD_PidsSymbol_Transparency_Blink.md) | PRD_PidsSymbol_Transparency_Blink.md | Draft | 2026-05-20 |
+| [SoundTypeSwitch_ImmediateStop_Fix-prd.md](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | SoundTypeSwitch_ImmediateStop_Fix | Draft | 2026-05-20 |
+| [Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) | Device_CompositeState_SSOT_And_FaultAutoRecovery | Draft | 2026-05-19 |
+| [FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md](prds/FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md) | FenceGroup_Blink_And_Sound_DualPlay_Fix | Draft | 2026-05-19 |
 | [Malfunction_CompositeState_And_FenceGroup_Visualization-prd.md](prds/Malfunction_CompositeState_And_FenceGroup_Visualization-prd.md) | Malfunction_CompositeState_And_FenceGroup_Visualization | Completed | 2026-05-19 |
 | [BatchReport_DualInsert_And_MalfunctionRestore_Fix-prd.md](prds/BatchReport_DualInsert_And_MalfunctionRestore_Fix-prd.md) | BatchReport_DualInsert_And_MalfunctionRestore_Fix | Completed | 2026-05-19 |
 | [GatewayEvent_Group_NtoN_Migration-prd.md](prds/GatewayEvent_Group_NtoN_Migration-prd.md) | GatewayEvent_Group_NtoN_Migration | Completed | 2026-05-19 |
@@ -51,9 +59,22 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [Event_Performance_Optimization-prd-plan.md](plans/Event_Performance_Optimization-prd-plan.md) | [PRD](prds/Event_Performance_Optimization-prd.md) | 0/21 | 2026-05-22 |
-| [SoundTypeSwitch_ImmediateStop_Fix-plan.md](plans/SoundTypeSwitch_ImmediateStop_Fix-plan.md) | [PRD](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | 10/10 | 2026-05-20 |
-| [Device_CompositeState_SSOT_And_FaultAutoRecovery-plan.md](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-plan.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) | 13/13 | 2026-05-19 |
+| [Multisensor_Symbol_Fix-prd-plan.md](plans/Multisensor_Symbol_Fix-prd-plan.md) | [PRD](prds/Multisensor_Symbol_Fix-prd.md) | 20/20 | 2026-06-04 |
+| [EventCardPerformance-prd-plan.md](plans/EventCardPerformance-prd-plan.md) | [PRD](prds/EventCardPerformance-prd.md) | 16/29 | 2026-06-04 |
+| [OverlayMap_MBTiles_Provider-prd-plan.md](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) | 22/23 | 2026-06-02 |
+| [DetectionPulse_Ripple_Enlargement-prd-plan.md](plans/DetectionPulse_Ripple_Enlargement-prd-plan.md) | [PRD](prds/DetectionPulse_Ripple_Enlargement-prd.md) | 9/9 | 2026-06-02 |
+| [RedisDomainService_DoubleStop_Fix-prd-plan.md](plans/RedisDomainService_DoubleStop_Fix-prd-plan.md) | [PRD](prds/RedisDomainService_DoubleStop_Fix-prd.md) | 2/3 | 2026-06-01 |
+| [NatsShutdown_SubscriptionHang_Fix-prd-plan.md](plans/NatsShutdown_SubscriptionHang_Fix-prd-plan.md) | [PRD](prds/NatsShutdown_SubscriptionHang_Fix-prd.md) | 0/8 | 2026-06-01 |
+| [AppShutdown_Blocking_Fix-prd-plan.md](plans/AppShutdown_Blocking_Fix-prd-plan.md) | [PRD](prds/AppShutdown_Blocking_Fix-prd.md) | 4/7 | 2026-06-01 |
+| [OverlayMap_Performance_Optimization-prd-plan.md](plans/OverlayMap_Performance_Optimization-prd-plan.md) | [PRD](prds/OverlayMap_Performance_Optimization-prd.md) | 56/67 | 2026-05-27 |
+| [PRD_SplashScreen_Startup_Gating-prd-plan.md](plans/PRD_SplashScreen_Startup_Gating-prd-plan.md) | [PRD](prds/PRD_SplashScreen_Startup_Gating-prd.md) | 22/36 | 2026-05-27 |
+| [MalfunctionCard_ControllerNumber_BindingFix-prd-plan.md](plans/MalfunctionCard_ControllerNumber_BindingFix-prd-plan.md) | [PRD](prds/MalfunctionCard_ControllerNumber_BindingFix-prd.md) | 4/8 | 2026-05-27 |
+| [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | 7/15 | 2026-05-26 |
+| [MapSymbol_PulseAnimation_Performance_Fix-prd-plan.md](plans/MapSymbol_PulseAnimation_Performance_Fix-prd-plan.md) | [PRD](prds/MapSymbol_PulseAnimation_Performance_Fix-prd.md) | 20/24 | 2026-05-26 |
+| [Event_Performance_Optimization-prd-plan.md](plans/Event_Performance_Optimization-prd-plan.md) | [PRD](prds/Event_Performance_Optimization-prd.md) | 49/60 | 2026-05-22 |
+| [SoundTypeSwitch_ImmediateStop_Fix-plan.md](plans/SoundTypeSwitch_ImmediateStop_Fix-plan.md) | [PRD](prds/SoundTypeSwitch_ImmediateStop_Fix-prd.md) | 0/0 | 2026-05-20 |
+| [Device_CompositeState_SSOT_And_FaultAutoRecovery-plan.md](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-plan.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) | 0/0 | 2026-05-19 |
+| [FenceGroup_Blink_And_Sound_DualPlay_Fix-plan.md](plans/FenceGroup_Blink_And_Sound_DualPlay_Fix-plan.md) | [PRD](prds/FenceGroup_Blink_And_Sound_DualPlay_Fix-prd.md) | 0/9 | 2026-05-19 |
 | [Malfunction_CompositeState_And_FenceGroup_Visualization-plan.md](plans/Malfunction_CompositeState_And_FenceGroup_Visualization-plan.md) | [PRD](prds/Malfunction_CompositeState_And_FenceGroup_Visualization-prd.md) | 35/35 | 2026-05-19 |
 | [BatchReport_DualInsert_And_MalfunctionRestore_Fix-plan.md](plans/BatchReport_DualInsert_And_MalfunctionRestore_Fix-plan.md) | [PRD](prds/BatchReport_DualInsert_And_MalfunctionRestore_Fix-prd.md) | 26/26 | 2026-05-19 |
 | [Detection_Sound_And_DualPath_Fix-prd-plan.md](plans/Detection_Sound_And_DualPath_Fix-prd-plan.md) | [PRD](prds/Detection_Sound_And_DualPath_Fix-prd.md) | 21/21 | 2026-05-19 |
@@ -72,7 +93,8 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
-| [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) → [Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-plan.md) | 2026-05-19 |
+| [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) → [Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
+| [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) → [Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd-plan.md) | 2026-05-20 |
 | [Detection_Sound_And_DualPath_Fix-report.md](reports/Detection_Sound_And_DualPath_Fix-report.md) | [PRD](prds/Detection_Sound_And_DualPath_Fix-prd.md) → [Plan](plans/Detection_Sound_And_DualPath_Fix-prd-plan.md) | 2026-05-18 |
 | [REPORT_GMapCustomControl_ImageDrag_BugFix.md](reports/REPORT_GMapCustomControl_ImageDrag_BugFix.md) | [PRD](prds/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd.md) → [Plan](plans/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd-plan.md) | 2026-05-15 |
 | [REPORT_ImageOverlay_FileCopy_On_Register.md](reports/REPORT_ImageOverlay_FileCopy_On_Register.md) | [PRD](prds/REPORT_ImageOverlay_FileCopy_On_Register.md-prd.md) → [Plan](plans/REPORT_ImageOverlay_FileCopy_On_Register.md-prd-plan.md) | 2026-05-13 |

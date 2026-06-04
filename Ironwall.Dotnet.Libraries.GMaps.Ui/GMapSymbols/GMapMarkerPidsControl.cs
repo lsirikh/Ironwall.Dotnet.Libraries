@@ -444,7 +444,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         // UI 스레드 접근 보장
         if (!Dispatcher.CheckAccess())
         {
-            Dispatcher.BeginInvoke(() => UpdateFOVPath(animate));
+            Dispatcher.BeginInvoke(() => UpdateFOVPath(animate), DispatcherPriority.Background);
             return;
         }
 

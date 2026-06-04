@@ -57,7 +57,7 @@ public class DeviceSymbolLookupModel : BaseModel
         {
             Interlocked.Exchange(ref _isFlushPending, 0);
             SymbolModel?.SetUpdate();
-        }, DispatcherPriority.Normal);
+        }, DispatcherPriority.Background);
     }
 
     /// <summary>
