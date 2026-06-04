@@ -108,8 +108,9 @@ public class DeviceSymbolLookupModel : BaseModel
             },
             EnumEventType.Fault => SymbolModel.CompositeStatus switch
             {
-                EnumCompositeEventStatus.Detecting => EnumCompositeEventStatus.FaultedDetecting,
-                _                                  => EnumCompositeEventStatus.Faulted,
+                EnumCompositeEventStatus.Detecting        => EnumCompositeEventStatus.FaultedDetecting,
+                EnumCompositeEventStatus.FaultedDetecting => EnumCompositeEventStatus.FaultedDetecting, // Detecting 차원 보존
+                _                                         => EnumCompositeEventStatus.Faulted,
             },
             _ => SymbolModel.CompositeStatus,
         };

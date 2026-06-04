@@ -113,11 +113,8 @@ public class EventUiModule : Module
                 var eqm = scope.Resolve<EventQueueManager>();
                 var sem = scope.Resolve<SymbolEventManager>();
 
-                // 개별 심볼: 0→1 Detecting, N→0 Normal (하위 호환 유지)
-                eqm.OnDeviceFirstEvent += sem.SetDeviceDetecting;
-                eqm.OnDeviceEmpty += sem.RestoreDeviceSymbol;
-
-                // 개별 심볼: SSOT 복합 상태 전이 (OnDeviceStateChanged)
+                // 개별 심볼: SSOT 복합 상태 전이 단일 경로 (OnDeviceStateChanged)
+                // OnDeviceFirstEvent/OnDeviceEmpty 경로 제거 — OnDeviceStateChanged 발화 순서가 앞서므로 중복
                 eqm.OnDeviceStateChanged += sem.HandleDeviceStateChanged;
 
                 // 자동복구: Fault 자동 조치보고
