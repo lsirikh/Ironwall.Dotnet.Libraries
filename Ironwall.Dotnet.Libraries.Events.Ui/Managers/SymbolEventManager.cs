@@ -229,10 +229,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     public void SetDeviceDetecting(int deviceId, EnumDeviceType deviceType, EnumEventType eventType)
     {
         if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup))
-        {
-            _log?.Warning($"SetDeviceDetecting: 미등록 Device({deviceId},{deviceType})");
             return;
-        }
         deviceLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
         _log?.Info($"개별 심볼 Detecting 설정: Device({deviceId}, {deviceType}) -> {eventType}");
     }
@@ -277,10 +274,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     public void HandleDeviceStateChanged(int deviceId, EnumDeviceType deviceType, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
     {
         if (!TryResolveDevice(deviceId, deviceType, out var deviceLookup))
-        {
-            _log?.Warning($"HandleDeviceStateChanged: 미등록 Device({deviceId},{deviceType})");
             return;
-        }
         deviceLookup.ApplyCompositeStatus(next);
         _log?.Info($"개별 심볼 상태 전이: Device({deviceId},{deviceType}) {prev}→{next}");
     }

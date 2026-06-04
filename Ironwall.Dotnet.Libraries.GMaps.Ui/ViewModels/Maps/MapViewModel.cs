@@ -259,6 +259,7 @@ public class MapViewModel : BasePanelViewModel,
             var devices = DeviceProvider.ToList();
             var symbols = MainMap?.Markers.ToList();
             _symbolEventManager.Dispose();
+            var registeredCount = 0;
             foreach (var device in devices)
             {
                 // 1차: DeviceType 완전 일치
@@ -279,7 +280,7 @@ public class MapViewModel : BasePanelViewModel,
                 if (symbol != null)
                 {
                     _symbolEventManager.RegisterDeviceSymbol(device, symbol.Model);
-                    //_log?.Info($"장비-심볼 매핑: {device.DeviceName} <-> {symbol.Title}");
+                    registeredCount++;
                 }
 
                 // 복수 그룹 지원: 각 DeviceGroup에 대해 그룹 심볼 매핑
@@ -298,7 +299,7 @@ public class MapViewModel : BasePanelViewModel,
                 }
             }
 
-            //_log?.Info($"장비-심볼 매핑 완료: {devices.Count}개 장비");
+            _log?.Info($"심볼 등록 완료: 개별 {registeredCount}건 / 전체 {devices.Count}건 (FenceGroup 전용: {devices.Count - registeredCount}건)");
         }
         catch (Exception ex)
         {
