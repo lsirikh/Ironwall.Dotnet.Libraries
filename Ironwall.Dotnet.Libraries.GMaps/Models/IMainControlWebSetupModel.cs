@@ -14,4 +14,7 @@ public interface IMainControlWebSetupModel
 
     /// <summary>MainControl 웹서버 포트</summary>
     int PortWebServer { get; set; }
+
+    /// <summary>웹서버 기능 활성화 여부. false이면 ContextMenu 미표시.</summary>
+    bool IsWebServerEnabled { get; set; }
 }

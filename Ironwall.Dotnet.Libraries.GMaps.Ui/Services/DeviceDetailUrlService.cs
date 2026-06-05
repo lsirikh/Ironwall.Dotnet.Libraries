@@ -47,6 +47,8 @@ public class DeviceDetailUrlService : IDeviceDetailUrlService
         _setup = setup;
     }
 
+    public bool IsWebServerEnabled => _setup.IsWebServerEnabled;
+
     public string BuildUrl(EnumDeviceType deviceType, int deviceId, string? panel = "detail")
     {
         var key = deviceType.ToString();

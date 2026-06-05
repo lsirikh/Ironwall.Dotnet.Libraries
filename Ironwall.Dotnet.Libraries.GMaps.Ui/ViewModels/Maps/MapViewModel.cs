@@ -3383,11 +3383,13 @@ public class MapViewModel : BasePanelViewModel,
                 };
                 var hasDevice = pidsMarker.LinkedDeviceId > 0;
 
+                var webServerEnabled = _deviceDetailUrlService?.IsWebServerEnabled == true;
                 var listUrl = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, 0, null);
                 var listItem = new MenuItem
                 {
                     Header = $"{devName}페이지",
                     IsEnabled = !string.IsNullOrEmpty(listUrl),
+                    Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ViewList, Width = 16, Height = 16 }
                 };
                 listItem.Click += (s, e) => _deviceDetailUrlService.OpenInChrome(listUrl);
@@ -3397,6 +3399,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     Header = $"{devName}상세",
                     IsEnabled = hasDevice,
+                    Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.InformationOutline, Width = 16, Height = 16 }
                 };
                 detailItem.Click += (s, e) =>
@@ -3410,6 +3413,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     Header = $"{devName}수정",
                     IsEnabled = hasDevice,
+                    Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Pencil, Width = 16, Height = 16 }
                 };
                 editItem.Click += (s, e) =>
@@ -3425,6 +3429,7 @@ public class MapViewModel : BasePanelViewModel,
                     var ctrlItem = new MenuItem
                     {
                         Header = "제어기 홈페이지",
+                        Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Web, Width = 16, Height = 16 }
                     };
                     var controllerModel = pidsMarker.LinkedDevice as IControllerDeviceModel;

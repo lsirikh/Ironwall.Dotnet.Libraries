@@ -23,4 +23,9 @@ public interface IDeviceDetailUrlService
     /// 주어진 URL을 Chrome으로 연다. Chrome 미설치 시 기본 브라우저로 폴백.
     /// </summary>
     void OpenInChrome(string url);
+
+    /// <summary>
+    /// 웹서버 기능 활성화 여부. false이면 ContextMenu 미표시.
+    /// </summary>
+    bool IsWebServerEnabled { get; }
 }
