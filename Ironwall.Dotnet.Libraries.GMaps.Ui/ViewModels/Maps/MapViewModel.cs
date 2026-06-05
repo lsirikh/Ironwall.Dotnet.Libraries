@@ -5707,7 +5707,7 @@ public class MapViewModel : BasePanelViewModel,
 
         HideMapRoiPanel();
 
-        MapRoiPanel = new MapRoiControl();
+        MapRoiPanel = new MapRoiControl { Opacity = 0 };
         MapRoiPanel.RoiItems = _roiItems;
         MapRoiPanel.MoveRequested += OnRoiMoveRequested;
         MapRoiPanel.RegisterRequested += OnRoiRegisterRequested;
@@ -5717,11 +5717,12 @@ public class MapViewModel : BasePanelViewModel,
 
         IsMapRoiPanelVisible = true;
 
-        // DB에서 관심지역 로드 + Canvas 정 가운데 배치
+        // 위치 먼저 잡은 후 Opacity 1로 표시 (점프 방지)
         MapRoiPanel.Loaded += async (s, e) =>
         {
             await LoadMapRoisAsync();
             MapRoiPanel?.CenterInCanvas();
+            if (MapRoiPanel != null) MapRoiPanel.Opacity = 1;
         };
     }
 
@@ -6069,7 +6070,7 @@ public class MapViewModel : BasePanelViewModel,
         if (IsLayerPanelVisible) return;
 
         HideLayerPanel();
-        LayerPanel = new LayerPanelControl { TreeNodes = _layerTreeNodes };
+        LayerPanel = new LayerPanelControl { TreeNodes = _layerTreeNodes, Opacity = 0 };
         LayerPanel.LayerVisibilityChanged += OnLayerVisibilityChanged;
         LayerPanel.LayerOpacityChanged += OnLayerOpacityChanged;
         LayerPanel.LayerDeleteRequested += OnLayerDeleteRequested;
@@ -6079,10 +6080,12 @@ public class MapViewModel : BasePanelViewModel,
         LayerPanel.LayerNavigateRequested += OnLayerNavigateRequested;
         LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
         IsLayerPanelVisible = true;
+        // 위치 먼저 잡은 후 Opacity 1로 표시 (점프 방지)
         LayerPanel.Loaded += async (s, e) =>
         {
             await LoadLayersFromDbAsync();
             LayerPanel?.CenterInCanvas();
+            if (LayerPanel != null) LayerPanel.Opacity = 1;
         };
     }
 
