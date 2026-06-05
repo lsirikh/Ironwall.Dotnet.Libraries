@@ -5551,7 +5551,8 @@ public class MapViewModel : BasePanelViewModel,
     /// 사용 가능한 지도 목록
     /// </summary>
     public IEnumerable<IMapModel> AvailableMaps => _mapProvider
-        .Where(m => m is not CustomMapModel);
+        .Where(m => m is not CustomMapModel)
+        .Where(m => m.Category == EnumMapCategory.Standard || m.Category == EnumMapCategory.Satellite);
 
     /// <summary>
     /// ComboBox에서 선택된 지도
