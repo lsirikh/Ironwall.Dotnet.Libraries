@@ -200,4 +200,5 @@ file class StubMainControlWebSetupModel : IMainControlWebSetupModel
 {
     public string IpAddrerssWebServer { get; set; } = string.Empty;
     public int PortWebServer { get; set; }
+    public bool IsWebServerEnabled { get; set; } = true;
 }
