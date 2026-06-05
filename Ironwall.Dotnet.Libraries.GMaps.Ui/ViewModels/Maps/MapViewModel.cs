@@ -3429,7 +3429,6 @@ public class MapViewModel : BasePanelViewModel,
                     var ctrlItem = new MenuItem
                     {
                         Header = "제어기 홈페이지",
-                        Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Web, Width = 16, Height = 16 }
                     };
                     var controllerModel = pidsMarker.LinkedDevice as IControllerDeviceModel;
