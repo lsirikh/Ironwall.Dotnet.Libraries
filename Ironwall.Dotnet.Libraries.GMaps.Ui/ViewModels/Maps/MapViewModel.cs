@@ -1412,7 +1412,7 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 홈 위치로 이동 명령어 실행 가능 여부
     /// </summary>
-    private bool CanExecuteMoveHomeLocation(object arg) => HomePosition != null;
+    private bool CanExecuteMoveHomeLocation(object arg) => HomePosition?.IsAvailable == true;
 
     /// <summary>
     /// 홈 위치로 이동 실행
@@ -1425,7 +1425,7 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 홈 위치 설정 명령어 실행 가능 여부
     /// </summary>
-    private bool CanExecuteSetHomeLocation(object arg) => true;
+    private bool CanExecuteSetHomeLocation(object arg) => HomePosition?.IsAvailable == true;
 
     /// <summary>
     /// 홈 위치 설정 실행
@@ -2510,8 +2510,10 @@ public class MapViewModel : BasePanelViewModel,
         var position = _setupModel.HomePosition.Position;
         HomePosition.Position = position;
         HomePosition.Zoom = _setupModel.HomePosition.Zoom;
-        HomePosition.IsAvailable = true;
+        HomePosition.IsAvailable = _setupModel.HomePosition?.IsAvailable ?? false;
         ClickedCurrentPosition = new PointLatLng(position.Latitude, position.Longitude);
+        MoveHomeLocationCommand?.RaiseCanExecuteChanged();
+        SetHomeLocationCommand?.RaiseCanExecuteChanged();
 
         _log?.Info($"HomePosition정보가 (Lat:{HomePosition.Position.Latitude}, Lng:{HomePosition.Position.Longitude}, Alt:{HomePosition.Position.Altitude}, Zoom:{HomePosition.Zoom})으로 설정되었습니다.");
     }
@@ -2526,6 +2528,8 @@ public class MapViewModel : BasePanelViewModel,
         HomePosition.Position = new CoordinateModel(latitude: ClickedCurrentPosition.Lat, longitude: ClickedCurrentPosition.Lng, altitude: 0);
         HomePosition.Zoom = Zoom;
         HomePosition.IsAvailable = true;
+        MoveHomeLocationCommand?.RaiseCanExecuteChanged();
+        SetHomeLocationCommand?.RaiseCanExecuteChanged();
         _log?.Info($"The home position is set to (Position: ({HomePosition.Position.Latitude}, {HomePosition.Position.Longitude}), Zoom: {HomePosition.Zoom}).");
         await MapSettingsHelper.SaveHomePositionAsync(HomePosition, _log);
     }
@@ -2552,6 +2556,8 @@ public class MapViewModel : BasePanelViewModel,
         MainMap.Position = new PointLatLng(HomePosition.Position.Latitude, HomePosition.Position.Longitude);
         HomePosition.Zoom = DEFAULT_ZOOM;
         HomePosition.IsAvailable = false;
+        MoveHomeLocationCommand?.RaiseCanExecuteChanged();
+        SetHomeLocationCommand?.RaiseCanExecuteChanged();
         _log?.Info($"Home position has been released..");
 
         // JSON에 저장
