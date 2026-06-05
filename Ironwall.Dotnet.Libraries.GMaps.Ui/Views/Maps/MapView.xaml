@@ -303,7 +303,7 @@
 							IsEnabled="{Binding HasSelectedItem}"
 							Style="{StaticResource ToolbarButtonStyle}"
 							ToolTip="선택 항목 삭제">
-							<md:PackIcon Foreground="#C0392B" Kind="Delete" />
+							<md:PackIcon Kind="Delete" />
 						</Button>
 					</StackPanel>
 				</Border>
