@@ -26,6 +26,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | Device API Add/Delete/Save + Provider 전파 전방위 수정 (14-agent, 시나리오 30개×2Round, 1 CRITICAL + 9 HIGH) | **Draft** | 2026-06-08 |
+| [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen 구현 (PRD-SPLASH-002, 17-agent 검증) | **Pending Approval** | 2026-06-08 |
 | [RemoteDesktop_PanFollowBug_Fix-prd.md](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | RemoteDesktop_PanFollowBug_Fix | Approved | 2026-06-04 |
 | [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Superseded | 2026-06-04 |
 | [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix | Completed | 2026-06-04 |
