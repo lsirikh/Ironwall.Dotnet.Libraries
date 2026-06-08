@@ -26,6 +26,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | 탐지/장애 이벤트 처리 오염 및 버그 수정 (13-agent, 25시나리오×2Round, 1 CRITICAL + 8 HIGH) | **Draft** | 2026-06-08 |
+| [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | Layer Visibility 저장/복원 버그 수정 (12-agent, 20시나리오×2Round, RC-1~6: OverlayImage/Symbol 재시작 시 가시성 미복원) | **Draft** | 2026-06-08 |
 | [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | Device API Add/Delete/Save + Provider 전파 전방위 수정 (14-agent, 시나리오 30개×2Round, 1 CRITICAL + 9 HIGH) | **Draft** | 2026-06-08 |
 | [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen 구현 (PRD-SPLASH-002, 17-agent 검증) | **Pending Approval** | 2026-06-08 |
 | [RemoteDesktop_PanFollowBug_Fix-prd.md](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | RemoteDesktop_PanFollowBug_Fix | Approved | 2026-06-04 |

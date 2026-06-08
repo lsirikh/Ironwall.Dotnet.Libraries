@@ -177,6 +177,14 @@ public class MapViewModel : BasePanelViewModel,
             // 4.5.1. OverlayImage → MapLayers Seed
             await SeedOverlayImageLayersAsync();
 
+            // 4.5.2. 저장된 레이어 가시성 복원 — 트리 빌드 즉시, 마커 복원은 ApplicationIdle 후
+            // ① 트리 빌드: _layerTreeNodes 확보 (DB 조회, 즉시 실행)
+            await LoadLayersFromDbAsync();
+            // ② 마커 복원: 모든 렌더링 완료 후 적용 → startup flash 방지 + UpdateMarkersVisibilityByZoom 경쟁 없음
+            await System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeAsync(
+                RestoreLayerVisibility,
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
             // 4.6. 오버레이 첫 렌더링 — 맵 로드 완료 후 실행
             if (_customMapOverlayService.ActiveOverlays.Any())
             {
@@ -742,6 +750,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         ToggleWGS84Command = new RelayCommand(ExecuteToggleWGS84Command, CanExecuteToggleWGS84Command);
         ToggleMGRSCommand = new RelayCommand(ExecuteToggleMGRSCommand, CanExecuteToggleMGRSCommand);
+        ToggleSnapToGridCommand = new RelayCommand(_ => IsSnapToGridEnabled = !IsSnapToGridEnabled);
         ToggleUTMCommand = new RelayCommand(ExecuteToggleUTMCommand, CanExecuteToggleUTMCommand);
     }
 
@@ -1570,6 +1579,7 @@ public class MapViewModel : BasePanelViewModel,
         IsEditModeEnabled = !IsEditModeEnabled;
         if (!IsEditModeEnabled)
         {
+            IsSnapToGridEnabled = false;
             await InitializeDeviceSymbolIntegration();
         }
     }
@@ -4239,7 +4249,11 @@ public class MapViewModel : BasePanelViewModel,
     private void MainMap_OnCurrentPositionChanged(PointLatLng point)
     {
         // Position은 GMapControl 내부에서 이미 변경된 후 이벤트가 발화되므로 재설정 불필요.
-        // 재설정하면 PositionChangedCallBack → ForceUpdateOverlays() 이중 호출 유발.
+        // RefreshVisibleTiles는 드래그 중에도 호출해야 함:
+        //   → OverlayMapCanvas 타일은 절대 픽셀 좌표(Canvas.SetLeft/Top)로 배치되므로
+        //     매 프레임 FromLatLngToLocal 재계산으로 갱신하지 않으면 base 타일과 어긋남.
+        //   → TriggerSelectionChange 체인은 GMapCustomControl_OnPositionChanged에서 이미 차단됨.
+        _log?.Info($"[PAN][VM] RefreshVisibleTiles drag={MainMap?.IsDragging} t={DateTime.Now:HH:mm:ss.fff}");
         _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 
@@ -4851,6 +4865,28 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
+    /// 격자 스냅 활성화 여부
+    /// </summary>
+    public bool IsSnapToGridEnabled
+    {
+        get => _isSnapToGridEnabled;
+        set { _isSnapToGridEnabled = value; NotifyOfPropertyChange(nameof(IsSnapToGridEnabled)); }
+    }
+
+    /// <summary>
+    /// 격자 크기(px) — 슬라이더 범위 4~50
+    /// </summary>
+    public double GridSizePx
+    {
+        get => _gridSizePx;
+        set
+        {
+            _gridSizePx = Math.Max(4, Math.Min(50, value));
+            NotifyOfPropertyChange(nameof(GridSizePx));
+        }
+    }
+
+    /// <summary>
     /// UTM 좌표계 표시 여부
     /// </summary>
     public bool IsShowUTM
@@ -5110,6 +5146,7 @@ public class MapViewModel : BasePanelViewModel,
     public RelayCommand? ToggleWGS84Command { get; private set; }
     public RelayCommand? ToggleMGRSCommand { get; private set; }
     public RelayCommand? ToggleUTMCommand { get; private set; }
+    public RelayCommand? ToggleSnapToGridCommand { get; private set; }
 
     // 네비게이션 관련 명령어
     public RelayCommand? MoveHomeLocationCommand { get; private set; }
@@ -5258,9 +5295,17 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private GMapSymbols.GMapImageMarker? FindImageMarkerByFilePath(string filePath)
     {
+        static string Normalize(string? p)
+        {
+            if (string.IsNullOrEmpty(p)) return string.Empty;
+            try { return System.IO.Path.GetFullPath(p).TrimEnd('\\', '/'); }
+            catch { return p.Replace('/', '\\').TrimEnd('\\', '/'); }
+        }
+        var target = Normalize(filePath);
         return MainMap?.Markers
             .OfType<GMapSymbols.GMapImageMarker>()
-            .FirstOrDefault(m => string.Equals(m.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(m => string.Equals(Normalize(m.FilePath), target,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     private void OnPropertyPanelCloseRequested(object? sender, EventArgs e)
@@ -5611,12 +5656,17 @@ public class MapViewModel : BasePanelViewModel,
     private bool _isShowMGRS;
     private bool _isShowMGRSGrid;
     private bool _isShowUTM;
+    private bool _isSnapToGridEnabled;
+    private double _gridSizePx = 32.0;
 
     // 회전 관련 필드
     private double _currentRotation;
     private double _mapRotation;
     private double _rotationSnapAngle;
     private bool _showRotationControl = false;
+
+    // Layer 가시성 적용 재진입 차단 (ApplyLayerVisibility/AggregateLeafCheckedFromMarkers 공유)
+    private bool _isApplyingLayerVisibility;
 
     // Adorner관련 필드
     private bool _isMultiSelectEnabled = false;
@@ -6005,7 +6055,7 @@ public class MapViewModel : BasePanelViewModel,
                     if (layer.MapId.HasValue)
                     {
                         _customMapOverlayService.DeactivateOverlay(layer.MapId.Value);
-                        await _customMapService.DeleteCustomMapAsync(layer.MapId.Value, deleteFiles: false);
+                        await _customMapService.DeleteCustomMapAsync(layer.MapId.Value, deleteFiles: true);
                     }
                     break;
 
@@ -6112,21 +6162,12 @@ public class MapViewModel : BasePanelViewModel,
             await _gMapDbService.SeedDefaultSymbolLayersAsync();
             var list = await _gMapDbService.FetchMapLayersAsync();
 
-            // DB flat 목록 → 3-Tier 트리 구조 변환
             _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>());
 
-            // LayerPanel에 트리 바인딩
             if (LayerPanel != null)
                 LayerPanel.TreeNodes = _layerTreeNodes;
 
-            // 로드된 레이어 상태를 맵에 반영 (Leaf 노드만)
-            foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes))
-            {
-                if (leaf.Model != null)
-                    ApplyLayerVisibility(leaf.Model);
-            }
-
-            // 마커 개수 집계
+            AggregateLeafCheckedFromMarkers();
             UpdateLayerItemCounts();
 
             var leafCount = LayerTreeBuilder.Flatten(_layerTreeNodes).Count();
@@ -6136,6 +6177,41 @@ public class MapViewModel : BasePanelViewModel,
         {
             _log?.Error($"레이어 로드 실패: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 저장된 레이어 가시성을 마커에 복원한다.
+    /// UpdateMarkersVisibilityByZoom 덮어쓰기 방지를 위해 IsLayerEnabled도 함께 설정.
+    /// ApplicationIdle 이후 호출되어야 함 (마커 렌더링 완료 후).
+    /// </summary>
+    private void RestoreLayerVisibility()
+    {
+        if (_layerTreeNodes == null || MainMap == null) return;
+
+        foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes))
+        {
+            var model = leaf.Model;
+            if (model == null) continue;
+
+            if (model.LayerType == "OverlayImage" && !string.IsNullOrEmpty(model.FilePath))
+            {
+                var imgMarker = FindImageMarkerByFilePath(model.FilePath);
+                if (imgMarker != null)
+                {
+                    imgMarker.IsLayerEnabled = model.IsVisible;
+                    imgMarker.IsVisible = model.IsVisible;
+                    imgMarker.ZIndex = model.ZOrder;
+                }
+                else
+                    _log?.Warning($"[Restore] OverlayImage 마커 미발견: {model.FilePath}");
+            }
+            else
+            {
+                ApplyLayerVisibility(model);
+            }
+        }
+        MainMap?.InvalidateVisual();
+        AggregateLeafCheckedFromMarkers();
     }
 
     private async void OnLayerVisibilityChanged(object? sender, LayerChangedEventArgs e)
@@ -6160,12 +6236,16 @@ public class MapViewModel : BasePanelViewModel,
             else if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
             {
                 var marker = FindImageMarkerByFilePath(e.Layer.FilePath);
-                if (marker != null && marker.Shape != null)
+                if (marker != null)
                 {
-                    marker.Shape.Visibility = e.IsVisible
-                        ? System.Windows.Visibility.Visible
-                        : System.Windows.Visibility.Collapsed;
-                    MainMap.InvalidateVisual();
+                    marker.IsLayerEnabled = e.IsVisible;
+                    marker.IsVisible = e.IsVisible;
+                    MainMap?.InvalidateVisual();
+                    await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
+                }
+                else
+                {
+                    _log?.Warning($"[OverlayImage] 마커 미발견: {e.Layer.FilePath}");
                 }
             }
             else
@@ -6395,36 +6475,71 @@ public class MapViewModel : BasePanelViewModel,
     private void ApplyLayerVisibility(IMapLayerModel layer)
     {
         if (layer.LayerType != "Symbol" || string.IsNullOrEmpty(layer.Category)) return;
+        if (_isApplyingLayerVisibility) return;
 
-        foreach (var marker in MainMap!.Markers)
+        _isApplyingLayerVisibility = true;
+        try
         {
-            if (marker.Shape == null) continue;
-
-            bool match = MatchMarkerToCategory(marker, layer.Category);
-            if (!match) continue;
-
-            if (!layer.IsVisible)
+            foreach (var marker in MainMap!.Markers)
             {
-                marker.Shape.Visibility = System.Windows.Visibility.Collapsed;
-            }
-            else
-            {
-                double markerZoom = marker switch
+                if (!MatchMarkerToCategory(marker, layer.Category)) continue;
+                if (marker is not GMapSymbols.IEditableMarker em) continue;
+
+                em.IsLayerEnabled = layer.IsVisible;
+                if (!layer.IsVisible)
                 {
-                    GMapSymbols.GMapPidsMarker pm => pm.Zoom,
-                    GMapSymbols.GMapPidsGroupMarker gm => gm.Zoom,
-                    GMapSymbols.GMapMilitarySymbolMarker mm => mm.Zoom,
-                    GMapSymbols.GMapGeometricMarker geo => geo.Zoom,
-                    GMapSymbols.GMapLineMarker lm => lm.Zoom,
-                    GMapSymbols.GMapInfraMarker im => im.Zoom,
-                    _ => 0
-                };
-
-                bool zoomOk = MainMap!.Zoom >= markerZoom;
-                marker.Shape.Visibility = zoomOk
-                    ? System.Windows.Visibility.Visible
-                    : System.Windows.Visibility.Collapsed;
+                    em.IsVisible = false;
+                }
+                else
+                {
+                    bool zoomOk = MainMap!.Zoom >= em.Zoom;
+                    em.IsVisible = zoomOk && em.ShowShape;
+                }
             }
+            MainMap?.InvalidateVisual();
+        }
+        finally
+        {
+            _isApplyingLayerVisibility = false;
+        }
+    }
+
+    /// <summary>
+    /// 시작 집계: Layer ON인 Symbol Leaf 중 ShowShape 혼재 시 IsChecked를 Indeterminate(null)로 설정.
+    /// _isApplyingLayerVisibility 가드 내에서만 호출 — CheckChanged → ApplyLayerVisibility 재진입 차단.
+    /// </summary>
+    private void AggregateLeafCheckedFromMarkers()
+    {
+        if (_layerTreeNodes == null || MainMap == null) return;
+
+        _isApplyingLayerVisibility = true;
+        try
+        {
+            foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes)
+                .Where(n => n.NodeType == LayerNodeType.Leaf
+                         && n.Model?.LayerType == "Symbol"
+                         && n.Model.IsVisible))
+            {
+                var category = leaf.Model!.Category;
+                if (string.IsNullOrEmpty(category)) continue;
+
+                var markers = MainMap.Markers
+                    .Where(m => MatchMarkerToCategory(m, category))
+                    .OfType<GMapSymbols.IEditableMarker>()
+                    .ToList();
+
+                if (markers.Count == 0) continue;
+
+                bool allVisible = markers.All(m => m.ShowShape);
+                bool noneVisible = markers.All(m => !m.ShowShape);
+
+                if (!allVisible)
+                    leaf.SetCheckedSilently(noneVisible ? false : (bool?)null);
+            }
+        }
+        finally
+        {
+            _isApplyingLayerVisibility = false;
         }
     }
 

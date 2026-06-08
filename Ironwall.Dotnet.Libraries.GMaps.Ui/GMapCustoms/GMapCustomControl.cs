@@ -359,6 +359,11 @@ public class GMapCustomControl : GMapControl
             _mgrsOverlay.DrawMGRSGrid(drawingContext, ViewArea, (int)Zoom, this);
         }
 
+        if (IsSnapToGridEnabled)
+        {
+            _snapGridOverlay.DrawGrid(drawingContext, this, PixelsPerDip);
+        }
+
         if (ShowRotationControl)
         {
             RenderRotationInfo(drawingContext);
@@ -399,15 +404,35 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     private void GMapCustomControl_OnPositionChanged(PointLatLng point)
     {
+        var now = DateTime.Now;
+
+        // 드래그 시작 감지 (false → true 전환)
+        if (IsDragging && !_prevDragging)
+        {
+            _panStartTime = now;
+            _panSkipCount = 0;
+            _log?.Info($"[PAN] ===DRAG-START=== t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5} zoom={Zoom}");
+        }
+        _prevDragging = IsDragging;
+
+        // 드래그 중에는 TriggerSelectionChange → OnAreaChange → UpdateMarkersVisibilityByZoom + InvalidateVisual
+        // 체인이 매 프레임 실행되어 심볼이 타일과 어긋나는 버그 유발 (RDP 환경 특히 심각).
+        // 드래그 완료 후(IsDragging=false)에만 영역 변경 처리를 허용한다.
+        if (IsDragging)
+        {
+            _panSkipCount++;
+            // RDP 이벤트 압축 진단: 10프레임마다 한 번 로그 (너무 많으면 로그 폭주)
+            if (_panSkipCount % 10 == 1)
+                _log?.Info($"[PAN] SKIP#{_panSkipCount} t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5}");
+            return;
+        }
+
         try
         {
-            // 위치 변경 시에도 OnAreaChange 이벤트 발생
             var viewArea = ViewArea;
             var zoom = Zoom;
-
+            _log?.Info($"[PAN] OnPositionChanged EXEC — drag=false lat={point.Lat:F5} lng={point.Lng:F5} t={now:HH:mm:ss.fff}");
             TriggerSelectionChange(viewArea, zoom, false);
-
-            //_log?.Info($"위치 변경됨: ({point.Lat:F6}, {point.Lng:F6})");
         }
         catch (Exception ex)
         {
@@ -446,17 +471,7 @@ public class GMapCustomControl : GMapControl
     }
 
     private bool SetMarkerVisibility(IEditableMarker marker)
-    {
-        // 마커의 설정된 줌 레벨보다 현재 줌이 크거나 같으면 표시
-        if (Zoom >= marker.Zoom)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+        => Zoom >= marker.Zoom && marker.IsLayerEnabled && marker.ShowShape;
     /// <summary>
     /// 지도 영역 변경 이벤트
     /// </summary>
@@ -470,8 +485,16 @@ public class GMapCustomControl : GMapControl
             // 줌 레벨에 따른 마커 가시성 처리
             UpdateMarkersVisibilityByZoom();
 
-            // 화면 갱신
-            InvalidateVisual();
+            // 드래그 중 InvalidateVisual 차단:
+            // Markers.Add 등이 드래그 중 호출되면 GMap.NET 내부 ForceUpdateOverlays(newItems)
+            // → TriggerSelectionChange → 이 핸들러 경로로 InvalidateVisual이 발화됨.
+            // RDP 환경에서 드래그 중 InvalidateVisual은 GMapCustomControl_OnPositionChanged 주석 참조.
+            // 드래그 종료 시 GMap.NET OnMouseUp → ForceUpdateOverlays(all) + OnMouseLeftButtonUp
+            // → TriggerSelectionChange에서 InvalidateVisual이 IsDragging=false 상태로 호출됨.
+            if (!IsDragging)
+            {
+                InvalidateVisual();
+            }
         }
         catch (Exception ex)
         {
@@ -641,7 +664,7 @@ public class GMapCustomControl : GMapControl
         base.OnMouseLeftButtonDown(e);
 
         _log?.Info("클릭된 객체 검색 시작");
-        var clickedImage = GetImageAt(geoPos);
+        var clickedImage = GetImageAtScreen(mousePos);
         var clickedMarker = GetMarkerAtScreen(mousePos);
 
         _log?.Info($"검색 결과 - 이미지: {clickedImage?.Title ?? "없음"}, 마커: {clickedMarker?.Title ?? "없음"}");
@@ -710,7 +733,11 @@ public class GMapCustomControl : GMapControl
         if (_isDragging)
         {
             ResetDragState();
-            _log?.Info("드래그 완료");
+            var elapsed = (DateTime.Now - _panStartTime).TotalMilliseconds;
+            _log?.Info($"[PAN] ===DRAG-END=== t={DateTime.Now:HH:mm:ss.fff} skippedFrames={_panSkipCount} elapsed={elapsed:F0}ms → TriggerSelectionChange once");
+
+            // OnPositionChanged를 드래그 중 skip했으므로 종료 시점에 한 번 영역 갱신
+            TriggerSelectionChange(ViewArea, Zoom, false);
         }
     }
 
@@ -771,13 +798,17 @@ public class GMapCustomControl : GMapControl
                 var markerScreenPos = FromLatLngToLocal(marker.Position);
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);
                 var screenDistance = CalculateScreenDistance(screenPosition, markerScreenPoint);
-                var markerRadius = Math.Max(marker.Width, marker.Height) / 2.0 + 10;
+
+                // 렌더된 화면 크기 기준 반경 — Shape.ActualWidth/Height 우선, 폴백 32px
+                var shape = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
+                var renderedW = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0;
+                var renderedH = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0;
+                var markerRadius = Math.Max(renderedW, renderedH) / 2.0 + 8;
 
                 if (screenDistance <= markerRadius)
                 {
-                    var z = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape is UIElement s
-                        ? System.Windows.Controls.Panel.GetZIndex(s) : 0;
-                    var area = marker.Width * marker.Height;
+                    var z = shape != null ? System.Windows.Controls.Panel.GetZIndex(shape) : 0;
+                    var area = renderedW * renderedH;
                     candidates.Add((marker, screenDistance, z, area));
                 }
             }
@@ -815,12 +846,29 @@ public class GMapCustomControl : GMapControl
     }
 
     /// <summary>
-    /// 특정 위치의 이미지 찾기  
+    /// 특정 위치의 이미지 찾기 (LatLng 기반 — 내부 유틸 용도)
     /// </summary>
     private GMapCustomImage GetImageAt(PointLatLng position)
     {
         return CustomImages.FirstOrDefault(img =>
-            img.Visibility && img.Contains(position));
+            img.Visibility && (img.Zoom <= 0 || Zoom >= img.Zoom) && img.Contains(position));
+    }
+
+    /// <summary>
+    /// 화면 좌표 기반 이미지 히트테스트 — 렌더러와 동일한 FromLatLngToLocal 경로를 사용하여
+    /// LatLng 이중 변환 오차 제거. 고줌(18+)에서 정밀도 보장.
+    /// </summary>
+    private GMapCustomImage? GetImageAtScreen(Point screenPos)
+    {
+        return CustomImages.FirstOrDefault(img =>
+        {
+            if (!img.Visibility || (img.Zoom > 0 && Zoom < img.Zoom)) return false;
+            var bounds = img.ImageBounds;
+            var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
+            var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
+            return screenPos.X >= topLeft.X && screenPos.X <= bottomRight.X &&
+                   screenPos.Y >= topLeft.Y && screenPos.Y <= bottomRight.Y;
+        });
     }
     #endregion
     
@@ -1992,6 +2040,47 @@ public class GMapCustomControl : GMapControl
     }
 
     /// <summary>
+    /// 격자 스냅 활성화 DependencyProperty
+    /// </summary>
+    public static readonly DependencyProperty IsSnapToGridEnabledProperty =
+        DependencyProperty.Register(nameof(IsSnapToGridEnabled), typeof(bool), typeof(GMapCustomControl),
+            new PropertyMetadata(false, OnIsSnapToGridEnabledChanged));
+
+    public bool IsSnapToGridEnabled
+    {
+        get => (bool)GetValue(IsSnapToGridEnabledProperty);
+        set => SetValue(IsSnapToGridEnabledProperty, value);
+    }
+
+    private static void OnIsSnapToGridEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is GMapCustomControl control)
+            control.InvalidateVisual();
+    }
+
+    /// <summary>
+    /// 격자 크기(px) DependencyProperty — 기본 32px, 8px 하한은 SnapGridOverlayService에서 적용
+    /// </summary>
+    public static readonly DependencyProperty GridSizePxProperty =
+        DependencyProperty.Register(nameof(GridSizePx), typeof(double), typeof(GMapCustomControl),
+            new PropertyMetadata(32.0, OnGridSizePxChanged));
+
+    public double GridSizePx
+    {
+        get => (double)GetValue(GridSizePxProperty);
+        set => SetValue(GridSizePxProperty, value);
+    }
+
+    private static void OnGridSizePxChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is GMapCustomControl control)
+        {
+            control._snapGridOverlay?.InvalidateCache();
+            control.InvalidateVisual();
+        }
+    }
+
+    /// <summary>
     /// 지도 회전 각도 DependencyProperty
     /// </summary>
     public static readonly DependencyProperty MapRotationProperty =
@@ -2153,6 +2242,12 @@ public class GMapCustomControl : GMapControl
     private IEventAggregator? _eventAggregator;
     private ILogService? _log;
     private MGRSGridOverlayService _mgrsOverlay;
+    private SnapGridOverlayService _snapGridOverlay = new();
+
+    // 드래그 진단 필드 — RDP 패닝 버그 분석용
+    private bool _prevDragging;
+    private int _panSkipCount;
+    private DateTime _panStartTime;
 
     // 상수
     public int VISIBILITY_ZOOM = 14;

@@ -48,6 +48,9 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         _log = log;
         _imageModel = imageModel ?? throw new ArgumentNullException(nameof(imageModel));
 
+        // IsLayerEnabled를 모델 visibility와 동기화 — UpdateMarkersVisibilityByZoom이 먼저 실행되어도 flash 방지
+        _isLayerEnabled = imageModel.Visibility;
+
         // 기본 설정
         ZIndex = 5; // 다른 마커보다 낮은 Z-Index (배경 이미지이므로)
 
@@ -375,6 +378,16 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
                 _imageModel.Visibility = value;
                 OnPropertyChanged(nameof(IsVisible));
             }
+        }
+    }
+
+    public bool IsLayerEnabled
+    {
+        get => _isLayerEnabled;
+        set
+        {
+            _isLayerEnabled = value;
+            OnPropertyChanged(nameof(IsLayerEnabled));
         }
     }
 
@@ -910,6 +923,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     private double _strokeThickness = 2.0;
     private EnumOperationState _operationState = EnumOperationState.NONE;
     private bool _enableShapeAnimation;
+    private bool _isLayerEnabled = true;
 
     #endregion
 

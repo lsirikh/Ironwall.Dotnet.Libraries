@@ -489,7 +489,15 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         }
     }
 
-
+    public bool IsLayerEnabled
+    {
+        get => _isLayerEnabled;
+        set
+        {
+            _isLayerEnabled = value;
+            OnPropertyChanged(nameof(IsLayerEnabled));
+        }
+    }
 
     public bool EnableShapeAnimation
     {
@@ -519,5 +527,6 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
     protected bool _isSelected;
     private bool _enableShapeAnimation;
     private bool _isVisible;
+    private bool _isLayerEnabled = true;
     #endregion
 }

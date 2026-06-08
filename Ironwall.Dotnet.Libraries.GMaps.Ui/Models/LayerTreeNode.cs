@@ -88,6 +88,19 @@ public class LayerTreeNode : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// CheckChanged를 발화하지 않고 _isChecked를 갱신 (시작 집계 전용).
+    /// 자식/부모 전파 없음 — leaf 단위 직접 적용 시만 사용.
+    /// </summary>
+    internal void SetCheckedSilently(bool? value)
+    {
+        if (_isChecked == value) return;
+        _isChecked = value;
+        OnPropertyChanged(nameof(IsChecked));
+        // 부모 그룹/섹션 tri-state 갱신 (CheckChanged 미발화 — 그룹 노드는 Leaf가 아님)
+        Parent?.UpdateCheckStateFromChildren();
+    }
+
+    /// <summary>
     /// Leaf 노드의 IsChecked가 변경될 때 발생 (routed event 대체)
     /// </summary>
     public event EventHandler? CheckChanged;

@@ -20,6 +20,7 @@ public interface IEditableMarker : IDisposable
     double Bearing { get; set; }
     bool IsSelected { get; set; }
     bool IsVisible { get; set; }
+    bool IsLayerEnabled { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
     EnumColorType FillColor { get; set; }
