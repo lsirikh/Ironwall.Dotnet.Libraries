@@ -147,15 +147,16 @@ public class UnitTestMapLayer
         var list = await _fx.Svc.FetchMapLayersAsync();
         var symbols = list!.Where(l => l.LayerType == "Symbol").ToList();
 
-        Assert.Equal(11, symbols.Count);
+        Assert.Equal(12, symbols.Count);
         Assert.Contains(symbols, s => s.Category == "PidsCamera");
         Assert.Contains(symbols, s => s.Category == "Military");
         Assert.Contains(symbols, s => s.Category == "Geometric");
+        Assert.Contains(symbols, s => s.Category == "Basic");
 
         // 중복 호출 시 증가 안 함
         await _fx.Svc.SeedDefaultSymbolLayersAsync();
         var list2 = await _fx.Svc.FetchMapLayersAsync();
-        Assert.Equal(11, list2!.Count(l => l.LayerType == "Symbol"));
+        Assert.Equal(12, list2!.Count(l => l.LayerType == "Symbol"));
 
         // Cleanup
         foreach (var s in symbols)

@@ -44,6 +44,7 @@ public static class LayerTreeBuilder
         ["PidsEnclosure"]  = ("함체",       "PackageVariant",  "PidsEquipment"),
 
         // 독립 심볼
+        ["Basic"]          = ("핀(단일)",    "MapMarkerOutline",""),
         ["PidsGroup"]      = ("PIDS 그룹",  "Group",           ""),
         ["Military"]       = ("군사 심볼",   "Shield",          ""),
         ["Geometric"]      = ("기하학 도형", "ShapeOutline",    ""),

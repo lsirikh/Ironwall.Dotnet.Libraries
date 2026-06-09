@@ -6493,7 +6493,7 @@ public class MapViewModel : BasePanelViewModel,
                 else
                 {
                     bool zoomOk = MainMap!.Zoom >= em.Zoom;
-                    em.IsVisible = zoomOk && em.ShowShape;
+                    em.IsVisible = zoomOk;
                 }
             }
             MainMap?.InvalidateVisual();
@@ -6505,7 +6505,9 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// 시작 집계: Layer ON인 Symbol Leaf 중 ShowShape 혼재 시 IsChecked를 Indeterminate(null)로 설정.
+    /// 시작 집계: Layer ON인 Symbol Leaf 중 IsLayerEnabled 혼재 시 IsChecked를 Indeterminate(null)로 설정.
+    /// ShowShape 대신 IsLayerEnabled 사용 — ShowShape는 마커 내부 아이콘 제어용이라
+    /// PidsGroup처럼 ShowShape 기본값이 false인 마커에서 leaf가 잘못 OFF가 되는 버그 방지.
     /// _isApplyingLayerVisibility 가드 내에서만 호출 — CheckChanged → ApplyLayerVisibility 재진입 차단.
     /// </summary>
     private void AggregateLeafCheckedFromMarkers()
@@ -6530,11 +6532,11 @@ public class MapViewModel : BasePanelViewModel,
 
                 if (markers.Count == 0) continue;
 
-                bool allVisible = markers.All(m => m.ShowShape);
-                bool noneVisible = markers.All(m => !m.ShowShape);
+                bool allEnabled = markers.All(m => m.IsLayerEnabled);
+                bool noneEnabled = markers.All(m => !m.IsLayerEnabled);
 
-                if (!allVisible)
-                    leaf.SetCheckedSilently(noneVisible ? false : (bool?)null);
+                if (!allEnabled)
+                    leaf.SetCheckedSilently(noneEnabled ? false : (bool?)null);
             }
         }
         finally
@@ -6585,6 +6587,7 @@ public class MapViewModel : BasePanelViewModel,
             "PidsController" => marker is GMapSymbols.GMapPidsMarker pc && pc.DeviceType == Enums.EnumDeviceType.Controller,
             "PidsLamp" => marker is GMapSymbols.GMapPidsMarker pl && pl.DeviceType == Enums.EnumDeviceType.Lamp,
             "PidsEnclosure" => marker is GMapSymbols.GMapPidsMarker pe && pe.DeviceType == Enums.EnumDeviceType.Enclosure,
+            "Basic" => marker is GMapSymbols.GMapCustomMarker,
             "PidsGroup" => marker is GMapSymbols.GMapPidsGroupMarker,
             "Military" => marker is GMapSymbols.GMapMilitarySymbolMarker,
             "Geometric" => marker is GMapSymbols.GMapGeometricMarker,

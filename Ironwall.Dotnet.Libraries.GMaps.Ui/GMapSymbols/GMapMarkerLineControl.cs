@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Collections.Generic;
+using System.ComponentModel;
 using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
@@ -178,6 +179,10 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         {
             System.Diagnostics.Debug.WriteLine("MapControl을 찾을 수 없음!");
         }
+
+        // IsVisible 변경 감지: Visibility=false 후 true로 복원 시 기하 재계산
+        if (Marker != null)
+            Marker.PropertyChanged += OnMarkerPropertyChanged;
     }
 
     private void OnControlUnloaded(object sender, RoutedEventArgs e)
@@ -187,6 +192,21 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             _mapControl.OnMapZoomChanged -= OnMapChanged;
             _mapControl.OnMapDrag -= OnMapChanged;
             _mapControl.OnPositionChanged -= OnMapPositionChanged;
+        }
+
+        if (Marker != null)
+            Marker.PropertyChanged -= OnMarkerPropertyChanged;
+    }
+
+    private void OnMarkerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(GMapLineMarker.IsVisible)
+            && Marker?.IsVisible == true
+            && _mapControl != null)
+        {
+            // Visibility가 false→true로 바뀔 때 형상 재계산.
+            // RestoreLayerVisibility() 이후 On 시 Offset/Points가 stale한 상태를 복구.
+            Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
         }
     }
 

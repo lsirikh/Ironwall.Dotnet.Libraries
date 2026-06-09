@@ -471,7 +471,7 @@ public class GMapCustomControl : GMapControl
     }
 
     private bool SetMarkerVisibility(IEditableMarker marker)
-        => Zoom >= marker.Zoom && marker.IsLayerEnabled && marker.ShowShape;
+        => Zoom >= marker.Zoom && marker.IsLayerEnabled;
     /// <summary>
     /// 지도 영역 변경 이벤트
     /// </summary>

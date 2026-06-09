@@ -1485,10 +1485,6 @@ internal class GMapDbService : TaskService, IGMapDbService
         {
             await using var conn = await OpenConnectionAsync(token);
 
-            // 이미 존재하면 스킵
-            var existing = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM MapLayers WHERE LayerType = 'Symbol';");
-            if (existing > 0) return;
-
             var defaults = new[]
             {
                 ("카메라",       "PidsCamera",     50),
@@ -1502,15 +1498,26 @@ internal class GMapDbService : TaskService, IGMapDbService
                 ("기하학 도형",  "Geometric",      20),
                 ("선/경계",      "Line",           20),
                 ("인프라",       "Infra",          20),
+                ("핀(단일)",     "Basic",          20),
             };
 
-            const string sql = @"INSERT INTO MapLayers (Name, LayerType, Category, IsVisible, Opacity, ZOrder)
-                                 VALUES (@Name, 'Symbol', @Category, TRUE, 1.0, @ZOrder);";
+            const string checkSql = "SELECT COUNT(*) FROM MapLayers WHERE LayerType = 'Symbol' AND Category = @Category;";
+            const string insertSql = @"INSERT INTO MapLayers (Name, LayerType, Category, IsVisible, Opacity, ZOrder)
+                                       VALUES (@Name, 'Symbol', @Category, TRUE, 1.0, @ZOrder);";
 
+            int added = 0;
             foreach (var (name, category, zorder) in defaults)
-                await conn.ExecuteAsync(sql, new { Name = name, Category = category, ZOrder = zorder });
+            {
+                var count = await conn.ExecuteScalarAsync<int>(checkSql, new { Category = category });
+                if (count == 0)
+                {
+                    await conn.ExecuteAsync(insertSql, new { Name = name, Category = category, ZOrder = zorder });
+                    added++;
+                }
+            }
 
-            _log?.Info($"기본 심볼 레이어 {defaults.Length}개 생성 완료");
+            if (added > 0)
+                _log?.Info($"기본 심볼 레이어 {added}개 추가 완료");
         }
         catch (Exception ex) { _log?.Error($"기본 레이어 생성 실패: {ex.Message}"); throw; }
     }

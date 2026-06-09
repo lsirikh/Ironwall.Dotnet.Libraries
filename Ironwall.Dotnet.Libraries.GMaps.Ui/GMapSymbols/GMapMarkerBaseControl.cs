@@ -526,7 +526,9 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         base.OnRenderSizeChanged(sizeInfo);
 
-        if (Marker != null)
+        // Collapsed 시 ActualWidth/Height=0이 되어 Marker.Width=0 → Offset=(0,0)으로 캔버스 위치가 틀어지는 버그 방지.
+        // 실제 크기가 있을 때만 마커 모델에 동기화.
+        if (Marker != null && ActualWidth > 0)
         {
             Marker.Width = ActualWidth;
             Marker.Height = ActualHeight;

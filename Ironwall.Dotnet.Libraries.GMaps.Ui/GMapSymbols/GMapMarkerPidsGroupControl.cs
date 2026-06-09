@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Shapes;
 using GMap.NET;
@@ -53,7 +54,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         #region - Overrides -
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("=== GMapMarkerLineControl Loaded ===");
+            System.Diagnostics.Debug.WriteLine("=== GMapMarkerPidsGroupControl Loaded ===");
 
             // Visual Tree가 완성된 후 MapControl 찾기
             _mapControl = FindParentMapControl();
@@ -74,6 +75,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             {
                 System.Diagnostics.Debug.WriteLine("MapControl을 찾을 수 없음!");
             }
+
+            // IsVisible 변경 감지: Visibility=false 후 true로 복원 시 기하 재계산
+            if (Marker != null)
+                Marker.PropertyChanged += OnMarkerPropertyChanged;
         }
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
@@ -83,6 +88,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 _mapControl.OnMapZoomChanged -= OnMapChanged;
                 _mapControl.OnMapDrag -= OnMapChanged;
                 _mapControl.OnPositionChanged -= OnMapPositionChanged;
+            }
+
+            if (Marker != null)
+                Marker.PropertyChanged -= OnMarkerPropertyChanged;
+        }
+
+        private void OnMarkerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(GMapPidsGroupMarker.IsVisible)
+                && Marker?.IsVisible == true
+                && _mapControl != null)
+            {
+                // Visibility가 false→true로 바뀔 때 형상 재계산.
+                // RestoreLayerVisibility() 이후 On 시 Offset/Points가 stale한 상태를 복구.
+                Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
             }
         }
 

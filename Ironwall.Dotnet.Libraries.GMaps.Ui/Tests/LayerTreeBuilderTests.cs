@@ -14,7 +14,7 @@ public class LayerTreeBuilderTests
     [Fact(DisplayName = "Build — 11개 심볼 → 3 Section, PIDS 그룹 6자식, 독립 5개")]
     public void Build_CreatesCorrectHierarchy()
     {
-        // Arrange: 11개 심볼 레이어 (SeedDefault와 동일)
+        // Arrange: 12개 심볼 레이어 (SeedDefault와 동일)
         var layers = CreateDefaultSymbolLayers();
 
         // Act
@@ -26,9 +26,9 @@ public class LayerTreeBuilderTests
         Assert.Equal("OVERLAY IMAGE", tree[1].Name);
         Assert.Equal("SYMBOLS", tree[2].Name);
 
-        // SYMBOLS Section 자식: PIDS 장비(Group) + 독립 5개 = 6개
+        // SYMBOLS Section 자식: PIDS 장비(Group) + 독립 6개 = 7개
         var symbols = tree[2];
-        Assert.Equal(6, symbols.Children.Count);
+        Assert.Equal(7, symbols.Children.Count);
 
         // PIDS 장비 그룹: 6개 자식
         var pidsGroup = symbols.Children[0];
@@ -36,9 +36,9 @@ public class LayerTreeBuilderTests
         Assert.Equal("PIDS 장비", pidsGroup.Name);
         Assert.Equal(6, pidsGroup.Children.Count);
 
-        // 독립 심볼: Leaf 5개
+        // 독립 심볼: Leaf 6개
         var independents = symbols.Children.Skip(1).ToList();
-        Assert.Equal(5, independents.Count);
+        Assert.Equal(6, independents.Count);
         Assert.All(independents, n => Assert.Equal(LayerNodeType.Leaf, n.NodeType));
     }
 
@@ -63,7 +63,7 @@ public class LayerTreeBuilderTests
 
     #region Test 1.5: Flatten 유틸리티
 
-    [Fact(DisplayName = "Flatten — 전체 Leaf 노드 11개")]
+    [Fact(DisplayName = "Flatten — 전체 Leaf 노드 12개")]
     public void Flatten_ReturnsAllLeaves()
     {
         var layers = CreateDefaultSymbolLayers();
@@ -71,8 +71,8 @@ public class LayerTreeBuilderTests
 
         var leaves = LayerTreeBuilder.Flatten(tree).ToList();
 
-        // 11개 Leaf (PIDS 6 + 독립 5)
-        Assert.Equal(11, leaves.Count);
+        // 12개 Leaf (PIDS 6 + 독립 6)
+        Assert.Equal(12, leaves.Count);
         Assert.All(leaves, n => Assert.Equal(LayerNodeType.Leaf, n.NodeType));
     }
 
@@ -130,7 +130,7 @@ public class LayerTreeBuilderTests
         {
             "PidsCamera", "PidsSensor", "PidsSpeaker",
             "PidsController", "PidsLamp", "PidsEnclosure",
-            "PidsGroup", "Military", "Geometric", "Line", "Infra"
+            "PidsGroup", "Military", "Geometric", "Line", "Infra", "Basic"
         };
 
         return categories.Select((cat, i) => (IMapLayerModel)new MapLayerModel
