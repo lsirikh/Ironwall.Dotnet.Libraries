@@ -413,14 +413,35 @@
 					<md:PackIcon Kind="ContentDuplicate" />
 				</Button>
 
-				<!--  마커 격자 스냅 버튼  -->
-				<Button
-					Command="{Binding SnapMarkerToGridCommand}"
-					IsEnabled="{Binding CanEditMarker}"
-					Style="{StaticResource ToolbarButtonStyle}"
-					ToolTip="마커를 격자에 맞춤 (Ctrl+G)">
-					<md:PackIcon Kind="GridLarge" />
-				</Button>
+				<!--  격자 스냅 토글  -->
+				<Grid>
+					<ToggleButton
+						x:Name="SnapGridToggle"
+						Command="{Binding ToggleSnapToGridCommand}"
+						IsChecked="{Binding IsSnapToGridEnabled, Mode=OneWay}"
+						IsEnabled="{Binding IsEditModeEnabled}"
+						ToolTip="격자 스냅 ON/OFF (편집 모드 필요)">
+						<ToggleButton.Style>
+							<Style BasedOn="{StaticResource MaterialDesignSwitchToggleButton}" TargetType="ToggleButton">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsSnapToGridEnabled}" Value="True">
+										<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</ToggleButton.Style>
+						<md:PackIcon Kind="GridLarge" />
+					</ToggleButton>
+					<Popup
+						AllowsTransparency="True"
+						IsOpen="{Binding IsSnapToGridEnabled, Mode=OneWay}"
+						Placement="Bottom"
+						PlacementTarget="{x:Reference SnapGridToggle}"
+						StaysOpen="True"
+						VerticalOffset="4">
+						<local:GridSnapSettingsControl />
+					</Popup>
+				</Grid>
 
 				<!--<StackPanel Orientation="Horizontal" Visibility="{Binding CanEditMarker, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<md:PackIcon
@@ -598,7 +619,9 @@
 			<AdornerDecorator Panel.ZIndex="0">
 				<gmap:GMapCustomControl
 					x:Name="MainMap"
+					GridSizePx="{Binding GridSizePx, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					IsEditMode="{Binding IsEditModeEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					IsSnapToGridEnabled="{Binding IsSnapToGridEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					MapRotation="{Binding MapRotation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 					MaxZoom="19"
 					MinZoom="2"

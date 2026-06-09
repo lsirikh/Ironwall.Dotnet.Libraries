@@ -689,6 +689,35 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 (int)Math.Round(mapRelativePos.X),
                 (int)Math.Round(mapRelativePos.Y));
 
+            // LatLng 도메인 격자 스냅 (IsSnapToGridEnabled ON 시)
+            if (_mapControl is GMapCustoms.GMapCustomControl snapCtrl && snapCtrl.IsSnapToGridEnabled)
+            {
+                var gridPx = Math.Max(8.0, snapCtrl.GridSizePx);
+                var cx = _mapControl.ActualWidth / 2;
+                var cy = _mapControl.ActualHeight / 2;
+                var origin = _mapControl.FromLocalToLatLng((int)cx, (int)cy);
+                var offsetH = _mapControl.FromLocalToLatLng((int)(cx + gridPx), (int)cy);
+                var offsetV = _mapControl.FromLocalToLatLng((int)cx, (int)(cy + gridPx));
+                double gridDegLng = Math.Abs(offsetH.Lng - origin.Lng);
+                double gridDegLat = Math.Abs(offsetV.Lat - origin.Lat);
+
+                const double threshold = 0.2;
+
+                if (gridDegLat > 0)
+                {
+                    double snappedLat = Math.Round(newGeoPos.Lat / gridDegLat) * gridDegLat;
+                    if (Math.Abs(newGeoPos.Lat - snappedLat) < gridDegLat * threshold)
+                        newGeoPos = new GMap.NET.PointLatLng(snappedLat, newGeoPos.Lng);
+                }
+
+                if (gridDegLng > 0)
+                {
+                    double snappedLng = Math.Round(newGeoPos.Lng / gridDegLng) * gridDegLng;
+                    if (Math.Abs(newGeoPos.Lng - snappedLng) < gridDegLng * threshold)
+                        newGeoPos = new GMap.NET.PointLatLng(newGeoPos.Lat, snappedLng);
+                }
+            }
+
             _targetMarker.UpdateLocation(newGeoPos);
         }
         catch (Exception ex)
