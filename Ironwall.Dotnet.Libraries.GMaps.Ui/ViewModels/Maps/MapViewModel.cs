@@ -3411,7 +3411,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     Header = $"{devName}페이지",
                     IsEnabled = !string.IsNullOrEmpty(listUrl),
-                    Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
+                    Visibility = (IsEditModeEnabled || webServerEnabled) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ViewList, Width = 16, Height = 16 }
                 };
                 listItem.Click += (s, e) => _deviceDetailUrlService.OpenInChrome(listUrl);
@@ -3421,7 +3421,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     Header = $"{devName}상세",
                     IsEnabled = hasDevice,
-                    Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
+                    Visibility = (IsEditModeEnabled || webServerEnabled) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.InformationOutline, Width = 16, Height = 16 }
                 };
                 detailItem.Click += (s, e) =>
@@ -3435,7 +3435,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     Header = $"{devName}수정",
                     IsEnabled = hasDevice,
-                    Visibility = webServerEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
+                    Visibility = (IsEditModeEnabled || webServerEnabled) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Pencil, Width = 16, Height = 16 }
                 };
                 editItem.Click += (s, e) =>
@@ -3475,6 +3475,7 @@ public class MapViewModel : BasePanelViewModel,
                     {
                         Header = "음원 실행",
                         IsEnabled = isEnabled,
+                        Visibility = (IsEditModeEnabled || webServerEnabled) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Play, Width = 16, Height = 16 }
                     };
                     playItem.Click += (s, e) => ShowBroadcastPlayPanel(pidsMarker.LinkedDeviceId);
@@ -3484,6 +3485,7 @@ public class MapViewModel : BasePanelViewModel,
                     {
                         Header = "TTS 실행",
                         IsEnabled = isEnabled,
+                        Visibility = (IsEditModeEnabled || webServerEnabled) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Microphone, Width = 16, Height = 16 }
                     };
                     ttsItem.Click += (s, e) => ShowTtsBroadcastPanel(pidsMarker.LinkedDeviceId);
@@ -3493,6 +3495,7 @@ public class MapViewModel : BasePanelViewModel,
                     {
                         Header = "Stop",
                         IsEnabled = isEnabled,
+                        Visibility = (IsEditModeEnabled || webServerEnabled) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Stop, Width = 16, Height = 16 }
                     };
                     stopItem.Click += async (s, e) =>
