@@ -2427,7 +2427,11 @@ public class MapViewModel : BasePanelViewModel,
                 MainMap.Markers.Add(marker);
                 // EditMode 상태에 맞게 IsHitTestVisible 동기화
                 if (marker is GMapMarker gm && gm.Shape is UIElement shapeEl)
+                {
                     shapeEl.IsHitTestVisible = IsEditModeEnabled;
+                    // Panel.ZIndex 초기 동기화 (RestoreLayerVisibility 전까지 ZIndex=0 방지)
+                    System.Windows.Controls.Panel.SetZIndex(shapeEl, marker.ZIndex);
+                }
                 _log?.Info($"이미지 마커 추가 완료: {imageModel.Title}");
             }
             else
@@ -2974,8 +2978,8 @@ public class MapViewModel : BasePanelViewModel,
             }
             else
             {
-                // 신규 마커: 현재 심볼 중 최상위 ZIndex + 1 부여
-                int maxZ = 0;
+                // 신규 마커: 심볼 band(1000+) 내 최상위 ZIndex + 1 부여
+                int maxZ = 1000 - 1; // 심볼 band floor (최소 1000)
                 foreach (var m in MainMap.Markers)
                 {
                     if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
@@ -3551,49 +3555,77 @@ public class MapViewModel : BasePanelViewModel,
     #region Marker ZOrder Control
 
     /// <summary>
-    /// 앱 시작 시 모든 심볼 마커에 고유 ZIndex 할당
+    /// 앱 시작 시 모든 마커에 고유 ZIndex 할당 (이미지 band 0~999 / 심볼 band 1000+)
     /// 중복 ZIndex가 있으면 컬렉션 순서대로 순차 재할당 + Batch DB 저장
     /// </summary>
     private void EnsureUniqueZOrder()
     {
         if (MainMap?.Markers == null) return;
+        EnsureUniqueZOrderForBand(isImage: true,  bandOffset: 0);
+        EnsureUniqueZOrderForBand(isImage: false, bandOffset: 1000);
+    }
 
-        var editableMarkers = MainMap.Markers
+    private void EnsureUniqueZOrderForBand(bool isImage, int bandOffset)
+    {
+        var markers = MainMap!.Markers
             .OfType<GMapMarker>()
-            .Where(m => m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement)
+            .Where(m => (m is IImageEditableMarker) == isImage
+                        && m is IEditableMarker
+                        && m.Shape is UIElement)
             .ToList();
 
-        if (editableMarkers.Count == 0) return;
+        if (markers.Count == 0) return;
 
-        // 중복 ZIndex 검출
-        var zValues = editableMarkers
+        var zValues = markers
             .Select(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
             .ToList();
 
-        bool hasDuplicates = zValues.Count != zValues.Distinct().Count();
-        if (!hasDuplicates)
+        if (zValues.Count == zValues.Distinct().Count())
         {
-            _log?.Info($"[ZOrder] 고유값 확인 완료 — {editableMarkers.Count}개 마커, 중복 없음");
+            _log?.Info($"[ZOrder] {(isImage ? "Image" : "Symbol")} band 고유값 확인 완료 — {markers.Count}개, 중복 없음");
             return;
         }
 
-        // 순차 재할당 + Batch DB
-        _log?.Info($"[ZOrder] 중복 감지 — {editableMarkers.Count}개 마커에 고유 ZIndex 할당 시작");
+        _log?.Info($"[ZOrder] {(isImage ? "Image" : "Symbol")} band 중복 감지 — {markers.Count}개 재할당");
         var changes = new List<(int id, int zOrder)>();
-        for (int i = 0; i < editableMarkers.Count; i++)
+        for (int i = 0; i < markers.Count; i++)
         {
-            var gMarker = editableMarkers[i];
+            int newZ = bandOffset + i;
+            var gMarker = markers[i];
             if (gMarker.Shape is UIElement shape)
             {
-                ApplyMarkerZOrderLocal(gMarker, shape, i);
+                ApplyMarkerZOrderLocal(gMarker, shape, newZ);
                 if (gMarker is IEditableMarker em && em.Id > 0)
-                    changes.Add((em.Id, i));
+                    changes.Add((em.Id, newZ));
             }
         }
-        if (changes.Count > 0)
-            _ = _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
 
-        _log?.Info($"[ZOrder] 고유 ZIndex 할당 완료 (0 ~ {editableMarkers.Count - 1}), DB Batch {changes.Count}건");
+        if (isImage)
+        {
+            foreach (var (id, z) in changes)
+            {
+                var imgMarker = markers.OfType<IImageEditableMarker>()
+                    .FirstOrDefault(m => m.Id == id);
+                if (imgMarker != null && !string.IsNullOrEmpty(imgMarker.FilePath))
+                {
+                    var node = LayerTreeBuilder.Flatten(_layerTreeNodes)
+                        .FirstOrDefault(n => string.Equals(n.Model?.FilePath, imgMarker.FilePath,
+                            StringComparison.OrdinalIgnoreCase));
+                    if (node?.Model != null)
+                    {
+                        node.Model.ZOrder = z;
+                        _ = _gMapDbService.UpdateMapLayerAsync(node.Model);
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (changes.Count > 0)
+                _ = _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
+        }
+
+        _log?.Info($"[ZOrder] {(isImage ? "Image" : "Symbol")} band 재할당 완료 ({bandOffset}~{bandOffset + markers.Count - 1}), DB {changes.Count}건");
         LogAllMarkerZOrder();
     }
 
@@ -3606,12 +3638,13 @@ public class MapViewModel : BasePanelViewModel,
 
         int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
 
-        // 바로 위: 가장 작은 ZIndex > currentZ 인 마커 찾기
+        // 바로 위: 같은 band 내에서 가장 작은 ZIndex > currentZ 인 마커 찾기
+        bool isImageMarker = gMarker is IImageEditableMarker;
         GMapMarker? target = null;
         int targetZ = int.MaxValue;
         foreach (var m in MainMap.Markers)
         {
-            if (m == gMarker || m is not IEditableMarker || m is IImageEditableMarker || m.Shape is not UIElement s) continue;
+            if (m == gMarker || m is not IEditableMarker || (m is IImageEditableMarker) != isImageMarker || m.Shape is not UIElement s) continue;
             int z = System.Windows.Controls.Panel.GetZIndex(s);
             if (z > currentZ && z < targetZ) { target = m; targetZ = z; }
         }
@@ -3634,12 +3667,13 @@ public class MapViewModel : BasePanelViewModel,
 
         int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
 
-        // 바로 아래: 가장 큰 ZIndex < currentZ 인 마커 찾기
+        // 바로 아래: 같은 band 내에서 가장 큰 ZIndex < currentZ 인 마커 찾기
+        bool isImageMarker = gMarker is IImageEditableMarker;
         GMapMarker? target = null;
         int targetZ = int.MinValue;
         foreach (var m in MainMap.Markers)
         {
-            if (m == gMarker || m is not IEditableMarker || m is IImageEditableMarker || m.Shape is not UIElement s) continue;
+            if (m == gMarker || m is not IEditableMarker || (m is IImageEditableMarker) != isImageMarker || m.Shape is not UIElement s) continue;
             int z = System.Windows.Controls.Panel.GetZIndex(s);
             if (z < currentZ && z > targetZ) { target = m; targetZ = z; }
         }
@@ -3660,10 +3694,12 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape || MainMap == null) return;
 
-        int maxZ = 0;
+        bool isImageMarkerTop = gMarker is IImageEditableMarker;
+        int bandMin = isImageMarkerTop ? 0 : 1000;
+        int maxZ = bandMin - 1;
         foreach (var m in MainMap.Markers)
         {
-            if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
+            if ((m is IImageEditableMarker) == isImageMarkerTop && m is IEditableMarker && m.Shape is UIElement s)
                 maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
         }
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
@@ -3679,51 +3715,91 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (marker is not GMapMarker gMarker || gMarker.Shape is not UIElement shape || MainMap == null) return;
 
+        bool isImageMarkerBottom = gMarker is IImageEditableMarker;
+        int bandFloor = isImageMarkerBottom ? 0 : 1000;
         int minZ = int.MaxValue;
         foreach (var m in MainMap.Markers)
         {
-            if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
+            if ((m is IImageEditableMarker) == isImageMarkerBottom && m is IEditableMarker && m.Shape is UIElement s)
                 minZ = Math.Min(minZ, System.Windows.Controls.Panel.GetZIndex(s));
         }
-        if (minZ == int.MaxValue) minZ = 0;
+        if (minZ == int.MaxValue) minZ = bandFloor;
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        ApplyMarkerZOrderLocal(gMarker, shape, minZ - 1);
-        _log?.Info($"[ZOrder] MoveToBottom: '{marker.Title}' ZIndex={oldZ}→{minZ - 1}");
+        int newBottomZ = Math.Max(minZ - 1, bandFloor);
+        ApplyMarkerZOrderLocal(gMarker, shape, newBottomZ);
+        _log?.Info($"[ZOrder] MoveToBottom: '{marker.Title}' ZIndex={oldZ}→{newBottomZ}");
         NormalizeAllZOrder();
     }
 
     /// <summary>
-    /// 전체 마커를 현재 순서 기준으로 0~n-1 재번호 + Batch DB 저장
+    /// 전체 마커를 현재 순서 기준으로 band별 재번호 + DB 저장
+    /// 이미지 band: 0~n-1 / 심볼 band: 1000~(1000+m-1)
     /// </summary>
     private void NormalizeAllZOrder()
     {
         if (MainMap?.Markers == null) return;
+        NormalizeZOrderBand(isImage: true,  bandOffset: 0);
+        NormalizeZOrderBand(isImage: false, bandOffset: 1000);
+    }
 
-        var sorted = MainMap.Markers
+    private void NormalizeZOrderBand(bool isImage, int bandOffset)
+    {
+        var sorted = MainMap!.Markers
             .OfType<GMapMarker>()
-            .Where(m => m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement)
+            .Where(m => (m is IImageEditableMarker) == isImage
+                        && m is IEditableMarker
+                        && m.Shape is UIElement)
             .OrderBy(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
             .ToList();
+
+        if (sorted.Count == 0) return;
 
         var changes = new List<(int id, int zOrder)>();
 
         for (int i = 0; i < sorted.Count; i++)
         {
+            int newZ = bandOffset + i;
             var gMarker = sorted[i];
             if (gMarker.Shape is not UIElement shape) continue;
 
-            int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
-            if (currentZ == i) continue; // 변경 없으면 스킵
+            if (System.Windows.Controls.Panel.GetZIndex(shape) == newZ) continue;
 
-            ApplyMarkerZOrderLocal(gMarker, shape, i);
+            ApplyMarkerZOrderLocal(gMarker, shape, newZ);
             if (gMarker is IEditableMarker em && em.Id > 0)
-                changes.Add((em.Id, i));
+                changes.Add((em.Id, newZ));
         }
 
-        if (changes.Count > 0)
-            _ = _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
+        if (changes.Count == 0)
+        {
+            _log?.Info($"[ZOrder] {(isImage ? "Image" : "Symbol")} band 정규화 — 변경 없음");
+            return;
+        }
 
-        _log?.Info($"[ZOrder] 정규화 완료 (0~{sorted.Count - 1}), DB Batch {changes.Count}건");
+        if (isImage)
+        {
+            foreach (var (id, z) in changes)
+            {
+                var imgMarker = sorted.OfType<IImageEditableMarker>()
+                    .FirstOrDefault(m => m.Id == id);
+                if (imgMarker != null && !string.IsNullOrEmpty(imgMarker.FilePath))
+                {
+                    var node = LayerTreeBuilder.Flatten(_layerTreeNodes)
+                        .FirstOrDefault(n => string.Equals(n.Model?.FilePath, imgMarker.FilePath,
+                            StringComparison.OrdinalIgnoreCase));
+                    if (node?.Model != null)
+                    {
+                        node.Model.ZOrder = z;
+                        _ = _gMapDbService.UpdateMapLayerAsync(node.Model);
+                    }
+                }
+            }
+        }
+        else
+        {
+            _ = _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
+        }
+
+        _log?.Info($"[ZOrder] {(isImage ? "Image" : "Symbol")} band 정규화 완료 ({bandOffset}~{bandOffset + sorted.Count - 1}), DB {changes.Count}건");
         LogAllMarkerZOrder();
     }
 
@@ -3745,15 +3821,18 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (PropertyPanel == null || SelectedMarker == null || MainMap == null) return;
 
-        var symbolMarkers = MainMap.Markers
+        bool isImageSelected = SelectedMarker is IImageEditableMarker;
+        var bandMarkers = MainMap.Markers
             .OfType<GMapMarker>()
-            .Where(m => m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement)
+            .Where(m => (m is IImageEditableMarker) == isImageSelected
+                        && m is IEditableMarker
+                        && m.Shape is UIElement)
             .OrderBy(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
             .ToList();
 
-        int rank = symbolMarkers.IndexOf(SelectedMarker as GMapMarker);
+        int rank = bandMarkers.IndexOf(SelectedMarker as GMapMarker);
         PropertyPanel.MarkerZOrderDisplay = rank >= 0
-            ? $"{rank + 1} / {symbolMarkers.Count}"
+            ? $"{rank + 1} / {bandMarkers.Count}"
             : "- / -";
     }
 
@@ -3778,18 +3857,34 @@ public class MapViewModel : BasePanelViewModel,
     {
         ApplyMarkerZOrderLocal(gMarker, shape, newZ);
         if (gMarker is IEditableMarker editableMarker && editableMarker.Id > 0)
-            _ = SaveMarkerZOrderAsync(editableMarker.Id, newZ);
+            _ = SaveMarkerZOrderAsync(editableMarker, newZ);
     }
 
-    private async Task SaveMarkerZOrderAsync(int symbolId, int zOrder)
+    private async Task SaveMarkerZOrderAsync(IEditableMarker marker, int zOrder)
     {
         try
         {
-            await _gMapDbSymbolService.UpdateSymbolZOrderAsync(symbolId, zOrder);
+            if (marker is IImageEditableMarker imageMarker)
+            {
+                var filePath = imageMarker.FilePath;
+                var layerNode = string.IsNullOrEmpty(filePath) ? null
+                    : LayerTreeBuilder.Flatten(_layerTreeNodes)
+                        .FirstOrDefault(n => string.Equals(n.Model?.FilePath, filePath,
+                            StringComparison.OrdinalIgnoreCase));
+                if (layerNode?.Model != null)
+                {
+                    layerNode.Model.ZOrder = zOrder;
+                    await _gMapDbService.UpdateMapLayerAsync(layerNode.Model);
+                }
+            }
+            else
+            {
+                await _gMapDbSymbolService.UpdateSymbolZOrderAsync(marker.Id, zOrder);
+            }
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ZOrder] DB 저장 실패: Id={symbolId} ZOrder={zOrder} — {ex.Message}");
+            _log?.Error($"[ZOrder] DB 저장 실패: Id={marker.Id} ZOrder={zOrder} — {ex.Message}");
         }
     }
 
@@ -6256,7 +6351,10 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     imgMarker.IsLayerEnabled = model.IsVisible;
                     imgMarker.IsVisible = model.IsVisible;
-                    imgMarker.ZIndex = model.ZOrder;
+                    if (imgMarker is IEditableMarker editableImg)
+                        ((IEditableMarker)editableImg).ZOrder = model.ZOrder;
+                    else
+                        imgMarker.ZIndex = model.ZOrder;
                 }
                 else
                     _log?.Warning($"[Restore] OverlayImage 마커 미발견: {model.FilePath}");
