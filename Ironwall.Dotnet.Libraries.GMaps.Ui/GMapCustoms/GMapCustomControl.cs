@@ -153,6 +153,16 @@ public class GMapCustomControl : GMapControl
     public event Action<GMapCustomImage> OnImageClicked;
 
     /// <summary>
+    /// 이미지 우클릭 이벤트 - ViewModel에 우클릭된 이미지 전달 (회전 초기화/입력 컨텍스트 메뉴용, FR-9)
+    /// </summary>
+    public event Action<GMapCustomImage>? OnImageRightClicked;
+
+    /// <summary>
+    /// 이미지 편집(이동/리사이즈/회전) 완료 이벤트 - DB 영속화 트리거 (FR-8)
+    /// </summary>
+    public Action<GMapCustomImage>? OnImageEditCompleted;
+
+    /// <summary>
     /// 마커 편집 관련 이벤트들 (외부로 전파)
     /// </summary>
     public event EventHandler<MarkerEditStartedEventArgs> MarkerEditStarted;
@@ -378,6 +388,13 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     private void GMapCustomControl_OnMapZoomChanged()
     {
+        // ★ NFR-3(b) 백스톱 — 드래그 중 프로그램적 줌 발생 시 즉시 드래그 종료 (점프 bounds 미커밋)
+        if (_isImageDrag)
+        {
+            ResetDragState();
+            return;
+        }
+
         try
         {
             _log?.Info($"줌 변경됨: {Zoom}");
@@ -722,7 +739,10 @@ public class GMapCustomControl : GMapControl
         // ReleaseMouseCapture()를 먼저 실행해야 WPF 이벤트 라우팅이 즉시 정상화된다.
         if (_isDragging && _isImageDrag)
         {
+            // ★ FR-8 — ResetDragState가 _draggedImage를 null로 만들기 전에 캡처 후 편집완료 발화(DB 영속화)
+            var edited = _draggedImage;
             ResetDragState();
+            if (edited != null) OnImageEditCompleted?.Invoke(edited);
             _log?.Info("이미지 드래그 완료");
             e.Handled = true;
             return;
@@ -752,12 +772,36 @@ public class GMapCustomControl : GMapControl
         if (!IsEditMode)
         {
             var mousePos = e.GetPosition(this);
+
+            // ★ NFR-7 — 마커 우선 else-if 체인 (마커/이미지 이중 컨텍스트 메뉴 방지)
             var clickedMarker = GetMarkerAtScreen(mousePos);
             if (clickedMarker != null)
             {
                 OnMarkerRightClicked?.Invoke(clickedMarker);
                 e.Handled = true;
+                return;
             }
+
+            // ★ FR-9 — 회전 보정된 히트테스트로 이미지 우클릭 감지 → 회전 초기화/입력 메뉴
+            var clickedImage = GetImageAtScreen(mousePos);
+            if (clickedImage != null)
+            {
+                OnImageRightClicked?.Invoke(clickedImage);
+                e.Handled = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 마우스 캡처 손실 시(창 비활성화/포커스 손실 등) 진행 중 드래그/회전 상태 정리 (NFR-4, S06/S13)
+    /// </summary>
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        if (_isDragging || _isImageDrag || _draggedImage != null)
+        {
+            ResetDragState();
+            _log?.Info("OnLostMouseCapture — 진행 중 드래그 상태 정리");
         }
     }
 
@@ -799,13 +843,20 @@ public class GMapCustomControl : GMapControl
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);
                 var screenDistance = CalculateScreenDistance(screenPosition, markerScreenPoint);
 
-                // 렌더된 화면 크기 기준 반경 — Shape.ActualWidth/Height 우선, 폴백 32px
+                // 렌더된 화면 크기 — Shape.ActualWidth/Height 우선, 폴백 32px
                 var shape = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
                 var renderedW = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0;
                 var renderedH = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0;
-                var markerRadius = Math.Max(renderedW, renderedH) / 2.0 + 8;
 
-                if (screenDistance <= markerRadius)
+                // ★ AABB 히트테스트 (MarkerHitTest_AABB_Fix R-1) — 원형 반경(Math.Max(W,H)/2+8) 대신
+                //   마커 Width×Height 사각형으로 판정. 마커 Offset=(-W/2,-H/2)이므로 markerScreenPoint가
+                //   시각 중심 → 중심 기준 AABB가 정확. 원형은 라인/비정방형 심볼에서 빈 공간 오선택 발생.
+                var halfW = renderedW / 2.0;
+                var halfH = renderedH / 2.0;
+                var dx = Math.Abs(screenPosition.X - markerScreenPoint.X);
+                var dy = Math.Abs(screenPosition.Y - markerScreenPoint.Y);
+
+                if (dx <= halfW && dy <= halfH)
                 {
                     var z = shape != null ? System.Windows.Controls.Panel.GetZIndex(shape) : 0;
                     var area = renderedW * renderedH;
@@ -863,11 +914,8 @@ public class GMapCustomControl : GMapControl
         return CustomImages.FirstOrDefault(img =>
         {
             if (!img.Visibility || (img.Zoom > 0 && Zoom < img.Zoom)) return false;
-            var bounds = img.ImageBounds;
-            var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
-            var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
-            return screenPos.X >= topLeft.X && screenPos.X <= bottomRight.X &&
-                   screenPos.Y >= topLeft.Y && screenPos.Y <= bottomRight.Y;
+            if (img.Opacity <= 0) return false;             // ★ FR-10 (AABB PRD R-2 흡수) — 투명 이미지 클릭 차단
+            return HitTestImageScreen(img, screenPos);      // ★ NFR-1 (AABB PRD R-3 흡수) — 회전 보정 AABB
         });
     }
     #endregion
@@ -1116,6 +1164,13 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
+        // ★ NFR-3(a) — 이미지 드래그/회전 중에는 줌 차단 (좌표계 변동으로 인한 점프 방지)
+        if (_isImageDrag)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.Shift)
         {
             double rotationDelta = e.Delta > 0 ? 5 : -5;
@@ -1176,7 +1231,9 @@ public class GMapCustomControl : GMapControl
             return true;
         }
 
-        if (selectedImage.Contains(geoPos))
+        // ★ Move-폴백도 회전 보정 히트테스트 사용 (NFR-1, S12).
+        //   기존 Contains(geoPos)는 비회전 AABB라 회전 이미지에서 빈 모서리 오선택 / 시각영역 미선택 발생.
+        if (HitTestImageScreen(selectedImage, mousePos))
         {
             StartImageDrag(selectedImage, mousePos, ResizeHandle.Move);
             e.Handled = true;
@@ -1197,6 +1254,17 @@ public class GMapCustomControl : GMapControl
         _isDragging = true;
         _isImageDrag = true;
 
+        // ★ 회전 드래그: 이미지 중심/시작각/기준 회전값 캐싱 (FR-5, 절대각 누적 기반)
+        if (handle == ResizeHandle.Rotate)
+        {
+            var imageRect = GetImageScreenRect(image);
+            var cx = imageRect.X + imageRect.Width / 2;
+            var cy = imageRect.Y + imageRect.Height / 2;
+            _rotationCenterScreen = new Point(cx, cy);
+            _rotationStartAngle = CalculateRotationAngle(new GPoint((long)cx, (long)cy), mousePos);
+            _rotationBaseUserRotation = image.UserRotation;
+        }
+
         SetupImageDragData(image);
         this.CaptureMouse();
         _log?.Info($"이미지 편집 시작: {handle}");
@@ -1209,6 +1277,28 @@ public class GMapCustomControl : GMapControl
     {
         var curBounds = _draggedImage.ImageBounds;
         RectLatLng newBounds = curBounds;
+
+        // ★ 회전 케이스 (FR-4): 절대각 누적. deltaX/deltaY 사용 금지 — 아래 _dragStartPoint 매 프레임
+        //   리셋 때문에 누적이 안 되므로, 시작각 캐시(_rotationStartAngle) 기준 절대각으로 계산한다.
+        if (_resizeHandle == ResizeHandle.Rotate)
+        {
+            var cur = CalculateRotationAngle(
+                new GPoint((long)_rotationCenterScreen.X, (long)_rotationCenterScreen.Y), currentPos);
+            // 드래그 시작 이후 회전량을 최단호(-180,180]로 정규화 (0/360 경계 명시적 처리).
+            var deltaAngle = NormalizeAngle(cur - _rotationStartAngle);
+            var newAngle = ApplySnapAngle(NormalizeAngle(_rotationBaseUserRotation + deltaAngle));
+            _draggedImage.UserRotation = newAngle;
+            InvalidateVisual();
+            _dragStartPoint = currentPos;
+            return; // bounds 변경 없음
+        }
+
+        // ★ 회전 상태 Resize 시 화면 델타를 이미지 로컬축으로 역회전 (NFR-2).
+        //   Move(평행이동)는 화면 델타 그대로가 맞으므로 제외.
+        if (_resizeHandle != ResizeHandle.Move && _draggedImage.EffectiveRotation != 0)
+        {
+            (deltaX, deltaY) = RotateVector(deltaX, deltaY, -_draggedImage.EffectiveRotation);
+        }
 
         switch (_resizeHandle)
         {
@@ -1233,6 +1323,10 @@ public class GMapCustomControl : GMapControl
             case ResizeHandle.MiddleRight:
                 newBounds = ResizeBoundsFree(curBounds, deltaX, 0, false, false, true, false);
                 break;
+            default:
+                // ★ S07 — 미처리 핸들 회귀 감지 (silent no-op 방지)
+                _log?.Warning($"[ProcessImageDrag] 미처리 핸들: {_resizeHandle}");
+                break;
         }
 
         if (newBounds.WidthLng > 0.0001 && newBounds.HeightLat > 0.0001)
@@ -1248,20 +1342,85 @@ public class GMapCustomControl : GMapControl
     #endregion
     
     #region Handle Detection Methods
+
+    /// <summary>
+    /// 이미지 화면 사각형(AABB) 계산. bounds → FromLatLngToLocal. (NFR-1 공통 헬퍼)
+    /// </summary>
+    private Rect GetImageScreenRect(GMapCustomImage image)
+    {
+        var bounds = image.ImageBounds;
+        var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
+        var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
+        return new Rect(topLeft.X, topLeft.Y,
+            bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
+    }
+
+    /// <summary>
+    /// 이미지 중심(화면 좌표) 기준 회전 변환. 렌더·히트·드래그 델타가 공유하는 단일 진실원. (NFR-1)
+    /// </summary>
+    private RotateTransform GetImageRotateTransform(GMapCustomImage image, Rect imageRect)
+    {
+        var cx = imageRect.X + imageRect.Width / 2;
+        var cy = imageRect.Y + imageRect.Height / 2;
+        return new RotateTransform(image.EffectiveRotation, cx, cy);
+    }
+
+    /// <summary>
+    /// 화면 좌표를 이미지 비회전 로컬 좌표로 역변환. EffectiveRotation==0이면 그대로 반환. (NFR-1)
+    /// </summary>
+    private Point InverseRotateMouse(GMapCustomImage image, Rect imageRect, Point mousePos)
+    {
+        if (image.EffectiveRotation == 0) return mousePos;
+        var m = GetImageRotateTransform(image, imageRect).Value; // Matrix (회전이므로 항상 가역)
+        m.Invert();
+        return m.Transform(mousePos);
+    }
+
+    /// <summary>
+    /// 화면 델타 벡터를 회전 (NFR-2, 평행이동 성분 제외 순수 벡터 회전).
+    /// </summary>
+    private (double dx, double dy) RotateVector(double dx, double dy, double degrees)
+    {
+        if (degrees == 0) return (dx, dy);
+        var rad = degrees * Math.PI / 180.0;
+        var cos = Math.Cos(rad);
+        var sin = Math.Sin(rad);
+        return (dx * cos - dy * sin, dx * sin + dy * cos);
+    }
+
+    /// <summary>
+    /// 화면 좌표가 이미지의 (회전 보정된) 사각형 안에 있는지 — 히트테스트 공통 코어. (NFR-1, S12)
+    /// </summary>
+    private bool HitTestImageScreen(GMapCustomImage image, Point screenPos)
+    {
+        var imageRect = GetImageScreenRect(image);
+        var local = InverseRotateMouse(image, imageRect, screenPos);
+        return local.X >= imageRect.Left && local.X <= imageRect.Right &&
+               local.Y >= imageRect.Top && local.Y <= imageRect.Bottom;
+    }
+
     /// <summary>
     /// 클릭된 이미지 핸들 감지
     /// </summary>
     private ResizeHandle GetClickedImageHandle(GMapCustomImage image, Point mousePos)
     {
-        var bounds = image.ImageBounds;
-        var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
-        var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
+        var imageRect = GetImageScreenRect(image);
 
-        var imageRect = new Rect(topLeft.X, topLeft.Y,
-            bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
+        // ★ 회전 역변환 — 렌더러(GetImageRotateTransform)와 동일 좌표계 보장 (NFR-1).
+        //   회전 핸들/8핸들 모두 비회전 imageRect 기준 좌표로 그려지므로 마우스를 역회전해 비교한다.
+        var local = InverseRotateMouse(image, imageRect, mousePos);
 
         var handleSize = 8;
         var tolerance = handleSize + 2;
+
+        // ★ 회전 핸들을 8핸들보다 먼저 검사하여 Contains() Move-폴백보다 우선되게 한다 (FR-3, S02 R2).
+        var rotateHandle = new Point(imageRect.Left + imageRect.Width / 2,
+                                     imageRect.Top - ROTATE_HANDLE_DISTANCE);
+        if (Math.Abs(local.X - rotateHandle.X) <= tolerance &&
+            Math.Abs(local.Y - rotateHandle.Y) <= tolerance)
+        {
+            return ResizeHandle.Rotate;
+        }
 
         var handles = new[]
         {
@@ -1277,8 +1436,8 @@ public class GMapCustomControl : GMapControl
 
         foreach (var (handlePos, handleType) in handles)
         {
-            if (Math.Abs(mousePos.X - handlePos.X) <= tolerance &&
-                Math.Abs(mousePos.Y - handlePos.Y) <= tolerance)
+            if (Math.Abs(local.X - handlePos.X) <= tolerance &&
+                Math.Abs(local.Y - handlePos.Y) <= tolerance)
             {
                 return handleType;
             }
@@ -1354,34 +1513,29 @@ public class GMapCustomControl : GMapControl
     {
         if (customImage?.Img == null) return;
 
+        int pushCount = 0;   // ★ NFR-5 — Push 횟수 추적, finally에서 균형 복원
         try
         {
-            var bounds = customImage.ImageBounds;
-            var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
-            var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
+            var imageRect = GetImageScreenRect(customImage);
 
-            var imageRect = new Rect(topLeft.X, topLeft.Y,
-                bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
-
-            // 회전 처리
-            if (customImage.Rotation != 0)
+            // 회전 처리 (EffectiveRotation = UserRotation + MapCorrectionRotation, NFR-1 단일 진실원)
+            if (customImage.EffectiveRotation != 0)
             {
-                var centerX = imageRect.X + imageRect.Width / 2;
-                var centerY = imageRect.Y + imageRect.Height / 2;
-                var rotateTransform = new RotateTransform(customImage.Rotation, centerX, centerY);
-                drawingContext.PushTransform(rotateTransform);
+                drawingContext.PushTransform(GetImageRotateTransform(customImage, imageRect));
+                pushCount++;
             }
 
             // 투명도 처리
             if (customImage.Opacity < 1.0)
             {
                 drawingContext.PushOpacity(customImage.Opacity);
+                pushCount++;
             }
 
             // 이미지 그리기
             drawingContext.DrawImage(customImage.Img, imageRect);
 
-            // 선택된 이미지 테두리 및 핸들 표시
+            // 선택된 이미지 테두리 및 핸들 표시 (PushTransform 범위 내부 → 핸들이 회전 위치에 그려짐)
             if (ShowImageBounds || customImage.IsSelected)
             {
                 var boundsPen = new Pen(Brushes.Red, 2) { DashStyle = DashStyles.Dash };
@@ -1400,14 +1554,15 @@ public class GMapCustomControl : GMapControl
                     drawingContext.DrawText(nameText, new Point(imageRect.X, imageRect.Y - 15));
                 }
             }
-
-            // Transform 스택 정리
-            if (customImage.Opacity < 1.0) drawingContext.Pop();
-            if (customImage.Rotation != 0) drawingContext.Pop();
         }
         catch (Exception ex)
         {
             _log?.Error($"단일 이미지 렌더링 실패: {ex.Message}");
+        }
+        finally
+        {
+            // ★ NFR-5 — 예외 발생 시에도 PushTransform/PushOpacity 스택을 정확히 복원
+            for (int i = 0; i < pushCount; i++) drawingContext.Pop();
         }
     }
 
@@ -1452,6 +1607,16 @@ public class GMapCustomControl : GMapControl
         {
             drawingContext.DrawEllipse(edgeHandleBrush, handlePen, handle, handleSize / 2, handleSize / 2);
         }
+
+        // ★ 회전 핸들 (FR-2): 상단 중앙에서 위쪽으로 연결선 + 초록 원.
+        //   PushTransform(회전) 범위 내부이므로 imageRect 로컬좌표로 그리면
+        //   GetClickedImageHandle의 역회전 히트(NFR-1)와 위치가 정확히 일치한다.
+        var rotateBrush = Brushes.LimeGreen;
+        var cx = imageRect.Left + imageRect.Width / 2;
+        var topMid = new Point(cx, imageRect.Top);
+        var rotatePt = new Point(cx, imageRect.Top - ROTATE_HANDLE_DISTANCE);
+        drawingContext.DrawLine(handlePen, topMid, rotatePt);
+        drawingContext.DrawEllipse(rotateBrush, handlePen, rotatePt, handleSize / 2.0, handleSize / 2.0);
     }
 
     #endregion
@@ -1604,10 +1769,12 @@ public class GMapCustomControl : GMapControl
                 marker.ForceUpdateLocalPosition(this);
             }
 
-            // 이미지 오버레이 회전 보정
+            // 이미지 오버레이 회전 보정 (FR-7, NFR-6)
+            // ★ Rotation(=UserRotation) 덮어쓰기 금지 — 사용자 편집 회전값 보존.
+            //   맵 보정값만 MapCorrectionRotation에 반영하고, 렌더는 EffectiveRotation(합산)을 사용한다.
             foreach (var customImage in CustomImages)
             {
-                customImage.Rotation = -MapRotation;
+                customImage.MapCorrectionRotation = -MapRotation;
             }
 
             InvalidateVisual();
@@ -1747,6 +1914,13 @@ public class GMapCustomControl : GMapControl
 
         if (!IsEditMode)
         {
+            // ★ NFR-4 (S06) — 진행 중 드래그/회전 강제 종료 (CaptureMouse 해제, 입력 락업 방지)
+            if (_isDragging || _isImageDrag || _draggedImage != null)
+            {
+                ResetDragState();
+                _log?.Info("SetEditMode(false) — 진행 중 드래그 강제 종료(CaptureMouse 해제)");
+            }
+
             // 편집 모드 해제 시 모든 선택 해제
             foreach (var img in CustomImages) img.IsSelected = false;
             //foreach (var marker in CustomMarkers) marker.IsSelected = false;
@@ -1796,6 +1970,10 @@ public class GMapCustomControl : GMapControl
         _isImageDrag = false;
         _draggedImage = null;
         _resizeHandle = ResizeHandle.None;
+        // ★ 회전 드래그 전용 상태 초기화 (NFR-4 — 누수 방지)
+        _rotationCenterScreen = default;
+        _rotationStartAngle = 0;
+        _rotationBaseUserRotation = 0;
         this.ReleaseMouseCapture();
     }
 
@@ -2232,7 +2410,7 @@ public class GMapCustomControl : GMapControl
         None, TopLeft, TopCenter, TopRight,
         MiddleLeft, MiddleRight,
         BottomLeft, BottomCenter, BottomRight,
-        Move
+        Move, Rotate
     }
 
     #endregion
@@ -2264,5 +2442,11 @@ public class GMapCustomControl : GMapControl
     private Point _originalFixedPoint;
     private Point _originalDragPoint;
     private double _originalDiagonal;
+
+    // 회전 드래그 전용 상태 (FR-5) — 절대각 누적용
+    private Point _rotationCenterScreen;        // 이미지 중심 화면 좌표 (드래그 시작 시 캐싱)
+    private double _rotationStartAngle;         // 드래그 시작 시 atan2 절대각
+    private double _rotationBaseUserRotation;   // 드래그 시작 시 UserRotation 스냅샷
+    private const double ROTATE_HANDLE_DISTANCE = 30; // 상단 중앙에서 위쪽 오프셋(px)
     #endregion
 }

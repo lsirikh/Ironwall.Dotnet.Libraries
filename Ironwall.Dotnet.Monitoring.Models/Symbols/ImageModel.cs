@@ -146,6 +146,7 @@ public class ImageModel : BaseModel, IImageModel
     #region - 시각적 표현 속성 -
     public double Width { get; set; }
     public double Height { get; set; }
+    /// <summary>사용자 편집 회전 각도(도). DB 영속 대상 = GMapCustomImage.UserRotation. 맵 보정(-MapRotation)은 런타임 전용이라 여기 저장하지 않는다.</summary>
     public double Rotation { get; set; }
     public bool Visibility { get; set; }
     public double Opacity { get; set; }
