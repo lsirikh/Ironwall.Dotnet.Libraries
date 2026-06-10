@@ -5249,6 +5249,7 @@ public class MapViewModel : BasePanelViewModel,
             // 이벤트 구독 추가
             PropertyPanel.CloseRequested += OnPropertyPanelCloseRequested;
             PropertyPanel.MarkerPropertyChanged += OnMarkerPropertyChanged;
+            PropertyPanel.ZOrderChangeRequested += OnPropertyPanelZOrderChangeRequested;
 
             // 공통 속성 설정
             PropertyPanel.AvailableColors = AvailableColors;
@@ -5348,6 +5349,19 @@ public class MapViewModel : BasePanelViewModel,
         HidePropertyPanel();
     }
 
+    private void OnPropertyPanelZOrderChangeRequested(object? sender, ZOrderChangeRequestedEventArgs e)
+    {
+        if (SelectedMarker == null || MainMap == null) return;
+        switch (e.Direction)
+        {
+            case ZOrderDirection.Up:       MoveMarkerUp(SelectedMarker);       break;
+            case ZOrderDirection.Down:     MoveMarkerDown(SelectedMarker);     break;
+            case ZOrderDirection.ToTop:    MoveMarkerToTop(SelectedMarker);    break;
+            case ZOrderDirection.ToBottom: MoveMarkerToBottom(SelectedMarker); break;
+        }
+        RefreshPropertyPanelZIndex();
+    }
+
     private void HidePropertyPanel()
     {
         if (PropertyPanel != null)
@@ -5355,6 +5369,7 @@ public class MapViewModel : BasePanelViewModel,
             // 이벤트 구독 해제
             PropertyPanel.CloseRequested -= OnPropertyPanelCloseRequested;
             PropertyPanel.MarkerPropertyChanged -= OnMarkerPropertyChanged;
+            PropertyPanel.ZOrderChangeRequested -= OnPropertyPanelZOrderChangeRequested;
 
             // 바인딩 정리
             PropertyPanel.ClearAllBindings();
