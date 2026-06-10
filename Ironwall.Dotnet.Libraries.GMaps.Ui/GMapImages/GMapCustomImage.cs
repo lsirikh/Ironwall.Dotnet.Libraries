@@ -243,7 +243,7 @@ public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
         {
             Opacity = imageCopy.Opacity,
             Visibility = imageCopy.Visibility,
-            Rotation = imageCopy.Rotation,
+            UserRotation = imageCopy.Rotation,   // 사용자 편집 회전 복사 (MapCorrectionRotation은 런타임 전용이라 미복사)
         };
 
         return clone;
@@ -505,16 +505,52 @@ public class GMapCustomImage : GMapImage, IBaseModel, INotifyPropertyChanged
 
 
     /// <summary>
-    /// 회전 각도 (도 단위)
+    /// 사용자 편집 회전 각도 (도 단위). DB 영속 대상 — <see cref="ImageModel.Rotation"/>에 매핑.
+    /// 맵 회전(MapRotation)과 무관한 "사용자 의도" 값. (FR-6, NFR-6)
     /// </summary>
-    public double Rotation
+    public double UserRotation
     {
         get => _model.Rotation;
         set
         {
-            _model.Rotation = value % 360;
+            // [0,360) 정규화 — C# %는 음수 부호를 보존하므로 (+360)%360으로 canonical화 (DB 일관성).
+            _model.Rotation = ((value % 360) + 360) % 360;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(EffectiveRotation));
+            OnPropertyChanged(nameof(Rotation));
         }
+    }
+
+    /// <summary>
+    /// 맵 보정 회전 (= -MapRotation). 런타임 전용 — DB에 저장하지 않는다. (FR-6, NFR-6)
+    /// 맵이 회전해도 이미지가 화면상 같은 방향을 유지하도록 하는 보정값.
+    /// </summary>
+    private double _mapCorrectionRotation;
+    public double MapCorrectionRotation
+    {
+        get => _mapCorrectionRotation;
+        set
+        {
+            _mapCorrectionRotation = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(EffectiveRotation));
+        }
+    }
+
+    /// <summary>
+    /// 렌더링·히트테스트·드래그 델타가 공유하는 최종 적용 회전 각도 (단일 진실원, NFR-1).
+    /// = UserRotation + MapCorrectionRotation.
+    /// </summary>
+    public double EffectiveRotation => (UserRotation + _mapCorrectionRotation) % 360;
+
+    /// <summary>
+    /// 회전 각도 (도 단위) — 하위호환 별칭. 내부적으로 <see cref="UserRotation"/>에 위임한다.
+    /// 신규 코드는 편집/DB는 UserRotation, 렌더/히트는 EffectiveRotation을 사용한다.
+    /// </summary>
+    public double Rotation
+    {
+        get => UserRotation;
+        set => UserRotation = value;
     }
 
     public bool IsSelected

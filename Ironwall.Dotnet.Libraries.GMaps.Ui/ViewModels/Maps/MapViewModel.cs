@@ -370,6 +370,8 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnMarkerClicked += OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked += OnMapMarkerRightClicked;
             MainMap.OnImageClicked += OnMapImageClicked;
+            MainMap.OnImageRightClicked += OnMapImageRightClicked;       // FR-9 이미지 우클릭 메뉴
+            MainMap.OnImageEditCompleted += OnMapImageEditCompleted;     // FR-8 편집 완료 DB 영속화
             MainMap.OnMapClicked += OnMapClicked;
 
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
@@ -406,6 +408,8 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
             MainMap.OnImageClicked -= OnMapImageClicked;
+            MainMap.OnImageRightClicked -= OnMapImageRightClicked;
+            MainMap.OnImageEditCompleted -= OnMapImageEditCompleted;
             MainMap.OnMapClicked -= OnMapClicked;
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
@@ -498,6 +502,99 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"이미지 클릭 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 지도 이미지 편집(이동/리사이즈/회전) 완료 핸들러 — UserRotation/Bounds DB 영속화 (FR-8, NFR-6)
+    /// </summary>
+    private async void OnMapImageEditCompleted(GMapCustomImage image)
+    {
+        try
+        {
+            if (image == null) return;
+
+            // GMapCustomImage.Model은 ImageBounds(Deconstruct)·UserRotation(_model.Rotation)이 동기화된 상태.
+            // MapCorrectionRotation은 런타임 전용이라 모델에 반영되지 않음 → DB엔 UserRotation만 저장됨 (NFR-6).
+            _log?.Info($"[IMG-EDIT-DONE] Title={image.Title}, UserRotation={image.UserRotation:F1}, Bounds={image.ImageBounds}");
+
+            if (image.Id > 0)
+            {
+                await _gMapDbSymbolService.UpdateImageAsync(image.Model);
+            }
+            else
+            {
+                _log?.Warning($"[IMG-EDIT-DONE] 영속 경로 없음(Id<=0) — DB 저장 생략: {image.Title}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"이미지 편집 완료 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 지도 이미지 우클릭 핸들러 — 회전 초기화/프리셋 컨텍스트 메뉴 (FR-9)
+    /// </summary>
+    private void OnMapImageRightClicked(GMapCustomImage image)
+    {
+        try
+        {
+            ShowImageContextMenu(image, new Point());
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"이미지 우클릭 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 이미지 우클릭 컨텍스트 메뉴 — 회전 초기화/프리셋(0/90/180/270°). (FR-9, NFR-7)
+    /// 다이얼로그 금지 컨벤션에 따라 자유 각도 입력 대신 프리셋 제공.
+    /// </summary>
+    public void ShowImageContextMenu(GMapCustomImage image, Point screenPosition)
+    {
+        try
+        {
+            if (image == null) return;
+
+            var menu = new ContextMenu();
+
+            void AddRotateItem(string header, double angle, MaterialDesignThemes.Wpf.PackIconKind icon)
+            {
+                var item = new MenuItem
+                {
+                    Header = header,
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = icon, Width = 16, Height = 16 }
+                };
+                item.Click += async (s, e) =>
+                {
+                    try
+                    {
+                        image.UserRotation = angle;     // EffectiveRotation 자동 갱신
+                        MainMap?.InvalidateVisual();
+                        if (image.Id > 0)
+                            await _gMapDbSymbolService.UpdateImageAsync(image.Model);  // UserRotation만 영속 (NFR-6)
+                    }
+                    catch (Exception ex) { _log?.Error($"이미지 회전 설정 저장 실패: {ex.Message}"); }
+                };
+                menu.Items.Add(item);
+            }
+
+            AddRotateItem("회전 초기화 (0°)", 0, MaterialDesignThemes.Wpf.PackIconKind.RotateRight);
+            AddRotateItem("90° 회전", 90, MaterialDesignThemes.Wpf.PackIconKind.RotateRight);
+            AddRotateItem("180° 회전", 180, MaterialDesignThemes.Wpf.PackIconKind.RotateRight);
+            AddRotateItem("270° 회전", 270, MaterialDesignThemes.Wpf.PackIconKind.RotateRight);
+
+            if (menu.Items.Count > 0)
+            {
+                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+                menu.IsOpen = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"이미지 컨텍스트 메뉴 표시 실패: {ex.Message}");
         }
     }
 
