@@ -3406,7 +3406,7 @@ public class MapViewModel : BasePanelViewModel,
                 var hasDevice = pidsMarker.LinkedDeviceId > 0;
 
                 var webServerEnabled = _deviceDetailUrlService?.IsWebServerEnabled == true;
-                var listUrl = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, 0, null);
+                var listUrl = _deviceDetailUrlService?.BuildUrl(pidsMarker.DeviceType, 0, null) ?? string.Empty;
                 var listItem = new MenuItem
                 {
                     Header = $"{devName}페이지",
@@ -3544,7 +3544,10 @@ public class MapViewModel : BasePanelViewModel,
             }
 
             if (menu.Items.Count > 0)
+            {
+                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
                 menu.IsOpen = true;
+            }
         }
         catch (Exception ex)
         {
