@@ -378,6 +378,48 @@
 										Margin="0,8"
 										Background="{StaticResource BorderGrayBrush}" />
 
+									<!--  DISPLAY 섹션 라벨  -->
+									<TextBlock
+										Margin="0,0,0,8"
+										FontSize="13"
+										FontWeight="Bold"
+										Foreground="{StaticResource PrimaryBlueBrush}"
+										Text="DISPLAY" />
+
+									<!--  최소 줌 레벨  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+											<ColumnDefinition Width="30" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="최소 줌" />
+										<Slider
+											Grid.Column="1"
+											Margin="5,0"
+											VerticalAlignment="Center"
+											IsSnapToTickEnabled="True"
+											Maximum="20"
+											Minimum="0"
+											TickFrequency="1"
+											Value="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}}" />
+										<TextBlock
+											Grid.Column="2"
+											VerticalAlignment="Center"
+											FontSize="11"
+											Foreground="#555555"
+											Text="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0:F0}}" />
+									</Grid>
+
+									<!--  구분선  -->
+									<Border
+										Height="1"
+										Margin="0,8"
+										Background="{StaticResource BorderGrayBrush}" />
+
 									<!--  Z-ORDER 섹션 라벨  -->
 									<TextBlock
 										Margin="0,0,0,8"

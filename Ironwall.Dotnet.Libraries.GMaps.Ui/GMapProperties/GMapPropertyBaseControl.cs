@@ -302,6 +302,19 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DependencyProperty.Register(nameof(IsEditModeEnabled), typeof(bool),
                 typeof(GMapPropertyBaseControl), new PropertyMetadata(false));
 
+        /// <summary>
+        /// 마커 최소 표시 줌 레벨 (0 = 모든 줌에서 표시)
+        /// </summary>
+        public double MarkerZoom
+        {
+            get => (double)GetValue(MarkerZoomProperty);
+            set => SetValue(MarkerZoomProperty, value);
+        }
+
+        public static readonly DependencyProperty MarkerZoomProperty =
+            DependencyProperty.Register(nameof(MarkerZoom), typeof(double),
+                typeof(GMapPropertyBaseControl), new PropertyMetadata(0.0, OnMarkerZoomChanged));
+
         #endregion
 
         #region Abstract Methods
@@ -541,6 +554,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                     control.MarkerStrokeThickness = newMarker.StrokeThickness;
                     control.ShowShape = newMarker.ShowShape;
                     control.ShowTitle = newMarker.ShowTitle;
+                    control.MarkerZoom = newMarker.Zoom;
 
                     // *** 특화 속성 설정 추가 ***
                     System.Diagnostics.Debug.WriteLine("SetupSpecificPropertiesFromMarker 호출");
@@ -662,6 +676,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             }
         }
 
+        private static void OnMarkerZoomChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                control.SelectedMarker.Zoom = (double)e.NewValue;
+                control.OnMarkerPropertyChanged("Zoom", e.OldValue, e.NewValue);
+            }
+        }
+
         #endregion
 
         #region Binding Setup Methods
@@ -696,6 +719,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             SetBinding(MarkerStrokeThicknessProperty, CreateTwoWayBinding(nameof(SelectedMarker.StrokeThickness)));
             SetBinding(ShowShapeProperty, CreateTwoWayBinding(nameof(SelectedMarker.ShowShape)));
             SetBinding(ShowTitleProperty, CreateTwoWayBinding(nameof(SelectedMarker.ShowTitle)));
+            SetBinding(MarkerZoomProperty, CreateTwoWayBinding(nameof(SelectedMarker.Zoom)));
 
             // 색상 속성은 EnumColorType이므로 직접 바인딩
             SetBinding(MarkerFillColorProperty, CreateTwoWayBinding(nameof(SelectedMarker.FillColor)));
@@ -781,6 +805,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, MarkerStrokeThicknessProperty);
             BindingOperations.ClearBinding(this, ShowShapeProperty);
             BindingOperations.ClearBinding(this, ShowTitleProperty);
+            BindingOperations.ClearBinding(this, MarkerZoomProperty);
         }
 
         #endregion
