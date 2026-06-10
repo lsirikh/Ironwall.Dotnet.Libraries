@@ -3504,44 +3504,41 @@ public class MapViewModel : BasePanelViewModel,
                 }
             }
 
-            // ── 레이어 순서 제어 (편집 모드에서만) ──
-            if (IsEditModeEnabled)
+            // ── 레이어 순서 제어 ──
+            if (menu.Items.Count > 0)
+                menu.Items.Add(new Separator());
+
+            var moveTopItem = new MenuItem
             {
-                if (menu.Items.Count > 0)
-                    menu.Items.Add(new Separator());
+                Header = "맨 위로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseUp, Width = 16, Height = 16 }
+            };
+            moveTopItem.Click += (s, e) => MoveMarkerToTop(marker);
+            menu.Items.Add(moveTopItem);
 
-                var moveTopItem = new MenuItem
-                {
-                    Header = "맨 위로",
-                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseUp, Width = 16, Height = 16 }
-                };
-                moveTopItem.Click += (s, e) => MoveMarkerToTop(marker);
-                menu.Items.Add(moveTopItem);
+            var moveUpItem = new MenuItem
+            {
+                Header = "한 칸 위로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowUp, Width = 16, Height = 16 }
+            };
+            moveUpItem.Click += (s, e) => MoveMarkerUp(marker);
+            menu.Items.Add(moveUpItem);
 
-                var moveUpItem = new MenuItem
-                {
-                    Header = "한 칸 위로",
-                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowUp, Width = 16, Height = 16 }
-                };
-                moveUpItem.Click += (s, e) => MoveMarkerUp(marker);
-                menu.Items.Add(moveUpItem);
+            var moveDownItem = new MenuItem
+            {
+                Header = "한 칸 아래로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowDown, Width = 16, Height = 16 }
+            };
+            moveDownItem.Click += (s, e) => MoveMarkerDown(marker);
+            menu.Items.Add(moveDownItem);
 
-                var moveDownItem = new MenuItem
-                {
-                    Header = "한 칸 아래로",
-                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowDown, Width = 16, Height = 16 }
-                };
-                moveDownItem.Click += (s, e) => MoveMarkerDown(marker);
-                menu.Items.Add(moveDownItem);
-
-                var moveBottomItem = new MenuItem
-                {
-                    Header = "맨 아래로",
-                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseDown, Width = 16, Height = 16 }
-                };
-                moveBottomItem.Click += (s, e) => MoveMarkerToBottom(marker);
-                menu.Items.Add(moveBottomItem);
-            }
+            var moveBottomItem = new MenuItem
+            {
+                Header = "맨 아래로",
+                Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseDown, Width = 16, Height = 16 }
+            };
+            moveBottomItem.Click += (s, e) => MoveMarkerToBottom(marker);
+            menu.Items.Add(moveBottomItem);
 
             if (menu.Items.Count > 0)
             {
