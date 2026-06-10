@@ -545,6 +545,19 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 // ZOrder 컬럼 이미 존재하거나 ZIndex 컬럼 없으면 무시
             }
 
+            // ── 심볼 ZOrder Band 시프트 마이그레이션 ──
+            // 이미지 band(0~999)와 충돌 방지: 기존 심볼 ZOrder를 1000+ 대역으로 이동
+            try
+            {
+                await conn.ExecuteAsync(
+                    "UPDATE `Symbols` SET `ZOrder` = `ZOrder` + 1000 WHERE `ZOrder` < 1000;", token);
+                _log?.Info("Symbols ZOrder band 시프트 완료 (1000+ 대역)");
+            }
+            catch
+            {
+                // ZOrder 컬럼 없거나 이미 시프트된 경우 무시
+            }
+
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)

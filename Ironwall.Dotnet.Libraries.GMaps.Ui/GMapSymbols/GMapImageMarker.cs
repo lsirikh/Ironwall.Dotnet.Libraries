@@ -52,7 +52,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         _isLayerEnabled = imageModel.Visibility;
 
         // 기본 설정
-        ZIndex = 5; // 다른 마커보다 낮은 Z-Index (배경 이미지이므로)
+        ZIndex = imageModel.ZOrder > 0 ? imageModel.ZOrder : 0;
 
         // ImageBounds 초기화
         _imageBounds = imageModel.ToRect();
@@ -495,6 +495,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         set
         {
             ZIndex = value;
+            _imageModel.ZOrder = value;
             if (Shape is System.Windows.UIElement shapeEl)
                 System.Windows.Controls.Panel.SetZIndex(shapeEl, value);
         }

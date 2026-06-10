@@ -105,6 +105,7 @@ public class ImageModel : BaseModel, IImageModel
         Visibility = model.Visibility;
         Opacity = model.Opacity;
         Zoom = model.Zoom;
+        ZOrder = model.ZOrder;
     }
 
     #endregion
@@ -155,6 +156,11 @@ public class ImageModel : BaseModel, IImageModel
     /// 0 = 모든 줌 레벨에서 표시
     /// </summary>
     public double Zoom { get; set; }
+
+    /// <summary>
+    /// 런타임 Z-Order 홀더. MapLayers.ZOrder에서 주입받음 (DB 컬럼 없음).
+    /// </summary>
+    public int ZOrder { get; set; } = 0;
     #endregion
     #endregion
     #region - Attributes -
