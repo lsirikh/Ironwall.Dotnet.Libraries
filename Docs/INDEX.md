@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-04 (advance-phase 자동)
-- **총 문서 수**: 168개
+- **마지막 갱신**: 2026-06-10 (advance-phase 자동)
+- **총 문서 수**: 186개
 
 ---
 
@@ -26,10 +26,19 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | 탐지/장애 이벤트 처리 오염 및 버그 수정 (13-agent, 25시나리오×2Round, 1 CRITICAL + 8 HIGH) | **Draft** | 2026-06-08 |
-| [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | Layer Visibility 저장/복원 버그 수정 (12-agent, 20시나리오×2Round, RC-1~6: OverlayImage/Symbol 재시작 시 가시성 미복원) | **Draft** | 2026-06-08 |
-| [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | Device API Add/Delete/Save + Provider 전파 전방위 수정 (14-agent, 시나리오 30개×2Round, 1 CRITICAL + 9 HIGH) | **Draft** | 2026-06-08 |
-| [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen 구현 (PRD-SPLASH-002, 17-agent 검증) | **Pending Approval** | 2026-06-08 |
+| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | 오른쪽 클릭 컨텍스트 메뉴 표시 규칙 (Edit/WebEnabled 조건) | Approved | 2026-06-10 |
+| [OverlayImage_ZOrder_Independence-prd.md](prds/OverlayImage_ZOrder_Independence-prd.md) | OverlayImage_ZOrder_Independence | Approved | 2026-06-10 |
+| [ZOrder_PropertyPanel_Integration-prd.md](prds/ZOrder_PropertyPanel_Integration-prd.md) | ZOrder_PropertyPanel_Integration | Draft | 2026-06-10 |
+| [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | LayerVisibility_Persistence_Fix | Approved | 2026-06-08 |
+| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | EventProcess_ContaminationFix | Draft | 2026-06-08 |
+| [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | DeviceApi_ProviderPropagation_Fix | Draft | 2026-06-08 |
+| [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen_MonitoringSolution | Draft | 2026-06-08 |
+| [SplashScreen_LibraryComponent-prd.md](prds/SplashScreen_LibraryComponent-prd.md) | SplashScreen_LibraryComponent | Draft | 2026-06-08 |
+| [SymbolTextSeparation_LabelPositioning-prd.md](prds/SymbolTextSeparation_LabelPositioning-prd.md) | SymbolTextSeparation_LabelPositioning | Approved | 2026-06-05 |
+| [GridSnap_System-prd.md](prds/GridSnap_System-prd.md) | GridSnap_System | Approved | 2026-06-05 |
+| [WebServer_Enable_Feature-prd.md](prds/WebServer_Enable_Feature-prd.md) | WebServer_Enable_Feature | Completed | 2026-06-05 |
+| [MapSetup_Panel_Refactor-prd.md](prds/MapSetup_Panel_Refactor-prd.md) | MapSetup_Panel_Refactor | Approved | 2026-06-05 |
+| [SettingPanel_BrokerLabel_Rename-prd.md](prds/SettingPanel_BrokerLabel_Rename-prd.md) | SettingPanel_BrokerLabel_Rename | Approved | 2026-06-05 |
 | [RemoteDesktop_PanFollowBug_Fix-prd.md](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | RemoteDesktop_PanFollowBug_Fix | Approved | 2026-06-04 |
 | [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | MapSymbol_DispatcherFreeze_And_LogNoise_Fix | Superseded | 2026-06-04 |
 | [SymbolUpdate_DispatcherFreeze_Fix-prd.md](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | SymbolUpdate_DispatcherFreeze_Fix | Completed | 2026-06-04 |
@@ -65,7 +74,12 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [RemoteDesktop_PanFollowBug_Fix-prd-plan.md](plans/RemoteDesktop_PanFollowBug_Fix-prd-plan.md) | [PRD](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | 0/16 | 2026-06-04 |
+| [ZOrder_PropertyPanel_Integration-prd-plan.md](plans/ZOrder_PropertyPanel_Integration-prd-plan.md) | [PRD](prds/ZOrder_PropertyPanel_Integration-prd.md) | 0/0 | 2026-06-10 |
+| [LayerVisibility_Persistence_Fix-prd-plan.md](plans/LayerVisibility_Persistence_Fix-prd-plan.md) | [PRD](prds/LayerVisibility_Persistence_Fix-prd.md) | 3/14 | 2026-06-08 |
+| [SplashScreen_MonitoringSolution-prd-plan.md](plans/SplashScreen_MonitoringSolution-prd-plan.md) | [PRD](prds/SplashScreen_MonitoringSolution-prd.md) | 0/0 | 2026-06-08 |
+| [SymbolTextSeparation_LabelPositioning-prd-plan.md](plans/SymbolTextSeparation_LabelPositioning-prd-plan.md) | [PRD](prds/SymbolTextSeparation_LabelPositioning-prd.md) | 20/38 | 2026-06-05 |
+| [GridSnap_System-prd-plan.md](plans/GridSnap_System-prd-plan.md) | [PRD](prds/GridSnap_System-prd.md) | 11/18 | 2026-06-05 |
+| [RemoteDesktop_PanFollowBug_Fix-prd-plan.md](plans/RemoteDesktop_PanFollowBug_Fix-prd-plan.md) | [PRD](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | 8/16 | 2026-06-04 |
 | [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | 7/15 | 2026-06-04 |
 | [SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | 20/20 | 2026-06-04 |
 | [Multisensor_Symbol_Fix-prd-plan.md](plans/Multisensor_Symbol_Fix-prd-plan.md) | [PRD](prds/Multisensor_Symbol_Fix-prd.md) | 20/20 | 2026-06-04 |
@@ -101,6 +115,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [WebServer_Enable_Feature-report.md](reports/WebServer_Enable_Feature-report.md) | [PRD](prds/WebServer_Enable_Feature-prd.md) → [Plan](plans/WebServer_Enable_Feature-prd-plan.md) | 2026-06-05 |
 | [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) → [Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |
 | [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) → [Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
 | [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) → [Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd-plan.md) | 2026-05-20 |
