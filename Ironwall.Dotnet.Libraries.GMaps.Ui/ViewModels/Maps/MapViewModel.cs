@@ -3466,6 +3466,27 @@ public class MapViewModel : BasePanelViewModel,
                     menu.Items.Add(ctrlItem);
                 }
 
+                // 카메라 홈페이지 (IpCamera 전용)
+                if (pidsMarker.DeviceType == EnumDeviceType.IpCamera)
+                {
+                    var camItem = new MenuItem
+                    {
+                        Header = "카메라 홈페이지",
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Web, Width = 16, Height = 16 }
+                    };
+                    var cameraModel = pidsMarker.LinkedDevice as ICameraDeviceModel;
+                    camItem.IsEnabled = cameraModel != null;
+                    camItem.Click += (s, e) =>
+                    {
+                        if (cameraModel != null)
+                        {
+                            var url = $"http://{cameraModel.IpAddress}:{cameraModel.IpPort}";
+                            _deviceDetailUrlService.OpenInChrome(url);
+                        }
+                    };
+                    menu.Items.Add(camItem);
+                }
+
                 // 스피커 방송 제어 (IpSpeaker 전용)
                 if (pidsMarker.DeviceType == EnumDeviceType.IpSpeaker)
                 {
