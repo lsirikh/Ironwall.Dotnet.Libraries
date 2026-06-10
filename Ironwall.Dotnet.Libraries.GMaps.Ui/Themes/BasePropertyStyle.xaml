@@ -37,6 +37,28 @@
 		<Setter Property="FontWeight" Value="SemiBold" />
 	</Style>
 
+	<Style x:Key="ZOrderButtonStyle" TargetType="Button">
+		<Setter Property="Width" Value="24" />
+		<Setter Property="Height" Value="24" />
+		<Setter Property="Margin" Value="2,0" />
+		<Setter Property="Padding" Value="2" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderBrush" Value="{StaticResource BorderGrayBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Style.Triggers>
+			<Trigger Property="IsMouseOver" Value="True">
+				<Setter Property="Background" Value="#E8F0FE" />
+			</Trigger>
+			<Trigger Property="IsPressed" Value="True">
+				<Setter Property="Background" Value="#C5D5FB" />
+			</Trigger>
+			<Trigger Property="IsEnabled" Value="False">
+				<Setter Property="Opacity" Value="0.4" />
+			</Trigger>
+		</Style.Triggers>
+	</Style>
+
 
 	<!--  기본 속성 컨트롤 스타일  -->
 	<Style x:Key="BasePropertyStyle" TargetType="{x:Type properties:GMapPropertyBaseControl}">
@@ -347,6 +369,78 @@
 											Content="제목"
 											Foreground="#333333"
 											IsChecked="{Binding ShowTitle, RelativeSource={RelativeSource TemplatedParent}}" />
+									</Grid>
+
+									<!--  구분선  -->
+									<Border
+										Height="1"
+										Margin="0,8"
+										Background="{StaticResource BorderGrayBrush}" />
+
+									<!--  Z-ORDER 섹션 라벨  -->
+									<TextBlock
+										Margin="0,0,0,8"
+										FontSize="13"
+										FontWeight="Bold"
+										Foreground="{StaticResource PrimaryBlueBrush}"
+										Text="Z-ORDER" />
+
+									<!--  Z-ORDER 조작  -->
+									<Grid
+										Margin="0,5"
+										IsEnabled="{Binding IsEditModeEnabled, RelativeSource={RelativeSource TemplatedParent}}">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource PropertyLabel}"
+											Text="순서" />
+										<StackPanel Grid.Column="1" Orientation="Horizontal">
+											<TextBlock
+												Margin="2,0,8,0"
+												VerticalAlignment="Center"
+												FontSize="11"
+												Foreground="#555555"
+												Text="{Binding MarkerZIndexDisplay, RelativeSource={RelativeSource TemplatedParent}}" />
+											<Button
+												x:Name="PART_ZOrderTopButton"
+												Style="{StaticResource ZOrderButtonStyle}"
+												ToolTip="맨 위로">
+												<md:PackIcon
+													Width="14"
+													Height="14"
+													Kind="ChevronDoubleUp" />
+											</Button>
+											<Button
+												x:Name="PART_ZOrderUpButton"
+												Style="{StaticResource ZOrderButtonStyle}"
+												ToolTip="위로">
+												<md:PackIcon
+													Width="14"
+													Height="14"
+													Kind="ChevronUp" />
+											</Button>
+											<Button
+												x:Name="PART_ZOrderDownButton"
+												Style="{StaticResource ZOrderButtonStyle}"
+												ToolTip="아래로">
+												<md:PackIcon
+													Width="14"
+													Height="14"
+													Kind="ChevronDown" />
+											</Button>
+											<Button
+												x:Name="PART_ZOrderBottomButton"
+												Style="{StaticResource ZOrderButtonStyle}"
+												ToolTip="맨 아래로">
+												<md:PackIcon
+													Width="14"
+													Height="14"
+													Kind="ChevronDoubleDown" />
+											</Button>
+										</StackPanel>
 									</Grid>
 
 									<!--  특화 속성 영역 (ContentPresenter)  -->

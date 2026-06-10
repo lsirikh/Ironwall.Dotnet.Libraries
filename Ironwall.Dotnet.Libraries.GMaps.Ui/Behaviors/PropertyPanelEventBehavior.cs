@@ -125,6 +125,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
                 // 이벤트 구독
                 _currentPropertyPanel.CloseRequested += OnCloseRequested;
                 _currentPropertyPanel.MarkerPropertyChanged += OnMarkerPropertyChanged;
+                _currentPropertyPanel.ZOrderChangeRequested += OnZOrderChangeRequested;
 
                 //System.Diagnostics.Debug.WriteLine($"PropertyPanel 이벤트 연결: {_currentPropertyPanel.GetType().Name}");
 
@@ -146,6 +147,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             {
                 _currentPropertyPanel.CloseRequested -= OnCloseRequested;
                 _currentPropertyPanel.MarkerPropertyChanged -= OnMarkerPropertyChanged;
+                _currentPropertyPanel.ZOrderChangeRequested -= OnZOrderChangeRequested;
 
                 //System.Diagnostics.Debug.WriteLine($"PropertyPanel 이벤트 해제: {_currentPropertyPanel.GetType().Name}");
                 _currentPropertyPanel = null;
@@ -180,6 +182,24 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
                 // EventAggregator 사용
                 var eventAggregator = IoC.Get<IEventAggregator>();
                 await eventAggregator.PublishOnUIThreadAsync(new PropertyPanelCloseRequestedEvent());
+            }
+        }
+
+        private async void OnZOrderChangeRequested(object sender, ZOrderChangeRequestedEventArgs e)
+        {
+            try
+            {
+                if (sender is not GMapPropertyBaseControl propertyControl) return;
+                var eventAggregator = IoC.Get<IEventAggregator>();
+                await eventAggregator.PublishOnUIThreadAsync(new ZOrderChangeRequestedEvent
+                {
+                    Direction = e.Direction,
+                    Marker = propertyControl.SelectedMarker
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ZOrderChange] 오류: {ex.Message}");
             }
         }
 

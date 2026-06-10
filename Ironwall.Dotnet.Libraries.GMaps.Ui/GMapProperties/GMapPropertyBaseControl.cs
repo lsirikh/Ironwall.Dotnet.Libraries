@@ -276,6 +276,32 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(true));
 
+        /// <summary>
+        /// Z-order 순위 표시 문자열 ("3 / 15") — MapViewModel이 set
+        /// </summary>
+        public string MarkerZIndexDisplay
+        {
+            get => (string)GetValue(MarkerZIndexDisplayProperty);
+            set => SetValue(MarkerZIndexDisplayProperty, value);
+        }
+
+        public static readonly DependencyProperty MarkerZIndexDisplayProperty =
+            DependencyProperty.Register(nameof(MarkerZIndexDisplay), typeof(string),
+                typeof(GMapPropertyBaseControl), new PropertyMetadata("- / -"));
+
+        /// <summary>
+        /// 편집 모드 여부 — Z-order 버튼 IsEnabled 게이트
+        /// </summary>
+        public bool IsEditModeEnabled
+        {
+            get => (bool)GetValue(IsEditModeEnabledProperty);
+            set => SetValue(IsEditModeEnabledProperty, value);
+        }
+
+        public static readonly DependencyProperty IsEditModeEnabledProperty =
+            DependencyProperty.Register(nameof(IsEditModeEnabled), typeof(bool),
+                typeof(GMapPropertyBaseControl), new PropertyMetadata(false));
+
         #endregion
 
         #region Abstract Methods
@@ -324,6 +350,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         /// 닫기 버튼 클릭 이벤트
         /// </summary>
         public event EventHandler? CloseRequested;
+
+        /// <summary>
+        /// Z-order 버튼(<</>>/< />) 클릭 이벤트 — PropertyPanelEventBehavior → EventAggregator → MapViewModel 체인
+        /// </summary>
+        public event EventHandler<ZOrderChangeRequestedEventArgs>? ZOrderChangeRequested;
         #endregion
 
         #region Constructor
@@ -514,6 +545,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                     // *** 특화 속성 설정 추가 ***
                     System.Diagnostics.Debug.WriteLine("SetupSpecificPropertiesFromMarker 호출");
                     control.SetupSpecificPropertiesFromMarker(newMarker);
+                }
+                else
+                {
+                    control.MarkerZIndexDisplay = "- / -";
                 }
 
                 System.Diagnostics.Debug.WriteLine("SetupMarkerBindings 호출");
@@ -787,6 +822,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 headerArea.Cursor = IsDraggable ? Cursors.SizeAll : Cursors.Arrow;
             }
+
+            // Z-order 버튼 연결
+            if (GetTemplateChild("PART_ZOrderTopButton") is Button topBtn)
+                topBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.ToTop));
+            if (GetTemplateChild("PART_ZOrderUpButton") is Button upBtn)
+                upBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.Up));
+            if (GetTemplateChild("PART_ZOrderDownButton") is Button downBtn)
+                downBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.Down));
+            if (GetTemplateChild("PART_ZOrderBottomButton") is Button bottomBtn)
+                bottomBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.ToBottom));
         }
         #endregion
         #region Fields

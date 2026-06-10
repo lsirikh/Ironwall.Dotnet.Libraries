@@ -17,7 +17,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISymbolModel
+public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMarker where T : ISymbolModel
 {
     #region - Ctors -
     /// <summary>
@@ -466,6 +466,18 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable where T : ISym
         {
             _model.StrokeThickness = value;
             OnPropertyChanged(nameof(StrokeThickness));
+        }
+    }
+
+    int IEditableMarker.ZIndex
+    {
+        get => ZIndex;  // GMapMarker.ZIndex (GMap.NET ItemContainerStyle 바인딩 → 렌더 순서)
+        set
+        {
+            ZIndex = value;  // GMap.NET PropertyChanged → ItemContainerStyle 바인딩 갱신
+            _model.ZIndex = value;
+            if (Shape is System.Windows.UIElement shapeEl)
+                System.Windows.Controls.Panel.SetZIndex(shapeEl, value);
         }
     }
 

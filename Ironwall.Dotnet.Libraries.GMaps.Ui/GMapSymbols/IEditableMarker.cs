@@ -26,6 +26,7 @@ public interface IEditableMarker : IDisposable
     EnumColorType FillColor { get; set; }
     EnumColorType StrokeColor { get; set; }
     double StrokeThickness { get; set; }
+    int ZIndex { get; set; }
     EnumOperationState OperationState { get; set; }
 
     // Adorner 시스템이 필요한 메서드들

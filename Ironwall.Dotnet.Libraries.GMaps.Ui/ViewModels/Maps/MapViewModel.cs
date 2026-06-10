@@ -61,7 +61,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 public class MapViewModel : BasePanelViewModel,
                             IHandle<AllDevicesLoadedMessage>,
                             IHandle<CallDeleteMapRoiProcessMessageModel>,
-                            IHandle<CallDeleteMapLayerProcessMessageModel>
+                            IHandle<CallDeleteMapLayerProcessMessageModel>,
+                            IHandle<ZOrderChangeRequestedEvent>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
 {
@@ -2971,7 +2972,7 @@ public class MapViewModel : BasePanelViewModel,
             int maxZ = 0;
             foreach (var m in MainMap.Markers)
             {
-                if (m is IEditableMarker && m.Shape is UIElement s)
+                if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
                     maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
             }
             ApplyMarkerZIndex(gMapMarker, shapeElement, maxZ + 1);
@@ -3552,7 +3553,7 @@ public class MapViewModel : BasePanelViewModel,
 
         var editableMarkers = MainMap.Markers
             .OfType<GMapMarker>()
-            .Where(m => m is IEditableMarker && m.Shape is UIElement)
+            .Where(m => m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement)
             .ToList();
 
         if (editableMarkers.Count == 0) return;
@@ -3603,7 +3604,7 @@ public class MapViewModel : BasePanelViewModel,
         int targetZ = int.MaxValue;
         foreach (var m in MainMap.Markers)
         {
-            if (m == gMarker || m is not IEditableMarker || m.Shape is not UIElement s) continue;
+            if (m == gMarker || m is not IEditableMarker || m is IImageEditableMarker || m.Shape is not UIElement s) continue;
             int z = System.Windows.Controls.Panel.GetZIndex(s);
             if (z > currentZ && z < targetZ) { target = m; targetZ = z; }
         }
@@ -3631,7 +3632,7 @@ public class MapViewModel : BasePanelViewModel,
         int targetZ = int.MinValue;
         foreach (var m in MainMap.Markers)
         {
-            if (m == gMarker || m is not IEditableMarker || m.Shape is not UIElement s) continue;
+            if (m == gMarker || m is not IEditableMarker || m is IImageEditableMarker || m.Shape is not UIElement s) continue;
             int z = System.Windows.Controls.Panel.GetZIndex(s);
             if (z < currentZ && z > targetZ) { target = m; targetZ = z; }
         }
@@ -3655,7 +3656,7 @@ public class MapViewModel : BasePanelViewModel,
         int maxZ = 0;
         foreach (var m in MainMap.Markers)
         {
-            if (m is IEditableMarker && m.Shape is UIElement s)
+            if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
                 maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
         }
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
@@ -3674,7 +3675,7 @@ public class MapViewModel : BasePanelViewModel,
         int minZ = int.MaxValue;
         foreach (var m in MainMap.Markers)
         {
-            if (m is IEditableMarker && m.Shape is UIElement s)
+            if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
                 minZ = Math.Min(minZ, System.Windows.Controls.Panel.GetZIndex(s));
         }
         if (minZ == int.MaxValue) minZ = 0;
@@ -3693,7 +3694,7 @@ public class MapViewModel : BasePanelViewModel,
 
         var sorted = MainMap.Markers
             .OfType<GMapMarker>()
-            .Where(m => m is IEditableMarker && m.Shape is UIElement)
+            .Where(m => m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement)
             .OrderBy(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
             .ToList();
 
@@ -3719,18 +3720,47 @@ public class MapViewModel : BasePanelViewModel,
         LogAllMarkerZIndex();
     }
 
+    public Task HandleAsync(ZOrderChangeRequestedEvent message, CancellationToken cancellationToken)
+    {
+        if (message?.Marker == null || MainMap == null) return Task.CompletedTask;
+        switch (message.Direction)
+        {
+            case ZOrderDirection.Up:       MoveMarkerUp(message.Marker);       break;
+            case ZOrderDirection.Down:     MoveMarkerDown(message.Marker);     break;
+            case ZOrderDirection.ToTop:    MoveMarkerToTop(message.Marker);    break;
+            case ZOrderDirection.ToBottom: MoveMarkerToBottom(message.Marker); break;
+        }
+        RefreshPropertyPanelZIndex();
+        return Task.CompletedTask;
+    }
+
+    private void RefreshPropertyPanelZIndex()
+    {
+        if (PropertyPanel == null || SelectedMarker == null || MainMap == null) return;
+
+        var symbolMarkers = MainMap.Markers
+            .OfType<GMapMarker>()
+            .Where(m => m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement)
+            .OrderBy(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
+            .ToList();
+
+        int rank = symbolMarkers.IndexOf(SelectedMarker as GMapMarker);
+        PropertyPanel.MarkerZIndexDisplay = rank >= 0
+            ? $"{rank + 1} / {symbolMarkers.Count}"
+            : "- / -";
+    }
+
     /// <summary>
     /// ZIndex를 Shape + GMapMarker + Model에 적용 (DB 저장 없음 — Batch용)
     /// </summary>
     private void ApplyMarkerZIndexLocal(GMapMarker gMarker, UIElement shape, int newZ)
     {
-        System.Windows.Controls.Panel.SetZIndex(shape, newZ);
-        gMarker.ZIndex = newZ;
-        if (gMarker is IEditableMarker)
+        if (gMarker is IEditableMarker em)
+            ((IEditableMarker)em).ZIndex = newZ;  // GMapMarker.ZIndex + _model.ZIndex + Panel.SetZIndex(shape) 일괄 처리
+        else
         {
-            var modelProp = gMarker.GetType().GetProperty("Model");
-            if (modelProp?.GetValue(gMarker) is ISymbolModel symbolModel)
-                symbolModel.ZIndex = newZ;
+            System.Windows.Controls.Panel.SetZIndex(shape, newZ);
+            gMarker.ZIndex = newZ;
         }
     }
 
@@ -4936,6 +4966,8 @@ public class MapViewModel : BasePanelViewModel,
 
                 NotifyOfPropertyChange(nameof(IsEditModeEnabled));
                 NotifyOfPropertyChange(nameof(CanEditMarker));
+                if (PropertyPanel != null)
+                    PropertyPanel.IsEditModeEnabled = value;
                 _log?.Info($"편집 모드: {(value ? "활성화" : "비활성화")}");
             }
         }
@@ -5222,8 +5254,10 @@ public class MapViewModel : BasePanelViewModel,
             PropertyPanel.AvailableColors = AvailableColors;
             PropertyPanel.AvailableSizes = AvailableSize;
             PropertyPanel.IsDraggable = true;
+            PropertyPanel.IsEditModeEnabled = IsEditModeEnabled;
 
             IsPropertyPanelVisible = true;
+            RefreshPropertyPanelZIndex();
             _log?.Info($"PropertyPanel 생성 완료: {PropertyPanel.GetType().Name}");
         }
 
