@@ -280,7 +280,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     `FillColor`         VARCHAR(20) NOT NULL DEFAULT 'Blue',            -- 내부 색상
                     `StrokeColor`       VARCHAR(20) NOT NULL DEFAULT 'White',           -- 외부 선 라인 색상
                     `StrokeThickness`   DECIMAL(4,2) DEFAULT 1.0,                       -- 외부 선 라인 두께
-                    `ZIndex`            INT DEFAULT 10,                                 -- 레이어 순서 (높을수록 위)
+                    `ZOrder`            INT DEFAULT 10,                                 -- 레이어 순서 (높을수록 위)
                     `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     `CreatedBy`         VARCHAR(100),
@@ -519,16 +519,30 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "Images 테이블 생성…" });
 
-            // ── 기존 테이블 마이그레이션: ZIndex 컬럼 추가 ──
+            // ── 기존 테이블 마이그레이션: ZIndex 컬럼 추가 (레거시 DB 지원) ──
             try
             {
                 await conn.ExecuteAsync(
                     "ALTER TABLE `Symbols` ADD COLUMN `ZIndex` INT DEFAULT 10;", token);
-                _log?.Info("Symbols 테이블에 ZIndex 컬럼 추가 완료");
+                _log?.Info("Symbols 테이블에 ZIndex 컬럼 추가 완료 (레거시)");
             }
             catch
             {
                 // 이미 컬럼이 존재하면 무시 (Duplicate column name)
+            }
+
+            // ── ZIndex → ZOrder 컬럼 이관 마이그레이션 ──
+            try
+            {
+                await conn.ExecuteAsync(
+                    "ALTER TABLE `Symbols` ADD COLUMN `ZOrder` INT DEFAULT 10;", token);
+                _log?.Info("Symbols 테이블에 ZOrder 컬럼 추가 완료");
+                await conn.ExecuteAsync("UPDATE Symbols SET ZOrder = ZIndex;", token);
+                _log?.Info("Symbols ZIndex → ZOrder 데이터 이관 완료");
+            }
+            catch
+            {
+                // ZOrder 컬럼 이미 존재하거나 ZIndex 컬럼 없으면 무시
             }
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
@@ -692,7 +706,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness, ZIndex,
+                        FillColor, StrokeColor, StrokeThickness, ZOrder,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = 'BASIC_SHAPES'
@@ -724,7 +738,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom,
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness, ZIndex,
+                        FillColor, StrokeColor, StrokeThickness, ZOrder,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Id = @Id;";
@@ -757,7 +771,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness, ZIndex,
+                        FillColor, StrokeColor, StrokeThickness, ZOrder,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Pid = @Pid;";
@@ -787,7 +801,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, 
-                        FillColor, StrokeColor, StrokeThickness, ZIndex,
+                        FillColor, StrokeColor, StrokeThickness, ZOrder,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = @Category
@@ -817,10 +831,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INSERT INTO Symbols
                     (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
                      Width, Height, Category, ShowShape, ShowTitle, 
-                     FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+                     FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
                     VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                             @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                            @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                            @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
                     SELECT LAST_INSERT_ID();";
 
             var id = await conn.ExecuteScalarAsync<int>(sql, new
@@ -842,7 +856,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System" // 또는 현재 사용자 정보
             });
 
@@ -871,7 +885,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
                 CreatedBy = @CreatedBy
                WHERE Id = @Id;";
 
@@ -895,7 +909,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System" // 또는 현재 사용자 정보
             });
 
@@ -912,38 +926,38 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         }
     }
 
-    public async Task UpdateSymbolZIndexAsync(int symbolId, int zIndex, CancellationToken token = default)
+    public async Task UpdateSymbolZOrderAsync(int symbolId, int zOrder, CancellationToken token = default)
     {
         try
         {
             await using var conn = await OpenConnectionAsync(token);
-            const string sql = "UPDATE Symbols SET ZIndex = @ZIndex WHERE Id = @Id;";
-            await conn.ExecuteAsync(sql, new { ZIndex = zIndex, Id = symbolId });
-            _log?.Info($"Symbol ZIndex 업데이트 완료 — Id={symbolId}, ZIndex={zIndex}");
+            const string sql = "UPDATE Symbols SET ZOrder = @ZOrder WHERE Id = @Id;";
+            await conn.ExecuteAsync(sql, new { ZOrder = zOrder, Id = symbolId });
+            _log?.Info($"Symbol ZOrder 업데이트 완료 — Id={symbolId}, ZOrder={zOrder}");
         }
         catch (Exception ex)
         {
-            _log?.Error($"Symbol ZIndex 업데이트 실패 — Id={symbolId}: {ex.Message}");
+            _log?.Error($"Symbol ZOrder 업데이트 실패 — Id={symbolId}: {ex.Message}");
             throw;
         }
     }
 
-    public async Task BatchUpdateZIndexAsync(List<(int id, int zIndex)> changes, CancellationToken token = default)
+    public async Task BatchUpdateZOrderAsync(List<(int id, int zOrder)> changes, CancellationToken token = default)
     {
         if (changes == null || changes.Count == 0) return;
 
         try
         {
             await using var conn = await OpenConnectionAsync(token);
-            var cases = string.Join("\n", changes.Select(c => $"WHEN {c.id} THEN {c.zIndex}"));
+            var cases = string.Join("\n", changes.Select(c => $"WHEN {c.id} THEN {c.zOrder}"));
             var ids = string.Join(",", changes.Select(c => c.id));
-            var sql = $"UPDATE Symbols SET ZIndex = CASE Id\n{cases}\nEND\nWHERE Id IN ({ids});";
+            var sql = $"UPDATE Symbols SET ZOrder = CASE Id\n{cases}\nEND\nWHERE Id IN ({ids});";
             await conn.ExecuteAsync(sql);
-            _log?.Info($"[ZIndex] Batch UPDATE 완료 — {changes.Count}건");
+            _log?.Info($"[ZOrder] Batch UPDATE 완료 — {changes.Count}건");
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ZIndex] Batch UPDATE 실패 — {changes.Count}건: {ex.Message}");
+            _log?.Error($"[ZOrder] Batch UPDATE 실패 — {changes.Count}건: {ex.Message}");
         }
     }
 
@@ -1027,7 +1041,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -1064,7 +1078,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -1102,10 +1116,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             INSERT INTO Symbols
             (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
              Width, Height, Category, ShowShape, ShowTitle, 
-             FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+             FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
             VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                     @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                    @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                    @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
             SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -1127,7 +1141,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -1176,7 +1190,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
                 CreatedBy = @CreatedBy
             WHERE Id = @Id;";
 
@@ -1200,7 +1214,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -1273,7 +1287,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -1311,7 +1325,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1348,7 +1362,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1386,7 +1400,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1421,7 +1435,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1458,10 +1472,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         INSERT INTO Symbols
         (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
          Width, Height, Category, ShowShape, ShowTitle, 
-         FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+         FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
         VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                 @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
         SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -1483,7 +1497,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -1550,7 +1564,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
             Bearing = @Bearing, Width = @Width, Height = @Height,
             Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
             CreatedBy = @CreatedBy
         WHERE Id = @Id;";
 
@@ -1574,7 +1588,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -1690,7 +1704,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1728,7 +1742,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
                     m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
@@ -1766,7 +1780,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
                     m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
@@ -1805,10 +1819,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             INSERT INTO Symbols
             (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
              Width, Height, Category, ShowShape, ShowTitle, 
-             FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+             FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
             VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                     @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                    @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                    @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
             SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -1830,7 +1844,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -1889,7 +1903,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+                FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
                 CreatedBy = @CreatedBy
             WHERE Id = @Id;";
 
@@ -1913,7 +1927,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -1999,7 +2013,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
         FROM    Symbols s
@@ -2061,7 +2075,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
         FROM    Symbols s
@@ -2116,10 +2130,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         INSERT INTO Symbols
         (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
          Width, Height, Category, ShowShape, ShowTitle, 
-         FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+         FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
         VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                 @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
         SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -2141,7 +2155,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -2216,7 +2230,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
             Bearing = @Bearing, Width = @Width, Height = @Height,
             Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
             CreatedBy = @CreatedBy
         WHERE Id = @Id;";
 
@@ -2240,7 +2254,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -2346,7 +2360,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
         FROM    Symbols s
@@ -2383,7 +2397,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
         FROM    Symbols s
@@ -2421,10 +2435,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         INSERT INTO Symbols
         (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
          Width, Height, Category, ShowShape, ShowTitle, 
-         FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+         FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
         VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                 @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
         SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -2446,7 +2460,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -2512,7 +2526,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
             Bearing = @Bearing, Width = @Width, Height = @Height,
             Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+            FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
             CreatedBy = @CreatedBy
         WHERE Id = @Id;";
 
@@ -2536,7 +2550,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -2618,7 +2632,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                         s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                         s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                         pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
                         pg.ShowArrowHead, pg.LinePattern
@@ -2681,7 +2695,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                         s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, 
-                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZIndex,
+                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder,
                         s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                         pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
                         pg.ShowArrowHead, pg.LinePattern
@@ -2738,10 +2752,10 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INSERT INTO Symbols
                 (Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
                  Width, Height, Category, ShowShape, ShowTitle, 
-                 FillColor, StrokeColor, StrokeThickness, ZIndex, CreatedBy)
+                 FillColor, StrokeColor, StrokeThickness, ZOrder, CreatedBy)
                 VALUES (@Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
                         @Width, @Height, @Category, @ShowShape, @ShowTitle, 
-                        @FillColor, @StrokeColor, @StrokeThickness, @ZIndex, @CreatedBy);
+                        @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @CreatedBy);
                 SELECT LAST_INSERT_ID();";
 
             var symbolId = await conn.ExecuteScalarAsync<int>(symbolSql, new
@@ -2763,7 +2777,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -2839,7 +2853,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     Latitude = @Latitude, Longitude = @Longitude, Altitude = @Altitude, Zoom = @Zoom,
                     Bearing = @Bearing, Width = @Width, Height = @Height,
                     Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle,
-                    FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZIndex = @ZIndex,
+                    FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
                     CreatedBy = @CreatedBy
                 WHERE Id = @Id;";
 
@@ -2863,7 +2877,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FillColor = model.FillColor.ToString(),
                 StrokeColor = model.StrokeColor.ToString(),
                 model.StrokeThickness,
-                model.ZIndex,
+                model.ZOrder,
                 CreatedBy = "System"
             }, transaction);
 
@@ -3307,7 +3321,7 @@ internal class SymbolSQL
     public decimal StrokeThickness { get; set; } = 1.0m;
 
     /// <summary>레이어 순서 (높을수록 위)</summary>
-    public int ZIndex { get; set; } = 10;
+    public int ZOrder { get; set; } = 10;
 
     /// <summary>생성 일시</summary>
     public DateTime CreatedAt { get; set; }
@@ -3343,7 +3357,7 @@ internal class SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
     };
 }
@@ -3386,7 +3400,7 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
         // GeometrySymbol 전용 속성들 (간소화)
         ShapeType = EnumParseHelper.TryParseEnum(GeometryShapeType, EnumShapeType.Circle),
@@ -3446,7 +3460,7 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
         // PidsSymbol 전용 속성들
         LinkedDeviceId = LinkedDeviceId,
@@ -3522,7 +3536,7 @@ internal sealed class MilitarySymbolSQL : SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
         // MilitarySymbol 전용 속성들
         Affiliation = EnumParseHelper.TryParseEnum(Affiliation, EnumMilitaryAffiliation.Unknown),
@@ -3581,7 +3595,7 @@ internal sealed class LineSymbolSQL : SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
         // LineSymbol 전용 속성들
         LineOpacity = (double)LineOpacity,
@@ -3660,7 +3674,7 @@ internal sealed class InfraSymbolSQL : SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
         // InfraSymbol 전용 속성들
         BuildingType = EnumBuildingType.Factory,  // 하나뿐이므로 하드코딩
@@ -3722,7 +3736,7 @@ internal sealed class PidsGroupSymbolSQL : SymbolSQL
         FillColor = EnumParseHelper.TryParseEnum(FillColor, EnumColorType.Blue),
         StrokeColor = EnumParseHelper.TryParseEnum(StrokeColor, EnumColorType.Blue),
         StrokeThickness = (double)StrokeThickness,
-        ZIndex = ZIndex,
+        ZOrder = ZOrder,
 
         // PidsGroupSymbol 전용 속성들
         LinkedDeviceGroup = LinkedDeviceGroup,

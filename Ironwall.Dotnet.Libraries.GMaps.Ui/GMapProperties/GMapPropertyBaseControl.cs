@@ -279,14 +279,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         /// <summary>
         /// Z-order 순위 표시 문자열 ("3 / 15") — MapViewModel이 set
         /// </summary>
-        public string MarkerZIndexDisplay
+        public string MarkerZOrderDisplay
         {
-            get => (string)GetValue(MarkerZIndexDisplayProperty);
-            set => SetValue(MarkerZIndexDisplayProperty, value);
+            get => (string)GetValue(MarkerZOrderDisplayProperty);
+            set => SetValue(MarkerZOrderDisplayProperty, value);
         }
 
-        public static readonly DependencyProperty MarkerZIndexDisplayProperty =
-            DependencyProperty.Register(nameof(MarkerZIndexDisplay), typeof(string),
+        public static readonly DependencyProperty MarkerZOrderDisplayProperty =
+            DependencyProperty.Register(nameof(MarkerZOrderDisplay), typeof(string),
                 typeof(GMapPropertyBaseControl), new PropertyMetadata("- / -"));
 
         /// <summary>
@@ -548,7 +548,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 }
                 else
                 {
-                    control.MarkerZIndexDisplay = "- / -";
+                    control.MarkerZOrderDisplay = "- / -";
                 }
 
                 System.Diagnostics.Debug.WriteLine("SetupMarkerBindings 호출");

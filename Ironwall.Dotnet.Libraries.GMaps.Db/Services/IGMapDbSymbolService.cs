@@ -86,11 +86,11 @@ public interface IGMapDbSymbolService
     /// <returns>업데이트된 Symbol 모델</returns>
     Task<ISymbolModel?> UpdateSymbolAsync(ISymbolModel model, CancellationToken token = default);
 
-    /// <summary>Symbol의 ZIndex만 업데이트합니다</summary>
-    Task UpdateSymbolZIndexAsync(int symbolId, int zIndex, CancellationToken token = default);
+    /// <summary>Symbol의 ZOrder만 업데이트합니다</summary>
+    Task UpdateSymbolZOrderAsync(int symbolId, int zOrder, CancellationToken token = default);
 
-    /// <summary>여러 Symbol의 ZIndex를 Batch UPDATE합니다 (단일 SQL)</summary>
-    Task BatchUpdateZIndexAsync(List<(int id, int zIndex)> changes, CancellationToken token = default);
+    /// <summary>여러 Symbol의 ZOrder를 Batch UPDATE합니다 (단일 SQL)</summary>
+    Task BatchUpdateZOrderAsync(List<(int id, int zOrder)> changes, CancellationToken token = default);
 
     /// <summary>Symbol을 삭제합니다</summary>
     /// <param name="model">Symbol 모델</param>

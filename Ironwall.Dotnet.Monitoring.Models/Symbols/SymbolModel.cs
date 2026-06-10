@@ -95,7 +95,7 @@ public class SymbolModel : BaseModel, ISymbolModel
     #endregion
 
     #region - 레이어 순서 -
-    public int ZIndex { get; set; } = 10;
+    public int ZOrder { get; set; } = 10;
     #endregion
 
 }

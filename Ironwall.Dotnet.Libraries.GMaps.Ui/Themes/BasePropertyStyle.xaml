@@ -404,7 +404,7 @@
 												VerticalAlignment="Center"
 												FontSize="11"
 												Foreground="#555555"
-												Text="{Binding MarkerZIndexDisplay, RelativeSource={RelativeSource TemplatedParent}}" />
+												Text="{Binding MarkerZOrderDisplay, RelativeSource={RelativeSource TemplatedParent}}" />
 											<Button
 												x:Name="PART_ZOrderTopButton"
 												Style="{StaticResource ZOrderButtonStyle}"

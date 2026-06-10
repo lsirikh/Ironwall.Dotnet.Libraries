@@ -21,6 +21,6 @@ public interface ISymbolModel : IBaseModel
     double StrokeThickness { get; set; }
     EnumMarkerCategory Category { get; set; }
     EnumOperationState OperationState { get; set; }
-    int ZIndex { get; set; }
+    int ZOrder { get; set; }
 
 }
