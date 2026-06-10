@@ -2330,7 +2330,7 @@ public class MapViewModel : BasePanelViewModel,
 
             foreach (var item in sortedSymbols)
             {
-                AddMarkerFromSymbol(item);
+                AddMarkerFromSymbol(item, isExistingMarker: true);
             }
 
             _log?.Info($"심볼 추가 완료 - 총 {sortedSymbols.Count}개");
@@ -2929,18 +2929,17 @@ public class MapViewModel : BasePanelViewModel,
     // <summary>
     /// 심볼로부터 마커 추가
     /// </summary>
-    private void AddMarkerFromSymbol(ISymbolModel symbolModel)
+    private void AddMarkerFromSymbol(ISymbolModel symbolModel, bool isExistingMarker = false)
     {
         try
         {
             _log?.Info($"마커 생성 시작: Type={symbolModel.GetType().Name}, Title={symbolModel.Title}");
 
-
             // 1. Factory로 마커 생성
             var marker = _markerFactory.CreateMarker(symbolModel);
 
             // 2. 지도에 추가
-            AddMarkerToMap(marker);
+            AddMarkerToMap(marker, isExistingMarker);
 
             _log?.Info($"마커 추가 완료: {symbolModel.Title}");
         }
@@ -2953,7 +2952,7 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 지도에 마커 추가 - 단순화
     /// </summary>
-    private void AddMarkerToMap(IEditableMarker marker)
+    private void AddMarkerToMap(IEditableMarker marker, bool isExistingMarker = false)
     {
         if (marker is not GMapMarker gMapMarker)
         {
@@ -2968,14 +2967,22 @@ public class MapViewModel : BasePanelViewModel,
         {
             shapeElement.IsHitTestVisible = IsEditModeEnabled;
 
-            // 새 마커는 최상위 ZIndex 부여
-            int maxZ = 0;
-            foreach (var m in MainMap.Markers)
+            if (isExistingMarker)
             {
-                if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
-                    maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
+                // DB 로드 마커: 생성자에서 이미 symbolModel.ZIndex로 ZIndex + Panel.ZIndex 설정됨 — 유지
+                System.Windows.Controls.Panel.SetZIndex(shapeElement, gMapMarker.ZIndex);
             }
-            ApplyMarkerZIndex(gMapMarker, shapeElement, maxZ + 1);
+            else
+            {
+                // 신규 마커: 현재 심볼 중 최상위 ZIndex + 1 부여
+                int maxZ = 0;
+                foreach (var m in MainMap.Markers)
+                {
+                    if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
+                        maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
+                }
+                ApplyMarkerZIndex(gMapMarker, shapeElement, maxZ + 1);
+            }
         }
 
         // Shape 확인 로그

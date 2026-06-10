@@ -69,6 +69,7 @@
 						x:Name="PART_MainBorder"
 						MinWidth="280"
 						MaxWidth="300"
+						MaxHeight="520"
 						Background="White"
 						BorderBrush="{StaticResource BorderGrayBrush}"
 						BorderThickness="1"
