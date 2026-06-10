@@ -29,8 +29,8 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         _log = log;
         _model = symbolModel;
 
-        // 기본 설정 — 모델의 ZIndex 사용
-        ZIndex = symbolModel.ZIndex;
+        // 기본 설정 — 모델의 ZOrder 사용
+        ZIndex = symbolModel.ZOrder;
         UpdateOffset();
 
         // 가상 메서드들 호출
@@ -469,13 +469,13 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
-    int IEditableMarker.ZIndex
+    int IEditableMarker.ZOrder
     {
         get => ZIndex;  // GMapMarker.ZIndex (GMap.NET ItemContainerStyle 바인딩 → 렌더 순서)
         set
         {
             ZIndex = value;  // GMap.NET PropertyChanged → ItemContainerStyle 바인딩 갱신
-            _model.ZIndex = value;
+            _model.ZOrder = value;
             if (Shape is System.Windows.UIElement shapeEl)
                 System.Windows.Controls.Panel.SetZIndex(shapeEl, value);
         }

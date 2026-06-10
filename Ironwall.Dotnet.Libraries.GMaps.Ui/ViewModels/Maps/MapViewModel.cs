@@ -325,7 +325,7 @@ public class MapViewModel : BasePanelViewModel,
     public async Task HandleAsync(AllDevicesLoadedMessage message, CancellationToken cancellationToken)
     {
         await InitializeDeviceSymbolIntegration();
-        EnsureUniqueZIndex();
+        EnsureUniqueZOrder();
     }
 
     private void InitializeLineDrawingService()
@@ -2981,7 +2981,7 @@ public class MapViewModel : BasePanelViewModel,
                     if (m is IEditableMarker and not IImageEditableMarker && m.Shape is UIElement s)
                         maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
                 }
-                ApplyMarkerZIndex(gMapMarker, shapeElement, maxZ + 1);
+                ApplyMarkerZOrder(gMapMarker, shapeElement, maxZ + 1);
             }
         }
 
@@ -3554,7 +3554,7 @@ public class MapViewModel : BasePanelViewModel,
     /// 앱 시작 시 모든 심볼 마커에 고유 ZIndex 할당
     /// 중복 ZIndex가 있으면 컬렉션 순서대로 순차 재할당 + Batch DB 저장
     /// </summary>
-    private void EnsureUniqueZIndex()
+    private void EnsureUniqueZOrder()
     {
         if (MainMap?.Markers == null) return;
 
@@ -3573,28 +3573,28 @@ public class MapViewModel : BasePanelViewModel,
         bool hasDuplicates = zValues.Count != zValues.Distinct().Count();
         if (!hasDuplicates)
         {
-            _log?.Info($"[ZIndex] 고유값 확인 완료 — {editableMarkers.Count}개 마커, 중복 없음");
+            _log?.Info($"[ZOrder] 고유값 확인 완료 — {editableMarkers.Count}개 마커, 중복 없음");
             return;
         }
 
         // 순차 재할당 + Batch DB
-        _log?.Info($"[ZIndex] 중복 감지 — {editableMarkers.Count}개 마커에 고유 ZIndex 할당 시작");
-        var changes = new List<(int id, int zIndex)>();
+        _log?.Info($"[ZOrder] 중복 감지 — {editableMarkers.Count}개 마커에 고유 ZIndex 할당 시작");
+        var changes = new List<(int id, int zOrder)>();
         for (int i = 0; i < editableMarkers.Count; i++)
         {
             var gMarker = editableMarkers[i];
             if (gMarker.Shape is UIElement shape)
             {
-                ApplyMarkerZIndexLocal(gMarker, shape, i);
+                ApplyMarkerZOrderLocal(gMarker, shape, i);
                 if (gMarker is IEditableMarker em && em.Id > 0)
                     changes.Add((em.Id, i));
             }
         }
         if (changes.Count > 0)
-            _ = _gMapDbSymbolService.BatchUpdateZIndexAsync(changes);
+            _ = _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
 
-        _log?.Info($"[ZIndex] 고유 ZIndex 할당 완료 (0 ~ {editableMarkers.Count - 1}), DB Batch {changes.Count}건");
-        LogAllMarkerZIndex();
+        _log?.Info($"[ZOrder] 고유 ZIndex 할당 완료 (0 ~ {editableMarkers.Count - 1}), DB Batch {changes.Count}건");
+        LogAllMarkerZOrder();
     }
 
     /// <summary>
@@ -3619,10 +3619,10 @@ public class MapViewModel : BasePanelViewModel,
         if (target == null) return; // 이미 최상위
 
         // 스왑
-        ApplyMarkerZIndex(gMarker, shape, targetZ);
-        ApplyMarkerZIndex(target, target.Shape as UIElement, currentZ);
+        ApplyMarkerZOrder(gMarker, shape, targetZ);
+        ApplyMarkerZOrder(target, target.Shape as UIElement, currentZ);
         _log?.Info($"[ZOrder] SwapUp: '{marker.Title}'({currentZ}→{targetZ}) ↔ '{((IEditableMarker)target).Title}'({targetZ}→{currentZ})");
-        LogAllMarkerZIndex();
+        LogAllMarkerZOrder();
     }
 
     /// <summary>
@@ -3647,10 +3647,10 @@ public class MapViewModel : BasePanelViewModel,
         if (target == null) return; // 이미 최하위
 
         // 스왑
-        ApplyMarkerZIndex(gMarker, shape, targetZ);
-        ApplyMarkerZIndex(target, target.Shape as UIElement, currentZ);
+        ApplyMarkerZOrder(gMarker, shape, targetZ);
+        ApplyMarkerZOrder(target, target.Shape as UIElement, currentZ);
         _log?.Info($"[ZOrder] SwapDown: '{marker.Title}'({currentZ}→{targetZ}) ↔ '{((IEditableMarker)target).Title}'({targetZ}→{currentZ})");
-        LogAllMarkerZIndex();
+        LogAllMarkerZOrder();
     }
 
     /// <summary>
@@ -3667,9 +3667,9 @@ public class MapViewModel : BasePanelViewModel,
                 maxZ = Math.Max(maxZ, System.Windows.Controls.Panel.GetZIndex(s));
         }
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        ApplyMarkerZIndexLocal(gMarker, shape, maxZ + 1);
+        ApplyMarkerZOrderLocal(gMarker, shape, maxZ + 1);
         _log?.Info($"[ZOrder] MoveToTop: '{marker.Title}' ZIndex={oldZ}→{maxZ + 1}");
-        NormalizeAllZIndex();
+        NormalizeAllZOrder();
     }
 
     /// <summary>
@@ -3687,15 +3687,15 @@ public class MapViewModel : BasePanelViewModel,
         }
         if (minZ == int.MaxValue) minZ = 0;
         var oldZ = System.Windows.Controls.Panel.GetZIndex(shape);
-        ApplyMarkerZIndexLocal(gMarker, shape, minZ - 1);
+        ApplyMarkerZOrderLocal(gMarker, shape, minZ - 1);
         _log?.Info($"[ZOrder] MoveToBottom: '{marker.Title}' ZIndex={oldZ}→{minZ - 1}");
-        NormalizeAllZIndex();
+        NormalizeAllZOrder();
     }
 
     /// <summary>
     /// 전체 마커를 현재 순서 기준으로 0~n-1 재번호 + Batch DB 저장
     /// </summary>
-    private void NormalizeAllZIndex()
+    private void NormalizeAllZOrder()
     {
         if (MainMap?.Markers == null) return;
 
@@ -3705,7 +3705,7 @@ public class MapViewModel : BasePanelViewModel,
             .OrderBy(m => System.Windows.Controls.Panel.GetZIndex(m.Shape as UIElement))
             .ToList();
 
-        var changes = new List<(int id, int zIndex)>();
+        var changes = new List<(int id, int zOrder)>();
 
         for (int i = 0; i < sorted.Count; i++)
         {
@@ -3715,16 +3715,16 @@ public class MapViewModel : BasePanelViewModel,
             int currentZ = System.Windows.Controls.Panel.GetZIndex(shape);
             if (currentZ == i) continue; // 변경 없으면 스킵
 
-            ApplyMarkerZIndexLocal(gMarker, shape, i);
+            ApplyMarkerZOrderLocal(gMarker, shape, i);
             if (gMarker is IEditableMarker em && em.Id > 0)
                 changes.Add((em.Id, i));
         }
 
         if (changes.Count > 0)
-            _ = _gMapDbSymbolService.BatchUpdateZIndexAsync(changes);
+            _ = _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
 
-        _log?.Info($"[ZIndex] 정규화 완료 (0~{sorted.Count - 1}), DB Batch {changes.Count}건");
-        LogAllMarkerZIndex();
+        _log?.Info($"[ZOrder] 정규화 완료 (0~{sorted.Count - 1}), DB Batch {changes.Count}건");
+        LogAllMarkerZOrder();
     }
 
     public Task HandleAsync(ZOrderChangeRequestedEvent message, CancellationToken cancellationToken)
@@ -3737,11 +3737,11 @@ public class MapViewModel : BasePanelViewModel,
             case ZOrderDirection.ToTop:    MoveMarkerToTop(message.Marker);    break;
             case ZOrderDirection.ToBottom: MoveMarkerToBottom(message.Marker); break;
         }
-        RefreshPropertyPanelZIndex();
+        RefreshPropertyPanelZOrder();
         return Task.CompletedTask;
     }
 
-    private void RefreshPropertyPanelZIndex()
+    private void RefreshPropertyPanelZOrder()
     {
         if (PropertyPanel == null || SelectedMarker == null || MainMap == null) return;
 
@@ -3752,7 +3752,7 @@ public class MapViewModel : BasePanelViewModel,
             .ToList();
 
         int rank = symbolMarkers.IndexOf(SelectedMarker as GMapMarker);
-        PropertyPanel.MarkerZIndexDisplay = rank >= 0
+        PropertyPanel.MarkerZOrderDisplay = rank >= 0
             ? $"{rank + 1} / {symbolMarkers.Count}"
             : "- / -";
     }
@@ -3760,10 +3760,10 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// ZIndex를 Shape + GMapMarker + Model에 적용 (DB 저장 없음 — Batch용)
     /// </summary>
-    private void ApplyMarkerZIndexLocal(GMapMarker gMarker, UIElement shape, int newZ)
+    private void ApplyMarkerZOrderLocal(GMapMarker gMarker, UIElement shape, int newZ)
     {
         if (gMarker is IEditableMarker em)
-            ((IEditableMarker)em).ZIndex = newZ;  // GMapMarker.ZIndex + _model.ZIndex + Panel.SetZIndex(shape) 일괄 처리
+            ((IEditableMarker)em).ZOrder = newZ;  // GMapMarker.ZIndex + _model.ZIndex + Panel.SetZIndex(shape) 일괄 처리
         else
         {
             System.Windows.Controls.Panel.SetZIndex(shape, newZ);
@@ -3774,29 +3774,29 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// ZIndex를 Shape + GMapMarker + Model + DB 개별 저장 (스왑용)
     /// </summary>
-    private void ApplyMarkerZIndex(GMapMarker gMarker, UIElement shape, int newZ)
+    private void ApplyMarkerZOrder(GMapMarker gMarker, UIElement shape, int newZ)
     {
-        ApplyMarkerZIndexLocal(gMarker, shape, newZ);
+        ApplyMarkerZOrderLocal(gMarker, shape, newZ);
         if (gMarker is IEditableMarker editableMarker && editableMarker.Id > 0)
-            _ = SaveMarkerZIndexAsync(editableMarker.Id, newZ);
+            _ = SaveMarkerZOrderAsync(editableMarker.Id, newZ);
     }
 
-    private async Task SaveMarkerZIndexAsync(int symbolId, int zIndex)
+    private async Task SaveMarkerZOrderAsync(int symbolId, int zOrder)
     {
         try
         {
-            await _gMapDbSymbolService.UpdateSymbolZIndexAsync(symbolId, zIndex);
+            await _gMapDbSymbolService.UpdateSymbolZOrderAsync(symbolId, zOrder);
         }
         catch (Exception ex)
         {
-            _log?.Error($"[ZOrder] DB 저장 실패: Id={symbolId} ZIndex={zIndex} — {ex.Message}");
+            _log?.Error($"[ZOrder] DB 저장 실패: Id={symbolId} ZOrder={zOrder} — {ex.Message}");
         }
     }
 
     /// <summary>
-    /// 모든 마커의 현재 ZIndex 상태를 로그로 덤프
+    /// 모든 마커의 현재 ZOrder 상태를 로그로 덤프
     /// </summary>
-    private void LogAllMarkerZIndex()
+    private void LogAllMarkerZOrder()
     {
         if (MainMap == null) return;
         _log?.Info("[ZOrder] ── 전체 마커 ZIndex 현황 ──");
@@ -5265,7 +5265,7 @@ public class MapViewModel : BasePanelViewModel,
             PropertyPanel.IsEditModeEnabled = IsEditModeEnabled;
 
             IsPropertyPanelVisible = true;
-            RefreshPropertyPanelZIndex();
+            RefreshPropertyPanelZOrder();
             _log?.Info($"PropertyPanel 생성 완료: {PropertyPanel.GetType().Name}");
         }
 
@@ -5366,7 +5366,7 @@ public class MapViewModel : BasePanelViewModel,
             case ZOrderDirection.ToTop:    MoveMarkerToTop(SelectedMarker);    break;
             case ZOrderDirection.ToBottom: MoveMarkerToBottom(SelectedMarker); break;
         }
-        RefreshPropertyPanelZIndex();
+        RefreshPropertyPanelZOrder();
     }
 
     private void HidePropertyPanel()

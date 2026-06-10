@@ -489,6 +489,17 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
+    int IEditableMarker.ZOrder
+    {
+        get => ZIndex;
+        set
+        {
+            ZIndex = value;
+            if (Shape is System.Windows.UIElement shapeEl)
+                System.Windows.Controls.Panel.SetZIndex(shapeEl, value);
+        }
+    }
+
     #endregion
 
     #region - Image 전용 속성 -
