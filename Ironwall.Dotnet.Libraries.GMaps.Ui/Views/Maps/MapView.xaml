@@ -662,6 +662,8 @@
 				Margin="5,5,300,5"
 				HorizontalAlignment="Right"
 				VerticalAlignment="Bottom"
+				DigitalZoomLevel="{Binding MainMap.DigitalZoomLevel, Mode=TwoWay}"
+				DigitalZoomSteps="2"
 				MaxZoom="{Binding ZoomMax}"
 				MinZoom="{Binding ZoomMin}"
 				Zoom="{Binding MainMap.Zoom, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

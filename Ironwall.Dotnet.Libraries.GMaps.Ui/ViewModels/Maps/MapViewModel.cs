@@ -372,6 +372,7 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnImageClicked += OnMapImageClicked;
             MainMap.OnImageRightClicked += OnMapImageRightClicked;       // FR-9 이미지 우클릭 메뉴
             MainMap.OnImageEditCompleted += OnMapImageEditCompleted;     // FR-8 편집 완료 DB 영속화
+            MainMap.DigitalZoomLevelChanged += OnMapDigitalZoomLevelChanged; // 디지털 줌 → 축척바 갱신
             MainMap.OnMapClicked += OnMapClicked;
 
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
@@ -410,6 +411,7 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnImageClicked -= OnMapImageClicked;
             MainMap.OnImageRightClicked -= OnMapImageRightClicked;
             MainMap.OnImageEditCompleted -= OnMapImageEditCompleted;
+            MainMap.DigitalZoomLevelChanged -= OnMapDigitalZoomLevelChanged;
             MainMap.OnMapClicked -= OnMapClicked;
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
@@ -869,8 +871,18 @@ public class MapViewModel : BasePanelViewModel,
         MoveHomeLocationCommand = new RelayCommand(ExecuteMoveHomeLocation, CanExecuteMoveHomeLocation);
         SetHomeLocationCommand = new RelayCommand(ExecuteSetHomeLocation, CanExecuteSetHomeLocation);
         ShowMapRoiPanelCommand = new RelayCommand(_ => ShowMapRoiPanel());
-        ZoomInCommand = new RelayCommand(_ => { if (ZoomMax > MainMap?.Zoom) MainMap.Zoom++; });
-        ZoomOutCommand = new RelayCommand(_ => { if (ZoomMin < MainMap?.Zoom) MainMap.Zoom--; });
+        ZoomInCommand = new RelayCommand(_ =>
+        {
+            if (MainMap == null) return;
+            if (MainMap.Zoom < ZoomMax) MainMap.Zoom++;
+            else MainMap.StepDigitalZoom(+1);   // MaxZoom 초과 → 디지털 줌(상한 도달 시 no-op)
+        });
+        ZoomOutCommand = new RelayCommand(_ =>
+        {
+            if (MainMap == null) return;
+            if (MainMap.DigitalZoomLevel > 0) MainMap.StepDigitalZoom(-1);   // 디지털 우선 감소
+            else if (MainMap.Zoom > ZoomMin) MainMap.Zoom--;
+        });
         ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
     }
 
@@ -4564,6 +4576,10 @@ public class MapViewModel : BasePanelViewModel,
 
     private void MainMap_OnMapZoomChanged()
     {
+        // ★ FR-10: 실제 타일 줌이 바뀌면(맵 전환/홈 이동/줌아웃 등) 디지털 줌 초기화.
+        //   디지털 줌은 _core.Zoom을 바꾸지 않으므로 디지털 인/아웃 자체로는 이 핸들러가 호출되지 않는다.
+        MainMap?.ResetDigitalZoom();
+
         CreateScaleBar();
         ClearAllSelections();
         ReapplyLayerVisibilityForZoom();
@@ -4634,6 +4650,12 @@ public class MapViewModel : BasePanelViewModel,
     private void CreateScaleBar()
     {
         (var scaleX, var scale) = ScaleHelper.RelativeCreateScalebar(Zoom);
+
+        // ★ 디지털 줌(FR-9): 같은 지상거리가 화면에서 DigitalZoomScale배 더 많은 픽셀을 차지하므로
+        //   거리 라벨(scale)은 동일하게 두고 바 픽셀 폭만 배율만큼 늘린다.
+        double digScale = MainMap?.DigitalZoomScale ?? 1.0;
+        scaleX *= digScale;
+
         Scale = scale;
         ScalePoints = new PointCollection()
         {
@@ -4644,6 +4666,9 @@ public class MapViewModel : BasePanelViewModel,
         };
         NotifyOfPropertyChange(() => ScalePoints);
     }
+
+    /// <summary>디지털 줌 레벨 변경 → 축척바 재계산(거리 동일, 바 폭 ×배율).</summary>
+    private void OnMapDigitalZoomLevelChanged(int level) => CreateScaleBar();
 
     /// <summary>
     /// 객체 위치 검색 - 첫 번째 마커 위치로 이동
@@ -5034,6 +5059,7 @@ public class MapViewModel : BasePanelViewModel,
         set
         {
             MainMap.MaxZoom = value;
+            MainMap?.ResetDigitalZoom();   // ★ FR-10: MaxZoom 변동(provider/맵 전환) 시 디지털 줌 초기화
             NotifyOfPropertyChange(nameof(ZoomMax));
         }
     }

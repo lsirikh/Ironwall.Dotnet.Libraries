@@ -346,6 +346,9 @@ public class GMapCustomControl : GMapControl
         //   마커/오브젝트 위에서도 휠 줌이 동작하도록 마커 무시 옵션을 켠다(WinForms 데모 표준 설정).
         IgnoreMarkerOnMouseWheel = true;
 
+        // ★ 디지털 줌(SE-1/NFR-4): 리사이즈 시 ScaleTransform 중심(ActualWidth/2)이 바뀌므로 재적용.
+        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0) ApplyDigitalZoomTransform(); };
+
         base.OnInitialized(e);
 
         var tier = System.Windows.Media.RenderCapability.Tier >> 16;
@@ -1188,6 +1191,64 @@ public class GMapCustomControl : GMapControl
         }
     }
 
+    #region Digital Zoom (MaxZoom 초과 소프트 확대 — 컨트롤 RenderTransform 방식)
+
+    // 불변식: ScaleMode(Integer)·Zoom·_core.Zoom/ScaleX/Y는 절대 변경하지 않는다. RenderTransform만 변경.
+    //   WPF가 e.GetPosition(this)에 RenderTransform.Inverse를 자동 적용하므로 히트테스트 수동 보정 금지(이중변환 버그).
+    public const int DIGITAL_ZOOM_MAX = 2;
+    private static readonly double[] DIGITAL_SCALE_TABLE = { 1.0, 1.5, 2.0 };
+
+    /// <summary>디지털 줌 레벨 변경 시 발화 (arg = 새 레벨 0~2). 축척바 동기화용.</summary>
+    public event Action<int>? DigitalZoomLevelChanged;
+
+    /// <summary>
+    /// 현재 디지털 줌 레벨(0~2). DependencyProperty — 슬라이더/VM과 TwoWay 바인딩(변경 통지 내장).
+    /// CLR 프로퍼티로 두면 바인딩이 변경 통지를 못 받으므로 DP 필수.
+    /// </summary>
+    public int DigitalZoomLevel
+    {
+        get => (int)GetValue(DigitalZoomLevelProperty);
+        set => SetValue(DigitalZoomLevelProperty, value);
+    }
+    public static readonly DependencyProperty DigitalZoomLevelProperty =
+        DependencyProperty.Register(nameof(DigitalZoomLevel), typeof(int), typeof(GMapCustomControl),
+            new FrameworkPropertyMetadata(0, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
+                OnDigitalZoomLevelChanged, CoerceDigitalZoomLevel));
+
+    private static object CoerceDigitalZoomLevel(DependencyObject d, object baseValue)
+        => Math.Clamp((int)baseValue, 0, DIGITAL_ZOOM_MAX);
+
+    private static void OnDigitalZoomLevelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var c = (GMapCustomControl)d;
+        c.ApplyDigitalZoomTransform();
+        c.DigitalZoomLevelChanged?.Invoke((int)e.NewValue);
+    }
+
+    /// <summary>현재 디지털 줌 배율(1.0/1.5/2.0).</summary>
+    public double DigitalZoomScale => DIGITAL_SCALE_TABLE[Math.Clamp(DigitalZoomLevel, 0, DIGITAL_ZOOM_MAX)];
+
+    /// <summary>디지털 줌 레벨 증감(+1/-1). 코어스로 [0,2] 클램프. UI 스레드에서만 호출.</summary>
+    public void StepDigitalZoom(int delta) => DigitalZoomLevel += delta;
+
+    /// <summary>맵 전환·Provider 변경·홈 이동·MaxZoom 변동 시 디지털 줌 초기화(FR-10).</summary>
+    public void ResetDigitalZoom() => DigitalZoomLevel = 0;
+
+    /// <summary>디지털 배율을 컨트롤 RenderTransform(화면 중심 기준 ScaleTransform)으로 적용.</summary>
+    private void ApplyDigitalZoomTransform()
+    {
+        if (ActualWidth <= 0 || ActualHeight <= 0) return;   // SE-1: 초기화/리사이즈 중 중심 어긋남 방어 (NFR-4)
+        double scale = DigitalZoomScale;
+        if (Math.Abs(scale - 1.0) < 0.001)
+            RenderTransform = null;                          // 아이덴티티 복원
+        else
+            RenderTransform = new ScaleTransform(scale, scale, ActualWidth / 2.0, ActualHeight / 2.0);
+        _log?.Info($"[DigitalZoom] level={DigitalZoomLevel}, scale={scale:F1}x");
+        InvalidateVisual();
+    }
+
+    #endregion
+
     /// <summary>
     /// 마우스 휠 처리 (Shift + 휠 = 회전)
     /// </summary>
@@ -1208,10 +1269,25 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
-        // ★ T2 — 줌 경계(Max/Min) 가드. GMap.NET base는 휠 시 Position을 먼저 커서로 옮긴 뒤 Zoom을 클램프하므로,
-        //   Max에서 휠업/Min에서 휠다운 시 "줌은 그대로인데 중심만 점프"한다. 경계에서 base 호출 자체를 차단.
         bool zoomUp = InvertedMouseWheelZooming ? e.Delta < 0 : e.Delta > 0;
-        if ((zoomUp && Zoom >= MaxZoom) || (!zoomUp && Zoom <= MinZoom))
+
+        // ★ FR-1: MaxZoom 도달 후 휠업 → 디지털 줌 진입 (타일 줌/_core 불변, RenderTransform만 확대)
+        if (zoomUp && Zoom >= MaxZoom)
+        {
+            if (DigitalZoomLevel < DIGITAL_ZOOM_MAX) StepDigitalZoom(+1);
+            e.Handled = true;
+            return;
+        }
+        // ★ FR-2: 디지털 줌 활성 중 휠다운 → 디지털 감소 우선 (0 도달 후 다음 휠다운부터 정상 줌아웃)
+        if (!zoomUp && DigitalZoomLevel > 0)
+        {
+            StepDigitalZoom(-1);
+            e.Handled = true;
+            return;
+        }
+        // ★ T2: MinZoom 하한 가드 — GMap.NET base는 휠 시 Position을 먼저 옮긴 뒤 Zoom 클램프하므로
+        //   경계에서 "줌 그대로/중심만 점프"를 막기 위해 base 호출 자체를 차단.
+        if (!zoomUp && Zoom <= MinZoom)
         {
             e.Handled = true;
             return;
