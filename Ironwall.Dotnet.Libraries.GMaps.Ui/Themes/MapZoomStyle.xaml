@@ -74,18 +74,20 @@
 									Kind="MagnifyMinus" />
 							</Button>
 
-							<!--  슬라이더 (정수 줌 레벨 스냅, 눈금=MaxZoom 추종)  -->
+							<!--  슬라이더: Maximum=ExtendedMaxZoom(MaxZoom+디지털단계), Value=SliderValue 라우팅.
+							      디지털 구간은 MaxZoom 너머 추가된 눈금으로 시각 구분된다.  -->
 							<Slider
 								Grid.Column="2"
 								Margin="4,0"
 								VerticalAlignment="Center"
 								IsSnapToTickEnabled="True"
-								Maximum="{Binding MaxZoom, RelativeSource={RelativeSource TemplatedParent}}"
+								Maximum="{Binding ExtendedMaxZoom, RelativeSource={RelativeSource TemplatedParent}}"
 								Minimum="{Binding MinZoom, RelativeSource={RelativeSource TemplatedParent}}"
 								SmallChange="1"
 								TickFrequency="1"
 								TickPlacement="Both"
-								Value="{Binding Zoom, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
+								ToolTip="MaxZoom 초과 구간은 디지털 줌(소프트 확대)"
+								Value="{Binding SliderValue, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
 
 							<!--  줌 인  -->
 							<Button
