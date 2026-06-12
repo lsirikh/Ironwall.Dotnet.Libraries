@@ -400,6 +400,23 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// <summary>
     /// 마우스 왼쪽 버튼 다운
     /// </summary>
+    /// <summary>
+    /// ★ T4 — 핸들(이동/회전/리사이즈) 영역에서만 히트테스트에 응답한다.
+    /// 본체 영역은 null을 반환하여 휠/드래그가 Adorner를 '투과' → 하위 맵으로 전달되어
+    /// 오브젝트 위에서도 맵 줌/팬이 동작한다. 핸들 조작은 기존대로 유지.
+    /// </summary>
+    protected override System.Windows.Media.HitTestResult HitTestCore(System.Windows.Media.PointHitTestParameters hitTestParameters)
+    {
+        var pt = hitTestParameters.HitPoint;
+        var elementBounds = new Rect(AdornedElement.RenderSize);
+        var markerCenter = new Point(elementBounds.Width / 2, elementBounds.Height / 2);
+
+        if (DetectClickedHandle(pt, markerCenter) != MarkerHandle.None)
+            return new System.Windows.Media.PointHitTestResult(this, pt);
+
+        return null!; // 본체 → 투과 (WPF HitTestCore는 no-hit 시 null 반환 허용)
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         try
