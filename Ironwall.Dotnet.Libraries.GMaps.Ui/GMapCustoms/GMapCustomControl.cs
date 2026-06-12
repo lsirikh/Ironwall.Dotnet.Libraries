@@ -1203,6 +1203,15 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // ★ T2 — 줌 경계(Max/Min) 가드. GMap.NET base는 휠 시 Position을 먼저 커서로 옮긴 뒤 Zoom을 클램프하므로,
+        //   Max에서 휠업/Min에서 휠다운 시 "줌은 그대로인데 중심만 점프"한다. 경계에서 base 호출 자체를 차단.
+        bool zoomUp = InvertedMouseWheelZooming ? e.Delta < 0 : e.Delta > 0;
+        if ((zoomUp && Zoom >= MaxZoom) || (!zoomUp && Zoom <= MinZoom))
+        {
+            e.Handled = true;
+            return;
+        }
+
         base.OnMouseWheel(e);
     }
 
@@ -1248,6 +1257,7 @@ public class GMapCustomControl : GMapControl
 
         _resizeHandle = GetClickedImageHandle(selectedImage, mousePos);
 
+        // 핸들(리사이즈/회전/중심이동)을 클릭한 경우만 편집으로 소비.
         if (_resizeHandle != ResizeHandle.None)
         {
             StartImageDrag(selectedImage, mousePos, _resizeHandle);
@@ -1255,15 +1265,8 @@ public class GMapCustomControl : GMapControl
             return true;
         }
 
-        // ★ Move-폴백도 회전 보정 히트테스트 사용 (NFR-1, S12).
-        //   기존 Contains(geoPos)는 비회전 AABB라 회전 이미지에서 빈 모서리 오선택 / 시각영역 미선택 발생.
-        if (HitTestImageScreen(selectedImage, mousePos))
-        {
-            StartImageDrag(selectedImage, mousePos, ResizeHandle.Move);
-            e.Handled = true;
-            return true;
-        }
-
+        // ★ T4 — 이미지 '본체' 클릭/드래그는 편집으로 소비하지 않고 맵 팬으로 위임(false 반환).
+        //   이미지 이동은 중심 이동(Move) 핸들로만 한다. (기존 본체 드래그=이동 폴백 제거)
         return false;
     }
 
@@ -1444,6 +1447,15 @@ public class GMapCustomControl : GMapControl
             Math.Abs(local.Y - rotateHandle.Y) <= tolerance)
         {
             return ResizeHandle.Rotate;
+        }
+
+        // ★ T4 — 중심 이동(Move) 핸들. 본체 드래그는 맵 팬, 이미지 이동은 이 중심 핸들로만 한다.
+        var moveHandle = new Point(imageRect.Left + imageRect.Width / 2,
+                                   imageRect.Top + imageRect.Height / 2);
+        if (Math.Abs(local.X - moveHandle.X) <= tolerance &&
+            Math.Abs(local.Y - moveHandle.Y) <= tolerance)
+        {
+            return ResizeHandle.Move;
         }
 
         var handles = new[]
@@ -1631,6 +1643,10 @@ public class GMapCustomControl : GMapControl
         {
             drawingContext.DrawEllipse(edgeHandleBrush, handlePen, handle, handleSize / 2, handleSize / 2);
         }
+
+        // ★ T4 — 중심 이동(Move) 핸들 (하늘색 원). 본체 드래그는 맵 팬, 이동은 이 핸들로만.
+        var moveCenter = new Point(imageRect.Left + imageRect.Width / 2, imageRect.Top + imageRect.Height / 2);
+        drawingContext.DrawEllipse(Brushes.DeepSkyBlue, handlePen, moveCenter, handleSize / 2.0 + 1, handleSize / 2.0 + 1);
 
         // ★ 회전 핸들 (FR-2): 상단 중앙에서 위쪽으로 연결선 + 초록 원.
         //   PushTransform(회전) 범위 내부이므로 imageRect 로컬좌표로 그리면

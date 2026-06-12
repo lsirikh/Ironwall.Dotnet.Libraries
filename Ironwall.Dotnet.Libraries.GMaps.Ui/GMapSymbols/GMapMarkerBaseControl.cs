@@ -558,7 +558,9 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
                 mapControl.TriggerMarkerClicked(Marker);
             }
 
-            e.Handled = true;
+            // ★ T4 — e.Handled를 설정하지 않는다. 본체 클릭/드래그가 부모(GMapCustomControl)로 버블되어
+            //   맵 팬이 동작하도록 한다(오브젝트가 맵 인터렉션을 막지 않게). 심볼 이동은 Adorner 중심 핸들로 수행.
+            //   선택 알림은 위 TriggerMarkerClicked로 이미 전달됨.
         }
         catch (Exception ex)
         {

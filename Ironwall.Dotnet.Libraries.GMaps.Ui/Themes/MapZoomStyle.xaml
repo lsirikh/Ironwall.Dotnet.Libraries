@@ -74,14 +74,16 @@
 									Kind="MagnifyMinus" />
 							</Button>
 
-							<!--  슬라이더  -->
+							<!--  슬라이더 (정수 줌 레벨 스냅, 눈금=MaxZoom 추종)  -->
 							<Slider
 								Grid.Column="2"
 								Margin="4,0"
 								VerticalAlignment="Center"
+								IsSnapToTickEnabled="True"
 								Maximum="{Binding MaxZoom, RelativeSource={RelativeSource TemplatedParent}}"
 								Minimum="{Binding MinZoom, RelativeSource={RelativeSource TemplatedParent}}"
 								SmallChange="1"
+								TickFrequency="1"
 								TickPlacement="Both"
 								Value="{Binding Zoom, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
 

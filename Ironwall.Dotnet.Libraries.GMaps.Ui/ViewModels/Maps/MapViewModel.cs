@@ -689,8 +689,13 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 편집을 위한 마커 선택
     /// </summary>
+    private bool _isSelectingMarker;   // T4-B: 본체 클릭이 Shape+GMapCustomControl 양쪽에서 OnMarkerClicked 이중 발화 → 재진입 방지
     private async void SelectMarkerForEditing(IEditableMarker marker)
     {
+        // ★ 재진입 가드 — 동일 클릭의 2차 발화가 DbUpdateProcess를 중복 트리거하지 않게 차단.
+        //   1차(Shape.TriggerMarkerClicked)가 올바른 마커를 선택하고, 2차(GetMarkerAtScreen)는 여기서 무시된다.
+        if (_isSelectingMarker) return;
+        _isSelectingMarker = true;
         try
         {
             _log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
@@ -724,6 +729,10 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"마커 편집 선택 실패: {ex.Message}");
+        }
+        finally
+        {
+            _isSelectingMarker = false;
         }
     }
 
@@ -2276,8 +2285,8 @@ public class MapViewModel : BasePanelViewModel,
         MainMap.Manager.Mode = AccessMode.ServerOnly;
 
         // 3. Zoom 범위만 설정 (Position/Zoom은 ConfigureCommonMapSettings에서 HomePosition 적용)
-        if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
-        if (provider.MaxZoom.HasValue) MainMap.MaxZoom = provider.MaxZoom.Value;
+        if (provider.MinZoom >= 0) ZoomMin = provider.MinZoom;   // 래퍼 경유 → 슬라이더 Minimum 통지 (T1)
+        if (provider.MaxZoom.HasValue) ZoomMax = provider.MaxZoom.Value;   // 래퍼 경유 → 슬라이더 Maximum 통지 (T1)
 
         // ReloadMap 호출하지 않음 — IsStarted=false 상태 (폼 미로드)
         // GMapControl_Loaded → OnMapOpen에서 타일 자동 로드됨
@@ -2328,8 +2337,8 @@ public class MapViewModel : BasePanelViewModel,
         MainMap.Manager.Mode = AccessMode.ServerOnly;
 
         // 5. Zoom 범위 설정
-        if (provider.MinZoom >= 0) MainMap.MinZoom = provider.MinZoom;
-        if (provider.MaxZoom.HasValue) MainMap.MaxZoom = provider.MaxZoom.Value;
+        if (provider.MinZoom >= 0) ZoomMin = provider.MinZoom;   // 래퍼 경유 → 슬라이더 Minimum 통지 (T1)
+        if (provider.MaxZoom.HasValue) ZoomMax = provider.MaxZoom.Value;   // 래퍼 경유 → 슬라이더 Maximum 통지 (T1)
 
         // 6. 위치/줌 복원
         MainMap.Position = savedPosition;
@@ -2349,9 +2358,9 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (MainMap == null || SelectedMap == null) return;
 
-        // MinZoom/MaxZoom는 항상 DB 값으로 설정
-        MainMap.MinZoom = SelectedMap.MinZoomLevel;
-        MainMap.MaxZoom = SelectedMap.MaxZoomLevel;
+        // MinZoom/MaxZoom는 항상 DB 값으로 설정 (래퍼 경유 → 슬라이더 통지, T1)
+        ZoomMin = SelectedMap.MinZoomLevel;
+        ZoomMax = SelectedMap.MaxZoomLevel;
 
         if (isInitialLoad)
         {
