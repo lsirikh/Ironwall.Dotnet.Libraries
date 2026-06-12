@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-06-10 (advance-phase 자동)
-- **총 문서 수**: 186개
+- **총 문서 수**: 191개
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md](analysis/OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md) | 줌→회전 누적(이중회전) + 마커 AABB 부정확 근본원인 | 2026-06-10 |
 | [RapidEventBurst_Stutter_Analysis.md](analysis/RapidEventBurst_Stutter_Analysis.md) | RapidEventBurst_Stutter_Analysis.md | 2026-06-04 |
 | [Multisensor_Symbol_Bug_Analysis.md](analysis/Multisensor_Symbol_Bug_Analysis.md) | Multisensor_Symbol_Bug_Analysis.md | 2026-06-04 |
 | [EventStateSyncArchitecture_Analysis.md](analysis/EventStateSyncArchitecture_Analysis.md) | EventStateSyncArchitecture_Analysis.md | 2026-06-04 |
@@ -26,7 +27,9 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | 오른쪽 클릭 컨텍스트 메뉴 표시 규칙 (Edit/WebEnabled 조건) | Approved | 2026-06-10 |
+| [OverlayImage_Rotation_Editing-prd.md](prds/OverlayImage_Rotation_Editing-prd.md) | OverlayImage_Rotation_Editing | Approved | 2026-06-10 |
+| [MarkerHitTest_AABB_Fix-prd.md](prds/MarkerHitTest_AABB_Fix-prd.md) | MarkerHitTest_AABB_Fix | Approved | 2026-06-10 |
+| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Approved | 2026-06-10 |
 | [OverlayImage_ZOrder_Independence-prd.md](prds/OverlayImage_ZOrder_Independence-prd.md) | OverlayImage_ZOrder_Independence | Approved | 2026-06-10 |
 | [ZOrder_PropertyPanel_Integration-prd.md](prds/ZOrder_PropertyPanel_Integration-prd.md) | ZOrder_PropertyPanel_Integration | Draft | 2026-06-10 |
 | [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | LayerVisibility_Persistence_Fix | Approved | 2026-06-08 |
@@ -74,6 +77,8 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [OverlayImage_Rotation_Editing-prd-plan.md](plans/OverlayImage_Rotation_Editing-prd-plan.md) | [PRD](prds/OverlayImage_Rotation_Editing-prd.md) | 0/33 | 2026-06-10 |
+| [OverlayImage_ZOrder_Independence-plan.md](plans/OverlayImage_ZOrder_Independence-plan.md) | [PRD](prds/OverlayImage_ZOrder_Independence-prd.md) | 0/25 | 2026-06-10 |
 | [ZOrder_PropertyPanel_Integration-prd-plan.md](plans/ZOrder_PropertyPanel_Integration-prd-plan.md) | [PRD](prds/ZOrder_PropertyPanel_Integration-prd.md) | 0/0 | 2026-06-10 |
 | [LayerVisibility_Persistence_Fix-prd-plan.md](plans/LayerVisibility_Persistence_Fix-prd-plan.md) | [PRD](prds/LayerVisibility_Persistence_Fix-prd.md) | 3/14 | 2026-06-08 |
 | [SplashScreen_MonitoringSolution-prd-plan.md](plans/SplashScreen_MonitoringSolution-prd-plan.md) | [PRD](prds/SplashScreen_MonitoringSolution-prd.md) | 0/0 | 2026-06-08 |
