@@ -843,18 +843,42 @@ public class GMapCustomControl : GMapControl
                 var markerScreenPoint = new Point(markerScreenPos.X, markerScreenPos.Y);
                 var screenDistance = CalculateScreenDistance(screenPosition, markerScreenPoint);
 
-                // 렌더된 화면 크기 — Shape.ActualWidth/Height 우선, 폴백 32px
+                // 렌더된 화면 크기 — 이미지 마커는 OnRender 캐시(RenderedScreenWidth) 우선(ActualWidth 1사이클 지연 회피),
+                // 그 외 마커는 Shape.ActualWidth/Height, 폴백 32px
                 var shape = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
-                var renderedW = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0;
-                var renderedH = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0;
+                double renderedW, renderedH;
+                if (shape is GMapMarkerImageControl imgCtrl && imgCtrl.RenderedScreenWidth > 0)
+                {
+                    renderedW = imgCtrl.RenderedScreenWidth;
+                    renderedH = imgCtrl.RenderedScreenHeight;
+                }
+                else
+                {
+                    renderedW = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0;
+                    renderedH = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0;
+                }
 
                 // ★ AABB 히트테스트 (MarkerHitTest_AABB_Fix R-1) — 원형 반경(Math.Max(W,H)/2+8) 대신
                 //   마커 Width×Height 사각형으로 판정. 마커 Offset=(-W/2,-H/2)이므로 markerScreenPoint가
                 //   시각 중심 → 중심 기준 AABB가 정확. 원형은 라인/비정방형 심볼에서 빈 공간 오선택 발생.
                 var halfW = renderedW / 2.0;
                 var halfH = renderedH / 2.0;
-                var dx = Math.Abs(screenPosition.X - markerScreenPoint.X);
-                var dy = Math.Abs(screenPosition.Y - markerScreenPoint.Y);
+
+                // ★ 회전 보정 — 마커 Shape는 RenderTransform(Bearing, origin 0.5/0.5)으로 시각 중심 기준 회전한다.
+                //   클릭 좌표를 markerScreenPoint 중심으로 -Bearing 역회전한 뒤 비회전 AABB와 비교해야 정확.
+                //   (이미지 GetImageAtScreen의 InverseRotateMouse와 동일 원리, NFR-1)
+                var testPos = screenPosition;
+                if (marker.Bearing != 0)
+                {
+                    var rad = -marker.Bearing * Math.PI / 180.0;
+                    var ox = screenPosition.X - markerScreenPoint.X;
+                    var oy = screenPosition.Y - markerScreenPoint.Y;
+                    testPos = new Point(
+                        markerScreenPoint.X + ox * Math.Cos(rad) - oy * Math.Sin(rad),
+                        markerScreenPoint.Y + ox * Math.Sin(rad) + oy * Math.Cos(rad));
+                }
+                var dx = Math.Abs(testPos.X - markerScreenPoint.X);
+                var dy = Math.Abs(testPos.Y - markerScreenPoint.Y);
 
                 if (dx <= halfW && dy <= halfH)
                 {

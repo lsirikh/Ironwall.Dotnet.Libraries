@@ -185,6 +185,13 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
 
     #region Override Methods - Direct Rendering (Phase 29)
 
+    /// <summary>
+    /// OnRender가 산출한 현재 화면 표시 크기 (px). 히트테스트에서 ActualWidth/Height 대신 사용한다.
+    /// Width setter 후 ActualWidth는 1 레이아웃 사이클 지연되므로, 줌 직후 클릭 빗나감을 방지하기 위한 즉시 캐시.
+    /// </summary>
+    public double RenderedScreenWidth { get; private set; }
+    public double RenderedScreenHeight { get; private set; }
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -225,6 +232,10 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
             if (screenWidth < MinSize) screenWidth = MinSize;
             if (screenHeight < MinSize) screenHeight = MinSize;
 
+            // ★ 히트테스트용 즉시 캐시 — ActualWidth/Height의 1 레이아웃 사이클 지연 회피 (분석 원인 B)
+            RenderedScreenWidth = screenWidth;
+            RenderedScreenHeight = screenHeight;
+
             // 컨트롤 크기 동기화 (Adorner 선택 영역용)
             // SuppressBoundsUpdate: OnRender → Width setter → bounds 재계산 루프 차단
             Marker.SuppressBoundsUpdate = true;
@@ -238,14 +249,9 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
             // 이미지 그리기 영역 (컨트롤 로컬 좌표 기준)
             var imageRect = new Rect(0, 0, screenWidth, screenHeight);
 
-            // 회전 처리
-            if (Marker.Bearing != 0)
-            {
-                var centerX = screenWidth / 2;
-                var centerY = screenHeight / 2;
-                var rotateTransform = new RotateTransform(Marker.Bearing, centerX, centerY);
-                dc.PushTransform(rotateTransform);
-            }
+            // ★ 회전은 base(GMapMarkerBaseControl.OnRotationAngleChanged)의 RenderTransform(RotationAngle, origin 0.5/0.5)이
+            //   단독 처리한다. 여기서 다시 PushTransform(Bearing)을 걸면 2배 과회전 + 줌 시 위치 드리프트(중심 불일치:
+            //   ActualWidth vs screenWidth)가 발생하므로 제거. (분석: OverlayImage_Rotation_Zoom_AABB_RootCause)
 
             // 투명도 처리
             if (ImageOpacity < 1.0)
@@ -253,12 +259,11 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
                 dc.PushOpacity(ImageOpacity);
             }
 
-            // 이미지 그리기
+            // 이미지 그리기 (비회전 imageRect — 회전은 RenderTransform이 적용)
             dc.DrawImage(ImageSource, imageRect);
 
             // Transform 스택 정리
             if (ImageOpacity < 1.0) dc.Pop();
-            if (Marker.Bearing != 0) dc.Pop();
 
         }
         catch (Exception ex)
