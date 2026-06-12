@@ -439,8 +439,8 @@ public class GMapCustomControl : GMapControl
         {
             _panSkipCount++;
             // RDP 이벤트 압축 진단: 10프레임마다 한 번 로그 (너무 많으면 로그 폭주)
-            if (_panSkipCount % 10 == 1)
-                _log?.Info($"[PAN] SKIP#{_panSkipCount} t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5}");
+            //if (_panSkipCount % 10 == 1)
+            //    _log?.Info($"[PAN] SKIP#{_panSkipCount} t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5}");
             return;
         }
 

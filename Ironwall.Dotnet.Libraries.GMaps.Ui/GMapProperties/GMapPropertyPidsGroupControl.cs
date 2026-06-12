@@ -35,7 +35,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         protected override void ClearSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== PidsGroupControl ClearSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsGroupControl ClearSpecificBindings 시작 ===");
 
             // Line 관련 바인딩 해제
             BindingOperations.ClearBinding(this, LinePatternProperty);
@@ -48,7 +48,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             BindingOperations.ClearBinding(this, LinkedDeviceGroupProperty);
             BindingOperations.ClearBinding(this, EventStatusProperty);
 
-            System.Diagnostics.Debug.WriteLine("=== PidsGroupControl ClearSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsGroupControl ClearSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificBindings()

@@ -215,7 +215,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             BindingOperations.ClearBinding(this, ImageVisibilityProperty);
             BindingOperations.ClearBinding(this, MaintainAspectRatioProperty);
 
-            System.Diagnostics.Debug.WriteLine("GMapPropertyImageControl.ClearSpecificBindings 완료");
+            //System.Diagnostics.Debug.WriteLine("GMapPropertyImageControl.ClearSpecificBindings 완료");
         }
 
         protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)

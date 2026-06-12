@@ -33,9 +33,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         protected override void ClearSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== ClearSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== ClearSpecificBindings 시작 ===");
             BindingOperations.ClearBinding(this, MarkerOpacityProperty);
-            System.Diagnostics.Debug.WriteLine("=== ClearSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== ClearSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificBindings()

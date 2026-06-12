@@ -718,13 +718,13 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         if (d is GMapMarkerBaseControl<T> control)
         {
-            System.Diagnostics.Debug.WriteLine($"OnMarkerStrokeThicknessChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnMarkerStrokeThicknessChanged: {e.OldValue} → {e.NewValue}");
 
             // 마커 객체가 있으면 동기화
             if (control.Marker != null && !control._isUpdatingFromMarker)
             {
                 control.Marker.StrokeThickness = (double)e.NewValue;
-                System.Diagnostics.Debug.WriteLine($"마커 StrokeThickness 업데이트: {control.Marker.StrokeThickness}");
+                //System.Diagnostics.Debug.WriteLine($"마커 StrokeThickness 업데이트: {control.Marker.StrokeThickness}");
             }
 
 
@@ -777,11 +777,11 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     private static void OnShowTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine($"OnShowTitleChanged: {e.OldValue} -> {e.NewValue}");
+        //System.Diagnostics.Debug.WriteLine($"OnShowTitleChanged: {e.OldValue} -> {e.NewValue}");
 
         if (d is GMapMarkerBaseControl<T> control)
         {
-            System.Diagnostics.Debug.WriteLine($"  마커에 전파: Marker.ShowTitle = {control.ShowTitle}");
+            //System.Diagnostics.Debug.WriteLine($"  마커에 전파: Marker.ShowTitle = {control.ShowTitle}");
 
             control.ShowTitle = (bool)e.NewValue;
         }

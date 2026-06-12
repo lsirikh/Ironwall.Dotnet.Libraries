@@ -32,7 +32,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         protected override void ClearSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== LineControl ClearSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== LineControl ClearSpecificBindings 시작 ===");
 
             BindingOperations.ClearBinding(this, LinePatternProperty);
             BindingOperations.ClearBinding(this, LineOpacityProperty);
@@ -40,7 +40,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, TotalDistanceProperty);
             BindingOperations.ClearBinding(this, PointCountProperty);
 
-            System.Diagnostics.Debug.WriteLine("=== LineControl ClearSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== LineControl ClearSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificBindings()

@@ -4509,7 +4509,7 @@ public class MapViewModel : BasePanelViewModel,
         //   → OverlayMapCanvas 타일은 절대 픽셀 좌표(Canvas.SetLeft/Top)로 배치되므로
         //     매 프레임 FromLatLngToLocal 재계산으로 갱신하지 않으면 base 타일과 어긋남.
         //   → TriggerSelectionChange 체인은 GMapCustomControl_OnPositionChanged에서 이미 차단됨.
-        _log?.Info($"[PAN][VM] RefreshVisibleTiles drag={MainMap?.IsDragging} t={DateTime.Now:HH:mm:ss.fff}");
+        //_log?.Info($"[PAN][VM] RefreshVisibleTiles drag={MainMap?.IsDragging} t={DateTime.Now:HH:mm:ss.fff}");
         _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 

@@ -32,7 +32,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         protected override void ClearSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== MilitaryControl ClearSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== MilitaryControl ClearSpecificBindings 시작 ===");
 
             BindingOperations.ClearBinding(this, AffiliationProperty);
             BindingOperations.ClearBinding(this, BattleDimensionProperty);
@@ -44,7 +44,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
             BindingOperations.ClearBinding(this, CallSignProperty);
             BindingOperations.ClearBinding(this, CountryCodeProperty);
 
-            System.Diagnostics.Debug.WriteLine("=== MilitaryControl ClearSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== MilitaryControl ClearSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificBindings()

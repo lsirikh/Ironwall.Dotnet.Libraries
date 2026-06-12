@@ -143,22 +143,22 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         protected override void ClearSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== Infra ClearSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== Infra ClearSpecificBindings 시작 ===");
             BindingOperations.ClearBinding(this, BuildingTypeProperty);
             BindingOperations.ClearBinding(this, BuildingUsageProperty);
             BindingOperations.ClearBinding(this, FloorCountProperty);
             BindingOperations.ClearBinding(this, BasementFloorCountProperty);
             BindingOperations.ClearBinding(this, BuildingAreaProperty);
-            System.Diagnostics.Debug.WriteLine("=== Infra ClearSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== Infra ClearSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== Infra SetupSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== Infra SetupSpecificBindings 시작 ===");
 
             if (SelectedMarker is IInfraEditableMarker infraMarker)
             {
-                System.Diagnostics.Debug.WriteLine($"바인딩 대상: {infraMarker.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {infraMarker.GetType().Name}");
 
                 SetBinding(BuildingTypeProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingType)));
                 SetBinding(BuildingUsageProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingUsage)));
@@ -167,7 +167,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 SetBinding(BuildingAreaProperty, CreateTwoWayBinding(nameof(infraMarker.BuildingArea)));
             }
 
-            System.Diagnostics.Debug.WriteLine("=== Infra SetupSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== Infra SetupSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)

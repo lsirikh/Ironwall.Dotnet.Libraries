@@ -37,7 +37,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         protected override void ClearSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 시작 ===");
 
             BindingOperations.ClearBinding(this, LinkedDeviceIdProperty);
             BindingOperations.ClearBinding(this, LinkedDeviceProperty);
@@ -49,16 +49,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             BindingOperations.ClearBinding(this, FOVColorProperty);
             BindingOperations.ClearBinding(this, FOVOpacityProperty);
 
-            System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== PidsControl SetupSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsControl SetupSpecificBindings 시작 ===");
 
             if (SelectedMarker is IPidsEditableMarker pidsMarker)
             {
-                System.Diagnostics.Debug.WriteLine($"바인딩 대상: {pidsMarker.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {pidsMarker.GetType().Name}");
 
                 // LinkedDeviceId 바인딩
                 var linkedDeviceIdBinding = CreateTwoWayBinding(nameof(pidsMarker.LinkedDeviceId));
@@ -94,18 +94,18 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 SetBinding(BaseBearingProperty, baseBearingBinding);
             }
 
-            System.Diagnostics.Debug.WriteLine("=== PidsControl SetupSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsControl SetupSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)
         {
             if (!(marker is IPidsEditableMarker pidsMarker)) return;
 
-            System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 시작 ===");
-            System.Diagnostics.Debug.WriteLine($"  마커 Title: {pidsMarker.Title}");
-            System.Diagnostics.Debug.WriteLine($"  마커 LinkedDeviceId: {pidsMarker.LinkedDeviceId}");
-            System.Diagnostics.Debug.WriteLine($"  마커 LinkedDevice: {pidsMarker.LinkedDevice?.DeviceName ?? "null"}");
-            System.Diagnostics.Debug.WriteLine($"  FilteredDeviceList Count: {FilteredDeviceList?.Count ?? 0}");
+            //System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 시작 ===");
+            //System.Diagnostics.Debug.WriteLine($"  마커 Title: {pidsMarker.Title}");
+            //System.Diagnostics.Debug.WriteLine($"  마커 LinkedDeviceId: {pidsMarker.LinkedDeviceId}");
+            //System.Diagnostics.Debug.WriteLine($"  마커 LinkedDevice: {pidsMarker.LinkedDevice?.DeviceName ?? "null"}");
+            //System.Diagnostics.Debug.WriteLine($"  FilteredDeviceList Count: {FilteredDeviceList?.Count ?? 0}");
 
             this.LinkedDeviceId = pidsMarker.LinkedDeviceId;
             this.LinkedDevice = pidsMarker.LinkedDevice;
@@ -119,8 +119,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             this.DetectionBearing = pidsMarker.DetectionBearing;
             this.BaseBearing = pidsMarker.BaseBearing;
 
-            System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
-            System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");
+            //System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
+            //System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");
         }
 
         protected override void UpdateSpecificProperties()
