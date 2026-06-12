@@ -662,8 +662,8 @@
 				Margin="5,5,300,5"
 				HorizontalAlignment="Right"
 				VerticalAlignment="Bottom"
-				MaxZoom="{Binding MainMap.MaxZoom}"
-				MinZoom="{Binding MainMap.MinZoom}"
+				MaxZoom="{Binding ZoomMax}"
+				MinZoom="{Binding ZoomMin}"
 				Zoom="{Binding MainMap.Zoom, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 				ZoomInCommand="{Binding ZoomInCommand}"
 				ZoomOutCommand="{Binding ZoomOutCommand}" />
