@@ -68,31 +68,7 @@
 							Text="{Binding ImageOpacity, StringFormat='{}{0:P0}'}" />
 					</Grid>
 
-					<!-- 회전 각도 (기본 Bearing 사용) -->
-					<Grid Margin="0,5">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="60" />
-							<ColumnDefinition Width="*" />
-							<ColumnDefinition Width="35" />
-						</Grid.ColumnDefinitions>
-						<TextBlock
-							Grid.Column="0"
-							Style="{StaticResource PropertyLabel}"
-							Text="회전" />
-						<Slider
-							Grid.Column="1"
-							Margin="5,0"
-							VerticalAlignment="Center"
-							Maximum="360"
-							Minimum="0"
-							TickFrequency="5"
-							Value="{Binding MarkerBearing}" />
-						<TextBlock
-							Grid.Column="2"
-							VerticalAlignment="Center"
-							Foreground="White"
-							Text="{Binding MarkerBearing, StringFormat='{}{0:F0}°'}" />
-					</Grid>
+					<!-- 회전: 기본 속성의 '회전'(MarkerBearing)과 중복이므로 제거. 기본 속성 슬라이더에서 조정. -->
 
 					<!-- 표시 여부 -->
 					<Grid Margin="0,5">
