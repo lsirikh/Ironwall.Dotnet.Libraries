@@ -341,6 +341,11 @@ public class GMapCustomControl : GMapControl
         // 맵 패닝을 좌클릭으로 변경 (GMap.NET 기본: Right)
         DragButton = System.Windows.Input.MouseButton.Left;
 
+        // ★ T4 — 편집모드에서 마커 Shape(IsHitTestVisible=true) 위에 마우스가 있으면 GMapControl.IsMouseDirectlyOver=false가
+        //   되어 base.OnMouseWheel의 줌 조건((IsMouseDirectlyOver || IgnoreMarkerOnMouseWheel))이 막힌다.
+        //   마커/오브젝트 위에서도 휠 줌이 동작하도록 마커 무시 옵션을 켠다(WinForms 데모 표준 설정).
+        IgnoreMarkerOnMouseWheel = true;
+
         base.OnInitialized(e);
 
         var tier = System.Windows.Media.RenderCapability.Tier >> 16;
