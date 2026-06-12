@@ -214,12 +214,13 @@
 											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 									</Grid>
 
-									<!--  회전 (슬라이더 + 값 TextBlock)  -->
+									<!--  회전 (슬라이더 + 직접입력 TextBox + ° 단위, MarkerBearing로 양방향 동기화)  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
 											<ColumnDefinition Width="*" />
-											<ColumnDefinition Width="40" />
+											<ColumnDefinition Width="45" />
+											<ColumnDefinition Width="Auto" />
 										</Grid.ColumnDefinitions>
 										<TextBlock
 											Grid.Column="0"
@@ -233,12 +234,16 @@
 											Minimum="0"
 											TickFrequency="5"
 											Value="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
-										<TextBlock
+										<TextBox
 											Grid.Column="2"
-											Margin="5,0,0,0"
+											Style="{StaticResource CompactTextBox}"
+											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}" />
+										<TextBlock
+											Grid.Column="3"
+											Margin="3,0,0,0"
 											VerticalAlignment="Center"
 											Foreground="#999999"
-											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, StringFormat='{}{0:F0}°'}" />
+											Text="°" />
 									</Grid>
 
 									<!--  구분선  -->
