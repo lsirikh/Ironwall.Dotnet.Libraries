@@ -156,22 +156,30 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// <summary>
         /// (EB2) 표시 카드 수가 MAX_EVENT_CARDS 를 초과하면 가장 오래된 카드부터 제거한다.
         /// 제거 방식은 검증된 경로(HandleAutoReportAsync)와 동일: _cardByEntryId 정리 + Dispose.
-        /// CollectionChanged 핸들러가 활성인 상태에서 호출해 EP 동기화를 유지한다.
-        /// 주: EventQueueManager 엔트리 자체는 EQM 의 수명주기(자동정리/조치보고)로 관리 — 표시 캡은 UI 메모리 보호 목적.
+        /// 이 패널은 EventProvider(EP) 백킹 컬렉션을 쓰지 않고 ViewModelProvider(VP) 에서만 카드를 제거한다
+        /// (CollectionChanged 핸들러에 Remove 분기가 없어 핸들러 활성/비활성이 캡 정확성에 영향 없음).
+        /// ⚠ 제거되는 카드의 EQM 엔트리는 남는다 — 표시 캡은 UI 메모리 보호 목적이며, EQM 엔트리/심볼 시각상태는
+        ///   EQM 수명주기(자동정리/조치보고)로 정리된다(그 전까지 desync 가능). 추적용으로 경고 로그를 남긴다.
         /// </summary>
         private void EnforceDisplayCap()
         {
             int removed = 0;
+            int orphanedEntries = 0;
             while (ViewModelProvider.Count > MAX_EVENT_CARDS)
             {
                 var oldest = ViewModelProvider[0];
-                if (oldest.EntryId != null) _cardByEntryId.TryRemove(oldest.EntryId, out _);
+                if (oldest.EntryId != null)
+                {
+                    _cardByEntryId.TryRemove(oldest.EntryId, out _);
+                    orphanedEntries++;   // EQM 엔트리는 남음 (자동정리까지 잔류)
+                }
                 ViewModelProvider.Remove(oldest);
                 oldest.Dispose();
                 removed++;
             }
             if (removed > 0)
-                _log?.Info($"[EB2] 표시 카드 하드캡({MAX_EVENT_CARDS}) 초과 — 오래된 카드 {removed}개 제거");
+                _log?.Warning($"[EB2] 표시 카드 하드캡({MAX_EVENT_CARDS}) 초과 — 오래된 카드 {removed}개 제거 " +
+                              $"(EQM 엔트리 {orphanedEntries}개는 자동정리까지 잔류)");
         }
 
         private void FlushPendingCards(object? state) => _ = FlushPendingCardsAsync();
@@ -461,6 +469,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 if (!_inFlightEventIds.TryAdd(eventId, 0))
                 {
                     _log?.Info($"AutoReport: Event({eventId}) 조치보고 진행 중 — 중복 스킵");
+                    entry.NextRetryAfter = DateTime.Now.AddSeconds(BACKOFF_SECONDS); // 타이트 재발화 루프 방지
                     return;
                 }
 
@@ -734,8 +743,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
         private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private readonly SemaphoreSlim _batchReportGate = new(1, 1);
-        // (EC2/EC5) 조치보고 진행 중인 EventId 집합. Auto/AutoRecovery/Batch 3경로가 동일 이벤트에
-        // 동시에 CreateActionEventAsync 를 호출해 서버 중복 조치보고/NATS 중복발행하는 것을 막는 멱등 가드.
+        // (EC2/EC5) 조치보고 진행 중인 EventId 집합. 이 패널의 Auto/AutoRecovery/Batch 3경로 한정으로
+        // 동일 이벤트에 CreateActionEventAsync 가 동시 호출돼 서버 중복 조치보고/NATS 중복발행되는 것을 막는다.
+        // ⚠ 수동 조치보고(DetectionEventCardViewModel.SendAction 다이얼로그)는 별도 VM이라 이 가드에 미참여 →
+        //   수동 vs 자동 교차 중복은 현재 서버 멱등 미보장(후속 과제: 가드 소유 통합).
         private readonly ConcurrentDictionary<int, byte> _inFlightEventIds = new();
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;

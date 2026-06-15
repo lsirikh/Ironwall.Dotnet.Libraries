@@ -80,7 +80,7 @@ public class EventUiModule : Module
                 _eventSetup,
                 c.Resolve<Caliburn.Micro.IEventAggregator>()
             )).As<IDetectionNatsSyncService>()
-              .As<IService>().WithMetadata("Order", 100)   // (EB1) OnExit StopAsync → NATS 구독 해제
+              .As<IService>().WithMetadata("Order", _count + 1)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();
             builder.Register(c => new MalfunctionNatsSyncService(
                 c.ResolveOptional<ILogService>(),
@@ -90,7 +90,7 @@ public class EventUiModule : Module
                 _eventSetup,
                 c.Resolve<Caliburn.Micro.IEventAggregator>()
             )).As<IMalfunctionNatsSyncService>()
-              .As<IService>().WithMetadata("Order", 101)   // (EB1) OnExit StopAsync → NATS 구독 해제
+              .As<IService>().WithMetadata("Order", _count + 2)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();
             builder.Register(c => new EventQueueManager(
                        c.ResolveOptional<ILogService>(),

@@ -42,8 +42,9 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     #endregion
 
     #region - IService -
-    // IService.ExecuteAsync — ParentBootstrapper.BaseStart 가 호출. StartService 위임.
-    // (EB1) IService 등록으로 OnExit 시 StopAsync 가 호출되어 NATS 구독이 해제된다.
+    // IService.ExecuteAsync — OnStartup→Start() 가 OrderBy(Metadata["Order"]) 정렬 후 호출. StartService 위임.
+    // (EB1) IService 등록으로 OnExit 가 동일 정렬 후 StopAsync 를 호출 → NATS 구독 해제. Order 메타데이터는
+    //       BaseStart 가 아니라 Start()/OnExit() 의 OrderBy 때문에 필수(누락 시 KeyNotFoundException).
     public Task ExecuteAsync(CancellationToken token = default) => StartService(token);
 
     public Task StartService(CancellationToken token = default)

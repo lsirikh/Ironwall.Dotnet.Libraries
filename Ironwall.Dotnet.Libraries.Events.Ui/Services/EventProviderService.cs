@@ -342,6 +342,7 @@ public class EventProviderService
 
                 return new PagedResult<IMalfunctionEventModel>
                 {
+                    Success = response.Success,   // (EA2 대칭) API 실패 vs 빈 결과 구분 — swap-on-success 후속 대비
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0
@@ -386,6 +387,7 @@ public class EventProviderService
 
                 return new PagedResult<IConnectionEventModel>
                 {
+                    Success = response.Success,   // (EA2 대칭) API 실패 vs 빈 결과 구분 — swap-on-success 후속 대비
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0
