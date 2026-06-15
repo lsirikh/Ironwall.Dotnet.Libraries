@@ -296,6 +296,8 @@ public class EventProviderService
 
                 return new PagedResult<IDetectionEventModel>
                 {
+                    // (EA2) API 실패는 Success=false(호출부 보존), 정상 빈 결과는 Success=true(클리어 정상)
+                    Success = response.Success,
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0

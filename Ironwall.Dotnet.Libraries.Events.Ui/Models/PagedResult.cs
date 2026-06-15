@@ -6,6 +6,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Models;
 /// </summary>
 public class PagedResult<T>
 {
+    /// <summary>
+    /// API 조회 성공 여부. (EA2) false = 서버/네트워크 실패 → 호출부는 기존 컬렉션을 보존해야 한다.
+    /// true + Items 비어있음 = 정상적인 빈 결과(해당 기간 이벤트 없음) → 클리어 정상.
+    /// </summary>
+    public bool Success { get; set; } = true;
+
     public List<T> Items { get; set; } = new();
     public int Page { get; set; }
     public int TotalPages { get; set; }
