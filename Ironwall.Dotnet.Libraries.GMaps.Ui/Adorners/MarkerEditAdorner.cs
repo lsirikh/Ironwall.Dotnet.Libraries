@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using System.Windows.Threading;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System.Windows.Shapes;
@@ -546,6 +547,10 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         _isDragging = true;
         _dragStartPoint = mousePos;
+        // 그랩 오프셋: 클릭 지점과 마커 중심(RenderSize 절반)의 차이. 이동 스냅 시 마커 '중심'을
+        // 격자에 맞추기 위해 사용. (RC-2 — 클릭 지점이 아닌 중심이 스냅되도록)
+        var sz = AdornedElement.RenderSize;
+        _grabOffset = mousePos - new Point(sz.Width / 2.0, sz.Height / 2.0);
         _editState.IsEditing = true;
         _editState.EditMode = ConvertHandleToEditMode(_activeHandle);
 
@@ -696,44 +701,35 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 Math.Pow(currentPos.X - _dragStartPoint.X, 2) +
                 Math.Pow(currentPos.Y - _dragStartPoint.Y, 2));
 
-            if (distance < 1.0) return; // 3픽셀 미만 이동 무시
+            if (distance < 1.0) return; // 1픽셀 미만 이동 무시
 
+            // 그랩 오프셋을 차감해 '마커 중심'이 갈 지점을 구한다. (RC-2)
+            var centerPos = currentPos - _grabOffset;
+
+            // AdornedElement → 맵 컨트롤 내부 좌표(시각 격자와 동일 공간)로 변환
             var elementToMap = AdornedElement.TransformToAncestor(_mapControl);
-            var mapRelativePos = elementToMap.Transform(currentPos);
+            var mapRelativePos = elementToMap.Transform(centerPos);
+
+            // 화면 픽셀 도메인 격자 스냅 (IsSnapToGridEnabled ON, 맵 회전 0°일 때만).
+            // RC-1: 시각 격자와 동일한 ComputeOrigin/Snap 사용 → 보이는 선/교점에 정확히 흡착.
+            // RC-N: DigitalZoom 역보정 불필요(TransformToAncestor가 컨트롤 자신 RenderTransform 제외).
+            //       맵 회전 시 화면축 격자가 지리 직교를 보장 못 하므로 스냅 비활성(FR-12).
+            if (_mapControl is GMapCustoms.GMapCustomControl snapCtrl
+                && snapCtrl.IsSnapToGridEnabled
+                && Math.Abs(snapCtrl.MapRotation) < 0.1)
+            {
+                var gridPx = SnapGridOverlayService.EffectiveGridPx(snapCtrl.GridSizePx);
+                var (x0, y0) = SnapGridOverlayService.ComputeOrigin(
+                    gridPx, _mapControl.ActualWidth, _mapControl.ActualHeight);
+                var (sx, sy, _, _) = SnapGridOverlayService.Snap(
+                    mapRelativePos.X, mapRelativePos.Y, gridPx, x0, y0);
+                mapRelativePos = new Point(sx, sy);
+            }
 
             // 반올림으로 정밀도 개선
             var newGeoPos = _mapControl.FromLocalToLatLng(
                 (int)Math.Round(mapRelativePos.X),
                 (int)Math.Round(mapRelativePos.Y));
-
-            // LatLng 도메인 격자 스냅 (IsSnapToGridEnabled ON 시)
-            if (_mapControl is GMapCustoms.GMapCustomControl snapCtrl && snapCtrl.IsSnapToGridEnabled)
-            {
-                var gridPx = Math.Max(8.0, snapCtrl.GridSizePx);
-                var cx = _mapControl.ActualWidth / 2;
-                var cy = _mapControl.ActualHeight / 2;
-                var origin = _mapControl.FromLocalToLatLng((int)cx, (int)cy);
-                var offsetH = _mapControl.FromLocalToLatLng((int)(cx + gridPx), (int)cy);
-                var offsetV = _mapControl.FromLocalToLatLng((int)cx, (int)(cy + gridPx));
-                double gridDegLng = Math.Abs(offsetH.Lng - origin.Lng);
-                double gridDegLat = Math.Abs(offsetV.Lat - origin.Lat);
-
-                const double threshold = 0.2;
-
-                if (gridDegLat > 0)
-                {
-                    double snappedLat = Math.Round(newGeoPos.Lat / gridDegLat) * gridDegLat;
-                    if (Math.Abs(newGeoPos.Lat - snappedLat) < gridDegLat * threshold)
-                        newGeoPos = new GMap.NET.PointLatLng(snappedLat, newGeoPos.Lng);
-                }
-
-                if (gridDegLng > 0)
-                {
-                    double snappedLng = Math.Round(newGeoPos.Lng / gridDegLng) * gridDegLng;
-                    if (Math.Abs(newGeoPos.Lng - snappedLng) < gridDegLng * threshold)
-                        newGeoPos = new GMap.NET.PointLatLng(newGeoPos.Lat, snappedLng);
-                }
-            }
 
             _targetMarker.UpdateLocation(newGeoPos);
         }
@@ -1340,6 +1336,8 @@ public class MarkerEditAdorner : Adorner, IDisposable
     private MarkerEditState _editState;
     private bool _isDragging;
     private Point _dragStartPoint;
+    // 드래그 시작 시 (그랩 지점 - 마커 중심) 벡터. 스냅 대상을 항상 마커 '중심'으로 보정. (RC-2)
+    private Vector _grabOffset;
     private MarkerHandle _activeHandle = MarkerHandle.None;
 
     // 원본 데이터 백업 (Undo용)
