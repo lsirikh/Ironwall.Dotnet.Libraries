@@ -27,6 +27,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [DigitalZoom_RenderTransform-prd.md](prds/DigitalZoom_RenderTransform-prd.md) | 디지털 줌 — MaxZoom 초과 RenderTransform 소프트 확대 | Approved | 2026-06-12 |
+| [GMap_Zoom_Improvements-prd.md](prds/GMap_Zoom_Improvements-prd.md) | 줌 T1~T4 (슬라이더/경계휠/디지털줌A/오브젝트통과) | Approved | 2026-06-10 |
 | [OverlayImage_Rotation_Editing-prd.md](prds/OverlayImage_Rotation_Editing-prd.md) | OverlayImage_Rotation_Editing | Approved | 2026-06-10 |
 | [MarkerHitTest_AABB_Fix-prd.md](prds/MarkerHitTest_AABB_Fix-prd.md) | MarkerHitTest_AABB_Fix | Approved | 2026-06-10 |
 | [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Approved | 2026-06-10 |
@@ -77,6 +79,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [DigitalZoom_RenderTransform-prd-plan.md](plans/DigitalZoom_RenderTransform-prd-plan.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) | 구현완료(검증✅) | 2026-06-15 |
 | [OverlayImage_Rotation_Editing-prd-plan.md](plans/OverlayImage_Rotation_Editing-prd-plan.md) | [PRD](prds/OverlayImage_Rotation_Editing-prd.md) | 0/33 | 2026-06-10 |
 | [OverlayImage_ZOrder_Independence-plan.md](plans/OverlayImage_ZOrder_Independence-plan.md) | [PRD](prds/OverlayImage_ZOrder_Independence-prd.md) | 0/25 | 2026-06-10 |
 | [ZOrder_PropertyPanel_Integration-prd-plan.md](plans/ZOrder_PropertyPanel_Integration-prd-plan.md) | [PRD](prds/ZOrder_PropertyPanel_Integration-prd.md) | 0/0 | 2026-06-10 |
