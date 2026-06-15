@@ -139,11 +139,42 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                             .Select(vm => (IDetectionEventModel)vm.Model)
                             .ToList();
 
+            // (EA7) 부분 실패 수집 — 한 건 실패로 전체 중단/무응답 방지. 실패 시 재로드 생략해 편집 보존.
+            var saveFailures = new List<string>();
+
             foreach (var model in updateList)
-                await _providerService.UpdateDetectionEventAsync(model, token);
+            {
+                try { await _providerService.UpdateDetectionEventAsync(model, token); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"수정(Id={model.Id}): {ex.Message}");
+                    _log?.Error($"UpdateDetectionEventAsync 실패 Id={model.Id}: {ex.Message}");
+                }
+            }
 
             foreach (var model in insertList.OfType<IDetectionEventModel>())
-                await _providerService.InsertDetectionEventAsync(model, token);
+            {
+                try { await _providerService.InsertDetectionEventAsync(model, token); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"추가: {ex.Message}");
+                    _log?.Error($"InsertDetectionEventAsync 실패: {ex.Message}");
+                }
+            }
+
+            if (saveFailures.Count > 0)
+            {
+                // 일부 저장 실패 → 사용자 알림 + 재로드 생략(미저장 편집분 보존)
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "이벤트 저장 일부 실패",
+                    Explain = $"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n"
+                              + string.Join("\n", saveFailures.Take(5))
+                });
+                return;
+            }
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);

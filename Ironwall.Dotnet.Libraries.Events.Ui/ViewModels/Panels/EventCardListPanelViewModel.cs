@@ -153,6 +153,27 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
 
         // Timer 콜백: 동기 래퍼 — async void 금지(Timer 콜백에서 예외 시 프로세스 크래시)
+        /// <summary>
+        /// (EB2) 표시 카드 수가 MAX_EVENT_CARDS 를 초과하면 가장 오래된 카드부터 제거한다.
+        /// 제거 방식은 검증된 경로(HandleAutoReportAsync)와 동일: _cardByEntryId 정리 + Dispose.
+        /// CollectionChanged 핸들러가 활성인 상태에서 호출해 EP 동기화를 유지한다.
+        /// 주: EventQueueManager 엔트리 자체는 EQM 의 수명주기(자동정리/조치보고)로 관리 — 표시 캡은 UI 메모리 보호 목적.
+        /// </summary>
+        private void EnforceDisplayCap()
+        {
+            int removed = 0;
+            while (ViewModelProvider.Count > MAX_EVENT_CARDS)
+            {
+                var oldest = ViewModelProvider[0];
+                if (oldest.EntryId != null) _cardByEntryId.TryRemove(oldest.EntryId, out _);
+                ViewModelProvider.Remove(oldest);
+                oldest.Dispose();
+                removed++;
+            }
+            if (removed > 0)
+                _log?.Info($"[EB2] 표시 카드 하드캡({MAX_EVENT_CARDS}) 초과 — 오래된 카드 {removed}개 제거");
+        }
+
         private void FlushPendingCards(object? state) => _ = FlushPendingCardsAsync();
 
         private async Task FlushPendingCardsAsync()
@@ -181,6 +202,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         // 배치 entryId 매칭
                         foreach (var card in batch)
                             TryAssignEntryId(card);
+                        // (EB2) 표시 카드 하드 캡 — 장시간 운용 시 무한 증가 방지 (핸들러 활성 상태에서 제거)
+                        EnforceDisplayCap();
                         IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
                         UpdateAction?.Invoke();
                     }
@@ -693,6 +716,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #endregion
         #region - Attributes -
         private const int ANIMATION_THRESHOLD = 20;
+        private const int MAX_EVENT_CARDS = 500;   // (EB2) 표시 카드 하드 캡
         private const int BATCH_INTERVAL_MS = 150;
         private const string AUTO_REPORT_DETECTION   = "탐지 자동 조치보고";
         private const string AUTO_REPORT_MALFUNCTION = "이상 자동 조치보고";
