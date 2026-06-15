@@ -123,6 +123,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [DigitalZoom_RenderTransform-report.md](reports/DigitalZoom_RenderTransform-report.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) → [Plan](plans/DigitalZoom_RenderTransform-prd-plan.md) | 2026-06-15 |
 | [WebServer_Enable_Feature-report.md](reports/WebServer_Enable_Feature-report.md) | [PRD](prds/WebServer_Enable_Feature-prd.md) → [Plan](plans/WebServer_Enable_Feature-prd-plan.md) | 2026-06-05 |
 | [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) → [Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |
 | [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) → [Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
