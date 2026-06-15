@@ -2206,7 +2206,8 @@ public class GMapCustomControl : GMapControl
 
         var centerLocal = FromLatLngToLocal(new PointLatLng(centerLat, centerLng));
         var gridPx = SnapGridOverlayService.EffectiveGridPx(GridSizePx);
-        var (x0, y0) = SnapGridOverlayService.ComputeOrigin(gridPx, ActualWidth, ActualHeight);
+        // 맵 고정 격자: DrawGrid/마커스냅과 동일한 지오 앵커 기반 원점 (RC-7/FR-16)
+        var (x0, y0) = SnapGridOverlayService.ComputeOrigin(this, gridPx);
         var (sx, sy, snapX, snapY) = SnapGridOverlayService.Snap(
             centerLocal.X, centerLocal.Y, gridPx, x0, y0);
 
