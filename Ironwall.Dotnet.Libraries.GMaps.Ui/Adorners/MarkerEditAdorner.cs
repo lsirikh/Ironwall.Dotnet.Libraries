@@ -722,8 +722,8 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 && Math.Abs(snapCtrl.MapRotation) < 0.1)
             {
                 var gridPx = SnapGridOverlayService.EffectiveGridPx(snapCtrl.GridSizePx);
-                var (x0, y0) = SnapGridOverlayService.ComputeOrigin(
-                    gridPx, _mapControl.ActualWidth, _mapControl.ActualHeight);
+                // 맵 고정 격자: DrawGrid와 동일하게 지오 앵커 기반 원점 산출 (RC-7/FR-16)
+                var (x0, y0) = SnapGridOverlayService.ComputeOrigin(snapCtrl, gridPx);
                 var (sx, sy, _, _) = SnapGridOverlayService.Snap(
                     handleTarget.X, handleTarget.Y, gridPx, x0, y0);
                 handleTarget = new Point(sx, sy);
