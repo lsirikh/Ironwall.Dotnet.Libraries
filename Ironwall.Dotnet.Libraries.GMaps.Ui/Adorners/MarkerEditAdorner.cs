@@ -547,8 +547,8 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         _isDragging = true;
         _dragStartPoint = mousePos;
-        // 그랩 오프셋: 클릭 지점과 마커 중심(RenderSize 절반)의 차이. 이동 스냅 시 마커 '중심'을
-        // 격자에 맞추기 위해 사용. (RC-2 — 클릭 지점이 아닌 중심이 스냅되도록)
+        // 그랩 오프셋: 클릭 지점과 'Adorner 중앙 이동핸들'(RenderSize/2)의 차이. 이동 시 핸들이
+        // 커서에 고정되도록 유지하고, 스냅 대상도 이 핸들이 되게 한다. (RC-2/RC-5)
         var sz = AdornedElement.RenderSize;
         _grabOffset = mousePos - new Point(sz.Width / 2.0, sz.Height / 2.0);
         _editState.IsEditing = true;
@@ -703,17 +703,20 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
             if (distance < 1.0) return; // 1픽셀 미만 이동 무시
 
-            // 그랩 오프셋을 차감해 '마커 중심'이 갈 지점을 구한다. (RC-2)
-            var centerPos = currentPos - _grabOffset;
-
-            // AdornedElement → 맵 컨트롤 내부 좌표(시각 격자와 동일 공간)로 변환
+            // ── 스냅 대상 = 'Adorner 중앙 이동핸들'(RenderSize/2). 심볼 아이콘 중심이 아님. (RC-5/FR-14)
+            //   이동핸들은 라벨을 포함한 컨트롤 bbox 중앙(RenderSize/2)에 그려지는 반면, Position 앵커는
+            //   Offset=-(_model.W/2,_model.H/2)(아이콘 중앙)이라 라벨이 있으면 둘이 다르다. 그래서
+            //   '핸들의 화면 위치'를 스냅한 뒤, 핸들을 그 점으로 옮기는 데 필요한 델타를 Position에 적용한다.
             var elementToMap = AdornedElement.TransformToAncestor(_mapControl);
-            var mapRelativePos = elementToMap.Transform(centerPos);
+            var sz = AdornedElement.RenderSize;
+            var handleLocal = new Point(sz.Width / 2.0, sz.Height / 2.0);
 
-            // 화면 픽셀 도메인 격자 스냅 (IsSnapToGridEnabled ON, 맵 회전 0°일 때만).
-            // RC-1: 시각 격자와 동일한 ComputeOrigin/Snap 사용 → 보이는 선/교점에 정확히 흡착.
-            // RC-N: DigitalZoom 역보정 불필요(TransformToAncestor가 컨트롤 자신 RenderTransform 제외).
-            //       맵 회전 시 화면축 격자가 지리 직교를 보장 못 하므로 스냅 비활성(FR-12).
+            // 커서를 따라가는 핸들 목표(그랩오프셋 유지) — 맵 컨트롤 내부 좌표(시각 격자와 동일 공간)
+            var handleTarget = elementToMap.Transform(currentPos - _grabOffset);
+
+            // 화면 픽셀 격자 스냅: Adorner 중앙 핸들이 보이는 격자선/교점에 흡착(교점>라인 가중치).
+            // RC-1: DrawGrid와 동일한 ComputeOrigin/Snap. RC-N: DigitalZoom 역보정 불필요
+            //   (TransformToAncestor가 컨트롤 자신 RenderTransform 제외). 맵 회전 시 스냅 비활성(FR-12).
             if (_mapControl is GMapCustoms.GMapCustomControl snapCtrl
                 && snapCtrl.IsSnapToGridEnabled
                 && Math.Abs(snapCtrl.MapRotation) < 0.1)
@@ -722,14 +725,20 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 var (x0, y0) = SnapGridOverlayService.ComputeOrigin(
                     gridPx, _mapControl.ActualWidth, _mapControl.ActualHeight);
                 var (sx, sy, _, _) = SnapGridOverlayService.Snap(
-                    mapRelativePos.X, mapRelativePos.Y, gridPx, x0, y0);
-                mapRelativePos = new Point(sx, sy);
+                    handleTarget.X, handleTarget.Y, gridPx, x0, y0);
+                handleTarget = new Point(sx, sy);
             }
 
-            // 반올림으로 정밀도 개선
+            // 핸들↔Position 앵커 보정: 핸들을 handleTarget으로 옮기는 데 필요한 델타를 Position에 적용.
+            //   (라벨이 없으면 handleNow==posNow → 델타 그대로, 무해)
+            var handleNow = elementToMap.Transform(handleLocal);
+            var posNow = _mapControl.FromLatLngToLocal(_targetMarker.Position);
+            double newPosX = posNow.X + (handleTarget.X - handleNow.X);
+            double newPosY = posNow.Y + (handleTarget.Y - handleNow.Y);
+
             var newGeoPos = _mapControl.FromLocalToLatLng(
-                (int)Math.Round(mapRelativePos.X),
-                (int)Math.Round(mapRelativePos.Y));
+                (int)Math.Round(newPosX),
+                (int)Math.Round(newPosY));
 
             _targetMarker.UpdateLocation(newGeoPos);
         }
@@ -1336,7 +1345,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     private MarkerEditState _editState;
     private bool _isDragging;
     private Point _dragStartPoint;
-    // 드래그 시작 시 (그랩 지점 - 마커 중심) 벡터. 스냅 대상을 항상 마커 '중심'으로 보정. (RC-2)
+    // 드래그 시작 시 (그랩 지점 - Adorner 중앙 이동핸들) 벡터. 핸들을 커서에 고정 + 스냅 대상. (RC-2/RC-5)
     private Vector _grabOffset;
     private MarkerHandle _activeHandle = MarkerHandle.None;
 
