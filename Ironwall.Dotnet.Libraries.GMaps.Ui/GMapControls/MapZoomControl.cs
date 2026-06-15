@@ -69,6 +69,35 @@ public class MapZoomControl : Control
     // (Zoom DP는 OnCoerceZoom 클램프로 MaxZoom 초과를 표현 못 하므로 — CM-8)
     private bool _isSyncing;
 
+    /// <summary>슬라이더 좌측 라벨("17" / "18+" / "18++"). 읽기전용 DP. (C1/FR-11)</summary>
+    public string ZoomLabel
+    {
+        get => (string)GetValue(ZoomLabelProperty);
+        private set => SetValue(ZoomLabelKey, value);
+    }
+    private static readonly DependencyPropertyKey ZoomLabelKey =
+        DependencyProperty.RegisterReadOnly(nameof(ZoomLabel), typeof(string), typeof(MapZoomControl),
+            new PropertyMetadata("15"));   // Zoom default=15·Level default=0 일치 → 최초 렌더 stale 방지
+    public static readonly DependencyProperty ZoomLabelProperty = ZoomLabelKey.DependencyProperty;
+
+    /// <summary>디지털 줌 활성 여부(라벨 색 트리거용). 읽기전용 DP.</summary>
+    public bool IsDigitalZoom
+    {
+        get => (bool)GetValue(IsDigitalZoomProperty);
+        private set => SetValue(IsDigitalZoomKey, value);
+    }
+    private static readonly DependencyPropertyKey IsDigitalZoomKey =
+        DependencyProperty.RegisterReadOnly(nameof(IsDigitalZoom), typeof(bool), typeof(MapZoomControl),
+            new PropertyMetadata(false));
+    public static readonly DependencyProperty IsDigitalZoomProperty = IsDigitalZoomKey.DependencyProperty;
+
+    private static void UpdateZoomLabel(MapZoomControl c)
+    {
+        int baseZoom = (int)System.Math.Min(c.Zoom, c.MaxZoom);
+        c.ZoomLabel = baseZoom.ToString() + new string('+', System.Math.Max(0, c.DigitalZoomLevel));
+        c.IsDigitalZoom = c.DigitalZoomLevel > 0;
+    }
+
     /// <summary>디지털 줌 레벨(0~Steps). MainMap.DigitalZoomLevel과 TwoWay.</summary>
     public int DigitalZoomLevel
     {
@@ -119,6 +148,7 @@ public class MapZoomControl : Control
         // Zoom은 MaxZoom으로 클램프(초과분은 디지털 줌이 담당). Zoom>MaxZoom 일시 상태가 슬라이더에 누설되지 않게.
         try { c.SliderValue = System.Math.Min(c.Zoom, c.MaxZoom) + c.DigitalZoomLevel; }
         finally { c._isSyncing = false; }
+        UpdateZoomLabel(c);   // ★ C1: 맵→슬라이더/MaxZoom 변경 경로 라벨 갱신
     }
 
     /// <summary>MaxZoom 또는 DigitalZoomSteps 변경 → ExtendedMaxZoom 갱신 + 합성값 재동기화.</summary>
@@ -151,5 +181,12 @@ public class MapZoomControl : Control
             }
         }
         finally { c._isSyncing = false; }
+        UpdateZoomLabel(c);   // ★ C1: 슬라이더 드래그 경로 라벨 갱신 (두 콜백 모두 가드로 억압되므로 여기서 직접)
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        UpdateZoomLabel(this);   // 템플릿 적용 시점 현재 Zoom/DigitalZoomLevel로 라벨 1회 동기화 (최초 렌더 stale 방어)
     }
 }

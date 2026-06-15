@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
@@ -8,7 +8,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
-	<!--  줌 버튼 스타일  -->
+	<!--  以?踰꾪듉 ?ㅽ??? -->
 	<Style x:Key="ZoomButtonStyle" TargetType="Button">
 		<Setter Property="Width" Value="32" />
 		<Setter Property="Height" Value="32" />
@@ -45,14 +45,15 @@
 						Style="{StaticResource MapFloatingPanelStyle}">
 						<Grid>
 							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="40" />
+								<ColumnDefinition Width="48" />
 								<ColumnDefinition Width="32" />
 								<ColumnDefinition Width="*" />
 								<ColumnDefinition Width="32" />
 							</Grid.ColumnDefinitions>
 
-							<!--  줌 레벨 표시  -->
+							<!--  以??덈꺼 ?쒖떆 (?붿???以뚯? "18+"/"18++", ?쒖꽦 ???ㅻ젋吏)  -->
 							<TextBlock
+								x:Name="ZoomLabelText"
 								Grid.Column="0"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
@@ -60,9 +61,9 @@
 								FontSize="14"
 								FontWeight="Bold"
 								Foreground="{StaticResource PrimaryBlueBrush}"
-								Text="{Binding Zoom, RelativeSource={RelativeSource TemplatedParent}, StringFormat=F0}" />
+								Text="{Binding ZoomLabel, RelativeSource={RelativeSource TemplatedParent}}" />
 
-							<!--  줌 아웃  -->
+							<!--  以??꾩썐  -->
 							<Button
 								Grid.Column="1"
 								Command="{TemplateBinding ZoomOutCommand}"
@@ -74,8 +75,8 @@
 									Kind="MagnifyMinus" />
 							</Button>
 
-							<!--  슬라이더: Maximum=ExtendedMaxZoom(MaxZoom+디지털단계), Value=SliderValue 라우팅.
-							      디지털 구간은 MaxZoom 너머 추가된 눈금으로 시각 구분된다.  -->
+							<!--  ?щ씪?대뜑: Maximum=ExtendedMaxZoom(MaxZoom+?붿??몃떒怨?, Value=SliderValue ?쇱슦??
+							      ?붿???援ш컙? MaxZoom ?덈㉧ 異붽????덇툑?쇰줈 ?쒓컖 援щ텇?쒕떎.  -->
 							<Slider
 								Grid.Column="2"
 								Margin="4,0"
@@ -86,10 +87,10 @@
 								SmallChange="1"
 								TickFrequency="1"
 								TickPlacement="Both"
-								ToolTip="MaxZoom 초과 구간은 디지털 줌(소프트 확대)"
+								ToolTip="MaxZoom 珥덇낵 援ш컙? ?붿???以??뚰봽???뺣?)"
 								Value="{Binding SliderValue, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
 
-							<!--  줌 인  -->
+							<!--  以??? -->
 							<Button
 								Grid.Column="3"
 								Command="{TemplateBinding ZoomInCommand}"
@@ -102,6 +103,11 @@
 							</Button>
 						</Grid>
 					</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsDigitalZoom" Value="True">
+								<Setter TargetName="ZoomLabelText" Property="Foreground" Value="#E67E22" />
+							</Trigger>
+						</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>
 		</Setter>

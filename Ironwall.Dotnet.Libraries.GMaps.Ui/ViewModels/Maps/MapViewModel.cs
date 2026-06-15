@@ -4651,10 +4651,10 @@ public class MapViewModel : BasePanelViewModel,
     {
         (var scaleX, var scale) = ScaleHelper.RelativeCreateScalebar(Zoom);
 
-        // ★ 디지털 줌(FR-9): 같은 지상거리가 화면에서 DigitalZoomScale배 더 많은 픽셀을 차지하므로
-        //   거리 라벨(scale)은 동일하게 두고 바 픽셀 폭만 배율만큼 늘린다.
+        // ★ C2/FR-12: 디지털 줌 시 바 픽셀 폭은 고정하고 거리 라벨 숫자만 ÷배율(같은 픽셀폭이 더 짧은 거리 표현).
+        //   (이전 FR-9의 scaleX *= digScale 바 확대 방식 대체 — 사용자 피드백)
         double digScale = MainMap?.DigitalZoomScale ?? 1.0;
-        scaleX *= digScale;
+        scale = ScaleHelper.AdjustScaleLabel(scale, digScale);
 
         Scale = scale;
         ScalePoints = new PointCollection()

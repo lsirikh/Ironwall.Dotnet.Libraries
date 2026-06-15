@@ -108,4 +108,45 @@ public static class ScaleHelper
         return (scaleX, scale);
 
     }
+
+    /// <summary>
+    /// 디지털 줌 배율 적용: 바 픽셀 폭은 유지하고 거리 라벨 숫자만 ÷digScale 한다. (C2/FR-12)
+    /// 예: "30m" × digScale=1.5 → "20m", × 2.0 → "15m". "1Km" × 2.0 → "500m"(단위 자동 전환).
+    /// </summary>
+    /// <param name="label">RelativeCreateScalebar 반환 라벨("30m","1Km","500m" 등)</param>
+    /// <param name="digScale">DigitalZoomScale (1.0 / 1.5 / 2.0)</param>
+    public static string AdjustScaleLabel(string label, double digScale)
+    {
+        if (digScale <= 1.0 || string.IsNullOrEmpty(label))
+            return label;
+
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        double meters;
+        if (label.EndsWith("Km", StringComparison.Ordinal))
+        {
+            if (!double.TryParse(label[..^2], System.Globalization.NumberStyles.Float, ci, out double km))
+                return label;
+            meters = km * 1000.0;
+        }
+        else if (label.EndsWith("m", StringComparison.Ordinal))
+        {
+            if (!double.TryParse(label[..^1], System.Globalization.NumberStyles.Float, ci, out double m))
+                return label;
+            meters = m;
+        }
+        else
+        {
+            return label;
+        }
+
+        double adjusted = meters / digScale;
+        if (adjusted >= 1000.0)
+        {
+            double km = adjusted / 1000.0;
+            return (km == Math.Floor(km))
+                ? ((int)km).ToString(ci) + "Km"
+                : km.ToString("F1", ci) + "Km";
+        }
+        return ((int)Math.Round(adjusted)).ToString(ci) + "m";
+    }
 }

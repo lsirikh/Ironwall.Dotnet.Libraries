@@ -616,7 +616,9 @@
 			ShowRotationControl="{Binding ShowRotationControl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />-->
 		<Grid Grid.Row="2" Grid.ColumnSpan="2">
 
-			<AdornerDecorator Panel.ZIndex="0">
+			<!--  ClipToBounds(C3): 디지털 줌 RenderTransform 확대분이 상단 윈도우 컨트롤바/툴바를 덮지 않도록 맵 경계에서 클립.
+			      AdornerDecorator에만 적용(Grid 아님) — 형제 PropertyPanelCanvas(드래그 패널, 음수 Top 가능)는 클립 제외.  -->
+			<AdornerDecorator Panel.ZIndex="0" ClipToBounds="True">
 				<gmap:GMapCustomControl
 					x:Name="MainMap"
 					GridSizePx="{Binding GridSizePx, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
