@@ -21,7 +21,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
    Company      : Sensorway Co., Ltd.
    Email        : lsirikh@naver.com
 ****************************************************************************/
-public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService
+public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
 {
     #region - Ctors -
     public MalfunctionNatsSyncService(
@@ -42,8 +42,14 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService
     #endregion
 
     #region - IService -
+    // IService.ExecuteAsync — ParentBootstrapper.BaseStart 가 호출. StartService 위임.
+    // (EB1) IService 등록으로 OnExit 시 StopAsync 가 호출되어 NATS 구독이 해제된다.
+    public Task ExecuteAsync(CancellationToken token = default) => StartService(token);
+
     public Task StartService(CancellationToken token = default)
     {
+        // 멱등: 빌드콜백/ExecuteAsync 중복 호출돼도 단일 구독 유지 (이중 구독 방지)
+        _natsService.NatsSubscribeEventAsync -= OnNatsMalfunctionAsync;
         _natsService.NatsSubscribeEventAsync += OnNatsMalfunctionAsync;
         _log?.Info($"{nameof(MalfunctionNatsSyncService)} started — MALFUNCTION 구독 등록");
         return Task.CompletedTask;

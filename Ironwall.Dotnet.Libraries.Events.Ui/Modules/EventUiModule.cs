@@ -79,7 +79,9 @@ public class EventUiModule : Module
                 c.Resolve<IEventQueueManager>(),
                 _eventSetup,
                 c.Resolve<Caliburn.Micro.IEventAggregator>()
-            )).As<IDetectionNatsSyncService>().SingleInstance();
+            )).As<IDetectionNatsSyncService>()
+              .As<IService>().WithMetadata("Order", 100)   // (EB1) OnExit StopAsync → NATS 구독 해제
+              .SingleInstance();
             builder.Register(c => new MalfunctionNatsSyncService(
                 c.ResolveOptional<ILogService>(),
                 c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
@@ -87,7 +89,9 @@ public class EventUiModule : Module
                 c.Resolve<IEventQueueManager>(),
                 _eventSetup,
                 c.Resolve<Caliburn.Micro.IEventAggregator>()
-            )).As<IMalfunctionNatsSyncService>().SingleInstance();
+            )).As<IMalfunctionNatsSyncService>()
+              .As<IService>().WithMetadata("Order", 101)   // (EB1) OnExit StopAsync → NATS 구독 해제
+              .SingleInstance();
             builder.Register(c => new EventQueueManager(
                        c.ResolveOptional<ILogService>(),
                        c.ResolveOptional<IEventSetupModel>()))
