@@ -37,7 +37,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - Implementation of Interface -
         #endregion
         #region - Overrides -
-        public override async Task SendAction(string? content, string? idUser)
+        public override async Task<bool> SendAction(string? content, string? idUser)
         {
             var account = IoC.Get<IAccountModel>();
             IdUser = account.Name;
@@ -54,7 +54,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             if (!response.Success)
             {
                 _log?.Error($"[ACTION_REPORT] Detection INSERT 실패: {response.Message}");
-                return;
+                return false;   // (EA3) 실패 신호 → 다이얼로그 유지
             }
 
             await _eventAggregator.PublishOnCurrentThreadAsync(new DetectionReportedMessageModel(this, Contents, IdUser));
@@ -67,7 +67,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 ActionTime = DateTime.Now
             });
 
-            await base.SendAction(content, idUser);
+            return await base.SendAction(content, idUser);
         }
 
         protected override Task CloseDialog()

@@ -287,20 +287,30 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 foreach (var card in cards)
                 {
                     var eventModel = card.Model;
+                    var eventId = eventModel?.Id ?? 0;
 
-                    // ① 서버 API로 조치보고 생성 (ActionUser: Username만, Content: "일괄처리" 고정)
-                    var dto = new ActionEventCreateDto
+                    // (EC5) 동일 이벤트가 Auto/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
+                    if (eventId > 0 && !_inFlightEventIds.TryAdd(eventId, 0))
                     {
-                        User = _userModel.Name,
-                        Content = "일괄처리",
-                        FromEventId = eventModel?.Id ?? 0
-                    };
+                        _log?.Info($"배치 조치보고: Event({eventId}) 진행 중 — 중복 스킵");
+                        continue;
+                    }
 
-                    var response = await _apiService.CreateActionEventAsync(dto);
-                    if (!response.Success)
-                        throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
+                    try
+                    {
+                        // ① 서버 API로 조치보고 생성 (ActionUser: Username만, Content: "일괄처리" 고정)
+                        var dto = new ActionEventCreateDto
+                        {
+                            User = _userModel.Name,
+                            Content = "일괄처리",
+                            FromEventId = eventId
+                        };
 
-                    // ② 심볼 복원: EntryId null 폴백 체인 (FR-01)
+                        var response = await _apiService.CreateActionEventAsync(dto);
+                        if (!response.Success)
+                            throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
+
+                        // ② 심볼 복원: EntryId null 폴백 체인 (FR-01)
                     // 1차: _pendingEntries 폴백 — entryId가 아직 카드에 할당 안 된 경우
                     if (card.EntryId == null && eventModel?.Id != null)
                     {
@@ -346,7 +356,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         ActionTime = DateTime.Now
                     });
 
-                    await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
+                        await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
+                    }
+                    finally
+                    {
+                        if (eventId > 0) _inFlightEventIds.TryRemove(eventId, out _);
+                    }
                 }
             }
             catch (Exception ex)
@@ -419,6 +434,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     return;
                 }
 
+                // (EC5) 동일 이벤트가 Batch/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
+                if (!_inFlightEventIds.TryAdd(eventId, 0))
+                {
+                    _log?.Info($"AutoReport: Event({eventId}) 조치보고 진행 중 — 중복 스킵");
+                    return;
+                }
+
+                try
+                {
                 var content = entry.EventType switch
                 {
                     EnumEventType.Intrusion => AUTO_REPORT_DETECTION,
@@ -460,6 +484,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 });
 
                 _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId})");
+                }
+                finally
+                {
+                    _inFlightEventIds.TryRemove(eventId, out _);
+                }
             }
             catch (Exception ex)
             {
@@ -485,6 +514,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 var eventModel = card.Model;
                 if (eventModel == null) return;
 
+                // (EC5) 동일 이벤트가 Batch/Auto 등 다른 경로에서 조치 진행 중이면 중복 스킵
+                if (!_inFlightEventIds.TryAdd(eventModel.Id, 0))
+                {
+                    _log?.Info($"AutoRecovery: Event({eventModel.Id}) 조치보고 진행 중 — 중복 스킵");
+                    return;
+                }
+
+                try
+                {
                 var dto = new ActionEventCreateDto
                 {
                     User = _userModel.Name,
@@ -513,6 +551,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 });
 
                 _log?.Info($"AutoRecovery 완료: Event({eventModel.Id}), Entry({faultEntryId})");
+                }
+                finally
+                {
+                    _inFlightEventIds.TryRemove(eventModel.Id, out _);
+                }
             }
             catch (Exception ex)
             {
@@ -667,6 +710,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
         private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private readonly SemaphoreSlim _batchReportGate = new(1, 1);
+        // (EC2/EC5) 조치보고 진행 중인 EventId 집합. Auto/AutoRecovery/Batch 3경로가 동일 이벤트에
+        // 동시에 CreateActionEventAsync 를 호출해 서버 중복 조치보고/NATS 중복발행하는 것을 막는 멱등 가드.
+        private readonly ConcurrentDictionary<int, byte> _inFlightEventIds = new();
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;

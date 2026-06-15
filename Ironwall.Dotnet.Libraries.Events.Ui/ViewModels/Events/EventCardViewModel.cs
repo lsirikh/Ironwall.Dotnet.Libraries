@@ -33,10 +33,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #endregion
         #region - Overrides -
         protected abstract Task CloseDialog();
-        public async virtual Task SendAction(string? content, string? idUser)
+        // (EA3) 반환값: 조치보고 서버 저장 성공 여부. 호출자(다이얼로그)는 false 면 닫지 않고 오류를 알린다.
+        public async virtual Task<bool> SendAction(string? content, string? idUser)
         {
             _log?.Info($"CardViewModel SendAction : User({IdUser}), Content({Contents}), Device({Device?.DeviceName}), DateTime({DateTime})");
             await CloseDialog();
+            return true;
         }
         #endregion
         #region - Binding Methods -
