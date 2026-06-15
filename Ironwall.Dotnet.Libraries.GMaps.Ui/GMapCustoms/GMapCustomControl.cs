@@ -1411,7 +1411,7 @@ public class GMapCustomControl : GMapControl
         switch (_resizeHandle)
         {
             case ResizeHandle.Move:
-                newBounds = MoveBounds(curBounds, deltaX, deltaY);
+                newBounds = SnapBoundsCenter(MoveBounds(curBounds, deltaX, deltaY)); // RC-4: 중심 격자 스냅
                 break;
             case ResizeHandle.TopLeft:
             case ResizeHandle.TopRight:
@@ -2188,6 +2188,36 @@ public class GMapCustomControl : GMapControl
         var newGeoTopLeft = FromLocalToLatLng((int)newTopLeft.X, (int)newTopLeft.Y);
 
         return new RectLatLng(newGeoTopLeft.Lat, newGeoTopLeft.Lng, bounds.WidthLng, bounds.HeightLat);
+    }
+
+    /// <summary>
+    /// 오버레이 이미지(AABB)의 '중심'을 화면 픽셀 격자에 스냅한다. (RC-4 / FR-11)
+    /// 마커 스냅과 동일한 ComputeOrigin/Snap 사용 → 보이는 격자선/교점에 흡착.
+    /// 스냅 비활성이거나 맵 회전(MapRotation≠0) 시 원본 그대로 반환(FR-12).
+    /// </summary>
+    private RectLatLng SnapBoundsCenter(RectLatLng bounds)
+    {
+        if (!IsSnapToGridEnabled || Math.Abs(MapRotation) > 0.1)
+            return bounds;
+
+        // AABB 중심 (Lat=상단/최대, Lng=좌측/최소 → 중심은 -H/2, +W/2)
+        double centerLat = bounds.Lat - bounds.HeightLat / 2.0;
+        double centerLng = bounds.Lng + bounds.WidthLng / 2.0;
+
+        var centerLocal = FromLatLngToLocal(new PointLatLng(centerLat, centerLng));
+        var gridPx = SnapGridOverlayService.EffectiveGridPx(GridSizePx);
+        var (x0, y0) = SnapGridOverlayService.ComputeOrigin(gridPx, ActualWidth, ActualHeight);
+        var (sx, sy, snapX, snapY) = SnapGridOverlayService.Snap(
+            centerLocal.X, centerLocal.Y, gridPx, x0, y0);
+
+        if (!snapX && !snapY)
+            return bounds;
+
+        var snappedCenter = FromLocalToLatLng((int)Math.Round(sx), (int)Math.Round(sy));
+        // 중심 → 좌상단 재구성 (상단 = 중심 + H/2, 좌측 = 중심 - W/2)
+        double newLat = snappedCenter.Lat + bounds.HeightLat / 2.0;
+        double newLng = snappedCenter.Lng - bounds.WidthLng / 2.0;
+        return new RectLatLng(newLat, newLng, bounds.WidthLng, bounds.HeightLat);
     }
 
     /// <summary>
