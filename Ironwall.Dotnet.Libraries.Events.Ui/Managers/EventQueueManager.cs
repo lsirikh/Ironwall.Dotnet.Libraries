@@ -256,6 +256,29 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             onDeviceEmpty?.Invoke(deviceKey.DeviceId, deviceKey.DeviceType);
     }
 
+    /// <summary>
+    /// (EB3) 특정 장비에 속한 모든 이벤트 엔트리를 제거한다. 장비 삭제(NATS DELETED) 시 호출하면
+    /// 고아 이벤트 카드가 남지 않는다. _deviceIndex 스냅샷 후 Dequeue 에 위임 — 그룹/디바이스 인덱스,
+    /// 상태 전이, 심볼 이벤트 정리를 검증된 단일 경로로 처리한다.
+    /// 주(선행의존): 실제 호출 트리거(DeviceNatsSyncService 의 DELETED 분기)는 DeviceApi PRD(C1)에서
+    /// 연결된다. 현재는 메서드만 제공(dormant) — 회귀 위험 없음.
+    /// </summary>
+    public void RemoveByDevice(int deviceId, EnumDeviceType deviceType)
+    {
+        List<string> entryIds;
+        lock (_gate)
+        {
+            if (!_deviceIndex.TryGetValue((deviceId, deviceType), out var set) || set.Count == 0)
+                return;
+            entryIds = set.ToList();   // 스냅샷 — Dequeue 가 _deviceIndex 를 변경하므로 먼저 복사
+        }
+
+        foreach (var entryId in entryIds)
+            Dequeue(entryId);
+
+        _log?.Info($"[EB3] RemoveByDevice: Device({deviceId},{deviceType}) — {entryIds.Count}개 엔트리 제거");
+    }
+
     public void DequeueAll()
     {
         var groupStates = new List<(int GroupId, EnumCompositeEventStatus State)>();

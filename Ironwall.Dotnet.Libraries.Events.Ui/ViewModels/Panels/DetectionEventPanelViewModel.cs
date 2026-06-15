@@ -139,11 +139,42 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                             .Select(vm => (IDetectionEventModel)vm.Model)
                             .ToList();
 
+            // (EA7) 부분 실패 수집 — 한 건 실패로 전체 중단/무응답 방지. 실패 시 재로드 생략해 편집 보존.
+            var saveFailures = new List<string>();
+
             foreach (var model in updateList)
-                await _providerService.UpdateDetectionEventAsync(model, token);
+            {
+                try { await _providerService.UpdateDetectionEventAsync(model, token); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"수정(Id={model.Id}): {ex.Message}");
+                    _log?.Error($"UpdateDetectionEventAsync 실패 Id={model.Id}: {ex.Message}");
+                }
+            }
 
             foreach (var model in insertList.OfType<IDetectionEventModel>())
-                await _providerService.InsertDetectionEventAsync(model, token);
+            {
+                try { await _providerService.InsertDetectionEventAsync(model, token); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"추가: {ex.Message}");
+                    _log?.Error($"InsertDetectionEventAsync 실패: {ex.Message}");
+                }
+            }
+
+            if (saveFailures.Count > 0)
+            {
+                // 일부 저장 실패 → 사용자 알림 + 재로드 생략(미저장 편집분 보존)
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "이벤트 저장 일부 실패",
+                    Explain = $"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n"
+                              + string.Join("\n", saveFailures.Take(5))
+                });
+                return;
+            }
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -285,26 +316,63 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                 _totalPages = 1;
                 _totalCount = 0;
 
-                // 기존 Detection 이벤트 제거
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // (EA2) swap-on-success: 첫 페이지를 먼저 가져와 성공을 확인한 뒤에만 기존 컬렉션을 교체.
+                //   fetch 실패 시 Remove/Clear 를 하지 않아 기존 이벤트가 소실되지 않는다.
+                PagedResult<IDetectionEventModel> firstPage;
+                try
+                {
+                    firstPage = await _providerService.FetchDetectionEventsPageAsync(
+                        StartDate, EndDate, 1, 100, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _log?.Error($"DataInitialize 첫 페이지 fetch 실패: {ex.Message}");
+                    firstPage = new PagedResult<IDetectionEventModel> { Success = false };
+                }
+
+                if (!firstPage.Success)
+                {
+                    // 기존 컬렉션 보존 + 사용자 알림 (화면 공백/복구불가 루프 방지)
+                    await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                    {
+                        Explain = "탐지 이벤트를 불러오지 못했습니다. 서버 연결 상태를 확인하세요. 기존 목록은 유지됩니다."
+                    }, cancellationToken);
+                    return; // finally 에서 IsVisible=true
+                }
+
+                // 성공 → 기존 컬렉션 교체
+                _currentPage = firstPage.Page;
+                _totalPages = firstPage.TotalPages;
+                _totalCount = firstPage.Total;
+
                 var existingDetection = _eventProvider.OfType<IDetectionEventModel>().ToList();
                 foreach (var e in existingDetection) _eventProvider.Remove(e);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
                 });
-
-                // CollectionChanged 구독을 LoadNextPageAsync 전에 설정
-                // → VP.Add 시 CollectionChanged가 EP 동기화 담당 (double-add 방지)
+                // CollectionChanged 구독을 Add 전에 설정 → VP.Add 시 EP 동기화(double-add 방지)
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 첫 페이지 로드
-                await LoadNextPageAsync(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                DispatcherService.Invoke(() =>
+                {
+                    foreach (var item in firstPage.Items)
+                    {
+                        ViewModelProvider.Add(new DetectionEventViewModel(item)
+                        {
+                            Index = ViewModelProvider.Count + 1
+                        });
+                    }
+                    NotifyOfPropertyChange(() => LoadedCountText);
+                    NotifyOfPropertyChange(() => HasMorePages);
+                });
 
                 // 캐시 날짜범위 기록
                 SetCachedDate(_startDate, _endDate);

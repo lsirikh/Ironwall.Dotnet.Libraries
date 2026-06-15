@@ -153,6 +153,35 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         }
 
         // Timer 콜백: 동기 래퍼 — async void 금지(Timer 콜백에서 예외 시 프로세스 크래시)
+        /// <summary>
+        /// (EB2) 표시 카드 수가 MAX_EVENT_CARDS 를 초과하면 가장 오래된 카드부터 제거한다.
+        /// 제거 방식은 검증된 경로(HandleAutoReportAsync)와 동일: _cardByEntryId 정리 + Dispose.
+        /// 이 패널은 EventProvider(EP) 백킹 컬렉션을 쓰지 않고 ViewModelProvider(VP) 에서만 카드를 제거한다
+        /// (CollectionChanged 핸들러에 Remove 분기가 없어 핸들러 활성/비활성이 캡 정확성에 영향 없음).
+        /// ⚠ 제거되는 카드의 EQM 엔트리는 남는다 — 표시 캡은 UI 메모리 보호 목적이며, EQM 엔트리/심볼 시각상태는
+        ///   EQM 수명주기(자동정리/조치보고)로 정리된다(그 전까지 desync 가능). 추적용으로 경고 로그를 남긴다.
+        /// </summary>
+        private void EnforceDisplayCap()
+        {
+            int removed = 0;
+            int orphanedEntries = 0;
+            while (ViewModelProvider.Count > MAX_EVENT_CARDS)
+            {
+                var oldest = ViewModelProvider[0];
+                if (oldest.EntryId != null)
+                {
+                    _cardByEntryId.TryRemove(oldest.EntryId, out _);
+                    orphanedEntries++;   // EQM 엔트리는 남음 (자동정리까지 잔류)
+                }
+                ViewModelProvider.Remove(oldest);
+                oldest.Dispose();
+                removed++;
+            }
+            if (removed > 0)
+                _log?.Warning($"[EB2] 표시 카드 하드캡({MAX_EVENT_CARDS}) 초과 — 오래된 카드 {removed}개 제거 " +
+                              $"(EQM 엔트리 {orphanedEntries}개는 자동정리까지 잔류)");
+        }
+
         private void FlushPendingCards(object? state) => _ = FlushPendingCardsAsync();
 
         private async Task FlushPendingCardsAsync()
@@ -181,6 +210,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         // 배치 entryId 매칭
                         foreach (var card in batch)
                             TryAssignEntryId(card);
+                        // (EB2) 표시 카드 하드 캡 — 장시간 운용 시 무한 증가 방지 (핸들러 활성 상태에서 제거)
+                        EnforceDisplayCap();
                         IsAnimationEnabled = ViewModelProvider.Count <= ANIMATION_THRESHOLD;
                         UpdateAction?.Invoke();
                     }
@@ -287,20 +318,30 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 foreach (var card in cards)
                 {
                     var eventModel = card.Model;
+                    var eventId = eventModel?.Id ?? 0;
 
-                    // ① 서버 API로 조치보고 생성 (ActionUser: Username만, Content: "일괄처리" 고정)
-                    var dto = new ActionEventCreateDto
+                    // (EC5) 동일 이벤트가 Auto/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
+                    if (eventId > 0 && !_inFlightEventIds.TryAdd(eventId, 0))
                     {
-                        User = _userModel.Name,
-                        Content = "일괄처리",
-                        FromEventId = eventModel?.Id ?? 0
-                    };
+                        _log?.Info($"배치 조치보고: Event({eventId}) 진행 중 — 중복 스킵");
+                        continue;
+                    }
 
-                    var response = await _apiService.CreateActionEventAsync(dto);
-                    if (!response.Success)
-                        throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
+                    try
+                    {
+                        // ① 서버 API로 조치보고 생성 (ActionUser: Username만, Content: "일괄처리" 고정)
+                        var dto = new ActionEventCreateDto
+                        {
+                            User = _userModel.Name,
+                            Content = "일괄처리",
+                            FromEventId = eventId
+                        };
 
-                    // ② 심볼 복원: EntryId null 폴백 체인 (FR-01)
+                        var response = await _apiService.CreateActionEventAsync(dto);
+                        if (!response.Success)
+                            throw new Exception($"처리 중 장애가 발생했습니다.\n{response.Message}");
+
+                        // ② 심볼 복원: EntryId null 폴백 체인 (FR-01)
                     // 1차: _pendingEntries 폴백 — entryId가 아직 카드에 할당 안 된 경우
                     if (card.EntryId == null && eventModel?.Id != null)
                     {
@@ -346,7 +387,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         ActionTime = DateTime.Now
                     });
 
-                    await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
+                        await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
+                    }
+                    finally
+                    {
+                        if (eventId > 0) _inFlightEventIds.TryRemove(eventId, out _);
+                    }
                 }
             }
             catch (Exception ex)
@@ -419,6 +465,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     return;
                 }
 
+                // (EC5) 동일 이벤트가 Batch/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
+                if (!_inFlightEventIds.TryAdd(eventId, 0))
+                {
+                    _log?.Info($"AutoReport: Event({eventId}) 조치보고 진행 중 — 중복 스킵");
+                    entry.NextRetryAfter = DateTime.Now.AddSeconds(BACKOFF_SECONDS); // 타이트 재발화 루프 방지
+                    return;
+                }
+
+                try
+                {
                 var content = entry.EventType switch
                 {
                     EnumEventType.Intrusion => AUTO_REPORT_DETECTION,
@@ -460,6 +516,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 });
 
                 _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId})");
+                }
+                finally
+                {
+                    _inFlightEventIds.TryRemove(eventId, out _);
+                }
             }
             catch (Exception ex)
             {
@@ -485,6 +546,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 var eventModel = card.Model;
                 if (eventModel == null) return;
 
+                // (EC5) 동일 이벤트가 Batch/Auto 등 다른 경로에서 조치 진행 중이면 중복 스킵
+                if (!_inFlightEventIds.TryAdd(eventModel.Id, 0))
+                {
+                    _log?.Info($"AutoRecovery: Event({eventModel.Id}) 조치보고 진행 중 — 중복 스킵");
+                    return;
+                }
+
+                try
+                {
                 var dto = new ActionEventCreateDto
                 {
                     User = _userModel.Name,
@@ -513,6 +583,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 });
 
                 _log?.Info($"AutoRecovery 완료: Event({eventModel.Id}), Entry({faultEntryId})");
+                }
+                finally
+                {
+                    _inFlightEventIds.TryRemove(eventModel.Id, out _);
+                }
             }
             catch (Exception ex)
             {
@@ -650,6 +725,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #endregion
         #region - Attributes -
         private const int ANIMATION_THRESHOLD = 20;
+        private const int MAX_EVENT_CARDS = 500;   // (EB2) 표시 카드 하드 캡
         private const int BATCH_INTERVAL_MS = 150;
         private const string AUTO_REPORT_DETECTION   = "탐지 자동 조치보고";
         private const string AUTO_REPORT_MALFUNCTION = "이상 자동 조치보고";
@@ -667,6 +743,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
         private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private readonly SemaphoreSlim _batchReportGate = new(1, 1);
+        // (EC2/EC5) 조치보고 진행 중인 EventId 집합. 이 패널의 Auto/AutoRecovery/Batch 3경로 한정으로
+        // 동일 이벤트에 CreateActionEventAsync 가 동시 호출돼 서버 중복 조치보고/NATS 중복발행되는 것을 막는다.
+        // ⚠ 수동 조치보고(DetectionEventCardViewModel.SendAction 다이얼로그)는 별도 VM이라 이 가드에 미참여 →
+        //   수동 vs 자동 교차 중복은 현재 서버 멱등 미보장(후속 과제: 가드 소유 통합).
+        private readonly ConcurrentDictionary<int, byte> _inFlightEventIds = new();
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;

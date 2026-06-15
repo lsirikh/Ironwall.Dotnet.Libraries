@@ -34,10 +34,21 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         {
             var user = $"{_user?.Username}({_user?.EmployeeNumber})";
             if (!(Model is MalfunctionEventCardViewModel vm)) return;
-            if (SelectableItemViewModel?.Name == "기타")
-                await vm.SendAction(Memo, user);
-            else
-                await vm.SendAction(SelectableItemViewModel?.Name, user);
+
+            // (EA3) SendAction 성공 여부 확인 — 실패 시 다이얼로그 유지 + 오류 알림(성공 오인식 방지)
+            bool ok = (SelectableItemViewModel?.Name == "기타")
+                ? await vm.SendAction(Memo, user)
+                : await vm.SendAction(SelectableItemViewModel?.Name, user);
+
+            if (!ok)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "조치보고 실패",
+                    Explain = "조치보고 저장에 실패했습니다. 네트워크/서버 상태를 확인 후 다시 시도하세요."
+                });
+                return;
+            }
 
             await _eventAggregator.PublishOnCurrentThreadAsync(new CloseDialogMessageModel());
         }

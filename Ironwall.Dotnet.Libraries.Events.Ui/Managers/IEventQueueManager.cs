@@ -18,6 +18,9 @@ public interface IEventQueueManager
     /// <summary>조치보고 시 해당 entry 제거 + 그룹 복원 판단</summary>
     void Dequeue(string entryId);
 
+    /// <summary>(EB3) 특정 장비의 모든 이벤트 엔트리 제거 — 장비 삭제 시 고아 이벤트 방지</summary>
+    void RemoveByDevice(int deviceId, EnumDeviceType deviceType);
+
     /// <summary>전체 이벤트 일괄 조치보고</summary>
     void DequeueAll();
 

@@ -296,6 +296,8 @@ public class EventProviderService
 
                 return new PagedResult<IDetectionEventModel>
                 {
+                    // (EA2) API 실패는 Success=false(호출부 보존), 정상 빈 결과는 Success=true(클리어 정상)
+                    Success = response.Success,
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0
@@ -340,6 +342,7 @@ public class EventProviderService
 
                 return new PagedResult<IMalfunctionEventModel>
                 {
+                    Success = response.Success,   // (EA2 대칭) API 실패 vs 빈 결과 구분 — swap-on-success 후속 대비
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0
@@ -384,6 +387,7 @@ public class EventProviderService
 
                 return new PagedResult<IConnectionEventModel>
                 {
+                    Success = response.Success,   // (EA2 대칭) API 실패 vs 빈 결과 구분 — swap-on-success 후속 대비
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0
