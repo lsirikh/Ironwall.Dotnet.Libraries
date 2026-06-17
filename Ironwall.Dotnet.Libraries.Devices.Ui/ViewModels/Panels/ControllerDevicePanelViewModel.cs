@@ -126,7 +126,17 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             var currentList = _deviceProvider.OfType<ControllerDeviceModel>().ToList();
 
             // 서버 목록 조회 (비교를 위해)
-            var serverList = await FetchControllersAsync(token);
+            var (serverList, complete) = await FetchControllersAsync(token);
+            if (!complete)
+            {
+                // (리뷰 MEDIUM) 서버 목록 불완전 → 부분 비교로 편집 소실 방지: 저장 보류.
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "저장 보류",
+                    Explain = "서버 제어기 목록을 완전히 불러오지 못해 저장을 보류합니다. 잠시 후 다시 시도하세요."
+                });
+                return;
+            }
 
             // Insert 대상: ID가 없는 경우 (신규)
             var insertList = currentList.Where(m => m.Id <= 0).ToList();
@@ -245,31 +255,32 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     /// <summary>
     /// GOP API를 통해 Controller 목록 조회하고 Model로 변환
     /// </summary>
-    private async Task<List<ControllerDeviceModel>> FetchControllersAsync(CancellationToken token = default)
+    // (#11/FR-3 + 리뷰 MEDIUM) 전 페이지 순회 + 완전성 신호. 기존 limit:20 단건은 20건 초과 누락.
+    //   중간 페이지 실패 시 부분목록을 Save 비교에 쓰면 편집 소실 → complete=false 로 호출부가 보류 판단.
+    private async Task<(List<ControllerDeviceModel> list, bool complete)> FetchControllersAsync(CancellationToken token = default)
     {
+        var all = new List<ControllerDeviceModel>();
         try
         {
-            var response = await _apiService.GetControllersAsync(
-                page: 1,
-                limit: 20,
-                token: token);
-
-            if (response.Success && response.Data != null)
+            const int limit = 100, maxPages = 100;
+            for (int page = 1; page <= maxPages; page++)
             {
-                return response.Data
-                    .Select(dto => dto.ToControllerDeviceModel())
-                    .ToList();
+                var response = await _apiService.GetControllersAsync(page: page, limit: limit, token: token);
+                if (!response.Success || response.Data == null)
+                {
+                    _log?.Error($"Failed to fetch controllers (page {page}): {response.Error?.Message}");
+                    return (all, false);
+                }
+                var batch = response.Data.Select(dto => dto.ToControllerDeviceModel()).ToList();
+                all.AddRange(batch);
+                if (batch.Count < limit) return (all, true);   // 마지막 페이지 = 완전
             }
-            else
-            {
-                _log?.Error($"Failed to fetch controllers: {response.Error?.Message}");
-                return new List<ControllerDeviceModel>();
-            }
+            return (all, true);
         }
         catch (Exception ex)
         {
             _log?.Error($"Exception in FetchControllersAsync: {ex.Message}");
-            return new List<ControllerDeviceModel>();
+            return (all, false);
         }
     }
 
