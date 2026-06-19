@@ -16,4 +16,5 @@ public interface IBaseDeviceModel : IBaseModel
     double Latitude { get; set; }
     double Longitude { get; set; }
     bool IsEnable { get; set; }
+    double? Heading { get; set; }
 }

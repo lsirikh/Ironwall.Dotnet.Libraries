@@ -67,6 +67,15 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 
         // FR-08c: 등록 즉시 Device.Status → Symbol.OperationState 동기화
         lookup.SyncFromDevice(deviceModel.Status);
+
+        // FR-13 ④: 장비정보(API geolocation.heading) → 심볼 BaseBearing 메모리 반영(로컬 DB 미저장).
+        // SaveMarker 호출하지 않음 — SoT=서버, 설치방향 변경은 서버 장비 API로. heading=null이면 미변경.
+        if (deviceModel.Heading.HasValue && symbolModel is IPidsSymbolModel pids)
+        {
+            pids.BaseBearing = deviceModel.Heading.Value;
+            pids.DetectionBearing = pids.BaseBearing;   // 초기 FOV 방향 = 설치방향
+            _log?.Info($"[SymbolEventManager] BaseBearing 메모리 반영: Device({deviceModel.Id}) heading={deviceModel.Heading.Value:F1}°");
+        }
     }
 
     // 그룹 심볼 매핑 등록 (그룹 마커용)
