@@ -1,7 +1,10 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -92,6 +95,46 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
         ReloadButtonEnable = false;
         _log?.Info($"{_className}({this.GetHashCode()})의 ButtonAllEnable End!!");
     }
+
+    /// <summary>
+    /// 공통 삭제 루프 (CRUD 라이프사이클 통일 — 가드 단일 출처).
+    /// <para>Id≤0(Draft/미저장 임시행) → 로컬만 제거(API 미호출). Id&gt;0 → DELETE API 후 성공 시에만 로컬 제거(verify-after-success).</para>
+    /// 실패한 id는 <see cref="_deleteFailures"/>에 누적되고 0건 초과 시 베이스가 InfoPopup으로 통지(중앙화).
+    /// </summary>
+    /// <param name="getId">행 VM → 모델 Id 추출 (예: r =&gt; r.Model.Id)</param>
+    /// <param name="deleteApi">Id로 서버 1건 삭제 (성공 bool 반환)</param>
+    /// <param name="removeLocal">로컬 provider에서 행 제거</param>
+    protected async Task ExecuteDeleteAsync(
+        IEnumerable<T> items,
+        Func<T, int> getId,
+        Func<int, CancellationToken, Task<bool>> deleteApi,
+        Action<T> removeLocal,
+        CancellationToken ct = default)
+    {
+        _deleteFailures.Clear();
+        foreach (var row in items)
+        {
+            ct.ThrowIfCancellationRequested();
+            int id = getId(row);
+            if (id <= 0) { removeLocal(row); continue; }          // Draft = 로컬만 (API 미호출)
+            bool ok;
+            try { ok = await deleteApi(id, ct); }
+            catch (OperationCanceledException) { throw; }          // 취소는 실패로 오분류하지 않음(재던지기)
+            catch (Exception ex) { _log?.Error($"[{_className}] ExecuteDeleteAsync(id={id}) 예외: {ex.Message}"); ok = false; }
+            if (ok) removeLocal(row);                              // verify-after-success
+            else _deleteFailures.Add(id);
+        }
+
+        // 부분 삭제 실패 통지(중앙화) — 미통지 시 "삭제했는데 행이 조용히 복귀"가 사용자에게 노출됨
+        if (_deleteFailures.Count > 0)
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "삭제 일부 실패",
+                Explain = $"{_deleteFailures.Count}건 삭제에 실패했습니다. 서버에 남아있는 항목은 재조회 시 다시 표시됩니다.\n(Id: {string.Join(", ", _deleteFailures.Take(10))})"
+            }, ct);
+        }
+    }
     #endregion
     #region - IHanldes -
     #endregion
@@ -144,5 +187,6 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
     private bool _reloadButtonEnable;
     private bool _saveButtonEnable;
     protected readonly SemaphoreSlim _processGate = new(1, 1);
+    protected readonly List<int> _deleteFailures = new();
     #endregion
 }

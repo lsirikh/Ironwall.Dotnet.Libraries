@@ -155,7 +155,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
             foreach (var model in insertList.OfType<IDetectionEventModel>())
             {
-                try { await _providerService.InsertDetectionEventAsync(model, token); }
+                try { var created = await _providerService.InsertDetectionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
@@ -493,10 +493,12 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in _pendingDeleteItems)
-            {
-                var ret = await _providerService.DeleteDetectionEventAsync(item.Model.Id, cancellationToken);
-            }
+            await ExecuteDeleteAsync(
+                _pendingDeleteItems,
+                r => r.Model.Id,
+                (id, t) => _providerService.DeleteDetectionEventAsync(id, t),
+                r => _eventProvider.Remove(r.Model),
+                cancellationToken);
             _pendingDeleteItems = [];
         }, cancellationToken);
 
