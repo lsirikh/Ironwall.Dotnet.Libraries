@@ -238,7 +238,7 @@ public class AdornerManagerService : IDisposable
                 var adorner = adornerLayer.CreateAdorner(marker, markerControl);
                 if (adorner != null)
                 {
-                    _log?.Info($"마커 선택 및 Adorner 생성: {marker.Title}");
+                    //_log?.Info($"마커 선택 및 Adorner 생성: {marker.Title}");
 
                     // 이벤트 발생
                     MarkerSelectionChanged?.Invoke(this, new MarkerSelectionChangedEventArgs(marker, true));
@@ -321,7 +321,7 @@ public class AdornerManagerService : IDisposable
                     }
                 }
 
-                _log?.Info("모든 마커 선택 해제 완료");
+                //_log?.Info("모든 마커 선택 해제 완료");
             }
             catch (Exception ex)
             {
@@ -633,7 +633,7 @@ public class AdornerManagerService : IDisposable
     /// </summary>
     private void OnAdornerCreated(object? sender, AdornerLifecycleEventArgs e)
     {
-        _log?.Info($"Adorner 생성됨: {e.Marker.Title}");
+        //_log?.Info($"Adorner 생성됨: {e.Marker.Title}");
         AdornerCreated?.Invoke(this, e);
     }
 
@@ -642,7 +642,7 @@ public class AdornerManagerService : IDisposable
     /// </summary>
     private void OnAdornerRemoved(object? sender, AdornerLifecycleEventArgs e)
     {
-        _log?.Info($"Adorner 제거됨: {e.Marker.Title}");
+        //_log?.Info($"Adorner 제거됨: {e.Marker.Title}");
         AdornerRemoved?.Invoke(this, e);
     }
 

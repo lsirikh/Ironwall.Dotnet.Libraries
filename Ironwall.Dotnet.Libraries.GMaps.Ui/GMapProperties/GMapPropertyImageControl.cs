@@ -204,7 +204,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 SetBinding(ImageVisibilityProperty, CreateTwoWayBinding(nameof(imageMarker.IsVisible)));
                 SetBinding(MaintainAspectRatioProperty, CreateTwoWayBinding(nameof(imageMarker.MaintainAspectRatio)));
 
-                System.Diagnostics.Debug.WriteLine("GMapPropertyImageControl.SetupSpecificBindings 완료");
+                //System.Diagnostics.Debug.WriteLine("GMapPropertyImageControl.SetupSpecificBindings 완료");
             }
         }
 
@@ -230,7 +230,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 // 읽기 전용 경계 정보 업데이트
                 UpdateBoundsInfo(imageMarker);
 
-                System.Diagnostics.Debug.WriteLine($"GMapPropertyImageControl 특화 속성 설정: FilePath={ImageFilePath}, Opacity={ImageOpacity}, Visibility={ImageVisibility}");
+                //System.Diagnostics.Debug.WriteLine($"GMapPropertyImageControl 특화 속성 설정: FilePath={ImageFilePath}, Opacity={ImageOpacity}, Visibility={ImageVisibility}");
             }
         }
 

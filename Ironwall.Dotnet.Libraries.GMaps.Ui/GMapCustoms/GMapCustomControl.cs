@@ -636,13 +636,13 @@ public class GMapCustomControl : GMapControl
 
     private void OnAdornerCreated(object? sender, AdornerLifecycleEventArgs e)
     {
-        _log?.Info($"Adorner 생성: {e.Marker.Title}");
+        //_log?.Info($"Adorner 생성: {e.Marker.Title}");
         AdornerCreated?.Invoke(this, e);
     }
 
     private void OnAdornerRemoved(object? sender, AdornerLifecycleEventArgs e)
     {
-        _log?.Info($"Adorner 제거: {e.Marker.Title}");
+        //_log?.Info($"Adorner 제거: {e.Marker.Title}");
         AdornerRemoved?.Invoke(this, e);
     }
 
@@ -655,13 +655,13 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        _log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 시작 ===");
-        _log?.Info($"편집 모드: {IsEditMode}");
+        //_log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 시작 ===");
+        //_log?.Info($"편집 모드: {IsEditMode}");
 
         var mousePos = e.GetPosition(this);
         var geoPos = FromLocalToLatLng((int)mousePos.X, (int)mousePos.Y);
 
-        _log?.Info($"마우스 위치: 화면({mousePos.X:F2}, {mousePos.Y:F2}) -> 지리({geoPos.Lat:F6}, {geoPos.Lng:F6})");
+        //_log?.Info($"마우스 위치: 화면({mousePos.X:F2}, {mousePos.Y:F2}) -> 지리({geoPos.Lat:F6}, {geoPos.Lng:F6})");
 
         // [FP-1] base 호출 전 처리: base.OnMouseLeftButtonDown이 GMap.NET 내부 _core.MouseDown을
         // 기록하여 팬을 Armed 상태로 만든다. 라인 드로잉·이미지 편집이 이벤트를 소비할 경우
@@ -675,28 +675,28 @@ public class GMapCustomControl : GMapControl
 
         if (IsEditMode)
         {
-            _log?.Info("편집 모드에서 처리 시작");
+            //_log?.Info("편집 모드에서 처리 시작");
 
             if (HandleImageEdit(mousePos, geoPos, e))
             {
                 _log?.Info("이미지 편집 처리 완료 — base 호출 없이 팬 Armed 방지");
                 return;
             }
-            _log?.Info("이미지 편집 해당 없음");
+            //_log?.Info("이미지 편집 해당 없음");
         }
 
         // 이미지/라인 편집 소비 없음 → base 호출하여 팬 및 기타 처리 위임
         base.OnMouseLeftButtonDown(e);
 
-        _log?.Info("클릭된 객체 검색 시작");
+        //_log?.Info("클릭된 객체 검색 시작");
         var clickedImage = GetImageAtScreen(mousePos);
         var clickedMarker = GetMarkerAtScreen(mousePos);
 
-        _log?.Info($"검색 결과 - 이미지: {clickedImage?.Title ?? "없음"}, 마커: {clickedMarker?.Title ?? "없음"}");
+        //_log?.Info($"검색 결과 - 이미지: {clickedImage?.Title ?? "없음"}, 마커: {clickedMarker?.Title ?? "없음"}");
 
         if (clickedMarker != null)
         {
-            _log?.Info($"마커 클릭 이벤트 발생: {clickedMarker.Title}");
+            //_log?.Info($"마커 클릭 이벤트 발생: {clickedMarker.Title}");
             OnMarkerClicked?.Invoke(clickedMarker);
         }
         else if (clickedImage != null)
@@ -710,7 +710,7 @@ public class GMapCustomControl : GMapControl
             OnMapClicked?.Invoke(geoPos, mousePos);
         }
 
-        _log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 완료 ===");
+        //_log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 완료 ===");
     }
 
     /// <summary>
@@ -829,7 +829,7 @@ public class GMapCustomControl : GMapControl
     // GMapCustomControl.cs - GetMarkerAt 메서드를 화면 좌표 기반으로 수정
     private IEditableMarker? GetMarkerAtScreen(Point screenPosition)
     {
-        _log?.Info($"GetMarkerAtScreen 호출: 화면위치({screenPosition.X:F2}, {screenPosition.Y:F2})");
+        //_log?.Info($"GetMarkerAtScreen 호출: 화면위치({screenPosition.X:F2}, {screenPosition.Y:F2})");
 
         if (Markers == null || !Markers.Any())
             return null;
@@ -914,7 +914,7 @@ public class GMapCustomControl : GMapControl
             .ThenBy(c => c.distance)
             .First();
 
-        _log?.Info($"GetMarkerAtScreen 선택: '{selected.marker.Title}' ZIndex={selected.zIndex} Area={selected.area:F0} Dist={selected.distance:F1}px (후보 {candidates.Count}개)");
+        //_log?.Info($"GetMarkerAtScreen 선택: '{selected.marker.Title}' ZIndex={selected.zIndex} Area={selected.area:F0} Dist={selected.distance:F1}px (후보 {candidates.Count}개)");
         return selected.marker;
     }
 
@@ -1013,11 +1013,11 @@ public class GMapCustomControl : GMapControl
 
         try
         {
-            _log?.Info($"마커 선택 시도: {marker.Title}");
+            //_log?.Info($"마커 선택 시도: {marker.Title}");
 
             if (marker != null)
             {
-                _log?.Info($"마커 컨트롤 찾음: {marker.GetType().Name}");
+                //_log?.Info($"마커 컨트롤 찾음: {marker.GetType().Name}");
 
                 // 마커를 선택 상태로 설정
                 marker.IsSelected = true;
@@ -1025,7 +1025,7 @@ public class GMapCustomControl : GMapControl
 
                 // AdornerManager를 통한 선택
                 bool result = AdornerManager.SelectMarker(marker, markerControl, this);
-                _log?.Info($"AdornerManager.SelectMarker 결과: {result}");
+                //_log?.Info($"AdornerManager.SelectMarker 결과: {result}");
 
                 return result;
             }
@@ -1047,7 +1047,7 @@ public class GMapCustomControl : GMapControl
         // 마커 자체가 IMarkerControl을 구현하는 경우 (예: GMapImageMarker)
         if (marker is IMarkerControl markerControl)
         {
-            _log?.Info($"마커 자체가 IMarkerControl 구현: {marker.GetType().Name}");
+            //_log?.Info($"마커 자체가 IMarkerControl 구현: {marker.GetType().Name}");
             return markerControl;
         }
 

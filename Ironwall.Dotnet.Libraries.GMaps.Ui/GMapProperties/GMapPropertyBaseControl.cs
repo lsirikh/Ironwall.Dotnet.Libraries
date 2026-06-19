@@ -813,7 +813,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (GetTemplateChild("PART_CloseButton") is Button closeButton)
             {
                 closeButton.Click += OnCloseButtonClick;
-                System.Diagnostics.Debug.WriteLine("닫기 버튼 이벤트 연결 완료");
+                //System.Diagnostics.Debug.WriteLine("닫기 버튼 이벤트 연결 완료");
             }
 
             // 헤더 커서 설정

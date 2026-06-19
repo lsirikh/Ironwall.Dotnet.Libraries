@@ -92,7 +92,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
         // 키보드 포커스 가능하도록 설정
         this.Focusable = true;
 
-        _log?.Info($"MarkerEditAdorner 생성: {_targetMarker.Title}");
+        //_log?.Info($"MarkerEditAdorner 생성: {_targetMarker.Title}");
     }
 
     #endregion
@@ -136,7 +136,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 EditCompleted = null;
                 EditCancelled = null;
 
-                _log?.Info($"MarkerEditAdorner 리소스 해제: {_targetMarker?.Title}");
+                //_log?.Info($"MarkerEditAdorner 리소스 해제: {_targetMarker?.Title}");
             }
             catch (Exception ex)
             {

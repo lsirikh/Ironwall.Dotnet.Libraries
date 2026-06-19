@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-10 (advance-phase 자동)
-- **총 문서 수**: 191개
+- **마지막 갱신**: 2026-06-19 (advance-phase 자동)
+- **총 문서 수**: 205개
 
 ---
 
@@ -10,7 +10,9 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md](analysis/OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md) | 줌→회전 누적(이중회전) + 마커 AABB 부정확 근본원인 | 2026-06-10 |
+| [Client_API_Conformance_Audit-analysis.md](analysis/Client_API_Conformance_Audit-analysis.md) | Client_API_Conformance_Audit | 2026-06-19 |
+| [GOP_API_v4_Changes_ClientImpact-analysis.md](analysis/GOP_API_v4_Changes_ClientImpact-analysis.md) | GOP_API_v4_Changes_ClientImpact | 2026-06-19 |
+| [OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md](analysis/OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md) | OverlayImage_Rotation_Zoom_AABB_RootCause | 2026-06-12 |
 | [RapidEventBurst_Stutter_Analysis.md](analysis/RapidEventBurst_Stutter_Analysis.md) | RapidEventBurst_Stutter_Analysis.md | 2026-06-04 |
 | [Multisensor_Symbol_Bug_Analysis.md](analysis/Multisensor_Symbol_Bug_Analysis.md) | Multisensor_Symbol_Bug_Analysis.md | 2026-06-04 |
 | [EventStateSyncArchitecture_Analysis.md](analysis/EventStateSyncArchitecture_Analysis.md) | EventStateSyncArchitecture_Analysis.md | 2026-06-04 |
@@ -27,20 +29,23 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [DigitalZoom_RenderTransform-prd.md](prds/DigitalZoom_RenderTransform-prd.md) | 디지털 줌 — MaxZoom 초과 RenderTransform 소프트 확대 | Approved | 2026-06-12 |
-| [GMap_Zoom_Improvements-prd.md](prds/GMap_Zoom_Improvements-prd.md) | 줌 T1~T4 (슬라이더/경계휠/디지털줌A/오브젝트통과) | Approved | 2026-06-10 |
+| [Client_API_v46_Conformance-prd.md](prds/Client_API_v46_Conformance-prd.md) | Client_API_v46_Conformance | Approved | 2026-06-19 |
+| [NATS-Tracking-Geolocation-메시지정리.md](prds/NATS-Tracking-Geolocation-메시지정리.md) | NATS-Tracking-Geolocation-메시지정리.md | Draft | 2026-06-19 |
+| [DevicePanel_CRUD_API_Sync-prd.md](prds/DevicePanel_CRUD_API_Sync-prd.md) | DevicePanel_CRUD_API_Sync | Draft | 2026-06-17 |
+| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | EventProcess_ContaminationFix | Draft | 2026-06-15 |
+| [GridSnap_System-prd.md](prds/GridSnap_System-prd.md) | GridSnap_System | Approved | 2026-06-15 |
+| [DigitalZoom_RenderTransform-prd.md](prds/DigitalZoom_RenderTransform-prd.md) | DigitalZoom_RenderTransform | Draft | 2026-06-15 |
+| [GMap_Zoom_Improvements-prd.md](prds/GMap_Zoom_Improvements-prd.md) | GMap_Zoom_Improvements | Approved | 2026-06-12 |
+| [MarkerHitTest_AABB_Fix-prd.md](prds/MarkerHitTest_AABB_Fix-prd.md) | MarkerHitTest_AABB_Fix | Completed | 2026-06-10 |
 | [OverlayImage_Rotation_Editing-prd.md](prds/OverlayImage_Rotation_Editing-prd.md) | OverlayImage_Rotation_Editing | Approved | 2026-06-10 |
-| [MarkerHitTest_AABB_Fix-prd.md](prds/MarkerHitTest_AABB_Fix-prd.md) | MarkerHitTest_AABB_Fix | Approved | 2026-06-10 |
 | [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Approved | 2026-06-10 |
 | [OverlayImage_ZOrder_Independence-prd.md](prds/OverlayImage_ZOrder_Independence-prd.md) | OverlayImage_ZOrder_Independence | Approved | 2026-06-10 |
 | [ZOrder_PropertyPanel_Integration-prd.md](prds/ZOrder_PropertyPanel_Integration-prd.md) | ZOrder_PropertyPanel_Integration | Draft | 2026-06-10 |
 | [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | LayerVisibility_Persistence_Fix | Approved | 2026-06-08 |
-| [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | EventProcess_ContaminationFix | Draft | 2026-06-08 |
 | [DeviceApi_ProviderPropagation_Fix-prd.md](prds/DeviceApi_ProviderPropagation_Fix-prd.md) | DeviceApi_ProviderPropagation_Fix | Draft | 2026-06-08 |
 | [SplashScreen_MonitoringSolution-prd.md](prds/SplashScreen_MonitoringSolution-prd.md) | SplashScreen_MonitoringSolution | Draft | 2026-06-08 |
 | [SplashScreen_LibraryComponent-prd.md](prds/SplashScreen_LibraryComponent-prd.md) | SplashScreen_LibraryComponent | Draft | 2026-06-08 |
 | [SymbolTextSeparation_LabelPositioning-prd.md](prds/SymbolTextSeparation_LabelPositioning-prd.md) | SymbolTextSeparation_LabelPositioning | Approved | 2026-06-05 |
-| [GridSnap_System-prd.md](prds/GridSnap_System-prd.md) | GridSnap_System | Approved | 2026-06-05 |
 | [WebServer_Enable_Feature-prd.md](prds/WebServer_Enable_Feature-prd.md) | WebServer_Enable_Feature | Completed | 2026-06-05 |
 | [MapSetup_Panel_Refactor-prd.md](prds/MapSetup_Panel_Refactor-prd.md) | MapSetup_Panel_Refactor | Approved | 2026-06-05 |
 | [SettingPanel_BrokerLabel_Rename-prd.md](prds/SettingPanel_BrokerLabel_Rename-prd.md) | SettingPanel_BrokerLabel_Rename | Approved | 2026-06-05 |
@@ -79,14 +84,17 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [DigitalZoom_RenderTransform-prd-plan.md](plans/DigitalZoom_RenderTransform-prd-plan.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) | 구현완료(검증✅) | 2026-06-15 |
+| [Client_API_v46_Conformance-prd-plan.md](plans/Client_API_v46_Conformance-prd-plan.md) | [PRD](prds/Client_API_v46_Conformance-prd.md) | 0/0 | 2026-06-19 |
+| [EventProcess_ContaminationFix-prd-plan.md](plans/EventProcess_ContaminationFix-prd-plan.md) | [PRD](prds/EventProcess_ContaminationFix-prd.md) | 0/14 | 2026-06-15 |
+| [GridSnap_System-prd-plan.md](plans/GridSnap_System-prd-plan.md) | [PRD](prds/GridSnap_System-prd.md) | 11/32 | 2026-06-15 |
+| [DigitalZoom_RenderTransform-prd-plan.md](plans/DigitalZoom_RenderTransform-prd-plan.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) | 0/12 | 2026-06-15 |
+| [GMap_Zoom_Improvements-prd-plan.md](plans/GMap_Zoom_Improvements-prd-plan.md) | [PRD](prds/GMap_Zoom_Improvements-prd.md) | 0/5 | 2026-06-12 |
 | [OverlayImage_Rotation_Editing-prd-plan.md](plans/OverlayImage_Rotation_Editing-prd-plan.md) | [PRD](prds/OverlayImage_Rotation_Editing-prd.md) | 0/33 | 2026-06-10 |
 | [OverlayImage_ZOrder_Independence-plan.md](plans/OverlayImage_ZOrder_Independence-plan.md) | [PRD](prds/OverlayImage_ZOrder_Independence-prd.md) | 0/25 | 2026-06-10 |
 | [ZOrder_PropertyPanel_Integration-prd-plan.md](plans/ZOrder_PropertyPanel_Integration-prd-plan.md) | [PRD](prds/ZOrder_PropertyPanel_Integration-prd.md) | 0/0 | 2026-06-10 |
 | [LayerVisibility_Persistence_Fix-prd-plan.md](plans/LayerVisibility_Persistence_Fix-prd-plan.md) | [PRD](prds/LayerVisibility_Persistence_Fix-prd.md) | 3/14 | 2026-06-08 |
 | [SplashScreen_MonitoringSolution-prd-plan.md](plans/SplashScreen_MonitoringSolution-prd-plan.md) | [PRD](prds/SplashScreen_MonitoringSolution-prd.md) | 0/0 | 2026-06-08 |
 | [SymbolTextSeparation_LabelPositioning-prd-plan.md](plans/SymbolTextSeparation_LabelPositioning-prd-plan.md) | [PRD](prds/SymbolTextSeparation_LabelPositioning-prd.md) | 20/38 | 2026-06-05 |
-| [GridSnap_System-prd-plan.md](plans/GridSnap_System-prd-plan.md) | [PRD](prds/GridSnap_System-prd.md) | 11/18 | 2026-06-05 |
 | [RemoteDesktop_PanFollowBug_Fix-prd-plan.md](plans/RemoteDesktop_PanFollowBug_Fix-prd-plan.md) | [PRD](prds/RemoteDesktop_PanFollowBug_Fix-prd.md) | 8/16 | 2026-06-04 |
 | [MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md](plans/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd-plan.md) | [PRD](prds/MapSymbol_DispatcherFreeze_And_LogNoise_Fix-prd.md) | 7/15 | 2026-06-04 |
 | [SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) | 20/20 | 2026-06-04 |
@@ -123,6 +131,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [Client_API_v46_Conformance_Phase0-report.md](reports/Client_API_v46_Conformance_Phase0-report.md) | [PRD](prds/Client_API_v46_Conformance_Phase0-prd.md) → [Plan](plans/Client_API_v46_Conformance_Phase0-prd-plan.md) | 2026-06-19 |
 | [DigitalZoom_RenderTransform-report.md](reports/DigitalZoom_RenderTransform-report.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) → [Plan](plans/DigitalZoom_RenderTransform-prd-plan.md) | 2026-06-15 |
 | [WebServer_Enable_Feature-report.md](reports/WebServer_Enable_Feature-report.md) | [PRD](prds/WebServer_Enable_Feature-prd.md) → [Plan](plans/WebServer_Enable_Feature-prd-plan.md) | 2026-06-05 |
 | [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) → [Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |

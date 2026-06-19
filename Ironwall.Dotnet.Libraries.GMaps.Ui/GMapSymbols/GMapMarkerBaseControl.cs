@@ -554,7 +554,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
             if (mapControl != null && Marker != null)
             {
-                _log?.Info($"마커 컨트롤에서 부모에게 클릭 이벤트 전달: {Marker.Title} ({Marker.Width} x {Marker.Height})");
+                //_log?.Info($"마커 컨트롤에서 부모에게 클릭 이벤트 전달: {Marker.Title} ({Marker.Width} x {Marker.Height})");
                 mapControl.TriggerMarkerClicked(Marker);
             }
 

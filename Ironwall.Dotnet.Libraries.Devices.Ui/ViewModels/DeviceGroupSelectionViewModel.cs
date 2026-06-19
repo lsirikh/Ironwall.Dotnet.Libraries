@@ -104,23 +104,26 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             AddButtonEnable = false;
             NotifyOfPropertyChange(nameof(AddButtonEnable));
 
-            var groupId = _selection[0].Id;
-            var assignedIds = AssignedDevices.Select(d => d.Id);
+            try
+            {
+                var groupId = _selection[0].Id;
+                var assignedIds = AssignedDevices.Select(d => d.Id);
 
-            var dialog = new DeviceAssignDialogViewModel(_apiService, _deviceProvider, _log);
-            dialog.Initialize(groupId, assignedIds);
+                var dialog = new DeviceAssignDialogViewModel(_apiService, _deviceProvider, _log);
+                dialog.Initialize(groupId, assignedIds);
 
-            await _eventAggregator.PublishOnUIThreadAsync(
-                new OpenDeviceAssignDialogMessageModel
-                {
-                    Dialog = dialog,
-                    OnCompleted = () =>
+                await _eventAggregator.PublishOnUIThreadAsync(
+                    new OpenDeviceAssignDialogMessageModel
                     {
-                        _ = LoadAssignedDevicesAsync();
-                        AddButtonEnable = true;
-                        NotifyOfPropertyChange(nameof(AddButtonEnable));
-                    }
-                });
+                        Dialog = dialog,
+                        OnCompleted = () => _ = LoadAssignedDevicesAsync()
+                    });
+            }
+            finally
+            {
+                AddButtonEnable = true;
+                NotifyOfPropertyChange(nameof(AddButtonEnable));
+            }
         }
 
         public async Task RemoveDeviceButton()

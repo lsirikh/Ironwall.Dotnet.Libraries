@@ -439,13 +439,13 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
-            _log?.Info($"=== 마커 클릭 시작 ===");
-            _log?.Info($"클릭 전 - {GetMarkerInfo(marker)}");
-            _log?.Info($"OnMapMarkerClicked 호출됨: {marker.Title}, 편집모드: {IsEditModeEnabled}");
+            //_log?.Info($"=== 마커 클릭 시작 ===");
+            //_log?.Info($"클릭 전 - {GetMarkerInfo(marker)}");
+            //_log?.Info($"OnMapMarkerClicked 호출됨: {marker.Title}, 편집모드: {IsEditModeEnabled}");
 
             if (IsEditModeEnabled)
             {
-                _log?.Info($"편집 모드에서 마커 선택 시도");
+                //_log?.Info($"편집 모드에서 마커 선택 시도");
                 SelectMarkerForEditing(marker);
                 
             }
@@ -457,8 +457,8 @@ public class MapViewModel : BasePanelViewModel,
             //    _log?.Info($"UpdateSelectedMarker 호출 후 - {GetMarkerInfo(marker)}");
             //}
 
-            _log?.Info($"클릭 완료 후 - {GetMarkerInfo(marker)}");
-            _log?.Info($"=== 마커 클릭 종료 ===");
+            //_log?.Info($"클릭 완료 후 - {GetMarkerInfo(marker)}");
+            //_log?.Info($"=== 마커 클릭 종료 ===");
         }
         catch (Exception ex)
         {
@@ -673,7 +673,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void OnAdornerCreated(object? sender, AdornerLifecycleEventArgs e)
     {
-        _log?.Info($"Adorner 생성됨: {e.Marker.Title}");
+        //_log?.Info($"Adorner 생성됨: {e.Marker.Title}");
         AdornerCount++;
     }
 
@@ -682,7 +682,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void OnAdornerRemoved(object? sender, AdornerLifecycleEventArgs e)
     {
-        _log?.Info($"Adorner 제거됨: {e.Marker.Title}");
+        //_log?.Info($"Adorner 제거됨: {e.Marker.Title}");
         AdornerCount = Math.Max(0, AdornerCount - 1);
     }
     #endregion
@@ -700,28 +700,28 @@ public class MapViewModel : BasePanelViewModel,
         _isSelectingMarker = true;
         try
         {
-            _log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
+            //_log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
 
             if(SelectedMarker != null)
                 await DbUpdateProcess(SelectedMarker);
 
             // 이전 선택 해제
             ClearAllSelections();
-            _log?.Info("이전 선택 해제 완료");
+            //_log?.Info("이전 선택 해제 완료");
 
             if (MainMap == null) return;
 
-            
+
             // 새 마커 선택 및 Adorner 생성
-            _log?.Info($"MainMap.SelectMarker 호출 중...");
+            //_log?.Info($"MainMap.SelectMarker 호출 중...");
             bool success = MainMap.SelectMarker(marker);
-            _log?.Info($"MainMap.SelectMarker 결과: {success}");
+            //_log?.Info($"MainMap.SelectMarker 결과: {success}");
 
             if (success)
             {
                 UpdateSelectedMarker(marker);
                 ShowPropertyPanel();
-                _log?.Info($"마커 편집 모드 활성화 완료: {marker.Title}");
+                //_log?.Info($"마커 편집 모드 활성화 완료: {marker.Title}");
             }
             else
             {
@@ -766,16 +766,16 @@ public class MapViewModel : BasePanelViewModel,
     private void UpdateSelectedMarker(IEditableMarker marker)
     {
 
-        _log?.Info($"UpdateSelectedMarker 시작(marker) - {GetMarkerInfo(marker)}");
+        //_log?.Info($"UpdateSelectedMarker 시작(marker) - {GetMarkerInfo(marker)}");
 
-        SelectedMarker = marker;  
-        _log?.Info($"SelectedMarker 설정 후(Selectedmarker) - {GetMarkerInfo(SelectedMarker)}");
+        SelectedMarker = marker;
+        //_log?.Info($"SelectedMarker 설정 후(Selectedmarker) - {GetMarkerInfo(SelectedMarker)}");
 
 
         SelectedImage = null; // 이미지 선택 해제
 
         NotifyOfPropertyChange(nameof(CanEditMarker));
-        _log?.Info($"UpdateSelectedMarker 완료 - {GetMarkerInfo(marker)}");
+        //_log?.Info($"UpdateSelectedMarker 완료 - {GetMarkerInfo(marker)}");
     }
 
     /// <summary>
@@ -4558,7 +4558,7 @@ public class MapViewModel : BasePanelViewModel,
         ClickedCurrentPosition = MainMap.FromLocalToLatLng((int)p.X, (int)p.Y);
 
         // 디버깅 로그 추가
-        _log?.Info($"마우스 클릭: 화면좌표({p.X:F2}, {p.Y:F2}) -> 지리좌표({ClickedCurrentPosition.Lat:F6}, {ClickedCurrentPosition.Lng:F6})");
+        //_log?.Info($"마우스 클릭: 화면좌표({p.X:F2}, {p.Y:F2}) -> 지리좌표({ClickedCurrentPosition.Lat:F6}, {ClickedCurrentPosition.Lng:F6})");
     }
 
     /// <summary>
@@ -4966,7 +4966,7 @@ public class MapViewModel : BasePanelViewModel,
                 await _gMapDbSymbolService.UpdatePidsGroupSymbolAsync(pidsGroupMarker.Model);
                 break;
             case GMapImageMarker imageMarker:
-                _log?.Info($"[DEBUG-DBUPDATE] ImageModel Id={imageMarker.ImageModel.Id}, W={imageMarker.ImageModel.Width},H={imageMarker.ImageModel.Height}, Bounds=L:{imageMarker.ImageModel.Left:F6},T:{imageMarker.ImageModel.Top:F6},R:{imageMarker.ImageModel.Right:F6},B:{imageMarker.ImageModel.Bottom:F6}");
+                //_log?.Info($"[DEBUG-DBUPDATE] ImageModel Id={imageMarker.ImageModel.Id}, W={imageMarker.ImageModel.Width},H={imageMarker.ImageModel.Height}, Bounds=L:{imageMarker.ImageModel.Left:F6},T:{imageMarker.ImageModel.Top:F6},R:{imageMarker.ImageModel.Right:F6},B:{imageMarker.ImageModel.Bottom:F6}");
                 await _gMapDbSymbolService.UpdateImageAsync(imageMarker.ImageModel);
                 break;
             default:
@@ -5488,12 +5488,12 @@ public class MapViewModel : BasePanelViewModel,
     #region Property Panel Methods
     private void ShowPropertyPanel()
     {
-        _log?.Info($"ShowPropertyPanel 시작 - SelectedMarker: {SelectedMarker?.Title}");
+        //_log?.Info($"ShowPropertyPanel 시작 - SelectedMarker: {SelectedMarker?.Title}");
 
         if (SelectedMarker == null) return;
 
         // Property Panel 생성 전후로 마커 상태 로그
-        _log?.Info($"Property Panel 생성 전 - {GetMarkerInfo(SelectedMarker)}");
+        //_log?.Info($"Property Panel 생성 전 - {GetMarkerInfo(SelectedMarker)}");
 
        
         // 기존 패널 정리
@@ -5520,10 +5520,10 @@ public class MapViewModel : BasePanelViewModel,
 
             IsPropertyPanelVisible = true;
             RefreshPropertyPanelZOrder();
-            _log?.Info($"PropertyPanel 생성 완료: {PropertyPanel.GetType().Name}");
+            //_log?.Info($"PropertyPanel 생성 완료: {PropertyPanel.GetType().Name}");
         }
 
-        _log?.Info($"Property Panel 생성 후 - {GetMarkerInfo(SelectedMarker)}");
+        //_log?.Info($"Property Panel 생성 후 - {GetMarkerInfo(SelectedMarker)}");
         IsPropertyPanelVisible = true;
     }
 

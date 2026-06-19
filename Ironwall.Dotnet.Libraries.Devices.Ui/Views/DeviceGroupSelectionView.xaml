@@ -42,7 +42,7 @@
 					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="2*" MinWidth="80" />
 					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="Auto" />
@@ -72,6 +72,8 @@
 				<Button
 					x:Name="ApplyButton"
 					Grid.Column="4"
+					HorizontalAlignment="Center"
+					Margin="5 0"
 					BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
 					Style="{StaticResource MaterialDesignFlatButton}">
 					<StackPanel Orientation="Horizontal">
@@ -80,13 +82,14 @@
 					</StackPanel>
 				</Button>
 
-				<!--  Spacer  -->
-				<Separator
+				<!--  Spacer + vertical divider  -->
+				<Rectangle
 					Grid.Column="5"
-					Margin="8,4"
-					Style="{StaticResource MaterialDesignDarkSeparator}"
-					HorizontalAlignment="Stretch"
-					/>
+					Width="1"
+					Margin="0,4"
+					HorizontalAlignment="Right"
+					VerticalAlignment="Stretch"
+					Fill="{DynamicResource MaterialDesignDivider}" />
 
 				<!--  추가 버튼  -->
 				<Button
@@ -204,22 +207,22 @@
 							Binding="{Binding DeviceName}"
 							Header="장비명"
 							IsReadOnly="True"
-							Width="*" />
+							Width="3*" />
 						<DataGridTextColumn
 							Binding="{Binding DeviceType}"
 							Header="장비유형"
 							IsReadOnly="True"
-							Width="110" />
+							Width="1*" />
 						<DataGridTextColumn
 							Binding="{Binding Status}"
 							Header="상태"
 							IsReadOnly="True"
-							Width="90" />
+							Width="1*" />
 						<DataGridCheckBoxColumn
 							Binding="{Binding IsEnable}"
 							Header="활성화"
 							IsReadOnly="True"
-							Width="60" />
+							Width="1*" />
 					</DataGrid.Columns>
 				</DataGrid>
 			</Grid>

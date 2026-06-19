@@ -196,7 +196,7 @@ public class MarkerAdornerLayer : IDisposable
                     adornerLayer.Add(adorner);
                     _activeAdorners[marker] = adorner;
 
-                    _log?.Info($"Adorner 생성 및 추가: {marker.Title}");
+                    //_log?.Info($"Adorner 생성 및 추가: {marker.Title}");
 
                     // 이벤트 발생
                     AdornerCreated?.Invoke(this, new AdornerLifecycleEventArgs(marker, AdornerLifecycleEventType.Created));
@@ -261,7 +261,7 @@ public class MarkerAdornerLayer : IDisposable
                     RemoveAdornerInternal(kvp.Key, kvp.Value);
                 }
 
-                _log?.Info($"모든 Adorner 제거 완료: {adorners.Count}개");
+                //_log?.Info($"모든 Adorner 제거 완료: {adorners.Count}개");
             }
             catch (Exception ex)
             {
@@ -397,7 +397,7 @@ public class MarkerAdornerLayer : IDisposable
                     RemoveAdornerInternal(kvp.Key, kvp.Value);
                 }
 
-                _log?.Info($"다른 Adorner 제거 완료: {adorners.Count}개, 유지: {keepMarker.Title}");
+                //_log?.Info($"다른 Adorner 제거 완료: {adorners.Count}개, 유지: {keepMarker.Title}");
             }
             catch (Exception ex)
             {
@@ -432,7 +432,7 @@ public class MarkerAdornerLayer : IDisposable
             if (adornerLayer != null)
             {
                 adornerLayer.Remove(adorner);
-                _log?.Info($"AdornerLayer에서 Adorner 제거: {marker.Title}");
+                //_log?.Info($"AdornerLayer에서 Adorner 제거: {marker.Title}");
             }
             else
             {
@@ -448,7 +448,7 @@ public class MarkerAdornerLayer : IDisposable
                 disposableAdorner.Dispose();
             }
 
-            _log?.Info($"Adorner 제거 완료: {marker.Title}");
+            //_log?.Info($"Adorner 제거 완료: {marker.Title}");
 
             // 이벤트 발생
             AdornerRemoved?.Invoke(this, new AdornerLifecycleEventArgs(marker, AdornerLifecycleEventType.Removed));

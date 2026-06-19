@@ -76,7 +76,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
                 // → OnSelectedMarkerChanged에서 LinkedDevice가 FilteredDeviceList와 매칭됨
                 panel.SelectedMarker = marker;
 
-                _log?.Info($"Created {panelType.Name} for {markerType.Name}");
+                //_log?.Info($"Created {panelType.Name} for {markerType.Name}");
                 return panel;
             }
 
