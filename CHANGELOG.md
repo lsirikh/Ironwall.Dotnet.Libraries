@@ -15,6 +15,13 @@
 ## [Unreleased]
 
 ### Added
+- **Client/Server API v4.6 정합 — Phase 0 (S1~S5)** ([PRD](docs/prds/Client_API_v46_Conformance-prd.md) v3.1 · [Plan](docs/plans/Client_API_v46_Conformance-prd-plan.md))
+  - **FR-0**: `IApiService.DeleteRequestAsync<T>(endpoint, body)` body-DELETE 오버로드 신설(벌크해제 공통 인프라, `PatchRequestAsync` 패턴)
+  - **FR-1**: ActionEvent 1:N — `GetDetection/MalfunctionActionsAsync`가 `/{id}/actions`(복수) + `ApiListResponse<ActionEventDto>` 배열 반환(기존 단수 `/action`+단건 → 404/역직렬화 위험 제거)
+  - **FR-5**: `DeviceGroupBulkRemoveResultDto` + `IDeviceApiService.RemoveDevicesFromGroupAsync`(body-DELETE 벌크 제거) — VM 1콜 교체는 후속(WIP 정리 후)
+  - **FR-6**: `EventMappingCameraDto`/`SpeakerDto`에 `is_enable` 추가(Speaker PUT 422 해소)
+  - **FR-7**: `GeolocationDto.heading`(0~360 FOV 방위) + `CameraPresetDto.is_restricted_zone`(감시금지구역) 추가 (restricted_actions는 v4.6 폐기로 미추가)
+  - 검증: 5개 프로젝트 빌드 0에러, Messages 단위테스트 174/174 통과, code-review 무차단. PARK(후속): FR-1(b) RowDetails·FR-2·FR-3·FR-8·FR-10~17(NATS/외부의존) — Plan 참조
 - **디지털 줌 (Digital Zoom)** ([PRD](docs/prds/DigitalZoom_RenderTransform-prd.md) · [Plan](docs/plans/DigitalZoom_RenderTransform-prd-plan.md))
   - MaxZoom 초과 시 `GMapCustomControl.RenderTransform = ScaleTransform`으로 타일+마커+오버레이 균일 소프트 확대(1.5x/2.0x). ScaleMode/Zoom/_core 불변, 히트테스트 무보정(WPF 자동 역변환)
   - 휠/슬라이더/버튼 라우팅(`DigitalZoomLevel`/`SliderValue` DP), 축척바 거리 숫자 ÷배율, 맵 전환 시 리셋

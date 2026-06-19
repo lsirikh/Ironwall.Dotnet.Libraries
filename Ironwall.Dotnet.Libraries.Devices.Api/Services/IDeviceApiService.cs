@@ -528,4 +528,10 @@ public interface IDeviceApiService : IService
         int groupId,
         int deviceId,
         CancellationToken token = default);
+
+    // v4.3: 일괄 제거 (body-DELETE) — 단건 N콜 → 1콜 (40초→<1초)
+    Task<ApiResponse<DeviceGroupBulkRemoveResultDto>> RemoveDevicesFromGroupAsync(
+        int groupId,
+        DeviceGroupAssignRequestDto dto,
+        CancellationToken token = default);
 }

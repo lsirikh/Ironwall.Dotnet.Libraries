@@ -478,13 +478,13 @@ public class EventRelationApiTests
 
         try
         {
-            // ── DetectionAction 조회 ──
-            var actionResp = await _svc.GetDetectionActionAsync(detId);
+            // ── DetectionActions 조회 (v4.6 1:N — 배열) ──
+            var actionResp = await _svc.GetDetectionActionsAsync(detId);
             Assert.True(actionResp.Success,
-                $"GetDetectionAction failed: {actionResp.Error?.Code} - {actionResp.Message}");
+                $"GetDetectionActions failed: {actionResp.Error?.Code} - {actionResp.Message}");
             Assert.NotNull(actionResp.Data);
-            Assert.Equal(actId, actionResp.Data.Id);
-            _output.WriteLine($"DetectionAction ID={actionResp.Data.Id}, User={actionResp.Data.User}");
+            Assert.Contains(actionResp.Data, a => a.Id == actId);
+            _output.WriteLine($"DetectionActions count={actionResp.Data.Count}");
         }
         finally
         {
@@ -528,13 +528,13 @@ public class EventRelationApiTests
 
         try
         {
-            // ── MalfunctionAction 조회 ──
-            var actionResp = await _svc.GetMalfunctionActionAsync(malId);
+            // ── MalfunctionActions 조회 (v4.6 1:N — 배열) ──
+            var actionResp = await _svc.GetMalfunctionActionsAsync(malId);
             Assert.True(actionResp.Success,
-                $"GetMalfunctionAction failed: {actionResp.Error?.Code} - {actionResp.Message}");
+                $"GetMalfunctionActions failed: {actionResp.Error?.Code} - {actionResp.Message}");
             Assert.NotNull(actionResp.Data);
-            Assert.Equal(actId, actionResp.Data.Id);
-            _output.WriteLine($"MalfunctionAction ID={actionResp.Data.Id}, User={actionResp.Data.User}");
+            Assert.Contains(actionResp.Data, a => a.Id == actId);
+            _output.WriteLine($"MalfunctionActions count={actionResp.Data.Count}");
         }
         finally
         {

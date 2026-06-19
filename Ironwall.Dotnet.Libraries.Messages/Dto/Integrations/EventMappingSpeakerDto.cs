@@ -16,6 +16,9 @@ public class EventMappingSpeakerDto
     [JsonProperty("repeat_count")]
     public int RepeatCount { get; set; }
 
+    [JsonProperty("is_enable")]
+    public bool IsEnable { get; set; } = true;
+
     [JsonProperty("priority")]
     public int Priority { get; set; }
 }

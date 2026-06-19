@@ -19,6 +19,9 @@ public class EventMappingCameraDto
     [JsonProperty("delay_time")]
     public int DelayTime { get; set; }
 
+    [JsonProperty("is_enable")]
+    public bool IsEnable { get; set; } = true;
+
     [JsonProperty("priority")]
     public int Priority { get; set; }
 }

@@ -342,11 +342,12 @@ public interface IEventApiService : IService
 
     // ────────────────────────── Detection/Malfunction Action 조회 ──────────────────────────
 
-    Task<ApiResponse<ActionEventDto>> GetDetectionActionAsync(
+    // v4.6: ActionEvent 1:N — /{id}/actions(복수) + 배열 응답
+    Task<ApiListResponse<ActionEventDto>> GetDetectionActionsAsync(
         int detectionId,
         CancellationToken token = default);
 
-    Task<ApiResponse<ActionEventDto>> GetMalfunctionActionAsync(
+    Task<ApiListResponse<ActionEventDto>> GetMalfunctionActionsAsync(
         int malfunctionId,
         CancellationToken token = default);
 

@@ -32,6 +32,13 @@ public class CameraPresetDto
     [JsonProperty("rois", Order = 8, NullValueHandling = NullValueHandling.Ignore)]
     public List<RoiDto>? Rois { get; set; }
 
+    /// <summary>
+    /// 감시금지구역 표시 (v4.6). true 시 매니저별 통일 차단(RTSP/녹화/이벤트/화면마스킹).
+    /// ※ restricted_actions는 v4.6 차장결재로 폐기 — is_restricted_zone 단일 플래그로 통일.
+    /// </summary>
+    [JsonProperty("is_restricted_zone", Order = 9)]
+    public bool IsRestrictedZone { get; set; }
+
     [JsonProperty("created_at", Order = 99, NullValueHandling = NullValueHandling.Ignore)]
     public string? CreatedAt { get; set; }
 
