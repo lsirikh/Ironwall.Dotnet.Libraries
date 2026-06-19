@@ -162,6 +162,38 @@ public class ApiService : IApiService
     }
 
     /// <summary>
+    /// Delete 요청 처리 (body 포함 — 서버 벌크해제용, v4.3+)
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="endpoint"></param>
+    /// <param name="body"></param>
+    /// <returns></returns>
+    public async Task<HttpResponseMessage> DeleteRequestAsync<T>(string endpoint, T body)
+    {
+        try
+        {
+            if (_client == null)
+                throw new InvalidOperationException("HttpClient 인스턴스가 생성되지 않았습니다.");
+
+            if (string.IsNullOrWhiteSpace(endpoint))
+                throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
+
+            var json = JsonConvert.SerializeObject(body);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var request = new HttpRequestMessage(HttpMethod.Delete, endpoint)
+            {
+                Content = content
+            };
+            return await _client.SendAsync(request);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[ApiService] DELETE(body) 요청 실패: {ex.Message}");
+            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+        }
+    }
+
+    /// <summary>
     /// Patch 요청 처리
     /// </summary>
     /// <typeparam name="T"></typeparam>

@@ -1334,6 +1334,22 @@ public class DeviceApiService : IDeviceApiService
         }
     }
 
+    // v4.3: 일괄 제거 (body-DELETE) — DeviceGroupAssignRequestDto.device_ids 재사용
+    public async Task<ApiResponse<DeviceGroupBulkRemoveResultDto>> RemoveDevicesFromGroupAsync(
+        int groupId, DeviceGroupAssignRequestDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/devices/groups/{groupId}/devices", dto);
+            return await response.ToApiResponseAsync<DeviceGroupBulkRemoveResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(RemoveDevicesFromGroupAsync)}] Error: {ex.Message}");
+            return ApiResponse<DeviceGroupBulkRemoveResultDto>.CreateError("INTERNAL_ERROR", "Failed to bulk-remove devices from group", ex.Message);
+        }
+    }
+
     #endregion
 
     #region - Attributes -

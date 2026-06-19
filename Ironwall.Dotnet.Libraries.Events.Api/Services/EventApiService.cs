@@ -680,31 +680,32 @@ public class EventApiService : IEventApiService
     #endregion
 
     #region - Detection/Malfunction Action 조회 -
-    public async Task<ApiResponse<ActionEventDto>> GetDetectionActionAsync(int detectionId, CancellationToken token = default)
+    // v4.6: ActionEvent 1:N — 경로 /actions(복수) + 배열(ApiListResponse). 미존재 시 data:[]
+    public async Task<ApiListResponse<ActionEventDto>> GetDetectionActionsAsync(int detectionId, CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections/{detectionId}/action");
-            return await response.ToApiResponseAsync<ActionEventDto>();
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/detections/{detectionId}/actions");
+            return await response.ToApiListResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
         {
-            _log?.Error($"[{nameof(GetDetectionActionAsync)}] Error: {ex.Message}");
-            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get detection action {detectionId}", ex.Message);
+            _log?.Error($"[{nameof(GetDetectionActionsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get actions of detection {detectionId}", ex.Message);
         }
     }
 
-    public async Task<ApiResponse<ActionEventDto>> GetMalfunctionActionAsync(int malfunctionId, CancellationToken token = default)
+    public async Task<ApiListResponse<ActionEventDto>> GetMalfunctionActionsAsync(int malfunctionId, CancellationToken token = default)
     {
         try
         {
-            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions/{malfunctionId}/action");
-            return await response.ToApiResponseAsync<ActionEventDto>();
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/events/malfunctions/{malfunctionId}/actions");
+            return await response.ToApiListResponseAsync<ActionEventDto>();
         }
         catch (Exception ex)
         {
-            _log?.Error($"[{nameof(GetMalfunctionActionAsync)}] Error: {ex.Message}");
-            return ApiResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get malfunction action {malfunctionId}", ex.Message);
+            _log?.Error($"[{nameof(GetMalfunctionActionsAsync)}] Error: {ex.Message}");
+            return ApiListResponse<ActionEventDto>.CreateError("INTERNAL_ERROR", $"Failed to get actions of malfunction {malfunctionId}", ex.Message);
         }
     }
     #endregion

@@ -1063,6 +1063,8 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<DeviceGroupAssignResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<object>> RemoveDeviceFromGroupAsync(int groupId, int deviceId, CancellationToken token = default)
         => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<DeviceGroupBulkRemoveResultDto>> RemoveDevicesFromGroupAsync(int groupId, DeviceGroupAssignRequestDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<DeviceGroupBulkRemoveResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Enclosure Metrics ────────────────────────────
     public Task<EnclosureMetricSaveResponseDto> CreateEnclosureMetricAsync(int enclosureId, EnclosureMetricDto dto, CancellationToken token = default)

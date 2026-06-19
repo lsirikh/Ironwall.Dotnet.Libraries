@@ -18,4 +18,11 @@ public class GeolocationDto
 
     [JsonProperty("altitude")]
     public double Altitude { get; set; }
+
+    /// <summary>
+    /// 장비 설치 방위각 0~360° (v4.4). GIS 부채꼴(FOV) 방향 시각화용. optional.
+    /// Camera/Speaker/Sensor 의미있음, Lamp/Enclosure는 null.
+    /// </summary>
+    [JsonProperty("heading", NullValueHandling = NullValueHandling.Ignore)]
+    public double? Heading { get; set; }
 }
