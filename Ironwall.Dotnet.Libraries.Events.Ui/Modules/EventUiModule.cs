@@ -74,6 +74,7 @@ public class EventUiModule : Module
                    .SingleInstance();
             builder.RegisterType<TrackingStatusNatsSyncService>()
                    .As<ITrackingStatusNatsSyncService>()
+                   .As<IService>().WithMetadata("Order", _count + 3)   // OnExit StopAsync → NATS 구독 해제
                    .SingleInstance();
             builder.Register(c => new DetectionNatsSyncService(
                 c.ResolveOptional<ILogService>(),
@@ -176,6 +177,10 @@ public class EventUiModule : Module
                 // MalfunctionNatsSyncService 시작 — NATS MALFUNCTION 구독 등록
                 var mns = scope.Resolve<IMalfunctionNatsSyncService>();
                 mns.StartService();
+
+                // TrackingStatusNatsSyncService 시작 — NATS TRACKING_STATUS 구독 등록(로그-only stub)
+                var tns = scope.Resolve<ITrackingStatusNatsSyncService>();
+                tns.StartService();
             });
          
             builder.RegisterType<DetectionReportDialogViewModel>().AsSelf()//  new DetectionReportDialogViewModel() 로도 해결 가능

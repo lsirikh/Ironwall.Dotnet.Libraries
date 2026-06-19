@@ -12,4 +12,5 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /// </summary>
 public interface ITrackingStatusNatsSyncService : IService
 {
+    Task StartService(CancellationToken token = default);
 }
