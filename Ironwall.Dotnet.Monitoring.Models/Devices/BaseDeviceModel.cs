@@ -58,4 +58,7 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
     public double Longitude { get; set; }
     [JsonProperty("is_enable", Order = 13)]
     public bool IsEnable { get; set; }
+    /// <summary>장비 설치 방위각 0~360° (v4.4 geolocation.heading). 심볼 FOV BaseBearing 구동용. optional.</summary>
+    [JsonProperty("heading", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
+    public double? Heading { get; set; }
 }

@@ -58,6 +58,7 @@ public static class DtoToModelHelper
             model.Location = dto.Geolocation.Location;
             model.Latitude = dto.Geolocation.Latitude;
             model.Longitude = dto.Geolocation.Longitude;
+            model.Heading = dto.Geolocation.Heading;   // v4.4: 설치 방위 → 심볼 BaseBearing 구동(메모리)
         }
     }
 

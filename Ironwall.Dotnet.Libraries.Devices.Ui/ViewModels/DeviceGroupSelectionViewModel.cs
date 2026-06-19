@@ -6,6 +6,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.Generic;
@@ -177,19 +178,23 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
                 var groupId = _selection[0].Id;
-                _log?.Info($"[DeviceGroupSelectionVM] Removing {targets.Count} devices from group {groupId}");
-                foreach (var device in targets)
+                // v4.3 벌크 해제: 등록(배치 POST 1콜)의 반대 방향 — 단건 N콜 루프 제거, body-DELETE 1콜
+                var dto = new DeviceGroupAssignRequestDto { DeviceIds = targets.Select(d => d.Id).ToList() };
+                _log?.Info($"[DeviceGroupSelectionVM] Bulk removing {targets.Count} devices from group {groupId} (1-call)");
+                var resp = await _apiService.RemoveDevicesFromGroupAsync(groupId, dto);
+                if (resp.Success && resp.Data != null)
                 {
-                    _log?.Info($"[DeviceGroupSelectionVM] API RemoveDeviceFromGroupAsync(groupId={groupId}, deviceId={device.Id})");
-                    var resp = await _apiService.RemoveDeviceFromGroupAsync(groupId, device.Id);
-                    if (!resp.Success)
-                        _log?.Warning($"RemoveDevice failed (Id={device.Id}): {resp.Message}");
-                    else
+                    var removed = resp.Data.RemovedDeviceIds ?? new List<int>();
+                    foreach (var id in removed)
                     {
-                        _log?.Info($"[DeviceGroupSelectionVM] Removed device {device.Id} from group {groupId} OK");
-                        var model = _deviceProvider.OfType<IBaseDeviceModel>().FirstOrDefault(m => m.Id == device.Id);
+                        var model = _deviceProvider.OfType<IBaseDeviceModel>().FirstOrDefault(m => m.Id == id);
                         model?.DeviceGroups?.Remove(groupId);
                     }
+                    _log?.Info($"[DeviceGroupSelectionVM] Bulk removed OK: removed={removed.Count}, skipped={resp.Data.SkippedDeviceIds?.Count ?? 0}, notFound={resp.Data.NotFoundDeviceIds?.Count ?? 0}");
+                }
+                else
+                {
+                    _log?.Warning($"[DeviceGroupSelectionVM] Bulk remove failed: {resp.Error?.Code} - {resp.Message}");
                 }
                 SelectedAssignedDevices.Clear();
                 await LoadAssignedDevicesAsync();

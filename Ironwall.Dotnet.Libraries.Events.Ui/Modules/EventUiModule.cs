@@ -72,6 +72,9 @@ public class EventUiModule : Module
             builder.RegisterType<CameraPtzNatsSyncService>()
                    .As<ICameraPtzNatsSyncService>()
                    .SingleInstance();
+            builder.RegisterType<TrackingStatusNatsSyncService>()
+                   .As<ITrackingStatusNatsSyncService>()
+                   .SingleInstance();
             builder.Register(c => new DetectionNatsSyncService(
                 c.ResolveOptional<ILogService>(),
                 c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
