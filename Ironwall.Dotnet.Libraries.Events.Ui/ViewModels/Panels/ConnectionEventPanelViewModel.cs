@@ -140,7 +140,10 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
                 await _providerService.UpdateConnectionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IConnectionEventModel>())
-                await _providerService.InsertConnectionEventAsync(model, token);
+            {
+                var created = await _providerService.InsertConnectionEventAsync(model, token);
+                if (created != null && created.Id > 0) model.Id = created.Id;   // Id write-back → 재Save 유령중복 방지
+            }
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -406,10 +409,12 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in _pendingDeleteItems)
-            {
-                var ret = await _providerService.DeleteConnectionEventAsync(item.Model.Id, cancellationToken);
-            }
+            await ExecuteDeleteAsync(
+                _pendingDeleteItems,
+                r => r.Model.Id,
+                (id, t) => _providerService.DeleteConnectionEventAsync(id, t),
+                r => _eventProvider.Remove(r.Model),
+                cancellationToken);
             _pendingDeleteItems = [];
         }, cancellationToken);
 

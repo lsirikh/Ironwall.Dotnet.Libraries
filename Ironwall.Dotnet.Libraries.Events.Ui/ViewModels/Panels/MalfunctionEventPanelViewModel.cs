@@ -142,7 +142,10 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                 await _providerService.UpdateMalfunctionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IMalfunctionEventModel>())
-                await _providerService.InsertMalfunctionEventAsync(model, token);
+            {
+                var created = await _providerService.InsertMalfunctionEventAsync(model, token);
+                if (created != null && created.Id > 0) model.Id = created.Id;   // Id write-back → 재Save 유령중복 방지
+            }
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -413,10 +416,12 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in _pendingDeleteItems)
-            {
-                var ret = await _providerService.DeleteMalfunctionEventAsync(item.Model.Id, cancellationToken);
-            }
+            await ExecuteDeleteAsync(
+                _pendingDeleteItems,
+                r => r.Model.Id,
+                (id, t) => _providerService.DeleteMalfunctionEventAsync(id, t),
+                r => _eventProvider.Remove(r.Model),
+                cancellationToken);
             _pendingDeleteItems = [];
         }, cancellationToken);
 

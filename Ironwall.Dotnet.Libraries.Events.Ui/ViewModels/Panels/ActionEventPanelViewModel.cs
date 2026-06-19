@@ -136,7 +136,10 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
                 await _providerService.UpdateActionEventAsync(model, token);
 
             foreach (var model in insertList.OfType<IActionEventModel>())
-                await _providerService.InsertActionEventAsync(model, token);
+            {
+                var created = await _providerService.InsertActionEventAsync(model, token);
+                if (created != null && created.Id > 0) model.Id = created.Id;   // Id write-back → 재Save 재Insert(유령중복) 방지
+            }
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);
@@ -418,10 +421,13 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
         // 2. 비동기 작업 (UI 스레드와 분리)
         await Task.Run(async () =>
         {
-            foreach (var item in _pendingDeleteItems)
-            {
-                var ret = await _providerService.DeleteActionEventAsync(item.Model.Id, cancellationToken);
-            }
+            // CRUD 통일: Id<=0(Draft 미저장)은 로컬만 제거(API 미호출), Id>0만 DELETE + 성공 시 제거
+            await ExecuteDeleteAsync(
+                _pendingDeleteItems,
+                r => r.Model.Id,
+                (id, t) => _providerService.DeleteActionEventAsync(id, t),
+                r => EventProvider.Remove(r.Model),
+                cancellationToken);
             _pendingDeleteItems = [];
         }, cancellationToken);
 
