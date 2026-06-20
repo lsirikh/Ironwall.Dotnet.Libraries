@@ -67,7 +67,8 @@ public class BatchActionReportTests
             _mockUserModel.Object,
             _mockApiService.Object,
             _mockSymbolEventManager.Object,
-            _mockEventQueueManager.Object);
+            _mockEventQueueManager.Object,
+            new Ironwall.Dotnet.Libraries.Events.Ui.Services.ActionReportGuard());  // (Phase3) 실제 가드(결정적)
     }
 
     private DetectionEventCardViewModel CreateDetectionCard(int eventId = 1)

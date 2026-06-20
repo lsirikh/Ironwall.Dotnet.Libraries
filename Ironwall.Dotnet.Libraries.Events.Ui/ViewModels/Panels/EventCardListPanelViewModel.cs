@@ -47,7 +47,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                           , IAccountModel userModel
                                           , IEventApiService apiService
                                           , ISymbolEventManager symbolEventManager
-                                          , IEventQueueManager eventQueueManager)
+                                          , IEventQueueManager eventQueueManager
+                                          , IActionReportGuard reportGuard)
                                         : base(ea, log)
         {
             _providerService = providerService;
@@ -55,6 +56,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             _apiService = apiService;
             _symbolEventManager = symbolEventManager;
             _eventQueueManager = eventQueueManager;
+            _reportGuard = reportGuard;
             _batchBuffer = new EventCardBatchBuffer<EventCardBaseViewModel>();
         }
         #endregion
@@ -321,7 +323,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var eventId = eventModel?.Id ?? 0;
 
                     // (EC5) 동일 이벤트가 Auto/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
-                    if (eventId > 0 && !_inFlightEventIds.TryAdd(eventId, 0))
+                    if (!_reportGuard.TryEnter(eventId))
                     {
                         _log?.Info($"배치 조치보고: Event({eventId}) 진행 중 — 중복 스킵");
                         continue;
@@ -391,7 +393,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     }
                     finally
                     {
-                        if (eventId > 0) _inFlightEventIds.TryRemove(eventId, out _);
+                        _reportGuard.Exit(eventId);
                     }
                 }
             }
@@ -466,7 +468,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 }
 
                 // (EC5) 동일 이벤트가 Batch/AutoRecovery 등 다른 경로에서 조치 진행 중이면 중복 스킵
-                if (!_inFlightEventIds.TryAdd(eventId, 0))
+                if (!_reportGuard.TryEnter(eventId))
                 {
                     _log?.Info($"AutoReport: Event({eventId}) 조치보고 진행 중 — 중복 스킵");
                     entry.NextRetryAfter = DateTime.Now.AddSeconds(BACKOFF_SECONDS); // 타이트 재발화 루프 방지
@@ -519,7 +521,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 }
                 finally
                 {
-                    _inFlightEventIds.TryRemove(eventId, out _);
+                    _reportGuard.Exit(eventId);
                 }
             }
             catch (Exception ex)
@@ -547,7 +549,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 if (eventModel == null) return;
 
                 // (EC5) 동일 이벤트가 Batch/Auto 등 다른 경로에서 조치 진행 중이면 중복 스킵
-                if (!_inFlightEventIds.TryAdd(eventModel.Id, 0))
+                if (!_reportGuard.TryEnter(eventModel.Id))
                 {
                     _log?.Info($"AutoRecovery: Event({eventModel.Id}) 조치보고 진행 중 — 중복 스킵");
                     return;
@@ -586,7 +588,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 }
                 finally
                 {
-                    _inFlightEventIds.TryRemove(eventModel.Id, out _);
+                    _reportGuard.Exit(eventModel.Id);
                 }
             }
             catch (Exception ex)
@@ -743,11 +745,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private readonly ConcurrentDictionary<int, string> _pendingEntries = new();
         private readonly ConcurrentDictionary<string, EventCardBaseViewModel> _cardByEntryId = new();
         private readonly SemaphoreSlim _batchReportGate = new(1, 1);
-        // (EC2/EC5) 조치보고 진행 중인 EventId 집합. 이 패널의 Auto/AutoRecovery/Batch 3경로 한정으로
-        // 동일 이벤트에 CreateActionEventAsync 가 동시 호출돼 서버 중복 조치보고/NATS 중복발행되는 것을 막는다.
-        // ⚠ 수동 조치보고(DetectionEventCardViewModel.SendAction 다이얼로그)는 별도 VM이라 이 가드에 미참여 →
-        //   수동 vs 자동 교차 중복은 현재 서버 멱등 미보장(후속 과제: 가드 소유 통합).
-        private readonly ConcurrentDictionary<int, byte> _inFlightEventIds = new();
+        // (EC2/EC5 + Phase3) 조치보고 멱등 가드(싱글톤 IActionReportGuard). Auto/AutoRecovery/Batch 3경로 +
+        // 수동 조치보고(EventCard.SendAction)가 같은 인스턴스를 공유 → 동일 EventId에 CreateActionEventAsync
+        // 동시 호출(서버 중복 조치보고/NATS 중복발행)을 차단. 수동×자동 교차 중복 해소.
+        private readonly IActionReportGuard _reportGuard;
         private Timer? _batchTimer;
         private EventCardBaseViewModel _selectedEventCardViewModel;
         private bool _isAnimationEnabled = true;

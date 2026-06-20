@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
@@ -42,31 +43,42 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             IdUser = account.Name;
             Contents = content ?? "자동 조치보고";
 
-            var apiService = IoC.Get<IEventApiService>();
-            var dto = new ActionEventCreateDto
+            // (Phase3) 조치보고 멱등 — 동일 EventId가 자동/자동복구/배치 경로에서 진행 중이면 수동 보고 스킵(서버/NATS 중복 차단).
+            var guard = IoC.Get<IActionReportGuard>();
+            if (!guard.TryEnter(Model.Id))
             {
-                User = IdUser ?? string.Empty,
-                Content = Contents,
-                FromEventId = Model.Id
-            };
-            var response = await apiService.CreateActionEventAsync(dto);
-            if (!response.Success)
-            {
-                _log?.Error($"[ACTION_REPORT] Malfunction INSERT 실패: {response.Message}");
-                return false;   // (EA3) 실패 신호 → 다이얼로그 유지
+                _log?.Info($"[ACTION_REPORT] Malfunction Event({Model.Id}) 조치보고 진행 중 — 수동 중복 스킵");
+                return true;   // 다른 경로가 보고 중 → 이벤트는 보고됨(다이얼로그 닫기 허용)
             }
-
-            await _eventAggregator.PublishOnCurrentThreadAsync(new MalfunctionReportedMessageModel(this, Contents, IdUser));
-            await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+            try
             {
-                EventId = Model.Id,
-                EventType = EnumEventType.Fault,
-                ActionDetails = Contents,
-                ActionUser = IdUser,
-                ActionTime = DateTime.Now
-            });
+                var apiService = IoC.Get<IEventApiService>();
+                var dto = new ActionEventCreateDto
+                {
+                    User = IdUser ?? string.Empty,
+                    Content = Contents,
+                    FromEventId = Model.Id
+                };
+                var response = await apiService.CreateActionEventAsync(dto);
+                if (!response.Success)
+                {
+                    _log?.Error($"[ACTION_REPORT] Malfunction INSERT 실패: {response.Message}");
+                    return false;   // (EA3) 실패 신호 → 다이얼로그 유지
+                }
 
-            return await base.SendAction(content, idUser);
+                await _eventAggregator.PublishOnCurrentThreadAsync(new MalfunctionReportedMessageModel(this, Contents, IdUser));
+                await _eventAggregator.PublishOnBackgroundThreadAsync(new SendActionRequestMessage
+                {
+                    EventId = Model.Id,
+                    EventType = EnumEventType.Fault,
+                    ActionDetails = Contents,
+                    ActionUser = IdUser,
+                    ActionTime = DateTime.Now
+                });
+
+                return await base.SendAction(content, idUser);
+            }
+            finally { guard.Exit(Model.Id); }
         }
 
         protected override Task CloseDialog()
