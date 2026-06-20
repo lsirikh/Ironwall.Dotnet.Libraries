@@ -80,6 +80,7 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             var resp = await _apiService.CreateSpeakerAsync(model.ToSpeakerDeviceDto(), CancellationToken.None);
             if (!resp.Success || resp.Data == null)
             {
+                _log?.Error($"[Speaker Insert] 추가 실패 HTTP {resp.StatusCode}: {resp.Message} | 서버 detail={resp.Error?.Details}");
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "스피커 추가 실패",
