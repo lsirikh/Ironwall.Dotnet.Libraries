@@ -51,7 +51,10 @@ public class EventUiModule : Module
                 c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>(),
                 c.ResolveOptional<Ironwall.Dotnet.Libraries.Events.Providers.EventProvider>()
             )).SingleInstance();
-            
+
+            // (Phase3) 조치보고 멱등 가드 — 자동/자동복구/배치(EventCardListPanel) + 수동(EventCard.SendAction) 공유 싱글톤
+            builder.RegisterType<ActionReportGuard>().As<IActionReportGuard>().SingleInstance();
+
             builder.RegisterType<EventDashboardViewModel>().SingleInstance();
             builder.RegisterType<EventTabControlViewModel>().SingleInstance();
             builder.RegisterType<DetectionEventPanelViewModel>().SingleInstance();
