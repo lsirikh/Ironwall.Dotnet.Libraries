@@ -84,10 +84,13 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         {
             var existing = _deviceProvider.OfType<CameraDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
             int number = 1; while (existing.Contains(number)) number++;
-            var model = new CameraDeviceModel { DeviceNumber = number, DeviceName = $"새 카메라 {number}" };
+            // (422 fix) 서버 ip_port>=1 요구(Controller와 동일 규칙) → 유효 placeholder 포트 부여.
+            var model = new CameraDeviceModel { DeviceNumber = number, DeviceName = $"새 카메라 {number}", IpPort = 502 };
             var resp = await _apiService.CreateCameraAsync(model.ToCameraDeviceDto(), CancellationToken.None);
             if (!resp.Success || resp.Data == null)
             {
+                // (422 디버깅) 서버 거부 필드 로깅. 카메라 DTO는 비밀번호 포함 가능 → 요청 본문은 로깅하지 않고 서버 응답(detail)만.
+                _log?.Error($"[Camera Insert] 추가 실패 HTTP {resp.StatusCode}: {resp.Message} | 서버 detail={resp.Error?.Details}");
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "카메라 추가 실패",

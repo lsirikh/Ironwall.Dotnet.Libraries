@@ -83,7 +83,9 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         {
             var existing = _deviceProvider.OfType<ControllerDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
             int number = 1; while (existing.Contains(number)) number++;
-            var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}" };
+            // (422 fix) 서버는 ip_port>=1 요구(VALIDATION_ERROR) → 유효 placeholder 포트 부여(사용자가 실제 포트로 편집).
+            //   ip_address 빈값("")은 서버가 허용(거부 필드 아님).
+            var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}", Port = 502 };
             var dto = model.ToControllerDeviceDto();
             _log?.Info($"[Controller Insert] 요청 POST DTO: {Newtonsoft.Json.JsonConvert.SerializeObject(dto)}");
             var resp = await _apiService.CreateControllerAsync(dto, CancellationToken.None);
