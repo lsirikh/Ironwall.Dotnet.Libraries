@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Xunit;
 using Newtonsoft.Json;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Tests;
 
@@ -4939,3 +4940,71 @@ public class WindyModeNatsTests
     #endregion
 }
 #endregion
+
+/// <summary>
+/// (Phase v2.9.1) ApiMessageHelper 에러 응답 변환 — 422 본문 보존/StatusCode 회귀 잠금.
+/// 기존 결함: FastAPI {"detail":[...]} 가 MissingMemberHandling.Ignore로 빈 객체가 되어 본문이 폐기됐다.
+/// </summary>
+public class ApiMessageHelperErrorTests
+{
+    private static System.Net.Http.HttpResponseMessage MakeResponse(System.Net.HttpStatusCode code, string body)
+        => new System.Net.Http.HttpResponseMessage(code)
+        {
+            Content = new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        };
+
+    [Fact]
+    [Trait("Category", "API")]
+    public async Task ToApiResponseAsync_FastApi422Detail_PreservesBodyAndStatusCode()
+    {
+        // Arrange — FastAPI HTTPValidationError(성공/메시지/에러 키 없음)
+        var body = "{\"detail\":[{\"loc\":[\"body\",\"type_device\"],\"msg\":\"value is not a valid enumeration member\",\"type\":\"type_error.enum\"}]}";
+        var resp = MakeResponse(System.Net.HttpStatusCode.UnprocessableEntity, body);
+
+        // Act
+        var result = await resp.ToApiResponseAsync<ControllerDeviceDto>();
+
+        // Assert — 본문 폐기되지 않고 Error.Details에 보존 + StatusCode=422
+        Assert.False(result.Success);
+        Assert.Equal(422, result.StatusCode);
+        Assert.NotNull(result.Error);
+        Assert.NotNull(result.Error!.Details);
+        Assert.Contains("type_device", result.Error.Details!);
+    }
+
+    [Fact]
+    [Trait("Category", "API")]
+    public async Task ToApiResponseAsync_StandardErrorEnvelope_ReturnsEnvelopeWithStatusCode()
+    {
+        // Arrange — 서버 표준 에러 envelope는 그대로 보존되어야 한다
+        var body = "{\"success\":false,\"message\":\"Controller not found\",\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Controller not found\"}}";
+        var resp = MakeResponse(System.Net.HttpStatusCode.NotFound, body);
+
+        // Act
+        var result = await resp.ToApiResponseAsync<ControllerDeviceDto>();
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal(404, result.StatusCode);
+        Assert.Equal("Controller not found", result.Message);
+        Assert.NotNull(result.Error);
+        Assert.Equal("NOT_FOUND", result.Error!.Code);
+    }
+
+    [Fact]
+    [Trait("Category", "API")]
+    public async Task ToApiResponseAsync_Success_ReturnsData_NoRegression()
+    {
+        // Arrange — 성공 경로 무영향 확인
+        var body = "{\"success\":true,\"message\":\"ok\",\"data\":{\"id\":7,\"name_device\":\"Ctrl-7\",\"type_device\":\"Controller\",\"status\":\"ACTIVATED\"}}";
+        var resp = MakeResponse(System.Net.HttpStatusCode.OK, body);
+
+        // Act
+        var result = await resp.ToApiResponseAsync<ControllerDeviceDto>();
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(7, result.Data!.Id);
+    }
+}

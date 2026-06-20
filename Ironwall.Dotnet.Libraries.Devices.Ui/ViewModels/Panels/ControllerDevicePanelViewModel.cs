@@ -84,9 +84,13 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             var existing = _deviceProvider.OfType<ControllerDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
             int number = 1; while (existing.Contains(number)) number++;
             var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}" };
-            var resp = await _apiService.CreateControllerAsync(model.ToControllerDeviceDto(), CancellationToken.None);
+            var dto = model.ToControllerDeviceDto();
+            _log?.Info($"[Controller Insert] 요청 POST DTO: {Newtonsoft.Json.JsonConvert.SerializeObject(dto)}");
+            var resp = await _apiService.CreateControllerAsync(dto, CancellationToken.None);
             if (!resp.Success || resp.Data == null)
             {
+                // (422 디버깅) 서버 응답 본문(어느 필드가 왜 거부됐는지 = FastAPI detail) + HTTP status 보존 로깅.
+                _log?.Error($"[Controller Insert] 추가 실패 HTTP {resp.StatusCode}: {resp.Message} | 서버 detail={resp.Error?.Details}");
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "제어기 추가 실패",

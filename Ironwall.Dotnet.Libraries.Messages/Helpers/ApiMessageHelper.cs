@@ -41,19 +41,25 @@ public static class ApiMessageHelper
             }
             else
             {
-                // 에러 응답 처리
-                try
-                {
-                    var errorResult = JsonConvert.DeserializeObject<ApiResponse<T>>(content, _jsonSettings);
-                    if (errorResult != null)
-                        return errorResult;
-                }
+                // (FR-8 보완) 에러 응답: 서버 표준 envelope(success/message/error)면 그대로 사용.
+                //   아니면(FastAPI {"detail":[...]} 등 비표준 본문) MissingMemberHandling.Ignore 때문에 '빈 객체'가
+                //   생성되어 422 detail이 통째로 폐기되던 문제 → 본문 전문을 Error.Details에 보존한다.
+                ApiResponse<T>? errorResult = null;
+                try { errorResult = JsonConvert.DeserializeObject<ApiResponse<T>>(content, _jsonSettings); }
                 catch { }
 
-                return ApiResponse<T>.CreateError(
+                if (errorResult != null && (errorResult.Error != null || !string.IsNullOrEmpty(errorResult.Message)))
+                {
+                    errorResult.StatusCode = (int)response.StatusCode;
+                    return errorResult;
+                }
+
+                var fallback = ApiResponse<T>.CreateError(
                     GetErrorCode(response.StatusCode),
                     $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
-                    content);
+                    content);   // ← 422 detail 등 서버 본문 전문 보존
+                fallback.StatusCode = (int)response.StatusCode;
+                return fallback;
             }
         }
         catch (Exception ex)
@@ -85,18 +91,23 @@ public static class ApiMessageHelper
             }
             else
             {
-                try
-                {
-                    var errorResult = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
-                    if (errorResult != null)
-                        return errorResult;
-                }
+                // (FR-8 보완) 표준 envelope면 그대로, 아니면(FastAPI {"detail":[...]} 등) 본문 전문을 Error.Details에 보존.
+                ApiListResponse<T>? errorResult = null;
+                try { errorResult = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings); }
                 catch { }
 
-                return ApiListResponse<T>.CreateError(
+                if (errorResult != null && (errorResult.Error != null || !string.IsNullOrEmpty(errorResult.Message)))
+                {
+                    errorResult.StatusCode = (int)response.StatusCode;
+                    return errorResult;
+                }
+
+                var fallback = ApiListResponse<T>.CreateError(
                     GetErrorCode(response.StatusCode),
                     $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
                     content);
+                fallback.StatusCode = (int)response.StatusCode;
+                return fallback;
             }
         }
         catch (Exception ex)
@@ -140,18 +151,23 @@ public static class ApiMessageHelper
             }
             else
             {
-                try
-                {
-                    var errorResult = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings);
-                    if (errorResult != null)
-                        return errorResult;
-                }
+                // (FR-8 보완) 표준 envelope면 그대로, 아니면 본문 전문을 Error.Details에 보존.
+                ApiListResponse<T>? errorResult = null;
+                try { errorResult = JsonConvert.DeserializeObject<ApiListResponse<T>>(content, _jsonSettings); }
                 catch { }
 
-                return ApiListResponse<T>.CreateError(
+                if (errorResult != null && (errorResult.Error != null || !string.IsNullOrEmpty(errorResult.Message)))
+                {
+                    errorResult.StatusCode = (int)response.StatusCode;
+                    return errorResult;
+                }
+
+                var fallback = ApiListResponse<T>.CreateError(
                     GetErrorCode(response.StatusCode),
                     $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
                     content);
+                fallback.StatusCode = (int)response.StatusCode;
+                return fallback;
             }
         }
         catch (Exception ex)
