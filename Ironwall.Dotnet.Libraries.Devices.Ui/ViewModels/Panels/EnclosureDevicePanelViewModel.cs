@@ -35,8 +35,14 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        _pCancellationTokenSource = new CancellationTokenSource();
-        await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
+        // (P2-S5) 초기 로딩도 _processGate 직렬화 — 로딩 중 Insert/Save/Delete 경합 차단.
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            _pCancellationTokenSource = new CancellationTokenSource();
+            await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
+        }
+        finally { _processGate.Release(); }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -60,10 +66,38 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         });
     }
 
-    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new EnclosureDeviceViewModel(new EnclosureDeviceModel());
-        ViewModelProvider.Add(vm);
+        // (P2-S1) 추가 즉시 Create — pending(Id=0) 미발생. 기본값으로 서버 생성 후 서버 Id를 그리드에 반영.
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            var existing = _deviceProvider.OfType<EnclosureDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
+            int number = 1; while (existing.Contains(number)) number++;
+            var model = new EnclosureDeviceModel { DeviceNumber = number, DeviceName = $"새 함체 {number}" };
+            var resp = await _apiService.CreateEnclosureAsync(model.ToEnclosureDeviceDto(), CancellationToken.None);
+            if (!resp.Success || resp.Data == null)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "함체 추가 실패",
+                    Explain = $"장비를 추가하지 못했습니다. 서버 상태를 확인하세요.\n{resp.Message}"
+                });
+                return;
+            }
+            // (코드리뷰 C1) 타입드 provider는 공유 DeviceProvider의 단방향 투영 → 수동 Add 시 FetchAll 투영과
+            //   이중행. 서버 생성분은 재조회로만 반영(단일 원천).
+            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
+            {
+                _pCancellationTokenSource.Cancel();
+                _pCancellationTokenSource.Dispose();
+            }
+            _pCancellationTokenSource = new CancellationTokenSource();
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
+            await DataInitialize(_pCancellationTokenSource.Token);
+        }
+        catch (Exception ex) { _log?.Error($"OnClickInsertButton: {ex.Message}"); }
+        finally { _processGate.Release(); }
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -106,23 +140,36 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
             _pCancellationTokenSource = new CancellationTokenSource();
             var token = _pCancellationTokenSource.Token;
 
+            // (P2-S2) Save = Update 전용. 추가는 OnClickInsertButton(즉시 Create), 삭제는 HandleAsync에서 처리.
             var currentList = _deviceProvider.OfType<EnclosureDeviceModel>().ToList();
-            var serverList = await FetchEnclosuresAsync(token);
+            var (serverList, complete) = await FetchEnclosuresAsync(token);
+            if (!complete)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "저장 보류",
+                    Explain = "서버 함체 목록을 완전히 불러오지 못해 수정 저장을 보류합니다. 잠시 후 다시 시도하세요."
+                });
+                return;
+            }
+            var failures = new List<string>();
 
-            var insertList = currentList.Where(m => m.Id <= 0).ToList();
-            var updateList = currentList
-                .Where(m => m.Id > 0)
-                .Join(serverList, m => m.Id, d => d.Id,
-                    (m, d) => new { updated = m, original = d })
-                .Where(p => !DeviceEquals(p.updated, p.original))
-                .Select(p => p.updated)
-                .ToList();
+            foreach (var model in currentList.Where(m => m.Id > 0))
+            {
+                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
+                if (server != null && !DeviceEquals(model, server))
+                    if (!await UpdateEnclosureAsync(model, token))
+                        failures.Add($"{model.DeviceName}(Id={model.Id})");
+            }
 
-            foreach (var model in insertList)
-                await CreateEnclosureAsync(model, token);
-
-            foreach (var model in updateList)
-                await UpdateEnclosureAsync(model, token);
+            if (failures.Count > 0)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "함체 수정 일부 실패",
+                    Explain = $"{failures.Count}건 수정에 실패했습니다.\n" + string.Join("\n", failures)
+                });
+            }
 
             await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
             await DataInitialize(_pCancellationTokenSource.Token);
@@ -187,27 +234,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
     }
     #endregion
     #region - Helper Methods -
-    private async Task<bool> CreateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
-    {
-        try
-        {
-            var dto = model.ToEnclosureDeviceDto();
-            var response = await _apiService.CreateEnclosureAsync(dto, token);
-            if (response.Success)
-            {
-                _log?.Info($"Enclosure created successfully: {response.Data?.Id}");
-                return true;
-            }
-            _log?.Error($"Failed to create enclosure: {response.Error?.Message}");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"Exception in CreateEnclosureAsync: {ex.Message}");
-            return false;
-        }
-    }
-
+    // (P2-S1) Create 헬퍼 제거 — 추가는 OnClickInsertButton 즉시 Create로 일원화. Update만 유지.
     private async Task<bool> UpdateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
     {
         try
@@ -229,21 +256,31 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         }
     }
 
-    private async Task<List<EnclosureDeviceModel>> FetchEnclosuresAsync(CancellationToken token = default)
+    // (P2-S4) 전 페이지 순회 + 완전성 신호.
+    private async Task<(List<EnclosureDeviceModel> list, bool complete)> FetchEnclosuresAsync(CancellationToken token = default)
     {
+        var all = new List<EnclosureDeviceModel>();
         try
         {
-            var response = await _apiService.GetEnclosuresAsync(page: 1, limit: 100, token: token);
-            if (response.Success && response.Data != null)
-                return response.Data.Select(dto => dto.ToEnclosureDeviceModel()).ToList();
-
-            _log?.Error($"Failed to fetch enclosures: {response.Error?.Message}");
-            return new List<EnclosureDeviceModel>();
+            const int limit = 100, maxPages = 100;
+            for (int page = 1; page <= maxPages; page++)
+            {
+                var response = await _apiService.GetEnclosuresAsync(page: page, limit: limit, token: token);
+                if (!response.Success || response.Data == null)
+                {
+                    _log?.Error($"Failed to fetch enclosures (page {page}): {response.Error?.Message}");
+                    return (all, false);
+                }
+                var batch = response.Data.Select(dto => dto.ToEnclosureDeviceModel()).ToList();
+                all.AddRange(batch);
+                if (batch.Count < limit) return (all, true);
+            }
+            return (all, true);
         }
         catch (Exception ex)
         {
             _log?.Error($"Exception in FetchEnclosuresAsync: {ex.Message}");
-            return new List<EnclosureDeviceModel>();
+            return (all, false);
         }
     }
     #endregion
@@ -294,38 +331,38 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
     #region - IHandles -
     public async Task HandleAsync(CallDeleteEnclosureDeviceProcessMessageModel message, CancellationToken cancellationToken)
     {
-        await _eventAggregator.PublishOnCurrentThreadAsync(
-            new OpenProgressPopupMessageModel(), cancellationToken);
-
-        await Task.Run(async () =>
+        // (P2-S3) 삭제 _processGate 직렬화 + 베이스 ExecuteDeleteAsync(Id<=0 로컬/Id>0 verify-after-success/부분실패 통지).
+        if (!await _processGate.WaitAsync(0)) return;
+        try
         {
-            foreach (var item in SelectedItems.ToList())
+            await _eventAggregator.PublishOnCurrentThreadAsync(
+                new OpenProgressPopupMessageModel(), cancellationToken);
+
+            await Task.Run(async () =>
             {
-                var model = (IEnclosureDeviceModel)item.Model;
-                if (model.Id <= 0)
-                {
-                    _deviceProvider.Remove(model);
-                    continue;
-                }
-                var response = await _apiService.DeleteEnclosureAsync(model.Id, cancellationToken);
-                if (!response.Success)
-                    _log?.Error($"Failed to delete enclosure {model.Id}: {response.Error?.Message}");
+                await ExecuteDeleteAsync(
+                    SelectedItems.ToList(),
+                    r => r.Model.Id,
+                    async (id, ct) => (await _apiService.DeleteEnclosureAsync(id, ct)).Success,
+                    r => _deviceProvider.Remove((IEnclosureDeviceModel)r.Model),
+                    cancellationToken);
+            }, cancellationToken);
+
+            if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = new CancellationTokenSource();
             }
-        }, cancellationToken);
 
-        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
-        {
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
+            await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
+            await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
+            UpdateAction?.Invoke();
+
+            await _eventAggregator.PublishOnCurrentThreadAsync(
+                new ClosePopupMessageModel(), cancellationToken);
         }
-
-        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
-        await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
-        UpdateAction?.Invoke();
-
-        await _eventAggregator.PublishOnCurrentThreadAsync(
-            new ClosePopupMessageModel(), cancellationToken);
+        finally { _processGate.Release(); }
     }
     #endregion
     #region - Properties -

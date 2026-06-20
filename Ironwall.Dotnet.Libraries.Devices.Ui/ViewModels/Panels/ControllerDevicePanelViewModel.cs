@@ -44,8 +44,14 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        _pCancellationTokenSource = new CancellationTokenSource();
-        await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
+        // (P2-S5) 초기 로딩도 _processGate 직렬화 — 로딩 중 Insert/Save/Delete 경합 차단.
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            _pCancellationTokenSource = new CancellationTokenSource();
+            await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
+        }
+        finally { _processGate.Release(); }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -69,10 +75,38 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         });
     }
 
-    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new ControllerDeviceViewModel(new ControllerDeviceModel());
-        ViewModelProvider.Add(vm);
+        // (P2-S1) 추가 즉시 Create — pending(Id=0) 미발생. 기본값으로 서버 생성 후 서버 Id를 그리드에 반영.
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            var existing = _deviceProvider.OfType<ControllerDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
+            int number = 1; while (existing.Contains(number)) number++;
+            var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}" };
+            var resp = await _apiService.CreateControllerAsync(model.ToControllerDeviceDto(), CancellationToken.None);
+            if (!resp.Success || resp.Data == null)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "제어기 추가 실패",
+                    Explain = $"장비를 추가하지 못했습니다. 서버 상태를 확인하세요.\n{resp.Message}"
+                });
+                return;
+            }
+            // (코드리뷰 C1) 타입드 provider는 공유 DeviceProvider의 단방향 투영 → 수동 Add 시 FetchAll 투영과
+            //   이중행. 서버 생성분은 재조회로만 반영(단일 원천).
+            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
+            {
+                _pCancellationTokenSource.Cancel();
+                _pCancellationTokenSource.Dispose();
+            }
+            _pCancellationTokenSource = new CancellationTokenSource();
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
+            await DataInitialize(_pCancellationTokenSource.Token);
+        }
+        catch (Exception ex) { _log?.Error($"OnClickInsertButton: {ex.Message}"); }
+        finally { _processGate.Release(); }
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -138,28 +172,24 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 return;
             }
 
-            // Insert 대상: ID가 없는 경우 (신규)
-            var insertList = currentList.Where(m => m.Id <= 0).ToList();
-
-            // Update 대상: ID가 있고 변경된 경우
-            var updateList = currentList
-                .Where(m => m.Id > 0)
-                .Join(serverList, m => m.Id, d => d.Id,
-                    (m, d) => new { updated = m, original = d })
-                .Where(p => !DeviceEquals(p.updated, p.original))
-                .Select(p => p.updated)
-                .ToList();
-
-            // Create 처리
-            foreach (var model in insertList)
+            // (P2-S2) Save = Update 전용. 추가는 OnClickInsertButton(즉시 Create), 삭제는 HandleAsync에서 처리.
+            //   Insert(Id<=0 Create) 루프 제거 → pending 유령 재생성/중복(#13) 원천 차단.
+            var failures = new List<string>();
+            foreach (var model in currentList.Where(m => m.Id > 0))
             {
-                await CreateControllerAsync(model, token);
+                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
+                if (server != null && !DeviceEquals(model, server))
+                    if (!await UpdateControllerAsync(model, token))
+                        failures.Add($"{model.DeviceName}(Id={model.Id})");
             }
 
-            // Update 처리
-            foreach (var model in updateList)
+            if (failures.Count > 0)
             {
-                await UpdateControllerAsync(model, token);
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "제어기 수정 일부 실패",
+                    Explain = $"{failures.Count}건 수정에 실패했습니다.\n" + string.Join("\n", failures)
+                });
             }
 
             // 재조회
@@ -284,34 +314,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         }
     }
 
-    /// <summary>
-    /// GOP API를 통해 Controller 생성
-    /// </summary>
-    private async Task<bool> CreateControllerAsync(ControllerDeviceModel model, CancellationToken token = default)
-    {
-        try
-        {
-            var dto = model.ToControllerDeviceDto();
-            var response = await _apiService.CreateControllerAsync(dto, token);
-
-            if (response.Success)
-            {
-                _log?.Info($"Controller created successfully: {response.Data?.Id}");
-                return true;
-            }
-            else
-            {
-                _log?.Error($"Failed to create controller: {response.Error?.Message}");
-                return false;
-            }
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"Exception in CreateControllerAsync: {ex.Message}");
-            return false;
-        }
-    }
-
+    // (P2-S1) Create 헬퍼 제거 — 추가는 OnClickInsertButton 즉시 Create로 일원화. Update만 유지.
     /// <summary>
     /// GOP API를 통해 Controller 업데이트
     /// </summary>
@@ -388,48 +391,45 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteControllerDeviceProcessMessageModel message, CancellationToken cancellationToken)
     {
-        // Progress Popup 표시
-        await _eventAggregator.PublishOnCurrentThreadAsync(
-            new OpenProgressPopupMessageModel(),
-            cancellationToken);
-
-        // 삭제 처리 (UI 스레드와 분리)
-        await Task.Run(async () =>
+        // (P2-S3) 삭제 _processGate 직렬화 + 베이스 ExecuteDeleteAsync(Id<=0 로컬/Id>0 verify-after-success/부분실패 통지).
+        if (!await _processGate.WaitAsync(0)) return;
+        try
         {
-            foreach (var item in SelectedItems.ToList())
+            // Progress Popup 표시
+            await _eventAggregator.PublishOnCurrentThreadAsync(
+                new OpenProgressPopupMessageModel(),
+                cancellationToken);
+
+            // 삭제 처리 (UI 스레드와 분리)
+            await Task.Run(async () =>
             {
-                var model = (IControllerDeviceModel)item.Model;
-                if (model.Id <= 0)
-                {
-                    _deviceProvider.Remove(model);
-                    continue;
-                }
-                var response = await _apiService.DeleteControllerAsync(model.Id, cancellationToken);
+                await ExecuteDeleteAsync(
+                    SelectedItems.ToList(),
+                    r => r.Model.Id,
+                    async (id, ct) => (await _apiService.DeleteControllerAsync(id, ct)).Success,
+                    r => _deviceProvider.Remove((IControllerDeviceModel)r.Model),
+                    cancellationToken);
+            }, cancellationToken);
 
-                if (!response.Success)
-                {
-                    _log?.Error($"Failed to delete controller {model.Id}: {response.Error?.Message}");
-                }
+            // 취소 토큰 재생성
+            if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = new CancellationTokenSource();
             }
-        }, cancellationToken);
 
-        // 취소 토큰 재생성
-        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
-        {
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
+            // 재조회
+            await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
+            await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
+            UpdateAction?.Invoke();
+
+            // Progress Popup 닫기
+            await _eventAggregator.PublishOnCurrentThreadAsync(
+                new ClosePopupMessageModel(),
+                cancellationToken);
         }
-
-        // 재조회
-        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
-        await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
-        UpdateAction?.Invoke();
-
-        // Progress Popup 닫기
-        await _eventAggregator.PublishOnCurrentThreadAsync(
-            new ClosePopupMessageModel(),
-            cancellationToken);
+        finally { _processGate.Release(); }
     }
     #endregion
     #region - Properties -
