@@ -45,8 +45,14 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        _pCancellationTokenSource = new CancellationTokenSource();
-        await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
+        // (P2-S5) 초기 로딩도 _processGate 직렬화 — 로딩 중 Insert/Save/Delete 경합 차단.
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            _pCancellationTokenSource = new CancellationTokenSource();
+            await DataInitialize(_pCancellationTokenSource!.Token).ConfigureAwait(false);
+        }
+        finally { _processGate.Release(); }
     }
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -70,10 +76,38 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         });
     }
 
-    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new CameraDeviceViewModel(new CameraDeviceModel());
-        ViewModelProvider.Add(vm);
+        // (P2-S1) 추가 즉시 Create — pending(Id=0) 미발생. 기본값으로 서버 생성 후 서버 Id를 그리드에 반영.
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            var existing = _deviceProvider.OfType<CameraDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
+            int number = 1; while (existing.Contains(number)) number++;
+            var model = new CameraDeviceModel { DeviceNumber = number, DeviceName = $"새 카메라 {number}" };
+            var resp = await _apiService.CreateCameraAsync(model.ToCameraDeviceDto(), CancellationToken.None);
+            if (!resp.Success || resp.Data == null)
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "카메라 추가 실패",
+                    Explain = $"장비를 추가하지 못했습니다. 서버 상태를 확인하세요.\n{resp.Message}"
+                });
+                return;
+            }
+            // (코드리뷰 C1) 타입드 provider는 공유 DeviceProvider의 단방향 투영 → 수동 Add 시 FetchAll 투영과
+            //   이중행. 서버 생성분은 재조회로만 반영(단일 원천).
+            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
+            {
+                _pCancellationTokenSource.Cancel();
+                _pCancellationTokenSource.Dispose();
+            }
+            _pCancellationTokenSource = new CancellationTokenSource();
+            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
+            await DataInitialize(_pCancellationTokenSource.Token);
+        }
+        catch (Exception ex) { _log?.Error($"OnClickInsertButton: {ex.Message}"); }
+        finally { _processGate.Release(); }
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -123,34 +157,36 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
             var token = _pCancellationTokenSource.Token;
 
-            // 현재 Provider의 목록
+            // (P2-S2) Save = Update 전용. 추가는 OnClickInsertButton(즉시 Create), 삭제는 HandleAsync에서 처리.
+            //   Insert(Id<=0 Create) 루프 제거 → pending 유령 재생성/중복(#13) 원천 차단.
             var currentList = _deviceProvider.OfType<CameraDeviceModel>().ToList();
-
-            // 서버 목록 조회 (비교를 위해)
-            var serverList = await FetchCamerasAsync(token);
-
-            // Insert 대상: ID가 없는 경우 (신규)
-            var insertList = currentList.Where(m => m.Id <= 0).ToList();
-
-            // Update 대상: ID가 있고 변경된 경우
-            var updateList = currentList
-                .Where(m => m.Id > 0)
-                .Join(serverList, m => m.Id, d => d.Id,
-                    (m, d) => new { updated = m, original = d })
-                .Where(p => !DeviceEquals(p.updated, p.original))
-                .Select(p => p.updated)
-                .ToList();
-
-            // Create 처리
-            foreach (var model in insertList)
+            var (serverList, complete) = await FetchCamerasAsync(token);
+            if (!complete)
             {
-                await CreateCameraAsync(model, token);
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "저장 보류",
+                    Explain = "서버 카메라 목록을 완전히 불러오지 못해 수정 저장을 보류합니다. 잠시 후 다시 시도하세요."
+                });
+                return;
+            }
+            var failures = new List<string>();
+
+            foreach (var model in currentList.Where(m => m.Id > 0))
+            {
+                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
+                if (server != null && !DeviceEquals(model, server))
+                    if (!await UpdateCameraAsync(model, token))
+                        failures.Add($"{model.DeviceName}(Id={model.Id})");
             }
 
-            // Update 처리
-            foreach (var model in updateList)
+            if (failures.Count > 0)
             {
-                await UpdateCameraAsync(model, token);
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "카메라 수정 일부 실패",
+                    Explain = $"{failures.Count}건 수정에 실패했습니다.\n" + string.Join("\n", failures)
+                });
             }
 
             // 재조회
@@ -264,62 +300,36 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     /// <summary>
     /// GOP API를 통해 Camera 목록 조회하고 Model로 변환
     /// </summary>
-    private async Task<List<CameraDeviceModel>> FetchCamerasAsync(CancellationToken token = default)
+    // (P2-S4) 전 페이지 순회 + 완전성 신호. 단일 page:1,limit:100 은 100건 초과 누락 + 중간 페이지
+    //   실패를 '정상 빈/부분'과 구분 못 함 → complete=false 로 Save 보류 판단.
+    private async Task<(List<CameraDeviceModel> list, bool complete)> FetchCamerasAsync(CancellationToken token = default)
     {
+        var all = new List<CameraDeviceModel>();
         try
         {
-            var response = await _apiService.GetCamerasAsync(
-                page: 1,
-                limit: 100,
-                token: token);
-
-            if (response.Success && response.Data != null)
+            const int limit = 100, maxPages = 100;
+            for (int page = 1; page <= maxPages; page++)
             {
-                return response.Data
-                    .Select(dto => dto.ToCameraDeviceModel())
-                    .ToList();
+                var response = await _apiService.GetCamerasAsync(page: page, limit: limit, token: token);
+                if (!response.Success || response.Data == null)
+                {
+                    _log?.Error($"Failed to fetch cameras (page {page}): {response.Error?.Message}");
+                    return (all, false);
+                }
+                var batch = response.Data.Select(dto => dto.ToCameraDeviceModel()).ToList();
+                all.AddRange(batch);
+                if (batch.Count < limit) return (all, true);
             }
-            else
-            {
-                _log?.Error($"Failed to fetch cameras: {response.Error?.Message}");
-                return new List<CameraDeviceModel>();
-            }
+            return (all, true);
         }
         catch (Exception ex)
         {
             _log?.Error($"Exception in FetchCamerasAsync: {ex.Message}");
-            return new List<CameraDeviceModel>();
+            return (all, false);
         }
     }
 
-    /// <summary>
-    /// GOP API를 통해 Camera 생성
-    /// </summary>
-    private async Task<bool> CreateCameraAsync(CameraDeviceModel model, CancellationToken token = default)
-    {
-        try
-        {
-            var dto = model.ToCameraDeviceDto();
-            var response = await _apiService.CreateCameraAsync(dto, token);
-
-            if (response.Success)
-            {
-                _log?.Info($"Camera created successfully: {response.Data?.Id}");
-                return true;
-            }
-            else
-            {
-                _log?.Error($"Failed to create camera: {response.Error?.Message}");
-                return false;
-            }
-        }
-        catch (Exception ex)
-        {
-            _log?.Error($"Exception in CreateCameraAsync: {ex.Message}");
-            return false;
-        }
-    }
-
+    // (P2-S1) Create 헬퍼 제거 — 추가는 OnClickInsertButton 즉시 Create로 일원화. Update만 유지.
     /// <summary>
     /// GOP API를 통해 Camera 업데이트
     /// </summary>
@@ -397,48 +407,45 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteCameraDeviceProcessMessageModel message, CancellationToken cancellationToken)
     {
-        // Progress Popup 표시
-        await _eventAggregator.PublishOnCurrentThreadAsync(
-            new OpenProgressPopupMessageModel(),
-            cancellationToken);
-
-        // 삭제 처리 (UI 스레드와 분리)
-        await Task.Run(async () =>
+        // (P2-S3) 삭제 _processGate 직렬화 + 베이스 ExecuteDeleteAsync(Id<=0 로컬/Id>0 verify-after-success/부분실패 통지).
+        if (!await _processGate.WaitAsync(0)) return;
+        try
         {
-            foreach (var item in SelectedItems.ToList())
+            // Progress Popup 표시
+            await _eventAggregator.PublishOnCurrentThreadAsync(
+                new OpenProgressPopupMessageModel(),
+                cancellationToken);
+
+            // 삭제 처리 (UI 스레드와 분리)
+            await Task.Run(async () =>
             {
-                var model = (ICameraDeviceModel)item.Model;
-                if (model.Id <= 0)
-                {
-                    _deviceProvider.Remove(model);
-                    continue;
-                }
-                var response = await _apiService.DeleteCameraAsync(model.Id, cancellationToken);
+                await ExecuteDeleteAsync(
+                    SelectedItems.ToList(),
+                    r => r.Model.Id,
+                    async (id, ct) => (await _apiService.DeleteCameraAsync(id, ct)).Success,
+                    r => _deviceProvider.Remove((ICameraDeviceModel)r.Model),
+                    cancellationToken);
+            }, cancellationToken);
 
-                if (!response.Success)
-                {
-                    _log?.Error($"Failed to delete camera {model.Id}: {response.Error?.Message}");
-                }
+            // 취소 토큰 재생성
+            if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = new CancellationTokenSource();
             }
-        }, cancellationToken);
 
-        // 취소 토큰 재생성
-        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
-        {
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
+            // 재조회
+            await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
+            await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
+            UpdateAction?.Invoke();
+
+            // Progress Popup 닫기
+            await _eventAggregator.PublishOnCurrentThreadAsync(
+                new ClosePopupMessageModel(),
+                cancellationToken);
         }
-
-        // 재조회
-        await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
-        await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
-        UpdateAction?.Invoke();
-
-        // Progress Popup 닫기
-        await _eventAggregator.PublishOnCurrentThreadAsync(
-            new ClosePopupMessageModel(),
-            cancellationToken);
+        finally { _processGate.Release(); }
     }
     #endregion
     #region - Properties -
