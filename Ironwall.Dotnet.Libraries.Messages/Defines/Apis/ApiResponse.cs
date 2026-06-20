@@ -39,6 +39,12 @@ public class ApiResponse<T>
     public MetaDto Meta { get; set; } = new MetaDto();
 
     /// <summary>
+    /// HTTP 상태 코드 (클라이언트 진단용 — 서버 직렬화/역직렬화 대상 아님)
+    /// </summary>
+    [JsonIgnore]
+    public int StatusCode { get; set; }
+
+    /// <summary>
     /// 성공 응답 생성
     /// </summary>
     public static ApiResponse<T> CreateSuccess(T data, string message = "Operation completed successfully")
