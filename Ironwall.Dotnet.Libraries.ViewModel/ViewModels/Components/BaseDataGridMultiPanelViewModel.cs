@@ -49,6 +49,7 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
     {
         try
         {
+            int draftCount = CountUnsavedDrafts();   // (PR-C) 미저장 Draft 수 — Clear로 폐기되기 전 캡처
             DispatcherService.Invoke(() =>
             {
                 ButtonAllDisable();
@@ -56,6 +57,14 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
                 SelectedItems.Clear();
                 IsVisible = false;
             });
+
+            // (PR-C) 화면 전환/종료로 미저장 Draft가 폐기됨을 비차단 통지(아키텍처상 차단형 확인불가 → 손실 시점 경고 + 행 시각마커로 사전 가시성).
+            if (draftCount > 0)
+                _ = _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "미저장 항목 안내",
+                    Explain = $"저장하지 않은 {draftCount}건이 화면 전환으로 사라졌습니다. 유지하려면 저장 후 이동하세요."
+                });
 
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
                 _pCancellationTokenSource?.Cancel();
@@ -220,6 +229,9 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
 
     /// <summary>(Draft 격리 불변식) Id≤0 Draft는 공유/타입드 provider 투영 금지 — CollectionChanged.Add 가드용.</summary>
     protected static bool ShouldProjectToProvider(int id) => id > 0;
+
+    /// <summary>(PR-C) 미저장 Draft(Id≤0) 행 수 — 패널별 override(T가 Id 미노출이라 베이스 일반화 불가). 종료/전환 시 손실 경고용.</summary>
+    protected virtual int CountUnsavedDrafts() => 0;
     #endregion
     #region - IHanldes -
     #endregion

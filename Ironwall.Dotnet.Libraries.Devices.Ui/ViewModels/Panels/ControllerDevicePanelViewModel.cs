@@ -200,6 +200,9 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         NotifyOfPropertyChange(() => SelectedItems);
     }
 
+    // (PR-C) 화면 전환/종료 시 미저장 Draft(Id≤0) 손실 경고용 — 베이스 CountUnsavedDrafts override.
+    protected override int CountUnsavedDrafts() => ViewModelProvider.Count(vm => vm.Model.Id <= 0);
+
     private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         switch (e.Action)

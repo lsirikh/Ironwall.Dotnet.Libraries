@@ -407,6 +407,9 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     public event System.Action? UpdateAction;
     #endregion
     #region - Helpers -
+    // (PR-C) 미저장 Draft(Id≤0) 개수 — 화면 전환/종료 시 미저장 손실 경고용.
+    protected override int CountUnsavedDrafts() => ViewModelProvider.Count(vm => vm.Model.Id <= 0);
+
     internal static bool DeviceGroupEquals(IDeviceGroupModel a, IDeviceGroupModel b)
         => a.Name == b.Name && a.Description == b.Description;
     #endregion

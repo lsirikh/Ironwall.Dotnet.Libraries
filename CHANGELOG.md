@@ -35,6 +35,13 @@
   - 편집모드 오브젝트 위 휠줌/드래그팬 통과(`IgnoreMarkerOnMouseWheel`, MarkerEditAdorner `HitTestCore` 핸들 한정)
 
 ### Fixed
+- **장비 패널 CRUD Temp-state 통일 (Phase 1, PR-A/B/C)** ([PRD](docs/prds/DevicePanel_TempState_Unification-prd.md) v1.1 · [Plan](docs/plans/DevicePanel_TempState_Unification-prd-plan.md))
+  - 설계 전환(사용자 결정): 직전 DeviceGroup B모델(추가 즉시 Create)을 **Temp-state로 통일 환원** — 서버가 미완성 placeholder 거부(422)·Sensor는 controller_id FK 필요로 즉시등록 불가 → 7패널(Controller/Camera/Sensor/Speaker/Enclosure/Lamp + DeviceGroup) 일관. 5-Agent PRD 검토 + opus 코드리뷰(머지차단 2 + High 3) 반영.
+  - **Temp-state 베이스 템플릿**(`BaseDataGridMultiPanelViewModel`): `ExecuteCreateAsync`(필수필드 사전검증→보류)/`ExecuteSaveUpdatesAsync`/`NotifySaveResultAsync`(sanitize 통지)/`SanitizeDetails`(민감정보 마스킹)/`ShouldProjectToProvider`. 추가=로컬 Draft(Id≤0) Add(서버 미호출), Save=일괄 Create+Update+재조회+생존자(실패/보류) 복원.
+  - **Draft 격리**(근본해결): CollectionChanged.Add Id≤0 미투영 → 공유/타입드 provider 오염·이중행 동시 차단. Insert는 `_processGate`로 직렬화(Save 진행 중 경합 방지).
+  - **Id≤0 게이팅**(Critical 버그 차단 — 미저장 그룹 `POST groups/0/devices`·낙관적 desync): 그룹 장비추가 버튼 비활성(`CanAddAssign`)+메서드 가드, 배정 다이얼로그 groupId/후보/newId 가드, verify-after-success(응답 `AssignedDeviceIds` 기준), 센서 제어기 드롭다운·PIDS 픽커 Temp(Id≤0) 제외.
+  - **UX/보안**: 미저장 행 시각마커(`IsDraft` 배경/툴팁) + 화면전환 시 미저장 손실 비차단 알림. `Uninitialize` 빈 catch 로깅화, Controller 전체 DTO 로깅 제거, 생존자 행 Index 재부여.
+  - 검증: Devices.Ui/GMaps.Ui/Events.Ui 빌드 0에러, 불변식 grep 7/7. 후속(Phase 2/3): Speaker `server_id` FK, Enclosure ThresholdConfig UI, Camera RTSP.
 - **장비 패널 CRUD↔API 연동 정합 — DeviceGroup B모델 + Controller 페이지네이션 (Phase 1)** ([PRD](docs/prds/DevicePanel_CRUD_API_Sync-prd.md) v1.1)
   - 16-Agent 분석 + 2-Round 시뮬로 식별: 그룹 추가/삭제/수정이 API와 desync(추가후 사라짐·삭제후 잔존·수정 시 무관 그룹 중복생성). 원인=클라이언트 pending(Id=0)+Save 일괄 diff 모델(서버/API는 정상). 10-Agent 코드리뷰 반영.
   - **DeviceGroup B모델 전환**: 추가=즉시 `CreateDeviceGroupAsync`(반환 서버 Id 반영, pending 미발생) / 삭제=API 성공 시에만 provider 제거(verify-after-success) / Save=Update 전용(Insert·Delete diff 루프 제거 → 유령 중복생성 차단) / Reload=서버 재조회 swap-on-success(유령 청소)
