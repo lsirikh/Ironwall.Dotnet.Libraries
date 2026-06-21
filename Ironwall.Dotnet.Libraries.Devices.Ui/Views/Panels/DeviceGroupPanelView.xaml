@@ -159,7 +159,7 @@
 				<Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
 					<Style.Triggers>
 						<DataTrigger Binding="{Binding IsDraft}" Value="True">
-							<Setter Property="Background" Value="#33FF9800" />
+							<Setter Property="Background" Value="#FFE0B2" />
 							<Setter Property="ToolTip" Value="미저장 — 저장 시 서버에 등록됩니다" />
 						</DataTrigger>
 					</Style.Triggers>
