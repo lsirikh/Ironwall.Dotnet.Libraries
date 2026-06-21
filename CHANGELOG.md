@@ -35,6 +35,28 @@
   - 편집모드 오브젝트 위 휠줌/드래그팬 통과(`IgnoreMarkerOnMouseWheel`, MarkerEditAdorner `HitTestCore` 핸들 한정)
 
 ### Fixed
+- **제어기 추가 HTTP 422 수정 + API 422 응답 본문 보존/진단 로깅** ([Report](docs/reports/Controller_422_Fix-report.md)) — 머지 `881ac5a`
+  - 근본원인(4각도 Workflow 조사): `ControllerDeviceModel` ctor가 Camera/Speaker/Enclosure/Lamp와 달리 `DeviceType` 미설정 → `ToControllerDeviceDto`가 `type_device="NONE"` 전송 → 서버 enum 검증 422. **제어기에서만** 발생한 이유.
+  - **수정**: `ControllerDeviceModel` ctor에 `DeviceType = EnumDeviceType.Controller`(peer 4모델과 동일 패턴 누락 보완).
+  - **진단 인프라**: `ApiMessageHelper`의 3개 비성공 분기가 FastAPI `{"detail":[...]}`를 `MissingMemberHandling.Ignore`로 빈 객체 역직렬화→**본문 폐기**하던 결함 수정 → 표준 envelope면 그대로, 아니면 본문 전문을 `Error.Details`에 보존(FR-8 보완) + `ApiResponse.StatusCode` 추가. Controller Insert에 요청 DTO/실패 422본문 로깅.
+  - 검증: Devices.Ui·Events.Ui 빌드 0에러, Messages 182/182(신규 `ApiMessageHelperErrorTests` 3건 포함) 통과, code-review(opus) 머지차단 0.
+  - **차기 422(머지 `a916d59`)**: 로그가 다음 거부 필드 표출 — `{"field":"ip_port","message":"Input should be greater than or equal to 1"}`. 즉시-POST가 `ip_port=0` 전송. → Controller/Camera/Lamp Insert에 유효 placeholder 포트 **502**(통합테스트 검증값) 부여(`ip_address=""`는 서버 허용). Camera/Lamp/Speaker/Enclosure Insert에 실패 `Error.Details` 로깅 추가(Camera/Lamp 비번 보유→요청본문 미로깅). 후속: Sensor ctor DeviceType 미설정(다중 서브타입→별도 설계).
+- **DataGridPanel CRUD 라이프사이클 베이스 통일 — Phase 1 (베이스 + Event 4패널)** ([PRD](docs/prds/DataGridPanel_Delete_Centralization-prd.md) v2.0 · [Plan](docs/plans/DataGridPanel_Delete_Centralization-prd-plan.md))
+  - 2개 Workflow 전수 감사(삭제+저장)로 확정: Event 4패널이 **삭제 시 Id≤0(Draft) 무가드 → Id=0 DELETE(404/유령행)**, **Save가 Create 후 Id write-back 없이 Insert 루프 → 재Save 유령중복**. code-review(opus) 반영(H1/H2).
+  - **베이스 `ExecuteDeleteAsync` 공통 헬퍼**(`BaseDataGridMultiPanelViewModel<T>`): Id≤0 로컬만 제거(API 미호출) / Id>0 DELETE + 성공 시에만 제거(verify-after-success) / 취소(OCE) 재던지기 / 부분실패 누적 후 **InfoPopup 통지(중앙화)**. abstract·virtual 계약 변경 없음 → device 6패널 무영향(증분 안전).
+  - **Event 4패널**(Detection/Malfunction/Connection/Action): 무가드 삭제 루프 → `ExecuteDeleteAsync`. Save Insert 루프에서 `created.Id`를 model에 **write-back**(재Save 재Insert·유령중복 차단).
+  - 검증: ViewModel/Events.Ui/Devices.Ui 빌드 0에러, Events.Ui 테스트 300통과/11실패=baseline(3069ba1) 동일(**회귀 0**).
+- **DataGridPanel CRUD 통일 — Phase 2 (Device 6패널 B모델)** ([PRD](docs/prds/DataGridPanel_Delete_Centralization-prd.md) v2.0 · [Report](docs/reports/DataGridPanel_CRUD_Phase2_3-report.md)) — 머지 `a84dab6`
+  - architect(opus) 정밀 맵: 6패널 구조 동일(A모델). `CreateXxxAsync` 래퍼가 `Task<bool>`로 서버 `ApiResponse<Dto>.Data`(Id) 폐기 = 유령중복(#13) 직접원인.
+  - **Insert(5패널 Camera/Speaker/Enclosure/Lamp/Controller)**: Draft(Id=0) → `_processGate` 안 즉시 `CreateXxxAsync` → **FetchAllDevicesAsync+DataInitialize로만 반영**(코드리뷰 C1: 타입드 provider=공유 단방향 투영이라 수동 Add 시 FetchAll 투영과 이중행 → 수동 Add 제거).
+  - **Save(6패널)**: insertList(Id≤0 Create) 루프 제거 → `FetchXxxAsync` complete 가드 + `Where(Id>0)` Update 전용(유령중복 차단). 5패널 Fetch 전페이지+complete 튜플화.
+  - **Delete(6패널)**: 베이스 `ExecuteDeleteAsync`(Id≤0 로컬/Id>0 verify-after-success/부분실패 통지) + `_processGate` 직렬화.
+  - **Sensor 특수**: controller_id FK라 즉시 Create 불가 → Insert는 Draft 유지, Save에서 `Controller.Id>0` Draft만 커밋 후 로컬 Draft 제거(코드리뷰 H1: 이중행 방지)+FetchAll 서버본 반영, 미선택은 보류+안내(Draft 보존).
+  - code-review(opus) 2라운드: C1(이중행)/H1(Sensor 커밋 이중행)/M1 수정 후 머지차단 0 검증. 빌드 0에러. ⚠ 런타임 검증 필요(즉시 POST 동작).
+- **DataGridPanel CRUD 통일 — Phase 3 (조치보고 멱등)** ([PRD](docs/prds/DataGridPanel_Delete_Centralization-prd.md) v2.0 · [Report](docs/reports/DataGridPanel_CRUD_Phase2_3-report.md)) — 머지 `bc53164`
+  - 수동 조치보고(ReportDialog→EventCard.SendAction)가 자동/자동복구/배치의 in-flight 가드(`_inFlightEventIds`)에 미참여 → 수동×자동 동일 EventId 중복 ActionEvent 위험.
+  - **싱글톤 `IActionReportGuard` 추출**: EventCardListPanel 3경로 + 수동 2경로(Detection/Malfunction SendAction)가 동일 인스턴스 공유. 진행 중이면 수동 스킵(중복 차단). 가드 의미론 `eventId>0` 기준 통일(AutoRecovery Id≤0 키 점유 제거 — 의도).
+  - code-review(opus): Critical/High 0, 3경로 동치 확인. 빌드 0에러, 테스트 300통과/11실패=baseline(회귀 0).
 - **장비 패널 CRUD↔API 연동 정합 — DeviceGroup B모델 + Controller 페이지네이션 (Phase 1)** ([PRD](docs/prds/DevicePanel_CRUD_API_Sync-prd.md) v1.1)
   - 16-Agent 분석 + 2-Round 시뮬로 식별: 그룹 추가/삭제/수정이 API와 desync(추가후 사라짐·삭제후 잔존·수정 시 무관 그룹 중복생성). 원인=클라이언트 pending(Id=0)+Save 일괄 diff 모델(서버/API는 정상). 10-Agent 코드리뷰 반영.
   - **DeviceGroup B모델 전환**: 추가=즉시 `CreateDeviceGroupAsync`(반환 서버 Id 반영, pending 미발생) / 삭제=API 성공 시에만 provider 제거(verify-after-success) / Save=Update 전용(Insert·Delete diff 루프 제거 → 유령 중복생성 차단) / Reload=서버 재조회 swap-on-success(유령 청소)

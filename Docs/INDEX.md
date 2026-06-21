@@ -1,8 +1,17 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-19 (advance-phase 자동)
-- **총 문서 수**: 205개
+- **마지막 갱신**: 2026-06-21 (Accounts_Ui_Library_Extraction PRD 추가 — 1,050라인, 24시나리오, 2회시뮬레이션)
+- **총 문서 수**: 216개
+
+---
+
+## 스토리보드 (Docs/storyboards/)
+
+| 파일 | 내용 | 날짜 |
+|------|------|------|
+| [Account_GOP_Integration_Storyboard.html](storyboards/Account_GOP_Integration_Storyboard.html) | GOP Account 연동 인터랙티브 스토리보드 v2.0 — WPF ShellView 기반 와이어프레임 (LoginGateOverlay·NATS Gate·MaterialDesignDataGrid·1차 인터랙션, 7화면) | 2026-06-21 |
+| [DevicePanel_EventPanel_Storyboard.html](storyboards/DevicePanel_EventPanel_Storyboard.html) | Device/Event 패널 스토리보드 | 2026-06-19 |
 
 ---
 
@@ -29,6 +38,15 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP REST API v4.6 Account/Auth JWT 연동 · PRD-GOP-00 (보완: SUP-C1~L1 12건 추가) | Draft | 2026-06-20 |
+| [GOP_Permission_Gate_Feature-prd.md](prds/GOP_Permission_Gate_Feature-prd.md) | PRD-GOP-01: IPermissionService + MinRoleConverter + ConductorControlViewModel 3중 방어선 (P1, 18 STEP) | Draft | 2026-06-20 |
+| [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | PRD-GOP-02: AccountManager/Register/Editor/Delete→GOP API 전환 · 하드코딩 비밀번호 CRITICAL 해소 (P1, 26 STEP) | Draft | 2026-06-20 |
+| [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | PRD-GOP-03: MyPage 자기정보 GOP 전환 · role덮어쓰기 방지 · 세션관리 섹션 신규 (P1, 18 STEP) | Draft | 2026-06-20 |
+| [GOP_Menu_Role_Visibility-prd.md](prds/GOP_Menu_Role_Visibility-prd.md) | PRD-GOP-04: LeftMenu 5단계 role 가시성 · Label 오타 3건 · Tag 우회 차단 (P2, 12 STEP) | Draft | 2026-06-20 |
+| [GOP_UserSession_AuditLog_UI-prd.md](prds/GOP_UserSession_AuditLog_UI-prd.md) | PRD-GOP-05: 세션모니터/그룹관리/감사로그/설정변경이력 신규 UI (P2, 28 STEP) | Draft | 2026-06-20 |
+| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts.Ui 신규 라이브러리 구축 + VM/View 이관 전략 (Track C, 1,050라인, 24시나리오, 2회시뮬레이션, 2 CRITICAL / 6 HIGH 이슈 확정) | Draft | 2026-06-21 |
+| [GOP_PreAuth_Overlay_NatsGate-prd.md](prds/GOP_PreAuth_Overlay_NatsGate-prd.md) | PRD-GOP-07: 미인증 LoginGateOverlay + EventCardPanel 숨김 + NATS IsLogin 게이팅 (P1, 14 STEP) | Draft | 2026-06-21 |
+| [GOP_Session_Resilience_Lifecycle-prd.md](prds/GOP_Session_Resilience_Lifecycle-prd.md) | PRD-GOP-06: 앱재시작복원·선제Refresh·강제로그아웃·지수백오프·OnExit통보 (P2, 20 STEP) | Draft | 2026-06-20 |
 | [Client_API_v46_Conformance-prd.md](prds/Client_API_v46_Conformance-prd.md) | Client_API_v46_Conformance | Approved | 2026-06-19 |
 | [NATS-Tracking-Geolocation-메시지정리.md](prds/NATS-Tracking-Geolocation-메시지정리.md) | NATS-Tracking-Geolocation-메시지정리.md | Draft | 2026-06-19 |
 | [DevicePanel_CRUD_API_Sync-prd.md](prds/DevicePanel_CRUD_API_Sync-prd.md) | DevicePanel_CRUD_API_Sync | Draft | 2026-06-17 |
