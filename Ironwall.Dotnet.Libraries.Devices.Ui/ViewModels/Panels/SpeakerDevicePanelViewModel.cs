@@ -68,38 +68,16 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
 
     public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        // (P2-S1) 추가 즉시 Create — pending(Id=0) 미발생. 기본값으로 서버 생성 후 서버 Id를 그리드에 반영.
-        //   이름/IP 등 인라인 편집은 Save(Update)로 반영. (B모델 — DeviceGroup 템플릿)
         if (!await _processGate.WaitAsync(0)) return;
         try
         {
-            // 고유 DeviceNumber(연타 시 빈 장비 양산 완화). 서버 거부 시 실패팝업.
-            var existing = _deviceProvider.OfType<SpeakerDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
+            // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. 이름/속성 입력 후 Save 시 등록.
+            //   Draft(Id≤0)는 ViewModelProvider에만(provider 미진입, CollectionChanged 가드).
+            var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
             int number = 1; while (existing.Contains(number)) number++;
             var model = new SpeakerDeviceModel { DeviceNumber = number, DeviceName = $"새 스피커 {number}" };
-            var resp = await _apiService.CreateSpeakerAsync(model.ToSpeakerDeviceDto(), CancellationToken.None);
-            if (!resp.Success || resp.Data == null)
-            {
-                _log?.Error($"[Speaker Insert] 추가 실패 HTTP {resp.StatusCode}: {resp.Message} | 서버 detail={resp.Error?.Details}");
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "스피커 추가 실패",
-                    Explain = $"장비를 추가하지 못했습니다. 서버 상태를 확인하세요.\n{resp.Message}"
-                });
-                return;
-            }
-            // (코드리뷰 C1) 타입드 provider는 공유 DeviceProvider의 단방향 투영 → 수동 Add 시 FetchAll 투영과
-            //   이중행. 서버 생성분은 재조회로만 반영(단일 원천).
-            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
-            {
-                _pCancellationTokenSource.Cancel();
-                _pCancellationTokenSource.Dispose();
-            }
-            _pCancellationTokenSource = new CancellationTokenSource();
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
+            ViewModelProvider.Add(new SpeakerDeviceViewModel(model));
         }
-        catch (Exception ex) { _log?.Error($"OnClickInsertButton: {ex.Message}"); }
         finally { _processGate.Release(); }
     }
 
@@ -143,40 +121,49 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             _pCancellationTokenSource = new CancellationTokenSource();
             var token = _pCancellationTokenSource.Token;
 
-            // (P2-S2) Save = Update 전용. 추가는 OnClickInsertButton(즉시 Create), 삭제는 HandleAsync에서 처리.
-            //   Insert(Id<=0 Create) 루프 제거 → pending 유령 재생성/중복(#13) 원천 차단.
-            var currentList = _deviceProvider.OfType<SpeakerDeviceModel>().ToList();
+            // (Temp-state) Save = Create(Draft Id≤0) + Update(Id>0 변경분). Draft는 ViewModelProvider에만 존재.
             var (serverList, complete) = await FetchSpeakersAsync(token);
             if (!complete)
             {
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "저장 보류",
-                    Explain = "서버 스피커 목록을 완전히 불러오지 못해 수정 저장을 보류합니다. 잠시 후 다시 시도하세요."
+                    Explain = "서버 스피커 목록을 완전히 불러오지 못해 저장을 보류합니다. 잠시 후 다시 시도하세요."
                 });
                 return;
             }
             var failures = new List<string>();
+            var draftVMs = ViewModelProvider.Where(vm => vm.Model.Id <= 0).ToList();
+            var committed = new List<SpeakerDeviceViewModel>();
 
-            foreach (var model in currentList.Where(m => m.Id > 0))
+            // 루프A: Draft 생성 (서버 필수필드 없음 → 무조건 생성 시도)
+            int held = await ExecuteCreateAsync(
+                draftVMs,
+                vm => true  /* 서버 필수필드 없음 */,
+                (vm, ct) => CreateSpeakerAsync((SpeakerDeviceModel)vm.Model, ct),
+                vm => committed.Add(vm),
+                vm => $"{vm.Model.DeviceName}(신규)",
+                failures, token);
+
+            // 루프B: Id>0 변경분 Update
+            var updateVMs = ViewModelProvider.Where(vm =>
             {
-                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
-                if (server != null && !DeviceEquals(model, server))
-                    if (!await UpdateSpeakerAsync(model, token))
-                        failures.Add($"{model.DeviceName}(Id={model.Id})");
-            }
+                if (vm.Model.Id <= 0) return false;
+                var srv = serverList.FirstOrDefault(s => s.Id == vm.Model.Id);
+                return srv != null && !DeviceEquals((ISpeakerDeviceModel)vm.Model, srv);
+            }).ToList();
+            await ExecuteSaveUpdatesAsync(
+                updateVMs,
+                (vm, ct) => UpdateSpeakerAsync((SpeakerDeviceModel)vm.Model, ct),
+                vm => $"{vm.Model.DeviceName}(Id={vm.Model.Id})",
+                failures, token);
 
-            if (failures.Count > 0)
-            {
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "스피커 수정 일부 실패",
-                    Explain = $"{failures.Count}건 수정에 실패했습니다.\n" + string.Join("\n", failures)
-                });
-            }
+            // 재조회 + 재구성 + 생존자(실패/보류 Draft) 복원
+            await _deviceProviderService.FetchAllDevicesAsync(token);
+            await DataInitialize(token);
+            foreach (var d in draftVMs.Except(committed)) { d.Index = ViewModelProvider.Count + 1; ViewModelProvider.Add(d); }
 
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
+            await NotifySaveResultAsync("스피커 저장 안내", failures, held, token);
             await Task.Delay(2000, token);
         }
         catch (TaskCanceledException ex) { _log?.Warning(ex.Message); }
@@ -197,19 +184,37 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
         NotifyOfPropertyChange(() => SelectedItems);
     }
 
+    // (Temp-state) 화면 전환/종료 시 미저장 Draft(Id≤0) 손실 경고용 — 베이스 가드 override.
+    protected override int CountUnsavedDrafts() => ViewModelProvider.Count(vm => vm.Model.Id <= 0);
+
     private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
+                // (Draft 격리) Id≤0 미저장 Draft는 provider 미투영(공유 오염/이중행 차단).
                 if (e.NewItems == null) return;
                 foreach (ISpeakerDeviceViewModel newItem in e.NewItems)
+                {
+                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
                     _deviceProvider.Add((ISpeakerDeviceModel)newItem.Model);
+                }
                 break;
             case NotifyCollectionChangedAction.Remove:
                 if (e.OldItems == null) return;
                 foreach (ISpeakerDeviceViewModel oldItem in e.OldItems)
                     _deviceProvider.Remove((ISpeakerDeviceModel)oldItem.Model);
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                if (e.OldItems != null)
+                    foreach (ISpeakerDeviceViewModel oldItem in e.OldItems)
+                        _deviceProvider.Remove((ISpeakerDeviceModel)oldItem.Model);
+                if (e.NewItems != null)
+                    foreach (ISpeakerDeviceViewModel newItem in e.NewItems)
+                    {
+                        if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
+                        _deviceProvider.Add((ISpeakerDeviceModel)newItem.Model);
+                    }
                 break;
             case NotifyCollectionChangedAction.Reset:
                 ViewModelProvider.Clear();
@@ -237,26 +242,27 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
     }
     #endregion
     #region - Helper Methods -
-    // (P2-S1) Create 헬퍼 제거 — 추가는 OnClickInsertButton 즉시 Create로 일원화. Update만 유지.
-    private async Task<bool> UpdateSpeakerAsync(SpeakerDeviceModel model, CancellationToken token = default)
+    // (Temp-state) Create/Update 헬퍼 — ApiResultLite 반환(베이스 ExecuteCreate/SaveUpdates 연동).
+    private async Task<ApiResultLite> CreateSpeakerAsync(SpeakerDeviceModel model, CancellationToken token = default)
     {
         try
         {
-            var dto = model.ToSpeakerDeviceDto();
-            var response = await _apiService.UpdateSpeakerAsync(model.Id, dto, token);
-            if (response.Success)
-            {
-                _log?.Info($"Speaker updated successfully: {model.Id}");
-                return true;
-            }
-            _log?.Error($"Failed to update speaker {model.Id}: {response.Error?.Message}");
-            return false;
+            var r = await _apiService.CreateSpeakerAsync(model.ToSpeakerDeviceDto(), token);
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"CreateSpeakerAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
+    }
+
+    private async Task<ApiResultLite> UpdateSpeakerAsync(SpeakerDeviceModel model, CancellationToken token = default)
+    {
+        try
         {
-            _log?.Error($"Exception in UpdateSpeakerAsync: {ex.Message}");
-            return false;
+            var r = await _apiService.UpdateSpeakerAsync(model.Id, model.ToSpeakerDeviceDto(), token);
+            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
         }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"UpdateSpeakerAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
     }
 
     // (P2-S4) 전 페이지 순회 + 완전성 신호. 단일 page:1,limit:100 은 100건 초과 누락 + 중간 페이지

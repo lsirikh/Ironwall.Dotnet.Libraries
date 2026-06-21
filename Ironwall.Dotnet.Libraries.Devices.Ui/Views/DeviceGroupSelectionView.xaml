@@ -94,7 +94,7 @@
 				<!--  추가 버튼  -->
 				<Button
 					Grid.Column="6"
-					IsEnabled="{Binding IsSingleSelected}"
+					IsEnabled="{Binding CanAddAssign}"
 					Style="{StaticResource IconButtonStyle}"
 					ToolTip="추가하기">
 					<i:Interaction.Behaviors>

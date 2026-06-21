@@ -53,7 +53,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
 
         public async Task LoadAssignedDevicesAsync(CancellationToken token = default)
         {
-            if (!IsSingleSelected) { AssignedDevices.Clear(); return; }
+            if (!IsSingleSelected || _selection[0].Id <= 0) { AssignedDevices.Clear(); return; }   // (G1a) 미저장 그룹은 배정목록 없음
             try
             {
                 DispatcherService.Invoke(() => IsVisible = false);
@@ -101,7 +101,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
 
         public async Task AddDeviceButton()
         {
-            if (!IsSingleSelected) return;
+            // (G2 강제) 미저장 그룹(Id≤0)에는 장비 배정 불가 — custom behavior라 IsEnabled(G1) 단독 우회 가능 → 메서드 가드 필수.
+            if (!IsSingleSelected || _selection[0].Id <= 0) { _log?.Warning("[DeviceGroupSelectionVM] AddDeviceButton: 미저장 그룹(Id≤0) 장비추가 차단"); return; }
             AddButtonEnable = false;
             NotifyOfPropertyChange(nameof(AddButtonEnable));
 
@@ -130,7 +131,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public async Task RemoveDeviceButton()
         {
             _log?.Info($"[DeviceGroupSelectionVM] RemoveDeviceButton called, IsSingleSelected={IsSingleSelected}, SelectedCount={SelectedAssignedDevices.Count}");
-            if (!IsSingleSelected || SelectedAssignedDevices.Count == 0) return;
+            if (!IsSingleSelected || _selection[0].Id <= 0 || SelectedAssignedDevices.Count == 0) return;   // (G2b) 미저장 그룹 제거 차단
             _pendingRemoveTargets = SelectedAssignedDevices.ToList();
             _log?.Info($"[DeviceGroupSelectionVM] _pendingRemoveTargets saved: {_pendingRemoveTargets.Count} items (Ids: {string.Join(",", _pendingRemoveTargets.Select(d => d.Id))})");
             await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
@@ -145,6 +146,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             Name = CommonOrNullString(_selection, m => m.Name);
             Description = CommonOrNullString(_selection, m => m.Description);
             NotifyOfPropertyChange(nameof(IsSingleSelected));
+            NotifyOfPropertyChange(nameof(CanAddAssign));
         }
 
         private static T? CommonOrNullString<T>(IEnumerable<DeviceGroupViewModel> list, Func<IDeviceGroupModel, T> selector) where T : class?
@@ -218,6 +220,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public BindableCollection<DeviceAssignItemViewModel> SelectedAssignedDevices { get; }
         public bool IsSingleSelected => _selection.Count == 1;
         public bool CanRemoveDeviceButton => IsSingleSelected && SelectedAssignedDevices.Count > 0;
+        public bool CanAddAssign => IsSingleSelected && _selection[0].Id > 0;   // (G1) 미저장 그룹(Id≤0) 장비추가 버튼 비활성
         public bool IsVisible { get; set; } = true;
         public bool AddButtonEnable { get; set; } = true;
         public bool RemoveButtonEnable { get; set; } = true;

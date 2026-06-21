@@ -84,7 +84,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         if (!await _processGate.WaitAsync(0)) return;
         try
         {
-            var existing = _deviceProvider.OfType<SensorDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
+            var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
             int number = 1; while (existing.Contains(number)) number++;
             var model = new SensorDeviceModel { DeviceNumber = number, DeviceName = $"새 센서 {number}" };
             ViewModelProvider.Add(new SensorDeviceViewModel(model));
@@ -140,10 +140,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
 
             var token = _pCancellationTokenSource.Token;
 
-            // 현재 Provider의 목록
-            var currentList = _deviceProvider.OfType<SensorDeviceModel>().ToList();
-
-            // 서버 목록 조회 (전 페이지 + 완전성)
+            // (Temp-state) Save = Create(Draft Id≤0, 제어기 선택분만) + Update(Id>0 변경분). Draft는 ViewModelProvider에만.
             var (serverList, complete) = await FetchSensorsAsync(token);
             if (!complete)
             {
@@ -154,47 +151,38 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                 });
                 return;
             }
-
             var failures = new List<string>();
-            int draftNoController = 0;
+            var draftVMs = ViewModelProvider.Where(vm => vm.Model.Id <= 0).ToList();
+            var committed = new List<SensorDeviceViewModel>();
 
-            // (P2-S6) Draft-commit-when-valid: 제어기(FK) 선택된 Draft만 즉시 Create + Id write-back(재Save 중복 방지).
-            //   미선택 Draft는 서버 422 방지를 위해 보류(행 유지) + 아래 안내.
-            foreach (var model in currentList.Where(m => m.Id <= 0))
+            // 루프A: Draft 생성 (controller_id>0 필수 — 미선택 시 보류)
+            int held = await ExecuteCreateAsync(
+                draftVMs,
+                vm => { var c = ((ISensorDeviceModel)vm.Model).Controller; return c != null && c.Id > 0; },
+                (vm, ct) => CreateSensorAsync((SensorDeviceModel)vm.Model, ct),
+                vm => committed.Add(vm),
+                vm => $"{vm.Model.DeviceName}(신규)",
+                failures, token);
+
+            // 루프B: Id>0 변경분 Update
+            var updateVMs = ViewModelProvider.Where(vm =>
             {
-                if (model.Controller == null || model.Controller.Id <= 0) { draftNoController++; continue; }
-                var resp = await _apiService.CreateSensorAsync(model.ToSensorDeviceDto(), token);
-                if (resp.Success && resp.Data != null)
-                    _deviceProvider.Remove((ISensorDeviceModel)model);   // (코드리뷰 H1) 커밋된 로컬 Draft 제거 → FetchAll 서버본만 반영(타입드 투영 이중행 방지)
-                else
-                    failures.Add($"{model.DeviceName}(신규)");
-            }
+                if (vm.Model.Id <= 0) return false;
+                var srv = serverList.FirstOrDefault(s => s.Id == vm.Model.Id);
+                return srv != null && !DeviceEquals((ISensorDeviceModel)vm.Model, srv);
+            }).ToList();
+            await ExecuteSaveUpdatesAsync(
+                updateVMs,
+                (vm, ct) => UpdateSensorAsync((SensorDeviceModel)vm.Model, ct),
+                vm => $"{vm.Model.DeviceName}(Id={vm.Model.Id})",
+                failures, token);
 
-            // Update 전용 (Id>0 변경분)
-            foreach (var model in currentList.Where(m => m.Id > 0))
-            {
-                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
-                if (server != null && !DeviceEquals(model, server))
-                    if (!await UpdateSensorAsync(model, token))
-                        failures.Add($"{model.DeviceName}(Id={model.Id})");
-            }
+            // 재조회 + 재구성 + 생존자(실패/보류 Draft=제어기 미선택) 복원
+            await _deviceProviderService.FetchAllDevicesAsync(token);
+            await DataInitialize(token);
+            foreach (var d in draftVMs.Except(committed)) { d.Index = ViewModelProvider.Count + 1; ViewModelProvider.Add(d); }
 
-            if (failures.Count > 0 || draftNoController > 0)
-            {
-                var explain = "";
-                if (failures.Count > 0) explain += $"{failures.Count}건 저장에 실패했습니다.\n" + string.Join("\n", failures) + "\n";
-                if (draftNoController > 0) explain += $"{draftNoController}건은 제어기 미선택으로 저장되지 않았습니다. 제어기를 선택한 뒤 다시 저장하세요.";
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "센서 저장 안내",
-                    Explain = explain
-                });
-            }
-
-            // committed Draft는 로컬 제거되어 FetchAll 서버본으로 단일 반영. 미선택 Id<=0 Draft는 공유 provider에
-            //   없으므로(타입드 전용) UpdateOrAddDevices(비-Reset upsert)에 영향받지 않아 그대로 보존된다.
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
+            await NotifySaveResultAsync("센서 저장 안내", failures, held, token);
             await Task.Delay(2000, token);
         }
         catch (TaskCanceledException ex) { _log?.Warning(ex.Message); }
@@ -215,15 +203,19 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         NotifyOfPropertyChange(() => SelectedItems);
     }
 
+    // (PR-C) 미저장 Draft(Id≤0) 개수 — 화면 전환/종료 시 손실 경고용. 베이스 가상메서드 override.
+    protected override int CountUnsavedDrafts() => ViewModelProvider.Count(vm => vm.Model.Id <= 0);
+
     private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
-                // New items added
+                // (Draft 격리) Id≤0 미저장 Draft는 provider 미투영(공유 오염/이중행 차단).
                 if (e.NewItems == null) return;
                 foreach (ISensorDeviceViewModel newItem in e.NewItems)
                 {
+                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
                     _deviceProvider.Add((ISensorDeviceModel)newItem.Model);
                 }
                 break;
@@ -247,6 +239,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                 if (e.NewItems == null) return;
                 foreach (ISensorDeviceViewModel newItem in e.NewItems)
                 {
+                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
                     _deviceProvider.Add((ISensorDeviceModel)newItem.Model);
                 }
                 break;
@@ -311,33 +304,27 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         }
     }
 
-    // (P2-S6) Create 헬퍼 제거 — Save의 Draft-commit에서 _apiService.CreateSensorAsync 직접 호출(Id write-back). Update만 유지.
-    /// <summary>
-    /// GOP API를 통해 Sensor 업데이트
-    /// </summary>
-    private async Task<bool> UpdateSensorAsync(SensorDeviceModel model, CancellationToken token = default)
+    // (Temp-state) Create/Update 헬퍼 — ApiResultLite 반환(베이스 ExecuteCreate/SaveUpdates 연동).
+    private async Task<ApiResultLite> CreateSensorAsync(SensorDeviceModel model, CancellationToken token = default)
     {
         try
         {
-            var dto = model.ToSensorDeviceDto();
-            var response = await _apiService.UpdateSensorAsync(model.Id, dto, token);
+            var r = await _apiService.CreateSensorAsync(model.ToSensorDeviceDto(), token);
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"CreateSensorAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
+    }
 
-            if (response.Success)
-            {
-                _log?.Info($"Sensor updated successfully: {model.Id}");
-                return true;
-            }
-            else
-            {
-                _log?.Error($"Failed to update sensor {model.Id}: {response.Error?.Message}");
-                return false;
-            }
-        }
-        catch (Exception ex)
+    private async Task<ApiResultLite> UpdateSensorAsync(SensorDeviceModel model, CancellationToken token = default)
+    {
+        try
         {
-            _log?.Error($"Exception in UpdateSensorAsync: {ex.Message}");
-            return false;
+            var r = await _apiService.UpdateSensorAsync(model.Id, model.ToSensorDeviceDto(), token);
+            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
         }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"UpdateSensorAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
     }
     #endregion
     #region - Processes -
@@ -426,7 +413,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     }
     #endregion
     #region - Properties -
-    public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider;
+    public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider.Where(c => c.Id > 0);   // (G6) Temp 제어기 제외
     public event System.Action? UpdateAction;
     #endregion
     #region - Attributes -

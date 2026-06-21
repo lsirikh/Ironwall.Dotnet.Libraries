@@ -158,6 +158,16 @@
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:LampDeviceSelectedItemsBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
 			</i:Interaction.Behaviors>
+			<DataGrid.RowStyle>
+				<Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsDraft}" Value="True">
+							<Setter Property="Background" Value="#33FF9800" />
+							<Setter Property="ToolTip" Value="미저장 — 저장 시 서버에 등록됩니다" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</DataGrid.RowStyle>
 			<DataGrid.Columns>
 
 				<!--  No  -->

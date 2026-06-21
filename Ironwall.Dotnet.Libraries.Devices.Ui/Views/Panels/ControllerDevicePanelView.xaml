@@ -163,6 +163,17 @@
 				<behavior:ClearSelectionOnEscBehavior />
 				<behavior_inner:ControllerDeviceSelectedItemsBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
 			</i:Interaction.Behaviors>
+			<!--  (PR-C) 미저장 Draft(IsDraft=Id≤0) 행 시각 강조 — 암시적 MaterialDesign 행 스타일 상속  -->
+			<DataGrid.RowStyle>
+				<Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsDraft}" Value="True">
+							<Setter Property="Background" Value="#33FF9800" />
+							<Setter Property="ToolTip" Value="미저장 — 저장 시 서버에 등록됩니다" />
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</DataGrid.RowStyle>
 			<DataGrid.Columns>
 
 				<!--  No  -->

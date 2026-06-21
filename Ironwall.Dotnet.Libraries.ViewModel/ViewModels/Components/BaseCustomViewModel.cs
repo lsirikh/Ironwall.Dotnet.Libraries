@@ -53,13 +53,17 @@ public abstract class BaseCustomViewModel<T> : SelectableBaseViewModel, IBaseCus
         {
             _model.Id = value;
             NotifyOfPropertyChange(() => Id);
+            NotifyOfPropertyChange(() => IsDraft);
         }
     }
+
+    /// <summary>(PR-C) Temp/미저장 행(Id≤0) — DataGrid 행 시각마커 바인딩용. Save 등록 시 Id&gt;0 → false.</summary>
+    public bool IsDraft => _model.Id <= 0;
 
     public T Model
     {
         get => _model;
-        set { _model = value; NotifyOfPropertyChange(() => Model); }
+        set { _model = value; NotifyOfPropertyChange(() => Model); NotifyOfPropertyChange(() => IsDraft); }
     }
 
     #endregion

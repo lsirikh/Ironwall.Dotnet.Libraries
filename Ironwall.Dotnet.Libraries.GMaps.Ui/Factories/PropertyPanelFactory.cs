@@ -92,7 +92,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             if (_deviceProvider == null) return;
 
             var deviceType = marker.DeviceType;
-            var allDevices = _deviceProvider.ToList();
+            // (B6 방어계층) Temp(미저장 Id≤0) 장비는 PIDS 픽커 후보 제외 — Draft 격리와 이중 방어.
+            var allDevices = _deviceProvider.Where(d => d.Id > 0).ToList();
 
             // DeviceType에 따라 필터링
             var filteredDevices = FilterDevicesByType(allDevices, deviceType);
