@@ -195,7 +195,7 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
         public bool? IsEnable { get; set; }
         public ObservableCollection<DeviceGroupItemViewModel> GroupItems { get; set; } = new();
         public SensorDevicePanelViewModel DevicePanelViewModel { get; }
-        public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider;
+        public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider.Where(c => c.Id > 0);   // (G6) Temp(미저장) 제어기는 센서 FK 후보 제외
         #endregion
         #region - Attributes -
         private readonly ControllerDeviceProvider _controllerProvider;

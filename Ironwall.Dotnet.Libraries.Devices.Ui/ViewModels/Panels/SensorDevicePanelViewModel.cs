@@ -410,7 +410,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     }
     #endregion
     #region - Properties -
-    public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider;
+    public IEnumerable<IControllerDeviceModel> Controllers => _controllerProvider.Where(c => c.Id > 0);   // (G6) Temp 제어기 제외
     public event System.Action? UpdateAction;
     #endregion
     #region - Attributes -

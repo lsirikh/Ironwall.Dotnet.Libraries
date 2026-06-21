@@ -35,7 +35,7 @@ public class DeviceAssignDialogViewModel : Screen
 
         AllDevices.Clear();
         foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>()
-                                             .Where(m => !_assignedIds.Contains(m.Id)))
+                                             .Where(m => m.Id > 0 && !_assignedIds.Contains(m.Id)))   // (G4) Temp(미저장) 장비 후보 제외
         {
             AllDevices.Add(new DeviceAssignItemViewModel
             {
@@ -51,7 +51,11 @@ public class DeviceAssignDialogViewModel : Screen
 
     public async Task ConfirmButton(CancellationToken token = default)
     {
-        var newIds = SelectedDevices.Select(d => d.Id).ToList();
+        // (G3) Temp 그룹(Id≤0)에는 배정 불가 — 2차 방어(groups/0/devices 호출 차단).
+        if (_groupId <= 0) { _log?.Warning("ConfirmButton: 미저장 그룹(Id≤0)에 장비 배정 시도 차단"); await TryCloseAsync(false); return; }
+
+        // (G5) Temp(미저장) 장비 제외.
+        var newIds = SelectedDevices.Select(d => d.Id).Where(id => id > 0).ToList();
 
         if (newIds.Count == 0) { await TryCloseAsync(true); return; }
 
@@ -65,8 +69,10 @@ public class DeviceAssignDialogViewModel : Screen
             }
             else
             {
+                // (M4) verify-after-success — 서버가 실제 배정한 ID(AssignedDeviceIds) 기준으로만 로컬 갱신.
+                var assigned = resp.Data?.AssignedDeviceIds ?? newIds;
                 foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>()
-                             .Where(m => newIds.Contains(m.Id)))
+                             .Where(m => assigned.Contains(m.Id)))
                 {
                     model.DeviceGroups ??= new List<int>();
                     if (!model.DeviceGroups.Contains(_groupId))
