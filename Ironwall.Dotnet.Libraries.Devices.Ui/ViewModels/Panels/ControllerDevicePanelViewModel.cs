@@ -75,44 +75,14 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         });
     }
 
-    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        // (P2-S1) 추가 즉시 Create — pending(Id=0) 미발생. 기본값으로 서버 생성 후 서버 Id를 그리드에 반영.
-        if (!await _processGate.WaitAsync(0)) return;
-        try
-        {
-            var existing = _deviceProvider.OfType<ControllerDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
-            int number = 1; while (existing.Contains(number)) number++;
-            // (422 fix) 서버는 ip_port>=1 요구(VALIDATION_ERROR) → 유효 placeholder 포트 부여(사용자가 실제 포트로 편집).
-            //   ip_address 빈값("")은 서버가 허용(거부 필드 아님).
-            var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}", Port = 502 };
-            var dto = model.ToControllerDeviceDto();
-            _log?.Info($"[Controller Insert] 요청 POST DTO: {Newtonsoft.Json.JsonConvert.SerializeObject(dto)}");
-            var resp = await _apiService.CreateControllerAsync(dto, CancellationToken.None);
-            if (!resp.Success || resp.Data == null)
-            {
-                // (422 디버깅) 서버 응답 본문(어느 필드가 왜 거부됐는지 = FastAPI detail) + HTTP status 보존 로깅.
-                _log?.Error($"[Controller Insert] 추가 실패 HTTP {resp.StatusCode}: {resp.Message} | 서버 detail={resp.Error?.Details}");
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "제어기 추가 실패",
-                    Explain = $"장비를 추가하지 못했습니다. 서버 상태를 확인하세요.\n{resp.Message}"
-                });
-                return;
-            }
-            // (코드리뷰 C1) 타입드 provider는 공유 DeviceProvider의 단방향 투영 → 수동 Add 시 FetchAll 투영과
-            //   이중행. 서버 생성분은 재조회로만 반영(단일 원천).
-            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
-            {
-                _pCancellationTokenSource.Cancel();
-                _pCancellationTokenSource.Dispose();
-            }
-            _pCancellationTokenSource = new CancellationTokenSource();
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
-        }
-        catch (Exception ex) { _log?.Error($"OnClickInsertButton: {ex.Message}"); }
-        finally { _processGate.Release(); }
+        // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. IP/포트 등 입력 후 Save 시 등록.
+        //   Draft(Id≤0)는 ViewModelProvider에만(provider 미진입, CollectionChanged 가드).
+        var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
+        int number = 1; while (existing.Contains(number)) number++;
+        var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}" };
+        ViewModelProvider.Add(new ControllerDeviceViewModel(model));
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -162,14 +132,10 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
 
             var token = _pCancellationTokenSource.Token;
 
-            // 현재 Provider의 목록
-            var currentList = _deviceProvider.OfType<ControllerDeviceModel>().ToList();
-
-            // 서버 목록 조회 (비교를 위해)
+            // (Temp-state) Save = Create(Draft Id≤0) + Update(Id>0 변경분). Draft는 ViewModelProvider에만 존재.
             var (serverList, complete) = await FetchControllersAsync(token);
             if (!complete)
             {
-                // (리뷰 MEDIUM) 서버 목록 불완전 → 부분 비교로 편집 소실 방지: 저장 보류.
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "저장 보류",
@@ -177,30 +143,38 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 });
                 return;
             }
-
-            // (P2-S2) Save = Update 전용. 추가는 OnClickInsertButton(즉시 Create), 삭제는 HandleAsync에서 처리.
-            //   Insert(Id<=0 Create) 루프 제거 → pending 유령 재생성/중복(#13) 원천 차단.
             var failures = new List<string>();
-            foreach (var model in currentList.Where(m => m.Id > 0))
-            {
-                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
-                if (server != null && !DeviceEquals(model, server))
-                    if (!await UpdateControllerAsync(model, token))
-                        failures.Add($"{model.DeviceName}(Id={model.Id})");
-            }
+            var draftVMs = ViewModelProvider.Where(vm => vm.Model.Id <= 0).ToList();
+            var committed = new List<ControllerDeviceViewModel>();
 
-            if (failures.Count > 0)
-            {
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "제어기 수정 일부 실패",
-                    Explain = $"{failures.Count}건 수정에 실패했습니다.\n" + string.Join("\n", failures)
-                });
-            }
+            // 루프A: Draft 생성 (Port≥1 필수 — 미충족 시 보류)
+            int held = await ExecuteCreateAsync(
+                draftVMs,
+                vm => ((IControllerDeviceModel)vm.Model).Port >= 1,
+                (vm, ct) => CreateControllerAsync((ControllerDeviceModel)vm.Model, ct),
+                vm => committed.Add(vm),
+                vm => $"{vm.Model.DeviceName}(신규)",
+                failures, token);
 
-            // 재조회
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
+            // 루프B: Id>0 변경분 Update
+            var updateVMs = ViewModelProvider.Where(vm =>
+            {
+                if (vm.Model.Id <= 0) return false;
+                var srv = serverList.FirstOrDefault(s => s.Id == vm.Model.Id);
+                return srv != null && !DeviceEquals((IControllerDeviceModel)vm.Model, srv);
+            }).ToList();
+            await ExecuteSaveUpdatesAsync(
+                updateVMs,
+                (vm, ct) => UpdateControllerAsync((ControllerDeviceModel)vm.Model, ct),
+                vm => $"{vm.Model.DeviceName}(Id={vm.Model.Id})",
+                failures, token);
+
+            // 재조회 + 재구성 + 생존자(실패/보류 Draft) 복원
+            await _deviceProviderService.FetchAllDevicesAsync(token);
+            await DataInitialize(token);
+            foreach (var d in draftVMs.Except(committed)) ViewModelProvider.Add(d);
+
+            await NotifySaveResultAsync("제어기 저장 안내", failures, held, token);
             await Task.Delay(2000, token);
         }
         catch (TaskCanceledException ex) { _log?.Warning(ex.Message); }
@@ -226,10 +200,11 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
-                // New items added
+                // (Draft 격리) Id≤0 미저장 Draft는 provider 미투영(공유 오염/이중행 차단).
                 if (e.NewItems == null) return;
                 foreach (IControllerDeviceViewModel newItem in e.NewItems)
                 {
+                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
                     _deviceProvider.Add((IControllerDeviceModel)newItem.Model);
                 }
                 break;
@@ -253,6 +228,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 if (e.NewItems == null) return;
                 foreach (IControllerDeviceViewModel newItem in e.NewItems)
                 {
+                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
                     _deviceProvider.Add((IControllerDeviceModel)newItem.Model);
                 }
                 break;
@@ -320,33 +296,27 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         }
     }
 
-    // (P2-S1) Create 헬퍼 제거 — 추가는 OnClickInsertButton 즉시 Create로 일원화. Update만 유지.
-    /// <summary>
-    /// GOP API를 통해 Controller 업데이트
-    /// </summary>
-    private async Task<bool> UpdateControllerAsync(ControllerDeviceModel model, CancellationToken token = default)
+    // (Temp-state) Create/Update 헬퍼 — ApiResultLite 반환(베이스 ExecuteCreate/SaveUpdates 연동).
+    private async Task<ApiResultLite> CreateControllerAsync(ControllerDeviceModel model, CancellationToken token = default)
     {
         try
         {
-            var dto = model.ToControllerDeviceDto();
-            var response = await _apiService.UpdateControllerAsync(model.Id, dto, token);
+            var r = await _apiService.CreateControllerAsync(model.ToControllerDeviceDto(), token);
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"CreateControllerAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
+    }
 
-            if (response.Success)
-            {
-                _log?.Info($"Controller updated successfully: {model.Id}");
-                return true;
-            }
-            else
-            {
-                _log?.Error($"Failed to update controller {model.Id}: {response.Error?.Message}");
-                return false;
-            }
-        }
-        catch (Exception ex)
+    private async Task<ApiResultLite> UpdateControllerAsync(ControllerDeviceModel model, CancellationToken token = default)
+    {
+        try
         {
-            _log?.Error($"Exception in UpdateControllerAsync: {ex.Message}");
-            return false;
+            var r = await _apiService.UpdateControllerAsync(model.Id, model.ToControllerDeviceDto(), token);
+            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
         }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"UpdateControllerAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
     }
     #endregion
     #region - Processes -

@@ -66,39 +66,14 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         });
     }
 
-    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        // (P2-S1) 추가 즉시 Create — pending(Id=0) 미발생. 기본값으로 서버 생성 후 서버 Id를 그리드에 반영.
-        if (!await _processGate.WaitAsync(0)) return;
-        try
-        {
-            var existing = _deviceProvider.OfType<EnclosureDeviceModel>().Select(m => m.DeviceNumber).ToHashSet();
-            int number = 1; while (existing.Contains(number)) number++;
-            var model = new EnclosureDeviceModel { DeviceNumber = number, DeviceName = $"새 함체 {number}" };
-            var resp = await _apiService.CreateEnclosureAsync(model.ToEnclosureDeviceDto(), CancellationToken.None);
-            if (!resp.Success || resp.Data == null)
-            {
-                _log?.Error($"[Enclosure Insert] 추가 실패 HTTP {resp.StatusCode}: {resp.Message} | 서버 detail={resp.Error?.Details}");
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "함체 추가 실패",
-                    Explain = $"장비를 추가하지 못했습니다. 서버 상태를 확인하세요.\n{resp.Message}"
-                });
-                return;
-            }
-            // (코드리뷰 C1) 타입드 provider는 공유 DeviceProvider의 단방향 투영 → 수동 Add 시 FetchAll 투영과
-            //   이중행. 서버 생성분은 재조회로만 반영(단일 원천).
-            if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
-            {
-                _pCancellationTokenSource.Cancel();
-                _pCancellationTokenSource.Dispose();
-            }
-            _pCancellationTokenSource = new CancellationTokenSource();
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
-        }
-        catch (Exception ex) { _log?.Error($"OnClickInsertButton: {ex.Message}"); }
-        finally { _processGate.Release(); }
+        // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. 입력 후 Save 시 등록.
+        //   Draft(Id≤0)는 ViewModelProvider에만(provider 미진입, CollectionChanged 가드).
+        var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
+        int number = 1; while (existing.Contains(number)) number++;
+        var model = new EnclosureDeviceModel { DeviceNumber = number, DeviceName = $"새 함체 {number}" };
+        ViewModelProvider.Add(new EnclosureDeviceViewModel(model));
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -141,39 +116,49 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
             _pCancellationTokenSource = new CancellationTokenSource();
             var token = _pCancellationTokenSource.Token;
 
-            // (P2-S2) Save = Update 전용. 추가는 OnClickInsertButton(즉시 Create), 삭제는 HandleAsync에서 처리.
-            var currentList = _deviceProvider.OfType<EnclosureDeviceModel>().ToList();
+            // (Temp-state) Save = Create(Draft Id≤0) + Update(Id>0 변경분). Draft는 ViewModelProvider에만 존재.
             var (serverList, complete) = await FetchEnclosuresAsync(token);
             if (!complete)
             {
                 await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 {
                     Title = "저장 보류",
-                    Explain = "서버 함체 목록을 완전히 불러오지 못해 수정 저장을 보류합니다. 잠시 후 다시 시도하세요."
+                    Explain = "서버 함체 목록을 완전히 불러오지 못해 저장을 보류합니다. 잠시 후 다시 시도하세요."
                 });
                 return;
             }
             var failures = new List<string>();
+            var draftVMs = ViewModelProvider.Where(vm => vm.Model.Id <= 0).ToList();
+            var committed = new List<EnclosureDeviceViewModel>();
 
-            foreach (var model in currentList.Where(m => m.Id > 0))
+            // 루프A: Draft 생성 (서버 필수필드 없음 — 항상 생성 시도)
+            int held = await ExecuteCreateAsync(
+                draftVMs,
+                vm => true  /* 서버 필수필드 없음(ip_port 없음) */,
+                (vm, ct) => CreateEnclosureAsync((EnclosureDeviceModel)vm.Model, ct),
+                vm => committed.Add(vm),
+                vm => $"{vm.Model.DeviceName}(신규)",
+                failures, token);
+
+            // 루프B: Id>0 변경분 Update
+            var updateVMs = ViewModelProvider.Where(vm =>
             {
-                var server = serverList.FirstOrDefault(s => s.Id == model.Id);
-                if (server != null && !DeviceEquals(model, server))
-                    if (!await UpdateEnclosureAsync(model, token))
-                        failures.Add($"{model.DeviceName}(Id={model.Id})");
-            }
+                if (vm.Model.Id <= 0) return false;
+                var srv = serverList.FirstOrDefault(s => s.Id == vm.Model.Id);
+                return srv != null && !DeviceEquals((IEnclosureDeviceModel)vm.Model, srv);
+            }).ToList();
+            await ExecuteSaveUpdatesAsync(
+                updateVMs,
+                (vm, ct) => UpdateEnclosureAsync((EnclosureDeviceModel)vm.Model, ct),
+                vm => $"{vm.Model.DeviceName}(Id={vm.Model.Id})",
+                failures, token);
 
-            if (failures.Count > 0)
-            {
-                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                {
-                    Title = "함체 수정 일부 실패",
-                    Explain = $"{failures.Count}건 수정에 실패했습니다.\n" + string.Join("\n", failures)
-                });
-            }
+            // 재조회 + 재구성 + 생존자(실패/보류 Draft) 복원
+            await _deviceProviderService.FetchAllDevicesAsync(token);
+            await DataInitialize(token);
+            foreach (var d in draftVMs.Except(committed)) ViewModelProvider.Add(d);
 
-            await _deviceProviderService.FetchAllDevicesAsync(_pCancellationTokenSource.Token);
-            await DataInitialize(_pCancellationTokenSource.Token);
+            await NotifySaveResultAsync("함체 저장 안내", failures, held, token);
             await Task.Delay(2000, token);
         }
         catch (TaskCanceledException ex) { _log?.Warning(ex.Message); }
@@ -199,9 +184,13 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
+                // (Draft 격리) Id≤0 미저장 Draft는 provider 미투영(공유 오염/이중행 차단).
                 if (e.NewItems == null) return;
                 foreach (IEnclosureDeviceViewModel newItem in e.NewItems)
+                {
+                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
                     _deviceProvider.Add((IEnclosureDeviceModel)newItem.Model);
+                }
                 break;
             case NotifyCollectionChangedAction.Remove:
                 if (e.OldItems == null) return;
@@ -235,26 +224,27 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
     }
     #endregion
     #region - Helper Methods -
-    // (P2-S1) Create 헬퍼 제거 — 추가는 OnClickInsertButton 즉시 Create로 일원화. Update만 유지.
-    private async Task<bool> UpdateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
+    // (Temp-state) Create/Update 헬퍼 — ApiResultLite 반환(베이스 ExecuteCreate/SaveUpdates 연동).
+    private async Task<ApiResultLite> CreateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
     {
         try
         {
-            var dto = model.ToEnclosureDeviceDto();
-            var response = await _apiService.UpdateEnclosureAsync(model.Id, dto, token);
-            if (response.Success)
-            {
-                _log?.Info($"Enclosure updated successfully: {model.Id}");
-                return true;
-            }
-            _log?.Error($"Failed to update enclosure {model.Id}: {response.Error?.Message}");
-            return false;
+            var r = await _apiService.CreateEnclosureAsync(model.ToEnclosureDeviceDto(), token);
+            return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"CreateEnclosureAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
+    }
+
+    private async Task<ApiResultLite> UpdateEnclosureAsync(EnclosureDeviceModel model, CancellationToken token = default)
+    {
+        try
         {
-            _log?.Error($"Exception in UpdateEnclosureAsync: {ex.Message}");
-            return false;
+            var r = await _apiService.UpdateEnclosureAsync(model.Id, model.ToEnclosureDeviceDto(), token);
+            return new ApiResultLite(r.Success, r.StatusCode, r.Error?.Details);
         }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _log?.Error($"UpdateEnclosureAsync: {ex.Message}"); return new ApiResultLite(false, 0, ex.Message); }
     }
 
     // (P2-S4) 전 페이지 순회 + 완전성 신호.
