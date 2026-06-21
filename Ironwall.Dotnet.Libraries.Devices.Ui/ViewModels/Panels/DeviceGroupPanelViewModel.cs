@@ -63,14 +63,20 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
         });
     }
 
-    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. 이름/설명 입력 후 Save 시 등록. Draft는 ViewModelProvider에만.
-        var existing = ViewModelProvider.Select(vm => vm.Model.Name).ToHashSet();
-        var name = "새 그룹";
-        for (int n = 2; existing.Contains(name); n++) name = $"새 그룹 ({n})";
-        var model = new DeviceGroupModel { Name = name, Description = string.Empty };
-        ViewModelProvider.Add(new DeviceGroupViewModel(model));
+        // (C1) Save 진행 중 Insert 끼어들기 경합 차단 — _processGate로 직렬화(타 핸들러와 동일).
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. 이름/설명 입력 후 Save 시 등록. Draft는 ViewModelProvider에만.
+            var existing = ViewModelProvider.Select(vm => vm.Model.Name).ToHashSet();
+            var name = "새 그룹";
+            for (int n = 2; existing.Contains(name); n++) name = $"새 그룹 ({n})";
+            var model = new DeviceGroupModel { Name = name, Description = string.Empty };
+            ViewModelProvider.Add(new DeviceGroupViewModel(model));
+        }
+        finally { _processGate.Release(); }
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -176,7 +182,7 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
                 foreach (var g in refreshed) _deviceGroupProvider.Add(g);
             }
             await DataInitialize(token);
-            foreach (var d in draftVMs.Except(committed)) ViewModelProvider.Add(d);
+            foreach (var d in draftVMs.Except(committed)) { d.Index = ViewModelProvider.Count + 1; ViewModelProvider.Add(d); }
 
             await NotifySaveResultAsync("그룹 저장 안내", failures, held, token);
             await Task.Delay(2000, token);
@@ -198,6 +204,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
         try
         {
             var r = await _apiService.CreateDeviceGroupAsync(model.ToDeviceGroupDto(), token);
+            if (r.Success && r.Data != null)
+                model.Id = r.Data.ToDeviceGroupModel().Id;   // (R2/H2) 서버 Id write-back — 선택 에디터의 stale Id(0) 방지 → CanAddAssign 정상화
             return new ApiResultLite(r.Success && r.Data != null, r.StatusCode, r.Error?.Details);
         }
         catch (OperationCanceledException) { throw; }
@@ -239,6 +247,17 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
                 if (e.OldItems == null) return;
                 foreach (IDeviceGroupViewModel oldItem in e.OldItems)
                     _deviceGroupProvider.Remove(oldItem.Model);
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                if (e.OldItems != null)
+                    foreach (IDeviceGroupViewModel oldItem in e.OldItems)
+                        _deviceGroupProvider.Remove(oldItem.Model);
+                if (e.NewItems != null)
+                    foreach (IDeviceGroupViewModel newItem in e.NewItems)
+                    {
+                        if (!ShouldProjectToProvider(newItem.Model.Id)) continue;   // (Draft 격리)
+                        _deviceGroupProvider.Add(newItem.Model);
+                    }
                 break;
             case NotifyCollectionChangedAction.Reset:
                 ViewModelProvider.Clear();

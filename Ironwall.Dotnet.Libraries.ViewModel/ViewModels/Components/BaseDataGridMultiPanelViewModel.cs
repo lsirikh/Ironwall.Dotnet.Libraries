@@ -62,8 +62,11 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
             _pCancellationTokenSource?.Dispose();
 
         }
-        catch (Exception)
+        catch (OperationCanceledException) { /* 비활성화 중 취소는 정상 */ }
+        catch (Exception ex)
         {
+            // 빈 catch 금지(rules) — 비활성화 중 Dispose/Cancel 실패를 침묵 처리하면 진단 불가.
+            _log?.Error($"[{_className}] Uninitialize 예외: {ex.Message}");
         }
         return Task.CompletedTask;
     }

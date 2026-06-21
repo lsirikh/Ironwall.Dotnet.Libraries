@@ -75,14 +75,19 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         });
     }
 
-    public override void OnClickInsertButton(object sender, RoutedEventArgs e)
+    public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. IP/포트 등 입력 후 Save 시 등록.
-        //   Draft(Id≤0)는 ViewModelProvider에만(provider 미진입, CollectionChanged 가드).
-        var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
-        int number = 1; while (existing.Contains(number)) number++;
-        var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}" };
-        ViewModelProvider.Add(new ControllerDeviceViewModel(model));
+        if (!await _processGate.WaitAsync(0)) return;
+        try
+        {
+            // (Temp-state) 로컬 Draft 추가만 — 서버 미반영. IP/포트 등 입력 후 Save 시 등록.
+            //   Draft(Id≤0)는 ViewModelProvider에만(provider 미진입, CollectionChanged 가드).
+            var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
+            int number = 1; while (existing.Contains(number)) number++;
+            var model = new ControllerDeviceModel { DeviceNumber = number, DeviceName = $"새 제어기 {number}" };
+            ViewModelProvider.Add(new ControllerDeviceViewModel(model));
+        }
+        finally { _processGate.Release(); }
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
@@ -172,7 +177,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
             // 재조회 + 재구성 + 생존자(실패/보류 Draft) 복원
             await _deviceProviderService.FetchAllDevicesAsync(token);
             await DataInitialize(token);
-            foreach (var d in draftVMs.Except(committed)) ViewModelProvider.Add(d);
+            foreach (var d in draftVMs.Except(committed)) { d.Index = ViewModelProvider.Count + 1; ViewModelProvider.Add(d); }
 
             await NotifySaveResultAsync("제어기 저장 안내", failures, held, token);
             await Task.Delay(2000, token);

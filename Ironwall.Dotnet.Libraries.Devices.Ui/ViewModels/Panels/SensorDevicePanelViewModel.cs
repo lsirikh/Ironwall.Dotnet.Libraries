@@ -180,7 +180,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
             // 재조회 + 재구성 + 생존자(실패/보류 Draft=제어기 미선택) 복원
             await _deviceProviderService.FetchAllDevicesAsync(token);
             await DataInitialize(token);
-            foreach (var d in draftVMs.Except(committed)) ViewModelProvider.Add(d);
+            foreach (var d in draftVMs.Except(committed)) { d.Index = ViewModelProvider.Count + 1; ViewModelProvider.Add(d); }
 
             await NotifySaveResultAsync("센서 저장 안내", failures, held, token);
             await Task.Delay(2000, token);

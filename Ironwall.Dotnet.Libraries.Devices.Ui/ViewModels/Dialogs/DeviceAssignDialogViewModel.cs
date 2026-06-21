@@ -34,6 +34,8 @@ public class DeviceAssignDialogViewModel : Screen
         _assignedIds = new HashSet<int>(assignedDeviceIds);
 
         AllDevices.Clear();
+        // (G3) 미저장 그룹(Id≤0)엔 후보를 채우지 않음 — ConfirmButton 가드와 동일 방어(🔴 강제계층, PRD 지정).
+        if (groupId <= 0) return;
         foreach (var model in _deviceProvider.OfType<IBaseDeviceModel>()
                                              .Where(m => m.Id > 0 && !_assignedIds.Contains(m.Id)))   // (G4) Temp(미저장) 장비 후보 제외
         {
