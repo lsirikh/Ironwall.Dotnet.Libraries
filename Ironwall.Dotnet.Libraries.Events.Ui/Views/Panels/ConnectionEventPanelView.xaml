@@ -316,6 +316,8 @@
 								VerticalAlignment="Center"
 								HorizontalContentAlignment="Center"
 								IsEditable="False"
+								IsEnabled="{Binding IsDraft}"
+								ToolTip="이벤트 발생 시점 장비는 변경할 수 없습니다(추적성 보존). 신규 행에서만 지정 가능합니다."
 								ItemsSource="{Binding Data.DeviceProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
 								SelectedItem="{Binding Device, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 								<ComboBox.ItemsPanel>
