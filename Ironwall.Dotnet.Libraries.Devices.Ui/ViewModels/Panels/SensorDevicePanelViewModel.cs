@@ -269,6 +269,8 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
                a.Location == b.Location &&
                a.Latitude == b.Latitude &&
                a.Longitude == b.Longitude &&
+               a.Heading == b.Heading &&
+               a.Altitude == b.Altitude &&
                a.Controller?.Id == b.Controller?.Id;
     }
     #endregion

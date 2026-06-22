@@ -17,4 +17,5 @@ public interface IBaseDeviceModel : IBaseModel
     double Longitude { get; set; }
     bool IsEnable { get; set; }
     double? Heading { get; set; }
+    double? Altitude { get; set; }
 }

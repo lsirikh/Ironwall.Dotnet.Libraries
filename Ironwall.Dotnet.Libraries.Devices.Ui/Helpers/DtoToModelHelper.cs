@@ -59,19 +59,23 @@ public static class DtoToModelHelper
             model.Latitude = dto.Geolocation.Latitude;
             model.Longitude = dto.Geolocation.Longitude;
             model.Heading = dto.Geolocation.Heading;   // v4.4: 설치 방위 → 심볼 BaseBearing 구동(메모리)
+            model.Altitude = dto.Geolocation.Altitude; // v4.4: 설치 고도(optional)
         }
     }
 
     private static void MapGeolocationToDto(BaseDeviceModel model, BaseDeviceDto dto)
     {
         dto.IsEnable = model.IsEnable;
-        if (!string.IsNullOrEmpty(model.Location) || model.Latitude != 0 || model.Longitude != 0)
+        if (!string.IsNullOrEmpty(model.Location) || model.Latitude != 0 || model.Longitude != 0
+            || model.Heading.HasValue || model.Altitude.HasValue)
         {
             dto.Geolocation = new GeolocationDto
             {
                 Location = model.Location,
                 Latitude = model.Latitude,
-                Longitude = model.Longitude
+                Longitude = model.Longitude,
+                Heading = model.Heading,    // BLOCKER-1 핫픽스: 저장 시 방위각 API 전송(NullValueHandling.Ignore)
+                Altitude = model.Altitude   // 설치 고도(optional, null 시 직렬화 생략)
             };
         }
     }
@@ -484,7 +488,7 @@ public static class DtoToModelHelper
         {
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
-            Altitude = dto.Altitude
+            Altitude = dto.Altitude ?? 0   // CameraPositionModel.Altitude는 non-nullable, 미설정 시 0
         };
     }
 

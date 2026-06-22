@@ -274,6 +274,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         a.Location == b.Location &&
         a.Latitude == b.Latitude &&
         a.Longitude == b.Longitude &&
+        a.Heading == b.Heading &&
+        a.Altitude == b.Altitude &&
         CameraUrlsEquals(a.Urls, b.Urls);
     }
 

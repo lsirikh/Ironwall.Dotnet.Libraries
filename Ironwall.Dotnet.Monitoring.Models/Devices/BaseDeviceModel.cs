@@ -31,6 +31,8 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
         Latitude = model.Latitude;
         Longitude = model.Longitude;
         IsEnable = model.IsEnable;
+        Heading = model.Heading;
+        Altitude = model.Altitude;
     }
 
     [JsonProperty("device_number", Order = 2)]
@@ -61,4 +63,7 @@ public class BaseDeviceModel : BaseModel, IBaseDeviceModel
     /// <summary>장비 설치 방위각 0~360° (v4.4 geolocation.heading). 심볼 FOV BaseBearing 구동용. optional.</summary>
     [JsonProperty("heading", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
     public double? Heading { get; set; }
+    /// <summary>장비 설치 고도(m) (v4.4 geolocation.altitude). optional.</summary>
+    [JsonProperty("altitude", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
+    public double? Altitude { get; set; }
 }

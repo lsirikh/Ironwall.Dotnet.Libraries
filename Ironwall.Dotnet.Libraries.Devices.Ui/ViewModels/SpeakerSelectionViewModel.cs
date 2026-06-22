@@ -34,6 +34,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 item.Location = Location ?? item.Location;
                 if (Latitude.HasValue) item.Latitude = Math.Clamp(Latitude.Value, -90.0, 90.0);
                 if (Longitude.HasValue) item.Longitude = Math.Clamp(Longitude.Value, -180.0, 180.0);
+                if (Bearing.HasValue) item.Bearing = Bearing.Value;     // mod360 정규화는 VM setter가 처리
+                if (Altitude.HasValue) item.Altitude = Altitude.Value;
                 if (IsEnable.HasValue) item.IsEnable = IsEnable.Value;
             }
             ApplyGroups();
@@ -63,6 +65,16 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 .All(m => EqualityComparer<T>.Default.Equals(selector(m), firstValue)) ? firstValue : null;
         }
 
+        /* 공통값 계산 헬퍼 — 소스가 Nullable<T>(Heading/Altitude). 전부 동일하면 그 값, 혼재/일부 null이면 null */
+        private static T? CommonOrNullNullable<T>(IEnumerable<SpeakerDeviceViewModel> list, Func<ISpeakerDeviceModel, T?> selector) where T : struct
+        {
+            if (list == null || !list.Any()) return null;
+            var models = list.Select(vm => vm.Model as ISpeakerDeviceModel).Where(m => m != null).ToList();
+            if (models.Count == 0) return null;
+            T? first = selector(models[0]!);
+            return models.All(m => Nullable.Equals(selector(m!), first)) ? first : (T?)null;
+        }
+
         public void RefreshAll()
         {
             DeviceNumber = CommonOrNullValue(_selection, m => m.DeviceNumber);
@@ -75,6 +87,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             Location = CommonOrNullString(_selection, m => m.Location);
             Latitude = CommonOrNullValue(_selection, m => m.Latitude);
             Longitude = CommonOrNullValue(_selection, m => m.Longitude);
+            Bearing = CommonOrNullNullable(_selection, m => m.Heading);
+            Altitude = CommonOrNullNullable(_selection, m => m.Altitude);
             IsEnable = CommonOrNullValue(_selection, m => m.IsEnable);
             RefreshGroupItems();
         }
@@ -123,6 +137,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public string? Location { get; set; }
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
+        public double? Bearing { get; set; }
+        public double? Altitude { get; set; }
         public bool? IsEnable { get; set; }
         public ObservableCollection<DeviceGroupItemViewModel> GroupItems { get; set; } = new();
         public SpeakerDevicePanelViewModel DevicePanelViewModel { get; }

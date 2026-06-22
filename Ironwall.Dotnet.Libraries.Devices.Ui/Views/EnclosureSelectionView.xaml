@@ -194,9 +194,13 @@
 						</ComboBox>
 					</Grid>
 
-					<!--  ===== 구역③ 위치 정보 (P1: Location/Lat/Lng — Alt/Bearing은 P2) =====  -->
+					<!--  ===== 구역③ 위치 정보 (Location/Lat/Lng + Alt/Bearing) =====  -->
 					<TextBlock Style="{StaticResource SectionTitle}" Text="위치 정보" />
 					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto" />
 							<ColumnDefinition Width="*" MinWidth="60" />
@@ -207,10 +211,12 @@
 						</Grid.ColumnDefinitions>
 
 						<TextBlock
+							Grid.Row="0"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="Location" />
 						<TextBox
+							Grid.Row="0"
 							Grid.Column="1"
 							Margin="0,0,12,0"
 							md:HintAssist.Hint="설치 위치"
@@ -218,10 +224,12 @@
 							Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 						<TextBlock
+							Grid.Row="0"
 							Grid.Column="2"
 							Style="{StaticResource TextBlockTitle}"
 							Text="Lat" />
 						<TextBox
+							Grid.Row="0"
 							Grid.Column="3"
 							Margin="0,0,12,0"
 							md:HintAssist.Hint="위도"
@@ -229,14 +237,42 @@
 							Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 						<TextBlock
+							Grid.Row="0"
 							Grid.Column="4"
 							Style="{StaticResource TextBlockTitle}"
 							Text="Lng" />
 						<TextBox
+							Grid.Row="0"
 							Grid.Column="5"
 							md:HintAssist.Hint="경도"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Alt" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="고도(m)"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Altitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Bearing" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="3"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="0~360°"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Bearing, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 					</Grid>
 
 					<!--  ===== 구역④ 그룹 (기존 세로 스크롤 ListBox 유지) =====  -->
