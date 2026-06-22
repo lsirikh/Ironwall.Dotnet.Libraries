@@ -161,6 +161,28 @@ public abstract class BaseDeviceViewModel<T> : BaseCustomViewModel<T>
             NotifyOfPropertyChange(() => IsEnable);
         }
     }
+
+    /// <summary>설치 방위각 0~360° (model.Heading, v4.4). 미설정 시 null. set 시 mod360 정규화(서버 0~360 검증 대응).</summary>
+    public double? Bearing
+    {
+        get { return _model.Heading; }
+        set
+        {
+            _model.Heading = value.HasValue ? ((value.Value % 360) + 360) % 360 : (double?)null;
+            NotifyOfPropertyChange(() => Bearing);
+        }
+    }
+
+    /// <summary>설치 고도(m, model.Altitude). optional, clamp 없음.</summary>
+    public double? Altitude
+    {
+        get { return _model.Altitude; }
+        set
+        {
+            _model.Altitude = value;
+            NotifyOfPropertyChange(() => Altitude);
+        }
+    }
     #endregion
     #region - Attributes -
     private int _index;

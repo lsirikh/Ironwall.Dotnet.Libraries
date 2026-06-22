@@ -16,8 +16,9 @@ public class GeolocationDto
     [JsonProperty("longitude")]
     public double Longitude { get; set; }
 
-    [JsonProperty("altitude")]
-    public double Altitude { get; set; }
+    /// <summary>설치 고도(m). optional — 서버 Geolocation.altitude(anyOf number|null). 미설정 시 직렬화 생략.</summary>
+    [JsonProperty("altitude", NullValueHandling = NullValueHandling.Ignore)]
+    public double? Altitude { get; set; }
 
     /// <summary>
     /// 장비 설치 방위각 0~360° (v4.4). GIS 부채꼴(FOV) 방향 시각화용. optional.

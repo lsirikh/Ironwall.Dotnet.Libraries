@@ -15,6 +15,16 @@
 	d:Background="WhiteSmoke"
 	mc:Ignorable="d">
 
+	<UserControl.Resources>
+		<!--  구역 소제목 / 입력 여백 (속성패널 공통 재설계 v2.9.4)  -->
+		<Style x:Key="SectionTitle" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="Foreground" Value="{DynamicResource PrimaryHueDarkBrush}" />
+			<Setter Property="Margin" Value="0,8,0,4" />
+		</Style>
+	</UserControl.Resources>
+
 	<GroupBox
 		Margin="5"
 		Style="{StaticResource MaterialDesignGroupBox}"
@@ -28,251 +38,330 @@
 					Text="경광등 속성" />
 			</StackPanel>
 		</GroupBox.Header>
+
+		<!--  Row0: 속성영역(스크롤) / Row1: 적용버튼(고정)  -->
 		<Grid Margin="5,0">
 			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto" />
-				<RowDefinition Height="Auto" />
-				<RowDefinition Height="Auto" />
-				<RowDefinition Height="Auto" />
+				<RowDefinition Height="*" />
 				<RowDefinition Height="Auto" />
 			</Grid.RowDefinitions>
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="2*" MinWidth="50" />
-				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="2*" MinWidth="50" />
-				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="2*" MinWidth="50" />
-				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="2*" MinWidth="50" />
-				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="2*" MinWidth="50" />
-			</Grid.ColumnDefinitions>
 
-			<!--  ========== Row 0: DeviceNo / Name / IP / Port / User ========  -->
-			<TextBlock
+			<ScrollViewer
 				Grid.Row="0"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Device No" />
-			<TextBox
-				Grid.Row="0"
-				Grid.Column="1"
-				md:HintAssist.Hint="1"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+				HorizontalScrollBarVisibility="Disabled"
+				VerticalScrollBarVisibility="Auto">
+				<StackPanel Margin="0,0,8,0">
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="2"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Name" />
-			<TextBox
-				Grid.Row="0"
-				Grid.Column="3"
-				md:HintAssist.Hint="경광등_01"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					<!--  ===== 구역① 장비 공통 =====  -->
+					<TextBlock Style="{StaticResource SectionTitle}" Text="장비 공통" />
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+						</Grid.ColumnDefinitions>
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="4"
-				Style="{StaticResource TextBlockTitle}"
-				Text="IP" />
-			<TextBox
-				Grid.Row="0"
-				Grid.Column="5"
-				md:HintAssist.Hint="192.168.0.10"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding IpAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Device No" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="1"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="6"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Port" />
-			<TextBox
-				Grid.Row="0"
-				Grid.Column="7"
-				md:HintAssist.Hint="9000"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding IpPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-				<i:Interaction.Behaviors>
-					<behavior:NumericOnlyBehavior />
-				</i:Interaction.Behaviors>
-			</TextBox>
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Name" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="3"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="경광등_01"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="8"
-				Style="{StaticResource TextBlockTitle}"
-				Text="User" />
-			<TextBox
-				Grid.Row="0"
-				Grid.Column="9"
-				md:HintAssist.Hint="admin"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="4"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Ver." />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="5"
+							md:HintAssist.Hint="v1.0"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-			<!--  ========== Row 1: PW / Desc / Status / Ver / Location ========  -->
-			<TextBlock
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="활성화" />
+						<ComboBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							SelectedItem="{Binding IsEnable, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<sys:Boolean>True</sys:Boolean>
+							<sys:Boolean>False</sys:Boolean>
+						</ComboBox>
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Status" />
+						<ComboBox
+							Grid.Row="1"
+							Grid.Column="3"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
+							SelectedItem="{Binding Status, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemsPanel>
+								<ItemsPanelTemplate>
+									<VirtualizingStackPanel />
+								</ItemsPanelTemplate>
+							</ComboBox.ItemsPanel>
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<TextBlock Text="{Binding}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</Grid>
+
+					<!--  ===== 구역② 장비별 속성 =====  -->
+					<TextBlock Style="{StaticResource SectionTitle}" Text="장비별 속성" />
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+						</Grid.ColumnDefinitions>
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="IP" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="192.168.0.10"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding IpAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Port" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="3"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="9000"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding IpPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+							<i:Interaction.Behaviors>
+								<behavior:NumericOnlyBehavior />
+							</i:Interaction.Behaviors>
+						</TextBox>
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="4"
+							Style="{StaticResource TextBlockTitle}"
+							Text="User" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="5"
+							md:HintAssist.Hint="admin"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="PW" />
+						<PasswordBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							PasswordChar="*"
+							Style="{StaticResource PasswordBoxInput}">
+							<i:Interaction.Behaviors>
+								<behavior:PasswordBehavior Password="{Binding UserPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+							</i:Interaction.Behaviors>
+						</PasswordBox>
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Desc" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="3"
+							md:HintAssist.Hint="설명"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					</Grid>
+
+					<!--  ===== 구역③ 위치 정보 (Location/Lat/Lng + Alt/Bearing) =====  -->
+					<TextBlock Style="{StaticResource SectionTitle}" Text="위치 정보" />
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" MinWidth="60" />
+						</Grid.ColumnDefinitions>
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Location" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="설치 위치"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Lat" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="3"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="위도"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="4"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Lng" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="5"
+							md:HintAssist.Hint="경도"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="0"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Alt" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="고도(m)"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Altitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="2"
+							Style="{StaticResource TextBlockTitle}"
+							Text="Bearing" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="3"
+							Margin="0,0,12,0"
+							md:HintAssist.Hint="0~360°"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Bearing, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+					</Grid>
+
+					<!--  ===== 구역④ 그룹 (기존 세로 스크롤 ListBox 유지) =====  -->
+					<TextBlock Style="{StaticResource SectionTitle}" Text="그룹" />
+					<ListBox
+						MaxHeight="80"
+						BorderThickness="0"
+						ItemsSource="{Binding GroupItems}"
+						ScrollViewer.VerticalScrollBarVisibility="Auto">
+						<i:Interaction.Behaviors>
+							<behavior:BubbleMouseWheelBehavior />
+						</i:Interaction.Behaviors>
+						<ListBox.ItemsPanel>
+							<ItemsPanelTemplate>
+								<StackPanel Orientation="Vertical" />
+							</ItemsPanelTemplate>
+						</ListBox.ItemsPanel>
+						<ListBox.ItemTemplate>
+							<DataTemplate>
+								<CheckBox
+									Margin="4,2"
+									Content="{Binding GroupName}"
+									IsChecked="{Binding IsChecked, Mode=TwoWay}"
+									IsThreeState="True" />
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+				</StackPanel>
+			</ScrollViewer>
+
+			<!--  ===== 고정 footer: 적용 버튼 (스크롤 밖) =====  -->
+			<Border
 				Grid.Row="1"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="PW" />
-			<PasswordBox
-				Grid.Row="1"
-				Grid.Column="1"
-				PasswordChar="*"
-				Style="{StaticResource PasswordBoxInput}">
-				<i:Interaction.Behaviors>
-					<behavior:PasswordBehavior Password="{Binding UserPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-				</i:Interaction.Behaviors>
-			</PasswordBox>
-
-			<TextBlock
-				Grid.Row="1"
-				Grid.Column="2"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Desc" />
-			<TextBox
-				Grid.Row="1"
-				Grid.Column="3"
-				md:HintAssist.Hint="설명"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-			<TextBlock
-				Grid.Row="1"
-				Grid.Column="4"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Status" />
-			<ComboBox
-				Grid.Row="1"
-				Grid.Column="5"
-				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
-				SelectedItem="{Binding Status, Mode=TwoWay}"
-				Style="{StaticResource ComboBoxContent}">
-				<ComboBox.ItemsPanel>
-					<ItemsPanelTemplate>
-						<VirtualizingStackPanel />
-					</ItemsPanelTemplate>
-				</ComboBox.ItemsPanel>
-				<ComboBox.ItemTemplate>
-					<DataTemplate>
-						<TextBlock Text="{Binding}" />
-					</DataTemplate>
-				</ComboBox.ItemTemplate>
-			</ComboBox>
-
-			<TextBlock
-				Grid.Row="1"
-				Grid.Column="6"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Ver." />
-			<TextBox
-				Grid.Row="1"
-				Grid.Column="7"
-				md:HintAssist.Hint="v1.0"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-			<TextBlock
-				Grid.Row="1"
-				Grid.Column="8"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Location" />
-			<TextBox
-				Grid.Row="1"
-				Grid.Column="9"
-				md:HintAssist.Hint="설치 위치"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-			<!--  ========== Row 2: Lat / Lng / 활성화 ========  -->
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Lat" />
-			<TextBox
-				Grid.Row="2"
-				Grid.Column="1"
-				md:HintAssist.Hint="위도"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="2"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Lng" />
-			<TextBox
-				Grid.Row="2"
-				Grid.Column="3"
-				md:HintAssist.Hint="경도"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="4"
-				Style="{StaticResource TextBlockTitle}"
-				Text="활성화" />
-			<ComboBox
-				Grid.Row="2"
-				Grid.Column="5"
-				SelectedItem="{Binding IsEnable, Mode=TwoWay}"
-				Style="{StaticResource ComboBoxContent}">
-				<sys:Boolean>True</sys:Boolean>
-				<sys:Boolean>False</sys:Boolean>
-			</ComboBox>
-
-			<!--  ========== Row 3~4: Groups Vertical + 적용 버튼 ========  -->
-			<TextBlock
-				Grid.Row="3"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Groups" />
-			<ListBox
-				Grid.Row="3"
-				Grid.RowSpan="2"
-				Grid.Column="1"
-				Grid.ColumnSpan="3"
-				MaxHeight="80"
-				BorderThickness="0"
-				ScrollViewer.VerticalScrollBarVisibility="Auto"
-				ItemsSource="{Binding GroupItems}">
-				<ListBox.ItemsPanel>
-					<ItemsPanelTemplate>
-						<StackPanel Orientation="Vertical" />
-					</ItemsPanelTemplate>
-				</ListBox.ItemsPanel>
-				<ListBox.ItemTemplate>
-					<DataTemplate>
-						<CheckBox
-							Margin="4,2"
-							Content="{Binding GroupName}"
-							IsChecked="{Binding IsChecked, Mode=TwoWay}"
-							IsThreeState="True" />
-					</DataTemplate>
-				</ListBox.ItemTemplate>
-			</ListBox>
-
-			<Button
-				x:Name="ApplyButton"
-				Grid.Row="4"
-				Grid.Column="8"
-				Grid.ColumnSpan="2"
-				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
-				Style="{StaticResource MaterialDesignFlatButton}">
-				<Button.Content>
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
-						<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
-					</StackPanel>
-				</Button.Content>
-			</Button>
+				Margin="0,4,0,0"
+				Padding="0,6,0,0"
+				BorderBrush="{DynamicResource MaterialDesignDivider}"
+				BorderThickness="0,1,0,0">
+				<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+					<Button
+						x:Name="ApplyButton"
+						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+						Style="{StaticResource MaterialDesignFlatButton}">
+						<Button.Content>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon Kind="Check" Style="{StaticResource ButtonIcon}" />
+								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="적용" />
+							</StackPanel>
+						</Button.Content>
+					</Button>
+				</StackPanel>
+			</Border>
 		</Grid>
 	</GroupBox>
 </UserControl>

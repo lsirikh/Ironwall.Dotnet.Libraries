@@ -799,6 +799,8 @@ public class DeviceProviderService : IDeviceProviderService
         existing.Status = newDevice.Status;
         existing.DeviceType = newDevice.DeviceType;
         existing.Version = newDevice.Version;
+        existing.Heading = newDevice.Heading;     // v4.4: 설치 방위각 — FetchAll 후 심볼 BaseBearing 갱신 반영(누락 버그)
+        existing.Altitude = newDevice.Altitude;   // v4.4: 설치 고도
 
         // Type-Specific 속성 업데이트
         if (existing is ControllerDeviceModel existingController && newDevice is ControllerDeviceModel newController)

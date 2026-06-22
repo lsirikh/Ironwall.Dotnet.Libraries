@@ -267,6 +267,8 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                a.Location == b.Location &&
                a.Latitude == b.Latitude &&
                a.Longitude == b.Longitude &&
+               a.Heading == b.Heading &&
+               a.Altitude == b.Altitude &&
                a.IsEnable == b.IsEnable;
     }
 
