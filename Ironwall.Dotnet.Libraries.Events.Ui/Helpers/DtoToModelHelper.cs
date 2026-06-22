@@ -101,6 +101,7 @@ public static class DtoToModelHelper
             TypeEvent = model.MessageType.ToString(),
             ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
             Result = model.Result.ToString(),
+            DeviceId = model.Device?.Id ?? 0,   // 서버 Create는 flat device_id(FK) 필수
             Device = ConvertDeviceToDto(model.Device),
             DeviceDescription = model.Device?.DeviceName
         };
@@ -118,6 +119,7 @@ public static class DtoToModelHelper
             TypeEvent = model.MessageType.ToString(),
             ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
             Reason = model.Reason.ToString(),
+            DeviceId = model.Device?.Id ?? 0,   // 서버 Create는 flat device_id(FK) 필수
             Device = ConvertDeviceToDto(model.Device),
             DeviceDescription = model.Device?.DeviceName,
             Detail = new MalfunctionDetailDto
@@ -140,6 +142,7 @@ public static class DtoToModelHelper
             Id = model.Id,
             CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             TypeEvent = model.MessageType.ToString(),
+            DeviceId = model.Device?.Id ?? 0,   // 서버 Create는 flat device_id(FK) 필수
             Device = ConvertDeviceToDto(model.Device),
             DeviceDescription = model.Device?.DeviceName
         };
@@ -160,6 +163,49 @@ public static class DtoToModelHelper
             FromEvent = ConvertOriginEventToDto(model.OriginEvent)
         };
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // Model → Replace DTO 변환 (수정 PUT 전용, 서버 *EventReplace 계약: 허용 필드만)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>IDetectionEventModel → DetectionEventReplaceDto (PUT 전용, type_event/result/detail만)</summary>
+    public static DetectionEventReplaceDto ToDetectionEventReplaceDto(this IDetectionEventModel model)
+        => new()
+        {
+            TypeEvent = model.MessageType.ToString(),
+            Result = model.Result.ToString()
+        };
+
+    /// <summary>IMalfunctionEventModel → MalfunctionEventReplaceDto (PUT 전용, type_event/reason/detail만)</summary>
+    public static MalfunctionEventReplaceDto ToMalfunctionEventReplaceDto(this IMalfunctionEventModel model)
+        => new()
+        {
+            TypeEvent = model.MessageType.ToString(),
+            Reason = model.Reason.ToString(),
+            Detail = new MalfunctionDetailDto
+            {
+                FirstStart = model.FirstStart,
+                FirstEnd = model.FirstEnd,
+                SecondStart = model.SecondStart,
+                SecondEnd = model.SecondEnd
+            }
+        };
+
+    /// <summary>IConnectionEventModel → ConnectionEventReplaceDto (PUT 전용, type_event만)</summary>
+    public static ConnectionEventReplaceDto ToConnectionEventReplaceDto(this IConnectionEventModel model)
+        => new()
+        {
+            TypeEvent = model.MessageType.ToString()
+        };
+
+    /// <summary>IActionEventModel → ActionEventReplaceDto (PUT 전용, type_event/content/user만 — from_event_id 제외, 원본 연결 불변)</summary>
+    public static ActionEventReplaceDto ToActionEventReplaceDto(this IActionEventModel model)
+        => new()
+        {
+            TypeEvent = model.MessageType.ToString(),
+            Content = model.Content ?? string.Empty,
+            User = model.User ?? string.Empty
+        };
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DeviceProvider 통합 오버로드

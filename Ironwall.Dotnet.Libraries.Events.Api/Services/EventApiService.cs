@@ -193,7 +193,7 @@ public class EventApiService : IEventApiService
     /// <param name="dto">전체 Detection Event 정보 DTO</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>수정된 Detection Event DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<DetectionEventDto>> UpdateDetectionEventAsync(int id, DetectionEventDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<DetectionEventDto>> UpdateDetectionEventAsync(int id, DetectionEventReplaceDto dto, CancellationToken token = default)
     {
         try
         {
@@ -345,7 +345,7 @@ public class EventApiService : IEventApiService
     /// <param name="dto">전체 Malfunction Event 정보 DTO</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>수정된 Malfunction Event DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<MalfunctionEventDto>> UpdateMalfunctionEventAsync(int id, MalfunctionEventDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<MalfunctionEventDto>> UpdateMalfunctionEventAsync(int id, MalfunctionEventReplaceDto dto, CancellationToken token = default)
     {
         try
         {
@@ -497,7 +497,7 @@ public class EventApiService : IEventApiService
     /// <param name="dto">전체 Connection Event 정보 DTO</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>수정된 Connection Event DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<ConnectionEventDto>> UpdateConnectionEventAsync(int id, ConnectionEventDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<ConnectionEventDto>> UpdateConnectionEventAsync(int id, ConnectionEventReplaceDto dto, CancellationToken token = default)
     {
         try
         {
@@ -643,7 +643,7 @@ public class EventApiService : IEventApiService
     /// <param name="dto">전체 Action Event 정보 DTO</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
-    public async Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(int id, ActionEventCreateDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(int id, ActionEventReplaceDto dto, CancellationToken token = default)
     {
         try
         {
