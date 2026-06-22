@@ -50,4 +50,9 @@
 	<ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
   </ItemGroup>
 
+  <!-- no-data 기본 타일 중앙 로고(pack URI 임베드) -->
+  <ItemGroup>
+	<Resource Include="Resources\Images\sensorway.png" />
+  </ItemGroup>
+
 </Project>
