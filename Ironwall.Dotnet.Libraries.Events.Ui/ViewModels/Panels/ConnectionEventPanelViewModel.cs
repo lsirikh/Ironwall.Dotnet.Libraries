@@ -64,7 +64,7 @@ public class ConnectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Con
     }
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new ConnectionEventViewModel(new ConnectionEventModel());
+        var vm = new ConnectionEventViewModel(new ConnectionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Connection });
         ViewModelProvider.Add(vm);
     }
 

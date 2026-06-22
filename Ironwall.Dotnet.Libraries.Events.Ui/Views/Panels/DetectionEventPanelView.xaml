@@ -252,6 +252,7 @@
 				<!--  MessageType  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
+					IsReadOnly="True"
 					Header="Message Type"
 					SortMemberPath="MessageType">
 					<DataGridColumn.HeaderStyle>
