@@ -148,6 +148,11 @@ public class GMapCustomControl : GMapControl
     public event Action<IEditableMarker>? OnMarkerRightClicked;
 
     /// <summary>
+    /// 마커 더블클릭 이벤트 - ViewModel에 더블클릭된 마커 전달 (RTSP 팝업 등). 편집/일반 모드 모두.
+    /// </summary>
+    public event Action<IEditableMarker>? OnMarkerDoubleClicked;
+
+    /// <summary>
     /// 이미지 클릭 이벤트 - ViewModel에 클릭된 이미지 전달
     /// </summary>
     public event Action<GMapCustomImage> OnImageClicked;
@@ -613,6 +618,20 @@ public class GMapCustomControl : GMapControl
         }
     }
 
+    /// <summary>마커 더블클릭을 ViewModel로 전달(편집모드=자식 Shape 경로, 일반모드=OnMouseDoubleClick 경로 공용 진입점).</summary>
+    public void TriggerMarkerDoubleClicked(GMapMarker marker)
+    {
+        try
+        {
+            if (marker is IEditableMarker editableMarker)
+                OnMarkerDoubleClicked?.Invoke(editableMarker);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"TriggerMarkerDoubleClicked 실패: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// AdornerManager 이벤트 핸들러들
     /// </summary>
@@ -649,6 +668,11 @@ public class GMapCustomControl : GMapControl
     #endregion
     
     #region Mouse Input Handling
+
+    // 마커 더블클릭 감지(컨트롤 레벨 — 편집/일반 모드 공통, 자식 Shape 이벤트 비의존)
+    private const int MarkerDoubleClickIntervalMs = 500;
+    private DateTime _lastMarkerClickTime = DateTime.MinValue;
+    private IEditableMarker? _lastClickedMarkerForDbl;
 
     /// <summary>
     /// 마우스 왼쪽 버튼 클릭
@@ -696,8 +720,23 @@ public class GMapCustomControl : GMapControl
 
         if (clickedMarker != null)
         {
-            //_log?.Info($"마커 클릭 이벤트 발생: {clickedMarker.Title}");
-            OnMarkerClicked?.Invoke(clickedMarker);
+            // 더블클릭 감지(컨트롤 레벨 — 자식 Shape에 의존하지 않아 편집/일반 모드 공통 동작)
+            var nowClick = DateTime.Now;
+            if (ReferenceEquals(clickedMarker, _lastClickedMarkerForDbl)
+                && (nowClick - _lastMarkerClickTime).TotalMilliseconds <= MarkerDoubleClickIntervalMs)
+            {
+                _lastMarkerClickTime = DateTime.MinValue;
+                _lastClickedMarkerForDbl = null;
+                //_log?.Info($"마커 더블클릭 이벤트 발생: {clickedMarker.Title}");
+                OnMarkerDoubleClicked?.Invoke(clickedMarker);
+            }
+            else
+            {
+                _lastMarkerClickTime = nowClick;
+                _lastClickedMarkerForDbl = clickedMarker;
+                //_log?.Info($"마커 클릭 이벤트 발생: {clickedMarker.Title}");
+                OnMarkerClicked?.Invoke(clickedMarker);
+            }
         }
         else if (clickedImage != null)
         {

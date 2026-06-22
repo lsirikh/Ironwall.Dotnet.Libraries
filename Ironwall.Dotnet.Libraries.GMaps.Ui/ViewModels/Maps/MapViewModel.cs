@@ -369,6 +369,7 @@ public class MapViewModel : BasePanelViewModel,
             // GMapCustomControl 이벤트 구독
             MainMap.OnMarkerClicked += OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked += OnMapMarkerRightClicked;
+            MainMap.OnMarkerDoubleClicked += OnMapMarkerDoubleClicked;   // RTSP 카메라 팝업
             MainMap.OnImageClicked += OnMapImageClicked;
             MainMap.OnImageRightClicked += OnMapImageRightClicked;       // FR-9 이미지 우클릭 메뉴
             MainMap.OnImageEditCompleted += OnMapImageEditCompleted;     // FR-8 편집 완료 DB 영속화
@@ -408,6 +409,7 @@ public class MapViewModel : BasePanelViewModel,
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
+            MainMap.OnMarkerDoubleClicked -= OnMapMarkerDoubleClicked;
             MainMap.OnImageClicked -= OnMapImageClicked;
             MainMap.OnImageRightClicked -= OnMapImageRightClicked;
             MainMap.OnImageEditCompleted -= OnMapImageEditCompleted;
@@ -478,6 +480,43 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"마커 우클릭 처리 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 지도 카메라 심볼 더블클릭 → RTSP 스트리밍 팝업 오픈(IpCamera 한정).
+    /// 카메라 모델의 RTSP URL(Urls.RtspSub→RtspMain→Ip)을 어댑터로 변환해 팝업에 전달.
+    /// (P5에서 ObservableCollection 팝업 오픈/위치복원에 연결)
+    /// </summary>
+    private void OnMapMarkerDoubleClicked(IEditableMarker marker)
+    {
+        try
+        {
+            // 카메라(IpCamera)만 대상
+            if (marker is not IPidsEditableMarker pidsMarker
+                || pidsMarker.DeviceType != EnumDeviceType.IpCamera)
+                return;
+
+            var cameraModel = pidsMarker.LinkedDevice as ICameraDeviceModel;
+            if (cameraModel == null)
+            {
+                _log?.Warning($"[CameraPopup] 카메라 모델 없음(LinkedDevice null): {marker.Title}");
+                return;
+            }
+
+            var connInfo = CameraConnectionAdapter.ToConnectionInfo(cameraModel, preferSub: true);
+            if (connInfo == null)
+            {
+                _log?.Warning($"[CameraPopup] RTSP URL 없음(영상 없음): {marker.Title}");
+                return;
+            }
+
+            // TODO(P5): 저장위치(Store.TryGet) 또는 우상단 최초위치로 팝업 오픈 + 멀티/포커스
+            _log?.Info($"[CameraPopup] 카메라 더블클릭: {marker.Title} (Id={cameraModel.Id})");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 더블클릭 처리 실패: {ex.Message}");
         }
     }
 
