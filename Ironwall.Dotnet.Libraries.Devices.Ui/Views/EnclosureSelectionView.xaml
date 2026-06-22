@@ -331,6 +331,19 @@
 				BorderThickness="0,1,0,0">
 				<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
 					<Button
+						x:Name="ThresholdButton"
+						Margin="0,0,8,0"
+						IsEnabled="{Binding IsSingleSelected}"
+						Style="{StaticResource MaterialDesignFlatButton}"
+						ToolTip="단일 선택 시 임계값 설정">
+						<Button.Content>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon Kind="Tune" Style="{StaticResource ButtonIcon}" />
+								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="임계값" />
+							</StackPanel>
+						</Button.Content>
+					</Button>
+					<Button
 						x:Name="ApplyButton"
 						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
 						Style="{StaticResource MaterialDesignFlatButton}">

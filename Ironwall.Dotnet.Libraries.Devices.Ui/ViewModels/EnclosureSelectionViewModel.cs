@@ -1,11 +1,14 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Dialogs;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
 {
@@ -40,6 +43,23 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 if (IsEnable.HasValue) item.IsEnable = IsEnable.Value;
             }
             ApplyGroups();
+        }
+
+        /// <summary>단일 선택 시에만 임계값 설정 가능(카메라 상세 패턴).</summary>
+        public bool IsSingleSelected => _selection != null && _selection.Count == 1;
+
+        /// <summary>임계값 설정 다이얼로그 열기 — model 직접 편집, 영속은 그리드 적용(Save).</summary>
+        public void ThresholdButton()
+        {
+            try
+            {
+                if (!IsSingleSelected) return;
+                var model = _selection.FirstOrDefault()?.Model as IEnclosureDeviceModel;
+                if (model == null) return;
+                var dialog = new EnclosureThresholdDialogViewModel(model);
+                _eventAggregator?.PublishOnUIThreadAsync(new OpenEnclosureThresholdDialogMessageModel { Dialog = dialog });
+            }
+            catch (Exception ex) { _log?.Error(ex.Message); }
         }
 
         private static T? CommonOrNullValue<T>(IEnumerable<EnclosureDeviceViewModel> list, Func<IEnclosureDeviceModel, T> selector) where T : struct

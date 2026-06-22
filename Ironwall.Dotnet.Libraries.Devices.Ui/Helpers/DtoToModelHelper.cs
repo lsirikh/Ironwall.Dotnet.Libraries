@@ -2,6 +2,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Servers;
+using Newtonsoft.Json.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 
@@ -366,6 +367,8 @@ public static class DtoToModelHelper
             HeaterEnabled = dto.HeaterEnabled,
             FanEnabled = dto.FanEnabled
         };
+        // 임계값(threshold_config JObject) → 강타입 모델 (이전엔 드롭 → 재조회 시 임계값 소실)
+        model.ThresholdConfig = dto.ThresholdConfig?.ToObject<EnclosureThresholdConfigModel>();
         MapGeolocationToModel(dto, model);
         return model;
     }
@@ -387,6 +390,9 @@ public static class DtoToModelHelper
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled
         };
+        // 강타입 임계값 모델 → threshold_config JObject (이전엔 드롭 → 저장 무효). null이면 미전송(Ignore).
+        if (model.ThresholdConfig != null)
+            dto.ThresholdConfig = JObject.FromObject(model.ThresholdConfig);
         MapGeolocationToDto(model, dto);
         return dto;
     }

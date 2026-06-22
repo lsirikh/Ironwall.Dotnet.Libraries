@@ -1,0 +1,91 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Devices.Ui.Views.EnclosureThresholdSettingView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	d:DesignWidth="380"
+	mc:Ignorable="d">
+	<UserControl.Resources>
+		<Style x:Key="ThLabel" TargetType="TextBlock">
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Margin" Value="0,0,12,0" />
+			<Setter Property="Width" Value="96" />
+		</Style>
+	</UserControl.Resources>
+
+	<Grid Margin="8,12,8,8">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition Width="*" MinWidth="120" />
+		</Grid.ColumnDefinitions>
+
+		<TextBlock
+			Grid.Row="0"
+			Grid.Column="0"
+			Style="{StaticResource ThLabel}"
+			Text="온도 상한(°C)" />
+		<TextBox
+			Grid.Row="0"
+			Grid.Column="1"
+			Margin="0,4"
+			md:HintAssist.Hint="예: 45"
+			Text="{Binding TempHigh, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+		<TextBlock
+			Grid.Row="1"
+			Grid.Column="0"
+			Style="{StaticResource ThLabel}"
+			Text="온도 하한(°C)" />
+		<TextBox
+			Grid.Row="1"
+			Grid.Column="1"
+			Margin="0,4"
+			md:HintAssist.Hint="예: -10"
+			Text="{Binding TempLow, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+		<TextBlock
+			Grid.Row="2"
+			Grid.Column="0"
+			Style="{StaticResource ThLabel}"
+			Text="습도 상한(%)" />
+		<TextBox
+			Grid.Row="2"
+			Grid.Column="1"
+			Margin="0,4"
+			md:HintAssist.Hint="예: 80"
+			Text="{Binding HumidityHigh, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+		<TextBlock
+			Grid.Row="3"
+			Grid.Column="0"
+			Style="{StaticResource ThLabel}"
+			Text="습도 하한(%)" />
+		<TextBox
+			Grid.Row="3"
+			Grid.Column="1"
+			Margin="0,4"
+			md:HintAssist.Hint="예: 20"
+			Text="{Binding HumidityLow, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+		<TextBlock
+			Grid.Row="4"
+			Grid.Column="0"
+			Style="{StaticResource ThLabel}"
+			Text="진동 임계값" />
+		<TextBox
+			Grid.Row="4"
+			Grid.Column="1"
+			Margin="0,4"
+			md:HintAssist.Hint="예: 5.0"
+			Text="{Binding VibrationThreshold, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+	</Grid>
+</UserControl>

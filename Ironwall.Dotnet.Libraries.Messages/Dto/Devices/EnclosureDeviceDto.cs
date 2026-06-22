@@ -20,9 +20,9 @@ public class EnclosureDeviceDto : BaseDeviceDto
     public string DoorStatus { get; set; } = "CLOSED";
 
     /// <summary>
-    /// 임계값 설정 (JSONB)
+    /// 임계값 설정 (JSONB) — null이면 직렬화 생략(서버 저장값 null 덮어쓰기 방지)
     /// </summary>
-    [JsonProperty("threshold_config", Order = 12)]
+    [JsonProperty("threshold_config", Order = 12, NullValueHandling = NullValueHandling.Ignore)]
     public JObject? ThresholdConfig { get; set; }
 
     /// <summary>
