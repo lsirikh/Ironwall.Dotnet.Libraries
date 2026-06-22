@@ -302,7 +302,8 @@ public static class DtoToModelHelper
         return model;
     }
 
-    /// <summary>ServerDto → ServerModel (방송서버 — nested 읽기 + ServerProvider 적재 공용)</summary>
+    /// <summary>ServerDto → ServerModel (방송서버 — nested 읽기 + ServerProvider 적재 공용).
+    /// ThresholdConfig(JObject↔ServerThresholdConfigModel)는 드롭다운/표시에 불필요하여 미매핑(기존 nested 읽기도 동일).</summary>
     public static ServerModel ToServerModel(this ServerDto dto)
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));

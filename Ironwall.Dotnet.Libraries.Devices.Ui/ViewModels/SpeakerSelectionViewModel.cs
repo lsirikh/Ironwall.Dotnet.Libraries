@@ -113,9 +113,16 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         /// <summary>서버목록 새로고침(D4) — API 재조회 후 드롭다운 갱신. 현재 선택(ServerId)은 유지.</summary>
         public async void RefreshServers()
         {
-            await IoC.Get<IDeviceProviderService>().FetchServersAsync();
-            RefreshServerItems();
-            NotifyOfPropertyChange(nameof(ServerId));
+            try
+            {
+                await IoC.Get<IDeviceProviderService>().FetchServersAsync();
+                RefreshServerItems();
+                NotifyOfPropertyChange(nameof(ServerId));
+            }
+            catch (Exception)
+            {
+                // 비치명적: FetchServersAsync 내부에서 로깅·stale 캐시 보존. 새로고침 실패해도 기존 목록 유지.
+            }
         }
 
         private void RefreshGroupItems()
