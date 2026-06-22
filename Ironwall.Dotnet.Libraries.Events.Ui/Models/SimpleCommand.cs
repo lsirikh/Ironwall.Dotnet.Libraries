@@ -34,3 +34,35 @@ public class SimpleCommand : ICommand
         }
     }
 }
+
+/// <summary>
+/// CommandParameter를 받는 비동기 ICommand. ContextMenu MenuItem 등에서 행(Row) 컨텍스트 전달용.
+/// </summary>
+public class SimpleParamCommand : ICommand
+{
+    private readonly Func<object?, Task> _execute;
+    private bool _isExecuting;
+
+    public SimpleParamCommand(Func<object?, Task> execute)
+    {
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+    }
+
+    public event EventHandler? CanExecuteChanged;
+
+    public bool CanExecute(object? parameter) => !_isExecuting;
+
+    public async void Execute(object? parameter)
+    {
+        if (_isExecuting) return;
+        _isExecuting = true;
+        try
+        {
+            await _execute(parameter);
+        }
+        finally
+        {
+            _isExecuting = false;
+        }
+    }
+}

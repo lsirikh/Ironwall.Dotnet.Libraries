@@ -3,6 +3,9 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
+using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
+using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -38,6 +41,34 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
         _eventProvider = eventProvider;
         DeviceProvider = deviceProvider;
         LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
+        ReportCommand = new SimpleParamCommand(ReportRowAsync);
+    }
+    #endregion
+
+    #region - Action Report (우클릭 조치보고) -
+    /// <summary>행 우클릭 '조치보고' — 미저장 Draft(Id≤0)는 차단(FromEventId FK 필요). 기존행은 1:N 후속 조치보고 허용(중복 가드 없음). 기존 ReportDialog 재사용.</summary>
+    private async Task ReportRowAsync(object? param)
+    {
+        if (param is not MalfunctionEventViewModel row)
+            return;
+
+        if (row.IsDraft)
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "조치보고 불가",
+                Explain = "미저장 이벤트입니다. 저장 후 조치보고할 수 있습니다."
+            });
+            return;
+        }
+
+        if (row.Model is not IMalfunctionEventModel model)
+            return;
+
+        // 행 VM과 독립된 임시 카드 VM 재구성(SendAction/멱등가드는 카드 VM 보유) — 패널 행 Dispose 무영향
+        var card = new MalfunctionEventCardViewModel(_eventAggregator, _log, model);
+        IoC.Get<MalfunctionReportDialogViewModel>().UpdateData(card, IoC.Get<IAccountModel>());
+        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenEventReportDialogMessageModel { EventType = "MALFUNCTION" });
     }
     #endregion
     #region - Implementation of Interface -
@@ -549,6 +580,9 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     public bool HasMorePages => _currentPage < _totalPages;
 
     public ICommand LoadMoreCommand { get; }
+
+    /// <summary>행 우클릭 '조치보고' 커맨드(CommandParameter=행 VM). 기존 조치보고 다이얼로그 재사용.</summary>
+    public ICommand ReportCommand { get; }
     #endregion
     #region - Attributes -
     protected DateTime _startDate;
