@@ -321,6 +321,7 @@
 								IsEditable="False"
 								IsEnabled="{Binding IsDraft}"
 								ToolTip="원본 이벤트는 생성 시에만 지정할 수 있고, 저장 후에는 변경할 수 없습니다."
+								ToolTipService.ShowOnDisabled="True"
 								ItemsSource="{Binding Data.EventProvider, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}"
 								SelectedItem="{Binding OriginEvent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 								<ComboBox.ItemsPanel>
@@ -423,6 +424,9 @@
 						<DataTemplate>
 							<TextBox
 								VerticalAlignment="Center"
+								IsEnabled="{Binding IsDraft}"
+								ToolTipService.ShowOnDisabled="True"
+								ToolTip="이벤트 발생 시각은 변경할 수 없습니다(추적성 보존). 신규 행에서만 지정 가능합니다."
 								Text="{Binding DateTime, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								TextAlignment="Center" />
 						</DataTemplate>

@@ -94,6 +94,7 @@ public abstract class BaseEventViewModel<T> : BaseCustomViewModel<T>
         get { return _model.DateTime; }
         set
         {
+            if (!IsDraft) return;   // created_at 불변(서버 E-07): 기존 행 발생시각 변경 차단(2차 방어 — CommitEdit/프로그래matic 포함, 거짓 IsEdited 방지)
             SetModelProperty(value, _model.DateTime, v => _model.DateTime = v);
         }
     }
