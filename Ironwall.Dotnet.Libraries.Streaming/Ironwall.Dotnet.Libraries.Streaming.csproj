@@ -18,11 +18,11 @@
     <PackageReference Include="Polly" Version="8.6.3" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
   
-	<!-- Caliburn.Micro -->
-    <PackageReference Include="Caliburn.Micro" Version="5.0.258" />
+	<!-- Caliburn.Micro (호스트 앱 라이브러리 버전 정합) -->
+    <PackageReference Include="Caliburn.Micro" Version="4.0.230" />
 
-    <!-- Autofac -->
-    <PackageReference Include="Autofac" Version="8.4.0" />
+    <!-- Autofac (호스트 앱 라이브러리 버전 정합) -->
+    <PackageReference Include="Autofac" Version="8.3.0" />
 
     <!-- MaterialDesignThemes -->
     <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
