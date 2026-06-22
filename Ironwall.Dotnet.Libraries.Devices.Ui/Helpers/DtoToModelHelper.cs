@@ -390,9 +390,12 @@ public static class DtoToModelHelper
             HeaterEnabled = model.HeaterEnabled,
             FanEnabled = model.FanEnabled
         };
-        // 강타입 임계값 모델 → threshold_config JObject (이전엔 드롭 → 저장 무효). null이면 미전송(Ignore).
-        if (model.ThresholdConfig != null)
-            dto.ThresholdConfig = JObject.FromObject(model.ThresholdConfig);
+        // 강타입 임계값 모델 → threshold_config JObject (이전엔 드롭 → 저장 무효).
+        // (리뷰 M1) 전 필드 null인 '빈 임계값'은 미전송 — 다이얼로그가 주입한 빈 객체가 서버 값을 null로 덮어쓰는 것 방지.
+        var tc = model.ThresholdConfig;
+        if (tc != null && (tc.TempHigh.HasValue || tc.TempLow.HasValue
+            || tc.HumidityHigh.HasValue || tc.HumidityLow.HasValue || tc.VibrationThreshold.HasValue))
+            dto.ThresholdConfig = JObject.FromObject(tc);
         MapGeolocationToDto(model, dto);
         return dto;
     }
