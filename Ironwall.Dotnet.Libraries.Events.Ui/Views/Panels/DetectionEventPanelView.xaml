@@ -228,6 +228,18 @@
 				<behavior_inner:DetectionEventSelectedItemBehavior SelectedItems="{Binding SelectedItems, Mode=TwoWay}" />
 				<behavior_inner:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
+			<DataGrid.RowStyle>
+				<Style BasedOn="{StaticResource {x:Type DataGridRow}}" TargetType="DataGridRow">
+					<Setter Property="ContextMenu">
+						<Setter.Value>
+							<ContextMenu>
+								<MenuItem Command="{Binding Data.ReportCommand, Source={StaticResource proxy}}" CommandParameter="{Binding}" Header="조치보고" />
+							</ContextMenu>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</DataGrid.RowStyle>
+
 			<DataGrid.Columns>
 
 				<!--  No  -->
