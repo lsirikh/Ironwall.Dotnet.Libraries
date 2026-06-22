@@ -53,7 +53,7 @@ public class EnclosureDeviceViewModel : DeviceViewModel, IEnclosureDeviceViewMod
         {
             var tc = ThresholdConfig;
             if (tc == null) return "-";
-            return $"T:{tc.TempHigh ?? 0}/{tc.TempLow ?? 0} H:{tc.HumidityHigh ?? 0}/{tc.HumidityLow ?? 0}";
+            return $"T:{tc.TempHigh ?? 0}/{tc.TempLow ?? 0} H:{tc.HumidityHigh ?? 0} C:{tc.CurrentHigh ?? 0} V:{tc.VoltageLow ?? 0} Vib:{tc.VibrationHigh ?? 0}";
         }
     }
     #endregion

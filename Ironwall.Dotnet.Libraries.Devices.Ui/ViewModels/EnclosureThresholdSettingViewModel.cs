@@ -38,14 +38,19 @@ public sealed class EnclosureThresholdSettingViewModel : BasePanelViewModel
         get => _model.HumidityHigh;
         set { _model.HumidityHigh = value; NotifyOfPropertyChange(() => HumidityHigh); }
     }
-    public double? HumidityLow
+    public double? CurrentHigh
     {
-        get => _model.HumidityLow;
-        set { _model.HumidityLow = value; NotifyOfPropertyChange(() => HumidityLow); }
+        get => _model.CurrentHigh;
+        set { _model.CurrentHigh = value; NotifyOfPropertyChange(() => CurrentHigh); }
     }
-    public double? VibrationThreshold
+    public double? VoltageLow
     {
-        get => _model.VibrationThreshold;
-        set { _model.VibrationThreshold = value; NotifyOfPropertyChange(() => VibrationThreshold); }
+        get => _model.VoltageLow;
+        set { _model.VoltageLow = value; NotifyOfPropertyChange(() => VoltageLow); }
+    }
+    public int? VibrationHigh
+    {
+        get => _model.VibrationHigh;
+        set { _model.VibrationHigh = value; NotifyOfPropertyChange(() => VibrationHigh); }
     }
 }

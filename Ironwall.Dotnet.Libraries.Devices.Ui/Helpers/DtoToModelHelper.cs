@@ -394,7 +394,7 @@ public static class DtoToModelHelper
         // (리뷰 M1) 전 필드 null인 '빈 임계값'은 미전송 — 다이얼로그가 주입한 빈 객체가 서버 값을 null로 덮어쓰는 것 방지.
         var tc = model.ThresholdConfig;
         if (tc != null && (tc.TempHigh.HasValue || tc.TempLow.HasValue
-            || tc.HumidityHigh.HasValue || tc.HumidityLow.HasValue || tc.VibrationThreshold.HasValue))
+            || tc.HumidityHigh.HasValue || tc.CurrentHigh.HasValue || tc.VoltageLow.HasValue || tc.VibrationHigh.HasValue))
             dto.ThresholdConfig = JObject.FromObject(tc);
         MapGeolocationToDto(model, dto);
         return dto;

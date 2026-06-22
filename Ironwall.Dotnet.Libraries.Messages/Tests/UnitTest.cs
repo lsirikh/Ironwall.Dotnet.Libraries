@@ -3126,7 +3126,7 @@ public class Phase13_DtoFieldTests
             "type_device": "Enclosure",
             "status": "ACTIVATED",
             "door_status": "CLOSED",
-            "threshold_config": { "temp_high": 40.0, "temp_low": -10.0, "humidity_high": 85.0, "humidity_low": 20.0, "vibration_threshold": 5.0 },
+            "threshold_config": { "temp_high": 40.0, "temp_low": -10.0, "humidity_high": 85.0, "current_high": 10.0, "voltage_low": 180.0, "vibration_high": 5 },
             "heater_enabled": true,
             "fan_enabled": false
         }

@@ -71,7 +71,8 @@ public class EnclosureThresholdDialogViewModel : Conductor<BasePanelViewModel>.C
             TempHigh = src?.TempHigh,
             TempLow = src?.TempLow,
             HumidityHigh = src?.HumidityHigh,
-            HumidityLow = src?.HumidityLow,
-            VibrationThreshold = src?.VibrationThreshold
+            CurrentHigh = src?.CurrentHigh,
+            VoltageLow = src?.VoltageLow,
+            VibrationHigh = src?.VibrationHigh
         };
 }

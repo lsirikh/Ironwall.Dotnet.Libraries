@@ -612,8 +612,9 @@ public class EnclosureApiTests
                 temp_high = 40.0,
                 temp_low = -10.0,
                 humidity_high = 90.0,
-                humidity_low = 10.0,
-                vibration_threshold = 5.0
+                current_high = 10.0,
+                voltage_low = 200.0,
+                vibration_high = 5
             })
         };
         var createResp = await _svc.CreateEnclosureAsync(createDto);
