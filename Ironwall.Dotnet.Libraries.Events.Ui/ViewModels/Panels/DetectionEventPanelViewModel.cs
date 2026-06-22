@@ -133,18 +133,20 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
             var insertList = currentList
                             .Where(m => m.Id <= 0)
+                            .OfType<IDetectionEventModel>()
                             .ToList();
-            var updateList = ViewModelProvider
+            var updateRows = ViewModelProvider
                             .Where(vm => vm.IsEdited && vm.Model.Id > 0)
-                            .Select(vm => (IDetectionEventModel)vm.Model)
                             .ToList();
 
-            // (EA7) 부분 실패 수집 — 한 건 실패로 전체 중단/무응답 방지. 실패 시 재로드 생략해 편집 보존.
+            // (EA7) 부분 실패 수집 — 한 건 실패로 전체 중단/무응답 방지. 실패/보류 시 재로드 생략해 편집 보존.
             var saveFailures = new List<string>();
+            int held = 0;
 
-            foreach (var model in updateList)
+            foreach (var vm in updateRows)
             {
-                try { await _providerService.UpdateDetectionEventAsync(model, token); }
+                var model = (IDetectionEventModel)vm.Model;
+                try { await _providerService.UpdateDetectionEventAsync(model, token); vm.IsEdited = false; }   // 성공 행은 dirty 해제(재-PUT 누적 방지)
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
@@ -153,8 +155,9 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                 }
             }
 
-            foreach (var model in insertList.OfType<IDetectionEventModel>())
+            foreach (var model in insertList)
             {
+                if (model.Device == null || model.Device.Id <= 0) { held++; continue; }   // 장비 미선택 Draft 보류(서버 device_id FK 필수)
                 try { var created = await _providerService.InsertDetectionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -164,14 +167,18 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                 }
             }
 
-            if (saveFailures.Count > 0)
+            if (saveFailures.Count > 0 || held > 0)
             {
-                // 일부 저장 실패 → 사용자 알림 + 재로드 생략(미저장 편집분 보존)
+                // 일부 저장 실패/보류 → 사용자 알림 + 재로드 생략(미저장 편집·Draft 보존)
+                var sb = new System.Text.StringBuilder();
+                if (saveFailures.Count > 0)
+                    sb.AppendLine($"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n" + string.Join("\n", saveFailures.Take(5)));
+                if (held > 0)
+                    sb.AppendLine($"{held}건은 장비 미선택으로 보류했습니다. 장비를 선택한 뒤 다시 저장하세요.");
                 await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
                 {
-                    Title = "이벤트 저장 일부 실패",
-                    Explain = $"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n"
-                              + string.Join("\n", saveFailures.Take(5))
+                    Title = "이벤트 저장 일부 보류/실패",
+                    Explain = sb.ToString().TrimEnd()
                 });
                 return;
             }

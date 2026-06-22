@@ -247,12 +247,9 @@ public class EventApiServiceTests
         var service = _container.ResolveNamed<IEventApiService>("EventApi");
         await service.ExecuteAsync(CancellationToken.None);
 
-        var dto = new DetectionEventDto
+        var dto = new DetectionEventReplaceDto
         {
             TypeEvent = "Intrusion",
-            Device = new BaseDeviceDto { Id = 6, TypeDevice = "Sensor" },
-            DeviceDescription = "Fence sensor #6",
-            ActionReported = "False",
             Result = "VIBRATION_SENSOR"
         };
 
@@ -429,12 +426,9 @@ public class EventApiServiceTests
         var service = _container.ResolveNamed<IEventApiService>("EventApi");
         await service.ExecuteAsync(CancellationToken.None);
 
-        var dto = new MalfunctionEventDto
+        var dto = new MalfunctionEventReplaceDto
         {
             TypeEvent = "Fault",
-            Device = new BaseDeviceDto { Id = 4, TypeDevice = "Sensor" },
-            DeviceDescription = "Multi sensor #4",
-            ActionReported = "True",
             Reason = "FAULT_ETC",
             Detail = new MalfunctionDetailDto
             {
@@ -442,8 +436,7 @@ public class EventApiServiceTests
                 FirstEnd = 2,
                 SecondStart = 5,
                 SecondEnd = 5
-            },
-            CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            }
         };
 
         // Act
@@ -609,11 +602,9 @@ public class EventApiServiceTests
         var service = _container.ResolveNamed<IEventApiService>("EventApi");
         await service.ExecuteAsync(CancellationToken.None);
 
-        var dto = new ConnectionEventDto
+        var dto = new ConnectionEventReplaceDto
         {
-            TypeEvent = "Connection",
-            Device = new BaseDeviceDto { Id = 3, TypeDevice = "Sensor" },
-            DeviceDescription = "PIR sensor #3",
+            TypeEvent = "Connection"
         };
 
         // Act
@@ -784,12 +775,11 @@ public class EventApiServiceTests
         var service = _container.ResolveNamed<IEventApiService>("EventApi");
         await service.ExecuteAsync(CancellationToken.None);
 
-        var dto = new ActionEventCreateDto
+        var dto = new ActionEventReplaceDto
         {
             TypeEvent = "Action",
             Content = "침입 탐지 재확인 - 실제 침입 확인됨, 경찰 출동 요청",
-            User = "operator_park",
-            FromEventId = 1
+            User = "operator_park"
         };
 
         // Act

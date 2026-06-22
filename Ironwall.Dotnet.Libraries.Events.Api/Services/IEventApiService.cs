@@ -94,7 +94,7 @@ public interface IEventApiService : IService
     /// <returns>수정된 Detection Event DTO를 포함한 API 응답</returns>
     Task<ApiResponse<DetectionEventDto>> UpdateDetectionEventAsync(
         int id,
-        DetectionEventDto dto,
+        DetectionEventReplaceDto dto,
         CancellationToken token = default);
 
     /// <summary>
@@ -173,7 +173,7 @@ public interface IEventApiService : IService
     /// <returns>수정된 Malfunction Event DTO를 포함한 API 응답</returns>
     Task<ApiResponse<MalfunctionEventDto>> UpdateMalfunctionEventAsync(
         int id,
-        MalfunctionEventDto dto,
+        MalfunctionEventReplaceDto dto,
         CancellationToken token = default);
 
     /// <summary>
@@ -252,7 +252,7 @@ public interface IEventApiService : IService
     /// <returns>수정된 Connection Event DTO를 포함한 API 응답</returns>
     Task<ApiResponse<ConnectionEventDto>> UpdateConnectionEventAsync(
         int id,
-        ConnectionEventDto dto,
+        ConnectionEventReplaceDto dto,
         CancellationToken token = default);
 
     /// <summary>
@@ -327,7 +327,7 @@ public interface IEventApiService : IService
     /// <returns>수정된 Action Event DTO를 포함한 API 응답</returns>
     Task<ApiResponse<ActionEventDto>> UpdateActionEventAsync(
         int id,
-        ActionEventCreateDto dto,
+        ActionEventReplaceDto dto,
         CancellationToken token = default);
 
     /// <summary>

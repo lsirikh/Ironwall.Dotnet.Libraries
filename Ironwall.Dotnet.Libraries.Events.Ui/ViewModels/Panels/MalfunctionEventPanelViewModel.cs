@@ -130,21 +130,56 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
             _pCancellationTokenSource = new CancellationTokenSource();
 
             var token = _pCancellationTokenSource.Token;
-            var currentList = _eventProvider;
 
-            var insertList = currentList.Where(m => m.Id <= 0).ToList();
-            var updateList = ViewModelProvider
-                             .Where(vm => vm.IsEdited && vm.Model.Id > 0)
+            var insertList = ViewModelProvider
+                             .Where(vm => vm.Model.Id <= 0)
                              .Select(vm => (IMalfunctionEventModel)vm.Model)
                              .ToList();
+            var updateRows = ViewModelProvider
+                             .Where(vm => vm.IsEdited && vm.Model.Id > 0)
+                             .ToList();
 
-            foreach (var model in updateList)
-                await _providerService.UpdateMalfunctionEventAsync(model, token);
+            // 부분 실패 수집 — 한 건 실패로 전체 중단 방지. 실패/보류 시 재로드 생략해 편집 보존.
+            var saveFailures = new List<string>();
+            int held = 0;
 
-            foreach (var model in insertList.OfType<IMalfunctionEventModel>())
+            foreach (var vm in updateRows)
             {
-                var created = await _providerService.InsertMalfunctionEventAsync(model, token);
-                if (created != null && created.Id > 0) model.Id = created.Id;   // Id write-back → 재Save 유령중복 방지
+                var model = (IMalfunctionEventModel)vm.Model;
+                try { await _providerService.UpdateMalfunctionEventAsync(model, token); vm.IsEdited = false; }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"수정(Id={model.Id}): {ex.Message}");
+                    _log?.Error($"UpdateMalfunctionEventAsync 실패 Id={model.Id}: {ex.Message}");
+                }
+            }
+
+            foreach (var model in insertList)
+            {
+                if (model.Device == null || model.Device.Id <= 0) { held++; continue; }   // 장비 미선택 Draft 보류(서버 device_id FK 필수)
+                try { var created = await _providerService.InsertMalfunctionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    saveFailures.Add($"추가: {ex.Message}");
+                    _log?.Error($"InsertMalfunctionEventAsync 실패: {ex.Message}");
+                }
+            }
+
+            if (saveFailures.Count > 0 || held > 0)
+            {
+                var sb = new System.Text.StringBuilder();
+                if (saveFailures.Count > 0)
+                    sb.AppendLine($"{saveFailures.Count}건 저장에 실패했습니다. 편집 내용을 유지합니다.\n" + string.Join("\n", saveFailures.Take(5)));
+                if (held > 0)
+                    sb.AppendLine($"{held}건은 장비 미선택으로 보류했습니다. 장비를 선택한 뒤 다시 저장하세요.");
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "이벤트 저장 일부 보류/실패",
+                    Explain = sb.ToString().TrimEnd()
+                });
+                return;
             }
 
             await DataInitialize().ConfigureAwait(false);
@@ -291,26 +326,61 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
                 _totalPages = 1;
                 _totalCount = 0;
 
-                // 기존 Malfunction 이벤트 제거
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // swap-on-success: 첫 페이지를 먼저 가져와 성공 확인 후에만 기존 컬렉션 교체(실패 시 보존+통지 — 화면 공백 방지)
+                PagedResult<IMalfunctionEventModel> firstPage;
+                try
+                {
+                    firstPage = await _providerService.FetchMalfunctionEventsPageAsync(
+                        StartDate, EndDate, 1, 100, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _log?.Error($"DataInitialize 첫 페이지 fetch 실패: {ex.Message}");
+                    firstPage = new PagedResult<IMalfunctionEventModel> { Success = false };
+                }
+
+                if (!firstPage.Success)
+                {
+                    await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                    {
+                        Explain = "장애 이벤트를 불러오지 못했습니다. 서버 연결 상태를 확인하세요. 기존 목록은 유지됩니다."
+                    }, cancellationToken);
+                    return; // finally 에서 IsVisible=true
+                }
+
+                _currentPage = firstPage.Page;
+                _totalPages = firstPage.TotalPages;
+                _totalCount = firstPage.Total;
+
+                // 성공 → 기존 컬렉션 교체
                 var existingMalfunction = _eventProvider.OfType<IMalfunctionEventModel>().ToList();
                 foreach (var e in existingMalfunction) _eventProvider.Remove(e);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-
                 DispatcherService.Invoke(() =>
                 {
                     ViewModelProvider.Clear();
                 });
-
-                // CollectionChanged 구독을 LoadNextPageAsync 전에 설정
-                // → VP.Add 시 CollectionChanged가 EP 동기화 담당 (double-add 방지)
+                // CollectionChanged 구독을 Add 전에 설정 → VP.Add 시 EP 동기화(double-add 방지)
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 첫 페이지 로드
-                await LoadNextPageAsync(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                DispatcherService.Invoke(() =>
+                {
+                    foreach (var item in firstPage.Items)
+                    {
+                        ViewModelProvider.Add(new MalfunctionEventViewModel(item)
+                        {
+                            Index = ViewModelProvider.Count + 1
+                        });
+                    }
+                    NotifyOfPropertyChange(() => LoadedCountText);
+                    NotifyOfPropertyChange(() => HasMorePages);
+                });
 
                 // 캐시 날짜범위 기록
                 SetCachedDate(_startDate, _endDate);

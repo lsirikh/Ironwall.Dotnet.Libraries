@@ -774,7 +774,7 @@ public class EventProviderServiceTests
         mockApiService
             .Setup(x => x.UpdateDetectionEventAsync(
                 100,
-                It.IsAny<DetectionEventDto>(),
+                It.IsAny<DetectionEventReplaceDto>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(apiResponse);
 
@@ -789,7 +789,7 @@ public class EventProviderServiceTests
         Assert.Equal(EnumTrueFalse.False, result.Status);
         mockApiService.Verify(x => x.UpdateDetectionEventAsync(
             100,
-            It.Is<DetectionEventDto>(dto => dto.Id == 100 && dto.ActionReported == "False"),
+            It.Is<DetectionEventReplaceDto>(dto => dto.TypeEvent == "Intrusion" && dto.Result == "PIR_SENSOR"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -920,7 +920,7 @@ public class EventProviderServiceTests
         mockApiService
             .Setup(x => x.UpdateMalfunctionEventAsync(
                 200,
-                It.IsAny<MalfunctionEventDto>(),
+                It.IsAny<MalfunctionEventReplaceDto>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(apiResponse);
 
@@ -1047,7 +1047,7 @@ public class EventProviderServiceTests
         mockApiService
             .Setup(x => x.UpdateConnectionEventAsync(
                 300,
-                It.IsAny<ConnectionEventDto>(),
+                It.IsAny<ConnectionEventReplaceDto>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(apiResponse);
 
@@ -1174,7 +1174,7 @@ public class EventProviderServiceTests
         mockApiService
             .Setup(x => x.UpdateActionEventAsync(
                 400,
-                It.IsAny<ActionEventCreateDto>(),
+                It.IsAny<ActionEventReplaceDto>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(apiResponse);
 

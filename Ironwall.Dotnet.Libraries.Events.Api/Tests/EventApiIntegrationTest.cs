@@ -113,10 +113,9 @@ public class DetectionEventApiTests
             Assert.Equal("PIR_SENSOR", patchResp.Data!.Result);
 
             // ── Put ──
-            var putDto = new DetectionEventDto
+            var putDto = new DetectionEventReplaceDto
             {
                 TypeEvent = "Intrusion",
-                DeviceId = 2,
                 Result = "THERMAL_SENSOR"
             };
             var putResp = await _svc.UpdateDetectionEventAsync(id, putDto);
@@ -213,10 +212,9 @@ public class MalfunctionEventApiTests
             Assert.Equal("FAULT_MULTI", patchResp.Data!.Reason);
 
             // ── Put ──
-            var putDto = new MalfunctionEventDto
+            var putDto = new MalfunctionEventReplaceDto
             {
                 TypeEvent = "Fault",
-                DeviceId = 2,
                 Reason = "FAULT_ETC",
                 Detail = new MalfunctionDetailDto
                 {
@@ -297,10 +295,9 @@ public class ConnectionEventApiTests
                 $"Patch failed: {patchResp.Error?.Code} - {patchResp.Message}");
 
             // ── Put ──
-            var putDto = new ConnectionEventDto
+            var putDto = new ConnectionEventReplaceDto
             {
-                TypeEvent = "Connection",
-                DeviceId = 2
+                TypeEvent = "Connection"
             };
             var putResp = await _svc.UpdateConnectionEventAsync(id, putDto);
             Assert.True(putResp.Success,
@@ -394,12 +391,11 @@ public class ActionEventApiTests
                 Assert.Equal("operator_kim", patchResp.Data!.User);
 
                 // ── Put ──
-                var putDto = new ActionEventCreateDto
+                var putDto = new ActionEventReplaceDto
                 {
                     TypeEvent = "Action",
                     Content = "E08 Full Update Content",
-                    User = "operator_park",
-                    FromEventId = detId
+                    User = "operator_park"
                 };
                 var putResp = await _svc.UpdateActionEventAsync(id, putDto);
                 Assert.True(putResp.Success,

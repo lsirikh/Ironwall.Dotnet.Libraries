@@ -506,7 +506,7 @@ public class EventProviderService
         {
             _log?.Info($"UpdateDetectionEventAsync() started for ID {model.Id}");
 
-            var dto = model.ToDetectionEventDto();
+            var dto = model.ToDetectionEventReplaceDto();   // PUT은 Replace 계약(허용 필드만)
             var response = await _apiService.UpdateDetectionEventAsync(model.Id, dto, token);
 
             if (!response.Success || response.Data == null)
@@ -599,7 +599,7 @@ public class EventProviderService
         {
             _log?.Info($"UpdateMalfunctionEventAsync() started for ID {model.Id}");
 
-            var dto = model.ToMalfunctionEventDto();
+            var dto = model.ToMalfunctionEventReplaceDto();   // PUT은 Replace 계약(허용 필드만)
             var response = await _apiService.UpdateMalfunctionEventAsync(model.Id, dto, token);
 
             if (!response.Success || response.Data == null)
@@ -692,7 +692,7 @@ public class EventProviderService
         {
             _log?.Info($"UpdateConnectionEventAsync() started for ID {model.Id}");
 
-            var dto = model.ToConnectionEventDto();
+            var dto = model.ToConnectionEventReplaceDto();   // PUT은 Replace 계약(type_event만)
             var response = await _apiService.UpdateConnectionEventAsync(model.Id, dto, token);
 
             if (!response.Success || response.Data == null)
@@ -793,14 +793,9 @@ public class EventProviderService
         {
             _log?.Info($"UpdateActionEventAsync() started for ID {model.Id}");
 
-            var createDto = new ActionEventCreateDto
-            {
-                TypeEvent = "Action",
-                Content = model.Content ?? string.Empty,
-                User = model.User ?? string.Empty,
-                FromEventId = model.OriginEvent?.Id ?? 0
-            };
-            var response = await _apiService.UpdateActionEventAsync(model.Id, createDto, token);
+            // PUT은 ActionEventReplace 계약 — from_event_id 미포함(원본 연결은 사후 불변), content/user/type_event만
+            var replaceDto = model.ToActionEventReplaceDto();
+            var response = await _apiService.UpdateActionEventAsync(model.Id, replaceDto, token);
 
             if (!response.Success || response.Data == null)
             {
