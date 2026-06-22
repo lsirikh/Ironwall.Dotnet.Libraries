@@ -258,6 +258,17 @@ public interface IGMapDbService
     Task<bool> DeleteMapRoiAsync(
         int id, CancellationToken token = default);
 
+    /*────────────────────── CameraPopupPosition (카메라 RTSP 팝업 위치) ──────────────*/
+
+    /// <summary>카메라 팝업 위치를 Upsert(CameraId 단독 키, 다중 클라 공유).</summary>
+    Task<bool> UpsertCameraPopupPositionAsync(ICameraPopupPositionModel model, CancellationToken token = default);
+    /// <summary>카메라 Id로 저장된 팝업 위치 조회(없으면 null).</summary>
+    Task<ICameraPopupPositionModel?> GetCameraPopupPositionAsync(int cameraId, CancellationToken token = default);
+    /// <summary>모든 카메라 팝업 위치 조회.</summary>
+    Task<List<ICameraPopupPositionModel>?> FetchCameraPopupPositionsAsync(CancellationToken token = default);
+    /// <summary>카메라 Id로 저장된 팝업 위치 삭제.</summary>
+    Task<bool> DeleteCameraPopupPositionAsync(int cameraId, CancellationToken token = default);
+
     /*────────────────────── MapLayer (레이어 관리) ─────────────*/
 
     Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default);
