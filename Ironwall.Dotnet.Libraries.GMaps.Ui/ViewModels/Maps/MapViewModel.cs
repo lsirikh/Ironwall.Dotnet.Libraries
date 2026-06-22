@@ -2292,6 +2292,9 @@ public class MapViewModel : BasePanelViewModel,
             return;
         }
 
+        // 빈 타일(커버리지 밖) 영역에 깔끔/모던 기본 타일 표시 — UI 스레드 1회 생성·캐시(멱등)
+        provider.DefaultTileBytes = DefaultTileImageFactory.GetBytes();
+
         // 2. Provider 설정 (EmptyProvider 불필요 — 최초이므로 참조 변경 자연 발생)
         MainMap.MapProvider = provider;
         MainMap.Manager.Mode = AccessMode.ServerOnly;
@@ -2343,6 +2346,9 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Error($"[MapSwitch] MBTiles 열기 실패: {mbtilesPath}");
             return;
         }
+
+        // 빈 타일(커버리지 밖) 영역에 깔끔/모던 기본 타일 표시 — 캐시라 멱등(이미 설정돼도 무해)
+        provider.DefaultTileBytes = DefaultTileImageFactory.GetBytes();
 
         // 4. Provider 설정
         MainMap.MapProvider = provider;

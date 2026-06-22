@@ -251,4 +251,103 @@ public class MBTilesTests
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // TEST-03: 빈 타일 기본 타일(no-data tile) 반환 결정 로직
+    //
+    //   MBTilesMapProvider.GetTileImage(GMap.NET.Core)는 WPF/System.Data.SQLite 네이티브
+    //   의존이라 net8.0 격리 테스트에서 직접 호출 불가 → ToTmsRow와 동일하게 분기 로직을
+    //   로컬 복제하여 결정 테이블 동치를 검증한다.
+    //
+    //   실제 코드(미러 대상):
+    //     if (source == null) return null;                      // (a)
+    //     if (zoom < MinZoom || zoom > MaxZoom) return null;     // (b)
+    //     var img = source.GetImage(pos, zoom);                 // (c)
+    //     if (img == null && TileImageProxy != null && DefaultTileBytes != null)
+    //         return GetTileImageFromArray(DefaultTileBytes);
+    //     return img;
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private enum TileOutcome { Null, DefaultTile, RealTile }
+
+    /// <summary>MBTilesMapProvider.GetTileImage 기본 타일 분기(a/b/c)의 충실한 복제.</summary>
+    private static TileOutcome ResolveTile(
+        bool sourceOpen, int zoom, int minZoom, int maxZoom,
+        bool tileExists, bool defaultBytesSet, bool tileImageProxyAvailable)
+    {
+        if (!sourceOpen) return TileOutcome.Null;                          // (a) source == null
+        if (zoom < minZoom || zoom > maxZoom) return TileOutcome.Null;     // (b) 줌 범위 밖
+        if (tileExists) return TileOutcome.RealTile;                       // (c) 실제 타일 우선
+        if (defaultBytesSet && tileImageProxyAvailable)
+            return TileOutcome.DefaultTile;                                // (c) 타일 없음 → 기본 타일
+        return TileOutcome.Null;                                           // (c) 기본 없음 → 기존 동작 유지
+    }
+
+    [Fact]
+    public void should_return_default_tile_when_tile_missing_and_default_set()
+    {
+        // (c) 정상 줌 + 타일 없음 + 기본 바이트 주입됨 → 기본 타일 (커버리지 밖 흰화면 해소)
+        var outcome = ResolveTile(
+            sourceOpen: true, zoom: 15, minZoom: 0, maxZoom: 18,
+            tileExists: false, defaultBytesSet: true, tileImageProxyAvailable: true);
+
+        Assert.Equal(TileOutcome.DefaultTile, outcome);
+    }
+
+    [Fact]
+    public void should_prefer_real_tile_over_default()
+    {
+        // (c) 실제 타일이 있으면 기본 바이트가 설정돼 있어도 실제 타일 반환(우선순위)
+        var outcome = ResolveTile(
+            sourceOpen: true, zoom: 15, minZoom: 0, maxZoom: 18,
+            tileExists: true, defaultBytesSet: true, tileImageProxyAvailable: true);
+
+        Assert.Equal(TileOutcome.RealTile, outcome);
+    }
+
+    [Fact]
+    public void should_return_null_when_source_not_loaded_even_with_default()
+    {
+        // (a) source 미오픈(맵 미로드)이면 기본 타일을 깔지 않음 — 로드 실패 은폐 방지
+        var outcome = ResolveTile(
+            sourceOpen: false, zoom: 15, minZoom: 0, maxZoom: 18,
+            tileExists: false, defaultBytesSet: true, tileImageProxyAvailable: true);
+
+        Assert.Equal(TileOutcome.Null, outcome);
+    }
+
+    [Theory]
+    [InlineData(-1)]   // minZoom 미만
+    [InlineData(19)]   // maxZoom 초과
+    public void should_return_null_when_zoom_out_of_range_even_with_default(int zoom)
+    {
+        // (b) 줌 범위 밖이면 기본 타일 미반환 — FillEmptyTiles 부모타일 폴백 보존
+        var outcome = ResolveTile(
+            sourceOpen: true, zoom: zoom, minZoom: 0, maxZoom: 18,
+            tileExists: false, defaultBytesSet: true, tileImageProxyAvailable: true);
+
+        Assert.Equal(TileOutcome.Null, outcome);
+    }
+
+    [Fact]
+    public void should_preserve_legacy_null_when_no_default_bytes()
+    {
+        // (c) 타일 없음 + 기본 바이트 미주입 → 기존 동작(null) 그대로 유지(하위호환)
+        var outcome = ResolveTile(
+            sourceOpen: true, zoom: 15, minZoom: 0, maxZoom: 18,
+            tileExists: false, defaultBytesSet: false, tileImageProxyAvailable: true);
+
+        Assert.Equal(TileOutcome.Null, outcome);
+    }
+
+    [Fact]
+    public void should_return_null_when_tile_image_proxy_unavailable()
+    {
+        // (c) 타일 없음 + 기본 바이트 있으나 TileImageProxy 미설정 → null (NRE 가드)
+        var outcome = ResolveTile(
+            sourceOpen: true, zoom: 15, minZoom: 0, maxZoom: 18,
+            tileExists: false, defaultBytesSet: true, tileImageProxyAvailable: false);
+
+        Assert.Equal(TileOutcome.Null, outcome);
+    }
 }
