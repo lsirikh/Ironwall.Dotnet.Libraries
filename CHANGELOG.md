@@ -18,7 +18,12 @@
 - **장비 속성패널 레이아웃 재설계 — Phase 1 (레이아웃+스크롤)** ([PRD](docs/prds/DevicePropertyPanel_Layout_Redesign-prd.md) v1.1 · [Plan](docs/plans/DevicePropertyPanel_Layout_Redesign-prd-plan.md))
   - 6 SelectionView(제어기/센서/카메라/스피커/함체/경광등)를 **4구역(장비공통·장비별·위치·그룹)** 으로 통일 + 헤더·**적용버튼 고정**, **속성영역만 세로 스크롤**(GroupBox 내부 2행 Grid: ScrollViewer/footer).
   - 신규 `Utils/Behaviors/BubbleMouseWheelBehavior` — 내부 ListBox(Groups) 스크롤 한계 시에만 부모로 휠 재전파(Groups 기존 세로스크롤 보존 + 중첩 휠 갇힘 해소).
-  - 6차원 Agent 시뮬레이션(머지블로커 4 식별) 반영한 PRD v1.1. 바인딩/PasswordBox/ItemsSource/BindingProxy 1:1 보존(code-review opus: Critical/High 0). 후속 Phase 2: Bearing·Alt 왕복.
+  - 6차원 Agent 시뮬레이션(머지블로커 4 식별) 반영한 PRD v1.1. 바인딩/PasswordBox/ItemsSource/BindingProxy 1:1 보존(code-review opus: Critical/High 0).
+- **장비 속성패널 — Phase 2 (Bearing/Altitude 왕복)**
+  - 6패널 위치구역에 **Bearing(방위각 0~360°)·Alt(고도)** 편집 추가. `BaseDeviceViewModel.Bearing`(→Heading, set mod360 정규화)/`Altitude`, 6 SelectionViewModel(`CommonOrNullNullable` 공통값 + RefreshAll + ApplyButton HasValue 가드), 6 DeviceEquals(Heading/Altitude 비교).
+  - **매핑 핫픽스(BLOCKER-1)**: `DtoToModelHelper.MapGeolocationToDto`가 Heading·Altitude를 실제 API 전송(이전 누락 → 방위각 저장 무효). `GeolocationDto.Altitude`→`double?`. `BaseDeviceModel` Altitude + 복사생성자 Heading/Altitude 복사.
+  - **심볼 FOV 갱신**: `DeviceProviderService.UpdateDeviceProperties`에 Heading/Altitude 복사 + `SymbolEventManager.RegisterDeviceSymbol`에 `SetUpdate()` → Bearing 저장 시 지도 심볼 부채꼴 재렌더링.
+  - **버그수정**: `CameraSelectionViewModel` ctor `RefreshAll()` 누락 복구. xUnit 7케이스(왕복/null보존/가드/직렬화) — 전체 81 통과.
 - **Client/Server API v4.6 정합 — Phase 0 (S1~S5)** ([PRD](docs/prds/Client_API_v46_Conformance-prd.md) v3.1 · [Plan](docs/plans/Client_API_v46_Conformance-prd-plan.md))
   - **FR-0**: `IApiService.DeleteRequestAsync<T>(endpoint, body)` body-DELETE 오버로드 신설(벌크해제 공통 인프라, `PatchRequestAsync` 패턴)
   - **FR-1**: ActionEvent 1:N — `GetDetection/MalfunctionActionsAsync`가 `/{id}/actions`(복수) + `ApiListResponse<ActionEventDto>` 배열 반환(기존 단수 `/action`+단건 → 404/역직렬화 위험 제거)
