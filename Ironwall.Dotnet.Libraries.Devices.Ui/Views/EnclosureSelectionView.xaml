@@ -23,6 +23,22 @@
 			<Setter Property="Foreground" Value="{DynamicResource PrimaryHueDarkBrush}" />
 			<Setter Property="Margin" Value="0,8,0,4" />
 		</Style>
+		<!--  필드 라벨/입력 고정 크기 + 라벨-값 여백 (v2.9.5)  -->
+		<Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource TextBlockTitle}">
+			<Setter Property="Width" Value="72" />
+			<Setter Property="Margin" Value="0,0,10,0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+		<Style x:Key="FieldBox" TargetType="TextBox" BasedOn="{StaticResource TextBoxInput}">
+			<Setter Property="Width" Value="170" />
+			<Setter Property="Margin" Value="0,0,20,0" />
+			<Setter Property="HorizontalAlignment" Value="Left" />
+		</Style>
+		<Style x:Key="FieldCombo" TargetType="ComboBox" BasedOn="{StaticResource ComboBoxContent}">
+			<Setter Property="Width" Value="170" />
+			<Setter Property="Margin" Value="0,0,20,0" />
+			<Setter Property="HorizontalAlignment" Value="Left" />
+		</Style>
 	</UserControl.Resources>
 
 	<GroupBox
@@ -61,62 +77,59 @@
 						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
 						</Grid.ColumnDefinitions>
 
 						<TextBlock
 							Grid.Row="0"
 							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Device No" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="1"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="1"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding DeviceNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 						<TextBlock
 							Grid.Row="0"
 							Grid.Column="2"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Name" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="3"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="함체_01"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 						<TextBlock
 							Grid.Row="0"
 							Grid.Column="4"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Ver." />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="5"
 							md:HintAssist.Hint="v1.0"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="활성화" />
 						<ComboBox
 							Grid.Row="1"
 							Grid.Column="1"
-							Margin="0,0,12,0"
 							SelectedItem="{Binding IsEnable, Mode=TwoWay}"
-							Style="{StaticResource ComboBoxContent}">
+							Style="{StaticResource FieldCombo}">
 							<sys:Boolean>True</sys:Boolean>
 							<sys:Boolean>False</sys:Boolean>
 						</ComboBox>
@@ -124,14 +137,14 @@
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="2"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Status" />
 						<ComboBox
 							Grid.Row="1"
 							Grid.Column="3"
 							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDeviceStatus}}}"
 							SelectedItem="{Binding Status, Mode=TwoWay}"
-							Style="{StaticResource ComboBoxContent}">
+							Style="{StaticResource FieldCombo}">
 							<ComboBox.ItemsPanel>
 								<ItemsPanelTemplate>
 									<VirtualizingStackPanel />
@@ -150,45 +163,43 @@
 					<Grid>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
 						</Grid.ColumnDefinitions>
 
 						<TextBlock
 							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Door" />
 						<TextBox
 							Grid.Column="1"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="CLOSED"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding DoorStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 						<TextBlock
 							Grid.Column="2"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Heater" />
 						<ComboBox
 							Grid.Column="3"
-							Margin="0,0,12,0"
 							SelectedItem="{Binding HeaterEnabled, Mode=TwoWay}"
-							Style="{StaticResource ComboBoxContent}">
+							Style="{StaticResource FieldCombo}">
 							<sys:Boolean>True</sys:Boolean>
 							<sys:Boolean>False</sys:Boolean>
 						</ComboBox>
 
 						<TextBlock
 							Grid.Column="4"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Fan" />
 						<ComboBox
 							Grid.Column="5"
 							SelectedItem="{Binding FanEnabled, Mode=TwoWay}"
-							Style="{StaticResource ComboBoxContent}">
+							Style="{StaticResource FieldCombo}">
 							<sys:Boolean>True</sys:Boolean>
 							<sys:Boolean>False</sys:Boolean>
 						</ComboBox>
@@ -203,75 +214,71 @@
 						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
 							<ColumnDefinition Width="Auto" />
-							<ColumnDefinition Width="*" MinWidth="60" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
 						</Grid.ColumnDefinitions>
 
 						<TextBlock
 							Grid.Row="0"
 							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Location" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="1"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="설치 위치"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding Location, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 						<TextBlock
 							Grid.Row="0"
 							Grid.Column="2"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Lat" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="3"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="위도"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 						<TextBlock
 							Grid.Row="0"
 							Grid.Column="4"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Lng" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="5"
 							md:HintAssist.Hint="경도"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Alt" />
 						<TextBox
 							Grid.Row="1"
 							Grid.Column="1"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="고도(m)"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding Altitude, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="2"
-							Style="{StaticResource TextBlockTitle}"
+							Style="{StaticResource FieldLabel}"
 							Text="Bearing" />
 						<TextBox
 							Grid.Row="1"
 							Grid.Column="3"
-							Margin="0,0,12,0"
 							md:HintAssist.Hint="0~360°"
-							Style="{StaticResource TextBoxInput}"
+							Style="{StaticResource FieldBox}"
 							Text="{Binding Bearing, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 					</Grid>
 
