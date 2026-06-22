@@ -25,8 +25,17 @@ public class SpeakerDeviceDto : BaseDeviceDto
     public string? Description { get; set; }
 
     /// <summary>
-    /// 방송서버 참조 (read-only, nested)
+    /// 방송서버 참조 (read-only, nested) — 응답 역직렬화 전용. 쓰기는 <see cref="ServerId"/> 사용.
     /// </summary>
     [JsonProperty("server", Order = 13)]
     public ServerDto? Server { get; set; }
+
+    /// <summary>
+    /// 방송서버 ID (write) — SpeakerCreate/Update.server_id. 해제 미지원이라 null이면 직렬화 생략.
+    /// </summary>
+    [JsonProperty("server_id", Order = 14, NullValueHandling = NullValueHandling.Ignore)]
+    public int? ServerId { get; set; }
+
+    /// <summary>요청 본문에 nested server를 직렬화하지 않음(서버는 server_id를 기대 + 민감정보 누출 방지).</summary>
+    public bool ShouldSerializeServer() => false;
 }

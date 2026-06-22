@@ -297,22 +297,28 @@ public static class DtoToModelHelper
         MapGeolocationToModel(dto, model);
 
         if (dto.Server != null)
-        {
-            model.Server = new ServerModel
-            {
-                Id = dto.Server.Id,
-                CategoryId = dto.Server.CategoryId,
-                Name = dto.Server.Name,
-                Status = dto.Server.Status,
-                IpAddress = dto.Server.IpAddress,
-                Port = dto.Server.Port,
-                Hostname = dto.Server.Hostname,
-                UserName = dto.Server.UserName,
-                UserPassword = dto.Server.UserPassword
-            };
-        }
+            model.Server = dto.Server.ToServerModel();
 
         return model;
+    }
+
+    /// <summary>ServerDto → ServerModel (방송서버 — nested 읽기 + ServerProvider 적재 공용).
+    /// ThresholdConfig(JObject↔ServerThresholdConfigModel)는 드롭다운/표시에 불필요하여 미매핑(기존 nested 읽기도 동일).</summary>
+    public static ServerModel ToServerModel(this ServerDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+        return new ServerModel
+        {
+            Id = dto.Id,
+            CategoryId = dto.CategoryId,
+            Name = dto.Name,
+            Status = dto.Status,
+            IpAddress = dto.IpAddress,
+            Port = dto.Port,
+            Hostname = dto.Hostname,
+            UserName = dto.UserName,
+            UserPassword = dto.UserPassword
+        };
     }
 
     public static SpeakerDeviceDto ToSpeakerDeviceDto(this SpeakerDeviceModel model)
@@ -334,21 +340,9 @@ public static class DtoToModelHelper
 
         MapGeolocationToDto(model, dto);
 
-        if (model.Server != null)
-        {
-            dto.Server = new ServerDto
-            {
-                Id = model.Server.Id,
-                CategoryId = model.Server.CategoryId,
-                Name = model.Server.Name,
-                Status = model.Server.Status,
-                IpAddress = model.Server.IpAddress,
-                Port = model.Server.Port,
-                Hostname = model.Server.Hostname,
-                UserName = model.Server.UserName,
-                UserPassword = model.Server.UserPassword
-            };
-        }
+        // 쓰기경로 비대칭: 서버는 server_id(int)를 기대 — nested server 객체 대신 ID만 전송.
+        // (ShouldSerializeServer()=>false 로 nested는 직렬화 차단). 해제 미지원 → null이면 Ignore로 생략.
+        dto.ServerId = model.Server?.Id;
 
         return dto;
     }

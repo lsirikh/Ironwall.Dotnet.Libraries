@@ -1,9 +1,11 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
+using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Servers;
 using System;
 using System.Collections.ObjectModel;
 
@@ -37,6 +39,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
                 if (Bearing.HasValue) item.Bearing = Bearing.Value;     // mod360 정규화는 VM setter가 처리
                 if (Altitude.HasValue) item.Altitude = Altitude.Value;
                 if (IsEnable.HasValue) item.IsEnable = IsEnable.Value;
+                // 방송서버: 선택 시에만 적용(미선택=미변경). 캐시 인스턴스를 Id로 재조회해 대입(인스턴스 오염 회피).
+                if (ServerId.HasValue)
+                {
+                    var server = ServerItems.FirstOrDefault(s => s.Id == ServerId.Value);
+                    if (server != null) item.Server = server;
+                }
             }
             ApplyGroups();
         }
@@ -90,7 +98,31 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
             Bearing = CommonOrNullNullable(_selection, m => m.Heading);
             Altitude = CommonOrNullNullable(_selection, m => m.Altitude);
             IsEnable = CommonOrNullValue(_selection, m => m.IsEnable);
+            ServerId = CommonOrNullNullable(_selection, m => m.Server?.Id);
             RefreshGroupItems();
+            RefreshServerItems();
+        }
+
+        private void RefreshServerItems()
+        {
+            var provider = IoC.Get<ServerProvider>();
+            ServerItems = new ObservableCollection<IServerModel>(provider.OfType<IServerModel>());
+            NotifyOfPropertyChange(nameof(ServerItems));
+        }
+
+        /// <summary>서버목록 새로고침(D4) — API 재조회 후 드롭다운 갱신. 현재 선택(ServerId)은 유지.</summary>
+        public async void RefreshServers()
+        {
+            try
+            {
+                await IoC.Get<IDeviceProviderService>().FetchServersAsync();
+                RefreshServerItems();
+                NotifyOfPropertyChange(nameof(ServerId));
+            }
+            catch (Exception)
+            {
+                // 비치명적: FetchServersAsync 내부에서 로깅·stale 캐시 보존. 새로고침 실패해도 기존 목록 유지.
+            }
         }
 
         private void RefreshGroupItems()
@@ -140,6 +172,8 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels
         public double? Bearing { get; set; }
         public double? Altitude { get; set; }
         public bool? IsEnable { get; set; }
+        public int? ServerId { get; set; }
+        public ObservableCollection<IServerModel> ServerItems { get; set; } = new();
         public ObservableCollection<DeviceGroupItemViewModel> GroupItems { get; set; } = new();
         public SpeakerDevicePanelViewModel DevicePanelViewModel { get; }
         #endregion

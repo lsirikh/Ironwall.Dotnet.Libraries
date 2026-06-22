@@ -15,6 +15,9 @@
 ## [Unreleased]
 
 ### Added
+- **스피커 방송서버(server_id) 배정** ([PRD](docs/prds/SpeakerServerAssignment-prd.md) v1.1 · [Plan](docs/plans/SpeakerServerAssignment-prd-plan.md))
+  - 스피커 속성패널에 방송서버 드롭다운(ServerProvider) — 선택/변경 + 신규 추가 시 첫 서버 자동배정(서버 0개면 Inform). 12-Agent opus 시뮬레이션(5블로커/1High) 반영.
+  - 매핑 비대칭 정합: 쓰기=`server_id`(int?, ShouldSerialize 차단으로 nested 미전송) ↔ 읽기=nested `server`. DeviceEquals server_id 비교 추가, UpdateDeviceProperties Server 복사(유령서버 차단), ServerProvider 신설(startup 적재+새로고침).
 - **장비 속성패널 레이아웃 재설계 — Phase 1 (레이아웃+스크롤)** ([PRD](docs/prds/DevicePropertyPanel_Layout_Redesign-prd.md) v1.1 · [Plan](docs/plans/DevicePropertyPanel_Layout_Redesign-prd-plan.md))
   - 6 SelectionView(제어기/센서/카메라/스피커/함체/경광등)를 **4구역(장비공통·장비별·위치·그룹)** 으로 통일 + 헤더·**적용버튼 고정**, **속성영역만 세로 스크롤**(GroupBox 내부 2행 Grid: ScrollViewer/footer).
   - 신규 `Utils/Behaviors/BubbleMouseWheelBehavior` — 내부 ListBox(Groups) 스크롤 한계 시에만 부모로 휠 재전파(Groups 기존 세로스크롤 보존 + 중첩 휠 갇힘 해소).
