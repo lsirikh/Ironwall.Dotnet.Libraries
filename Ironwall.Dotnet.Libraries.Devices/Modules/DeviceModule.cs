@@ -45,6 +45,9 @@ public class DeviceModule : Module
                 .As<ILoadable>().SingleInstance().WithMetadata("Order", _count++);
             builder.RegisterType<DeviceGroupProvider>().As<DeviceGroupProvider>()
                 .SingleInstance().WithMetadata("Order", _count++);
+            // 방송서버 캐시(스피커 드롭다운) — ILoadable 미부착(빈 캐시 동결 방지), FetchServersAsync로 적재
+            builder.RegisterType<ServerProvider>().As<ServerProvider>()
+                .SingleInstance().WithMetadata("Order", _count++);
 
         }
         catch

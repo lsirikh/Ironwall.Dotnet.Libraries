@@ -240,7 +240,8 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
         a.Latitude == b.Latitude &&
         a.Longitude == b.Longitude &&
         a.Heading == b.Heading &&
-        a.Altitude == b.Altitude;
+        a.Altitude == b.Altitude &&
+        a.Server?.Id == b.Server?.Id;   // 방송서버 변경 감지(int? Nullable, ?? 0 금지 — null/0 동치화 방지)
     }
     #endregion
     #region - Helper Methods -

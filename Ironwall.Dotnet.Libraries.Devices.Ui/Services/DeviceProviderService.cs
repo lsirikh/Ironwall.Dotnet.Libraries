@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Servers;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 /****************************************************************************
@@ -50,7 +51,9 @@ public class DeviceProviderService : IDeviceProviderService
         ControllerDeviceProvider controllerProvider,
         SensorDeviceProvider sensorProvider,
         CameraDeviceProvider cameraProvider,
-        DeviceGroupProvider deviceGroupProvider)
+        DeviceGroupProvider deviceGroupProvider,
+        IServerApiService serverApiService,
+        ServerProvider serverProvider)
     {
         _log = logService;
         _eventAggregator = eventAggregator;
@@ -60,6 +63,8 @@ public class DeviceProviderService : IDeviceProviderService
         _sensorProvider = sensorProvider;
         _cameraProvider = cameraProvider;
         _deviceGroupProvider = deviceGroupProvider;
+        _serverApiService = serverApiService;
+        _serverProvider = serverProvider;
     }
     #endregion
 
@@ -109,6 +114,9 @@ public class DeviceProviderService : IDeviceProviderService
         try
         {
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} started");
+
+            // ──────────── 0. Servers (스피커 드롭다운 — 디바이스 로드와 독립, 내부 try/catch라 실패해도 디바이스 로드 계속) ────────────
+            await FetchServersAsync(token);
 
             //_deviceProvider.Clear();
             // ──────────── 1. Controllers (먼저 로딩) ────────────
@@ -327,6 +335,65 @@ public class DeviceProviderService : IDeviceProviderService
         catch (Exception ex)
         {
             _log?.Error($"Exception in FetchDeviceGroupsAsync: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 방송서버 목록을 GOP API에서 조회하여 ServerProvider에 캐싱합니다(스피커 드롭다운 데이터소스).
+    /// <para>★API 실패 시 기존 캐시를 비우지 않음(Clear 생략) — stale-but-nonempty가 빈 드롭다운보다 안전.</para>
+    /// </summary>
+    public async Task FetchServersAsync(CancellationToken token = default)
+    {
+        var allServers = new List<IServerModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        bool fetchOk = true;
+
+        try
+        {
+            _log?.Info("FetchServersAsync() started");
+
+            while (true)
+            {
+                var response = await _serverApiService.GetServersAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success)
+                {
+                    _log?.Error($"Failed to fetch servers at page {currentPage}: {response.Error?.Message}");
+                    fetchOk = false;   // API 실패 → 기존 캐시 보존(Clear 생략)
+                    break;
+                }
+                if (response.Data == null || response.Data.Count == 0)
+                    break;
+
+                foreach (var dto in response.Data)
+                    allServers.Add(dto.ToServerModel());
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            if (fetchOk)
+            {
+                _serverProvider.Clear();
+                foreach (var server in allServers)
+                    _serverProvider.Add(server);
+                _log?.Info($"Servers loaded: {allServers.Count} items");
+            }
+            else
+            {
+                _log?.Warning("FetchServersAsync: API 실패 — 기존 ServerProvider 캐시 보존(빈 드롭다운 방지)");
+            }
+            await PublishSplashMessage("ServerProvider의 정보를 모두 불러왔습니다...");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchServersAsync: {ex.Message}");
         }
     }
 
@@ -845,6 +912,7 @@ public class DeviceProviderService : IDeviceProviderService
             existingSpeaker.Location = newSpeaker.Location;
             existingSpeaker.Latitude = newSpeaker.Latitude;
             existingSpeaker.Longitude = newSpeaker.Longitude;
+            existingSpeaker.Server = newSpeaker.Server;   // P0: 방송서버 갱신(누락 시 서버 삭제/재할당 후 유령서버 영구잔존)
         }
         else if (existing is EnclosureDeviceModel existingEnclosure && newDevice is EnclosureDeviceModel newEnclosure)
         {
@@ -927,5 +995,7 @@ public class DeviceProviderService : IDeviceProviderService
     private readonly SensorDeviceProvider _sensorProvider;
     private readonly CameraDeviceProvider _cameraProvider;
     private readonly DeviceGroupProvider _deviceGroupProvider;
+    private readonly IServerApiService _serverApiService;
+    private readonly ServerProvider _serverProvider;
     #endregion
 }

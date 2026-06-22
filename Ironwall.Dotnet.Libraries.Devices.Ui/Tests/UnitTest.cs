@@ -419,7 +419,9 @@ public class DeviceProviderServiceTests
             controllerProvider: controllerProvider ?? new ControllerDeviceProvider(mockLog, devProvider),
             sensorProvider: sensorProvider ?? new SensorDeviceProvider(mockLog, devProvider),
             cameraProvider: cameraProvider ?? new CameraDeviceProvider(mockLog, devProvider),
-            deviceGroupProvider: deviceGroupProvider ?? new DeviceGroupProvider(mockLog));
+            deviceGroupProvider: deviceGroupProvider ?? new DeviceGroupProvider(mockLog),
+            serverApiService: new MockServerApiService(),
+            serverProvider: new ServerProvider(mockLog));
     }
     #endregion
 
@@ -1077,6 +1079,62 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<MetricDeleteResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── IService ────────────────────────────
+    public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
+}
+
+/// <summary>
+/// Mock IServerApiService — DeviceProviderService.FetchServersAsync 경로용.
+/// GetServersAsync는 Servers(기본 빈 목록) 성공 반환, 나머지는 미구현(NOT_IMPLEMENTED).
+/// </summary>
+public class MockServerApiService : IServerApiService
+{
+    public bool GetServersCalled { get; private set; }
+    public List<ServerDto> Servers { get; } = new();
+
+    public Task<ApiListResponse<ServerDto>> GetServersAsync(int? categoryId = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    {
+        GetServersCalled = true;
+        // 단일 페이지로 전체 반환(2페이지부터 빈 목록 → 페이지 루프 종료)
+        return Task.FromResult(ApiListResponse<ServerDto>.CreateSuccess(page == 1 ? Servers.ToList() : new List<ServerDto>()));
+    }
+
+    public Task<ApiListResponse<CategoryDto>> GetCategoriesAsync(int page = 1, int limit = 20, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<CategoryDto>.CreateSuccess(new List<CategoryDto>()));
+    public Task<ApiResponse<CategoryDetailDto>> GetCategoryByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CategoryDetailDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CategoryDto>> CreateCategoryAsync(CategoryDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CategoryDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CategoryDto>> PatchCategoryAsync(int id, CategoryDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CategoryDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<CategoryDto>> UpdateCategoryAsync(int id, CategoryDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<CategoryDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<object>> DeleteCategoryAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    public Task<ApiResponse<ServerDto>> GetServerByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<ServerDto>> CreateServerAsync(ServerDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<ServerDto>> PatchServerAsync(int id, ServerDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<ServerDto>> UpdateServerAsync(int id, ServerDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<object>> DeleteServerAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<object>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    public Task<ApiResponse<ServerMetricDto>> CreateServerMetricAsync(int serverId, ServerMetricDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerMetricDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiListResponse<ServerMetricDto>> GetServerMetricsAsync(int serverId, string? startDate = null, string? endDate = null, int limit = 100, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<ServerMetricDto>.CreateSuccess(new List<ServerMetricDto>()));
+    public Task<ApiResponse<ServerMetricLatestDto>> GetServerMetricLatestAsync(int serverId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ServerMetricLatestDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<MetricDeleteResultDto>> DeleteServerMetricsAsync(int serverId, string? beforeDate = null, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<MetricDeleteResultDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    public Task<ApiResponse<ProxySettingDto>> GetProxySettingsAsync(int serverId, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<ProxySettingDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
     public Task ExecuteAsync(CancellationToken token = default) => Task.CompletedTask;
     public Task StopAsync(CancellationToken token = default) => Task.CompletedTask;
 }
@@ -2117,7 +2175,9 @@ public class FetchDeviceByIdAsync_SensorSubTypeTests
             controllerProvider: new ControllerDeviceProvider(log, dp),
             sensorProvider: new SensorDeviceProvider(log, dp),
             cameraProvider: new CameraDeviceProvider(log, dp),
-            deviceGroupProvider: new DeviceGroupProvider(log));
+            deviceGroupProvider: new DeviceGroupProvider(log),
+            serverApiService: new MockServerApiService(),
+            serverProvider: new ServerProvider(log));
     }
 
     [Theory]
