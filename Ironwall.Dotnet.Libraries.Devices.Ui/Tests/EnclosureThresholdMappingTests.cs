@@ -44,6 +44,15 @@ public class EnclosureThresholdMappingTests
     }
 
     [Fact]
+    public void should_not_write_empty_threshold_to_dto()
+    {
+        // 리뷰 M1: 전 필드 null인 빈 임계값(다이얼로그 주입)은 전송하지 않아 서버 값 보존
+        var dto = MakeEnclosure(new EnclosureThresholdConfigModel()).ToEnclosureDeviceDto();
+
+        Assert.Null(dto.ThresholdConfig);
+    }
+
+    [Fact]
     public void should_read_threshold_from_dto_jobject()
     {
         var dto = new EnclosureDeviceDto
