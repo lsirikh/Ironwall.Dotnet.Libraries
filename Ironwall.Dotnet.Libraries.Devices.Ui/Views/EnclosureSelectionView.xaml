@@ -156,6 +156,18 @@
 								</DataTemplate>
 							</ComboBox.ItemTemplate>
 						</ComboBox>
+
+						<TextBlock
+							Grid.Row="1"
+							Grid.Column="4"
+							Style="{StaticResource FieldLabel}"
+							Text="Type" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="5"
+							IsReadOnly="True"
+							Style="{StaticResource FieldBox}"
+							Text="{Binding DeviceType, Mode=OneWay}" />
 					</Grid>
 
 					<!--  ===== 구역② 장비별 속성 =====  -->
