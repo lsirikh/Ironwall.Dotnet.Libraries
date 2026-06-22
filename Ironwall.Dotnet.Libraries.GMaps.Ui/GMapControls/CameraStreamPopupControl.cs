@@ -18,9 +18,6 @@ public class CameraStreamPopupControl : Control
     private bool _isDragging;
     private Point _lastMousePosition;
 
-    /// <summary>드래그 종료 — MapViewModel이 AnchorGeo 재계산 + DB 저장.</summary>
-    public event EventHandler? DragCompleted;
-
     static CameraStreamPopupControl()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(CameraStreamPopupControl),
@@ -93,7 +90,8 @@ public class CameraStreamPopupControl : Control
         if (!_isDragging) return;
         _isDragging = false;
         ReleaseMouseCapture();
-        DragCompleted?.Invoke(this, EventArgs.Empty);
+        // VM 경유로 MapViewModel에 드래그 종료 통지(컨트롤은 ItemTemplate 생성이라 직접 구독 불가)
+        (DataContext as CameraStreamPopupViewModel)?.RaiseDragCompleted();
     }
 
     private Canvas? FindParentCanvas()

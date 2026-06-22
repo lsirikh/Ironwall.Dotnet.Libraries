@@ -36,6 +36,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>닫기 요청 — MapViewModel이 컬렉션에서 제거 + DisposeAsync.</summary>
     public event EventHandler? CloseRequested;
 
+    /// <summary>드래그 종료 — MapViewModel이 CanvasLeft/Top→AnchorGeo 재계산 + DB 저장.</summary>
+    public event EventHandler? DragCompleted;
+
+    /// <summary>컨트롤이 드래그 종료 시 호출 → DragCompleted 발화.</summary>
+    internal void RaiseDragCompleted() => DragCompleted?.Invoke(this, EventArgs.Empty);
+
     public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
     {

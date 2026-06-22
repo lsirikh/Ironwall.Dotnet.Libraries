@@ -726,6 +726,30 @@
 					x:Name="LayerPanelPresenter"
 					Content="{Binding LayerPanel}"
 					Visibility="{Binding IsLayerPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  카메라 RTSP 스트리밍 팝업(멀티) — Geo 앵커 추종, 드래그 이동  -->
+				<ItemsControl
+					Canvas.Left="0"
+					Canvas.Top="0"
+					ClipToBounds="False"
+					ItemsSource="{Binding CameraPopups}">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<Canvas ClipToBounds="False" />
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+					<ItemsControl.ItemContainerStyle>
+						<Style TargetType="ContentPresenter">
+							<Setter Property="Canvas.Left" Value="{Binding CanvasLeft}" />
+							<Setter Property="Canvas.Top" Value="{Binding CanvasTop}" />
+						</Style>
+					</ItemsControl.ItemContainerStyle>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<ctrl:CameraStreamPopupControl />
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
 			</Canvas>
 		</Grid>
 	</Grid>

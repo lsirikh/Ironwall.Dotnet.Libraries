@@ -17,6 +17,8 @@ using Ironwall.Dotnet.Libraries.Enums;
 using GMap.NET.MapProviders.Custom;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using System.Windows.Controls;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapImages;
@@ -370,6 +372,7 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnMarkerClicked += OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked += OnMapMarkerRightClicked;
             MainMap.OnMarkerDoubleClicked += OnMapMarkerDoubleClicked;   // RTSP 카메라 팝업
+            MainMap.Markers.CollectionChanged += Markers_CollectionChangedForCameraPopups;  // FR-13 심볼 제거 시 팝업 닫기
             MainMap.OnImageClicked += OnMapImageClicked;
             MainMap.OnImageRightClicked += OnMapImageRightClicked;       // FR-9 이미지 우클릭 메뉴
             MainMap.OnImageEditCompleted += OnMapImageEditCompleted;     // FR-8 편집 완료 DB 영속화
@@ -410,6 +413,7 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
             MainMap.OnMarkerDoubleClicked -= OnMapMarkerDoubleClicked;
+            MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForCameraPopups;
             MainMap.OnImageClicked -= OnMapImageClicked;
             MainMap.OnImageRightClicked -= OnMapImageRightClicked;
             MainMap.OnImageEditCompleted -= OnMapImageEditCompleted;
@@ -511,14 +515,163 @@ public class MapViewModel : BasePanelViewModel,
                 return;
             }
 
-            // TODO(P5): 저장위치(Store.TryGet) 또는 우상단 최초위치로 팝업 오픈 + 멀티/포커스
-            _log?.Info($"[CameraPopup] 카메라 더블클릭: {marker.Title} (Id={cameraModel.Id})");
+            _ = OpenCameraStreamPopupAsync(cameraModel.Id, marker.Title, connInfo, marker);
         }
         catch (Exception ex)
         {
             _log?.Error($"카메라 더블클릭 처리 실패: {ex.Message}");
         }
     }
+
+    #region - Camera RTSP Stream Popup (맵 위 이동식 영상 팝업) -
+
+    private const double CameraPopupInitialOffsetRight = 100;   // 심볼 중점 기준 오른쪽
+    private const double CameraPopupInitialOffsetUp = 100;      // 심볼 중점 기준 위
+
+    private ObservableCollection<CameraStreamPopupViewModel>? _cameraPopups;
+    private ICameraPopupPositionStore? _cameraPopupPositionStore;
+    private ISharedCameraStreamHub? _cameraStreamHub;
+    private bool _cameraStreamHubResolved;
+
+    /// <summary>맵 위에 열린 카메라 RTSP 팝업 목록(MapView PropertyPanelCanvas ItemsControl 바인딩).</summary>
+    public ObservableCollection<CameraStreamPopupViewModel> CameraPopups
+        => _cameraPopups ??= new ObservableCollection<CameraStreamPopupViewModel>();
+
+    private ICameraPopupPositionStore CameraPopupPositionStore
+        => _cameraPopupPositionStore ??= new CameraPopupPositionStore(_gMapDbService, _log);
+
+    /// <summary>ISharedCameraStreamHub는 메인솔루션 StreamingModule 등록 시에만 존재 — IoC lazy 획득.</summary>
+    private ISharedCameraStreamHub? ResolveHub()
+    {
+        if (_cameraStreamHubResolved) return _cameraStreamHub;
+        _cameraStreamHubResolved = true;
+        try { _cameraStreamHub = IoC.Get<ISharedCameraStreamHub>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] StreamingHub 미등록(영상 팝업 비활성): {ex.Message}");
+            _cameraStreamHub = null;
+        }
+        return _cameraStreamHub;
+    }
+
+    private async Task OpenCameraStreamPopupAsync(int cameraId, string? title, RtspConnectionInfo connInfo, IEditableMarker marker)
+    {
+        try
+        {
+            if (MainMap == null) return;
+
+            // 중복 더블클릭 → 기존 팝업 포커스(맨 앞으로)
+            var existing = CameraPopups.FirstOrDefault(p => p.CameraId == cameraId);
+            if (existing != null)
+            {
+                var idx = CameraPopups.IndexOf(existing);
+                if (idx >= 0 && idx < CameraPopups.Count - 1)
+                    CameraPopups.Move(idx, CameraPopups.Count - 1);
+                return;
+            }
+
+            var hub = ResolveHub();
+            if (hub == null) return;
+
+            // 위치: 저장된 AnchorGeo 우선, 없으면 카메라 심볼 우상단(중점+오른쪽100/위100에 팝업 좌하단)
+            PointLatLng anchorGeo;
+            double left, top;
+            var saved = await CameraPopupPositionStore.TryGetPositionAsync(cameraId);
+            if (saved != null)
+            {
+                anchorGeo = new PointLatLng(saved.Latitude, saved.Longitude);
+                var sp = MainMap.FromLatLngToLocal(anchorGeo);
+                left = sp.X; top = sp.Y;
+            }
+            else
+            {
+                var c = MainMap.FromLatLngToLocal(marker.Position);
+                left = c.X + CameraPopupInitialOffsetRight;
+                top = c.Y - CameraPopupInitialOffsetUp - CameraStreamPopupViewModel.DefaultHeight;
+                anchorGeo = MainMap.FromLocalToLatLng((int)left, (int)top);
+            }
+
+            var vm = new CameraStreamPopupViewModel(cameraId, title, connInfo, anchorGeo, hub)
+            {
+                CanvasLeft = left,
+                CanvasTop = top,
+            };
+            vm.CloseRequested += OnCameraPopupCloseRequested;
+            vm.DragCompleted += OnCameraPopupDragCompleted;
+            CameraPopups.Add(vm);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 오픈 실패(CameraId={cameraId}): {ex.Message}");
+        }
+    }
+
+    private async void OnCameraPopupCloseRequested(object? sender, EventArgs e)
+    {
+        if (sender is CameraStreamPopupViewModel vm) await CloseCameraPopupAsync(vm);
+    }
+
+    private async void OnCameraPopupDragCompleted(object? sender, EventArgs e)
+    {
+        if (sender is not CameraStreamPopupViewModel vm || MainMap == null) return;
+        try
+        {
+            // 드래그 종료 위치(팝업 좌상단) → 위경도 앵커 갱신 + DB 저장(다중 클라 공유)
+            var geo = MainMap.FromLocalToLatLng((int)vm.CanvasLeft, (int)vm.CanvasTop);
+            vm.AnchorGeo = geo;
+            await CameraPopupPositionStore.SavePositionAsync(vm.CameraId, geo);
+        }
+        catch (Exception ex) { _log?.Error($"카메라 팝업 위치 저장 실패: {ex.Message}"); }
+    }
+
+    private async Task CloseCameraPopupAsync(CameraStreamPopupViewModel vm)
+    {
+        try
+        {
+            vm.CloseRequested -= OnCameraPopupCloseRequested;
+            vm.DragCompleted -= OnCameraPopupDragCompleted;
+            CameraPopups.Remove(vm);
+            await vm.DisposeAsync();   // Hub Lease 해제(C-03)
+        }
+        catch (Exception ex) { _log?.Error($"카메라 팝업 닫기 실패: {ex.Message}"); }
+    }
+
+    /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음).</summary>
+    private void RefreshCameraPopupPositions()
+    {
+        if (MainMap == null || _cameraPopups == null || _cameraPopups.Count == 0) return;
+        foreach (var vm in _cameraPopups)
+        {
+            var sp = MainMap.FromLatLngToLocal(vm.AnchorGeo);
+            vm.CanvasLeft = sp.X;
+            vm.CanvasTop = sp.Y;
+        }
+    }
+
+    /// <summary>FR-13: 카메라 심볼이 맵에서 제거(레이어 off·삭제)되면 해당 팝업 자동 닫기+Dispose.</summary>
+    private void Markers_CollectionChangedForCameraPopups(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        try
+        {
+            if (_cameraPopups == null || _cameraPopups.Count == 0) return;
+
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove && e.OldItems != null)
+            {
+                foreach (var old in e.OldItems.OfType<GMapPidsMarker>())
+                {
+                    var vm = _cameraPopups.FirstOrDefault(p => p.CameraId == old.LinkedDeviceId);
+                    if (vm != null) _ = CloseCameraPopupAsync(vm);
+                }
+            }
+            else if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                foreach (var vm in _cameraPopups.ToList()) _ = CloseCameraPopupAsync(vm);
+            }
+        }
+        catch (Exception ex) { _log?.Error($"카메라 팝업 심볼제거 처리 실패: {ex.Message}"); }
+    }
+
+    #endregion
 
     /// <summary>
     /// 지도 이미지 클릭 이벤트 핸들러
@@ -4577,6 +4730,7 @@ public class MapViewModel : BasePanelViewModel,
         //   → TriggerSelectionChange 체인은 GMapCustomControl_OnPositionChanged에서 이미 차단됨.
         //_log?.Info($"[PAN][VM] RefreshVisibleTiles drag={MainMap?.IsDragging} t={DateTime.Now:HH:mm:ss.fff}");
         _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+        RefreshCameraPopupPositions();   // 카메라 팝업 Geo 추종(팬)
     }
 
     /// <summary>
@@ -4628,6 +4782,7 @@ public class MapViewModel : BasePanelViewModel,
         CreateScaleBar();
         ClearAllSelections();
         ReapplyLayerVisibilityForZoom();
+        RefreshCameraPopupPositions();   // 카메라 팝업 Geo 추종(줌)
 
         // 줌 변경 시 스테일 타일 로딩 즉시 취소 + 새 CTS 교체 → 즉시 갱신
         if (_customMapOverlayService != null)
