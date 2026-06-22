@@ -70,7 +70,7 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     }
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new MalfunctionEventViewModel(new MalfunctionEventModel());
+        var vm = new MalfunctionEventViewModel(new MalfunctionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault });
         ViewModelProvider.Add(vm);
     }
     

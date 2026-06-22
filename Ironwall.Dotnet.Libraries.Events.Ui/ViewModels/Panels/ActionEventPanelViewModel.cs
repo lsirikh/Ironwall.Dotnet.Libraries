@@ -73,7 +73,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new ActionEventViewModel(new ActionEventModel());
+        var vm = new ActionEventViewModel(new ActionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Action });
         ViewModelProvider.Add(vm);
     }
 

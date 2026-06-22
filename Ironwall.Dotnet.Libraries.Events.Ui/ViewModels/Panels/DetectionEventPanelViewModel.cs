@@ -80,7 +80,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
-        var vm = new DetectionEventViewModel(new DetectionEventModel());
+        var vm = new DetectionEventViewModel(new DetectionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Intrusion });
         ViewModelProvider.Add(vm);
     }
 
