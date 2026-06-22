@@ -15,6 +15,9 @@
 ## [Unreleased]
 
 ### Added
+- **함체 임계값(Threshold) 설정 다이얼로그 — P1 라이브러리** ([PRD](docs/prds/EnclosureThresholdDialog-prd.md))
+  - 함체 임계값(온/습도 상하한·진동) 편집 다이얼로그 신설 — 카메라 상세(Conductor.Collection.OneActive) 패턴 복제: `EnclosureThresholdDialogViewModel`+`EnclosureThresholdSettingViewModel`/View, `OpenEnclosureThresholdDialogMessageModel`, 함체 SelectionView '임계값' 버튼(단일선택).
+  - **매핑 보강(BLOCKER급)**: `DtoToModelHelper`가 threshold_config(JObject)↔`EnclosureThresholdConfigModel` 양방향 매핑(이전 드롭). `EnclosureDeviceDto.ThresholdConfig` NullValueHandling.Ignore. `DeviceEquals`에 임계값 비교(null=빈객체 동등), `UpdateDeviceProperties` 임계값 복사. xUnit 7. (P2 메인솔루션 wrapper/핸들러/등록 별도)
 - **스피커 방송서버(server_id) 배정** ([PRD](docs/prds/SpeakerServerAssignment-prd.md) v1.1 · [Plan](docs/plans/SpeakerServerAssignment-prd-plan.md))
   - 스피커 속성패널에 방송서버 드롭다운(ServerProvider) — 선택/변경 + 신규 추가 시 첫 서버 자동배정(서버 0개면 Inform). 12-Agent opus 시뮬레이션(5블로커/1High) 반영.
   - 매핑 비대칭 정합: 쓰기=`server_id`(int?, ShouldSerialize 차단으로 nested 미전송) ↔ 읽기=nested `server`. DeviceEquals server_id 비교 추가, UpdateDeviceProperties Server 복사(유령서버 차단), ServerProvider 신설(startup 적재+새로고침).

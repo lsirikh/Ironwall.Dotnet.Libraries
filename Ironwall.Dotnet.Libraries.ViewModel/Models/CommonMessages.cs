@@ -33,6 +33,10 @@ public class OpenCameraDetailDialogMessageModel
 {
     public object? Dialog { get; set; }
 }
+public class OpenEnclosureThresholdDialogMessageModel
+{
+    public object? Dialog { get; set; }
+}
 public class OpenDeviceAssignDialogMessageModel
 {
     public object? Dialog { get; set; }

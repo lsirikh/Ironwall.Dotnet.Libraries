@@ -241,7 +241,18 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         a.Latitude == b.Latitude &&
         a.Longitude == b.Longitude &&
         a.Heading == b.Heading &&
-        a.Altitude == b.Altitude;
+        a.Altitude == b.Altitude &&
+        ThresholdEquals(a.ThresholdConfig, b.ThresholdConfig);   // 임계값 변경 감지(없으면 Update 미트리거)
+    }
+
+    // null 설정과 '모든 필드 null'인 빈 설정을 동등 취급(다이얼로그가 빈 임계값 생성 시 허위 변경감지 방지)
+    private static bool ThresholdEquals(IEnclosureThresholdConfigModel? a, IEnclosureThresholdConfigModel? b)
+    {
+        return a?.TempHigh == b?.TempHigh
+            && a?.TempLow == b?.TempLow
+            && a?.HumidityHigh == b?.HumidityHigh
+            && a?.HumidityLow == b?.HumidityLow
+            && a?.VibrationThreshold == b?.VibrationThreshold;
     }
     #endregion
     #region - Helper Methods -

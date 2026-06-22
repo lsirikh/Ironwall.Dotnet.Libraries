@@ -919,6 +919,7 @@ public class DeviceProviderService : IDeviceProviderService
             existingEnclosure.DoorStatus = newEnclosure.DoorStatus;
             existingEnclosure.HeaterEnabled = newEnclosure.HeaterEnabled;
             existingEnclosure.FanEnabled = newEnclosure.FanEnabled;
+            existingEnclosure.ThresholdConfig = newEnclosure.ThresholdConfig;   // 임계값 — FetchAll 후 갱신 반영(누락 시 stale)
             existingEnclosure.IsEnable = newEnclosure.IsEnable;
             existingEnclosure.Location = newEnclosure.Location;
             existingEnclosure.Latitude = newEnclosure.Latitude;
