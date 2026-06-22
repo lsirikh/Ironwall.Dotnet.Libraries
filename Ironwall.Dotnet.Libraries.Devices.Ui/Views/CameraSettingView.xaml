@@ -8,12 +8,11 @@
 	d:DesignHeight="500"
 	d:DesignWidth="800"
 	mc:Ignorable="d">
-	<Grid Height="500" Margin="16">
+	<Grid Margin="16">
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="3*" />
 			<ColumnDefinition Width="7*" />
 		</Grid.ColumnDefinitions>
-
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
@@ -27,144 +26,124 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  WeatherMode  -->
 		<TextBlock
 			Grid.Row="0"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Weather Mode" />
-		<TextBox
+		<ComboBox
 			Grid.Row="0"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="NORMAL / FOG / RAIN"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding WeatherMode, Mode=OneWay}" />
+			ItemsSource="{Binding WeatherModeOptions}"
+			SelectedItem="{Binding WeatherMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  CameraMode  -->
 		<TextBlock
 			Grid.Row="1"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Camera Mode" />
-		<TextBox
+		<ComboBox
 			Grid.Row="1"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="NORMAL / PATROL / STABILIZATION"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding CameraMode, Mode=OneWay}" />
+			ItemsSource="{Binding CameraModeOptions}"
+			SelectedItem="{Binding CameraMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  Heater  -->
 		<TextBlock
 			Grid.Row="2"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Heater" />
-		<TextBox
+		<ComboBox
 			Grid.Row="2"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="on / off"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding Heater, Mode=OneWay}" />
+			ItemsSource="{Binding OnOffOptions}"
+			SelectedItem="{Binding Heater, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  Fan  -->
 		<TextBlock
 			Grid.Row="3"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Fan" />
-		<TextBox
+		<ComboBox
 			Grid.Row="3"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="on / off"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding Fan, Mode=OneWay}" />
+			ItemsSource="{Binding OnOffOptions}"
+			SelectedItem="{Binding Fan, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  Headlight  -->
 		<TextBlock
 			Grid.Row="4"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Headlight" />
-		<TextBox
+		<ComboBox
 			Grid.Row="4"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="on / off"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding Headlight, Mode=OneWay}" />
+			ItemsSource="{Binding OnOffOptions}"
+			SelectedItem="{Binding Headlight, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  DayNightMode  -->
 		<TextBlock
 			Grid.Row="5"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Day/Night Mode" />
-		<TextBox
+		<ComboBox
 			Grid.Row="5"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="DAY / NIGHT / AUTO"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding DayNightMode, Mode=OneWay}" />
+			ItemsSource="{Binding DayNightModeOptions}"
+			SelectedItem="{Binding DayNightMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  FocusMode  -->
 		<TextBlock
 			Grid.Row="6"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Focus Mode" />
-		<TextBox
+		<ComboBox
 			Grid.Row="6"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="AUTO / MANUAL"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding FocusMode, Mode=OneWay}" />
+			ItemsSource="{Binding FocusModeOptions}"
+			SelectedItem="{Binding FocusMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  IrisMode  -->
 		<TextBlock
 			Grid.Row="7"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Iris Mode" />
-		<TextBox
+		<ComboBox
 			Grid.Row="7"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="AUTO / MANUAL"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding IrisMode, Mode=OneWay}" />
+			ItemsSource="{Binding IrisModeOptions}"
+			SelectedItem="{Binding IrisMode, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  Tracking  -->
 		<TextBlock
 			Grid.Row="8"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Tracking" />
-		<TextBox
+		<ComboBox
 			Grid.Row="8"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="ACTIVE / INACTIVE"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding Tracking, Mode=OneWay}" />
+			ItemsSource="{Binding TrackingOptions}"
+			SelectedItem="{Binding Tracking, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 
-		<!--  Palette  -->
 		<TextBlock
 			Grid.Row="9"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
 			Text="Palette" />
-		<TextBox
+		<ComboBox
 			Grid.Row="9"
 			Grid.Column="1"
-			IsReadOnly="True"
-			md:HintAssist.Hint="WHITE_HOT / BLACK_HOT"
-			Style="{StaticResource TextBoxInput}"
-			Text="{Binding Palette, Mode=OneWay}" />
+			ItemsSource="{Binding PaletteOptions}"
+			SelectedItem="{Binding Palette, Mode=TwoWay}"
+			Style="{StaticResource ComboBoxContent}" />
 	</Grid>
 </UserControl>

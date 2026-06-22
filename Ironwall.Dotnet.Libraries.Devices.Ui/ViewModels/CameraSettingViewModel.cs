@@ -84,4 +84,14 @@ public sealed class CameraSettingViewModel : BasePanelViewModel
         get => _model.Palette;
         set { _model.Palette = value; NotifyOfPropertyChange(() => Palette); }
     }
+
+    // ── 편집 콤보 옵션(서버 enum 문자열) ──
+    public IReadOnlyList<string> WeatherModeOptions { get; } = new[] { "NORMAL", "FOG", "SEA_FOG", "YELLOW_DUST", "RAIN", "SNOW", "HEAT_HAZE" };
+    public IReadOnlyList<string> CameraModeOptions { get; } = new[] { "NORMAL", "STABILIZATION", "BLC", "NIGHT_ENHANCE" };
+    public IReadOnlyList<string> OnOffOptions { get; } = new[] { "on", "off" };
+    public IReadOnlyList<string> DayNightModeOptions { get; } = new[] { "AUTO", "DAY", "NIGHT" };
+    public IReadOnlyList<string> FocusModeOptions { get; } = new[] { "AUTO", "MANUAL" };
+    public IReadOnlyList<string> IrisModeOptions { get; } = new[] { "AUTO", "MANUAL" };
+    public IReadOnlyList<string> TrackingOptions { get; } = new[] { "ACTIVE", "LOST", "IDLE" };
+    public IReadOnlyList<string> PaletteOptions { get; } = new[] { "WHITE_HOT", "BLACK_HOT", "RAINBOW", "IRONBOW" };
 }

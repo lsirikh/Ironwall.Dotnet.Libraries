@@ -483,6 +483,28 @@ public static class DtoToModelHelper
         };
     }
 
+    /// <summary>CameraSettingModel → CameraSettingDto (카메라 setting 저장 PUT/PATCH 본문)</summary>
+    public static CameraSettingDto ToCameraSettingDto(this CameraSettingModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+
+        return new CameraSettingDto
+        {
+            Id = model.Id,
+            CameraId = model.CameraId,
+            WeatherMode = model.WeatherMode,
+            CameraMode = model.CameraMode,
+            Heater = model.Heater,
+            Fan = model.Fan,
+            Headlight = model.Headlight,
+            DayNightMode = model.DayNightMode,
+            FocusMode = model.FocusMode,
+            IrisMode = model.IrisMode,
+            Tracking = model.Tracking,
+            Palette = model.Palette
+        };
+    }
+
     public static CameraPositionModel ToCameraPositionModel(GeolocationDto dto)
     {
         if (dto == null) throw new ArgumentNullException(nameof(dto));
