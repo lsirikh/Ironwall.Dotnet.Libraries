@@ -168,6 +168,7 @@
 							<ColumnDefinition Width="Auto" />
 							<ColumnDefinition Width="Auto" />
 							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
 						</Grid.ColumnDefinitions>
 
 						<TextBlock
@@ -189,6 +190,32 @@
 							md:HintAssist.Hint="설명"
 							Style="{StaticResource FieldBox}"
 							Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Column="4"
+							Style="{StaticResource FieldLabel}"
+							Text="방송서버" />
+						<ComboBox
+							Grid.Column="5"
+							DisplayMemberPath="Name"
+							ItemsSource="{Binding ServerItems}"
+							SelectedValue="{Binding ServerId}"
+							SelectedValuePath="Id"
+							Style="{StaticResource FieldCombo}" />
+
+						<Button
+							x:Name="RefreshServers"
+							Grid.Column="6"
+							Width="28"
+							Height="28"
+							VerticalAlignment="Center"
+							Style="{StaticResource MaterialDesignIconButton}"
+							ToolTip="서버목록 새로고침">
+							<md:PackIcon
+								Width="18"
+								Height="18"
+								Kind="Refresh" />
+						</Button>
 					</Grid>
 
 					<!--  ===== 구역③ 위치 정보 (Location/Lat/Lng + Alt/Bearing) =====  -->

@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Devices.Ui.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Servers;
 using System;
 using System.Collections.Specialized;
 using System.Threading;
@@ -76,6 +77,18 @@ public class SpeakerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Speak
             var existing = ViewModelProvider.Select(vm => vm.Model.DeviceNumber).ToHashSet();
             int number = 1; while (existing.Contains(number)) number++;
             var model = new SpeakerDeviceModel { DeviceNumber = number, DeviceName = $"새 스피커 {number}" };
+
+            // (D3) 기본 방송서버 자동배정 — 첫 서버(최소 Id). 서버 0개면 Inform 안내(serverless 등록은 API상 허용).
+            var servers = IoC.Get<ServerProvider>().OfType<IServerModel>().OrderBy(s => s.Id).ToList();
+            if (servers.Count > 0)
+                model.Server = servers[0];
+            else
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "방송서버 없음",
+                    Explain = "등록된 방송서버가 없습니다. 서버를 먼저 등록한 뒤 스피커에 배정하세요."
+                });
+
             ViewModelProvider.Add(new SpeakerDeviceViewModel(model));
         }
         finally { _processGate.Release(); }

@@ -46,6 +46,11 @@ public interface IDeviceProviderService : IService
     Task FetchDeviceGroupsAsync(CancellationToken token = default);
 
     /// <summary>
+    /// 방송서버 목록을 GOP API에서 조회하여 ServerProvider를 업데이트합니다(스피커 드롭다운 새로고침).
+    /// </summary>
+    Task FetchServersAsync(CancellationToken token = default);
+
+    /// <summary>
     /// 단일 Device를 API에서 재조회하여 Provider 캐시를 갱신합니다.
     /// NatsSync SYNC_DEVICE 메시지 수신 시 호출됩니다.
     /// </summary>
