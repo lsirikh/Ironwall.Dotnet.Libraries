@@ -75,6 +75,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
             pids.BaseBearing = deviceModel.Heading.Value;
             pids.DetectionBearing = pids.BaseBearing;   // 초기 FOV 방향 = 설치방향
             _log?.Info($"[SymbolEventManager] BaseBearing 메모리 반영: Device({deviceModel.Id}) heading={deviceModel.Heading.Value:F1}°");
+            symbolModel.SetUpdate();   // BaseBearing/DetectionBearing 변경 → FOV 부채꼴 재렌더링 트리거(UI notify, DB 미저장)
         }
     }
 
