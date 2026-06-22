@@ -46,7 +46,11 @@ public class ActionEventViewModel : BaseEventViewModel<IActionEventModel>, IActi
     public IExEventModel? OriginEvent
     {
         get { return _model.OriginEvent; }
-        set { SetModelProperty(value, _model.OriginEvent, v => _model.OriginEvent = v); }
+        set
+        {
+            if (!IsDraft) return;   // from_event_id 불변(서버 E-02): 조치보고 원본은 생성 시에만 지정, 사후 변경 차단 — 전 경로
+            SetModelProperty(value, _model.OriginEvent, v => _model.OriginEvent = v);
+        }
     }
 
     public string? User

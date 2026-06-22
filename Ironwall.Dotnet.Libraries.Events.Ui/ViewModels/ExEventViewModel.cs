@@ -56,6 +56,7 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
         get { return _model.Device; }
         set
         {
+            if (!IsDraft) return;   // device_id 불변(서버 E-05/06): 기존 행 장비 변경 차단 — SelectionView 일괄적용 등 프로그래matic 경로 포함
             SetModelProperty(value, _model.Device, v => _model.Device = v);
 
         }
@@ -66,6 +67,7 @@ public class ExEventViewModel : BaseEventViewModel<IExEventModel>, IExEventViewM
         get { return _model.Status; }
         set
         {
+            if (!IsDraft) return;   // action_reported 시스템 자동관리(서버 E-03/04/08): 사용자 변경 차단 — 전 경로
             SetModelProperty(value, _model.Status, v => _model.Status = v);
         }
     }

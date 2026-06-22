@@ -85,6 +85,7 @@ public abstract class BaseEventViewModel<T> : BaseCustomViewModel<T>
         get { return _model.MessageType; }
         set
         {
+            if (!IsDraft) return;   // type_event 불변(패널 고정/서버 정책): 기존 행 변경 차단 — SelectionView 일괄적용 등 프로그래matic 경로 포함
             SetModelProperty(value, _model.MessageType, v => _model.MessageType = v);
         }
     }
