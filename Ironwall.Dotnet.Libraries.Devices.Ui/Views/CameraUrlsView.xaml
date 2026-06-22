@@ -8,7 +8,7 @@
 	d:DesignHeight="300"
 	d:DesignWidth="800"
 	mc:Ignorable="d">
-	<Grid Height="300" Margin="16">
+	<Grid Margin="16">
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="3*" />
 			<ColumnDefinition Width="7*" />
@@ -32,10 +32,9 @@
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="1"
-			IsReadOnly="True"
 			md:HintAssist.Hint="http://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding HomepageUrl, Mode=OneWay}" />
+			Text="{Binding HomepageUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 		<!--  OnvifDeviceService  -->
 		<TextBlock
@@ -46,10 +45,9 @@
 		<TextBox
 			Grid.Row="1"
 			Grid.Column="1"
-			IsReadOnly="True"
 			md:HintAssist.Hint="http://.../onvif/device_service"
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding OnvifDeviceService, Mode=OneWay}" />
+			Text="{Binding OnvifDeviceService, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 		<!--  RtspMain  -->
 		<TextBlock
@@ -60,10 +58,9 @@
 		<TextBox
 			Grid.Row="2"
 			Grid.Column="1"
-			IsReadOnly="True"
 			md:HintAssist.Hint="rtsp://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding RtspMain, Mode=OneWay}" />
+			Text="{Binding RtspMain, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 		<!--  RtspSub  -->
 		<TextBlock
@@ -74,10 +71,9 @@
 		<TextBox
 			Grid.Row="3"
 			Grid.Column="1"
-			IsReadOnly="True"
 			md:HintAssist.Hint="rtsp://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding RtspSub, Mode=OneWay}" />
+			Text="{Binding RtspSub, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 		<!--  WebrtcMain  -->
 		<TextBlock
@@ -88,10 +84,9 @@
 		<TextBox
 			Grid.Row="4"
 			Grid.Column="1"
-			IsReadOnly="True"
 			md:HintAssist.Hint="http://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding WebrtcMain, Mode=OneWay}" />
+			Text="{Binding WebrtcMain, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
 		<!--  SnapshotCh1  -->
 		<TextBlock
@@ -102,9 +97,8 @@
 		<TextBox
 			Grid.Row="5"
 			Grid.Column="1"
-			IsReadOnly="True"
 			md:HintAssist.Hint="http://..."
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding SnapshotCh1, Mode=OneWay}" />
+			Text="{Binding SnapshotCh1, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 	</Grid>
 </UserControl>
