@@ -19,15 +19,20 @@ public class FromEventConverter : JsonConverter<IEventDto>
         // JSON 객체 로드
         var jsonObject = JObject.Load(reader);
 
-        // type_event 필드로 타입 결정
-        var typeEvent = jsonObject["type_event"]?.Value<string>();
-
-        IEventDto? result = typeEvent?.ToLower() switch
-        {
-            "intrusion" or "detection" => jsonObject.ToObject<DetectionEventDto>(serializer),
-            "fault" or "malfunction" => jsonObject.ToObject<MalfunctionEventDto>(serializer),
-            _ => null
-        };
+        // 라우팅: 서버 type_event는 세부유형(ContactOn/Fire/Fault 등) 다양 → type_event 문자열 매칭만으로는 누락.
+        //   구조(필드 존재)로 우선 판별 — Detection은 result, Malfunction은 reason 보유. type_event는 보조 폴백.
+        IEventDto? result;
+        if (jsonObject["result"] != null)
+            result = jsonObject.ToObject<DetectionEventDto>(serializer);
+        else if (jsonObject["reason"] != null)
+            result = jsonObject.ToObject<MalfunctionEventDto>(serializer);
+        else
+            result = jsonObject["type_event"]?.Value<string>()?.ToLower() switch
+            {
+                "intrusion" or "detection" => jsonObject.ToObject<DetectionEventDto>(serializer),
+                "fault" or "malfunction" => jsonObject.ToObject<MalfunctionEventDto>(serializer),
+                _ => null
+            };
 
         return result;
     }
