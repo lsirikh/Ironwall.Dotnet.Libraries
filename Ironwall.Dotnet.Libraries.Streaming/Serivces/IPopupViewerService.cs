@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
+using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.Serivces;
 public interface IPopupViewerService
@@ -11,7 +12,13 @@ public interface IPopupViewerService
     /// <summary>
     /// 팝업 윈도우에 카메라를 표시합니다.
     /// </summary>
-    void ShowPopup(string? eventId = null, string? description = null, params ICameraModel[] connections);
+    string? ShowPopup(string? eventId = null, string? description = null, params ICameraModel[] connections);
+
+    /// <summary>
+    /// 설정된 PopupStartupDelayMs만큼 대기 후 팝업을 표시합니다.
+    /// EventService 등 비동기 파이프라인에서 사용합니다.
+    /// </summary>
+    Task<string?> ShowPopupAsync(string? eventId = null, string? description = null, params ICameraModel[] connections);
 
     /// <summary>
     /// 팝업 윈도우의 위치를 설정합니다.
@@ -24,6 +31,11 @@ public interface IPopupViewerService
     /// </summary>
     /// <param name="offset"></param>
     void SetMarginOffset(int offset);
+
+    /// <summary>
+    /// 팝업을 표시할 대상 모니터의 작업 영역을 설정합니다 (WPF 논리 단위).
+    /// </summary>
+    void SetTargetWorkArea(System.Windows.Rect workArea);
 
     /// <summary>
     /// 특정 RowId를 가진 Row를 제거합니다.

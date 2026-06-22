@@ -50,14 +50,20 @@ public class ImprovedStreamingContext : IPooledObject
     public StreamingStatistics? Statistics { get; private set; }
     public Dictionary<string, Delegate>? EventHandlers { get; set; }
     public bool IsInUse { get; private set; }
+    /// <summary>Active 상태인지 여부 — WeakRef 복구 시 Cleaning 상태 재등록 방지용 (SE-06)</summary>
+    public bool IsActive => _state == ContextState.Active;
 
-    // 재연결 상태 플래그 추가
-    private volatile bool _isReconnecting = false;
-    public bool IsReconnecting
-    {
-        get => _isReconnecting;
-        set => _isReconnecting = value;
-    }
+    // 재연결 상태 플래그 — Interlocked CAS로 원자적 진입 보장 (BUG-02)
+    private int _reconnectFlag = 0;  // 0 = idle, 1 = reconnecting
+    public bool IsReconnecting => _reconnectFlag == 1;
+
+    /// <summary>재연결 시작 시도. 이미 재연결 중이면 false 반환 (CAS 원자적 진입).</summary>
+    public bool TryBeginReconnect() =>
+        Interlocked.CompareExchange(ref _reconnectFlag, 1, 0) == 0;
+
+    /// <summary>재연결 플래그 해제.</summary>
+    public void EndReconnect() =>
+        Interlocked.Exchange(ref _reconnectFlag, 0);
 
     /// <summary>
     /// Context 초기화 - RtspPlayer 포함
@@ -118,13 +124,13 @@ public class ImprovedStreamingContext : IPooledObject
                 _mediaPlayer.EnableHardwareDecoding = options.UseHardwareAcceleration;
 
                 // RtspPlayer가 있으면 VideoView 연결
-                if (_rtspPlayer != null)
-                {
-                    _log?.Info($"[ImprovedStreamingContext] RtspPlayer linked for {id}");
-                    // Player의 VideoView는 나중에 UI 스레드에서 연결
-                }
+                //if (_rtspPlayer != null)
+                //{
+                //    _log?.Info($"[ImprovedStreamingContext] RtspPlayer linked for {id}");
+                //    // Player의 VideoView는 나중에 UI 스레드에서 연결
+                //}
 
-                _log?.Info($"[ImprovedStreamingContext] Context initialized for {id}");
+                //_log?.Info($"[ImprovedStreamingContext] Context initialized for {id}");
                 _state = ContextState.Active;
             }
             catch
@@ -148,7 +154,7 @@ public class ImprovedStreamingContext : IPooledObject
             }
 
             _rtspPlayer = player;
-            _log?.Info($"[ImprovedStreamingContext] Player attached for {Id}");
+            //_log?.Info($"[ImprovedStreamingContext] Player attached for {Id}");
         }
     }
 
@@ -160,26 +166,27 @@ public class ImprovedStreamingContext : IPooledObject
         lock (_lock)
         {
             _rtspPlayer = null;
-            _log?.Info($"[ImprovedStreamingContext] Player detached for {Id}");
+            //_log?.Info($"[ImprovedStreamingContext] Player detached for {Id}");
         }
     }
 
     /// <summary>
-    /// Player 상태 업데이트
+    /// Player 상태 업데이트 (비블로킹 - 성능 최적화)
     /// </summary>
     public void UpdatePlayerState(PlaybackState state, string? statusMessage = null)
     {
+        // 상태 먼저 업데이트 (동기)
+        State = state;
 
         // NULL 체크 추가
         if (_rtspPlayer == null)
         {
             _log?.Warning($"[ImprovedStreamingContext] Player is null, skipping update for {Id}");
-            State = state;  // 상태만 업데이트
             return;
         }
 
-        // UI 스레드에서 실행
-        DispatcherService.Invoke(() =>
+        // UI 스레드에서 비동기 실행 (비블로킹)
+        DispatcherService.BeginInvoke(() =>
         {
             try
             {
@@ -199,8 +206,6 @@ public class ImprovedStreamingContext : IPooledObject
                 _log?.Error($"[ImprovedStreamingContext] Failed to update player state: {ex.Message}");
             }
         });
-
-        State = state;
     }
 
     public void SetMedia(Media media)
@@ -263,21 +268,22 @@ public class ImprovedStreamingContext : IPooledObject
     {
         try
         {
-            // Player 분리
+            // Player 분리 (비블로킹 - 성능 최적화)
             if (_rtspPlayer != null)
             {
-                // UI 스레드에서 Player 정리
-                DispatcherService.Invoke(() =>
+                var player = _rtspPlayer;
+                _rtspPlayer = null;
+
+                // UI 스레드에서 비동기로 Player 정리
+                DispatcherService.BeginInvoke(() =>
                 {
                     try
                     {
-                        _rtspPlayer.SetValue(ImprovedRtspPlayer.PlaybackStateProperty, PlaybackState.None);
-                        _rtspPlayer.SetValue(ImprovedRtspPlayer.StatusMessageProperty, "Disconnected");
+                        player.SetValue(ImprovedRtspPlayer.PlaybackStateProperty, PlaybackState.None);
+                        player.SetValue(ImprovedRtspPlayer.StatusMessageProperty, "Disconnected");
                     }
                     catch { }
                 });
-
-                _rtspPlayer = null;
             }
 
             // 이벤트 핸들러 제거
@@ -344,10 +350,10 @@ public class ImprovedStreamingContext : IPooledObject
             if (EventHandlers.TryGetValue("Buffering", out var bufferingHandler))
                 _mediaPlayer.Buffering -= (EventHandler<MediaPlayerBufferingEventArgs>)bufferingHandler;
 
-            if (EventHandlers.TryGetValue("Error", out var errorHandler))
+            if (EventHandlers.TryGetValue("EncounteredError", out var errorHandler))
                 _mediaPlayer.EncounteredError -= (EventHandler<EventArgs>)errorHandler;
 
-            if (EventHandlers.TryGetValue("Ended", out var endedHandler))
+            if (EventHandlers.TryGetValue("EndReached", out var endedHandler))
                 _mediaPlayer.EndReached -= (EventHandler<EventArgs>)endedHandler;
 
             if (EventHandlers.TryGetValue("TimeChanged", out var timeHandler))
@@ -385,7 +391,7 @@ public class ImprovedStreamingContext : IPooledObject
                 EventHandlers = null;
                 State = PlaybackState.None;
                 IsInUse = false;
-                _isReconnecting = false;
+                EndReconnect();
             }
             catch (Exception ex)
             {

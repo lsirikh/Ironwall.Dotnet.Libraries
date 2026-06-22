@@ -16,8 +16,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Helpers;
 public static class RtspUrlValidator
 {
     private static readonly Regex RtspUrlPattern = new(
-        @"^rtsp:\/\/(([a-zA-Z0-9_]+):([a-zA-Z0-9_]+)@)?([a-zA-Z0-9.-]+)(:[0-9]+)?(\/.*)?$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    @"^rtsp:\/\/(([a-zA-Z0-9_]+):([^@]+)@)?([a-zA-Z0-9.-]+)(:[0-9]+)?(\/.*)?$",
+    RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static bool IsValidUrl(string url)
     {

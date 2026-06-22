@@ -47,13 +47,51 @@
 		</Setter>
 	</Style>
 
+	<!--  Row X 버튼 전용 스타일 — ContentPresenter 제거, TextBlock으로 Content 표시  -->
+	<Style x:Key="RowCloseButtonStyle" TargetType="Button">
+		<Setter Property="Width" Value="20" />
+		<Setter Property="Height" Value="20" />
+		<Setter Property="Background" Value="Transparent" />
+		<Setter Property="BorderThickness" Value="0" />
+		<Setter Property="Foreground" Value="#FFA0A0A0" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Padding" Value="0" />
+		<Setter Property="FontSize" Value="11" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="border"
+						Background="{TemplateBinding Background}"
+						CornerRadius="3">
+						<TextBlock
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							FontSize="{TemplateBinding FontSize}"
+							Foreground="{TemplateBinding Foreground}"
+							Text="{TemplateBinding Content}" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="border" Property="Background" Value="#33FFFFFF" />
+							<Setter Property="Foreground" Value="#FFDDDDDD" />
+						</Trigger>
+						<Trigger Property="IsPressed" Value="True">
+							<Setter TargetName="border" Property="Background" Value="#55FFFFFF" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
 	<!--  PopupViewer Style  -->
 	<Style TargetType="{x:Type local:PopupViewer}">
 		<Setter Property="Background" Value="#FF2D2D30" />
 		<Setter Property="BorderBrush" Value="#FF007ACC" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="MinWidth" Value="800" />
-		<Setter Property="MinHeight" Value="600" />
+		<Setter Property="MinHeight" Value="550" />
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type local:PopupViewer}">
@@ -201,40 +239,17 @@
 
 											<ItemsControl.ItemTemplate>
 												<DataTemplate>
-													<!--  각 Row  -->
+													<!--  각 Row — Header(~28px) + 카메라 영역(252px) = 280px 고정  -->
 													<Border
-														Height="Auto"
 														BorderBrush="#FF3F3F46"
 														BorderThickness="0,0,0,1">
-														<!--  Row 내 카메라들  -->
-														<!--<ItemsControl ItemsSource="{Binding Cameras}">
-															<ItemsControl.ItemsPanel>
-																<ItemsPanelTemplate>
-																	<UniformGrid Rows="1" />
-																</ItemsPanelTemplate>
-															</ItemsControl.ItemsPanel>
-
-															<ItemsControl.ItemTemplate>
-																<DataTemplate>
-																	<Border Margin="2">
-																		<local:ImprovedRtspPlayer
-																			AutoPlay="{Binding AutoPlay}"
-																			ConnectionInfo="{Binding ConnectionInfo}"
-																			ContextId="{Binding ContextId}"
-																			DisplayName="{Binding DisplayName}"
-																			ShowControls="{Binding ShowControls}"
-																			StreamingOptions="{Binding StreamingOptions}" />
-																	</Border>
-																</DataTemplate>
-															</ItemsControl.ItemTemplate>
-														</ItemsControl>-->
 														<!--  ===== Row 구조 변경: Grid로 EventId Header 추가 =====  -->
 														<Grid>
 															<Grid.RowDefinitions>
 																<!--  EventId Header  -->
 																<RowDefinition Height="Auto" />
-																<!--  Cameras  -->
-																<RowDefinition Height="Auto" />
+																<!--  Cameras (고정 252px — Header ~28px 합산 ≈ 280px)  -->
+																<RowDefinition Height="252" />
 															</Grid.RowDefinitions>
 
 															<!--  ===== EventId Header =====  -->
@@ -262,6 +277,7 @@
 																		<ColumnDefinition Width="Auto" />
 																		<ColumnDefinition Width="Auto" />
 																		<ColumnDefinition Width="*" />
+																		<ColumnDefinition Width="Auto" />
 																		<ColumnDefinition Width="Auto" />
 																	</Grid.ColumnDefinitions>
 
@@ -313,6 +329,16 @@
 																		<Run Text="카메라: " />
 																		<Run Text="{Binding Cameras.Count, Mode=OneWay}" />
 																	</TextBlock>
+
+																	<!--  Row 개별 종료 X 버튼  -->
+																	<Button
+																		Grid.Column="4"
+																		Style="{StaticResource RowCloseButtonStyle}"
+																		Margin="6,0,0,0"
+																		VerticalAlignment="Center"
+																		Command="{Binding CloseRowCommand}"
+																		Content="✕"
+																		ToolTip="이 Row 닫기" />
 																</Grid>
 															</Border>
 
@@ -326,7 +352,7 @@
 
 																<ItemsControl.ItemTemplate>
 																	<DataTemplate>
-																		<Border Margin="2">
+																		<Border Margin="2" Height="248">
 																			<local:ImprovedRtspPlayer
 																				AutoPlay="{Binding AutoPlay}"
 																				ConnectionInfo="{Binding ConnectionInfo}"

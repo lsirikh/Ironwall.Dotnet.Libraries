@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Controls;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
@@ -7,6 +8,7 @@ using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 using Ironwall.Dotnet.Libraries.Streaming.Views;
 using System;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
@@ -21,6 +23,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
     public class PopupViewerService : IPopupViewerService
     {
         private readonly ILogService? _log;
+        private readonly ISharedCameraStreamHub? _hub;
+        private readonly IStreamingSetupModel? _setupModel;
 
         private PopupWindowViewModel? _currentViewModel;
         private Window? _currentWindow;
@@ -28,6 +32,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
 
         private EnumDisplayPosition _displayPosition = EnumDisplayPosition.TopRight;
         private int _marginOffset = 20; // 화면 가장자리 여백
+        private Rect? _targetWorkArea = null;
 
         private List<string> _listedCameraRowIds = new List<string>();
 
@@ -43,11 +48,22 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             _log = IoC.Get<ILogService>();
         }
 
-        public void ShowPopup(string eventId, string description,  params ICameraModel[] cameras)
+        public PopupViewerService(IStreamingSetupModel setupModel) : this()
+        {
+            _setupModel = setupModel;
+        }
+
+        public PopupViewerService(ISharedCameraStreamHub hub, IStreamingSetupModel setupModel) : this(setupModel)
+        {
+            _hub = hub;
+        }
+
+        public string? ShowPopup(string? eventId = null, string? description = null, params ICameraModel[] cameras)
         {
             if (cameras == null || cameras.Length == 0)
-                return;
+                return null;
 
+            string? rowId = null;
             Execute.OnUIThread(() =>
             {
                 lock (_lock)
@@ -61,7 +77,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     if (_currentViewModel == null) return;
 
                     // 카메라 추가
-                    var rowId = _currentViewModel.AddCameras(eventId, description, cameras);
+                    rowId = _currentViewModel.AddCameras(eventId, description, cameras);
                     if (!string.IsNullOrEmpty(rowId))
                     {
                         _listedCameraRowIds.Add(rowId);
@@ -76,6 +92,18 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
                     }
                 }
             });
+            return rowId;
+        }
+
+        public async Task<string?> ShowPopupAsync(string? eventId = null, string? description = null, params ICameraModel[] cameras)
+        {
+            var delayMs = _setupModel?.PopupStartupDelayMs ?? 0;
+            if (delayMs > 0)
+            {
+                _log?.Info($"[PopupViewerService] Startup delay {delayMs}ms before showing popup");
+                await Task.Delay(delayMs).ConfigureAwait(false);
+            }
+            return ShowPopup(eventId, description, cameras);
         }
 
         /// <summary>
@@ -138,8 +166,14 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
 
         private void CreateNewPopup()
         {
-            // ViewModel 생성
-            _currentViewModel = new PopupWindowViewModel();
+            // ViewModel 생성 — Hub가 있으면 Lease 기반 스트림 관리 활성화
+            _currentViewModel = _hub != null
+                ? new PopupWindowViewModel(_hub)
+                : new PopupWindowViewModel();
+
+            // 큐 최소 대기 시간 주입
+            _currentViewModel.QueueMinDisplayMs = _setupModel?.QueueMinDisplayMs ?? 0;
+
             _currentViewModel.RequestClose += OnViewModelRequestClose;
             _currentViewModel.RemoveCameraRow += OnViewModelRemoveCameraRow;
 
@@ -168,17 +202,18 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             ClosePopup();
         }
 
-        private void OnWindowClosed(object? sender, EventArgs e)
+        private async void OnWindowClosed(object? sender, EventArgs e)
         {
+            _log?.Info("[PopupViewerService] Popup window closed");
+
+            PopupWindowViewModel? vmToDispose = null;
             lock (_lock)
             {
-                _log?.Info("[PopupViewerService] Popup window closed");
-
                 if (_currentViewModel != null)
                 {
                     _currentViewModel.RequestClose -= OnViewModelRequestClose;
                     _currentViewModel.RemoveCameraRow -= OnViewModelRemoveCameraRow;
-                    _currentViewModel.Dispose();
+                    vmToDispose = _currentViewModel;
                     _currentViewModel = null;
                 }
 
@@ -190,6 +225,10 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
 
                 _listedCameraRowIds.Clear();
             }
+
+            // lock 외부에서 await — Lease.DisposeAsync → Hub.ReleaseAsync 체인 완전 실행 보장
+            if (vmToDispose != null)
+                await vmToDispose.DisposeAsync().ConfigureAwait(false);
         }
 
         public void ClosePopup()
@@ -226,12 +265,21 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Serivces{
             }
         }
 
+        public void SetTargetWorkArea(Rect workArea)
+        {
+            _targetWorkArea = workArea;
+            _log?.Info($"[PopupViewerService] Target work area set to {workArea}");
+            if (_currentWindow?.IsVisible == true)
+            {
+                PositionWindow();
+            }
+        }
+
         private void PositionWindow()
         {
-
             if (_currentWindow == null) return;
 
-            var workArea = SystemParameters.WorkArea;
+            var workArea = _targetWorkArea ?? SystemParameters.WorkArea;
             double windowWidth = _currentWindow.ActualWidth > 0 ? _currentWindow.ActualWidth : 800;
             double windowHeight = _currentWindow.ActualHeight > 0 ? _currentWindow.ActualHeight : 600;
 

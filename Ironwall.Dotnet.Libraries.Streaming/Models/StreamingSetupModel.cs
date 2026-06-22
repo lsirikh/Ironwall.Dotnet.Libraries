@@ -25,8 +25,12 @@ public interface IStreamingSetupModel
     int ContextPoolSize { get; set; }
     bool EnableFrameSkipping { get; set; }
     int MaxFrameSkip { get; set; }
-    bool IsAutoDiscard { get; set; } 
+    bool IsAutoDiscard { get; set; }
     int TimeoutSeconds { get; set; }
+    int ClockJitterMs { get; set; }
+    bool EnableClockSync { get; set; }
+    int PopupStartupDelayMs { get; set; }
+    int QueueMinDisplayMs { get; set; }
 }
 
 /// <summary>
@@ -34,7 +38,7 @@ public interface IStreamingSetupModel
 /// </summary>
 public class StreamingSetupModel : IStreamingSetupModel
 {
-    public int MaxConnections { get; set; } = 17;
+    public int MaxConnections { get; set; } = 25; // 4 rows × 3 cameras + 여유 (기존 17)
     public int MaxRetryAttempts { get; set; } = 5;
     public long MaxMemoryUsageBytes { get; set; } = 1024L * 1024 * 1024; // 1GB
     public bool EnableDebugLogging { get; set; } = false;
@@ -54,7 +58,17 @@ public class StreamingSetupModel : IStreamingSetupModel
     public int InactiveStreamTimeoutMinutes { get; set; } = 30;
 
     public bool IsAutoDiscard { get; set; } = true;
-    public int TimeoutSeconds { get; set; } = 10;
+    public int TimeoutSeconds { get; set; } = 15;
+
+    // 클럭 동기화 설정
+    public int ClockJitterMs { get; set; } = 500;
+    public bool EnableClockSync { get; set; } = true;
+
+    // 팝업 기동 딜레이
+    public int PopupStartupDelayMs { get; set; } = 0;
+
+    // 큐 항목 최소 표시 대기 시간 (ms) — 표시 슬롯이 비워진 후 다음 큐 항목을 올리기까지 대기
+    public int QueueMinDisplayMs { get; set; } = 1000;
 
     /// <summary>
     /// 기본 생성자
@@ -83,6 +97,10 @@ public class StreamingSetupModel : IStreamingSetupModel
             MaxFrameSkip = model.MaxFrameSkip;
             IsAutoDiscard = model.IsAutoDiscard;
             TimeoutSeconds = model.TimeoutSeconds;
+            ClockJitterMs = model.ClockJitterMs;
+            EnableClockSync = model.EnableClockSync;
+            PopupStartupDelayMs = model.PopupStartupDelayMs;
+            QueueMinDisplayMs = model.QueueMinDisplayMs;
         }
     }
 

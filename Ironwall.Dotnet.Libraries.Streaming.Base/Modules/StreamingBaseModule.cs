@@ -23,6 +23,7 @@ public class StreamingBaseModule : Module
         base.Load(builder);
         builder.RegisterType<CameraDeviceProvider>().SingleInstance();
         builder.RegisterType<CameraEventProvider>().SingleInstance();
+        // CameraStreamHub 등록은 StreamingModule (Streaming 프로젝트)에서 처리
     }
     #endregion
     #region - Binding Methods -

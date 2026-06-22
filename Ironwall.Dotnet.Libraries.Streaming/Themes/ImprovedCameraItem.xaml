@@ -6,9 +6,10 @@
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Streaming.Controls"
 	xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF">
 
-	<!--  공통 리소스 (기존과 동일)  -->
+	<!--  공통 리소스  -->
 	<converters:PlaybackStateToColorConverter x:Key="StateToColorConverter" />
 	<converters:PlaybackStateToVisibilityConverter x:Key="StateToVisibilityConverter" />
+	<converters:PlaybackStateToLabelConverter x:Key="StateToLabelConverter" />
 
 
 	<BooleanToVisibilityConverter x:Key="BoolToVisibility" />
@@ -239,7 +240,7 @@
 							</Border>
 
 							<!--  Video Display Area  -->
-							<Grid Grid.Row="1" MinHeight="150">
+							<Grid Grid.Row="1" MinHeight="175">
 								<!--  Layer 1: Background  -->
 								<Rectangle Fill="Black" />
 
@@ -248,6 +249,12 @@
 									<Rectangle Fill="Black" />
 									<vlc:VideoView x:Name="PART_VideoView" />
 								</Grid>
+
+								<!--  Layer 2b: Hub SharedFrame Image (IsHubMode=true 시 VideoContainer 대체)  -->
+								<Image
+									x:Name="PART_SharedImage"
+									Stretch="Uniform"
+									Source="{Binding SharedFrame, RelativeSource={RelativeSource TemplatedParent}}" />
 
 								<!--  Layer 3: Overlay Panel  -->
 								<Grid x:Name="OverlayPanel">
@@ -262,27 +269,66 @@
 										</Style>
 									</Grid.Style>
 
-									<!--  Status Badge (우상단)  -->
+									<!--  Status Badge (좌상단 — 연결 상태 배지)  -->
 									<Border
-										Margin="10"
-										Padding="8,4"
-										HorizontalAlignment="Right"
+										Margin="6,6,0,0"
+										Padding="5,3"
+										HorizontalAlignment="Left"
 										VerticalAlignment="Top"
-										Background="#CC000000"
-										CornerRadius="4"
+										Background="#AA000000"
+										CornerRadius="3"
 										IsHitTestVisible="False"
-										Visibility="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToVisibilityConverter}, ConverterParameter=playing}">
+										Visibility="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToVisibilityConverter}, ConverterParameter=badge}">
 										<StackPanel Orientation="Horizontal">
+											<!--  상태 색상 점  -->
 											<Ellipse
 												Width="8"
 												Height="8"
-												Margin="0,0,6,0"
+												Margin="0,0,5,0"
+												VerticalAlignment="Center"
 												Fill="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToColorConverter}}" />
+											<!--  한글 상태 레이블  -->
 											<TextBlock
 												x:Name="PART_StatusText"
-												FontSize="11"
+												VerticalAlignment="Center"
+												FontSize="10"
 												Foreground="White"
-												Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}}" />
+												Text="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToLabelConverter}}" />
+											<!--  Timeout 카운트다운 (값이 있을 때만 표시)  -->
+											<TextBlock
+												Margin="4,0,0,0"
+												VerticalAlignment="Center"
+												FontSize="10"
+												Foreground="#FFFFC107"
+												Text="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}">
+												<TextBlock.Style>
+													<Style TargetType="TextBlock">
+														<Setter Property="Visibility" Value="Visible" />
+														<Style.Triggers>
+															<DataTrigger Binding="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}" Value="">
+																<Setter Property="Visibility" Value="Collapsed" />
+															</DataTrigger>
+															<DataTrigger Binding="{Binding TimeoutDisplay, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+																<Setter Property="Visibility" Value="Collapsed" />
+															</DataTrigger>
+														</Style.Triggers>
+													</Style>
+												</TextBlock.Style>
+											</TextBlock>
+											<!--  HUB 모드 표시  -->
+											<Border
+												Margin="4,0,0,0"
+												Padding="3,1"
+												Background="#FF1565C0"
+												CornerRadius="2"
+												Visibility="{Binding IsHubMode, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BoolToVisibility}}">
+												<TextBlock
+													VerticalAlignment="Center"
+													FontSize="9"
+													FontWeight="Bold"
+													Foreground="White"
+													Text="HUB" />
+											</Border>
 										</StackPanel>
 									</Border>
 
@@ -366,6 +412,24 @@
 												Content="Retry"
 												Foreground="White"
 												Style="{StaticResource ImprovedStreamingButtonStyle}" />
+										</StackPanel>
+									</Grid>
+
+									<!--  SharedStreamWaiting Panel (공유 스트림 초기화 중)  -->
+									<Grid Visibility="{Binding PlaybackState, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource StateToVisibilityConverter}, ConverterParameter=shared}">
+										<Rectangle Fill="Black" Opacity="0.75" />
+										<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+											<ProgressBar
+												Width="50"
+												Height="50"
+												IsIndeterminate="True"
+												Style="{StaticResource ImprovedStreamingProgressBarStyle}" />
+											<TextBlock
+												Margin="0,10,0,0"
+												HorizontalAlignment="Center"
+												FontSize="12"
+												Foreground="#FF90CAF9"
+												Text="공유 스트림 초기화 중..." />
 										</StackPanel>
 									</Grid>
 
@@ -585,6 +649,17 @@
 							</Border>
 						</Grid>
 					</Border>
+					<!--  IsHubMode: VideoView↔SharedImage 양방향 토글. 로컬 값 없이 Trigger가 단독 제어  -->
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsHubMode" Value="True">
+							<Setter TargetName="VideoContainer" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_SharedImage" Property="Visibility" Value="Visible" />
+						</Trigger>
+						<Trigger Property="IsHubMode" Value="False">
+							<Setter TargetName="VideoContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SharedImage" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>
 		</Setter>
@@ -608,6 +683,12 @@
 			</Trigger>
 			<Trigger Property="PlaybackState" Value="Paused">
 				<Setter Property="BorderBrush" Value="#FF9E9E9E" />
+			</Trigger>
+			<Trigger Property="PlaybackState" Value="SharedStreamWaiting">
+				<Setter Property="BorderBrush" Value="#FF1E88E5" />
+			</Trigger>
+			<Trigger Property="PlaybackState" Value="SharedStreamPlaying">
+				<Setter Property="BorderBrush" Value="#FF4CAF50" />
 			</Trigger>
 		</Style.Triggers>
 	</Style>

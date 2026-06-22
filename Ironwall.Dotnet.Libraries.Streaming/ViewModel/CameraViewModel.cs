@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
 using System;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 /****************************************************************************
@@ -28,6 +29,11 @@ public class CameraViewModel : PropertyChangedBase
     public CameraViewModel(ICameraModel model, string rowId) : this(model)
     {
         _contextId = $"{rowId}_{Guid}";
+    }
+
+    public CameraViewModel(ICameraModel model, string rowId, CameraRowViewModel ownerRow) : this(model, rowId)
+    {
+        _ownerRow = ownerRow;
     }
 
     #region Properties
@@ -103,6 +109,33 @@ public class CameraViewModel : PropertyChangedBase
     
     public string ContextId => _contextId ?? _model.Guid;
 
+    /// <summary>소속 Row가 취소됐는지 여부 — OnLoaded에서 연결 차단에 사용</summary>
+    public bool IsConnectCancelled => _ownerRow?.IsCancelled ?? false;
+
+    /// <summary>Row의 취소 토큰 — ConnectAsync에 전달하여 연결 도중 취소 가능</summary>
+    public CancellationToken RowCancellationToken => _ownerRow?.CancellationToken ?? CancellationToken.None;
+
+    /// <summary>Hub 기반 스트리밍 활성 여부 — ImprovedRtspPlayer 연결 경로 분기에 사용</summary>
+    public bool IsHubManaged => _ownerRow?.HasHub ?? false;
+
+    /// <summary>Hub Lease의 relay URL — ConnectViaHubAsync에서 연결 대상으로 사용.
+    /// ConnectionInfo가 있으면 카메라별 relay URL을 조회하고, 없으면 Row의 첫 번째 relay URL을 반환.</summary>
+    public string? CurrentLeaseRelayUrl
+    {
+        get
+        {
+            if (_ownerRow == null) return null;
+            var info = _model?.ConnectionInfo;
+            if (info == null || string.IsNullOrEmpty(info.IpAddress))
+                return _ownerRow.CurrentLeaseRelayUrl;
+            var cameraId = info.GetCameraKey();
+            return _ownerRow.GetLeaseRelayUrl(cameraId) ?? _ownerRow.CurrentLeaseRelayUrl;
+        }
+    }
+
+    /// <summary>소속 CameraRowViewModel — ImprovedRtspPlayer에서 StartStreamAsync 호출용</summary>
+    public CameraRowViewModel? OwnerRow => _ownerRow;
+
     /// <summary>
     /// Wrapper Model
     /// </summary>
@@ -120,5 +153,6 @@ public class CameraViewModel : PropertyChangedBase
     private string _statusMessage = "Ready";
     private DateTime _startTime;
     private string? _contextId;
+    private CameraRowViewModel? _ownerRow;
     #endregion
 }
