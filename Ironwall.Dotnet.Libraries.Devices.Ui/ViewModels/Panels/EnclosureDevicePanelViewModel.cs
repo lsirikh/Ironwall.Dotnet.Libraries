@@ -251,8 +251,9 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         return a?.TempHigh == b?.TempHigh
             && a?.TempLow == b?.TempLow
             && a?.HumidityHigh == b?.HumidityHigh
-            && a?.HumidityLow == b?.HumidityLow
-            && a?.VibrationThreshold == b?.VibrationThreshold;
+            && a?.CurrentHigh == b?.CurrentHigh
+            && a?.VoltageLow == b?.VoltageLow
+            && a?.VibrationHigh == b?.VibrationHigh;
     }
     #endregion
     #region - Helper Methods -

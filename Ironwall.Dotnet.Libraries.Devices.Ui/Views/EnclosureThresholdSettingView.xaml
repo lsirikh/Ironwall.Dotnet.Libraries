@@ -19,6 +19,7 @@
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
 		<!--  온도 상한  -->
@@ -60,30 +61,43 @@
 			Style="{StaticResource TextBoxInput}"
 			Text="{Binding HumidityHigh, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
-		<!--  습도 하한  -->
+		<!--  전류 상한  -->
 		<TextBlock
 			Grid.Row="3"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="습도 하한(%)" />
+			Text="전류 상한(A)" />
 		<TextBox
 			Grid.Row="3"
 			Grid.Column="1"
-			md:HintAssist.Hint="예: 20"
+			md:HintAssist.Hint="예: 10.0"
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding HumidityLow, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+			Text="{Binding CurrentHigh, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
-		<!--  진동 임계값  -->
+		<!--  전압 하한  -->
 		<TextBlock
 			Grid.Row="4"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="진동 임계값" />
+			Text="전압 하한(V)" />
 		<TextBox
 			Grid.Row="4"
 			Grid.Column="1"
-			md:HintAssist.Hint="예: 5.0"
+			md:HintAssist.Hint="예: 200"
 			Style="{StaticResource TextBoxInput}"
-			Text="{Binding VibrationThreshold, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+			Text="{Binding VoltageLow, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+		<!--  진동 상한  -->
+		<TextBlock
+			Grid.Row="5"
+			Grid.Column="0"
+			Style="{StaticResource TextBlockTitle}"
+			Text="진동 상한" />
+		<TextBox
+			Grid.Row="5"
+			Grid.Column="1"
+			md:HintAssist.Hint="예: 10"
+			Style="{StaticResource TextBoxInput}"
+			Text="{Binding VibrationHigh, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 	</Grid>
 </UserControl>

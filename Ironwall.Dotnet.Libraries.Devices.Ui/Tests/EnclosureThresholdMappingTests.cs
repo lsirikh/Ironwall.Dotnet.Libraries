@@ -22,8 +22,8 @@ public class EnclosureThresholdMappingTests
             ThresholdConfig = th,
         };
 
-    private static EnclosureThresholdConfigModel Th(double? th = 45, double? tl = -10, double? hh = 80, double? hl = 20, double? v = 5)
-        => new() { TempHigh = th, TempLow = tl, HumidityHigh = hh, HumidityLow = hl, VibrationThreshold = v };
+    private static EnclosureThresholdConfigModel Th(double? th = 45, double? tl = -10, double? hh = 80, double? ch = 10.0, double? vl = 200.0, int? vh = 70)
+        => new() { TempHigh = th, TempLow = tl, HumidityHigh = hh, CurrentHigh = ch, VoltageLow = vl, VibrationHigh = vh };
 
     [Fact]
     public void should_write_threshold_to_dto_when_model_has_it()
@@ -59,28 +59,29 @@ public class EnclosureThresholdMappingTests
         {
             NumberDevice = 1,
             NameDevice = "함체_01",
-            ThresholdConfig = JObject.FromObject(Th(th: 50, v: 7.5))
+            ThresholdConfig = JObject.FromObject(Th(th: 50, vh: 90))
         };
 
         var model = dto.ToEnclosureDeviceModel();
 
         Assert.NotNull(model.ThresholdConfig);
         Assert.Equal(50.0, model.ThresholdConfig!.TempHigh);
-        Assert.Equal(7.5, model.ThresholdConfig.VibrationThreshold);
+        Assert.Equal(90, model.ThresholdConfig.VibrationHigh);
     }
 
     [Fact]
     public void should_round_trip_threshold_values()
     {
-        var model = MakeEnclosure(Th(th: 42, tl: -5, hh: 75, hl: 30, v: 3.3));
+        var model = MakeEnclosure(Th(th: 42, tl: -5, hh: 75, ch: 15.0, vl: 180.0, vh: 85));
 
         var result = model.ToEnclosureDeviceDto().ToEnclosureDeviceModel();
 
         Assert.Equal(42.0, result.ThresholdConfig!.TempHigh);
         Assert.Equal(-5.0, result.ThresholdConfig.TempLow);
         Assert.Equal(75.0, result.ThresholdConfig.HumidityHigh);
-        Assert.Equal(30.0, result.ThresholdConfig.HumidityLow);
-        Assert.Equal(3.3, result.ThresholdConfig.VibrationThreshold);
+        Assert.Equal(15.0, result.ThresholdConfig.CurrentHigh);
+        Assert.Equal(180.0, result.ThresholdConfig.VoltageLow);
+        Assert.Equal(85, result.ThresholdConfig.VibrationHigh);
     }
 
     // ───────── DeviceEquals 임계값 변경 감지 ─────────

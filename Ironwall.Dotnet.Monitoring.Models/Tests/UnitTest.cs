@@ -615,8 +615,9 @@ public class Phase21_EnclosureThresholdConfigTests
             "temp_high": 40.0,
             "temp_low": -10.0,
             "humidity_high": 85.0,
-            "humidity_low": 20.0,
-            "vibration_threshold": 5.0
+            "current_high": 15.0,
+            "voltage_low": 210.0,
+            "vibration_high": 5
         }
         """;
 
@@ -626,8 +627,9 @@ public class Phase21_EnclosureThresholdConfigTests
         Assert.Equal(40.0, model!.TempHigh);
         Assert.Equal(-10.0, model.TempLow);
         Assert.Equal(85.0, model.HumidityHigh);
-        Assert.Equal(20.0, model.HumidityLow);
-        Assert.Equal(5.0, model.VibrationThreshold);
+        Assert.Equal(15.0, model.CurrentHigh);
+        Assert.Equal(210.0, model.VoltageLow);
+        Assert.Equal(5, model.VibrationHigh);
     }
 
     [Fact(DisplayName = "A21.2-2: EnclosureThresholdConfigModel 왕복 직렬화")]
@@ -639,8 +641,9 @@ public class Phase21_EnclosureThresholdConfigTests
             TempHigh = 45.0,
             TempLow = -15.0,
             HumidityHigh = 90.0,
-            HumidityLow = 10.0,
-            VibrationThreshold = 3.5
+            CurrentHigh = 20.0,
+            VoltageLow = 200.0,
+            VibrationHigh = 3
         };
 
         var json = JsonConvert.SerializeObject(original);
@@ -650,8 +653,9 @@ public class Phase21_EnclosureThresholdConfigTests
         Assert.Equal(original.TempHigh, restored!.TempHigh);
         Assert.Equal(original.TempLow, restored.TempLow);
         Assert.Equal(original.HumidityHigh, restored.HumidityHigh);
-        Assert.Equal(original.HumidityLow, restored.HumidityLow);
-        Assert.Equal(original.VibrationThreshold, restored.VibrationThreshold);
+        Assert.Equal(original.CurrentHigh, restored.CurrentHigh);
+        Assert.Equal(original.VoltageLow, restored.VoltageLow);
+        Assert.Equal(original.VibrationHigh, restored.VibrationHigh);
     }
 }
 
@@ -722,8 +726,9 @@ public class Phase21_EnclosureModelThresholdTests
                 "temp_high": 40.0,
                 "temp_low": -10.0,
                 "humidity_high": 85.0,
-                "humidity_low": 20.0,
-                "vibration_threshold": 5.0
+                "current_high": 15.0,
+                "voltage_low": 210.0,
+                "vibration_high": 5
             },
             "heater_enabled": false,
             "fan_enabled": false
@@ -739,8 +744,9 @@ public class Phase21_EnclosureModelThresholdTests
         Assert.Equal(40.0, model.ThresholdConfig!.TempHigh);
         Assert.Equal(-10.0, model.ThresholdConfig.TempLow);
         Assert.Equal(85.0, model.ThresholdConfig.HumidityHigh);
-        Assert.Equal(20.0, model.ThresholdConfig.HumidityLow);
-        Assert.Equal(5.0, model.ThresholdConfig.VibrationThreshold);
+        Assert.Equal(15.0, model.ThresholdConfig.CurrentHigh);
+        Assert.Equal(210.0, model.ThresholdConfig.VoltageLow);
+        Assert.Equal(5, model.ThresholdConfig.VibrationHigh);
 
         // Round-trip
         var serialized = JsonConvert.SerializeObject(model);
