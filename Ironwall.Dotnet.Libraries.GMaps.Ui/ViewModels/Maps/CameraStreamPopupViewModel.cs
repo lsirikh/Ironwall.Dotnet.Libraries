@@ -29,6 +29,9 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     private double _canvasTop;
     private double _popupWidth = DefaultWidth;
     private double _popupHeight = DefaultHeight;
+    private double _cameraScreenX;
+    private double _cameraScreenY;
+    private double _lineX1, _lineY1, _lineX2, _lineY2;
     private bool _isLarge;
     private ICommand? _closeCommand;
     private ICommand? _toggleSizeCommand;
@@ -75,10 +78,44 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>ImprovedRtspPlayer의 DataContext(Hub 경로 분기에 사용).</summary>
     public CameraViewModel StreamVm { get; }
 
-    public double CanvasLeft { get => _canvasLeft; set { _canvasLeft = value; NotifyOfPropertyChange(nameof(CanvasLeft)); } }
-    public double CanvasTop { get => _canvasTop; set { _canvasTop = value; NotifyOfPropertyChange(nameof(CanvasTop)); } }
-    public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); } }
-    public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); } }
+    public double CanvasLeft { get => _canvasLeft; set { _canvasLeft = value; NotifyOfPropertyChange(nameof(CanvasLeft)); RecomputeLine(); } }
+    public double CanvasTop { get => _canvasTop; set { _canvasTop = value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
+    public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); RecomputeLine(); } }
+    public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); RecomputeLine(); } }
+
+    // ── 연결선(Leader Line): 카메라 심볼 중점 → 팝업 경계 (빨간 점선) ──────────
+    /// <summary>카메라 심볼 중점의 위경도(팬/줌 시 화면점 재계산용). MapViewModel이 설정.</summary>
+    public PointLatLng CameraGeo { get; set; }
+
+    /// <summary>카메라 심볼 중점의 화면(Canvas) 좌표 = 연결선 끝점1. MapViewModel이 팬/줌 시 갱신.</summary>
+    public double CameraScreenX { get => _cameraScreenX; set { _cameraScreenX = value; RecomputeLine(); } }
+    public double CameraScreenY { get => _cameraScreenY; set { _cameraScreenY = value; RecomputeLine(); } }
+
+    public double LineX1 { get => _lineX1; private set { _lineX1 = value; NotifyOfPropertyChange(nameof(LineX1)); } }
+    public double LineY1 { get => _lineY1; private set { _lineY1 = value; NotifyOfPropertyChange(nameof(LineY1)); } }
+    public double LineX2 { get => _lineX2; private set { _lineX2 = value; NotifyOfPropertyChange(nameof(LineX2)); } }
+    public double LineY2 { get => _lineY2; private set { _lineY2 = value; NotifyOfPropertyChange(nameof(LineY2)); } }
+
+    /// <summary>끝점1=카메라 중점, 끝점2=카메라→팝업중심 선분이 팝업 사각형 경계와 만나는 점(좌/우/상/하 자동).</summary>
+    private void RecomputeLine()
+    {
+        var cx = _canvasLeft + _popupWidth / 2;
+        var cy = _canvasTop + _popupHeight / 2;
+        var dx = _cameraScreenX - cx;
+        var dy = _cameraScreenY - cy;
+
+        LineX1 = _cameraScreenX;
+        LineY1 = _cameraScreenY;
+
+        if (Math.Abs(dx) < 1e-6 && Math.Abs(dy) < 1e-6) { LineX2 = cx; LineY2 = cy; return; }
+
+        var scaleX = Math.Abs(dx) > 1e-6 ? (_popupWidth / 2) / Math.Abs(dx) : double.PositiveInfinity;
+        var scaleY = Math.Abs(dy) > 1e-6 ? (_popupHeight / 2) / Math.Abs(dy) : double.PositiveInfinity;
+        var scale = Math.Min(Math.Min(scaleX, scaleY), 1.0);   // 팝업 경계까지(카메라가 안쪽이면 중심)
+
+        LineX2 = cx + dx * scale;
+        LineY2 = cy + dy * scale;
+    }
 
     /// <summary>"크게보기" 토글 상태(런타임만, 영속 안 함 — Q4).</summary>
     public bool IsLarge { get => _isLarge; private set { _isLarge = value; NotifyOfPropertyChange(nameof(IsLarge)); } }

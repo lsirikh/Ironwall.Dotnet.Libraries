@@ -727,6 +727,33 @@
 					Content="{Binding LayerPanel}"
 					Visibility="{Binding IsLayerPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+				<!--  카메라 팝업 연결선(Leader Line) — 카메라 심볼 중점 ↔ 팝업 경계, 팝업 아래 z레이어  -->
+				<ItemsControl
+					Canvas.Left="0"
+					Canvas.Top="0"
+					ClipToBounds="False"
+					IsHitTestVisible="False"
+					ItemsSource="{Binding CameraPopups}">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<Canvas ClipToBounds="False" />
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Line
+								IsHitTestVisible="False"
+								Stroke="Red"
+								StrokeDashArray="4 3"
+								StrokeThickness="1.5"
+								X1="{Binding LineX1}"
+								X2="{Binding LineX2}"
+								Y1="{Binding LineY1}"
+								Y2="{Binding LineY2}" />
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
 				<!--  카메라 RTSP 스트리밍 팝업(멀티) — Geo 앵커 추종, 드래그 이동  -->
 				<ItemsControl
 					Canvas.Left="0"

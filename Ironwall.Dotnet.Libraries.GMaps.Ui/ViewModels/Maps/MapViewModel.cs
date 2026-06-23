@@ -612,10 +612,15 @@ public class MapViewModel : BasePanelViewModel,
                 anchorGeo = MainMap.FromLocalToLatLng((int)left, (int)top);
             }
 
+            // 연결선(Leader Line) 끝점1 = 카메라 심볼 중점
+            var camScreen = MainMap.FromLatLngToLocal(marker.Position);
             var vm = new CameraStreamPopupViewModel(cameraId, title, connInfo, anchorGeo, hub)
             {
                 CanvasLeft = left,
                 CanvasTop = top,
+                CameraGeo = marker.Position,
+                CameraScreenX = camScreen.X,
+                CameraScreenY = camScreen.Y,
             };
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
@@ -663,6 +668,11 @@ public class MapViewModel : BasePanelViewModel,
         if (MainMap == null || _cameraPopups == null || _cameraPopups.Count == 0) return;
         foreach (var vm in _cameraPopups)
         {
+            // 카메라 심볼 화면점(연결선 끝점1) 갱신 — 팬/줌 추종
+            var cs = MainMap.FromLatLngToLocal(vm.CameraGeo);
+            vm.CameraScreenX = cs.X;
+            vm.CameraScreenY = cs.Y;
+
             var sp = MainMap.FromLatLngToLocal(vm.AnchorGeo);
             vm.CanvasLeft = sp.X;
             vm.CanvasTop = sp.Y;
