@@ -662,19 +662,25 @@ public class MapViewModel : BasePanelViewModel,
             if (saved != null)
             {
                 anchorGeo = new PointLatLng(saved.Latitude, saved.Longitude);
-                var sp = MainMap.FromLatLngToLocal(anchorGeo);
+                // inner(타일) → outer(화면) 보정 — 팝업은 디지털줌 RenderTransform 밖 캔버스에 산다(InnerToOuter는 scale=1이면 항등)
+                var g = MainMap.FromLatLngToLocal(anchorGeo);
+                var sp = MainMap.InnerToOuter(new Point(g.X, g.Y));
                 left = sp.X; top = sp.Y;
             }
             else
             {
-                var c = MainMap.FromLatLngToLocal(marker.Position);
+                var g = MainMap.FromLatLngToLocal(marker.Position);
+                var c = MainMap.InnerToOuter(new Point(g.X, g.Y));   // 심볼의 화면(outer) 위치 기준 우상단 오프셋
                 left = c.X + CameraPopupInitialOffsetRight;
                 top = c.Y - CameraPopupInitialOffsetUp - CameraStreamPopupViewModel.DefaultHeight;
-                anchorGeo = MainMap.FromLocalToLatLng((int)left, (int)top);
+                // outer(화면) → inner → 위경도 앵커
+                var ip = MainMap.OuterToInner(new Point(left, top));
+                anchorGeo = MainMap.FromLocalToLatLng((int)ip.X, (int)ip.Y);
             }
 
-            // 연결선(Leader Line) 끝점1 = 카메라 심볼 중점
-            var camScreen = MainMap.FromLatLngToLocal(marker.Position);
+            // 연결선(Leader Line) 끝점1 = 카메라 심볼 중점(화면 outer 좌표)
+            var cg = MainMap.FromLatLngToLocal(marker.Position);
+            var camScreen = MainMap.InnerToOuter(new Point(cg.X, cg.Y));
             var vm = new CameraStreamPopupViewModel(cameraId, title, connInfo, anchorGeo, hub)
             {
                 CanvasLeft = left,
@@ -704,8 +710,9 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is not CameraStreamPopupViewModel vm || MainMap == null) return;
         try
         {
-            // 드래그 종료 위치(팝업 좌상단) → 위경도 앵커 갱신 + DB 저장(다중 클라 공유)
-            var geo = MainMap.FromLocalToLatLng((int)vm.CanvasLeft, (int)vm.CanvasTop);
+            // 드래그 종료 위치(팝업 좌상단, 화면 outer) → inner 역보정 → 위경도 앵커 갱신 + DB 저장(다중 클라 공유)
+            var ip = MainMap.OuterToInner(new Point(vm.CanvasLeft, vm.CanvasTop));
+            var geo = MainMap.FromLocalToLatLng((int)ip.X, (int)ip.Y);
             vm.AnchorGeo = geo;
             StartOrResetAutoCloseTimer(vm);   // 드래그 = 상호작용 → 카운트 리셋
             await CameraPopupPositionStore.SavePositionAsync(vm.CameraId, geo);
@@ -732,14 +739,16 @@ public class MapViewModel : BasePanelViewModel,
         if (MainMap == null || _cameraPopups == null || _cameraPopups.Count == 0) return;
         foreach (var vm in _cameraPopups.ToList())   // 순회 중 Close(Remove) 재진입 방어
         {
-            // 카메라 심볼 화면점(연결선 끝점1) 갱신 — 팬/줌 추종
+            // 카메라 심볼 화면점(연결선 끝점1) 갱신 — 팬/줌 추종 + 디지털줌 outer 보정(InnerToOuter는 scale=1이면 항등)
             var cs = MainMap.FromLatLngToLocal(vm.CameraGeo);
-            vm.CameraScreenX = cs.X;
-            vm.CameraScreenY = cs.Y;
+            var cso = MainMap.InnerToOuter(new Point(cs.X, cs.Y));
+            vm.CameraScreenX = cso.X;
+            vm.CameraScreenY = cso.Y;
 
             var sp = MainMap.FromLatLngToLocal(vm.AnchorGeo);
-            vm.CanvasLeft = sp.X;
-            vm.CanvasTop = sp.Y;
+            var spo = MainMap.InnerToOuter(new Point(sp.X, sp.Y));
+            vm.CanvasLeft = spo.X;
+            vm.CanvasTop = spo.Y;
         }
     }
 
@@ -4902,6 +4911,7 @@ public class MapViewModel : BasePanelViewModel,
     private void MainMap_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+        RefreshCameraPopupPositions();   // 리사이즈 시 ScaleTransform 중심(W/2,H/2) 변동 → 팝업 outer 재계산
     }
 
     /// <summary>
@@ -4962,8 +4972,13 @@ public class MapViewModel : BasePanelViewModel,
         NotifyOfPropertyChange(() => ScalePoints);
     }
 
-    /// <summary>디지털 줌 레벨 변경 → 축척바 재계산(거리 동일, 바 폭 ×배율).</summary>
-    private void OnMapDigitalZoomLevelChanged(int level) => CreateScaleBar();
+    /// <summary>디지털 줌 레벨 변경 → 축척바 재계산 + 카메라 팝업 outer 재배치.
+    /// (디지털줌은 _core.Zoom 불변이라 OnMapZoomChanged가 미발화 → 여기서 직접 Refresh, RC-2)</summary>
+    private void OnMapDigitalZoomLevelChanged(int level)
+    {
+        CreateScaleBar();
+        RefreshCameraPopupPositions();   // 디지털 인/아웃 시 팝업·연결선 outer 좌표 재계산
+    }
 
     /// <summary>
     /// 객체 위치 검색 - 첫 번째 마커 위치로 이동

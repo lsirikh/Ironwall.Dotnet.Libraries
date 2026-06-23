@@ -60,6 +60,11 @@
   - 편집모드 오브젝트 위 휠줌/드래그팬 통과(`IgnoreMarkerOnMouseWheel`, MarkerEditAdorner `HitTestCore` 핸들 한정)
 
 ### Fixed
+- **디지털 줌 활성 시 카메라 RTSP 팝업/연결선 좌표 어긋남 수정** ([PRD](docs/prds/CameraPopup_DigitalZoom_Alignment-prd.md) v1.0 · [Plan](docs/plans/CameraPopup_DigitalZoom_Alignment-prd-plan.md))
+  - 증상: 디지털 줌(1.5/2.0x) 시 팝업·빨간 연결선이 카메라 심볼에서 떨어짐(화면 중심에서 멀수록·줌 클수록 선형↑). 디지털 줌만 인/아웃 시 팝업 미추종(제자리 고정).
+  - 근본원인: 디지털 줌 = `GMapCustomControl.RenderTransform=ScaleTransform(s,s,W/2,H/2)`. 마커는 transform '안'(WPF가 `RenderTransform.Inverse` 자동 적용), 팝업은 형제 `PropertyPanelCanvas`(transform '밖')에서 `FromLatLngToLocal` raw inner 좌표를 그대로 사용 → **좌표 도메인 비대칭(RC-1)**. 디지털 줌은 `_core.Zoom` 불변이라 `OnMapZoomChanged` 미발화 → `RefreshCameraPopupPositions` 미호출(RC-2).
+  - 수정: `GMapCustomControl`에 **팝업 전용** `InnerToOuter`/`OuterToInner`(중심 W/2,H/2 기준 ScaleTransform 정/역, `ActualWidth<=0`·`scale=1` 항등 가드) 신설 → 팝업 최초/추종 위치·연결선 끝점(`OpenCameraStreamPopupAsync`/`RefreshCameraPopupPositions`)을 outer 보정, 드래그 저장은 `OuterToInner`로 역보정 후 `FromLocalToLatLng`. `OnMapDigitalZoomLevelChanged`·`MainMap_SizeChanged`에 `RefreshCameraPopupPositions` 연결(RC-2). **scale=1이면 항등 → 디지털 줌 미사용 회귀 0**, 마커/격자/스냅 무손상(이중보정 회피, 불변식 준수).
+  - 검증: 회전 독립 합성 확인(V-01: `ApplyMapRotation`은 `Bearing`만 변경), GMaps.Ui 빌드 0에러, 격리 단위테스트 61통과(DigitalZoom 7 신규: 항등/왕복/중심불변/보정정확/단조성/배율테이블), code-review(opus) **MERGE**(Critical/High/Medium 0). ※메인솔루션 재빌드 후 런타임 검증 대기.
 - **장비 패널 CRUD Temp-state 통일 (Phase 1, PR-A/B/C)** ([PRD](docs/prds/DevicePanel_TempState_Unification-prd.md) v1.1 · [Plan](docs/plans/DevicePanel_TempState_Unification-prd-plan.md))
   - 설계 전환(사용자 결정): 직전 DeviceGroup B모델(추가 즉시 Create)을 **Temp-state로 통일 환원** — 서버가 미완성 placeholder 거부(422)·Sensor는 controller_id FK 필요로 즉시등록 불가 → 7패널(Controller/Camera/Sensor/Speaker/Enclosure/Lamp + DeviceGroup) 일관. 5-Agent PRD 검토 + opus 코드리뷰(머지차단 2 + High 3) 반영.
   - **Temp-state 베이스 템플릿**(`BaseDataGridMultiPanelViewModel`): `ExecuteCreateAsync`(필수필드 사전검증→보류)/`ExecuteSaveUpdatesAsync`/`NotifySaveResultAsync`(sanitize 통지)/`SanitizeDetails`(민감정보 마스킹)/`ShouldProjectToProvider`. 추가=로컬 Draft(Id≤0) Add(서버 미호출), Save=일괄 Create+Update+재조회+생존자(실패/보류) 복원.
