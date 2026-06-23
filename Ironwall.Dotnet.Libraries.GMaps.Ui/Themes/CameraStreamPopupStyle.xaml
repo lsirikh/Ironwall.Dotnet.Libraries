@@ -104,17 +104,22 @@
                                 </Grid>
                             </Border>
 
-                            <!--  영상 영역 (Hub WriteableBitmap — airspace hole 회피)  -->
+                            <!--  영상 영역 (Hub WriteableBitmap — airspace hole 회피). 우버튼 드래그-PTZ 입력 표면 + 벡터 오버레이  -->
                             <Border
+                                x:Name="PART_VideoRegion"
                                 Grid.Row="1"
                                 Background="Black"
                                 CornerRadius="0,0,9,9"
                                 ClipToBounds="True">
-                                <streaming:ImprovedRtspPlayer
-                                    x:Name="PART_Player"
-                                    AutoPlay="True"
-                                    DataContext="{Binding StreamVm}"
-                                    ConnectionInfo="{Binding DataContext.ConnectionInfo, RelativeSource={RelativeSource TemplatedParent}}" />
+                                <Grid>
+                                    <streaming:ImprovedRtspPlayer
+                                        x:Name="PART_Player"
+                                        AutoPlay="True"
+                                        DataContext="{Binding StreamVm}"
+                                        ConnectionInfo="{Binding DataContext.ConnectionInfo, RelativeSource={RelativeSource TemplatedParent}}" />
+                                    <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
+                                    <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
+                                </Grid>
                             </Border>
                         </Grid>
                     </Border>

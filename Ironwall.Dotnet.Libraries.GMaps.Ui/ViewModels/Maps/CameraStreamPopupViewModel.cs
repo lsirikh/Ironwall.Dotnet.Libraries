@@ -45,6 +45,13 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤이 드래그 종료 시 호출 → DragCompleted 발화.</summary>
     internal void RaiseDragCompleted() => DragCompleted?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 IPtzController.RelativeMoveByPixel 호출 + FOV 갱신. (FR-DRAG-03)</summary>
+    public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
+
+    /// <summary>컨트롤이 영상 위 우버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
+    internal void RaisePtzDrag(double dx, double dy, double imageW, double imageH)
+        => PtzDragRequested?.Invoke(this, new PtzDragEventArgs(dx, dy, imageW, imageH));
+
     public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
     {
@@ -120,6 +127,23 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>"크게보기" 토글 상태(런타임만, 영속 안 함 — Q4).</summary>
     public bool IsLarge { get => _isLarge; private set { _isLarge = value; NotifyOfPropertyChange(nameof(IsLarge)); } }
 
+    // ── PTZ 제어 상태(CameraPopup_PTZ_Control) ────────────────────────────────
+    private bool _isSelected;
+    private bool _isPtzCapable;
+    private bool _isPanelExpanded;
+
+    /// <summary>단일 선택 상태(MapViewModel.SelectedCameraPopup이 상호배타 설정). (FR-SEL-01)</summary>
+    public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; NotifyOfPropertyChange(nameof(IsSelected)); } }
+
+    /// <summary>PTZ 제어 가능 여부(MapViewModel이 IPtzController.EnsureReady 후 설정). false면 우버튼 입력 차단. (FR-GATE-01)</summary>
+    public bool IsPtzCapable { get => _isPtzCapable; set { if (_isPtzCapable == value) return; _isPtzCapable = value; NotifyOfPropertyChange(nameof(IsPtzCapable)); } }
+
+    /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
+    public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); } }
+
+    /// <summary>우버튼 짧은클릭(8px 미만) → 탭 패널 토글.</summary>
+    internal void TogglePanel() => IsPanelExpanded = !IsPanelExpanded;
+
     public ICommand CloseCommand =>
         _closeCommand ??= new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
 
@@ -145,4 +169,18 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         catch { /* 종료 경로 — 무해 */ }
         CloseRequested = null;
     }
+}
+
+/// <summary>우버튼 드래그-PTZ 완료 이벤트 인자 — 픽셀 델타 + 영상 영역 치수(정규화·변환 기준).</summary>
+public sealed class PtzDragEventArgs : EventArgs
+{
+    public PtzDragEventArgs(double dx, double dy, double imageW, double imageH)
+    {
+        Dx = dx; Dy = dy; ImageWidth = imageW; ImageHeight = imageH;
+    }
+
+    public double Dx { get; }
+    public double Dy { get; }
+    public double ImageWidth { get; }
+    public double ImageHeight { get; }
 }
