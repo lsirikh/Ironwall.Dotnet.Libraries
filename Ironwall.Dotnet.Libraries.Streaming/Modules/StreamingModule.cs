@@ -40,9 +40,14 @@ public class StreamingModule : Module
             _log?.Info("[StreamingModule] Loading streaming module...");
 
             // Setup Model 등록
-            var setupModel = new StreamingSetupModel(_model);
-            builder.RegisterInstance(setupModel).As<StreamingSetupModel>()
-                .As<IStreamingSetupModel>().SingleInstance();
+            // (1) 서비스/Hub용 concrete 스냅샷. 팝업 수명은 MapViewModel이 관장하므로 서비스 내부
+            //     자동폐기(CheckTimeouts)는 비활성 — 더블/리셋 시 라이브 타임아웃과 어긋나지 않게 한다.
+            var setupModel = new StreamingSetupModel(_model) { IsAutoDiscard = false };
+            builder.RegisterInstance(setupModel).As<StreamingSetupModel>().SingleInstance();
+
+            // (2) 라이브러리 소비자(MapViewModel)가 라이브 설정(IsCameraPopupUsed/TimeoutSeconds/IsAutoDiscard)을
+            //     읽도록 메인 SetupModel(라이브 인스턴스)을 IStreamingSetupModel로 등록.
+            builder.RegisterInstance(_model).As<IStreamingSetupModel>().SingleInstance();
 
             // Context Pool 등록
             builder.Register(c => new StreamingContextPool(setupModel.ContextPoolSize))

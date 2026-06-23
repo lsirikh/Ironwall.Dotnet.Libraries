@@ -19,6 +19,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
+using Ironwall.Dotnet.Libraries.Streaming.Models;
 using System.Windows.Controls;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapImages;
@@ -508,6 +509,14 @@ public class MapViewModel : BasePanelViewModel,
                 || pidsMarker.DeviceType != EnumDeviceType.IpCamera)
                 return;
 
+            // 카메라 팝업 연동 OFF면 더블클릭 무시 (EventSetupView "카메라 팝업 연동")
+            var setup = ResolveStreamingSetup();
+            if (setup != null && !setup.IsCameraPopupUsed)
+            {
+                _log?.Info("[CameraPopup] 카메라 팝업 연동 OFF — 더블클릭 무시");
+                return;
+            }
+
             var cameraModel = pidsMarker.LinkedDevice as ICameraDeviceModel;
             if (cameraModel == null)
             {
@@ -553,6 +562,9 @@ public class MapViewModel : BasePanelViewModel,
     private ICameraPopupPositionStore? _cameraPopupPositionStore;
     private ISharedCameraStreamHub? _cameraStreamHub;
     private bool _cameraStreamHubResolved;
+    private IStreamingSetupModel? _streamingSetup;
+    private bool _streamingSetupResolved;
+    private readonly Dictionary<CameraStreamPopupViewModel, System.Windows.Threading.DispatcherTimer> _popupAutoCloseTimers = new();
 
     /// <summary>맵 위에 열린 카메라 RTSP 팝업 목록(MapView PropertyPanelCanvas ItemsControl 바인딩).</summary>
     public ObservableCollection<CameraStreamPopupViewModel> CameraPopups
@@ -575,6 +587,54 @@ public class MapViewModel : BasePanelViewModel,
         return _cameraStreamHub;
     }
 
+    /// <summary>IStreamingSetupModel(라이브 SetupModel) — 메인솔루션 StreamingModule 등록 시에만 존재. IoC lazy.</summary>
+    private IStreamingSetupModel? ResolveStreamingSetup()
+    {
+        if (_streamingSetupResolved) return _streamingSetup;
+        _streamingSetupResolved = true;
+        try { _streamingSetup = IoC.Get<IStreamingSetupModel>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] StreamingSetup 미등록(게이팅/자동해제 기본동작): {ex.Message}");
+            _streamingSetup = null;
+        }
+        return _streamingSetup;
+    }
+
+    /// <summary>자동해제 타이머 시작/리셋 — IsAutoDiscard ON일 때 TimeoutSeconds 후 팝업 자동 닫힘.</summary>
+    private void StartOrResetAutoCloseTimer(CameraStreamPopupViewModel vm)
+    {
+        var setup = ResolveStreamingSetup();
+        if (setup == null || !setup.IsAutoDiscard || setup.TimeoutSeconds <= 0)
+        {
+            StopAutoCloseTimer(vm);   // 자동해제 OFF면 기존 타이머 제거
+            return;
+        }
+
+        if (!_popupAutoCloseTimers.TryGetValue(vm, out var timer))
+        {
+            timer = new System.Windows.Threading.DispatcherTimer();
+            timer.Tick += (s, e) =>
+            {
+                StopAutoCloseTimer(vm);
+                _ = CloseCameraPopupAsync(vm);   // 타임아웃 만료 → 팝업 닫힘(+Hub Lease 해제)
+            };
+            _popupAutoCloseTimers[vm] = timer;
+        }
+        timer.Stop();
+        timer.Interval = TimeSpan.FromSeconds(setup.TimeoutSeconds);
+        timer.Start();   // 리셋(상호작용 시 재시작)
+    }
+
+    private void StopAutoCloseTimer(CameraStreamPopupViewModel vm)
+    {
+        if (_popupAutoCloseTimers.TryGetValue(vm, out var timer))
+        {
+            timer.Stop();
+            _popupAutoCloseTimers.Remove(vm);
+        }
+    }
+
     private async Task OpenCameraStreamPopupAsync(int cameraId, string? title, RtspConnectionInfo connInfo, IEditableMarker marker)
     {
         try
@@ -588,6 +648,7 @@ public class MapViewModel : BasePanelViewModel,
                 var idx = CameraPopups.IndexOf(existing);
                 if (idx >= 0 && idx < CameraPopups.Count - 1)
                     CameraPopups.Move(idx, CameraPopups.Count - 1);
+                StartOrResetAutoCloseTimer(existing);   // 재더블클릭 = 상호작용 → 카운트 리셋
                 return;
             }
 
@@ -625,6 +686,7 @@ public class MapViewModel : BasePanelViewModel,
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
             CameraPopups.Add(vm);
+            StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
         }
         catch (Exception ex)
         {
@@ -645,6 +707,7 @@ public class MapViewModel : BasePanelViewModel,
             // 드래그 종료 위치(팝업 좌상단) → 위경도 앵커 갱신 + DB 저장(다중 클라 공유)
             var geo = MainMap.FromLocalToLatLng((int)vm.CanvasLeft, (int)vm.CanvasTop);
             vm.AnchorGeo = geo;
+            StartOrResetAutoCloseTimer(vm);   // 드래그 = 상호작용 → 카운트 리셋
             await CameraPopupPositionStore.SavePositionAsync(vm.CameraId, geo);
         }
         catch (Exception ex) { _log?.Error($"카메라 팝업 위치 저장 실패: {ex.Message}"); }
@@ -654,6 +717,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            StopAutoCloseTimer(vm);    // 자동해제 타이머 정지
             vm.CloseRequested -= OnCameraPopupCloseRequested;
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             CameraPopups.Remove(vm);

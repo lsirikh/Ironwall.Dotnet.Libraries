@@ -31,6 +31,9 @@ public interface IStreamingSetupModel
     bool EnableClockSync { get; set; }
     int PopupStartupDelayMs { get; set; }
     int QueueMinDisplayMs { get; set; }
+
+    /// <summary>맵 카메라 팝업 연동 on/off — false면 카메라 심볼 더블클릭으로 팝업이 열리지 않음.</summary>
+    bool IsCameraPopupUsed { get; set; }
 }
 
 /// <summary>
@@ -63,6 +66,9 @@ public class StreamingSetupModel : IStreamingSetupModel
     // 클럭 동기화 설정
     public int ClockJitterMs { get; set; } = 500;
     public bool EnableClockSync { get; set; } = true;
+
+    // 맵 카메라 팝업 연동 on/off (기본 ON — 신규 설치 시 더블클릭으로 열림)
+    public bool IsCameraPopupUsed { get; set; } = true;
 
     // 팝업 기동 딜레이
     public int PopupStartupDelayMs { get; set; } = 0;
@@ -101,6 +107,7 @@ public class StreamingSetupModel : IStreamingSetupModel
             EnableClockSync = model.EnableClockSync;
             PopupStartupDelayMs = model.PopupStartupDelayMs;
             QueueMinDisplayMs = model.QueueMinDisplayMs;
+            IsCameraPopupUsed = model.IsCameraPopupUsed;
         }
     }
 
