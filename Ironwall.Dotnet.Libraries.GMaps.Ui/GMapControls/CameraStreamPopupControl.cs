@@ -24,6 +24,17 @@ public class CameraStreamPopupControl : Control
             new FrameworkPropertyMetadata(typeof(CameraStreamPopupControl)));
     }
 
+    /// <summary>헤더 타이틀 — 관심지역/레이어 패널과 동일하게 TemplateBinding으로 노출(MapView가 {Binding Title} 주입).</summary>
+    public string PanelTitle
+    {
+        get => (string)GetValue(PanelTitleProperty);
+        set => SetValue(PanelTitleProperty, value);
+    }
+
+    public static readonly DependencyProperty PanelTitleProperty =
+        DependencyProperty.Register(nameof(PanelTitle), typeof(string),
+            typeof(CameraStreamPopupControl), new PropertyMetadata(string.Empty));
+
     public CameraStreamPopupControl()
     {
         MouseLeftButtonDown += OnMouseLeftButtonDown;
@@ -94,14 +105,24 @@ public class CameraStreamPopupControl : Control
         (DataContext as CameraStreamPopupViewModel)?.RaiseDragCompleted();
     }
 
+    // ItemsControl 호스팅 구조: PropertyPanelCanvas → ItemsControl → ItemsPanel(Canvas, 0×0)
+    //   → ContentPresenter(Canvas.Left/Top) → 이 컨트롤.
+    // 첫 Canvas(ItemsPanel)는 ActualWidth/Height=0이라 clamp가 무력화되므로,
+    // 크기가 있는 상위 Canvas(=PropertyPanelCanvas)를 우선 사용한다(좌표 원점은 동일).
     private Canvas? FindParentCanvas()
     {
         DependencyObject? parent = this;
+        Canvas? firstCanvas = null;
         while (parent != null)
         {
             parent = VisualTreeHelper.GetParent(parent);
-            if (parent is Canvas canvas) return canvas;
+            if (parent is Canvas canvas)
+            {
+                firstCanvas ??= canvas;
+                if (canvas.ActualWidth > 0 || canvas.ActualHeight > 0)
+                    return canvas;
+            }
         }
-        return null;
+        return firstCanvas;
     }
 }

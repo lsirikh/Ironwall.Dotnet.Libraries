@@ -746,7 +746,10 @@
 					</ItemsControl.ItemContainerStyle>
 					<ItemsControl.ItemTemplate>
 						<DataTemplate>
-							<ctrl:CameraStreamPopupControl />
+							<ctrl:CameraStreamPopupControl
+								Width="{Binding PopupWidth}"
+								Height="{Binding PopupHeight}"
+								PanelTitle="{Binding Title}" />
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>

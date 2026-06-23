@@ -9,10 +9,32 @@
         <ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
+    <!--  헤더 버튼(크게보기/닫기) — PanelCloseButtonStyle 답습: 26×26 원형 + 호버 #33FFFFFF  -->
+    <Style x:Key="PopupHeaderIconButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="13">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!--  맵 위 이동식 RTSP 스트리밍 팝업 — 관심지역/레이어 창 답습  -->
     <Style TargetType="{x:Type ctrl:CameraStreamPopupControl}">
-        <Setter Property="Width" Value="{Binding PopupWidth}" />
-        <Setter Property="Height" Value="{Binding PopupHeight}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ctrl:CameraStreamPopupControl}">
@@ -35,7 +57,7 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <!--  헤더 (드래그)  -->
+                            <!--  헤더 (드래그) — 관심지역/레이어 패널과 동일 구조  -->
                             <Border
                                 Grid.Row="0"
                                 Background="{StaticResource PrimaryBlueBrush}"
@@ -43,7 +65,7 @@
                                 Cursor="SizeAll">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="35" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
@@ -59,17 +81,16 @@
                                     <TextBlock
                                         Grid.Column="1"
                                         Margin="2,0"
-                                        VerticalAlignment="Center"
-                                        FontSize="13" FontWeight="Bold" Foreground="White"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        FontSize="14" FontWeight="Bold" Foreground="White"
                                         TextTrimming="CharacterEllipsis"
-                                        Text="{Binding Title}" />
+                                        Text="{TemplateBinding PanelTitle}" />
 
-                                    <!--  크게보기 토글  -->
+                                    <!--  크게/작게 토글  -->
                                     <Button
                                         Grid.Column="2"
-                                        Width="26" Height="26"
-                                        Background="Transparent" BorderThickness="0"
-                                        Cursor="Hand"
+                                        Margin="0,0,2,0"
+                                        Style="{StaticResource PopupHeaderIconButtonStyle}"
                                         Command="{Binding ToggleSizeCommand}"
                                         ToolTip="크게/작게">
                                         <md:PackIcon Width="14" Height="14" Foreground="White" Kind="Resize" />
@@ -92,8 +113,8 @@
                                 <streaming:ImprovedRtspPlayer
                                     x:Name="PART_Player"
                                     AutoPlay="True"
-                                    ConnectionInfo="{Binding ConnectionInfo}"
-                                    DataContext="{Binding StreamVm}" />
+                                    DataContext="{Binding StreamVm}"
+                                    ConnectionInfo="{Binding DataContext.ConnectionInfo, RelativeSource={RelativeSource TemplatedParent}}" />
                             </Border>
                         </Grid>
                     </Border>
