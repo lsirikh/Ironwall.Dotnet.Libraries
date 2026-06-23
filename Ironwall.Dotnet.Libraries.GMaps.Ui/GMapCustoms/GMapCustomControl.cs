@@ -1286,6 +1286,33 @@ public class GMapCustomControl : GMapControl
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// inner(논리/타일) 좌표 → outer(화면) 좌표. 디지털 줌 ScaleTransform(중심 cx,cy 기준)의 정방향 변환.
+    /// ★ 카메라 팝업 경로(PropertyPanelCanvas — RenderTransform '밖' 형제 캔버스) 전용.
+    ///   마커/격자/스냅(컨트롤 '안' — WPF가 e.GetPosition(this)에 RenderTransform.Inverse를 자동 적용)에는
+    ///   절대 적용 금지: 이중보정 버그(불변식, 본 region 상단 주석 참조). scale=1(디지털줌 OFF)이면 항등.
+    ///   ※ 이 수식을 바꾸면 tests/GMaps.Ui.Tests/DigitalZoomCoordinateTests.cs의 복제 수식도 동기화할 것(L-1).
+    /// </summary>
+    public Point InnerToOuter(Point p)
+    {
+        double s = DigitalZoomScale;
+        if (ActualWidth <= 0 || ActualHeight <= 0 || Math.Abs(s - 1.0) < 0.001) return p;
+        double cx = ActualWidth / 2.0, cy = ActualHeight / 2.0;
+        return new Point(cx + (p.X - cx) * s, cy + (p.Y - cy) * s);
+    }
+
+    /// <summary>
+    /// outer(화면) 좌표 → inner(논리/타일) 좌표. <see cref="InnerToOuter"/>의 역함수(드래그 저장 시 FromLocalToLatLng 입력용).
+    /// ★ 팝업 경로 전용(위 가드 동일). scale=1이면 항등.
+    /// </summary>
+    public Point OuterToInner(Point p)
+    {
+        double s = DigitalZoomScale;
+        if (ActualWidth <= 0 || ActualHeight <= 0 || Math.Abs(s - 1.0) < 0.001) return p;
+        double cx = ActualWidth / 2.0, cy = ActualHeight / 2.0;
+        return new Point(cx + (p.X - cx) / s, cy + (p.Y - cy) / s);
+    }
+
     #endregion
 
     /// <summary>
