@@ -518,9 +518,12 @@ public class MapViewModel : BasePanelViewModel,
             var connInfo = CameraConnectionAdapter.ToConnectionInfo(cameraModel, preferSub: true);
             if (connInfo == null)
             {
-                _log?.Warning($"[CameraPopup] RTSP URL 없음(영상 없음): {marker.Title}");
+                _log?.Warning($"[CameraPopup] RTSP URL 없음(영상 없음): {marker.Title} — 카메라 상세보기 > URLs 탭에 rtsp:// 입력 필요");
                 return;
             }
+
+            // 실제 접속 URL = 카메라 설정(Urls.RtspSub/RtspMain) 원본. VLC엔 원본 그대로, 로그만 자격증명 마스킹.
+            _log?.Info($"[CameraPopup] 카메라 {cameraModel.Id}({marker.Title}) RTSP 접속 URL(설정값)={MaskRtspCredentials(connInfo.GetFullUrl())}");
 
             _ = OpenCameraStreamPopupAsync(cameraModel.Id, marker.Title, connInfo, marker);
         }
@@ -528,6 +531,17 @@ public class MapViewModel : BasePanelViewModel,
         {
             _log?.Error($"카메라 더블클릭 처리 실패: {ex.Message}");
         }
+    }
+
+    /// <summary>로그 출력용 RTSP URL 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host). 재생 URL은 원본 유지.</summary>
+    private static string MaskRtspCredentials(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return "(빈 URL)";
+        var scheme = url.IndexOf("://", StringComparison.Ordinal);
+        var at = url.IndexOf('@');
+        if (scheme > 0 && at > scheme)
+            return string.Concat(url.AsSpan(0, scheme + 3), "***@", url.AsSpan(at + 1));
+        return url;
     }
 
     #region - Camera RTSP Stream Popup (맵 위 이동식 영상 팝업) -
