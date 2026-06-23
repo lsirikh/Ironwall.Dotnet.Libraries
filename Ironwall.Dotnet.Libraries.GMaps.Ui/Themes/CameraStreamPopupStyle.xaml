@@ -1,0 +1,105 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:streaming="clr-namespace:Ironwall.Dotnet.Libraries.Streaming.Controls;assembly=Ironwall.Dotnet.Libraries.Streaming">
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!--  맵 위 이동식 RTSP 스트리밍 팝업 — 관심지역/레이어 창 답습  -->
+    <Style TargetType="{x:Type ctrl:CameraStreamPopupControl}">
+        <Setter Property="Width" Value="{Binding PopupWidth}" />
+        <Setter Property="Height" Value="{Binding PopupHeight}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ctrl:CameraStreamPopupControl}">
+                    <Border
+                        Background="White"
+                        BorderBrush="{StaticResource BorderGrayBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                        <Border.Effect>
+                            <DropShadowEffect
+                                BlurRadius="8"
+                                Opacity="0.12"
+                                ShadowDepth="2"
+                                Color="Black" />
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="42" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <!--  헤더 (드래그)  -->
+                            <Border
+                                Grid.Row="0"
+                                Background="{StaticResource PrimaryBlueBrush}"
+                                CornerRadius="9,9,0,0"
+                                Cursor="SizeAll">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <md:PackIcon
+                                        Grid.Column="0"
+                                        Width="18" Height="18"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Foreground="White"
+                                        Kind="Cctv" />
+
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Margin="2,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="13" FontWeight="Bold" Foreground="White"
+                                        TextTrimming="CharacterEllipsis"
+                                        Text="{Binding Title}" />
+
+                                    <!--  크게보기 토글  -->
+                                    <Button
+                                        Grid.Column="2"
+                                        Width="26" Height="26"
+                                        Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand"
+                                        Command="{Binding ToggleSizeCommand}"
+                                        ToolTip="크게/작게">
+                                        <md:PackIcon Width="14" Height="14" Foreground="White" Kind="Resize" />
+                                    </Button>
+
+                                    <!--  닫기  -->
+                                    <Button
+                                        x:Name="PART_CloseButton"
+                                        Grid.Column="3"
+                                        Style="{StaticResource PanelCloseButtonStyle}" />
+                                </Grid>
+                            </Border>
+
+                            <!--  영상 영역 (Hub WriteableBitmap — airspace hole 회피)  -->
+                            <Border
+                                Grid.Row="1"
+                                Background="Black"
+                                CornerRadius="0,0,9,9"
+                                ClipToBounds="True">
+                                <streaming:ImprovedRtspPlayer
+                                    x:Name="PART_Player"
+                                    AutoPlay="True"
+                                    ConnectionInfo="{Binding ConnectionInfo}"
+                                    DataContext="{Binding StreamVm}" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

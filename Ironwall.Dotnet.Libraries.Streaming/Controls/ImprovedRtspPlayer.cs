@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Streaming.Commands;
 using Ironwall.Dotnet.Libraries.Streaming.Events;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Serivces;
+using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
 using LibVLCSharp.WPF;
 using System;
 using System.Collections.Generic;
@@ -79,7 +80,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
 
-        _log?.Info($"[ImprovedRtspPlayer] Control created with ID: {_cachedContextId}");
+        //_log?.Info($"[ImprovedRtspPlayer] Control created with ID: {_cachedContextId}");
     }
 
     #region - Dependency Properties -
@@ -114,7 +115,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
             nameof(ConnectionInfo),
             typeof(RtspConnectionInfo),
             typeof(ImprovedRtspPlayer),
-            new PropertyMetadata(null, OnConnectionInfoChanged));
+            new PropertyMetadata(null));
 
     public RtspConnectionInfo ConnectionInfo
     {
@@ -230,6 +231,34 @@ public class ImprovedRtspPlayer : Control, IDisposable
         set => SetValue(TimeoutDisplayProperty, value);
     }
 
+    public static readonly DependencyProperty SharedFrameProperty =
+        DependencyProperty.Register(
+            nameof(SharedFrame),
+            typeof(System.Windows.Media.Imaging.BitmapSource),
+            typeof(ImprovedRtspPlayer),
+            new PropertyMetadata(null));
+
+    /// <summary>Hub SharedFrameBuffer의 공유 BitmapSource. Hub 모드에서 Image.Source에 바인딩된다.</summary>
+    public System.Windows.Media.Imaging.BitmapSource? SharedFrame
+    {
+        get => (System.Windows.Media.Imaging.BitmapSource?)GetValue(SharedFrameProperty);
+        set => SetValue(SharedFrameProperty, value);
+    }
+
+    public static readonly DependencyProperty IsHubModeProperty =
+        DependencyProperty.Register(
+            nameof(IsHubMode),
+            typeof(bool),
+            typeof(ImprovedRtspPlayer),
+            new PropertyMetadata(false, OnIsHubModeChanged));
+
+    /// <summary>true이면 VideoView 대신 SharedFrame Image를 표시한다.</summary>
+    public bool IsHubMode
+    {
+        get => (bool)GetValue(IsHubModeProperty);
+        set => SetValue(IsHubModeProperty, value);
+    }
+
     #endregion
 
     #region - Commands -
@@ -286,6 +315,11 @@ public class ImprovedRtspPlayer : Control, IDisposable
         _loadingIndicator = GetTemplateChild(PART_LoadingIndicator) as ProgressBar;
         _errorPanel = GetTemplateChild(PART_ErrorPanel) as StackPanel;
         _statusText = GetTemplateChild(PART_StatusText) as TextBlock;
+
+        // OnApplyTemplate 시점의 IsHubMode 값을 VideoView에 즉시 반영
+        // (OnIsHubModeChanged 콜백이 _videoView 초기화 전 호출된 경우 대비)
+        if (_videoView != null)
+            _videoView.Visibility = IsHubMode ? Visibility.Collapsed : Visibility.Visible;
     }
 
     #endregion
@@ -303,7 +337,34 @@ public class ImprovedRtspPlayer : Control, IDisposable
         // Player Registry에 등록
         RegisterToService();
 
-        _log?.Info($"[ImprovedRtspPlayer] Control loaded: {_cachedContextId}");
+        // AutoPlay 처리 - 모든 바인딩 완료 후 여기서!
+        // WPF 렌더 파이프라인 지연 후에도 Row 취소 여부를 재확인
+        if (AutoPlay && ConnectionInfo != null)
+        {
+            if (DataContext is CameraViewModel vm)
+            {
+                if (vm.IsConnectCancelled)
+                {
+                    _log?.Info($"[ImprovedRtspPlayer] Skipping connect — row cancelled: {_cachedContextId}");
+                    return;
+                }
+                // Hub 경로: relay URL 경유 재생 (sout 재생성 없음)
+                if (vm.IsHubManaged)
+                {
+                    // AllowsTransparency 창에서 VideoView HWND가 airspace hole을 만들지 않도록
+                    // ConnectViaHubAsync 시작 전 동기로 IsHubMode=true 설정.
+                    // 이렇게 하면 OnApplyTemplate 이후 VideoView가 로드되어도 즉시 Collapsed.
+                    IsHubMode = true;
+                    _ = ConnectViaHubAsync(vm);
+                }
+                else
+                    _ = ConnectAsync();
+            }
+            else
+            {
+                _ = ConnectAsync();
+            }
+        }
     }
 
     private async void OnUnloaded(object? sender, RoutedEventArgs e)
@@ -326,7 +387,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
         if (!_isRegistered && _playerRegistry != null && !string.IsNullOrEmpty(_cachedContextId))
         {
             _isRegistered = _playerRegistry.RegisterPlayer(_cachedContextId, this);
-            _log?.Info($"[ImprovedRtspPlayer] Registered to service: {_cachedContextId}, Success: {_isRegistered}");
+            //_log?.Info($"[ImprovedRtspPlayer] Registered to service: {_cachedContextId}, Success: {_isRegistered}");
         }
     }
 
@@ -336,7 +397,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
         {
             _playerRegistry.UnregisterPlayer(_cachedContextId);
             _isRegistered = false;
-            _log?.Info($"[ImprovedRtspPlayer] Unregistered from service: {_cachedContextId}");
+            //_log?.Info($"[ImprovedRtspPlayer] Unregistered from service: {_cachedContextId}");
         }
     }
 
@@ -348,23 +409,154 @@ public class ImprovedRtspPlayer : Control, IDisposable
             return;
         }
 
-        _log?.Info($"[ImprovedRtspPlayer] Requesting connection through service: {_cachedContextId}");
+        // DataContext의 Row CancellationToken 사용 (Row 취소 시 연결 중단)
+        var ct = DataContext is CameraViewModel vm ? vm.RowCancellationToken : default;
 
-        // 서비스를 통해 연결 요청 (VideoView는 서비스가 알아서 가져감)
         await _streamingService.ConnectAsync(
             _cachedContextId,
             ConnectionInfo,
             StreamingOptions,
-            null);  // VideoView는 서비스가 Player에서 직접 가져감
+            null,
+            ct);
+    }
+
+    private async Task ConnectViaHubAsync(CameraViewModel vm)
+    {
+        if (ConnectionInfo == null) return;
+
+        var ct = vm.RowCancellationToken;
+        // Cache DP values on UI thread before any ConfigureAwait(false) await
+        var connInfo = ConnectionInfo;
+        var streamOpts = StreamingOptions;
+        var cameraId = connInfo.GetCameraKey();
+
+        _log?.Info($"[Player][HubPath] START  contextId={_cachedContextId}  src={connInfo.GetFullUrl()}");
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            PlaybackState = PlaybackState.Connecting;
+            IsHubMode = true;
+        });
+
+        try
+        {
+            // 1. Hub Lease 획득 — Entry가 없으면 VLC MediaPlayer 생성 + Playing 대기
+            _log?.Info($"[Player][HubPath] AcquireAsync  camera={connInfo.IpAddress}:{connInfo.Port}/{connInfo.StreamPath}");
+            await vm.OwnerRow!.StartStreamAsync(connInfo, ct).ConfigureAwait(false);
+
+            // 2. 공유 BitmapSource 획득 후 UI에 바인딩 (ConnectAsync 직접 호출 금지 — H-01)
+            // Playing 이벤트 직후 OnVideoFormat이 아직 호출 안 됐을 수 있으므로 최대 2s 재시도
+            var frame = vm.OwnerRow.GetLeaseFrame(cameraId);
+            if (frame == null)
+            {
+                for (int i = 0; i < 15 && !ct.IsCancellationRequested; i++)
+                {
+                    await Task.Delay(200, ct).ConfigureAwait(false);
+                    frame = vm.OwnerRow.GetLeaseFrame(cameraId);
+                    if (frame != null) break;
+                }
+                if (frame != null)
+                    _log?.Info($"[Player][HubPath] Frame arrived after retry  cameraId={cameraId}");
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (frame != null)
+                {
+                    SharedFrame = frame;
+                    PlaybackState = PlaybackState.Playing;
+                    _log?.Info($"[Player][HubPath] Frame bound  cameraId={cameraId}  contextId={_cachedContextId}");
+                }
+                else
+                {
+                    // 메타데이터 전용 엔트리(테스트용)거나 VLC 초기화 중 — 레거시 경로로 폴백
+                    _log?.Info($"[Player][HubPath] No frame available, falling back to direct connect  contextId={_cachedContextId}");
+                    IsHubMode = false;
+                    PlaybackState = PlaybackState.None;
+                }
+            });
+
+            // Hub 경로 타임아웃 등록 (IsAutoDiscard=false면 CheckTimeouts가 무시)
+            if (frame != null)
+                _streamingService?.RegisterConnectionStartTime(_cachedContextId);
+
+            // VLC는 연결 직후 OnVideoFormat을 두 번 호출하는 경우가 있다 (첫 번째: 예비 해상도, 두 번째: 실제 해상도).
+            // 두 번째 호출 시 새 WriteableBitmap이 생성되어 SharedFrame이 구버전을 가리키는 문제를 방지.
+            // 800ms 후 최신 Frame으로 재바인딩한다.
+            if (frame != null)
+            {
+                try
+                {
+                    await Task.Delay(800, ct).ConfigureAwait(false);
+                    var latestFrame = vm.OwnerRow.GetLeaseFrame(cameraId);
+                    if (latestFrame != null)
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            if (IsHubMode && latestFrame != SharedFrame)
+                            {
+                                SharedFrame = latestFrame;
+                                _log?.Info($"[Player][HubPath] WB replaced — SharedFrame rebind  cameraId={cameraId}");
+                            }
+                        });
+                    }
+                }
+                catch (OperationCanceledException) { /* Row 취소 — 정상 */ }
+            }
+
+            if (frame == null && _streamingService != null)
+                await _streamingService.ConnectAsync(_cachedContextId, connInfo, streamOpts, null, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _log?.Info($"[Player][HubPath] Cancelled  contextId={_cachedContextId}");
+            await Dispatcher.InvokeAsync(() => { IsHubMode = false; });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[Player][HubPath] Exception → fallback  contextId={_cachedContextId}  err={ex.Message}");
+            await Dispatcher.InvokeAsync(() => { IsHubMode = false; });
+            if (_streamingService != null)
+                await ConnectAsync().ConfigureAwait(false);
+        }
     }
 
     private async Task DisconnectAsync()
     {
+        // Hub 모드: SharedFrame + IsHubMode 초기화만 수행 (Lease 해제는 CameraRowViewModel.DisposeAsync 담당)
+        if (IsHubMode)
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                SharedFrame = null;
+                IsHubMode = false;
+                PlaybackState = PlaybackState.Disconnected;
+            });
+            return;
+        }
+
         if (_streamingService == null)
             return;
 
-        _log?.Info($"[ImprovedRtspPlayer] Requesting disconnection through service: {_cachedContextId}");
         await _streamingService.DisconnectAsync(_cachedContextId);
+    }
+
+    /// <summary>
+    /// Timeout 만료 시 CheckTimeouts에서 호출 — Hub-mode 플레이어를 정리하고 Row 종료를 요청한다.
+    /// 반드시 UI 스레드에서 실행되도록 Dispatcher.InvokeAsync를 사용한다.
+    /// </summary>
+    internal void RequestHubStop()
+    {
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            SharedFrame = null;
+            IsHubMode = false;
+            PlaybackState = PlaybackState.Stopped;
+
+            // Row 종료 — CloseRowCommand는 CameraRowViewModel이 소유
+            if (DataContext is CameraViewModel vm)
+                vm.OwnerRow?.CloseRowCommand?.Execute(null);
+        });
     }
 
     private async Task PlayAsync()
@@ -434,6 +626,17 @@ public class ImprovedRtspPlayer : Control, IDisposable
                 PlaybackState == PlaybackState.Buffering);
     }
 
+    private static void OnIsHubModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is ImprovedRtspPlayer player && e.NewValue is bool isHub && player._videoView != null)
+        {
+            // LibVLCSharp ForegroundWindow (sibling HWND)은 VideoView.Visibility 변경에 반응한다.
+            // VideoContainer collapse만으로는 ForegroundWindow가 갱신되지 않을 수 있으므로
+            // VideoView를 직접 숨겨 투명 airspace hole을 방지한다.
+            player._videoView.Visibility = isHub ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
     private static void OnContextIdChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is ImprovedRtspPlayer player)
@@ -456,25 +659,8 @@ public class ImprovedRtspPlayer : Control, IDisposable
                 player.RegisterToService();
             }
 
-            player._log?.Info($"[ImprovedRtspPlayer] ContextId changed from '{oldId}' to '{newId}'");
+            //player._log?.Info($"[ImprovedRtspPlayer] ContextId changed from '{oldId}' to '{newId}'");
             CommandManager.InvalidateRequerySuggested();
-        }
-    }
-
-    private static void OnConnectionInfoChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is ImprovedRtspPlayer player)
-        {
-            player._log?.Info($"[ImprovedRtspPlayer] ConnectionInfo changed: " +
-            $"Old={e.OldValue != null}, New={e.NewValue != null}, " +
-            $"AutoPlay={player.AutoPlay}, ContextId={player._cachedContextId}");
-
-            if (player.AutoPlay && e.NewValue != null)
-            {
-                player._log?.Info($"[ImprovedRtspPlayer] Triggering ConnectAsync for {player._cachedContextId}");
-                //await player.ConnectAsync();
-                _ = player.ConnectAsync();
-            }
         }
     }
 
@@ -604,7 +790,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
                         _videoView = null;
                     }
 
-                    _log?.Info($"[ImprovedRtspPlayer] Disposed: {_cachedContextId}");
+                    //_log?.Info($"[ImprovedRtspPlayer] Disposed: {_cachedContextId}");
                 }
                 catch (Exception ex)
                 {

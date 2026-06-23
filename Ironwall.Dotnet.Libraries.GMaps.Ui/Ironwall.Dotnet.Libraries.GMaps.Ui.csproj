@@ -45,6 +45,8 @@
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps.Db\Ironwall.Dotnet.Libraries.GMaps.Db.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps\Ironwall.Dotnet.Libraries.GMaps.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming\Ironwall.Dotnet.Libraries.Streaming.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />

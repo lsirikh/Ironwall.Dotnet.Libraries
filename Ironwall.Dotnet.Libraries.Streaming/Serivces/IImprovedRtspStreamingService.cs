@@ -17,8 +17,9 @@ public interface IImprovedRtspStreamingService: IService, IDisposable
 
     void ClearAllPlayers();
     Task<bool> ConnectAsync(string contextId,
-        RtspConnectionInfo connectionInfo,
-        StreamingOptions? options = null, VideoView? videoView = null);
+        RtspConnectionInfo? connectionInfo,
+        StreamingOptions? options = null, VideoView? videoView = null,
+        CancellationToken ct = default);
     Task DisconnectAllAsync();
     Task DisconnectAsync(string contextId);
     MediaPlayer? GetMediaPlayer(string? contextId);
@@ -40,4 +41,6 @@ public interface IImprovedRtspStreamingService: IService, IDisposable
     
     Task<bool> TakeSnapshotAsync(string contextId, string filePath);
 
+    /// <summary>Hub 경로 플레이어를 타임아웃 트래킹에 등록. IsAutoDiscard 팝업에서 호출.</summary>
+    void RegisterConnectionStartTime(string contextId);
 }

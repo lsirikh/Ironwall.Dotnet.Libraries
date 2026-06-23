@@ -70,6 +70,14 @@ public class PlaybackStateToVisibilityConverter : IValueConverter
                     return state == PlaybackState.Restricted
                         ? Visibility.Visible : Visibility.Collapsed;
 
+                case "shared":  // 공유 스트림 대기
+                    return state == PlaybackState.SharedStreamWaiting
+                        ? Visibility.Visible : Visibility.Collapsed;
+
+                case "badge":  // None 제외 모든 상태에서 배지 표시
+                    return state != PlaybackState.None
+                        ? Visibility.Visible : Visibility.Collapsed;
+
                 default:
                     return Visibility.Collapsed;
             }

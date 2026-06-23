@@ -19,10 +19,15 @@ namespace Ironwall.Dotnet.Libraries.Streaming.Views
     /// </summary>
     public partial class PopupWindowView : Window
     {
-
         public PopupWindowView()
         {
             InitializeComponent();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            // disposal은 PopupViewerService.OnWindowClosed가 단독 담당 (중복 호출 방지)
         }
     }
 }

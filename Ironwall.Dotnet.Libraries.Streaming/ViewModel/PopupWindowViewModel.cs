@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Commands;
 using Ironwall.Dotnet.Libraries.Streaming.Events;
@@ -7,6 +8,8 @@ using Ironwall.Dotnet.Libraries.Streaming.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Serivces;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
@@ -20,15 +23,16 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
     ****************************************************************************/
     
 
-    public class PopupWindowViewModel : PropertyChangedBase, IDisposable
+    public class PopupWindowViewModel : PropertyChangedBase, IDisposable, IAsyncDisposable
     {
         #region Fields
         private readonly ILogService? _log;
         private readonly IImprovedRtspStreamingService? _streamingService;
+        private readonly ISharedCameraStreamHub? _hub;
         private readonly object _lockObject = new object();
 
         // Row 관리 상수
-        private const int MAX_ROWS = 4; // 최대 표시 가능한 Row의 갯수
+        private const int MAX_ROWS = 3; // 최대 표시 가능한 Row의 갯수
         private const int MAX_CAMERAS_PER_ROW = 3; // 1개 Row 당 최대 시현 카메라
 
         // ContextId  조회용 Dictionary
@@ -41,6 +45,15 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         private readonly Dictionary<string, CameraRowViewModel> _rowLookup = new Dictionary<string, CameraRowViewModel>();
 
         private bool _isDisposed = false;
+
+        // 큐 항목 최소 표시 대기 ms — PopupViewerService가 주입
+        public int QueueMinDisplayMs { get; set; } = 0;
+
+        // 마지막으로 Row가 화면에 표시된 시각 (레이트 리밋 기준)
+        private DateTime _lastRowDisplayedAt = DateTime.MinValue;
+
+        // 이미 예약된 Dequeue 작업이 있는지 (중복 스케줄 방지)
+        private bool _dequeueScheduled = false;
         #endregion
 
         #region Constructor
@@ -53,6 +66,11 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             ClearCameraCommand = new RelayCommand<CameraViewModel>(ClearCamera);
 
             _streamingService.StateChanged += OnStreamingStateChanged;
+        }
+
+        public PopupWindowViewModel(ISharedCameraStreamHub hub) : this()
+        {
+            _hub = hub;
         }
         #endregion
 
@@ -120,13 +138,15 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
 
                 _log?.Info($"[PopupWindowViewModel] Adding {cameras.Length} cameras as new row");
 
-                // 새로운 Row 생성
-                var newRow = new CameraRowViewModel(eventId, description);
+                // 새로운 Row 생성 — Hub가 주입된 경우 Lease 기반 스트림 관리 활성화
+                var newRow = _hub != null
+                    ? new CameraRowViewModel(eventId, description, _hub)
+                    : new CameraRowViewModel(eventId, description);
 
                 // 연결 정보를 CameraItemViewModel로 변환 (최대 2개까지)
                 var camerasToAdd = cameras.Take(MAX_CAMERAS_PER_ROW).Select(conn =>
                 {
-                    return new CameraViewModel(conn, newRow.RowId);
+                    return new CameraViewModel(conn, newRow.RowId, newRow);
                 }).ToList();
 
                 // Row에 카메라 추가
@@ -141,18 +161,17 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                 // RowId로 조회 가능하도록 Dictionary에 추가
                 _rowLookup[newRow.RowId] = newRow;
 
-                // FIFO 처리 - 3줄을 넘으면 맨 아래 줄 제거
-                if (CameraRows.Count >= MAX_ROWS)
-                {
-                    _waitingQueue.Enqueue(newRow);
-                    _log?.Info($"[PopupWindowViewModel] Row({newRow.RowId}) added to waiting queue. Queue count: {_waitingQueue.Count}");
-                    //RemoveBottomRow();
-                }else
-                {
-                    // 맨 위에 새 Row 추가 (FIFO - 위에서 추가)
-                    CameraRows.Insert(0, newRow);
-                    _log?.Info($"[PopupWindowViewModel] Added new row({newRow.RowId}) with {camerasToAdd.Count} cameras.");
-                }
+                // Row 개별 종료 구독 — sender 기반, 클로저 캡처 금지
+                newRow.CloseRequested += OnRowCloseRequested;
+
+                // Queue-First: 모든 이벤트는 예외 없이 Queue 경유.
+                // QueueMinDisplayMs 대기 후 슬롯이 있으면 표시.
+                // QueueMinDisplayMs=0이면 Task.Delay(0) → 즉시 표시 (체감 동일).
+                // 첫 이벤트도 예외 없음 — 연속성 테스트와 Redis 경로 모두 동일하게 처리.
+                _waitingQueue.Enqueue(newRow);
+                _log?.Info($"[PopupWindowViewModel] Row({newRow.RowId}) enqueued. Queue: {_waitingQueue.Count}");
+                if (CameraRows.Count < MAX_ROWS)
+                    ScheduleDequeue();
 
                 // UI 업데이트
                 NotifyOfPropertyChange(nameof(CurrentCount));
@@ -175,6 +194,7 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
         {
             lock (_lockObject)
             {
+                if (_isDisposed) return false;
                 if (string.IsNullOrEmpty(rowId))
                     return false;
 
@@ -201,6 +221,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                     // Row 제거
                     CameraRows.Remove(row);
                     _rowLookup.Remove(rowId);
+                    row.CloseRequested -= OnRowCloseRequested;
+                    row.Dispose();
 
                     RemoveCameraRow?.Invoke(this, rowId);
 
@@ -215,8 +237,8 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
 
                     _log?.Info($"[PopupWindowViewModel] Row removed. Current: {RowCount}, Waiting: {WaitingQueueCount}");
 
-                    // 비어있으면 닫기 요청
-                    if (IsEmpty && WaitingQueueCount == 0)
+                    // 비어있으면 닫기 요청 (dequeue 타이머 pending 중이면 닫지 않음)
+                    if (IsEmpty && WaitingQueueCount == 0 && !_dequeueScheduled)
                     {
                         RequestClose?.Invoke(this, EventArgs.Empty);
                     }
@@ -228,6 +250,9 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                 if (_waitingQueue.Contains(row))
                 {
                     _log?.Info($"[PopupWindowViewModel] Removing row from waiting queue: {rowId}");
+
+                    // 취소 마킹 — ProcessWaitingQueue에서 Dequeue 시 자동 스킵됨
+                    row.Cancel();
 
                     // Queue는 Remove를 직접 지원하지 않으므로, 재구성 필요
                     var tempList = _waitingQueue.ToList();
@@ -245,10 +270,20 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
                     }
 
                     _rowLookup.Remove(rowId);
+                    row.CloseRequested -= OnRowCloseRequested;
+                    row.Dispose();
 
                     RemoveCameraRow?.Invoke(this, rowId);
 
                     NotifyOfPropertyChange(nameof(WaitingQueueCount));
+                    NotifyOfPropertyChange(nameof(IsEmpty));
+                    NotifyOfPropertyChange(nameof(CurrentCount));
+                    NotifyOfPropertyChange(nameof(RowCount));
+
+                    // 대기 큐에서 제거 후 모두 비었으면 팝업 창 닫기 요청
+                    // dequeue 타이머 pending 중이면 닫지 않음 (타이머 콜백에서 최종 판단)
+                    if (IsEmpty && WaitingQueueCount == 0 && !_dequeueScheduled)
+                        RequestClose?.Invoke(this, EventArgs.Empty);
 
                     _log?.Info($"[PopupWindowViewModel] Row removed from queue. Waiting: {WaitingQueueCount}");
 
@@ -262,20 +297,98 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
 
         #endregion
         #region Private Methods
+
+        private void OnRowCloseRequested(object? sender, string rowId)
+        {
+            // sender 사용 — newRow 클로저 캡처 금지 (멀티 Row 시 wrong row 참조 버그 방지)
+            if (sender is CameraRowViewModel row)
+                row.CloseRequested -= OnRowCloseRequested;
+            RemoveRowById(rowId);
+        }
+
         /// <summary>
-        /// 대기 큐에서 다음 Row를 가져와서 표시
+        /// 표시 슬롯이 비워졌을 때 대기 큐에서 다음 Row를 가져올지 결정.
+        /// QueueMinDisplayMs > 0 이면 남은 대기 시간만큼 지연 후 표시.
         /// </summary>
         private void ProcessWaitingQueue()
         {
-            // 표시 공간이 있고, 대기 큐에 Row가 있으면
-            while (CameraRows.Count < MAX_ROWS && _waitingQueue.Count > 0)
-            {
-                var nextRow = _waitingQueue.Dequeue();
-                CameraRows.Insert(0, nextRow);
+            if (_waitingQueue.Count == 0) return;
 
-                _log?.Info($"[PopupWindowViewModel] Moved row({nextRow.RowId}) from queue to display. Remaining in queue: {_waitingQueue.Count}");
+            if (QueueMinDisplayMs > 0)
+                ScheduleDequeue();
+            else
+                DequeueFromWaitingQueue();
+        }
+
+        /// <summary>
+        /// 남은 대기 시간을 계산해 단 하나의 Dequeue 작업을 스케줄링.
+        /// 이미 예약된 작업이 있으면 중복 스케줄을 건너뜀.
+        /// </summary>
+        private void ScheduleDequeue()
+        {
+            if (_dequeueScheduled) return;
+            _dequeueScheduled = true;
+
+            int remainingMs;
+            if (_lastRowDisplayedAt == DateTime.MinValue)
+            {
+                remainingMs = 0;
+            }
+            else
+            {
+                var elapsed = (DateTime.UtcNow - _lastRowDisplayedAt).TotalMilliseconds;
+                remainingMs = (int)Math.Max(0, QueueMinDisplayMs - elapsed);
+            }
+
+            _ = Task.Delay(remainingMs).ContinueWith(
+                _ => Execute.OnUIThread(() =>
+                {
+                    if (_isDisposed) return;
+                    _dequeueScheduled = false;
+                    DequeueFromWaitingQueue();
+                    // 타이머 후 dequeue했음에도 여전히 비어있으면 닫기 (OFF로 큐가 비워진 경우)
+                    if (IsEmpty && WaitingQueueCount == 0 && !_dequeueScheduled)
+                        RequestClose?.Invoke(this, EventArgs.Empty);
+                }),
+                TaskScheduler.Default);
+        }
+
+        private void DequeueFromWaitingQueue()
+        {
+            lock (_lockObject)
+            {
+                if (CameraRows.Count >= MAX_ROWS || _waitingQueue.Count == 0) return;
+
+                var nextRow = _waitingQueue.Dequeue();
+                while (nextRow != null && nextRow.IsCancelled)
+                {
+                    _rowLookup.Remove(nextRow.RowId);
+                    nextRow.Dispose();
+                    _log?.Info($"[PopupWindowViewModel] Skipped cancelled row: {nextRow.RowId}. Remaining: {_waitingQueue.Count}");
+                    nextRow = _waitingQueue.Count > 0 ? _waitingQueue.Dequeue() : null;
+                }
+
+                if (nextRow == null) return;
+
+                CameraRows.Insert(0, nextRow);
+                _lastRowDisplayedAt = DateTime.UtcNow;
+                NotifyOfPropertyChange(nameof(CurrentCount));
+                NotifyOfPropertyChange(nameof(RowCount));
+                NotifyOfPropertyChange(nameof(IsEmpty));
+                NotifyOfPropertyChange(nameof(WaitingQueueCount));
+                _log?.Info($"[PopupWindowViewModel] Moved row({nextRow.RowId}) from queue to display. Remaining: {_waitingQueue.Count}");
+
+                // 슬롯이 남아 있고 큐에 더 있으면 다음 것도 스케줄
+                if (CameraRows.Count < MAX_ROWS && _waitingQueue.Count > 0)
+                    ScheduleDequeue();
             }
         }
+
+        // QueueMinDisplayMs == 0 이거나 충분한 시간이 지났으면 즉시 표시 가능
+        private bool CanShowNow() =>
+            QueueMinDisplayMs == 0 ||
+            _lastRowDisplayedAt == DateTime.MinValue ||
+            (DateTime.UtcNow - _lastRowDisplayedAt).TotalMilliseconds >= QueueMinDisplayMs;
 
         /// <summary>
         /// 카메라 단위로 삭제 (기존 메서드 유지)
@@ -385,34 +498,63 @@ namespace Ironwall.Dotnet.Libraries.Streaming.ViewModel{
             if (_streamingService != null)
                 _streamingService.StateChanged -= OnStreamingStateChanged;
 
+            CameraRowViewModel[] rowsToDispose;
             lock (_lockObject)
             {
+                // DisposeAsync()는 CameraRows.ToArray()로 rows를 수집하는데,
+                // Clear() 이후 호출되면 빈 배열을 보게 된다. Close() 경로에서는
+                // 여기서 직접 fire-and-forget 해제해야 Hub 세션이 제때 종료된다.
+                rowsToDispose = CameraRows.Concat(_waitingQueue).ToArray();
                 CameraRows.Clear();
                 _waitingQueue.Clear();
                 _contextLookup.Clear();
                 _rowLookup.Clear();
             }
 
+            foreach (var row in rowsToDispose)
+            {
+                row.CloseRequested -= OnRowCloseRequested;
+                _ = row.DisposeAsync().AsTask();
+            }
+
             RequestClose?.Invoke(this, EventArgs.Empty);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
+
+            if (_streamingService != null)
+                _streamingService.StateChanged -= OnStreamingStateChanged;
+
+            CameraRowViewModel[] activeRows;
+            CameraRowViewModel[] queuedRows;
+            string[] contextIds;
+            lock (_lockObject)
+            {
+                activeRows = CameraRows.ToArray();
+                queuedRows = _waitingQueue.ToArray();
+                contextIds = _contextLookup.Keys.ToArray();
+                CameraRows.Clear();
+                _waitingQueue.Clear();
+                _contextLookup.Clear();
+                _rowLookup.Clear();
+            }
+
+            foreach (var row in activeRows.Concat(queuedRows))
+                await row.DisposeAsync().ConfigureAwait(false);
+
+            if (_streamingService != null)
+            {
+                foreach (var contextId in contextIds)
+                    await _streamingService.DisconnectAsync(contextId).ConfigureAwait(false);
+            }
         }
 
         public void Dispose()
         {
-            if (!_isDisposed)
-            {
-                _isDisposed = true;
-
-                if (_streamingService != null)
-                    _streamingService.StateChanged -= OnStreamingStateChanged;
-
-                lock (_lockObject)
-                {
-                    CameraRows.Clear();
-                    _waitingQueue.Clear();
-                    _contextLookup.Clear();
-                    _rowLookup.Clear();
-                }
-            }
+            DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
         #endregion
 

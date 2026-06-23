@@ -62,6 +62,29 @@ public class RtspConnectionInfo : BaseModel
     }
 
     /// <summary>
+    /// Hub가 생성한 로컬 relay URL인 경우 true.
+    /// ImprovedRtspStreamingService는 이 경우 sout relay 생성을 건너뜀.
+    /// </summary>
+    public bool IsLocalRelay { get; set; } = false;
+
+    /// <summary>
+    /// Hub relay URL로부터 RtspConnectionInfo를 생성한다.
+    /// 예: "rtsp://127.0.0.1:15554/192.168.1.1:554/ch0"
+    /// </summary>
+    public static RtspConnectionInfo FromRelayUrl(string relayUrl)
+    {
+        var uri = new Uri(relayUrl);
+        return new RtspConnectionInfo
+        {
+            IpAddress    = uri.Host,
+            Port         = uri.Port,
+            StreamPath   = uri.AbsolutePath.TrimStart('/'),
+            Protocol     = uri.Scheme,
+            IsLocalRelay = true
+        };
+    }
+
+    /// <summary>
     /// 객체 복제
     /// </summary>
     public RtspConnectionInfo Clone()
@@ -88,6 +111,22 @@ public class RtspConnectionInfo : BaseModel
     public override string ToString()
     {
         return !string.IsNullOrEmpty(Description) ? Description : GetFullUrl();
+    }
+
+    /// <summary>
+    /// 카메라 고유 키 — credential · query 제외, host:port/path 형식.
+    /// Hub / SharedSession / Row 전체에서 동일한 키를 사용하기 위한 표준 메서드.
+    /// </summary>
+    public string GetCameraKey()
+    {
+        var fullUrl = GetFullUrl();
+        if (!string.IsNullOrEmpty(fullUrl) && Uri.TryCreate(fullUrl, UriKind.Absolute, out var uri))
+        {
+            var port = uri.Port > 0 ? uri.Port : 554;
+            var path = uri.AbsolutePath.TrimStart('/');
+            return $"{uri.Host}:{port}/{path}";
+        }
+        return $"{IpAddress}:{Port}/{StreamPath}";
     }
 
     /// <summary>

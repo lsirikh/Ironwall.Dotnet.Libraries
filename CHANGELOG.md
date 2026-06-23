@@ -15,6 +15,10 @@
 ## [Unreleased]
 
 ### Added
+- **맵 위 이동식 RTSP 스트리밍 팝업** ([PRD](docs/prds/Rtsp_Map_Popup-prd.md) v1.3 · [Plan](docs/plans/Rtsp_Map_Popup-prd-plan.md))
+  - 맵 카메라 심볼 **더블클릭** → 카메라 우상단(중점 +오른쪽100/위100)에 **이동식 RTSP 영상 팝업**. Geo 앵커로 팬/줌 추종, 드래그 이동 위치를 **카메라별 DB 영속**(`CameraPopupPositions`, 다중 클라 공유)해 재오픈 시 복원. 멀티 팝업 + 중복=기존 포커스, **심볼 제거 시 자동 닫기(FR-13)**, 크게보기 384↔640.
+  - 참조 솔루션 `Dotnet.Rtsp.Viewer.Ui`의 `Streaming(.Base)`(LibVLCSharp 3.9.4, **Hub 공유 디코더**) 이식. 맵 오버레이 airspace hole 회피 위해 **Hub WriteableBitmap(IsHubMode)** 경로. `CameraStreamPopupControl`/Style(관심지역·레이어 창 답습)+VM, `CameraConnectionAdapter`(Urls.RtspSub→RtspMain→Ip), 더블클릭 배선(GMapCustomControl 편집/일반 공통), `CameraPopupPositionStore`(DB+인메모리폴백).
+  - NFR-07 패키지 정합(Caliburn.Micro 5.0.258→4.0.230, Autofac 8.4.0→8.3.0). 네이티브 libvlc/plugins 배포. code-review(opus). ※메인솔루션 Bootstrapper에 `StreamingModule` 등록 필요(미등록 시 팝업 비활성).
 - **MBTiles 베이스맵 빈 영역 기본 타일(no-data tile)** ([PRD](docs/prds/BaseMap_NoData_DefaultTile-prd.md) · [Plan](docs/plans/BaseMap_NoData_DefaultTile-prd-plan.md))
   - MBTiles 베이스맵 커버리지 밖으로 팬/줌 시 흰 화면 대신 **깔끔/모던 기본 타일**(라이트 뉴트럴 #EEF1F5 + 우/하 1px #DFE3E8 hairline)을 맵 격자에 정렬해 타일링 표시.
   - `MBTilesMapProvider.DefaultTileBytes`(byte[]) 추가 + `GetTileImage`가 **정상 줌 & 타일 없음일 때만** 기본 타일 반환(맵 미로드·줌 범위 밖은 null 유지 → 로드실패 은폐/부모타일 폴백 보존). 공유 인스턴스 금지(`GetTileImageFromArray` 매 요청 새 PureImage → use-after-dispose 회피).

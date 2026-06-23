@@ -2,6 +2,9 @@
 using Autofac.Core;
 using Autofac;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
+using Ironwall.Dotnet.Libraries.Streaming.Hub;
+using Ironwall.Dotnet.Libraries.Streaming.Infrastructure;
 using Ironwall.Dotnet.Libraries.Streaming.Models;
 using Ironwall.Dotnet.Libraries.Streaming.Serivces;
 using System;
@@ -81,7 +84,18 @@ public class StreamingModule : Module
                     }
                 });
 
-            // PopupViewerService 등록
+            // RelayPortPool 등록 (기본 포트 범위 15554~15700)
+            builder.RegisterType<RelayPortPool>()
+                .AsSelf()
+                .SingleInstance();
+
+            // CameraStreamHub 등록
+            builder.RegisterType<CameraStreamHub>()
+                .As<ISharedCameraStreamHub>()
+                .SingleInstance()
+                .OnRelease(h => ((IDisposable)h).Dispose());
+
+            // PopupViewerService 등록 — ISharedCameraStreamHub 자동 주입
             builder.RegisterType<PopupViewerService>()
                 .As<IPopupViewerService>()
                 .SingleInstance()

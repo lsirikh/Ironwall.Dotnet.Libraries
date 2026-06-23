@@ -344,6 +344,20 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "MapLayers 테이블 생성…" });
 
+            // 카메라별 RTSP 팝업 위치(Geo 앵커) — 다중 클라이언트 공유, CameraId 단독 PK
+            const string createCameraPopupPositionsSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraPopupPositions` (
+                    `CameraId`    INT PRIMARY KEY,
+                    `Latitude`    DECIMAL(10,8) NOT NULL,
+                    `Longitude`   DECIMAL(11,8) NOT NULL,
+                    `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                );";
+
+            await _conn.ExecuteAsync(createCameraPopupPositionsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "CameraPopupPositions 테이블 생성…" });
+
             // MBTiles 컬럼 마이그레이션 (기존 DB에 컬럼이 없으면 추가)
             await MigrateCustomMapsTableAsync();
 
@@ -1390,6 +1404,112 @@ internal class GMapDbService : TaskService, IGMapDbService
 
     #endregion
 
+    #region - CameraPopupPosition CRUD (카메라 RTSP 팝업 위치) -
+
+    /// <summary>카메라 팝업 위치를 Upsert(없으면 INSERT, 있으면 UPDATE). UpdatedAt는 컬럼 기본값으로 자동 갱신.</summary>
+    public async Task<bool> UpsertCameraPopupPositionAsync(ICameraPopupPositionModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                INSERT INTO CameraPopupPositions (CameraId, Latitude, Longitude)
+                VALUES (@CameraId, @Latitude, @Longitude)
+                ON DUPLICATE KEY UPDATE Latitude = @Latitude, Longitude = @Longitude;";
+
+            int ret = await conn.ExecuteAsync(sql, new
+            {
+                model.CameraId,
+                model.Latitude,
+                model.Longitude
+            });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 Upsert 실패 (CameraId={model.CameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>카메라 Id로 저장된 팝업 위치를 조회. 없으면 null.</summary>
+    public async Task<ICameraPopupPositionModel?> GetCameraPopupPositionAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT CameraId, Latitude, Longitude, UpdatedAt
+                FROM CameraPopupPositions
+                WHERE CameraId = @CameraId;";
+
+            var r = await conn.QueryFirstOrDefaultAsync<CameraPopupPositionSQL>(sql, new { CameraId = cameraId });
+            if (r == null) return null;
+
+            return new CameraPopupPositionModel
+            {
+                CameraId = r.CameraId,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                UpdatedAt = r.UpdatedAt
+            };
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 조회 실패 (CameraId={cameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>모든 카메라 팝업 위치를 조회(앱 시작 시 일괄 로드용).</summary>
+    public async Task<List<ICameraPopupPositionModel>?> FetchCameraPopupPositionsAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = @"
+                SELECT CameraId, Latitude, Longitude, UpdatedAt
+                FROM CameraPopupPositions;";
+
+            var rows = await conn.QueryAsync<CameraPopupPositionSQL>(sql);
+            return rows.Select(r => (ICameraPopupPositionModel)new CameraPopupPositionModel
+            {
+                CameraId = r.CameraId,
+                Latitude = (double)r.Latitude,
+                Longitude = (double)r.Longitude,
+                UpdatedAt = r.UpdatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 전체 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>카메라 Id로 저장된 팝업 위치를 삭제.</summary>
+    public async Task<bool> DeleteCameraPopupPositionAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+
+            const string sql = "DELETE FROM CameraPopupPositions WHERE CameraId = @CameraId;";
+            int ret = await conn.ExecuteAsync(sql, new { CameraId = cameraId });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"카메라 팝업 위치 삭제 실패 (CameraId={cameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    #endregion
+
     #region - MapLayer CRUD -
 
     public async Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default)
@@ -1721,6 +1841,15 @@ internal sealed class MapRoiSQL
     public int Zoom { get; set; }
     public int MapId { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>CameraPopupPositions 테이블 DTO</summary>
+internal sealed class CameraPopupPositionSQL
+{
+    public int CameraId { get; set; }
+    public decimal Latitude { get; set; }
+    public decimal Longitude { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
 
