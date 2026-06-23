@@ -237,6 +237,13 @@ public class MapViewModel : BasePanelViewModel,
             // Adorner 시스템 정리
             CleanupAdornerIntegration();
 
+            // 열린 카메라 RTSP 팝업 정리(Hub Lease/스트림 해제) — 누수 방지(H-1)
+            if (_cameraPopups != null)
+            {
+                foreach (var popup in _cameraPopups.ToList())
+                    await CloseCameraPopupAsync(popup);
+            }
+
             if (close)
             {
                 // GMap.NET CacheEngine은 IsBackground=false 포그라운드 스레드 → 미호출 시 프로세스 영구 잔존
