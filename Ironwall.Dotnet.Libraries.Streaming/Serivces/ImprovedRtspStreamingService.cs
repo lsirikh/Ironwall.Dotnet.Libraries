@@ -1352,11 +1352,9 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             }
             else
             {
-                // 재연결 조건 충족 안됨 - 연결 종료
-                if (_setupModel.IsAutoDiscard)
-                {
-                    await DisconnectAsync(context.Id);
-                }
+                // 재연결 조건 충족 안됨(재연결 비활성/시도 소진) - 연결 종료.
+                // IsAutoDiscard와 무관하게 항상 정리: 실패 스트림 컨텍스트 누수 방지(슬롯 잠식 방지).
+                await DisconnectAsync(context.Id);
             }
         }
         catch (OperationCanceledException)

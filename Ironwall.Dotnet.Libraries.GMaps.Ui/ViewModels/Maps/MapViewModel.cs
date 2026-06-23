@@ -730,7 +730,7 @@ public class MapViewModel : BasePanelViewModel,
     private void RefreshCameraPopupPositions()
     {
         if (MainMap == null || _cameraPopups == null || _cameraPopups.Count == 0) return;
-        foreach (var vm in _cameraPopups)
+        foreach (var vm in _cameraPopups.ToList())   // 순회 중 Close(Remove) 재진입 방어
         {
             // 카메라 심볼 화면점(연결선 끝점1) 갱신 — 팬/줌 추종
             var cs = MainMap.FromLatLngToLocal(vm.CameraGeo);

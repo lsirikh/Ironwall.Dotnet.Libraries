@@ -133,8 +133,13 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         PopupHeight = IsLarge ? LargeHeight : DefaultHeight;
     }
 
+    private bool _disposed;
+
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;   // 멱등(타이머 Tick + 수동 Close 동시 진입 방어)
+        _disposed = true;
+
         // Hub Lease 해제(C-03: Row가 Stop→Dispose 순서 담당)
         try { await _row.DisposeAsync().ConfigureAwait(false); }
         catch { /* 종료 경로 — 무해 */ }
