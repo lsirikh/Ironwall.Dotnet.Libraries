@@ -7,6 +7,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Modules;         // AccountModule
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Gateways;     // DbAccountGateway
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;     // ISessionConfigService / IProfileImageService
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;   // AccountViewModel / LoginViewModel / RegisterViewModel
+using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs;  // Delete/ResetPass 다이얼로그
 using Ironwall.Dotnet.Libraries.Base.Models;              // IMariaDbSetupModel
 using Ironwall.Dotnet.Libraries.Base.Services;            // ILogService
 using Ironwall.Dotnet.Monitoring.Models.Accounts;         // AccountModel (C-1 전용 모델)
@@ -91,10 +92,10 @@ public class AccountUiModule : Module
             // builder.RegisterType<AccountManagerPanelViewModel>().SingleInstance();
             // builder.RegisterType<MyPagePanelViewModel>().SingleInstance();
             // builder.RegisterType<AccountSetupPanelViewModel>().SingleInstance();
-            // builder.RegisterType<RegisterDialogViewModel>().SingleInstance();
-            // builder.RegisterType<EditorDialogViewModel>().SingleInstance();
-            // builder.RegisterType<DeleteAccountDialogViewModel>().SingleInstance();
-            // builder.RegisterType<ResetPasswordDialogViewModel>().SingleInstance();
+            // builder.RegisterType<RegisterDialogViewModel>().SingleInstance();   // Phase 3b
+            // builder.RegisterType<EditorDialogViewModel>().SingleInstance();     // Phase 3b
+            builder.RegisterType<DeleteAccountDialogViewModel>().SingleInstance();
+            builder.RegisterType<ResetPassDialogViewModel>().SingleInstance();
         }
         catch
         {

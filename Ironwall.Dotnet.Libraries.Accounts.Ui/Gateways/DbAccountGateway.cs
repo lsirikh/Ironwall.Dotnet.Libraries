@@ -73,8 +73,11 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     public async Task<IAccountModel?> ResetAccountPasswordAsync(IAccountModel acc, string newPassword, CancellationToken ct = default)
     {
         // 관리자 강제 초기화 — 현재 비밀번호 검증 없음. UpdateAccountPassAsync 내부에서 HashPassword.
+        var oldHash = acc.Password;
         acc.Password = newPassword;
-        return await _db.UpdateAccountPassAsync(acc, ct).ConfigureAwait(false);
+        var result = await _db.UpdateAccountPassAsync(acc, ct).ConfigureAwait(false);
+        if (result is null) acc.Password = oldHash;     // DB 실패 시 인메모리 롤백
+        return result;
     }
     #endregion
 
@@ -88,13 +91,16 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     public async Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default)
     {
         // 본인 변경 — 현재 비밀번호 검증(acc.Password=해시) 후 변경
-        if (!PasswordHelper.VerifyPassword(acc.Password, currentPassword))
+        var oldHash = acc.Password;
+        if (!PasswordHelper.VerifyPassword(oldHash, currentPassword))
         {
             _log?.Warning("비밀번호 변경 거부 — 현재 비밀번호 불일치");
             return null;
         }
         acc.Password = newPassword;                         // UpdateAccountPassAsync 내부에서 HashPassword
-        return await _db.UpdateAccountPassAsync(acc, ct).ConfigureAwait(false);
+        var result = await _db.UpdateAccountPassAsync(acc, ct).ConfigureAwait(false);
+        if (result is null) acc.Password = oldHash;         // DB 실패 시 인메모리 롤백(선적용 버그 수정)
+        return result;
     }
     #endregion
 
