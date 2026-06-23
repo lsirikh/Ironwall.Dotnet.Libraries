@@ -18,6 +18,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
@@ -37,11 +38,15 @@ public class ImprovedRtspPlayer : Control, IDisposable
     private const string PART_LoadingIndicator = "PART_LoadingIndicator";
     private const string PART_ErrorPanel = "PART_ErrorPanel";
     private const string PART_StatusText = "PART_StatusText";
+    private const string PART_SnapshotFlash = "PART_SnapshotFlash";
+    private const string PART_SnapshotOsd = "PART_SnapshotOsd";
 
     private VideoView? _videoView;
     private ProgressBar? _loadingIndicator;
     private StackPanel? _errorPanel;
     private TextBlock? _statusText;
+    private FrameworkElement? _snapshotFlash;
+    private FrameworkElement? _snapshotOsd;
 
     // Service references
     private IImprovedRtspStreamingService? _streamingService;
@@ -315,6 +320,8 @@ public class ImprovedRtspPlayer : Control, IDisposable
         _loadingIndicator = GetTemplateChild(PART_LoadingIndicator) as ProgressBar;
         _errorPanel = GetTemplateChild(PART_ErrorPanel) as StackPanel;
         _statusText = GetTemplateChild(PART_StatusText) as TextBlock;
+        _snapshotFlash = GetTemplateChild(PART_SnapshotFlash) as FrameworkElement;
+        _snapshotOsd = GetTemplateChild(PART_SnapshotOsd) as FrameworkElement;
 
         // OnApplyTemplate 시점의 IsHubMode 값을 VideoView에 즉시 반영
         // (OnIsHubModeChanged 콜백이 _videoView 초기화 전 호출된 경우 대비)
@@ -599,14 +606,47 @@ public class ImprovedRtspPlayer : Control, IDisposable
                 return false;
 
             filePath ??= $"snapshot_{_cachedContextId}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            return await _streamingService.TakeSnapshotAsync(_cachedContextId ?? throw new NullReferenceException($"CachedContextId가 설정되어있지 않습니다.") , filePath);
+            var ok = await _streamingService.TakeSnapshotAsync(_cachedContextId ?? throw new NullReferenceException($"CachedContextId가 설정되어있지 않습니다.") , filePath);
+            if (ok)
+                await Dispatcher.InvokeAsync(PlaySnapshotFeedback);   // 흰 플래시 + 우상단 OSD
+            return ok;
         }
         catch (Exception ex)
         {
             _log?.Error(ex.Message);
             return false;
         }
-        
+
+    }
+
+    /// <summary>스냅샷 촬영 피드백: 흰 플래시 번쩍(250ms) + 우상단 OSD "스냅샷 저장"(1초 유지 후 사라짐).</summary>
+    private void PlaySnapshotFeedback()
+    {
+        try
+        {
+            if (_snapshotFlash != null)
+            {
+                var flash = new DoubleAnimation
+                {
+                    From = 0.85,
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(250),
+                    FillBehavior = FillBehavior.Stop,
+                };
+                _snapshotFlash.BeginAnimation(UIElement.OpacityProperty, flash);
+            }
+
+            if (_snapshotOsd != null)
+            {
+                // 0→1(120ms) → 1초 유지 → 0(300ms). FillBehavior.Stop으로 종료 후 Opacity=0 복귀.
+                var osd = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+                osd.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(120))));
+                osd.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1120))));
+                osd.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1420))));
+                _snapshotOsd.BeginAnimation(UIElement.OpacityProperty, osd);
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[ImprovedRtspPlayer] Snapshot feedback failed: {ex.Message}"); }
     }
 
     private bool CanPlay()

@@ -484,6 +484,41 @@
 										</StackPanel>
 									</Grid>
 								</Grid>
+
+								<!--  스냅샷 플래시(흰 번쩍) — 최상단, 클릭 무시  -->
+								<Rectangle
+									x:Name="PART_SnapshotFlash"
+									Fill="White"
+									IsHitTestVisible="False"
+									Opacity="0" />
+
+								<!--  스냅샷 OSD(우상단 "스냅샷 저장", 1초 후 사라짐)  -->
+								<Border
+									x:Name="PART_SnapshotOsd"
+									Margin="0,10,10,0"
+									Padding="10,5"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Top"
+									Background="#CC000000"
+									CornerRadius="4"
+									IsHitTestVisible="False"
+									Opacity="0">
+									<StackPanel Orientation="Horizontal">
+										<TextBlock
+											Margin="0,0,6,0"
+											VerticalAlignment="Center"
+											FontFamily="Segoe MDL2 Assets"
+											FontSize="14"
+											Foreground="White"
+											Text="&#xE722;" />
+										<TextBlock
+											VerticalAlignment="Center"
+											FontSize="13"
+											FontWeight="SemiBold"
+											Foreground="White"
+											Text="스냅샷 저장" />
+									</StackPanel>
+								</Border>
 							</Grid>
 
 							<!--  Control Bar  -->

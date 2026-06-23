@@ -713,9 +713,17 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             if (TryGetContext(contextId, out var context) && context != null)
             {
                 if (context.MediaPlayer != null)
-                { 
-                    _log?.Info($"[ImprovedRtspStreamingService] Taking snapshot for {contextId}: {fileName}");
-                    return await Task.Run(() => context.MediaPlayer.TakeSnapshot(0, $"{_setupModel.SnapshotPath}\\{fileName}", 0, 0));
+                {
+                    // 저장 폴더 자동생성 + 상대경로면 앱 기준 절대화 + 슬래시 혼용 제거(Path.Combine)
+                    var dir = _setupModel.SnapshotPath;
+                    if (string.IsNullOrWhiteSpace(dir)) dir = "snapshots";
+                    if (!System.IO.Path.IsPathRooted(dir))
+                        dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, dir);
+                    System.IO.Directory.CreateDirectory(dir);
+                    var fullPath = System.IO.Path.Combine(dir, fileName);
+
+                    _log?.Info($"[ImprovedRtspStreamingService] Taking snapshot for {contextId}: {fullPath}");
+                    return await Task.Run(() => context.MediaPlayer.TakeSnapshot(0, fullPath, 0, 0));
                 }
             }
             return false;
