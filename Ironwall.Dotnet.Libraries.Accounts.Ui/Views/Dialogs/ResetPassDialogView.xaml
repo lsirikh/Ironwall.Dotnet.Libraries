@@ -1,0 +1,219 @@
+﻿<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs.ResetPassDialogView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Dialogs"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
+	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+
+	<UserControl.Resources>
+		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+	</UserControl.Resources>
+
+	<md:DialogHost
+		x:Name="DialogHost"
+		DialogTheme="Inherit"
+		Identifier="ResetPasswordDialogView">
+
+		<md:Card
+			x:Name="CardContents"
+			Width="450"
+			Height="300"
+			MinWidth="400"
+			MinHeight="250"
+			Padding="20"
+			VerticalAlignment="Stretch"
+			md:ThemeAssist.Theme="Inherit"
+			Opacity="0.9"
+			UniformCornerRadius="10">
+
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="5*" />
+					<ColumnDefinition Width="5*" />
+				</Grid.ColumnDefinitions>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="2*" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="3*" />
+				</Grid.RowDefinitions>
+				<StackPanel
+					Grid.Row="0"
+					Grid.ColumnSpan="2"
+					Orientation="Horizontal">
+					<md:PackIcon Kind="AccountCheck" Style="{StaticResource DialogTitleIcon}" />
+					<TextBlock
+						VerticalAlignment="Center"
+						Style="{StaticResource DialogTitle}"
+						Text="비밀번호 변경"
+						TextWrapping="Wrap" />
+				</StackPanel>
+				<Separator
+					Grid.Row="1"
+					Grid.ColumnSpan="2"
+					Style="{StaticResource MaterialDesignLightSeparator}" />
+				<Grid
+					Grid.Row="2"
+					Grid.Column="0"
+					Grid.ColumnSpan="2">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="4.5*" />
+						<ColumnDefinition Width="5.5*" />
+					</Grid.ColumnDefinitions>
+					<Grid.RowDefinitions>
+						<RowDefinition />
+						<RowDefinition />
+						<RowDefinition />
+					</Grid.RowDefinitions>
+
+					<TextBlock
+						Grid.Row="0"
+						Grid.Column="0"
+						Style="{StaticResource TextBlockTitle}"
+						Text="비밀번호" />
+					<PasswordBox
+						x:Name="InputPassword"
+						Grid.Row="0"
+						Grid.Column="1"
+						md:HintAssist.Hint="비밀번호"
+						utilPass:PasswordBoxAssistant.BindPassword="True"
+						PasswordChar="*"
+						Style="{StaticResource PasswordBoxInput}">
+						<!--  시각적 Validation 담당  -->
+						<utilPass:PasswordBoxAssistant.BoundPassword>
+							<Binding
+								Mode="TwoWay"
+								Path="InputPassword"
+								UpdateSourceTrigger="PropertyChanged">
+								<Binding.ValidationRules>
+									<utils:StringLengthValidationRule Max="20" Min="8" />
+								</Binding.ValidationRules>
+							</Binding>
+						</utilPass:PasswordBoxAssistant.BoundPassword>
+					</PasswordBox>
+
+
+					<TextBlock
+						Grid.Row="1"
+						Grid.Column="0"
+						Style="{StaticResource TextBlockTitle}"
+						Text="신규 비밀번호" />
+					<PasswordBox
+						x:Name="NewPassword"
+						Grid.Row="1"
+						Grid.Column="1"
+						md:HintAssist.Hint="새 비밀번호"
+						utilPass:PasswordBoxAssistant.BindPassword="True"
+						PasswordChar="*"
+						Style="{StaticResource PasswordBoxInput}">
+						<!--  시각적 Validation 담당  -->
+						<utilPass:PasswordBoxAssistant.BoundPassword>
+							<Binding
+								Mode="TwoWay"
+								Path="NewPassword"
+								UpdateSourceTrigger="PropertyChanged">
+								<Binding.ValidationRules>
+									<utils:StringLengthValidationRule Max="20" Min="8" />
+								</Binding.ValidationRules>
+							</Binding>
+						</utilPass:PasswordBoxAssistant.BoundPassword>
+					</PasswordBox>
+
+
+					<TextBlock
+						Grid.Row="2"
+						Grid.Column="0"
+						Style="{StaticResource TextBlockTitle}"
+						Text="신규 비밀번호 확인" />
+					<!--<PasswordBox
+						x:Name="NewPasswordConfirm"
+						Grid.Row="2"
+						Grid.Column="1"
+						md:HintAssist.Hint="새 비밀번호 확인"
+						utilPass:PasswordBoxAssistant.BindPassword="True"
+						PasswordChar="*"
+						Style="{StaticResource PasswordBoxInput}">
+						<
+						<utilPass:PasswordBoxAssistant.BoundPassword>
+							<Binding
+								FallbackValue="12345678"
+								Mode="TwoWay"
+								Path="NewPasswordConfirm"
+								UpdateSourceTrigger="PropertyChanged">
+								<Binding.ValidationRules>
+									<ExceptionValidationRule />
+									<utils:PassConfirmValidationRule ValidatesOnTargetUpdated="True">
+										<utils:PassConfirmValidationRule.Parameters>
+											<utils:PassConfirmValidationParameters BasicString="{Binding Data.NewPassword, FallbackValue=12345678, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}" />
+										</utils:PassConfirmValidationRule.Parameters>
+									</utils:PassConfirmValidationRule>
+								</Binding.ValidationRules>
+							</Binding>
+						</utilPass:PasswordBoxAssistant.BoundPassword>
+					</PasswordBox>-->
+
+					<PasswordBox
+						x:Name="NewPasswordConfirm"
+						Grid.Row="2"
+						Grid.Column="1"
+						md:HintAssist.Hint="비밀번호 확인"
+						utilPass:PasswordBoxAssistant.BindPassword="True"
+						PasswordChar="*"
+						Style="{StaticResource PasswordBoxInput}">
+						<utilPass:PasswordBoxAssistant.BoundPassword>
+							<Binding
+								Mode="TwoWay"
+								Path="NewPasswordConfirm"
+								UpdateSourceTrigger="PropertyChanged">
+								<Binding.ValidationRules>
+									<utils:PassConfirmValidationRule ValidatesOnTargetUpdated="True">
+										<utils:PassConfirmValidationRule.Parameters>
+											<utils:PassConfirmValidationParameters BasicString="{Binding Data.NewPassword, Source={StaticResource proxy}, UpdateSourceTrigger=PropertyChanged}" />
+										</utils:PassConfirmValidationRule.Parameters>
+									</utils:PassConfirmValidationRule>
+								</Binding.ValidationRules>
+							</Binding>
+						</utilPass:PasswordBoxAssistant.BoundPassword>
+					</PasswordBox>
+
+				</Grid>
+
+				<Grid
+					Grid.Row="3"
+					Grid.ColumnSpan="2"
+					Margin="0,10,0,0">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="5*" />
+						<ColumnDefinition Width="5*" />
+					</Grid.ColumnDefinitions>
+					<Button
+						x:Name="ClickOk"
+						Grid.Column="0"
+						Margin="10,0"
+						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						변경
+					</Button>
+					<Button
+						x:Name="ClickCancel"
+						Grid.Column="1"
+						Margin="10,0"
+						BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
+						취소
+					</Button>
+				</Grid>
+			</Grid>
+		</md:Card>
+	</md:DialogHost>
+</UserControl>
