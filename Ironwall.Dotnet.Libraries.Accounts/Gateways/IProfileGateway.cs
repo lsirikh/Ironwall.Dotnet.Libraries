@@ -1,0 +1,20 @@
+using Ironwall.Dotnet.Monitoring.Models.Accounts;
+
+namespace Ironwall.Dotnet.Libraries.Accounts.Gateways;
+
+/****************************************************************************
+   Purpose      : 본인 프로필 게이트웨이 (조회/저장/비밀번호 변경)
+   Notes        : MyPagePanel + ResetPassDialog(본인)가 의존.
+                  ChangePasswordAsync는 currentPassword 검증을 흡수(Db=로컬, Api=서버).
+****************************************************************************/
+public interface IProfileGateway
+{
+    /// <summary>PK 기준 본인 계정 조회.</summary>
+    Task<IAccountModel?> GetProfileAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>본인 프로필 정보 저장(비밀번호 제외).</summary>
+    Task<IAccountModel?> UpdateProfileAsync(IAccountModel acc, CancellationToken ct = default);
+
+    /// <summary>본인 비밀번호 변경(현재 비밀번호 검증 후). 검증 실패 시 null.</summary>
+    Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default);
+}

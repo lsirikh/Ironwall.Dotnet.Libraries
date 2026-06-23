@@ -1,0 +1,20 @@
+using Ironwall.Dotnet.Monitoring.Models.Accounts;
+
+namespace Ironwall.Dotnet.Libraries.Accounts.Gateways;
+
+/****************************************************************************
+   Purpose      : 로그인/세션 인증 게이트웨이 (데이터 접근 추상화)
+   Notes        : Db 어댑터 = 로컬 인증 + TokenGenerator, Api 어댑터(GOP-00) = 서버 JWT.
+                  VM(LoginPanelViewModel)은 이 인터페이스에만 의존 → API 전환 시 재편집 0.
+****************************************************************************/
+public interface IAuthGateway
+{
+    /// <summary>아이디/비밀번호로 인증. 실패 시 null.</summary>
+    Task<AuthResult?> AuthenticateAsync(string username, string password, CancellationToken ct = default);
+
+    /// <summary>가장 최근 로그인 기록(저장된 아이디 복원용).</summary>
+    Task<ILoginModel?> GetLatestLoginAsync(CancellationToken ct = default);
+
+    /// <summary>로그인 성공 로그 기록.</summary>
+    Task RecordLoginAsync(string username, bool isUsernameSaved, CancellationToken ct = default);
+}

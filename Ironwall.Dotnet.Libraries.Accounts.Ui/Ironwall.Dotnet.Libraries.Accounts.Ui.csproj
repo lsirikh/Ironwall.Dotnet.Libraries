@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 버전은 기존 *.Ui 와 동일하게 핀 (H-2 버전 스큐 방지) -->
+    <PackageReference Include="Autofac" Version="8.3.0" />
+    <PackageReference Include="Caliburn.Micro" Version="4.0.230" />
+    <PackageReference Include="MaterialDesignColors" Version="5.2.1" />
+    <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 기반 인프라 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
+
+    <!-- 계정 도메인 + Gateway 계약(Accounts) + Direct-DB 백엔드(Accounts.Db) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts\Ironwall.Dotnet.Libraries.Accounts.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Db\Ironwall.Dotnet.Libraries.Accounts.Db.csproj" />
+
+    <!-- TokenGenerator / PasswordHelper 출처 — Services/Helpers 만 사용, Bootstrapper류 import 금지 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Framework\Ironwall.Dotnet.Framework.csproj" />
+  </ItemGroup>
+
+</Project>
