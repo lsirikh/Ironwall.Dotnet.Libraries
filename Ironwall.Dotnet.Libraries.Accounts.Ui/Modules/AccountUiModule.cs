@@ -92,8 +92,8 @@ public class AccountUiModule : Module
             // builder.RegisterType<AccountManagerPanelViewModel>().SingleInstance();
             // builder.RegisterType<MyPagePanelViewModel>().SingleInstance();
             // builder.RegisterType<AccountSetupPanelViewModel>().SingleInstance();
-            // builder.RegisterType<RegisterDialogViewModel>().SingleInstance();   // Phase 3b
-            // builder.RegisterType<EditorDialogViewModel>().SingleInstance();     // Phase 3b
+            builder.RegisterType<RegisterDialogViewModel>().SingleInstance();
+            builder.RegisterType<EditorDialogViewModel>().SingleInstance();
             builder.RegisterType<DeleteAccountDialogViewModel>().SingleInstance();
             builder.RegisterType<ResetPassDialogViewModel>().SingleInstance();
         }

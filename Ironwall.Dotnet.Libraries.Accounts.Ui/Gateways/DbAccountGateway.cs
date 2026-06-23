@@ -55,6 +55,9 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     public Task<IAccountModel?> CreateAccountAsync(IAccountModel acc, CancellationToken ct = default)
         => _db.InsertAccountAsync(acc, ct);
 
+    public Task<IAccountModel?> UpdateAccountAsync(IAccountModel acc, CancellationToken ct = default)
+        => _db.UpdateAccountAsync(acc, ct);
+
     public async Task<bool> RemoveAccountAsync(IAccountModel acc, string currentPassword, CancellationToken ct = default)
     {
         // currentPassword 가 제공되면 대상 계정의 해시(acc.Password)와 검증 후 삭제

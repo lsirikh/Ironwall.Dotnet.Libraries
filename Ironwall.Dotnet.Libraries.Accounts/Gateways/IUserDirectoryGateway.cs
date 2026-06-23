@@ -15,6 +15,9 @@ public interface IUserDirectoryGateway
     /// <summary>신규 계정 생성. 반환=PK 채워진 모델(실패 시 null).</summary>
     Task<IAccountModel?> CreateAccountAsync(IAccountModel acc, CancellationToken ct = default);
 
+    /// <summary>관리자에 의한 계정 정보 수정(비밀번호 제외).</summary>
+    Task<IAccountModel?> UpdateAccountAsync(IAccountModel acc, CancellationToken ct = default);
+
     /// <summary>계정 삭제. currentPassword가 비어있지 않으면 검증 후 삭제.</summary>
     Task<bool> RemoveAccountAsync(IAccountModel acc, string currentPassword, CancellationToken ct = default);
 
