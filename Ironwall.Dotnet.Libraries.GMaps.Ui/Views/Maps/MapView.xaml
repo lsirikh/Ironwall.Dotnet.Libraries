@@ -684,6 +684,7 @@
 				<ContentPresenter
 					Canvas.Left="300"
 					Canvas.Top="100"
+					Panel.ZIndex="20"
 					Content="{Binding PropertyPanel}"
 					Visibility="{Binding IsPropertyPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
@@ -692,24 +693,28 @@
 					x:Name="MilitarySymbolRegisterPresenter"
 					Canvas.Left="400"
 					Canvas.Top="50"
+					Panel.ZIndex="30"
 					Content="{Binding MilitarySymbolRegisterPanel}"
 					Visibility="{Binding IsMilitarySymbolRegisterVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  관심지역(ROI) 패널  -->
 				<ContentPresenter
 					x:Name="MapRoiPresenter"
+					Panel.ZIndex="40"
 					Content="{Binding MapRoiPanel}"
 					Visibility="{Binding IsMapRoiPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  음원 실행 패널  -->
 				<ContentPresenter
 					x:Name="BroadcastPlayPresenter"
+					Panel.ZIndex="50"
 					Content="{Binding BroadcastPlayPanel}"
 					Visibility="{Binding IsBroadcastPlayPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  TTS 실행 패널  -->
 				<ContentPresenter
 					x:Name="TtsBroadcastPresenter"
+					Panel.ZIndex="60"
 					Content="{Binding TtsBroadcastPanel}"
 					Visibility="{Binding IsTtsBroadcastPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
@@ -718,12 +723,14 @@
 					x:Name="MapRegistrationPresenter"
 					Canvas.Left="350"
 					Canvas.Top="80"
+					Panel.ZIndex="70"
 					Content="{Binding MapRegistrationPanel}"
 					Visibility="{Binding IsMapRegistrationPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  레이어 관리 패널  -->
 				<ContentPresenter
 					x:Name="LayerPanelPresenter"
+					Panel.ZIndex="100"
 					Content="{Binding LayerPanel}"
 					Visibility="{Binding IsLayerPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
@@ -733,6 +740,7 @@
 					Canvas.Top="0"
 					ClipToBounds="False"
 					IsHitTestVisible="False"
+					Panel.ZIndex="5"
 					ItemsSource="{Binding CameraPopups}">
 					<ItemsControl.ItemsPanel>
 						<ItemsPanelTemplate>
@@ -759,6 +767,7 @@
 					Canvas.Left="0"
 					Canvas.Top="0"
 					ClipToBounds="False"
+					Panel.ZIndex="10"
 					ItemsSource="{Binding CameraPopups}">
 					<ItemsControl.ItemsPanel>
 						<ItemsPanelTemplate>
