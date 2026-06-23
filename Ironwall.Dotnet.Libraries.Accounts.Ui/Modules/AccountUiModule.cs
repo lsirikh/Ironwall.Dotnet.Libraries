@@ -6,8 +6,10 @@ using Ironwall.Dotnet.Libraries.Accounts.Models;          // IAccountSetupModel,
 using Ironwall.Dotnet.Libraries.Accounts.Modules;         // AccountModule
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Gateways;     // DbAccountGateway
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;     // ISessionConfigService / IProfileImageService
+using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;   // AccountViewModel / LoginViewModel / RegisterViewModel
 using Ironwall.Dotnet.Libraries.Base.Models;              // IMariaDbSetupModel
 using Ironwall.Dotnet.Libraries.Base.Services;            // ILogService
+using Ironwall.Dotnet.Monitoring.Models.Accounts;         // AccountModel (C-1 전용 모델)
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Modules;
 
@@ -77,14 +79,14 @@ public class AccountUiModule : Module
                        .SingleInstance();
             }
 
-            // 6) ViewModel 등록 — Phase 2/3 이관 후 활성화 (현재 VM 미생성)
-            // builder.RegisterType<AccountViewModel>().SingleInstance();
-            // builder.RegisterType<LoginViewModel>().SingleInstance();
-            // builder.Register(c => new RegisterViewModel(
-            //         c.Resolve<Caliburn.Micro.IEventAggregator>(),
-            //         c.ResolveOptional<ILogService>(),
-            //         new Ironwall.Dotnet.Monitoring.Models.Accounts.AccountModel()))
-            //        .AsSelf().InstancePerDependency();   // ⚠️ C-1: 전용 모델 주입
+            // 6) 상태 VM (Phase 2 이관 완료) — 패널/다이얼로그 VM은 Phase 3에서 활성화
+            builder.RegisterType<AccountViewModel>().SingleInstance();
+            builder.RegisterType<LoginViewModel>().SingleInstance();
+            builder.Register(c => new RegisterViewModel(
+                        c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                        c.Resolve<ILogService>(),
+                        new AccountModel()))                  // ⚠️ C-1: 전용 모델 주입(공유 싱글톤 격리)
+                   .AsSelf().InstancePerDependency();
             // builder.RegisterType<LoginPanelViewModel>().SingleInstance();
             // builder.RegisterType<AccountManagerPanelViewModel>().SingleInstance();
             // builder.RegisterType<MyPagePanelViewModel>().SingleInstance();
