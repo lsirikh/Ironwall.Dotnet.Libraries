@@ -37,7 +37,6 @@ public class CameraStreamPopupControl : Control
     private Point _ptzStart;
 
     // 방향 패드(누름=연속이동, 뗌=정지)
-    private FrameworkElement? _ptzPad;
     private bool _padActive;
 
     static CameraStreamPopupControl()
@@ -64,9 +63,13 @@ public class CameraStreamPopupControl : Control
         MouseMove += OnMouseMove;
         MouseLeftButtonUp += OnLeftButtonUp;
 
-        // 우버튼 = 컨트롤 패널(아코디언) 토글.
+        // 우버튼 = 컨텍스트 메뉴.
         MouseRightButtonDown += OnRightButtonDown;
         LostMouseCapture += OnLostMouseCapture;
+
+        // 방향 패드 버튼(누름=연속이동/뗌=정지) — 컨트롤 레벨 Preview로 가로채 버튼 클릭보다 먼저 처리.
+        PreviewMouseLeftButtonDown += OnPadDown;
+        PreviewMouseLeftButtonUp += OnPadUp;
         Focusable = true;
     }
 
@@ -83,18 +86,6 @@ public class CameraStreamPopupControl : Control
 
         _videoRegion = GetTemplateChild("PART_VideoRegion") as FrameworkElement;
         _ptzOverlay = GetTemplateChild("PART_PtzOverlay") as Canvas;
-
-        if (_ptzPad != null)
-        {
-            _ptzPad.PreviewMouseLeftButtonDown -= OnPadDown;
-            _ptzPad.PreviewMouseLeftButtonUp -= OnPadUp;
-        }
-        _ptzPad = GetTemplateChild("PART_PtzPad") as FrameworkElement;
-        if (_ptzPad != null)
-        {
-            _ptzPad.PreviewMouseLeftButtonDown += OnPadDown;   // 누름 → 연속 이동
-            _ptzPad.PreviewMouseLeftButtonUp += OnPadUp;       // 뗌 → 정지
-        }
     }
 
     /*──────────────── 좌버튼: 창 이동(헤더) ────────────────*/
@@ -251,7 +242,7 @@ public class CameraStreamPopupControl : Control
         {
             vm.RaisePadPress(dx, dy);
             _padActive = true;
-            _ptzPad?.CaptureMouse();   // 버튼 밖에서 떼도 정지 보장
+            CaptureMouse();   // 버튼 밖에서 떼도 정지 보장(컨트롤 캡처)
             e.Handled = true;
         }
     }
@@ -260,7 +251,7 @@ public class CameraStreamPopupControl : Control
     {
         if (!_padActive) return;
         _padActive = false;
-        _ptzPad?.ReleaseMouseCapture();
+        ReleaseMouseCapture();
         (DataContext as CameraStreamPopupViewModel)?.RaisePtzStop();
         e.Handled = true;
     }
@@ -294,6 +285,12 @@ public class CameraStreamPopupControl : Control
 
     private void OnLostMouseCapture(object sender, MouseEventArgs e)
     {
+        // 캡처 분실 → 진행 중 패드 이동 정지(멈춤 보장).
+        if (_padActive)
+        {
+            _padActive = false;
+            (DataContext as CameraStreamPopupViewModel)?.RaisePtzStop();
+        }
         // 포커스 이탈/캡처 분실 → 드래그 자동 취소(RelativeMove 미호출). (FR-DRAG-05)
         if (!_ptzActive) return;
         _ptzActive = false;
