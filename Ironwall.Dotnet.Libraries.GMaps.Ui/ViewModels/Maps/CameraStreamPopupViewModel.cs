@@ -166,6 +166,24 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>ONVIF PTZ 준비(InitializeFull+GetNode, 수 초 소요) 진행 중 — "PTZ 준비 중…" 배지 표시용. 끝나면 IsPtzCapable로 결정.</summary>
     public bool IsPtzLoading { get => _isPtzLoading; set { if (_isPtzLoading == value) return; _isPtzLoading = value; NotifyOfPropertyChange(nameof(IsPtzLoading)); } }
 
+    // ── PTZ 속도(ContinuousMove 속도, 사용자 조절) — PTZ 탭 슬라이더/텍스트박스. [0.1, 1.0]. ────────────
+    private double _panTiltSpeed = 0.6;   // 팬/틸트 ContinuousMove 속도(패드/드래그)
+    private double _zoomSpeed = 0.6;       // 줌 ContinuousMove 속도(휠)
+
+    /// <summary>패드/드래그 PanTilt 속도(ContinuousMove 속도 크기 [0.1,1.0]). MapViewModel이 ContinuousMove에 전달. 슬라이더+직접입력.</summary>
+    public double PanTiltSpeed
+    {
+        get => _panTiltSpeed;
+        set { var v = Math.Clamp(value, 0.1, 1.0); if (Math.Abs(_panTiltSpeed - v) < 1e-6) return; _panTiltSpeed = v; NotifyOfPropertyChange(nameof(PanTiltSpeed)); }
+    }
+
+    /// <summary>휠 줌 속도(ContinuousMove 줌 속도 크기 [0.1,1.0]). MapViewModel이 ContinuousMove(zoomVel)에 전달. 슬라이더+직접입력.</summary>
+    public double ZoomSpeed
+    {
+        get => _zoomSpeed;
+        set { var v = Math.Clamp(value, 0.1, 1.0); if (Math.Abs(_zoomSpeed - v) < 1e-6) return; _zoomSpeed = v; NotifyOfPropertyChange(nameof(ZoomSpeed)); }
+    }
+
     /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
     public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); NotifyOfPropertyChange(nameof(ControlHeight)); } }
 

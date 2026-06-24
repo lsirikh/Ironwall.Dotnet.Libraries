@@ -673,9 +673,8 @@ public class MapViewModel : BasePanelViewModel,
         }
     }
 
-    // ── ContinuousMove 속도/펄스 상수(RelativeMove 미지원 카메라 대응) ──
-    private const double PtzMoveSpeed = 0.6;        // 팬/틸트 ContinuousMove 속도(-1~1)
-    private const double PtzZoomSpeed = 0.6;        // 줌 ContinuousMove 속도
+    // ── ContinuousMove 펄스 상수(RelativeMove 미지원 카메라 대응) ──
+    //    팬/틸트·줌 속도 크기는 팝업 VM(PanTiltSpeed/ZoomSpeed, [0.1,1.0])이 사용자 조절값으로 보유 — PTZ 탭 슬라이더/텍스트박스.
     private const int PtzDragMaxDurationMs = 700;   // 드래그 1회 이동 최대 시간(드래그 길이 비례)
     private const int PtzZoomPulseMs = 250;         // 휠 1노치 줌 펄스 시간
 
@@ -712,8 +711,8 @@ public class MapViewModel : BasePanelViewModel,
         {
             var maxLen = Math.Max(40.0, Math.Min(e.ImageWidth, e.ImageHeight) * 0.4);
             var mag = Math.Min(1.0, len / maxLen);
-            var panVel = (e.Dx / len) * PtzMoveSpeed;
-            var tiltVel = -(e.Dy / len) * PtzMoveSpeed;   // 화면 아래로 드래그 → 틸트 다운
+            var panVel = (e.Dx / len) * vm.PanTiltSpeed;
+            var tiltVel = -(e.Dy / len) * vm.PanTiltSpeed;   // 화면 아래로 드래그 → 틸트 다운
             if (!await ptz.ContinuousMoveAsync(vm.CameraId, panVel, tiltVel, 0, ct).ConfigureAwait(false)) return;
             await Task.Delay((int)(mag * PtzDragMaxDurationMs), ct).ConfigureAwait(false);
             await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
@@ -730,7 +729,7 @@ public class MapViewModel : BasePanelViewModel,
         var ptz = ResolvePtzController();
         if (ptz == null) return;
         BeginPtzGesture(vm.CameraId);   // 드래그/줌 대기 취소(앞 Stop이 패드 이동 끊지 않게)
-        _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * PtzMoveSpeed, -e.Dy * PtzMoveSpeed, 0);
+        _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0);
     }
 
     private void OnCameraPopupPtzStop(object? sender, EventArgs e)
@@ -753,7 +752,7 @@ public class MapViewModel : BasePanelViewModel,
         var ct = BeginPtzGesture(vm.CameraId);   // 직전 제스처 취소
         try
         {
-            if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * PtzZoomSpeed, ct).ConfigureAwait(false)) return;
+            if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct).ConfigureAwait(false)) return;
             await Task.Delay(PtzZoomPulseMs, ct).ConfigureAwait(false);
             await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
         }
