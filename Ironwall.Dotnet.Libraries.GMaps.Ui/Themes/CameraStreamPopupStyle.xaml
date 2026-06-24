@@ -9,6 +9,28 @@
         <ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
+    <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+    <!--  PTZ 방향 패드 버튼  -->
+    <Style x:Key="PtzPadButtonStyle" TargetType="Button">
+        <Setter Property="Margin" Value="2" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Background" Value="#FF223043" />
+        <Setter Property="Foreground" Value="#FFCFE0F0" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!--  탭 버튼  -->
+    <Style x:Key="PtzTabButtonStyle" TargetType="Button">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0,0,0,2" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
     <!--  헤더 버튼(크게보기/닫기) — PanelCloseButtonStyle 답습: 26×26 원형 + 호버 #33FFFFFF  -->
     <Style x:Key="PopupHeaderIconButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="26" />
@@ -56,6 +78,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="42" />
                                 <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!--  헤더 (드래그) — 관심지역/레이어 패널과 동일 구조  -->
@@ -121,6 +144,75 @@
                                     <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
                                 </Grid>
+                            </Border>
+
+                            <!--  탭 패널 ([PTZ][프리셋][옵션]) — 우버튼 짧은클릭 토글. 영상 영역(*)이 줄고 패널이 아래에 펼쳐짐  -->
+                            <Border
+                                Grid.Row="2"
+                                Background="#FF131922"
+                                BorderBrush="{StaticResource BorderGrayBrush}"
+                                BorderThickness="0,1,0,0"
+                                CornerRadius="0,0,9,9"
+                                Visibility="{Binding IsPanelExpanded, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Margin="8">
+                                    <!--  탭 바  -->
+                                    <UniformGrid Margin="0,0,0,6" Columns="3" Rows="1">
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="0" Content="PTZ" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="1" Content="프리셋" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="2" Content="옵션" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                    </UniformGrid>
+
+                                    <!--  PTZ 탭: 8방향 패드 + 정지  -->
+                                    <UniformGrid Width="132" Height="132" HorizontalAlignment="Center" Columns="3" Rows="3">
+                                        <UniformGrid.Style>
+                                            <Style TargetType="UniformGrid">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </UniformGrid.Style>
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="UL" Content="↖" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="U" Content="▲" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="UR" Content="↗" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="L" Content="◀" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding StopCommand}" Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" ToolTip="정지" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="R" Content="▶" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="DL" Content="↙" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="D" Content="▼" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="DR" Content="↘" Style="{StaticResource PtzPadButtonStyle}" />
+                                    </UniformGrid>
+
+                                    <!--  프리셋 탭 (Phase 4)  -->
+                                    <TextBlock Margin="0,12" HorizontalAlignment="Center" Foreground="#FF8B98A8" FontSize="12" Text="프리셋 — 준비 중 (Phase 4)">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="1">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <!--  옵션 탭 (Phase 5)  -->
+                                    <TextBlock Margin="0,12" HorizontalAlignment="Center" Foreground="#FF8B98A8" FontSize="12" Text="옵션(주야간/포커스) — 준비 중 (Phase 5)">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="2">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
                             </Border>
                         </Grid>
                     </Border>

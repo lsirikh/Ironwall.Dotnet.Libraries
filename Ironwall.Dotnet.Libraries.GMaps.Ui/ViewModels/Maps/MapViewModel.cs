@@ -683,6 +683,40 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {ex.Message}"); }
     }
 
+    private const double PtzNudgePixels = 60;        // PTZ 탭 방향 패드 1회 nudge 가상 픽셀
+    private const double PtzNudgeNominalDim = 300;    // nudge 정규화 기준 영상 치수
+
+    private void OnCameraPopupPtzNudge(object? sender, PtzNudgeEventArgs e)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzNudgeAsync(vm, e);
+    }
+
+    /// <summary>PTZ 탭 방향 패드 → 가상 픽셀 델타로 RelativeMove(드래그와 동일 경로) + FOV. (FR-UI-02)</summary>
+    private async Task HandlePtzNudgeAsync(CameraStreamPopupViewModel vm, PtzNudgeEventArgs e)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            var moved = await ptz.RelativeMoveByPixelAsync(
+                vm.CameraId, e.Dx * PtzNudgePixels, e.Dy * PtzNudgePixels,
+                PtzNudgeNominalDim, PtzNudgeNominalDim, PtzDragSensitivity).ConfigureAwait(false);
+            if (!moved) return;
+            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
+            if (pos != null)
+                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
+                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ nudge 실패 cam={vm.CameraId}: {ex.Message}"); }
+    }
+
+    private void OnCameraPopupPtzStop(object? sender, EventArgs e)
+    {
+        if (sender is not CameraStreamPopupViewModel vm) return;
+        var ptz = ResolvePtzController();
+        if (ptz != null) _ = ptz.StopAsync(vm.CameraId);
+    }
+
     /// <summary>UI 스레드 마샬링(백그라운드 ONVIF 호출 후 VM/심볼 갱신용).</summary>
     private static Task OnUiAsync(System.Action action)
     {
@@ -798,6 +832,8 @@ public class MapViewModel : BasePanelViewModel,
             vm.DragCompleted += OnCameraPopupDragCompleted;
             vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // PTZ 드래그 → IPtzController
             vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
+            vm.PtzNudgeRequested += OnCameraPopupPtzNudge;          // PTZ 탭 방향 패드
+            vm.PtzStopRequested += OnCameraPopupPtzStop;
             CameraPopups.Add(vm);
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
             StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
@@ -841,6 +877,8 @@ public class MapViewModel : BasePanelViewModel,
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
             vm.SelectRequested -= OnCameraPopupSelectRequested;
+            vm.PtzNudgeRequested -= OnCameraPopupPtzNudge;
+            vm.PtzStopRequested -= OnCameraPopupPtzStop;
             if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
             ResolvePtzController()?.Release(vm.CameraId);   // PTZ 자원 정리(멱등, FR-DISPOSE-01)
             CameraPopups.Remove(vm);

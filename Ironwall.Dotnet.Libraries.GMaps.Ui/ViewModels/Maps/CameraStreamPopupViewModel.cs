@@ -150,6 +150,36 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>우버튼 짧은클릭(8px 미만) → 탭 패널 토글.</summary>
     internal void TogglePanel() => IsPanelExpanded = !IsPanelExpanded;
 
+    private int _activeTab;   // 0=PTZ, 1=프리셋, 2=옵션
+    /// <summary>활성 탭(0=PTZ / 1=프리셋 / 2=옵션). (FR-UI-02)</summary>
+    public int ActiveTab { get => _activeTab; set { if (_activeTab == value) return; _activeTab = value; NotifyOfPropertyChange(nameof(ActiveTab)); } }
+
+    private ICommand? _selectTabCommand;
+    public ICommand SelectTabCommand => _selectTabCommand ??= new RelayCommand(p => { if (int.TryParse(p?.ToString(), out var i)) { ActiveTab = i; IsPanelExpanded = true; } });
+
+    /// <summary>PTZ 탭 방향 버튼(8방향) → MapViewModel이 IPtzController로 상대 이동. (FR-UI-02)</summary>
+    public event EventHandler<PtzNudgeEventArgs>? PtzNudgeRequested;
+    /// <summary>PTZ 정지 버튼.</summary>
+    public event EventHandler? PtzStopRequested;
+
+    private ICommand? _nudgeCommand;
+    public ICommand NudgeCommand => _nudgeCommand ??= new RelayCommand(p => RaiseNudge(p?.ToString()));
+
+    private ICommand? _stopCommand;
+    public ICommand StopCommand => _stopCommand ??= new RelayCommand(() => PtzStopRequested?.Invoke(this, EventArgs.Empty));
+
+    private void RaiseNudge(string? dir)
+    {
+        var (dx, dy) = dir switch
+        {
+            "UL" => (-1d, -1d), "U" => (0d, -1d), "UR" => (1d, -1d),
+            "L" => (-1d, 0d), "R" => (1d, 0d),
+            "DL" => (-1d, 1d), "D" => (0d, 1d), "DR" => (1d, 1d),
+            _ => (0d, 0d)
+        };
+        if (dx != 0 || dy != 0) PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
+    }
+
     public ICommand CloseCommand =>
         _closeCommand ??= new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
 
@@ -189,4 +219,12 @@ public sealed class PtzDragEventArgs : EventArgs
     public double Dy { get; }
     public double ImageWidth { get; }
     public double ImageHeight { get; }
+}
+
+/// <summary>PTZ 탭 방향 패드 nudge 인자 — 방향 단위벡터(-1/0/1).</summary>
+public sealed class PtzNudgeEventArgs : EventArgs
+{
+    public PtzNudgeEventArgs(double dx, double dy) { Dx = dx; Dy = dy; }
+    public double Dx { get; }
+    public double Dy { get; }
 }
