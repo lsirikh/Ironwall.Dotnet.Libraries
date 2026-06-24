@@ -27,14 +27,14 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="라인 정보" />
 
 							<!--  포인트 개수 (읽기 전용)  -->
@@ -79,14 +79,14 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="라인 스타일" />
 
 							<!--  라인 패턴  -->
@@ -146,14 +146,14 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="PIDS 그룹 설정" />
 
 							<!--  연결된 디바이스 그룹  -->

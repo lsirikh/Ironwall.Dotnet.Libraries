@@ -71,7 +71,7 @@
 							Grid.Column="2"
 							Margin="5,0"
 							VerticalAlignment="Center"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Text="{Binding FloorCount, StringFormat='F{0}'}" />
 					</Grid>
 
@@ -97,7 +97,7 @@
 							Grid.Column="2"
 							Margin="5,0"
 							VerticalAlignment="Center"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Text="{Binding BasementFloorCount, StringFormat='B{0}'}" />
 					</Grid>
 
@@ -119,7 +119,7 @@
 						<TextBlock
 							Grid.Column="2"
 							Margin="5,0,0,0"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Text="㎡" />
 					</Grid>
 				</StackPanel>

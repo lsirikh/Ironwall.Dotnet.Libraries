@@ -14,8 +14,8 @@
 				<ControlTemplate TargetType="{x:Type ctrl:BroadcastPlayControl}">
 					<Border
 						Width="280"
-						Background="White"
-						BorderBrush="{StaticResource BorderGrayBrush}"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
 						CornerRadius="10">
 						<Border.Effect>
@@ -34,7 +34,7 @@
 							<!--  헤더  -->
 							<Border
 								Grid.Row="0"
-								Background="{StaticResource PrimaryBlueBrush}"
+								Background="{DynamicResource PrimaryBrush}"
 								CornerRadius="9,9,0,0"
 								Cursor="SizeAll">
 								<Grid>
@@ -49,7 +49,7 @@
 										Height="18"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Kind="VolumeHigh" />
 									<TextBlock
 										Grid.Column="1"
@@ -57,7 +57,7 @@
 										VerticalAlignment="Center"
 										FontSize="13"
 										FontWeight="Bold"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="음원 실행" />
 									<Button
 										x:Name="PART_CloseButton"
@@ -78,13 +78,13 @@
 										VerticalAlignment="Center"
 										FontSize="12"
 										FontWeight="Medium"
-										Foreground="#555555"
+										Foreground="{DynamicResource TextSecondaryBrush}"
 										Text="파일 그룹 ID" />
 									<TextBox
 										Grid.Column="1"
 										Padding="6"
-										Background="#F9FAFB"
-										BorderBrush="{StaticResource BorderGrayBrush}"
+										Background="{DynamicResource SurfaceAltBrush}"
+										BorderBrush="{DynamicResource BorderBrush}"
 										BorderThickness="1"
 										FontSize="12"
 										Text="{Binding FileGroupId, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -99,13 +99,13 @@
 										VerticalAlignment="Center"
 										FontSize="12"
 										FontWeight="Medium"
-										Foreground="#555555"
+										Foreground="{DynamicResource TextSecondaryBrush}"
 										Text="반복 횟수" />
 									<TextBox
 										Grid.Column="1"
 										Padding="6"
-										Background="#F9FAFB"
-										BorderBrush="{StaticResource BorderGrayBrush}"
+										Background="{DynamicResource SurfaceAltBrush}"
+										BorderBrush="{DynamicResource BorderBrush}"
 										BorderThickness="1"
 										FontSize="12"
 										Text="{Binding Repeat, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

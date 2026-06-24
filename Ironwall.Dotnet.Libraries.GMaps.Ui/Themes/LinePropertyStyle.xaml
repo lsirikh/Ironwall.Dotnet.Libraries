@@ -25,14 +25,14 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="라인 정보" />
 
 							<!--  포인트 개수 (읽기 전용)  -->
@@ -43,7 +43,7 @@
 								</Grid.ColumnDefinitions>
 								<TextBlock
 									Grid.Column="0"
-                                    Foreground="White"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Style="{StaticResource PropertyLabel}"
 									Text="포인트 수" />
 								<TextBlock
@@ -60,7 +60,7 @@
 								</Grid.ColumnDefinitions>
 								<TextBlock
 									Grid.Column="0"
-                                    Foreground="White"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Style="{StaticResource PropertyLabel}"
 									Text="총 거리" />
 								<TextBlock
@@ -75,14 +75,14 @@
 					<Border
 						Margin="0,0,0,10"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="라인 스타일" />
 
 							<!--  라인 패턴  -->
@@ -93,7 +93,7 @@
 								</Grid.ColumnDefinitions>
 								<TextBlock
 									Grid.Column="0"
-                                    Foreground="White"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Style="{StaticResource PropertyLabel}"
 									Text="패턴" />
 								<ComboBox
@@ -117,7 +117,7 @@
 								</Grid.ColumnDefinitions>
 								<TextBlock
 									Grid.Column="0"
-                                    Foreground="White"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Style="{StaticResource PropertyLabel}"
 									Text="투명도" />
 								<StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -140,14 +140,14 @@
 					<!--<Border
 						Margin="0,0,0,0"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="라인 옵션" />
 
 							-->

@@ -51,8 +51,8 @@
 	</Style>
 
 	<Style x:Key="CommonButton" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource LightBlueBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
         <Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="Button">
@@ -81,19 +81,19 @@
 						x:Name="border"
 						Padding="8,4"
 						Background="#442C5F9E"
-						BorderBrush="{StaticResource PrimaryBlueBrush}"
+						BorderBrush="{DynamicResource PrimaryBrush}"
 						BorderThickness="1"
 						CornerRadius="3">
 						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsChecked" Value="True">
-							<Setter TargetName="border" Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter TargetName="border" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 							<Setter Property="Foreground" Value="White" />
 						</Trigger>
 						<Trigger Property="IsChecked" Value="False">
 							<Setter TargetName="border" Property="Background" Value="Transparent" />
-							<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
 						</Trigger>
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="border" Property="Background" Value="#AA2C5F9E" />
@@ -118,7 +118,7 @@
 						Width="600"
 						Height="550"
 						Background="{TemplateBinding Background}"
-						BorderBrush="{StaticResource BorderGrayBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
 						CornerRadius="10">
 
@@ -146,7 +146,7 @@
 							<!--  헤더 영역  -->
 							<Border
 								Grid.Row="0"
-								Background="{StaticResource PrimaryBlueBrush}"
+								Background="{DynamicResource PrimaryBrush}"
 								CornerRadius="9,9,0,0"
 								Cursor="SizeAll">
 								<Grid>
@@ -163,7 +163,7 @@
 										Height="20"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Kind="Shield" />
 
 									<!--  제목  -->
@@ -173,7 +173,7 @@
 										VerticalAlignment="Center"
 										FontSize="14"
 										FontWeight="Bold"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="군대 부호 등록" />
 
 									<!--  닫기 버튼  -->
@@ -191,7 +191,7 @@
 								<Border
 									Margin="0,0,0,10"
 									Padding="10"
-									Background="White" BorderBrush="{StaticResource BorderGrayBrush}" BorderThickness="1"
+									Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
 									CornerRadius="5">
 									<StackPanel>
 										<TextBlock
@@ -229,7 +229,7 @@
 								<Border
 									Margin="0,0,0,10"
 									Padding="10"
-									Background="White" BorderBrush="{StaticResource BorderGrayBrush}" BorderThickness="1"
+									Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
 									CornerRadius="5">
 									<StackPanel>
 										<TextBlock
@@ -280,20 +280,20 @@
 								<!--  좌측: 부대 심볼 리스트  -->
 								<Border
 									Grid.Column="0"
-									Background="White"
-									BorderBrush="{StaticResource BorderGrayBrush}"
+									Background="{DynamicResource SurfaceBrush}"
+									BorderBrush="{DynamicResource BorderBrush}"
 									BorderThickness="1"
 									CornerRadius="5">
 									<StackPanel>
 										<!--  타이틀 헤더  -->
 										<Border
 											Padding="8,4"
-											Background="{StaticResource PrimaryBlueBrush}"
+											Background="{DynamicResource PrimaryBrush}"
 											CornerRadius="4,4,0,0">
 											<TextBlock
 												HorizontalAlignment="Center"
 												FontWeight="Bold"
-												Foreground="White"
+												Foreground="{DynamicResource OnPrimaryFixedBrush}"
 												Text="부대 심볼" />
 										</Border>
 
@@ -328,7 +328,7 @@
 								<Border
 									Grid.Column="1"
 									Margin="10,0"
-									Background="White" BorderBrush="{StaticResource BorderGrayBrush}" BorderThickness="1"
+									Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
 									CornerRadius="5">
 									<control:GMapMilitarySymbolMarkerControl
 										x:Name="PART_MilitarySymbolPreview"
@@ -350,20 +350,20 @@
 								<Border
 									Grid.Column="2"
 									Padding="0"
-									Background="White"
-									BorderBrush="{StaticResource BorderGrayBrush}"
+									Background="{DynamicResource SurfaceBrush}"
+									BorderBrush="{DynamicResource BorderBrush}"
 									BorderThickness="1"
 									CornerRadius="5">
 									<StackPanel>
 										<!--  타이틀 헤더  -->
 										<Border
 											Padding="8,4"
-											Background="{StaticResource PrimaryBlueBrush}"
+											Background="{DynamicResource PrimaryBrush}"
 											CornerRadius="4,4,0,0">
 											<TextBlock
 												HorizontalAlignment="Center"
 												FontWeight="Bold"
-												Foreground="White"
+												Foreground="{DynamicResource OnPrimaryFixedBrush}"
 												Text="기본 정보" />
 										</Border>
 

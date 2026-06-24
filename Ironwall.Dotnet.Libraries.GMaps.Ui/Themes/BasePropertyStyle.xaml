@@ -17,7 +17,7 @@
 		<Setter Property="FontSize" Value="11" />
 		<Setter Property="MinHeight" Value="24" />
 		<Setter Property="Background" Value="White" />
-		<Setter Property="BorderBrush" Value="{StaticResource BorderGrayBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="VerticalContentAlignment" Value="Center" />
 	</Style>
@@ -43,7 +43,7 @@
 		<Setter Property="Margin" Value="2,0" />
 		<Setter Property="Padding" Value="2" />
 		<Setter Property="Background" Value="Transparent" />
-		<Setter Property="BorderBrush" Value="{StaticResource BorderGrayBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="Cursor" Value="Hand" />
 		<Style.Triggers>
@@ -70,8 +70,8 @@
 						MinWidth="280"
 						MaxWidth="300"
 						MaxHeight="520"
-						Background="White"
-						BorderBrush="{StaticResource BorderGrayBrush}"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
 						CornerRadius="10">
 
@@ -96,7 +96,7 @@
 							<Border
 								x:Name="PART_HeaderArea"
 								Grid.Row="0"
-								Background="{StaticResource PrimaryBlueBrush}"
+								Background="{DynamicResource PrimaryBrush}"
 								CornerRadius="9,9,0,0"
 								Cursor="SizeAll">
 								<Grid>
@@ -113,7 +113,7 @@
 										Height="18"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Kind="MapMarker" />
 
 									<!--  제목  -->
@@ -123,7 +123,7 @@
 										VerticalAlignment="Center"
 										FontSize="14"
 										FontWeight="Bold"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="마커 속성" />
 
 									<!--  닫기 버튼  -->
@@ -146,7 +146,7 @@
 										Margin="0,0,0,8"
 										FontSize="13"
 										FontWeight="Bold"
-										Foreground="{StaticResource PrimaryBlueBrush}"
+										Foreground="{DynamicResource PrimaryBrush}"
 										Text="BASIC" />
 
 									<!--  제목  -->
@@ -206,7 +206,7 @@
 											Height="10"
 											HorizontalAlignment="Center"
 											VerticalAlignment="Center"
-											Foreground="#999999"
+											Foreground="{DynamicResource TextMutedBrush}"
 											Kind="WindowClose" />
 										<TextBox
 											Grid.Column="3"
@@ -242,7 +242,7 @@
 											Grid.Column="3"
 											Margin="3,0,0,0"
 											VerticalAlignment="Center"
-											Foreground="#999999"
+											Foreground="{DynamicResource TextMutedBrush}"
 											Text="°" />
 									</Grid>
 
@@ -250,14 +250,14 @@
 									<Border
 										Height="1"
 										Margin="0,8"
-										Background="{StaticResource BorderGrayBrush}" />
+										Background="{DynamicResource BorderBrush}" />
 
 									<!--  색상 섹션 라벨  -->
 									<TextBlock
 										Margin="0,0,0,8"
 										FontSize="13"
 										FontWeight="Bold"
-										Foreground="{StaticResource PrimaryBlueBrush}"
+										Foreground="{DynamicResource PrimaryBrush}"
 										Text="COLOR" />
 
 									<!--  색상  -->
@@ -284,7 +284,7 @@
 															Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
 															RadiusX="2"
 															RadiusY="2"
-															Stroke="{StaticResource BorderGrayBrush}"
+															Stroke="{DynamicResource BorderBrush}"
 															StrokeThickness="0.5" />
 														<TextBlock
 															Margin="10,0"
@@ -320,7 +320,7 @@
 															Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
 															RadiusX="2"
 															RadiusY="2"
-															Stroke="{StaticResource BorderGrayBrush}"
+															Stroke="{DynamicResource BorderBrush}"
 															StrokeThickness="0.5" />
 														<TextBlock
 															Margin="10,0"
@@ -359,7 +359,7 @@
 									<Border
 										Height="1"
 										Margin="0,8"
-										Background="{StaticResource BorderGrayBrush}" />
+										Background="{DynamicResource BorderBrush}" />
 
 									<!--  표시 옵션  -->
 									<Grid Margin="0,5,0,5">
@@ -371,13 +371,13 @@
 										<CheckBox
 											Grid.Column="0"
 											Content="모양"
-											Foreground="#333333"
+											Foreground="{DynamicResource TextPrimaryBrush}"
 											IsChecked="{Binding ShowShape, RelativeSource={RelativeSource TemplatedParent}}" />
 
 										<CheckBox
 											Grid.Column="1"
 											Content="제목"
-											Foreground="#333333"
+											Foreground="{DynamicResource TextPrimaryBrush}"
 											IsChecked="{Binding ShowTitle, RelativeSource={RelativeSource TemplatedParent}}" />
 									</Grid>
 
@@ -385,14 +385,14 @@
 									<Border
 										Height="1"
 										Margin="0,8"
-										Background="{StaticResource BorderGrayBrush}" />
+										Background="{DynamicResource BorderBrush}" />
 
 									<!--  DISPLAY 섹션 라벨  -->
 									<TextBlock
 										Margin="0,0,0,8"
 										FontSize="13"
 										FontWeight="Bold"
-										Foreground="{StaticResource PrimaryBlueBrush}"
+										Foreground="{DynamicResource PrimaryBrush}"
 										Text="DISPLAY" />
 
 									<!--  최소 줌 레벨  -->
@@ -419,7 +419,7 @@
 											Grid.Column="2"
 											VerticalAlignment="Center"
 											FontSize="11"
-											Foreground="#555555"
+											Foreground="{DynamicResource TextSecondaryBrush}"
 											Text="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0:F0}}" />
 									</Grid>
 
@@ -427,14 +427,14 @@
 									<Border
 										Height="1"
 										Margin="0,8"
-										Background="{StaticResource BorderGrayBrush}" />
+										Background="{DynamicResource BorderBrush}" />
 
 									<!--  Z-ORDER 섹션 라벨  -->
 									<TextBlock
 										Margin="0,0,0,8"
 										FontSize="13"
 										FontWeight="Bold"
-										Foreground="{StaticResource PrimaryBlueBrush}"
+										Foreground="{DynamicResource PrimaryBrush}"
 										Text="Z-ORDER" />
 
 									<!--  Z-ORDER 조작  -->
@@ -454,7 +454,7 @@
 												Margin="2,0,8,0"
 												VerticalAlignment="Center"
 												FontSize="11"
-												Foreground="#555555"
+												Foreground="{DynamicResource TextSecondaryBrush}"
 												Text="{Binding MarkerZOrderDisplay, RelativeSource={RelativeSource TemplatedParent}}" />
 											<Button
 												x:Name="PART_ZOrderTopButton"
@@ -508,13 +508,13 @@
 											<Border
 												Height="1"
 												Margin="0,0,0,8"
-												Background="{StaticResource BorderGrayBrush}" />
+												Background="{DynamicResource BorderBrush}" />
 
 											<TextBlock
 												Margin="0,0,0,8"
 												FontSize="13"
 												FontWeight="Bold"
-												Foreground="{StaticResource PrimaryBlueBrush}"
+												Foreground="{DynamicResource PrimaryBrush}"
 												Text="{TemplateBinding SpecificPropertiesTitle}" />
 
 											<!--  특화 속성 내용  -->

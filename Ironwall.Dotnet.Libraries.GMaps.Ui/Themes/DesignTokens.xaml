@@ -49,7 +49,7 @@
 							Height="14"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Kind="Close" />
 					</Border>
 					<ControlTemplate.Triggers>
@@ -64,7 +64,7 @@
 
 	<!-- ═══════════════════ 패널 버튼 (Primary) ═══════════════════ -->
 	<Style x:Key="PanelPrimaryButtonStyle" TargetType="Button">
-		<Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+		<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
 		<Setter Property="Foreground" Value="White" />
 		<Setter Property="FontSize" Value="12" />
 		<Setter Property="FontWeight" Value="Medium" />
@@ -81,7 +81,7 @@
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="#245085" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
 						</Trigger>
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Opacity" Value="0.4" />
@@ -94,8 +94,8 @@
 
 	<!-- ═══════════════════ 패널 버튼 (Secondary) ═══════════════════ -->
 	<Style x:Key="PanelSecondaryButtonStyle" TargetType="Button">
-		<Setter Property="Background" Value="{StaticResource LightBlueBrush}" />
-		<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
 		<Setter Property="FontSize" Value="12" />
 		<Setter Property="FontWeight" Value="Medium" />
 		<Setter Property="Cursor" Value="Hand" />
@@ -106,14 +106,14 @@
 						x:Name="Bd"
 						Padding="10,7"
 						Background="{TemplateBinding Background}"
-						BorderBrush="{StaticResource BorderGrayBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
 						CornerRadius="5">
 						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="#DCE8F8" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SecondaryHoverBrush}" />
 						</Trigger>
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Opacity" Value="0.4" />
@@ -126,8 +126,8 @@
 
 	<!-- ═══════════════════ 패널 버튼 (Danger) ═══════════════════ -->
 	<Style x:Key="PanelDangerButtonStyle" TargetType="Button">
-		<Setter Property="Background" Value="#FFF5F5" />
-		<Setter Property="Foreground" Value="{StaticResource DangerRedBrush}" />
+		<Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
 		<Setter Property="FontSize" Value="12" />
 		<Setter Property="FontWeight" Value="Medium" />
 		<Setter Property="Cursor" Value="Hand" />
@@ -138,14 +138,14 @@
 						x:Name="Bd"
 						Padding="10,7"
 						Background="{TemplateBinding Background}"
-						BorderBrush="#FFCDD2"
+						BorderBrush="{DynamicResource DangerBorderBrush}"
 						BorderThickness="1"
 						CornerRadius="5">
 						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="#FFEBEE" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerHoverBrush}" />
 						</Trigger>
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Opacity" Value="0.4" />
@@ -174,11 +174,11 @@
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{StaticResource LightBlueBrush}" />
-							<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
 						</Trigger>
 						<Trigger Property="IsPressed" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 							<Setter Property="Foreground" Value="White" />
 						</Trigger>
 					</ControlTemplate.Triggers>
@@ -205,11 +205,11 @@
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{StaticResource LightBlueBrush}" />
-							<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+							<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
 						</Trigger>
 						<Trigger Property="IsChecked" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 							<Setter Property="Foreground" Value="White" />
 						</Trigger>
 					</ControlTemplate.Triggers>
@@ -229,14 +229,14 @@
 	<Style x:Key="ToolbarSeparatorStyle" TargetType="Border">
 		<Setter Property="Width" Value="1" />
 		<Setter Property="Height" Value="24" />
-		<Setter Property="Background" Value="{StaticResource BorderGrayBrush}" />
+		<Setter Property="Background" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="Margin" Value="4,0" />
 	</Style>
 
 	<!-- ═══════════════════ 맵 위 플로팅 패널 공통 ═══════════════════ -->
 	<Style x:Key="MapFloatingPanelStyle" TargetType="Border">
 		<Setter Property="Background" Value="White" />
-		<Setter Property="BorderBrush" Value="{StaticResource BorderGrayBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="CornerRadius" Value="8" />
 		<Setter Property="Padding" Value="8" />

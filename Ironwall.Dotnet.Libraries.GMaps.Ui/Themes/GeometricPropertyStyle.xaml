@@ -54,7 +54,7 @@
 							Value="{Binding MarkerOpacity}" />
 						<TextBlock
 							Grid.Column="2"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Text="{Binding MarkerOpacity, StringFormat='{}{0:P2}'}" />
 					</Grid>
 				</StackPanel>

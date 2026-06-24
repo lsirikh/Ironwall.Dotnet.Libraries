@@ -49,7 +49,7 @@
 							Grid.Column="1"
 							VerticalAlignment="Center"
 							Content="FOV 영역 표시"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							IsChecked="{Binding ShowFOV}" />
 					</Grid>
 
@@ -110,7 +110,7 @@
 						<TextBlock
 							Grid.Column="2"
 							VerticalAlignment="Center"
-							Foreground="White"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Text="{Binding FOVOpacity, StringFormat='{}{0:P0}'}" />
 					</Grid>
 
@@ -118,14 +118,14 @@
 					<Border
 						Margin="0,10,0,0"
 						Padding="8,4"
-						Background="{StaticResource PrimaryBlueBrush}"
+						Background="{DynamicResource PrimaryBrush}"
 						CornerRadius="5">
 						<StackPanel>
 							<TextBlock
 								HorizontalAlignment="Center"
 								FontSize="12"
 								FontWeight="Bold"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Text="탐지 영역 설정" />
 
 							<!--  탐지 범위  -->
@@ -152,7 +152,7 @@
 								<TextBlock
 									Grid.Column="2"
 									VerticalAlignment="Center"
-									Foreground="White"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Text="{Binding DetectionRange, StringFormat='{}{0:F0}m'}" />
 							</Grid>
 
@@ -180,7 +180,7 @@
 								<TextBlock
 									Grid.Column="2"
 									VerticalAlignment="Center"
-									Foreground="White"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Text="{Binding DetectionAngle, StringFormat='{}{0:F0}°'}" />
 							</Grid>
 
@@ -208,7 +208,7 @@
 								<TextBlock
 									Grid.Column="2"
 									VerticalAlignment="Center"
-									Foreground="White"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Text="{Binding DetectionBearing, StringFormat='{}{0:F0}°'}" />
 							</Grid>
 
@@ -236,7 +236,7 @@
 								<TextBlock
 									Grid.Column="2"
 									VerticalAlignment="Center"
-									Foreground="White"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Text="{Binding BaseBearing, StringFormat='{}{0:F0}°'}" />
 							</Grid>
 						</StackPanel>

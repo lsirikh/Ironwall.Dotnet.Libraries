@@ -21,14 +21,14 @@
 								Grid.Column="0"
 								FontSize="11"
 								FontWeight="Bold"
-								Foreground="{StaticResource PrimaryBlueBrush}"
+								Foreground="{DynamicResource PrimaryBrush}"
 								Text="{TemplateBinding Scale}" />
 							<Polyline
 								Grid.Column="1"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
 								Points="{TemplateBinding ScalePoints}"
-								Stroke="{StaticResource PrimaryBlueBrush}"
+								Stroke="{DynamicResource PrimaryBrush}"
 								StrokeThickness="2" />
 						</Grid>
 					</Border>

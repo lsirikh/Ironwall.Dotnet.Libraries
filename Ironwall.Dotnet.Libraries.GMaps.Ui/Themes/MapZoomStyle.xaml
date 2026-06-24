@@ -24,10 +24,10 @@
 					</Border>
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{StaticResource LightBlueBrush}" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
 						</Trigger>
 						<Trigger Property="IsPressed" Value="True">
-							<Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 							<Setter Property="Foreground" Value="White" />
 						</Trigger>
 					</ControlTemplate.Triggers>
@@ -60,14 +60,14 @@
 								FontFamily="Consolas"
 								FontSize="14"
 								FontWeight="Bold"
-								Foreground="{StaticResource PrimaryBlueBrush}"
+								Foreground="{DynamicResource PrimaryBrush}"
 								Text="{Binding ZoomLabel, RelativeSource={RelativeSource TemplatedParent}}" />
 
 							<!--  以??꾩썐  -->
 							<Button
 								Grid.Column="1"
 								Command="{TemplateBinding ZoomOutCommand}"
-								Foreground="{StaticResource PrimaryBlueBrush}"
+								Foreground="{DynamicResource PrimaryBrush}"
 								Style="{StaticResource ZoomButtonStyle}">
 								<md:PackIcon
 									Width="18"
@@ -94,7 +94,7 @@
 							<Button
 								Grid.Column="3"
 								Command="{TemplateBinding ZoomInCommand}"
-								Foreground="{StaticResource PrimaryBlueBrush}"
+								Foreground="{DynamicResource PrimaryBrush}"
 								Style="{StaticResource ZoomButtonStyle}">
 								<md:PackIcon
 									Width="18"

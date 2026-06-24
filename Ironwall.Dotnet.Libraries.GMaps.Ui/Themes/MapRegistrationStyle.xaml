@@ -15,8 +15,8 @@
 				<ControlTemplate TargetType="{x:Type ctrl:MapRegistrationControl}">
 					<Border
 						Width="320"
-						Background="White"
-						BorderBrush="{StaticResource BorderGrayBrush}"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
 						CornerRadius="10">
 						<Border.Effect>
@@ -35,7 +35,7 @@
 							<!-- 헤더 -->
 							<Border
 								Grid.Row="0"
-								Background="{StaticResource PrimaryBlueBrush}"
+								Background="{DynamicResource PrimaryBrush}"
 								CornerRadius="9,9,0,0">
 								<Grid>
 									<Grid.ColumnDefinitions>
@@ -48,13 +48,13 @@
 										Width="18" Height="18"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Kind="MapPlus" />
 									<TextBlock
 										Grid.Column="1"
 										VerticalAlignment="Center"
 										FontSize="13" FontWeight="SemiBold"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="오버레이 맵 등록" />
 									<Button
 										x:Name="PART_CloseButton"
@@ -68,29 +68,29 @@
 
 								<!-- ═══ Register Phase ═══ -->
 								<StackPanel x:Name="RegisterContent" Visibility="Visible">
-									<TextBlock Text="레이어명" FontSize="11" Foreground="#666" Margin="0,0,0,4" />
+									<TextBlock Text="레이어명" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
 									<TextBox
 										Text="{Binding LayerName, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 										FontSize="12" Padding="6,4"
 										md:HintAssist.Hint="레이어 이름 입력" />
 
-									<TextBlock Text="파일 정보" FontSize="11" Foreground="#666" Margin="0,12,0,4" />
+									<TextBlock Text="파일 정보" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,4" />
 									<StackPanel Margin="4,0,0,0">
 										<TextBlock FontSize="11">
-											<Run Text="파일: " Foreground="#999" />
+											<Run Text="파일: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding FileName, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 										<TextBlock FontSize="11" Margin="0,2,0,0">
-											<Run Text="크기: " Foreground="#999" />
+											<Run Text="크기: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding FileSize, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 										<TextBlock FontSize="11" Margin="0,2,0,0">
-											<Run Text="해상도: " Foreground="#999" />
+											<Run Text="해상도: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding ImageResolution, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 									</StackPanel>
 
-									<TextBlock Text="줌 범위" FontSize="11" Foreground="#666" Margin="0,12,0,4" />
+									<TextBlock Text="줌 범위" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,4" />
 									<Grid>
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="*" />
@@ -98,14 +98,14 @@
 											<ColumnDefinition Width="*" />
 										</Grid.ColumnDefinitions>
 										<StackPanel Grid.Column="0">
-											<TextBlock Text="최소" FontSize="10" Foreground="#999" Margin="0,0,0,2" />
+											<TextBlock Text="최소" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,2" />
 											<TextBox
 												Text="{Binding MinZoom, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 												FontSize="12" Padding="6,4" TextAlignment="Center" />
 										</StackPanel>
 										<TextBlock Grid.Column="1" Text="~" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,6" />
 										<StackPanel Grid.Column="2">
-											<TextBlock Text="최대" FontSize="10" Foreground="#999" Margin="0,0,0,2" />
+											<TextBlock Text="최대" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,2" />
 											<TextBox
 												Text="{Binding MaxZoom, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 												FontSize="12" Padding="6,4" TextAlignment="Center" />
@@ -141,28 +141,28 @@
 										Height="18"
 										Minimum="0" Maximum="100"
 										Value="{Binding ProgressPercentage, RelativeSource={RelativeSource TemplatedParent}}"
-										Foreground="{StaticResource PrimaryBlueBrush}" />
+										Foreground="{DynamicResource PrimaryBrush}" />
 									<TextBlock
 										HorizontalAlignment="Right"
-										FontSize="11" Foreground="#666" Margin="0,2,0,8">
+										FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8">
 										<Run Text="{Binding ProgressPercentage, RelativeSource={RelativeSource TemplatedParent}, StringFormat='{}{0:F0}%'}" />
 									</TextBlock>
 
 									<StackPanel Margin="4,0,0,0">
 										<TextBlock FontSize="11">
-											<Run Text="줌 레벨: " Foreground="#999" />
+											<Run Text="줌 레벨: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding CurrentZoom, RelativeSource={RelativeSource TemplatedParent}}" />
-											<Run Text=" / " Foreground="#999" />
+											<Run Text=" / " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding MaxZoom, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 										<TextBlock FontSize="11" Margin="0,2,0,0">
-											<Run Text="타일: " Foreground="#999" />
+											<Run Text="타일: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding ProcessedTiles, RelativeSource={RelativeSource TemplatedParent}, StringFormat='{}{0}'}" />
-											<Run Text=" / " Foreground="#999" />
+											<Run Text=" / " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding TotalTiles, RelativeSource={RelativeSource TemplatedParent}, StringFormat='{}{0}'}" />
 										</TextBlock>
 										<TextBlock FontSize="11" Margin="0,2,0,0">
-											<Run Text="경과: " Foreground="#999" />
+											<Run Text="경과: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding ElapsedTime, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 									</StackPanel>
@@ -180,7 +180,7 @@
 									<md:PackIcon
 										Width="36" Height="36"
 										HorizontalAlignment="Center"
-										Foreground="#27AE60"
+										Foreground="{DynamicResource StatusNormalBrush}"
 										Kind="CheckCircle" Margin="0,8,0,8" />
 									<TextBlock
 										Text="등록 완료"
@@ -188,15 +188,15 @@
 										HorizontalAlignment="Center" Margin="0,0,0,8" />
 									<StackPanel Margin="4,0,0,0">
 										<TextBlock FontSize="11">
-											<Run Text="레이어명: " Foreground="#999" />
+											<Run Text="레이어명: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding LayerName, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 										<TextBlock FontSize="11" Margin="0,2,0,0">
-											<Run Text="총 타일: " Foreground="#999" />
+											<Run Text="총 타일: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding TotalTiles, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 										<TextBlock FontSize="11" Margin="0,2,0,0">
-											<Run Text="소요 시간: " Foreground="#999" />
+											<Run Text="소요 시간: " Foreground="{DynamicResource TextMutedBrush}" />
 											<Run Text="{Binding ElapsedTime, RelativeSource={RelativeSource TemplatedParent}}" />
 										</TextBlock>
 									</StackPanel>
@@ -213,16 +213,16 @@
 									<md:PackIcon
 										Width="36" Height="36"
 										HorizontalAlignment="Center"
-										Foreground="{StaticResource DangerRedBrush}"
+										Foreground="{DynamicResource StatusCriticalBrush}"
 										Kind="AlertCircle" Margin="0,8,0,8" />
 									<TextBlock
 										Text="등록 실패"
 										FontSize="14" FontWeight="SemiBold"
-										Foreground="{StaticResource DangerRedBrush}"
+										Foreground="{DynamicResource StatusCriticalBrush}"
 										HorizontalAlignment="Center" Margin="0,0,0,8" />
 									<TextBlock
 										Text="{Binding ErrorMessage, RelativeSource={RelativeSource TemplatedParent}}"
-										FontSize="11" Foreground="#666"
+										FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
 										TextWrapping="Wrap" Margin="0,0,0,12" />
 									<Button
 										x:Name="PART_ErrorCloseButton"
