@@ -8,11 +8,17 @@
         · Tokens.Shared / Converters = 테마 불변 → 상시 병합(스왑 비대상).
         · Tokens.Light = 기본 활성 토큰셋. 런타임에 ThemeService가 Add-new→Remove-old로
           Tokens.Light ↔ Tokens.Dark 만 원자 교체(FR-03, R-17).
+        · Styles.* (IMPL-12/13/14) = keyed 공용 컨트롤 스타일. 색은 DynamicResource 토큰 →
+          테마 스왑에 동참. MD BasedOn(StaticResource)은 앱이 MD3.Defaults 를 먼저 병합한
+          스코프에서 해소(EXT-01 순서: MD3.Defaults → Theme.Current).
     -->
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Shared.xaml" />
         <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Converters.xaml" />
         <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Light.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Controls.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Containers.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Styles.Nav.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
 </ResourceDictionary>
