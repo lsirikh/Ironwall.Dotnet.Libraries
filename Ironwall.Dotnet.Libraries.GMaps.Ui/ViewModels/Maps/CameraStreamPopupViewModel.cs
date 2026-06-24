@@ -154,6 +154,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     // ── PTZ 제어 상태(CameraPopup_PTZ_Control) ────────────────────────────────
     private bool _isSelected;
     private bool _isPtzCapable;
+    private bool _isPtzLoading;
     private bool _isPanelExpanded;
 
     /// <summary>단일 선택 상태(MapViewModel.SelectedCameraPopup이 상호배타 설정). (FR-SEL-01)</summary>
@@ -161,6 +162,9 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
 
     /// <summary>PTZ 제어 가능 여부(MapViewModel이 IPtzController.EnsureReady 후 설정). false면 우버튼 입력 차단. (FR-GATE-01)</summary>
     public bool IsPtzCapable { get => _isPtzCapable; set { if (_isPtzCapable == value) return; _isPtzCapable = value; NotifyOfPropertyChange(nameof(IsPtzCapable)); } }
+
+    /// <summary>ONVIF PTZ 준비(InitializeFull+GetNode, 수 초 소요) 진행 중 — "PTZ 준비 중…" 배지 표시용. 끝나면 IsPtzCapable로 결정.</summary>
+    public bool IsPtzLoading { get => _isPtzLoading; set { if (_isPtzLoading == value) return; _isPtzLoading = value; NotifyOfPropertyChange(nameof(IsPtzLoading)); } }
 
     /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
     public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); NotifyOfPropertyChange(nameof(ControlHeight)); } }

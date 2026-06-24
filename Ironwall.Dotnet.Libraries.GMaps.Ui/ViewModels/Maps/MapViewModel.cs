@@ -651,6 +651,7 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Warning($"[CameraPopup] PTZ 비활성 — IPtzController 미해석 cam={vm.CameraId}. 메인 OnvifServiceModule 등록(EXT-01) + 앱 재빌드/재시작 확인.");
             return;
         }
+        await OnUiAsync(() => vm.IsPtzLoading = true).ConfigureAwait(false);   // "PTZ 준비 중…" 표시(수 초 소요)
         try
         {
             var conn = new ConnectionModel
@@ -662,10 +663,14 @@ public class MapViewModel : BasePanelViewModel,
             };
             _log?.Info($"[CameraPopup] PTZ 준비 시도 cam={vm.CameraId} {cam.IpAddress}:{conn.PortOnvif}");
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
-            await OnUiAsync(() => vm.IsPtzCapable = ok).ConfigureAwait(false);
+            await OnUiAsync(() => { vm.IsPtzCapable = ok; vm.IsPtzLoading = false; }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} capable={ok} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
         }
-        catch (Exception ex) { _log?.Warning($"[CameraPopup] PTZ 준비 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+        catch (Exception ex)
+        {
+            await OnUiAsync(() => vm.IsPtzLoading = false).ConfigureAwait(false);
+            _log?.Warning($"[CameraPopup] PTZ 준비 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}");
+        }
     }
 
     // ── ContinuousMove 속도/펄스 상수(RelativeMove 미지원 카메라 대응) ──
