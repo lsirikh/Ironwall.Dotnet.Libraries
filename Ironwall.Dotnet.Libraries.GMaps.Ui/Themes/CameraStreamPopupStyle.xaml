@@ -166,10 +166,10 @@
                                     <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
-                                    <!--  PTZ 상태 배지(좌상단, 스트리밍 HUB 배지 6,6 아래) — 🟢가능 / 🟠준비중 / ⚪지원안함.
-                                          IsPtzLoading/IsPtzCapable로 3상태 상호배타 표시. RTSP 컨트롤 위 오버레이라 입력 비간섭(히트테스트 제외)  -->
+                                    <!--  PTZ 상태 배지(상단 상태 띠 중앙 — RTSP 헤더 Row0 #FF3F3F46, "Playing"·"스트리밍 HUB"와 같은 높이) — 🟢가능 / 🟠준비중 / ⚪지원안함.
+                                          좌=스트리밍 HUB·우=Playing이라 충돌 피해 중앙 배치. IsPtzLoading/IsPtzCapable로 3상태 상호배타. RTSP 컨트롤 위 오버레이라 입력 비간섭(히트테스트 제외)  -->
                                     <!--  🟠 준비중: ONVIF 연결(InitializeFull+GetNode, 첫 오픈 수 초·이후 워밍 즉시) 진행 중  -->
-                                    <Border Margin="6,34,0,0" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    <Border Margin="0,5,0,0" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top"
                                             Background="#AA000000" CornerRadius="3" IsHitTestVisible="False"
                                             Visibility="{Binding IsPtzLoading, Converter={StaticResource BoolToVis}}">
                                         <StackPanel Orientation="Horizontal">
@@ -178,7 +178,7 @@
                                         </StackPanel>
                                     </Border>
                                     <!--  🟢 가능: 준비 완료 + PTZ 지원 카메라  -->
-                                    <Border Margin="6,34,0,0" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    <Border Margin="0,5,0,0" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top"
                                             Background="#AA000000" CornerRadius="3" IsHitTestVisible="False">
                                         <Border.Style>
                                             <Style TargetType="Border">
@@ -200,7 +200,7 @@
                                         </StackPanel>
                                     </Border>
                                     <!--  ⚪ 지원안함: 준비 완료했으나 비PTZ 카메라(또는 ONVIF 포트/계정 실패)  -->
-                                    <Border Margin="6,34,0,0" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    <Border Margin="0,5,0,0" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top"
                                             Background="#AA000000" CornerRadius="3" IsHitTestVisible="False">
                                         <Border.Style>
                                             <Style TargetType="Border">
