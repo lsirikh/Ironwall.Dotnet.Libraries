@@ -166,6 +166,62 @@
                                     <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
+                                    <!--  PTZ 상태 배지(좌상단, 스트리밍 HUB 배지 6,6 아래) — 🟢가능 / 🟠준비중 / ⚪지원안함.
+                                          IsPtzLoading/IsPtzCapable로 3상태 상호배타 표시. RTSP 컨트롤 위 오버레이라 입력 비간섭(히트테스트 제외)  -->
+                                    <!--  🟠 준비중: ONVIF 연결(InitializeFull+GetNode, 첫 오픈 수 초·이후 워밍 즉시) 진행 중  -->
+                                    <Border Margin="6,34,0,0" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                            Background="#AA000000" CornerRadius="3" IsHitTestVisible="False"
+                                            Visibility="{Binding IsPtzLoading, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FFF39C12" />
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="PTZ 준비중…" />
+                                        </StackPanel>
+                                    </Border>
+                                    <!--  🟢 가능: 준비 완료 + PTZ 지원 카메라  -->
+                                    <Border Margin="6,34,0,0" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                            Background="#AA000000" CornerRadius="3" IsHitTestVisible="False">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsPtzLoading}" Value="False" />
+                                                            <Condition Binding="{Binding IsPtzCapable}" Value="True" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FF2ECC71" />
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="PTZ 가능" />
+                                        </StackPanel>
+                                    </Border>
+                                    <!--  ⚪ 지원안함: 준비 완료했으나 비PTZ 카메라(또는 ONVIF 포트/계정 실패)  -->
+                                    <Border Margin="6,34,0,0" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                            Background="#AA000000" CornerRadius="3" IsHitTestVisible="False">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsPtzLoading}" Value="False" />
+                                                            <Condition Binding="{Binding IsPtzCapable}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FF95A5A6" />
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="PTZ 지원안함" />
+                                        </StackPanel>
+                                    </Border>
+
                                 </Grid>
                             </Border>
 
