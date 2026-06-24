@@ -48,7 +48,7 @@
 				<Separator
 					Grid.Row="1"
 					Grid.ColumnSpan="4"
-					Background="#33000000"
+					Background="{DynamicResource DividerBrush}"
 					Style="{StaticResource MaterialDesignLightSeparator}" />
 
 				<StackPanel Grid.Row="2" Orientation="Vertical">
@@ -434,7 +434,7 @@
 					<Separator
 						Grid.Row="1"
 						Grid.ColumnSpan="4"
-						Background="#33000000"
+						Background="{DynamicResource DividerBrush}"
 						Style="{StaticResource MaterialDesignLightSeparator}" />
 
 					<Button

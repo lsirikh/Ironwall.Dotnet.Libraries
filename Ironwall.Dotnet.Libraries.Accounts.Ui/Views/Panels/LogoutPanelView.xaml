@@ -43,7 +43,7 @@
 
 				<Separator
 					Grid.Row="1"
-					Background="#33000000"
+					Background="{DynamicResource DividerBrush}"
 					Style="{StaticResource MaterialDesignLightSeparator}" />
 
 				<Grid
@@ -72,7 +72,7 @@
 
 				<Separator
 					Grid.Row="3"
-					Background="#33000000"
+					Background="{DynamicResource DividerBrush}"
 					Style="{StaticResource MaterialDesignLightSeparator}" />
 
 
