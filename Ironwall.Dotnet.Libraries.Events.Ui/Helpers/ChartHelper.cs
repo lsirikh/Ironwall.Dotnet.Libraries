@@ -70,7 +70,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                 Stroke = new SolidColorPaint(stroke),
                 DataLabelsPosition = PolarLabelsPosition.Middle,
                 DataLabelsSize = 13,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesFixed, 2),
             };
             pie.PointMeasured += Pie_PointMeasured;
             return pie;
@@ -112,7 +112,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                 Fill = new SolidColorPaint(color),
                 Stroke= new SolidColorPaint(stroke),
                 DataLabelsSize = 12,
-                DataLabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesFixed, 2),
                 DataLabelsRotation = 90,
                 DataLabelsPosition = DataLabelsPosition.Middle,
             };
@@ -219,28 +219,28 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
             {
                 var values = controllers.Select(c => (double)c.SensorDetection).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Detection", values, new SKColor(255, 205, 0), SKColors.White));
+                series.Add(MakeBar("Detection", values, new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("MAL"))
             {
                 var values = controllers.Select(c => (double)c.Malfunction).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Malfunction", values, new SKColor(30, 144, 255), SKColors.White));
+                series.Add(MakeBar("Malfunction", values, new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("CON"))
             {
                 var values = controllers.Select(c => (double)c.Connection).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Connection", values, new SKColor(155, 89, 182), SKColors.White));
+                series.Add(MakeBar("Connection", values, new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("ACT"))
             {
                 var values = controllers.Select(c => (double)c.Action).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Action", values, new SKColor(50, 205, 50), SKColors.White));
+                series.Add(MakeBar("Action", values, new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
             }
 
             return (series, controllerLabels);
@@ -258,25 +258,25 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
             {
                 series.Add(MakePie("Detection",
                     summary.SensorDetection + summary.CameraDetection,
-                    new SKColor(255, 205, 0), SKColors.White));
+                    new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("MAL"))
             {
                 series.Add(MakePie("Malfunction", summary.Malfunction,
-                    new SKColor(30, 144, 255), SKColors.White));
+                    new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("CON"))
             {
                 series.Add(MakePie("Connection", summary.Connection,
-                    new SKColor(155, 89, 182), SKColors.White));
+                    new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("ACT"))
             {
                 series.Add(MakePie("Action", summary.Action,
-                    new SKColor(50, 205, 50), SKColors.White));
+                    new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
             }
 
             return series;

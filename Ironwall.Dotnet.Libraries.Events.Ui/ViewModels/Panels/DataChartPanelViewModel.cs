@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView.Painting;
+using MaterialDesignThemes.Wpf;
 using SkiaSharp;
 using System;
 using System.Collections.ObjectModel;
@@ -222,8 +223,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public SolidColorPaint LegendTextPaint { get; set; } =
         new SolidColorPaint
         {
-            Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Malgun Gothic")
+            Color = ChartThemeProvider.TextColor(BaseTheme.Light),
+            SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
