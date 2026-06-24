@@ -42,6 +42,13 @@ internal static class PtzVectorMapper
             PanTilt = new Vector2DDto { X = (float)pan, Y = (float)tilt, Space = panTiltSpace }
         };
 
+    /// <summary>Zoom 전용 상대 이동 벡터(PanTilt 없음 → 회전 미변경, 휠 줌). zoomSpace 필수.</summary>
+    public static PtzVectorDto BuildZoom(double zoom, string? zoomSpace)
+        => new()
+        {
+            Zoom = new Vector1DDto { X = (float)zoom, Space = zoomSpace }
+        };
+
     /// <summary>Pan/Tilt/Zoom 절대 위치 벡터(프리셋 이동). zoomSpace가 null이면 Zoom 생략.</summary>
     public static PtzVectorDto BuildAbsolute(double pan, double tilt, double? zoom, string? panTiltSpace, string? zoomSpace)
         => new()

@@ -57,9 +57,15 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 IPtzController.RelativeMoveByPixel 호출 + FOV 갱신. (FR-DRAG-03)</summary>
     public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
 
-    /// <summary>컨트롤이 영상 위 우버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
+    /// <summary>컨트롤이 영상 위 좌버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
     internal void RaisePtzDrag(double dx, double dy, double imageW, double imageH)
         => PtzDragRequested?.Invoke(this, new PtzDragEventArgs(dx, dy, imageW, imageH));
+
+    /// <summary>영상 위 휠 → PTZ 줌(+1=줌인 / -1=줌아웃). MapViewModel이 IPtzController.RelativeZoom 호출. (FR-PTZCTL-03)</summary>
+    public event EventHandler<int>? PtzZoomRequested;
+
+    /// <summary>컨트롤이 영상 위 휠 회전 시 호출(방향 ±1).</summary>
+    internal void RaisePtzZoom(int direction) => PtzZoomRequested?.Invoke(this, direction);
 
     public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
@@ -98,6 +104,10 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public double CanvasTop { get => _canvasTop; set { _canvasTop = value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
     public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); RecomputeLine(); } }
     public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); RecomputeLine(); } }
+
+    private int _zIndex;
+    /// <summary>팝업 z-order(선택/오픈 시 최상위). Panel.ZIndex 바인딩 — 컬렉션 Move 대신 사용해 RTSP 컨테이너 재생성(영상 끊김) 방지. (FR-SEL-02)</summary>
+    public int ZIndex { get => _zIndex; set { if (_zIndex == value) return; _zIndex = value; NotifyOfPropertyChange(nameof(ZIndex)); } }
 
     // ── 연결선(Leader Line): 카메라 심볼 중점 → 팝업 경계 (빨간 점선) ──────────
     /// <summary>카메라 심볼 중점의 위경도(팬/줌 시 화면점 재계산용). MapViewModel이 설정.</summary>

@@ -727,6 +727,30 @@ public class MapViewModel : BasePanelViewModel,
         if (ptz != null) _ = ptz.StopAsync(vm.CameraId);
     }
 
+    private const double PtzZoomStep = 0.1;   // 휠 1노치당 상대 줌 변화량(rel zoom space 비율)
+
+    private void OnCameraPopupPtzZoom(object? sender, int direction)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzZoomAsync(vm, direction);
+    }
+
+    /// <summary>영상 휠 → 상대 줌(RelativeZoom) + FOV 갱신. (FR-PTZCTL-03)</summary>
+    private async Task HandlePtzZoomAsync(CameraStreamPopupViewModel vm, int direction)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            var moved = await ptz.RelativeZoomAsync(vm.CameraId, direction * PtzZoomStep).ConfigureAwait(false);
+            if (!moved) return;
+            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
+            if (pos != null)
+                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
+                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
 
     private void OnCameraPopupPresetsReload(object? sender, EventArgs e)
@@ -901,12 +925,12 @@ public class MapViewModel : BasePanelViewModel,
         BringCameraPopupToFront(vm);
     }
 
-    /// <summary>팝업을 컬렉션 끝(= ItemsControl 렌더 순서상 최상위)으로 이동. (FR-SEL-02)</summary>
+    private int _popupZCounter;   // Panel.ZIndex 증가 카운터(팝업 간 상대 z-order)
+
+    /// <summary>팝업을 최상위로 — Panel.ZIndex 증가. 컬렉션 Move 금지(ItemsControl 컨테이너 재생성=RTSP 영상 끊김 방지). (FR-SEL-02)</summary>
     private void BringCameraPopupToFront(CameraStreamPopupViewModel vm)
     {
-        var idx = CameraPopups.IndexOf(vm);
-        if (idx >= 0 && idx < CameraPopups.Count - 1)
-            CameraPopups.Move(idx, CameraPopups.Count - 1);
+        vm.ZIndex = ++_popupZCounter;
     }
 
     /// <summary>자동해제 타이머 시작/리셋 — IsAutoDiscard ON일 때 TimeoutSeconds 후 팝업 자동 닫힘.</summary>
@@ -953,9 +977,8 @@ public class MapViewModel : BasePanelViewModel,
             var existing = CameraPopups.FirstOrDefault(p => p.CameraId == cameraId);
             if (existing != null)
             {
-                var idx = CameraPopups.IndexOf(existing);
-                if (idx >= 0 && idx < CameraPopups.Count - 1)
-                    CameraPopups.Move(idx, CameraPopups.Count - 1);
+                BringCameraPopupToFront(existing);      // Move 금지 — ZIndex로 최상위(영상 유지)
+                SelectedCameraPopup = existing;
                 StartOrResetAutoCloseTimer(existing);   // 재더블클릭 = 상호작용 → 카운트 리셋
                 return;
             }
@@ -999,7 +1022,8 @@ public class MapViewModel : BasePanelViewModel,
             };
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
-            vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // PTZ 드래그 → IPtzController
+            vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // 좌버튼 PTZ 드래그 → IPtzController
+            vm.PtzZoomRequested += OnCameraPopupPtzZoom;            // 휠 → 상대 줌
             vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
             vm.PtzNudgeRequested += OnCameraPopupPtzNudge;          // PTZ 탭 방향 패드
             vm.PtzStopRequested += OnCameraPopupPtzStop;
@@ -1013,6 +1037,7 @@ public class MapViewModel : BasePanelViewModel,
             vm.AutoFocusRequested += OnCameraPopupAutoFocus;
             CameraPopups.Add(vm);
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
+            BringCameraPopupToFront(vm);       // 새 팝업 최상위(ZIndex)
             StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
 
             // ONVIF PTZ 준비(비동기) → IsPtzCapable 설정(PTZ 카메라만 우버튼 활성)
@@ -1053,6 +1078,7 @@ public class MapViewModel : BasePanelViewModel,
             vm.CloseRequested -= OnCameraPopupCloseRequested;
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
+            vm.PtzZoomRequested -= OnCameraPopupPtzZoom;
             vm.SelectRequested -= OnCameraPopupSelectRequested;
             vm.PtzNudgeRequested -= OnCameraPopupPtzNudge;
             vm.PtzStopRequested -= OnCameraPopupPtzStop;

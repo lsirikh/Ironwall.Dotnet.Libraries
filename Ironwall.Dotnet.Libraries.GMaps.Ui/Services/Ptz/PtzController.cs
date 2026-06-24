@@ -57,7 +57,8 @@ public sealed class PtzController : IPtzController
     private sealed record SpaceInfo(
         bool HasRel, string? RelPtUri, double RelXMin, double RelXMax, double RelYMin, double RelYMax,
         bool HasAbs, string? AbsPtUri, double AbsXMin, double AbsXMax, double AbsYMin, double AbsYMax,
-        string? AbsZoomUri, double AbsZMin, double AbsZMax);
+        string? AbsZoomUri, double AbsZMin, double AbsZMax,
+        bool HasRelZoom, string? RelZoomUri, double RelZMin, double RelZMax);
 
     /*──────────────── 공개 API ────────────────*/
 
@@ -122,6 +123,27 @@ public sealed class PtzController : IPtzController
         }
         catch (OperationCanceledException) { return false; }
         catch (Exception ex) { _log?.Error($"[PTZ] RelativeMove 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> RelativeZoomAsync(int cameraId, double zoomDelta, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { HasRelZoom: true } sp || ctx.Model?.PtzClient == null)
+            return false;
+
+        var z = PtzCoordinateMath.ClampToRange(zoomDelta, sp.RelZMin, sp.RelZMax);
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var vec = PtzVectorMapper.ToPtzVector(PtzVectorMapper.BuildZoom(z, sp.RelZoomUri));
+                await ctx.Model.PtzClient.RelativeMoveAsync(ctx.ProfileToken, vec, null).ConfigureAwait(false);
+                return true;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] RelativeZoom 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
     public async Task<bool> AbsoluteMoveAsync(int cameraId, double pan, double tilt, double zoom, CancellationToken ct = default)
@@ -292,6 +314,7 @@ public sealed class PtzController : IPtzController
             var rel = sp.RelativePanTiltTranslationSpace?.FirstOrDefault();
             var abs = sp.AbsolutePanTiltPositionSpace?.FirstOrDefault();
             var absZ = sp.AbsoluteZoomPositionSpace?.FirstOrDefault();
+            var relZ = sp.RelativeZoomTranslationSpace?.FirstOrDefault();
 
             return new SpaceInfo(
                 HasRel: rel != null,
@@ -303,7 +326,9 @@ public sealed class PtzController : IPtzController
                 AbsXMin: abs?.XRange?.Min ?? -1d, AbsXMax: abs?.XRange?.Max ?? 1d,
                 AbsYMin: abs?.YRange?.Min ?? -1d, AbsYMax: abs?.YRange?.Max ?? 1d,
                 AbsZoomUri: absZ?.URI,
-                AbsZMin: absZ?.XRange?.Min ?? 0d, AbsZMax: absZ?.XRange?.Max ?? 1d);
+                AbsZMin: absZ?.XRange?.Min ?? 0d, AbsZMax: absZ?.XRange?.Max ?? 1d,
+                HasRelZoom: relZ != null, RelZoomUri: relZ?.URI,
+                RelZMin: relZ?.XRange?.Min ?? -1d, RelZMax: relZ?.XRange?.Max ?? 1d);
         }
         catch (Exception ex)
         {

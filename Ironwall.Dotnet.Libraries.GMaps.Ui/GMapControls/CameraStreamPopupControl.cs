@@ -12,9 +12,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 /// 맵 위 이동식 RTSP 스트리밍 팝업 CustomControl(관심지역/레이어 창 드래그 패턴 답습).
 /// DataContext = <see cref="CameraStreamPopupViewModel"/>.
 /// <para>
-/// 좌버튼: 헤더(Y≤42) 드래그로 부모 Canvas 내 창 이동(VM.CanvasLeft/Top).
-/// 우버튼(영상 영역, CameraPopup_PTZ_Control): 드래그 = PTZ 방향 이동(벡터 오버레이→릴리즈 시 RelativeMove),
-/// 8px 미만 짧은클릭 = 탭 패널 토글. IsPtzCapable=false면 차단.
+/// 좌버튼: 헤더(Y≤42) 드래그=부모 Canvas 내 창 이동(VM.CanvasLeft/Top) / 영상 영역 드래그=PTZ 방향 이동
+/// (벡터 오버레이→릴리즈 시 RelativeMove) / 짧은클릭=팝업 선택. 우버튼: 컨트롤 패널(아코디언 탭) 토글.
+/// 휠(영상 영역): PTZ 줌 인/아웃. PTZ/줌은 IsPtzCapable=false면 차단.
 /// </para>
 /// </summary>
 public class CameraStreamPopupControl : Control
@@ -55,13 +55,13 @@ public class CameraStreamPopupControl : Control
 
     public CameraStreamPopupControl()
     {
-        MouseLeftButtonDown += OnMouseLeftButtonDown;
+        // 좌버튼 = 선택 + 헤더 창이동 + 영상 PTZ 드래그(드래그=이동, 짧은클릭=선택).
+        MouseLeftButtonDown += OnLeftButtonDown;
         MouseMove += OnMouseMove;
-        MouseLeftButtonUp += OnMouseLeftButtonUp;
+        MouseLeftButtonUp += OnLeftButtonUp;
 
-        // 우버튼 = PTZ 전용(드래그=이동, 짧은클릭=탭패널). (FR-DRAG-07)
-        MouseRightButtonDown += OnPtzButtonDown;
-        MouseRightButtonUp += OnPtzButtonUp;
+        // 우버튼 = 컨트롤 패널(아코디언) 토글.
+        MouseRightButtonDown += OnRightButtonDown;
         LostMouseCapture += OnLostMouseCapture;
         Focusable = true;
     }
@@ -83,21 +83,36 @@ public class CameraStreamPopupControl : Control
 
     /*──────────────── 좌버튼: 창 이동(헤더) ────────────────*/
 
-    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void OnLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // 좌클릭(헤더/영상 어디든) = 이 팝업 선택 + 맨앞. (FR-SEL-01)
-        (DataContext as CameraStreamPopupViewModel)?.RaiseSelectRequested();
+        if (DataContext is not CameraStreamPopupViewModel vm) return;
+
+        // 좌클릭(헤더/영상 어디든) = 이 팝업 선택 + 최상위. (FR-SEL-01)
+        vm.RaiseSelectRequested();
 
         var position = e.GetPosition(this);
-        if (position.Y > HeaderHeight) return;   // 헤더만 창이동 드래그
+        if (position.Y <= HeaderHeight)
+        {
+            // 헤더 → 창 이동 드래그
+            var canvas = FindParentCanvas();
+            if (canvas == null) return;
+            _isDragging = true;
+            _lastMousePosition = e.GetPosition(canvas);
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
 
-        var canvas = FindParentCanvas();
-        if (canvas == null) return;
-
-        _isDragging = true;
-        _lastMousePosition = e.GetPosition(canvas);
-        CaptureMouse();
-        e.Handled = true;
+        // 영상 영역 → PTZ 드래그(IsPtzCapable일 때만). 8px 미만이면 위 선택만 적용. (FR-DRAG-01/03)
+        if (vm.IsPtzCapable && _videoRegion != null)
+        {
+            _ptzActive = true;
+            _isPtzDragging = false;
+            _ptzStart = e.GetPosition(_videoRegion);
+            CaptureMouse();
+            Keyboard.Focus(this);   // ESC 취소 수신용
+            e.Handled = true;
+        }
     }
 
     private void OnMouseMove(object sender, MouseEventArgs e)
@@ -136,32 +151,53 @@ public class CameraStreamPopupControl : Control
         _lastMousePosition = cur;
     }
 
-    private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void OnLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_isDragging) return;
-        _isDragging = false;
-        ReleaseMouseCapture();
-        (DataContext as CameraStreamPopupViewModel)?.RaiseDragCompleted();
+        // 영상 PTZ 드래그 종료
+        if (_ptzActive)
+        {
+            _ptzActive = false;
+            ReleaseMouseCapture();
+            var vm = DataContext as CameraStreamPopupViewModel;
+            if (_isPtzDragging && _videoRegion != null && vm != null)
+            {
+                var cur = e.GetPosition(_videoRegion);
+                // 릴리즈 시 단 1회 RelativeMove 요청(MapViewModel이 IPtzController 호출). (FR-DRAG-03)
+                vm.RaisePtzDrag(cur.X - _ptzStart.X, cur.Y - _ptzStart.Y,
+                    _videoRegion.ActualWidth, _videoRegion.ActualHeight);
+            }
+            // 8px 미만 짧은클릭은 down에서 이미 선택됨(추가 동작 없음).
+            _isPtzDragging = false;
+            ClearPtzVector();
+            e.Handled = true;
+            return;
+        }
+
+        // 헤더 창 이동 종료
+        if (_isDragging)
+        {
+            _isDragging = false;
+            ReleaseMouseCapture();
+            (DataContext as CameraStreamPopupViewModel)?.RaiseDragCompleted();
+        }
     }
 
-    /*──────────────── 우버튼: PTZ 드래그 / 탭 패널 ────────────────*/
+    /*──────────────── 우버튼: 컨트롤 패널(아코디언) 토글 / 휠: 줌 ────────────────*/
 
-    private void OnPtzButtonDown(object sender, MouseButtonEventArgs e)
+    private void OnRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is not CameraStreamPopupViewModel vm) return;
+        // 우클릭 = 컨트롤 패널(PTZ/프리셋/옵션 탭) 펼침/접기. 맵 컨텍스트 메뉴로 버블 방지.
+        (DataContext as CameraStreamPopupViewModel)?.TogglePanel();
+        e.Handled = true;
+    }
 
-        // PTZ 미지원 → 입력 차단(오버레이/메뉴 없음). (FR-GATE-01/03)
-        if (!vm.IsPtzCapable) { e.Handled = true; return; }
-
-        // 헤더 영역 우클릭은 무시(영상 영역만 PTZ)
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        // 영상 영역 휠 = PTZ 줌(업=줌인 / 다운=줌아웃). 헤더/미지원은 무시. (FR-PTZCTL-03)
+        if (DataContext is not CameraStreamPopupViewModel vm || !vm.IsPtzCapable) return;
         if (e.GetPosition(this).Y <= HeaderHeight) return;
-        if (_videoRegion == null) return;
-
-        _ptzActive = true;
-        _isPtzDragging = false;
-        _ptzStart = e.GetPosition(_videoRegion);
-        CaptureMouse();
-        Keyboard.Focus(this);   // ESC 취소 수신용
+        vm.RaisePtzZoom(e.Delta > 0 ? 1 : -1);
         e.Handled = true;
     }
 
@@ -179,31 +215,6 @@ public class CameraStreamPopupControl : Control
             DrawPtzVector(_ptzStart, cur);
     }
 
-    private void OnPtzButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        if (!_ptzActive) return;
-        _ptzActive = false;
-        ReleaseMouseCapture();
-
-        var vm = DataContext as CameraStreamPopupViewModel;
-        if (_isPtzDragging && _videoRegion != null && vm != null)
-        {
-            var cur = e.GetPosition(_videoRegion);
-            var dx = cur.X - _ptzStart.X;
-            var dy = cur.Y - _ptzStart.Y;
-            // 릴리즈 시 단 1회 RelativeMove 요청(MapViewModel이 IPtzController 호출). (FR-DRAG-03)
-            vm.RaisePtzDrag(dx, dy, _videoRegion.ActualWidth, _videoRegion.ActualHeight);
-        }
-        else if (!_isPtzDragging && vm != null)
-        {
-            // 8px 미만 짧은클릭 → 탭 패널 토글. (FR-UI-01)
-            vm.TogglePanel();
-        }
-
-        _isPtzDragging = false;
-        ClearPtzVector();
-        e.Handled = true;
-    }
 
     private void OnLostMouseCapture(object sender, MouseEventArgs e)
     {
