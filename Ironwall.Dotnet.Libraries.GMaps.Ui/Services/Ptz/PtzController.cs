@@ -78,7 +78,9 @@ public sealed class PtzController : IPtzController
                 // (구버전은 ctx.Model?.PtzClient==null 기준이라, 비PTZ 카메라는 모델을 못 담아 매 오픈 재초기화됐다.)
                 if (ctx.Model == null)
                 {
-                    var model = await _onvif.InitializeFullAsync(conn, ct).ConfigureAwait(false);
+                    // PTZ 빠른 초기화(InitializePtz): device-info/스트림파싱/ONVIF프리셋 생략 + 클라이언트 일괄 생성으로
+                    // SOAP 왕복 ~12→3 단축(첫 오픈 지연 감소). PTZ 이동/줌·옵션(주야간/포커스)에 필요한 것만 확보.
+                    var model = await _onvif.InitializePtzAsync(conn, ct).ConfigureAwait(false);
                     if (model == null)
                     {
                         // ONVIF 연결/인증 자체 실패 — 캐시하지 않음(다음 오픈 시 재시도 허용).
