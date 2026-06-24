@@ -59,7 +59,9 @@ public sealed class PtzController : IPtzController
         bool HasRel, string? RelPtUri, double RelXMin, double RelXMax, double RelYMin, double RelYMax,
         bool HasAbs, string? AbsPtUri, double AbsXMin, double AbsXMax, double AbsYMin, double AbsYMax,
         string? AbsZoomUri, double AbsZMin, double AbsZMax,
-        bool HasRelZoom, string? RelZoomUri, double RelZMin, double RelZMax);
+        bool HasRelZoom, string? RelZoomUri, double RelZMin, double RelZMax,
+        // ContinuousMove velocity space URI(공백이면 카메라가 velocity를 무시할 수 있음 → ContinuousMove 무동작 원인).
+        string? ContPtUri, string? ContZoomUri);
 
     /*──────────────── 공개 API ────────────────*/
 
@@ -144,11 +146,15 @@ public sealed class PtzController : IPtzController
             try
             {
                 // ContinuousMove(속도). Relative 미지원 카메라도 대부분 지원. 카메라는 Stop/타임아웃까지 이동.
+                // velocity space를 GetNode의 ContinuousPanTilt/ZoomVelocitySpace로 명시 — 공백이면 일부 카메라가
+                // velocity를 무시해 무동작(이 카메라 증상). space가 null이면 카메라 기본 space 사용.
+                var sp = ctx.Spaces;
                 var speed = new PtzSpeedDto
                 {
-                    PanTilt = new Vector2DDto { X = (float)panVel, Y = (float)tiltVel },
-                    Zoom = new Vector1DDto { X = (float)zoomVel },
+                    PanTilt = new Vector2DDto { X = (float)panVel, Y = (float)tiltVel, Space = sp?.ContPtUri },
+                    Zoom = new Vector1DDto { X = (float)zoomVel, Space = sp?.ContZoomUri },
                 };
+                _log?.Info($"[PTZ] ContinuousMove cam={cameraId} pan={panVel:F2} tilt={tiltVel:F2} zoom={zoomVel:F2} ptSpace={(sp?.ContPtUri ?? "null")} zSpace={(sp?.ContZoomUri ?? "null")}");
                 await _onvif.MovePTZ(ctx.Model.PtzClient, speed, ctx.ProfileToken, "PT10S").ConfigureAwait(false);
                 return true;
             }
@@ -348,6 +354,8 @@ public sealed class PtzController : IPtzController
             var abs = sp.AbsolutePanTiltPositionSpace?.FirstOrDefault();
             var absZ = sp.AbsoluteZoomPositionSpace?.FirstOrDefault();
             var relZ = sp.RelativeZoomTranslationSpace?.FirstOrDefault();
+            var contPt = sp.ContinuousPanTiltVelocitySpace?.FirstOrDefault();   // ContinuousMove 팬틸트 velocity space
+            var contZ = sp.ContinuousZoomVelocitySpace?.FirstOrDefault();       // ContinuousMove 줌 velocity space
 
             return new SpaceInfo(
                 HasRel: rel != null,
@@ -361,7 +369,8 @@ public sealed class PtzController : IPtzController
                 AbsZoomUri: absZ?.URI,
                 AbsZMin: absZ?.XRange?.Min ?? 0d, AbsZMax: absZ?.XRange?.Max ?? 1d,
                 HasRelZoom: relZ != null, RelZoomUri: relZ?.URI,
-                RelZMin: relZ?.XRange?.Min ?? -1d, RelZMax: relZ?.XRange?.Max ?? 1d);
+                RelZMin: relZ?.XRange?.Min ?? -1d, RelZMax: relZ?.XRange?.Max ?? 1d,
+                ContPtUri: contPt?.URI, ContZoomUri: contZ?.URI);
         }
         catch (Exception ex)
         {
