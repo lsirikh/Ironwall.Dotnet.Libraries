@@ -51,6 +51,13 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     }
 
     public ViewModels.LoginViewModel LoginViewModel => _login;   // XAML 권한(레벨) 바인딩용
+
+    private bool _isVisible = true;
+    public bool IsVisible   // View의 ProgressBar/콘텐츠 표시 토글
+    {
+        get => _isVisible;
+        set { if (_isVisible == value) return; _isVisible = value; NotifyOfPropertyChange(() => IsVisible); }
+    }
     #endregion
     #region - Attributes -
     private readonly ISessionConfigService _session;

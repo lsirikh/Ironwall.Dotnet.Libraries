@@ -90,6 +90,7 @@ public class AccountUiModule : Module
                         new AccountModel()))                  // ⚠️ C-1: 전용 모델 주입(공유 싱글톤 격리)
                    .AsSelf().InstancePerDependency();
             builder.RegisterType<LoginPanelViewModel>().SingleInstance();
+            builder.RegisterType<LogoutPanelViewModel>().SingleInstance();
             builder.RegisterType<AccountManagerPanelViewModel>().SingleInstance();
             builder.RegisterType<MyPagePanelViewModel>().SingleInstance();
             builder.RegisterType<AccountSetupPanelViewModel>().SingleInstance();
