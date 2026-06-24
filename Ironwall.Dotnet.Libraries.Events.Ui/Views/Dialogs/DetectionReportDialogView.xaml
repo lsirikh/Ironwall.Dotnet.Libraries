@@ -27,7 +27,7 @@
 			<TextBlock Style="{StaticResource DialogTitle}" Text="탐지 이벤트" />
 		</StackPanel>
 
-		<Separator Background="#33000000" Style="{StaticResource MaterialDesignLightSeparator}" />
+		<Separator Background="{DynamicResource DividerBrush}" Style="{StaticResource MaterialDesignLightSeparator}" />
 
 		<ContentControl x:Name="SelectedItemEditor" IsEnabled="false" />
 
@@ -125,7 +125,7 @@
 			</Grid>
 		</Grid>
 
-		<Separator Background="#33000000" Style="{StaticResource MaterialDesignLightSeparator}" />
+		<Separator Background="{DynamicResource DividerBrush}" Style="{StaticResource MaterialDesignLightSeparator}" />
 
 		<Grid Margin="0,10,0,0">
 			<Grid.ColumnDefinitions>
