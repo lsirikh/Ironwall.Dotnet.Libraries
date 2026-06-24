@@ -285,10 +285,10 @@
                                         </Button>
                                     </UniformGrid>
 
-                                    <!--  PTZ 탭: 8방향 패드(누르면 연속 이동, 떼면 정지) + 중앙 정지. 컨트롤이 PART_PtzPad에서 누름/뗌 처리. 비PTZ면 비활성  -->
-                                    <UniformGrid x:Name="PART_PtzPad" Width="132" Height="132" HorizontalAlignment="Center" Columns="3" Rows="3" IsEnabled="{Binding IsPtzCapable}">
-                                        <UniformGrid.Style>
-                                            <Style TargetType="UniformGrid">
+                                    <!--  PTZ 탭: 좌=8방향 패드(누르면 연속이동·떼면 정지), 우=속도(PanTilt/Zoom 슬라이더+직접입력). 컨트롤이 버튼 Tag로 누름/뗌 처리. 비PTZ면 전체 비활성  -->
+                                    <Grid Margin="4,4,4,0" IsEnabled="{Binding IsPtzCapable}">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding ActiveTab}" Value="0">
@@ -296,49 +296,47 @@
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </UniformGrid.Style>
-                                        <Button Content="↖" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,-1" />
-                                        <Button Content="▲" Style="{StaticResource PtzPadButtonStyle}" Tag="0,-1" />
-                                        <Button Content="↗" Style="{StaticResource PtzPadButtonStyle}" Tag="1,-1" />
-                                        <Button Content="◀" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,0" />
-                                        <Button Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" Tag="stop" ToolTip="정지" />
-                                        <Button Content="▶" Style="{StaticResource PtzPadButtonStyle}" Tag="1,0" />
-                                        <Button Content="↙" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,1" />
-                                        <Button Content="▼" Style="{StaticResource PtzPadButtonStyle}" Tag="0,1" />
-                                        <Button Content="↘" Style="{StaticResource PtzPadButtonStyle}" Tag="1,1" />
-                                    </UniformGrid>
+                                        </Grid.Style>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <!--  PTZ 속도(ContinuousMove 속도) — PanTilt/Zoom 슬라이더 + 직접 입력([0.1~1.0]). PTZ 탭에서만 표시, 비PTZ면 비활성  -->
-                                    <StackPanel Margin="6,8,6,0" IsEnabled="{Binding IsPtzCapable}">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="0">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-                                        <!--  PanTilt 속도  -->
-                                        <DockPanel Margin="0,2">
-                                            <TextBlock DockPanel.Dock="Left" Width="50" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="PanTilt" />
-                                            <TextBox DockPanel.Dock="Right" Width="42" Margin="6,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
-                                                     Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
-                                                     Text="{Binding PanTiltSpeed, StringFormat=0.00, UpdateSourceTrigger=LostFocus}" ToolTip="팬/틸트 속도 (0.1~1.0)" />
-                                            <Slider VerticalAlignment="Center" Minimum="0.1" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
-                                                    Value="{Binding PanTiltSpeed}" ToolTip="팬/틸트 속도" />
-                                        </DockPanel>
-                                        <!--  Zoom 속도  -->
-                                        <DockPanel Margin="0,2">
-                                            <TextBlock DockPanel.Dock="Left" Width="50" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="Zoom" />
-                                            <TextBox DockPanel.Dock="Right" Width="42" Margin="6,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
-                                                     Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
-                                                     Text="{Binding ZoomSpeed, StringFormat=0.00, UpdateSourceTrigger=LostFocus}" ToolTip="줌 속도 (0.1~1.0)" />
-                                            <Slider VerticalAlignment="Center" Minimum="0.1" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
-                                                    Value="{Binding ZoomSpeed}" ToolTip="줌 속도" />
-                                        </DockPanel>
-                                    </StackPanel>
+                                        <!--  좌: 8방향 패드  -->
+                                        <UniformGrid x:Name="PART_PtzPad" Grid.Column="0" Width="132" Height="132" VerticalAlignment="Center" Columns="3" Rows="3">
+                                            <Button Content="↖" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,-1" />
+                                            <Button Content="▲" Style="{StaticResource PtzPadButtonStyle}" Tag="0,-1" />
+                                            <Button Content="↗" Style="{StaticResource PtzPadButtonStyle}" Tag="1,-1" />
+                                            <Button Content="◀" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,0" />
+                                            <Button Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" Tag="stop" ToolTip="정지" />
+                                            <Button Content="▶" Style="{StaticResource PtzPadButtonStyle}" Tag="1,0" />
+                                            <Button Content="↙" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,1" />
+                                            <Button Content="▼" Style="{StaticResource PtzPadButtonStyle}" Tag="0,1" />
+                                            <Button Content="↘" Style="{StaticResource PtzPadButtonStyle}" Tag="1,1" />
+                                        </UniformGrid>
+
+                                        <!--  우: 속도(PanTilt/Zoom) 슬라이더 + 직접 입력([0.1~1.0])  -->
+                                        <StackPanel Grid.Column="1" Margin="12,0,2,0" VerticalAlignment="Center">
+                                            <!--  PanTilt 속도  -->
+                                            <DockPanel Margin="0,3">
+                                                <TextBlock DockPanel.Dock="Left" Width="46" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="PanTilt" />
+                                                <TextBox DockPanel.Dock="Right" Width="40" Margin="6,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
+                                                         Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
+                                                         Text="{Binding PanTiltSpeed, StringFormat=0.00, UpdateSourceTrigger=LostFocus}" ToolTip="팬/틸트 속도 (0.1~1.0)" />
+                                                <Slider VerticalAlignment="Center" Minimum="0.1" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
+                                                        Value="{Binding PanTiltSpeed}" ToolTip="팬/틸트 속도" />
+                                            </DockPanel>
+                                            <!--  Zoom 속도  -->
+                                            <DockPanel Margin="0,3">
+                                                <TextBlock DockPanel.Dock="Left" Width="46" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="Zoom" />
+                                                <TextBox DockPanel.Dock="Right" Width="40" Margin="6,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
+                                                         Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
+                                                         Text="{Binding ZoomSpeed, StringFormat=0.00, UpdateSourceTrigger=LostFocus}" ToolTip="줌 속도 (0.1~1.0)" />
+                                                <Slider VerticalAlignment="Center" Minimum="0.1" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
+                                                        Value="{Binding ZoomSpeed}" ToolTip="줌 속도" />
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </Grid>
 
                                     <!--  프리셋 탭 (로컬 DB) — 비PTZ 카메라는 전체 버튼(가기/Home/삭제/저장/Home이동) 비활성  -->
                                     <StackPanel IsEnabled="{Binding IsPtzCapable}">
