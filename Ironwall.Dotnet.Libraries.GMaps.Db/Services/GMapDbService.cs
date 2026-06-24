@@ -358,6 +358,27 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "CameraPopupPositions 테이블 생성…" });
 
+            // 카메라 PTZ 프리셋(로컬 DB) — pan/tilt/zoom + space URI, (CameraId, PresetName) 유니크
+            const string createCameraPtzPresetsSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraPtzPresets` (
+                    `Id`           INT AUTO_INCREMENT PRIMARY KEY,
+                    `CameraId`     INT NOT NULL,
+                    `PresetName`   VARCHAR(100) NOT NULL,
+                    `IsHome`       TINYINT(1) NOT NULL DEFAULT 0,
+                    `Pan`          DOUBLE NOT NULL,
+                    `Tilt`         DOUBLE NOT NULL,
+                    `Zoom`         DOUBLE NOT NULL DEFAULT 0,
+                    `PanTiltSpace` VARCHAR(255) NULL,
+                    `ZoomSpace`    VARCHAR(255) NULL,
+                    `UpdatedAt`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY `uq_camera_preset` (`CameraId`, `PresetName`)
+                );";
+
+            await _conn.ExecuteAsync(createCameraPtzPresetsSql);
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
+                { Title = nameof(BuildSchemeAsync), Message = "CameraPtzPresets 테이블 생성…" });
+
             // MBTiles 컬럼 마이그레이션 (기존 DB에 컬럼이 없으면 추가)
             await MigrateCustomMapsTableAsync();
 
@@ -1508,6 +1529,106 @@ internal class GMapDbService : TaskService, IGMapDbService
         }
     }
 
+    /*────────────────────── CameraPtzPresets (PTZ 프리셋, 로컬 DB) ──────────────*/
+
+    /// <summary>카메라의 PTZ 프리셋 목록 조회(Home 우선, 이름 순).</summary>
+    public async Task<List<IPtzPresetModel>?> FetchPtzPresetsAsync(int cameraId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                SELECT Id, CameraId, PresetName, IsHome, Pan, Tilt, Zoom, PanTiltSpace, ZoomSpace, UpdatedAt
+                FROM CameraPtzPresets
+                WHERE CameraId = @CameraId
+                ORDER BY IsHome DESC, PresetName ASC;";
+            var rows = await conn.QueryAsync<PtzPresetSQL>(sql, new { CameraId = cameraId });
+            return rows.Select(MapPtzPreset).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ 프리셋 조회 실패 (CameraId={cameraId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>PTZ 프리셋 Upsert((CameraId, PresetName) 유니크 → 동일 이름 덮어쓰기). IsHome은 SetHome으로 별도 관리.</summary>
+    public async Task<bool> UpsertPtzPresetAsync(IPtzPresetModel model, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO CameraPtzPresets (CameraId, PresetName, IsHome, Pan, Tilt, Zoom, PanTiltSpace, ZoomSpace)
+                VALUES (@CameraId, @PresetName, @IsHome, @Pan, @Tilt, @Zoom, @PanTiltSpace, @ZoomSpace)
+                ON DUPLICATE KEY UPDATE
+                    Pan = @Pan, Tilt = @Tilt, Zoom = @Zoom,
+                    PanTiltSpace = @PanTiltSpace, ZoomSpace = @ZoomSpace;";
+            int ret = await conn.ExecuteAsync(sql, new
+            {
+                model.CameraId, model.PresetName, model.IsHome,
+                model.Pan, model.Tilt, model.Zoom, model.PanTiltSpace, model.ZoomSpace
+            });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ 프리셋 저장 실패 (CameraId={model.CameraId}, {model.PresetName}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>PTZ 프리셋 삭제(Id).</summary>
+    public async Task<bool> DeletePtzPresetAsync(int presetId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "DELETE FROM CameraPtzPresets WHERE Id = @Id;";
+            int ret = await conn.ExecuteAsync(sql, new { Id = presetId });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ 프리셋 삭제 실패 (Id={presetId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>카메라의 Home 프리셋을 지정(presetId만 IsHome=1, 나머지 0 — 단일 SQL CASE, 카메라당 1개 보장).</summary>
+    public async Task<bool> SetHomePtzPresetAsync(int cameraId, int presetId, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE CameraPtzPresets
+                SET IsHome = CASE WHEN Id = @PresetId THEN 1 ELSE 0 END
+                WHERE CameraId = @CameraId;";
+            int ret = await conn.ExecuteAsync(sql, new { CameraId = cameraId, PresetId = presetId });
+            return ret > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"PTZ Home 설정 실패 (CameraId={cameraId}, PresetId={presetId}): {ex.Message}");
+            throw;
+        }
+    }
+
+    private static IPtzPresetModel MapPtzPreset(PtzPresetSQL r) => new PtzPresetModel
+    {
+        Id = r.Id,
+        CameraId = r.CameraId,
+        PresetName = r.PresetName,
+        IsHome = r.IsHome,
+        Pan = r.Pan,
+        Tilt = r.Tilt,
+        Zoom = r.Zoom,
+        PanTiltSpace = r.PanTiltSpace,
+        ZoomSpace = r.ZoomSpace,
+        UpdatedAt = r.UpdatedAt
+    };
+
     #endregion
 
     #region - MapLayer CRUD -
@@ -1850,6 +1971,21 @@ internal sealed class CameraPopupPositionSQL
     public int CameraId { get; set; }
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>CameraPtzPresets 테이블 DTO</summary>
+internal sealed class PtzPresetSQL
+{
+    public int Id { get; set; }
+    public int CameraId { get; set; }
+    public string PresetName { get; set; } = string.Empty;
+    public bool IsHome { get; set; }
+    public double Pan { get; set; }
+    public double Tilt { get; set; }
+    public double Zoom { get; set; }
+    public string? PanTiltSpace { get; set; }
+    public string? ZoomSpace { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
 

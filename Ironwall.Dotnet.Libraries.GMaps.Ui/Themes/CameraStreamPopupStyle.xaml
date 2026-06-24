@@ -9,6 +9,39 @@
         <ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
+    <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+    <!--  PTZ 방향 패드 버튼  -->
+    <Style x:Key="PtzPadButtonStyle" TargetType="Button">
+        <Setter Property="Margin" Value="2" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Background" Value="#FF223043" />
+        <Setter Property="Foreground" Value="#FFCFE0F0" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!--  탭 버튼  -->
+    <Style x:Key="PtzTabButtonStyle" TargetType="Button">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0,0,0,2" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!--  옵션 탭 세그먼트 버튼(주야간/포커스) — 활성은 인라인 DataTrigger로 Accent  -->
+    <Style x:Key="PtzSegButtonStyle" TargetType="Button">
+        <Setter Property="Margin" Value="2,0" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Background" Value="#FF223043" />
+        <Setter Property="Foreground" Value="#FFCFE0F0" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
     <!--  헤더 버튼(크게보기/닫기) — PanelCloseButtonStyle 답습: 26×26 원형 + 호버 #33FFFFFF  -->
     <Style x:Key="PopupHeaderIconButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="26" />
@@ -39,6 +72,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ctrl:CameraStreamPopupControl}">
                     <Border
+                        x:Name="PART_Root"
                         Background="White"
                         BorderBrush="{StaticResource BorderGrayBrush}"
                         BorderThickness="1"
@@ -55,6 +89,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="42" />
                                 <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!--  헤더 (드래그) — 관심지역/레이어 패널과 동일 구조  -->
@@ -104,20 +139,240 @@
                                 </Grid>
                             </Border>
 
-                            <!--  영상 영역 (Hub WriteableBitmap — airspace hole 회피)  -->
+                            <!--  영상 영역 (Hub WriteableBitmap — airspace hole 회피). 우버튼 드래그-PTZ 입력 표면 + 벡터 오버레이  -->
                             <Border
+                                x:Name="PART_VideoRegion"
                                 Grid.Row="1"
                                 Background="Black"
                                 CornerRadius="0,0,9,9"
                                 ClipToBounds="True">
-                                <streaming:ImprovedRtspPlayer
-                                    x:Name="PART_Player"
-                                    AutoPlay="True"
-                                    DataContext="{Binding StreamVm}"
-                                    ConnectionInfo="{Binding DataContext.ConnectionInfo, RelativeSource={RelativeSource TemplatedParent}}" />
+                                <Grid>
+                                    <streaming:ImprovedRtspPlayer
+                                        x:Name="PART_Player"
+                                        AutoPlay="True"
+                                        DataContext="{Binding StreamVm}"
+                                        ConnectionInfo="{Binding DataContext.ConnectionInfo, RelativeSource={RelativeSource TemplatedParent}}" />
+                                    <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
+                                    <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
+                                </Grid>
+                            </Border>
+
+                            <!--  탭 패널 ([PTZ][프리셋][옵션]) — 우버튼 짧은클릭 토글. 영상 영역(*)이 줄고 패널이 아래에 펼쳐짐  -->
+                            <Border
+                                Grid.Row="2"
+                                Background="#FF131922"
+                                BorderBrush="{StaticResource BorderGrayBrush}"
+                                BorderThickness="0,1,0,0"
+                                CornerRadius="0,0,9,9"
+                                Visibility="{Binding IsPanelExpanded, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Margin="8">
+                                    <!--  탭 바  -->
+                                    <UniformGrid Margin="0,0,0,6" Columns="3" Rows="1">
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="0" Content="PTZ" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="1" Content="프리셋" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="2" Content="옵션" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                    </UniformGrid>
+
+                                    <!--  PTZ 탭: 8방향 패드 + 정지  -->
+                                    <UniformGrid Width="132" Height="132" HorizontalAlignment="Center" Columns="3" Rows="3">
+                                        <UniformGrid.Style>
+                                            <Style TargetType="UniformGrid">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </UniformGrid.Style>
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="UL" Content="↖" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="U" Content="▲" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="UR" Content="↗" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="L" Content="◀" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding StopCommand}" Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" ToolTip="정지" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="R" Content="▶" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="DL" Content="↙" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="D" Content="▼" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Command="{Binding NudgeCommand}" CommandParameter="DR" Content="↘" Style="{StaticResource PtzPadButtonStyle}" />
+                                    </UniformGrid>
+
+                                    <!--  프리셋 탭 (로컬 DB)  -->
+                                    <StackPanel>
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="1">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <!--  프리셋 목록  -->
+                                        <ItemsControl MaxHeight="108" ItemsSource="{Binding Presets}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <md:PackIcon Grid.Column="0" Width="13" Height="13" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="#FFFFB300" Kind="Home" Visibility="{Binding IsHome, Converter={StaticResource BoolToVis}}" />
+                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Foreground="#FFE6EDF3" Text="{Binding PresetName}" TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="2" Margin="2,0" Padding="6,2" Content="가기" FontSize="11" Command="{Binding DataContext.GotoPresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <Button Grid.Column="3" Margin="2,0" Padding="6,2" Content="Home" FontSize="11" ToolTip="Home으로 지정" Command="{Binding DataContext.SetHomeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <Button Grid.Column="4" Margin="2,0" Padding="6,2" Content="✕" FontSize="11" Foreground="#FFEF5350" Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!--  빈 목록  -->
+                                        <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="등록된 프리셋이 없습니다">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Presets.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!--  버튼 행  -->
+                                        <StackPanel Margin="0,6,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
+                                            <Button Margin="2,0" Padding="8,3" Content="현재위치 저장" FontSize="11" Command="{Binding SavePresetCommand}" />
+                                            <Button Margin="2,0" Padding="8,3" Content="Home 이동" FontSize="11" Command="{Binding GotoHomeCommand}" IsEnabled="{Binding HasHomePreset}" />
+                                        </StackPanel>
+
+                                        <!--  인라인 이름 입력  -->
+                                        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsSavingPreset, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock FontSize="11" Foreground="#FF9FB0C0" Text="프리셋 이름" />
+                                            <TextBox Margin="0,2" Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="12" Foreground="White" MaxLength="100" Text="{Binding NewPresetName, UpdateSourceTrigger=PropertyChanged}" />
+                                            <StackPanel Margin="0,4,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                                                <Button Margin="2,0" Padding="8,3" Content="취소" FontSize="11" Command="{Binding CancelSavePresetCommand}" />
+                                                <Button Margin="2,0" Padding="8,3" Content="확인" FontSize="11" Command="{Binding ConfirmSavePresetCommand}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!--  옵션 탭 (영상: 주야간/포커스)  -->
+                                    <StackPanel>
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveTab}" Value="2">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <!--  미지원 안내  -->
+                                        <TextBlock Margin="0,10" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="이 카메라는 영상 옵션을 지원하지 않습니다">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsImagingCapable}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!--  옵션 콘텐츠(지원 시)  -->
+                                        <StackPanel Visibility="{Binding IsImagingCapable, Converter={StaticResource BoolToVis}}">
+                                            <!--  주야간(IR Cut Filter)  -->
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="#FF9FB0C0" Text="주야간 (IR Cut)" />
+                                            <UniformGrid Margin="0,2,0,8" Columns="3" Rows="1">
+                                                <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="ON" Content="주간">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IrCutFilterMode}" Value="ON">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="OFF" Content="야간">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IrCutFilterMode}" Value="OFF">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="AUTO" Content="자동">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IrCutFilterMode}" Value="AUTO">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </UniformGrid>
+
+                                            <!--  포커스(AutoFocus)  -->
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="#FF9FB0C0" Text="포커스" />
+                                            <UniformGrid Margin="0,2" Columns="2" Rows="1">
+                                                <Button Command="{Binding SetAutoFocusCommand}" CommandParameter="true" Content="자동">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAutoFocus}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Command="{Binding SetAutoFocusCommand}" CommandParameter="false" Content="수동">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAutoFocus}" Value="False">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
                             </Border>
                         </Grid>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <!--  단일 선택 강조 — 굵은 Accent 테두리 (FR-SEL-02)  -->
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="PART_Root" Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                            <Setter TargetName="PART_Root" Property="BorderThickness" Value="3" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

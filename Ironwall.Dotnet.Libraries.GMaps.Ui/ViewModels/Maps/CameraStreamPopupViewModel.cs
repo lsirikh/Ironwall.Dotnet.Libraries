@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Caliburn.Micro;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
@@ -44,6 +47,19 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
 
     /// <summary>컨트롤이 드래그 종료 시 호출 → DragCompleted 발화.</summary>
     internal void RaiseDragCompleted() => DragCompleted?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>좌클릭 선택 요청 — MapViewModel이 SelectedCameraPopup 설정 + 맨앞 이동. (FR-SEL-01)</summary>
+    public event EventHandler? SelectRequested;
+
+    /// <summary>컨트롤 좌클릭 시 호출 → 선택 요청.</summary>
+    internal void RaiseSelectRequested() => SelectRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 IPtzController.RelativeMoveByPixel 호출 + FOV 갱신. (FR-DRAG-03)</summary>
+    public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
+
+    /// <summary>컨트롤이 영상 위 우버튼 드래그 종료(8px 초과) 시 호출. 델타·영상 치수를 전달.</summary>
+    internal void RaisePtzDrag(double dx, double dy, double imageW, double imageH)
+        => PtzDragRequested?.Invoke(this, new PtzDragEventArgs(dx, dy, imageW, imageH));
 
     public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
@@ -120,6 +136,140 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>"크게보기" 토글 상태(런타임만, 영속 안 함 — Q4).</summary>
     public bool IsLarge { get => _isLarge; private set { _isLarge = value; NotifyOfPropertyChange(nameof(IsLarge)); } }
 
+    // ── PTZ 제어 상태(CameraPopup_PTZ_Control) ────────────────────────────────
+    private bool _isSelected;
+    private bool _isPtzCapable;
+    private bool _isPanelExpanded;
+
+    /// <summary>단일 선택 상태(MapViewModel.SelectedCameraPopup이 상호배타 설정). (FR-SEL-01)</summary>
+    public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; NotifyOfPropertyChange(nameof(IsSelected)); } }
+
+    /// <summary>PTZ 제어 가능 여부(MapViewModel이 IPtzController.EnsureReady 후 설정). false면 우버튼 입력 차단. (FR-GATE-01)</summary>
+    public bool IsPtzCapable { get => _isPtzCapable; set { if (_isPtzCapable == value) return; _isPtzCapable = value; NotifyOfPropertyChange(nameof(IsPtzCapable)); } }
+
+    /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
+    public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); } }
+
+    /// <summary>우버튼 짧은클릭(8px 미만) → 탭 패널 토글.</summary>
+    internal void TogglePanel() => IsPanelExpanded = !IsPanelExpanded;
+
+    private int _activeTab;   // 0=PTZ, 1=프리셋, 2=옵션
+    /// <summary>활성 탭(0=PTZ / 1=프리셋 / 2=옵션). (FR-UI-02)</summary>
+    public int ActiveTab { get => _activeTab; set { if (_activeTab == value) return; _activeTab = value; NotifyOfPropertyChange(nameof(ActiveTab)); } }
+
+    private ICommand? _selectTabCommand;
+    public ICommand SelectTabCommand => _selectTabCommand ??= new RelayCommand(p =>
+    {
+        if (!int.TryParse(p?.ToString(), out var i)) return;
+        ActiveTab = i;
+        IsPanelExpanded = true;
+        if (i == 1) RaisePresetsReload();   // 프리셋 탭 진입 시 DB 재조회
+        else if (i == 2) RaiseOptionsReload();   // 옵션 탭 진입 시 영상 옵션 조회
+    });
+
+    /// <summary>PTZ 탭 방향 버튼(8방향) → MapViewModel이 IPtzController로 상대 이동. (FR-UI-02)</summary>
+    public event EventHandler<PtzNudgeEventArgs>? PtzNudgeRequested;
+    /// <summary>PTZ 정지 버튼.</summary>
+    public event EventHandler? PtzStopRequested;
+
+    private ICommand? _nudgeCommand;
+    public ICommand NudgeCommand => _nudgeCommand ??= new RelayCommand(p => RaiseNudge(p?.ToString()));
+
+    private ICommand? _stopCommand;
+    public ICommand StopCommand => _stopCommand ??= new RelayCommand(() => PtzStopRequested?.Invoke(this, EventArgs.Empty));
+
+    private void RaiseNudge(string? dir)
+    {
+        var (dx, dy) = dir switch
+        {
+            "UL" => (-1d, -1d), "U" => (0d, -1d), "UR" => (1d, -1d),
+            "L" => (-1d, 0d), "R" => (1d, 0d),
+            "DL" => (-1d, 1d), "D" => (0d, 1d), "DR" => (1d, 1d),
+            _ => (0d, 0d)
+        };
+        if (dx != 0 || dy != 0) PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
+    }
+
+    // ── 프리셋 탭(로컬 DB) ────────────────────────────────────────────────────
+    private readonly BindableCollection<IPtzPresetModel> _presets = new();
+    /// <summary>카메라 프리셋 목록(MapViewModel이 DB에서 로드해 주입). (FR-PRESET-01)</summary>
+    public BindableCollection<IPtzPresetModel> Presets => _presets;
+
+    /// <summary>Home 프리셋 존재 여부([Home 이동] 활성 판단). (FR-PRESET-07)</summary>
+    public bool HasHomePreset => _presets.Any(p => p.IsHome);
+
+    /// <summary>MapViewModel이 DB 로드 결과를 주입(UI 스레드).</summary>
+    internal void SetPresets(IEnumerable<IPtzPresetModel> presets)
+    {
+        _presets.Clear();
+        _presets.AddRange(presets);
+        NotifyOfPropertyChange(nameof(HasHomePreset));
+    }
+
+    public event EventHandler? PresetsReloadRequested;       // 탭 진입/변경 후 재조회 요청
+    public event EventHandler<IPtzPresetModel>? PresetGotoRequested;
+    public event EventHandler<string>? PresetSaveRequested;  // 인라인 이름 확정
+    public event EventHandler<IPtzPresetModel>? PresetDeleteRequested;
+    public event EventHandler<IPtzPresetModel>? PresetHomeRequested;
+
+    internal void RaisePresetsReload() => PresetsReloadRequested?.Invoke(this, EventArgs.Empty);
+
+    private bool _isSavingPreset;
+    /// <summary>프리셋 저장 인라인 이름 입력 표시 여부. (FR-PRESET-03)</summary>
+    public bool IsSavingPreset { get => _isSavingPreset; set { if (_isSavingPreset == value) return; _isSavingPreset = value; NotifyOfPropertyChange(nameof(IsSavingPreset)); } }
+
+    private string _newPresetName = string.Empty;
+    public string NewPresetName { get => _newPresetName; set { _newPresetName = value; NotifyOfPropertyChange(nameof(NewPresetName)); } }
+
+    private ICommand? _gotoPresetCommand, _deletePresetCommand, _setHomeCommand, _gotoHomeCommand;
+    private ICommand? _savePresetCommand, _confirmSaveCommand, _cancelSaveCommand;
+
+    public ICommand GotoPresetCommand => _gotoPresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetGotoRequested?.Invoke(this, m); });
+    public ICommand DeletePresetCommand => _deletePresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetDeleteRequested?.Invoke(this, m); });
+    public ICommand SetHomeCommand => _setHomeCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetHomeRequested?.Invoke(this, m); });
+    public ICommand GotoHomeCommand => _gotoHomeCommand ??= new RelayCommand(() => { var h = _presets.FirstOrDefault(p => p.IsHome); if (h != null) PresetGotoRequested?.Invoke(this, h); });
+
+    /// <summary>[현재위치 저장] → 인라인 이름 입력 시작.</summary>
+    public ICommand SavePresetCommand => _savePresetCommand ??= new RelayCommand(() => { NewPresetName = $"Preset_{_presets.Count + 1}"; IsSavingPreset = true; });
+    public ICommand ConfirmSavePresetCommand => _confirmSaveCommand ??= new RelayCommand(() =>
+    {
+        var name = NewPresetName?.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        PresetSaveRequested?.Invoke(this, name);
+        IsSavingPreset = false;
+    });
+    public ICommand CancelSavePresetCommand => _cancelSaveCommand ??= new RelayCommand(() => IsSavingPreset = false);
+
+    // ── 옵션 탭(영상: 주야간/포커스) ──────────────────────────────────────────
+    private bool _isImagingCapable;
+    /// <summary>영상 옵션 지원 여부(미지원이면 안내). (FR-OPT-03)</summary>
+    public bool IsImagingCapable { get => _isImagingCapable; set { if (_isImagingCapable == value) return; _isImagingCapable = value; NotifyOfPropertyChange(nameof(IsImagingCapable)); } }
+
+    private string _irCutFilterMode = "AUTO";
+    /// <summary>주야간(IrCutFilter): "ON"=주간 / "OFF"=야간 / "AUTO". (FR-OPT-01)</summary>
+    public string IrCutFilterMode { get => _irCutFilterMode; set { if (_irCutFilterMode == value) return; _irCutFilterMode = value; NotifyOfPropertyChange(nameof(IrCutFilterMode)); } }
+
+    private bool _isAutoFocus = true;
+    /// <summary>오토포커스 여부(false=수동). (FR-OPT-02)</summary>
+    public bool IsAutoFocus { get => _isAutoFocus; set { if (_isAutoFocus == value) return; _isAutoFocus = value; NotifyOfPropertyChange(nameof(IsAutoFocus)); } }
+
+    /// <summary>MapViewModel이 ONVIF 조회 결과를 주입(UI 스레드).</summary>
+    internal void SetImagingState(string irCutFilter, bool autoFocus)
+    {
+        IrCutFilterMode = string.IsNullOrEmpty(irCutFilter) ? "AUTO" : irCutFilter.ToUpperInvariant();
+        IsAutoFocus = autoFocus;
+    }
+
+    public event EventHandler? OptionsReloadRequested;
+    public event EventHandler<string>? IrCutFilterRequested;
+    public event EventHandler<bool>? AutoFocusRequested;
+
+    internal void RaiseOptionsReload() => OptionsReloadRequested?.Invoke(this, EventArgs.Empty);
+
+    private ICommand? _setIrCutFilterCommand, _setAutoFocusCommand;
+    public ICommand SetIrCutFilterCommand => _setIrCutFilterCommand ??= new RelayCommand(p => { var m = p?.ToString(); if (!string.IsNullOrEmpty(m)) IrCutFilterRequested?.Invoke(this, m); });
+    public ICommand SetAutoFocusCommand => _setAutoFocusCommand ??= new RelayCommand(p => { if (bool.TryParse(p?.ToString(), out var b)) AutoFocusRequested?.Invoke(this, b); });
+
     public ICommand CloseCommand =>
         _closeCommand ??= new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
 
@@ -145,4 +295,26 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         catch { /* 종료 경로 — 무해 */ }
         CloseRequested = null;
     }
+}
+
+/// <summary>우버튼 드래그-PTZ 완료 이벤트 인자 — 픽셀 델타 + 영상 영역 치수(정규화·변환 기준).</summary>
+public sealed class PtzDragEventArgs : EventArgs
+{
+    public PtzDragEventArgs(double dx, double dy, double imageW, double imageH)
+    {
+        Dx = dx; Dy = dy; ImageWidth = imageW; ImageHeight = imageH;
+    }
+
+    public double Dx { get; }
+    public double Dy { get; }
+    public double ImageWidth { get; }
+    public double ImageHeight { get; }
+}
+
+/// <summary>PTZ 탭 방향 패드 nudge 인자 — 방향 단위벡터(-1/0/1).</summary>
+public sealed class PtzNudgeEventArgs : EventArgs
+{
+    public PtzNudgeEventArgs(double dx, double dy) { Dx = dx; Dy = dy; }
+    public double Dx { get; }
+    public double Dy { get; }
 }
