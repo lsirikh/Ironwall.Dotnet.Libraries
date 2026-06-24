@@ -185,10 +185,10 @@
                                         <Button Command="{Binding NudgeCommand}" CommandParameter="DR" Content="↘" Style="{StaticResource PtzPadButtonStyle}" />
                                     </UniformGrid>
 
-                                    <!--  프리셋 탭 (Phase 4)  -->
-                                    <TextBlock Margin="0,12" HorizontalAlignment="Center" Foreground="#FF8B98A8" FontSize="12" Text="프리셋 — 준비 중 (Phase 4)">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
+                                    <!--  프리셋 탭 (로컬 DB)  -->
+                                    <StackPanel>
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding ActiveTab}" Value="1">
@@ -196,8 +196,60 @@
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                        </StackPanel.Style>
+
+                                        <!--  프리셋 목록  -->
+                                        <ItemsControl MaxHeight="108" ItemsSource="{Binding Presets}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <md:PackIcon Grid.Column="0" Width="13" Height="13" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="#FFFFB300" Kind="Home" Visibility="{Binding IsHome, Converter={StaticResource BoolToVis}}" />
+                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Foreground="#FFE6EDF3" Text="{Binding PresetName}" TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="2" Margin="2,0" Padding="6,2" Content="가기" FontSize="11" Command="{Binding DataContext.GotoPresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <Button Grid.Column="3" Margin="2,0" Padding="6,2" Content="Home" FontSize="11" ToolTip="Home으로 지정" Command="{Binding DataContext.SetHomeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <Button Grid.Column="4" Margin="2,0" Padding="6,2" Content="✕" FontSize="11" Foreground="#FFEF5350" Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!--  빈 목록  -->
+                                        <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="등록된 프리셋이 없습니다">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Presets.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!--  버튼 행  -->
+                                        <StackPanel Margin="0,6,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
+                                            <Button Margin="2,0" Padding="8,3" Content="현재위치 저장" FontSize="11" Command="{Binding SavePresetCommand}" />
+                                            <Button Margin="2,0" Padding="8,3" Content="Home 이동" FontSize="11" Command="{Binding GotoHomeCommand}" IsEnabled="{Binding HasHomePreset}" />
+                                        </StackPanel>
+
+                                        <!--  인라인 이름 입력  -->
+                                        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsSavingPreset, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock FontSize="11" Foreground="#FF9FB0C0" Text="프리셋 이름" />
+                                            <TextBox Margin="0,2" Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="12" Foreground="White" MaxLength="100" Text="{Binding NewPresetName, UpdateSourceTrigger=PropertyChanged}" />
+                                            <StackPanel Margin="0,4,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                                                <Button Margin="2,0" Padding="8,3" Content="취소" FontSize="11" Command="{Binding CancelSavePresetCommand}" />
+                                                <Button Margin="2,0" Padding="8,3" Content="확인" FontSize="11" Command="{Binding ConfirmSavePresetCommand}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
 
                                     <!--  옵션 탭 (Phase 5)  -->
                                     <TextBlock Margin="0,12" HorizontalAlignment="Center" Foreground="#FF8B98A8" FontSize="12" Text="옵션(주야간/포커스) — 준비 중 (Phase 5)">

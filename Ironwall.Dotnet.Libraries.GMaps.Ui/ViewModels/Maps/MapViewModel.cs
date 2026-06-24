@@ -596,6 +596,9 @@ public class MapViewModel : BasePanelViewModel,
     private ICameraPopupPositionStore CameraPopupPositionStore
         => _cameraPopupPositionStore ??= new CameraPopupPositionStore(_gMapDbService, _log);
 
+    private IPtzPresetStore? _ptzPresetStore;
+    private IPtzPresetStore PtzPresetStore => _ptzPresetStore ??= new PtzPresetStore(_gMapDbService, _log);
+
     /// <summary>ISharedCameraStreamHub는 메인솔루션 StreamingModule 등록 시에만 존재 — IoC lazy 획득.</summary>
     private ISharedCameraStreamHub? ResolveHub()
     {
@@ -717,6 +720,106 @@ public class MapViewModel : BasePanelViewModel,
         if (ptz != null) _ = ptz.StopAsync(vm.CameraId);
     }
 
+    /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
+
+    private void OnCameraPopupPresetsReload(object? sender, EventArgs e)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = LoadPresetsAsync(vm);
+    }
+
+    private async Task LoadPresetsAsync(CameraStreamPopupViewModel vm)
+    {
+        try
+        {
+            var list = await PtzPresetStore.GetPresetsAsync(vm.CameraId).ConfigureAwait(false);
+            await OnUiAsync(() => vm.SetPresets(list)).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Warning($"[CameraPopup] 프리셋 로드 실패 cam={vm.CameraId}: {ex.Message}"); }
+    }
+
+    private void OnCameraPopupPresetGoto(object? sender, IPtzPresetModel preset)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetGotoAsync(vm, preset);
+    }
+
+    /// <summary>프리셋 이동 = AbsoluteMove(저장 좌표) + FOV 갱신. (FR-PRESET-02)</summary>
+    private async Task HandlePresetGotoAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            var moved = await ptz.AbsoluteMoveAsync(vm.CameraId, preset.Pan, preset.Tilt, preset.Zoom).ConfigureAwait(false);
+            if (!moved) return;
+            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
+            if (pos != null)
+                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
+                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 이동 실패 cam={vm.CameraId}: {ex.Message}"); }
+    }
+
+    private void OnCameraPopupPresetSave(object? sender, string name)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetSaveAsync(vm, name);
+    }
+
+    /// <summary>프리셋 저장 = 현재 위치(GetStatus) 읽어 DB Upsert. 위치 못 읽으면 중단(쓰레기 좌표 금지). (FR-PRESET-03)</summary>
+    private async Task HandlePresetSaveAsync(CameraStreamPopupViewModel vm, string name)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
+            if (pos == null) { _log?.Warning($"[CameraPopup] 프리셋 저장 중단 — 현재 위치 읽기 실패 cam={vm.CameraId}"); return; }
+
+            var model = new PtzPresetModel
+            {
+                CameraId = vm.CameraId,
+                PresetName = name,
+                Pan = pos.Pan,
+                Tilt = pos.Tilt,
+                Zoom = pos.Zoom,
+                PanTiltSpace = pos.PanTiltSpace,
+                ZoomSpace = pos.ZoomSpace,
+            };
+            await PtzPresetStore.SaveAsync(model).ConfigureAwait(false);
+            await LoadPresetsAsync(vm).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 저장 실패 cam={vm.CameraId}: {ex.Message}"); }
+    }
+
+    private void OnCameraPopupPresetDelete(object? sender, IPtzPresetModel preset)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetDeleteAsync(vm, preset);
+    }
+
+    private async Task HandlePresetDeleteAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
+    {
+        try
+        {
+            await PtzPresetStore.DeleteAsync(preset.Id).ConfigureAwait(false);
+            await LoadPresetsAsync(vm).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 삭제 실패 id={preset.Id}: {ex.Message}"); }
+    }
+
+    private void OnCameraPopupPresetHome(object? sender, IPtzPresetModel preset)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetHomeAsync(vm, preset);
+    }
+
+    private async Task HandlePresetHomeAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
+    {
+        try
+        {
+            await PtzPresetStore.SetHomeAsync(vm.CameraId, preset.Id).ConfigureAwait(false);
+            await LoadPresetsAsync(vm).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] Home 설정 실패 id={preset.Id}: {ex.Message}"); }
+    }
+
     /// <summary>UI 스레드 마샬링(백그라운드 ONVIF 호출 후 VM/심볼 갱신용).</summary>
     private static Task OnUiAsync(System.Action action)
     {
@@ -834,6 +937,11 @@ public class MapViewModel : BasePanelViewModel,
             vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
             vm.PtzNudgeRequested += OnCameraPopupPtzNudge;          // PTZ 탭 방향 패드
             vm.PtzStopRequested += OnCameraPopupPtzStop;
+            vm.PresetsReloadRequested += OnCameraPopupPresetsReload; // 프리셋 탭 로드/이동/저장/삭제/Home
+            vm.PresetGotoRequested += OnCameraPopupPresetGoto;
+            vm.PresetSaveRequested += OnCameraPopupPresetSave;
+            vm.PresetDeleteRequested += OnCameraPopupPresetDelete;
+            vm.PresetHomeRequested += OnCameraPopupPresetHome;
             CameraPopups.Add(vm);
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
             StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
@@ -879,6 +987,11 @@ public class MapViewModel : BasePanelViewModel,
             vm.SelectRequested -= OnCameraPopupSelectRequested;
             vm.PtzNudgeRequested -= OnCameraPopupPtzNudge;
             vm.PtzStopRequested -= OnCameraPopupPtzStop;
+            vm.PresetsReloadRequested -= OnCameraPopupPresetsReload;
+            vm.PresetGotoRequested -= OnCameraPopupPresetGoto;
+            vm.PresetSaveRequested -= OnCameraPopupPresetSave;
+            vm.PresetDeleteRequested -= OnCameraPopupPresetDelete;
+            vm.PresetHomeRequested -= OnCameraPopupPresetHome;
             if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
             ResolvePtzController()?.Release(vm.CameraId);   // PTZ 자원 정리(멱등, FR-DISPOSE-01)
             CameraPopups.Remove(vm);

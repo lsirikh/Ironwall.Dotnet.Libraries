@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Caliburn.Micro;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Models;
 using Ironwall.Dotnet.Libraries.Streaming.ViewModel;
@@ -155,7 +158,13 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public int ActiveTab { get => _activeTab; set { if (_activeTab == value) return; _activeTab = value; NotifyOfPropertyChange(nameof(ActiveTab)); } }
 
     private ICommand? _selectTabCommand;
-    public ICommand SelectTabCommand => _selectTabCommand ??= new RelayCommand(p => { if (int.TryParse(p?.ToString(), out var i)) { ActiveTab = i; IsPanelExpanded = true; } });
+    public ICommand SelectTabCommand => _selectTabCommand ??= new RelayCommand(p =>
+    {
+        if (!int.TryParse(p?.ToString(), out var i)) return;
+        ActiveTab = i;
+        IsPanelExpanded = true;
+        if (i == 1) RaisePresetsReload();   // 프리셋 탭 진입 시 DB 재조회
+    });
 
     /// <summary>PTZ 탭 방향 버튼(8방향) → MapViewModel이 IPtzController로 상대 이동. (FR-UI-02)</summary>
     public event EventHandler<PtzNudgeEventArgs>? PtzNudgeRequested;
@@ -179,6 +188,56 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         };
         if (dx != 0 || dy != 0) PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
     }
+
+    // ── 프리셋 탭(로컬 DB) ────────────────────────────────────────────────────
+    private readonly BindableCollection<IPtzPresetModel> _presets = new();
+    /// <summary>카메라 프리셋 목록(MapViewModel이 DB에서 로드해 주입). (FR-PRESET-01)</summary>
+    public BindableCollection<IPtzPresetModel> Presets => _presets;
+
+    /// <summary>Home 프리셋 존재 여부([Home 이동] 활성 판단). (FR-PRESET-07)</summary>
+    public bool HasHomePreset => _presets.Any(p => p.IsHome);
+
+    /// <summary>MapViewModel이 DB 로드 결과를 주입(UI 스레드).</summary>
+    internal void SetPresets(IEnumerable<IPtzPresetModel> presets)
+    {
+        _presets.Clear();
+        _presets.AddRange(presets);
+        NotifyOfPropertyChange(nameof(HasHomePreset));
+    }
+
+    public event EventHandler? PresetsReloadRequested;       // 탭 진입/변경 후 재조회 요청
+    public event EventHandler<IPtzPresetModel>? PresetGotoRequested;
+    public event EventHandler<string>? PresetSaveRequested;  // 인라인 이름 확정
+    public event EventHandler<IPtzPresetModel>? PresetDeleteRequested;
+    public event EventHandler<IPtzPresetModel>? PresetHomeRequested;
+
+    internal void RaisePresetsReload() => PresetsReloadRequested?.Invoke(this, EventArgs.Empty);
+
+    private bool _isSavingPreset;
+    /// <summary>프리셋 저장 인라인 이름 입력 표시 여부. (FR-PRESET-03)</summary>
+    public bool IsSavingPreset { get => _isSavingPreset; set { if (_isSavingPreset == value) return; _isSavingPreset = value; NotifyOfPropertyChange(nameof(IsSavingPreset)); } }
+
+    private string _newPresetName = string.Empty;
+    public string NewPresetName { get => _newPresetName; set { _newPresetName = value; NotifyOfPropertyChange(nameof(NewPresetName)); } }
+
+    private ICommand? _gotoPresetCommand, _deletePresetCommand, _setHomeCommand, _gotoHomeCommand;
+    private ICommand? _savePresetCommand, _confirmSaveCommand, _cancelSaveCommand;
+
+    public ICommand GotoPresetCommand => _gotoPresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetGotoRequested?.Invoke(this, m); });
+    public ICommand DeletePresetCommand => _deletePresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetDeleteRequested?.Invoke(this, m); });
+    public ICommand SetHomeCommand => _setHomeCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetHomeRequested?.Invoke(this, m); });
+    public ICommand GotoHomeCommand => _gotoHomeCommand ??= new RelayCommand(() => { var h = _presets.FirstOrDefault(p => p.IsHome); if (h != null) PresetGotoRequested?.Invoke(this, h); });
+
+    /// <summary>[현재위치 저장] → 인라인 이름 입력 시작.</summary>
+    public ICommand SavePresetCommand => _savePresetCommand ??= new RelayCommand(() => { NewPresetName = $"Preset_{_presets.Count + 1}"; IsSavingPreset = true; });
+    public ICommand ConfirmSavePresetCommand => _confirmSaveCommand ??= new RelayCommand(() =>
+    {
+        var name = NewPresetName?.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        PresetSaveRequested?.Invoke(this, name);
+        IsSavingPreset = false;
+    });
+    public ICommand CancelSavePresetCommand => _cancelSaveCommand ??= new RelayCommand(() => IsSavingPreset = false);
 
     public ICommand CloseCommand =>
         _closeCommand ??= new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));
