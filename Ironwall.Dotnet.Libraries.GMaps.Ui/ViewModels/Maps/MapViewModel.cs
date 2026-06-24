@@ -573,6 +573,22 @@ public class MapViewModel : BasePanelViewModel,
     private bool _ptzControllerResolved;
     private const double PtzDragSensitivity = 2.0;   // 드래그 픽셀↔이동량 감도(Phase 0 실카메라 GetNode 응답으로 튜닝)
 
+    private CameraStreamPopupViewModel? _selectedCameraPopup;
+
+    /// <summary>단일 선택된 팝업(상호배타). 좌클릭 시 설정 + 맨앞 이동. (FR-SEL-01)</summary>
+    public CameraStreamPopupViewModel? SelectedCameraPopup
+    {
+        get => _selectedCameraPopup;
+        set
+        {
+            if (ReferenceEquals(_selectedCameraPopup, value)) return;
+            if (_selectedCameraPopup != null) _selectedCameraPopup.IsSelected = false;   // 이전 해제(원자)
+            _selectedCameraPopup = value;
+            if (_selectedCameraPopup != null) _selectedCameraPopup.IsSelected = true;     // 신규 활성
+            NotifyOfPropertyChange(nameof(SelectedCameraPopup));
+        }
+    }
+
     /// <summary>맵 위에 열린 카메라 RTSP 팝업 목록(MapView PropertyPanelCanvas ItemsControl 바인딩).</summary>
     public ObservableCollection<CameraStreamPopupViewModel> CameraPopups
         => _cameraPopups ??= new ObservableCollection<CameraStreamPopupViewModel>();
@@ -675,6 +691,21 @@ public class MapViewModel : BasePanelViewModel,
         return disp.InvokeAsync(action).Task;
     }
 
+    private void OnCameraPopupSelectRequested(object? sender, EventArgs e)
+    {
+        if (sender is not CameraStreamPopupViewModel vm) return;
+        SelectedCameraPopup = vm;
+        BringCameraPopupToFront(vm);
+    }
+
+    /// <summary>팝업을 컬렉션 끝(= ItemsControl 렌더 순서상 최상위)으로 이동. (FR-SEL-02)</summary>
+    private void BringCameraPopupToFront(CameraStreamPopupViewModel vm)
+    {
+        var idx = CameraPopups.IndexOf(vm);
+        if (idx >= 0 && idx < CameraPopups.Count - 1)
+            CameraPopups.Move(idx, CameraPopups.Count - 1);
+    }
+
     /// <summary>자동해제 타이머 시작/리셋 — IsAutoDiscard ON일 때 TimeoutSeconds 후 팝업 자동 닫힘.</summary>
     private void StartOrResetAutoCloseTimer(CameraStreamPopupViewModel vm)
     {
@@ -766,7 +797,9 @@ public class MapViewModel : BasePanelViewModel,
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
             vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // PTZ 드래그 → IPtzController
+            vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
             CameraPopups.Add(vm);
+            SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
             StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
 
             // ONVIF PTZ 준비(비동기) → IsPtzCapable 설정(PTZ 카메라만 우버튼 활성)
@@ -807,6 +840,8 @@ public class MapViewModel : BasePanelViewModel,
             vm.CloseRequested -= OnCameraPopupCloseRequested;
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
+            vm.SelectRequested -= OnCameraPopupSelectRequested;
+            if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
             ResolvePtzController()?.Release(vm.CameraId);   // PTZ 자원 정리(멱등, FR-DISPOSE-01)
             CameraPopups.Remove(vm);
             await vm.DisposeAsync();   // Hub Lease 해제(C-03)

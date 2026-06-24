@@ -45,6 +45,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤이 드래그 종료 시 호출 → DragCompleted 발화.</summary>
     internal void RaiseDragCompleted() => DragCompleted?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>좌클릭 선택 요청 — MapViewModel이 SelectedCameraPopup 설정 + 맨앞 이동. (FR-SEL-01)</summary>
+    public event EventHandler? SelectRequested;
+
+    /// <summary>컨트롤 좌클릭 시 호출 → 선택 요청.</summary>
+    internal void RaiseSelectRequested() => SelectRequested?.Invoke(this, EventArgs.Empty);
+
     /// <summary>우버튼 드래그-PTZ 완료 — MapViewModel이 IPtzController.RelativeMoveByPixel 호출 + FOV 갱신. (FR-DRAG-03)</summary>
     public event EventHandler<PtzDragEventArgs>? PtzDragRequested;
 

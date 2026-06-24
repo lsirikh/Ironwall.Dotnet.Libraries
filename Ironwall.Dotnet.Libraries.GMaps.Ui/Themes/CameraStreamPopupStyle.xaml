@@ -39,6 +39,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ctrl:CameraStreamPopupControl}">
                     <Border
+                        x:Name="PART_Root"
                         Background="White"
                         BorderBrush="{StaticResource BorderGrayBrush}"
                         BorderThickness="1"
@@ -123,6 +124,13 @@
                             </Border>
                         </Grid>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <!--  단일 선택 강조 — 굵은 Accent 테두리 (FR-SEL-02)  -->
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="PART_Root" Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                            <Setter TargetName="PART_Root" Property="BorderThickness" Value="3" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

@@ -85,8 +85,11 @@ public class CameraStreamPopupControl : Control
 
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // 좌클릭(헤더/영상 어디든) = 이 팝업 선택 + 맨앞. (FR-SEL-01)
+        (DataContext as CameraStreamPopupViewModel)?.RaiseSelectRequested();
+
         var position = e.GetPosition(this);
-        if (position.Y > HeaderHeight) return;   // 헤더만 드래그
+        if (position.Y > HeaderHeight) return;   // 헤더만 창이동 드래그
 
         var canvas = FindParentCanvas();
         if (canvas == null) return;
