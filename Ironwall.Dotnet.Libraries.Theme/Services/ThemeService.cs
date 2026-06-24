@@ -119,11 +119,22 @@ public sealed class ThemeService : IThemeService
         if (app == null)
             return;   // 헤드리스(단위 테스트) — WPF 엔진 미가동.
 
-        // (2) MaterialDesign 컨트롤
+        // (2) MaterialDesign 컨트롤 — 베이스 + 스토리보드 Modern Operations primary/secondary 정렬(FR-02).
+        //     앱 전역 MD 컨트롤이 LightBlue/Cyan(App.xaml 기본) 대신 선택 디자인(navy/teal)로 리컬러된다.
         var paletteHelper = new PaletteHelper();
         // 네임스페이스 Ironwall...Theme 와 MD Theme 클래스 충돌 → 정규화. SetBaseTheme(Theme, BaseTheme).
         var mdTheme = (MaterialDesignThemes.Wpf.Theme)paletteHelper.GetTheme();
         mdTheme.SetBaseTheme(theme);
+        if (theme == BaseTheme.Dark)
+        {
+            mdTheme.SetPrimaryColor(System.Windows.Media.Color.FromRgb(0x4A, 0x90, 0xE2));   // storyboard Dark --primary
+            mdTheme.SetSecondaryColor(System.Windows.Media.Color.FromRgb(0x2B, 0xC4, 0xD4)); // storyboard Dark --accent
+        }
+        else
+        {
+            mdTheme.SetPrimaryColor(System.Windows.Media.Color.FromRgb(0x2C, 0x5F, 0x9E));   // storyboard Light --primary
+            mdTheme.SetSecondaryColor(System.Windows.Media.Color.FromRgb(0x0E, 0x8C, 0x9B)); // storyboard Light --accent
+        }
         paletteHelper.SetTheme(mdTheme);
 
         // (3) MahApps chrome
