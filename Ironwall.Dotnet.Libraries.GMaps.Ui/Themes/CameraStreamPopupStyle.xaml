@@ -166,30 +166,6 @@
                                     <!--  드래그-PTZ 벡터 오버레이(화살표+게이지). 입력은 컨트롤이 처리하므로 히트테스트 제외  -->
                                     <Canvas x:Name="PART_PtzOverlay" Background="Transparent" IsHitTestVisible="False" />
 
-                                    <!--  PTZ 준비 상태 배지 — ONVIF 연결(수 초) 동안 "준비 중", 끝나면 "준비됨". 비PTZ면 숨김  -->
-                                    <Border Margin="6,0,0,44" Padding="7,2" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                                            Background="#E6B8860B" CornerRadius="3" IsHitTestVisible="False"
-                                            Visibility="{Binding IsPtzLoading, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock FontSize="10" Foreground="White" Text="⟳ PTZ 준비 중…" />
-                                    </Border>
-                                    <Border Margin="6,0,0,44" Padding="7,2" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                                            Background="#E61B7A3D" CornerRadius="3" IsHitTestVisible="False">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <MultiDataTrigger>
-                                                        <MultiDataTrigger.Conditions>
-                                                            <Condition Binding="{Binding IsPtzLoading}" Value="False" />
-                                                            <Condition Binding="{Binding IsPtzCapable}" Value="True" />
-                                                        </MultiDataTrigger.Conditions>
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </MultiDataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock FontSize="10" Foreground="White" Text="● PTZ 준비됨" />
-                                    </Border>
                                 </Grid>
                             </Border>
 
