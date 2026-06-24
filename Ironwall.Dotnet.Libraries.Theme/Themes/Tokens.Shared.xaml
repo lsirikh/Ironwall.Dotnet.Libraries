@@ -1,0 +1,24 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!--
+        IMPL-04 — Tokens.Shared (색상 0, 테마 불변).
+        radius/density/typography alias. Light/Dark 양 테마 공통 → Theme.Current에 상시 병합.
+    -->
+
+    <!-- ── Radius (Modern: 6 / 10 / 14) ── -->
+    <CornerRadius x:Key="RadiusSmall">6</CornerRadius>
+    <CornerRadius x:Key="RadiusMedium">10</CornerRadius>
+    <CornerRadius x:Key="RadiusLarge">14</CornerRadius>
+
+    <!-- ── Density (고밀도 행 높이) ── -->
+    <sys:Double x:Key="RowHeight">40</sys:Double>
+
+    <!-- ── Typography (Noto Sans CJK KR 본문 / Consolas 좌표 readout) ── -->
+    <!-- 레거시 Malgun Gothic/Arial 리터럴 ← 대체 대상 -->
+    <FontFamily x:Key="UiFont">Noto Sans CJK KR, Malgun Gothic, Segoe UI</FontFamily>
+    <FontFamily x:Key="MonoFont">Consolas</FontFamily>
+
+</ResourceDictionary>

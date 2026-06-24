@@ -15,6 +15,10 @@
 ## [Unreleased]
 
 ### Added
+- **UI Modern Dark/Light 테마 디자인 시스템 — Phase 1 완료** ([PRD](docs/prds/UI_ModernTheme_DesignSystem-prd.md) · [Plan](docs/plans/UI_ModernTheme_DesignSystem-prd-plan.md))
+  - 신규 leaf 어셈블리 `Ironwall.Dotnet.Libraries.Theme`(net8, MD/Colors 5.2.1 + MahApps 2.4.10, GMap/*.Ui 무참조). 토큰 딕셔너리 5종 — `Tokens.Light`(현재 출고 byte-identical, AD-6) / `Tokens.Dark`(Modern Dark) / `Tokens.Shared`(radius·density·font) / `Converters` / `Theme.Current`(스왑 컨테이너).
+  - `IThemeService`/`ThemeService`: Add-new→Remove-old 토큰 dict 원자 스왑 + PaletteHelper(MD) + ThemeManager(MahApps) 듀얼 엔진 단일 Dispatcher 패스 + `ThemeChanged`(비-WPF 경로 재색칠) + R-17 중복차단 + 영속화 seam(`IThemeSettingsStore`). 토큰 팩토리/MergedDictionaries 주입형으로 헤드리스 테스트 가능.
+  - `ThemeKeyLinter`(RISK-03): 참조-vs-정의 키 검증 + Light≡Dark 파리티 게이트. **빌드 0에러 · 테스트 11/11**(ThemeService 7 + 린터 4). 롤백 태그 `before-modern-theme-migration`, worktree `v2.12.0`.
 - **Accounts.Ui 라이브러리 추출 — Phase 0 착수** ([PRD](docs/prds/Accounts_Ui_Library_Extraction-prd.md) R3 · [Plan](docs/plans/Accounts_Ui_Library_Extraction-prd-plan.md))
   - 외부 Monitoring 솔루션에 산재한 계정 UI(VM 11 + View 8 = **27파일**)를 신규 WPF 라이브러리 `Ironwall.Dotnet.Libraries.Accounts.Ui`로 이관 준비. **Gateway seam**(`IAuthGateway`/`IUserDirectoryGateway`/`IProfileGateway` + `DbAccountGateway` 어댑터)으로 데이터 접근 역전 → 후속 GOP API 연동(GOP-00) 시 VM 재편집 0.
   - 동반 결함 수정 예정: C-1 공유싱글톤 Clear, H-4 중복확인 경쟁, async void/ct 미전달, DeleteAccount 2중루프 버그, L115 토큰 평문 로깅·`"12345678"` 하드코딩 제거. 롤백 태그 `before-accounts-ui-extraction`, worktree `v2.9.22`.

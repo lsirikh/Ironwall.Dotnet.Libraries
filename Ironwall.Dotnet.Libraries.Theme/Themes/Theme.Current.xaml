@@ -1,0 +1,18 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        IMPL-05 — Theme.Current (스왑 대상 컨테이너 / 소비자 진입점).
+        소비자(App.xaml 등)는 이 딕셔너리 하나만 병합한다.
+        · Tokens.Shared / Converters = 테마 불변 → 상시 병합(스왑 비대상).
+        · Tokens.Light = 기본 활성 토큰셋. 런타임에 ThemeService가 Add-new→Remove-old로
+          Tokens.Light ↔ Tokens.Dark 만 원자 교체(FR-03, R-17).
+    -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Shared.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Converters.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Ironwall.Dotnet.Libraries.Theme;component/Themes/Tokens.Light.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+</ResourceDictionary>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <RootNamespace>Ironwall.Dotnet.Libraries.Theme</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    AD-1: 토큰 dict는 무의존(leaf). IThemeService/ThemeService만 MD+MahApps 참조.
+    GMap.NET / *.Ui / Base 미참조 — GMaps→Events.Ui ProjectReference 순환참조 회피.
+  -->
+  <ItemGroup>
+    <PackageReference Include="MaterialDesignColors" Version="5.2.1" />
+    <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
+    <PackageReference Include="MahApps.Metro" Version="2.4.10" />
+  </ItemGroup>
+
+</Project>
