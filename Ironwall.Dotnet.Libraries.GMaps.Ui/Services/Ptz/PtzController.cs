@@ -72,21 +72,30 @@ public sealed class PtzController : IPtzController
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (ctx.Model?.PtzClient == null)
+                // 워밍 판단은 "모델이 캐시됐는가"(ctx.Model==null) 기준 — PtzClient 유무가 아니다.
+                // (구버전은 ctx.Model?.PtzClient==null 기준이라, 비PTZ 카메라는 모델을 못 담아 매 오픈 재초기화됐다.)
+                if (ctx.Model == null)
                 {
                     var model = await _onvif.InitializeFullAsync(conn, ct).ConfigureAwait(false);
-                    if (model?.PtzClient == null)
+                    if (model == null)
                     {
-                        _log?.Warning($"[PTZ] PtzClient 없음 cam={cameraId} — 비PTZ 카메라이거나 ONVIF 연결/인증 실패(포트/계정 확인).");
+                        // ONVIF 연결/인증 자체 실패 — 캐시하지 않음(다음 오픈 시 재시도 허용).
+                        _log?.Warning($"[PTZ] ONVIF 초기화 실패 cam={cameraId} — 연결/인증 실패(포트/계정 확인). 워밍 안 함(재시도 허용).");
                         return false;
                     }
+                    // 모델이 살아있으면 PTZ 미지원(고정 카메라)이라도 인스턴스를 캐시 유지(워밍).
+                    // 고정 카메라도 ONVIF Imaging(주야간/포커스)을 제공하며, 재오픈마다 ~31초 재초기화를 막는다.
                     ctx.Model = model;
                     ctx.ProfileToken = model.CameraMedia?.Token ?? string.Empty;
                     // 영상 옵션(Imaging)용 VideoSourceToken — 첫 프로파일의 VideoSourceConfiguration.
                     ctx.VsToken = model.Profiles?.FirstOrDefault()?.VideoSourceConfiguration?.SourceToken;
                     ctx.ImagingPossible = model.IsImagingPossible && model.ImagingClient != null && !string.IsNullOrEmpty(ctx.VsToken);
+                    if (model.PtzClient == null)
+                        _log?.Info($"[PTZ] cam={cameraId} 비PTZ(고정) — PtzClient 없음. 인스턴스 워밍 유지(Imaging={ctx.ImagingPossible}). 재오픈 시 즉시.");
                 }
-                ctx.Spaces ??= await LoadSpacesAsync(ctx).ConfigureAwait(false);
+                // PTZ space(GetNode)는 PtzClient가 있을 때만 로드(비PTZ는 생략 — LoadSpaces의 PtzClient 역참조 NRE 방지).
+                if (ctx.Model.PtzClient != null)
+                    ctx.Spaces ??= await LoadSpacesAsync(ctx).ConfigureAwait(false);
                 var cap = IsCapable(ctx);
                 if (!cap)
                     _log?.Warning($"[PTZ] capable=false cam={cameraId} (IsPtzPossible={ctx.Model?.IsPtzPossible}, GetNode space={(ctx.Spaces == null ? "로드실패/없음" : "로드됨")}).");
