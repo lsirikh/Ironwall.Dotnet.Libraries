@@ -64,7 +64,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -136,7 +136,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -199,7 +199,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -292,7 +292,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -353,7 +353,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -446,7 +446,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>
@@ -509,7 +509,7 @@
 
 						<Style.Triggers>
 							<Trigger Property="TextBlock.IsEnabled" Value="False">
-								<Setter Property="TextBlock.Foreground" Value="Gray" />
+								<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</Trigger>
 						</Style.Triggers>
 					</Style>

@@ -22,11 +22,11 @@
 
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
-		Background="#88FFFFFF"
+		Background="{DynamicResource SurfaceTranslucentBrush}"
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border
-				BorderBrush="#33000000"
+				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
 
@@ -46,7 +46,7 @@
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
 								Style="{StaticResource MaterialDesignToolForegroundButton}">
 								<md:PackIcon
@@ -54,7 +54,7 @@
 									Height="25"
 									VerticalAlignment="Center"
 									HorizontalContentAlignment="Center"
-									Foreground="Crimson"
+									Foreground="{DynamicResource StatusCriticalBrush}"
 									Kind="Error"
 									Opacity="1" />
 							</Button>
@@ -62,7 +62,7 @@
 								Margin="8,0,0,0"
 								VerticalAlignment="Center"
 								FontSize="16"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
 								Text="장애 이벤트" />
 						</StackPanel>
@@ -81,7 +81,7 @@
                                Grid.Column="0"
                                FontFamily="{StaticResource NotoSansCJKkRMedium}"
                                FontSize="20"
-                               Foreground="White"
+                               Foreground="{DynamicResource OnPrimaryFixedBrush}"
                                Opacity="1">
 
 							<TextBlock.Text>
@@ -203,7 +203,7 @@
 
 		<md:Flipper.BackContent>
 			<Border
-				BorderBrush="#33000000"
+				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
 
@@ -233,7 +233,7 @@
 								Margin="8,0,0,0"
 								VerticalAlignment="Center"
 								FontSize="16"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
 								Text="상세" />
 						</StackPanel>

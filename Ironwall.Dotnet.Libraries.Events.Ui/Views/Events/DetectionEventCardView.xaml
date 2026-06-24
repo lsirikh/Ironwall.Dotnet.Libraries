@@ -26,8 +26,8 @@
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border
-				Background="White"
-				BorderBrush="#33000000"
+				Background="{DynamicResource SurfaceBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
                 <Grid Width="220" Height="200">
@@ -46,7 +46,7 @@
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
 								Style="{StaticResource MaterialDesignToolForegroundButton}">
 								<md:PackIcon
@@ -54,7 +54,7 @@
 									Height="25"
 									VerticalAlignment="Center"
 									HorizontalContentAlignment="Center"
-									Foreground="#FFDD2C00"
+									Foreground="{DynamicResource StatusCriticalBrush}"
 									Kind="MotionSensor"
 									Opacity="1" />
 							</Button>
@@ -62,7 +62,7 @@
 								Margin="8,0,0,0"
 								VerticalAlignment="Center"
 								FontSize="16"
-								Foreground="White"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								Opacity="1"
 								Text="탐지 이벤트" />
 						</StackPanel>
@@ -82,7 +82,7 @@
                                Grid.Column="0"
                                FontFamily="{StaticResource NotoSansCJKkRMedium}"
                                FontSize="20"
-                               Foreground="White"
+                               Foreground="{DynamicResource OnPrimaryFixedBrush}"
                                Opacity="1">
 
 							<TextBlock.Text>
@@ -228,8 +228,8 @@
 
 		<md:Flipper.BackContent>
 			<Border
-				Background="White"
-				BorderBrush="#33000000"
+				Background="{DynamicResource SurfaceBrush}"
+				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
 				<Grid Height="200">

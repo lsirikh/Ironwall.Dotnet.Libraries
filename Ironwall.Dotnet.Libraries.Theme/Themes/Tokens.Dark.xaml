@@ -1,0 +1,64 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        IMPL-03 — Tokens.Dark (Modern Dark, 신규 도입).
+        AD-2: 리터럴 whole-brush. Tokens.Light와 동일 키셋(린터 RISK-03가 양방향 검증).
+        PRD §3.3 "Dark(적용)" 컬럼. Dark는 신규라 byte-identical 제약 없음.
+
+        ⚠ [Dark 적합] 표기 = PRD가 "(Dark 적합)"으로 위임한 토큰 → 스토리보드(sb-modern-*) 대조 후 미세조정 여지.
+        ⚠ R-08: PrimaryBrush #4A90E2 == NATO friendly hex → "마커는 hue 아닌 shape/symbology로 식별" 정책 채택(통합 금지).
+    -->
+
+    <!-- ══ Surfaces ══ -->
+    <SolidColorBrush x:Key="BgBrush"            Color="#13161B" />
+    <SolidColorBrush x:Key="SurfaceBrush"       Color="#1E2229" />
+    <SolidColorBrush x:Key="SurfaceAltBrush"    Color="#2A2F38" />
+    <SolidColorBrush x:Key="SurfaceSunkenBrush" Color="#171B21" />
+    <SolidColorBrush x:Key="SurfaceHoverBrush"  Color="#2C3645" /><!-- Dark 적합 -->
+    <SolidColorBrush x:Key="SurfacePressedBrush" Color="#3A4757" /><!-- Dark 적합 -->
+
+    <!-- ══ Borders / Dividers ══ -->
+    <SolidColorBrush x:Key="BorderBrush"  Color="#363C46" />
+    <SolidColorBrush x:Key="DividerBrush" Color="#2E343D" />
+
+    <!-- ══ Text ══ -->
+    <SolidColorBrush x:Key="TextPrimaryBrush"   Color="#EDF1F6" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B3BCC9" />
+    <SolidColorBrush x:Key="TextMutedBrush"     Color="#8B95A3" />
+
+    <!-- ══ Primary / Accent ══ -->
+    <SolidColorBrush x:Key="PrimaryBrush"        Color="#4A90E2" /><!-- R-08 참조 -->
+    <SolidColorBrush x:Key="PrimaryHoverBrush"   Color="#6BA6EB" />
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#34506E" /><!-- Dark 적합 -->
+    <SolidColorBrush x:Key="OnPrimaryBrush"      Color="#0B1220" />
+    <SolidColorBrush x:Key="OnPrimaryFixedBrush" Color="#FFFFFF" /><!-- 양 테마 고정: white-on-blue 헤더(FR-09) -->
+    <SolidColorBrush x:Key="AccentBrush"         Color="#2BC4D4" />
+
+    <!-- ══ Status (hue-lock) ══ -->
+    <SolidColorBrush x:Key="StatusCriticalBrush" Color="#FF5A52" />
+    <SolidColorBrush x:Key="DangerSurfaceBrush"  Color="#2A1A1C" /><!-- Dark 적합 -->
+    <SolidColorBrush x:Key="DangerBorderBrush"   Color="#5A2E30" /><!-- Dark 적합 -->
+    <SolidColorBrush x:Key="DangerHoverBrush"    Color="#3A2123" /><!-- Dark 적합 -->
+    <SolidColorBrush x:Key="StatusWarningBrush"  Color="#FFB02E" />
+    <SolidColorBrush x:Key="StatusNormalBrush"   Color="#4CC97A" />
+    <SolidColorBrush x:Key="StatusInfoBrush"     Color="#5FB0F2" /><!-- primary와 분리 유지 -->
+
+    <!-- ══ Scrim (alpha) ══ -->
+    <SolidColorBrush x:Key="ScrimModalBrush" Color="#A8000000" /><!-- rgba(0,0,0,.66) -->
+    <SolidColorBrush x:Key="ScrimSplitBrush" Color="#B3000000" /><!-- Dark 적합 별도 알파 -->
+
+    <!-- ══ Misc ══ -->
+    <SolidColorBrush x:Key="SelectionBrush" Color="#2A9FE6" /><!-- Dark 적합 -->
+    <SolidColorBrush x:Key="FocusRingBrush" Color="#6BA6EB" />
+
+    <!-- ══ Event/KPI 반투명 틴트 (IMPL-20, Dark 적합 — 다크표면 대비, hue=Light 대응) ══ -->
+    <SolidColorBrush x:Key="TintInfoBrush"     Color="#264A90E2" /><!-- Primary blue 틴트 -->
+    <SolidColorBrush x:Key="TintSuccessBrush"  Color="#264CC97A" /><!-- StatusNormal Dark 틴트 -->
+    <SolidColorBrush x:Key="TintCriticalBrush" Color="#2EFF5A52" /><!-- StatusCritical Dark 틴트 -->
+    <SolidColorBrush x:Key="TintWarningBrush"  Color="#2EFFB02E" /><!-- StatusWarning Dark 틴트 -->
+    <SolidColorBrush x:Key="TintAccentBrush"   Color="#2E5FB0F2" /><!-- StatusInfo Dark 틴트(cyan) -->
+    <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#88262B33" /><!-- 반투명 다크 표면 -->
+
+</ResourceDictionary>

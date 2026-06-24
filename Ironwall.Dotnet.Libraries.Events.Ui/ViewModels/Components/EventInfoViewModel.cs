@@ -21,6 +21,8 @@ using LiveChartsCore.Drawing;
 using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Theme.Services;
+using MaterialDesignThemes.Wpf;
 using System.Xml.Linq;
 using LiveChartsCore.Kernel;
 using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
@@ -42,7 +44,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                                 , EventProvider eventProvider
                                 , EventProviderService providerService
                                 , IEventAggregator? eventAggregator = null
-                                , ILogService? log = null)
+                                , ILogService? log = null
+                                , IThemeService? themeService = null)
         {
             _deviceProvider = deviceProvider;
             _eventProvider = eventProvider;
@@ -55,8 +58,30 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             _eventAggregator = eventAggregator ?? IoC.Get<IEventAggregator>();
             _log = log ?? IoC.Get<ILogService>();
 
+            // IMPL-21: 테마 서비스(선택). EXT-02 등록 전이면 null → 차트는 Light 기본색(graceful).
+            _themeService = themeService ?? TryResolveThemeService();
+            if (_themeService != null)
+                _themeService.ThemeChanged += OnThemeChanged;
+
             _names = new[] { "DET", "MAL", "CON", "ACT" };
             RefreshActiveness();
+        }
+
+        /// <summary>IThemeService 미등록(EXT-02 이전) 시 null 반환 — DI 깨짐 방지.</summary>
+        private static IThemeService? TryResolveThemeService()
+        {
+            try { return IoC.Get<IThemeService>(); }
+            catch { return null; }
+        }
+
+        /// <summary>현재 테마 — 서비스 없으면 Light 기본.</summary>
+        private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
+
+        /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
+        private void OnThemeChanged(object? sender, BaseTheme theme)
+        {
+            try { _rebuildChart?.Invoke(); }
+            catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
         #region - Implementation of Interface -
@@ -72,6 +97,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         {
             LSeries.Clear();
             DSeries.Clear();
+            if (close && _themeService != null)
+                _themeService.ThemeChanged -= OnThemeChanged;   // IMPL-21: 구독 해제(누수 방지)
             return base.OnDeactivateAsync(close, cancellationToken);
         }
         #endregion
@@ -169,6 +196,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
         public Task DataInitialize(CancellationToken cancellationToken = default)
         {
+            _rebuildChart = () => { _ = DataInitialize(); };   // IMPL-21: 테마 전환 시 재빌드
             return Task.Run(async () =>
             {
                 try
@@ -264,11 +292,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                         Name = "controller",
                         Position = AxisPosition.Start,
                         NameTextSize = 15,
-                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         UnitWidth = 1,
                         // (선택) 줄눈 제거
                         NamePadding = new Padding(0, -10, 0, 5),   // L,T,R,B
-                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         ShowSeparatorLines = false
                     };
 
@@ -276,9 +304,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     {
                         Name = "events",
                         Position = AxisPosition.Start,
-                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         NameTextSize = 15,
-                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 0),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0),
                         NamePadding = new Padding(0, 5, 0, -10),   // L,T,R,B
                         MinLimit = 0
                     };
@@ -307,10 +335,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
                             /* 2) Bar + Pie 시리즈 */
                             var bar = ChartHelper.MakeBar(
-                                m.DisplayName, counts, m.BarColor, SKColors.White);
+                                m.DisplayName, counts, m.BarColor, ChartThemeProvider.OnSeriesFixed);
 
                             var pie = ChartHelper.MakePie(
-                                m.DisplayName, counts.Sum(), m.PieColor, SKColors.White);
+                                m.DisplayName, counts.Sum(), m.PieColor, ChartThemeProvider.OnSeriesFixed);
 
                             /* 3) 추가 */
                             newLSeries.Add(bar);
@@ -341,6 +369,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         public Task DataInitializeFromStats(EventSummaryDto summary, EventByDeviceDto byDevice,
                                             CancellationToken ct = default)
         {
+            _rebuildChart = () => { _ = DataInitializeFromStats(summary, byDevice); };   // IMPL-21: 테마 전환 시 재빌드
             IsChartLoading = true;
             return Task.Run(() =>
             {
@@ -357,7 +386,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     // 디버그: API에서 받은 제어기 이름 확인
                     _log?.Info($"[EventInfoViewModel] xLabels: [{string.Join(", ", xLabels)}]");
 
-                    var koreanTypeface = SKTypeface.FromFamilyName("Malgun Gothic");
+                    var koreanTypeface = ChartThemeProvider.KoreanTypeface();
 
                     var xAxis = new Axis
                     {
@@ -365,13 +394,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                         Name = "controller",
                         Position = AxisPosition.Start,
                         NameTextSize = 15,
-                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2)
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
                         {
                             SKTypeface = koreanTypeface
                         },
                         UnitWidth = 1,
                         NamePadding = new Padding(0, -10, 0, 5),
-                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 2)
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
                         {
                             SKTypeface = koreanTypeface
                         },
@@ -382,9 +411,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     {
                         Name = "events",
                         Position = AxisPosition.Start,
-                        LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255), 2),
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         NameTextSize = 15,
-                        NamePaint = new SolidColorPaint(new SKColor(255, 255, 255), 0),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0),
                         NamePadding = new Padding(0, 5, 0, -10),
                         MinLimit = 0
                     };
@@ -447,8 +476,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         public SolidColorPaint LegendTextPaint { get; set; } =
         new SolidColorPaint
         {
-            Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Malgun Gothic")
+            Color = ChartThemeProvider.TextColor(BaseTheme.Light),
+            SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
@@ -457,8 +486,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         public SolidColorPaint TooltipTextPaint { get; set; } =
         new SolidColorPaint
         {
-            Color = new SKColor(50, 50, 50),
-            SKTypeface = SKTypeface.FromFamilyName("Malgun Gothic")
+            Color = ChartThemeProvider.TextColor(BaseTheme.Light),
+            SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
 
         public ObservableCollection<ISeries> LSeries { get; private set; }
@@ -542,6 +571,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         private bool _isMalfunctionEnable = true;
         private bool _isConnectionEnable = true;
         private bool _isActionEnable = true;
+
+        // IMPL-21: 테마 인식 차트
+        private readonly IThemeService? _themeService;
+        private System.Action? _rebuildChart;
         #endregion
     }
 

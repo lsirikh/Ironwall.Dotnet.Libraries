@@ -34,12 +34,12 @@
 		<GridSplitter
 			Grid.Row="0"
 			Height="1"
-			Foreground="#88000000" />
+			Foreground="{DynamicResource TextSecondaryBrush}" />
 		<Grid Grid.Row="1" VerticalAlignment="Center">
 			<Border
 				Margin="0,0,0,0"
 				HorizontalAlignment="Stretch"
-				Background="DodgerBlue"
+				Background="{DynamicResource PrimaryBrush}"
 				CornerRadius="2.5"
 				Opacity="0.95"
 				Style="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
@@ -53,7 +53,7 @@
 					<StackPanel
 						Grid.Column="0"
 						Width="5"
-						Background="DodgerBlue"
+						Background="{DynamicResource PrimaryBrush}"
 						Opacity="0.8" />
 					<Viewbox
 						Grid.Column="1"
@@ -63,7 +63,7 @@
 							<Button
 								x:Name="ButtonActionAll"
 								md:RippleAssist.IsCentered="True"
-								Foreground="WhiteSmoke"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
 								IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
 								Style="{StaticResource MaterialDesignIconForegroundButton}"
 								ToolTip="전체 조치보고"
@@ -95,7 +95,7 @@
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="15"
-							Foreground="WhiteSmoke"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Opacity="0.80"
 							Text="이벤트 수" />
 						<TextBlock
@@ -103,7 +103,7 @@
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="15"
-							Foreground="#40C4FF"
+							Foreground="{DynamicResource AccentBrush}"
 							Opacity="0.80"
 							Text="{Binding ViewModelProvider.Count, FallbackValue=1000}" />
 					</StackPanel>

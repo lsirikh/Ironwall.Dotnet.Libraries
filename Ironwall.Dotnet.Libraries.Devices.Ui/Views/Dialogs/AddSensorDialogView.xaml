@@ -17,7 +17,7 @@
 		<Border
 			Grid.Row="0"
 			Margin="5"
-			BorderBrush="White"
+			BorderBrush="{DynamicResource OnPrimaryFixedBrush}"
 			BorderThickness="1"
 			CornerRadius="10">
 			<Grid Margin="20,5">
@@ -39,7 +39,7 @@
 					Margin="0,5"
 					VerticalAlignment="Center"
 					FontSize="15"
-					Foreground="White"
+					Foreground="{DynamicResource OnPrimaryFixedBrush}"
 					Text="센서 장비 추가" />
 				<TextBox
 					Grid.Row="1"
@@ -94,7 +94,7 @@
 		<Border
 			Grid.Row="1"
 			Margin="5"
-			BorderBrush="White"
+			BorderBrush="{DynamicResource OnPrimaryFixedBrush}"
 			BorderThickness="1"
 			CornerRadius="10">
 
@@ -103,7 +103,7 @@
 					Margin="20,20,0,0"
 					VerticalAlignment="Center"
 					FontSize="15"
-					Foreground="White"
+					Foreground="{DynamicResource OnPrimaryFixedBrush}"
 					Text="Sensor Property" />
 				<ScrollViewer Margin="5" VerticalScrollBarVisibility="Auto">
 

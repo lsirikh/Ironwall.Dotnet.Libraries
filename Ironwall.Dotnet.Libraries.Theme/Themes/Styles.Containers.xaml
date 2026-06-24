@@ -1,0 +1,87 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!--
+        IMPL-13 — 컨테이너 토큰 스타일셋 (FR-06). DataGrid(헤더/행/hover/selected) · Card · Dialog.
+        keyed only, MD BasedOn 유지, 색/radius 만 토큰. 행 높이=RowHeight(Shared, 고밀도 40).
+        ※ "draft 행"(Id<=0 임시상태) 강조는 데이터 의존 → 소비자 뷰에서 DataTrigger로 적용
+          ([[project_crud_tempstate_canonical]]). 여기선 토큰 기반 일반 행/hover/selected 만 정의.
+    -->
+
+    <!-- ═══════════════ DataGrid ═══════════════ -->
+
+    <Style x:Key="ModernDataGrid" TargetType="DataGrid" BasedOn="{StaticResource MaterialDesignDataGrid}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="RowBackground" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="AlternatingRowBackground" Value="{DynamicResource SurfaceAltBrush}" />
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource DividerBrush}" />
+        <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource DividerBrush}" />
+        <Setter Property="RowHeight" Value="{DynamicResource RowHeight}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+    </Style>
+
+    <Style x:Key="ModernDataGridColumnHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+
+    <Style x:Key="ModernDataGridCell" TargetType="DataGridCell" BasedOn="{StaticResource MaterialDesignDataGridCell}">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- 행: hover / selected 토큰 상태 -->
+    <Style x:Key="ModernDataGridRow" TargetType="DataGridRow">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ═══════════════ Card ═══════════════ -->
+
+    <Style x:Key="ModernCard" TargetType="md:Card" BasedOn="{StaticResource MaterialDesignElevatedCard}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="UniformCornerRadius" Value="10" /><!-- RadiusMedium(10): Card 속성은 double -->
+    </Style>
+
+    <!-- ═══════════════ Dialog ═══════════════ -->
+
+    <!-- 다이얼로그 본체 패널 -->
+    <Style x:Key="ModernDialogPanel" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusLarge}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- 다이얼로그 헤더 띠: white-on-blue 정책(FR-09, IMPL-15) -->
+    <Style x:Key="ModernDialogHeader" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="CornerRadius" Value="14,14,0,0" /><!-- RadiusLarge 상단만 -->
+    </Style>
+
+    <Style x:Key="ModernDialogHeaderText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+</ResourceDictionary>
