@@ -55,4 +55,13 @@
     <SolidColorBrush x:Key="SelectionBrush" Color="#007ACC" /><!-- ImageMarker selection (≠ Streaming accent) -->
     <SolidColorBrush x:Key="FocusRingBrush" Color="#3D7AC4" /><!-- VER-14 앵커: 현 포커스 -->
 
+    <!-- ══ Event/KPI 반투명 틴트 (IMPL-20, Light=byte-identical 기존 hex) ══ -->
+    <!-- Dark 값은 다크표면 대비용 별도 — storyboard sb-modern 대조로 정밀화(V-11) -->
+    <SolidColorBrush x:Key="TintInfoBrush"     Color="#22111188" /><!-- KPI 정보 틴트(EventInfo) -->
+    <SolidColorBrush x:Key="TintSuccessBrush"  Color="#22118811" /><!-- KPI 성공 틴트(EventInfo) -->
+    <SolidColorBrush x:Key="TintCriticalBrush" Color="#22FF6464" /><!-- severity 위험 틴트(CameraEventInfo) -->
+    <SolidColorBrush x:Key="TintWarningBrush"  Color="#22FFB347" /><!-- severity 경고 틴트 -->
+    <SolidColorBrush x:Key="TintAccentBrush"   Color="#224FC3F7" /><!-- severity 정보 틴트(cyan) -->
+    <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#88FFFFFF" /><!-- flip 카드 반투명 표면 -->
+
 </ResourceDictionary>

@@ -26,7 +26,7 @@
 
 			<!-- KPI Card 1: 총 탐지 건수 -->
 			<md:Card Grid.Column="0" Margin="5" Padding="20"
-					 Background="#22FF6464"
+					 Background="{DynamicResource TintCriticalBrush}"
 					 UniformCornerRadius="8">
 				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
 					<TextBlock Text="{Binding TotalCount}"
@@ -42,7 +42,7 @@
 
 			<!-- KPI Card 2: 일평균 -->
 			<md:Card Grid.Column="1" Margin="5" Padding="20"
-					 Background="#22FFB347"
+					 Background="{DynamicResource TintWarningBrush}"
 					 UniformCornerRadius="8">
 				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
 					<TextBlock Text="{Binding DailyAverage, StringFormat={}{0:F1}}"
@@ -58,7 +58,7 @@
 
 			<!-- KPI Card 3: 활성 카메라 수 -->
 			<md:Card Grid.Column="2" Margin="5" Padding="20"
-					 Background="#224FC3F7"
+					 Background="{DynamicResource TintAccentBrush}"
 					 UniformCornerRadius="8">
 				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
 					<TextBlock Text="{Binding ActiveCameraCount}"

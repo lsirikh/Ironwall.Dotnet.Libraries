@@ -22,7 +22,7 @@
 
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
-		Background="#88FFFFFF"
+		Background="{DynamicResource SurfaceTranslucentBrush}"
 		Style="{StaticResource MaterialDesignCardFlipper}">
 		<md:Flipper.FrontContent>
 			<Border

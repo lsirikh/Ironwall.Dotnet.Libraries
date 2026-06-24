@@ -53,4 +53,12 @@
     <SolidColorBrush x:Key="SelectionBrush" Color="#2A9FE6" /><!-- Dark 적합 -->
     <SolidColorBrush x:Key="FocusRingBrush" Color="#6BA6EB" />
 
+    <!-- ══ Event/KPI 반투명 틴트 (IMPL-20, Dark 적합 — 다크표면 대비, hue=Light 대응) ══ -->
+    <SolidColorBrush x:Key="TintInfoBrush"     Color="#264A90E2" /><!-- Primary blue 틴트 -->
+    <SolidColorBrush x:Key="TintSuccessBrush"  Color="#264CC97A" /><!-- StatusNormal Dark 틴트 -->
+    <SolidColorBrush x:Key="TintCriticalBrush" Color="#2EFF5A52" /><!-- StatusCritical Dark 틴트 -->
+    <SolidColorBrush x:Key="TintWarningBrush"  Color="#2EFFB02E" /><!-- StatusWarning Dark 틴트 -->
+    <SolidColorBrush x:Key="TintAccentBrush"   Color="#2E5FB0F2" /><!-- StatusInfo Dark 틴트(cyan) -->
+    <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#88262B33" /><!-- 반투명 다크 표면 -->
+
 </ResourceDictionary>
