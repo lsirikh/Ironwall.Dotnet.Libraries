@@ -26,13 +26,13 @@
 			Margin="6,0,0,0"
 			Padding="5,1"
             VerticalAlignment="Center"
-			Background="{StaticResource LightBlueBrush}"
+			Background="{DynamicResource SurfaceAltBrush}"
 			CornerRadius="8">
 			<TextBlock
 				HorizontalAlignment="Center"
 				FontSize="9"
 				FontWeight="Bold"
-				Foreground="{StaticResource PrimaryBlueBrush}"
+				Foreground="{DynamicResource PrimaryBrush}"
 				Text="{Binding}" />
 		</Border>
 	</DataTemplate>
@@ -60,10 +60,10 @@
 				Kind="{Binding IconKind}">
 				<md:PackIcon.Style>
 					<Style TargetType="md:PackIcon">
-						<Setter Property="Foreground" Value="#444" />
+						<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 						<Style.Triggers>
 							<DataTrigger Binding="{Binding IsChecked}" Value="False">
-								<Setter Property="Foreground" Value="#CCC" />
+								<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</DataTrigger>
 						</Style.Triggers>
 					</Style>
@@ -78,10 +78,10 @@
 				TextOptions.TextFormattingMode="Display">
 				<TextBlock.Style>
 					<Style TargetType="TextBlock">
-						<Setter Property="Foreground" Value="#222" />
+						<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 						<Style.Triggers>
 							<DataTrigger Binding="{Binding IsChecked}" Value="False">
-								<Setter Property="Foreground" Value="#AAA" />
+								<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
 							</DataTrigger>
 						</Style.Triggers>
 					</Style>
@@ -142,7 +142,7 @@
 				<TextBlock
 					VerticalAlignment="Center"
 					FontSize="12"
-					Foreground="#222"
+					Foreground="{DynamicResource TextPrimaryBrush}"
 					Text="{Binding Name}"
 					TextOptions.TextRenderingMode="ClearType"
 					TextOptions.TextFormattingMode="Display"
@@ -192,7 +192,7 @@
 				Grid.Column="3"
 				VerticalAlignment="Center"
 				FontSize="9"
-				Foreground="#888"
+				Foreground="{DynamicResource TextMutedBrush}"
 				Text="{Binding Opacity, StringFormat={}{0:P0}}" />
 		</Grid>
 	</DataTemplate>
@@ -223,14 +223,14 @@
 					Height="15"
 					Margin="0,0,4,0"
 					VerticalAlignment="Center"
-					Foreground="{StaticResource PrimaryBlueBrush}"
+					Foreground="{DynamicResource PrimaryBrush}"
 					Kind="{Binding IconKind}" />
 				<TextBlock
 					Grid.Column="2"
 					VerticalAlignment="Center"
 					FontSize="12"
 					FontWeight="SemiBold"
-					Foreground="#222"
+					Foreground="{DynamicResource TextPrimaryBrush}"
 					Text="{Binding Name}"
 					TextOptions.TextRenderingMode="ClearType"
 					TextOptions.TextFormattingMode="Display" />
@@ -260,7 +260,7 @@
 												Height="14"
 												HorizontalAlignment="Center"
 												VerticalAlignment="Center"
-												Foreground="#888"
+												Foreground="{DynamicResource TextMutedBrush}"
 												Kind="ChevronDown"
 												RenderTransformOrigin="0.5,0.5">
 												<md:PackIcon.RenderTransform>
@@ -340,13 +340,13 @@
 				<Border
 					Grid.Column="0"
 					Padding="8,4"
-					Background="{StaticResource PrimaryBlueBrush}"
+					Background="{DynamicResource PrimaryBrush}"
 					CornerRadius="4">
 					<TextBlock
 						VerticalAlignment="Center"
 						FontSize="10.5"
 						FontWeight="Bold"
-						Foreground="White"
+						Foreground="{DynamicResource OnPrimaryFixedBrush}"
 						Text="{Binding Name}"
 						TextOptions.TextRenderingMode="ClearType"
 						TextOptions.TextFormattingMode="Display" />
@@ -370,7 +370,7 @@
 												x:Name="Arrow"
 												Width="14"
 												Height="14"
-												Foreground="#888"
+												Foreground="{DynamicResource TextMutedBrush}"
 												Kind="ChevronDown"
 												RenderTransformOrigin="0.5,0.5">
 												<md:PackIcon.RenderTransform>
@@ -414,7 +414,7 @@
 					Margin="4,2,0,2"
 					FontSize="10"
 					FontStyle="Italic"
-					Foreground="#999"
+					Foreground="{DynamicResource TextMutedBrush}"
 					Text="등록된 항목이 없습니다">
 					<TextBlock.Style>
 						<Style TargetType="TextBlock">
@@ -445,8 +445,8 @@
 				<ControlTemplate TargetType="{x:Type ctrl:LayerPanelControl}">
 					<Border
 						Width="250"
-						Background="White"
-						BorderBrush="{StaticResource BorderGrayBrush}"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
 						ClipToBounds="True"
 						CornerRadius="10">
@@ -467,7 +467,7 @@
 							<!-- 헤더 -->
 							<Border
 								Grid.Row="0"
-								Background="{StaticResource PrimaryBlueBrush}"
+								Background="{DynamicResource PrimaryBrush}"
 								CornerRadius="9,9,0,0"
 								Cursor="SizeAll">
 								<Grid>
@@ -482,7 +482,7 @@
 										Height="16"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Kind="Layers" />
 									<TextBlock
 										Grid.Column="1"
@@ -490,7 +490,7 @@
 										VerticalAlignment="Center"
 										FontSize="13"
 										FontWeight="Bold"
-										Foreground="White"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="{TemplateBinding PanelTitle}" />
 									<Button
 										x:Name="PART_CloseButton"
