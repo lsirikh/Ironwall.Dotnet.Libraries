@@ -104,6 +104,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <md:PackIcon
@@ -121,9 +122,19 @@
                                         TextTrimming="CharacterEllipsis"
                                         Text="{TemplateBinding PanelTitle}" />
 
-                                    <!--  크게/작게 토글  -->
+                                    <!--  옵션(컨트롤 패널 PTZ/프리셋/옵션) 토글  -->
                                     <Button
                                         Grid.Column="2"
+                                        Margin="0,0,2,0"
+                                        Style="{StaticResource PopupHeaderIconButtonStyle}"
+                                        Command="{Binding TogglePanelCommand}"
+                                        ToolTip="옵션 / 컨트롤 패널 (PTZ·프리셋·옵션)">
+                                        <md:PackIcon Width="15" Height="15" Foreground="White" Kind="Tune" />
+                                    </Button>
+
+                                    <!--  크게/작게 토글  -->
+                                    <Button
+                                        Grid.Column="3"
                                         Margin="0,0,2,0"
                                         Style="{StaticResource PopupHeaderIconButtonStyle}"
                                         Command="{Binding ToggleSizeCommand}"
@@ -134,7 +145,7 @@
                                     <!--  닫기  -->
                                     <Button
                                         x:Name="PART_CloseButton"
-                                        Grid.Column="3"
+                                        Grid.Column="4"
                                         Style="{StaticResource PanelCloseButtonStyle}" />
                                 </Grid>
                             </Border>

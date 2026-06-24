@@ -165,8 +165,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
     public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); NotifyOfPropertyChange(nameof(ControlHeight)); } }
 
-    /// <summary>우버튼 짧은클릭(8px 미만) → 탭 패널 토글.</summary>
+    /// <summary>컨트롤 패널(아코디언) 토글.</summary>
     internal void TogglePanel() => IsPanelExpanded = !IsPanelExpanded;
+
+    private ICommand? _togglePanelCommand;
+    /// <summary>헤더 옵션 버튼 → 컨트롤 패널(PTZ/프리셋/옵션) 펼침/접기.</summary>
+    public ICommand TogglePanelCommand => _togglePanelCommand ??= new RelayCommand(() => TogglePanel());
 
     private int _activeTab;   // 0=PTZ, 1=프리셋, 2=옵션
     /// <summary>활성 탭(0=PTZ / 1=프리셋 / 2=옵션). (FR-UI-02)</summary>

@@ -204,9 +204,27 @@ public class CameraStreamPopupControl : Control
 
     private void OnRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // 우클릭 = 컨트롤 패널(PTZ/프리셋/옵션 탭) 펼침/접기. 맵 컨텍스트 메뉴로 버블 방지.
-        (DataContext as CameraStreamPopupViewModel)?.TogglePanel();
-        e.Handled = true;
+        // 우클릭 = 컨텍스트 메뉴(PopupMenu). 항목 선택 시 해당 탭으로 컨트롤 패널 펼침.
+        if (DataContext is not CameraStreamPopupViewModel vm) return;
+        var menu = new ContextMenu
+        {
+            PlacementTarget = this,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
+        };
+        menu.Items.Add(MakeMenuItem("PTZ 제어", () => vm.SelectTabCommand.Execute("0")));
+        menu.Items.Add(MakeMenuItem("프리셋", () => vm.SelectTabCommand.Execute("1")));
+        menu.Items.Add(MakeMenuItem("옵션(주야간/포커스)", () => vm.SelectTabCommand.Execute("2")));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem(vm.IsPanelExpanded ? "컨트롤 패널 닫기" : "컨트롤 패널 열기", vm.TogglePanel));
+        menu.IsOpen = true;
+        e.Handled = true;   // 맵 컨텍스트 메뉴로 버블 방지
+    }
+
+    private static MenuItem MakeMenuItem(string header, System.Action action)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => action();
+        return item;
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)
