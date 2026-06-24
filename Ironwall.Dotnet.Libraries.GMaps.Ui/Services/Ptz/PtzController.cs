@@ -215,25 +215,6 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] GetStatus 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
-    public async Task<(double Bearing, double Zoom100)?> GetFovAsync(int cameraId, CancellationToken ct = default)
-    {
-        var pos = await GetStatusAsync(cameraId, ct).ConfigureAwait(false);
-        if (pos == null || !_ctx.TryGetValue(cameraId, out var ctx) || ctx.Spaces is not { } sp) return null;
-
-        // Pan: ONVIF abs space([xMin,xMax], 보통 [-1,1], 중앙=home)를 home 기준 ±180° 오프셋 → 0~360°.
-        // (UpdateFOV가 DetectionBearing = BaseBearing + ConvertPanToBearing(pan)로 쓰므로 home=0 오프셋이어야 함.)
-        var xr = sp.AbsXMax - sp.AbsXMin;
-        var panNorm = Math.Abs(xr) > 1e-9 ? (2.0 * (pos.Pan - sp.AbsXMin) / xr - 1.0) : pos.Pan;   // [-1,1]
-        var bearing = panNorm * 180.0;
-        if (bearing < 0) bearing += 360.0;
-
-        // Zoom: ONVIF abs zoom([zMin,zMax], 보통 [0,1]) → FOV 기대 스케일 0~100(100=NVR 최대줌).
-        var zr = sp.AbsZMax - sp.AbsZMin;
-        var zoom100 = Math.Abs(zr) > 1e-9 ? Math.Clamp((pos.Zoom - sp.AbsZMin) / zr, 0.0, 1.0) * 100.0 : 0.0;
-
-        return (bearing, zoom100);
-    }
-
     public async Task StopAsync(int cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return;

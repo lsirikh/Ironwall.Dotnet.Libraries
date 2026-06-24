@@ -700,7 +700,7 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzDragAsync(vm, e);
     }
 
-    /// <summary>좌버튼 드래그 릴리즈 → 드래그 방향으로 ContinuousMove, 길이 비례 시간 후 Stop + FOV. (FR-DRAG-03/FR-FOV-01)</summary>
+    /// <summary>좌버튼 드래그 릴리즈 → 드래그 방향으로 ContinuousMove, 길이 비례 시간 후 Stop. FOV(부채꼴)는 NVR→NATS가 갱신. (FR-DRAG-03)</summary>
     private async Task HandlePtzDragAsync(CameraStreamPopupViewModel vm, PtzDragEventArgs e)
     {
         var ptz = ResolvePtzController();
@@ -717,7 +717,7 @@ public class MapViewModel : BasePanelViewModel,
             if (!await ptz.ContinuousMoveAsync(vm.CameraId, panVel, tiltVel, 0, ct).ConfigureAwait(false)) return;
             await Task.Delay((int)(mag * PtzDragMaxDurationMs), ct).ConfigureAwait(false);
             await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
-            await UpdateCameraFovAsync(ptz, vm).ConfigureAwait(false);
+            // FOV는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함(스케일 불일치).
         }
         catch (OperationCanceledException) { /* 새 제스처가 인계 — 이전 Stop 생략 */ }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
@@ -737,17 +737,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz != null) _ = StopAndUpdateFovAsync(ptz, vm);
-    }
-
-    private async Task StopAndUpdateFovAsync(IPtzController ptz, CameraStreamPopupViewModel vm)
-    {
-        try
-        {
-            await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
-            await UpdateCameraFovAsync(ptz, vm).ConfigureAwait(false);
-        }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 정지 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+        if (ptz != null) _ = ptz.StopAsync(vm.CameraId);   // FOV는 NATS가 갱신
     }
 
     private void OnCameraPopupPtzZoom(object? sender, int direction)
@@ -755,7 +745,7 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzZoomAsync(vm, direction);
     }
 
-    /// <summary>영상 휠 → 줌 방향 ContinuousMove 펄스 후 Stop + FOV. (FR-PTZCTL-03)</summary>
+    /// <summary>영상 휠 → 줌 방향 ContinuousMove 펄스 후 Stop. FOV는 NVR→NATS가 갱신. (FR-PTZCTL-03)</summary>
     private async Task HandlePtzZoomAsync(CameraStreamPopupViewModel vm, int direction)
     {
         var ptz = ResolvePtzController();
@@ -766,19 +756,9 @@ public class MapViewModel : BasePanelViewModel,
             if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * PtzZoomSpeed, ct).ConfigureAwait(false)) return;
             await Task.Delay(PtzZoomPulseMs, ct).ConfigureAwait(false);
             await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
-            await UpdateCameraFovAsync(ptz, vm).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { /* 새 제스처가 인계 */ }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
-    }
-
-    /// <summary>이동 후 실제 PTZ 위치를 읽어 맵 심볼 부채꼴(FOV) 갱신(NATS 경로와 멱등). ONVIF 정규화값(pan ±1, zoom 0~1)을 심볼 FOV 스케일(방위각 0~360°, 줌 0~100)로 변환해 전달. 미지원 시 무시.</summary>
-    private async Task UpdateCameraFovAsync(IPtzController ptz, CameraStreamPopupViewModel vm)
-    {
-        var fov = await ptz.GetFovAsync(vm.CameraId).ConfigureAwait(false);
-        if (fov == null) return;
-        await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
-            vm.CameraId, (float)fov.Value.Bearing, 0f, (float)fov.Value.Zoom100)).ConfigureAwait(false);
     }
 
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
@@ -803,19 +783,15 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetGotoAsync(vm, preset);
     }
 
-    /// <summary>프리셋 이동 = AbsoluteMove(저장 좌표) + FOV 갱신. (FR-PRESET-02)</summary>
+    /// <summary>프리셋 이동 = AbsoluteMove(저장 좌표). FOV(부채꼴)는 NVR→NATS가 갱신. (FR-PRESET-02)</summary>
     private async Task HandlePresetGotoAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
     {
         var ptz = ResolvePtzController();
         if (ptz == null) return;
         try
         {
-            var moved = await ptz.AbsoluteMoveAsync(vm.CameraId, preset.Pan, preset.Tilt, preset.Zoom).ConfigureAwait(false);
-            if (!moved) return;
-            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
-            if (pos != null)
-                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
-                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+            await ptz.AbsoluteMoveAsync(vm.CameraId, preset.Pan, preset.Tilt, preset.Zoom).ConfigureAwait(false);
+            // FOV는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함.
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }

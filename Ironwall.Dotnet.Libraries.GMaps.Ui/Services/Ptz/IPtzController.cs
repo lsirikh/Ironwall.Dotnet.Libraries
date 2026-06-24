@@ -65,9 +65,6 @@ public interface IPtzController
     /// <summary>현재 PTZ 위치 읽기(프리셋 저장용 GetStatus). 실패 시 null. (FR-PRESET-03)</summary>
     Task<PtzPosition?> GetStatusAsync(int cameraId, CancellationToken ct = default);
 
-    /// <summary>FOV 부채꼴 갱신용 — 현재 위치를 심볼 FOV 스케일(방위각 0~360° home 오프셋, 줌 0~100)로 변환. ONVIF 정규화값(±1/0~1)을 변환. 미지원 시 null. (FR-FOV-01)</summary>
-    Task<(double Bearing, double Zoom100)?> GetFovAsync(int cameraId, CancellationToken ct = default);
-
     /// <summary>이동 정지(StopPTZ panTilt+zoom).</summary>
     Task StopAsync(int cameraId, CancellationToken ct = default);
 
