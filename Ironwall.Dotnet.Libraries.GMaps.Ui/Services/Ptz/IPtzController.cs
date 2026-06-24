@@ -53,6 +53,9 @@ public interface IPtzController
     /// <summary>상대 줌(휠) — RelativeZoomTranslationSpace로 클램프. zoomDelta +=줌인/-=줌아웃. (FR-PTZCTL-03)</summary>
     Task<bool> RelativeZoomAsync(int cameraId, double zoomDelta, CancellationToken ct = default);
 
+    /// <summary>연속 이동(ContinuousMove 속도) — 패드 누름/드래그 조이스틱/휠 줌. Relative 미지원 카메라 대응. Stop으로 정지. 속도 [-1,1]. (FR-PTZCTL-03)</summary>
+    Task<bool> ContinuousMoveAsync(int cameraId, double panVel, double tiltVel, double zoomVel, CancellationToken ct = default);
+
     /// <summary>
     /// 절대 이동(프리셋 좌표 pan/tilt/zoom). 카메라 절대 space로 클램프. AbsoluteMove는 드래그에 취소되지 않음. (FR-PRESET-02)
     /// </summary>

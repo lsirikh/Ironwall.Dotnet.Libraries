@@ -668,87 +668,90 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[CameraPopup] PTZ 준비 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
+    // ── ContinuousMove 속도/펄스 상수(RelativeMove 미지원 카메라 대응) ──
+    private const double PtzMoveSpeed = 0.6;        // 팬/틸트 ContinuousMove 속도(-1~1)
+    private const double PtzZoomSpeed = 0.6;        // 줌 ContinuousMove 속도
+    private const int PtzDragMaxDurationMs = 700;   // 드래그 1회 이동 최대 시간(드래그 길이 비례)
+    private const int PtzZoomPulseMs = 250;         // 휠 1노치 줌 펄스 시간
+
     private void OnCameraPopupPtzDragRequested(object? sender, PtzDragEventArgs e)
     {
         if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzDragAsync(vm, e);
     }
 
-    /// <summary>우버튼 드래그 릴리즈 → RelativeMove 1회 + FOV 부채꼴 갱신(GetStatus→ProcessCameraPtz, NATS와 멱등). (FR-DRAG-03/FR-FOV-01)</summary>
+    /// <summary>좌버튼 드래그 릴리즈 → 드래그 방향으로 ContinuousMove, 길이 비례 시간 후 Stop + FOV. (FR-DRAG-03/FR-FOV-01)</summary>
     private async Task HandlePtzDragAsync(CameraStreamPopupViewModel vm, PtzDragEventArgs e)
     {
         var ptz = ResolvePtzController();
         if (ptz == null) return;
+        var len = Math.Sqrt(e.Dx * e.Dx + e.Dy * e.Dy);
+        if (len < 1) return;
         try
         {
-            var moved = await ptz.RelativeMoveByPixelAsync(
-                vm.CameraId, e.Dx, e.Dy, e.ImageWidth, e.ImageHeight, PtzDragSensitivity).ConfigureAwait(false);
-            if (!moved) return;
-
-            // FOV 폴백: 실제 PTZ 위치를 읽어 맵 심볼 부채꼴 갱신(NVRManager NATS 수신 경로와 멱등 공존)
-            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
-            if (pos != null)
-                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
-                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+            var maxLen = Math.Max(40.0, Math.Min(e.ImageWidth, e.ImageHeight) * 0.4);
+            var mag = Math.Min(1.0, len / maxLen);
+            var panVel = (e.Dx / len) * PtzMoveSpeed;
+            var tiltVel = -(e.Dy / len) * PtzMoveSpeed;   // 화면 아래로 드래그 → 틸트 다운
+            if (!await ptz.ContinuousMoveAsync(vm.CameraId, panVel, tiltVel, 0).ConfigureAwait(false)) return;
+            await Task.Delay((int)(mag * PtzDragMaxDurationMs)).ConfigureAwait(false);
+            await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
+            await UpdateCameraFovAsync(ptz, vm).ConfigureAwait(false);
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
-    private const double PtzNudgePixels = 60;        // PTZ 탭 방향 패드 1회 nudge 가상 픽셀
-    private const double PtzNudgeNominalDim = 300;    // nudge 정규화 기준 영상 치수
-
+    /// <summary>방향 패드 누름 → 해당 방향 ContinuousMove(뗄 때까지 계속). 뗌은 PtzStop. (FR-UI-02)</summary>
     private void OnCameraPopupPtzNudge(object? sender, PtzNudgeEventArgs e)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzNudgeAsync(vm, e);
-    }
-
-    /// <summary>PTZ 탭 방향 패드 → 가상 픽셀 델타로 RelativeMove(드래그와 동일 경로) + FOV. (FR-UI-02)</summary>
-    private async Task HandlePtzNudgeAsync(CameraStreamPopupViewModel vm, PtzNudgeEventArgs e)
-    {
+        if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz == null) return;
-        try
-        {
-            var moved = await ptz.RelativeMoveByPixelAsync(
-                vm.CameraId, e.Dx * PtzNudgePixels, e.Dy * PtzNudgePixels,
-                PtzNudgeNominalDim, PtzNudgeNominalDim, PtzDragSensitivity).ConfigureAwait(false);
-            if (!moved) return;
-            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
-            if (pos != null)
-                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
-                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
-        }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ nudge 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+        if (ptz != null) _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * PtzMoveSpeed, -e.Dy * PtzMoveSpeed, 0);
     }
 
     private void OnCameraPopupPtzStop(object? sender, EventArgs e)
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz != null) _ = ptz.StopAsync(vm.CameraId);
+        if (ptz != null) _ = StopAndUpdateFovAsync(ptz, vm);
     }
 
-    private const double PtzZoomStep = 0.1;   // 휠 1노치당 상대 줌 변화량(rel zoom space 비율)
+    private async Task StopAndUpdateFovAsync(IPtzController ptz, CameraStreamPopupViewModel vm)
+    {
+        try
+        {
+            await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
+            await UpdateCameraFovAsync(ptz, vm).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 정지 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
 
     private void OnCameraPopupPtzZoom(object? sender, int direction)
     {
         if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzZoomAsync(vm, direction);
     }
 
-    /// <summary>영상 휠 → 상대 줌(RelativeZoom) + FOV 갱신. (FR-PTZCTL-03)</summary>
+    /// <summary>영상 휠 → 줌 방향 ContinuousMove 펄스 후 Stop + FOV. (FR-PTZCTL-03)</summary>
     private async Task HandlePtzZoomAsync(CameraStreamPopupViewModel vm, int direction)
     {
         var ptz = ResolvePtzController();
         if (ptz == null) return;
         try
         {
-            var moved = await ptz.RelativeZoomAsync(vm.CameraId, direction * PtzZoomStep).ConfigureAwait(false);
-            if (!moved) return;
-            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
-            if (pos != null)
-                await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
-                    vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+            if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * PtzZoomSpeed).ConfigureAwait(false)) return;
+            await Task.Delay(PtzZoomPulseMs).ConfigureAwait(false);
+            await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
+            await UpdateCameraFovAsync(ptz, vm).ConfigureAwait(false);
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    /// <summary>이동 후 실제 PTZ 위치를 읽어 맵 심볼 부채꼴(FOV) 갱신(NATS 경로와 멱등). 미지원 시 무시.</summary>
+    private async Task UpdateCameraFovAsync(IPtzController ptz, CameraStreamPopupViewModel vm)
+    {
+        var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
+        if (pos != null)
+            await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
+                vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
     }
 
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/

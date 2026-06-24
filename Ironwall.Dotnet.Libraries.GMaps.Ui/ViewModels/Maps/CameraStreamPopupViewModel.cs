@@ -193,6 +193,11 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     private ICommand? _stopCommand;
     public ICommand StopCommand => _stopCommand ??= new RelayCommand(() => PtzStopRequested?.Invoke(this, EventArgs.Empty));
 
+    /// <summary>방향 패드 버튼 누름 → 해당 방향 연속 이동 시작(컨트롤이 PreviewMouseDown에서 호출). dx/dy ∈ {-1,0,1}.</summary>
+    internal void RaisePadPress(int dx, int dy) => PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
+    /// <summary>방향 패드 버튼 뗌/정지 → 이동 중지(컨트롤이 PreviewMouseUp에서 호출).</summary>
+    internal void RaisePtzStop() => PtzStopRequested?.Invoke(this, EventArgs.Empty);
+
     private void RaiseNudge(string? dir)
     {
         var (dx, dy) = dir switch

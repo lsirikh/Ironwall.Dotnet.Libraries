@@ -168,15 +168,57 @@
                                 Visibility="{Binding IsPanelExpanded, Converter={StaticResource BoolToVis}}">
                                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Margin="8">
-                                    <!--  탭 바  -->
+                                    <!--  탭 바 (선택된 탭 강조)  -->
                                     <UniformGrid Margin="0,0,0,6" Columns="3" Rows="1">
-                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="0" Content="PTZ" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
-                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="1" Content="프리셋" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
-                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="2" Content="옵션" Foreground="#FFE6EDF3" Style="{StaticResource PtzTabButtonStyle}" />
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="0" Content="PTZ">
+                                            <Button.Style>
+                                                <Style BasedOn="{StaticResource PtzTabButtonStyle}" TargetType="Button">
+                                                    <Setter Property="Foreground" Value="#FF8290A0" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ActiveTab}" Value="0">
+                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="FontWeight" Value="Bold" />
+                                                            <Setter Property="Background" Value="#FF1B2735" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="1" Content="프리셋">
+                                            <Button.Style>
+                                                <Style BasedOn="{StaticResource PtzTabButtonStyle}" TargetType="Button">
+                                                    <Setter Property="Foreground" Value="#FF8290A0" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ActiveTab}" Value="1">
+                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="FontWeight" Value="Bold" />
+                                                            <Setter Property="Background" Value="#FF1B2735" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Command="{Binding SelectTabCommand}" CommandParameter="2" Content="옵션">
+                                            <Button.Style>
+                                                <Style BasedOn="{StaticResource PtzTabButtonStyle}" TargetType="Button">
+                                                    <Setter Property="Foreground" Value="#FF8290A0" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ActiveTab}" Value="2">
+                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="FontWeight" Value="Bold" />
+                                                            <Setter Property="Background" Value="#FF1B2735" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
                                     </UniformGrid>
 
-                                    <!--  PTZ 탭: 8방향 패드 + 정지  -->
-                                    <UniformGrid Width="132" Height="132" HorizontalAlignment="Center" Columns="3" Rows="3">
+                                    <!--  PTZ 탭: 8방향 패드(누르면 연속 이동, 떼면 정지) + 중앙 정지. 컨트롤이 PART_PtzPad에서 누름/뗌 처리  -->
+                                    <UniformGrid x:Name="PART_PtzPad" Width="132" Height="132" HorizontalAlignment="Center" Columns="3" Rows="3">
                                         <UniformGrid.Style>
                                             <Style TargetType="UniformGrid">
                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -187,15 +229,15 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </UniformGrid.Style>
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="UL" Content="↖" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="U" Content="▲" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="UR" Content="↗" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="L" Content="◀" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding StopCommand}" Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" ToolTip="정지" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="R" Content="▶" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="DL" Content="↙" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="D" Content="▼" Style="{StaticResource PtzPadButtonStyle}" />
-                                        <Button Command="{Binding NudgeCommand}" CommandParameter="DR" Content="↘" Style="{StaticResource PtzPadButtonStyle}" />
+                                        <Button Content="↖" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,-1" />
+                                        <Button Content="▲" Style="{StaticResource PtzPadButtonStyle}" Tag="0,-1" />
+                                        <Button Content="↗" Style="{StaticResource PtzPadButtonStyle}" Tag="1,-1" />
+                                        <Button Content="◀" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,0" />
+                                        <Button Content="■" Foreground="#FFFFCDD2" Style="{StaticResource PtzPadButtonStyle}" Tag="stop" ToolTip="정지" />
+                                        <Button Content="▶" Style="{StaticResource PtzPadButtonStyle}" Tag="1,0" />
+                                        <Button Content="↙" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,1" />
+                                        <Button Content="▼" Style="{StaticResource PtzPadButtonStyle}" Tag="0,1" />
+                                        <Button Content="↘" Style="{StaticResource PtzPadButtonStyle}" Tag="1,1" />
                                     </UniformGrid>
 
                                     <!--  프리셋 탭 (로컬 DB)  -->

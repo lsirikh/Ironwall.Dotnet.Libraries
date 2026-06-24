@@ -36,6 +36,10 @@ public class CameraStreamPopupControl : Control
     private bool _isPtzDragging;
     private Point _ptzStart;
 
+    // 방향 패드(누름=연속이동, 뗌=정지)
+    private FrameworkElement? _ptzPad;
+    private bool _padActive;
+
     static CameraStreamPopupControl()
     {
         DefaultStyleKeyProperty.OverrideMetadata(typeof(CameraStreamPopupControl),
@@ -79,6 +83,18 @@ public class CameraStreamPopupControl : Control
 
         _videoRegion = GetTemplateChild("PART_VideoRegion") as FrameworkElement;
         _ptzOverlay = GetTemplateChild("PART_PtzOverlay") as Canvas;
+
+        if (_ptzPad != null)
+        {
+            _ptzPad.PreviewMouseLeftButtonDown -= OnPadDown;
+            _ptzPad.PreviewMouseLeftButtonUp -= OnPadUp;
+        }
+        _ptzPad = GetTemplateChild("PART_PtzPad") as FrameworkElement;
+        if (_ptzPad != null)
+        {
+            _ptzPad.PreviewMouseLeftButtonDown += OnPadDown;   // 누름 → 연속 이동
+            _ptzPad.PreviewMouseLeftButtonUp += OnPadUp;       // 뗌 → 정지
+        }
     }
 
     /*──────────────── 좌버튼: 창 이동(헤더) ────────────────*/
@@ -103,12 +119,14 @@ public class CameraStreamPopupControl : Control
             return;
         }
 
-        // 영상 영역 → PTZ 드래그(IsPtzCapable일 때만). 8px 미만이면 위 선택만 적용. (FR-DRAG-01/03)
+        // 영상 영역 안에서만 PTZ 드래그(IsPtzCapable일 때). 패널/밖이면 무시. 8px 미만은 위 선택만. (FR-DRAG-01/03)
         if (vm.IsPtzCapable && _videoRegion != null)
         {
+            var p = e.GetPosition(_videoRegion);
+            if (p.X < 0 || p.Y < 0 || p.X > _videoRegion.ActualWidth || p.Y > _videoRegion.ActualHeight) return;
             _ptzActive = true;
             _isPtzDragging = false;
-            _ptzStart = e.GetPosition(_videoRegion);
+            _ptzStart = p;
             CaptureMouse();
             Keyboard.Focus(this);   // ESC 취소 수신용
             e.Handled = true;
@@ -194,11 +212,51 @@ public class CameraStreamPopupControl : Control
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         base.OnMouseWheel(e);
-        // 영상 영역 휠 = PTZ 줌(업=줌인 / 다운=줌아웃). 헤더/미지원은 무시. (FR-PTZCTL-03)
-        if (DataContext is not CameraStreamPopupViewModel vm || !vm.IsPtzCapable) return;
-        if (e.GetPosition(this).Y <= HeaderHeight) return;
+        // 영상 영역 안에서만 휠 = PTZ 줌(업=줌인 / 다운=줌아웃). 패널/헤더/미지원은 무시. (FR-PTZCTL-03)
+        if (DataContext is not CameraStreamPopupViewModel vm || !vm.IsPtzCapable || _videoRegion == null) return;
+        var p = e.GetPosition(_videoRegion);
+        if (p.X < 0 || p.Y < 0 || p.X > _videoRegion.ActualWidth || p.Y > _videoRegion.ActualHeight) return;
         vm.RaisePtzZoom(e.Delta > 0 ? 1 : -1);
         e.Handled = true;
+    }
+
+    /*──────────────── 방향 패드: 누름=연속 이동 / 뗌=정지 ────────────────*/
+
+    private void OnPadDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not CameraStreamPopupViewModel vm) return;
+        var tag = FindButtonTag(e.OriginalSource);
+        if (string.IsNullOrEmpty(tag)) return;
+        if (tag == "stop") { vm.RaisePtzStop(); e.Handled = true; return; }
+        var parts = tag.Split(',');
+        if (parts.Length == 2 && int.TryParse(parts[0], out var dx) && int.TryParse(parts[1], out var dy))
+        {
+            vm.RaisePadPress(dx, dy);
+            _padActive = true;
+            _ptzPad?.CaptureMouse();   // 버튼 밖에서 떼도 정지 보장
+            e.Handled = true;
+        }
+    }
+
+    private void OnPadUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_padActive) return;
+        _padActive = false;
+        _ptzPad?.ReleaseMouseCapture();
+        (DataContext as CameraStreamPopupViewModel)?.RaisePtzStop();
+        e.Handled = true;
+    }
+
+    /// <summary>이벤트 OriginalSource에서 비주얼 트리 상위로 올라가며 Tag(방향/"stop") 가진 Button을 찾는다.</summary>
+    private static string? FindButtonTag(object? src)
+    {
+        var d = src as DependencyObject;
+        while (d != null)
+        {
+            if (d is Button b && b.Tag is string t) return t;
+            d = VisualTreeHelper.GetParent(d);
+        }
+        return null;
     }
 
     private void HandlePtzMove(MouseEventArgs e)

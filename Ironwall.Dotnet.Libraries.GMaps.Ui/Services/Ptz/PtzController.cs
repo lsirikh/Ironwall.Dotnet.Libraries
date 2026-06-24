@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
+using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models.Commons;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Models;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Services;
 using OnvifImaging = Ironwall.Dotnet.Libraries.OnvifSolution.Imaging;
@@ -123,6 +124,29 @@ public sealed class PtzController : IPtzController
         }
         catch (OperationCanceledException) { return false; }
         catch (Exception ex) { _log?.Error($"[PTZ] RelativeMove 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> ContinuousMoveAsync(int cameraId, double panVel, double tiltVel, double zoomVel, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // ContinuousMove(속도). Relative 미지원 카메라도 대부분 지원. 카메라는 Stop/타임아웃까지 이동.
+                var speed = new PtzSpeedDto
+                {
+                    PanTilt = new Vector2DDto { X = (float)panVel, Y = (float)tiltVel },
+                    Zoom = new Vector1DDto { X = (float)zoomVel },
+                };
+                await _onvif.MovePTZ(ctx.Model.PtzClient, speed, ctx.ProfileToken, "PT10S").ConfigureAwait(false);
+                return true;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] ContinuousMove 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
     public async Task<bool> RelativeZoomAsync(int cameraId, double zoomDelta, CancellationToken ct = default)
