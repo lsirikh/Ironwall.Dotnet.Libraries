@@ -645,7 +645,12 @@ public class MapViewModel : BasePanelViewModel,
     private async Task EnsurePtzReadyAsync(CameraStreamPopupViewModel vm, ICameraDeviceModel cam)
     {
         var ptz = ResolvePtzController();
-        if (ptz == null) return;
+        if (ptz == null)
+        {
+            // 무음 실패 방지(진단) — 메인 솔루션 Bootstrapper에 OnvifServiceModule 등록 + 재빌드 필요.
+            _log?.Warning($"[CameraPopup] PTZ 비활성 — IPtzController 미해석 cam={vm.CameraId}. 메인 OnvifServiceModule 등록(EXT-01) + 앱 재빌드/재시작 확인.");
+            return;
+        }
         try
         {
             var conn = new ConnectionModel
@@ -655,8 +660,10 @@ public class MapViewModel : BasePanelViewModel,
                 Username = cam.UserName,
                 Password = cam.UserPassword,
             };
+            _log?.Info($"[CameraPopup] PTZ 준비 시도 cam={vm.CameraId} {cam.IpAddress}:{conn.PortOnvif}");
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
             await OnUiAsync(() => vm.IsPtzCapable = ok).ConfigureAwait(false);
+            _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} capable={ok} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
         }
         catch (Exception ex) { _log?.Warning($"[CameraPopup] PTZ 준비 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }

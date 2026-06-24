@@ -73,7 +73,11 @@ public sealed class PtzController : IPtzController
                 if (ctx.Model?.PtzClient == null)
                 {
                     var model = await _onvif.InitializeFullAsync(conn, ct).ConfigureAwait(false);
-                    if (model?.PtzClient == null) return false;
+                    if (model?.PtzClient == null)
+                    {
+                        _log?.Warning($"[PTZ] PtzClient 없음 cam={cameraId} — 비PTZ 카메라이거나 ONVIF 연결/인증 실패(포트/계정 확인).");
+                        return false;
+                    }
                     ctx.Model = model;
                     ctx.ProfileToken = model.CameraMedia?.Token ?? string.Empty;
                     // 영상 옵션(Imaging)용 VideoSourceToken — 첫 프로파일의 VideoSourceConfiguration.
@@ -81,7 +85,10 @@ public sealed class PtzController : IPtzController
                     ctx.ImagingPossible = model.IsImagingPossible && model.ImagingClient != null && !string.IsNullOrEmpty(ctx.VsToken);
                 }
                 ctx.Spaces ??= await LoadSpacesAsync(ctx).ConfigureAwait(false);
-                return IsCapable(ctx);
+                var cap = IsCapable(ctx);
+                if (!cap)
+                    _log?.Warning($"[PTZ] capable=false cam={cameraId} (IsPtzPossible={ctx.Model?.IsPtzPossible}, GetNode space={(ctx.Spaces == null ? "로드실패/없음" : "로드됨")}).");
+                return cap;
             }
             finally { ctx.Gate.Release(); }
         }
