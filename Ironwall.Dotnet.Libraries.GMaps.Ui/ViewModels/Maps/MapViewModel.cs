@@ -1097,7 +1097,9 @@ public class MapViewModel : BasePanelViewModel,
             vm.IrCutFilterRequested -= OnCameraPopupIrCutFilter;
             vm.AutoFocusRequested -= OnCameraPopupAutoFocus;
             if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
-            ResolvePtzController()?.Release(vm.CameraId);   // PTZ 자원 정리(멱등, FR-DISPOSE-01)
+            // 인스턴스 유지: 팝업 닫기 시 ONVIF/PTZ 인스턴스는 Release하지 않고 워밍 유지(재오픈 즉시). 이동만 정지.
+            // Release는 카메라 심볼/모델 삭제 시에만(Markers_CollectionChangedForCameraPopups).
+            _ = ResolvePtzController()?.StopAsync(vm.CameraId);
             if (_ptzGestureCts.TryRemove(vm.CameraId, out var gcts)) { try { gcts.Cancel(); } catch { } gcts.Dispose(); }
             CameraPopups.Remove(vm);
             await vm.DisposeAsync();   // Hub Lease 해제(C-03)
@@ -1135,6 +1137,8 @@ public class MapViewModel : BasePanelViewModel,
             {
                 foreach (var old in e.OldItems.OfType<GMapPidsMarker>())
                 {
+                    // 심볼/모델 삭제 = ONVIF 인스턴스 정리(워밍 해제). 팝업이 열려 있으면 닫기.
+                    ResolvePtzController()?.Release(old.LinkedDeviceId);
                     var vm = _cameraPopups.FirstOrDefault(p => p.CameraId == old.LinkedDeviceId);
                     if (vm != null) _ = CloseCameraPopupAsync(vm);
                 }
