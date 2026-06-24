@@ -24,6 +24,9 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
 
+    <!-- Phase 2 (IMPL-08): Modern Dark/Light 테마 토큰/서비스 (leaf, 순환 없음 — AD-1) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+
     <!-- 계정 도메인 + Gateway 계약(Accounts) + Direct-DB 백엔드(Accounts.Db) -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts\Ironwall.Dotnet.Libraries.Accounts.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Db\Ironwall.Dotnet.Libraries.Accounts.Db.csproj" />
