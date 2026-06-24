@@ -103,7 +103,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public double CanvasLeft { get => _canvasLeft; set { _canvasLeft = value; NotifyOfPropertyChange(nameof(CanvasLeft)); RecomputeLine(); } }
     public double CanvasTop { get => _canvasTop; set { _canvasTop = value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
     public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); RecomputeLine(); } }
-    public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); RecomputeLine(); } }
+    public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); NotifyOfPropertyChange(nameof(ControlHeight)); RecomputeLine(); } }
+
+    /// <summary>컨트롤 패널(아코디언) 높이 — 펼치면 팝업이 이만큼 아래로 커져 영상이 가려지지 않음.</summary>
+    public const double PanelHeight = 188;
+    /// <summary>컨트롤 실제 높이 = 영상 높이(PopupHeight) + 패널(펼침 시). MapView Height에 바인딩. (FR-UI-01)</summary>
+    public double ControlHeight => _popupHeight + (_isPanelExpanded ? PanelHeight : 0);
 
     private int _zIndex;
     /// <summary>팝업 z-order(선택/오픈 시 최상위). Panel.ZIndex 바인딩 — 컬렉션 Move 대신 사용해 RTSP 컨테이너 재생성(영상 끊김) 방지. (FR-SEL-02)</summary>
@@ -158,7 +163,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public bool IsPtzCapable { get => _isPtzCapable; set { if (_isPtzCapable == value) return; _isPtzCapable = value; NotifyOfPropertyChange(nameof(IsPtzCapable)); } }
 
     /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
-    public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); } }
+    public bool IsPanelExpanded { get => _isPanelExpanded; set { if (_isPanelExpanded == value) return; _isPanelExpanded = value; NotifyOfPropertyChange(nameof(IsPanelExpanded)); NotifyOfPropertyChange(nameof(ControlHeight)); } }
 
     /// <summary>우버튼 짧은클릭(8px 미만) → 탭 패널 토글.</summary>
     internal void TogglePanel() => IsPanelExpanded = !IsPanelExpanded;

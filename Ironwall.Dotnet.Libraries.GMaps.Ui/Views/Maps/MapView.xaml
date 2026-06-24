@@ -785,7 +785,7 @@
 						<DataTemplate>
 							<ctrl:CameraStreamPopupControl
 								Width="{Binding PopupWidth}"
-								Height="{Binding PopupHeight}"
+								Height="{Binding ControlHeight}"
 								PanelTitle="{Binding Title}" />
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>

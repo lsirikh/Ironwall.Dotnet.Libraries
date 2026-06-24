@@ -160,11 +160,13 @@
                             <!--  탭 패널 ([PTZ][프리셋][옵션]) — 우버튼 짧은클릭 토글. 영상 영역(*)이 줄고 패널이 아래에 펼쳐짐  -->
                             <Border
                                 Grid.Row="2"
+                                Height="188"
                                 Background="#FF131922"
                                 BorderBrush="{StaticResource BorderGrayBrush}"
                                 BorderThickness="0,1,0,0"
                                 CornerRadius="0,0,9,9"
                                 Visibility="{Binding IsPanelExpanded, Converter={StaticResource BoolToVis}}">
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Margin="8">
                                     <!--  탭 바  -->
                                     <UniformGrid Margin="0,0,0,6" Columns="3" Rows="1">
@@ -363,6 +365,7 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
+                                </ScrollViewer>
                             </Border>
                         </Grid>
                     </Border>
