@@ -658,7 +658,7 @@ public class MapViewModel : BasePanelViewModel,
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
             await OnUiAsync(() => vm.IsPtzCapable = ok).ConfigureAwait(false);
         }
-        catch (Exception ex) { _log?.Warning($"[CameraPopup] PTZ 준비 실패 cam={vm.CameraId}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Warning($"[CameraPopup] PTZ 준비 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     private void OnCameraPopupPtzDragRequested(object? sender, PtzDragEventArgs e)
@@ -683,7 +683,7 @@ public class MapViewModel : BasePanelViewModel,
                 await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
                     vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
         }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     private const double PtzNudgePixels = 60;        // PTZ 탭 방향 패드 1회 nudge 가상 픽셀
@@ -710,7 +710,7 @@ public class MapViewModel : BasePanelViewModel,
                 await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
                     vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
         }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ nudge 실패 cam={vm.CameraId}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ nudge 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     private void OnCameraPopupPtzStop(object? sender, EventArgs e)
@@ -756,7 +756,7 @@ public class MapViewModel : BasePanelViewModel,
                 await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
                     vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
         }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 이동 실패 cam={vm.CameraId}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     private void OnCameraPopupPresetSave(object? sender, string name)
@@ -787,7 +787,7 @@ public class MapViewModel : BasePanelViewModel,
             await PtzPresetStore.SaveAsync(model).ConfigureAwait(false);
             await LoadPresetsAsync(vm).ConfigureAwait(false);
         }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 저장 실패 cam={vm.CameraId}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 저장 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     private void OnCameraPopupPresetDelete(object? sender, IPtzPresetModel preset)

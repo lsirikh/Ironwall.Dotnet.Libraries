@@ -20,8 +20,8 @@ public sealed record PtzPosition(double Pan, double Tilt, double Zoom, string? P
 /// 책임:
 /// - cameraId → (PtzClient, profileToken) 해석(IOnvifService.InitializeFull 캐시).
 /// - cameraId별 GetNode space(Rel/Abs PanTilt·Zoom XRange/YRange/URI) 캐시 — 모든 변환/클램프 진실원.
-/// - ONVIF 호출 직렬화: cameraId별 SemaphoreSlim(1,1) + CTS. 다른 cameraId 병렬, 동일 직렬.
-///   RelativeMove=Last-Write-Wins(이전 취소), AbsoluteMove(프리셋)=드래그에 취소되지 않음(프리셋 우선).
+/// - ONVIF 호출 직렬화: cameraId별 SemaphoreSlim(1,1)로 직렬(FIFO). 다른 cameraId 병렬, 동일 직렬.
+///   (드래그는 릴리즈당 RelativeMove 1회라 플러드 없음 → FIFO로 충분. Last-Write-Wins/CTS 취소는 후속·미구현.)
 /// - IOnvifService 미노출 메서드(Relative/Absolute/GetStatus/GetNode)는 PtzClient 직접 호출 래퍼.
 ///
 /// 스레드 안전(I-05): cameraId 맵=ConcurrentDictionary, PtzClient 동일 인스턴스 병렬 호출 금지.
@@ -42,7 +42,7 @@ public interface IPtzController
 
     /// <summary>
     /// 픽셀 드래그 델타 기반 상대 이동(RelativeMove). GetNode space로 변환·클램프(고정±1.0 금지),
-    /// Y축 반전 적용. 연속 호출은 Last-Write-Wins(이전 진행 취소). (FR-DRAG-03/04, FR-PTZCTL-03)
+    /// Y축 반전 적용. 연속 호출은 Gate로 직렬(FIFO). (FR-DRAG-03/04; LWW는 후속)
     /// </summary>
     Task<bool> RelativeMoveByPixelAsync(int cameraId, double dx, double dy,
         double imageW, double imageH, double sensitivity = 1.0, CancellationToken ct = default);
@@ -58,6 +58,6 @@ public interface IPtzController
     /// <summary>이동 정지(StopPTZ panTilt+zoom).</summary>
     Task StopAsync(int cameraId, CancellationToken ct = default);
 
-    /// <summary>카메라 PTZ 리소스 정리(진행 CTS 취소·Semaphore·캐시 제거). 멱등. (FR-DISPOSE-01)</summary>
+    /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(int cameraId);
 }

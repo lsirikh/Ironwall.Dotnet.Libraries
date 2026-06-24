@@ -159,14 +159,25 @@ public sealed class PtzController : IPtzController
     public async Task StopAsync(int cameraId, CancellationToken ct = default)
     {
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return;
-        try { await _onvif.StopPTZ(ctx.Model.PtzClient, ctx.ProfileToken, true, true).ConfigureAwait(false); }
+        try
+        {
+            // C1: PtzClient(WCF 채널) 동일 인스턴스 병렬 호출 금지(I-05) — Move와 동일 Gate로 직렬화.
+            // (1회성 Relative/Absolute 이동이라 Stop이 직전 이동 뒤로 큐잉돼도 지연 짧음. 진행 중 이동
+            //  즉시 중단이 필요하면 별도 채널 필요 — 후속.)
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try { await _onvif.StopPTZ(ctx.Model.PtzClient, ctx.ProfileToken, true, true).ConfigureAwait(false); }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[PTZ] Stop 실패 cam={cameraId}: {Mask(ex.Message)}"); }
     }
 
     public void Release(int cameraId)
     {
-        if (!_ctx.TryRemove(cameraId, out var ctx)) return;
-        try { ctx.Gate.Dispose(); } catch { /* 정리 실패 무시 */ }
+        // H2: 딕셔너리에서만 제거. SemaphoreSlim은 Dispose하지 않는다 — 진행 중 Move/GetStatus 태스크가
+        // 동일 ctx.Gate를 await/Release 중일 수 있어, 여기서 Dispose하면 ObjectDisposedException 경합.
+        // SemaphoreSlim은 WaitHandle 미사용 시 정리할 핸들이 없어 미Dispose 비용 무시 가능. 멱등.
+        _ctx.TryRemove(cameraId, out _);
     }
 
     /*──────────────── 내부 헬퍼 ────────────────*/
