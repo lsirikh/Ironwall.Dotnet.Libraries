@@ -31,6 +31,17 @@
         <Setter Property="Cursor" Value="Hand" />
     </Style>
 
+    <!--  옵션 탭 세그먼트 버튼(주야간/포커스) — 활성은 인라인 DataTrigger로 Accent  -->
+    <Style x:Key="PtzSegButtonStyle" TargetType="Button">
+        <Setter Property="Margin" Value="2,0" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Background" Value="#FF223043" />
+        <Setter Property="Foreground" Value="#FFCFE0F0" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
     <!--  헤더 버튼(크게보기/닫기) — PanelCloseButtonStyle 답습: 26×26 원형 + 호버 #33FFFFFF  -->
     <Style x:Key="PopupHeaderIconButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="26" />
@@ -251,10 +262,10 @@
                                         </StackPanel>
                                     </StackPanel>
 
-                                    <!--  옵션 탭 (Phase 5)  -->
-                                    <TextBlock Margin="0,12" HorizontalAlignment="Center" Foreground="#FF8B98A8" FontSize="12" Text="옵션(주야간/포커스) — 준비 중 (Phase 5)">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
+                                    <!--  옵션 탭 (영상: 주야간/포커스)  -->
+                                    <StackPanel>
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding ActiveTab}" Value="2">
@@ -262,8 +273,95 @@
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                        </StackPanel.Style>
+
+                                        <!--  미지원 안내  -->
+                                        <TextBlock Margin="0,10" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="이 카메라는 영상 옵션을 지원하지 않습니다">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsImagingCapable}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!--  옵션 콘텐츠(지원 시)  -->
+                                        <StackPanel Visibility="{Binding IsImagingCapable, Converter={StaticResource BoolToVis}}">
+                                            <!--  주야간(IR Cut Filter)  -->
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="#FF9FB0C0" Text="주야간 (IR Cut)" />
+                                            <UniformGrid Margin="0,2,0,8" Columns="3" Rows="1">
+                                                <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="ON" Content="주간">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IrCutFilterMode}" Value="ON">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="OFF" Content="야간">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IrCutFilterMode}" Value="OFF">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Command="{Binding SetIrCutFilterCommand}" CommandParameter="AUTO" Content="자동">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IrCutFilterMode}" Value="AUTO">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </UniformGrid>
+
+                                            <!--  포커스(AutoFocus)  -->
+                                            <TextBlock Margin="0,2" FontSize="11" Foreground="#FF9FB0C0" Text="포커스" />
+                                            <UniformGrid Margin="0,2" Columns="2" Rows="1">
+                                                <Button Command="{Binding SetAutoFocusCommand}" CommandParameter="true" Content="자동">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAutoFocus}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Command="{Binding SetAutoFocusCommand}" CommandParameter="false" Content="수동">
+                                                    <Button.Style>
+                                                        <Style BasedOn="{StaticResource PtzSegButtonStyle}" TargetType="Button">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsAutoFocus}" Value="False">
+                                                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </Grid>

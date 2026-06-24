@@ -164,6 +164,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         ActiveTab = i;
         IsPanelExpanded = true;
         if (i == 1) RaisePresetsReload();   // 프리셋 탭 진입 시 DB 재조회
+        else if (i == 2) RaiseOptionsReload();   // 옵션 탭 진입 시 영상 옵션 조회
     });
 
     /// <summary>PTZ 탭 방향 버튼(8방향) → MapViewModel이 IPtzController로 상대 이동. (FR-UI-02)</summary>
@@ -238,6 +239,36 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         IsSavingPreset = false;
     });
     public ICommand CancelSavePresetCommand => _cancelSaveCommand ??= new RelayCommand(() => IsSavingPreset = false);
+
+    // ── 옵션 탭(영상: 주야간/포커스) ──────────────────────────────────────────
+    private bool _isImagingCapable;
+    /// <summary>영상 옵션 지원 여부(미지원이면 안내). (FR-OPT-03)</summary>
+    public bool IsImagingCapable { get => _isImagingCapable; set { if (_isImagingCapable == value) return; _isImagingCapable = value; NotifyOfPropertyChange(nameof(IsImagingCapable)); } }
+
+    private string _irCutFilterMode = "AUTO";
+    /// <summary>주야간(IrCutFilter): "ON"=주간 / "OFF"=야간 / "AUTO". (FR-OPT-01)</summary>
+    public string IrCutFilterMode { get => _irCutFilterMode; set { if (_irCutFilterMode == value) return; _irCutFilterMode = value; NotifyOfPropertyChange(nameof(IrCutFilterMode)); } }
+
+    private bool _isAutoFocus = true;
+    /// <summary>오토포커스 여부(false=수동). (FR-OPT-02)</summary>
+    public bool IsAutoFocus { get => _isAutoFocus; set { if (_isAutoFocus == value) return; _isAutoFocus = value; NotifyOfPropertyChange(nameof(IsAutoFocus)); } }
+
+    /// <summary>MapViewModel이 ONVIF 조회 결과를 주입(UI 스레드).</summary>
+    internal void SetImagingState(string irCutFilter, bool autoFocus)
+    {
+        IrCutFilterMode = string.IsNullOrEmpty(irCutFilter) ? "AUTO" : irCutFilter.ToUpperInvariant();
+        IsAutoFocus = autoFocus;
+    }
+
+    public event EventHandler? OptionsReloadRequested;
+    public event EventHandler<string>? IrCutFilterRequested;
+    public event EventHandler<bool>? AutoFocusRequested;
+
+    internal void RaiseOptionsReload() => OptionsReloadRequested?.Invoke(this, EventArgs.Empty);
+
+    private ICommand? _setIrCutFilterCommand, _setAutoFocusCommand;
+    public ICommand SetIrCutFilterCommand => _setIrCutFilterCommand ??= new RelayCommand(p => { var m = p?.ToString(); if (!string.IsNullOrEmpty(m)) IrCutFilterRequested?.Invoke(this, m); });
+    public ICommand SetAutoFocusCommand => _setAutoFocusCommand ??= new RelayCommand(p => { if (bool.TryParse(p?.ToString(), out var b)) AutoFocusRequested?.Invoke(this, b); });
 
     public ICommand CloseCommand =>
         _closeCommand ??= new RelayCommand(() => CloseRequested?.Invoke(this, EventArgs.Empty));

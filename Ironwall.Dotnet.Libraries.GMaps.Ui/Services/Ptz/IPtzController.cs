@@ -14,6 +14,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 /// <summary>카메라 현재 PTZ 위치(프리셋 저장/복원 단위). space URI를 동봉해 저장↔이동 round-trip 보장.</summary>
 public sealed record PtzPosition(double Pan, double Tilt, double Zoom, string? PanTiltSpace, string? ZoomSpace);
 
+/// <summary>카메라 영상 옵션 상태(옵션 탭). <c>IrCutFilter</c>="ON"(주간)/"OFF"(야간)/"AUTO". <c>AutoFocus</c>=오토포커스 여부.</summary>
+public sealed record CameraImagingState(string IrCutFilter, bool AutoFocus);
+
 /// <summary>
 /// 팝업 PTZ 제어의 단일 소유 앱서비스. (PRD FR-PTZCTL-01~03 / FR-WRAP-01)
 ///
@@ -57,6 +60,18 @@ public interface IPtzController
 
     /// <summary>이동 정지(StopPTZ panTilt+zoom).</summary>
     Task StopAsync(int cameraId, CancellationToken ct = default);
+
+    /// <summary>영상 옵션(주야간/포커스) 사용 가능 여부 — IsImagingPossible + ImagingClient + VideoSourceToken. (FR-OPT-03)</summary>
+    bool IsImagingCapable(int cameraId);
+
+    /// <summary>현재 영상 옵션(주야간 IrCutFilter / 오토포커스) 조회 — 옵션 탭 표시. 미지원/실패 시 null. (FR-OPT-01/02)</summary>
+    Task<CameraImagingState?> GetImagingAsync(int cameraId, CancellationToken ct = default);
+
+    /// <summary>주야간(IrCutFilter: "ON"=주간/"OFF"=야간/"AUTO") 설정. read-modify-write로 타 필드 보존. (FR-OPT-01)</summary>
+    Task<bool> SetIrCutFilterAsync(int cameraId, string mode, CancellationToken ct = default);
+
+    /// <summary>오토포커스(AUTO/MANUAL) 설정. read-modify-write로 타 필드 보존. (FR-OPT-02)</summary>
+    Task<bool> SetAutoFocusAsync(int cameraId, bool auto, CancellationToken ct = default);
 
     /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(int cameraId);

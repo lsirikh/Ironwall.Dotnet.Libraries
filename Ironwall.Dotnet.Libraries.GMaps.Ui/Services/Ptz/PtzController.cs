@@ -9,6 +9,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Models;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Services;
+using OnvifImaging = Ironwall.Dotnet.Libraries.OnvifSolution.Imaging;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 
@@ -46,6 +47,8 @@ public sealed class PtzController : IPtzController
         public ICameraOnvifModel? Model;
         public string ProfileToken = string.Empty;
         public SpaceInfo? Spaces;
+        public string? VsToken;            // 영상 옵션(Imaging)용 VideoSourceToken
+        public bool ImagingPossible;       // IsImagingPossible + ImagingClient + VsToken
         public readonly SemaphoreSlim Gate = new(1, 1);
         public volatile bool Busy;
     }
@@ -73,6 +76,9 @@ public sealed class PtzController : IPtzController
                     if (model?.PtzClient == null) return false;
                     ctx.Model = model;
                     ctx.ProfileToken = model.CameraMedia?.Token ?? string.Empty;
+                    // 영상 옵션(Imaging)용 VideoSourceToken — 첫 프로파일의 VideoSourceConfiguration.
+                    ctx.VsToken = model.Profiles?.FirstOrDefault()?.VideoSourceConfiguration?.SourceToken;
+                    ctx.ImagingPossible = model.IsImagingPossible && model.ImagingClient != null && !string.IsNullOrEmpty(ctx.VsToken);
                 }
                 ctx.Spaces ??= await LoadSpacesAsync(ctx).ConfigureAwait(false);
                 return IsCapable(ctx);
@@ -170,6 +176,83 @@ public sealed class PtzController : IPtzController
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[PTZ] Stop 실패 cam={cameraId}: {Mask(ex.Message)}"); }
+    }
+
+    /*──────────────── 영상 옵션(Imaging) ────────────────*/
+
+    public bool IsImagingCapable(int cameraId) => _ctx.TryGetValue(cameraId, out var c) && c.ImagingPossible;
+
+    public async Task<CameraImagingState?> GetImagingAsync(int cameraId, CancellationToken ct = default)
+    {
+        if (!TryImaging(cameraId, out var ctx)) return null;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var s = await ctx.Model!.ImagingClient!.GetImagingSettingsAsync(ctx.VsToken).ConfigureAwait(false);
+                if (s == null) return null;
+                var irc = s.IrCutFilterSpecified ? s.IrCutFilter.ToString() : "AUTO";
+                var af = s.Focus?.AutoFocusMode == OnvifImaging.AutoFocusMode.AUTO;
+                return new CameraImagingState(irc, af);
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return null; }
+        catch (Exception ex) { _log?.Error($"[PTZ] GetImaging 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
+    }
+
+    public async Task<bool> SetIrCutFilterAsync(int cameraId, string mode, CancellationToken ct = default)
+    {
+        if (!TryImaging(cameraId, out var ctx)) return false;
+        if (!Enum.TryParse<OnvifImaging.IrCutFilterMode>(mode, true, out var irc)) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // read-modify-write — 타 필드(밝기/대비/Focus 등) 보존, 변경 필드만 Specified.
+                var s = await ctx.Model!.ImagingClient!.GetImagingSettingsAsync(ctx.VsToken).ConfigureAwait(false);
+                if (s == null) return false;
+                s.IrCutFilter = irc;
+                s.IrCutFilterSpecified = true;
+                await ctx.Model.ImagingClient.SetImagingSettingsAsync(ctx.VsToken, s, false).ConfigureAwait(false);
+                return true;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] SetIrCutFilter 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> SetAutoFocusAsync(int cameraId, bool auto, CancellationToken ct = default)
+    {
+        if (!TryImaging(cameraId, out var ctx)) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var s = await ctx.Model!.ImagingClient!.GetImagingSettingsAsync(ctx.VsToken).ConfigureAwait(false);
+                if (s == null) return false;
+                s.Focus ??= new OnvifImaging.FocusConfiguration20();
+                s.Focus.AutoFocusMode = auto ? OnvifImaging.AutoFocusMode.AUTO : OnvifImaging.AutoFocusMode.MANUAL;
+                await ctx.Model.ImagingClient.SetImagingSettingsAsync(ctx.VsToken, s, false).ConfigureAwait(false);
+                return true;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] SetAutoFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    private bool TryImaging(int cameraId, out CamCtx ctx)
+    {
+        ctx = null!;
+        if (!_ctx.TryGetValue(cameraId, out var c) || !c.ImagingPossible
+            || c.Model?.ImagingClient == null || string.IsNullOrEmpty(c.VsToken)) return false;
+        ctx = c;
+        return true;
     }
 
     public void Release(int cameraId)

@@ -820,6 +820,65 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Error($"[CameraPopup] Home 설정 실패 id={preset.Id}: {ex.Message}"); }
     }
 
+    /*──────────────── 영상 옵션(주야간/포커스) 핸들러 ────────────────*/
+
+    private void OnCameraPopupOptionsReload(object? sender, EventArgs e)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = LoadImagingAsync(vm);
+    }
+
+    /// <summary>옵션 탭 진입 → 영상 옵션(주야간/포커스) 조회·반영. (FR-OPT-01/02/03)</summary>
+    private async Task LoadImagingAsync(CameraStreamPopupViewModel vm)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            var capable = ptz.IsImagingCapable(vm.CameraId);
+            var st = capable ? await ptz.GetImagingAsync(vm.CameraId).ConfigureAwait(false) : null;
+            await OnUiAsync(() =>
+            {
+                vm.IsImagingCapable = capable && st != null;
+                if (st != null) vm.SetImagingState(st.IrCutFilter, st.AutoFocus);
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Warning($"[CameraPopup] 영상 옵션 로드 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    private void OnCameraPopupIrCutFilter(object? sender, string mode)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandleIrCutFilterAsync(vm, mode);
+    }
+
+    private async Task HandleIrCutFilterAsync(CameraStreamPopupViewModel vm, string mode)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            if (await ptz.SetIrCutFilterAsync(vm.CameraId, mode).ConfigureAwait(false))
+                await LoadImagingAsync(vm).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 주야간 설정 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    private void OnCameraPopupAutoFocus(object? sender, bool auto)
+    {
+        if (sender is CameraStreamPopupViewModel vm) _ = HandleAutoFocusAsync(vm, auto);
+    }
+
+    private async Task HandleAutoFocusAsync(CameraStreamPopupViewModel vm, bool auto)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            if (await ptz.SetAutoFocusAsync(vm.CameraId, auto).ConfigureAwait(false))
+                await LoadImagingAsync(vm).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 포커스 설정 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
     /// <summary>UI 스레드 마샬링(백그라운드 ONVIF 호출 후 VM/심볼 갱신용).</summary>
     private static Task OnUiAsync(System.Action action)
     {
@@ -942,6 +1001,9 @@ public class MapViewModel : BasePanelViewModel,
             vm.PresetSaveRequested += OnCameraPopupPresetSave;
             vm.PresetDeleteRequested += OnCameraPopupPresetDelete;
             vm.PresetHomeRequested += OnCameraPopupPresetHome;
+            vm.OptionsReloadRequested += OnCameraPopupOptionsReload;  // 옵션 탭 주야간/포커스
+            vm.IrCutFilterRequested += OnCameraPopupIrCutFilter;
+            vm.AutoFocusRequested += OnCameraPopupAutoFocus;
             CameraPopups.Add(vm);
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
             StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
@@ -992,6 +1054,9 @@ public class MapViewModel : BasePanelViewModel,
             vm.PresetSaveRequested -= OnCameraPopupPresetSave;
             vm.PresetDeleteRequested -= OnCameraPopupPresetDelete;
             vm.PresetHomeRequested -= OnCameraPopupPresetHome;
+            vm.OptionsReloadRequested -= OnCameraPopupOptionsReload;
+            vm.IrCutFilterRequested -= OnCameraPopupIrCutFilter;
+            vm.AutoFocusRequested -= OnCameraPopupAutoFocus;
             if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
             ResolvePtzController()?.Release(vm.CameraId);   // PTZ 자원 정리(멱등, FR-DISPOSE-01)
             CameraPopups.Remove(vm);
