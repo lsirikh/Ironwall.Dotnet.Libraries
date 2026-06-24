@@ -772,13 +772,13 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
-    /// <summary>이동 후 실제 PTZ 위치를 읽어 맵 심볼 부채꼴(FOV) 갱신(NATS 경로와 멱등). 미지원 시 무시.</summary>
+    /// <summary>이동 후 실제 PTZ 위치를 읽어 맵 심볼 부채꼴(FOV) 갱신(NATS 경로와 멱등). ONVIF 정규화값(pan ±1, zoom 0~1)을 심볼 FOV 스케일(방위각 0~360°, 줌 0~100)로 변환해 전달. 미지원 시 무시.</summary>
     private async Task UpdateCameraFovAsync(IPtzController ptz, CameraStreamPopupViewModel vm)
     {
-        var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
-        if (pos != null)
-            await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
-                vm.CameraId, (float)pos.Pan, (float)pos.Tilt, (float)pos.Zoom)).ConfigureAwait(false);
+        var fov = await ptz.GetFovAsync(vm.CameraId).ConfigureAwait(false);
+        if (fov == null) return;
+        await OnUiAsync(() => _symbolEventManager.ProcessCameraPtz(
+            vm.CameraId, (float)fov.Value.Bearing, 0f, (float)fov.Value.Zoom100)).ConfigureAwait(false);
     }
 
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
