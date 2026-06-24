@@ -24,7 +24,8 @@ public sealed record CameraImagingState(string IrCutFilter, bool AutoFocus);
 /// - cameraId → (PtzClient, profileToken) 해석(IOnvifService.InitializeFull 캐시).
 /// - cameraId별 GetNode space(Rel/Abs PanTilt·Zoom XRange/YRange/URI) 캐시 — 모든 변환/클램프 진실원.
 /// - ONVIF 호출 직렬화: cameraId별 SemaphoreSlim(1,1)로 직렬(FIFO). 다른 cameraId 병렬, 동일 직렬.
-///   (드래그는 릴리즈당 RelativeMove 1회라 플러드 없음 → FIFO로 충분. Last-Write-Wins/CTS 취소는 후속·미구현.)
+///   제스처(드래그/줌) Last-Write-Wins: MapViewModel이 cameraId별 CTS로 직전 제스처를 취소(큐 적체 방지),
+///   취소 토큰을 Continuous/Delay에 전달한다.
 /// - IOnvifService 미노출 메서드(Relative/Absolute/GetStatus/GetNode)는 PtzClient 직접 호출 래퍼.
 ///
 /// 스레드 안전(I-05): cameraId 맵=ConcurrentDictionary, PtzClient 동일 인스턴스 병렬 호출 금지.
