@@ -269,6 +269,17 @@ public interface IGMapDbService
     /// <summary>카메라 Id로 저장된 팝업 위치 삭제.</summary>
     Task<bool> DeleteCameraPopupPositionAsync(int cameraId, CancellationToken token = default);
 
+    /*────────────────────── CameraPtzPresets (PTZ 프리셋, 로컬 DB) ──────────────*/
+
+    /// <summary>카메라의 PTZ 프리셋 목록 조회(Home 우선, 이름 순).</summary>
+    Task<List<IPtzPresetModel>?> FetchPtzPresetsAsync(int cameraId, CancellationToken token = default);
+    /// <summary>PTZ 프리셋 Upsert((CameraId, PresetName) 유니크 → 덮어쓰기).</summary>
+    Task<bool> UpsertPtzPresetAsync(IPtzPresetModel model, CancellationToken token = default);
+    /// <summary>PTZ 프리셋 삭제(Id).</summary>
+    Task<bool> DeletePtzPresetAsync(int presetId, CancellationToken token = default);
+    /// <summary>카메라의 Home 프리셋 지정(presetId만 IsHome=1, 카메라당 1개).</summary>
+    Task<bool> SetHomePtzPresetAsync(int cameraId, int presetId, CancellationToken token = default);
+
     /*────────────────────── MapLayer (레이어 관리) ─────────────*/
 
     Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default);
