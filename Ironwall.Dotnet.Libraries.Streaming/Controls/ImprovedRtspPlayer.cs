@@ -606,7 +606,12 @@ public class ImprovedRtspPlayer : Control, IDisposable
                 return false;
 
             filePath ??= $"snapshot_{_cachedContextId}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            var ok = await _streamingService.TakeSnapshotAsync(_cachedContextId ?? throw new NullReferenceException($"CachedContextId가 설정되어있지 않습니다.") , filePath);
+
+            // Hub 모드: 로컬 LibVLC MediaPlayer가 없으므로 표시 중인 공유 프레임(SharedFrame)을 직접 PNG로 저장.
+            var ok = IsHubMode
+                ? await SaveSharedFrameSnapshotAsync(filePath)
+                : await _streamingService.TakeSnapshotAsync(_cachedContextId ?? throw new NullReferenceException($"CachedContextId가 설정되어있지 않습니다."), filePath);
+
             if (ok)
                 await Dispatcher.InvokeAsync(PlaySnapshotFeedback);   // 흰 플래시 + 우상단 OSD
             return ok;
@@ -616,7 +621,36 @@ public class ImprovedRtspPlayer : Control, IDisposable
             _log?.Error(ex.Message);
             return false;
         }
+    }
 
+    /// <summary>Hub 모드 스냅샷 — 표시 중인 공유 프레임(SharedFrame)의 동결 복사본을 PNG로 저장(로컬 MediaPlayer 없음 대응).</summary>
+    private async Task<bool> SaveSharedFrameSnapshotAsync(string fileName)
+    {
+        // UI 스레드에서 현재 공유 프레임의 픽셀 복사본(동결) 생성 — 라이브 WriteableBitmap 갱신과 분리.
+        var frozen = await Dispatcher.InvokeAsync(() =>
+        {
+            var f = SharedFrame;
+            if (f == null) return (BitmapSource?)null;
+            var copy = new WriteableBitmap(f);
+            copy.Freeze();
+            return (BitmapSource)copy;
+        });
+        if (frozen == null)
+        {
+            _log?.Warning("[ImprovedRtspPlayer] Hub 스냅샷 실패 — 공유 프레임 없음");
+            return false;
+        }
+
+        var fullPath = _streamingService!.ResolveSnapshotPath(fileName);
+        await Task.Run(() =>
+        {
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(frozen));
+            using var fs = System.IO.File.Create(fullPath);
+            encoder.Save(fs);
+        });
+        _log?.Info($"[ImprovedRtspPlayer] Hub snapshot saved: {fullPath}");
+        return true;
     }
 
     /// <summary>스냅샷 촬영 피드백: 흰 플래시 번쩍(250ms) + 우상단 OSD "스냅샷 저장"(1초 유지 후 사라짐).</summary>

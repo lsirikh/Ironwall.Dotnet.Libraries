@@ -41,6 +41,9 @@ public interface IImprovedRtspStreamingService: IService, IDisposable
     
     Task<bool> TakeSnapshotAsync(string contextId, string filePath);
 
+    /// <summary>스냅샷 저장 전체 경로 해석(설정 SnapshotPath 기준, 폴더 생성). Hub 모드 직접 저장용.</summary>
+    string ResolveSnapshotPath(string fileName);
+
     /// <summary>Hub 경로 플레이어를 타임아웃 트래킹에 등록. IsAutoDiscard 팝업에서 호출.</summary>
     void RegisterConnectionStartTime(string contextId);
 }

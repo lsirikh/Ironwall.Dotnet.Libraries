@@ -714,14 +714,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             {
                 if (context.MediaPlayer != null)
                 {
-                    // 저장 폴더 자동생성 + 상대경로면 앱 기준 절대화 + 슬래시 혼용 제거(Path.Combine)
-                    var dir = _setupModel.SnapshotPath;
-                    if (string.IsNullOrWhiteSpace(dir)) dir = "snapshots";
-                    if (!System.IO.Path.IsPathRooted(dir))
-                        dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, dir);
-                    System.IO.Directory.CreateDirectory(dir);
-                    var fullPath = System.IO.Path.Combine(dir, fileName);
-
+                    var fullPath = ResolveSnapshotPath(fileName);
                     _log?.Info($"[ImprovedRtspStreamingService] Taking snapshot for {contextId}: {fullPath}");
                     return await Task.Run(() => context.MediaPlayer.TakeSnapshot(0, fullPath, 0, 0));
                 }
@@ -733,6 +726,18 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             _log?.Error($"[ImprovedRtspStreamingService] Snapshot failed for {contextId}: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>스냅샷 저장 전체 경로 해석 — 설정 SnapshotPath(없으면 "snapshots"), 상대경로면 앱 기준 절대화, 폴더 자동 생성.
+    /// Hub 모드 플레이어가 공유 프레임을 직접 저장할 때도 동일 규칙을 쓰도록 공개.</summary>
+    public string ResolveSnapshotPath(string fileName)
+    {
+        var dir = _setupModel.SnapshotPath;
+        if (string.IsNullOrWhiteSpace(dir)) dir = "snapshots";
+        if (!System.IO.Path.IsPathRooted(dir))
+            dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, dir);
+        System.IO.Directory.CreateDirectory(dir);
+        return System.IO.Path.Combine(dir, fileName);
     }
 
     public void RegisterConnectionStartTime(string contextId)
