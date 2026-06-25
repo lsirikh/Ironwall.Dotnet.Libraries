@@ -41,4 +41,10 @@ public interface IAccountApiService
     Task<ApiResponse<AuthUserDto>> UpdateMyProfileAsync(UserSelfUpdateDto dto, CancellationToken ct = default);
     /// <summary>PUT /api/users/me/password — {current_password,new_password(min6)}. 서버 세션무효화 없음(F07-01).</summary>
     Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default);
+
+    // ── 관리 화면용 조회 (FR-19, 후속 GOP-05 UI) ──
+    /// <summary>GET /api/user-groups — 그룹 목록(권한 nested {modules,device_groups}).</summary>
+    Task<ApiListResponse<UserGroupDto>> GetUserGroupsAsync(CancellationToken ct = default);
+    /// <summary>GET /api/user-sessions — 세션 목록(ADMIN).</summary>
+    Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default);
 }
