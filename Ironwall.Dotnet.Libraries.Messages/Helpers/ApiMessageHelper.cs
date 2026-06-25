@@ -20,6 +20,9 @@ public static class ApiMessageHelper
         DateParseHandling = DateParseHandling.None  // ISO 날짜 문자열을 DateTime으로 변환하지 않음
     };
 
+    /// <summary>평면(envelope 없는) 응답 역직렬화 등에서 동일 설정 재사용 (GOP-00 FR-7, GetMe).</summary>
+    public static JsonSerializerSettings JsonSettings => _jsonSettings;
+
     #region - HttpResponse → ApiResponse 변환 -
     /// <summary>
     /// HttpResponseMessage → ApiResponse&lt;T&gt; 변환 (확장 메서드)
@@ -232,6 +235,7 @@ public static class ApiMessageHelper
             HttpStatusCode.UnprocessableEntity => "UNPROCESSABLE_ENTITY",
             HttpStatusCode.InternalServerError => "INTERNAL_SERVER_ERROR",
             HttpStatusCode.ServiceUnavailable => "SERVICE_UNAVAILABLE",
+            HttpStatusCode.GatewayTimeout => "GATEWAY_TIMEOUT",
             _ => "UNKNOWN_ERROR"
         };
     }

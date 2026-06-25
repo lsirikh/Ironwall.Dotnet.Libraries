@@ -20,10 +20,12 @@ public class ApiService : IApiService
 {
     #region - Ctors -
     public ApiService(ILogService? log
-                    , ApiSetupModel setupModel)
+                    , ApiSetupModel setupModel
+                    , DelegatingHandler? authHandler = null)
     {
         _log = log;
         _setupModel = setupModel;
+        _authHandler = authHandler;   // FR-5: Bearer 등 메시지 핸들러 파이프라인(Account 전용 주입, Device/Event=null)
     }
     #endregion
     #region - Implementation of Interface -
@@ -48,14 +50,24 @@ public class ApiService : IApiService
     /// </summary>
     public void Initialize()
     {
-        var handler = new HttpClientHandler();
+        var httpHandler = new HttpClientHandler();
         if (!string.IsNullOrEmpty(_setupModel.Username) && !string.IsNullOrEmpty(_setupModel.Password))
-            handler.Credentials = new NetworkCredential(_setupModel.Username, _setupModel.Password);
+            httpHandler.Credentials = new NetworkCredential(_setupModel.Username, _setupModel.Password);
 
-        _client = new HttpClient(handler)
+        // FR-5: authHandler(BearerAuthHandler 등) 주입 시 파이프라인 최상단에 끼운다. 없으면 평범한 HttpClientHandler.
+        HttpMessageHandler pipeline = httpHandler;
+        if (_authHandler != null)
+        {
+            _authHandler.InnerHandler = httpHandler;
+            pipeline = _authHandler;
+        }
+
+        // FR-4: setupModel.Timeout 존중(0 이하면 기본 TIMEOUT 폴백). 기존엔 하드코딩 const 만 써서 설정이 무시되던 버그.
+        var timeoutSec = _setupModel.Timeout > 0 ? _setupModel.Timeout : TIMEOUT;
+        _client = new HttpClient(pipeline)
         {
             BaseAddress = new Uri(_setupModel.Url),
-            Timeout = TimeSpan.FromSeconds(TIMEOUT)
+            Timeout = TimeSpan.FromSeconds(timeoutSec)
         };
     }
 
@@ -77,7 +89,7 @@ public class ApiService : IApiService
             // QueryString 추가
             if (parameters != null)
             {
-                var queryString = new FormUrlEncodedContent(parameters).ReadAsStringAsync().Result;
+                var queryString = await new FormUrlEncodedContent(parameters).ReadAsStringAsync().ConfigureAwait(false);
                 url += "?" + queryString;
             }
 
@@ -86,7 +98,7 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] GET 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
 
@@ -112,7 +124,7 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] POST 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
 
@@ -134,7 +146,7 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] FormData POST 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
 
@@ -157,7 +169,7 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] DELETE 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
 
@@ -189,7 +201,7 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] DELETE(body) 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
 
@@ -221,7 +233,7 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] PATCH 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
 
@@ -249,9 +261,17 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             _log?.Error($"[ApiService] PUT 요청 실패: {ex.Message}");
-            return new HttpResponseMessage(HttpStatusCode.BadRequest) { ReasonPhrase = ex.Message };
+            return BuildExceptionResponse(ex);
         }
     }
+
+    /// <summary>예외 → 상태코드 매핑 (FR-6): 타임아웃 504 / 연결실패 503 / 그 외 500. 기존 BadRequest(400) 일괄변환 폐지(401/503/504 구분 가능).</summary>
+    internal static HttpResponseMessage BuildExceptionResponse(Exception ex) => ex switch
+    {
+        TaskCanceledException   => new HttpResponseMessage(HttpStatusCode.GatewayTimeout)     { ReasonPhrase = "Request timed out" },
+        HttpRequestException h   => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { ReasonPhrase = h.Message },
+        _                        => new HttpResponseMessage(HttpStatusCode.InternalServerError){ ReasonPhrase = ex.Message },
+    };
     #endregion
     #region - IHanldes -
     #endregion
@@ -265,6 +285,7 @@ public class ApiService : IApiService
     private readonly ILogService? _log;
     private readonly ApiSetupModel _setupModel;
     private HttpClient? _client;
+    private readonly DelegatingHandler? _authHandler;
     private const int TIMEOUT = 10;
     #endregion
 }
