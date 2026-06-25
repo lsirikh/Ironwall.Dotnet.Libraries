@@ -5,10 +5,11 @@ using System.Windows.Shapes;
 using GMap.NET;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.Enums;
+using MaterialDesignThemes.Wpf;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /****************************************************************************
-   Purpose      : 추적 타겟 오버레이 마커 (transient — 편집/영속 없음)
+   Purpose      : 추적 타겟 오버레이 마커 (물방울 핀 + 타입 아이콘 + 호버 툴팁)
    Created By   : GHLee
    Created On   : 2026-06-25
    Department   : SW Team
@@ -16,22 +17,27 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
    Email        : lsirikh@naver.com
 ****************************************************************************/
 /// <summary>
-/// AiAnalysis TRACKING_STATUS 타겟을 지도에 표시하는 경량 마커.
-/// <para>심볼/장비 마커(<c>GMapBaseMarker&lt;ISymbolModel&gt;</c>)와 달리 <b>편집·영속·속성패널이 없는 transient</b>
-/// 마커라 ISymbolModel 결합을 피하고 <see cref="GMapMarker"/>를 직접 파생한다.</para>
-/// <para>비주얼: 위협색 원 + 타입 이니셜 + 방향 화살표(bearing) + track_id 라벨. 위협색은 severity hue-lock(테마 불변).</para>
-/// <para>스레드: 생성·갱신은 모두 UI Dispatcher에서만 호출(매니저가 보장).</para>
+/// AiAnalysis TRACKING_STATUS 타겟 마커. transient(편집/영속 없음)라 ISymbolModel 결합을 피하고 <see cref="GMapMarker"/> 직접 파생.
+/// <para><b>디자인</b>: 물방울 핀(<see cref="PackIconKind.MapMarker"/>, <b>색=위험도</b> severity hue-lock) 안에
+/// 타입 아이콘(사람=Walk / 차=Car / 동물=Paw / 미상=HelpCircle, 흰색) + 진행방향 화살표.
+/// 라벨 텍스트 없음 — <b>마우스 호버 시 툴팁</b>으로 track_id + 속도(m/s) 표시.</para>
+/// <para>핀 끝(tip)이 실제 좌표에 앵커. 생성·갱신은 UI Dispatcher에서만(매니저 보장).</para>
 /// </summary>
 public sealed class GMapTrackingMarker : GMapMarker
 {
-    private const double Box = 40d;     // 마커 캔버스 크기
-    private const double DotSize = 18d;
+    private const double PinW = 36d;
+    private const double PinH = 36d;
+    private const double HeadX = 18d;   // 핀 머리 중심
+    private const double HeadY = 14d;
+    private const double TipX = 18d;     // 핀 끝(앵커)
+    private const double TipY = 33d;
 
-    private readonly Ellipse _dot;
-    private readonly TextBlock _glyph;
-    private readonly TextBlock _label;
+    private readonly PackIcon _pin;
+    private readonly PackIcon _typeIcon;
     private readonly Polygon _arrow;
     private readonly RotateTransform _arrowRotate;
+    private readonly TextBlock _tipId;
+    private readonly TextBlock _tipSpeed;
 
     public int CameraId { get; }
     public string TrackId { get; }
@@ -41,90 +47,83 @@ public sealed class GMapTrackingMarker : GMapMarker
         CameraId = cameraId;
         TrackId = trackId;
 
-        var canvas = new Canvas { Width = Box, Height = Box, IsHitTestVisible = false };
+        var canvas = new Canvas { Width = PinW, Height = PinH };
 
-        // 방향 화살표 (북=0°, 시계방향). 중심(20,20) 기준 회전.
-        _arrowRotate = new RotateTransform(0d, Box / 2, Box / 2);
+        // 진행방향 화살표 — 머리 위에서 heading 방향으로 회전(orbit)
+        _arrowRotate = new RotateTransform(0d, HeadX, HeadY);
         _arrow = new Polygon
         {
-            Points = new PointCollection { new(Box / 2, 1), new(Box / 2 - 5, 13), new(Box / 2 + 5, 13) },
+            Points = new PointCollection { new(HeadX, -4), new(HeadX - 4, 5), new(HeadX + 4, 5) },
             Fill = Brushes.White,
-            Stroke = new SolidColorBrush(Color.FromArgb(160, 0, 0, 0)),
-            StrokeThickness = 0.5,
+            Stroke = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+            StrokeThickness = 0.6,
             RenderTransform = _arrowRotate,
             Visibility = Visibility.Collapsed,
         };
         canvas.Children.Add(_arrow);
 
-        // 위협색 원
-        _dot = new Ellipse
+        // 물방울 핀(색=위험도)
+        _pin = new PackIcon
         {
-            Width = DotSize,
-            Height = DotSize,
-            Fill = BrushFor(EnumColorType.Gray),
-            Stroke = Brushes.White,
-            StrokeThickness = 2,
+            Kind = PackIconKind.MapMarker,
+            Width = PinW,
+            Height = PinH,
+            Foreground = BrushFor(EnumColorType.Gray),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Colors.Black, BlurRadius = 3, ShadowDepth = 1, Opacity = 0.5,
+            },
         };
-        Canvas.SetLeft(_dot, (Box - DotSize) / 2);
-        Canvas.SetTop(_dot, (Box - DotSize) / 2);
-        canvas.Children.Add(_dot);
+        Canvas.SetLeft(_pin, 0);
+        Canvas.SetTop(_pin, 0);
+        canvas.Children.Add(_pin);
 
-        // 타입 이니셜
-        _glyph = new TextBlock
+        // 타입 아이콘(흰색) — 핀 머리 중앙
+        _typeIcon = new PackIcon
         {
-            Text = "?",
+            Kind = PackIconKind.HelpCircle,
+            Width = 15,
+            Height = 15,
             Foreground = Brushes.White,
-            FontWeight = FontWeights.Bold,
-            FontSize = 10,
-            Width = DotSize,
-            TextAlignment = TextAlignment.Center,
         };
-        Canvas.SetLeft(_glyph, (Box - DotSize) / 2);
-        Canvas.SetTop(_glyph, (Box - DotSize) / 2 + 1);
-        canvas.Children.Add(_glyph);
+        Canvas.SetLeft(_typeIcon, HeadX - 7.5);
+        Canvas.SetTop(_typeIcon, HeadY - 7.5);
+        canvas.Children.Add(_typeIcon);
 
-        // track_id 라벨
-        _label = new TextBlock
-        {
-            Text = trackId,
-            Foreground = Brushes.White,
-            FontSize = 8,
-            Background = new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)),
-            Padding = new Thickness(2, 0, 2, 0),
-            TextAlignment = TextAlignment.Center,
-        };
-        Canvas.SetTop(_label, Box - 9);
-        Canvas.SetLeft(_label, 0);
-        _label.Width = Box;
-        canvas.Children.Add(_label);
+        // 호버 툴팁: track_id + 속도
+        _tipId = new TextBlock { Text = trackId, FontWeight = FontWeights.Bold };
+        _tipSpeed = new TextBlock { Text = "— m/s", FontSize = 11, Opacity = 0.8 };
+        var tip = new StackPanel { Margin = new Thickness(2) };
+        tip.Children.Add(_tipId);
+        tip.Children.Add(_tipSpeed);
+        canvas.ToolTip = tip;
 
         Shape = canvas;
-        Offset = new Point(-Box / 2, -Box / 2);   // 중심 정렬
+        Offset = new Point(-TipX, -TipY);   // 핀 끝이 좌표에 앵커
     }
 
-    /// <summary>위협색·타입·라벨·방향을 갱신(위치는 매니저가 <see cref="GMapMarker.Position"/> 직접 설정).</summary>
-    public void Update(EnumColorType threatColor, EnumTargetType type, double bearing, bool showArrow)
+    /// <summary>위협색·타입·방향·속도를 갱신(위치는 매니저가 <see cref="GMapMarker.Position"/> 직접 설정).</summary>
+    public void Update(EnumColorType threatColor, EnumTargetType type, double bearing, bool showArrow, double speedMps)
     {
-        var brush = BrushFor(threatColor);
-        _dot.Fill = brush;
-        _arrow.Fill = brush;
-        _glyph.Text = GlyphFor(type);
+        _pin.Foreground = BrushFor(threatColor);
+        _typeIcon.Kind = IconFor(type);
         _arrowRotate.Angle = bearing;
         _arrow.Visibility = showArrow ? Visibility.Visible : Visibility.Collapsed;
+        _tipSpeed.Text = $"{speedMps:F1} m/s";
     }
 
-    /// <summary>lost/idle 등 흐릿 처리(제거 전 페이드 표현).</summary>
+    /// <summary>lost/idle 등 흐릿 처리(제거 전 페이드).</summary>
     public void SetDimmed(bool dimmed) => ((Canvas)Shape).Opacity = dimmed ? 0.45 : 1.0;
 
-    private static string GlyphFor(EnumTargetType type) => type switch
+    private static PackIconKind IconFor(EnumTargetType type) => type switch
     {
-        EnumTargetType.Person => "P",
-        EnumTargetType.Vehicle => "V",
-        EnumTargetType.Animal => "A",
-        _ => "?",
+        EnumTargetType.Person => PackIconKind.Walk,
+        EnumTargetType.Vehicle => PackIconKind.Car,
+        EnumTargetType.Animal => PackIconKind.Paw,
+        _ => PackIconKind.HelpCircle,
     };
 
-    // severity hue-lock — 의미색은 테마 불변(직접 brush). NORMAL/CAUTION/THREAT/Unknown.
+    // severity hue-lock — 의미색은 테마 불변. NORMAL=Green/CAUTION=Orange/THREAT=Red/Unknown=Gray.
     private static SolidColorBrush BrushFor(EnumColorType color)
     {
         var b = color switch

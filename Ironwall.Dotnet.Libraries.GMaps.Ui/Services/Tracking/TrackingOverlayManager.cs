@@ -148,7 +148,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
 
             var color = ColorOf(t);
             entry.Marker.Position = new PointLatLng(lat, lng);   // Position-only(NFR-02)
-            entry.Marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing, showArrow: speed > 0d);
+            entry.Marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing, showArrow: speed > 0d, speedMps: speed);
 
             // 트레일: NATS gap 분절(P2-09) → 점 추가(FIFO) → 줌 기준 재투영
             if (entry.Trail is not null)
@@ -172,7 +172,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             {
                 ZIndex = ZTrackingBand,
             };
-            marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing: 0d, showArrow: false);
+            marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing: 0d, showArrow: false, speedMps: 0d);
             _map!.Markers.Add(marker);
 
             var trail = new GMapTrailMarker(cameraId, t.TrackId, color);
