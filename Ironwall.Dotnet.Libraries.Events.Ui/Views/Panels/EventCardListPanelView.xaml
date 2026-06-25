@@ -39,7 +39,7 @@
 			<Border
 				Margin="0,0,0,0"
 				HorizontalAlignment="Stretch"
-				Background="{DynamicResource PrimaryBrush}"
+				Background="{DynamicResource SurfaceAltBrush}"
 				CornerRadius="2.5"
 				Opacity="0.95"
 				Style="{StaticResource MaterialDesignToolBarMainPanelBorderStyle}">
@@ -63,7 +63,7 @@
 							<Button
 								x:Name="ButtonActionAll"
 								md:RippleAssist.IsCentered="True"
-								Foreground="{DynamicResource OnPrimaryFixedBrush}"
+								Foreground="{DynamicResource PrimaryBrush}"
 								IsEnabled="{Binding ViewModelProvider.Count, Converter={StaticResource CountToBooleanConverter}}"
 								Style="{StaticResource MaterialDesignIconForegroundButton}"
 								ToolTip="전체 조치보고"
@@ -95,7 +95,7 @@
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="15"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Foreground="{DynamicResource TextSecondaryBrush}"
 							Opacity="0.80"
 							Text="이벤트 수" />
 						<TextBlock
