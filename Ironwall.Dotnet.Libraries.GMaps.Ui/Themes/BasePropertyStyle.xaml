@@ -16,7 +16,9 @@
 		<Setter Property="Padding" Value="4,2" />
 		<Setter Property="FontSize" Value="11" />
 		<Setter Property="MinHeight" Value="24" />
-		<Setter Property="Background" Value="White" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
 		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="VerticalContentAlignment" Value="Center" />
@@ -27,11 +29,12 @@
 		<Setter Property="Padding" Value="4,2" />
 		<Setter Property="FontSize" Value="10" />
 		<Setter Property="MinHeight" Value="24" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 		<Setter Property="VerticalContentAlignment" Value="Center" />
 	</Style>
 
 	<Style x:Key="PropertyLabel" TargetType="TextBlock">
-		<Setter Property="Foreground" Value="#555555" />
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="FontSize" Value="11" />
 		<Setter Property="FontWeight" Value="SemiBold" />
@@ -46,12 +49,13 @@
 		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 		<Style.Triggers>
 			<Trigger Property="IsMouseOver" Value="True">
-				<Setter Property="Background" Value="#E8F0FE" />
+				<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
 			</Trigger>
 			<Trigger Property="IsPressed" Value="True">
-				<Setter Property="Background" Value="#C5D5FB" />
+				<Setter Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
 			</Trigger>
 			<Trigger Property="IsEnabled" Value="False">
 				<Setter Property="Opacity" Value="0.4" />

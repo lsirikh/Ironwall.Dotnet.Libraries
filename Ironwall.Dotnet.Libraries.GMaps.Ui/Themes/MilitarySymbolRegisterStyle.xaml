@@ -29,7 +29,7 @@
 		<Setter Property="Padding" Value="4,2" />
 		<Setter Property="FontSize" Value="11" />
 		<Setter Property="MinHeight" Value="24" />
-		<Setter Property="Background" Value="White" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
 		<Setter Property="BorderBrush" Value="Gray" />
 		<Setter Property="BorderThickness" Value="1" />
 		<Setter Property="VerticalContentAlignment" Value="Center" />
@@ -89,7 +89,7 @@
 					<ControlTemplate.Triggers>
 						<Trigger Property="IsChecked" Value="True">
 							<Setter TargetName="border" Property="Background" Value="{DynamicResource PrimaryBrush}" />
-							<Setter Property="Foreground" Value="White" />
+							<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
 						</Trigger>
 						<Trigger Property="IsChecked" Value="False">
 							<Setter TargetName="border" Property="Background" Value="Transparent" />
@@ -106,8 +106,8 @@
 
 	<!--  메인 컨트롤 스타일  -->
 	<Style TargetType="{x:Type milreg:GMapMilitarySymbolRegisterControl}">
-		<Setter Property="Background" Value="White" />
-		<Setter Property="Foreground" Value="#333333" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 		<Setter Property="FontFamily" Value="Malgun Gothic" />
 		<Setter Property="FontSize" Value="12" />
 		<Setter Property="Template">

@@ -28,7 +28,7 @@
 						</Trigger>
 						<Trigger Property="IsPressed" Value="True">
 							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
-							<Setter Property="Foreground" Value="White" />
+							<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
 						</Trigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>

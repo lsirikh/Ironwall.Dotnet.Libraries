@@ -315,28 +315,28 @@
                                             <Button Content="↘" Style="{StaticResource PtzPadButtonStyle}" Tag="1,1" />
                                         </UniformGrid>
 
-                                        <!--  우: 속도(PanTilt/Zoom) — 라벨+값 위, 슬라이더는 전체폭(좁은 슬라이더 0.1↔1.0 점프 방지). 0.05 단위 스냅  -->
+                                        <!--  우: 속도(PanTilt/Zoom) — 라벨+값 위, 슬라이더는 전체폭(좁은 슬라이더 0.1↔1.0 점프 방지). 0.1 단위 스냅  -->
                                         <StackPanel Grid.Column="1" Margin="12,0,2,0" VerticalAlignment="Center">
                                             <!--  PanTilt 속도  -->
                                             <Grid Margin="0,0,0,1">
                                                 <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="PanTilt" />
                                                 <TextBox HorizontalAlignment="Right" Width="42" Padding="2,0" VerticalContentAlignment="Center"
                                                          Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
-                                                         Text="{Binding PanTiltSpeed, StringFormat=0.00, UpdateSourceTrigger=LostFocus}" ToolTip="팬/틸트 속도 (0.1~1.0)" />
+                                                         Text="{Binding PanTiltSpeed, StringFormat=0.0, UpdateSourceTrigger=LostFocus}" ToolTip="팬/틸트 속도 (0.1~1.0)" />
                                             </Grid>
-                                            <Slider Margin="0,0,0,8" Minimum="0.1" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
-                                                    TickFrequency="0.05" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
-                                                    Value="{Binding PanTiltSpeed}" ToolTip="팬/틸트 속도 (0.05 단위)" />
+                                            <Slider Margin="0,0,0,8" Minimum="0.1" Maximum="1.0" SmallChange="0.1" LargeChange="0.1"
+                                                    TickFrequency="0.1" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
+                                                    Value="{Binding PanTiltSpeed}" ToolTip="팬/틸트 속도 (0.1 단위)" />
                                             <!--  Zoom 속도  -->
                                             <Grid Margin="0,0,0,1">
                                                 <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="Zoom" />
                                                 <TextBox HorizontalAlignment="Right" Width="42" Padding="2,0" VerticalContentAlignment="Center"
                                                          Background="#FF0E151C" BorderBrush="#FF38485A" FontSize="11" Foreground="White" TextAlignment="Center"
-                                                         Text="{Binding ZoomSpeed, StringFormat=0.00, UpdateSourceTrigger=LostFocus}" ToolTip="줌 속도 (0.1~1.0)" />
+                                                         Text="{Binding ZoomSpeed, StringFormat=0.0, UpdateSourceTrigger=LostFocus}" ToolTip="줌 속도 (0.1~1.0)" />
                                             </Grid>
-                                            <Slider Minimum="0.1" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
-                                                    TickFrequency="0.05" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
-                                                    Value="{Binding ZoomSpeed}" ToolTip="줌 속도 (0.05 단위)" />
+                                            <Slider Minimum="0.1" Maximum="1.0" SmallChange="0.1" LargeChange="0.1"
+                                                    TickFrequency="0.1" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
+                                                    Value="{Binding ZoomSpeed}" ToolTip="줌 속도 (0.1 단위)" />
                                         </StackPanel>
                                     </Grid>
 
