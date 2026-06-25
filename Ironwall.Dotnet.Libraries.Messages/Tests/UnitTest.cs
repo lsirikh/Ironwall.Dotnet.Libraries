@@ -3723,7 +3723,8 @@ public class Phase25_PtzControlBodyDtoTests
 [Collection("Phase26")]
 public class Phase26_TrackingStatusBodyDtoTests
 {
-    [Fact(DisplayName = "A26.1-1: TrackingStatusBodyDto — Active Tracking (full)")]
+    // ⚠ 전면 교체(Gop_Message_Broker §8.3.7, 하위호환 없음): 단일 target → 다중 targets[].
+    [Fact(DisplayName = "A26.1-1: should_deserialize_targets_array_when_active_tracking")]
     [Trait("Category", "DTO")]
     public void TrackingStatusBodyDto_Deserialization_ActiveTracking()
     {
@@ -3731,50 +3732,81 @@ public class Phase26_TrackingStatusBodyDtoTests
         {
             "camera_id": 201,
             "tracking": "active",
-            "target": {
-                "label": "person",
-                "confidence": 0.92,
-                "bbox": [150, 220, 60, 120],
-                "thumbnail": "http://192.168.1.50:8080/tracking/frame_001.jpg"
-            },
-            "target_location": {
-                "latitude": 38.1235,
-                "longitude": 127.5680,
-                "distance_m": 120.5
-            }
+            "ttl_sec": 5,
+            "frame_width": 1280,
+            "frame_height": 720,
+            "targets": [
+                {
+                    "track_id": "cam201-1738750245-007",
+                    "label": "person",
+                    "threat_level": "THREAT",
+                    "confidence": 0.92,
+                    "observed_at": "2026-02-05T10:30:00.000Z",
+                    "location": { "latitude": 38.1235, "longitude": 127.5680, "distance_m": 120.5 },
+                    "bbox": [150, 220, 60, 120],
+                    "thumbnail": "http://192.168.1.50:8080/tracking/frame_001.jpg"
+                }
+            ]
         }
         """;
         var dto = JsonConvert.DeserializeObject<Dto.Brokers.TrackingStatusBodyDto>(json);
         Assert.NotNull(dto);
         Assert.Equal(201, dto.CameraId);
         Assert.Equal("active", dto.Tracking);
+        Assert.Equal(5, dto.TtlSec);
+        Assert.Equal(1280, dto.FrameWidth);
+        Assert.Equal(720, dto.FrameHeight);
 
-        // target (DetectedObjectDto with thumbnail)
-        Assert.NotNull(dto.Target);
-        Assert.Equal("person", dto.Target.Label);
-        Assert.Equal(0.92, dto.Target.Confidence);
-        Assert.NotNull(dto.Target.Bbox);
-        Assert.Equal(4, dto.Target.Bbox.Count);
-        Assert.Equal("http://192.168.1.50:8080/tracking/frame_001.jpg", dto.Target.Thumbnail);
+        // targets[] (다중)
+        Assert.NotNull(dto.Targets);
+        Assert.Single(dto.Targets);
+        var t = dto.Targets[0];
+        Assert.Equal("cam201-1738750245-007", t.TrackId);
+        Assert.Equal("person", t.Label);
+        Assert.Equal("THREAT", t.ThreatLevel);
+        Assert.Equal(0.92, t.Confidence);
+        Assert.Equal("2026-02-05T10:30:00.000Z", t.ObservedAt);
+        Assert.NotNull(t.Location);
+        Assert.Equal(38.1235, t.Location.Latitude);
+        Assert.Equal(127.5680, t.Location.Longitude);
+        Assert.Equal(120.5, t.Location.DistanceM);
+        Assert.NotNull(t.Bbox);
+        Assert.Equal(4, t.Bbox.Count);
 
-        // target_location (TrackingTargetLocationDto)
-        Assert.NotNull(dto.TargetLocation);
-        Assert.Equal(38.1235, dto.TargetLocation.Latitude);
-        Assert.Equal(127.5680, dto.TargetLocation.Longitude);
-        Assert.Equal(120.5, dto.TargetLocation.DistanceM);
+        // enum 안전 파싱 (string → enum, 매니저 층 동작 검증)
+        Assert.Equal(EnumThreatLevel.THREAT, TrackingEnumExtensions.ParseThreatLevel(t.ThreatLevel));
+        Assert.Equal(EnumColorType.Red, TrackingEnumExtensions.ParseThreatLevel(t.ThreatLevel).ToColorType());
+        Assert.Equal(EnumTargetType.Person, TrackingEnumExtensions.ParseTargetType(t.Label));
     }
 
-    [Fact(DisplayName = "A26.1-2: TrackingStatusBodyDto — Idle Tracking (null target)")]
+    [Fact(DisplayName = "A26.1-2: should_have_empty_targets_when_idle_tracking")]
     [Trait("Category", "DTO")]
     public void TrackingStatusBodyDto_Deserialization_IdleTracking()
     {
-        var json = """{"camera_id": 201, "tracking": "idle", "target": null, "target_location": null}""";
+        var json = """{"camera_id": 201, "tracking": "idle", "targets": []}""";
         var dto = JsonConvert.DeserializeObject<Dto.Brokers.TrackingStatusBodyDto>(json);
         Assert.NotNull(dto);
         Assert.Equal(201, dto.CameraId);
         Assert.Equal("idle", dto.Tracking);
-        Assert.Null(dto.Target);
-        Assert.Null(dto.TargetLocation);
+        Assert.NotNull(dto.Targets);
+        Assert.Empty(dto.Targets);
+    }
+
+    [Fact(DisplayName = "A26.1-3: should_fallback_unknown_when_threat_or_label_unmapped")]
+    [Trait("Category", "DTO")]
+    public void TrackingEnum_SafeParse_ShouldFallbackToUnknown()
+    {
+        // 미매핑/누락 → Unknown (예외 없음)
+        Assert.Equal(EnumThreatLevel.Unknown, TrackingEnumExtensions.ParseThreatLevel(null));
+        Assert.Equal(EnumThreatLevel.Unknown, TrackingEnumExtensions.ParseThreatLevel("bogus"));
+        Assert.Equal(EnumColorType.Gray, TrackingEnumExtensions.ParseThreatLevel(null).ToColorType());
+
+        // 대소문자 무시 + 복합 label split[0] + car·vehicle 동일 매핑
+        Assert.Equal(EnumThreatLevel.CAUTION, TrackingEnumExtensions.ParseThreatLevel("caution"));
+        Assert.Equal(EnumTargetType.Vehicle, TrackingEnumExtensions.ParseTargetType("car"));
+        Assert.Equal(EnumTargetType.Vehicle, TrackingEnumExtensions.ParseTargetType("vehicle"));
+        Assert.Equal(EnumTargetType.Person, TrackingEnumExtensions.ParseTargetType("armed_person"));
+        Assert.Equal(EnumTargetType.Unknown, TrackingEnumExtensions.ParseTargetType("drone"));
     }
 }
 

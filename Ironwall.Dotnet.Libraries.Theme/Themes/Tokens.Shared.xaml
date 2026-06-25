@@ -8,13 +8,13 @@
         radius/density/typography alias. Light/Dark 양 테마 공통 → Theme.Current에 상시 병합.
     -->
 
-    <!-- ── Radius (Modern: 6 / 10 / 14) ── -->
-    <CornerRadius x:Key="RadiusSmall">6</CornerRadius>
-    <CornerRadius x:Key="RadiusMedium">10</CornerRadius>
-    <CornerRadius x:Key="RadiusLarge">14</CornerRadius>
+    <!-- ── Radius (Tactical Command: 3 / 5 / 8 — 샤프) ── -->
+    <CornerRadius x:Key="RadiusSmall">3</CornerRadius>
+    <CornerRadius x:Key="RadiusMedium">5</CornerRadius>
+    <CornerRadius x:Key="RadiusLarge">8</CornerRadius>
 
-    <!-- ── Density (고밀도 행 높이) ── -->
-    <sys:Double x:Key="RowHeight">40</sys:Double>
+    <!-- ── Density (Tactical 고밀도 행 높이) ── -->
+    <sys:Double x:Key="RowHeight">30</sys:Double>
 
     <!-- ── Typography (Noto Sans CJK KR 본문 / Consolas 좌표 readout) ── -->
     <!-- 레거시 Malgun Gothic/Arial 리터럴 ← 대체 대상 -->

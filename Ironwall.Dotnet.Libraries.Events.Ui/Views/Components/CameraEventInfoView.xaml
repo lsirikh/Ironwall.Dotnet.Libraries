@@ -9,6 +9,30 @@
 	d:DesignWidth="800"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+
+	<!-- Tactical KPI 카드 공용 스타일: 어두운 표면 + 1px 상태색 헤어라인 + 샤프 코너 -->
+	<UserControl.Resources>
+		<Style x:Key="TacticalKpiCard" TargetType="{x:Type md:Card}">
+			<Setter Property="Margin" Value="4" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="UniformCornerRadius" Value="4" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="md:ElevationAssist.Elevation" Value="Dp0" />
+		</Style>
+		<Style x:Key="TacticalKpiLabel" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+			<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+			<Setter Property="Margin" Value="0,0,0,2" />
+		</Style>
+		<Style x:Key="TacticalKpiValue" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="34" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+		</Style>
+	</UserControl.Resources>
+
 	<Grid Margin="10">
 		<ProgressBar
 			Width="50"
@@ -24,52 +48,58 @@
 				<ColumnDefinition Width="1*" />
 			</Grid.ColumnDefinitions>
 
-			<!-- KPI Card 1: 총 탐지 건수 -->
-			<md:Card Grid.Column="0" Margin="5" Padding="20"
-					 Background="{DynamicResource TintCriticalBrush}"
-					 UniformCornerRadius="8">
-				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-					<TextBlock Text="{Binding TotalCount}"
-							   FontSize="36" FontWeight="Bold"
-							   HorizontalAlignment="Center"
-							   Foreground="{DynamicResource MaterialDesignBody}" />
-					<TextBlock Text="총 탐지 건수"
-							   FontSize="14" Opacity="0.7"
-							   HorizontalAlignment="Center"
-							   Foreground="{DynamicResource MaterialDesignBody}" />
-				</StackPanel>
+			<!-- KPI Card 1: 총 탐지 건수 (위험=빨강 액센트) -->
+			<md:Card Grid.Column="0" Style="{StaticResource TacticalKpiCard}"
+					 BorderBrush="{DynamicResource StatusCriticalBrush}">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="4" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<Border Grid.Column="0" Background="{DynamicResource StatusCriticalBrush}" />
+					<StackPanel Grid.Column="1" Margin="14,10" VerticalAlignment="Center">
+						<TextBlock Style="{StaticResource TacticalKpiLabel}" Text="총 탐지 건수" />
+						<TextBlock Style="{StaticResource TacticalKpiValue}"
+								   Foreground="{DynamicResource StatusCriticalBrush}"
+								   Text="{Binding TotalCount}" />
+					</StackPanel>
+				</Grid>
 			</md:Card>
 
-			<!-- KPI Card 2: 일평균 -->
-			<md:Card Grid.Column="1" Margin="5" Padding="20"
-					 Background="{DynamicResource TintWarningBrush}"
-					 UniformCornerRadius="8">
-				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-					<TextBlock Text="{Binding DailyAverage, StringFormat={}{0:F1}}"
-							   FontSize="36" FontWeight="Bold"
-							   HorizontalAlignment="Center"
-							   Foreground="{DynamicResource MaterialDesignBody}" />
-					<TextBlock Text="일평균 탐지"
-							   FontSize="14" Opacity="0.7"
-							   HorizontalAlignment="Center"
-							   Foreground="{DynamicResource MaterialDesignBody}" />
-				</StackPanel>
+			<!-- KPI Card 2: 일평균 (경고=앰버 액센트) -->
+			<md:Card Grid.Column="1" Style="{StaticResource TacticalKpiCard}"
+					 BorderBrush="{DynamicResource StatusWarningBrush}">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="4" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<Border Grid.Column="0" Background="{DynamicResource StatusWarningBrush}" />
+					<StackPanel Grid.Column="1" Margin="14,10" VerticalAlignment="Center">
+						<TextBlock Style="{StaticResource TacticalKpiLabel}" Text="일평균 탐지" />
+						<TextBlock Style="{StaticResource TacticalKpiValue}"
+								   Foreground="{DynamicResource StatusWarningBrush}"
+								   Text="{Binding DailyAverage, StringFormat={}{0:F1}}" />
+					</StackPanel>
+				</Grid>
 			</md:Card>
 
-			<!-- KPI Card 3: 활성 카메라 수 -->
-			<md:Card Grid.Column="2" Margin="5" Padding="20"
-					 Background="{DynamicResource TintAccentBrush}"
-					 UniformCornerRadius="8">
-				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-					<TextBlock Text="{Binding ActiveCameraCount}"
-							   FontSize="36" FontWeight="Bold"
-							   HorizontalAlignment="Center"
-							   Foreground="{DynamicResource MaterialDesignBody}" />
-					<TextBlock Text="활성 카메라"
-							   FontSize="14" Opacity="0.7"
-							   HorizontalAlignment="Center"
-							   Foreground="{DynamicResource MaterialDesignBody}" />
-				</StackPanel>
+			<!-- KPI Card 3: 활성 카메라 수 (정보=시안 액센트) -->
+			<md:Card Grid.Column="2" Style="{StaticResource TacticalKpiCard}"
+					 BorderBrush="{DynamicResource StatusInfoBrush}">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="4" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<Border Grid.Column="0" Background="{DynamicResource StatusInfoBrush}" />
+					<StackPanel Grid.Column="1" Margin="14,10" VerticalAlignment="Center">
+						<TextBlock Style="{StaticResource TacticalKpiLabel}" Text="활성 카메라" />
+						<TextBlock Style="{StaticResource TacticalKpiValue}"
+								   Foreground="{DynamicResource StatusInfoBrush}"
+								   Text="{Binding ActiveCameraCount}" />
+					</StackPanel>
+				</Grid>
 			</md:Card>
 		</Grid>
 	</Grid>

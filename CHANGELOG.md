@@ -15,6 +15,10 @@
 ## [Unreleased]
 
 ### Added
+- **Tracking GIS 시각화 + 트레일 + TTL + 설정 (P1~P3) — Foundation 착수** ([PRD](docs/prds/Tracking_GIS_Visualization_Playback-prd.md) · [Plan](docs/plans/Tracking_GIS_Visualization_Playback-prd-plan.md))
+  - **계약 확정(V-CONTRACT-1)**: `Gop_Message_Broker_연동설계.md §8.3.7`(권위 SoT)로 TRACKING_STATUS 메시지 검증 — `targets[]`/`track_id`/`observed_at`/`threat_level`/`location` 전부 필수. 설계 보강 6건(복합키·lost/idle 제거·Unknown 클라폴백·소문자변환·ttl기본5·car·vehicle) PRD 반영.
+  - **P1 Foundation(빌드0·테스트 183/183)**: ① `EnumThreatLevel`(NORMAL/CAUTION/THREAT+Unknown 클라폴백)·`EnumTargetType`·`TrackingEnumExtensions`(안전파싱+ToColorType, 토큰스캔으로 `armed_person`→Person 견고화) 신설(`.Enums`) ② `IClock`/`SystemClock` 신설(`.Base`, 규칙 I-02) ③ **DTO 전면 교체**(`.Messages`): `TrackingStatusBodyDto` 단수 `target`→다중 `targets[]`+`ttl_sec`/`frame_w·h`, 신규 `TrackingTargetDto`. Phase26 단위테스트 재작성(역직렬화/idle/enum폴백).
+  - 롤백 태그 `before-tracking-gis`(@62dd557), worktree `v2.13.0`. 계약 인터페이스=Events.Ui 배치(비순환), Enum=`.Enums`·마커=`GMaps.Ui/GMapSymbols`(경로 정정).
 - **UI Modern Dark/Light 테마 디자인 시스템 — Phase 1 완료** ([PRD](docs/prds/UI_ModernTheme_DesignSystem-prd.md) · [Plan](docs/plans/UI_ModernTheme_DesignSystem-prd-plan.md))
   - 신규 leaf 어셈블리 `Ironwall.Dotnet.Libraries.Theme`(net8, MD/Colors 5.2.1 + MahApps 2.4.10, GMap/*.Ui 무참조). 토큰 딕셔너리 5종 — `Tokens.Light`(현재 출고 byte-identical, AD-6) / `Tokens.Dark`(Modern Dark) / `Tokens.Shared`(radius·density·font) / `Converters` / `Theme.Current`(스왑 컨테이너).
   - `IThemeService`/`ThemeService`: Add-new→Remove-old 토큰 dict 원자 스왑 + PaletteHelper(MD) + ThemeManager(MahApps) 듀얼 엔진 단일 Dispatcher 패스 + `ThemeChanged`(비-WPF 경로 재색칠) + R-17 중복차단 + 영속화 seam(`IThemeSettingsStore`). 토큰 팩토리/MergedDictionaries 주입형으로 헤드리스 테스트 가능.

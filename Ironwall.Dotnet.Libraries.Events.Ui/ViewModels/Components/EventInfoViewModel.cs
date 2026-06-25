@@ -62,6 +62,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             _themeService = themeService ?? TryResolveThemeService();
             if (_themeService != null)
                 _themeService.ThemeChanged += OnThemeChanged;
+            // 초기 테마색 반영(다크에서 열려도 레전드/툴팁 보이게)
+            LegendTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
+            TooltipTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
 
             _names = new[] { "DET", "MAL", "CON", "ACT" };
             RefreshActiveness();
@@ -80,7 +83,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try { _rebuildChart?.Invoke(); }
+            try { var c = ChartThemeProvider.TextColor(theme); LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() }; TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() }; _rebuildChart?.Invoke(); }
             catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
@@ -473,25 +476,45 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             set { _isActionEnable = value; ToggleVisibility(3, value); }
         }
 
-        public SolidColorPaint LegendTextPaint { get; set; } =
-        new SolidColorPaint
+        // 토글 시 차트가 다시 그리도록 알림 속성으로(재할당+Notify). 스칼라 .Color 변경만으론 LiveCharts 미갱신.
+        private SolidColorPaint _legendTextPaint = new SolidColorPaint
         {
             Color = ChartThemeProvider.TextColor(BaseTheme.Light),
             SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint LegendTextPaint
+        {
+            get => _legendTextPaint;
+            set { _legendTextPaint = value; NotifyOfPropertyChange(nameof(LegendTextPaint)); }
+        }
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
-        public SolidColorPaint TooltipTextPaint { get; set; } =
-        new SolidColorPaint
+        private SolidColorPaint _tooltipTextPaint = new SolidColorPaint
         {
             Color = ChartThemeProvider.TextColor(BaseTheme.Light),
             SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint TooltipTextPaint
+        {
+            get => _tooltipTextPaint;
+            set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
+        }
 
-        public ObservableCollection<ISeries> LSeries { get; private set; }
-        public ObservableCollection<ISeries> DSeries { get; private set; }
+        // 재할당이 차트에 반영되도록 알림 속성으로(토글 시 시리즈 교체→차트 갱신→레전드 재생성).
+        private ObservableCollection<ISeries> _lSeries = new();
+        public ObservableCollection<ISeries> LSeries
+        {
+            get => _lSeries;
+            private set { _lSeries = value; NotifyOfPropertyChange(nameof(LSeries)); }
+        }
+        private ObservableCollection<ISeries> _dSeries = new();
+        public ObservableCollection<ISeries> DSeries
+        {
+            get => _dSeries;
+            private set { _dSeries = value; NotifyOfPropertyChange(nameof(DSeries)); }
+        }
 
         public ObservableCollection<Axis> XAxes { get; } = [];
         public ObservableCollection<Axis> YAxes { get; } = [];

@@ -125,19 +125,20 @@ public sealed class ThemeService : IThemeService
         // 네임스페이스 Ironwall...Theme 와 MD Theme 클래스 충돌 → 정규화. SetBaseTheme(Theme, BaseTheme).
         var mdTheme = (MaterialDesignThemes.Wpf.Theme)paletteHelper.GetTheme();
         mdTheme.SetBaseTheme(theme);
+        // Tactical Command 팔레트(스토리보드): Dark=시안 #22B8D9+앰버, Light=딥시안 #0C6B89+앰버.
         if (theme == BaseTheme.Dark)
         {
-            mdTheme.SetPrimaryColor(System.Windows.Media.Color.FromRgb(0x4A, 0x90, 0xE2));   // storyboard Dark --primary
-            mdTheme.SetSecondaryColor(System.Windows.Media.Color.FromRgb(0x2B, 0xC4, 0xD4)); // storyboard Dark --accent
+            mdTheme.SetPrimaryColor(System.Windows.Media.Color.FromRgb(0x22, 0xB8, 0xD9));   // tactical Dark primary(cyan)
+            mdTheme.SetSecondaryColor(System.Windows.Media.Color.FromRgb(0xF0, 0xA3, 0x3C)); // tactical Dark accent(amber)
         }
         else
         {
-            mdTheme.SetPrimaryColor(System.Windows.Media.Color.FromRgb(0x2C, 0x5F, 0x9E));   // storyboard Light --primary
-            mdTheme.SetSecondaryColor(System.Windows.Media.Color.FromRgb(0x0E, 0x8C, 0x9B)); // storyboard Light --accent
+            mdTheme.SetPrimaryColor(System.Windows.Media.Color.FromRgb(0x0C, 0x6B, 0x89));   // tactical Light primary(deep cyan)
+            mdTheme.SetSecondaryColor(System.Windows.Media.Color.FromRgb(0xB2, 0x5A, 0x06)); // tactical Light accent(amber)
         }
         paletteHelper.SetTheme(mdTheme);
 
-        // (3) MahApps chrome
-        ThemeManager.Current.ChangeTheme(app, theme == BaseTheme.Dark ? "Dark.Blue" : "Light.Blue");
+        // (3) MahApps chrome — Tactical 시안 강조
+        ThemeManager.Current.ChangeTheme(app, theme == BaseTheme.Dark ? "Dark.Cyan" : "Light.Cyan");
     }
 }

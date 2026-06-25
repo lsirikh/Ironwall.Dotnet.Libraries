@@ -280,6 +280,15 @@ public interface IGMapDbService
     /// <summary>카메라의 Home 프리셋 지정(presetId만 IsHome=1, 카메라당 1개).</summary>
     Task<bool> SetHomePtzPresetAsync(int cameraId, int presetId, CancellationToken token = default);
 
+    /*────────────────────── CameraTrackPoints (추적 좌표 영속, 로컬 DB) ──────────*/
+
+    /// <summary>추적 좌표 일괄 저장(수신 batch). 반환=삽입 행수.</summary>
+    Task<int> InsertTrackPointsAsync(IEnumerable<ITrackPointModel> points, CancellationToken token = default);
+    /// <summary>시간범위 추적 좌표 조회(observed_at ASC). cameraId null=전체.</summary>
+    Task<List<ITrackPointModel>?> FetchTrackPointsAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken token = default);
+    /// <summary>보존정책 — 기준 시각 이전 좌표 삭제. 반환=삭제 행수.</summary>
+    Task<int> DeleteTrackPointsBeforeAsync(DateTime cutoffUtc, CancellationToken token = default);
+
     /*────────────────────── MapLayer (레이어 관리) ─────────────*/
 
     Task<List<IMapLayerModel>?> FetchMapLayersAsync(CancellationToken token = default);

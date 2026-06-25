@@ -375,9 +375,29 @@ internal class GMapDbService : TaskService, IGMapDbService
                 );";
 
             await _conn.ExecuteAsync(createCameraPtzPresetsSql);
+
+            // 추적 좌표 영속(로컬 자체 DB, 2026-06-25 결정) — NATS 수신분 기록 + Playback 시간범위 조회
+            const string createCameraTrackPointsSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraTrackPoints` (
+                    `Id`           INT AUTO_INCREMENT PRIMARY KEY,
+                    `CameraId`     INT NOT NULL,
+                    `TrackId`      VARCHAR(64) NOT NULL,
+                    `Label`        VARCHAR(32) NULL,
+                    `ThreatLevel`  VARCHAR(16) NULL,
+                    `Latitude`     DECIMAL(10,8) NOT NULL,
+                    `Longitude`    DECIMAL(11,8) NOT NULL,
+                    `DistanceM`    DOUBLE NULL,
+                    `SpeedMps`     DOUBLE NULL,
+                    `ObservedAt`   DATETIME(3) NOT NULL,
+                    `CreatedAt`    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX `ix_track_camera_obs` (`CameraId`, `ObservedAt`),
+                    INDEX `ix_track_track_obs` (`TrackId`, `ObservedAt`)
+                );";
+            await _conn.ExecuteAsync(createCameraTrackPointsSql);
+
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
-                { Title = nameof(BuildSchemeAsync), Message = "CameraPtzPresets 테이블 생성…" });
+                { Title = nameof(BuildSchemeAsync), Message = "CameraPtzPresets/CameraTrackPoints 테이블 생성…" });
 
             // MBTiles 컬럼 마이그레이션 (기존 DB에 컬럼이 없으면 추가)
             await MigrateCustomMapsTableAsync();
@@ -1528,6 +1548,96 @@ internal class GMapDbService : TaskService, IGMapDbService
             throw;
         }
     }
+
+    /*────────────────────── CameraTrackPoints (추적 좌표 영속, 로컬 DB) ──────────*/
+
+    /// <summary>추적 좌표 일괄 저장(수신 batch). 반환=삽입 행수.</summary>
+    public async Task<int> InsertTrackPointsAsync(IEnumerable<ITrackPointModel> points, CancellationToken token = default)
+    {
+        try
+        {
+            var rows = points?.ToList() ?? new List<ITrackPointModel>();
+            if (rows.Count == 0) return 0;
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO CameraTrackPoints (CameraId, TrackId, Label, ThreatLevel, Latitude, Longitude, DistanceM, SpeedMps, ObservedAt)
+                VALUES (@CameraId, @TrackId, @Label, @ThreatLevel, @Latitude, @Longitude, @DistanceM, @SpeedMps, @ObservedAt);";
+            return await conn.ExecuteAsync(sql, rows.Select(p => new
+            {
+                p.CameraId, p.TrackId, p.Label, p.ThreatLevel, p.Latitude, p.Longitude, p.DistanceM, p.SpeedMps, p.ObservedAt
+            }));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"추적 좌표 저장 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>시간범위 추적 좌표 조회(observed_at ASC). cameraId null이면 전체 카메라.</summary>
+    public async Task<List<ITrackPointModel>?> FetchTrackPointsAsync(int? cameraId, DateTime fromUtc, DateTime toUtc, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                SELECT Id, CameraId, TrackId, Label, ThreatLevel, Latitude, Longitude, DistanceM, SpeedMps, ObservedAt
+                FROM CameraTrackPoints
+                WHERE ObservedAt >= @From AND ObservedAt <= @To
+                  AND (@CameraId IS NULL OR CameraId = @CameraId)
+                ORDER BY ObservedAt ASC;";
+            var rows = await conn.QueryAsync<TrackPointSQL>(sql, new { CameraId = cameraId, From = fromUtc, To = toUtc });
+            return rows.Select(MapTrackPoint).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"추적 좌표 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>보존정책 — 기준 시각 이전 좌표 삭제. 반환=삭제 행수.</summary>
+    public async Task<int> DeleteTrackPointsBeforeAsync(DateTime cutoffUtc, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            return await conn.ExecuteAsync("DELETE FROM CameraTrackPoints WHERE ObservedAt < @Cutoff;", new { Cutoff = cutoffUtc });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"추적 좌표 보존삭제 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    private sealed class TrackPointSQL
+    {
+        public int Id { get; set; }
+        public int CameraId { get; set; }
+        public string TrackId { get; set; } = string.Empty;
+        public string? Label { get; set; }
+        public string? ThreatLevel { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double? DistanceM { get; set; }
+        public double? SpeedMps { get; set; }
+        public DateTime ObservedAt { get; set; }
+    }
+
+    private static ITrackPointModel MapTrackPoint(TrackPointSQL r) => new TrackPointModel
+    {
+        Id = r.Id,
+        CameraId = r.CameraId,
+        TrackId = r.TrackId,
+        Label = r.Label,
+        ThreatLevel = r.ThreatLevel,
+        Latitude = r.Latitude,
+        Longitude = r.Longitude,
+        DistanceM = r.DistanceM,
+        SpeedMps = r.SpeedMps,
+        ObservedAt = r.ObservedAt,
+    };
 
     /*────────────────────── CameraPtzPresets (PTZ 프리셋, 로컬 DB) ──────────────*/
 

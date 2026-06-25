@@ -1,13 +1,14 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services.Tracking;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
-   Purpose      : NATS TRACKING_STATUS 메시지 수신 — 현재 로그-only stub
+   Purpose      : NATS TRACKING_STATUS 수신 → GIS 오버레이 매니저 반영 (FR-15)
    Created By   : GHLee
    Created On   : 2026-06-19
    Department   : SW Team
@@ -15,19 +16,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
    Email        : lsirikh@naver.com
 ****************************************************************************/
 /// <summary>
-/// AiAnalysis가 발행하는 TRACKING_STATUS 메시지를 수신해 <b>우선 로그만 기록</b>하는 stub.
+/// AiAnalysis가 발행하는 TRACKING_STATUS(Gop_Message_Broker §8.3.7)를 수신해 추적 오버레이 마커로 반영한다.
 /// <para>Subject: sensorway.{부대ID}.gis.tracking-status</para>
-/// <para>targets[] 오버레이 마커(upsert/ttl_sec 소멸/observed_at 역전방지/threat_level 시각화) 처리는 FR-15 후속.</para>
+/// <para>tracking=active → targets[] 일괄 upsert / tracking=lost·idle → 해당 camera_id 마커 제거(페이드).</para>
+/// <para><see cref="ITrackingOverlayManager"/>는 <b>optional</b>(GMapUiModule 미로드 시 null → 로그-only graceful).</para>
 /// </summary>
 public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
 {
     #region - Ctors -
     public TrackingStatusNatsSyncService(
         ILogService? log,
-        INatsService natsService)
+        INatsService natsService,
+        ITrackingOverlayManager? overlay = null,
+        ITrackPointWriter? writer = null)
     {
         _log = log;
         _natsService = natsService;
+        _overlay = overlay;
+        _writer = writer;
     }
     #endregion
 
@@ -35,7 +41,8 @@ public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
     public Task StartService(CancellationToken token = default)
     {
         _natsService.NatsSubscribeEventAsync += OnNatsTrackingStatusAsync;
-        _log?.Info($"{nameof(TrackingStatusNatsSyncService)} started — TRACKING_STATUS 구독 등록(로그-only)");
+        _log?.Info($"{nameof(TrackingStatusNatsSyncService)} started — TRACKING_STATUS 구독 등록"
+                   + (_overlay is null ? "(오버레이 미연결: 로그-only)" : ""));
         return Task.CompletedTask;
     }
 
@@ -50,36 +57,60 @@ public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
     #endregion
 
     #region - Processes -
-    private Task OnNatsTrackingStatusAsync(MessageArgsModel e)
+    private async Task OnNatsTrackingStatusAsync(MessageArgsModel e)
     {
         try
         {
             // Subject 필터: gis.tracking-status subject만 처리
-            if (e.Subject?.Contains("gis.tracking-status") != true) return Task.CompletedTask;
-            if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
+            if (e.Subject?.Contains("gis.tracking-status") != true) return;
+            if (string.IsNullOrWhiteSpace(e.Data)) return;
 
             var jObj = JObject.Parse(e.Data);
-            if (jObj.Value<string>("cmd") != "TRACKING_STATUS") return Task.CompletedTask;
+            if (jObj.Value<string>("cmd") != "TRACKING_STATUS") return;
 
-            var body = jObj["body"];
-            var cameraId = body?.Value<int?>("camera_id");
-            var tracking = body?.Value<string>("tracking");
-            var targetCount = (body?["targets"] as JArray)?.Count ?? 0;
+            var body = jObj["body"]?.ToObject<TrackingStatusBodyDto>();
+            if (body is null) return;
 
-            // ── 로그-only stub ── (오버레이 마커 처리는 FR-15 후속)
-            _log?.Info($"TRACKING_STATUS 수신(로그-only): cameraId={cameraId}, tracking={tracking}, targets={targetCount} | body={body?.ToString(Formatting.None)}");
-            // TODO(FR-15): TrackingStatusBodyDto(다중 targets[]) 역직렬화 → GIS 오버레이 마커 upsert/ttl 소멸/threat 시각화
+            // 미연결(둘 다 null) 시 로그-only graceful
+            if (_overlay is null && _writer is null)
+            {
+                _log?.Info($"TRACKING_STATUS 수신(미연결): camera={body.CameraId}, tracking={body.Tracking}, targets={body.Targets?.Count ?? 0}");
+                return;
+            }
+
+            // tracking 소문자 분기(active/lost/idle) — 대소문자 무시
+            switch (body.Tracking?.Trim().ToLowerInvariant())
+            {
+                case "active":
+                    if (body.Targets is { Count: > 0 })
+                    {
+                        // 로컬 DB 영속(P4, 비-UI) + 오버레이 렌더 — 각자 독립 graceful
+                        if (_writer is not null) await _writer.WriteBatchAsync(body.CameraId, body.Targets);
+                        if (_overlay is not null) await _overlay.UpsertBatchAsync(body.CameraId, body.Targets, body.TtlSec);
+                    }
+                    break;
+
+                case "lost":
+                case "idle":
+                    if (_overlay is not null) await _overlay.ExpireCameraAsync(body.CameraId);
+                    break;
+
+                default:
+                    _log?.Warning($"TRACKING_STATUS 알 수 없는 tracking 값: '{body.Tracking}' (camera={body.CameraId})");
+                    break;
+            }
         }
         catch (Exception ex)
         {
             _log?.Error($"OnNatsTrackingStatusAsync 오류: {ex.Message}");
         }
-        return Task.CompletedTask;
     }
     #endregion
 
     #region - Attributes -
     private readonly ILogService? _log;
     private readonly INatsService _natsService;
+    private readonly ITrackingOverlayManager? _overlay;
+    private readonly ITrackPointWriter? _writer;
     #endregion
 }

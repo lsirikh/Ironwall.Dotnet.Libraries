@@ -12,7 +12,7 @@
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
-	d:Background="WhiteSmoke"
+	d:Background="{DynamicResource SurfaceBrush}"
 	d:Height="600"
 	d:Width="900"
 	FontFamily="{DynamicResource MaterialDesignFont}"
@@ -283,8 +283,9 @@
 		<Border
 			Grid.Row="4"
 			Padding="10,8"
-			Background="#F5F5F5"
-			BorderBrush="#E0E0E0"
+			Background="{DynamicResource SurfaceAltBrush}"
+			TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
+			BorderBrush="{DynamicResource BorderBrush}"
 			BorderThickness="1"
 			CornerRadius="4">
 			<StackPanel Orientation="Horizontal">
@@ -298,7 +299,7 @@
 					VerticalAlignment="Center"
 					FontSize="14"
 					FontWeight="Bold"
-					Foreground="#1976D2"
+					Foreground="{DynamicResource PrimaryBrush}"
 					Text="{Binding SelectedItemCount}" />
 				<TextBlock
 					Margin="3,0,0,0"
@@ -317,7 +318,7 @@
 					VerticalAlignment="Center"
 					FontSize="14"
 					FontWeight="Bold"
-					Foreground="#388E3C"
+					Foreground="{DynamicResource StatusNormalBrush}"
 					Text="{Binding ViewModelProvider.Count}" />
 				<TextBlock
 					Margin="3,0,0,0"

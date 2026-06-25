@@ -40,6 +40,10 @@ public class DeviceDetailUrlService : IDeviceDetailUrlService
             ["Enclosure"]     = ("svms-device-enclosure",  "ENCLOSURE"),
         };
 
+    // SVMS 웹서버 스킴. https = mkcert 사내 root CA 신뢰 시 Chrome 자물쇠 정상.
+    // http로 되돌리려면 이 값만 변경. (런타임 http/https 토글이 필요하면 IMainControlWebSetupModel에 스킴 설정 키 추가 — 후속)
+    private const string WebScheme = "https";
+
     private readonly IMainControlWebSetupModel _setup;
 
     public DeviceDetailUrlService(IMainControlWebSetupModel setup)
@@ -61,7 +65,7 @@ public class DeviceDetailUrlService : IDeviceDetailUrlService
             ? $"{ip}:{_setup.PortWebServer}"
             : ip;
 
-        var baseUrl = $"http://{host}/ssw-svms?node={pair.Node}&device={pair.Device}";
+        var baseUrl = $"{WebScheme}://{host}/ssw-svms?node={pair.Node}&device={pair.Device}";
         return string.IsNullOrEmpty(panel)
             ? baseUrl
             : $"{baseUrl}&panel={panel}&panelId={deviceId}";
