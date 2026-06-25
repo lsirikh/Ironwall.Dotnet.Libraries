@@ -1,5 +1,6 @@
 using Autofac;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Modules;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Services;
@@ -73,5 +74,18 @@ public class LiveGopServerTests
         var accounts = await ((IUserDirectoryGateway)gateway).GetAllAccountsAsync();
         Assert.NotNull(accounts);
         _out.WriteLine($"[목록 OK] {accounts!.Count} accounts: {string.Join(", ", accounts.ConvertAll(a => a.Username))}");
+
+        // 4) refresh — 보관된 refresh_token으로 갱신 (A-3: 토큰만 반환)
+        var api = c.Resolve<IAccountApiService>();
+        var store = c.Resolve<ITokenStorageService>();
+        var oldAccess = store.AccessToken;
+        var refreshed = await api.RefreshAsync(store.RefreshToken!);
+        Assert.True(refreshed.Success, $"refresh 실패: {refreshed.Error?.Code} {refreshed.Message}");
+        Assert.False(string.IsNullOrEmpty(refreshed.Data!.AccessToken));
+        _out.WriteLine($"[refresh OK] 새 access 발급, 이전과 다름={refreshed.Data.AccessToken != oldAccess}");
+
+        // 5) logout — best-effort (access_token 서버 블랙리스트 없음, §2.3.3)
+        var logout = await api.LogoutAsync();
+        _out.WriteLine($"[logout] success={logout.Success}, code={logout.Error?.Code}");
     }
 }
