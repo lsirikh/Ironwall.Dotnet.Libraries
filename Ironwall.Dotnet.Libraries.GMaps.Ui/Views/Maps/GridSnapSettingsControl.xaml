@@ -5,7 +5,7 @@
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
 
 	<Border
-		Background="White"
+		Background="{DynamicResource SurfaceBrush}"
 		BorderBrush="{DynamicResource PrimaryHueMidBrush}"
 		BorderThickness="1.5"
 		CornerRadius="6"
@@ -39,7 +39,7 @@
 				Text="{Binding GridSizePx, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat=F0}" />
 			<TextBlock
 				VerticalAlignment="Center"
-				Foreground="#888"
+				Foreground="{DynamicResource TextMutedBrush}"
 				Text="px" />
 		</StackPanel>
 	</Border>
