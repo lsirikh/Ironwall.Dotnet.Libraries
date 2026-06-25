@@ -101,12 +101,14 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public CameraViewModel StreamVm { get; }
 
     public double CanvasLeft { get => _canvasLeft; set { _canvasLeft = value; NotifyOfPropertyChange(nameof(CanvasLeft)); RecomputeLine(); } }
-    public double CanvasTop { get => _canvasTop; set { _canvasTop = value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
+    public double CanvasTop { get => _canvasTop; set { _canvasTop = value < MinCanvasTop ? MinCanvasTop : value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
     public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); RecomputeLine(); } }
     public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); NotifyOfPropertyChange(nameof(ControlHeight)); RecomputeLine(); } }
 
     /// <summary>컨트롤 패널(아코디언) 높이 — 펼치면 팝업이 이만큼 아래로 커져 영상이 가려지지 않음.</summary>
     public const double PanelHeight = 188;
+    /// <summary>팝업 상단 최소 Y(PropertyPanelCanvas 기준, 0=맵 영역 상단). 음수면 위로 넘쳐 상단 툴바/MahApps 윈도우 타이틀바(최대·최소·닫기)를 덮으므로 클램프. geo 추종은 AnchorGeo가 별도 보존하므로 표시 위치만 제한.</summary>
+    public const double MinCanvasTop = 0;
     /// <summary>컨트롤 실제 높이 = 영상 높이(PopupHeight) + 패널(펼침 시). MapView Height에 바인딩. (FR-UI-01)</summary>
     public double ControlHeight => _popupHeight + (_isPanelExpanded ? PanelHeight : 0);
 
@@ -174,14 +176,14 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public double PanTiltSpeed
     {
         get => _panTiltSpeed;
-        set { var v = Math.Clamp(value, 0.1, 1.0); if (Math.Abs(_panTiltSpeed - v) < 1e-6) return; _panTiltSpeed = v; NotifyOfPropertyChange(nameof(PanTiltSpeed)); }
+        set { var v = Math.Round(Math.Clamp(value, 0.1, 1.0), 1, MidpointRounding.AwayFromZero); if (Math.Abs(_panTiltSpeed - v) < 1e-6) return; _panTiltSpeed = v; NotifyOfPropertyChange(nameof(PanTiltSpeed)); }
     }
 
     /// <summary>휠 줌 속도(ContinuousMove 줌 속도 크기 [0.1,1.0]). MapViewModel이 ContinuousMove(zoomVel)에 전달. 슬라이더+직접입력.</summary>
     public double ZoomSpeed
     {
         get => _zoomSpeed;
-        set { var v = Math.Clamp(value, 0.1, 1.0); if (Math.Abs(_zoomSpeed - v) < 1e-6) return; _zoomSpeed = v; NotifyOfPropertyChange(nameof(ZoomSpeed)); }
+        set { var v = Math.Round(Math.Clamp(value, 0.1, 1.0), 1, MidpointRounding.AwayFromZero); if (Math.Abs(_zoomSpeed - v) < 1e-6) return; _zoomSpeed = v; NotifyOfPropertyChange(nameof(ZoomSpeed)); }
     }
 
     /// <summary>하단 [PTZ][프리셋][옵션] 탭 패널 펼침 여부(우버튼 짧은클릭 토글). (FR-UI-01)</summary>
