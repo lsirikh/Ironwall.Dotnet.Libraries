@@ -34,4 +34,7 @@ public interface ITrackingSetupModel
 
     /// <summary>observed_at gap이 이 초를 넘으면 트레일 세그먼트 분절.</summary>
     int GapThresholdSec { get; set; }
+
+    /// <summary>Playback 1회 조회 최대 시간(시간). 초과 범위는 제한(과다 로드·OOM 방지).</summary>
+    int MaxPlaybackHours { get; set; }
 }

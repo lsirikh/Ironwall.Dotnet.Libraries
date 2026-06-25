@@ -35,6 +35,9 @@ public class TrackingSetupModel : ITrackingSetupModel
     /// <summary>observed_at gap이 이 초를 넘으면 트레일 세그먼트 분절. 기본 10.</summary>
     public int GapThresholdSec { get; set; } = 10;
 
+    /// <summary>Playback 1회 조회 최대 시간(시간). 기본 6.</summary>
+    public int MaxPlaybackHours { get; set; } = 6;
+
     public TrackingSetupModel() { }
 
     /// <summary>복사 생성자.</summary>
@@ -47,6 +50,7 @@ public class TrackingSetupModel : ITrackingSetupModel
         LostTtlSec = model.LostTtlSec;
         MinVisibleZoom = model.MinVisibleZoom;
         MaxSpeedMs = model.MaxSpeedMs;
+        MaxPlaybackHours = model.MaxPlaybackHours;
         GapThresholdSec = model.GapThresholdSec;
     }
 }
