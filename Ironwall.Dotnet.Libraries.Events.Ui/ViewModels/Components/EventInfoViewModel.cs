@@ -502,8 +502,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
         }
 
-        public ObservableCollection<ISeries> LSeries { get; private set; }
-        public ObservableCollection<ISeries> DSeries { get; private set; }
+        // 재할당이 차트에 반영되도록 알림 속성으로(토글 시 시리즈 교체→차트 갱신→레전드 재생성).
+        private ObservableCollection<ISeries> _lSeries = new();
+        public ObservableCollection<ISeries> LSeries
+        {
+            get => _lSeries;
+            private set { _lSeries = value; NotifyOfPropertyChange(nameof(LSeries)); }
+        }
+        private ObservableCollection<ISeries> _dSeries = new();
+        public ObservableCollection<ISeries> DSeries
+        {
+            get => _dSeries;
+            private set { _dSeries = value; NotifyOfPropertyChange(nameof(DSeries)); }
+        }
 
         public ObservableCollection<Axis> XAxes { get; } = [];
         public ObservableCollection<Axis> YAxes { get; } = [];
