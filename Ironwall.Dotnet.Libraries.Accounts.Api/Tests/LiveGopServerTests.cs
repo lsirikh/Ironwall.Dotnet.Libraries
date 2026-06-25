@@ -76,8 +76,13 @@ public class LiveGopServerTests
         Assert.NotNull(accounts);
         _out.WriteLine($"[목록 OK] {accounts!.Count} accounts: {string.Join(", ", accounts.ConvertAll(a => a.Username))}");
 
-        // 4) refresh — 보관된 refresh_token으로 갱신 (A-3: 토큰만 반환)
+        // 3.5) 감사 로그(read-only) — audit-logs 500 수정 후 .NET 경로 실검증
         var api = c.Resolve<IAccountApiService>();
+        var audits = await api.GetAuditLogsAsync(1, 5);
+        Assert.True(audits.Success, $"audit 조회 실패: {audits.Error?.Code} {audits.Message}");
+        _out.WriteLine($"[감사 OK] {audits.Data!.Count}건, 첫 action={(audits.Data.Count > 0 ? audits.Data[0].ActionType : "-")}");
+
+        // 4) refresh — 보관된 refresh_token으로 갱신 (A-3: 토큰만 반환)
         var store = c.Resolve<ITokenStorageService>();
         var oldAccess = store.AccessToken;
         var refreshed = await api.RefreshAsync(store.RefreshToken!);

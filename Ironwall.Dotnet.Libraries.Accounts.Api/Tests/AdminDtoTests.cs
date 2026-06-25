@@ -56,4 +56,29 @@ public class AdminDtoTests
         Assert.True(s.IsActive);
         Assert.Null(s.LoggedOutAt);
     }
+
+    [Fact]
+    public void should_deserialize_auditlog_list_and_tolerate_nonenum_values()
+    {
+        // GET /api/audit-logs 실서버 발췌 + 비-enum 값(과거 잔재 형태)도 str 로 수용 검증(클라 방어)
+        const string json = @"{""success"":true,""data"":[
+            {""id"":43,""action_type"":""GROUP_CREATED"",""action_status"":""SUCCESS"",""resource_type"":""USER_GROUP"",
+             ""resource_id"":9,""resource_name"":""TG_v49"",""actor_id"":1,""actor_login_id"":""admin"",""actor_role"":""ADMIN"",
+             ""changes"":null,""description"":""신규 그룹 생성"",""created_at"":""2026-06-19T17:08:42+09:00""},
+            {""id"":26,""action_type"":""TEST_INS"",""action_status"":""SUCCESS"",""resource_type"":""TEST"",
+             ""actor_login_id"":""admin"",""created_at"":""2026-06-22T16:08:14+09:00""}
+        ],""pagination"":{""page"":1,""limit"":20,""total"":38,""total_pages"":2}}";
+
+        var res = ApiMessageHelper.FromJsonListResponse<AuditLogDto>(json);
+
+        Assert.NotNull(res);
+        Assert.True(res!.Success);
+        Assert.Equal(2, res.Data!.Count);
+        Assert.Equal("GROUP_CREATED", res.Data[0].ActionType);
+        Assert.Equal("USER_GROUP", res.Data[0].ResourceType);
+        Assert.Equal("admin", res.Data[0].ActorLoginId);
+        // 비-enum 값(서버 append-only 잔재)도 str 로 그대로 수용 — 클라가 깨지지 않음
+        Assert.Equal("TEST_INS", res.Data[1].ActionType);
+        Assert.Equal("TEST", res.Data[1].ResourceType);
+    }
 }

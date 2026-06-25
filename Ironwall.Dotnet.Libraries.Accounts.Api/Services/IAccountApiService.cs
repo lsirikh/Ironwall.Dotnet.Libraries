@@ -47,4 +47,6 @@ public interface IAccountApiService
     Task<ApiListResponse<UserGroupDto>> GetUserGroupsAsync(CancellationToken ct = default);
     /// <summary>GET /api/user-sessions — 세션 목록(ADMIN).</summary>
     Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default);
+    /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit). action_type/resource_type=str(tolerant).</summary>
+    Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default);
 }

@@ -187,4 +187,14 @@ public class AccountApiService : IAccountApiService
         }
         catch (Exception ex) { return ApiListResponse<UserSessionDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
+
+    public async Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.GetRequestAsync($"audit-logs?page={page}&limit={limit}").ConfigureAwait(false);
+            return await res.ToApiListResponseAsync<AuditLogDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiListResponse<AuditLogDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
 }
