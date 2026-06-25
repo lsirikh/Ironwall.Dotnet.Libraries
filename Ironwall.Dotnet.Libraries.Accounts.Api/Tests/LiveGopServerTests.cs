@@ -60,9 +60,10 @@ public class LiveGopServerTests
         var gateway = c.Resolve<IAuthGateway>();
 
         // 1) 로그인 → 서버 인증 + 토큰 보관(R1)
-        var auth = await gateway.AuthenticateAsync(LoginId!, Password!);
-        Assert.NotNull(auth);
-        Assert.False(string.IsNullOrEmpty(auth!.Token));
+        var outcome = await gateway.AuthenticateAsync(LoginId!, Password!);
+        Assert.True(outcome.Success, $"로그인 실패: {outcome.ErrorCode} {outcome.Message}");
+        var auth = outcome.Result!;
+        Assert.False(string.IsNullOrEmpty(auth.Token));
         _out.WriteLine($"[로그인 OK] role={auth.Role}, perms={auth.Permissions.Count}, account={auth.Account.Username}");
 
         // 2) 보관된 토큰으로 본인 프로필 조회 → BearerAuthHandler 자동 첨부 검증

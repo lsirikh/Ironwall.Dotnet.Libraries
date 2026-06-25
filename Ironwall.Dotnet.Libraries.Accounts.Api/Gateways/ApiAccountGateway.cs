@@ -29,14 +29,14 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
 
     // ───────────────────────── IAuthGateway ─────────────────────────
 
-    /// <summary>POST /auth/login → 토큰 보관(R1) + AuthResult. 실패 시 null(현 계약).</summary>
-    public async Task<AuthResult?> AuthenticateAsync(string username, string password, CancellationToken ct = default)
+    /// <summary>POST /auth/login → 토큰 보관(R1) + AuthOutcome. 실패 시 서버 Error.Code/Message/LockReason 전달(G1).</summary>
+    public async Task<AuthOutcome> AuthenticateAsync(string username, string password, CancellationToken ct = default)
     {
         var res = await _api.LoginAsync(username, password, ct).ConfigureAwait(false);
         if (!res.Success || res.Data?.User is null || string.IsNullOrEmpty(res.Data.AccessToken))
         {
             _log?.Warning($"[ApiAccountGateway] 로그인 실패: {res.Error?.Code ?? "UNKNOWN"}");
-            return null;
+            return AuthOutcome.Fail(res.Error?.Code ?? "UNAUTHORIZED", res.Error?.Message, res.Data?.User?.LockReason);
         }
 
         var data = res.Data;
@@ -49,7 +49,7 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         var permissions = PermissionsFlattener.Flatten(user.Permissions);
         var expiresAt = _tokenStore.AccessExpiresAtUtc ?? DateTime.UtcNow.AddHours(24); // exp 미상 시 기본 24h(§2.3.1)
 
-        return new AuthResult(account, data.AccessToken, expiresAt, user.Role ?? "GUEST", permissions);
+        return AuthOutcome.Ok(new AuthResult(account, data.AccessToken, expiresAt, user.Role ?? "GUEST", permissions));
     }
 
     /// <summary>서버엔 로그인 이력 조회 엔드포인트 없음(B-5, v4.10 BLOCKED) — '아이디 저장'은 로컬 prefs(후속). 현재 null.</summary>
@@ -59,6 +59,14 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     /// <summary>서버가 로그인 시 자동 기록(last_login_at). 클라 no-op — IsIdSaved 로컬 보존은 후속(G3).</summary>
     public Task RecordLoginAsync(string username, bool isUsernameSaved, CancellationToken ct = default)
         => Task.CompletedTask;
+
+    /// <summary>서버 logout best-effort + 토큰 폐기. access_token 서버 블랙리스트 없음(§2.3.3)이라 로컬 Clear 필수(G2).</summary>
+    public async Task LogoutAsync(CancellationToken ct = default)
+    {
+        try { await _api.LogoutAsync(ct).ConfigureAwait(false); }
+        catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] logout API 실패 — 로컬 폐기 진행: {ex.Message}"); }
+        finally { _tokenStore.Clear(); }
+    }
 
     // ──────────────── IUserDirectoryGateway (FR-19) ────────────────
 

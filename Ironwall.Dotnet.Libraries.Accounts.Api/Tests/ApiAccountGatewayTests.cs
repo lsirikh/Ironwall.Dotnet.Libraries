@@ -20,10 +20,11 @@ public class ApiAccountGatewayTests
         var store = new TokenStorageService();
         var gw = new ApiAccountGateway(new StubAuthApi(loginOk: true), store);
 
-        var result = await gw.AuthenticateAsync("admin", "pw");
+        var outcome = await gw.AuthenticateAsync("admin", "pw");
 
-        Assert.NotNull(result);
-        Assert.Equal("acc", result!.Token);                 // 서버 access_token
+        Assert.True(outcome.Success);
+        var result = outcome.Result!;
+        Assert.Equal("acc", result.Token);                  // 서버 access_token
         Assert.Equal("ADMIN", result.Role);                 // 서버 role
         Assert.Contains("events:r", result.Permissions);    // flat 권한 평탄화
         Assert.Contains("events:w", result.Permissions);
@@ -42,9 +43,10 @@ public class ApiAccountGatewayTests
         var store = new TokenStorageService();
         var gw = new ApiAccountGateway(new StubAuthApi(loginOk: false), store);
 
-        var result = await gw.AuthenticateAsync("admin", "bad");
+        var outcome = await gw.AuthenticateAsync("admin", "bad");
 
-        Assert.Null(result);
+        Assert.False(outcome.Success);
+        Assert.Equal("UNAUTHORIZED", outcome.ErrorCode);
         Assert.False(store.IsAuthenticated);
     }
 

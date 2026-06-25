@@ -28,16 +28,17 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     #endregion
 
     #region - IAuthGateway -
-    public async Task<AuthResult?> AuthenticateAsync(string username, string password, CancellationToken ct = default)
+    public async Task<AuthOutcome> AuthenticateAsync(string username, string password, CancellationToken ct = default)
     {
         // FetchAccountAsync(user,pass) 가 내부에서 PasswordHelper.VerifyPassword 로 해시 검증
         var acc = await _db.FetchAccountAsync(username, password, ct).ConfigureAwait(false);
-        if (acc is null) return null;                       // 인증 실패(아이디/비번 불일치)
+        if (acc is null)
+            return AuthOutcome.Fail("INVALID_CREDENTIALS", "아이디 또는 비밀번호가 일치하지 않습니다.");
 
         _token.Generate();                                  // 세션 토큰 발급(Db: 로컬 생성)
         // role = Level (AccountModel에 별도 role 컬럼 없음), permissions = 빈 배열(Api가 채울 자리)
-        return new AuthResult(acc, _token.Token ?? string.Empty, _token.Expire,
-                              acc.Level.ToString(), Array.Empty<string>());
+        return AuthOutcome.Ok(new AuthResult(acc, _token.Token ?? string.Empty, _token.Expire,
+                              acc.Level.ToString(), Array.Empty<string>()));
     }
 
     public Task<ILoginModel?> GetLatestLoginAsync(CancellationToken ct = default)
@@ -46,6 +47,9 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     public async Task RecordLoginAsync(string username, bool isUsernameSaved, CancellationToken ct = default)
         => await _db.InsertLoginAsync(new LoginModel { Username = username, IsIdSaved = isUsernameSaved }, ct)
                     .ConfigureAwait(false);
+
+    /// <summary>Direct 모드 — 서버 세션 없음. no-op(로컬 상태는 LoginViewModel.Logout 이 정리).</summary>
+    public Task LogoutAsync(CancellationToken ct = default) => Task.CompletedTask;
     #endregion
 
     #region - IUserDirectoryGateway -

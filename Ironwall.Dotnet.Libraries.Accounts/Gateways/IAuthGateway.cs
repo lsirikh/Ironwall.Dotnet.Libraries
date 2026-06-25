@@ -9,12 +9,15 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Gateways;
 ****************************************************************************/
 public interface IAuthGateway
 {
-    /// <summary>아이디/비밀번호로 인증. 실패 시 null.</summary>
-    Task<AuthResult?> AuthenticateAsync(string username, string password, CancellationToken ct = default);
+    /// <summary>아이디/비밀번호로 인증. 성공/실패(에러코드·사유)를 <see cref="AuthOutcome"/>로 반환(GOP-00 G1).</summary>
+    Task<AuthOutcome> AuthenticateAsync(string username, string password, CancellationToken ct = default);
 
     /// <summary>가장 최근 로그인 기록(저장된 아이디 복원용).</summary>
     Task<ILoginModel?> GetLatestLoginAsync(CancellationToken ct = default);
 
     /// <summary>로그인 성공 로그 기록.</summary>
     Task RecordLoginAsync(string username, bool isUsernameSaved, CancellationToken ct = default);
+
+    /// <summary>로그아웃. Direct=no-op / Api(GOP)=서버 logout best-effort + 토큰 폐기(GOP-00 G2).</summary>
+    Task LogoutAsync(CancellationToken ct = default);
 }

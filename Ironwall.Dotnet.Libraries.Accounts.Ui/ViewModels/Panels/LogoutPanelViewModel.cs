@@ -1,4 +1,5 @@
 using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -18,10 +19,12 @@ public class LogoutPanelViewModel : BasePanelViewModel
     #region - Ctors -
     public LogoutPanelViewModel(IEventAggregator eventAggregator
                                 , ILogService log
-                                , LoginViewModel loginViewModel)
+                                , LoginViewModel loginViewModel
+                                , IAuthGateway gateway)
                                 : base(eventAggregator, log)
     {
         ViewModel = loginViewModel;
+        _gateway = gateway;
     }
     #endregion
     #region - Binding Methods -
@@ -32,6 +35,7 @@ public class LogoutPanelViewModel : BasePanelViewModel
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
         await Task.Delay(TimeSpan.FromSeconds(1));
         await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseAllWindowsMessageModel());
+        await _gateway.LogoutAsync();   // 서버 logout best-effort + 토큰 폐기(Api) / no-op(Db) — G2
         ViewModel.Logout();
     }
 
@@ -43,5 +47,8 @@ public class LogoutPanelViewModel : BasePanelViewModel
     #endregion
     #region - Properties -
     public LoginViewModel ViewModel { get; }
+    #endregion
+    #region - Attributes -
+    private readonly IAuthGateway _gateway;
     #endregion
 }

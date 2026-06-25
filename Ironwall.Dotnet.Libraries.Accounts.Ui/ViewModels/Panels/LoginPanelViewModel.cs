@@ -63,8 +63,10 @@ public class LoginPanelViewModel : BasePanelViewModel
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
 
             // 게이트웨이가 인증 + 토큰 발급 (Db: 로컬 TokenGenerator, Api(GOP-00): 서버 JWT)
-            var auth = await _gateway.AuthenticateAsync(Username!, Password!, ct);
-            if (auth == null) throw new Exception("아이디 또는 비밀번호가 일치하지 않습니다.");
+            var outcome = await _gateway.AuthenticateAsync(Username!, Password!, ct);
+            if (!outcome.Success || outcome.Result is null)
+                throw new Exception(FailMessage(outcome));   // G1: 서버 사유별 메시지
+            var auth = outcome.Result;
 
             ViewModel.Insert(auth.Account);
             ViewModel.IsLogin = true;
@@ -83,7 +85,7 @@ public class LoginPanelViewModel : BasePanelViewModel
         catch (Exception ex)
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
-            SetLoginFailed("로그인 실패");
+            SetLoginFailed(ex.Message);   // G1: 사유별 메시지 표시(자격오류는 일반 문구로 SEC-5 준수)
             _log?.Info(ex.Message);
             await Task.Delay(TimeSpan.FromSeconds(2));
             ClearLoginStatus();
@@ -102,6 +104,16 @@ public class LoginPanelViewModel : BasePanelViewModel
     private void SetLoginSuccess(string message) { IsLoginSuccess = true; IsLoginFailed = false; Result = message; }
     private void SetLoginFailed(string message) { IsLoginSuccess = false; IsLoginFailed = true; Result = message; }
     private void ClearLoginStatus() { IsLoginSuccess = false; IsLoginFailed = false; Result = string.Empty; }
+
+    /// <summary>인증 실패 사유 → 사용자 메시지 (G1). 자격오류는 계정 존재 비노출(SEC-5) 위해 일반 문구.</summary>
+    private static string FailMessage(AuthOutcome o) => o.ErrorCode switch
+    {
+        "LOCKED" or "423"     => string.IsNullOrEmpty(o.LockReason) ? "잠긴 계정입니다." : $"잠긴 계정: {o.LockReason}",
+        "FORBIDDEN"           => "비활성 또는 권한이 없는 계정입니다.",
+        "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
+        "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",
+        _                     => "아이디 또는 비밀번호가 일치하지 않습니다.",
+    };
 
     public bool CanClickOk => !(string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(Password));
     #endregion
