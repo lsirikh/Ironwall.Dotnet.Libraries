@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
+using Ironwall.Dotnet.Libraries.Theme.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -37,6 +38,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             Series = new ObservableCollection<ISeries>();
             XAxes = new ObservableCollection<Axis>();
             YAxes = new ObservableCollection<Axis>();
+
+            // IMPL-21: 테마 반응 — 레전드/축 글씨 theme-aware (다크 안보임 수정)
+            _themeService = TryResolveThemeService();
+            if (_themeService != null)
+                _themeService.ThemeChanged += OnThemeChanged;
+            LegendTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
+        }
+
+        private static IThemeService? TryResolveThemeService()
+        {
+            try { return IoC.Get<IThemeService>(); }
+            catch { return null; }
+        }
+        private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
+        private void OnThemeChanged(object? sender, BaseTheme theme)
+        {
+            try { LegendTextPaint.Color = ChartThemeProvider.TextColor(theme); _ = DataInitialize(); }
+            catch (Exception ex) { _log?.Warning($"[DataChartPanelViewModel] OnThemeChanged 실패: {ex.Message}"); }
         }
         #endregion
         #region - Implementation of Interface -
@@ -51,6 +70,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             Series.Clear();
             XAxes.Clear();
             YAxes.Clear();
+            if (close && _themeService != null)
+                _themeService.ThemeChanged -= OnThemeChanged;
             return base.OnDeactivateAsync(close, cancellationToken);
         }
         #endregion
@@ -128,6 +149,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         Labels = xLabels,
                         LabelsRotation = 15,
                         TextSize = 12,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         UnitWidth = 1,
                         ShowSeparatorLines = false
                     };
@@ -136,6 +158,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     {
                         Name = "Events",
                         NameTextSize = 14,
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         MinLimit = 0
                     };
 
@@ -248,6 +272,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         protected DateTime _endDateDisplay;
         private EventProviderService _providerService;
         private bool _isChartLoading;
+        private readonly IThemeService? _themeService;
         #endregion
     }
 }
