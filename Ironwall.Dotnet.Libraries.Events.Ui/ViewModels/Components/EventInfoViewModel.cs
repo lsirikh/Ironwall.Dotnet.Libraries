@@ -62,6 +62,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             _themeService = themeService ?? TryResolveThemeService();
             if (_themeService != null)
                 _themeService.ThemeChanged += OnThemeChanged;
+            // 초기 테마색 반영(다크에서 열려도 레전드/툴팁 보이게)
+            LegendTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
+            TooltipTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
 
             _names = new[] { "DET", "MAL", "CON", "ACT" };
             RefreshActiveness();
@@ -80,7 +83,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try { _rebuildChart?.Invoke(); }
+            try { LegendTextPaint.Color = ChartThemeProvider.TextColor(theme); TooltipTextPaint.Color = ChartThemeProvider.TextColor(theme); _rebuildChart?.Invoke(); }
             catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
