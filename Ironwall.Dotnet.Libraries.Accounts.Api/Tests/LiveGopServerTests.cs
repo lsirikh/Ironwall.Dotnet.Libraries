@@ -68,5 +68,10 @@ public class LiveGopServerTests
         var profile = await ((IProfileGateway)gateway).GetProfileAsync(auth.Account.Id);
         Assert.NotNull(profile);
         _out.WriteLine($"[프로필 OK] {profile!.Username} / {profile.EMail}");
+
+        // 3) 계정 목록 조회(read-only) → 디렉터리 계약 + 리스트 봉투(B-8) 실측 검증
+        var accounts = await ((IUserDirectoryGateway)gateway).GetAllAccountsAsync();
+        Assert.NotNull(accounts);
+        _out.WriteLine($"[목록 OK] {accounts!.Count} accounts: {string.Join(", ", accounts.ConvertAll(a => a.Username))}");
     }
 }
