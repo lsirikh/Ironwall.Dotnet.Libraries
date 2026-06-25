@@ -213,7 +213,7 @@
 		<DataGrid
 			x:Name="DataGridUsers"
 			Grid.Row="1"
-			Height="260"
+			Height="280"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
 			ItemsSource="{Binding ViewModelProvider}"

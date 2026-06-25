@@ -94,7 +94,7 @@
 		</Border>
 
 		<!--  공용 날짜 피커  -->
-		<Grid Grid.Row="1" Margin="10,0">
+		<Grid Grid.Row="1" Margin="10,20">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="50" />
 				<ColumnDefinition Width="1*" />

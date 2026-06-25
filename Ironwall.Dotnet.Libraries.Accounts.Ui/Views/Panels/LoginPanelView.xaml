@@ -23,7 +23,7 @@
 				<Style BasedOn="{StaticResource MaterialDesignElevatedCard}" TargetType="md:Card">
 					<!--  기본 BorderBrush 설정  -->
 					<Setter Property="Width" Value="400" />
-					<Setter Property="Height" Value="400" />
+					<Setter Property="Height" Value="300" />
 					<Setter Property="Padding" Value="20" />
 					<Setter Property="Opacity" Value="0.9" />
 					<Setter Property="UniformCornerRadius" Value="8" />
@@ -32,8 +32,15 @@
 						<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
 							<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
 							<Setter Property="BorderThickness" Value="3" />
+							<Setter Property="Height" Value="356" />
 							<Setter Property="Width" Value="406" />
-							<Setter Property="Height" Value="406" />
+							<Setter Property="UniformCornerRadius" Value="8" />
+						</DataTrigger>
+						<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
+							<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
+							<Setter Property="BorderThickness" Value="3" />
+							<Setter Property="Height" Value="356" />
+							<Setter Property="Width" Value="406" />
 							<Setter Property="UniformCornerRadius" Value="8" />
 						</DataTrigger>
 					</Style.Triggers>
@@ -43,12 +50,11 @@
 			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
-					<RowDefinition Height="2.5*" />
-					<RowDefinition Height="1*" />
-					<RowDefinition Height="1.2*" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
 				</Grid.RowDefinitions>
 
 				<!--  시안 헤더 바 (LayerPanel 표준 패턴, 네거티브 마진으로 카드 가장자리까지)  -->
@@ -180,7 +186,7 @@
 					Background="{DynamicResource DividerBrush}"
 					Style="{StaticResource MaterialDesignLightSeparator}" />
 
-				<Grid Grid.Row="5" Margin="0,5">
+				<Grid Grid.Row="5" Margin="0,0">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="7*" />
 						<ColumnDefinition Width="5.5*" />
@@ -212,12 +218,15 @@
 							<Style BasedOn="{StaticResource MaterialDesignBody2TextBlock}" TargetType="TextBlock">
 								<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 								<Setter Property="FontWeight" Value="Bold" />
+								<Setter Property="Visibility" Value="Collapsed"/>
 								<Style.Triggers>
 									<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
 										<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}" />
+										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
 									<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
 										<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+										<Setter Property="Visibility" Value="Visible"/>
 									</DataTrigger>
 								</Style.Triggers>
 							</Style>
