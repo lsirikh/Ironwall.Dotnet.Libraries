@@ -19,12 +19,22 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  Header  -->
-		<TextBlock
+		<!--  시안 헤더 바 (LayerPanel 패턴)  -->
+		<Border
 			Grid.Row="0"
-			Margin="0,0,0,12"
-			Style="{StaticResource MaterialDesignHeadline6TextBlock}"
-			Text="그룹 장비 추가" />
+			Margin="-16,-16,-16,12"
+			Style="{StaticResource ModernDialogHeader}">
+			<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+				<md:PackIcon
+					Width="20"
+					Height="20"
+					Margin="0,0,8,0"
+					VerticalAlignment="Center"
+					Foreground="{DynamicResource OnPrimaryFixedBrush}"
+					Kind="PlaylistPlus" />
+				<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="그룹 장비 추가" />
+			</StackPanel>
+		</Border>
 
 		<!--  Device Multi-Select DataGrid  -->
 		<DataGrid
