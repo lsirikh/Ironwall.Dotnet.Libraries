@@ -27,11 +27,13 @@ public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
     public TrackingStatusNatsSyncService(
         ILogService? log,
         INatsService natsService,
-        ITrackingOverlayManager? overlay = null)
+        ITrackingOverlayManager? overlay = null,
+        ITrackPointWriter? writer = null)
     {
         _log = log;
         _natsService = natsService;
         _overlay = overlay;
+        _writer = writer;
     }
     #endregion
 
@@ -69,10 +71,10 @@ public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
             var body = jObj["body"]?.ToObject<TrackingStatusBodyDto>();
             if (body is null) return;
 
-            // 오버레이 미연결 시 로그-only graceful
-            if (_overlay is null)
+            // 미연결(둘 다 null) 시 로그-only graceful
+            if (_overlay is null && _writer is null)
             {
-                _log?.Info($"TRACKING_STATUS 수신(오버레이 미연결): camera={body.CameraId}, tracking={body.Tracking}, targets={body.Targets?.Count ?? 0}");
+                _log?.Info($"TRACKING_STATUS 수신(미연결): camera={body.CameraId}, tracking={body.Tracking}, targets={body.Targets?.Count ?? 0}");
                 return;
             }
 
@@ -81,12 +83,16 @@ public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
             {
                 case "active":
                     if (body.Targets is { Count: > 0 })
-                        await _overlay.UpsertBatchAsync(body.CameraId, body.Targets, body.TtlSec);
+                    {
+                        // 로컬 DB 영속(P4, 비-UI) + 오버레이 렌더 — 각자 독립 graceful
+                        if (_writer is not null) await _writer.WriteBatchAsync(body.CameraId, body.Targets);
+                        if (_overlay is not null) await _overlay.UpsertBatchAsync(body.CameraId, body.Targets, body.TtlSec);
+                    }
                     break;
 
                 case "lost":
                 case "idle":
-                    await _overlay.ExpireCameraAsync(body.CameraId);
+                    if (_overlay is not null) await _overlay.ExpireCameraAsync(body.CameraId);
                     break;
 
                 default:
@@ -105,5 +111,6 @@ public class TrackingStatusNatsSyncService : ITrackingStatusNatsSyncService
     private readonly ILogService? _log;
     private readonly INatsService _natsService;
     private readonly ITrackingOverlayManager? _overlay;
+    private readonly ITrackPointWriter? _writer;
     #endregion
 }
