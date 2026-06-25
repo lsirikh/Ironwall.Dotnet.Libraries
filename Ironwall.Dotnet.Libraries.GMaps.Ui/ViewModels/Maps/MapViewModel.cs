@@ -104,6 +104,7 @@ public class MapViewModel : BasePanelViewModel,
                         , CustomMapOverlayService customMapOverlayService
                         , IImageFileService imageFileService
                         , TrackingOverlayManager? trackingOverlay = null
+                        , PlaybackViewModel? playbackVm = null
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
@@ -122,6 +123,7 @@ public class MapViewModel : BasePanelViewModel,
         _customMapOverlayService = customMapOverlayService;
         _imageFileService = imageFileService;
         _trackingOverlay = trackingOverlay;
+        _playbackVm = playbackVm;
         DeviceProvider = deviceProvider;
         InitializeCommands();
     }
@@ -141,6 +143,7 @@ public class MapViewModel : BasePanelViewModel,
 
             // Tracking GIS 오버레이 매니저를 지도에 연결(TTL 스윕 기동). NATS 핸들러가 이 인스턴스로 마커 반영
             _trackingOverlay?.Attach(MainMap);
+            _playbackVm?.AttachMap(MainMap);   // Playback(P5) 재생 오버레이도 같은 지도에 연결
 
             // Adorner 시스템 통합
             SetupAdornerIntegration();
@@ -1561,7 +1564,40 @@ public class MapViewModel : BasePanelViewModel,
             else if (MainMap.Zoom > ZoomMin) MainMap.Zoom--;
         });
         ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
+        TogglePlaybackPanelCommand = new RelayCommand(_ => TogglePlaybackPanel());
     }
+
+    #region - Tracking Playback(P5) -
+    public RelayCommand? TogglePlaybackPanelCommand { get; private set; }
+
+    public GMapControls.PlaybackConsoleControl? PlaybackPanel
+    {
+        get => _playbackPanel;
+        private set { _playbackPanel = value; NotifyOfPropertyChange(nameof(PlaybackPanel)); }
+    }
+
+    public bool IsPlaybackPanelVisible
+    {
+        get => _isPlaybackPanelVisible;
+        set { _isPlaybackPanelVisible = value; NotifyOfPropertyChange(nameof(IsPlaybackPanelVisible)); }
+    }
+
+    /// <summary>맵 툴바 재생 버튼 — 콘솔 열기/닫기.</summary>
+    public void TogglePlaybackPanel()
+    {
+        if (_playbackVm == null) { _log?.Warning("Playback VM 미주입"); return; }
+        if (IsPlaybackPanelVisible) { _playbackVm.Close(); return; }   // Close→CloseRequested→숨김
+
+        if (PlaybackPanel == null)
+        {
+            PlaybackPanel = new GMapControls.PlaybackConsoleControl { DataContext = _playbackVm };
+            _playbackVm.CloseRequested += () => IsPlaybackPanelVisible = false;
+            _playbackVm.FocusRequested += (lat, lng) => { if (MainMap != null) MainMap.Position = new PointLatLng(lat, lng); };
+            if (MainMap != null) _playbackVm.AttachMap(MainMap);
+        }
+        IsPlaybackPanelVisible = true;
+    }
+    #endregion
 
     /// <summary>
     /// 편집 관련 명령어 초기화
@@ -6635,6 +6671,9 @@ public class MapViewModel : BasePanelViewModel,
     private ImageOverlayService _imageOverlayService;
     private IImageFileService _imageFileService;
     private readonly TrackingOverlayManager? _trackingOverlay;   // Tracking GIS 오버레이(FR-15)
+    private readonly PlaybackViewModel? _playbackVm;             // Tracking Playback(P5) 콘솔 VM
+    private GMapControls.PlaybackConsoleControl? _playbackPanel;
+    private bool _isPlaybackPanelVisible;
     private MarkerFactory _markerFactory;
 
     private PropertyPanelFactory _propertyPanelFactory;

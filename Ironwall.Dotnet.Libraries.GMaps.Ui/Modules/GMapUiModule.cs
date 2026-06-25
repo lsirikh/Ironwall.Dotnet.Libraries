@@ -62,6 +62,10 @@ public class GMapUiModule: Module
         builder.RegisterType<TrackingOverlayManager>().AsSelf().As<ITrackingOverlayManager>().SingleInstance();
         // 추적 좌표 로컬 DB 영속(P4) — 핸들러 write(ITrackPointWriter) + Playback read(AsSelf)
         builder.RegisterType<TrackPointStore>().AsSelf().As<ITrackPointWriter>().SingleInstance();
+        // Playback(P5) — 엔진·격리 오버레이·콘솔 VM (로컬 DB 조회 재생)
+        builder.RegisterType<PlaybackEngine>().SingleInstance();
+        builder.RegisterType<PlaybackOverlayManager>().SingleInstance();
+        builder.RegisterType<PlaybackViewModel>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<CustomMapOverlayService>().SingleInstance();

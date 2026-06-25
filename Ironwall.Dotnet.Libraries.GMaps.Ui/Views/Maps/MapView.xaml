@@ -275,6 +275,18 @@
 							</Button.Style>
 							<md:PackIcon Kind="Layers" />
 						</Button>
+						<Button Command="{Binding TogglePlaybackPanelCommand}" ToolTip="추적 재생(Playback)">
+							<Button.Style>
+								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsPlaybackPanelVisible}" Value="True">
+											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Button.Style>
+							<md:PackIcon Kind="PlayCircleOutline" />
+						</Button>
 					</StackPanel>
 				</Border>
 
@@ -733,6 +745,13 @@
 					Panel.ZIndex="100"
 					Content="{Binding LayerPanel}"
 					Visibility="{Binding IsLayerPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  추적 재생(Playback) 콘솔 — 컨트롤만, 재생 마커는 MainMap에 직접  -->
+				<ContentPresenter
+					x:Name="PlaybackPanelPresenter"
+					Panel.ZIndex="110"
+					Content="{Binding PlaybackPanel}"
+					Visibility="{Binding IsPlaybackPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  카메라 팝업 연결선(Leader Line) — 카메라 심볼 중점 ↔ 팝업 경계, 팝업 아래 z레이어  -->
 				<ItemsControl
