@@ -67,5 +67,17 @@ public static class TrackingMath
            && lat is >= -90d and <= 90d
            && lng is >= -180d and <= 180d;
 
+    /// <summary>
+    /// 트레일 세그먼트 페이드 Opacity — 최신(<paramref name="segmentIndex"/>=n-2)=1.0 → 오래됨(0)=0.15 선형감쇠.
+    /// 점이 2개 이하면 1.0. (FR-P2-01)
+    /// </summary>
+    public static double TrailFadeOpacity(int segmentIndex, int pointCount)
+    {
+        if (pointCount <= 2) return 1.0;
+        double t = (double)segmentIndex / (pointCount - 2);   // 0(오래됨)~1(최신)
+        if (t < 0d) t = 0d; else if (t > 1d) t = 1d;
+        return 0.15 + 0.85 * t;
+    }
+
     private static double ToRad(double deg) => deg * Math.PI / 180d;
 }

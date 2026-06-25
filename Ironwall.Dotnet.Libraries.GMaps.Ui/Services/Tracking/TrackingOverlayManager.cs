@@ -32,6 +32,8 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
     private const double DefaultMaxSpeedMs = 50d;
     private const double BearingMinMoveM = 0.5; // 이보다 짧게 움직이면 방향 유지
     private const int MaxRemovePerTick = 20;    // FR-P2-06 분할 제거
+    private const int DefaultTrailMaxPoints = 30;   // FR-P2-02 (D-13)
+    private const int DefaultGapThresholdSec = 10;  // FR-P2-09 트레일 분절 임계
 
     private readonly ILogService? _log;
     private readonly IClock _clock;
@@ -62,8 +64,10 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             };
             _sweepTimer.Tick += OnSweepTick;
             _sweepTimer.Start();
+            // 줌 변경 시에만 트레일 재투영(팬은 상대좌표 불변 — FR-P2-08 드래그 storm 회피)
+            _map.OnMapZoomChanged += OnZoomChanged;
         });
-        _log?.Info($"{nameof(TrackingOverlayManager)} attached — TTL 스윕 500ms 기동");
+        _log?.Info($"{nameof(TrackingOverlayManager)} attached — TTL 스윕 500ms + 줌 트레일 재투영 기동");
     }
 
     public Task UpsertBatchAsync(int cameraId, IReadOnlyList<TrackingTargetDto> targets, int? messageTtlSec, CancellationToken ct = default)
@@ -142,8 +146,19 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
                 ? TrackingMath.BearingDegrees(entry.LastLat, entry.LastLng, lat, lng)
                 : entry.LastBearing;
 
+            var color = ColorOf(t);
             entry.Marker.Position = new PointLatLng(lat, lng);   // Position-only(NFR-02)
-            entry.Marker.Update(ColorOf(t), TrackingEnumExtensions.ParseTargetType(t.Label), bearing, showArrow: speed > 0d);
+            entry.Marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing, showArrow: speed > 0d);
+
+            // 트레일: NATS gap 분절(P2-09) → 점 추가(FIFO) → 줌 기준 재투영
+            if (entry.Trail is not null)
+            {
+                if (dt > (_setup?.GapThresholdSec ?? DefaultGapThresholdSec))
+                    entry.Trail.ResetSegment();
+                entry.Trail.SetColor(color);
+                entry.Trail.AddPoint(new PointLatLng(lat, lng), _setup?.TrailMaxPoints ?? DefaultTrailMaxPoints);
+                entry.Trail.Rebuild(_map!);
+            }
 
             entry.LastObservedAt = observedAt;
             entry.LastLat = lat; entry.LastLng = lng;
@@ -152,15 +167,22 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
         }
         else
         {
+            var color = ColorOf(t);
             var marker = new GMapTrackingMarker(cameraId, t.TrackId, new PointLatLng(lat, lng))
             {
                 ZIndex = ZTrackingBand,
             };
-            marker.Update(ColorOf(t), TrackingEnumExtensions.ParseTargetType(t.Label), bearing: 0d, showArrow: false);
+            marker.Update(color, TrackingEnumExtensions.ParseTargetType(t.Label), bearing: 0d, showArrow: false);
             _map!.Markers.Add(marker);
+
+            var trail = new GMapTrailMarker(cameraId, t.TrackId, color);
+            trail.AddPoint(new PointLatLng(lat, lng), _setup?.TrailMaxPoints ?? DefaultTrailMaxPoints);
+            _map!.Markers.Add(trail);
+
             _entries[key] = new TrackEntry
             {
                 Marker = marker,
+                Trail = trail,
                 LastObservedAt = observedAt,
                 LastLat = lat, LastLng = lng,
                 LastSpeedMps = 0d, LastBearing = 0d,
@@ -182,11 +204,21 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             RemoveEntry(key);
     }
 
+    // 줌 변경 — 전 트레일 재투영(UI 스레드). 팬은 anchor 상대좌표 불변이라 미처리.
+    private void OnZoomChanged()
+    {
+        if (_map is null) return;
+        foreach (var entry in _entries.Values)
+            entry.Trail?.Rebuild(_map);
+    }
+
     private void RemoveEntry((int cameraId, string trackId) key)
     {
         if (_entries.TryGetValue(key, out var entry))
         {
             _map!.Markers.Remove(entry.Marker);
+            if (entry.Trail is not null)
+                _map!.Markers.Remove(entry.Trail);
             _entries.Remove(key);
         }
     }
@@ -216,6 +248,8 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
                 _sweepTimer.Tick -= OnSweepTick;
                 _sweepTimer = null;
             }
+            if (_map is not null)
+                _map.OnMapZoomChanged -= OnZoomChanged;
             foreach (var key in _entries.Keys.ToList())
                 RemoveEntry(key);
         });
@@ -225,6 +259,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
     private sealed class TrackEntry
     {
         public GMapTrackingMarker Marker = null!;
+        public GMapTrailMarker? Trail;
         public DateTime LastObservedAt;
         public DateTime LastSeen;
         public DateTime ExpireAt;

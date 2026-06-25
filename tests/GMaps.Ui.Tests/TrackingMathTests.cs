@@ -65,6 +65,15 @@ public class TrackingMathTests
         Assert.False(TrackingMath.IsReversed(t0, null));              // 첫 관측 → 수용
     }
 
+    [Fact(DisplayName = "should_fade_trail_newest_bright_oldest_faint")]
+    public void TrailFadeOpacity_LinearDecay()
+    {
+        Assert.Equal(1.0, TrackingMath.TrailFadeOpacity(0, 2), 6);    // 2점 → 단일 세그먼트 1.0
+        Assert.Equal(0.15, TrackingMath.TrailFadeOpacity(0, 5), 6);   // 오래됨
+        Assert.Equal(1.0, TrackingMath.TrailFadeOpacity(3, 5), 6);    // 최신
+        Assert.True(TrackingMath.TrailFadeOpacity(1, 5) < TrackingMath.TrailFadeOpacity(2, 5));
+    }
+
     [Theory(DisplayName = "should_validate_lat_lng_range_and_nan")]
     [InlineData(38.1, 127.5, true)]
     [InlineData(-90d, 180d, true)]
