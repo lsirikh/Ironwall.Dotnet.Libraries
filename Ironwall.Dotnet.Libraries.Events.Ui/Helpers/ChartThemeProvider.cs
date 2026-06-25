@@ -18,8 +18,8 @@ public static class ChartThemeProvider
     /// </summary>
     public static SKColor TextColor(BaseTheme theme)
         => theme == BaseTheme.Dark
-            ? new SKColor(0xED, 0xF1, 0xF6)
-            : new SKColor(0x1C, 0x1B, 0x1F);
+            ? new SKColor(0xE6, 0xED, 0xF3)   // tactical Dark textPrimary
+            : new SKColor(0x13, 0x20, 0x2C);  // tactical Light textPrimary
 
     /// <summary>
     /// 채도 높은 시리즈색 위에 얹는 고정 라벨/스트로크 색 — 양 테마 흰색(세그먼트 위라 테마 무관).

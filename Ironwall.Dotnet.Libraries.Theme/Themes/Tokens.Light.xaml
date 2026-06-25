@@ -3,60 +3,60 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!--
-        IMPL-02 — Tokens.Light = Modern Operations Light (스토리보드 적용).
-        AD-6 변경(2026-06-25, 사용자 요청): 기존 byte-identical 대신 storyboard.html
-        modern/light 팔레트로 정렬 — Light 화면이 선택한 Modern Operations 디자인으로 보이도록.
+        IMPL-02 — Tokens.Light = Tactical Command Light (스토리보드 적용).
+        컨셉 변경(2026-06-25, 사용자): Modern Operations → Tactical Command.
+        storyboard.html [data-concept="tactical"][data-theme="light"] 팔레트.
         AD-2: 리터럴 whole-brush. 키셋은 Tokens.Dark와 동일(린터 파리티).
     -->
 
     <!-- ══ Surfaces ══ -->
-    <SolidColorBrush x:Key="BgBrush"            Color="#EEF1F6" /><!-- storyboard bg -->
-    <SolidColorBrush x:Key="SurfaceBrush"       Color="#FFFFFF" /><!-- storyboard surface -->
-    <SolidColorBrush x:Key="SurfaceAltBrush"    Color="#F6F8FC" /><!-- storyboard surfaceAlt -->
-    <SolidColorBrush x:Key="SurfaceSunkenBrush" Color="#EAEEF4" /><!-- storyboard surfaceSunken -->
-    <SolidColorBrush x:Key="SurfaceHoverBrush"  Color="#E8F0FE" /><!-- hover(파생) -->
-    <SolidColorBrush x:Key="SurfacePressedBrush" Color="#C5D5FB" /><!-- pressed(파생) -->
+    <SolidColorBrush x:Key="BgBrush"            Color="#DDE3EB" /><!-- tactical bg -->
+    <SolidColorBrush x:Key="SurfaceBrush"       Color="#F2F5F9" /><!-- tactical surface -->
+    <SolidColorBrush x:Key="SurfaceAltBrush"    Color="#FFFFFF" /><!-- tactical surfaceAlt -->
+    <SolidColorBrush x:Key="SurfaceSunkenBrush" Color="#E2E8F0" /><!-- tactical surfaceSunken -->
+    <SolidColorBrush x:Key="SurfaceHoverBrush"  Color="#D8E0EA" /><!-- hover(파생) -->
+    <SolidColorBrush x:Key="SurfacePressedBrush" Color="#C5D2E0" /><!-- pressed(파생) -->
 
     <!-- ══ Borders / Dividers ══ -->
-    <SolidColorBrush x:Key="BorderBrush"  Color="#D8DFE9" /><!-- storyboard border -->
-    <SolidColorBrush x:Key="DividerBrush" Color="#E8ECF1" /><!-- storyboard divider -->
+    <SolidColorBrush x:Key="BorderBrush"  Color="#BCC7D4" /><!-- tactical border -->
+    <SolidColorBrush x:Key="DividerBrush" Color="#D2DAE3" /><!-- tactical divider -->
 
     <!-- ══ Text ══ -->
-    <SolidColorBrush x:Key="TextPrimaryBrush"   Color="#1A2230" /><!-- storyboard textPrimary -->
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#4A5568" /><!-- storyboard textSecondary -->
-    <SolidColorBrush x:Key="TextMutedBrush"     Color="#69748A" /><!-- storyboard textMuted -->
+    <SolidColorBrush x:Key="TextPrimaryBrush"   Color="#13202C" /><!-- tactical textPrimary -->
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#3D4D5C" /><!-- tactical textSecondary -->
+    <SolidColorBrush x:Key="TextMutedBrush"     Color="#5E6B79" /><!-- tactical textMuted -->
 
     <!-- ══ Primary / Accent ══ -->
-    <SolidColorBrush x:Key="PrimaryBrush"        Color="#2C5F9E" /><!-- storyboard primary -->
-    <SolidColorBrush x:Key="PrimaryHoverBrush"   Color="#234E85" /><!-- storyboard primaryHover -->
-    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#DCE8F8" /><!-- 보조 hover(파생) -->
-    <SolidColorBrush x:Key="OnPrimaryBrush"      Color="#FFFFFF" /><!-- storyboard onPrimary -->
-    <SolidColorBrush x:Key="OnPrimaryFixedBrush" Color="#FFFFFF" /><!-- 양 테마 고정 white-on-blue(FR-09) -->
-    <SolidColorBrush x:Key="AccentBrush"         Color="#0E8C9B" /><!-- storyboard accent -->
+    <SolidColorBrush x:Key="PrimaryBrush"        Color="#0C6B89" /><!-- tactical primary (deep cyan) -->
+    <SolidColorBrush x:Key="PrimaryHoverBrush"   Color="#09556E" /><!-- tactical primaryHover -->
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#DCE8EC" /><!-- 보조 hover(파생) -->
+    <SolidColorBrush x:Key="OnPrimaryBrush"      Color="#FFFFFF" /><!-- tactical onPrimary (Light=white on deep cyan) -->
+    <SolidColorBrush x:Key="OnPrimaryFixedBrush" Color="#FFFFFF" /><!-- 헤더 텍스트(Light primary=어두워 white) -->
+    <SolidColorBrush x:Key="AccentBrush"         Color="#B25A06" /><!-- tactical accent (amber) -->
 
     <!-- ══ Status (hue-lock) ══ -->
-    <SolidColorBrush x:Key="StatusCriticalBrush" Color="#D32F2F" /><!-- storyboard statusCritical -->
-    <SolidColorBrush x:Key="DangerSurfaceBrush"  Color="#FCEBEA" /><!-- critical 표면(파생) -->
-    <SolidColorBrush x:Key="DangerBorderBrush"   Color="#F4C7C3" /><!-- critical 테두리(파생) -->
-    <SolidColorBrush x:Key="DangerHoverBrush"    Color="#F9DDDB" /><!-- critical hover(파생) -->
-    <SolidColorBrush x:Key="StatusWarningBrush"  Color="#E08600" /><!-- storyboard statusWarning -->
-    <SolidColorBrush x:Key="StatusNormalBrush"   Color="#2E9E5B" /><!-- storyboard statusNormal -->
-    <SolidColorBrush x:Key="StatusInfoBrush"     Color="#1976D2" /><!-- storyboard statusInfo -->
+    <SolidColorBrush x:Key="StatusCriticalBrush" Color="#C62121" /><!-- tactical statusCritical -->
+    <SolidColorBrush x:Key="DangerSurfaceBrush"  Color="#F8E6E6" /><!-- critical 표면(파생) -->
+    <SolidColorBrush x:Key="DangerBorderBrush"   Color="#E5BFBF" /><!-- critical 테두리(파생) -->
+    <SolidColorBrush x:Key="DangerHoverBrush"    Color="#F0D5D5" /><!-- critical hover(파생) -->
+    <SolidColorBrush x:Key="StatusWarningBrush"  Color="#B26A00" /><!-- tactical statusWarning -->
+    <SolidColorBrush x:Key="StatusNormalBrush"   Color="#2E7D32" /><!-- tactical statusNormal -->
+    <SolidColorBrush x:Key="StatusInfoBrush"     Color="#15589F" /><!-- tactical statusInfo -->
 
     <!-- ══ Scrim (alpha) ══ -->
-    <SolidColorBrush x:Key="ScrimModalBrush" Color="#8C101621" /><!-- storyboard scrim rgba(16,22,33,.55) -->
-    <SolidColorBrush x:Key="ScrimSplitBrush" Color="#99101621" />
+    <SolidColorBrush x:Key="ScrimModalBrush" Color="#8C0E161F" /><!-- tactical scrim rgba(14,22,31,.55) -->
+    <SolidColorBrush x:Key="ScrimSplitBrush" Color="#990E161F" />
 
     <!-- ══ Misc ══ -->
-    <SolidColorBrush x:Key="SelectionBrush" Color="#007ACC" /><!-- ImageMarker selection -->
-    <SolidColorBrush x:Key="FocusRingBrush" Color="#3D7AC4" /><!-- storyboard focusRing -->
+    <SolidColorBrush x:Key="SelectionBrush" Color="#0C6B89" /><!-- tactical 선택 -->
+    <SolidColorBrush x:Key="FocusRingBrush" Color="#0C6B89" /><!-- tactical focusRing -->
 
-    <!-- ══ Event/KPI 반투명 틴트 (IMPL-20) ══ -->
-    <SolidColorBrush x:Key="TintInfoBrush"     Color="#22111188" /><!-- KPI 정보 틴트(EventInfo) -->
-    <SolidColorBrush x:Key="TintSuccessBrush"  Color="#22118811" /><!-- KPI 성공 틴트(EventInfo) -->
-    <SolidColorBrush x:Key="TintCriticalBrush" Color="#22FF6464" /><!-- severity 위험 틴트 -->
-    <SolidColorBrush x:Key="TintWarningBrush"  Color="#22FFB347" /><!-- severity 경고 틴트 -->
-    <SolidColorBrush x:Key="TintAccentBrush"   Color="#224FC3F7" /><!-- severity 정보 틴트(cyan) -->
-    <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#88FFFFFF" /><!-- flip 카드 반투명 표면 -->
+    <!-- ══ Event/KPI 반투명 틴트 (severity, 반투명이라 테마 공통 동작) ══ -->
+    <SolidColorBrush x:Key="TintInfoBrush"     Color="#2215589F" /><!-- 정보 틴트 -->
+    <SolidColorBrush x:Key="TintSuccessBrush"  Color="#222E7D32" /><!-- 성공 틴트 -->
+    <SolidColorBrush x:Key="TintCriticalBrush" Color="#22C62121" /><!-- 위험 틴트 -->
+    <SolidColorBrush x:Key="TintWarningBrush"  Color="#22B26A00" /><!-- 경고 틴트 -->
+    <SolidColorBrush x:Key="TintAccentBrush"   Color="#220C6B89" /><!-- 강조 틴트(cyan) -->
+    <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#CCF2F5F9" /><!-- 반투명 표면 -->
 
 </ResourceDictionary>
