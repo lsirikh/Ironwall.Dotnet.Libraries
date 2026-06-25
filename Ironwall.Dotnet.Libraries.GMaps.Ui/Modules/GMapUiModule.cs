@@ -54,8 +54,9 @@ public class GMapUiModule: Module
         builder.RegisterType<MapViewModel>().SingleInstance();
         // PTZ 제어(CameraPopup_PTZ_Control) — IOnvifService(OnvifServiceModule)·ILogService 의존, 메인 Bootstrapper에서 OnvifServiceModule 등록 필요
         builder.RegisterType<PtzController>().As<IPtzController>().SingleInstance();
-        // Tracking GIS 오버레이(FR-15) — IClock + 단일 진입점 매니저. ITrackingSetupModel은 소비앱 God-Model(EXT-01)이 optional 제공
+        // Tracking GIS 오버레이(FR-15) — IClock + 설정모델 + 단일 진입점 매니저(라이브러리 자족, EXT-01 없이 동작)
         builder.RegisterType<SystemClock>().As<IClock>().SingleInstance();
+        builder.RegisterType<TrackingSetupModel>().As<ITrackingSetupModel>().SingleInstance();
         builder.RegisterType<TrackingOverlayManager>().AsSelf().As<ITrackingOverlayManager>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();

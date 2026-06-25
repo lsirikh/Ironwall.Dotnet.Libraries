@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
@@ -22,6 +23,9 @@ public static class MapSettingsHelper
     #region - Constants -
     private const string SETTINGS_FILE_NAME = "appsettings.json";
     private const string APP_SETTINGS_SECTION = "AppSettings";
+
+    // 파일 read-modify-write 직렬화 — 동시 저장 시 손실/JSON 손상 방지(기존 무잠금 버그 수정, I-05)
+    private static readonly SemaphoreSlim _fileLock = new(1, 1);
     #endregion
 
     #region - Public Methods -
@@ -172,6 +176,47 @@ public static class MapSettingsHelper
         }
     }
 
+    /// <summary>추적 설정을 appsettings(AppSettings.Tracking)에 저장.</summary>
+    public static async Task SaveTrackingSettingsAsync(ITrackingSetupModel model, ILogService? log = default)
+    {
+        await SaveSettingAsync("Tracking", new
+        {
+            model.IsTrackingEnabled,
+            model.TrailMaxPoints,
+            model.DefaultTtlSec,
+            model.LostTtlSec,
+            model.MinVisibleZoom,
+            model.MaxSpeedMs,
+            model.GapThresholdSec,
+        }, log);
+    }
+
+    /// <summary>appsettings(AppSettings.Tracking)에서 추적 설정 로드(없으면 기본값).</summary>
+    public static async Task<TrackingSetupModel> LoadTrackingSettingsAsync()
+    {
+        var def = new TrackingSetupModel();
+        try
+        {
+            var json = await ReadSettingsFileAsync();
+            var t = JsonConvert.DeserializeObject<JObject>(json)?[APP_SETTINGS_SECTION]?["Tracking"];
+            if (t == null) return def;
+            return new TrackingSetupModel
+            {
+                IsTrackingEnabled = t["IsTrackingEnabled"]?.ToObject<bool>() ?? def.IsTrackingEnabled,
+                TrailMaxPoints = t["TrailMaxPoints"]?.ToObject<int>() ?? def.TrailMaxPoints,
+                DefaultTtlSec = t["DefaultTtlSec"]?.ToObject<int>() ?? def.DefaultTtlSec,
+                LostTtlSec = t["LostTtlSec"]?.ToObject<int>() ?? def.LostTtlSec,
+                MinVisibleZoom = t["MinVisibleZoom"]?.ToObject<double>() ?? def.MinVisibleZoom,
+                MaxSpeedMs = t["MaxSpeedMs"]?.ToObject<double>() ?? def.MaxSpeedMs,
+                GapThresholdSec = t["GapThresholdSec"]?.ToObject<int>() ?? def.GapThresholdSec,
+            };
+        }
+        catch (Exception)
+        {
+            return def;
+        }
+    }
+
     #endregion
 
     #region - Private Methods -
@@ -181,6 +226,7 @@ public static class MapSettingsHelper
     /// </summary>
     private static async Task SaveSettingAsync<T>(string propertyName, T value, ILogService? log = default)
     {
+        await _fileLock.WaitAsync();
         try
         {
             var filePath = GetSettingsFilePath();
@@ -237,6 +283,10 @@ public static class MapSettingsHelper
         {
             throw new InvalidOperationException($"지도 설정 저장 실패 '{propertyName}': {ex.Message}", ex);
         }
+        finally
+        {
+            _fileLock.Release();
+        }
     }
 
     /// <summary>
@@ -244,6 +294,7 @@ public static class MapSettingsHelper
     /// </summary>
     private static async Task SaveMultipleSettingsAsync(object settings, ILogService? log = default)
     {
+        await _fileLock.WaitAsync();
         try
         {
             var filePath = GetSettingsFilePath();
@@ -268,6 +319,10 @@ public static class MapSettingsHelper
         catch (Exception ex)
         {
             throw new InvalidOperationException($"지도 설정 저장 실패: {ex.Message}", ex);
+        }
+        finally
+        {
+            _fileLock.Release();
         }
     }
 
