@@ -17,6 +17,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using GMap.NET.MapProviders.Custom;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
@@ -102,6 +103,7 @@ public class MapViewModel : BasePanelViewModel,
                         , IGMapDbService gMapDbService
                         , CustomMapOverlayService customMapOverlayService
                         , IImageFileService imageFileService
+                        , TrackingOverlayManager? trackingOverlay = null
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
@@ -119,6 +121,7 @@ public class MapViewModel : BasePanelViewModel,
         _broadcastControlService = broadcastControlService;
         _customMapOverlayService = customMapOverlayService;
         _imageFileService = imageFileService;
+        _trackingOverlay = trackingOverlay;
         DeviceProvider = deviceProvider;
         InitializeCommands();
     }
@@ -135,6 +138,9 @@ public class MapViewModel : BasePanelViewModel,
         {
             MainMap = mapView.MainMap;
             _log?.Info($"MainMap 참조 설정 완료: {MainMap.GetHashCode()}");
+
+            // Tracking GIS 오버레이 매니저를 지도에 연결(TTL 스윕 기동). NATS 핸들러가 이 인스턴스로 마커 반영
+            _trackingOverlay?.Attach(MainMap);
 
             // Adorner 시스템 통합
             SetupAdornerIntegration();
@@ -6628,6 +6634,7 @@ public class MapViewModel : BasePanelViewModel,
     private CustomMapOverlayService _customMapOverlayService;
     private ImageOverlayService _imageOverlayService;
     private IImageFileService _imageFileService;
+    private readonly TrackingOverlayManager? _trackingOverlay;   // Tracking GIS 오버레이(FR-15)
     private MarkerFactory _markerFactory;
 
     private PropertyPanelFactory _propertyPanelFactory;

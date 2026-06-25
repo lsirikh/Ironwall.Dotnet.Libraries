@@ -39,6 +39,8 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Ui\Ironwall.Dotnet.Libraries.Devices.Ui.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Nats\Ironwall.Dotnet.Libraries.Nats.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
+    <!-- Tracking(FR-15): TRACKING_STATUS DTO(targets[]) 역직렬화 + ITrackingOverlayManager 계약 -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Messages\Ironwall.Dotnet.Libraries.Messages.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Api\Ironwall.Dotnet.Libraries.Events.Api.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
