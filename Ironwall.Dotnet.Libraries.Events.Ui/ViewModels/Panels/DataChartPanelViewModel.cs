@@ -54,7 +54,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try { LegendTextPaint.Color = ChartThemeProvider.TextColor(theme); _ = DataInitialize(); }
+            try { LegendTextPaint = new SolidColorPaint { Color = ChartThemeProvider.TextColor(theme), SKTypeface = ChartThemeProvider.KoreanTypeface() }; _ = DataInitialize(); }
             catch (Exception ex) { _log?.Warning($"[DataChartPanelViewModel] OnThemeChanged 실패: {ex.Message}"); }
         }
         #endregion
@@ -244,12 +244,17 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public ObservableCollection<Axis> XAxes { get; }
         public ObservableCollection<Axis> YAxes { get; }
 
-        public SolidColorPaint LegendTextPaint { get; set; } =
-        new SolidColorPaint
+        // 토글 시 차트가 다시 그리도록 알림 속성으로(재할당+Notify).
+        private SolidColorPaint _legendTextPaint = new SolidColorPaint
         {
             Color = ChartThemeProvider.TextColor(BaseTheme.Light),
             SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint LegendTextPaint
+        {
+            get => _legendTextPaint;
+            set { _legendTextPaint = value; NotifyOfPropertyChange(nameof(LegendTextPaint)); }
+        }
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));

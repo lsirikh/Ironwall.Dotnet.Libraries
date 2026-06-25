@@ -83,7 +83,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try { LegendTextPaint.Color = ChartThemeProvider.TextColor(theme); TooltipTextPaint.Color = ChartThemeProvider.TextColor(theme); _rebuildChart?.Invoke(); }
+            try { var c = ChartThemeProvider.TextColor(theme); LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() }; TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() }; _rebuildChart?.Invoke(); }
             catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
@@ -476,22 +476,31 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             set { _isActionEnable = value; ToggleVisibility(3, value); }
         }
 
-        public SolidColorPaint LegendTextPaint { get; set; } =
-        new SolidColorPaint
+        // 토글 시 차트가 다시 그리도록 알림 속성으로(재할당+Notify). 스칼라 .Color 변경만으론 LiveCharts 미갱신.
+        private SolidColorPaint _legendTextPaint = new SolidColorPaint
         {
             Color = ChartThemeProvider.TextColor(BaseTheme.Light),
             SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint LegendTextPaint
+        {
+            get => _legendTextPaint;
+            set { _legendTextPaint = value; NotifyOfPropertyChange(nameof(LegendTextPaint)); }
+        }
 
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
-        public SolidColorPaint TooltipTextPaint { get; set; } =
-        new SolidColorPaint
+        private SolidColorPaint _tooltipTextPaint = new SolidColorPaint
         {
             Color = ChartThemeProvider.TextColor(BaseTheme.Light),
             SKTypeface = ChartThemeProvider.KoreanTypeface()
         };
+        public SolidColorPaint TooltipTextPaint
+        {
+            get => _tooltipTextPaint;
+            set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
+        }
 
         public ObservableCollection<ISeries> LSeries { get; private set; }
         public ObservableCollection<ISeries> DSeries { get; private set; }
