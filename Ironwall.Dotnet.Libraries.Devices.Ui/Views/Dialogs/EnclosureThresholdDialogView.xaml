@@ -15,22 +15,13 @@
 			<RowDefinition Height="*" />
 		</Grid.RowDefinitions>
 
-		<!--  시안 헤더 바 (LayerPanel 패턴)  -->
-		<Border
+		<!--  Header  -->
+		<TextBlock
 			Grid.Row="0"
-			Margin="-16,-16,-16,8"
-			Style="{StaticResource ModernDialogHeader}">
-			<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-				<md:PackIcon
-					Width="20"
-					Height="20"
-					Margin="0,0,8,0"
-					VerticalAlignment="Center"
-					Foreground="{DynamicResource OnPrimaryFixedBrush}"
-					Kind="Gauge" />
-				<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="{Binding DisplayName}" />
-			</StackPanel>
-		</Border>
+			Margin="0,0,0,8"
+			FontSize="16"
+			FontWeight="Bold"
+			Text="{Binding DisplayName}" />
 
 		<!--  Tab items from Conductor.Collection  -->
 		<TabControl
