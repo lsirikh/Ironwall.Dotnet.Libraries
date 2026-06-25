@@ -3,6 +3,8 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Modules;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Api.Models;
+using Ironwall.Dotnet.Libraries.Api.Services;
+using Ironwall.Dotnet.Libraries.Base.Services;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Tests;
@@ -46,5 +48,17 @@ public class AccountApiModuleResolutionTests
     {
         using var c = Build();
         Assert.Same(c.Resolve<ITokenStorageService>(), c.Resolve<ITokenStorageService>());
+    }
+
+    [Fact]
+    public void should_register_apiservice_as_iservice_for_app_initialization()
+    {
+        // 회귀 가드: Account ApiService 는 As<IService> 로도 등록돼야 앱 IService 러너가
+        // ExecuteAsync→Initialize 를 호출(HttpClient 파이프라인 구성). 누락 시 DI 는 통과하나
+        // 런타임에 client=null 로 로그인 실패 — 단위테스트로 잡기 어려운 유형이라 명시 가드.
+        using var c = Build();
+
+        var services = c.Resolve<IEnumerable<IService>>();
+        Assert.Contains(services, s => s is ApiService);
     }
 }

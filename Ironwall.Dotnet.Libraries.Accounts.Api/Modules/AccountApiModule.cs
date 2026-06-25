@@ -46,7 +46,9 @@ public class AccountApiModule : Module
                 () => scope.Resolve<IAccountApiService>(),   // 순환 회피: 401 시점 지연 해석
                 _log);
             return new ApiService(_log, scope.ResolveNamed<ApiSetupModel>(_name), handler);
-        }).Named<IApiService>(_name).SingleInstance().WithMetadata("Order", _count);
+        }).Named<IApiService>(_name)
+          .As<IService>()   // ★ 앱 IService 러너가 ExecuteAsync→Initialize 호출(HttpClient 파이프라인 구성). 누락 시 로그인 시 client=null
+          .SingleInstance().WithMetadata("Order", _count);
 
         // Auth + User CRUD + 프로필 래퍼
         builder.Register(ctx => new AccountApiService(ctx.ResolveNamed<IApiService>(_name), _log))
