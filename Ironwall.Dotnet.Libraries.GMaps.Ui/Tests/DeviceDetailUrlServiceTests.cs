@@ -33,7 +33,7 @@ public class DeviceDetailUrlServiceTests
 
         var url = svc.BuildUrl(EnumDeviceType.IpCamera, 5);
 
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-camera&device=IP_CAMERA&panel=detail&panelId=5", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-camera&device=IP_CAMERA&panel=detail&panelId=5", url);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class DeviceDetailUrlServiceTests
 
         var url = svc.BuildUrl(EnumDeviceType.Controller, 1);
 
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-controller&device=PIDS_CONTROLLER&panel=detail&panelId=1", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-controller&device=PIDS_CONTROLLER&panel=detail&panelId=1", url);
     }
 
     #endregion
@@ -70,7 +70,7 @@ public class DeviceDetailUrlServiceTests
 
         var url = svc.BuildUrl(EnumDeviceType.PIR, 3);
 
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-sensor&device=PIDS_SENSOR&panel=detail&panelId=3", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-sensor&device=PIDS_SENSOR&panel=detail&panelId=3", url);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class DeviceDetailUrlServiceTests
 
         var url = svc.BuildUrl(EnumDeviceType.SmartSensor, 7);
 
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-sensor&device=PIDS_SENSOR&panel=detail&panelId=7", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-sensor&device=PIDS_SENSOR&panel=detail&panelId=7", url);
     }
 
     #endregion
@@ -96,7 +96,7 @@ public class DeviceDetailUrlServiceTests
 
         var url = svc.BuildUrl(EnumDeviceType.Controller, 1);
 
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-controller&device=PIDS_CONTROLLER&panel=detail&panelId=1", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-controller&device=PIDS_CONTROLLER&panel=detail&panelId=1", url);
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class DeviceDetailUrlServiceTests
     {
         var svc = new DeviceDetailUrlService(CreateSetup());
 
-        var b = "http://192.168.1.1:8080/ssw-svms";
+        var b = "https://192.168.1.1:8080/ssw-svms";
         Assert.Equal($"{b}?node=svms-device-controller&device=PIDS_CONTROLLER&panel=detail&panelId=1", svc.BuildUrl(EnumDeviceType.Controller,  1));
         Assert.Equal($"{b}?node=svms-device-camera&device=IP_CAMERA&panel=detail&panelId=2",           svc.BuildUrl(EnumDeviceType.IpCamera,    2));
         Assert.Equal($"{b}?node=svms-device-sensor&device=PIDS_SENSOR&panel=detail&panelId=3",         svc.BuildUrl(EnumDeviceType.SmartSensor, 3));
@@ -148,7 +148,7 @@ public class DeviceDetailUrlServiceTests
 
         var url = svc.BuildUrl(EnumDeviceType.Controller, 1);
 
-        Assert.StartsWith("http://192.168.1.1:8080/", url);
+        Assert.StartsWith("https://192.168.1.1:8080/", url);
     }
 
     #endregion
@@ -161,7 +161,7 @@ public class DeviceDetailUrlServiceTests
     {
         var svc = new DeviceDetailUrlService(CreateSetup());
         var url = svc.BuildUrl(EnumDeviceType.IpSpeaker, 10);
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-speaker&device=SPEAKER&panel=detail&panelId=10", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-speaker&device=SPEAKER&panel=detail&panelId=10", url);
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public class DeviceDetailUrlServiceTests
     {
         var svc = new DeviceDetailUrlService(CreateSetup());
         var url = svc.BuildUrl(EnumDeviceType.Lamp, 11);
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-lamp&device=LAMP&panel=detail&panelId=11", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-lamp&device=LAMP&panel=detail&panelId=11", url);
     }
 
     [Fact]
@@ -179,7 +179,7 @@ public class DeviceDetailUrlServiceTests
     {
         var svc = new DeviceDetailUrlService(CreateSetup());
         var url = svc.BuildUrl(EnumDeviceType.Enclosure, 12);
-        Assert.Equal("http://192.168.1.1:8080/ssw-svms?node=svms-device-enclosure&device=ENCLOSURE&panel=detail&panelId=12", url);
+        Assert.Equal("https://192.168.1.1:8080/ssw-svms?node=svms-device-enclosure&device=ENCLOSURE&panel=detail&panelId=12", url);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public class DeviceDetailUrlServiceTests
         var svc = new DeviceDetailUrlService(CreateSetup(port: 0));
         var url = svc.BuildUrl(EnumDeviceType.IpCamera, 1);
         Assert.DoesNotContain(":0", url);
-        Assert.StartsWith("http://192.168.1.1/ssw-svms", url);
+        Assert.StartsWith("https://192.168.1.1/ssw-svms", url);
     }
 
     #endregion
