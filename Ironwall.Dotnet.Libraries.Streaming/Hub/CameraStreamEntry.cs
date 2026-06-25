@@ -100,6 +100,10 @@ internal sealed class CameraStreamEntry : IAsyncDisposable
         player.EncounteredError += errorHandler;
 
         using var media = new Media(libVlc, new Uri(info.GetFullUrl()));
+        // Hub 플레이어는 비디오만 커스텀 콜백(SetVideoCallbacks→SharedFrameBuffer)으로 렌더하므로 오디오 트랙은 불필요.
+        // 오디오를 끄지 않으면 LibVLC가 오디오 클럭으로 A/V 동기를 맞추다 vmem 비디오 콜백이 stall → 프레임 정지.
+        // 오디오 포함 스트림(예: rtsp .../video1+audio1)을 쓰는 카메라만 영상이 멈추는 원인(비디오 전용 스트림은 무영향).
+        media.AddOption(":no-audio");
         player.Media = media;
         player.Play();
 
