@@ -207,7 +207,7 @@
 					<TextBlock Text="{Binding Result}">
 						<TextBlock.Style>
 							<Style BasedOn="{StaticResource MaterialDesignBody2TextBlock}" TargetType="TextBlock">
-								<Setter Property="Foreground" Value="Black" />
+								<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
 								<Setter Property="FontWeight" Value="Bold" />
 								<Style.Triggers>
 									<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
