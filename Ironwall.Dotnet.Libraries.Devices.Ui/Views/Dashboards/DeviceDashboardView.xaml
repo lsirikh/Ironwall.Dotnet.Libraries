@@ -44,8 +44,8 @@
 			Grid.Row="0"
 			Margin="5"
 			Background="{DynamicResource MaterialDesignBackground}"
-			BorderThickness="2"
-			CornerRadius="5">
+			BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"
+			CornerRadius="8">
 			<Border.Resources>
 				<Style TargetType="Border">
 					<Style.Triggers>
@@ -585,8 +585,8 @@
 			Grid.Row="0"
 			Margin="5"
 			md:ThemeAssist.Theme="Inherit"
-			BorderThickness="2"
-			CornerRadius="10">
+			BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"
+			CornerRadius="8">
 			<Border.Resources>
 				<Style TargetType="Border">
 					<Style.Triggers>
