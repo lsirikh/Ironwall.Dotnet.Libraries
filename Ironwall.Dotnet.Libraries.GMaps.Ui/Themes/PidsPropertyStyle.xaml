@@ -136,7 +136,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="탐지범위" />
@@ -164,7 +164,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="탐지각도" />
@@ -192,7 +192,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="탐지방향" />
@@ -220,7 +220,7 @@
 									<ColumnDefinition Width="35" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="기준방향" />

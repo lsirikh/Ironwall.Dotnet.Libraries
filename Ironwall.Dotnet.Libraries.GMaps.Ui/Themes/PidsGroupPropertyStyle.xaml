@@ -44,12 +44,12 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="포인트 수" />
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="1"
 									VerticalAlignment="Center"
 									Text="{Binding PointCount, StringFormat='{}{0}개'}" />
@@ -62,12 +62,12 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="총 거리" />
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="1"
 									VerticalAlignment="Center"
 									Text="{Binding TotalDistance, StringFormat='{}{0:F2}m'}" />
@@ -96,7 +96,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="패턴" />
@@ -120,7 +120,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="투명도" />
@@ -133,7 +133,7 @@
 										Value="{Binding LineOpacity, Mode=TwoWay}" />
 									<TextBlock
 										Margin="5,0,0,0"
-                                        Foreground="WhiteSmoke"
+                                        Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										VerticalAlignment="Center"
 										Text="{Binding LineOpacity, StringFormat='{}{0:P0}'}" />
 								</StackPanel>
@@ -163,7 +163,7 @@
 									<ColumnDefinition Width="*" />
 								</Grid.ColumnDefinitions>
 								<TextBlock
-                                    Foreground="WhiteSmoke"
+                                    Foreground="{DynamicResource OnPrimaryFixedBrush}"
 									Grid.Column="0"
 									Style="{StaticResource PropertyLabel}"
 									Text="장비 그룹" />
