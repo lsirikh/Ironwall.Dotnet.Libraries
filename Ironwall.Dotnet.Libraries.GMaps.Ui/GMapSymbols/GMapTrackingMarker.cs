@@ -20,7 +20,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 /// AiAnalysis TRACKING_STATUS 타겟 마커. transient(편집/영속 없음)라 ISymbolModel 결합을 피하고 <see cref="GMapMarker"/> 직접 파생.
 /// <para><b>디자인</b>: 물방울 핀(<see cref="PackIconKind.MapMarker"/>, <b>색=위험도</b> severity hue-lock) 안에
 /// 타입 아이콘(사람=Walk / 차=Car / 동물=Paw / 미상=HelpCircle, 흰색) + 진행방향 화살표.
-/// 라벨 텍스트 없음 — <b>마우스 호버 시 툴팁</b>으로 track_id + 속도(m/s) 표시.</para>
+/// <b>속도(m/s)는 핀 아래 상시 표시</b>, track_id는 <b>마우스 호버 툴팁</b>으로만.</para>
 /// <para>핀 끝(tip)이 실제 좌표에 앵커. 생성·갱신은 UI Dispatcher에서만(매니저 보장).</para>
 /// </summary>
 public sealed class GMapTrackingMarker : GMapMarker
@@ -36,8 +36,7 @@ public sealed class GMapTrackingMarker : GMapMarker
     private readonly PackIcon _typeIcon;
     private readonly Polygon _arrow;
     private readonly RotateTransform _arrowRotate;
-    private readonly TextBlock _tipId;
-    private readonly TextBlock _tipSpeed;
+    private readonly TextBlock _speedLabel;
 
     public int CameraId { get; }
     public string TrackId { get; }
@@ -90,13 +89,22 @@ public sealed class GMapTrackingMarker : GMapMarker
         Canvas.SetTop(_typeIcon, HeadY - 7.5);
         canvas.Children.Add(_typeIcon);
 
-        // 호버 툴팁: track_id + 속도
-        _tipId = new TextBlock { Text = trackId, FontWeight = FontWeights.Bold };
-        _tipSpeed = new TextBlock { Text = "— m/s", FontSize = 11, Opacity = 0.8 };
-        var tip = new StackPanel { Margin = new Thickness(2) };
-        tip.Children.Add(_tipId);
-        tip.Children.Add(_tipSpeed);
-        canvas.ToolTip = tip;
+        // 속도: 핀 아래 상시 표시
+        _speedLabel = new TextBlock
+        {
+            Text = "0.0 m/s",
+            Foreground = Brushes.White,
+            FontSize = 10,
+            TextAlignment = TextAlignment.Center,
+            Width = 52,
+            Background = new SolidColorBrush(Color.FromArgb(0xC0, 0, 0, 0)),
+        };
+        Canvas.SetLeft(_speedLabel, (PinW - 52) / 2);   // 핀 아래 중앙 정렬
+        Canvas.SetTop(_speedLabel, PinH);               // 핀 끝 바로 아래
+        canvas.Children.Add(_speedLabel);
+
+        // track_id 는 호버 툴팁으로만
+        canvas.ToolTip = trackId;
 
         Shape = canvas;
         Offset = new Point(-TipX, -TipY);   // 핀 끝이 좌표에 앵커
@@ -109,7 +117,7 @@ public sealed class GMapTrackingMarker : GMapMarker
         _typeIcon.Kind = IconFor(type);
         _arrowRotate.Angle = bearing;
         _arrow.Visibility = showArrow ? Visibility.Visible : Visibility.Collapsed;
-        _tipSpeed.Text = $"{speedMps:F1} m/s";
+        _speedLabel.Text = $"{speedMps:F1} m/s";
     }
 
     /// <summary>lost/idle 등 흐릿 처리(제거 전 페이드).</summary>
