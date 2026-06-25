@@ -31,6 +31,9 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts\Ironwall.Dotnet.Libraries.Accounts.csproj" />
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Db\Ironwall.Dotnet.Libraries.Accounts.Db.csproj" />
 
+    <!-- GOP-00: 서버 인증 어댑터 (useDbAuth=false 시 AccountApiModule 등록) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
+
     <!-- TokenGenerator / PasswordHelper 출처 — Services/Helpers 만 사용, Bootstrapper류 import 금지 -->
     <ProjectReference Include="..\Ironwall.Dotnet.Framework\Ironwall.Dotnet.Framework.csproj" />
   </ItemGroup>

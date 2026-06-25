@@ -1,7 +1,9 @@
 using Autofac;
 using Ironwall.Dotnet.Framework.Services;                 // TokenGenerator
 using Ironwall.Dotnet.Libraries.Accounts.Db.Modules;      // AccountDbModule
+using Ironwall.Dotnet.Libraries.Accounts.Api.Modules;     // AccountApiModule (GOP useDbAuth=false)
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;        // IAuthGateway / IUserDirectoryGateway / IProfileGateway
+using Ironwall.Dotnet.Libraries.Api.Models;               // IApiSetupModel (GOP 서버 설정)
 using Ironwall.Dotnet.Libraries.Accounts.Models;          // IAccountSetupModel, AccountSetupModel
 using Ironwall.Dotnet.Libraries.Accounts.Modules;         // AccountModule
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Gateways;     // DbAccountGateway
@@ -31,17 +33,20 @@ public class AccountUiModule : Module
     /// <param name="log">선택적 로깅.</param>
     /// <param name="count">IService Order 시작값(기존 AccountDb Order=10 유지).</param>
     /// <param name="useDbAuth">AuthMode.Direct(=true): DbAccountGateway 등록. GOP-00에서 false로 전환.</param>
+    /// <param name="apiSetup">GOP 서버 설정(useDbAuth=false 시 필수). AccountApiModule 에 주입.</param>
     public AccountUiModule(IAccountSetupModel accountSetup,
                            IMariaDbSetupModel? dbSetup = default,
                            ILogService? log = default,
                            int count = default,
-                           bool useDbAuth = true)
+                           bool useDbAuth = true,
+                           IApiSetupModel? apiSetup = default)
     {
         _accountSetup = accountSetup;
         _dbSetup = dbSetup;
         _log = log;
         _count = count;
         _useDbAuth = useDbAuth;
+        _apiSetup = apiSetup;
     }
     #endregion
 
@@ -71,7 +76,7 @@ public class AccountUiModule : Module
                    .As<IProfileImageService>().SingleInstance()
                    .IfNotRegistered(typeof(IProfileImageService));   // 앱이 커스텀 주입 시 우선
 
-            // 5) Gateway seam — AuthMode.Direct: DbAccountGateway (GOP-00에서 ApiAccountGateway로 교체)
+            // 5) Gateway seam — Direct: DbAccountGateway / GOP: ApiAccountGateway (AccountApiModule)
             if (_useDbAuth)
             {
                 builder.RegisterType<DbAccountGateway>()
@@ -79,6 +84,15 @@ public class AccountUiModule : Module
                        .As<IUserDirectoryGateway>()
                        .As<IProfileGateway>()
                        .SingleInstance();
+            }
+            else
+            {
+                // GOP-00: ApiAccountGateway(3 인터페이스)+IAccountApiService+TokenStorage+Permission+BearerAuthHandler 일괄 등록.
+                //         VM 은 IAuthGateway 등에만 의존하므로 재편집 0 (§2.4.1).
+                if (_apiSetup is null)
+                    throw new InvalidOperationException(
+                        "useDbAuth=false(GOP 모드)인데 apiSetup(IApiSetupModel — GOP 서버 URL)이 주입되지 않았습니다.");
+                builder.RegisterModule(new AccountApiModule(_log, _apiSetup, name: "Account", count: _count++));
             }
 
             // 6) 상태 VM (Phase 2 이관 완료) — 패널/다이얼로그 VM은 Phase 3에서 활성화
@@ -112,5 +126,6 @@ public class AccountUiModule : Module
     private readonly ILogService? _log;
     private int _count;
     private readonly bool _useDbAuth;
+    private readonly IApiSetupModel? _apiSetup;
     #endregion
 }
