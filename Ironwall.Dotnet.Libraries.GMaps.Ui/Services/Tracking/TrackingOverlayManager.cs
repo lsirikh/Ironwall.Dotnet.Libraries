@@ -53,6 +53,7 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
     public void Attach(GMapControl map)
     {
         _map = map ?? throw new ArgumentNullException(nameof(map));
+        if (_sweepTimer is not null) return;   // 멱등 — 뷰 재연결 시 타이머 중복 기동 방지
         DispatcherService.Invoke(() =>
         {
             _sweepTimer = new DispatcherTimer(DispatcherPriority.Background)

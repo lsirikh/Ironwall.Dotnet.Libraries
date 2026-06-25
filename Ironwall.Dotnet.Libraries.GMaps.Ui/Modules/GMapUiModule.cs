@@ -56,7 +56,7 @@ public class GMapUiModule: Module
         builder.RegisterType<PtzController>().As<IPtzController>().SingleInstance();
         // Tracking GIS 오버레이(FR-15) — IClock + 단일 진입점 매니저. ITrackingSetupModel은 소비앱 God-Model(EXT-01)이 optional 제공
         builder.RegisterType<SystemClock>().As<IClock>().SingleInstance();
-        builder.RegisterType<TrackingOverlayManager>().As<ITrackingOverlayManager>().SingleInstance();
+        builder.RegisterType<TrackingOverlayManager>().AsSelf().As<ITrackingOverlayManager>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<CustomMapOverlayService>().SingleInstance();
