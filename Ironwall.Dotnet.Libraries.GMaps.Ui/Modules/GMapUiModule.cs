@@ -9,6 +9,8 @@ using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Db.Modules;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
@@ -52,6 +54,9 @@ public class GMapUiModule: Module
         builder.RegisterType<MapViewModel>().SingleInstance();
         // PTZ 제어(CameraPopup_PTZ_Control) — IOnvifService(OnvifServiceModule)·ILogService 의존, 메인 Bootstrapper에서 OnvifServiceModule 등록 필요
         builder.RegisterType<PtzController>().As<IPtzController>().SingleInstance();
+        // Tracking GIS 오버레이(FR-15) — IClock + 단일 진입점 매니저. ITrackingSetupModel은 소비앱 God-Model(EXT-01)이 optional 제공
+        builder.RegisterType<SystemClock>().As<IClock>().SingleInstance();
+        builder.RegisterType<TrackingOverlayManager>().As<ITrackingOverlayManager>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<CustomMapOverlayService>().SingleInstance();
