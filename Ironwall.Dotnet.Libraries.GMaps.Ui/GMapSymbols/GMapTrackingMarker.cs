@@ -123,6 +123,23 @@ public sealed class GMapTrackingMarker : GMapMarker
     /// <summary>lost/idle 등 흐릿 처리(제거 전 페이드).</summary>
     public void SetDimmed(bool dimmed) => ((Canvas)Shape).Opacity = dimmed ? 0.45 : 1.0;
 
+    /// <summary>재생(Playback) 마커 식별 뱃지 — 라이브와 구분(핀 좌상단 ▶ PLAY).</summary>
+    public void EnablePlaybackBadge()
+    {
+        var badge = new TextBlock
+        {
+            Text = "▶",
+            Foreground = Brushes.White,
+            FontSize = 8,
+            FontWeight = FontWeights.Bold,
+            Background = new SolidColorBrush(Color.FromRgb(0xD3, 0x6B, 0xFF)),
+            Padding = new Thickness(3, 0, 3, 0),
+        };
+        Canvas.SetLeft(badge, -2);
+        Canvas.SetTop(badge, -2);
+        ((Canvas)Shape).Children.Add(badge);
+    }
+
     private static PackIconKind IconFor(EnumTargetType type) => type switch
     {
         EnumTargetType.Person => PackIconKind.Walk,
