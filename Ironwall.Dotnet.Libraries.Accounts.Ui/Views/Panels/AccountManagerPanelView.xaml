@@ -34,7 +34,7 @@
 			VerticalAlignment="Stretch"
 			md:ThemeAssist.Theme="Inherit"
 			Opacity="0.9"
-			UniformCornerRadius="10">
+			UniformCornerRadius="8">
 			<Grid HorizontalAlignment="Center">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
@@ -44,16 +44,21 @@
 					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
 				<StackPanel Grid.Row="0" Orientation="Vertical">
-					<StackPanel
-						Grid.Row="0"
-						VerticalAlignment="Center"
-						Orientation="Horizontal">
-						<md:PackIcon Kind="Account" Style="{StaticResource DialogTitleIcon}" />
-						<TextBlock Style="{StaticResource DialogTitle}" Text="사용자 정보" />
-					</StackPanel>
-
-
-					<Separator Background="{DynamicResource DividerBrush}" Style="{StaticResource MaterialDesignLightSeparator}" />
+					<!--  시안 헤더 바 (LayerPanel 패턴)  -->
+					<Border
+						Margin="-20,-20,-20,8"
+						Style="{StaticResource ModernDialogHeader}">
+						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+							<md:PackIcon
+								Width="20"
+								Height="20"
+								Margin="0,0,8,0"
+								VerticalAlignment="Center"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
+								Kind="Account" />
+							<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="사용자 정보" />
+						</StackPanel>
+					</Border>
 
 
 					<Grid Grid.Row="0" Margin="10,0">
