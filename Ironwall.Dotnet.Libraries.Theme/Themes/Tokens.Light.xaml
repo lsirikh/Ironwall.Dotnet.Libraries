@@ -18,8 +18,8 @@
     <SolidColorBrush x:Key="SurfacePressedBrush" Color="#C5D2E0" /><!-- pressed(파생) -->
 
     <!-- ══ Borders / Dividers ══ -->
-    <SolidColorBrush x:Key="BorderBrush"  Color="#BCC7D4" /><!-- tactical border -->
-    <SolidColorBrush x:Key="DividerBrush" Color="#D2DAE3" /><!-- tactical divider -->
+    <SolidColorBrush x:Key="BorderBrush"  Color="#8FA0B3" /><!-- tactical border (강화: 흐리멍텅 보정) -->
+    <SolidColorBrush x:Key="DividerBrush" Color="#B4C0CE" /><!-- tactical divider (강화) -->
 
     <!-- ══ Text ══ -->
     <SolidColorBrush x:Key="TextPrimaryBrush"   Color="#13202C" /><!-- tactical textPrimary -->
