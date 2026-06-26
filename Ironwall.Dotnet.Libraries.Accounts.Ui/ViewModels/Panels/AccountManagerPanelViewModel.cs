@@ -41,6 +41,14 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        // 최초 진입 시에도 서버에서 계정을 로드한다. 기존엔 _accountProvider(인메모리)에서 복사만 해
+        // '갱신' 버튼을 눌러야만 fetch 돼 첫 화면이 비어 보였음.
+        var fetched = await _gateway.GetAllAccountsAsync(cancellationToken).ConfigureAwait(false);
+        if (fetched != null)
+        {
+            _accountProvider.Clear();
+            fetched.ForEach(acc => _accountProvider.Add(acc));
+        }
         await DataInitialize(cancellationToken).ConfigureAwait(false);
     }
 
