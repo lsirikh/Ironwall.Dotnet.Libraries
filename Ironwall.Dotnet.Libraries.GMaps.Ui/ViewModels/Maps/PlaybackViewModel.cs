@@ -29,7 +29,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
 {
     private readonly PlaybackEngine _engine;
-    private readonly TrackPointStore _store;
+    private readonly ITrackPointReader _reader;   // 로컬/서버 교체 seam(분석 §1.1)
     private readonly PlaybackOverlayManager _overlay;
     private readonly ITrackingSetupModel? _setup;
     private readonly ILogService? _log;
@@ -40,11 +40,11 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     /// <summary>콘솔 닫기 요청(MapViewModel이 패널 숨김).</summary>
     public event System.Action? CloseRequested;
 
-    public PlaybackViewModel(PlaybackEngine engine, TrackPointStore store, PlaybackOverlayManager overlay,
+    public PlaybackViewModel(PlaybackEngine engine, ITrackPointReader reader, PlaybackOverlayManager overlay,
                              ITrackingSetupModel? setup = null, ILogService? log = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
         _setup = setup;
         _log = log;
@@ -157,7 +157,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
             _engine.GapThresholdSec = _setup.GapThresholdSec;
         }
 
-        var points = await _store.FetchAsync(null, fromUtc, toUtc).ConfigureAwait(true);
+        var points = await _reader.FetchAsync(null, fromUtc, toUtc).ConfigureAwait(true);
         _engine.Load(points);
         BuildEvents(points);
         _overlay.SetEnabledTracks(EnabledSet());

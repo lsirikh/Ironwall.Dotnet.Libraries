@@ -60,8 +60,9 @@ public class GMapUiModule: Module
         //    명시적 기본생성자 팩토리로 등록(순환 회피).
         builder.Register(_ => new TrackingSetupModel()).As<ITrackingSetupModel>().SingleInstance();
         builder.RegisterType<TrackingOverlayManager>().AsSelf().As<ITrackingOverlayManager>().SingleInstance();
-        // 추적 좌표 로컬 DB 영속(P4) — 핸들러 write(ITrackPointWriter) + Playback read(AsSelf)
-        builder.RegisterType<TrackPointStore>().AsSelf().As<ITrackPointWriter>().SingleInstance();
+        // 추적 좌표 로컬 DB 영속(P4) — write(ITrackPointWriter) + Playback read(ITrackPointReader seam, 서버전환 시 교체)
+        builder.RegisterType<TrackPointStore>().AsSelf()
+               .As<ITrackPointWriter>().As<ITrackPointReader>().SingleInstance();
         // Playback(P5) — 엔진·격리 오버레이·콘솔 VM (로컬 DB 조회 재생)
         builder.RegisterType<PlaybackEngine>().SingleInstance();
         builder.RegisterType<PlaybackOverlayManager>().SingleInstance();

@@ -19,7 +19,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
 /// <see cref="Ptz.PtzPresetStore"/> 패턴 — DB 실패 시 비블로킹(로그 후 빈 결과).
 /// <para>영속=우선 로컬 자체 DB(2026-06-25). 속도는 미저장(null) → Playback이 연속 좌표로 재계산.</para>
 /// </summary>
-public sealed class TrackPointStore : ITrackPointWriter
+public sealed class TrackPointStore : ITrackPointWriter, ITrackPointReader
 {
     private readonly IGMapDbService _db;
     private readonly ILogService? _log;
