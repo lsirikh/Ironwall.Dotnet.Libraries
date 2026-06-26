@@ -314,19 +314,9 @@
 						CornerRadius="4"
 						SnapsToDevicePixels="True">
 						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*" />
-								<ColumnDefinition Width="22" />
-							</Grid.ColumnDefinitions>
-
-							<!-- 전체 폭 투명 클릭/토글 레이어. 로컬 Stretch·MinWidth 0 로 implicit ToggleButton 스타일 침투 차단 -->
+							<!-- 전체 영역 클릭 레이어: 단일 셀이라 항상 전체폭을 채움 → Border 어디를 클릭해도 토글 -->
 							<ToggleButton
 								x:Name="ToggleButton"
-								Grid.ColumnSpan="2"
-								MinWidth="0"
-								MinHeight="0"
-								Margin="0"
-								Padding="0"
 								HorizontalAlignment="Stretch"
 								VerticalAlignment="Stretch"
 								Background="Transparent"
@@ -343,35 +333,36 @@
 								</ToggleButton.Template>
 							</ToggleButton>
 
-							<!-- 선택 항목 표시 (col0 제약 → 박스 밖 넘침 방지). 토글 레이어 위에 렌더 -->
-							<ContentPresenter
-								x:Name="ContentSite"
-								Grid.Column="0"
-								Margin="8,0,4,0"
-								HorizontalAlignment="Left"
-								VerticalAlignment="Center"
-								Content="{TemplateBinding SelectionBoxItem}"
-								ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-								ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-								IsHitTestVisible="False"
-								TextElement.Foreground="{TemplateBinding Foreground}"
-								SnapsToDevicePixels="True" />
-
-							<!-- 화살표 (col1) -->
-							<Path
-								x:Name="Arrow"
-								Grid.Column="1"
-								HorizontalAlignment="Center"
-								VerticalAlignment="Center"
-								Data="M0,0 L4,4 L8,0 Z"
-								Fill="{DynamicResource TextSecondaryBrush}"
-								IsHitTestVisible="False"
-								SnapsToDevicePixels="True" />
+							<!-- 내용+화살표 오버레이: IsHitTestVisible=False → 클릭이 아래 ToggleButton으로 통과(어디든 토글) -->
+							<Grid IsHitTestVisible="False">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="22" />
+								</Grid.ColumnDefinitions>
+								<ContentPresenter
+									x:Name="ContentSite"
+									Grid.Column="0"
+									Margin="8,0,4,0"
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									Content="{TemplateBinding SelectionBoxItem}"
+									ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+									ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+									TextElement.Foreground="{TemplateBinding Foreground}"
+									SnapsToDevicePixels="True" />
+								<Path
+									x:Name="Arrow"
+									Grid.Column="1"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Data="M0,0 L4,4 L8,0 Z"
+									Fill="{DynamicResource TextSecondaryBrush}"
+									SnapsToDevicePixels="True" />
+							</Grid>
 
 							<!-- 드롭다운 팝업: PART_Popup (콤보 전체 폭 기준 바로 아래) -->
 							<Popup
 								x:Name="PART_Popup"
-								Grid.ColumnSpan="2"
 								AllowsTransparency="True"
 								Focusable="False"
 								IsOpen="{TemplateBinding IsDropDownOpen}"
