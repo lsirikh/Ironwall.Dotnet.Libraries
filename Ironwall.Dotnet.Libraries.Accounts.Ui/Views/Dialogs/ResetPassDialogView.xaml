@@ -32,7 +32,6 @@
 			MinHeight="250"
 			Padding="20"
 			VerticalAlignment="Stretch"
-			md:ThemeAssist.Theme="Inherit"
 			Opacity="1"
 			UniformCornerRadius="8">
 
