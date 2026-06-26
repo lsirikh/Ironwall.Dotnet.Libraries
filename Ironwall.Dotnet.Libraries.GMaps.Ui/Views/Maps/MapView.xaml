@@ -287,6 +287,18 @@
 							</Button.Style>
 							<md:PackIcon Kind="PlayCircleOutline" />
 						</Button>
+						<Button Command="{Binding ToggleTrackingSettingsPanelCommand}" ToolTip="추적 설정">
+							<Button.Style>
+								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsTrackingSettingsPanelVisible}" Value="True">
+											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Button.Style>
+							<md:PackIcon Kind="CogOutline" />
+						</Button>
 					</StackPanel>
 				</Border>
 
@@ -752,6 +764,13 @@
 					Panel.ZIndex="110"
 					Content="{Binding PlaybackPanel}"
 					Visibility="{Binding IsPlaybackPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  추적 설정 패널(P3-04) — 즉시적용 + 저장 영속  -->
+				<ContentPresenter
+					x:Name="TrackingSettingsPresenter"
+					Panel.ZIndex="120"
+					Content="{Binding TrackingSettingsPanel}"
+					Visibility="{Binding IsTrackingSettingsPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  카메라 팝업 연결선(Leader Line) — 카메라 심볼 중점 ↔ 팝업 경계, 팝업 아래 z레이어  -->
 				<ItemsControl

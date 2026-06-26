@@ -66,6 +66,8 @@ public class GMapUiModule: Module
         builder.RegisterType<PlaybackEngine>().SingleInstance();
         builder.RegisterType<PlaybackOverlayManager>().SingleInstance();
         builder.RegisterType<PlaybackViewModel>().SingleInstance();
+        // 추적 설정 패널(P3-04) — 싱글톤 ITrackingSetupModel 직접 조정(즉시 적용) + 저장
+        builder.RegisterType<TrackingSetupViewModel>().SingleInstance();
         builder.RegisterType<TileGenerationService>().SingleInstance();
         builder.RegisterType<CustomMapService>().SingleInstance();
         builder.RegisterType<CustomMapOverlayService>().SingleInstance();
