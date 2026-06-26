@@ -37,7 +37,7 @@
 		<Setter Property="VerticalContentAlignment" Value="Center" />
 	</Style>
 
-	<Style x:Key="CompactComboBox" TargetType="ComboBox">
+	<Style x:Key="CompactComboBox" TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignComboBox}">
 		<Setter Property="Margin" Value="2" />
 		<Setter Property="Padding" Value="4,2" />
 		<Setter Property="FontSize" Value="10" />

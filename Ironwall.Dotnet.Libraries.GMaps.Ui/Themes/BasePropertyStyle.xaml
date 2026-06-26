@@ -24,7 +24,7 @@
 		<Setter Property="VerticalContentAlignment" Value="Center" />
 	</Style>
 
-	<Style x:Key="CompactComboBox" TargetType="ComboBox">
+	<Style x:Key="CompactComboBox" TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignComboBox}">
 		<Setter Property="Margin" Value="2" />
 		<Setter Property="Padding" Value="4,2" />
 		<Setter Property="FontSize" Value="10" />
@@ -275,6 +275,7 @@
 											Style="{StaticResource PropertyLabel}"
 											Text="채우기" />
 										<ComboBox
+											Background="Transparent"
 											Grid.Column="1"
 											ItemsSource="{Binding AvailableColors, RelativeSource={RelativeSource TemplatedParent}}"
 											SelectedItem="{Binding MarkerFillColor, RelativeSource={RelativeSource TemplatedParent}}"
