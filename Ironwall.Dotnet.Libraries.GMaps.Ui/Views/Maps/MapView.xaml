@@ -96,14 +96,19 @@
 			<ColumnDefinition Width="*" />
 		</Grid.ColumnDefinitions>
 
-		<Menu
+		<!--  단일 커맨드 바 (Variant A): 메뉴(좌) + 툴바(채움)를 한 행에  -->
+		<DockPanel
 			Grid.Row="0"
 			Grid.ColumnSpan="2"
 			Margin="50,0,0,0"
 			Panel.ZIndex="10"
-			Background="{DynamicResource SurfaceBrush}"
-			IsMainMenu="True"
-			Style="{StaticResource MaterialDesignMenu}">
+			Background="{DynamicResource SurfaceBrush}">
+			<Menu
+				DockPanel.Dock="Left"
+				VerticalAlignment="Center"
+				Background="Transparent"
+				IsMainMenu="True"
+				Style="{StaticResource MaterialDesignMenu}">
 
 			<!--  File 메뉴  -->
 			<MenuItem Header="_File">
@@ -205,17 +210,14 @@
 			</MenuItem>
 		</Menu>
 
-		<ToolBarTray
-			Grid.Row="1"
-			Grid.Column="0"
-			Grid.ColumnSpan="2"
-			Margin="50,0,0,0"
-			Panel.ZIndex="10"
-			Background="{DynamicResource SurfaceBrush}"
-			md:ThemeAssist.Theme="Inherit">
+			<ToolBarTray
+				VerticalAlignment="Center"
+				Background="{DynamicResource SurfaceBrush}"
+				md:ThemeAssist.Theme="Inherit">
 			<ToolBar ClipToBounds="True" Background="{DynamicResource SurfaceBrush}" Style="{StaticResource MaterialDesignToolBar}">
 
 				<!--  ① 지도 선택 그룹  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="지도" />
 				<ComboBox
 					Width="150"
 					Margin="5,0"
@@ -244,6 +246,7 @@
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
 				<!--  ② 네비게이션 그룹  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="이동" />
 				<Border Style="{StaticResource ToolbarGroupStyle}">
 					<StackPanel Orientation="Horizontal">
 						<Button Command="{Binding MoveHomeLocationCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="홈 위치 이동">
@@ -306,6 +309,7 @@
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
 				<!--  ④ 편집 그룹  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="편집" />
 				<Border Style="{StaticResource ToolbarGroupStyle}">
 					<StackPanel Orientation="Horizontal">
 						<ToggleButton
@@ -336,6 +340,7 @@
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
 				<!--  ⑤ 심볼 추가 그룹  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="심볼" />
 				<ComboBox
 					Width="120"
 					ItemsSource="{Binding AvailableMarkerCategories}"
@@ -627,6 +632,7 @@
 				</TextBlock>-->
 			</ToolBar>
 		</ToolBarTray>
+		</DockPanel>
 
 		<!--<gmap:GMapCustomControl
 			x:Name="MainMap"

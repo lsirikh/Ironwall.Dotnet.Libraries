@@ -74,7 +74,7 @@
 				<ControlTemplate TargetType="Button">
 					<Border
 						x:Name="Bd"
-						Padding="10,7"
+						Padding="2,2"
 						Background="{TemplateBinding Background}"
 						CornerRadius="5">
 						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -231,6 +231,15 @@
 		<Setter Property="Height" Value="24" />
 		<Setter Property="Background" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="Margin" Value="4,0" />
+	</Style>
+
+	<!--  툴바 그룹 마이크로 라벨 (지도/이동/편집/심볼 — Variant A)  -->
+	<Style x:Key="ToolbarGroupLabel" TargetType="TextBlock">
+		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+		<Setter Property="FontSize" Value="9" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+		<Setter Property="Margin" Value="6,0,3,0" />
 	</Style>
 
 	<!-- ═══════════════════ 맵 위 플로팅 패널 공통 ═══════════════════ -->
