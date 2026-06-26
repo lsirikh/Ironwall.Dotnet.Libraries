@@ -110,9 +110,15 @@ public class MyPagePanelViewModel : BasePanelViewModel
         try
         {
             var ret = await _gateway.UpdateProfileAsync(ViewModel.Model, cancellationToken);
-            if (ret != null) ViewModel.Insert(ret);
+            if (ret == null)   // 서버 저장 실패(null)인데 "완료"로 오인 표시하던 버그 — 실패 노출 후 종료
+            {
+                _log?.Warning("사용자 정보 변경 실패 — 서버가 저장하지 못함(null)");
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "내 정보", Explain = "사용자 정보 변경이 반영되지 않았습니다. 다시 시도해 주세요." }, cancellationToken);
+                return;
+            }
+            ViewModel.Insert(ret);   // 서버 에코(저장된 실제 값)로 화면 갱신
             _log?.Info("사용자 정보 변경작업 성공");
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = "사용자 정보 변경이 정상적으로 완료되었습니다." }, cancellationToken);
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "내 정보", Explain = "사용자 정보 변경이 정상적으로 완료되었습니다." }, cancellationToken);
         }
         catch (Exception ex)
         {

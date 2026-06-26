@@ -78,7 +78,13 @@ public class EditorDialogViewModel : BasePanelViewModel
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
 
             var ret = await _gateway.UpdateAccountAsync(ViewModel.Model, cancellationToken);
-            if (ret != null) ViewModel.Insert(ret);
+            if (ret == null)   // 저장 실패(null)인데 "완료"+닫힘으로 오인시키던 버그 — 실패 노출, 다이얼로그 유지
+            {
+                _log?.Warning("계정 정보 변경 실패 — 서버가 저장하지 못함(null)");
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "계정 편집", Explain = "계정 정보 변경이 반영되지 않았습니다. 다시 시도해 주세요." }, cancellationToken);
+                return;
+            }
+            ViewModel.Insert(ret);
 
             await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel(), cancellationToken);
             _log?.Info("사용자 정보 변경작업 성공");
