@@ -211,6 +211,7 @@
 			Grid.ColumnSpan="2"
 			Margin="50,0,0,0"
 			Panel.ZIndex="10"
+			Background="{DynamicResource SurfaceBrush}"
 			md:ThemeAssist.Theme="Inherit">
 			<ToolBar ClipToBounds="True" Background="{DynamicResource SurfaceBrush}" Style="{StaticResource MaterialDesignToolBar}">
 
