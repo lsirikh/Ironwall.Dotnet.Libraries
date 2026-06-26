@@ -64,9 +64,16 @@ public class ApiService : IApiService
 
         // FR-4: setupModel.Timeout 존중(0 이하면 기본 TIMEOUT 폴백). 기존엔 하드코딩 const 만 써서 설정이 무시되던 버그.
         var timeoutSec = _setupModel.Timeout > 0 ? _setupModel.Timeout : TIMEOUT;
+
+        // BaseAddress 끝 슬래시 정규화: base가 "…/api"(슬래시 없음)이면 상대 endpoint("auth/login")가
+        //   마지막 세그먼트 "/api"를 떨궈 "/auth/login"(404)로 가는 HttpClient 결합 함정. "/"로 강제해
+        //   "auth/login" → "…/api/auth/login" 정상 결합. (절대/leading-slash endpoint엔 영향 없음)
+        var baseUrl = string.IsNullOrEmpty(_setupModel.Url) || _setupModel.Url.EndsWith("/")
+            ? _setupModel.Url
+            : _setupModel.Url + "/";
         _client = new HttpClient(pipeline)
         {
-            BaseAddress = new Uri(_setupModel.Url),
+            BaseAddress = new Uri(baseUrl),
             Timeout = TimeSpan.FromSeconds(timeoutSec)
         };
     }
