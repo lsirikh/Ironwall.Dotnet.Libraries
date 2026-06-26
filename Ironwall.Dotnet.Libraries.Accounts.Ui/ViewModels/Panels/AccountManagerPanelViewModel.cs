@@ -47,7 +47,7 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
         if (fetched != null)
         {
             _accountProvider.Clear();
-            fetched.ForEach(acc => _accountProvider.Add(acc));
+            fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
         }
         else   // W5: fetch 실패 시 빈 화면 + 무안내 방지
         {
@@ -144,7 +144,7 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
             return;
         }
         _accountProvider.Clear();
-        fetched.ForEach(acc => _accountProvider.Add(acc));
+        fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
         await DataInitialize().ConfigureAwait(false);
     }
 
@@ -180,7 +180,7 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
             if (fetched != null)   // W4: 실패 시 기존 목록 보존
             {
                 _accountProvider.Clear();
-                fetched.ForEach(acc => _accountProvider.Add(acc));
+                fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
             }
 
             await DataInitialize(cancellationToken).ConfigureAwait(false);
