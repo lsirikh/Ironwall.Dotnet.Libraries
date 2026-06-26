@@ -320,9 +320,15 @@
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type ComboBox}">
 					<Grid>
-						<!-- 닫힌 박스 면: 자체 템플릿 ToggleButton(Aero 밝은 크롬 제거) -->
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="22" />
+						</Grid.ColumnDefinitions>
+
+						<!-- 전체 클릭영역 + 배경/테두리 (두 컬럼 span) -->
 						<ToggleButton
 							x:Name="ToggleButton"
+							Grid.ColumnSpan="2"
 							ClickMode="Press"
 							Focusable="False"
 							IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
@@ -334,41 +340,25 @@
 										BorderBrush="{DynamicResource BorderBrush}"
 										BorderThickness="1"
 										CornerRadius="4"
-										SnapsToDevicePixels="True">
-										<Grid>
-											<Grid.ColumnDefinitions>
-												<ColumnDefinition Width="*" />
-												<ColumnDefinition Width="18" />
-											</Grid.ColumnDefinitions>
-											<Path
-												x:Name="Arrow"
-												Grid.Column="1"
-												HorizontalAlignment="Center"
-												VerticalAlignment="Center"
-												Data="M0,0 L4,4 L8,0 Z"
-												Fill="{DynamicResource TextSecondaryBrush}"
-												SnapsToDevicePixels="True" />
-										</Grid>
-									</Border>
+										SnapsToDevicePixels="True" />
 									<ControlTemplate.Triggers>
 										<Trigger Property="IsMouseOver" Value="True">
 											<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
-											<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
 										</Trigger>
 										<Trigger Property="IsChecked" Value="True">
 											<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
-											<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource PrimaryBrush}" />
 										</Trigger>
 									</ControlTemplate.Triggers>
 								</ControlTemplate>
 							</ToggleButton.Template>
 						</ToggleButton>
 
-						<!-- 선택 항목 표시(색 스와치 ItemTemplate 닫힌 면 렌더). 화살표 영역 회피 우측 마진 -->
+						<!-- 선택 항목 표시 (col0 제약 → 박스 밖 넘침 방지) -->
 						<ContentPresenter
 							x:Name="ContentSite"
-							Margin="6,2,22,2"
-							HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+							Grid.Column="0"
+							Margin="8,0,4,0"
+							HorizontalAlignment="Left"
 							VerticalAlignment="Center"
 							Content="{TemplateBinding SelectionBoxItem}"
 							ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
@@ -377,9 +367,21 @@
 							TextElement.Foreground="{TemplateBinding Foreground}"
 							SnapsToDevicePixels="True" />
 
-						<!-- 드롭다운 팝업: PART_Popup 정확 명명(개폐 동작 필수) -->
+						<!-- 화살표 (col1) -->
+						<Path
+							x:Name="Arrow"
+							Grid.Column="1"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Data="M0,0 L4,4 L8,0 Z"
+							Fill="{DynamicResource TextSecondaryBrush}"
+							IsHitTestVisible="False"
+							SnapsToDevicePixels="True" />
+
+						<!-- 드롭다운 팝업: PART_Popup (콤보 전체 폭 기준) -->
 						<Popup
 							x:Name="PART_Popup"
+							Grid.ColumnSpan="2"
 							AllowsTransparency="True"
 							Focusable="False"
 							IsOpen="{TemplateBinding IsDropDownOpen}"
@@ -387,7 +389,7 @@
 							PopupAnimation="Slide">
 							<Border
 								x:Name="DropDownBorder"
-								MinWidth="{Binding ActualWidth, ElementName=ToggleButton}"
+								MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
 								MaxHeight="{TemplateBinding MaxDropDownHeight}"
 								Margin="0,2,0,4"
 								Background="{DynamicResource SurfaceAltBrush}"
@@ -410,6 +412,12 @@
 					</Grid>
 
 					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+						</Trigger>
+						<Trigger Property="IsDropDownOpen" Value="True">
+							<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource PrimaryBrush}" />
+						</Trigger>
 						<Trigger Property="HasItems" Value="False">
 							<Setter TargetName="DropDownBorder" Property="MinHeight" Value="24" />
 						</Trigger>
