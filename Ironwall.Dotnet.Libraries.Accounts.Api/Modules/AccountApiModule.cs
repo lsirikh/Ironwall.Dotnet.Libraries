@@ -58,6 +58,7 @@ public class AccountApiModule : Module
         builder.Register(ctx => new ApiAccountGateway(
                 ctx.Resolve<IAccountApiService>(),
                 ctx.Resolve<ITokenStorageService>(),
+                ctx.Resolve<IPermissionService>(),
                 _log))
             .As<IAuthGateway>()
             .As<IUserDirectoryGateway>()

@@ -11,7 +11,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Api.Tests;
 /// <summary>FR-19 ApiAccountGateway 계정관리(IUserDirectoryGateway) — API 호출 + DTO↔Model 매핑 검증.</summary>
 public class ApiAccountGatewayCrudTests
 {
-    private static ApiAccountGateway Gw() => new(new CrudStubApi(), new TokenStorageService());
+    private static ApiAccountGateway Gw() => new(new CrudStubApi(), new TokenStorageService(), new PermissionService());
 
     [Fact]
     public async Task should_list_accounts_via_api()

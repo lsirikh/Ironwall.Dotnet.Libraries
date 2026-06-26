@@ -20,12 +20,14 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
 {
     private readonly IAccountApiService _api;
     private readonly ITokenStorageService _tokenStore;
+    private readonly IPermissionService _permission;
     private readonly ILogService? _log;
 
-    public ApiAccountGateway(IAccountApiService api, ITokenStorageService tokenStore, ILogService? log = null)
+    public ApiAccountGateway(IAccountApiService api, ITokenStorageService tokenStore, IPermissionService permission, ILogService? log = null)
     {
         _api = api;
         _tokenStore = tokenStore;
+        _permission = permission;
         _log = log;
     }
 
@@ -46,6 +48,9 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
 
         // R1: access+refresh 를 게이트웨이가 직접 TokenStorage 에 보관(VM 엔 access 만 노출)
         _tokenStore.SetTokens(data.AccessToken, data.RefreshToken);
+        // ★ V-PG-01 §7: 로그인 시 권한엔진 적용. 이전엔 Apply() 호출이 0건이라 role/permissions 영구 미적용 →
+        //   모든 Can*/IsAdmin/HasRole 무력(게이팅 dead). 여기서 채워야 UI 게이팅이 살아난다. PermissionsChanged 발화.
+        _permission.Apply(user);
 
         var account = AccountDtoMapper.ToAccountModel(user);
         var permissions = PermissionsFlattener.Flatten(user.Permissions);
@@ -88,7 +93,7 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     {
         try { await _api.LogoutAsync(ct).ConfigureAwait(false); }
         catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] logout API 실패 — 로컬 폐기 진행: {ex.Message}"); }
-        finally { _tokenStore.Clear(); }
+        finally { _tokenStore.Clear(); _permission.Clear(); }   // ★ 토큰 + 권한엔진(role/토큰 → UNDEFINED) 동시 초기화
     }
 
     // ──────────────── IUserDirectoryGateway (FR-19) ────────────────

@@ -10,7 +10,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Api.Tests;
 /// <summary>FR-17 ApiAccountGateway 본인 프로필(IProfileGateway) — /users/me 연동 검증.</summary>
 public class ApiAccountGatewayProfileTests
 {
-    private static ApiAccountGateway Gw() => new(new ProfileStubApi(), new TokenStorageService());
+    private static ApiAccountGateway Gw() => new(new ProfileStubApi(), new TokenStorageService(), new PermissionService());
 
     [Fact]
     public async Task should_get_profile_via_api()

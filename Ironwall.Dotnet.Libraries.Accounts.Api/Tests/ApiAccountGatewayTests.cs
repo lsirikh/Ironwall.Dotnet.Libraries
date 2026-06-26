@@ -18,7 +18,7 @@ public class ApiAccountGatewayTests
     public async Task should_login_via_api_then_store_tokens_and_return_authresult()
     {
         var store = new TokenStorageService();
-        var gw = new ApiAccountGateway(new StubAuthApi(loginOk: true), store);
+        var gw = new ApiAccountGateway(new StubAuthApi(loginOk: true), store, new PermissionService());
 
         var outcome = await gw.AuthenticateAsync("admin", "pw");
 
@@ -41,7 +41,7 @@ public class ApiAccountGatewayTests
     public async Task should_return_null_and_not_store_when_login_fails()
     {
         var store = new TokenStorageService();
-        var gw = new ApiAccountGateway(new StubAuthApi(loginOk: false), store);
+        var gw = new ApiAccountGateway(new StubAuthApi(loginOk: false), store, new PermissionService());
 
         var outcome = await gw.AuthenticateAsync("admin", "bad");
 
