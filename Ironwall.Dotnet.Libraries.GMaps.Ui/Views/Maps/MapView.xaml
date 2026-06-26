@@ -761,6 +761,8 @@
 				<!--  추적 재생(Playback) 콘솔 — 컨트롤만, 재생 마커는 MainMap에 직접  -->
 				<ContentPresenter
 					x:Name="PlaybackPanelPresenter"
+					Canvas.Left="120"
+					Canvas.Top="60"
 					Panel.ZIndex="110"
 					Content="{Binding PlaybackPanel}"
 					Visibility="{Binding IsPlaybackPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -768,6 +770,8 @@
 				<!--  추적 설정 패널(P3-04) — 즉시적용 + 저장 영속  -->
 				<ContentPresenter
 					x:Name="TrackingSettingsPresenter"
+					Canvas.Left="170"
+					Canvas.Top="90"
 					Panel.ZIndex="120"
 					Content="{Binding TrackingSettingsPanel}"
 					Visibility="{Binding IsTrackingSettingsPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
