@@ -111,4 +111,12 @@
         <Setter Property="CornerRadius" Value="{DynamicResource RadiusMedium}" />
     </Style>
 
+    <!-- 전역: 모든 md:Card 배경을 SurfaceBrush로 통일 + elevation 오버레이 제거(Dp0).
+         다크에서 카드마다 회색(오버레이)/진청 제각각이던 패널 배경을 한 색으로 일치.
+         명시적 Style 또는 Background 가진 카드(KPI 등)는 로컬값 우선 → 영향 없음. -->
+    <Style TargetType="md:Card" BasedOn="{StaticResource MaterialDesignElevatedCard}">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="md:ElevationAssist.Elevation" Value="Dp0" />
+    </Style>
+
 </ResourceDictionary>
