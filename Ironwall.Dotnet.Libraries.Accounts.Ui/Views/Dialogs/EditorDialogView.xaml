@@ -16,11 +16,6 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 
-	<md:DialogHost
-		x:Name="DialogHost"
-		DialogTheme="Inherit"
-		Identifier="EditorDialogView">
-
 		<md:Card
 			x:Name="CardContents"
 			Width="500"
@@ -449,5 +444,4 @@
 
 			</Grid>
 		</md:Card>
-	</md:DialogHost>
 </UserControl>
