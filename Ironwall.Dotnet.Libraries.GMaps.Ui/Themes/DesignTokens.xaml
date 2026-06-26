@@ -260,4 +260,166 @@
 		</Setter>
 	</Style>
 
+	<!-- ═══════════════════ 속성창 공용 다크 ComboBox (자체완결·스코프안전) ═══════════════════ -->
+	<!-- BasedOn 없음 / 앱-MD StaticResource 0참조. 색은 전부 DynamicResource 테마 토큰. -->
+	<Style x:Key="PropertyComboBox" TargetType="{x:Type ComboBox}">
+		<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+		<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="Padding" Value="6,2" />
+		<Setter Property="MinHeight" Value="24" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="HorizontalContentAlignment" Value="Left" />
+		<Setter Property="VerticalContentAlignment" Value="Center" />
+		<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+		<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+		<Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+
+		<!-- 드롭다운 행(ComboBoxItem) — 시스템 흰배경/연파랑 하이라이트 제거 -->
+		<Setter Property="ItemContainerStyle">
+			<Setter.Value>
+				<Style TargetType="{x:Type ComboBoxItem}">
+					<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+					<Setter Property="Background" Value="Transparent" />
+					<Setter Property="Padding" Value="6,4" />
+					<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+					<Setter Property="SnapsToDevicePixels" Value="True" />
+					<Setter Property="Template">
+						<Setter.Value>
+							<ControlTemplate TargetType="{x:Type ComboBoxItem}">
+								<Border
+									x:Name="ItemBd"
+									Padding="{TemplateBinding Padding}"
+									Background="{TemplateBinding Background}"
+									SnapsToDevicePixels="True">
+									<ContentPresenter
+										HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+										VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+										TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
+								</Border>
+								<ControlTemplate.Triggers>
+									<Trigger Property="IsMouseOver" Value="True">
+										<Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+									</Trigger>
+									<Trigger Property="IsHighlighted" Value="True">
+										<Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+									</Trigger>
+									<Trigger Property="IsSelected" Value="True">
+										<Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource SurfacePressedBrush}" />
+									</Trigger>
+								</ControlTemplate.Triggers>
+							</ControlTemplate>
+						</Setter.Value>
+					</Setter>
+				</Style>
+			</Setter.Value>
+		</Setter>
+
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ComboBox}">
+					<Grid>
+						<!-- 닫힌 박스 면: 자체 템플릿 ToggleButton(Aero 밝은 크롬 제거) -->
+						<ToggleButton
+							x:Name="ToggleButton"
+							ClickMode="Press"
+							Focusable="False"
+							IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+							<ToggleButton.Template>
+								<ControlTemplate TargetType="{x:Type ToggleButton}">
+									<Border
+										x:Name="Bd"
+										Background="{DynamicResource SurfaceSunkenBrush}"
+										BorderBrush="{DynamicResource BorderBrush}"
+										BorderThickness="1"
+										CornerRadius="4"
+										SnapsToDevicePixels="True">
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*" />
+												<ColumnDefinition Width="18" />
+											</Grid.ColumnDefinitions>
+											<Path
+												x:Name="Arrow"
+												Grid.Column="1"
+												HorizontalAlignment="Center"
+												VerticalAlignment="Center"
+												Data="M0,0 L4,4 L8,0 Z"
+												Fill="{DynamicResource TextSecondaryBrush}"
+												SnapsToDevicePixels="True" />
+										</Grid>
+									</Border>
+									<ControlTemplate.Triggers>
+										<Trigger Property="IsMouseOver" Value="True">
+											<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+											<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+										</Trigger>
+										<Trigger Property="IsChecked" Value="True">
+											<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+											<Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource PrimaryBrush}" />
+										</Trigger>
+									</ControlTemplate.Triggers>
+								</ControlTemplate>
+							</ToggleButton.Template>
+						</ToggleButton>
+
+						<!-- 선택 항목 표시(색 스와치 ItemTemplate 닫힌 면 렌더). 화살표 영역 회피 우측 마진 -->
+						<ContentPresenter
+							x:Name="ContentSite"
+							Margin="6,2,22,2"
+							HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+							VerticalAlignment="Center"
+							Content="{TemplateBinding SelectionBoxItem}"
+							ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+							ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+							IsHitTestVisible="False"
+							TextElement.Foreground="{TemplateBinding Foreground}"
+							SnapsToDevicePixels="True" />
+
+						<!-- 드롭다운 팝업: PART_Popup 정확 명명(개폐 동작 필수) -->
+						<Popup
+							x:Name="PART_Popup"
+							AllowsTransparency="True"
+							Focusable="False"
+							IsOpen="{TemplateBinding IsDropDownOpen}"
+							Placement="Bottom"
+							PopupAnimation="Slide">
+							<Border
+								x:Name="DropDownBorder"
+								MinWidth="{Binding ActualWidth, ElementName=ToggleButton}"
+								MaxHeight="{TemplateBinding MaxDropDownHeight}"
+								Margin="0,2,0,4"
+								Background="{DynamicResource SurfaceAltBrush}"
+								BorderBrush="{DynamicResource BorderBrush}"
+								BorderThickness="1"
+								CornerRadius="4"
+								SnapsToDevicePixels="True">
+								<Border.Effect>
+									<DropShadowEffect
+										BlurRadius="8"
+										Opacity="0.18"
+										ShadowDepth="2"
+										Color="Black" />
+								</Border.Effect>
+								<ScrollViewer CanContentScroll="True" SnapsToDevicePixels="True">
+									<ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" SnapsToDevicePixels="True" />
+								</ScrollViewer>
+							</Border>
+						</Popup>
+					</Grid>
+
+					<ControlTemplate.Triggers>
+						<Trigger Property="HasItems" Value="False">
+							<Setter TargetName="DropDownBorder" Property="MinHeight" Value="24" />
+						</Trigger>
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.4" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
 </ResourceDictionary>

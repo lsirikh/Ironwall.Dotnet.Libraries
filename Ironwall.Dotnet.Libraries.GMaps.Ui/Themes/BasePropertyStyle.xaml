@@ -24,7 +24,7 @@
 		<Setter Property="VerticalContentAlignment" Value="Center" />
 	</Style>
 
-	<Style x:Key="CompactComboBox" TargetType="ComboBox">
+	<Style x:Key="CompactComboBox" TargetType="ComboBox" BasedOn="{StaticResource PropertyComboBox}">
 		<Setter Property="Margin" Value="2" />
 		<Setter Property="Padding" Value="4,2" />
 		<Setter Property="FontSize" Value="10" />
@@ -282,7 +282,7 @@
 											Style="{StaticResource CompactComboBox}">
 											<ComboBox.ItemTemplate>
 												<DataTemplate>
-													<StackPanel Orientation="Horizontal">
+													<StackPanel Orientation="Horizontal" Background="Transparent">
 														<Rectangle
 															Width="40"
 															Height="12"
@@ -294,6 +294,7 @@
 														<TextBlock
 															Margin="10,0"
 															FontSize="10"
+															Background="Transparent"
 															Foreground="{DynamicResource TextPrimaryBrush}"
 															Text="{Binding}" />
 													</StackPanel>
