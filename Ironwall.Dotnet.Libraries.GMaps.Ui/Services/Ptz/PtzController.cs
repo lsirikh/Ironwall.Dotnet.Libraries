@@ -144,7 +144,9 @@ public sealed class PtzController : IPtzController
         if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
         try
         {
+            var __swGate = System.Diagnostics.Stopwatch.StartNew();   // [진단] 게이트(직렬화) 대기 시간
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            __swGate.Stop();
             try
             {
                 // ContinuousMove(속도). Relative 미지원 카메라도 대부분 지원. 카메라는 Stop/타임아웃까지 이동.
@@ -156,8 +158,11 @@ public sealed class PtzController : IPtzController
                     PanTilt = new Vector2DDto { X = (float)panVel, Y = (float)tiltVel, Space = sp?.ContPtUri },
                     Zoom = new Vector1DDto { X = (float)zoomVel, Space = sp?.ContZoomUri },
                 };
-                _log?.Info($"[PTZ] ContinuousMove cam={cameraId} pan={panVel:F2} tilt={tiltVel:F2} zoom={zoomVel:F2} ptSpace={(sp?.ContPtUri ?? "null")} zSpace={(sp?.ContZoomUri ?? "null")}");
+                _log?.Info($"[PTZ] ContinuousMove cam={cameraId} pan={panVel:F2} tilt={tiltVel:F2} zoom={zoomVel:F2} ptSpace={(sp?.ContPtUri ?? "null")} zSpace={(sp?.ContZoomUri ?? "null")} gateWait={__swGate.ElapsedMilliseconds}ms");
+                var __swMove = System.Diagnostics.Stopwatch.StartNew();   // [진단] WCF ContinuousMove 호출 왕복
                 await _onvif.MovePTZ(ctx.Model.PtzClient, speed, ctx.ProfileToken, "PT10S").ConfigureAwait(false);
+                __swMove.Stop();
+                _log?.Info($"[PTZ] ContinuousMove WCF={__swMove.ElapsedMilliseconds}ms cam={cameraId}  (카메라 raw SOAP=~10~150ms 측정됨 — 이 값이 크면 WCF 바인딩 병목 확정)");
                 return true;
             }
             finally { ctx.Gate.Release(); }
@@ -314,6 +319,35 @@ public sealed class PtzController : IPtzController
         }
         catch (OperationCanceledException) { return false; }
         catch (Exception ex) { _log?.Error($"[PTZ] SetAutoFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    // 수동 포커스 펄스 상수
+    private const double FocusMoveSpeed = 0.7;   // ContinuousFocus 속도 [-1,1]
+    private const int FocusPulseMs = 350;        // 1클릭 펄스 시간
+
+    public async Task<bool> MoveFocusAsync(int cameraId, int direction, CancellationToken ct = default)
+    {
+        if (!TryImaging(cameraId, out var ctx)) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // ContinuousFocus(속도) 펄스 후 Stop — RelativeFocus 미지원 카메라 대응(SetAutoFocus처럼 ImagingClient 직접 호출).
+                var move = new OnvifImaging.FocusMove
+                {
+                    Continuous = new OnvifImaging.ContinuousFocus { Speed = (float)((direction >= 0 ? 1 : -1) * FocusMoveSpeed) }
+                };
+                await ctx.Model!.ImagingClient!.MoveAsync(ctx.VsToken, move).ConfigureAwait(false);
+                // Stop은 finally로 보장 — 취소로 Delay가 끊겨도 ContinuousFocus 모터가 계속 도는 것 방지.
+                try { await Task.Delay(FocusPulseMs, ct).ConfigureAwait(false); }
+                finally { try { await ctx.Model.ImagingClient.StopAsync(ctx.VsToken).ConfigureAwait(false); } catch { /* best-effort stop */ } }
+                return true;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] MoveFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
     private bool TryImaging(int cameraId, out CamCtx ctx)

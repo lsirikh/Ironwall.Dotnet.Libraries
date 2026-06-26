@@ -17,7 +17,7 @@
 		<md:Card
 			x:Name="CardContents"
 			Width="400"
-			Height="250"
+			Height="220"
 			MinWidth="300"
 			MinHeight="200"
 			Padding="20"

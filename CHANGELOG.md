@@ -14,6 +14,17 @@
 
 ## [Unreleased]
 
+### Fixed
+- **카메라 팝업 3종 수정** (Track B · 커밋 `4900093`/`58b3fd7`/`5edbfb1`)
+  - **66번 영상 프리즈**: Hub 플레이어(`CameraStreamEntry`)가 오디오 미차단 → 오디오 포함 스트림(`…/video1+audio1`)만 vmem 비디오 콜백 stall로 정지. `media.AddOption(":no-audio")`로 해결(비디오 전용 스트림 무영향). VLC `--no-audio` 캡처로 카메라 스트림 라이브 확인.
+  - **팝업이 윈도우 타이틀바 침범**: `CameraStreamPopupViewModel.CanvasTop` 세터에 `MinCanvasTop`(=0) 하한 클램프 — 상단 카메라 팝업이 `ClipToBounds=False` 캔버스에서 위로 넘쳐 MahApps 타이틀바(최대/최소/닫기)를 덮던 문제(MahApps 아닌 앱 오버레이가 원인).
+  - **PTZ 속도 슬라이더 부동소수 노출**: `PanTiltSpeed`/`ZoomSpeed`를 `Math.Round(.,1)`로 0.1 단위 반올림 + 슬라이더/표시 0.1 스냅(`0.2999…`→`0.3`).
+
+### Changed
+- **API·SVMS HTTP→HTTPS 전환** (라이브러리 `5edbfb1` · 메인 `162547f` · [영향분석](docs/analyses/Http_To_Https_Migration_Impact-analysis.md))
+  - 데이터 수신 API 베이스 URL(appsettings `Url`) http→https. 모든 도메인 API가 공유 `ApiService`(단일 HttpClient) 경유. mkcert 사내 root CA 신뢰 등록으로 .NET 기본 검증 통과 — **인증서 코드 변경 0**. 끝단 검증 `https://localhost:8000/`→200·TLS OK.
+  - SVMS 장비상세 링크 스킴 https(`DeviceDetailUrlService` `WebScheme` const, 테스트 25/25). ⚠ SVMS 서버도 https listen 필요.
+
 ### Added
 - **Tracking GIS 시각화 + 트레일 + TTL + 설정 (P1~P3) — Foundation 착수** ([PRD](docs/prds/Tracking_GIS_Visualization_Playback-prd.md) · [Plan](docs/plans/Tracking_GIS_Visualization_Playback-prd-plan.md))
   - **계약 확정(V-CONTRACT-1)**: `Gop_Message_Broker_연동설계.md §8.3.7`(권위 SoT)로 TRACKING_STATUS 메시지 검증 — `targets[]`/`track_id`/`observed_at`/`threat_level`/`location` 전부 필수. 설계 보강 6건(복합키·lost/idle 제거·Unknown 클라폴백·소문자변환·ttl기본5·car·vehicle) PRD 반영.

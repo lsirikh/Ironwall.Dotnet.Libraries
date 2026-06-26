@@ -391,7 +391,7 @@ UPGRADE.md
 
 # Harness documents
 docs/memory/
-docs/analysis/
+docs/analyses/
 docs/prds/
 docs/plans/
 docs/tests/

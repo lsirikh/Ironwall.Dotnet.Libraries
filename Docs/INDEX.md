@@ -1,7 +1,7 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-21 (Accounts_Ui_Library_Extraction PRD 추가 — 1,050라인, 24시나리오, 2회시뮬레이션)
+- **마지막 갱신**: 2026-06-25 (GOP_Account_Auth_Integration PRD **v2.2 완성** — FR 정합 마감 + 신규 FR-21(seam 계약확장) + §5-A 검증항목 + §10 DoD)
 - **총 문서 수**: 216개
 
 ---
@@ -19,6 +19,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [nats-tracking-message-flow-analysis.md](analyses/nats-tracking-message-flow-analysis.md) | NATS Tracking 메시지 수신 흐름 — 핸들러=로그-only stub(FR-15 미구현)·와일드카드 구독·공동구독자 5·DTO 구계약 잔재(targets[]). 계약 SoT=prds/NATS-Tracking-Geolocation-메시지정리.md §2.2 | 2026-06-23 |
 | [Client_API_Conformance_Audit-analysis.md](analysis/Client_API_Conformance_Audit-analysis.md) | Client_API_Conformance_Audit | 2026-06-19 |
 | [GOP_API_v4_Changes_ClientImpact-analysis.md](analysis/GOP_API_v4_Changes_ClientImpact-analysis.md) | GOP_API_v4_Changes_ClientImpact | 2026-06-19 |
 | [OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md](analysis/OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md) | OverlayImage_Rotation_Zoom_AABB_RootCause | 2026-06-12 |
@@ -38,6 +39,9 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [CameraPopup_PTZ_Control-prd.md](prds/CameraPopup_PTZ_Control-prd.md) | 맵 RTSP 팝업 PTZ 제어 — 우버튼 드래그 PTZ(벡터 시각화→**RelativeMove** 1회)+단일 선택+팝업 내 [PTZ][프리셋][옵션] 탭. 프리셋=로컬DB(이동 AbsoluteMove/저장 GetStatus/편집). 옵션 v1=주야간·포커스(ONVIF live). 신규 `IPtzController`+ONVIF 래퍼(Relative/Absolute/GetStatus/GetNode)+Imaging 쓰기 역매퍼. OnvifSolution(실동작 WCF/SOAP) 재사용. 디스커버리+옵션식별+5카테고리 시뮬레이션+적대적비평 종합. FR 35+/NFR 11/리스크 9(3 Critical: FOV폴백·space clamp·좌표 round-trip)/VER 6/미결 7. **HTML 스토리보드/와이어프레임**=`reports/CameraPopup_PTZ_Storyboard_Wireframe.html` (Track C) | Draft | 2026-06-23 |
+| [Tracking_GIS_Visualization_Playback-prd.md](prds/Tracking_GIS_Visualization_Playback-prd.md) | 실시간 GIS 추적 시각화(타입별 심볼·위험도 테두리·방향)+이동경로 트레일(점선/페이드/속도)+TTL 수명+설정(appsettings/맵세팅UI)+**서버 API 영속(§8 가이드: 서버 NATS 인제스트+GET, 클라는 조회만)**+별도 Playback 창(옵션B/타임라인/배속)+MP4(P6 후반). 6 Phase·46 FR·11 NFR·13 V·미결 D-05~D-21/D-A1~4. 자산발견+90시나리오+2회 시뮬레이션 architect(opus) 종합. 계약 SoT=NATS-Tracking §2.2 (Track C) | **Approved (P1~P3)** | 2026-06-24 |
+| [CameraPopup_DigitalZoom_Alignment-prd.md](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 디지털 줌 활성 시 카메라 RTSP 팝업·연결선이 심볼에서 어긋남 수정 · RC-1 좌표 도메인 비대칭(마커=RenderTransform 안 / 팝업=형제 PropertyPanelCanvas 밖에서 FromLatLngToLocal inner 좌표 직접 사용) · RC-2 디지털줌 갱신 트리거 부재 · 옵션 A: InnerToOuter/OuterToInner 헬퍼 + DigitalZoomLevelChanged→RefreshCameraPopupPositions · 회전 독립합성 검증(V-01) · scale=1 항등→회귀0 · **머지 `2062caf`·빌드0·격리테스트61·code-review(opus) MERGE** ※메인솔루션 재빌드 후 런타임검증 (Track B/C) | 구현완료 | 2026-06-23 |
 | [CameraPopup_Snapshot_UX-prd.md](prds/CameraPopup_Snapshot_UX-prd.md) | 카메라 팝업 스냅샷 UX · 저장폴더 설정화(EventSetupView 옵션+찾아보기, appsettings/SetupModel/StreamingSetupModel SnapshotPath) + 폴더 자동생성(기존엔 폴더없으면 저장실패) · 플래시 효과(흰 번쩍) · OSD "스냅샷 저장" 우상단 1초 · **구현·커밋(lib 7b3e984, 메인 fe276ee) 빌드0** ※앱 닫고 재빌드 검증 (Track C) | 구현완료 | 2026-06-23 |
 | [CameraPopup_Streaming_Settings-prd.md](prds/CameraPopup_Streaming_Settings-prd.md) | 카메라 팝업 설정 연동(EventSetupView↔맵) · SetupModel:IStreamingSetupModel 인터페이스 주입(IGMapSetupModel 패턴) · 더블클릭 게이팅(IsCameraPopupUsed) · 자동해제 타이머(IsAutoDiscard/TimeoutSeconds·상호작용 리셋) · 카메라심볼↔팝업 연결선(Leader Line·팬/줌/드래그 추종) · **구현·커밋(lib 04005a2/b57de1a/fb6ea46, 메인 3dcc6fe) code-review H-1/H-2/M-3 반영·빌드0** ※앱 닫고 재빌드 후 런타임 검증 (Track C) | 구현완료 | 2026-06-23 |
 | [Rtsp_Map_Popup-prd.md](prds/Rtsp_Map_Popup-prd.md) | 맵 카메라 더블클릭→Geo앵커 이동식 RTSP 팝업(위치기억) · 참조 Dotnet.Rtsp.Viewer.Ui LibVLCSharp Streaming 이식 · 관심지역/레이어 창 답습(384×300, Hub WriteableBitmap airspace 회피) · **위치영속=DB(다중클라 공유)** · 스토리보드+와이어프레임 · FR12/리스크9 · v1.1 미결4건 확정(DB/카메라Id/포커스/Hub) · 5영역 워크플로우+architect(opus) · **구현·머지 완료(lib `c9fcd8d` v2.6 / 메인솔루션 `1ee7ae8` v0.5) 8/8단계, 빌드0·48테스트·code-review H-1수정·네이티브배포** ※런타임 검증 대기 (Track C) | 구현완료 | 2026-06-23 |
@@ -45,13 +49,13 @@
 | [BaseMap_NoData_DefaultTile-prd.md](prds/BaseMap_NoData_DefaultTile-prd.md) | MBTiles 베이스맵 커버리지 밖 흰 화면에 "깔끔/모던" 기본 타일(격자 타일링) · DefaultTileBytes+GetTileImage 분기(c)+DefaultTileImageFactory · xUnit 41통과 · **구현·머지(a8d968b)** + v1.1 각 타일 중앙 센서웨이 로고(`cead507`) ※GMap.NET 고아 서브모듈=Core 1파일 git외+수동백업 (Track C) | 구현완료 | 2026-06-22 |
 | [SpeakerServerAssignment-prd.md](prds/SpeakerServerAssignment-prd.md) | 스피커 방송서버(server_id) 배정 · 12-Agent opus 시뮬레이션(5블로커/1High) · 매핑 비대칭(write server_id↔read nested) · ServerProvider 신설 · 해제없음+첫서버 자동배정 (Track C) · **구현·머지 완료(0913360)** | 구현완료 | 2026-06-22 |
 | [DevicePropertyPanel_Layout_Redesign-prd.md](prds/DevicePropertyPanel_Layout_Redesign-prd.md) | 6패널 속성 4구역 레이아웃+스크롤+Bearing/Alt 왕복 · 6차원 시뮬레이션 · **구현·머지 완료(c92344a)** | 구현완료 | 2026-06-22 |
-| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP REST API v4.6 Account/Auth JWT 연동 · PRD-GOP-00 (보완: SUP-C1~L1 12건 추가) | Draft | 2026-06-20 |
+| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP REST API **v4.9** Account/Auth JWT 연동 · PRD-GOP-00 · **v2.2 완성: 서버 회신(§2.3)+seam 정합(§2.4)+FR정합·FR-21·§5-A·DoD** — 3버킷(A:신규 ApiAccountGateway·B:공유.Api·C:앱)·FR-21 계약확장(G1 typed실패+G2 LogoutAsync)·VM편집 2곳·permissions flat·v4.10 게이트(B-4/5)·V-01~08 | Draft | 2026-06-25 |
 | [GOP_Permission_Gate_Feature-prd.md](prds/GOP_Permission_Gate_Feature-prd.md) | PRD-GOP-01: IPermissionService + MinRoleConverter + ConductorControlViewModel 3중 방어선 (P1, 18 STEP) | Draft | 2026-06-20 |
 | [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | PRD-GOP-02: AccountManager/Register/Editor/Delete→GOP API 전환 · 하드코딩 비밀번호 CRITICAL 해소 (P1, 26 STEP) | Draft | 2026-06-20 |
 | [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | PRD-GOP-03: MyPage 자기정보 GOP 전환 · role덮어쓰기 방지 · 세션관리 섹션 신규 (P1, 18 STEP) | Draft | 2026-06-20 |
 | [GOP_Menu_Role_Visibility-prd.md](prds/GOP_Menu_Role_Visibility-prd.md) | PRD-GOP-04: LeftMenu 5단계 role 가시성 · Label 오타 3건 · Tag 우회 차단 (P2, 12 STEP) | Draft | 2026-06-20 |
 | [GOP_UserSession_AuditLog_UI-prd.md](prds/GOP_UserSession_AuditLog_UI-prd.md) | PRD-GOP-05: 세션모니터/그룹관리/감사로그/설정변경이력 신규 UI (P2, 28 STEP) | Draft | 2026-06-20 |
-| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts.Ui 신규 라이브러리 구축 + VM/View 이관 전략 (Track C, 1,050라인, 24시나리오, 2회시뮬레이션, 2 CRITICAL / 6 HIGH 이슈 확정) | Draft | 2026-06-21 |
+| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts.Ui 신규 라이브러리 구축 + VM/View 이관 (Track C). **R3: Gateway seam(§6.3a, GOP-00 API 주입점) · C-2 정정 · OQ-1/4/6 해소** | Draft (R3) | 2026-06-23 |
 | [GOP_PreAuth_Overlay_NatsGate-prd.md](prds/GOP_PreAuth_Overlay_NatsGate-prd.md) | PRD-GOP-07: 미인증 LoginGateOverlay + EventCardPanel 숨김 + NATS IsLogin 게이팅 (P1, 14 STEP) | Draft | 2026-06-21 |
 | [GOP_Session_Resilience_Lifecycle-prd.md](prds/GOP_Session_Resilience_Lifecycle-prd.md) | PRD-GOP-06: 앱재시작복원·선제Refresh·강제로그아웃·지수백오프·OnExit통보 (P2, 20 STEP) | Draft | 2026-06-20 |
 | [Client_API_v46_Conformance-prd.md](prds/Client_API_v46_Conformance-prd.md) | Client_API_v46_Conformance | Approved | 2026-06-19 |
@@ -109,6 +113,10 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [GOP_Account_Auth_Integration-prd-plan.md](plans/GOP_Account_Auth_Integration-prd-plan.md) | [PRD](prds/GOP_Account_Auth_Integration-prd.md) | 0/46 (~116h, 3버킷 A/B/C + FR-21 + V-01~08) — dev 대기(SETUP-01 0순위, 버킷C 사전통지) | 2026-06-25 |
+| [Tracking_GIS_Visualization_Playback-prd-plan.md](plans/Tracking_GIS_Visualization_Playback-prd-plan.md) | [PRD](prds/Tracking_GIS_Visualization_Playback-prd.md) | 0/58 (P1~P3 범위, ~103h) — dev 대기(VER-01 0순위) | 2026-06-24 |
+| [CameraPopup_DigitalZoom_Alignment-prd-plan.md](plans/CameraPopup_DigitalZoom_Alignment-prd-plan.md) | [PRD](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 14/14 (완료·머지 `2062caf`) | 2026-06-23 |
+| [Accounts_Ui_Library_Extraction-prd-plan.md](plans/Accounts_Ui_Library_Extraction-prd-plan.md) | [PRD](prds/Accounts_Ui_Library_Extraction-prd.md) | 24/39 (Phase4✅ VM11+View7 자립, 테스트14/14) | 2026-06-24 |
 | [Client_API_v46_Conformance-prd-plan.md](plans/Client_API_v46_Conformance-prd-plan.md) | [PRD](prds/Client_API_v46_Conformance-prd.md) | 0/0 | 2026-06-19 |
 | [EventProcess_ContaminationFix-prd-plan.md](plans/EventProcess_ContaminationFix-prd-plan.md) | [PRD](prds/EventProcess_ContaminationFix-prd.md) | 0/14 | 2026-06-15 |
 | [GridSnap_System-prd-plan.md](plans/GridSnap_System-prd-plan.md) | [PRD](prds/GridSnap_System-prd.md) | 11/32 | 2026-06-15 |

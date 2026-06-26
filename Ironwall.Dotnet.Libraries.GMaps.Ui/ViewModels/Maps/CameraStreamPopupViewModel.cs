@@ -67,6 +67,18 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤이 영상 위 휠 회전 시 호출(방향 ±1).</summary>
     internal void RaisePtzZoom(int direction) => PtzZoomRequested?.Invoke(this, direction);
 
+    // PTZ 탭 줌 +/- 버튼 — 휠과 동일 경로(PtzZoomRequested → ContinuousMove 줌 펄스). +1=줌인 / -1=줌아웃.
+    private ICommand? _zoomInCommand, _zoomOutCommand;
+    public ICommand ZoomInCommand => _zoomInCommand ??= new RelayCommand(() => RaisePtzZoom(+1));
+    public ICommand ZoomOutCommand => _zoomOutCommand ??= new RelayCommand(() => RaisePtzZoom(-1));
+
+    /// <summary>수동 포커스 이동 요청(+1=far/-1=near). MapViewModel이 IPtzController.MoveFocus 호출.</summary>
+    public event EventHandler<int>? FocusRequested;
+    internal void RaiseFocus(int direction) => FocusRequested?.Invoke(this, direction);
+    private ICommand? _focusFarCommand, _focusNearCommand;
+    public ICommand FocusFarCommand => _focusFarCommand ??= new RelayCommand(() => RaiseFocus(+1));
+    public ICommand FocusNearCommand => _focusNearCommand ??= new RelayCommand(() => RaiseFocus(-1));
+
     public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
     {
@@ -105,8 +117,8 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); RecomputeLine(); } }
     public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); NotifyOfPropertyChange(nameof(ControlHeight)); RecomputeLine(); } }
 
-    /// <summary>컨트롤 패널(아코디언) 높이 — 펼치면 팝업이 이만큼 아래로 커져 영상이 가려지지 않음.</summary>
-    public const double PanelHeight = 188;
+    /// <summary>컨트롤 패널(아코디언) 높이 — 펼치면 팝업이 이만큼 아래로 커져 영상이 가려지지 않음. (PTZ 탭 줌·포커스 +/- 버튼 2행 추가로 188→230)</summary>
+    public const double PanelHeight = 230;
     /// <summary>팝업 상단 최소 Y(PropertyPanelCanvas 기준, 0=맵 영역 상단). 음수면 위로 넘쳐 상단 툴바/MahApps 윈도우 타이틀바(최대·최소·닫기)를 덮으므로 클램프. geo 추종은 AnchorGeo가 별도 보존하므로 표시 위치만 제한.</summary>
     public const double MinCanvasTop = 0;
     /// <summary>컨트롤 실제 높이 = 영상 높이(PopupHeight) + 패널(펼침 시). MapView Height에 바인딩. (FR-UI-01)</summary>

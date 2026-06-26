@@ -189,6 +189,9 @@
 					IsReadOnly="True"
 					ItemsSource="{Binding AssignedDevices}"
 					MinHeight="110"
+					Background="Transparent"
+					Margin="10 0"
+					BorderThickness="1"
 					SelectionMode="Extended"
 					Style="{StaticResource MaterialDesignDataGrid}"
 					Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">

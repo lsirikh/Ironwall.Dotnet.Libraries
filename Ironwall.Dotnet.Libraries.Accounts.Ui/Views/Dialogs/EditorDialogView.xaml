@@ -18,7 +18,7 @@
 
 		<md:Card
 			x:Name="CardContents"
-			Height="600"
+			Height="550"
 			Padding="20"
 			Width="400"
 			VerticalAlignment="Stretch"

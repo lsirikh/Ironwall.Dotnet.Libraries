@@ -228,7 +228,7 @@
                             <!--  탭 패널 ([PTZ][프리셋][옵션]) — 우버튼 짧은클릭 토글. 영상 영역(*)이 줄고 패널이 아래에 펼쳐짐  -->
                             <Border
                                 Grid.Row="2"
-                                Height="188"
+                                Height="230"
                                 Background="#FF131922"
                                 BorderBrush="{StaticResource BorderGrayBrush}"
                                 BorderThickness="0,1,0,0"
@@ -337,6 +337,24 @@
                                             <Slider Minimum="0.1" Maximum="1.0" SmallChange="0.1" LargeChange="0.1"
                                                     TickFrequency="0.1" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
                                                     Value="{Binding ZoomSpeed}" ToolTip="줌 속도 (0.1 단위)" />
+
+                                            <!--  줌 +/- (실제 줌 인/아웃 — 휠과 동일 ContinuousMove 줌)  -->
+                                            <Grid Margin="0,8,0,1">
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="줌" />
+                                                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                                                    <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding ZoomOutCommand}" ToolTip="줌 아웃" />
+                                                    <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding ZoomInCommand}" ToolTip="줌 인" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!--  포커스 +/- (수동 near/far) — IsImagingCapable 시만 활성  -->
+                                            <Grid Margin="0,4,0,0" IsEnabled="{Binding IsImagingCapable}">
+                                                <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="포커스" />
+                                                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                                                    <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding FocusNearCommand}" ToolTip="포커스 근경(near)" />
+                                                    <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding FocusFarCommand}" ToolTip="포커스 원경(far)" />
+                                                </StackPanel>
+                                            </Grid>
                                         </StackPanel>
                                     </Grid>
 

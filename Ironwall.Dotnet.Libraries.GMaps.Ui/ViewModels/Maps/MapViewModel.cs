@@ -674,7 +674,7 @@ public class MapViewModel : BasePanelViewModel,
             };
             _log?.Info($"[CameraPopup] PTZ 준비 시도 cam={vm.CameraId} {cam.IpAddress}:{conn.PortOnvif}");
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
-            await OnUiAsync(() => { vm.IsPtzCapable = ok; vm.IsPtzLoading = false; }).ConfigureAwait(false);
+            await OnUiAsync(() => { vm.IsPtzCapable = ok; vm.IsImagingCapable = ptz.IsImagingCapable(vm.CameraId); vm.IsPtzLoading = false; }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} capable={ok} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
         }
         catch (Exception ex)
@@ -687,6 +687,7 @@ public class MapViewModel : BasePanelViewModel,
     // ── ContinuousMove 펄스 상수(RelativeMove 미지원 카메라 대응) ──
     //    팬/틸트·줌 속도 크기는 팝업 VM(PanTiltSpeed/ZoomSpeed, [0.1,1.0])이 사용자 조절값으로 보유 — PTZ 탭 슬라이더/텍스트박스.
     private const int PtzDragMaxDurationMs = 700;   // 드래그 1회 이동 최대 시간(드래그 길이 비례)
+    private const int PtzDragMinDurationMs = 120;   // 짧은 드래그 최소 펄스 — sub-perceptible 무동작(dead-zone) 방지
     private const int PtzZoomPulseMs = 250;         // 휠 1노치 줌 펄스 시간
 
     // PTZ 제스처(드래그/줌) 취소용 — 새 제스처가 직전 것을 취소(Last-Write-Wins, 큐 적체 방지).
@@ -720,13 +721,17 @@ public class MapViewModel : BasePanelViewModel,
         var ct = BeginPtzGesture(vm.CameraId);   // 직전 제스처 취소(Last-Write-Wins)
         try
         {
-            var maxLen = Math.Max(40.0, Math.Min(e.ImageWidth, e.ImageHeight) * 0.4);
+            // 최대 드래그 길이(이 이상이면 mag=1.0 포화). 0.4→0.65로 늘려 더 길게 끌어야 최대 — 미세조절 폭↑.
+            var maxLen = Math.Max(60.0, Math.Min(e.ImageWidth, e.ImageHeight) * 0.65);
             var mag = Math.Min(1.0, len / maxLen);
-            var panVel = (e.Dx / len) * vm.PanTiltSpeed;
-            var tiltVel = -(e.Dy / len) * vm.PanTiltSpeed;   // 화면 아래로 드래그 → 틸트 다운
+            // 드래그 길이 비례 이동량: 속도·시간 둘 다 mag로 스케일 → 짧은 드래그=느리고 짧게, 긴 드래그=빠르고 길게(차이 뚜렷).
+            // 속도엔 하한(0.3)을 둬 아주 짧은 드래그도 죽지 않게(카메라 가감속에 묻히는 것 방지). 이전엔 ÷len(단위벡터)라 길이 무관이었음.
+            var velFactor = vm.PanTiltSpeed * (0.3 + 0.7 * mag);
+            var panVel = (e.Dx / len) * velFactor;
+            var tiltVel = -(e.Dy / len) * velFactor;   // 화면 아래로 드래그 → 틸트 다운
             if (!await ptz.ContinuousMoveAsync(vm.CameraId, panVel, tiltVel, 0, ct).ConfigureAwait(false)) return;
-            await Task.Delay((int)(mag * PtzDragMaxDurationMs), ct).ConfigureAwait(false);
-            await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
+            await Task.Delay(Math.Max(PtzDragMinDurationMs, (int)(mag * PtzDragMaxDurationMs)), ct).ConfigureAwait(false);
+            await ptz.StopAsync(vm.CameraId, ct).ConfigureAwait(false);
             // FOV는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함(스케일 불일치).
         }
         catch (OperationCanceledException) { /* 새 제스처가 인계 — 이전 Stop 생략 */ }
@@ -765,10 +770,18 @@ public class MapViewModel : BasePanelViewModel,
         {
             if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct).ConfigureAwait(false)) return;
             await Task.Delay(PtzZoomPulseMs, ct).ConfigureAwait(false);
-            await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);
+            await ptz.StopAsync(vm.CameraId, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { /* 새 제스처가 인계 */ }
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    /// <summary>포커스 +/- 버튼 → 수동 포커스 이동(near/far). direction +1=far/-1=near. (Imaging)</summary>
+    private void OnCameraPopupFocus(object? sender, int direction)
+    {
+        if (sender is not CameraStreamPopupViewModel vm) return;
+        var ptz = ResolvePtzController();
+        if (ptz != null) _ = ptz.MoveFocusAsync(vm.CameraId, direction);
     }
 
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
@@ -1040,6 +1053,7 @@ public class MapViewModel : BasePanelViewModel,
             vm.DragCompleted += OnCameraPopupDragCompleted;
             vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // 좌버튼 PTZ 드래그 → IPtzController
             vm.PtzZoomRequested += OnCameraPopupPtzZoom;            // 휠 → 상대 줌
+            vm.FocusRequested += OnCameraPopupFocus;               // 포커스 +/- → IPtzController.MoveFocus
             vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
             vm.PtzNudgeRequested += OnCameraPopupPtzNudge;          // PTZ 탭 방향 패드
             vm.PtzStopRequested += OnCameraPopupPtzStop;
@@ -1095,6 +1109,7 @@ public class MapViewModel : BasePanelViewModel,
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
             vm.PtzZoomRequested -= OnCameraPopupPtzZoom;
+            vm.FocusRequested -= OnCameraPopupFocus;
             vm.SelectRequested -= OnCameraPopupSelectRequested;
             vm.PtzNudgeRequested -= OnCameraPopupPtzNudge;
             vm.PtzStopRequested -= OnCameraPopupPtzStop;

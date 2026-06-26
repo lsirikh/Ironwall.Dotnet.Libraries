@@ -29,7 +29,7 @@
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="16" />
-			<RowDefinition Height="200" />
+			<RowDefinition Height="240" />
 			<RowDefinition Height="10" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
@@ -170,6 +170,8 @@
 				AutoGenerateColumns="False"
 				CanUserAddRows="False"
 				CanUserDeleteRows="False"
+				Background="Transparent"
+				BorderThickness="1"
 				ItemsSource="{Binding ViewModelProvider}"
 				SelectionMode="Extended"
 				Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">

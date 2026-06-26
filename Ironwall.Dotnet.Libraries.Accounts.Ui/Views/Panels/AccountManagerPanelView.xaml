@@ -195,6 +195,8 @@
 				<DataGrid
 					x:Name="DataGridUsers"
 					Grid.Row="1"
+					Background="Transparent"
+					BorderThickness="1"
 					cal:Message.Attach="[Event MouseDoubleClick] = [Action OnClickAccountDetail($source, $eventArgs)];"
 					AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 					ItemsSource="{Binding ViewModelProvider}"

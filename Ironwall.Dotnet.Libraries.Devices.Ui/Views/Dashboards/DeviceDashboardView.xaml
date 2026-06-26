@@ -43,7 +43,6 @@
 		<Border
 			Grid.Row="0"
 			Margin="5"
-			Background="{DynamicResource MaterialDesignBackground}"
 			BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"
 			CornerRadius="8">
 			<Border.Resources>
