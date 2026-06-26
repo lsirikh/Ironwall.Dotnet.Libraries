@@ -101,7 +101,7 @@
 			Grid.ColumnSpan="2"
 			Margin="50,0,0,0"
 			Panel.ZIndex="10"
-			Background="{DynamicResource MaterialDesignPaper}"
+			Background="{DynamicResource SurfaceBrush}"
 			IsMainMenu="True"
 			Style="{StaticResource MaterialDesignMenu}">
 
@@ -212,7 +212,7 @@
 			Margin="50,0,0,0"
 			Panel.ZIndex="10"
 			md:ThemeAssist.Theme="Inherit">
-			<ToolBar ClipToBounds="True" Style="{StaticResource MaterialDesignToolBar}">
+			<ToolBar ClipToBounds="True" Background="{DynamicResource SurfaceBrush}" Style="{StaticResource MaterialDesignToolBar}">
 
 				<!--  ① 지도 선택 그룹  -->
 				<ComboBox
