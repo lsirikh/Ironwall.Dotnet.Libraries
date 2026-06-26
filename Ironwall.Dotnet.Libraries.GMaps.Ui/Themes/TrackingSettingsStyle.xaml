@@ -118,7 +118,7 @@
 											<TextBlock Style="{StaticResource SetLabel}" Text="최소 줌" />
 											<TextBlock Style="{StaticResource SetHint}" Text="이하 숨김 (0=항상)" />
 										</StackPanel>
-										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="0" Maximum="20" Value="{Binding MinVisibleZoom, Mode=TwoWay}" />
+										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="0" Maximum="20" AutoToolTipPlacement="None" Value="{Binding MinVisibleZoom, Mode=TwoWay}" />
 										<TextBlock Grid.Column="2" Style="{StaticResource SetVal}" Text="{Binding MinVisibleZoom, StringFormat={}{0:0}}" />
 									</Grid>
 								</StackPanel>
@@ -138,7 +138,7 @@
 											<TextBlock Style="{StaticResource SetLabel}" Text="최대 점수" />
 											<TextBlock Style="{StaticResource SetHint}" Text="10~100" />
 										</StackPanel>
-										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="10" Maximum="100" Value="{Binding TrailMaxPoints, Mode=TwoWay}" />
+										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="10" Maximum="100" AutoToolTipPlacement="None" Value="{Binding TrailMaxPoints, Mode=TwoWay}" />
 										<TextBlock Grid.Column="2" Style="{StaticResource SetVal}" Text="{Binding TrailMaxPoints, StringFormat={}{0} pt}" />
 									</Grid>
 									<Grid Margin="0,3">

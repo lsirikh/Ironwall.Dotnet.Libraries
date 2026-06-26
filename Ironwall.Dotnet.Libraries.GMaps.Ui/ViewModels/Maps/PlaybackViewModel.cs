@@ -150,6 +150,13 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
             Status = $"최대 {maxH}시간으로 제한됨";
         }
 
+        // 설정(트레일 길이·gap 분절)을 재생 엔진에 반영 — 라이브와 동일 기준
+        if (_setup is not null)
+        {
+            _engine.TrailMaxPoints = _setup.TrailMaxPoints;
+            _engine.GapThresholdSec = _setup.GapThresholdSec;
+        }
+
         var points = await _store.FetchAsync(null, fromUtc, toUtc).ConfigureAwait(true);
         _engine.Load(points);
         BuildEvents(points);
@@ -218,7 +225,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         DispatcherService.Invoke(() =>
         {
             _suppressSeek = true;
-            Progress = _engine.Progress * 100.0;
+            Progress = Math.Round(_engine.Progress * 100.0, 2);   // 부동소수 찌꺼기 제거
             _suppressSeek = false;
             IsPlaying = _engine.IsPlaying;
             UpdateTimeLabel();

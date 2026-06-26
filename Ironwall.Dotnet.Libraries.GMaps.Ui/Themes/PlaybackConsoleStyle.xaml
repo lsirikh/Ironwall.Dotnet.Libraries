@@ -173,7 +173,8 @@
 											Style="{StaticResource PanelPrimaryButtonStyle}"
 											Command="{Binding PlayPauseCommand}"
 											Content="{Binding PlayPauseGlyph}" />
-										<Slider Grid.Column="1" Margin="9,0" VerticalAlignment="Center" Minimum="0" Maximum="100" Value="{Binding Progress, Mode=TwoWay}" />
+										<Slider Grid.Column="1" Margin="9,0" VerticalAlignment="Center" Minimum="0" Maximum="100"
+											AutoToolTipPlacement="None" IsSnapToTickEnabled="False" Value="{Binding Progress, Mode=TwoWay}" />
 										<TextBlock
 											Grid.Column="2"
 											MinWidth="118"

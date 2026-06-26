@@ -22,6 +22,7 @@ public sealed class PlaybackEngine : IDisposable
     private const double MinSpeed = 0.5, MaxSpeed = 4.0;
     private const int DefaultTrailMax = 30;
     private const int DefaultPresenceWindowSec = 5;   // 이 시간 내 점 없으면 트랙 퇴장(종료/gap)
+    private const int DefaultGapThresholdSec = 10;    // 연속 점 간 이 초 초과면 세션 분절
 
     private readonly IClock _clock;
     private readonly ILogService? _log;
@@ -43,6 +44,8 @@ public sealed class PlaybackEngine : IDisposable
     public bool IsPlaying { get; private set; }
     public int TrailMaxPoints { get; set; } = DefaultTrailMax;
     public int PresenceWindowSec { get; set; } = DefaultPresenceWindowSec;
+    /// <summary>연속 점 간 observed_at 간격이 이 초를 넘으면 트레일 분절(세션 경계 — 직선 연결 방지).</summary>
+    public int GapThresholdSec { get; set; } = DefaultGapThresholdSec;
 
     /// <summary>0.0~1.0 진행률.</summary>
     public double Progress
@@ -151,7 +154,14 @@ public sealed class PlaybackEngine : IDisposable
             var current = list[idx];
             if (t - current.ObservedAt > presence) continue;   // 종료/gap → 퇴장
 
-            int from = Math.Max(0, idx - Math.Max(2, TrailMaxPoints) + 1);
+            // 트레일: idx에서 뒤로 — TrailMax 상한 + 연속 점 gap 초과 시 분절(세션 경계서 멈춤 → 직선 연결 방지)
+            int maxTrail = Math.Max(2, TrailMaxPoints);
+            var gap = TimeSpan.FromSeconds(Math.Max(1, GapThresholdSec));
+            int from = idx;
+            while (from > 0
+                   && (idx - from + 1) < maxTrail
+                   && (list[from].ObservedAt - list[from - 1].ObservedAt) <= gap)
+                from--;
             var trail = list.GetRange(from, idx - from + 1);
 
             double? speed = null;
