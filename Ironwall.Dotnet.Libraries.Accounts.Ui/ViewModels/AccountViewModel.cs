@@ -100,6 +100,17 @@ public class AccountViewModel : BaseCustomViewModel<IAccountModel>
         }
     }
 
+    /// <summary>GOP 5단계 역할(구분). 편집 ComboBox 바인딩 대상.</summary>
+    public EnumUserRole Role
+    {
+        get => Model.Role;
+        set
+        {
+            Model.Role = value;
+            NotifyOfPropertyChange(() => Role);
+        }
+    }
+
     public EnumUsedType Used
     {
         get => Model.Used;

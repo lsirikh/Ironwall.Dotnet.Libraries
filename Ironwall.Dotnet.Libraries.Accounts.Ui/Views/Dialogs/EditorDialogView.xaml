@@ -174,8 +174,8 @@
 							Grid.ColumnSpan="2">
 							<ComboBox
 								x:Name="LevelComboBox"
-								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enum:EnumLevelType}}}"
-								SelectedItem="{Binding ViewModel.Level, UpdateSourceTrigger=PropertyChanged}"
+								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enum:EnumUserRole}}}"
+								SelectedItem="{Binding ViewModel.Role, UpdateSourceTrigger=PropertyChanged}"
 								Style="{StaticResource ComboBoxContent}">
 								<ComboBox.ItemsPanel>
 									<ItemsPanelTemplate>

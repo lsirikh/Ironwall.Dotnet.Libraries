@@ -17,7 +17,8 @@ public class AccountModel : IAccountModel
     public string Username { get; set; } = string.Empty;        //1
     public string Password { get; set; } = string.Empty;        //2
     public string Name { get; set; } = string.Empty;            //3
-    public EnumLevelType Level { get; set; }                        //4
+    public EnumLevelType Level { get; set; }                        //4 (레거시 2단계 — admin 게이팅 호환 유지)
+    public EnumUserRole Role { get; set; }                          //4b GOP 5단계 역할(권한 구분)
     public EnumUsedType Used { get; set; }                      //5
     #endregion
     #region - Implementations for IAccountModel -
@@ -52,6 +53,7 @@ public class AccountModel : IAccountModel
         Password = model.Password;
         Name = model.Name;
         Level = model.Level;
+        Role = model.Role;
         Used = model.Used;
 
         // IAccountModel 고유 영역
@@ -78,6 +80,7 @@ public class AccountModel : IAccountModel
         Password = string.Empty;
         Name = string.Empty;
         Level = default;             // Enum 기본값 (0)
+        Role = default;
         Used = default;
 
         EmployeeNumber = null;

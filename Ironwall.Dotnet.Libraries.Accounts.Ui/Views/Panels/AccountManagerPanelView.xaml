@@ -308,7 +308,7 @@
 
 						<!--  Level  -->
 						<DataGridTextColumn
-							Binding="{Binding Level}"
+							Binding="{Binding Role}"
 							Header="구분"
 							IsReadOnly="True">
 							<DataGridTextColumn.HeaderStyle>

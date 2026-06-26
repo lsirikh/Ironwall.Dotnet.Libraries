@@ -23,6 +23,7 @@ public static class AccountDtoMapper
         EmployeeNumber = d.EmployeeNumber,
         Phone = d.Phone,
         Level = RoleMappingHelper.ToLevel(RoleMappingHelper.ParseRole(d.Role)),
+        Role  = RoleMappingHelper.ParseRole(d.Role),     // GOP 5단계 전체 보존(구분 표시/편집)
         Used = d.IsActive ? EnumUsedType.USED : EnumUsedType.NOT_USED,
     };
 
@@ -37,7 +38,7 @@ public static class AccountDtoMapper
         Position = m.Position,
         EmployeeNumber = m.EmployeeNumber,
         Phone = m.Phone,
-        Role = RoleMappingHelper.ToRole(m.Level).ToString(),
+        Role = (m.Role != EnumUserRole.UNDEFINED ? m.Role : RoleMappingHelper.ToRole(m.Level)).ToString(),
     };
 
     /// <summary>AccountModel → PUT /users/{id} 본문(부분수정). null 필드는 DTO에서 미전송.</summary>
@@ -50,7 +51,7 @@ public static class AccountDtoMapper
         Position = m.Position,
         EmployeeNumber = m.EmployeeNumber,
         Phone = m.Phone,
-        Role = RoleMappingHelper.ToRole(m.Level).ToString(),
+        Role = (m.Role != EnumUserRole.UNDEFINED ? m.Role : RoleMappingHelper.ToRole(m.Level)).ToString(),
     };
 
     /// <summary>AccountModel → PUT /users/me 본문(본인 6필드). Image→photo_url.</summary>
