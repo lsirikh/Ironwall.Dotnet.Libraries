@@ -48,7 +48,12 @@ public class LoginPanelViewModel : BasePanelViewModel
     #endregion
     #region - Binding Methods -
     public async Task ClickRegister()
-        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenRegisterDialogMessageModel());
+        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+        {
+            // GOP는 계정 생성=admin 인증 필수라 로그인 화면 self-signup 불가 → 웹 안내로 대체
+            Title = "회원가입",
+            Explain = "회원가입은 통합관제 웹에서 진행해 주세요."
+        });
 
     public async Task ClickCancel()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
@@ -108,8 +113,8 @@ public class LoginPanelViewModel : BasePanelViewModel
     /// <summary>인증 실패 사유 → 사용자 메시지 (G1). 자격오류는 계정 존재 비노출(SEC-5) 위해 일반 문구.</summary>
     private static string FailMessage(AuthOutcome o) => o.ErrorCode switch
     {
-        "LOCKED" or "423"     => string.IsNullOrEmpty(o.LockReason) ? "잠긴 계정입니다." : $"잠긴 계정: {o.LockReason}",
-        "FORBIDDEN"           => "비활성 또는 권한이 없는 계정입니다.",
+        "LOCKED" or "423"     => string.IsNullOrEmpty(o.LockReason) ? "잠긴 계정입니다. 관리자에게 문의하세요." : $"잠긴 계정: {o.LockReason}",
+        "FORBIDDEN"           => "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.",   // W6: 잠금 사유 명확화
         "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
         "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",
         _                     => "아이디 또는 비밀번호가 일치하지 않습니다.",
