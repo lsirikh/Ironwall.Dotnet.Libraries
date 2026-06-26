@@ -13,6 +13,7 @@ public class UserCreateDto
     [JsonProperty("position")] public string? Position { get; set; }
     [JsonProperty("employee_number")] public string? EmployeeNumber { get; set; }
     [JsonProperty("phone")] public string? Phone { get; set; }
+    [JsonProperty("photo_url", NullValueHandling = NullValueHandling.Ignore)] public string? PhotoUrl { get; set; }
     [JsonProperty("role")] public string? Role { get; set; }
     [JsonProperty("group_id", NullValueHandling = NullValueHandling.Ignore)] public int? GroupId { get; set; }
 }
