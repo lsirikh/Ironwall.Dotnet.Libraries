@@ -49,6 +49,11 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
             _accountProvider.Clear();
             fetched.ForEach(acc => _accountProvider.Add(acc));
         }
+        else   // W5: fetch 실패 시 빈 화면 + 무안내 방지
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "계정 관리", Explain = "계정 목록을 불러오지 못했습니다. 서버 연결을 확인하세요." });
+        }
         await DataInitialize(cancellationToken).ConfigureAwait(false);
     }
 
@@ -132,8 +137,14 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
     {
         var fetched = await _gateway.GetAllAccountsAsync();
+        if (fetched == null)   // W4: 서버 실패 시 기존 목록 보존 + 안내(무조건 Clear 금지)
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "갱신", Explain = "계정 목록을 불러오지 못했습니다. 기존 목록을 유지합니다." });
+            return;
+        }
         _accountProvider.Clear();
-        fetched?.ForEach(acc => _accountProvider.Add(acc));
+        fetched.ForEach(acc => _accountProvider.Add(acc));
         await DataInitialize().ConfigureAwait(false);
     }
 
@@ -166,8 +177,11 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
             }
 
             var fetched = await _gateway.GetAllAccountsAsync(cancellationToken);
-            _accountProvider.Clear();
-            fetched?.ForEach(acc => _accountProvider.Add(acc));
+            if (fetched != null)   // W4: 실패 시 기존 목록 보존
+            {
+                _accountProvider.Clear();
+                fetched.ForEach(acc => _accountProvider.Add(acc));
+            }
 
             await DataInitialize(cancellationToken).ConfigureAwait(false);
 

@@ -100,14 +100,16 @@ public class AccountViewModel : BaseCustomViewModel<IAccountModel>
         }
     }
 
-    /// <summary>GOP 5단계 역할(구분). 편집 ComboBox 바인딩 대상.</summary>
+    /// <summary>GOP 5단계 역할(구분). 편집 ComboBox 바인딩 대상. Level(게이팅용)도 동기 갱신(드리프트 방지, W3).</summary>
     public EnumUserRole Role
     {
         get => Model.Role;
         set
         {
             Model.Role = value;
+            Model.Level = RoleMappingHelper.ToLevel(value);   // 구분(Role)↔체크박스 게이팅(Level) 동기화
             NotifyOfPropertyChange(() => Role);
+            NotifyOfPropertyChange(() => Level);
         }
     }
 
