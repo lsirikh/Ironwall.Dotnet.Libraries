@@ -99,10 +99,18 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
-        if (SelectedItemCount == 0) return;
+        // SelectedItemCount(캐시)는 OnClickCheckBoxItem→CheckSelectState 가 갱신하는데 미발화 시 0으로 남아
+        // 삭제가 조용히 무시됨. 체크 상태(IsSelected)에서 직접 집계해 방어.
+        var count = ViewModelProvider.Count(x => x.IsSelected);
+        if (count == 0)
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "사용자 삭제", Explain = "삭제할 계정을 체크박스로 선택하세요." });
+            return;
+        }
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
-            Explain = "사용자 계정을 삭제하시겠습니까?",
+            Explain = $"선택한 {count}개 계정을 삭제하시겠습니까?",
             MessageModel = new CallDeleteAccountAdminProcessMessageModel()
         });
     }
@@ -138,10 +146,15 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
 
+            // 결과(bool)를 확인해 실패를 사용자에게 노출(기존엔 무시해 실패해도 "성공" 표시).
+            int selected = 0, deleted = 0;
+            var failed = new System.Collections.Generic.List<string>();
             foreach (var item in ViewModelProvider)
             {
-                if (item.IsSelected)
-                    await _gateway.RemoveAccountAsync(item.Model, string.Empty, cancellationToken);  // 관리자 일괄삭제(비번검증 없음)
+                if (!item.IsSelected) continue;
+                selected++;
+                var ok = await _gateway.RemoveAccountAsync(item.Model, string.Empty, cancellationToken);  // 관리자 일괄삭제(비번검증 없음)
+                if (ok) deleted++; else failed.Add(item.Model.Username);
             }
 
             var fetched = await _gateway.GetAllAccountsAsync(cancellationToken);
@@ -150,7 +163,10 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
 
             await DataInitialize(cancellationToken).ConfigureAwait(false);
 
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사용자 삭제", Explain = "계정 삭제를 성공하였습니다." });
+            var explain = selected == 0 ? "선택된 계정이 없습니다."
+                        : failed.Count == 0 ? $"{deleted}개 계정을 삭제했습니다."
+                        : $"{deleted}/{selected}개 삭제. 실패: {string.Join(", ", failed)} (서버 거부/오류)";
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사용자 삭제", Explain = explain });
         }
         catch (Exception ex)
         {
