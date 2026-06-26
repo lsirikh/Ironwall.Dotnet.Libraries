@@ -133,9 +133,6 @@
 									<RowDefinition Height="Auto" />
 									<RowDefinition Height="Auto" />
 									<RowDefinition Height="Auto" />
-									<RowDefinition Height="Auto" />
-									<RowDefinition Height="Auto" />
-									<RowDefinition Height="Auto" />
 								</Grid.RowDefinitions>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="3*" />
@@ -240,28 +237,8 @@
 										Style="{StaticResource TextBoxInput}"
 										Text="{Binding ViewModel.EmployeeNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>
-								<!--  Birth  -->
-								<Grid Grid.Row="4" Grid.ColumnSpan="3">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="3*" />
-										<ColumnDefinition Width="7*" />
-									</Grid.ColumnDefinitions>
-
-									<TextBlock
-										Grid.Column="0"
-										Style="{StaticResource TextBlockTitle}"
-										Text="생년월일" />
-									<StackPanel
-										Grid.Column="1"
-										md:HintAssist.Hint="1990-10-10"
-										md:ValidationAssist.HorizontalAlignment="Left"
-										DataContext="{Binding ViewModel}">
-										<!--<DatePicker SelectedDate="{Binding ViewModel.Birth, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Converter={StaticResource StringToDateConverter}}" Style="{StaticResource DatePickerContent}" />-->
-										<DatePicker SelectedDate="{Binding Birth, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Style="{StaticResource DatePickerContent}" />
-									</StackPanel>
-								</Grid>
 								<!--  Phone  -->
-								<Grid Grid.Row="5" Grid.ColumnSpan="3">
+								<Grid Grid.Row="4" Grid.ColumnSpan="3">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="3*" />
 										<ColumnDefinition Width="7*" />
@@ -278,26 +255,8 @@
 										Style="{StaticResource TextBoxInput}"
 										Text="{Binding ViewModel.Phone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>
-								<!--  Address  -->
-								<Grid Grid.Row="6" Grid.ColumnSpan="3">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="3*" />
-										<ColumnDefinition Width="7*" />
-									</Grid.ColumnDefinitions>
-
-									<TextBlock
-										Grid.Column="0"
-										Style="{StaticResource TextBlockTitle}"
-										Text="주소" />
-									<TextBox
-										Grid.Column="1"
-										md:HintAssist.Hint="주소"
-										md:ValidationAssist.HorizontalAlignment="Left"
-										Style="{StaticResource TextBoxInput}"
-										Text="{Binding ViewModel.Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-								</Grid>
 								<!--  EMail  -->
-								<Grid Grid.Row="7" Grid.ColumnSpan="3">
+								<Grid Grid.Row="5" Grid.ColumnSpan="3">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="3*" />
 										<ColumnDefinition Width="7*" />
@@ -315,7 +274,7 @@
 										Text="{Binding ViewModel.EMail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>
 								<!--  Position  -->
-								<Grid Grid.Row="8" Grid.ColumnSpan="3">
+								<Grid Grid.Row="6" Grid.ColumnSpan="3">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="3*" />
 										<ColumnDefinition Width="7*" />
@@ -333,7 +292,7 @@
 										Text="{Binding ViewModel.Position, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>
 								<!--  Department  -->
-								<Grid Grid.Row="9" Grid.ColumnSpan="3">
+								<Grid Grid.Row="7" Grid.ColumnSpan="3">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="3*" />
 										<ColumnDefinition Width="7*" />
@@ -349,24 +308,6 @@
 										md:ValidationAssist.HorizontalAlignment="Left"
 										Style="{StaticResource TextBoxInput}"
 										Text="{Binding ViewModel.Department, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-								</Grid>
-								<!--  Company  -->
-								<Grid Grid.Row="10" Grid.ColumnSpan="3">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="3*" />
-										<ColumnDefinition Width="7*" />
-									</Grid.ColumnDefinitions>
-
-									<TextBlock
-										Grid.Column="0"
-										Style="{StaticResource TextBlockTitle}"
-										Text="회사" />
-									<TextBox
-										Grid.Column="1"
-										md:HintAssist.Hint="회사"
-										md:ValidationAssist.HorizontalAlignment="Left"
-										Style="{StaticResource TextBoxInput}"
-										Text="{Binding ViewModel.Company, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 								</Grid>
 							</Grid>
 						</ScrollViewer>
