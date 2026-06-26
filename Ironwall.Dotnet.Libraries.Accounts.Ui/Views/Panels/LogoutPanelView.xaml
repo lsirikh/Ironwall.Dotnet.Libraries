@@ -21,7 +21,7 @@
 			MinWidth="300"
 			MinHeight="200"
 			Padding="20"
-			Opacity="0.9"
+			Opacity="1"
 			UniformCornerRadius="8">
 			<Grid>
 				<Grid.RowDefinitions>
