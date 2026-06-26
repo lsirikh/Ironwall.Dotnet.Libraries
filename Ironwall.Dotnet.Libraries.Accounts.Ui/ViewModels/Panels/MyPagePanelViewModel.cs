@@ -58,8 +58,12 @@ public class MyPagePanelViewModel : BasePanelViewModel
         try
         {
             var key = $"{DateTime.Now:yyyyMMddHHmmssfff}";
-            var saved = await _profileImage.SaveAsync(dlg.FileName, key, ct);   // 검증(확장자/크기)+복사
+            var saved = await _profileImage.SaveAsync(dlg.FileName, key, ct);   // 검증(확장자/크기)+로컬 복사(즉시표시/DB모드)
             ViewModel.Image = Path.GetFileName(saved);
+
+            // API 모드: 원본을 서버에 업로드 → photo_url(절대 URL) 받으면 그걸로 영속·표시(W1 해결). DB 모드는 null이라 로컬 파일명 유지.
+            var url = await _gateway.UploadPhotoAsync(dlg.FileName, ct);
+            if (!string.IsNullOrEmpty(url)) ViewModel.Image = url;
         }
         catch (ArgumentException ex)
         {

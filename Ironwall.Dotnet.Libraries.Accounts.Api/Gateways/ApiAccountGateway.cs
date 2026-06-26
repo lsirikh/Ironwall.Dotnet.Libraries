@@ -125,6 +125,13 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success && res.Data is not null ? AccountDtoMapper.ToAccountModel(res.Data) : null;
     }
 
+    /// <summary>POST /users/me/photo — 사진 업로드, 서버가 photo_url 갱신. 갱신된 절대 URL 반환(실패 null).</summary>
+    public async Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default)
+    {
+        var res = await _api.UploadMyPhotoAsync(filePath, ct).ConfigureAwait(false);
+        return res.Success ? res.Data?.PhotoUrl : null;
+    }
+
     /// <summary>PUT /users/me/password. 서버는 세션 무효화 안 함(F07-01) → 변경 후 강제 재로그인은 호스트 책임(§2.3.3).</summary>
     public async Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default)
     {

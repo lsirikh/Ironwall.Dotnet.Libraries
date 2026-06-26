@@ -4,6 +4,9 @@ using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Newtonsoft.Json;
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 
@@ -156,6 +159,29 @@ public class AccountApiService : IAccountApiService
         }
         catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
+
+    public async Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default)
+    {
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(filePath, ct).ConfigureAwait(false);
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(bytes);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(GuessImageMime(filePath));
+            content.Add(fileContent, "file", System.IO.Path.GetFileName(filePath));
+            var res = await _api.PostFormDataRequestAsync("users/me/photo", content).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<AuthUserDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    private static string GuessImageMime(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".webp" => "image/webp",
+        ".gif" => "image/gif",
+        _ => "image/jpeg",
+    };
 
     public async Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
     {

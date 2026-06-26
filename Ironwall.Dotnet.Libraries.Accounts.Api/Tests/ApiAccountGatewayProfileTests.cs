@@ -51,6 +51,9 @@ public class ApiAccountGatewayProfileTests
         public Task<ApiResponse<AuthUserDto>> UpdateMyProfileAsync(UserSelfUpdateDto dto, CancellationToken ct = default)
             => Task.FromResult(ApiResponse<AuthUserDto>.CreateSuccess(Me));
 
+        public Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default)
+            => Task.FromResult(ApiResponse<AuthUserDto>.CreateSuccess(Me));
+
         public Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
             => Task.FromResult(ApiResponse<object>.CreateSuccess(new object()));
 

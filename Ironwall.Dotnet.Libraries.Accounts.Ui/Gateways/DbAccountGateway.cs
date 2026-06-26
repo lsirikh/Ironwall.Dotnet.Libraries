@@ -95,6 +95,10 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     public Task<IAccountModel?> UpdateProfileAsync(IAccountModel acc, CancellationToken ct = default)
         => _db.UpdateAccountAsync(acc, ct);
 
+    /// <summary>DB 모드는 서버 업로드 미사용 — null 반환(ClickAddPicture가 로컬 저장 파일명을 유지).</summary>
+    public Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default)
+        => Task.FromResult<string?>(null);
+
     public async Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default)
     {
         // 본인 변경 — 현재 비밀번호 검증(acc.Password=해시) 후 변경

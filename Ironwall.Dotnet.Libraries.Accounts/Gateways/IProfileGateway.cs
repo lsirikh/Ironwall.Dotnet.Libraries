@@ -17,4 +17,7 @@ public interface IProfileGateway
 
     /// <summary>본인 비밀번호 변경(현재 비밀번호 검증 후). 검증 실패 시 null.</summary>
     Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default);
+
+    /// <summary>프로필 사진 업로드. API=서버 업로드 후 photo_url(절대 URL) 반환, DB=미지원(null). 실패 시 null.</summary>
+    Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default);
 }
