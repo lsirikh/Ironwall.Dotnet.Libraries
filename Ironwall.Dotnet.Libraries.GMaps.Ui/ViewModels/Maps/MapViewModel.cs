@@ -105,6 +105,7 @@ public class MapViewModel : BasePanelViewModel,
                         , IImageFileService imageFileService
                         , TrackingOverlayManager? trackingOverlay = null
                         , PlaybackViewModel? playbackVm = null
+                        , TrackingSetupViewModel? trackingSetupVm = null
                         ) : base(eventAggregator, log)
     {
         _cts = new CancellationTokenSource();
@@ -124,6 +125,7 @@ public class MapViewModel : BasePanelViewModel,
         _imageFileService = imageFileService;
         _trackingOverlay = trackingOverlay;
         _playbackVm = playbackVm;
+        _trackingSetupVm = trackingSetupVm;
         DeviceProvider = deviceProvider;
         InitializeCommands();
     }
@@ -1565,6 +1567,7 @@ public class MapViewModel : BasePanelViewModel,
         });
         ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
         TogglePlaybackPanelCommand = new RelayCommand(_ => TogglePlaybackPanel());
+        ToggleTrackingSettingsPanelCommand = new RelayCommand(_ => ToggleTrackingSettingsPanel());
     }
 
     #region - Tracking Playback(P5) -
@@ -1596,6 +1599,36 @@ public class MapViewModel : BasePanelViewModel,
             if (MainMap != null) _playbackVm.AttachMap(MainMap);
         }
         IsPlaybackPanelVisible = true;
+    }
+    #endregion
+
+    #region - Tracking 설정(P3-04) -
+    public RelayCommand? ToggleTrackingSettingsPanelCommand { get; private set; }
+
+    public GMapControls.TrackingSettingsControl? TrackingSettingsPanel
+    {
+        get => _trackingSettingsPanel;
+        private set { _trackingSettingsPanel = value; NotifyOfPropertyChange(nameof(TrackingSettingsPanel)); }
+    }
+
+    public bool IsTrackingSettingsPanelVisible
+    {
+        get => _isTrackingSettingsPanelVisible;
+        set { _isTrackingSettingsPanelVisible = value; NotifyOfPropertyChange(nameof(IsTrackingSettingsPanelVisible)); }
+    }
+
+    /// <summary>맵 툴바 설정 버튼 — 추적 설정 패널 열기/닫기.</summary>
+    public void ToggleTrackingSettingsPanel()
+    {
+        if (_trackingSetupVm == null) { _log?.Warning("TrackingSetup VM 미주입"); return; }
+        if (IsTrackingSettingsPanelVisible) { IsTrackingSettingsPanelVisible = false; return; }
+
+        if (TrackingSettingsPanel == null)
+        {
+            TrackingSettingsPanel = new GMapControls.TrackingSettingsControl { DataContext = _trackingSetupVm };
+            _trackingSetupVm.CloseRequested += () => IsTrackingSettingsPanelVisible = false;
+        }
+        IsTrackingSettingsPanelVisible = true;
     }
     #endregion
 
@@ -6674,6 +6707,9 @@ public class MapViewModel : BasePanelViewModel,
     private readonly PlaybackViewModel? _playbackVm;             // Tracking Playback(P5) 콘솔 VM
     private GMapControls.PlaybackConsoleControl? _playbackPanel;
     private bool _isPlaybackPanelVisible;
+    private readonly TrackingSetupViewModel? _trackingSetupVm;   // 추적 설정 패널 VM(P3-04)
+    private GMapControls.TrackingSettingsControl? _trackingSettingsPanel;
+    private bool _isTrackingSettingsPanelVisible;
     private MarkerFactory _markerFactory;
 
     private PropertyPanelFactory _propertyPanelFactory;
