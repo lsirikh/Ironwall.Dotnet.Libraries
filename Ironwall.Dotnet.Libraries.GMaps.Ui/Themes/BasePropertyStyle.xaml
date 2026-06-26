@@ -294,6 +294,7 @@
 														<TextBlock
 															Margin="10,0"
 															FontSize="10"
+															Foreground="{DynamicResource TextPrimaryBrush}"
 															Text="{Binding}" />
 													</StackPanel>
 												</DataTemplate>
@@ -330,6 +331,7 @@
 														<TextBlock
 															Margin="10,0"
 															FontSize="10"
+															Foreground="{DynamicResource TextPrimaryBrush}"
 															Text="{Binding}" />
 													</StackPanel>
 												</DataTemplate>
@@ -354,7 +356,7 @@
 											Style="{StaticResource CompactComboBox}">
 											<ComboBox.ItemTemplate>
 												<DataTemplate>
-													<TextBlock HorizontalAlignment="Center" Text="{Binding}" />
+													<TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" Text="{Binding}" />
 												</DataTemplate>
 											</ComboBox.ItemTemplate>
 										</ComboBox>
