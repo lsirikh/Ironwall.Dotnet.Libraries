@@ -24,6 +24,8 @@
 			MinHeight="550"
 			Padding="20"
 			VerticalAlignment="Stretch"
+			md:ThemeAssist.Theme="Dark"
+			Background="{DynamicResource SurfaceBrush}"
 			Opacity="1"
 			UniformCornerRadius="8">
 			<Grid HorizontalAlignment="Center">
