@@ -73,9 +73,6 @@
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
 						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="3*" />
@@ -221,31 +218,14 @@
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.EmployeeNumber}" />
 
-						<!--  Birth  -->
-						<TextBlock
-							Grid.Row="5"
-							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
-							Text="생년월일" />
-						<StackPanel
-							Grid.Row="5"
-							Grid.Column="1"
-							Grid.ColumnSpan="2"
-							VerticalAlignment="Center"
-							md:HintAssist.Hint="1990-10-10"
-							md:ValidationAssist.HorizontalAlignment="Left">
-							<!--<DatePicker SelectedDate="{Binding ViewModel.Birth, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Converter={StaticResource StringToDateConverter}}" Style="{StaticResource DatePickerContent}" />-->
-							<DatePicker SelectedDate="{Binding ViewModel.Birth, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Style="{StaticResource DatePickerContent}" />
-						</StackPanel>
-
 						<!--  Phone  -->
 						<TextBlock
-							Grid.Row="6"
+							Grid.Row="5"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="전화번호" />
 						<TextBox
-							Grid.Row="6"
+							Grid.Row="5"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							VerticalAlignment="Center"
@@ -257,29 +237,14 @@
 							</i:Interaction.Behaviors>
 						</TextBox>
 
-						<!--  Password  -->
-						<TextBlock
-							Grid.Row="7"
-							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
-							Text="주소" />
-						<TextBox
-							Grid.Row="7"
-							Grid.Column="1"
-							Grid.ColumnSpan="2"
-							VerticalAlignment="Center"
-							md:HintAssist.Hint="주소"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding ViewModel.Address}" />
-
 						<!--  EMail  -->
 						<TextBlock
-							Grid.Row="8"
+							Grid.Row="6"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="이메일" />
 						<TextBox
-							Grid.Row="8"
+							Grid.Row="6"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							VerticalAlignment="Center"
@@ -289,12 +254,12 @@
 
 						<!--  Image  -->
 						<TextBlock
-							Grid.Row="9"
+							Grid.Row="7"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="사진" />
 						<TextBox
-							Grid.Row="9"
+							Grid.Row="7"
 							Grid.Column="1"
 							VerticalAlignment="Center"
 							md:HintAssist.Hint="사진"
@@ -305,7 +270,7 @@
 						<!--  open file  -->
 						<Button
 							x:Name="ClickAddPicture"
-							Grid.Row="9"
+							Grid.Row="7"
 							Grid.Column="2"
 							VerticalAlignment="Center"
 							IsDefault="True"
@@ -322,12 +287,12 @@
 
 						<!--  Position  -->
 						<TextBlock
-							Grid.Row="10"
+							Grid.Row="8"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="직급" />
 						<TextBox
-							Grid.Row="10"
+							Grid.Row="8"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							VerticalAlignment="Center"
@@ -337,33 +302,18 @@
 
 						<!--  Department  -->
 						<TextBlock
-							Grid.Row="11"
+							Grid.Row="9"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="부서" />
 						<TextBox
-							Grid.Row="11"
+							Grid.Row="9"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							VerticalAlignment="Center"
 							md:HintAssist.Hint="부서"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.Department}" />
-
-						<!--  Company  -->
-						<TextBlock
-							Grid.Row="12"
-							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
-							Text="회사" />
-						<TextBox
-							Grid.Row="12"
-							Grid.Column="1"
-							Grid.ColumnSpan="2"
-							VerticalAlignment="Center"
-							md:HintAssist.Hint="회사"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding ViewModel.Company}" />
 					</Grid>
 				</ScrollViewer>
 

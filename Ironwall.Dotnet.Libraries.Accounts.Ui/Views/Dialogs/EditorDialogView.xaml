@@ -18,17 +18,15 @@
 
 		<md:Card
 			x:Name="CardContents"
-			Width="500"
 			Height="600"
-			MinWidth="350"
-			MinHeight="550"
 			Padding="20"
+			Width="400"
 			VerticalAlignment="Stretch"
 			md:ThemeAssist.Theme="Dark"
 			Background="{DynamicResource SurfaceBrush}"
 			Opacity="1"
 			UniformCornerRadius="8">
-			<Grid HorizontalAlignment="Center">
+			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
@@ -57,7 +55,7 @@
 					Height="390"
 					VerticalScrollBarVisibility="Auto">
 
-					<Grid Width="400">
+					<Grid Width="Auto">
 						<Grid.Resources>
 							<Style BasedOn="{StaticResource TextBlockTitle}" TargetType="TextBlock">
 								<Setter Property="FontSize" Value="16" />
@@ -65,9 +63,6 @@
 							</Style>
 						</Grid.Resources>
 						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
@@ -231,30 +226,15 @@
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.EmployeeNumber}" />
 
-						<!--  Birth  -->
-						<TextBlock
-							Grid.Row="5"
-							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
-							Text="생년월일" />
-						<StackPanel
-							Grid.Row="5"
-							Grid.Column="1"
-							Grid.ColumnSpan="2"
-							md:HintAssist.Hint="1990-10-10"
-							md:ValidationAssist.HorizontalAlignment="Left">
-							<DatePicker SelectedDate="{Binding ViewModel.Birth, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" Style="{StaticResource DatePickerContent}" />
-						</StackPanel>
-
 						<!--  Phone  -->
 						<TextBlock
-							Grid.Row="6"
+							Grid.Row="5"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="전화번호" />
 						<TextBox
 							x:Name="EditorPhone"
-							Grid.Row="6"
+							Grid.Row="5"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							md:HintAssist.Hint="전화번호"
@@ -265,30 +245,15 @@
 							</i:Interaction.Behaviors>
 						</TextBox>
 
-						<!--  Address  -->
-						<TextBlock
-							Grid.Row="7"
-							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
-							Text="주소" />
-						<TextBox
-							x:Name="EditorAddress"
-							Grid.Row="7"
-							Grid.Column="1"
-							Grid.ColumnSpan="2"
-							md:HintAssist.Hint="주소"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding ViewModel.Address}" />
-
 						<!--  EMail  -->
 						<TextBlock
-							Grid.Row="8"
+							Grid.Row="6"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="이메일" />
 						<TextBox
 							x:Name="EditorEmail"
-							Grid.Row="8"
+							Grid.Row="6"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							md:HintAssist.Hint="이메일"
@@ -297,13 +262,13 @@
 
 						<!--  Image  -->
 						<TextBlock
-							Grid.Row="9"
+							Grid.Row="7"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="사진" />
 						<TextBox
 							x:Name="EditorImage"
-							Grid.Row="9"
+							Grid.Row="7"
 							Grid.Column="1"
 							md:HintAssist.Hint="사진"
 							IsEnabled="False"
@@ -312,7 +277,7 @@
 						<!--  open file  -->
 						<Button
 							x:Name="ClickAddPicture"
-							Grid.Row="9"
+							Grid.Row="7"
 							Grid.Column="2"
 							VerticalAlignment="Center"
 							IsDefault="True"
@@ -329,13 +294,13 @@
 
 						<!--  Position  -->
 						<TextBlock
-							Grid.Row="10"
+							Grid.Row="8"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="직급" />
 						<TextBox
 							x:Name="EditorPosition"
-							Grid.Row="10"
+							Grid.Row="8"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							md:HintAssist.Hint="직급"
@@ -344,42 +309,27 @@
 
 						<!--  Department  -->
 						<TextBlock
-							Grid.Row="11"
+							Grid.Row="9"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="부서" />
 						<TextBox
 							x:Name="EditorDepartment"
-							Grid.Row="11"
+							Grid.Row="9"
 							Grid.Column="1"
 							Grid.ColumnSpan="2"
 							md:HintAssist.Hint="부서"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.Department}" />
 
-						<!--  Company  -->
-						<TextBlock
-							Grid.Row="12"
-							Grid.Column="0"
-							Style="{StaticResource TextBlockTitle}"
-							Text="회사" />
-						<TextBox
-							x:Name="EditorCompany"
-							Grid.Row="12"
-							Grid.Column="1"
-							Grid.ColumnSpan="2"
-							md:HintAssist.Hint="회사"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding ViewModel.Company}" />
-
 						<!--  USED  -->
 						<TextBlock
-							Grid.Row="13"
+							Grid.Row="10"
 							Grid.Column="0"
 							Style="{StaticResource TextBlockTitle}"
 							Text="상태" />
 						<StackPanel
-							Grid.Row="13"
+							Grid.Row="10"
 							Grid.Column="1"
 							Grid.ColumnSpan="2">
 							<ComboBox

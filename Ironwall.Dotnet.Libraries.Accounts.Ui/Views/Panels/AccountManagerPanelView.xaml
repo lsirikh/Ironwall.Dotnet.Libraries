@@ -382,48 +382,10 @@
 							</DataGridTextColumn.ElementStyle>
 						</DataGridTextColumn>
 
-						<!--  Birth  -->
-						<DataGridTextColumn
-							Binding="{Binding Birth, StringFormat={}{0:yyyy-MM-dd}}"
-							Header="생년월일"
-							IsReadOnly="True">
-							<DataGridTextColumn.HeaderStyle>
-								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-									<Setter Property="HorizontalAlignment" Value="Center" />
-									<Setter Property="VerticalAlignment" Value="Center" />
-								</Style>
-							</DataGridTextColumn.HeaderStyle>
-							<DataGridTextColumn.ElementStyle>
-								<Style TargetType="{x:Type TextBlock}">
-									<Setter Property="HorizontalAlignment" Value="Center" />
-									<Setter Property="VerticalAlignment" Value="Center" />
-								</Style>
-							</DataGridTextColumn.ElementStyle>
-						</DataGridTextColumn>
-
 						<!--  Phone  -->
 						<DataGridTextColumn
 							Binding="{Binding Phone}"
 							Header="전화번호"
-							IsReadOnly="True">
-							<DataGridTextColumn.HeaderStyle>
-								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-									<Setter Property="HorizontalAlignment" Value="Center" />
-									<Setter Property="VerticalAlignment" Value="Center" />
-								</Style>
-							</DataGridTextColumn.HeaderStyle>
-							<DataGridTextColumn.ElementStyle>
-								<Style TargetType="{x:Type TextBlock}">
-									<Setter Property="HorizontalAlignment" Value="Center" />
-									<Setter Property="VerticalAlignment" Value="Center" />
-								</Style>
-							</DataGridTextColumn.ElementStyle>
-						</DataGridTextColumn>
-
-						<!--  Address  -->
-						<DataGridTextColumn
-							Binding="{Binding Address}"
-							Header="주소"
 							IsReadOnly="True">
 							<DataGridTextColumn.HeaderStyle>
 								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -481,25 +443,6 @@
 						<DataGridTextColumn
 							Binding="{Binding Department}"
 							Header="부서"
-							IsReadOnly="True">
-							<DataGridTextColumn.HeaderStyle>
-								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-									<Setter Property="HorizontalAlignment" Value="Center" />
-									<Setter Property="VerticalAlignment" Value="Center" />
-								</Style>
-							</DataGridTextColumn.HeaderStyle>
-							<DataGridTextColumn.ElementStyle>
-								<Style TargetType="{x:Type TextBlock}">
-									<Setter Property="HorizontalAlignment" Value="Center" />
-									<Setter Property="VerticalAlignment" Value="Center" />
-								</Style>
-							</DataGridTextColumn.ElementStyle>
-						</DataGridTextColumn>
-
-						<!--  Company  -->
-						<DataGridTextColumn
-							Binding="{Binding Company}"
-							Header="회사"
 							IsReadOnly="True">
 							<DataGridTextColumn.HeaderStyle>
 								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
