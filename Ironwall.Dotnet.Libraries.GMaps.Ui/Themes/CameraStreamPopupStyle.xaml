@@ -73,8 +73,8 @@
                 <ControlTemplate TargetType="{x:Type ctrl:CameraStreamPopupControl}">
                     <Border
                         x:Name="PART_Root"
-                        Background="White"
-                        BorderBrush="{StaticResource BorderGrayBrush}"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10">
                         <Border.Effect>
@@ -95,7 +95,7 @@
                             <!--  헤더 (드래그) — 관심지역/레이어 패널과 동일 구조  -->
                             <Border
                                 Grid.Row="0"
-                                Background="{StaticResource PrimaryBlueBrush}"
+                                Background="{DynamicResource PrimaryBrush}"
                                 CornerRadius="9,9,0,0"
                                 Cursor="SizeAll">
                                 <Grid>
@@ -111,14 +111,14 @@
                                         Grid.Column="0"
                                         Width="18" Height="18"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        Foreground="White"
+                                        Foreground="{DynamicResource OnPrimaryFixedBrush}"
                                         Kind="Cctv" />
 
                                     <TextBlock
                                         Grid.Column="1"
                                         Margin="2,0"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        FontSize="14" FontWeight="Bold" Foreground="White"
+                                        FontSize="14" FontWeight="Bold" Foreground="{DynamicResource OnPrimaryFixedBrush}"
                                         TextTrimming="CharacterEllipsis"
                                         Text="{TemplateBinding PanelTitle}" />
 
@@ -129,7 +129,7 @@
                                         Style="{StaticResource PopupHeaderIconButtonStyle}"
                                         Command="{Binding TogglePanelCommand}"
                                         ToolTip="옵션 / 컨트롤 패널 (PTZ·프리셋·옵션)">
-                                        <md:PackIcon Width="15" Height="15" Foreground="White" Kind="Tune" />
+                                        <md:PackIcon Width="15" Height="15" Foreground="{DynamicResource OnPrimaryFixedBrush}" Kind="Tune" />
                                     </Button>
 
                                     <!--  크게/작게 토글  -->
@@ -139,7 +139,7 @@
                                         Style="{StaticResource PopupHeaderIconButtonStyle}"
                                         Command="{Binding ToggleSizeCommand}"
                                         ToolTip="크게/작게">
-                                        <md:PackIcon Width="14" Height="14" Foreground="White" Kind="Resize" />
+                                        <md:PackIcon Width="14" Height="14" Foreground="{DynamicResource OnPrimaryFixedBrush}" Kind="Resize" />
                                     </Button>
 
                                     <!--  닫기  -->
