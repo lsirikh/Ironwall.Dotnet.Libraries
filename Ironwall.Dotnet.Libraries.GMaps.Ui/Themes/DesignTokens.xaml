@@ -317,6 +317,7 @@
 							<!-- 전체 영역 클릭 레이어: 단일 셀이라 항상 전체폭을 채움 → Border 어디를 클릭해도 토글 -->
 							<ToggleButton
 								x:Name="ToggleButton"
+								Style="{x:Null}"
 								HorizontalAlignment="Stretch"
 								VerticalAlignment="Stretch"
 								Background="Transparent"
