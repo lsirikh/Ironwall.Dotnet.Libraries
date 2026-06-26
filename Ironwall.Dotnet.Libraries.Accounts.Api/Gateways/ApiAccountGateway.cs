@@ -3,6 +3,8 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
 
@@ -52,13 +54,34 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return AuthOutcome.Ok(new AuthResult(account, data.AccessToken, expiresAt, user.Role ?? "GUEST", permissions));
     }
 
-    /// <summary>서버엔 로그인 이력 조회 엔드포인트 없음(B-5, v4.10 BLOCKED) — '아이디 저장'은 로컬 prefs(후속). 현재 null.</summary>
+    /// <summary>'아이디 저장' 로컬 prefs(G3). 서버엔 로그인 이력 조회 없음(B-5)이라 클라 로컬 파일에 보존.</summary>
     public Task<ILoginModel?> GetLatestLoginAsync(CancellationToken ct = default)
-        => Task.FromResult<ILoginModel?>(null);
+    {
+        try
+        {
+            if (!File.Exists(PrefsPath)) return Task.FromResult<ILoginModel?>(null);
+            var prefs = JsonConvert.DeserializeObject<LoginPrefs>(File.ReadAllText(PrefsPath));
+            if (prefs is null || !prefs.IsIdSaved || string.IsNullOrEmpty(prefs.Username))
+                return Task.FromResult<ILoginModel?>(null);
+            return Task.FromResult<ILoginModel?>(new LoginModel { Username = prefs.Username, IsIdSaved = true });
+        }
+        catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] 아이디 prefs 읽기 실패: {ex.Message}"); return Task.FromResult<ILoginModel?>(null); }
+    }
 
-    /// <summary>서버가 로그인 시 자동 기록(last_login_at). 클라 no-op — IsIdSaved 로컬 보존은 후속(G3).</summary>
+    /// <summary>로그인 성공 시 '아이디 저장' 체크 상태를 로컬 prefs에 보존(G3). 체크 해제면 비움.</summary>
     public Task RecordLoginAsync(string username, bool isUsernameSaved, CancellationToken ct = default)
-        => Task.CompletedTask;
+    {
+        try
+        {
+            var prefs = new LoginPrefs { Username = isUsernameSaved ? username : string.Empty, IsIdSaved = isUsernameSaved };
+            File.WriteAllText(PrefsPath, JsonConvert.SerializeObject(prefs));
+        }
+        catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] 아이디 저장 실패: {ex.Message}"); }
+        return Task.CompletedTask;
+    }
+
+    private static string PrefsPath => Path.Combine(AppContext.BaseDirectory, "login-prefs.json");
+    private sealed class LoginPrefs { public string Username { get; set; } = string.Empty; public bool IsIdSaved { get; set; } }
 
     /// <summary>서버 logout best-effort + 토큰 폐기. access_token 서버 블랙리스트 없음(§2.3.3)이라 로컬 Clear 필수(G2).</summary>
     public async Task LogoutAsync(CancellationToken ct = default)

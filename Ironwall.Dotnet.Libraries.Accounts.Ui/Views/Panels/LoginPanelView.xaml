@@ -106,16 +106,64 @@
 						Grid.Column="0"
 						Style="{StaticResource TextBlockTitle}"
 						Text="비밀번호(PW)" />
-					<PasswordBox
-						x:Name="TextBoxPW"
-						Grid.Row="2"
-						Grid.Column="2"
-						PasswordChar="*"
-						Style="{StaticResource PasswordBoxInput}">
-						<i:Interaction.Behaviors>
-							<behavior:PasswordBehavior Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-						</i:Interaction.Behaviors>
-					</PasswordBox>
+					<Grid Grid.Row="2" Grid.Column="2">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<!--  마스킹 PW (눈 버튼 누르는 동안 숨김)  -->
+						<PasswordBox
+							x:Name="TextBoxPW"
+							Grid.Column="0"
+							PasswordChar="*">
+							<PasswordBox.Style>
+								<Style BasedOn="{StaticResource PasswordBoxInput}" TargetType="PasswordBox">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsPressed, ElementName=EyePeek}" Value="True">
+											<Setter Property="Visibility" Value="Collapsed" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</PasswordBox.Style>
+							<i:Interaction.Behaviors>
+								<behavior:PasswordBehavior Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+							</i:Interaction.Behaviors>
+						</PasswordBox>
+						<!--  평문 PW (눈 버튼 누르는 동안만 표시, 읽기전용)  -->
+						<TextBox
+							Grid.Column="0"
+							IsReadOnly="True"
+							Text="{Binding Password, Mode=OneWay}">
+							<TextBox.Style>
+								<Style BasedOn="{StaticResource TextBoxInput}" TargetType="TextBox">
+									<Setter Property="Visibility" Value="Collapsed" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsPressed, ElementName=EyePeek}" Value="True">
+											<Setter Property="Visibility" Value="Visible" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</TextBox.Style>
+						</TextBox>
+						<!--  눈알 아이콘 — 누르고 있는 동안 평문 표시(hold-to-reveal)  -->
+						<Button
+							x:Name="EyePeek"
+							Grid.Column="1"
+							Width="32"
+							Margin="4,0,0,0"
+							Padding="0"
+							Background="Transparent"
+							BorderThickness="0"
+							Focusable="False"
+							Style="{StaticResource MaterialDesignFlatButton}"
+							ToolTip="누르고 있는 동안 비밀번호 표시">
+							<md:PackIcon
+								Width="20"
+								Height="20"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Kind="EyeOutline" />
+						</Button>
+					</Grid>
 
 				</Grid>
 				<Grid Grid.Row="2">
