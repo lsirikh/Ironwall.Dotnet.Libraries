@@ -25,8 +25,11 @@
 					<Setter Property="Width" Value="400" />
 					<Setter Property="Height" Value="300" />
 					<Setter Property="Padding" Value="20" />
-					<Setter Property="Opacity" Value="0.9" />
+					<Setter Property="Opacity" Value="1" />
 					<Setter Property="UniformCornerRadius" Value="8" />
+					<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+					<Setter Property="md:ElevationAssist.Elevation" Value="Dp0" />
+					<Setter Property="md:ThemeAssist.Theme" Value="Dark" />
 					<Style.Triggers>
 
 						<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
