@@ -38,6 +38,9 @@ public class TrackingSetupModel : ITrackingSetupModel
     /// <summary>Playback 1회 조회 최대 시간(시간). 기본 6.</summary>
     public int MaxPlaybackHours { get; set; } = 6;
 
+    /// <summary>로컬 추적 좌표 보존 일수. 기본 7. 0=무제한.</summary>
+    public int RetentionDays { get; set; } = 7;
+
     public TrackingSetupModel() { }
 
     /// <summary>복사 생성자.</summary>
@@ -52,5 +55,6 @@ public class TrackingSetupModel : ITrackingSetupModel
         MaxSpeedMs = model.MaxSpeedMs;
         MaxPlaybackHours = model.MaxPlaybackHours;
         GapThresholdSec = model.GapThresholdSec;
+        RetentionDays = model.RetentionDays;
     }
 }

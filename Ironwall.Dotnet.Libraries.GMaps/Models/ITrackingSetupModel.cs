@@ -37,4 +37,7 @@ public interface ITrackingSetupModel
 
     /// <summary>Playback 1회 조회 최대 시간(시간). 초과 범위는 제한(과다 로드·OOM 방지).</summary>
     int MaxPlaybackHours { get; set; }
+
+    /// <summary>로컬 추적 좌표 보존 일수. 이 일수 경과분은 주기 삭제(무한 증가 방지). 0=무제한.</summary>
+    int RetentionDays { get; set; }
 }

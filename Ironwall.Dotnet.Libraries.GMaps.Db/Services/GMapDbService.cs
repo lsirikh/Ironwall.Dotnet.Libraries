@@ -390,10 +390,31 @@ internal class GMapDbService : TaskService, IGMapDbService
                     `SpeedMps`     DOUBLE NULL,
                     `ObservedAt`   DATETIME(3) NOT NULL,
                     `CreatedAt`    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY `ux_track_dedup` (`CameraId`, `TrackId`, `ObservedAt`),  -- 재전송/중복 메시지 dedup
                     INDEX `ix_track_camera_obs` (`CameraId`, `ObservedAt`),
                     INDEX `ix_track_track_obs` (`TrackId`, `ObservedAt`)
                 );";
             await _conn.ExecuteAsync(createCameraTrackPointsSql);
+
+            // 기존 테이블(UNIQUE 없던 버전) 1회 마이그레이션 — 중복 제거 후 UNIQUE 추가(best-effort, 비치명)
+            try
+            {
+                var hasUx = await _conn.ExecuteScalarAsync<int>(@"
+                    SELECT COUNT(*) FROM information_schema.STATISTICS
+                     WHERE table_schema = DATABASE() AND table_name = 'CameraTrackPoints'
+                       AND index_name = 'ux_track_dedup';");
+                if (hasUx == 0)
+                {
+                    await _conn.ExecuteAsync(@"
+                        DELETE t1 FROM `CameraTrackPoints` t1
+                          JOIN `CameraTrackPoints` t2
+                            ON t1.`CameraId`=t2.`CameraId` AND t1.`TrackId`=t2.`TrackId`
+                           AND t1.`ObservedAt`=t2.`ObservedAt` AND t1.`Id` > t2.`Id`;");
+                    await _conn.ExecuteAsync(
+                        "ALTER TABLE `CameraTrackPoints` ADD UNIQUE KEY `ux_track_dedup` (`CameraId`,`TrackId`,`ObservedAt`);");
+                }
+            }
+            catch (Exception ex) { _log?.Warning($"[GMapDb] CameraTrackPoints dedup 마이그레이션 건너뜀: {ex.Message}"); }
 
             if (_eventAggregator != null)
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
@@ -1559,8 +1580,9 @@ internal class GMapDbService : TaskService, IGMapDbService
             var rows = points?.ToList() ?? new List<ITrackPointModel>();
             if (rows.Count == 0) return 0;
             await using var conn = await OpenConnectionAsync(token);
+            // INSERT IGNORE — ux_track_dedup(CameraId,TrackId,ObservedAt) 중복은 조용히 skip(재전송 dedup)
             const string sql = @"
-                INSERT INTO CameraTrackPoints (CameraId, TrackId, Label, ThreatLevel, Latitude, Longitude, DistanceM, SpeedMps, ObservedAt)
+                INSERT IGNORE INTO CameraTrackPoints (CameraId, TrackId, Label, ThreatLevel, Latitude, Longitude, DistanceM, SpeedMps, ObservedAt)
                 VALUES (@CameraId, @TrackId, @Label, @ThreatLevel, @Latitude, @Longitude, @DistanceM, @SpeedMps, @ObservedAt);";
             return await conn.ExecuteAsync(sql, rows.Select(p => new
             {
