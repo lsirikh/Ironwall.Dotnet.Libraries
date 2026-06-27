@@ -28,7 +28,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 public class GMapUiModule: Module
 {
     #region - Ctors -
-    public GMapUiModule(IGMapSetupModel gMapSetup, IMariaDbSetupModel gMapDbSetup, IMainControlWebSetupModel webSetup, ILogService? log = default, int count = default, ApiSetupModel? trackingApiSetup = null)
+    public GMapUiModule(IGMapSetupModel gMapSetup, IMariaDbSetupModel gMapDbSetup, IMainControlWebSetupModel webSetup, ILogService? log = default, int count = default, IApiSetupModel? trackingApiSetup = null)
     {
         _log = log;
         _count = count;
@@ -70,7 +70,10 @@ public class GMapUiModule: Module
         // 데이터소스 토글(로컬 DB ↔ 서버 API) — API 모드는 trackingApiSetup 주입 시에만 활성.
         if (_trackingApiSetup != null)
         {
-            builder.RegisterModule(new TrackingApiModule(_log, _trackingApiSetup, "TrackingApi", _count));
+            // 앱 God-Model(IApiSetupModel)을 concrete ApiSetupModel로 복사(타임아웃 30s).
+            // TrackingApiModule/ApiService/TrackingApiService는 concrete ApiSetupModel을 사용한다.
+            var trackingApi = new ApiSetupModel(_trackingApiSetup) { Timeout = 30 };
+            builder.RegisterModule(new TrackingApiModule(_log, trackingApi, "TrackingApi", _count));
             builder.Register(ctx => new TrackPointApiReader(ctx.Resolve<ITrackingApiService>(), _log))
                    .AsSelf().SingleInstance();
         }
@@ -110,6 +113,6 @@ public class GMapUiModule: Module
     private IGMapSetupModel _gMapSetup;
     private IMariaDbSetupModel _gMapDbSetup;
     private IMainControlWebSetupModel _webSetup;
-    private ApiSetupModel? _trackingApiSetup;
+    private IApiSetupModel? _trackingApiSetup;   // 앱 God-Model(SetupModel:IApiSetupModel) 그대로 수용
     #endregion
 }
