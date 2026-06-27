@@ -33,6 +33,22 @@ public class UserSessionPanelViewModel : BasePanelViewModel
 
     public async Task OnClickReloadButton() => await ReloadAsync(CancellationToken.None);
 
+    /// <summary>세션 강제 로그아웃(ADMIN) — DELETE /user-sessions/{id} 후 목록 갱신. 비활성 세션은 무시.</summary>
+    public async Task OnClickForceLogout(UserSessionDto session)
+    {
+        if (session is null || !session.IsActive) return;
+        try
+        {
+            var res = await _api.ForceLogoutSessionAsync(session.Id);
+            if (res.Success)
+                await ReloadAsync(CancellationToken.None);
+            else
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "세션 관리", Explain = $"강제 로그아웃 실패: {res.Error?.Message ?? res.Message}" });
+        }
+        catch (Exception ex) { _log?.Error($"[UserSession] 강제로그아웃 실패: {ex.Message}"); }
+    }
+
     private async Task ReloadAsync(CancellationToken ct)
     {
         try

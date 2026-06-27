@@ -49,6 +49,10 @@ public interface IAccountApiService
     Task<ApiListResponse<UserGroupDto>> GetUserGroupsAsync(CancellationToken ct = default);
     /// <summary>GET /api/user-sessions — 세션 목록(ADMIN).</summary>
     Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default);
+    /// <summary>DELETE /api/user-sessions/{session_id} — 세션 강제 로그아웃(ADMIN).
+    /// 기본구현=미지원(테스트 스텁 무수정 목적) — 실제 구현은 AccountApiService.</summary>
+    Task<ApiResponse<object>> ForceLogoutSessionAsync(int sessionId, CancellationToken ct = default)
+        => throw new NotImplementedException();
     /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit). action_type/resource_type=str(tolerant).</summary>
     Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default);
 }

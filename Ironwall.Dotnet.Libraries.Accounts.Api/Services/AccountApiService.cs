@@ -130,6 +130,16 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    public async Task<ApiResponse<object>> ForceLogoutSessionAsync(int sessionId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.DeleteRequestAsync($"user-sessions/{sessionId}").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<object>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiResponse<object>> ResetUserPasswordAsync(int id, string newPassword, CancellationToken ct = default)
     {
         try
