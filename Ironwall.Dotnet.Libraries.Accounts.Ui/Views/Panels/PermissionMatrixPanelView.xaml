@@ -7,52 +7,48 @@
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	d:DesignHeight="450"
-	d:DesignWidth="800"
+	d:DesignWidth="900"
+	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+	<!--  탭 콘텐츠 — 색은 100% DynamicResource 토큰.  -->
 	<Grid Margin="6">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
-		<DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
-			<TextBlock
-				VerticalAlignment="Center"
-				DockPanel.Dock="Left"
-				FontSize="15"
-				FontWeight="SemiBold"
-				Text="권한 설정 (그룹 × 모듈)" />
-			<Button
-				DockPanel.Dock="Right"
-				Padding="6,2"
-				Background="Transparent"
-				BorderThickness="0"
-				ToolTip="갱신">
+		<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+			<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="권한 설정 (그룹 × 모듈)" />
+			<Button DockPanel.Dock="Right" Style="{StaticResource ModernToolbarButton}" ToolTip="갱신">
 				<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
-				<md:PackIcon Width="22" Height="22" Kind="Refresh" />
+				<md:PackIcon Width="20" Height="20" Kind="Refresh" />
 			</Button>
 		</DockPanel>
 		<DataGrid
 			Grid.Row="1"
 			AutoGenerateColumns="False"
+			Background="Transparent"
 			CanUserAddRows="False"
+			CellStyle="{StaticResource ModernDataGridCell}"
+			ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
 			IsReadOnly="True"
-			ItemsSource="{Binding Rows}">
+			ItemsSource="{Binding Rows}"
+			RowStyle="{StaticResource ModernDataGridRow}"
+			Style="{StaticResource ModernDataGrid}">
 			<DataGrid.Columns>
-				<DataGridTextColumn Width="130" Binding="{Binding GroupName}" Header="그룹" />
-				<DataGridTextColumn Width="150" Binding="{Binding Module}" Header="모듈" />
-				<DataGridCheckBoxColumn Width="60" Binding="{Binding View}" Header="조회" />
-				<DataGridCheckBoxColumn Width="60" Binding="{Binding Edit}" Header="편집" />
-				<DataGridCheckBoxColumn Width="60" Binding="{Binding Delete}" Header="삭제" />
-				<DataGridCheckBoxColumn Width="60" Binding="{Binding Control}" Header="제어" />
+				<DataGridTextColumn Width="140" Binding="{Binding GroupName}" Header="그룹" />
+				<DataGridTextColumn Width="160" Binding="{Binding Module}" Header="모듈" />
+				<DataGridCheckBoxColumn Width="70" Binding="{Binding View}" Header="조회" />
+				<DataGridCheckBoxColumn Width="70" Binding="{Binding Edit}" Header="편집" />
+				<DataGridCheckBoxColumn Width="70" Binding="{Binding Delete}" Header="삭제" />
+				<DataGridCheckBoxColumn Width="70" Binding="{Binding Control}" Header="제어" />
 				<DataGridTextColumn Width="*" Header="" />
 			</DataGrid.Columns>
 		</DataGrid>
 		<TextBlock
 			Grid.Row="2"
-			Margin="0,6,0,0"
-			FontSize="11"
-			Opacity="0.7"
+			Margin="0,8,0,0"
+			Style="{StaticResource PanelFieldLabel}"
 			Text="※ 조회 전용 — 기존 그룹 권한 편집/저장은 서버 v5.0 권한수정 API 후 활성화 (현재 서버가 변경 차단)." />
 	</Grid>
 </UserControl>

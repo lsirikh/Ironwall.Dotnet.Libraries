@@ -7,44 +7,41 @@
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	d:DesignHeight="450"
-	d:DesignWidth="800"
+	d:DesignWidth="900"
+	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+	<!--  탭 콘텐츠 — 색은 100% DynamicResource 토큰. (세션 정책 영역은 EXT-10에서 상단 추가 예정)  -->
 	<Grid Margin="6">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 		</Grid.RowDefinitions>
-		<DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
-			<TextBlock
-				VerticalAlignment="Center"
-				DockPanel.Dock="Left"
-				FontSize="15"
-				FontWeight="SemiBold"
-				Text="접속 세션 모니터" />
-			<Button
-				DockPanel.Dock="Right"
-				Padding="6,2"
-				Background="Transparent"
-				BorderThickness="0"
-				ToolTip="갱신">
+		<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+			<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="접속 세션 모니터" />
+			<Button DockPanel.Dock="Right" Style="{StaticResource ModernToolbarButton}" ToolTip="갱신">
 				<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
-				<md:PackIcon Width="22" Height="22" Kind="Refresh" />
+				<md:PackIcon Width="20" Height="20" Kind="Refresh" />
 			</Button>
 		</DockPanel>
 		<DataGrid
 			Grid.Row="1"
 			AutoGenerateColumns="False"
+			Background="Transparent"
 			CanUserAddRows="False"
+			CellStyle="{StaticResource ModernDataGridCell}"
+			ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
 			IsReadOnly="True"
-			ItemsSource="{Binding Items}">
+			ItemsSource="{Binding Items}"
+			RowStyle="{StaticResource ModernDataGridRow}"
+			Style="{StaticResource ModernDataGrid}">
 			<DataGrid.Columns>
-				<DataGridTextColumn Width="120" Binding="{Binding LoginId}" Header="사용자" />
+				<DataGridTextColumn Width="130" Binding="{Binding LoginId}" Header="사용자" />
 				<DataGridTextColumn Width="90" Binding="{Binding Role}" Header="역할" />
-				<DataGridTextColumn Width="120" Binding="{Binding IpAddress}" Header="IP" />
+				<DataGridTextColumn Width="130" Binding="{Binding IpAddress}" Header="IP" />
 				<DataGridCheckBoxColumn Width="60" Binding="{Binding IsActive}" Header="활성" />
 				<DataGridTextColumn Width="150" Binding="{Binding ExpiresAt}" Header="만료" />
 				<DataGridTextColumn Width="150" Binding="{Binding LoggedOutAt}" Header="로그아웃" />
-				<DataGridTextColumn Width="120" Binding="{Binding LogoutReason}" Header="사유" />
+				<DataGridTextColumn Width="130" Binding="{Binding LogoutReason}" Header="사유" />
 				<DataGridTextColumn Width="*" Binding="{Binding CreatedAt}" Header="로그인시각" />
 			</DataGrid.Columns>
 		</DataGrid>
