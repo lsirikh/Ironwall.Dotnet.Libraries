@@ -112,6 +112,15 @@ public class AccountUiModule : Module
             builder.RegisterType<EditorDialogViewModel>().SingleInstance();
             builder.RegisterType<DeleteAccountDialogViewModel>().SingleInstance();
             builder.RegisterType<ResetPassDialogViewModel>().SingleInstance();
+
+            // GOP 모드 전용 읽기 패널 — IAccountApiService(그룹/세션/감사 읽기 API) 직접 주입.
+            // DbAuth 모드엔 IAccountApiService 미등록(AccountApiModule 미로드)이라 조건부 등록(resolve 깨짐 방지).
+            if (!_useDbAuth)
+            {
+                builder.RegisterType<PermissionMatrixPanelViewModel>().SingleInstance();
+                builder.RegisterType<UserSessionPanelViewModel>().SingleInstance();
+                builder.RegisterType<AuditLogPanelViewModel>().SingleInstance();
+            }
         }
         catch
         {
