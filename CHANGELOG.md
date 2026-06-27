@@ -26,6 +26,11 @@
   - SVMS 장비상세 링크 스킴 https(`DeviceDetailUrlService` `WebScheme` const, 테스트 25/25). ⚠ SVMS 서버도 https listen 필요.
 
 ### Added
+- **Tracking Playback 데이터소스 토글 (로컬 DB ↔ 서버 API)** ([PRD](docs/prds/Tracking_Playback_DataSource_Toggle-prd.md) · [Plan](docs/plans/Tracking_Playback_DataSource_Toggle-prd-plan.md) · 커밋 `6024a71`/`5a662ad`/`0d0948a`, 브랜치 `feature/track-datasource-toggle`, 태그 `before-track-datasource-toggle`)
+  - Playback reader를 설정에서 **로컬 DB / 서버 API** 선택(라이브 토글, 무재시작). `ITrackPointReader` seam만 — 라이브 오버레이·write(인제스트) 경로 무변경. 기본=Local(스테이션 #2까지).
+  - 신규 `Tracking.Api`(Events.Api 미러: cursor loop `GET /api/tracking/points`) + `TrackPointApiReader`/`TrackDataSourceSelector`(FetchAsync마다 분기) + `EnumTrackDataSource`(Local/Api; Hybrid v2) + `TrackPointDto`/`TrackApiListResponse`/`TrackCursorDto`(cursor envelope) + `TrackPointDtoMapper`(KST `+09:00`→UTC, AssumeUniversal) + 설정 콤보 UI(`EnumDisplayNameConverter`) + DataSource 영속(MapSettingsHelper — 기존 누락 MaxPlaybackHours/RetentionDays도 보강).
+  - 분석 체인(Explore×3→architect→**code-reviewer FLAWED 판정**) 적대검증 수정 전부 반영: `GetRequestAsync` ct無·첫페이지 cursor omit·`AsImplementedInterfaces`(ExecuteAsync 트리거)·`ITrackPointReader` 중복바인딩0·nullable 매퍼·webSetup Url부재→ApiSetupModel 명시. 빌드0·매퍼 7테스트·전체 회귀0(126/126).
+  - 🔲 후속: 메인솔루션 Bootstrapper `GMapUiModule(..., trackingApiSetup: GOP ApiSetupModel)` 연동(**사전통지**)·v2.6 머지·앱 재빌드 런타임. **서버측(별도 repo `api-test-server`)** GET /api/tracking/{points·sessions·health} + `gis-ingest` 워커 = 배포·mock E2E 완료(차수 v4.11/v4.12).
 - **Tracking GIS 시각화 + 트레일 + TTL + 설정 (P1~P3) — Foundation 착수** ([PRD](docs/prds/Tracking_GIS_Visualization_Playback-prd.md) · [Plan](docs/plans/Tracking_GIS_Visualization_Playback-prd-plan.md))
   - **계약 확정(V-CONTRACT-1)**: `Gop_Message_Broker_연동설계.md §8.3.7`(권위 SoT)로 TRACKING_STATUS 메시지 검증 — `targets[]`/`track_id`/`observed_at`/`threat_level`/`location` 전부 필수. 설계 보강 6건(복합키·lost/idle 제거·Unknown 클라폴백·소문자변환·ttl기본5·car·vehicle) PRD 반영.
   - **P1 Foundation(빌드0·테스트 183/183)**: ① `EnumThreatLevel`(NORMAL/CAUTION/THREAT+Unknown 클라폴백)·`EnumTargetType`·`TrackingEnumExtensions`(안전파싱+ToColorType, 토큰스캔으로 `armed_person`→Person 견고화) 신설(`.Enums`) ② `IClock`/`SystemClock` 신설(`.Base`, 규칙 I-02) ③ **DTO 전면 교체**(`.Messages`): `TrackingStatusBodyDto` 단수 `target`→다중 `targets[]`+`ttl_sec`/`frame_w·h`, 신규 `TrackingTargetDto`. Phase26 단위테스트 재작성(역직렬화/idle/enum폴백).
