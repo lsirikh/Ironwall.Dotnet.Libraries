@@ -25,6 +25,7 @@
 		</DockPanel>
 		<DataGrid
 			Grid.Row="1"
+			RowHeight="38"
 			AutoGenerateColumns="False"
 			Background="Transparent"
 			CanUserAddRows="False"
