@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
+using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
@@ -48,6 +49,11 @@ public sealed class TrackingSetupViewModel : PropertyChangedBase
     public double MaxSpeedMs { get => _model.MaxSpeedMs; set { _model.MaxSpeedMs = value; NotifyOfPropertyChange(); } }
     public int MaxPlaybackHours { get => _model.MaxPlaybackHours; set { _model.MaxPlaybackHours = value; NotifyOfPropertyChange(); } }
 
+    /// <summary>Playback 데이터 소스(로컬 DB / 서버 API). 변경 시 다음 Load부터 반영(라이브, 무재시작).</summary>
+    public EnumTrackDataSource DataSource { get => _model.DataSource; set { _model.DataSource = value; NotifyOfPropertyChange(); } }
+    /// <summary>콤보 ItemsSource — enum 값 목록(Local/Api).</summary>
+    public IReadOnlyList<EnumTrackDataSource> DataSourceOptions { get; } = Enum.GetValues<EnumTrackDataSource>().ToList();
+
     private string _status = "조정 즉시 반영 · [저장]으로 영속";
     public string Status { get => _status; set { _status = value; NotifyOfPropertyChange(); } }
     #endregion
@@ -84,6 +90,7 @@ public sealed class TrackingSetupViewModel : PropertyChangedBase
         _model.LostTtlSec = d.LostTtlSec;
         _model.MaxSpeedMs = d.MaxSpeedMs;
         _model.MaxPlaybackHours = d.MaxPlaybackHours;
+        _model.DataSource = d.DataSource;
         Refresh();   // 모든 바인딩 갱신
         Status = "기본값 복원됨 — [저장] 필요";
     }

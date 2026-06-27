@@ -12,6 +12,9 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
+using Ironwall.Dotnet.Libraries.Api.Models;
+using Ironwall.Dotnet.Libraries.Tracking.Api.Modules;
+using Ironwall.Dotnet.Libraries.Tracking.Api.Services;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 /****************************************************************************
@@ -25,13 +28,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 public class GMapUiModule: Module
 {
     #region - Ctors -
-    public GMapUiModule(IGMapSetupModel gMapSetup, IMariaDbSetupModel gMapDbSetup, IMainControlWebSetupModel webSetup, ILogService? log = default, int count = default)
+    public GMapUiModule(IGMapSetupModel gMapSetup, IMariaDbSetupModel gMapDbSetup, IMainControlWebSetupModel webSetup, ILogService? log = default, int count = default, ApiSetupModel? trackingApiSetup = null)
     {
         _log = log;
         _count = count;
         _gMapSetup = gMapSetup;
         _gMapDbSetup = gMapDbSetup;
         _webSetup = webSetup;
+        _trackingApiSetup = trackingApiSetup;   // Playback API 모드 base URL(=GOP ApiSetupModel). null이면 selector가 Local 폴백.
     }
     #endregion
     #region - Implementation of Interface -
@@ -60,9 +64,23 @@ public class GMapUiModule: Module
         //    명시적 기본생성자 팩토리로 등록(순환 회피).
         builder.Register(_ => new TrackingSetupModel()).As<ITrackingSetupModel>().SingleInstance();
         builder.RegisterType<TrackingOverlayManager>().AsSelf().As<ITrackingOverlayManager>().SingleInstance();
-        // 추적 좌표 로컬 DB 영속(P4) — write(ITrackPointWriter) + Playback read(ITrackPointReader seam, 서버전환 시 교체)
+        // 추적 좌표 로컬 DB 영속(P4) — write(ITrackPointWriter)만. read seam은 selector가 토글.
         builder.RegisterType<TrackPointStore>().AsSelf()
-               .As<ITrackPointWriter>().As<ITrackPointReader>().SingleInstance();
+               .As<ITrackPointWriter>().SingleInstance();
+        // 데이터소스 토글(로컬 DB ↔ 서버 API) — API 모드는 trackingApiSetup 주입 시에만 활성.
+        if (_trackingApiSetup != null)
+        {
+            builder.RegisterModule(new TrackingApiModule(_log, _trackingApiSetup, "TrackingApi", _count));
+            builder.Register(ctx => new TrackPointApiReader(ctx.Resolve<ITrackingApiService>(), _log))
+                   .AsSelf().SingleInstance();
+        }
+        // ITrackPointReader = selector(FetchAsync마다 DataSource 읽어 라이브 분기). api 미주입 시 Local 폴백.
+        builder.Register(ctx => new TrackDataSourceSelector(
+                   ctx.Resolve<TrackPointStore>(),
+                   _trackingApiSetup != null ? ctx.Resolve<TrackPointApiReader>() : null,
+                   ctx.Resolve<ITrackingSetupModel>(),
+                   _log))
+               .As<ITrackPointReader>().SingleInstance();
         // Playback(P5) — 엔진·격리 오버레이·콘솔 VM (로컬 DB 조회 재생)
         builder.RegisterType<PlaybackEngine>().SingleInstance();
         builder.RegisterType<PlaybackOverlayManager>().SingleInstance();
@@ -92,5 +110,6 @@ public class GMapUiModule: Module
     private IGMapSetupModel _gMapSetup;
     private IMariaDbSetupModel _gMapDbSetup;
     private IMainControlWebSetupModel _webSetup;
+    private ApiSetupModel? _trackingApiSetup;
     #endregion
 }

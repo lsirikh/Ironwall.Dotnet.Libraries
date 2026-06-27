@@ -188,6 +188,9 @@ public static class MapSettingsHelper
             model.MinVisibleZoom,
             model.MaxSpeedMs,
             model.GapThresholdSec,
+            model.MaxPlaybackHours,
+            model.RetentionDays,
+            model.DataSource,
         }, log);
     }
 
@@ -209,6 +212,9 @@ public static class MapSettingsHelper
                 MinVisibleZoom = t["MinVisibleZoom"]?.ToObject<double>() ?? def.MinVisibleZoom,
                 MaxSpeedMs = t["MaxSpeedMs"]?.ToObject<double>() ?? def.MaxSpeedMs,
                 GapThresholdSec = t["GapThresholdSec"]?.ToObject<int>() ?? def.GapThresholdSec,
+                MaxPlaybackHours = t["MaxPlaybackHours"]?.ToObject<int>() ?? def.MaxPlaybackHours,
+                RetentionDays = t["RetentionDays"]?.ToObject<int>() ?? def.RetentionDays,
+                DataSource = t["DataSource"]?.ToObject<Ironwall.Dotnet.Libraries.Enums.EnumTrackDataSource>() ?? def.DataSource,
             };
         }
         catch (Exception)

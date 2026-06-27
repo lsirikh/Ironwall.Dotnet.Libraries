@@ -1,3 +1,5 @@
+using Ironwall.Dotnet.Libraries.Enums;
+
 namespace Ironwall.Dotnet.Libraries.GMaps.Models;
 /****************************************************************************
    Purpose      : 추적 오버레이 설정 모델 (appsettings ↔ 맵세팅 UI live)
@@ -40,4 +42,7 @@ public interface ITrackingSetupModel
 
     /// <summary>로컬 추적 좌표 보존 일수. 이 일수 경과분은 주기 삭제(무한 증가 방지). 0=무제한.</summary>
     int RetentionDays { get; set; }
+
+    /// <summary>Playback 데이터 소스 — 로컬 DB / 서버 API 토글(기본 Local). FetchAsync마다 selector가 읽어 라이브 전환.</summary>
+    EnumTrackDataSource DataSource { get; set; }
 }

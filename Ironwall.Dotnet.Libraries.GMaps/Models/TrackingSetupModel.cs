@@ -1,3 +1,5 @@
+using Ironwall.Dotnet.Libraries.Enums;
+
 namespace Ironwall.Dotnet.Libraries.GMaps.Models;
 /****************************************************************************
    Purpose      : 추적 오버레이 설정 모델 구현 (기본값 + 복사생성자)
@@ -41,6 +43,9 @@ public class TrackingSetupModel : ITrackingSetupModel
     /// <summary>로컬 추적 좌표 보존 일수. 기본 7. 0=무제한.</summary>
     public int RetentionDays { get; set; } = 7;
 
+    /// <summary>Playback 데이터 소스 — 로컬 DB / 서버 API 토글. 기본 Local(스테이션 #2까지).</summary>
+    public EnumTrackDataSource DataSource { get; set; } = EnumTrackDataSource.Local;
+
     public TrackingSetupModel() { }
 
     /// <summary>복사 생성자.</summary>
@@ -56,5 +61,6 @@ public class TrackingSetupModel : ITrackingSetupModel
         MaxPlaybackHours = model.MaxPlaybackHours;
         GapThresholdSec = model.GapThresholdSec;
         RetentionDays = model.RetentionDays;
+        DataSource = model.DataSource;
     }
 }

@@ -49,6 +49,7 @@
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.OnvifSolution\Ironwall.Dotnet.Libraries.OnvifSolution.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming\Ironwall.Dotnet.Libraries.Streaming.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Streaming.Base\Ironwall.Dotnet.Libraries.Streaming.Base.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Tracking.Api\Ironwall.Dotnet.Libraries.Tracking.Api.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Utils\Ironwall.Dotnet.Libraries.Utils.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.ViewModel\Ironwall.Dotnet.Libraries.ViewModel.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Monitoring.Models\Ironwall.Dotnet.Monitoring.Models.csproj" />
