@@ -1,0 +1,86 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.AccountConsolePanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="700"
+	d:DesignWidth="1120"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<!--  계정·권한 관리 콘솔 — 큰 카드 + 시안 헤더 + 상단 수평 탭. 색은 100% DynamicResource 토큰(Tactical Command).  -->
+	<md:DialogHost DialogTheme="Inherit" Identifier="AccountConsole">
+		<md:Card
+			Width="1120"
+			Height="700"
+			MinWidth="900"
+			MinHeight="600"
+			Padding="0"
+			md:ThemeAssist.Theme="Inherit"
+			UniformCornerRadius="8">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
+
+				<!--  시안 헤더  -->
+				<Border
+					Grid.Row="0"
+					CornerRadius="8,8,0,0"
+					Style="{StaticResource ModernDialogHeader}">
+					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+						<md:PackIcon
+							Width="20"
+							Height="20"
+							Margin="0,0,8,0"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Kind="AccountCog" />
+						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="계정·권한 관리" />
+					</StackPanel>
+				</Border>
+
+				<!--  상단 수평 탭  -->
+				<TabControl
+					Grid.Row="1"
+					Margin="12"
+					Background="{DynamicResource SurfaceBrush}"
+					Style="{StaticResource MaterialDesignTabControl}"
+					TabStripPlacement="Top">
+					<TabItem Header="사용자" Visibility="{Binding CanSeeAccounts, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<ContentControl x:Name="AccountManagerPanelViewModel" />
+					</TabItem>
+					<TabItem Header="권한 설정" Visibility="{Binding CanSeePermission, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<ContentControl x:Name="PermissionMatrixPanelViewModel" />
+					</TabItem>
+					<TabItem Header="세션 관리" Visibility="{Binding CanSeeSession, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<ContentControl x:Name="UserSessionPanelViewModel" />
+					</TabItem>
+					<TabItem Header="감사 로그" Visibility="{Binding CanSeeAudit, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<ContentControl x:Name="AuditLogPanelViewModel" />
+					</TabItem>
+				</TabControl>
+
+				<!--  풋터  -->
+				<Border
+					Grid.Row="2"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="0,1,0,0">
+					<StackPanel
+						Margin="12"
+						HorizontalAlignment="Right"
+						Orientation="Horizontal">
+						<Button
+							x:Name="ClickClose"
+							Width="100"
+							Content="닫기"
+							Style="{StaticResource ModernSecondaryButton}" />
+					</StackPanel>
+				</Border>
+			</Grid>
+		</md:Card>
+	</md:DialogHost>
+</UserControl>

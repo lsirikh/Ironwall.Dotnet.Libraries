@@ -120,6 +120,7 @@ public class AccountUiModule : Module
                 builder.RegisterType<PermissionMatrixPanelViewModel>().SingleInstance();
                 builder.RegisterType<UserSessionPanelViewModel>().SingleInstance();
                 builder.RegisterType<AuditLogPanelViewModel>().SingleInstance();
+                builder.RegisterType<AccountConsolePanelViewModel>().SingleInstance();   // 계정·권한 관리 콘솔(4탭 호스트)
             }
         }
         catch
