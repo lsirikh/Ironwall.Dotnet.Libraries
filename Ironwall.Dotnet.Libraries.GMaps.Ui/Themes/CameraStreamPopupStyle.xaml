@@ -285,8 +285,8 @@
                                         </Button>
                                     </UniformGrid>
 
-                                    <!--  PTZ 탭: 좌=8방향 패드(누르면 연속이동·떼면 정지), 우=속도(PanTilt/Zoom 슬라이더+직접입력). 컨트롤이 버튼 Tag로 누름/뗌 처리. 비PTZ면 전체 비활성  -->
-                                    <Grid Margin="4,4,4,0" IsEnabled="{Binding IsPtzCapable}">
+                                    <!--  PTZ 탭: 좌=8방향 패드(누르면 연속이동·떼면 정지), 우=속도+줌(IsPtzCapable)·포커스(IsImagingCapable 독립). 컨트롤이 버튼 Tag로 누름/뗌 처리. ※외곽 IsPtzCapable 제거 — 포커스가 PTZ게이트에 막히면 영상전용 고정카메라서 수동포커스 도달불가(code-reviewer MEDIUM/E 해소)  -->
+                                    <Grid Margin="4,4,4,0">
                                         <Grid.Style>
                                             <Style TargetType="Grid">
                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -302,8 +302,8 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
-                                        <!--  좌: 8방향 패드  -->
-                                        <UniformGrid x:Name="PART_PtzPad" Grid.Column="0" Width="132" Height="132" VerticalAlignment="Center" Columns="3" Rows="3">
+                                        <!--  좌: 8방향 패드 (PTZ 전용)  -->
+                                        <UniformGrid x:Name="PART_PtzPad" Grid.Column="0" Width="132" Height="132" VerticalAlignment="Center" Columns="3" Rows="3" IsEnabled="{Binding IsPtzCapable}">
                                             <Button Content="↖" Style="{StaticResource PtzPadButtonStyle}" Tag="-1,-1" />
                                             <Button Content="▲" Style="{StaticResource PtzPadButtonStyle}" Tag="0,-1" />
                                             <Button Content="↗" Style="{StaticResource PtzPadButtonStyle}" Tag="1,-1" />
@@ -317,6 +317,8 @@
 
                                         <!--  우: 속도(PanTilt/Zoom) — 라벨+값 위, 슬라이더는 전체폭(좁은 슬라이더 0.1↔1.0 점프 방지). 0.1 단위 스냅  -->
                                         <StackPanel Grid.Column="1" Margin="12,0,2,0" VerticalAlignment="Center">
+                                          <!--  PTZ 전용(속도/줌) — IsPtzCapable 게이팅. 포커스는 아래에서 분리(imaging 전용)  -->
+                                          <StackPanel IsEnabled="{Binding IsPtzCapable}">
                                             <!--  PanTilt 속도  -->
                                             <Grid Margin="0,0,0,1">
                                                 <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="PanTilt" />
@@ -338,21 +340,22 @@
                                                     TickFrequency="0.1" IsSnapToTickEnabled="True" IsMoveToPointEnabled="True"
                                                     Value="{Binding ZoomSpeed}" ToolTip="줌 속도 (0.1 단위)" />
 
-                                            <!--  줌 +/- (실제 줌 인/아웃 — 휠과 동일 ContinuousMove 줌)  -->
+                                            <!--  줌 +/- (press-hold: 누르면 연속 줌·뗌 정지 — 컨트롤이 Tag로 처리. 휠과 동일 ContinuousMove 줌)  -->
                                             <Grid Margin="0,8,0,1">
                                                 <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="줌" />
                                                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                                                    <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding ZoomOutCommand}" ToolTip="줌 아웃" />
-                                                    <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding ZoomInCommand}" ToolTip="줌 인" />
+                                                    <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Tag="zoom:-1" ToolTip="줌 아웃(누르고 있는 동안)" />
+                                                    <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Tag="zoom:1" ToolTip="줌 인(누르고 있는 동안)" />
                                                 </StackPanel>
                                             </Grid>
+                                          </StackPanel>
 
-                                            <!--  포커스 +/- (수동 near/far) — IsImagingCapable 시만 활성  -->
+                                            <!--  포커스 +/- (press-hold: 누르면 연속 near/far·뗌 정지) — imaging 전용(IsImagingCapable), PTZ 게이트 밖 → 영상전용 고정카메라도 활성  -->
                                             <Grid Margin="0,4,0,0" IsEnabled="{Binding IsImagingCapable}">
                                                 <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="11" Foreground="#FF9FB0C0" Text="포커스" />
                                                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                                                    <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding FocusNearCommand}" ToolTip="포커스 근경(near)" />
-                                                    <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Command="{Binding FocusFarCommand}" ToolTip="포커스 원경(far)" />
+                                                    <Button Width="36" Content="−" Style="{StaticResource PtzSegButtonStyle}" Tag="focus:-1" ToolTip="포커스 근경 near(누르고 있는 동안)" />
+                                                    <Button Width="36" Content="+" Style="{StaticResource PtzSegButtonStyle}" Tag="focus:1" ToolTip="포커스 원경 far(누르고 있는 동안)" />
                                                 </StackPanel>
                                             </Grid>
                                         </StackPanel>

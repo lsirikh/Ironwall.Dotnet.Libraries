@@ -52,6 +52,10 @@ public sealed class PtzController : IPtzController
         public bool ImagingPossible;       // IsImagingPossible + ImagingClient + VsToken
         public readonly SemaphoreSlim Gate = new(1, 1);
         public volatile bool Busy;
+        // 연속 포커스(ContinuousFocus) 속도 범위 캐시 — GetMoveOptions 1회 조회(FR-PH-10 클램프 진실원). null=미조회/미지원→폴백.
+        public bool FocusOptLoaded;
+        public double? FocusSpeedMin;
+        public double? FocusSpeedMax;
     }
 
     /// <summary>GetNode로 읽은 카메라 좌표 space(변환/클램프 진실원). URI는 직렬화에 동봉.</summary>
@@ -321,11 +325,11 @@ public sealed class PtzController : IPtzController
         catch (Exception ex) { _log?.Error($"[PTZ] SetAutoFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
-    // 수동 포커스 펄스 상수
-    private const double FocusMoveSpeed = 0.7;   // ContinuousFocus 속도 [-1,1]
-    private const int FocusPulseMs = 350;        // 1클릭 펄스 시간
+    // 수동 포커스 기본 속도 — GetMoveOptions 범위로 클램프(FR-PH-10), 옵션 미제공 카메라는 이 값 폴백.
+    private const double FocusMoveSpeed = 0.7;   // ContinuousFocus 속도 크기 [0,1]
 
-    public async Task<bool> MoveFocusAsync(int cameraId, int direction, CancellationToken ct = default)
+    /// <summary>포커스 연속 이동 시작(누름→Stop까지). 속도는 카메라 ContinuousFocus 범위로 클램프. delay/stop 없음(StopFocusAsync가 정지). (FR-PH-02/10)</summary>
+    public async Task<bool> StartFocusAsync(int cameraId, int direction, CancellationToken ct = default)
     {
         if (!TryImaging(cameraId, out var ctx)) return false;
         try
@@ -333,21 +337,49 @@ public sealed class PtzController : IPtzController
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                // ContinuousFocus(속도) 펄스 후 Stop — RelativeFocus 미지원 카메라 대응(SetAutoFocus처럼 ImagingClient 직접 호출).
+                await EnsureFocusOptionsAsync(ctx).ConfigureAwait(false);   // GetMoveOptions 1회 캐시
+                var mag = PtzFocusMath.ClampMagnitude(FocusMoveSpeed, ctx.FocusSpeedMin, ctx.FocusSpeedMax);
+                // ContinuousFocus(속도) — RelativeFocus 미지원 카메라 대응(SetAutoFocus처럼 ImagingClient 직접). 정지는 StopFocusAsync.
                 var move = new OnvifImaging.FocusMove
                 {
-                    Continuous = new OnvifImaging.ContinuousFocus { Speed = (float)((direction >= 0 ? 1 : -1) * FocusMoveSpeed) }
+                    Continuous = new OnvifImaging.ContinuousFocus { Speed = (float)((direction >= 0 ? 1 : -1) * mag) }
                 };
                 await ctx.Model!.ImagingClient!.MoveAsync(ctx.VsToken, move).ConfigureAwait(false);
-                // Stop은 finally로 보장 — 취소로 Delay가 끊겨도 ContinuousFocus 모터가 계속 도는 것 방지.
-                try { await Task.Delay(FocusPulseMs, ct).ConfigureAwait(false); }
-                finally { try { await ctx.Model.ImagingClient.StopAsync(ctx.VsToken).ConfigureAwait(false); } catch { /* best-effort stop */ } }
                 return true;
             }
             finally { ctx.Gate.Release(); }
         }
         catch (OperationCanceledException) { return false; }
-        catch (Exception ex) { _log?.Error($"[PTZ] MoveFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] StartFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    /// <summary>포커스 연속 이동 정지(뗌/캡처분실/닫기) — ImagingClient.Stop. PTZ StopAsync와 별개 모터 경로. (FR-PH-02/03/05)</summary>
+    public async Task StopFocusAsync(int cameraId, CancellationToken ct = default)
+    {
+        if (!TryImaging(cameraId, out var ctx)) return;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try { await ctx.Model!.ImagingClient!.StopAsync(ctx.VsToken).ConfigureAwait(false); }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _log?.Error($"[PTZ] StopFocus 실패 cam={cameraId}: {Mask(ex.Message)}"); }
+    }
+
+    /// <summary>ContinuousFocus 속도 범위(GetMoveOptions)를 1회 조회해 캐시(FR-PH-10). 미지원/실패면 폴백 표시(±FocusMoveSpeed). Gate 보유 중 호출.</summary>
+    private async Task EnsureFocusOptionsAsync(CamCtx ctx)
+    {
+        if (ctx.FocusOptLoaded) return;
+        ctx.FocusOptLoaded = true;   // 1회만 시도(실패해도 폴백)
+        try
+        {
+            var opt = await ctx.Model!.ImagingClient!.GetMoveOptionsAsync(ctx.VsToken).ConfigureAwait(false);
+            var sp = opt?.Continuous?.Speed;
+            if (sp != null && sp.Max > sp.Min) { ctx.FocusSpeedMin = sp.Min; ctx.FocusSpeedMax = sp.Max; }
+            else _log?.Info("[PTZ] 포커스 ContinuousFocus 속도 옵션 없음 — 기본 폴백.");
+        }
+        catch (Exception ex) { _log?.Warning($"[PTZ] GetMoveOptions 실패(포커스 폴백): {Mask(ex.Message)}"); }
     }
 
     private bool TryImaging(int cameraId, out CamCtx ctx)

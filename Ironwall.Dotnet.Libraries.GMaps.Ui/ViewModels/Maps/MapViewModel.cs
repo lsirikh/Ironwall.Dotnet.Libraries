@@ -776,12 +776,30 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Error($"[CameraPopup] PTZ 줌 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
-    /// <summary>포커스 +/- 버튼 → 수동 포커스 이동(near/far). direction +1=far/-1=near. (Imaging)</summary>
-    private void OnCameraPopupFocus(object? sender, int direction)
+    /// <summary>줌 버튼 누름 → 방향 연속 줌 시작(뗄 때까지 계속). 뗌은 OnCameraPopupPtzStop(StopAsync). (FR-PH-01)</summary>
+    private void OnCameraPopupZoomHold(object? sender, int direction)
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz != null) _ = ptz.MoveFocusAsync(vm.CameraId, direction);
+        if (ptz == null) return;
+        BeginPtzGesture(vm.CameraId);   // 인플라이트 드래그/휠 펄스의 Delay·Stop 취소(새 hold 줌을 끊지 않게)
+        _ = ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed);   // 연속 — 뗄 때 StopAsync
+    }
+
+    /// <summary>포커스 버튼 누름 → 연속 포커스 시작(near/far). 뗌/캡처분실/닫기는 OnCameraPopupFocusStop. direction +1=far/-1=near. (FR-PH-02)</summary>
+    private void OnCameraPopupFocusHold(object? sender, int direction)
+    {
+        if (sender is not CameraStreamPopupViewModel vm) return;
+        var ptz = ResolvePtzController();
+        if (ptz != null) _ = ptz.StartFocusAsync(vm.CameraId, direction);
+    }
+
+    /// <summary>포커스 정지(뗌/캡처분실) → ImagingClient Stop. PTZ StopAsync와 별개 모터 경로. (FR-PH-02/03)</summary>
+    private void OnCameraPopupFocusStop(object? sender, EventArgs e)
+    {
+        if (sender is not CameraStreamPopupViewModel vm) return;
+        var ptz = ResolvePtzController();
+        if (ptz != null) _ = ptz.StopFocusAsync(vm.CameraId);
     }
 
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
@@ -1052,8 +1070,10 @@ public class MapViewModel : BasePanelViewModel,
             vm.CloseRequested += OnCameraPopupCloseRequested;
             vm.DragCompleted += OnCameraPopupDragCompleted;
             vm.PtzDragRequested += OnCameraPopupPtzDragRequested;   // 좌버튼 PTZ 드래그 → IPtzController
-            vm.PtzZoomRequested += OnCameraPopupPtzZoom;            // 휠 → 상대 줌
-            vm.FocusRequested += OnCameraPopupFocus;               // 포커스 +/- → IPtzController.MoveFocus
+            vm.PtzZoomRequested += OnCameraPopupPtzZoom;            // 휠 → 상대 줌(펄스)
+            vm.ZoomHoldRequested += OnCameraPopupZoomHold;          // 줌 +/- 누름 → 연속 줌(뗌=PtzStop)
+            vm.FocusHoldRequested += OnCameraPopupFocusHold;        // 포커스 +/- 누름 → 연속 포커스
+            vm.FocusStopRequested += OnCameraPopupFocusStop;        // 포커스 뗌/캡처분실 → ImagingClient Stop
             vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
             vm.PtzNudgeRequested += OnCameraPopupPtzNudge;          // PTZ 탭 방향 패드
             vm.PtzStopRequested += OnCameraPopupPtzStop;
@@ -1109,7 +1129,9 @@ public class MapViewModel : BasePanelViewModel,
             vm.DragCompleted -= OnCameraPopupDragCompleted;
             vm.PtzDragRequested -= OnCameraPopupPtzDragRequested;
             vm.PtzZoomRequested -= OnCameraPopupPtzZoom;
-            vm.FocusRequested -= OnCameraPopupFocus;
+            vm.ZoomHoldRequested -= OnCameraPopupZoomHold;
+            vm.FocusHoldRequested -= OnCameraPopupFocusHold;
+            vm.FocusStopRequested -= OnCameraPopupFocusStop;
             vm.SelectRequested -= OnCameraPopupSelectRequested;
             vm.PtzNudgeRequested -= OnCameraPopupPtzNudge;
             vm.PtzStopRequested -= OnCameraPopupPtzStop;
@@ -1124,7 +1146,12 @@ public class MapViewModel : BasePanelViewModel,
             if (ReferenceEquals(_selectedCameraPopup, vm)) SelectedCameraPopup = null;   // dangling 방지(FR-SEL-04)
             // 인스턴스 유지: 팝업 닫기 시 ONVIF/PTZ 인스턴스는 Release하지 않고 워밍 유지(재오픈 즉시). 이동만 정지.
             // Release는 카메라 심볼/모델 삭제 시에만(Markers_CollectionChangedForCameraPopups).
-            _ = ResolvePtzController()?.StopAsync(vm.CameraId);
+            var ptzOnClose = ResolvePtzController();
+            if (ptzOnClose != null)
+            {
+                _ = ptzOnClose.StopAsync(vm.CameraId);        // PTZ(팬틸트+줌) 정지
+                _ = ptzOnClose.StopFocusAsync(vm.CameraId);   // 포커스 hold 중 닫기 → ImagingClient 모터 정지(F-03, 가드 내장)
+            }
             if (_ptzGestureCts.TryRemove(vm.CameraId, out var gcts)) { try { gcts.Cancel(); } catch { } gcts.Dispose(); }
             CameraPopups.Remove(vm);
             await vm.DisposeAsync();   // Hub Lease 해제(C-03)

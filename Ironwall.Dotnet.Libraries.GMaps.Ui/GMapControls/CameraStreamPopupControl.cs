@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Ptz;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 
@@ -36,8 +37,9 @@ public class CameraStreamPopupControl : Control
     private bool _isPtzDragging;
     private Point _ptzStart;
 
-    // 방향 패드(누름=연속이동, 뗌=정지)
-    private bool _padActive;
+    // hold 버튼(방향패드/줌/포커스): 누름=연속이동, 뗌·캡처분실=정지. 제스처 타입으로 올바른 모터(PTZ vs Imaging) 정지 라우팅(F-01/02).
+    // _ptzActive(영상영역 좌드래그)와는 별개 필드(단일 enum 통합 금지, F-09). 제스처/파싱은 PtzGestureTag(WPF무의존) 단일 진실원.
+    private PtzHoldGesture _activeGesture = PtzHoldGesture.None;
 
     static CameraStreamPopupControl()
     {
@@ -236,27 +238,50 @@ public class CameraStreamPopupControl : Control
         if (DataContext is not CameraStreamPopupViewModel vm) return;
         var tag = FindButtonTag(e.OriginalSource);
         if (string.IsNullOrEmpty(tag)) return;
-        if (tag == "stop") { vm.RaisePtzStop(); e.Handled = true; return; }
-        var parts = tag.Split(',');
-        if (parts.Length == 2 && int.TryParse(parts[0], out var dx) && int.TryParse(parts[1], out var dy))
+
+        // 정지 버튼 = 진행 중 제스처를 올바른 모터로 정지 + PTZ Stop(명시적 사용자 정지).
+        if (tag == "stop") { StopActiveGesture(vm); vm.RaisePtzStop(); e.Handled = true; return; }
+
+        if (!PtzGestureTag.TryParse(tag, out var g, out var dx, out var dy)) return;
+
+        // 능력 게이팅(XAML IsEnabled 보조 방어, F08): 포커스=Imaging / 그 외=PTZ.
+        if (g == PtzHoldGesture.Focus ? !vm.IsImagingCapable : !vm.IsPtzCapable) return;
+
+        // 전환 pre-Stop(F-04): 직전 hold가 다른 타입이면 올바른 모터를 먼저 정지(순서=UI스레드 순차 발화로 Gate 선점 보장).
+        // ※마우스 캡처상 hold 중 타 버튼 동시 누름은 사실상 불가 → 방어적.
+        if (_activeGesture != PtzHoldGesture.None && _activeGesture != g)
+            StopActiveGesture(vm);
+
+        switch (g)
         {
-            vm.RaisePadPress(dx, dy);
-            _padActive = true;
-            CaptureMouse();   // 버튼 밖에서 떼도 정지 보장(컨트롤 캡처)
-            e.Handled = true;
+            case PtzHoldGesture.Zoom: vm.RaiseZoomHold(dx); break;        // dx=+1/-1
+            case PtzHoldGesture.Focus: vm.RaiseFocusHold(dx); break;      // dx=+1/-1
+            default: vm.RaisePadPress(dx, dy); break;                     // PanTilt
         }
+        _activeGesture = g;
+        CaptureMouse();   // 버튼 밖에서 떼도 정지 보장(컨트롤 캡처)
+        e.Handled = true;
     }
 
     private void OnPadUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_padActive) return;
-        _padActive = false;
+        if (_activeGesture == PtzHoldGesture.None) return;
         ReleaseMouseCapture();
-        (DataContext as CameraStreamPopupViewModel)?.RaisePtzStop();
+        StopActiveGesture(DataContext as CameraStreamPopupViewModel);
         e.Handled = true;
     }
 
-    /// <summary>이벤트 OriginalSource에서 비주얼 트리 상위로 올라가며 Tag(방향/"stop") 가진 Button을 찾는다.</summary>
+    /// <summary>진행 중 hold 제스처를 타입에 맞는 모터로 정지. Focus=ImagingClient(FocusStop) / PanTilt·Zoom=PTZ(PtzStop). _activeGesture 리셋.</summary>
+    private void StopActiveGesture(CameraStreamPopupViewModel? vm)
+    {
+        var g = _activeGesture;
+        _activeGesture = PtzHoldGesture.None;
+        if (vm == null) return;
+        if (g == PtzHoldGesture.Focus) vm.RaiseFocusStop();
+        else if (g == PtzHoldGesture.PanTilt || g == PtzHoldGesture.Zoom) vm.RaisePtzStop();
+    }
+
+    /// <summary>이벤트 OriginalSource에서 비주얼 트리 상위로 올라가며 Tag(방향/"stop"/"zoom:"/"focus:") 가진 Button을 찾는다.</summary>
     private static string? FindButtonTag(object? src)
     {
         var d = src as DependencyObject;
@@ -285,12 +310,9 @@ public class CameraStreamPopupControl : Control
 
     private void OnLostMouseCapture(object sender, MouseEventArgs e)
     {
-        // 캡처 분실 → 진행 중 패드 이동 정지(멈춤 보장).
-        if (_padActive)
-        {
-            _padActive = false;
-            (DataContext as CameraStreamPopupViewModel)?.RaisePtzStop();
-        }
+        // 캡처 분실(Alt+Tab/다이얼로그/RDP 등) → 진행 중 hold를 타입별 올바른 모터로 정지(F-01: 포커스는 ImagingClient Stop).
+        if (_activeGesture != PtzHoldGesture.None)
+            StopActiveGesture(DataContext as CameraStreamPopupViewModel);
         // 포커스 이탈/캡처 분실 → 드래그 자동 취소(RelativeMove 미호출). (FR-DRAG-05)
         if (!_ptzActive) return;
         _ptzActive = false;
