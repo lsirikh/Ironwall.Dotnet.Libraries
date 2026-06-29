@@ -17,13 +17,17 @@
 		x:Name="DialogHost"
 		DialogTheme="Inherit"
 		Identifier="LoginPanel">
-		<md:Card x:Name="CardContents">
+		<md:Card
+			x:Name="CardContents"
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center">
 			<!--  애니메이션 트리거  -->
 			<md:Card.Style>
 				<Style BasedOn="{StaticResource MaterialDesignElevatedCard}" TargetType="md:Card">
 					<!--  기본 BorderBrush 설정  -->
 					<Setter Property="Width" Value="400" />
 					<Setter Property="MinHeight" Value="300" />
+					<Setter Property="VerticalAlignment" Value="Center" />
 					<Setter Property="Padding" Value="20" />
 					<Setter Property="Opacity" Value="1" />
 					<Setter Property="UniformCornerRadius" Value="8" />
