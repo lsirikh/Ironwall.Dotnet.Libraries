@@ -15,6 +15,33 @@
 ## [Unreleased]
 
 ### Added
+- **강제 로그아웃 전파 — GIS(클라) Phase 1** ([PRD](docs/prds/GOP_Force_Logout_Propagation-prd.md) · [보고서](docs/reports/GOP_Force_Logout_Client_Phase1-report.md) · Accounts.Api/GMaps.Ui · `b15359b`)
+  - 단일 멱등 진입점 `ISessionLifecycle.ForceLogoutOnce`(Interlocked once-guard — NATS/401/수동 수렴) + TokenStorage jti·세대가드(refresh 부활 차단, FR-FL-05) + `BearerAuthHandler` 401폴백 배선 + GMaps `ForceLogoutRequested` 구독→PTZ정지·팝업(스트림)해제(FR-FL-07).
+  - 검증: 단위 신규6→Accounts.Api 73/73, GMaps.Ui 통합빌드0, **E2E(라이브) 강제로그아웃 후 access·refresh 401 무효화 확인**.
+  - 후속(서버계약/메인솔루션): NATS 즉시푸시(FR-FL-02)·유휴 하트비트(06)·셸 가림막/로그인 전환(08)·서명(10)·session_id 정밀매칭.
+
+### Fixed
+- **PTZ 응답성(큐잉 제거) + 팬틸트/줌 속도 반영** ([PRD](docs/prds/CameraPopup_PTZ_Responsiveness_Speed-prd.md) · GMaps.Ui · 머지 `4ebb93a`)
+  - **큐잉 지연 해소(A)**: 방향 패드·줌 버튼 핸들러가 `BeginPtzGesture` 취소토큰을 `ContinuousMoveAsync`에 미전달해 Gate 큐가 무한 누적되던 버그 수정 — 이제 새 제스처가 직전 대기명령을 LWW 취소(드래그/휠과 동일). `BeginPtzGesture`를 `ConcurrentDictionary.AddOrUpdate` 원자 교체로(경합 수정).
+  - **속도 미반영("날아감") 해소(B)**: `ContinuousPanTilt/ZoomVelocitySpace`의 범위(XRange/YRange)를 캡처하지 않아 raw `[-1,1]×speed`를 보내 카메라 범위와 안 맞으면 속도 슬라이더가 무효화되던 버그 수정 — `PtzVelocityMath.ScaleToRange`로 정규화 속도를 카메라 연속속도 범위로 스케일(0=정지 보존, 부호별 풀스케일). 드래그·패드·줌버튼·휠 **전 경로**가 단일지점 통과 → PanTilt/Zoom 속도 실반영. `[-1,1]` 표준 카메라는 항등(회귀0).
+  - Stop-before-fire는 미적용(ONVIF §5.3.2 ContinuousMove 자동대체, 추가 시 ~100ms 역효과). 진단로그에 `norm→scaled`+카메라 범위 노출(필드 진단). 단방향/비대칭 범위 1회 경고.
+  - 설계검증 wf_7ad8437b(architect+code-reviewer) + opus 리뷰 MERGE. 빌드0·단위테스트 168(PtzVelocityMath 24 신규). 롤백 `before-ptz-latency-speed`.
+  - ✅ **E2E 통과**(라이브 카메라, 사용자 승인): 범위 [-1,1] 표준 / v=0.2 vs 0.8 → ~6.7배 속도차 실증 → 카메라가 velocity magnitude 정상 존중 확인. 즉 증상의 진짜 원인은 큐잉(A)였고 LWW가 해소(B 스케일은 [-1,1] 카메라엔 항등·비표준엔 방어). 앱 런타임 체감은 사용자 최종 확인.
+
+### Added
+- **카메라 팝업 줌·포커스 Press-Hold 제어** ([PRD](docs/prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) · [Plan](docs/plans/CameraPopup_PressHold_PtzZoomFocus-prd-plan.md) · GMaps.Ui · 머지 `0fbb261`)
+  - 줌 ±·포커스 ± 버튼을 클릭=펄스 → **누르면 연속(ContinuousMove/ContinuousFocus)·떼면 정지** press-hold로 전환(방향 패드 패턴 통일). 통합 Tag 메커니즘(`PtzGestureTag`) + CaptureMouse 릴리즈 보장 안전망 + `_activeGesture` 타입별 정지 라우팅.
+  - 🔴 포커스 정지는 ImagingClient 별도 경로(신규 `StartFocusAsync`/`StopFocusAsync`) — PTZ `StopAsync`(StopPTZ)로는 포커스 모터가 안 멈춤. 정상릴리즈/캡처유실(Alt+Tab)/팝업닫기/제스처전환 **4경로 모두** 올바른 모터로 라우팅(code-review 치명결함 해소).
+  - **FR-PH-10**: 연속 포커스 속도를 카메라 `GetMoveOptions` ContinuousFocus 범위로 클램프(`PtzFocusMath`) — 0.7이 범위밖이라 무동작하던 F항목 해소. 포커스 게이팅을 외곽 `IsPtzCapable` 밖으로 분리(`IsImagingCapable` 독립) — 영상전용 고정카메라 수동포커스 도달가능(E항목 해소).
+  - v2.6 PTZ 권한 게이팅(cam:control) 통합: ZoomHold/FocusHold=`CanControlCamera` 게이팅 · FocusStop=무게이팅(정지 항상 허용). 휠 줌 펄스 유지, 펄스 잔재(`MoveFocusAsync`·OnCameraPopupFocus·줌/포커스 Command) 제거.
+  - 설계검증 wf_da23975b(architect SOUND_WITH_CHANGES + code-reviewer MERGE_WITH_FIXES). 빌드0·테스트 **144**(PtzGestureTag/PtzFocusMath 신규). 롤백태그 `before-presshold-ptz-zoomfocus`.
+- **권한 실제집행 — 클라 게이팅 (GOP_Permission_Enforcement, 서버독립분 완료)** (라이브러리 GMaps.Ui/Devices.Ui/Events.Ui)
+  - **FR-EN-06 PTZ**(`663c45e`): MapViewModel PTZ 제어 핸들러 10곳 `CanControl("cameras")` — 서버 ONVIF 미중계라 클라 단독 권위집행, 안전정지(Stop) 제외, EnsurePtzReady IsPtzCapable 이중방어.
+  - **FR-EN-09 장비**(`a4e63f1`): 7패널 CRUD `CanEdit/CanDelete("devices")` + `DevicePermissionGate` 공유 헬퍼.
+  - **FR-EN-10 이벤트**(`3282de8`): ACK=`CanControl`·CRUD=`CanEdit/CanDelete`("events") **독립 게이팅**(FR-PG-08), 배치 가드(_batchReportGate 이전), 자동경로 제외.
+  - **FR-EN-11**(장비/이벤트): `PermissionsChanged` 구독 → `Execute.OnUIThread` 버튼/커맨드 재평가(역할강등 즉시 반영).
+  - 주입=GMaps/Devices/Events.Ui→Accounts.Api ProjectReference + `IoC.Get<IPermissionService>()` lazy(미등록 전체허용 폴백, V-EN-11). 빌드0·GMaps.Ui 통합빌드0·Accounts.Api 62/62.
+  - **FR-EN-05 모듈(`b1037f5`)·FR-EN-07 방송·FR-EN-08 맵편집(`ff4c0d7`) 완료**: 서버 enum이 map/broadcast 수용 확인 + §6-1 등급별 값 API 시드 후 게이팅. 방송 발행 2곳 + 맵 심볼/오버레이/ROI/레이어 13곳, FR-PG-11(로컬렌더 허용·DB영속만 게이트). GMaps PTZ 강등 재평가(`f353f28`)·사용자수 실수정(`c693ddb`)도 포함. → **클라 집행 PRD(FR-EN-05~11) 전체 완료.** ⏸ 남음=AUTH_MODE=token 전환 시 클라 Bearer 배선(FR-EN-03③)+GOP-07 가림막.
 - **카메라 PTZ "특정 위치 확인" → NATS 좌표 발행** ([PRD](docs/prds/Camera_PTZ_AimLocation_Nats-prd.md) · [Plan](docs/plans/Camera_PTZ_AimLocation_Nats-prd-plan.md) · GMaps.Ui)
   - 맵에서 **PTZ 카메라 심볼 우클릭 → "특정 위치 확인" → 커서가 조준(Cross)으로 바뀌고 카메라 중심 반경 30m 원 표시 → 영역 안 클릭 → 해당 좌표를 NATS PUB로 발행**(카메라 회전 요청 + 좌표). 클라는 직접 회전하지 않고 좌표만 전달하며, 실제 PTZ 회전(지리 방위→pan/tilt)은 서버/NVRManager가 수행. 영역 밖 클릭·ESC·우클릭 = 취소.
   - PTZ 전용 노출: `ICameraDeviceModel.Category == EnumCameraType.PTZ`인 카메라에서만 메뉴 항목 표시(동기 판정, DB 스키마 변경 없음).
