@@ -15,6 +15,10 @@
 ## [Unreleased]
 
 ### Added
+- **권한 모델 일원화: 역할(등급) = 권한 단위 (PRD-GOP-01 OQ-PG-01 = Option A)** (라이브러리 + 서버 `api-test-server`)
+  - 기존엔 "구분(역할)"과 "권한 그룹(매트릭스)"이 따로 떠 있고(레벨/역할/그룹 3중), 실제 집행은 역할 하나뿐 + 그룹 매트릭스는 사용자 배정 경로조차 없는 고아 설정이었음. → **역할(등급)을 단일 권한 단위로 통합.**
+  - **서버**: `initialize_database`에 `ensure_role_permission_groups` 추가 — 5개 역할명 등급그룹(ADMIN/MAINTAINER/OPERATOR/VIEWER/GUEST)을 idempotent 보장(PRD §6-1 기반 기본 8×4 매트릭스, 기존 팀그룹 비파괴). 로그인 권한 유도를 `group_id` → **`user.role` 명 등급그룹 매트릭스**로 변경(`auth.py`) — 역할이 권한을 결정. 도커 재빌드+재기동, 라이브 검증(admin이 빈 권한 대신 FULL 매트릭스 수신).
+  - **클라**: `PermissionService` **ADMIN 무조건 통과**(서버가 ADMIN 권한 비워 보내 발생하던 잠복 차단 버그 수정). 권한 화면을 "권한 그룹"→**"권한 등급"**으로(5등급만 등급순 표시·한글 라벨, 임의 그룹 추가/삭제 제거). 계정의 "구분"이 곧 권한 등급. 빌드0·Accounts.Api 62/62.
 - **권한 그룹 편집저장 (PRD-GOP-01 IMPL-06) — 서버 권한수정 API 신설 + 클라 매트릭스 편집** (라이브러리 + 서버 `api-test-server`)
   - **서버**: 신규 `POST /api/user-groups/{id}/permissions`(ADMIN 전용 `require_admin`). 일반 PUT이 권한상승 방지로 `permissions`를 차단(v4.8 Phase 12-7a)하던 것을 ADMIN 전용 경로로 재개. `PermissionsSchema` strict 검증(미정의 모듈/verb→422) + `PERMISSION_CHANGED` 감사(append-only). pytest 3종(200/404/422)·라이브 E2E(admin 저장·422·404·audit) 통과. swagger=route docstring(원천), 도커 이미지 재빌드+컨테이너 재기동. 안전점 `pre-perm-edit-endpoint`.
   - **클라**: `IAccountApiService.UpdateGroupPermissionsAsync`(기본 인터페이스 구현=테스트 스텁 무영향) + `AccountApiService` POST 호출. `PermissionMatrixPanel` 상세 매트릭스 편집가능화(체크박스 `OneWay→TwoWay`, `ModulePermRowViewModel`→`PropertyChangedBase`) + [저장] 버튼 활성·`OnClickSave`(Modules→`PermissionsDto`, device_groups 보존, 성공 시 재조회·목록복귀). 빌드0·Accounts.Api 62/62. 안전점 `before-perm-edit-save`.
