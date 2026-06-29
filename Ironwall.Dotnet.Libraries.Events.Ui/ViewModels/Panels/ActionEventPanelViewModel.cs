@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
@@ -36,11 +37,46 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
         LoadMoreCommand = new SimpleCommand(async () => await LoadNextPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
     #endregion
+    #region - FR-EN-10/11 권한 게이팅 (events 도메인) -
+    private IPermissionService? _permissionService;
+    private bool _permissionResolved;
+    private IPermissionService? ResolvePermissionService()
+    {
+        if (_permissionResolved) return _permissionService;
+        _permissionResolved = true;
+        try { _permissionService = IoC.Get<IPermissionService>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(ActionEventPanelViewModel)}] PermissionService 미해석(전체허용 폴백): {ex.Message}");
+            _permissionService = null;
+        }
+        return _permissionService;
+    }
+    private bool CanEditEvents() => ResolvePermissionService()?.CanEdit("events") ?? true;
+    private bool CanDelEvents()  => ResolvePermissionService()?.CanDelete("events") ?? true;
+
+    private void OnPermissionsChanged()
+    {
+        Execute.OnUIThread(() =>
+        {
+            NotifyOfPropertyChange(nameof(CanInsertEvent));
+            NotifyOfPropertyChange(nameof(CanSaveEvent));
+            NotifyOfPropertyChange(nameof(CanDeleteEvent));
+        });
+    }
+    public bool CanInsertEvent => CanEditEvents();
+    public bool CanSaveEvent   => CanEditEvents();
+    public bool CanDeleteEvent => CanDelEvents();
+    #endregion
     #region - Implementation of Interface -
     #endregion
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        // FR-EN-11: 역할강등 재평가 구독
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged += OnPermissionsChanged;
+
         await base.OnActivateAsync(cancellationToken);
         if (IsCacheValid())
         {
@@ -56,12 +92,26 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
+        // FR-EN-11: 역할강등 재평가 구독 해제
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
+
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         return base.OnDeactivateAsync(close, cancellationToken);
     }
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
+        // FR-EN-10 CRUD 삭제 게이트 (CanDelete)
+        if (!CanDelEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "이벤트 삭제 권한이 없습니다."
+            });
+            return;
+        }
         if (SelectedItemCount == 0) return;
         _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
@@ -73,13 +123,15 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
+        // FR-EN-10 CRUD 생성 게이트 (CanEdit)
+        if (!CanEditEvents()) return;
         var vm = new ActionEventViewModel(new ActionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Action });
         ViewModelProvider.Add(vm);
     }
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        if (!await _processGate.WaitAsync(0))       // 0 → "비동기로 테스트-후-입장"
             return;
         try
         {
@@ -107,7 +159,17 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
 
     public override async void OnClickSaveButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        // FR-EN-10 CRUD 수정/저장 게이트 (CanEdit)
+        if (!CanEditEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "이벤트 저장 권한이 없습니다."
+            });
+            return;
+        }
+        if (!await _processGate.WaitAsync(0))       // 0 → "비동기로 테스트-후-입장"
             return;
 
         try

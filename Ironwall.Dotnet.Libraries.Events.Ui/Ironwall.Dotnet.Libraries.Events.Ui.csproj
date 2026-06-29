@@ -49,6 +49,8 @@
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Sounds\Ironwall.Dotnet.Libraries.Sounds.csproj" />
     <!-- Phase 2 (IMPL-08): Modern Dark/Light 테마 토큰/서비스 (leaf, 순환 없음 — AD-1) -->
     <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
+    <!-- FR-EN-10/11: IPermissionService 게이팅 (순환 없음 — Accounts.Api는 Events.Ui 미참조) -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Accounts.Api\Ironwall.Dotnet.Libraries.Accounts.Api.csproj" />
   </ItemGroup>
 
 </Project>
