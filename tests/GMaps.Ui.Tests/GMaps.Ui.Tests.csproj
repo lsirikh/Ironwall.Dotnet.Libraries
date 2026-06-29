@@ -11,6 +11,8 @@
   <!-- Tracking 순수 수식(WPF 무의존) 실제 소스 링크 — 복제 없이 실코드 검증 -->
   <ItemGroup>
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackingMath.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\DateRangeCalendar.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackSessionSplitter.cs" />
   </ItemGroup>
 
   <ItemGroup>

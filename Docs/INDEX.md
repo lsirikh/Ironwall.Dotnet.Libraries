@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-25 (GOP_Account_Auth_Integration PRD **v2.2 완성** — FR 정합 마감 + 신규 FR-21(seam 계약확장) + §5-A 검증항목 + §10 DoD)
-- **총 문서 수**: 216개
+- **마지막 갱신**: 2026-06-29 (CameraPopup_PressHold_PtzZoomFocus PRD 신규 — 줌·포커스 press-hold 전환, 설계검증 wf_da23975b 반영)
+- **총 문서 수**: 217개
 
 ---
 
@@ -39,6 +39,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [CameraPopup_PressHold_PtzZoomFocus-prd.md](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | 줌·포커스 버튼을 click-pulse→**press-hold-continuous + release-stop**으로 전환(방향 패드 패턴 통일). 통합 Tag 메커니즘(ParseGestureTag)+CaptureMouse 안전망. **설계검증 wf_da23975b**: architect SOUND_WITH_CHANGES + code-reviewer FLAWED→교정 반영(🔴 포커스 Stop은 ImagingClient 별도경로=StopFocusAsync 4곳 라우팅·pre-Stop awaited 순서보장·Tag 콜론파싱·Command제거). FR-PH-01~09. 비목표=F클램프(R1 런타임 1순위 리스크)·Gate분리. lib GMaps.Ui 단독 6파일 (Track C) | Draft | 2026-06-29 |
 | [CameraPopup_PTZ_Control-prd.md](prds/CameraPopup_PTZ_Control-prd.md) | 맵 RTSP 팝업 PTZ 제어 — 우버튼 드래그 PTZ(벡터 시각화→**RelativeMove** 1회)+단일 선택+팝업 내 [PTZ][프리셋][옵션] 탭. 프리셋=로컬DB(이동 AbsoluteMove/저장 GetStatus/편집). 옵션 v1=주야간·포커스(ONVIF live). 신규 `IPtzController`+ONVIF 래퍼(Relative/Absolute/GetStatus/GetNode)+Imaging 쓰기 역매퍼. OnvifSolution(실동작 WCF/SOAP) 재사용. 디스커버리+옵션식별+5카테고리 시뮬레이션+적대적비평 종합. FR 35+/NFR 11/리스크 9(3 Critical: FOV폴백·space clamp·좌표 round-trip)/VER 6/미결 7. **HTML 스토리보드/와이어프레임**=`reports/CameraPopup_PTZ_Storyboard_Wireframe.html` (Track C) | Draft | 2026-06-23 |
 | [Tracking_GIS_Visualization_Playback-prd.md](prds/Tracking_GIS_Visualization_Playback-prd.md) | 실시간 GIS 추적 시각화(타입별 심볼·위험도 테두리·방향)+이동경로 트레일(점선/페이드/속도)+TTL 수명+설정(appsettings/맵세팅UI)+**서버 API 영속(§8 가이드: 서버 NATS 인제스트+GET, 클라는 조회만)**+별도 Playback 창(옵션B/타임라인/배속)+MP4(P6 후반). 6 Phase·46 FR·11 NFR·13 V·미결 D-05~D-21/D-A1~4. 자산발견+90시나리오+2회 시뮬레이션 architect(opus) 종합. 계약 SoT=NATS-Tracking §2.2 (Track C) | **Approved (P1~P3)** | 2026-06-24 |
 | [CameraPopup_DigitalZoom_Alignment-prd.md](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 디지털 줌 활성 시 카메라 RTSP 팝업·연결선이 심볼에서 어긋남 수정 · RC-1 좌표 도메인 비대칭(마커=RenderTransform 안 / 팝업=형제 PropertyPanelCanvas 밖에서 FromLatLngToLocal inner 좌표 직접 사용) · RC-2 디지털줌 갱신 트리거 부재 · 옵션 A: InnerToOuter/OuterToInner 헬퍼 + DigitalZoomLevelChanged→RefreshCameraPopupPositions · 회전 독립합성 검증(V-01) · scale=1 항등→회귀0 · **머지 `2062caf`·빌드0·격리테스트61·code-review(opus) MERGE** ※메인솔루션 재빌드 후 런타임검증 (Track B/C) | 구현완료 | 2026-06-23 |
