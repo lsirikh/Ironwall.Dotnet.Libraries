@@ -395,6 +395,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             MouseMove += OnMouseMove;
             MouseLeftButtonUp += OnMouseLeftButtonUp;
 
+            // "현재위치 적용" 버튼은 PIDS SpecificContent(ContentPresenter 별도 namescope)에 있어
+            // GetTemplateChild로 못 찾는다 → 버블링되는 ButtonBase.Click을 컨트롤 레벨에서 잡아 이름으로 식별.
+            AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(OnAnyButtonClick));
         }
         #endregion
 
@@ -837,21 +840,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (GetTemplateChild("PART_ZOrderBottomButton") is Button bottomBtn)
                 bottomBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.ToBottom));
 
-            // "현재위치 적용" 버튼(있는 스타일에서만 — PidsPropertyStyle): 클릭→버튼 내부 프로그래스바→이벤트 발화.
-            // 완료(MapViewModel.EndDeviceLocationApply)되면 원래 상태로 복원.
-            _applyLocBtn = GetTemplateChild("PART_ApplyDeviceLocationButton") as Button;
-            if (_applyLocBtn != null)
-            {
-                _applyLocBtn.Click -= OnApplyDeviceLocationButtonClick;   // 템플릿 재적용 시 중복 구독 방지
-                _applyLocBtn.Click += OnApplyDeviceLocationButtonClick;
-            }
+            // "현재위치 적용" 버튼 배선은 생성자 AddHandler(ButtonBase.ClickEvent) + OnAnyButtonClick에서 처리.
+            // (SpecificContent는 ContentPresenter 별도 namescope라 GetTemplateChild로 못 찾음)
         }
 
-        private void OnApplyDeviceLocationButtonClick(object sender, RoutedEventArgs e)
+        /// <summary>버블링된 모든 버튼 클릭에서 "현재위치 적용" 버튼만 식별해 처리 — SpecificContent 버튼 배선용.</summary>
+        private void OnAnyButtonClick(object sender, RoutedEventArgs e)
         {
-            if (_applyLocBusy) return;            // 진행 중 재클릭 무시
+            if (e.OriginalSource is not Button btn || btn.Name != "PART_ApplyDeviceLocationButton")
+                return;
+            System.Diagnostics.Debug.WriteLine("[DeviceLocation] PART_ApplyDeviceLocationButton 클릭 감지");
+            if (_applyLocBusy) { e.Handled = true; return; }   // 진행 중 재클릭 무시
+            _applyLocBtn = btn;
             BeginDeviceLocationApply();
             DeviceLocationApplyRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
         }
 
         /// <summary>버튼을 진행 상태로 전환 — 내부에 무한 프로그래스바 표시(원래 콘텐츠 백업).</summary>

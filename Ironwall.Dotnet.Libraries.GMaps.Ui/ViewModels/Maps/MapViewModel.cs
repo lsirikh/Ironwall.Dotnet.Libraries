@@ -877,33 +877,39 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>"현재위치 적용" 클릭 — 동기 위임(async void 회피), 내부 async에서 예외 격리.</summary>
     private void OnDeviceLocationApplyRequested(object? sender, EventArgs e) => _ = HandleApplyDeviceLocationAsync();
 
-    /// <summary>심볼 현재 위치(+방위)를 연결 디바이스 Model/API에 저장.</summary>
+    /// <summary>심볼 현재 위치(+방위)를 연결 디바이스 Model/API에 저장. 진행바는 버튼 내부(Begin은 클릭 시, End는 여기 finally).</summary>
     private async Task HandleApplyDeviceLocationAsync()
     {
-        if (SelectedMarker is not GMapPidsMarker pids)
-            return;
-
-        var dev = pids.LinkedDevice;
-        if (dev == null) { SetAimStatus("연결된 디바이스가 없어 저장할 수 없습니다.", autoHide: true); return; }
-        if (dev.Id <= 0) { SetAimStatus("디바이스 ID가 유효하지 않습니다.", autoHide: true); return; }
-
-        double lat = pids.Latitude, lng = pids.Longitude;
-        if (!Services.Tracking.TrackingMath.IsValidLatLng(lat, lng))
-        {
-            SetAimStatus("심볼 좌표가 유효하지 않습니다.", autoHide: true);
-            return;
-        }
-
-        var gateway = ResolveDeviceLocationGateway();
-        if (gateway == null) { SetAimStatus("디바이스 저장 기능을 사용할 수 없습니다(미등록).", autoHide: true); return; }
-
-        double? heading = pids.BaseBearing;   // 심볼 방위(0~360) → 디바이스 Heading
-        var ct = _cts?.Token ?? CancellationToken.None;
+        _log?.Info("[DeviceLocation] '현재위치 적용' 이벤트 수신 — 핸들러 진입");
+        bool ok = false;
         try
         {
-            await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), ct);
-            bool ok = await gateway.ApplyLocationAsync(dev, lat, lng, heading, ct);
-            await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), ct);
+            if (SelectedMarker is not GMapPidsMarker pids)
+            {
+                _log?.Warning("[DeviceLocation] 중단 — 선택 마커가 GMapPidsMarker 아님");
+                return;
+            }
+
+            var dev = pids.LinkedDevice;
+            if (dev == null) { _log?.Warning("[DeviceLocation] 중단 — LinkedDevice=null"); SetAimStatus("연결된 디바이스가 없어 저장할 수 없습니다.", autoHide: true); return; }
+            if (dev.Id <= 0) { _log?.Warning($"[DeviceLocation] 중단 — 유효하지 않은 device.Id={dev.Id}"); SetAimStatus("디바이스 ID가 유효하지 않습니다.", autoHide: true); return; }
+
+            double lat = pids.Latitude, lng = pids.Longitude;
+            if (!Services.Tracking.TrackingMath.IsValidLatLng(lat, lng))
+            {
+                _log?.Warning($"[DeviceLocation] 중단 — 무효 좌표 ({lat},{lng})");
+                SetAimStatus("심볼 좌표가 유효하지 않습니다.", autoHide: true);
+                return;
+            }
+
+            var gateway = ResolveDeviceLocationGateway();
+            if (gateway == null) { _log?.Warning("[DeviceLocation] 중단 — IDeviceLocationGateway 미등록(DeviceUiModule 미로드?)"); SetAimStatus("디바이스 저장 기능을 사용할 수 없습니다(미등록).", autoHide: true); return; }
+
+            double? heading = pids.BaseBearing;   // 심볼 방위(0~360) → 디바이스 Heading
+            _log?.Info($"[DeviceLocation] 저장 시도 — device='{dev.DeviceName}' id={dev.Id} type={dev.GetType().Name} → ({lat:F6},{lng:F6}) heading={heading:F0}");
+            var ct = _cts?.Token ?? CancellationToken.None;
+            ok = await gateway.ApplyLocationAsync(dev, lat, lng, heading, ct);
+            _log?.Info($"[DeviceLocation] 저장 결과 — ok={ok} (device id={dev.Id})");
             SetAimStatus(ok
                 ? $"디바이스 '{dev.DeviceName}' 위치 저장됨 ({lat:F6}, {lng:F6})."
                 : "디바이스 위치 저장에 실패했습니다.", autoHide: true);
@@ -911,8 +917,11 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"[DeviceLocation] 적용 실패: {ex.Message}");
-            try { await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), CancellationToken.None); } catch { }
             SetAimStatus("디바이스 위치 저장 중 오류가 발생했습니다.", autoHide: true);
+        }
+        finally
+        {
+            PropertyPanel?.EndDeviceLocationApply(ok);   // 버튼 내부 진행바 → 정상 복원(성공/실패/예외 공통)
         }
     }
 

@@ -518,7 +518,10 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var body = new { geolocation };
-            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/{deviceKindPath}/{id}", body);
+            var url = $"{_setupModel.Url}/devices/{deviceKindPath}/{id}";
+            _log?.Info($"[PatchGeolocationAsync] PATCH {url} body={Newtonsoft.Json.JsonConvert.SerializeObject(body)}");
+            var response = await _apiService.PatchRequestAsync(url, body);
+            _log?.Info($"[PatchGeolocationAsync] 응답 status={(int)response.StatusCode} {response.StatusCode}");
             return await response.ToApiResponseAsync<object>();
         }
         catch (Exception ex)

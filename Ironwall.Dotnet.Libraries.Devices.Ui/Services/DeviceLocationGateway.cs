@@ -46,6 +46,7 @@ public class DeviceLocationGateway : IDeviceLocationGateway
             _log?.Warning($"[DeviceLocation] 미지원 디바이스 타입: {device.GetType().Name}");
             return false;
         }
+        _log?.Info($"[DeviceLocation] 게이트웨이 진입 — kind={kind} id={device.Id} → ({latitude:F6},{longitude:F6}) heading={(heading?.ToString("F0") ?? "-")}");
 
         // geolocation JSONB는 PATCH 시 전체 교체 → 보존할 하위필드(location/altitude)도 채워 보낸다.
         var geo = new GeolocationDto
