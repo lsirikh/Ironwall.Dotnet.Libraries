@@ -175,6 +175,15 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
             Groups.Clear();
             _raw = (res.Success && res.Data is not null) ? res.Data : new List<UserGroupDto>();
 
+            // 등급별 사용자 수 = 그 역할(role)을 가진 계정 수 (Option A: 등급=역할, group_id 아님).
+            // 서버 GET /user-groups 목록은 user_count 미포함 + 사용자는 group_id가 아닌 role로 등급 소속.
+            // ⚠ 서버 /users limit 상한=100(le=100) — 1000 지정 시 422. 계정 수가 100 초과면 페이징 필요(현재 GOP 규모 <100).
+            var usersRes = await _api.GetUsersAsync(1, 100, ct);
+            var countByRole = (usersRes.Success && usersRes.Data is not null)
+                ? usersRes.Data.GroupBy(u => (u.Role ?? string.Empty).ToUpperInvariant())
+                               .ToDictionary(x => x.Key, x => x.Count())
+                : new Dictionary<string, int>();
+
             // Option A: 5개 등급(역할명) 그룹만 노출, 등급 높은 순(ADMIN 위 → GUEST 아래). 임의 팀그룹은 제외.
             foreach (var g in _raw.Where(x => _levels.ContainsKey(x.Name))
                                   .OrderByDescending(x => _levels[x.Name].rank))
