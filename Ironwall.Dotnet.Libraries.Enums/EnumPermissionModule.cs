@@ -16,5 +16,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
         UserGroups,  // "user_groups" 그룹·권한
         AuditLogs,   // "audit_logs"  감사로그 (View만 활성)
         Servers,     // "servers"     서버모니터
+        Map,         // "map"         상황도(심볼/오버레이/ROI 편집) — View/Edit (FR-EN-05)
+        Broadcast,   // "broadcast"   방송(스피커/TTS) — View/Control (FR-EN-05)
     }
 }

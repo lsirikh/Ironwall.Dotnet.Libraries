@@ -15,6 +15,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
             EnumPermissionModule.Devices, EnumPermissionModule.Events, EnumPermissionModule.Reports,
             EnumPermissionModule.Cameras, EnumPermissionModule.Users, EnumPermissionModule.UserGroups,
             EnumPermissionModule.AuditLogs, EnumPermissionModule.Servers,
+            EnumPermissionModule.Map, EnumPermissionModule.Broadcast,
         };
 
         /// <summary>매트릭스 열 순서.</summary>
@@ -34,6 +35,8 @@ namespace Ironwall.Dotnet.Libraries.Enums
             EnumPermissionModule.UserGroups => "user_groups",
             EnumPermissionModule.AuditLogs  => "audit_logs",
             EnumPermissionModule.Servers    => "servers",
+            EnumPermissionModule.Map        => "map",
+            EnumPermissionModule.Broadcast  => "broadcast",
             _ => m.ToString().ToLowerInvariant(),
         };
 
@@ -58,6 +61,8 @@ namespace Ironwall.Dotnet.Libraries.Enums
             EnumPermissionModule.UserGroups => "그룹·권한",
             EnumPermissionModule.AuditLogs  => "감사로그",
             EnumPermissionModule.Servers    => "서버",
+            EnumPermissionModule.Map        => "상황도",
+            EnumPermissionModule.Broadcast  => "방송",
             _ => m.ToString(),
         };
 
@@ -78,6 +83,8 @@ namespace Ironwall.Dotnet.Libraries.Enums
         public static bool IsVerbAllowed(EnumPermissionModule m, EnumPermissionVerb v)
         {
             if (m == EnumPermissionModule.AuditLogs) return v == EnumPermissionVerb.View;
+            if (m == EnumPermissionModule.Map)       return v is EnumPermissionVerb.View or EnumPermissionVerb.Edit;     // 상황도 조회/편집
+            if (m == EnumPermissionModule.Broadcast) return v is EnumPermissionVerb.View or EnumPermissionVerb.Control;  // 방송 조회/제어
             if (v == EnumPermissionVerb.Control) return m == EnumPermissionModule.Cameras;
             return true; // View/Edit/Delete 는 나머지 전부 활성
         }
