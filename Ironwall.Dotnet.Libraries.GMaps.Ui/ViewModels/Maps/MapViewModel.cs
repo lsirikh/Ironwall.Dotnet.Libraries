@@ -182,6 +182,9 @@ public class MapViewModel : BasePanelViewModel,
         {
             await base.OnActivateAsync(cancellationToken);
 
+            // FR-EN-11: 역할강등/세션변경 시 PTZ 권한 재평가 구독(진행 중 이동 취소·팝업 비활성)
+            SubscribePtzPermission();
+
             // 1. 저장된 커스텀 맵들 로드
             await _customMapService.LoadCustomMapsAsync();
 
@@ -252,6 +255,8 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
+
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
             // Adorner 시스템 정리
@@ -872,6 +877,36 @@ public class MapViewModel : BasePanelViewModel,
 
     /// <summary>카메라 제어 권한(cam:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "cameras" 고정. (FR-EN-06)</summary>
     private bool CanControlCamera() => ResolvePermissionService()?.CanControl("cameras") ?? true;
+
+    // FR-EN-11: 역할강등 즉시 재평가 — 권한 상실 시 진행 중 PTZ 이동(연속이동) 취소 + 열린 팝업 PTZ 비활성.
+    private bool _ptzPermSubscribed;
+    private void SubscribePtzPermission()
+    {
+        if (_ptzPermSubscribed) return;
+        var perm = ResolvePermissionService();
+        if (perm == null) return;
+        perm.PermissionsChanged += OnPtzPermissionsChanged;
+        _ptzPermSubscribed = true;
+    }
+    private void UnsubscribePtzPermission()
+    {
+        if (!_ptzPermSubscribed) return;
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged -= OnPtzPermissionsChanged;
+        _ptzPermSubscribed = false;
+    }
+    /// <summary>PermissionsChanged 콜백(NATS 배경스레드 가능). 권한 상실 시 진행 중 제스처 취소 + 팝업 IsPtzCapable 비활성.</summary>
+    private void OnPtzPermissionsChanged()
+    {
+        var canCtrl = CanControlCamera();
+        if (!canCtrl)
+            foreach (var cts in _ptzGestureCts.Values) { try { cts.Cancel(); } catch { /* 이미 종료 */ } }
+        _ = OnUiAsync(() =>
+        {
+            if (_cameraPopups == null) return;
+            foreach (var vm in _cameraPopups) vm.IsPtzCapable = vm.IsPtzCapable && canCtrl;   // 권한 상실→비활성(복구는 팝업 재오픈)
+        });
+    }
 
     /// <summary>팝업 오픈 시 ONVIF PTZ 준비(InitializeFull + GetNode space) → IsPtzCapable 설정(게이팅 진실원). (FR-GATE-01)</summary>
     private async Task EnsurePtzReadyAsync(CameraStreamPopupViewModel vm, ICameraDeviceModel cam)
