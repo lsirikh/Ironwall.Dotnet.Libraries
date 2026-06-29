@@ -32,6 +32,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        // (FR-EN-11) 역할강등 재평가 구독
+        { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged += OnPermissionsChanged; }
         // (리뷰 MEDIUM) 초기 로딩 DataInitialize 도 _processGate 로 직렬화 → 로딩 중 Insert/Save/Delete 경합 차단.
         if (!await _processGate.WaitAsync(0)) return;
         try
@@ -44,6 +46,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
+        // (FR-EN-11) 역할강등 재평가 구독 해제
+        { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged -= OnPermissionsChanged; }
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
         {
@@ -55,6 +59,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
+        // (FR-EN-09) 삭제 권한 게이트
+        if (!DevicePermissionGate.CanDelete()) { _log?.Warning("[FR-EN-09] 삭제 권한 없음(devices)"); return; }
         if (SelectedItemCount == 0) return;
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
@@ -65,6 +71,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
 
     public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
+        // (FR-EN-09) 추가 권한 게이트
+        if (!DevicePermissionGate.CanEdit()) { _log?.Warning("[FR-EN-09] 추가 권한 없음(devices)"); return; }
         // (C1) Save 진행 중 Insert 끼어들기 경합 차단 — _processGate로 직렬화(타 핸들러와 동일).
         if (!await _processGate.WaitAsync(0)) return;
         try
@@ -125,6 +133,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
 
     public override async void OnClickSaveButton(object sender, RoutedEventArgs e)
     {
+        // (FR-EN-09) 저장 권한 게이트
+        if (!DevicePermissionGate.CanEdit()) { _log?.Warning("[FR-EN-09] 저장 권한 없음(devices)"); return; }
         if (!await _processGate.WaitAsync(0)) return;
         try
         {
@@ -345,6 +355,8 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteDeviceGroupProcessMessageModel message, CancellationToken cancellationToken)
     {
+        // (FR-EN-09) DeviceGroup 삭제는 인라인 루프 — OnClickDeleteButton 게이트 우회 가능, 여기서도 재확인.
+        if (!DevicePermissionGate.CanDelete()) { _log?.Warning("[FR-EN-09] 삭제 권한 없음(devices/group-handle)"); return; }
         // (리뷰 LOW) 삭제도 Insert/Save/Reload/OnActivate 와 동일 _processGate 로 직렬화 — 공유 CTS 조기취소/경합 방지.
         if (!await _processGate.WaitAsync(0)) return;
         try
@@ -407,6 +419,16 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     public event System.Action? UpdateAction;
     #endregion
     #region - Helpers -
+    /// <summary>(FR-EN-11) 역할강등 재평가 콜백 — NATS 배경스레드 발화 대응 OnUIThread 필수.</summary>
+    private void OnPermissionsChanged()
+    {
+        Execute.OnUIThread(() =>
+        {
+            IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
+            SaveButtonEnable = DevicePermissionGate.CanEdit();
+        });
+    }
+
     // (PR-C) 미저장 Draft(Id≤0) 개수 — 화면 전환/종료 시 미저장 손실 경고용.
     protected override int CountUnsavedDrafts() => ViewModelProvider.Count(vm => vm.Model.Id <= 0);
 

@@ -45,6 +45,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        // (FR-EN-11) 역할강등 재평가 구독
+        { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged += OnPermissionsChanged; }
         // (P2-S5) 초기 로딩도 _processGate 직렬화 — 로딩 중 Insert/Save/Delete 경합 차단.
         if (!await _processGate.WaitAsync(0)) return;
         try
@@ -57,6 +59,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
+        // (FR-EN-11) 역할강등 재평가 구독 해제
+        { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged -= OnPermissionsChanged; }
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
         {
@@ -68,6 +72,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
+        // (FR-EN-09) 삭제 권한 게이트
+        if (!DevicePermissionGate.CanDelete()) { _log?.Warning("[FR-EN-09] 삭제 권한 없음(devices)"); return; }
         if (SelectedItemCount == 0) return;
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
@@ -78,6 +84,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
     public override async void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
+        // (FR-EN-09) 추가 권한 게이트
+        if (!DevicePermissionGate.CanEdit()) { _log?.Warning("[FR-EN-09] 추가 권한 없음(devices)"); return; }
         if (!await _processGate.WaitAsync(0)) return;
         try
         {
@@ -122,6 +130,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
     public override async void OnClickSaveButton(object sender, RoutedEventArgs e)
     {
+        // (FR-EN-09) 저장 권한 게이트
+        if (!DevicePermissionGate.CanEdit()) { _log?.Warning("[FR-EN-09] 저장 권한 없음(devices)"); return; }
         if (!await _processGate.WaitAsync(0))
             return;
 
@@ -255,6 +265,16 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     }
     #endregion
     #region - Binding Methods -
+    /// <summary>(FR-EN-11) 역할강등 재평가 콜백 — NATS 배경스레드 발화 대응 OnUIThread 필수.</summary>
+    private void OnPermissionsChanged()
+    {
+        Execute.OnUIThread(() =>
+        {
+            IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
+            SaveButtonEnable = DevicePermissionGate.CanEdit();
+        });
+    }
+
     internal static bool DeviceEquals(ICameraDeviceModel a, ICameraDeviceModel b)
     {
         return a.DeviceNumber == b.DeviceNumber &&
