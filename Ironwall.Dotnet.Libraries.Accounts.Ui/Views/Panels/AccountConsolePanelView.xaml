@@ -59,6 +59,9 @@
 					<TabItem Header="세션 관리" Visibility="{Binding CanSeeSession, Converter={StaticResource BooleanToVisibilityConverter}}">
 						<ContentControl x:Name="UserSessionPanelViewModel" />
 					</TabItem>
+					<TabItem Header="세션 설정" Visibility="{Binding CanSeeSessionConfig, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<ContentControl x:Name="AccountSetupPanelViewModel" />
+					</TabItem>
 					<TabItem Header="감사 로그" Visibility="{Binding CanSeeAudit, Converter={StaticResource BooleanToVisibilityConverter}}">
 						<ContentControl x:Name="AuditLogPanelViewModel" />
 					</TabItem>

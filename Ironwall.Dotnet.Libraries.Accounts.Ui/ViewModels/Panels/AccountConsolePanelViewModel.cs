@@ -23,7 +23,8 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
                                        , AccountManagerPanelViewModel accountManager
                                        , PermissionMatrixPanelViewModel permissionMatrix
                                        , UserSessionPanelViewModel userSession
-                                       , AuditLogPanelViewModel auditLog)
+                                       , AuditLogPanelViewModel auditLog
+                                       , AccountSetupPanelViewModel accountSetup)
         : base(eventAggregator, log)
     {
         _permission = permission;
@@ -31,6 +32,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         PermissionMatrixPanelViewModel = permissionMatrix;
         UserSessionPanelViewModel = userSession;
         AuditLogPanelViewModel = auditLog;
+        AccountSetupPanelViewModel = accountSetup;
         _permission.PermissionsChanged += OnPermissionsChanged;
     }
     #endregion
@@ -43,6 +45,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         await ScreenExtensions.TryActivateAsync(PermissionMatrixPanelViewModel, cancellationToken);
         await ScreenExtensions.TryActivateAsync(UserSessionPanelViewModel, cancellationToken);
         await ScreenExtensions.TryActivateAsync(AuditLogPanelViewModel, cancellationToken);
+        await ScreenExtensions.TryActivateAsync(AccountSetupPanelViewModel, cancellationToken);
     }
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
@@ -51,6 +54,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         await ScreenExtensions.TryDeactivateAsync(PermissionMatrixPanelViewModel, close, cancellationToken);
         await ScreenExtensions.TryDeactivateAsync(UserSessionPanelViewModel, close, cancellationToken);
         await ScreenExtensions.TryDeactivateAsync(AuditLogPanelViewModel, close, cancellationToken);
+        await ScreenExtensions.TryDeactivateAsync(AccountSetupPanelViewModel, close, cancellationToken);
         await base.OnDeactivateAsync(close, cancellationToken);
     }
     #endregion
@@ -63,6 +67,7 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(CanSeeAccounts));
         NotifyOfPropertyChange(nameof(CanSeePermission));
         NotifyOfPropertyChange(nameof(CanSeeSession));
+        NotifyOfPropertyChange(nameof(CanSeeSessionConfig));
         NotifyOfPropertyChange(nameof(CanSeeAudit));
     }
     #endregion
@@ -72,11 +77,13 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     public PermissionMatrixPanelViewModel PermissionMatrixPanelViewModel { get; }
     public UserSessionPanelViewModel UserSessionPanelViewModel { get; }
     public AuditLogPanelViewModel AuditLogPanelViewModel { get; }
+    public AccountSetupPanelViewModel AccountSetupPanelViewModel { get; }
 
-    /// <summary>탭 노출 게이팅 — 사용자/권한/세션=ADMIN, 감사=ADMIN|MAINTAINER.</summary>
+    /// <summary>탭 노출 게이팅 — 사용자/권한/세션/세션설정=ADMIN, 감사=ADMIN|MAINTAINER.</summary>
     public bool CanSeeAccounts => _permission.IsAdmin;
     public bool CanSeePermission => _permission.IsAdmin;
     public bool CanSeeSession => _permission.IsAdmin;
+    public bool CanSeeSessionConfig => _permission.IsAdmin;
     public bool CanSeeAudit => _permission.CanAccessAuditLogs();
     #endregion
     #region - Attributes -
