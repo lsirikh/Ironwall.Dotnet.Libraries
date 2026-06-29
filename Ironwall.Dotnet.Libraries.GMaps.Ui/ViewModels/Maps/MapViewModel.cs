@@ -978,6 +978,8 @@ public class MapViewModel : BasePanelViewModel,
         var perm = ResolvePermissionService();
         if (perm == null) return;
         perm.PermissionsChanged += OnPtzPermissionsChanged;
+        var sl = ResolveSessionLifecycle();
+        if (sl != null) sl.ForceLogoutRequested += OnForceLogoutRequested;   // FR-FL-07: 강제 로그아웃 → GIS PTZ정지·스트림 해제
         _ptzPermSubscribed = true;
     }
     private void UnsubscribePtzPermission()
@@ -985,6 +987,8 @@ public class MapViewModel : BasePanelViewModel,
         if (!_ptzPermSubscribed) return;
         var perm = ResolvePermissionService();
         if (perm != null) perm.PermissionsChanged -= OnPtzPermissionsChanged;
+        var sl = ResolveSessionLifecycle();
+        if (sl != null) sl.ForceLogoutRequested -= OnForceLogoutRequested;
         _ptzPermSubscribed = false;
     }
     /// <summary>PermissionsChanged 콜백(NATS 배경스레드 가능). 권한 상실 시 진행 중 제스처 취소 + 팝업 IsPtzCapable 비활성.</summary>
@@ -997,6 +1001,30 @@ public class MapViewModel : BasePanelViewModel,
         {
             if (_cameraPopups == null) return;
             foreach (var vm in _cameraPopups) vm.IsPtzCapable = vm.IsPtzCapable && canCtrl;   // 권한 상실→비활성(복구는 팝업 재오픈)
+        });
+    }
+
+    // FR-FL-07: 강제 로그아웃(세션 revoke/401/수동) 전파 — 진행 중 PTZ 능동제어 정지 + 카메라 팝업(스트림) 해제.
+    //   ISessionLifecycle 도 IoC lazy(미등록 시 null=비활성). 셸의 가림막/로그인 화면 전환은 별도 구독자(메인 솔루션) 책임.
+    private ISessionLifecycle? _sessionLifecycle;
+    private bool _sessionLifecycleResolved;
+    private ISessionLifecycle? ResolveSessionLifecycle()
+    {
+        if (_sessionLifecycleResolved) return _sessionLifecycle;
+        _sessionLifecycleResolved = true;
+        try { _sessionLifecycle = IoC.Get<ISessionLifecycle>(); }
+        catch (Exception ex) { _log?.Warning($"[ForceLogout] SessionLifecycle 미해석(GIS 강제로그아웃 정리 비활성): {ex.Message}"); _sessionLifecycle = null; }
+        return _sessionLifecycle;
+    }
+    /// <summary>강제 로그아웃 콜백(배경스레드 가능). 진행 중 PTZ 제스처 즉시 취소 + 열린 카메라 팝업 닫기(스트림 해제).</summary>
+    private void OnForceLogoutRequested(EnumRevokeReason reason)
+    {
+        _log?.Info($"[ForceLogout] GIS 정리 (reason={reason}) — PTZ 정지 + 팝업 해제");
+        foreach (var cts in _ptzGestureCts.Values) { try { cts.Cancel(); } catch { /* 이미 종료 */ } }
+        _ = OnUiAsync(() =>
+        {
+            if (_cameraPopups == null) return;
+            foreach (var vm in _cameraPopups.ToList()) _ = CloseCameraPopupAsync(vm);   // 순회 중 Remove 재진입 방어, 비동기 해제
         });
     }
 

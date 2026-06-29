@@ -21,13 +21,15 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     private readonly IAccountApiService _api;
     private readonly ITokenStorageService _tokenStore;
     private readonly IPermissionService _permission;
+    private readonly ISessionLifecycle? _lifecycle;
     private readonly ILogService? _log;
 
-    public ApiAccountGateway(IAccountApiService api, ITokenStorageService tokenStore, IPermissionService permission, ILogService? log = null)
+    public ApiAccountGateway(IAccountApiService api, ITokenStorageService tokenStore, IPermissionService permission, ISessionLifecycle? lifecycle = null, ILogService? log = null)
     {
         _api = api;
         _tokenStore = tokenStore;
         _permission = permission;
+        _lifecycle = lifecycle;
         _log = log;
     }
 
@@ -51,6 +53,7 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         // ★ V-PG-01 §7: 로그인 시 권한엔진 적용. 이전엔 Apply() 호출이 0건이라 role/permissions 영구 미적용 →
         //   모든 Can*/IsAdmin/HasRole 무력(게이팅 dead). 여기서 채워야 UI 게이팅이 살아난다. PermissionsChanged 발화.
         _permission.Apply(user);
+        _lifecycle?.ResetForLogin();   // FR-FL-04: 새 로그인 → 강제 로그아웃 once-guard 재무장
 
         var account = AccountDtoMapper.ToAccountModel(user);
         var permissions = PermissionsFlattener.Flatten(user.Permissions);
@@ -93,7 +96,12 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
     {
         try { await _api.LogoutAsync(ct).ConfigureAwait(false); }
         catch (Exception ex) { _log?.Warning($"[ApiAccountGateway] logout API 실패 — 로컬 폐기 진행: {ex.Message}"); }
-        finally { _tokenStore.Clear(); _permission.Clear(); }   // ★ 토큰 + 권한엔진(role/토큰 → UNDEFINED) 동시 초기화
+        finally
+        {
+            // FR-FL-04: 수동 로그아웃도 단일 멱등 진입점 경유(NATS/401과 수렴 + ForceLogoutRequested 발화 → GIS PTZ정지·스트림해제)
+            if (_lifecycle != null) _lifecycle.ForceLogoutOnce(EnumRevokeReason.Manual);
+            else { _tokenStore.Clear(); _permission.Clear(); }   // lifecycle 미주입(테스트 등) 폴백
+        }
     }
 
     // ──────────────── IUserDirectoryGateway (FR-19) ────────────────

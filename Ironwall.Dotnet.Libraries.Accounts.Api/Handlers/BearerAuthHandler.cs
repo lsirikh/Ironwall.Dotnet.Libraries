@@ -76,11 +76,15 @@ public class BearerAuthHandler : DelegatingHandler
                 return false;
             }
 
+            var gen = _store.Generation;   // FR-FL-05: refresh 시작 시점 세대 캡처
             var result = await _accountApiFactory().RefreshAsync(refreshToken, ct).ConfigureAwait(false);
             if (result.Success && !string.IsNullOrEmpty(result.Data?.AccessToken))
             {
-                _store.SetTokens(result.Data.AccessToken, result.Data.RefreshToken);
-                return true;
+                // 강제 로그아웃(Clear)이 refresh 진행 중 끼어들었으면(세대 변경) 폐기 세션 부활 차단 → 실패 처리
+                if (_store.SetTokensIfGeneration(gen, result.Data.AccessToken, result.Data.RefreshToken))
+                    return true;
+                _log?.Warning("[BearerAuthHandler] refresh 성공했으나 세션 폐기됨(generation 변경) — 부활 차단");
+                return false;
             }
 
             _store.Clear();
