@@ -174,7 +174,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
             Groups.Clear();
             _raw = (res.Success && res.Data is not null) ? res.Data : new List<UserGroupDto>();
 
-            foreach (var g in _raw)
+            // 그룹 이름순(ㄱㄴㄷ/ABC, 문화권 정렬) 고정 — 서버 GET 이 ORDER BY 없어 편집(UPDATE) 후 순서가 비결정적으로 바뀌는 문제 해결.
+            foreach (var g in _raw.OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase))
             {
                 int v = 0, e = 0, d = 0, c = 0;
                 if (g.Permissions?.Modules is { } mods)
