@@ -46,6 +46,9 @@ public class TrackingSetupModel : ITrackingSetupModel
     /// <summary>Playback 데이터 소스 — 로컬 DB / 서버 API 토글. 기본 Local(스테이션 #2까지).</summary>
     public EnumTrackDataSource DataSource { get; set; } = EnumTrackDataSource.Local;
 
+    /// <summary>카메라 "특정 위치 확인" 타겟 모드 반경(m). 기본 30.</summary>
+    public double CameraAimRadiusMeters { get; set; } = 30d;
+
     public TrackingSetupModel() { }
 
     /// <summary>복사 생성자.</summary>
@@ -62,5 +65,6 @@ public class TrackingSetupModel : ITrackingSetupModel
         GapThresholdSec = model.GapThresholdSec;
         RetentionDays = model.RetentionDays;
         DataSource = model.DataSource;
+        CameraAimRadiusMeters = model.CameraAimRadiusMeters;
     }
 }

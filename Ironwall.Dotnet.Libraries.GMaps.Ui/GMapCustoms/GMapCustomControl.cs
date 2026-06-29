@@ -129,6 +129,19 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     public bool IsLineDrawing => _lineDrawingService?.IsDrawing ?? false;
 
+    /// <summary>
+    /// 카메라 "특정 위치 확인" 타겟 조준 모드 여부.
+    /// ON이면 좌클릭을 가로채 <see cref="TargetAimClicked"/>로 전달(맵 팬·마커선택·이미지편집·더블클릭 모두 차단).
+    /// 라인드로잉/편집 모드와 상호배타(ViewModel이 진입 시 강제 종료).
+    /// </summary>
+    public bool IsTargetAimMode { get; set; }
+
+    /// <summary>타겟 조준 반경 원의 중심(카메라 위치, WGS84). 타겟 모드 진입 시 설정, 종료 시 null.</summary>
+    public PointLatLng? AimOverlayCenter { get; set; }
+
+    /// <summary>타겟 조준 반경(m). 화면 원 크기 산출에 사용(지오→픽셀, 줌마다 재계산).</summary>
+    public double AimOverlayRadiusMeters { get; set; }
+
     #endregion
 
     #region Integration Events
@@ -136,6 +149,11 @@ public class GMapCustomControl : GMapControl
     /// 지도 클릭 이벤트 - ViewModel에 클릭 위치 전달
     /// </summary>
     public event Action<PointLatLng, Point> OnMapClicked;
+
+    /// <summary>
+    /// 타겟 조준 모드 좌클릭 - 클릭 지점 좌표를 ViewModel에 전달(카메라 회전요청 발행용).
+    /// </summary>
+    public event Action<PointLatLng, Point>? TargetAimClicked;
 
     /// <summary>
     /// 마커 클릭 이벤트 - ViewModel에 클릭된 마커 전달
@@ -390,6 +408,12 @@ public class GMapCustomControl : GMapControl
         if (ShowRotationControl)
         {
             RenderRotationInfo(drawingContext);
+        }
+
+        // 카메라 "특정 위치 확인" 타겟 반경 오버레이 (지오 앵커 — 팬/줌/디지털줌 자동 추종)
+        if (IsTargetAimMode && AimOverlayCenter.HasValue && AimOverlayRadiusMeters > 0d)
+        {
+            DrawAimRadius(drawingContext);
         }
     }
 
@@ -688,8 +712,18 @@ public class GMapCustomControl : GMapControl
         //_log?.Info($"마우스 위치: 화면({mousePos.X:F2}, {mousePos.Y:F2}) -> 지리({geoPos.Lat:F6}, {geoPos.Lng:F6})");
 
         // [FP-1] base 호출 전 처리: base.OnMouseLeftButtonDown이 GMap.NET 내부 _core.MouseDown을
-        // 기록하여 팬을 Armed 상태로 만든다. 라인 드로잉·이미지 편집이 이벤트를 소비할 경우
+        // 기록하여 팬을 Armed 상태로 만든다. 타겟 조준·라인 드로잉·이미지 편집이 이벤트를 소비할 경우
         // base를 호출하지 않아 팬 Armed를 방지한다.
+
+        // [Camera Aim] 타겟 조준 모드 — 라인드로잉과 동급 위치, base 호출 전 가로채기
+        // (팬 Armed·마커 히트테스트·이미지 편집·더블클릭 500ms 윈도우 모두 차단)
+        if (IsTargetAimMode)
+        {
+            TargetAimClicked?.Invoke(geoPos, mousePos);
+            e.Handled = true;
+            return;
+        }
+
         if (IsLineDrawing)
         {
             OnMapClicked?.Invoke(geoPos, mousePos);
@@ -1837,6 +1871,73 @@ public class GMapCustomControl : GMapControl
         {
             _log?.Error($"회전 정보 렌더링 실패: {ex.Message}");
         }
+    }
+
+    // 타겟 반경 오버레이 브러시/펜(정적 frozen — 렌더마다 재할당 회피)
+    private static readonly Brush _aimFillBrush = CreateFrozenBrush(Color.FromArgb(40, 0, 200, 255));
+    private static readonly Pen _aimEdgePen = CreateFrozenPen(Color.FromArgb(200, 0, 200, 255), 2d);
+    private static readonly Pen _aimCrossPen = CreateFrozenPen(Color.FromArgb(220, 0, 200, 255), 1.5d);
+
+    private static Brush CreateFrozenBrush(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
+    }
+
+    private static Pen CreateFrozenPen(Color c, double thickness)
+    {
+        var br = new SolidColorBrush(c);
+        br.Freeze();
+        var p = new Pen(br, thickness);
+        p.Freeze();
+        return p;
+    }
+
+    /// <summary>
+    /// 카메라 "특정 위치 확인" 타겟 반경 원 + 중심 십자 그리기.
+    /// 중심/반경은 매 렌더 시 현재 줌·팬 기준으로 지오→픽셀 재계산하므로 맵과 함께 정확히 이동/스케일.
+    /// </summary>
+    private void DrawAimRadius(DrawingContext drawingContext)
+    {
+        try
+        {
+            var center = AimOverlayCenter!.Value;
+            var cPx = FromLatLngToLocal(center);
+            double rPx = MetersToScreenPixels(AimOverlayRadiusMeters, center);
+            if (rPx <= 0d || double.IsNaN(rPx) || double.IsInfinity(rPx)) return;   // 변환 실패 시 미표시
+
+            var centerPt = new Point(cPx.X, cPx.Y);
+            drawingContext.DrawEllipse(_aimFillBrush, _aimEdgePen, centerPt, rPx, rPx);
+
+            const double cross = 7d;   // 중심 십자 반길이(px)
+            drawingContext.DrawLine(_aimCrossPen, new Point(centerPt.X - cross, centerPt.Y), new Point(centerPt.X + cross, centerPt.Y));
+            drawingContext.DrawLine(_aimCrossPen, new Point(centerPt.X, centerPt.Y - cross), new Point(centerPt.X, centerPt.Y + cross));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"타겟 반경 렌더 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 미터 반경 → 현재 줌의 화면 픽셀 반경. 중심에서 동쪽으로 meters 이동한 지오점의 화면거리로 산출.
+    /// (GMapMarkerPidsControl.ConvertMetersToPixels 와 동일 공식 — 컨트롤 자족 구현.)
+    /// </summary>
+    private double MetersToScreenPixels(double meters, PointLatLng center)
+    {
+        const double earthRadius = 6_371_000d;
+        if (Math.Abs(center.Lat) > 89.9d) return 0d;        // 극점 인근 방어(cos→0 발산 회피)
+        double latRad = center.Lat * Math.PI / 180d;
+        double denom = earthRadius * Math.Cos(latRad);
+        if (denom <= 0d) return 0d;
+        double deltaLng = meters / denom * 180d / Math.PI;
+        var target = new PointLatLng(center.Lat, center.Lng + deltaLng);
+        var cPx = FromLatLngToLocal(center);
+        var tPx = FromLatLngToLocal(target);
+        double dx = tPx.X - cPx.X;
+        double dy = tPx.Y - cPx.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     /// <summary>

@@ -18,6 +18,7 @@ using GMap.NET.MapProviders.Custom;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
@@ -100,6 +101,8 @@ public class MapViewModel : BasePanelViewModel,
                         , SymbolEventManager symbolEventManager
                         , IDeviceDetailUrlService deviceDetailUrlService
                         , IBroadcastControlService broadcastControlService
+                        , ICameraAimControlService cameraAimControlService
+                        , ITrackingSetupModel trackingSetupModel
                         , IGMapDbService gMapDbService
                         , CustomMapOverlayService customMapOverlayService
                         , IImageFileService imageFileService
@@ -121,6 +124,8 @@ public class MapViewModel : BasePanelViewModel,
         _symbolEventManager = symbolEventManager;
         _deviceDetailUrlService = deviceDetailUrlService;
         _broadcastControlService = broadcastControlService;
+        _cameraAimControlService = cameraAimControlService;
+        _trackingSetupModel = trackingSetupModel;
         _customMapOverlayService = customMapOverlayService;
         _imageFileService = imageFileService;
         _trackingOverlay = trackingOverlay;
@@ -399,6 +404,8 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnImageEditCompleted += OnMapImageEditCompleted;     // FR-8 편집 완료 DB 영속화
             MainMap.DigitalZoomLevelChanged += OnMapDigitalZoomLevelChanged; // 디지털 줌 → 축척바 갱신
             MainMap.OnMapClicked += OnMapClicked;
+            MainMap.TargetAimClicked += OnTargetAimClicked;                  // 카메라 특정위치 확인 — 좌클릭 좌표 수신
+            MainMap.PreviewKeyDown += OnMapPreviewKeyDownForAim;             // ESC 취소
 
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
             // AdornerManager 이벤트 구독
@@ -430,6 +437,9 @@ public class MapViewModel : BasePanelViewModel,
 
         try
         {
+            // 타겟 조준 모드가 켜진 채 뷰가 비활성화되면 전역 커서(Cursors.Cross)·오버레이가 잔존 → 강제 종료(H1)
+            ExitTargetAimMode();
+
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
@@ -440,6 +450,8 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnImageEditCompleted -= OnMapImageEditCompleted;
             MainMap.DigitalZoomLevelChanged -= OnMapDigitalZoomLevelChanged;
             MainMap.OnMapClicked -= OnMapClicked;
+            MainMap.TargetAimClicked -= OnTargetAimClicked;
+            MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForAim;
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
             MainMap.MarkerEditCancelled -= OnMarkerEditCancelled;
@@ -456,6 +468,194 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Error($"Adorner 시스템 정리 실패: {ex.Message}");
         }
     }
+    #endregion
+
+    #region - 카메라 특정위치 확인 (타겟 조준 모드, Camera_PTZ_AimLocation) -
+
+    private string _aimStatusMessage = string.Empty;
+    /// <summary>타겟 조준 모드 상태 배너 텍스트.</summary>
+    public string AimStatusMessage
+    {
+        get => _aimStatusMessage;
+        set { _aimStatusMessage = value; NotifyOfPropertyChange(nameof(AimStatusMessage)); }
+    }
+
+    private bool _isAimStatusVisible;
+    /// <summary>타겟 조준 모드 상태 배너 표시 여부.</summary>
+    public bool IsAimStatusVisible
+    {
+        get => _isAimStatusVisible;
+        set { _isAimStatusVisible = value; NotifyOfPropertyChange(nameof(IsAimStatusVisible)); }
+    }
+
+    /// <summary>타겟 조준 모드 진입 — 컨텍스트 메뉴 "특정 위치 확인" 클릭(동기, async 없음 — async void 함정 회피).</summary>
+    private void EnterTargetAimMode(ICameraDeviceModel cam)
+    {
+        try
+        {
+            if (MainMap == null || cam == null) return;
+
+            // 설치 좌표 유효성 — NaN/범위초과 + 미설정(0,0) 거부(M1: 좌표 미입력 카메라는 (0,0) 기본값)
+            if (!Services.Tracking.TrackingMath.IsValidLatLng(cam.Latitude, cam.Longitude)
+                || (Math.Abs(cam.Latitude) < 1e-6 && Math.Abs(cam.Longitude) < 1e-6))
+            {
+                SetAimStatus("카메라 설치 좌표가 없어 '특정 위치 확인'을 사용할 수 없습니다.", autoHide: true);
+                return;
+            }
+
+            // 모드 상호배제 — 라인드로잉/편집 강제 종료(한 번에 하나의 맵 인터랙션 모드)
+            CancelConflictingModesForAim();
+
+            _aimCamera = cam;
+            double radius = _trackingSetupModel?.CameraAimRadiusMeters ?? 30d;
+            if (radius <= 0d) radius = 30d;
+            _aimRadiusMeters = Math.Clamp(radius, 1d, 500d);   // 상한 가드(L4: 설정 오기입 방지)
+            unchecked { _aimGeneration++; }
+
+            MainMap.AimOverlayCenter = new PointLatLng(cam.Latitude, cam.Longitude);
+            MainMap.AimOverlayRadiusMeters = _aimRadiusMeters;
+            MainMap.IsTargetAimMode = true;
+            System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
+            MainMap.Focus();                 // ESC 키 수신을 위해 포커스 확보
+            MainMap.InvalidateVisual();
+
+            SetAimStatus($"특정 위치 확인 — 반경 {_aimRadiusMeters:F0}m 안을 클릭하세요. (ESC·영역 밖 클릭 = 취소)");
+            _log?.Info($"[CameraAim] 타겟 모드 진입 cam={cam.Id} R={_aimRadiusMeters:F0}m");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[CameraAim] 모드 진입 실패: {ex.Message}");
+            ExitTargetAimMode();
+        }
+    }
+
+    /// <summary>타겟 조준 모드 종료(취소/완료 공통) — 커서·오버레이·세션 정리.</summary>
+    private void ExitTargetAimMode()
+    {
+        try
+        {
+            unchecked { _aimGeneration++; }
+            _aimCamera = null;
+            if (MainMap != null)
+            {
+                MainMap.IsTargetAimMode = false;
+                MainMap.AimOverlayCenter = null;
+                MainMap.AimOverlayRadiusMeters = 0d;
+                MainMap.InvalidateVisual();
+            }
+            if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
+                System.Windows.Input.Mouse.OverrideCursor = null;
+            IsAimStatusVisible = false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[CameraAim] 모드 종료 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>타겟 모드 진입 시 충돌 모드(라인드로잉) 종료. (편집 모드 좌클릭은 타겟 분기가 선점)</summary>
+    private void CancelConflictingModesForAim()
+    {
+        try
+        {
+            if (MainMap?.IsLineDrawing == true)
+                _ = MainMap.LineDrawingService?.CancelDrawingAsync();
+            // 편집 모드 종료 — 세터가 SetEditMode(false)+ClearAllSelections 수행, 편집 단축키/어도너 상호배제(M5)
+            if (IsEditModeEnabled)
+                IsEditModeEnabled = false;
+        }
+        catch (Exception ex) { _log?.Warning($"[CameraAim] 충돌 모드 종료 경고: {ex.Message}"); }
+    }
+
+    /// <summary>타겟 모드 좌클릭 수신 — 반경 판정 → 이내=발행 / 밖=취소(사용자 결정).</summary>
+    private void OnTargetAimClicked(PointLatLng geo, Point screen)
+    {
+        if (MainMap == null || !MainMap.IsTargetAimMode) return;     // 방어
+        var cam = _aimCamera;
+        if (cam == null) { ExitTargetAimMode(); return; }
+
+        bool inside = Services.Tracking.CameraAimMath
+            .IsWithinRadius(cam.Latitude, cam.Longitude, geo.Lat, geo.Lng, _aimRadiusMeters);
+
+        if (!inside)
+        {
+            _log?.Info($"[CameraAim] 반경({_aimRadiusMeters:F0}m) 밖 클릭 → 취소");
+            ExitTargetAimMode();
+            SetAimStatus("반경 밖을 클릭하여 취소했습니다.", autoHide: true);
+            return;
+        }
+
+        var body = Services.Tracking.CameraAimRequestBuilder
+            .Build(cam.Id, cam.Latitude, cam.Longitude, geo.Lat, geo.Lng, Environment.UserName);
+        if (body == null)
+        {
+            ExitTargetAimMode();
+            SetAimStatus("좌표가 유효하지 않아 요청을 보낼 수 없습니다.", autoHide: true);
+            return;
+        }
+
+        // 모드 즉시 종료(단발성) → 종료 후 세대 캡처. 발행 완료 시 그 사이 새 세션 진입했으면 안내 생략(M3)
+        ExitTargetAimMode();
+        _ = HandleTargetAimPublishAsync(body, _aimGeneration);
+    }
+
+    /// <summary>회전요청 발행(내부 예외 격리) — async void 함정 회피용 별도 async 메서드. gen=발행 시점 세대(stale 안내 방지).</summary>
+    private async Task HandleTargetAimPublishAsync(CameraAimLocationBodyDto body, int gen)
+    {
+        try
+        {
+            await _cameraAimControlService.PublishAimAsync(body, _cts?.Token ?? CancellationToken.None)
+                                          .ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                if (gen == _aimGeneration)   // 그 사이 새 타겟 세션이 시작됐으면 새 안내 보존
+                    SetAimStatus($"카메라 {body.CameraId} → 회전요청 전송 ({body.DistanceM:F0}m, {body.BearingDeg:F0}°).", autoHide: true);
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[CameraAim] 발행 처리 실패: {ex.Message}");
+            await OnUiAsync(() =>
+            {
+                if (gen == _aimGeneration)
+                    SetAimStatus("회전요청 전송에 실패했습니다.", autoHide: true);
+            });
+        }
+    }
+
+    /// <summary>ESC = 타겟 모드 취소.</summary>
+    private void OnMapPreviewKeyDownForAim(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Escape && (MainMap?.IsTargetAimMode ?? false))
+        {
+            ExitTargetAimMode();
+            SetAimStatus("취소했습니다.", autoHide: true);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>타겟 모드 상태 안내(상단 배너 + 로그). autoHide=true면 2.5초 후 숨김(세대 유지 시).</summary>
+    private void SetAimStatus(string message, bool autoHide = false)
+    {
+        AimStatusMessage = message;
+        IsAimStatusVisible = true;
+        _log?.Info($"[CameraAim] {message}");
+        if (!autoHide) return;
+
+        var gen = _aimGeneration;
+        _ = Task.Delay(2500).ContinueWith(_ =>
+        {
+            try
+            {
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+                {
+                    if (gen == _aimGeneration) IsAimStatusVisible = false;
+                });
+            }
+            catch { /* 종료 중 Dispatcher 없음 — 무시 */ }
+        });
+    }
+
     #endregion
 
     #region - GMapCustomControl 이벤트 핸들러 -
@@ -4370,6 +4570,21 @@ public class MapViewModel : BasePanelViewModel,
                         }
                     };
                     menu.Items.Add(camItem);
+
+                    // 특정 위치 확인 (PTZ 카메라 전용) — 지도 클릭 좌표로 회전요청 NATS 발행
+                    if (cameraModel != null
+                        && cameraModel.Category == Ironwall.Dotnet.Libraries.Enums.EnumCameraType.PTZ)
+                    {
+                        var aimCam = cameraModel;   // 항목 시점 로컬 복사(stale 캡처 방지)
+                        var aimItem = new MenuItem
+                        {
+                            Header = "특정 위치 확인",
+                            Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.CrosshairsGps, Width = 16, Height = 16 }
+                        };
+                        // 동기 위임 — EnterTargetAimMode는 비동기 없음(async void 함정 회피)
+                        aimItem.Click += (s, e) => EnterTargetAimMode(aimCam);
+                        menu.Items.Add(aimItem);
+                    }
                 }
 
                 // 스피커 방송 제어 (IpSpeaker 전용)
@@ -6735,6 +6950,13 @@ public class MapViewModel : BasePanelViewModel,
     private IDeviceDetailUrlService _deviceDetailUrlService;
     private IBroadcastControlService _broadcastControlService;
     private readonly Dictionary<int, CancellationTokenSource> _broadcastTimers = new();
+
+    // 카메라 "특정 위치 확인" 타겟 조준 모드 (Camera_PTZ_AimLocation)
+    private readonly ICameraAimControlService _cameraAimControlService;
+    private readonly ITrackingSetupModel _trackingSetupModel;
+    private ICameraDeviceModel? _aimCamera;      // 현재 타겟 모드 대상 카메라(UI 스레드 전용)
+    private double _aimRadiusMeters;             // 진입 시 반경 스냅샷(m)
+    private int _aimGeneration;                  // stale-await 가드(취소 시 ++)
 
     // UI 상태 필드
     private string? _scale;
