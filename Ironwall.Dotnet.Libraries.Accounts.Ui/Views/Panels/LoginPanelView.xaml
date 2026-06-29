@@ -17,13 +17,17 @@
 		x:Name="DialogHost"
 		DialogTheme="Inherit"
 		Identifier="LoginPanel">
-		<md:Card x:Name="CardContents">
+		<md:Card
+			x:Name="CardContents"
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center">
 			<!--  애니메이션 트리거  -->
 			<md:Card.Style>
 				<Style BasedOn="{StaticResource MaterialDesignElevatedCard}" TargetType="md:Card">
 					<!--  기본 BorderBrush 설정  -->
 					<Setter Property="Width" Value="400" />
-					<Setter Property="Height" Value="300" />
+					<Setter Property="MinHeight" Value="300" />
+					<Setter Property="VerticalAlignment" Value="Center" />
 					<Setter Property="Padding" Value="20" />
 					<Setter Property="Opacity" Value="1" />
 					<Setter Property="UniformCornerRadius" Value="8" />
@@ -35,14 +39,12 @@
 						<DataTrigger Binding="{Binding IsLoginFailed}" Value="True">
 							<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
 							<Setter Property="BorderThickness" Value="3" />
-							<Setter Property="Height" Value="356" />
 							<Setter Property="Width" Value="406" />
 							<Setter Property="UniformCornerRadius" Value="8" />
 						</DataTrigger>
 						<DataTrigger Binding="{Binding IsLoginSuccess}" Value="True">
 							<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
 							<Setter Property="BorderThickness" Value="3" />
-							<Setter Property="Height" Value="356" />
 							<Setter Property="Width" Value="406" />
 							<Setter Property="UniformCornerRadius" Value="8" />
 						</DataTrigger>
@@ -57,7 +59,8 @@
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
-					<RowDefinition Height="*" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
 
 				<!--  시안 헤더 바 (LayerPanel 표준 패턴, 네거티브 마진으로 카드 가장자리까지)  -->

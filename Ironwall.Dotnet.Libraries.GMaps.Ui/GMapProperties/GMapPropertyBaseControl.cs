@@ -368,6 +368,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         /// Z-order 버튼(<</>>/< />) 클릭 이벤트 — PropertyPanelEventBehavior → EventAggregator → MapViewModel 체인
         /// </summary>
         public event EventHandler<ZOrderChangeRequestedEventArgs>? ZOrderChangeRequested;
+
+        /// <summary>
+        /// "현재위치 적용" 클릭 — 심볼 현재 위치를 연결 디바이스 Model/API에 반영 요청(MapViewModel 처리).
+        /// </summary>
+        public event EventHandler? DeviceLocationApplyRequested;
         #endregion
 
         #region Constructor
@@ -390,6 +395,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             MouseMove += OnMouseMove;
             MouseLeftButtonUp += OnMouseLeftButtonUp;
 
+            // "현재위치 적용" 버튼은 PIDS SpecificContent(ContentPresenter 별도 namescope)에 있어
+            // GetTemplateChild로 못 찾는다 → 버블링되는 ButtonBase.Click을 컨트롤 레벨에서 잡아 이름으로 식별.
+            AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(OnAnyButtonClick));
         }
         #endregion
 
@@ -831,6 +839,49 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 downBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.Down));
             if (GetTemplateChild("PART_ZOrderBottomButton") is Button bottomBtn)
                 bottomBtn.Click += (_, _) => ZOrderChangeRequested?.Invoke(this, new ZOrderChangeRequestedEventArgs(ZOrderDirection.ToBottom));
+
+            // "현재위치 적용" 버튼 배선은 생성자 AddHandler(ButtonBase.ClickEvent) + OnAnyButtonClick에서 처리.
+            // (SpecificContent는 ContentPresenter 별도 namescope라 GetTemplateChild로 못 찾음)
+        }
+
+        /// <summary>버블링된 모든 버튼 클릭에서 "현재위치 적용" 버튼만 식별해 처리 — SpecificContent 버튼 배선용.</summary>
+        private void OnAnyButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is not Button btn || btn.Name != "PART_ApplyDeviceLocationButton")
+                return;
+            System.Diagnostics.Debug.WriteLine("[DeviceLocation] PART_ApplyDeviceLocationButton 클릭 감지");
+            if (_applyLocBusy) { e.Handled = true; return; }   // 진행 중 재클릭 무시
+            _applyLocBtn = btn;
+            BeginDeviceLocationApply();
+            DeviceLocationApplyRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+
+        /// <summary>버튼을 진행 상태로 전환 — 내부에 무한 프로그래스바 표시(원래 콘텐츠 백업).</summary>
+        private void BeginDeviceLocationApply()
+        {
+            if (_applyLocBtn == null) return;
+            _applyLocBusy = true;
+            _applyLocOriginalContent = _applyLocBtn.Content;
+            _applyLocBtn.Content = new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 8,
+                Width = 120,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0)
+            };
+        }
+
+        /// <summary>작업 완료(성공/실패) 시 버튼을 원래 상태로 복원 — MapViewModel이 호출.</summary>
+        public void EndDeviceLocationApply(bool success)
+        {
+            if (_applyLocBtn == null) return;
+            _applyLocBusy = false;
+            if (_applyLocOriginalContent != null)
+                _applyLocBtn.Content = _applyLocOriginalContent;
         }
         #endregion
         #region Fields
@@ -838,6 +889,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private Point _lastMousePosition;
         protected bool _isInitializing;
         protected bool _isClearingBindings;
+        // "현재위치 적용" 버튼 진행 상태(Symbol_Apply_DeviceLocation)
+        private Button? _applyLocBtn;
+        private object? _applyLocOriginalContent;
+        private bool _applyLocBusy;
         #endregion
     }
 

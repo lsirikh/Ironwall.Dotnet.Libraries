@@ -40,6 +40,10 @@ public class DeviceUiModule : Module
             builder.RegisterModule(new DeviceModule(_log, _count++));
             //builder.RegisterModule(new DeviceDbModule(_log, _apiSetup, _count++));
             builder.RegisterModule(new DeviceApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
+            // 디바이스 위치 저장 게이트웨이(Symbol_Apply_DeviceLocation) — 맵 심볼 현재위치를 디바이스 API로 저장.
+            // IDeviceApiService(위 DeviceApiModule 등록)에 의존. GMaps.Ui가 lazy 해석.
+            builder.RegisterType<Ironwall.Dotnet.Libraries.Devices.Ui.Services.DeviceLocationGateway>()
+                   .As<Ironwall.Dotnet.Monitoring.Models.Devices.IDeviceLocationGateway>().SingleInstance();
             builder.RegisterType<DeviceProviderService>().As<IDeviceProviderService>().As<IService>()
                 .SingleInstance().WithMetadata("Order", _count);
             builder.RegisterType<DeviceDashboardViewModel>().SingleInstance();

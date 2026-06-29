@@ -35,6 +35,43 @@
 						</ComboBox>
 					</Grid>
 
+					<!--  현재위치 적용 — 콤보박스 폭에 맞춘 네모 버튼(앱 기본 원형 Button 스타일 opt-out)  -->
+					<Grid Margin="0,2,0,6">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+						<Button
+							x:Name="PART_ApplyDeviceLocationButton"
+							Grid.Column="1"
+							Height="30"
+							HorizontalAlignment="Stretch"
+							Content="현재위치 적용"
+							Cursor="Hand"
+							FontWeight="SemiBold"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Style="{x:Null}"
+							ToolTip="심볼의 현재 지도 위치(+방위)를 연결된 디바이스에 반영하고 서버에 저장합니다.">
+							<Button.Template>
+								<ControlTemplate TargetType="Button">
+									<Border
+										x:Name="bd"
+										Background="{DynamicResource PrimaryBrush}"
+										CornerRadius="2"
+										SnapsToDevicePixels="True"
+										TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
+										<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+									</Border>
+									<ControlTemplate.Triggers>
+										<Trigger Property="IsMouseOver" Value="True">
+											<Setter TargetName="bd" Property="Opacity" Value="0.85" />
+										</Trigger>
+									</ControlTemplate.Triggers>
+								</ControlTemplate>
+							</Button.Template>
+						</Button>
+					</Grid>
+
 					<!--  FOV 표시  -->
 					<Grid Margin="0,5">
 						<Grid.ColumnDefinitions>

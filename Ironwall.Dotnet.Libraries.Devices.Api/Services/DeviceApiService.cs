@@ -510,6 +510,28 @@ public class DeviceApiService : IDeviceApiService
     }
 
     /// <summary>
+    /// 장비 위치(geolocation)만 부분 수정 — PATCH /devices/{kind}/{id} 에 {"geolocation": {...}} 만 전송.
+    /// 좌표 외 필드(이름/IP/비번/hardware_spec 등)는 전송하지 않아 보존된다. (Symbol_Apply_DeviceLocation)
+    /// </summary>
+    public async Task<ApiResponse<object>> PatchGeolocationAsync(string deviceKindPath, int id, GeolocationDto geolocation, CancellationToken token = default)
+    {
+        try
+        {
+            var body = new { geolocation };
+            var url = $"{_setupModel.Url}/devices/{deviceKindPath}/{id}";
+            _log?.Info($"[PatchGeolocationAsync] PATCH {url} body={Newtonsoft.Json.JsonConvert.SerializeObject(body)}");
+            var response = await _apiService.PatchRequestAsync(url, body);
+            _log?.Info($"[PatchGeolocationAsync] 응답 status={(int)response.StatusCode} {response.StatusCode}");
+            return await response.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchGeolocationAsync)}] Error: {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"Failed to patch geolocation {deviceKindPath}/{id}", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// GOP API를 통해 특정 Camera의 전체 정보를 수정합니다(전체 업데이트).
     /// <para>PUT /devices/cameras/{id} 엔드포인트를 호출</para>
     /// <para>DTO의 모든 속성을 업데이트됩니다</para>
