@@ -495,15 +495,18 @@ public class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>타겟 조준 모드 진입 — 컨텍스트 메뉴 "특정 위치 확인" 클릭(동기, async 없음 — async void 함정 회피).</summary>
-    private void EnterTargetAimMode(ICameraDeviceModel cam)
+    private void EnterTargetAimMode(GMapPidsMarker marker)
     {
         try
         {
-            if (MainMap == null || cam == null) return;
+            if (MainMap == null || marker == null) return;
+            var cam = marker.LinkedDevice as ICameraDeviceModel;
+            if (cam == null) { SetAimStatus("연결된 카메라가 없어 '특정 위치 확인'을 사용할 수 없습니다.", autoHide: true); return; }
 
-            // 설치 좌표 유효성 — NaN/범위초과 + 미설정(0,0) 거부(M1: 좌표 미입력 카메라는 (0,0) 기본값)
-            if (!Services.Tracking.TrackingMath.IsValidLatLng(cam.Latitude, cam.Longitude)
-                || (Math.Abs(cam.Latitude) < 1e-6 && Math.Abs(cam.Longitude) < 1e-6))
+            // 중심 = 심볼 위치(FOV 부채꼴과 동일 중심). NaN/범위초과 + 미설정(0,0) 거부
+            double centerLat = marker.Latitude, centerLng = marker.Longitude;
+            if (!Services.Tracking.TrackingMath.IsValidLatLng(centerLat, centerLng)
+                || (Math.Abs(centerLat) < 1e-6 && Math.Abs(centerLng) < 1e-6))
             {
                 SetAimStatus("카메라 설치 좌표가 없어 '특정 위치 확인'을 사용할 수 없습니다.", autoHide: true);
                 return;
@@ -513,20 +516,21 @@ public class MapViewModel : BasePanelViewModel,
             CancelConflictingModesForAim();
 
             _aimCamera = cam;
-            double radius = _trackingSetupModel?.CameraAimRadiusMeters ?? 30d;
-            if (radius <= 0d) radius = 30d;
-            _aimRadiusMeters = Math.Clamp(radius, 1d, 500d);   // 상한 가드(L4: 설정 오기입 방지)
+            // 반경 = 그 카메라의 탐지범위(DetectionRange) — 지도 FOV 부채꼴이 닿는 거리와 동일. 미설정 시 글로벌 폴백.
+            double radius = marker.DetectionRange;
+            if (radius <= 0d) radius = _trackingSetupModel?.CameraAimRadiusMeters ?? 30d;
+            _aimRadiusMeters = Math.Clamp(radius, 1d, 5000d);
             unchecked { _aimGeneration++; }
 
-            MainMap.AimOverlayCenter = new PointLatLng(cam.Latitude, cam.Longitude);
+            MainMap.AimOverlayCenter = new PointLatLng(centerLat, centerLng);
             MainMap.AimOverlayRadiusMeters = _aimRadiusMeters;
             MainMap.IsTargetAimMode = true;
             System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
             MainMap.Focus();                 // ESC 키 수신을 위해 포커스 확보
             MainMap.InvalidateVisual();
 
-            SetAimStatus($"특정 위치 확인 — 반경 {_aimRadiusMeters:F0}m 안을 클릭하세요. (ESC·영역 밖 클릭 = 취소)");
-            _log?.Info($"[CameraAim] 타겟 모드 진입 cam={cam.Id} R={_aimRadiusMeters:F0}m");
+            SetAimStatus($"특정 위치 확인 — 탐지범위 {_aimRadiusMeters:F0}m 안을 클릭하세요. (ESC·영역 밖 클릭 = 취소)");
+            _log?.Info($"[CameraAim] 타겟 모드 진입 cam={cam.Id} R={_aimRadiusMeters:F0}m (DetectionRange)");
         }
         catch (Exception ex)
         {
@@ -4756,14 +4760,14 @@ public class MapViewModel : BasePanelViewModel,
                     if (cameraModel != null
                         && cameraModel.Category == Ironwall.Dotnet.Libraries.Enums.EnumCameraType.PTZ)
                     {
-                        var aimCam = cameraModel;   // 항목 시점 로컬 복사(stale 캡처 방지)
+                        var aimMarker = pidsMarker as GMapPidsMarker;   // concrete(런타임 PIDS 마커) — 반경=마커 DetectionRange
                         var aimItem = new MenuItem
                         {
                             Header = "특정 위치 확인",
                             Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.CrosshairsGps, Width = 16, Height = 16 }
                         };
                         // 동기 위임 — EnterTargetAimMode는 비동기 없음(async void 함정 회피)
-                        aimItem.Click += (s, e) => EnterTargetAimMode(aimCam);
+                        aimItem.Click += (s, e) => { if (aimMarker != null) EnterTargetAimMode(aimMarker); };
                         menu.Items.Add(aimItem);
                     }
                 }

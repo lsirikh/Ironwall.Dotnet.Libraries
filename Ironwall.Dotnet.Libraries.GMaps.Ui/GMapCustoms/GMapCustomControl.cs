@@ -1873,23 +1873,24 @@ public class GMapCustomControl : GMapControl
         }
     }
 
-    // 타겟 반경 오버레이 브러시/펜(정적 frozen — 렌더마다 재할당 회피)
-    private static readonly Brush _aimFillBrush = CreateFrozenBrush(Color.FromArgb(40, 0, 200, 255));
-    private static readonly Pen _aimEdgePen = CreateFrozenPen(Color.FromArgb(200, 0, 200, 255), 2d);
-    private static readonly Pen _aimCrossPen = CreateFrozenPen(Color.FromArgb(220, 0, 200, 255), 1.5d);
-
-    private static Brush CreateFrozenBrush(Color c)
-    {
-        var b = new SolidColorBrush(c);
-        b.Freeze();
-        return b;
-    }
+    // 타겟 반경 오버레이 — 흰색 점선 외곽(채움 없음). 정적 frozen — 렌더마다 재할당 회피.
+    private static readonly Pen _aimEdgePen = CreateDashedPen(Colors.White, 2d);
+    private static readonly Pen _aimCrossPen = CreateFrozenPen(Color.FromArgb(220, 255, 255, 255), 1.5d);
 
     private static Pen CreateFrozenPen(Color c, double thickness)
     {
         var br = new SolidColorBrush(c);
         br.Freeze();
         var p = new Pen(br, thickness);
+        p.Freeze();
+        return p;
+    }
+
+    private static Pen CreateDashedPen(Color c, double thickness)
+    {
+        var br = new SolidColorBrush(c);
+        br.Freeze();
+        var p = new Pen(br, thickness) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
         p.Freeze();
         return p;
     }
@@ -1908,7 +1909,7 @@ public class GMapCustomControl : GMapControl
             if (rPx <= 0d || double.IsNaN(rPx) || double.IsInfinity(rPx)) return;   // 변환 실패 시 미표시
 
             var centerPt = new Point(cPx.X, cPx.Y);
-            drawingContext.DrawEllipse(_aimFillBrush, _aimEdgePen, centerPt, rPx, rPx);
+            drawingContext.DrawEllipse(null, _aimEdgePen, centerPt, rPx, rPx);   // 채움 없음 — 흰 점선 외곽만
 
             const double cross = 7d;   // 중심 십자 반길이(px)
             drawingContext.DrawLine(_aimCrossPen, new Point(centerPt.X - cross, centerPt.Y), new Point(centerPt.X + cross, centerPt.Y));
