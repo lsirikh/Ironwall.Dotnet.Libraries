@@ -47,6 +47,10 @@ public interface IAccountApiService
     // ── 관리 화면용 조회 (FR-19, 후속 GOP-05 UI) ──
     /// <summary>GET /api/user-groups — 그룹 목록(권한 nested {modules,device_groups}).</summary>
     Task<ApiListResponse<UserGroupDto>> GetUserGroupsAsync(CancellationToken ct = default);
+    /// <summary>POST /api/user-groups/{id}/permissions — 그룹 권한(모듈×동작) 수정(ADMIN 전용, PRD-GOP-01 IMPL-06/서버 v5.0).
+    /// 일반 PUT 은 권한상승 방지로 permissions 차단 → 이 전용 경로로만 변경. 기본구현=미지원(테스트 스텁 무수정 목적).</summary>
+    Task<ApiResponse<UserGroupDto>> UpdateGroupPermissionsAsync(int groupId, PermissionsDto permissions, CancellationToken ct = default)
+        => throw new NotImplementedException();
     /// <summary>GET /api/user-sessions — 세션 목록(ADMIN).</summary>
     Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default);
     /// <summary>DELETE /api/user-sessions/{session_id} — 세션 강제 로그아웃(ADMIN).

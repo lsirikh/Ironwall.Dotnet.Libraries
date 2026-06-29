@@ -214,6 +214,16 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiListResponse<UserGroupDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    public async Task<ApiResponse<UserGroupDto>> UpdateGroupPermissionsAsync(int groupId, PermissionsDto permissions, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PostRequestAsync($"user-groups/{groupId}/permissions", permissions).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<UserGroupDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<UserGroupDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default)
     {
         try

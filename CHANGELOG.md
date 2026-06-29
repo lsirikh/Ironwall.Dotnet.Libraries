@@ -14,6 +14,11 @@
 
 ## [Unreleased]
 
+### Added
+- **권한 그룹 편집저장 (PRD-GOP-01 IMPL-06) — 서버 권한수정 API 신설 + 클라 매트릭스 편집** (라이브러리 + 서버 `api-test-server`)
+  - **서버**: 신규 `POST /api/user-groups/{id}/permissions`(ADMIN 전용 `require_admin`). 일반 PUT이 권한상승 방지로 `permissions`를 차단(v4.8 Phase 12-7a)하던 것을 ADMIN 전용 경로로 재개. `PermissionsSchema` strict 검증(미정의 모듈/verb→422) + `PERMISSION_CHANGED` 감사(append-only). pytest 3종(200/404/422)·라이브 E2E(admin 저장·422·404·audit) 통과. swagger=route docstring(원천), 도커 이미지 재빌드+컨테이너 재기동. 안전점 `pre-perm-edit-endpoint`.
+  - **클라**: `IAccountApiService.UpdateGroupPermissionsAsync`(기본 인터페이스 구현=테스트 스텁 무영향) + `AccountApiService` POST 호출. `PermissionMatrixPanel` 상세 매트릭스 편집가능화(체크박스 `OneWay→TwoWay`, `ModulePermRowViewModel`→`PropertyChangedBase`) + [저장] 버튼 활성·`OnClickSave`(Modules→`PermissionsDto`, device_groups 보존, 성공 시 재조회·목록복귀). 빌드0·Accounts.Api 62/62. 안전점 `before-perm-edit-save`.
+
 ### Fixed
 - **카메라 팝업 3종 수정** (Track B · 커밋 `4900093`/`58b3fd7`/`5edbfb1`)
   - **66번 영상 프리즈**: Hub 플레이어(`CameraStreamEntry`)가 오디오 미차단 → 오디오 포함 스트림(`…/video1+audio1`)만 vmem 비디오 콜백 stall로 정지. `media.AddOption(":no-audio")`로 해결(비디오 전용 스트림 무영향). VLC `--no-audio` 캡처로 카메라 스트림 라이브 확인.

@@ -60,7 +60,7 @@
 				Grid.Row="2"
 				Margin="0,8,0,0"
 				Style="{StaticResource PanelFieldLabel}"
-				Text="※ 그룹을 더블클릭하면 전체 권한(모듈 × 동작)을 볼 수 있습니다. 그룹 추가/삭제·편집저장은 서버 v5.0 후속." />
+				Text="※ 그룹을 더블클릭하면 전체 권한(모듈 × 동작)을 보고 편집·저장할 수 있습니다 (ADMIN). 그룹 추가/삭제는 서버 v5.0 후속." />
 		</Grid>
 
 		<!--  ② 그룹 상세 (모듈 × 동작 매트릭스)  -->
@@ -101,10 +101,8 @@
 							<DataTemplate>
 								<CheckBox
 									HorizontalAlignment="Center"
-									Focusable="False"
-									IsChecked="{Binding View, Mode=OneWay}"
-									IsEnabled="{Binding ViewEnabled}"
-									IsHitTestVisible="False" />
+									IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+									IsEnabled="{Binding ViewEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
@@ -113,10 +111,8 @@
 							<DataTemplate>
 								<CheckBox
 									HorizontalAlignment="Center"
-									Focusable="False"
-									IsChecked="{Binding Edit, Mode=OneWay}"
-									IsEnabled="{Binding EditEnabled}"
-									IsHitTestVisible="False" />
+									IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+									IsEnabled="{Binding EditEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
@@ -125,10 +121,8 @@
 							<DataTemplate>
 								<CheckBox
 									HorizontalAlignment="Center"
-									Focusable="False"
-									IsChecked="{Binding Delete, Mode=OneWay}"
-									IsEnabled="{Binding DeleteEnabled}"
-									IsHitTestVisible="False" />
+									IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+									IsEnabled="{Binding DeleteEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
@@ -137,10 +131,8 @@
 							<DataTemplate>
 								<CheckBox
 									HorizontalAlignment="Center"
-									Focusable="False"
-									IsChecked="{Binding Control, Mode=OneWay}"
-									IsEnabled="{Binding ControlEnabled}"
-									IsHitTestVisible="False" />
+									IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+									IsEnabled="{Binding ControlEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
@@ -150,15 +142,16 @@
 			<DockPanel Grid.Row="2" Margin="0,8,0,0">
 				<Button
 					Width="110"
+					cal:Message.Attach="[Event Click] = [Action OnClickSave()]"
 					DockPanel.Dock="Right"
-					Content="저장 🔒"
-					IsEnabled="False"
+					Content="저장"
+					IsEnabled="{Binding CanSave}"
 					Style="{StaticResource ModernSecondaryButton}"
-					ToolTip="서버 v5.0 권한수정 API 후 활성화" />
+					ToolTip="이 그룹의 권한(모듈×동작)을 저장합니다 (ADMIN)" />
 				<TextBlock
 					VerticalAlignment="Center"
 					Style="{StaticResource PanelFieldLabel}"
-					Text="※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 조회 전용 — 편집저장은 서버 v5.0 후속." />
+					Text="※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 체크 후 [저장]을 누르면 그룹 권한이 반영됩니다 (ADMIN)." />
 			</DockPanel>
 		</Grid>
 	</Grid>

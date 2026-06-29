@@ -18,7 +18,8 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
    Notes        : 사용자 피드백 — 플랫 (그룹×모듈) 리스트 폐기. (1)그룹당 1행 요약(조회N·편집N…),
                   (2)더블클릭 → 그 그룹 전체 권한 페이지(8모듈×4동작 체크박스, 현재상태 표시).
                   마스터-디테일은 IsListView/IsDetailView 토글(서브 Conductor 없이 Visibility 스왑).
-                  IAccountApiService 직접 주입(GOP 모드). ⚠ 조회 전용 — 편집저장/그룹 CRUD는 서버 v5.0 후속.
+                  IAccountApiService 직접 주입(GOP 모드).
+                  ★ IMPL-06: 체크 → [저장] → POST /user-groups/{id}/permissions(ADMIN) 로 편집저장(서버 v5.0).
 ****************************************************************************/
 public class PermissionMatrixPanelViewModel : BasePanelViewModel
 {
@@ -45,7 +46,13 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
     public bool IsDetailView
     {
         get => _isDetailView;
-        set { _isDetailView = value; NotifyOfPropertyChange(() => IsDetailView); NotifyOfPropertyChange(() => IsListView); }
+        set
+        {
+            _isDetailView = value;
+            NotifyOfPropertyChange(() => IsDetailView);
+            NotifyOfPropertyChange(() => IsListView);
+            NotifyOfPropertyChange(() => CanSave);
+        }
     }
     public bool IsListView => !_isDetailView;
 
@@ -55,6 +62,19 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
         get => _detailGroupName;
         set { _detailGroupName = value; NotifyOfPropertyChange(() => DetailGroupName); }
     }
+
+    // 상세 화면에서 편집 중인 그룹 식별/보존(저장 시 사용)
+    private int _detailGroupId;
+    private List<int>? _detailDeviceGroups;
+
+    private bool _isSaving;
+    public bool IsSaving
+    {
+        get => _isSaving;
+        set { _isSaving = value; NotifyOfPropertyChange(() => IsSaving); NotifyOfPropertyChange(() => CanSave); }
+    }
+    /// <summary>[저장] 활성 조건 — 상세 화면 + 저장 중 아님.</summary>
+    public bool CanSave => IsDetailView && !_isSaving;
     #endregion
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -74,6 +94,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
 
         var g = _raw.FirstOrDefault(x => x.Id == row.GroupId);
         var mods = g?.Permissions?.Modules ?? new Dictionary<string, ModulePermissionDto>();
+        _detailGroupId = row.GroupId;
+        _detailDeviceGroups = g?.Permissions?.DeviceGroups;
 
         Modules.Clear();
         foreach (var m in PermissionCatalog.Modules)
@@ -99,6 +121,39 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
     }
 
     public void ClickBackToList() => IsDetailView = false;
+
+    /// <summary>현재 상세 그룹의 권한(모듈×동작)을 서버에 저장(ADMIN). POST /user-groups/{id}/permissions.
+    /// 성공 시 목록을 재조회(요약 카운트 반영)하며 목록 화면으로 복귀한다. 실패 시 사유 안내.</summary>
+    public async Task OnClickSave()
+    {
+        if (_detailGroupId <= 0) return;
+        try
+        {
+            IsSaving = true;
+            var dto = new PermissionsDto
+            {
+                DeviceGroups = _detailDeviceGroups,
+                Modules = Modules.ToDictionary(
+                    m => m.ModuleKey,
+                    m => new ModulePermissionDto { View = m.View, Edit = m.Edit, Delete = m.Delete, Control = m.Control }),
+            };
+
+            var res = await _api.UpdateGroupPermissionsAsync(_detailGroupId, dto);
+            if (res.Success)
+            {
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "권한 설정", Explain = $"'{DetailGroupName}' 그룹의 권한을 저장했습니다." });
+                await ReloadAsync(CancellationToken.None);   // 목록 갱신(요약 카운트 반영, 상세→목록 복귀)
+            }
+            else
+            {
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "권한 설정", Explain = $"저장 실패: {res.Error?.Message ?? res.Message}" });
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[Permission] 권한 저장 실패: {ex.Message}"); }
+        finally { IsSaving = false; }
+    }
 
     /// <summary>그룹 추가 — 서버 v5.0 권한관리 API 후 활성화(현재 GOP 서버가 그룹 CRUD 미지원).</summary>
     public async Task OnClickAddGroup()
