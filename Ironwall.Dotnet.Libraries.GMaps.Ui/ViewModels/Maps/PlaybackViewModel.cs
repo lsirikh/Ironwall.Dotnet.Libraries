@@ -65,6 +65,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         StopCommand = new RelayCommand(_ => _engine.Stop());
         SpeedCommand = new RelayCommand(p => SetSpeed(p));
         FocusCommand = new RelayCommand(p => Focus(p as PlaybackTrackItem));
+        JumpToSessionCommand = new RelayCommand(p => JumpToSession(p as PlaybackTrackItem));
         CloseCommand = new RelayCommand(_ => Close());
     }
 
@@ -152,6 +153,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     public ICommand StopCommand { get; }
     public ICommand SpeedCommand { get; }          // 파라미터: 배속(string)
     public ICommand FocusCommand { get; }
+    public ICommand JumpToSessionCommand { get; }
     public ICommand CloseCommand { get; }
     #endregion
 
@@ -230,6 +232,7 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
                     Label = last.Label ?? "",
                     ThreatLevel = last.ThreatLevel ?? "",
                     Start = seg[0].ObservedAt.ToLocalTime(),
+                    StartUtc = seg[0].ObservedAt,   // 시크용(엔진 observed_at 도메인과 동일)
                     End = last.ObservedAt.ToLocalTime(),
                     Count = count,
                     Latitude = last.Latitude,       // 세션 대표 좌표(마지막 관측) — 따라보기 센터링용
@@ -285,6 +288,16 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         FocusRequested?.Invoke(item.Latitude, item.Longitude);
     }
 
+    /// <summary>세션 행 더블클릭 — 그 세션 시작 시각으로 시크 + 지도 센터링 + 재생 시작.</summary>
+    private void JumpToSession(PlaybackTrackItem? item)
+    {
+        if (item is null || !HasData) return;
+        _engine.SeekTo(item.StartUtc);                          // observed_at 도메인 직접 시크(Frame→슬라이더/라벨 갱신)
+        FocusRequested?.Invoke(item.Latitude, item.Longitude);  // 지도 센터링
+        _engine.Play();
+        IsPlaying = _engine.IsPlaying;
+    }
+
     private void OnFrame()
     {
         DispatcherService.Invoke(() =>
@@ -321,6 +334,8 @@ public sealed class PlaybackTrackItem : PropertyChangedBase
     public string Label { get; set; } = string.Empty;
     public string ThreatLevel { get; set; } = string.Empty;
     public DateTime Start { get; set; }
+    /// <summary>세션 시작 시각(UTC observed_at 도메인) — 더블클릭 시크용.</summary>
+    public DateTime StartUtc { get; set; }
     public DateTime End { get; set; }
     public int Count { get; set; }
     /// <summary>세션 대표 좌표(따라보기 센터링용).</summary>
@@ -361,10 +376,10 @@ public sealed class PlaybackTrackItem : PropertyChangedBase
         _ => string.IsNullOrWhiteSpace(ThreatLevel) ? "일반" : ThreatLevel,
     };
 
-    /// <summary>탐지 시간 시작~끝. DataGrid "시작~끝" 컬럼.</summary>
+    /// <summary>탐지 시간 시작~끝. DataGrid "시작~끝" 컬럼. 같은 날이면 날짜 생략(폭 절약).</summary>
     public string TimeRange => Start.Date == End.Date
-        ? $"{Start:MM-dd HH:mm:ss} ~ {End:HH:mm:ss}"
-        : $"{Start:MM-dd HH:mm:ss} ~ {End:MM-dd HH:mm:ss}";
+        ? $"{Start:HH:mm:ss} ~ {End:HH:mm:ss}"
+        : $"{Start:MM-dd HH:mm} ~ {End:MM-dd HH:mm}";
 
     public string Span => $"{Start:HH:mm:ss}–{End:HH:mm:ss} · {Count}pt";
 

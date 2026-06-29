@@ -228,7 +228,7 @@
                             <!--  탭 패널 ([PTZ][프리셋][옵션]) — 우버튼 짧은클릭 토글. 영상 영역(*)이 줄고 패널이 아래에 펼쳐짐  -->
                             <Border
                                 Grid.Row="2"
-                                Height="230"
+                                Height="200"
                                 Background="#FF131922"
                                 BorderBrush="{StaticResource BorderGrayBrush}"
                                 BorderThickness="0,1,0,0"

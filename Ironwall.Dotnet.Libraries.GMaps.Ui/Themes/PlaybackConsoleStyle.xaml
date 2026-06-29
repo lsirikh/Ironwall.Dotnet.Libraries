@@ -138,13 +138,19 @@
 	<Style x:Key="PbColHeader" TargetType="DataGridColumnHeader">
 		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
 		<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-		<Setter Property="FontSize" Value="10.5" />
+		<Setter Property="FontSize" Value="11" />
 		<Setter Property="FontWeight" Value="SemiBold" />
-		<Setter Property="Padding" Value="6,5" />
-		<Setter Property="HorizontalContentAlignment" Value="Left" />
-		<Setter Property="SeparatorBrush" Value="{DynamicResource BorderBrush}" />
-		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-		<Setter Property="BorderThickness" Value="0,0,0,1" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="DataGridColumnHeader">
+					<Border Background="{TemplateBinding Background}" Padding="8,0"
+						BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,1">
+						<ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left"
+							TextElement.Foreground="{DynamicResource TextSecondaryBrush}" />
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
 	</Style>
 
 	<Style x:Key="PbCell" TargetType="DataGridCell">
@@ -191,7 +197,7 @@
 		<Setter Property="SelectionMode" Value="Single" />
 		<Setter Property="SelectionUnit" Value="FullRow" />
 		<Setter Property="RowHeaderWidth" Value="0" />
-		<Setter Property="ColumnHeaderHeight" Value="26" />
+		<Setter Property="ColumnHeaderHeight" Value="38" />
 		<Setter Property="RowHeight" Value="30" />
 		<Setter Property="ColumnHeaderStyle" Value="{StaticResource PbColHeader}" />
 		<Setter Property="CellStyle" Value="{StaticResource PbCell}" />
@@ -368,11 +374,16 @@
 
 								<!-- ② 이벤트 -->
 								<StackPanel Margin="12,8">
-																		<TextBlock Style="{StaticResource PbSectionLabel}" Text="② 탐지 세션 — 표시 토글 · 따라보기 · 헤더 클릭=정렬" />
+																		<TextBlock Style="{StaticResource PbSectionLabel}" Text="② 탐지 세션 — 더블클릭=그 시각 재생 · ⌖ 위치보기 · 헤더 클릭=정렬" />
 									<Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Height="250">
 										<DataGrid Style="{StaticResource PbDataGrid}" ItemsSource="{Binding Events}">
+											<DataGrid.InputBindings>
+												<MouseBinding MouseAction="LeftDoubleClick"
+													Command="{Binding JumpToSessionCommand}"
+													CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+											</DataGrid.InputBindings>
 											<DataGrid.Columns>
-												<DataGridTemplateColumn Header="표시" Width="36">
+												<DataGridTemplateColumn Header="표시" Width="54">
 													<DataGridTemplateColumn.CellTemplate>
 														<DataTemplate>
 															<CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
