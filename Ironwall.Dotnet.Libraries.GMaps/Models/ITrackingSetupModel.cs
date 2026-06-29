@@ -45,4 +45,7 @@ public interface ITrackingSetupModel
 
     /// <summary>Playback 데이터 소스 — 로컬 DB / 서버 API 토글(기본 Local). FetchAsync마다 selector가 읽어 라이브 전환.</summary>
     EnumTrackDataSource DataSource { get; set; }
+
+    /// <summary>카메라 "특정 위치 확인" 타겟 모드의 반경(m). 클릭 유효 영역 + 화면 원 크기. 기본 30.</summary>
+    double CameraAimRadiusMeters { get; set; }
 }

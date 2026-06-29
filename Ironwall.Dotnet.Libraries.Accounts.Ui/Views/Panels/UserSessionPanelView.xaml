@@ -49,6 +49,7 @@
 						<DataTemplate>
 							<Button
 								HorizontalAlignment="Left"
+								VerticalAlignment="Center"
 								IsEnabled="{Binding IsActive}"
 								Style="{StaticResource ModernToolbarButton}"
 								ToolTip="강제 로그아웃">

@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;   // IPermissionService (FR-EN-06 권한 게이팅)
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -18,6 +19,7 @@ using GMap.NET.MapProviders.Custom;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Libraries.Streaming.Base.Hub;
@@ -100,6 +102,8 @@ public class MapViewModel : BasePanelViewModel,
                         , SymbolEventManager symbolEventManager
                         , IDeviceDetailUrlService deviceDetailUrlService
                         , IBroadcastControlService broadcastControlService
+                        , ICameraAimControlService cameraAimControlService
+                        , ITrackingSetupModel trackingSetupModel
                         , IGMapDbService gMapDbService
                         , CustomMapOverlayService customMapOverlayService
                         , IImageFileService imageFileService
@@ -121,6 +125,8 @@ public class MapViewModel : BasePanelViewModel,
         _symbolEventManager = symbolEventManager;
         _deviceDetailUrlService = deviceDetailUrlService;
         _broadcastControlService = broadcastControlService;
+        _cameraAimControlService = cameraAimControlService;
+        _trackingSetupModel = trackingSetupModel;
         _customMapOverlayService = customMapOverlayService;
         _imageFileService = imageFileService;
         _trackingOverlay = trackingOverlay;
@@ -175,6 +181,9 @@ public class MapViewModel : BasePanelViewModel,
         try
         {
             await base.OnActivateAsync(cancellationToken);
+
+            // FR-EN-11: 역할강등/세션변경 시 PTZ 권한 재평가 구독(진행 중 이동 취소·팝업 비활성)
+            SubscribePtzPermission();
 
             // 1. 저장된 커스텀 맵들 로드
             await _customMapService.LoadCustomMapsAsync();
@@ -246,6 +255,8 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
+
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
             // Adorner 시스템 정리
@@ -399,6 +410,8 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnImageEditCompleted += OnMapImageEditCompleted;     // FR-8 편집 완료 DB 영속화
             MainMap.DigitalZoomLevelChanged += OnMapDigitalZoomLevelChanged; // 디지털 줌 → 축척바 갱신
             MainMap.OnMapClicked += OnMapClicked;
+            MainMap.TargetAimClicked += OnTargetAimClicked;                  // 카메라 특정위치 확인 — 좌클릭 좌표 수신
+            MainMap.PreviewKeyDown += OnMapPreviewKeyDownForAim;             // ESC 취소
 
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
             // AdornerManager 이벤트 구독
@@ -430,6 +443,9 @@ public class MapViewModel : BasePanelViewModel,
 
         try
         {
+            // 타겟 조준 모드가 켜진 채 뷰가 비활성화되면 전역 커서(Cursors.Cross)·오버레이가 잔존 → 강제 종료(H1)
+            ExitTargetAimMode();
+
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
@@ -440,6 +456,8 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnImageEditCompleted -= OnMapImageEditCompleted;
             MainMap.DigitalZoomLevelChanged -= OnMapDigitalZoomLevelChanged;
             MainMap.OnMapClicked -= OnMapClicked;
+            MainMap.TargetAimClicked -= OnTargetAimClicked;
+            MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForAim;
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
             MainMap.MarkerEditCancelled -= OnMarkerEditCancelled;
@@ -456,6 +474,194 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Error($"Adorner 시스템 정리 실패: {ex.Message}");
         }
     }
+    #endregion
+
+    #region - 카메라 특정위치 확인 (타겟 조준 모드, Camera_PTZ_AimLocation) -
+
+    private string _aimStatusMessage = string.Empty;
+    /// <summary>타겟 조준 모드 상태 배너 텍스트.</summary>
+    public string AimStatusMessage
+    {
+        get => _aimStatusMessage;
+        set { _aimStatusMessage = value; NotifyOfPropertyChange(nameof(AimStatusMessage)); }
+    }
+
+    private bool _isAimStatusVisible;
+    /// <summary>타겟 조준 모드 상태 배너 표시 여부.</summary>
+    public bool IsAimStatusVisible
+    {
+        get => _isAimStatusVisible;
+        set { _isAimStatusVisible = value; NotifyOfPropertyChange(nameof(IsAimStatusVisible)); }
+    }
+
+    /// <summary>타겟 조준 모드 진입 — 컨텍스트 메뉴 "특정 위치 확인" 클릭(동기, async 없음 — async void 함정 회피).</summary>
+    private void EnterTargetAimMode(ICameraDeviceModel cam)
+    {
+        try
+        {
+            if (MainMap == null || cam == null) return;
+
+            // 설치 좌표 유효성 — NaN/범위초과 + 미설정(0,0) 거부(M1: 좌표 미입력 카메라는 (0,0) 기본값)
+            if (!Services.Tracking.TrackingMath.IsValidLatLng(cam.Latitude, cam.Longitude)
+                || (Math.Abs(cam.Latitude) < 1e-6 && Math.Abs(cam.Longitude) < 1e-6))
+            {
+                SetAimStatus("카메라 설치 좌표가 없어 '특정 위치 확인'을 사용할 수 없습니다.", autoHide: true);
+                return;
+            }
+
+            // 모드 상호배제 — 라인드로잉/편집 강제 종료(한 번에 하나의 맵 인터랙션 모드)
+            CancelConflictingModesForAim();
+
+            _aimCamera = cam;
+            double radius = _trackingSetupModel?.CameraAimRadiusMeters ?? 30d;
+            if (radius <= 0d) radius = 30d;
+            _aimRadiusMeters = Math.Clamp(radius, 1d, 500d);   // 상한 가드(L4: 설정 오기입 방지)
+            unchecked { _aimGeneration++; }
+
+            MainMap.AimOverlayCenter = new PointLatLng(cam.Latitude, cam.Longitude);
+            MainMap.AimOverlayRadiusMeters = _aimRadiusMeters;
+            MainMap.IsTargetAimMode = true;
+            System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
+            MainMap.Focus();                 // ESC 키 수신을 위해 포커스 확보
+            MainMap.InvalidateVisual();
+
+            SetAimStatus($"특정 위치 확인 — 반경 {_aimRadiusMeters:F0}m 안을 클릭하세요. (ESC·영역 밖 클릭 = 취소)");
+            _log?.Info($"[CameraAim] 타겟 모드 진입 cam={cam.Id} R={_aimRadiusMeters:F0}m");
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[CameraAim] 모드 진입 실패: {ex.Message}");
+            ExitTargetAimMode();
+        }
+    }
+
+    /// <summary>타겟 조준 모드 종료(취소/완료 공통) — 커서·오버레이·세션 정리.</summary>
+    private void ExitTargetAimMode()
+    {
+        try
+        {
+            unchecked { _aimGeneration++; }
+            _aimCamera = null;
+            if (MainMap != null)
+            {
+                MainMap.IsTargetAimMode = false;
+                MainMap.AimOverlayCenter = null;
+                MainMap.AimOverlayRadiusMeters = 0d;
+                MainMap.InvalidateVisual();
+            }
+            if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
+                System.Windows.Input.Mouse.OverrideCursor = null;
+            IsAimStatusVisible = false;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[CameraAim] 모드 종료 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>타겟 모드 진입 시 충돌 모드(라인드로잉) 종료. (편집 모드 좌클릭은 타겟 분기가 선점)</summary>
+    private void CancelConflictingModesForAim()
+    {
+        try
+        {
+            if (MainMap?.IsLineDrawing == true)
+                _ = MainMap.LineDrawingService?.CancelDrawingAsync();
+            // 편집 모드 종료 — 세터가 SetEditMode(false)+ClearAllSelections 수행, 편집 단축키/어도너 상호배제(M5)
+            if (IsEditModeEnabled)
+                IsEditModeEnabled = false;
+        }
+        catch (Exception ex) { _log?.Warning($"[CameraAim] 충돌 모드 종료 경고: {ex.Message}"); }
+    }
+
+    /// <summary>타겟 모드 좌클릭 수신 — 반경 판정 → 이내=발행 / 밖=취소(사용자 결정).</summary>
+    private void OnTargetAimClicked(PointLatLng geo, Point screen)
+    {
+        if (MainMap == null || !MainMap.IsTargetAimMode) return;     // 방어
+        var cam = _aimCamera;
+        if (cam == null) { ExitTargetAimMode(); return; }
+
+        bool inside = Services.Tracking.CameraAimMath
+            .IsWithinRadius(cam.Latitude, cam.Longitude, geo.Lat, geo.Lng, _aimRadiusMeters);
+
+        if (!inside)
+        {
+            _log?.Info($"[CameraAim] 반경({_aimRadiusMeters:F0}m) 밖 클릭 → 취소");
+            ExitTargetAimMode();
+            SetAimStatus("반경 밖을 클릭하여 취소했습니다.", autoHide: true);
+            return;
+        }
+
+        var body = Services.Tracking.CameraAimRequestBuilder
+            .Build(cam.Id, cam.Latitude, cam.Longitude, geo.Lat, geo.Lng, Environment.UserName);
+        if (body == null)
+        {
+            ExitTargetAimMode();
+            SetAimStatus("좌표가 유효하지 않아 요청을 보낼 수 없습니다.", autoHide: true);
+            return;
+        }
+
+        // 모드 즉시 종료(단발성) → 종료 후 세대 캡처. 발행 완료 시 그 사이 새 세션 진입했으면 안내 생략(M3)
+        ExitTargetAimMode();
+        _ = HandleTargetAimPublishAsync(body, _aimGeneration);
+    }
+
+    /// <summary>회전요청 발행(내부 예외 격리) — async void 함정 회피용 별도 async 메서드. gen=발행 시점 세대(stale 안내 방지).</summary>
+    private async Task HandleTargetAimPublishAsync(CameraAimLocationBodyDto body, int gen)
+    {
+        try
+        {
+            await _cameraAimControlService.PublishAimAsync(body, _cts?.Token ?? CancellationToken.None)
+                                          .ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                if (gen == _aimGeneration)   // 그 사이 새 타겟 세션이 시작됐으면 새 안내 보존
+                    SetAimStatus($"카메라 {body.CameraId} → 회전요청 전송 ({body.DistanceM:F0}m, {body.BearingDeg:F0}°).", autoHide: true);
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[CameraAim] 발행 처리 실패: {ex.Message}");
+            await OnUiAsync(() =>
+            {
+                if (gen == _aimGeneration)
+                    SetAimStatus("회전요청 전송에 실패했습니다.", autoHide: true);
+            });
+        }
+    }
+
+    /// <summary>ESC = 타겟 모드 취소.</summary>
+    private void OnMapPreviewKeyDownForAim(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Escape && (MainMap?.IsTargetAimMode ?? false))
+        {
+            ExitTargetAimMode();
+            SetAimStatus("취소했습니다.", autoHide: true);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>타겟 모드 상태 안내(상단 배너 + 로그). autoHide=true면 2.5초 후 숨김(세대 유지 시).</summary>
+    private void SetAimStatus(string message, bool autoHide = false)
+    {
+        AimStatusMessage = message;
+        IsAimStatusVisible = true;
+        _log?.Info($"[CameraAim] {message}");
+        if (!autoHide) return;
+
+        var gen = _aimGeneration;
+        _ = Task.Delay(2500).ContinueWith(_ =>
+        {
+            try
+            {
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+                {
+                    if (gen == _aimGeneration) IsAimStatusVisible = false;
+                });
+            }
+            catch { /* 종료 중 Dispatcher 없음 — 무시 */ }
+        });
+    }
+
     #endregion
 
     #region - GMapCustomControl 이벤트 핸들러 -
@@ -652,6 +858,62 @@ public class MapViewModel : BasePanelViewModel,
         return _ptzController;
     }
 
+    // ── 권한 게이팅(FR-EN-06) ── IPermissionService도 IPtzController처럼 IoC lazy 해석.
+    //    GMaps.Ui→Accounts.Api 참조 추가됨(순환 없음). 미등록(DB Auth/오프라인/테스트) 시 null → 전체허용 폴백(V-EN-11).
+    private IPermissionService? _permissionService;
+    private bool _permissionResolved;
+    private IPermissionService? ResolvePermissionService()
+    {
+        if (_permissionResolved) return _permissionService;
+        _permissionResolved = true;
+        try { _permissionService = IoC.Get<IPermissionService>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] PermissionService 미해석(권한 게이팅 전체허용 폴백): {ex.Message}");
+            _permissionService = null;
+        }
+        return _permissionService;
+    }
+
+    /// <summary>카메라 제어 권한(cam:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "cameras" 고정. (FR-EN-06)</summary>
+    private bool CanControlCamera() => ResolvePermissionService()?.CanControl("cameras") ?? true;
+
+    /// <summary>방송 발행 권한(broadcast:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "broadcast" 고정. (FR-EN-07)</summary>
+    private bool CanBroadcast() => ResolvePermissionService()?.CanControl("broadcast") ?? true;
+
+    /// <summary>상황도 편집 권한(map:edit). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "map" 고정. (FR-EN-08)</summary>
+    private bool CanEditMap() => ResolvePermissionService()?.CanEdit("map") ?? true;
+
+    // FR-EN-11: 역할강등 즉시 재평가 — 권한 상실 시 진행 중 PTZ 이동(연속이동) 취소 + 열린 팝업 PTZ 비활성.
+    private bool _ptzPermSubscribed;
+    private void SubscribePtzPermission()
+    {
+        if (_ptzPermSubscribed) return;
+        var perm = ResolvePermissionService();
+        if (perm == null) return;
+        perm.PermissionsChanged += OnPtzPermissionsChanged;
+        _ptzPermSubscribed = true;
+    }
+    private void UnsubscribePtzPermission()
+    {
+        if (!_ptzPermSubscribed) return;
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged -= OnPtzPermissionsChanged;
+        _ptzPermSubscribed = false;
+    }
+    /// <summary>PermissionsChanged 콜백(NATS 배경스레드 가능). 권한 상실 시 진행 중 제스처 취소 + 팝업 IsPtzCapable 비활성.</summary>
+    private void OnPtzPermissionsChanged()
+    {
+        var canCtrl = CanControlCamera();
+        if (!canCtrl)
+            foreach (var cts in _ptzGestureCts.Values) { try { cts.Cancel(); } catch { /* 이미 종료 */ } }
+        _ = OnUiAsync(() =>
+        {
+            if (_cameraPopups == null) return;
+            foreach (var vm in _cameraPopups) vm.IsPtzCapable = vm.IsPtzCapable && canCtrl;   // 권한 상실→비활성(복구는 팝업 재오픈)
+        });
+    }
+
     /// <summary>팝업 오픈 시 ONVIF PTZ 준비(InitializeFull + GetNode space) → IsPtzCapable 설정(게이팅 진실원). (FR-GATE-01)</summary>
     private async Task EnsurePtzReadyAsync(CameraStreamPopupViewModel vm, ICameraDeviceModel cam)
     {
@@ -674,7 +936,7 @@ public class MapViewModel : BasePanelViewModel,
             };
             _log?.Info($"[CameraPopup] PTZ 준비 시도 cam={vm.CameraId} {cam.IpAddress}:{conn.PortOnvif}");
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
-            await OnUiAsync(() => { vm.IsPtzCapable = ok; vm.IsImagingCapable = ptz.IsImagingCapable(vm.CameraId); vm.IsPtzLoading = false; }).ConfigureAwait(false);
+            await OnUiAsync(() => { vm.IsPtzCapable = ok && CanControlCamera(); vm.IsImagingCapable = ptz.IsImagingCapable(vm.CameraId); vm.IsPtzLoading = false; }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} capable={ok} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
         }
         catch (Exception ex)
@@ -708,7 +970,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPtzDragRequested(object? sender, PtzDragEventArgs e)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzDragAsync(vm, e);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePtzDragAsync(vm, e);   // cam:control 게이팅 (FR-EN-06)
     }
 
     /// <summary>좌버튼 드래그 릴리즈 → 드래그 방향으로 ContinuousMove, 길이 비례 시간 후 Stop. FOV(부채꼴)는 NVR→NATS가 갱신. (FR-DRAG-03)</summary>
@@ -744,6 +1006,7 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
         if (ptz == null) return;
+        if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06)
         BeginPtzGesture(vm.CameraId);   // 드래그/줌 대기 취소(앞 Stop이 패드 이동 끊지 않게)
         _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0);
     }
@@ -757,7 +1020,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPtzZoom(object? sender, int direction)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzZoomAsync(vm, direction);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePtzZoomAsync(vm, direction);   // cam:control (FR-EN-06)
     }
 
     /// <summary>영상 휠 → 줌 방향 ContinuousMove 펄스 후 Stop. FOV는 NVR→NATS가 갱신. (FR-PTZCTL-03)</summary>
@@ -782,6 +1045,7 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
         if (ptz == null) return;
+        if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06) — 다른 PTZ 핸들러와 동일
         BeginPtzGesture(vm.CameraId);   // 인플라이트 드래그/휠 펄스의 Delay·Stop 취소(새 hold 줌을 끊지 않게)
         _ = ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed);   // 연속 — 뗄 때 StopAsync
     }
@@ -791,10 +1055,10 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz != null) _ = ptz.StartFocusAsync(vm.CameraId, direction);
+        if (ptz != null && CanControlCamera()) _ = ptz.StartFocusAsync(vm.CameraId, direction);   // cam:imaging→잠정 cam:control (FR-EN-06)
     }
 
-    /// <summary>포커스 정지(뗌/캡처분실) → ImagingClient Stop. PTZ StopAsync와 별개 모터 경로. (FR-PH-02/03)</summary>
+    /// <summary>포커스 정지(뗌/캡처분실) → ImagingClient Stop. PTZ StopAsync와 별개 모터 경로. 정지는 항상 허용(권한 무관). (FR-PH-02/03)</summary>
     private void OnCameraPopupFocusStop(object? sender, EventArgs e)
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
@@ -821,7 +1085,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetGoto(object? sender, IPtzPresetModel preset)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetGotoAsync(vm, preset);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetGotoAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
     /// <summary>프리셋 이동 = AbsoluteMove(저장 좌표). FOV(부채꼴)는 NVR→NATS가 갱신. (FR-PRESET-02)</summary>
@@ -839,7 +1103,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetSave(object? sender, string name)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetSaveAsync(vm, name);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetSaveAsync(vm, name);   // cam:control (FR-EN-06)
     }
 
     /// <summary>프리셋 저장 = 현재 위치(GetStatus) 읽어 DB Upsert. 위치 못 읽으면 중단(쓰레기 좌표 금지). (FR-PRESET-03)</summary>
@@ -870,7 +1134,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetDelete(object? sender, IPtzPresetModel preset)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetDeleteAsync(vm, preset);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetDeleteAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
     private async Task HandlePresetDeleteAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
@@ -885,7 +1149,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetHome(object? sender, IPtzPresetModel preset)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetHomeAsync(vm, preset);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetHomeAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
     private async Task HandlePresetHomeAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
@@ -925,7 +1189,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupIrCutFilter(object? sender, string mode)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandleIrCutFilterAsync(vm, mode);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandleIrCutFilterAsync(vm, mode);   // cam:imaging→잠정 cam:control (OQ-PG-04 전, FR-EN-06)
     }
 
     private async Task HandleIrCutFilterAsync(CameraStreamPopupViewModel vm, string mode)
@@ -942,7 +1206,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupAutoFocus(object? sender, bool auto)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandleAutoFocusAsync(vm, auto);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandleAutoFocusAsync(vm, auto);   // cam:imaging→잠정 cam:control (OQ-PG-04 전, FR-EN-06)
     }
 
     private async Task HandleAutoFocusAsync(CameraStreamPopupViewModel vm, bool auto)
@@ -1750,6 +2014,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </remarks>
     private async void ExecuteLoadImageOverlay(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 오버레이 추가 차단"); return; }
         try
         {
             _log?.Info("이미지 오버레이 불러오기 시작");
@@ -1886,6 +2151,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async void ExecuteLoadMapImage(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 맵파일 추가 차단"); return; }
         try
         {
             _log?.Info("커스텀 맵 불러오기 시작");
@@ -1951,6 +2217,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void ExecuteCreateCustomMap(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 커스텀 맵 등록 차단"); return; }
         try
         {
             if (SelectedImage == null) return;
@@ -2377,6 +2644,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async void ExecuteDeleteSelected(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 선택 삭제 차단"); return; }
         try
         {
             if (SelectedImage != null)
@@ -2611,6 +2879,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async void ExecuteAddSelectedSymbol(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 추가 차단"); return; }
         try
         {
             var position = ClickedCurrentPosition.IsEmpty ? MainMap!.CenterPosition : ClickedCurrentPosition;
@@ -3451,6 +3720,7 @@ public class MapViewModel : BasePanelViewModel,
     public async void SetHomePosition()
     {
         if (HomePosition == null) return;
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 홈 위치 저장 차단"); return; }
 
         HomePosition.Position = new CoordinateModel(latitude: ClickedCurrentPosition.Lat, longitude: ClickedCurrentPosition.Lng, altitude: 0);
         HomePosition.Zoom = Zoom;
@@ -3498,6 +3768,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     public async Task AddCustomMarker(PointLatLng position, string title = "CustomMarker")
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — CustomMarker 추가 차단"); return; }
         try
         {
             // 1. SymbolModel 생성
@@ -3536,6 +3807,7 @@ public class MapViewModel : BasePanelViewModel,
 
     public async Task AddGeometricMarker(PointLatLng position, EnumShapeType shapeType, string title = "GeometricMarker")
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — GeometricMarker 추가 차단"); return; }
         try
         {
             // 1. SymbolModel 생성
@@ -4397,6 +4669,21 @@ public class MapViewModel : BasePanelViewModel,
                         }
                     };
                     menu.Items.Add(camItem);
+
+                    // 특정 위치 확인 (PTZ 카메라 전용) — 지도 클릭 좌표로 회전요청 NATS 발행
+                    if (cameraModel != null
+                        && cameraModel.Category == Ironwall.Dotnet.Libraries.Enums.EnumCameraType.PTZ)
+                    {
+                        var aimCam = cameraModel;   // 항목 시점 로컬 복사(stale 캡처 방지)
+                        var aimItem = new MenuItem
+                        {
+                            Header = "특정 위치 확인",
+                            Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.CrosshairsGps, Width = 16, Height = 16 }
+                        };
+                        // 동기 위임 — EnterTargetAimMode는 비동기 없음(async void 함정 회피)
+                        aimItem.Click += (s, e) => EnterTargetAimMode(aimCam);
+                        menu.Items.Add(aimItem);
+                    }
                 }
 
                 // 스피커 방송 제어 (IpSpeaker 전용)
@@ -6763,6 +7050,13 @@ public class MapViewModel : BasePanelViewModel,
     private IBroadcastControlService _broadcastControlService;
     private readonly Dictionary<int, CancellationTokenSource> _broadcastTimers = new();
 
+    // 카메라 "특정 위치 확인" 타겟 조준 모드 (Camera_PTZ_AimLocation)
+    private readonly ICameraAimControlService _cameraAimControlService;
+    private readonly ITrackingSetupModel _trackingSetupModel;
+    private ICameraDeviceModel? _aimCamera;      // 현재 타겟 모드 대상 카메라(UI 스레드 전용)
+    private double _aimRadiusMeters;             // 진입 시 반경 스냅샷(m)
+    private int _aimGeneration;                  // stale-await 가드(취소 시 ++)
+
     // UI 상태 필드
     private string? _scale;
     private ICoordinateModel _currentPosition = new CoordinateModel(37.648425, 126.904284);
@@ -6919,6 +7213,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnRoiRegisterRequested(object? sender, EventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 관심지역 등록 차단"); return; }
         try
         {
             var position = MainMap!.Position;
@@ -6951,6 +7246,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnRoiDeleteRequested(object? sender, MapRoiEventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 관심지역 삭제 차단"); return; }
         try
         {
             _pendingDeleteRoiId = e.Roi.Id;
@@ -6976,6 +7272,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnRoiTitleEdited(object? sender, MapRoiTitleEditedEventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 관심지역 이름 변경 차단"); return; }
         try
         {
             bool updated = await _gMapDbService.UpdateMapRoiTitleAsync(e.Roi.Id, e.NewTitle);
@@ -7067,6 +7364,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnBroadcastPlaySendRequested(object? sender, BroadcastSendEventArgs e)
     {
+        if (!CanBroadcast()) { _log?.Warning("[FR-EN-07] 방송 발행 권한 없음 — 음원 실행 차단"); return; }
         try
         {
             await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat);
@@ -7102,6 +7400,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnTtsSendRequested(object? sender, TtsSendEventArgs e)
     {
+        if (!CanBroadcast()) { _log?.Warning("[FR-EN-07] 방송 발행 권한 없음 — TTS 실행 차단"); return; }
         try
         {
             await _broadcastControlService.PublishTtsAsync(e.LinkedDeviceId, e.Message);
@@ -7374,7 +7673,10 @@ public class MapViewModel : BasePanelViewModel,
             {
                 ApplyLayerVisibility(e.Layer);
             }
-            await _gMapDbService.UpdateMapLayerVisibilityAsync(e.Layer.Id, e.IsVisible);
+            if (CanEditMap())   // FR-PG-11: 로컬 렌더는 허용, DB 영속만 권한 필요 (FR-EN-08)
+                await _gMapDbService.UpdateMapLayerVisibilityAsync(e.Layer.Id, e.IsVisible);
+            else
+                _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 가시성 DB 저장 차단(로컬 렌더는 적용됨)");
             _log?.Info($"레이어 '{e.Layer.Name}' Visibility={e.IsVisible}");
         }
         catch (Exception ex) { _log?.Error($"레이어 Visibility 변경 실패: {ex.Message}"); }
@@ -7397,7 +7699,10 @@ public class MapViewModel : BasePanelViewModel,
                     MainMap.InvalidateVisual();
                 }
             }
-            await _gMapDbService.UpdateMapLayerOpacityAsync(e.Layer.Id, e.Opacity);
+            if (CanEditMap())   // FR-PG-11: 로컬 렌더는 허용, DB 영속만 권한 필요 (FR-EN-08)
+                await _gMapDbService.UpdateMapLayerOpacityAsync(e.Layer.Id, e.Opacity);
+            else
+                _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 투명도 DB 저장 차단(로컬 렌더는 적용됨)");
             _log?.Info($"레이어 '{e.Layer.Name}' Opacity={e.Opacity:F2}");
         }
         catch (Exception ex) { _log?.Error($"레이어 Opacity 변경 실패: {ex.Message}"); }
@@ -7405,6 +7710,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnLayerDeleteRequested(object? sender, LayerChangedEventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 삭제 차단"); return; }
         try
         {
             var layer = e.Layer;
@@ -7432,6 +7738,7 @@ public class MapViewModel : BasePanelViewModel,
     private async void OnLayerRenameRequested(object? sender, Args.LayerRenameEventArgs e)
     {
         if (_isSyncingRename) return;
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 이름 변경 차단"); return; }
         _isSyncingRename = true;
         try
         {

@@ -11,12 +11,21 @@
   <!-- 순수 수식(WPF 무의존) 실제 소스 링크 — 복제 없이 실코드 검증 -->
   <ItemGroup>
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackingMath.cs" />
+    <!-- Press-Hold(CameraPopup_PressHold_PtzZoomFocus) 순수 헬퍼 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzGestureTag.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzFocusMath.cs" />
+    <!-- Tracking 달력/세션 분할 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\DateRangeCalendar.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackSessionSplitter.cs" />
+    <!-- 카메라 특정위치 확인 순수 로직(Camera_PTZ_AimLocation) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\CameraAimMath.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\CameraAimRequestBuilder.cs" />
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.Messages\Dto\Brokers\CameraAimLocationBodyDto.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">

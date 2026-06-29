@@ -191,6 +191,7 @@ public static class MapSettingsHelper
             model.MaxPlaybackHours,
             model.RetentionDays,
             model.DataSource,
+            model.CameraAimRadiusMeters,
         }, log);
     }
 
@@ -215,6 +216,7 @@ public static class MapSettingsHelper
                 MaxPlaybackHours = t["MaxPlaybackHours"]?.ToObject<int>() ?? def.MaxPlaybackHours,
                 RetentionDays = t["RetentionDays"]?.ToObject<int>() ?? def.RetentionDays,
                 DataSource = t["DataSource"]?.ToObject<Ironwall.Dotnet.Libraries.Enums.EnumTrackDataSource>() ?? def.DataSource,
+                CameraAimRadiusMeters = t["CameraAimRadiusMeters"]?.ToObject<double>() ?? def.CameraAimRadiusMeters,
             };
         }
         catch (Exception)

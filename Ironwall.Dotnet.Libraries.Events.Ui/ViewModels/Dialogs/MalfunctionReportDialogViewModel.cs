@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
@@ -29,9 +30,33 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
         {
         }
         #endregion
+        #region - FR-EN-10 권한 게이팅 (events:control) -
+        private IPermissionService? _permissionService;
+        private bool _permissionResolved;
+        private IPermissionService? ResolvePermissionService()
+        {
+            if (_permissionResolved) return _permissionService;
+            _permissionResolved = true;
+            try { _permissionService = IoC.Get<IPermissionService>(); }
+            catch { _permissionService = null; }
+            return _permissionService;
+        }
+        private bool CanCtrlEvents() => ResolvePermissionService()?.CanControl("events") ?? true;
+        #endregion
         #region - Implementation of Interface -
         public override async void ClickOk()
         {
+            // FR-EN-10 ACK 게이트 (CanControl) — SendAction 호출 이전 검사
+            if (!CanCtrlEvents())
+            {
+                await _eventAggregator.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "권한 없음",
+                    Explain = "조치보고 권한이 없습니다."
+                });
+                return;
+            }
+
             var user = $"{_user?.Username}({_user?.EmployeeNumber})";
             if (!(Model is MalfunctionEventCardViewModel vm)) return;
 

@@ -50,6 +50,8 @@ public class GMapUiModule: Module
         builder.RegisterInstance(_webSetup).As<IMainControlWebSetupModel>().SingleInstance();
         builder.RegisterType<DeviceDetailUrlService>().As<IDeviceDetailUrlService>().SingleInstance();
         builder.RegisterType<BroadcastControlService>().As<IBroadcastControlService>().SingleInstance();
+        // 카메라 "특정 위치 확인" 회전요청 NATS 발행(GIS→nvr_manager PUB) — Camera_PTZ_AimLocation
+        builder.RegisterType<CameraAimControlService>().As<ICameraAimControlService>().SingleInstance();
 
         builder.RegisterType<MarkerFactory>().SingleInstance();
         builder.RegisterType<PropertyPanelFactory>().SingleInstance();

@@ -12,27 +12,37 @@ using System.Linq;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 /****************************************************************************
-   Purpose      : 권한 설정 — 그룹 목록(요약) + 더블클릭 상세(모듈×동작 매트릭스)
+   Purpose      : 권한 등급(역할) 설정 — 등급 목록(요약) + 더블클릭 상세(모듈×동작 매트릭스)
    Created By   : GHLee
    Company      : Sensorway Co., Ltd.
-   Notes        : 사용자 피드백 — 플랫 (그룹×모듈) 리스트 폐기. (1)그룹당 1행 요약(조회N·편집N…),
-                  (2)더블클릭 → 그 그룹 전체 권한 페이지(8모듈×4동작 체크박스, 현재상태 표시).
-                  마스터-디테일은 IsListView/IsDetailView 토글(서브 Conductor 없이 Visibility 스왑).
-                  IAccountApiService 직접 주입(GOP 모드).
-                  ★ IMPL-06: 체크 → [저장] → POST /user-groups/{id}/permissions(ADMIN) 로 편집저장(서버 v5.0).
+   Notes        : ★ OQ-PG-01 = Option A 확정: 권한 = 역할(등급) 단위. 권한그룹 == 권한레벨 == 같은 개념.
+                  5개 등급(ADMIN/MAINTAINER/OPERATOR/VIEWER/GUEST)만 노출(임의 팀그룹 제외), 등급 높은 순.
+                  계정은 "구분(등급)" 하나로 권한 결정(서버 로그인이 역할명 등급 그룹의 매트릭스 사용).
+                  (1)등급당 1행 요약, (2)더블클릭 → 8모듈×4동작 체크박스 상세, 체크→[저장]→POST /user-groups/{id}/permissions(ADMIN).
 ****************************************************************************/
 public class PermissionMatrixPanelViewModel : BasePanelViewModel
 {
     private readonly IAccountApiService _api;
     private List<UserGroupDto> _raw = new();
 
+    // Option A(OQ-PG-01): 권한 = 역할(등급) 단위. 5개 역할명 등급 그룹만 노출 + 등급순 정렬 + 한글 라벨.
+    private static readonly Dictionary<string, (int rank, string label)> _levels =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ADMIN"] = (5, "관리자"),
+            ["MAINTAINER"] = (4, "유지보수자"),
+            ["OPERATOR"] = (3, "운영자"),
+            ["VIEWER"] = (2, "조회자"),
+            ["GUEST"] = (1, "게스트"),
+        };
+
     public PermissionMatrixPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api)
         : base(eventAggregator, log) => _api = api;
 
     #region - Properties -
-    /// <summary>그룹 목록(요약). DataGrid ItemsSource(목록 화면).</summary>
+    /// <summary>등급 목록(요약). DataGrid ItemsSource(목록 화면).</summary>
     public ObservableCollection<PermissionGroupRowViewModel> Groups { get; } = new();
-    /// <summary>선택 그룹 상세 — 8모듈×4동작. DataGrid ItemsSource(상세 화면).</summary>
+    /// <summary>선택 등급 상세 — 8모듈×4동작. DataGrid ItemsSource(상세 화면).</summary>
     public ObservableCollection<ModulePermRowViewModel> Modules { get; } = new();
 
     private PermissionGroupRowViewModel? _selectedGroup;
@@ -63,7 +73,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
         set { _detailGroupName = value; NotifyOfPropertyChange(() => DetailGroupName); }
     }
 
-    // 상세 화면에서 편집 중인 그룹 식별/보존(저장 시 사용)
+    // 상세 화면에서 편집 중인 등급 식별/보존(저장 시 사용)
     private int _detailGroupId;
     private List<int>? _detailDeviceGroups;
 
@@ -86,7 +96,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
     #region - Binding Methods -
     public async Task OnClickReloadButton() => await ReloadAsync(CancellationToken.None);
 
-    /// <summary>그룹 더블클릭 → 그 그룹의 전체 권한(모듈×동작) 상세 화면으로 진입.</summary>
+    /// <summary>등급 더블클릭 → 그 등급의 전체 권한(모듈×동작) 상세 화면으로 진입.</summary>
     public void OnClickGroupDetail()
     {
         var row = SelectedGroup;
@@ -122,7 +132,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
 
     public void ClickBackToList() => IsDetailView = false;
 
-    /// <summary>현재 상세 그룹의 권한(모듈×동작)을 서버에 저장(ADMIN). POST /user-groups/{id}/permissions.
+    /// <summary>현재 상세 등급의 권한(모듈×동작)을 서버에 저장(ADMIN). POST /user-groups/{id}/permissions.
     /// 성공 시 목록을 재조회(요약 카운트 반영)하며 목록 화면으로 복귀한다. 실패 시 사유 안내.</summary>
     public async Task OnClickSave()
     {
@@ -142,27 +152,18 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
             if (res.Success)
             {
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 설정", Explain = $"'{DetailGroupName}' 그룹의 권한을 저장했습니다." });
+                { Title = "권한 등급", Explain = $"'{DetailGroupName}' 등급의 권한을 저장했습니다." });
                 await ReloadAsync(CancellationToken.None);   // 목록 갱신(요약 카운트 반영, 상세→목록 복귀)
             }
             else
             {
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 설정", Explain = $"저장 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "권한 등급", Explain = $"저장 실패: {res.Error?.Message ?? res.Message}" });
             }
         }
         catch (Exception ex) { _log?.Error($"[Permission] 권한 저장 실패: {ex.Message}"); }
         finally { IsSaving = false; }
     }
-
-    /// <summary>그룹 추가 — 서버 v5.0 권한관리 API 후 활성화(현재 GOP 서버가 그룹 CRUD 미지원).</summary>
-    public async Task OnClickAddGroup()
-        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-        { Title = "권한 그룹", Explain = "그룹 추가는 서버 v5.0 권한관리 API 후 활성화됩니다." });
-
-    public async Task OnClickRemoveGroup()
-        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-        { Title = "권한 그룹", Explain = "그룹 삭제는 서버 v5.0 권한관리 API 후 활성화됩니다." });
     #endregion
     #region - Processes -
     private async Task ReloadAsync(CancellationToken ct)
@@ -174,8 +175,18 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
             Groups.Clear();
             _raw = (res.Success && res.Data is not null) ? res.Data : new List<UserGroupDto>();
 
-            // 그룹 이름순(ㄱㄴㄷ/ABC, 문화권 정렬) 고정 — 서버 GET 이 ORDER BY 없어 편집(UPDATE) 후 순서가 비결정적으로 바뀌는 문제 해결.
-            foreach (var g in _raw.OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase))
+            // 등급별 사용자 수 = 그 역할(role)을 가진 계정 수 (Option A: 등급=역할, group_id 아님).
+            // 서버 GET /user-groups 목록은 user_count 미포함 + 사용자는 group_id가 아닌 role로 등급 소속.
+            // ⚠ 서버 /users limit 상한=100(le=100) — 1000 지정 시 422. 계정 수가 100 초과면 페이징 필요(현재 GOP 규모 <100).
+            var usersRes = await _api.GetUsersAsync(1, 100, ct);
+            var countByRole = (usersRes.Success && usersRes.Data is not null)
+                ? usersRes.Data.GroupBy(u => (u.Role ?? string.Empty).ToUpperInvariant())
+                               .ToDictionary(x => x.Key, x => x.Count())
+                : new Dictionary<string, int>();
+
+            // Option A: 5개 등급(역할명) 그룹만 노출, 등급 높은 순(ADMIN 위 → GUEST 아래). 임의 팀그룹은 제외.
+            foreach (var g in _raw.Where(x => _levels.ContainsKey(x.Name))
+                                  .OrderByDescending(x => _levels[x.Name].rank))
             {
                 int v = 0, e = 0, d = 0, c = 0;
                 if (g.Permissions?.Modules is { } mods)
@@ -189,8 +200,8 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
                 Groups.Add(new PermissionGroupRowViewModel
                 {
                     GroupId = g.Id,
-                    GroupName = g.Name,
-                    UserCount = g.UserCount ?? 0,
+                    GroupName = _levels[g.Name].label,   // 한글 등급 라벨
+                    UserCount = countByRole.TryGetValue(g.Name.ToUpperInvariant(), out var uc) ? uc : 0,   // 역할(role)별 실제 계정 수
                     Active = g.IsActive ? "사용" : "미사용",
                     ViewCount = v,
                     EditCount = e,
@@ -200,7 +211,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
             }
             if (!res.Success)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 설정", Explain = $"불러오기 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "권한 등급", Explain = $"불러오기 실패: {res.Error?.Message ?? res.Message}" });
         }
         catch (Exception ex) { _log?.Error($"[Permission] 로드 실패: {ex.Message}"); }
     }

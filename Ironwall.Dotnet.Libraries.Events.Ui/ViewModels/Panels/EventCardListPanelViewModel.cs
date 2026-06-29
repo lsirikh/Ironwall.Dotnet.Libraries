@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
@@ -60,11 +61,45 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             _batchBuffer = new EventCardBatchBuffer<EventCardBaseViewModel>();
         }
         #endregion
+        #region - FR-EN-10/11 권한 게이팅 (events 도메인) -
+        // IoC.Get lazy — 미등록/오프라인/테스트 시 null → 전체허용 폴백
+        private IPermissionService? _permissionService;
+        private bool _permissionResolved;
+        private IPermissionService? ResolvePermissionService()
+        {
+            if (_permissionResolved) return _permissionService;
+            _permissionResolved = true;
+            try { _permissionService = IoC.Get<IPermissionService>(); }
+            catch (Exception ex)
+            {
+                _log?.Warning($"[{nameof(EventCardListPanelViewModel)}] PermissionService 미해석(전체허용 폴백): {ex.Message}");
+                _permissionService = null;
+            }
+            return _permissionService;
+        }
+        private bool CanCtrlEvents() => ResolvePermissionService()?.CanControl("events") ?? true;
+
+        // FR-EN-11: 역할강등 시 ACK 버튼 CanExecute 재평가
+        private void OnPermissionsChanged()
+        {
+            Execute.OnUIThread(() =>
+            {
+                NotifyOfPropertyChange(nameof(CanReportAction));
+                NotifyOfPropertyChange(nameof(CanReportAll));
+            });
+        }
+        public bool CanReportAction => CanCtrlEvents();
+        public bool CanReportAll    => CanCtrlEvents();
+        #endregion
         #region - Implementation of Interface -
         #endregion
         #region - Overrides -
         protected override Task OnActivateAsync(CancellationToken cancellationToken)
         {
+            // FR-EN-11: 역할강등 재평가 구독
+            var perm = ResolvePermissionService();
+            if (perm != null) perm.PermissionsChanged += OnPermissionsChanged;
+
             ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
             _batchTimer = new Timer(FlushPendingCards, null, BATCH_INTERVAL_MS, BATCH_INTERVAL_MS);
             return base.OnActivateAsync(cancellationToken);
@@ -72,6 +107,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
         protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
         {
+            // FR-EN-11: 역할강등 재평가 구독 해제
+            var perm = ResolvePermissionService();
+            if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
+
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
 
             // 타이머 안전 정지: Infinite로 먼저 중지 후 Dispose (진행 중 콜백 race 방지)
@@ -236,6 +275,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </summary>
         public async void OnClickButtonActionAll(object sender, RoutedEventArgs e)
         {
+            // FR-EN-10 ACK 일괄 게이트 (CanControl)
+            if (!CanCtrlEvents())
+            {
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "권한 없음",
+                    Explain = "조치보고 권한이 없습니다."
+                });
+                return;
+            }
             await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel() { Title = "전체 조치보고", Explain = "전체 조치보고를 수행하시겠습니까?", MessageModel = new CallAllEventReportMessageModel() });
         }
 
@@ -253,15 +302,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
         public async void OnButtonAction(object sender, RoutedEventArgs e)
         {
-            //if (!SetupModel.IsServer)
-            //    return;
-
-
-            //var source = e.OriginalSource as FrameworkElement;
-            //var dataContext = source.DataContext as EventCardViewModel;
-            ////_eventAggregator.PublishOnCurrentThreadAsync(new DiscardEventPreMessageModel { Value = dataContext });
-            //await _eventAggregator.PublishOnCurrentThreadAsync(new OpenPreEventRemoveDialogMessageModel { Value = dataContext });
-
+            // FR-EN-10 ACK 개별 게이트 (CanControl)
+            if (!CanCtrlEvents())
+            {
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "권한 없음",
+                    Explain = "조치보고 권한이 없습니다."
+                });
+                return;
+            }
 
             var source = e.OriginalSource as FrameworkElement;
             var dataContext = source?.DataContext as EventCardBaseViewModel;
@@ -301,6 +351,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </summary>
         public async Task ExecuteBatchReportAsync()
         {
+            // FR-EN-10 ACK 배치 게이트 (CanControl) — _batchReportGate 이전에 검사
+            if (!CanCtrlEvents())
+            {
+                _log?.Warning("[ExecuteBatchReportAsync] 권한 없음 — events:control 미보유");
+                return;
+            }
+
             // FR-03: 인플라이트 가드 — 더블클릭/중복 실행 방지
             if (!await _batchReportGate.WaitAsync(0))
             {
@@ -681,6 +738,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         /// </summary>
         public async Task HandleAsync(CallAllEventReportMessageModel message, CancellationToken cancellationToken)
         {
+            // FR-PG-13 하위가드: ConfirmPopup 도달 후에도 CanControl 재확인 (역할 강등 경합 방어)
+            if (!CanCtrlEvents())
+            {
+                _log?.Warning("[HandleAsync(CallAllEventReport)] 권한 없음 — 배치 조치보고 차단 (FR-PG-13)");
+                return;
+            }
             await ExecuteBatchReportAsync();
         }
 

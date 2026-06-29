@@ -1,4 +1,5 @@
 ﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
@@ -45,10 +46,56 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     }
     #endregion
 
+    #region - FR-EN-10/11 권한 게이팅 (events 도메인) -
+    private IPermissionService? _permissionService;
+    private bool _permissionResolved;
+    private IPermissionService? ResolvePermissionService()
+    {
+        if (_permissionResolved) return _permissionService;
+        _permissionResolved = true;
+        try { _permissionService = IoC.Get<IPermissionService>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[{nameof(MalfunctionEventPanelViewModel)}] PermissionService 미해석(전체허용 폴백): {ex.Message}");
+            _permissionService = null;
+        }
+        return _permissionService;
+    }
+    private bool CanCtrlEvents() => ResolvePermissionService()?.CanControl("events") ?? true;
+    private bool CanEditEvents() => ResolvePermissionService()?.CanEdit("events") ?? true;
+    private bool CanDelEvents()  => ResolvePermissionService()?.CanDelete("events") ?? true;
+
+    private void OnPermissionsChanged()
+    {
+        Execute.OnUIThread(() =>
+        {
+            NotifyOfPropertyChange(nameof(CanInsertEvent));
+            NotifyOfPropertyChange(nameof(CanSaveEvent));
+            NotifyOfPropertyChange(nameof(CanDeleteEvent));
+            NotifyOfPropertyChange(nameof(CanReportRow));
+        });
+    }
+    public bool CanInsertEvent => CanEditEvents();
+    public bool CanSaveEvent   => CanEditEvents();
+    public bool CanDeleteEvent => CanDelEvents();
+    public bool CanReportRow   => CanCtrlEvents();
+    #endregion
+
     #region - Action Report (우클릭 조치보고) -
     /// <summary>행 우클릭 '조치보고' — 미저장 Draft(Id≤0)는 차단(FromEventId FK 필요). 기존행은 1:N 후속 조치보고 허용(중복 가드 없음). 기존 ReportDialog 재사용.</summary>
     private async Task ReportRowAsync(object? param)
     {
+        // FR-EN-10 ACK 게이트 (CanControl)
+        if (!CanCtrlEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "조치보고 권한이 없습니다."
+            });
+            return;
+        }
+
         if (param is not MalfunctionEventViewModel row)
             return;
 
@@ -76,6 +123,10 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     #region - Overrides -
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        // FR-EN-11: 역할강등 재평가 구독
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged += OnPermissionsChanged;
+
         await base.OnActivateAsync(cancellationToken);
         if (IsCacheValid())
         {
@@ -91,6 +142,10 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
+        // FR-EN-11: 역할강등 재평가 구독 해제
+        var perm = ResolvePermissionService();
+        if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
+
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
         if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
         {
@@ -101,13 +156,15 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
     }
     public override void OnClickInsertButton(object sender, RoutedEventArgs e)
     {
+        // FR-EN-10 CRUD 생성 게이트 (CanEdit)
+        if (!CanEditEvents()) return;
         var vm = new MalfunctionEventViewModel(new MalfunctionEventModel { MessageType = Ironwall.Dotnet.Libraries.Enums.EnumEventType.Fault });
         ViewModelProvider.Add(vm);
     }
     
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        if (!await _processGate.WaitAsync(0))       // 0 → "비동기로 테스트-후-입장"
             return;
         try
         {
@@ -135,6 +192,16 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {
+        // FR-EN-10 CRUD 삭제 게이트 (CanDelete)
+        if (!CanDelEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "이벤트 삭제 권한이 없습니다."
+            });
+            return;
+        }
         if (SelectedItemCount == 0) return;
         _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
@@ -146,7 +213,17 @@ public class MalfunctionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Ma
 
     public override async void OnClickSaveButton(object sender, RoutedEventArgs e)
     {
-        if (!await _processGate.WaitAsync(0))       // 0 → “비동기로 테스트-후-입장”
+        // FR-EN-10 CRUD 수정/저장 게이트 (CanEdit)
+        if (!CanEditEvents())
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "권한 없음",
+                Explain = "이벤트 저장 권한이 없습니다."
+            });
+            return;
+        }
+        if (!await _processGate.WaitAsync(0))       // 0 → "비동기로 테스트-후-입장"
             return;
 
         try

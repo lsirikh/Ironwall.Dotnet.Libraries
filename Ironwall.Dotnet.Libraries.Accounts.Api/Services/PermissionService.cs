@@ -56,7 +56,11 @@ public class PermissionService : IPermissionService
     private bool Has(string module, string longVerb, string shortVerb)
     {
         lock (_gate)
+        {
+            // ADMIN 무조건 통과 — 서버가 ADMIN permissions 를 빈 객체로 보내므로 토큰만 보면 ADMIN 이 차단됨(OQ-PG-01 Option A).
+            if (_role == EnumUserRole.ADMIN) return true;
             return _tokens.Contains($"{module}:{longVerb}") || _tokens.Contains($"{module}:{shortVerb}");
+        }
     }
 
     private static List<int> ExtractDeviceGroups(JObject? permissions)

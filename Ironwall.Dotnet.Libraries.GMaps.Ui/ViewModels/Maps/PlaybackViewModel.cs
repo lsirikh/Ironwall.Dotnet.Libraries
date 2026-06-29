@@ -55,13 +55,38 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         ToTime = DateTime.Now;
         FromTime = ToTime.AddMinutes(-30);
 
+        Calendar = new RangeCalendarViewModel();
+        Calendar.RangeCompleted += OnCalendarRange;
+
         LoadCommand = new AsyncRelayCommand(_ => LoadAsync());
         PresetCommand = new AsyncRelayCommand(p => LoadPresetAsync(p));
+        ToggleCalendarCommand = new RelayCommand(_ => ToggleCalendar());
         PlayPauseCommand = new RelayCommand(_ => TogglePlay());
         StopCommand = new RelayCommand(_ => _engine.Stop());
         SpeedCommand = new RelayCommand(p => SetSpeed(p));
         FocusCommand = new RelayCommand(p => Focus(p as PlaybackTrackItem));
+        JumpToSessionCommand = new RelayCommand(p => JumpToSession(p as PlaybackTrackItem));
         CloseCommand = new RelayCommand(_ => Close());
+    }
+
+    /// <summary>달력 팝업 토글 — 열 때 현재 From/To로 달력을 동기화한다.</summary>
+    private void ToggleCalendar()
+    {
+        if (!IsCalendarOpen) Calendar.Sync(FromTime, ToTime);
+        IsCalendarOpen = !IsCalendarOpen;
+    }
+
+    /// <summary>달력 2클릭 완료 — 시작일 00:00 ~ 종료일 23:59:59로 기간 설정 후 팝업 닫기.</summary>
+    private void OnCalendarRange(DateTime start, DateTime end)
+    {
+        FromTime = start.Date;                              // 00:00:00
+        ToTime = end.Date.AddDays(1).AddSeconds(-1);        // 23:59:59 (종료일 끝)
+        IsCalendarOpen = false;
+        // MaxPlaybackHours 가드가 종일/다일 범위를 끝 N시간으로 클램프 → [불러오기] 전에 사전 안내
+        int maxH = _setup?.MaxPlaybackHours ?? 6;
+        Status = (ToTime - FromTime).TotalHours > maxH
+            ? $"{start:yyyy-MM-dd}~{end:yyyy-MM-dd} 선택 · ⚠ 최대 {maxH}시간만 재생됩니다(끝 구간) · [불러오기]"
+            : $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd} 선택됨 · [불러오기]를 누르세요";
     }
 
     /// <summary>콘솔 닫기 — 재생 정지 + 재생 마커 제거 후 닫기 요청.</summary>
@@ -77,8 +102,18 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     public void AttachMap(GMapControl map) => _overlay.Attach(map);
 
     #region - Bindable State -
-    public DateTime FromTime { get; set; }
-    public DateTime ToTime { get; set; }
+    private DateTime _fromTime;
+    public DateTime FromTime { get => _fromTime; set { _fromTime = value; NotifyOfPropertyChange(); } }
+
+    private DateTime _toTime;
+    public DateTime ToTime { get => _toTime; set { _toTime = value; NotifyOfPropertyChange(); } }
+
+    /// <summary>기간 선택 캘린더(2클릭 시작/끝). 팝업 토글은 <see cref="IsCalendarOpen"/>.</summary>
+    public RangeCalendarViewModel Calendar { get; }
+
+    private bool _isCalendarOpen;
+    /// <summary>달력 팝업 표시 여부.</summary>
+    public bool IsCalendarOpen { get => _isCalendarOpen; set { _isCalendarOpen = value; NotifyOfPropertyChange(); } }
 
     public ObservableCollection<PlaybackTrackItem> Events { get; } = new();
 
@@ -113,10 +148,12 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     #region - Commands -
     public ICommand LoadCommand { get; }
     public ICommand PresetCommand { get; }        // 파라미터: 분(string) / "today"
+    public ICommand ToggleCalendarCommand { get; }
     public ICommand PlayPauseCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand SpeedCommand { get; }          // 파라미터: 배속(string)
     public ICommand FocusCommand { get; }
+    public ICommand JumpToSessionCommand { get; }
     public ICommand CloseCommand { get; }
     #endregion
 
@@ -162,8 +199,8 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         BuildEvents(points);
         _overlay.SetEnabledTracks(EnabledSet());
         HasData = points.Count > 0;
-        Status = HasData ? $"{points.Count}점 · {Events.Count}트랙 로드" : "해당 기간 데이터 없음";
-        _log?.Info($"[Playback] 로드 {points.Count}점 / {Events.Count}트랙 ({FromTime:HH:mm}~{ToTime:HH:mm})");
+        Status = HasData ? $"{points.Count}점 · {Events.Count}건 로드" : "해당 기간 데이터 없음";
+        _log?.Info($"[Playback] 로드 {points.Count}점 / {Events.Count}건 ({FromTime:HH:mm}~{ToTime:HH:mm})");
         UpdateTimeLabel();
     }
 
@@ -171,30 +208,62 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     {
         foreach (var it in Events) it.PropertyChanged -= OnTrackToggle;
         Events.Clear();
+
+        // 같은 track_id라도 시간 공백(gap)이 크면 별개 탐지 세션으로 분절 → 각 세션이 한 행
+        // 트레일 분절(GapThresholdSec, 기본 10s)과 분리: 짧은 프레임드랍엔 안 쪼개고 '새 출현'만 분리
+        const double gapSec = 30;
+        var built = new List<PlaybackTrackItem>();
         foreach (var g in points.GroupBy(p => p.TrackId))
         {
             var list = g.OrderBy(p => p.ObservedAt).ToList();
-            var last = list[^1];
-            var item = new PlaybackTrackItem
+            var times = list.Select(p => p.ObservedAt).ToList();
+            var segments = TrackSessionSplitter.SplitByGap(times, gapSec);
+            bool multi = segments.Count > 1;
+            for (int si = 0; si < segments.Count; si++)
             {
-                TrackId = g.Key,
-                CameraId = last.CameraId,
-                Label = last.Label ?? "",
-                ThreatLevel = last.ThreatLevel ?? "",
-                Start = list[0].ObservedAt.ToLocalTime(),
-                End = last.ObservedAt.ToLocalTime(),
-                Count = list.Count,
-                IsEnabled = true,
-            };
+                var (start, count) = segments[si];
+                var seg = list.GetRange(start, count);
+                var last = seg[^1];
+                built.Add(new PlaybackTrackItem
+                {
+                    TrackId = g.Key,
+                    SessionId = multi ? $"{g.Key}#{si + 1}" : g.Key,
+                    CameraId = last.CameraId,
+                    Label = last.Label ?? "",
+                    ThreatLevel = last.ThreatLevel ?? "",
+                    Start = seg[0].ObservedAt.ToLocalTime(),
+                    StartUtc = seg[0].ObservedAt,   // 시크용(엔진 observed_at 도메인과 동일)
+                    End = last.ObservedAt.ToLocalTime(),
+                    Count = count,
+                    Latitude = last.Latitude,       // 세션 대표 좌표(마지막 관측) — 따라보기 센터링용
+                    Longitude = last.Longitude,
+                    IsEnabled = true,
+                });
+            }
+        }
+
+        // 시작 시각 오름차순으로 보기 좋게 정렬
+        foreach (var item in built.OrderBy(x => x.Start))
+        {
             item.PropertyChanged += OnTrackToggle;
             Events.Add(item);
         }
     }
 
+    private bool _syncingToggle;
     private void OnTrackToggle(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PlaybackTrackItem.IsEnabled))
-            _overlay.SetEnabledTracks(EnabledSet());
+        if (e.PropertyName != nameof(PlaybackTrackItem.IsEnabled)) return;
+        if (_syncingToggle) return;
+        // 오버레이는 track 단위 키라 세션 단위로 못 숨김 → 같은 track의 여러 세션 행을 함께 토글(일관성)
+        if (sender is PlaybackTrackItem changed)
+        {
+            _syncingToggle = true;
+            foreach (var it in Events.Where(x => x.TrackId == changed.TrackId && x.IsEnabled != changed.IsEnabled))
+                it.IsEnabled = changed.IsEnabled;
+            _syncingToggle = false;
+        }
+        _overlay.SetEnabledTracks(EnabledSet());
     }
 
     private HashSet<string> EnabledSet()
@@ -215,9 +284,18 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     private void Focus(PlaybackTrackItem? item)
     {
         if (item is null) return;
-        var snap = _engine.SnapshotAt(_engine.CurrentTime).FirstOrDefault(x => x.TrackId == item.TrackId);
-        if (snap is not null)
-            FocusRequested?.Invoke(snap.Current.Latitude, snap.Current.Longitude);
+        // 세션 대표 좌표로 직접 센터링 — 재생 위치가 이 세션 구간 밖(또는 정지)이어도 동작
+        FocusRequested?.Invoke(item.Latitude, item.Longitude);
+    }
+
+    /// <summary>세션 행 더블클릭 — 그 세션 시작 시각으로 시크 + 지도 센터링 + 재생 시작.</summary>
+    private void JumpToSession(PlaybackTrackItem? item)
+    {
+        if (item is null || !HasData) return;
+        _engine.SeekTo(item.StartUtc);                          // observed_at 도메인 직접 시크(Frame→슬라이더/라벨 갱신)
+        FocusRequested?.Invoke(item.Latitude, item.Longitude);  // 지도 센터링
+        _engine.Play();
+        IsPlaying = _engine.IsPlaying;
     }
 
     private void OnFrame()
@@ -241,31 +319,67 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
     {
         _engine.Frame -= OnFrame;
         _engine.Completed -= OnCompleted;
+        Calendar.RangeCompleted -= OnCalendarRange;
         foreach (var it in Events) it.PropertyChanged -= OnTrackToggle;
     }
 }
 
-/// <summary>Playback 이벤트 리스트 항목(트랙 요약 + 체크박스 표시상태).</summary>
+/// <summary>Playback 탐지 세션 리스트 항목(세션 단위 요약 + 표시 토글). DataGrid 컬럼에 바인딩.</summary>
 public sealed class PlaybackTrackItem : PropertyChangedBase
 {
     public string TrackId { get; set; } = string.Empty;
+    /// <summary>화면 표시용 탐지 ID. 한 track이 여러 세션으로 분절되면 <c>{TrackId}#n</c>.</summary>
+    public string SessionId { get; set; } = string.Empty;
     public int CameraId { get; set; }
     public string Label { get; set; } = string.Empty;
     public string ThreatLevel { get; set; } = string.Empty;
     public DateTime Start { get; set; }
+    /// <summary>세션 시작 시각(UTC observed_at 도메인) — 더블클릭 시크용.</summary>
+    public DateTime StartUtc { get; set; }
     public DateTime End { get; set; }
     public int Count { get; set; }
+    /// <summary>세션 대표 좌표(따라보기 센터링용).</summary>
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
 
     private bool _isEnabled = true;
     public bool IsEnabled { get => _isEnabled; set { _isEnabled = value; NotifyOfPropertyChange(); } }
 
-    public string TypeGlyph => TrackingEnumExtensions.ParseTargetType(Label) switch
+    private EnumTargetType TargetType => TrackingEnumExtensions.ParseTargetType(Label);
+
+    public string TypeGlyph => TargetType switch
     {
         EnumTargetType.Person => "🚶",
         EnumTargetType.Vehicle => "🚗",
         EnumTargetType.Animal => "🐾",
         _ => "❓",
     };
+
+    /// <summary>탐지 타입(한글). DataGrid "타입" 컬럼.</summary>
+    public string TypeText => TargetType switch
+    {
+        EnumTargetType.Person => "사람",
+        EnumTargetType.Vehicle => "차량",
+        EnumTargetType.Animal => "동물",
+        _ => "기타",
+    };
+
+    /// <summary>글리프 + 한글 타입(예: 🐾 동물).</summary>
+    public string TypeDisplay => $"{TypeGlyph} {TypeText}";
+
+    /// <summary>탐지 등급(한글). DataGrid "등급" 컬럼.</summary>
+    public string ThreatText => TrackingEnumExtensions.ParseThreatLevel(ThreatLevel).ToColorType() switch
+    {
+        EnumColorType.Red => "위험",
+        EnumColorType.Orange => "주의",
+        EnumColorType.Green => "일반",
+        _ => string.IsNullOrWhiteSpace(ThreatLevel) ? "일반" : ThreatLevel,
+    };
+
+    /// <summary>탐지 시간 시작~끝. DataGrid "시작~끝" 컬럼. 같은 날이면 날짜 생략(폭 절약).</summary>
+    public string TimeRange => Start.Date == End.Date
+        ? $"{Start:HH:mm:ss} ~ {End:HH:mm:ss}"
+        : $"{Start:MM-dd HH:mm} ~ {End:MM-dd HH:mm}";
 
     public string Span => $"{Start:HH:mm:ss}–{End:HH:mm:ss} · {Count}pt";
 

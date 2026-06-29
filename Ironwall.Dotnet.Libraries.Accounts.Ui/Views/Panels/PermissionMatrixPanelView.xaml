@@ -11,7 +11,7 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<Grid Margin="6">
-		<!--  ① 그룹 목록 (요약)  -->
+		<!--  ① 등급 목록 (요약) — 권한 = 역할(등급) 단위(OQ-PG-01 Option A)  -->
 		<Grid Visibility="{Binding IsListView, Converter={StaticResource BooleanToVisibilityConverter}}">
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto" />
@@ -19,16 +19,8 @@
 				<RowDefinition Height="Auto" />
 			</Grid.RowDefinitions>
 			<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
-				<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="권한 그룹" />
+				<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="권한 등급" />
 				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-					<Button Style="{StaticResource ModernToolbarButton}" ToolTip="그룹 추가">
-						<cal:Message.Attach>[Event Click] = [Action OnClickAddGroup()]</cal:Message.Attach>
-						<md:PackIcon Width="20" Height="20" Kind="AccountMultiplePlus" />
-					</Button>
-					<Button Style="{StaticResource ModernToolbarButton}" ToolTip="그룹 삭제">
-						<cal:Message.Attach>[Event Click] = [Action OnClickRemoveGroup()]</cal:Message.Attach>
-						<md:PackIcon Width="20" Height="20" Kind="AccountMultipleMinus" />
-					</Button>
 					<Button Style="{StaticResource ModernToolbarButton}" ToolTip="갱신">
 						<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
 						<md:PackIcon Width="20" Height="20" Kind="Refresh" />
@@ -50,7 +42,7 @@
 				SelectedItem="{Binding SelectedGroup}"
 				Style="{StaticResource ModernDataGrid}">
 				<DataGrid.Columns>
-					<DataGridTextColumn Width="200" Binding="{Binding GroupName}" Header="그룹" />
+					<DataGridTextColumn Width="200" Binding="{Binding GroupName}" Header="등급" />
 					<DataGridTextColumn Width="90" Binding="{Binding UserCount}" Header="사용자" />
 					<DataGridTextColumn Width="80" Binding="{Binding Active}" Header="활성" />
 					<DataGridTextColumn Width="*" Binding="{Binding Summary}" Header="권한 요약" />
@@ -60,10 +52,10 @@
 				Grid.Row="2"
 				Margin="0,8,0,0"
 				Style="{StaticResource PanelFieldLabel}"
-				Text="※ 그룹을 더블클릭하면 전체 권한(모듈 × 동작)을 보고 편집·저장할 수 있습니다 (ADMIN). 그룹 추가/삭제는 서버 v5.0 후속." />
+				Text="※ 등급을 더블클릭하면 전체 권한(모듈 × 동작)을 보고 편집·저장할 수 있습니다 (ADMIN). 계정의 '구분'이 곧 권한 등급입니다." />
 		</Grid>
 
-		<!--  ② 그룹 상세 (모듈 × 동작 매트릭스)  -->
+		<!--  ② 등급 상세 (모듈 × 동작 매트릭스)  -->
 		<Grid Visibility="{Binding IsDetailView, Converter={StaticResource BooleanToVisibilityConverter}}">
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto" />
@@ -80,7 +72,7 @@
 					VerticalAlignment="Center"
 					DockPanel.Dock="Left"
 					Style="{StaticResource PanelSectionLabel}"
-					Text="{Binding DetailGroupName, StringFormat='권한 — {0}'}" />
+					Text="{Binding DetailGroupName, StringFormat='권한 등급 — {0}'}" />
 			</DockPanel>
 			<DataGrid
 				Grid.Row="1"
@@ -147,11 +139,11 @@
 					Content="저장"
 					IsEnabled="{Binding CanSave}"
 					Style="{StaticResource ModernSecondaryButton}"
-					ToolTip="이 그룹의 권한(모듈×동작)을 저장합니다 (ADMIN)" />
+					ToolTip="이 등급의 권한(모듈×동작)을 저장합니다 (ADMIN)" />
 				<TextBlock
 					VerticalAlignment="Center"
 					Style="{StaticResource PanelFieldLabel}"
-					Text="※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 체크 후 [저장]을 누르면 그룹 권한이 반영됩니다 (ADMIN)." />
+					Text="※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 체크 후 [저장]을 누르면 이 등급의 권한이 반영됩니다 (ADMIN)." />
 			</DockPanel>
 		</Grid>
 	</Grid>

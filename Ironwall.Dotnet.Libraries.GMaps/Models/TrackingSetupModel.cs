@@ -37,14 +37,18 @@ public class TrackingSetupModel : ITrackingSetupModel
     /// <summary>observed_at gap이 이 초를 넘으면 트레일 세그먼트 분절. 기본 10.</summary>
     public int GapThresholdSec { get; set; } = 10;
 
-    /// <summary>Playback 1회 조회 최대 시간(시간). 기본 6.</summary>
-    public int MaxPlaybackHours { get; set; } = 6;
+    /// <summary>Playback 1회 조회 최대 시간(시간). 기본 24(하루 통째 조회 지원 — 캘린더 날짜 선택 정상화).
+    /// 클램프는 종료시각 기준 직전 N시간만 남기므로 6으로 두면 데이터가 그 날 저녁대가 아니면 0건이 됨.</summary>
+    public int MaxPlaybackHours { get; set; } = 24;
 
     /// <summary>로컬 추적 좌표 보존 일수. 기본 7. 0=무제한.</summary>
     public int RetentionDays { get; set; } = 7;
 
     /// <summary>Playback 데이터 소스 — 로컬 DB / 서버 API 토글. 기본 Local(스테이션 #2까지).</summary>
     public EnumTrackDataSource DataSource { get; set; } = EnumTrackDataSource.Local;
+
+    /// <summary>카메라 "특정 위치 확인" 타겟 모드 반경(m). 기본 30.</summary>
+    public double CameraAimRadiusMeters { get; set; } = 30d;
 
     public TrackingSetupModel() { }
 
@@ -62,5 +66,6 @@ public class TrackingSetupModel : ITrackingSetupModel
         GapThresholdSec = model.GapThresholdSec;
         RetentionDays = model.RetentionDays;
         DataSource = model.DataSource;
+        CameraAimRadiusMeters = model.CameraAimRadiusMeters;
     }
 }

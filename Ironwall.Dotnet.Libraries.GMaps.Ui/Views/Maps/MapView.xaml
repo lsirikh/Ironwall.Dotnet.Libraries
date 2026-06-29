@@ -687,6 +687,37 @@
 				MGRS="{Binding CurrentMGRS}"
 				UTM="{Binding CurrentUTM}" />
 
+			<!--  카메라 특정위치 확인(타겟 조준) 상태 배너 — IsAimStatusVisible 시 상단 중앙 표시  -->
+			<Border
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Margin="0,12,0,0"
+				Padding="14,8"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Top"
+				IsHitTestVisible="False"
+				Panel.ZIndex="300"
+				Background="#CC04161C"
+				BorderBrush="#FF00C8FF"
+				BorderThickness="1"
+				CornerRadius="4">
+				<Border.Style>
+					<Style TargetType="Border">
+						<Setter Property="Visibility" Value="Collapsed" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsAimStatusVisible}" Value="True">
+								<Setter Property="Visibility" Value="Visible" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Border.Style>
+				<TextBlock
+					FontSize="13"
+					FontWeight="SemiBold"
+					Foreground="White"
+					Text="{Binding AimStatusMessage}" />
+			</Border>
+
 			<!--  줌 컨트롤  -->
 			<ctrl:MapZoomControl
 				x:Name="MapZoomCtrl"
