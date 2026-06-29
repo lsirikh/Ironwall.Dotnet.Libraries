@@ -858,6 +858,64 @@ public class MapViewModel : BasePanelViewModel,
         return _ptzController;
     }
 
+    // ── 디바이스 위치 저장 게이트웨이(Symbol_Apply_DeviceLocation) ── DeviceUiModule 등록 시에만 해석.
+    private IDeviceLocationGateway? _deviceLocationGateway;
+    private bool _deviceLocationGatewayResolved;
+    private IDeviceLocationGateway? ResolveDeviceLocationGateway()
+    {
+        if (_deviceLocationGatewayResolved) return _deviceLocationGateway;
+        _deviceLocationGatewayResolved = true;
+        try { _deviceLocationGateway = IoC.Get<IDeviceLocationGateway>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[DeviceLocation] 게이트웨이 미등록(현재위치 적용 비활성): {ex.Message}");
+            _deviceLocationGateway = null;
+        }
+        return _deviceLocationGateway;
+    }
+
+    /// <summary>"현재위치 적용" 클릭 — 동기 위임(async void 회피), 내부 async에서 예외 격리.</summary>
+    private void OnDeviceLocationApplyRequested(object? sender, EventArgs e) => _ = HandleApplyDeviceLocationAsync();
+
+    /// <summary>심볼 현재 위치(+방위)를 연결 디바이스 Model/API에 저장.</summary>
+    private async Task HandleApplyDeviceLocationAsync()
+    {
+        if (SelectedMarker is not GMapPidsMarker pids)
+            return;
+
+        var dev = pids.LinkedDevice;
+        if (dev == null) { SetAimStatus("연결된 디바이스가 없어 저장할 수 없습니다.", autoHide: true); return; }
+        if (dev.Id <= 0) { SetAimStatus("디바이스 ID가 유효하지 않습니다.", autoHide: true); return; }
+
+        double lat = pids.Latitude, lng = pids.Longitude;
+        if (!Services.Tracking.TrackingMath.IsValidLatLng(lat, lng))
+        {
+            SetAimStatus("심볼 좌표가 유효하지 않습니다.", autoHide: true);
+            return;
+        }
+
+        var gateway = ResolveDeviceLocationGateway();
+        if (gateway == null) { SetAimStatus("디바이스 저장 기능을 사용할 수 없습니다(미등록).", autoHide: true); return; }
+
+        double? heading = pids.BaseBearing;   // 심볼 방위(0~360) → 디바이스 Heading
+        var ct = _cts?.Token ?? CancellationToken.None;
+        try
+        {
+            await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), ct);
+            bool ok = await gateway.ApplyLocationAsync(dev, lat, lng, heading, ct);
+            await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), ct);
+            SetAimStatus(ok
+                ? $"디바이스 '{dev.DeviceName}' 위치 저장됨 ({lat:F6}, {lng:F6})."
+                : "디바이스 위치 저장에 실패했습니다.", autoHide: true);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[DeviceLocation] 적용 실패: {ex.Message}");
+            try { await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), CancellationToken.None); } catch { }
+            SetAimStatus("디바이스 위치 저장 중 오류가 발생했습니다.", autoHide: true);
+        }
+    }
+
     // ── 권한 게이팅(FR-EN-06) ── IPermissionService도 IPtzController처럼 IoC lazy 해석.
     //    GMaps.Ui→Accounts.Api 참조 추가됨(순환 없음). 미등록(DB Auth/오프라인/테스트) 시 null → 전체허용 폴백(V-EN-11).
     private IPermissionService? _permissionService;
@@ -6572,6 +6630,7 @@ public class MapViewModel : BasePanelViewModel,
             PropertyPanel.CloseRequested += OnPropertyPanelCloseRequested;
             PropertyPanel.MarkerPropertyChanged += OnMarkerPropertyChanged;
             PropertyPanel.ZOrderChangeRequested += OnPropertyPanelZOrderChangeRequested;
+            PropertyPanel.DeviceLocationApplyRequested += OnDeviceLocationApplyRequested;   // 현재위치 적용(Symbol_Apply_DeviceLocation)
 
             // 공통 속성 설정
             PropertyPanel.AvailableColors = AvailableColors;
@@ -6692,6 +6751,7 @@ public class MapViewModel : BasePanelViewModel,
             PropertyPanel.CloseRequested -= OnPropertyPanelCloseRequested;
             PropertyPanel.MarkerPropertyChanged -= OnMarkerPropertyChanged;
             PropertyPanel.ZOrderChangeRequested -= OnPropertyPanelZOrderChangeRequested;
+            PropertyPanel.DeviceLocationApplyRequested -= OnDeviceLocationApplyRequested;
 
             // 바인딩 정리
             PropertyPanel.ClearAllBindings();

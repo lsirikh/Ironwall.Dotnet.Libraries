@@ -35,6 +35,19 @@
 						</ComboBox>
 					</Grid>
 
+					<!--  현재위치 적용 — 심볼 현재 지도위치(+방위)를 디바이스 Model/API에 저장  -->
+					<Button
+						x:Name="PART_ApplyDeviceLocationButton"
+						Margin="0,2,0,6"
+						Padding="6,5"
+						HorizontalAlignment="Stretch"
+						Background="{DynamicResource PrimaryBrush}"
+						BorderThickness="0"
+						Content="현재위치 적용"
+						FontWeight="SemiBold"
+						Foreground="{DynamicResource OnPrimaryFixedBrush}"
+						ToolTip="심볼의 현재 지도 위치(+방위)를 연결된 디바이스에 반영하고 서버에 저장합니다." />
+
 					<!--  FOV 표시  -->
 					<Grid Margin="0,5">
 						<Grid.ColumnDefinitions>

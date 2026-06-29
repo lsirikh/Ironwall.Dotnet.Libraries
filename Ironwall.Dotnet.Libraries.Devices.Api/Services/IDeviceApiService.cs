@@ -242,6 +242,21 @@ public interface IDeviceApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// 장비의 위치(geolocation)만 부분 수정합니다 (PATCH). 좌표 외 다른 필드는 전송하지 않아 보존됩니다.
+    /// <para>PATCH /devices/{deviceKindPath}/{id} 에 {"geolocation": {...}} 만 전송 (서버 exclude_unset).</para>
+    /// <para>geolocation JSONB는 전체 교체되므로 호출자가 보존할 하위필드(location/altitude 등)를 모두 채워 보내야 한다.</para>
+    /// </summary>
+    /// <param name="deviceKindPath">엔드포인트 경로 세그먼트 (cameras/sensors/controllers/speakers/enclosures/lamps)</param>
+    /// <param name="id">장비 ID</param>
+    /// <param name="geolocation">전체 geolocation 객체(보존 하위필드 포함)</param>
+    /// <param name="token">취소 토큰 (선택)</param>
+    Task<ApiResponse<object>> PatchGeolocationAsync(
+        string deviceKindPath,
+        int id,
+        GeolocationDto geolocation,
+        CancellationToken token = default);
+
+    /// <summary>
     /// GOP API를 통해 Camera의 전체 데이터를 교체합니다 (PUT).
     /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
     /// </summary>

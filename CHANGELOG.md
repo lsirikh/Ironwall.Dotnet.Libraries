@@ -15,6 +15,11 @@
 ## [Unreleased]
 
 ### Added
+- **장비 심볼 속성창 "현재위치 적용" — 심볼 위치를 디바이스 Model/API에 저장** ([PRD](docs/prds/Symbol_Apply_DeviceLocation_Api-prd.md) · [Plan](docs/plans/Symbol_Apply_DeviceLocation_Api-prd-plan.md) · GMaps.Ui + Devices.Ui/Api)
+  - 맵 장비 심볼 속성창(연결디바이스 콤보 아래)에 **"현재위치 적용"** 버튼 추가 → 심볼의 현재 지도 위치(위도/경도) + 방위(`BaseBearing`→`Heading`)를 연결된 디바이스 Model에 반영하고 **서버 API로 저장**. 버튼 클릭 시 **버튼 내부에 무한 프로그래스바**가 돌고, 완료되면 정상 상태로 복원.
+  - **배경**: 심볼 위치(GIS 심볼 테이블)와 디바이스 좌표(디바이스 테이블/API)는 별도 저장소라, 심볼을 드래그해도 디바이스 API 좌표는 안 바뀜 → "특정 위치 확인"(NATS) 기능의 카메라 좌표가 (0,0)/옛값인 문제를 근본 해소.
+  - **데이터 안전(geolocation-only PATCH)**: 전체 DTO PUT은 `ToCameraDeviceDto`의 HardwareSpec 역매핑 누락 + 맵 LinkedDevice가 목록 엔드포인트라 password/스펙 미적재 → 자격증명·스펙 소거 위험. 따라서 신규 `IDeviceApiService.PatchGeolocationAsync(kind, id, GeolocationDto)`로 **`{geolocation}`만 부분 PATCH**(서버 `exclude_unset`). 좌표 외 필드 미전송=무손상, geo JSONB 전체교체라 location/altitude 보존 포함. 성공 시에만 in-memory 모델 반영.
+  - **seam 분리**: 인터페이스 `IDeviceLocationGateway`(Monitoring.Models), 구현 `DeviceLocationGateway`(Devices.Ui, 6타입 분기 cameras/sensors/controllers/speakers/enclosures/lamps), GMaps.Ui는 lazy IoC 해석(미등록 시 graceful 비활성, 신규 프로젝트 참조 0). 속성창 버튼=ZOrder PART 패턴. Devices.Ui+GMaps.Ui 빌드0·회귀 124/124. Explore+code-reviewer(opus) H1 해소 반영.
 - **카메라 PTZ "특정 위치 확인" → NATS 좌표 발행** ([PRD](docs/prds/Camera_PTZ_AimLocation_Nats-prd.md) · [Plan](docs/plans/Camera_PTZ_AimLocation_Nats-prd-plan.md) · GMaps.Ui)
   - 맵에서 **PTZ 카메라 심볼 우클릭 → "특정 위치 확인" → 커서가 조준(Cross)으로 바뀌고 카메라 중심 반경 30m 원 표시 → 영역 안 클릭 → 해당 좌표를 NATS PUB로 발행**(카메라 회전 요청 + 좌표). 클라는 직접 회전하지 않고 좌표만 전달하며, 실제 PTZ 회전(지리 방위→pan/tilt)은 서버/NVRManager가 수행. 영역 밖 클릭·ESC·우클릭 = 취소.
   - PTZ 전용 노출: `ICameraDeviceModel.Category == EnumCameraType.PTZ`인 카메라에서만 메뉴 항목 표시(동기 판정, DB 스키마 변경 없음).
