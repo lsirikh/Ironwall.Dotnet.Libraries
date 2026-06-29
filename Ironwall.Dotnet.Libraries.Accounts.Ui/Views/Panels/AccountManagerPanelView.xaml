@@ -44,22 +44,7 @@
 					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
 				<StackPanel Grid.Row="0" Orientation="Vertical">
-					<!--  시안 헤더 바 (LayerPanel 패턴)  -->
-					<Border
-						Margin="-20,-20,-20,8"
-						Style="{StaticResource ModernDialogHeader}">
-						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<md:PackIcon
-								Width="20"
-								Height="20"
-								Margin="0,0,8,0"
-								VerticalAlignment="Center"
-								Foreground="{DynamicResource OnPrimaryFixedBrush}"
-								Kind="Account" />
-							<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="사용자 정보" />
-						</StackPanel>
-					</Border>
-
+					
 
 					<Grid Grid.Row="0" Margin="10,0">
 						<Grid.ColumnDefinitions>
@@ -490,27 +475,7 @@
 					<TextBlock Text="선택된 항목 : " />
 					<TextBlock Text="{Binding SelectedItemCount, UpdateSourceTrigger=PropertyChanged}" />
 				</StackPanel>
-				<Separator
-					Grid.Row="3"
-					Background="{DynamicResource DividerBrush}"
-					Style="{StaticResource MaterialDesignLightSeparator}" />
-				<Grid Grid.Row="4" Margin="0,10,0,0">
-					<Button
-						x:Name="ClickCancel"
-						VerticalAlignment="Center"
-						IsDefault="True"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}">
-						<Button.Content>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon Kind="Cancel" Style="{StaticResource ButtonIcon}" />
-								<TextBlock
-									Style="{StaticResource ButtonTextBlock}"
-									Text="닫기"
-									TextAlignment="Center" />
-							</StackPanel>
-						</Button.Content>
-					</Button>
-				</Grid>
+				
 			</Grid>
 		</md:Card>
 	</md:DialogHost>
