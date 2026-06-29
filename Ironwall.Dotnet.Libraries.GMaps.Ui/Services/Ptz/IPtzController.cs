@@ -80,8 +80,12 @@ public interface IPtzController
     /// <summary>오토포커스(AUTO/MANUAL) 설정. read-modify-write로 타 필드 보존. (FR-OPT-02)</summary>
     Task<bool> SetAutoFocusAsync(int cameraId, bool auto, CancellationToken ct = default);
 
-    /// <summary>수동 포커스 이동(near/far) — ContinuousFocus 펄스 후 Stop. direction +1=far(원경)/-1=near(근경). IsImagingCapable일 때만.</summary>
-    Task<bool> MoveFocusAsync(int cameraId, int direction, CancellationToken ct = default);
+    /// <summary>수동 포커스 연속 이동 시작(누름) — ContinuousFocus(Stop까지 계속). direction +1=far(원경)/-1=near(근경).
+    /// 속도는 카메라 GetMoveOptions(ContinuousFocus Speed) 범위로 클램프(FR-PH-10). IsImagingCapable일 때만.</summary>
+    Task<bool> StartFocusAsync(int cameraId, int direction, CancellationToken ct = default);
+
+    /// <summary>수동 포커스 정지(뗌) — ImagingClient.Stop. StopAsync(PTZ)와 별개 모터 경로(I-05 직교).</summary>
+    Task StopFocusAsync(int cameraId, CancellationToken ct = default);
 
     /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(int cameraId);

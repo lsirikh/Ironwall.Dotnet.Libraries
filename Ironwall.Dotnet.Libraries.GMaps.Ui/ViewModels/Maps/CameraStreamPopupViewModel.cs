@@ -67,17 +67,18 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>컨트롤이 영상 위 휠 회전 시 호출(방향 ±1).</summary>
     internal void RaisePtzZoom(int direction) => PtzZoomRequested?.Invoke(this, direction);
 
-    // PTZ 탭 줌 +/- 버튼 — 휠과 동일 경로(PtzZoomRequested → ContinuousMove 줌 펄스). +1=줌인 / -1=줌아웃.
-    private ICommand? _zoomInCommand, _zoomOutCommand;
-    public ICommand ZoomInCommand => _zoomInCommand ??= new RelayCommand(() => RaisePtzZoom(+1));
-    public ICommand ZoomOutCommand => _zoomOutCommand ??= new RelayCommand(() => RaisePtzZoom(-1));
+    // 줌 +/- 버튼 — press-hold(누르면 연속 줌·뗌 정지). 컨트롤이 PreviewMouseDown/Up에서 Hold/Stop 발화.
+    // 줌 release는 PtzStopRequested 재사용(StopAsync가 PanTilt+Zoom 정지). 휠은 별도 PtzZoomRequested 펄스 경로 유지.
+    /// <summary>줌 버튼 누름 → 연속 줌 시작(+1=줌인/-1=줌아웃). 컨트롤 PreviewMouseDown. 뗌은 PtzStopRequested.</summary>
+    public event EventHandler<int>? ZoomHoldRequested;
+    internal void RaiseZoomHold(int direction) => ZoomHoldRequested?.Invoke(this, direction);
 
-    /// <summary>수동 포커스 이동 요청(+1=far/-1=near). MapViewModel이 IPtzController.MoveFocus 호출.</summary>
-    public event EventHandler<int>? FocusRequested;
-    internal void RaiseFocus(int direction) => FocusRequested?.Invoke(this, direction);
-    private ICommand? _focusFarCommand, _focusNearCommand;
-    public ICommand FocusFarCommand => _focusFarCommand ??= new RelayCommand(() => RaiseFocus(+1));
-    public ICommand FocusNearCommand => _focusNearCommand ??= new RelayCommand(() => RaiseFocus(-1));
+    /// <summary>포커스 버튼 누름 → 연속 포커스 시작(+1=far/-1=near). 컨트롤 PreviewMouseDown. IsImagingCapable일 때만.</summary>
+    public event EventHandler<int>? FocusHoldRequested;
+    internal void RaiseFocusHold(int direction) => FocusHoldRequested?.Invoke(this, direction);
+    /// <summary>포커스 버튼 뗌/캡처분실/닫기 → 포커스 모터 정지(ImagingClient Stop — PTZ StopAsync와 별개 경로).</summary>
+    public event EventHandler? FocusStopRequested;
+    internal void RaiseFocusStop() => FocusStopRequested?.Invoke(this, EventArgs.Empty);
 
     public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
