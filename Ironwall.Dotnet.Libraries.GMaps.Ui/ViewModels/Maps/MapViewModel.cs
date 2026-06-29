@@ -878,6 +878,12 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>카메라 제어 권한(cam:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "cameras" 고정. (FR-EN-06)</summary>
     private bool CanControlCamera() => ResolvePermissionService()?.CanControl("cameras") ?? true;
 
+    /// <summary>방송 발행 권한(broadcast:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "broadcast" 고정. (FR-EN-07)</summary>
+    private bool CanBroadcast() => ResolvePermissionService()?.CanControl("broadcast") ?? true;
+
+    /// <summary>상황도 편집 권한(map:edit). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "map" 고정. (FR-EN-08)</summary>
+    private bool CanEditMap() => ResolvePermissionService()?.CanEdit("map") ?? true;
+
     // FR-EN-11: 역할강등 즉시 재평가 — 권한 상실 시 진행 중 PTZ 이동(연속이동) 취소 + 열린 팝업 PTZ 비활성.
     private bool _ptzPermSubscribed;
     private void SubscribePtzPermission()
@@ -1980,6 +1986,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </remarks>
     private async void ExecuteLoadImageOverlay(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 오버레이 추가 차단"); return; }
         try
         {
             _log?.Info("이미지 오버레이 불러오기 시작");
@@ -2116,6 +2123,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async void ExecuteLoadMapImage(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 맵파일 추가 차단"); return; }
         try
         {
             _log?.Info("커스텀 맵 불러오기 시작");
@@ -2181,6 +2189,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void ExecuteCreateCustomMap(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 커스텀 맵 등록 차단"); return; }
         try
         {
             if (SelectedImage == null) return;
@@ -2607,6 +2616,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async void ExecuteDeleteSelected(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 선택 삭제 차단"); return; }
         try
         {
             if (SelectedImage != null)
@@ -2841,6 +2851,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     private async void ExecuteAddSelectedSymbol(object obj)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 추가 차단"); return; }
         try
         {
             var position = ClickedCurrentPosition.IsEmpty ? MainMap!.CenterPosition : ClickedCurrentPosition;
@@ -3681,6 +3692,7 @@ public class MapViewModel : BasePanelViewModel,
     public async void SetHomePosition()
     {
         if (HomePosition == null) return;
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 홈 위치 저장 차단"); return; }
 
         HomePosition.Position = new CoordinateModel(latitude: ClickedCurrentPosition.Lat, longitude: ClickedCurrentPosition.Lng, altitude: 0);
         HomePosition.Zoom = Zoom;
@@ -3728,6 +3740,7 @@ public class MapViewModel : BasePanelViewModel,
     /// </summary>
     public async Task AddCustomMarker(PointLatLng position, string title = "CustomMarker")
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — CustomMarker 추가 차단"); return; }
         try
         {
             // 1. SymbolModel 생성
@@ -3766,6 +3779,7 @@ public class MapViewModel : BasePanelViewModel,
 
     public async Task AddGeometricMarker(PointLatLng position, EnumShapeType shapeType, string title = "GeometricMarker")
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — GeometricMarker 추가 차단"); return; }
         try
         {
             // 1. SymbolModel 생성
@@ -7171,6 +7185,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnRoiRegisterRequested(object? sender, EventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 관심지역 등록 차단"); return; }
         try
         {
             var position = MainMap!.Position;
@@ -7203,6 +7218,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnRoiDeleteRequested(object? sender, MapRoiEventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 관심지역 삭제 차단"); return; }
         try
         {
             _pendingDeleteRoiId = e.Roi.Id;
@@ -7228,6 +7244,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnRoiTitleEdited(object? sender, MapRoiTitleEditedEventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 관심지역 이름 변경 차단"); return; }
         try
         {
             bool updated = await _gMapDbService.UpdateMapRoiTitleAsync(e.Roi.Id, e.NewTitle);
@@ -7319,6 +7336,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnBroadcastPlaySendRequested(object? sender, BroadcastSendEventArgs e)
     {
+        if (!CanBroadcast()) { _log?.Warning("[FR-EN-07] 방송 발행 권한 없음 — 음원 실행 차단"); return; }
         try
         {
             await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat);
@@ -7354,6 +7372,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnTtsSendRequested(object? sender, TtsSendEventArgs e)
     {
+        if (!CanBroadcast()) { _log?.Warning("[FR-EN-07] 방송 발행 권한 없음 — TTS 실행 차단"); return; }
         try
         {
             await _broadcastControlService.PublishTtsAsync(e.LinkedDeviceId, e.Message);
@@ -7626,7 +7645,10 @@ public class MapViewModel : BasePanelViewModel,
             {
                 ApplyLayerVisibility(e.Layer);
             }
-            await _gMapDbService.UpdateMapLayerVisibilityAsync(e.Layer.Id, e.IsVisible);
+            if (CanEditMap())   // FR-PG-11: 로컬 렌더는 허용, DB 영속만 권한 필요 (FR-EN-08)
+                await _gMapDbService.UpdateMapLayerVisibilityAsync(e.Layer.Id, e.IsVisible);
+            else
+                _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 가시성 DB 저장 차단(로컬 렌더는 적용됨)");
             _log?.Info($"레이어 '{e.Layer.Name}' Visibility={e.IsVisible}");
         }
         catch (Exception ex) { _log?.Error($"레이어 Visibility 변경 실패: {ex.Message}"); }
@@ -7649,7 +7671,10 @@ public class MapViewModel : BasePanelViewModel,
                     MainMap.InvalidateVisual();
                 }
             }
-            await _gMapDbService.UpdateMapLayerOpacityAsync(e.Layer.Id, e.Opacity);
+            if (CanEditMap())   // FR-PG-11: 로컬 렌더는 허용, DB 영속만 권한 필요 (FR-EN-08)
+                await _gMapDbService.UpdateMapLayerOpacityAsync(e.Layer.Id, e.Opacity);
+            else
+                _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 투명도 DB 저장 차단(로컬 렌더는 적용됨)");
             _log?.Info($"레이어 '{e.Layer.Name}' Opacity={e.Opacity:F2}");
         }
         catch (Exception ex) { _log?.Error($"레이어 Opacity 변경 실패: {ex.Message}"); }
@@ -7657,6 +7682,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnLayerDeleteRequested(object? sender, LayerChangedEventArgs e)
     {
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 삭제 차단"); return; }
         try
         {
             var layer = e.Layer;
@@ -7684,6 +7710,7 @@ public class MapViewModel : BasePanelViewModel,
     private async void OnLayerRenameRequested(object? sender, Args.LayerRenameEventArgs e)
     {
         if (_isSyncingRename) return;
+        if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 레이어 이름 변경 차단"); return; }
         _isSyncingRename = true;
         try
         {
