@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;   // IPermissionService (FR-EN-06 권한 게이팅)
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Views.Maps;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -652,6 +653,26 @@ public class MapViewModel : BasePanelViewModel,
         return _ptzController;
     }
 
+    // ── 권한 게이팅(FR-EN-06) ── IPermissionService도 IPtzController처럼 IoC lazy 해석.
+    //    GMaps.Ui→Accounts.Api 참조 추가됨(순환 없음). 미등록(DB Auth/오프라인/테스트) 시 null → 전체허용 폴백(V-EN-11).
+    private IPermissionService? _permissionService;
+    private bool _permissionResolved;
+    private IPermissionService? ResolvePermissionService()
+    {
+        if (_permissionResolved) return _permissionService;
+        _permissionResolved = true;
+        try { _permissionService = IoC.Get<IPermissionService>(); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] PermissionService 미해석(권한 게이팅 전체허용 폴백): {ex.Message}");
+            _permissionService = null;
+        }
+        return _permissionService;
+    }
+
+    /// <summary>카메라 제어 권한(cam:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "cameras" 고정. (FR-EN-06)</summary>
+    private bool CanControlCamera() => ResolvePermissionService()?.CanControl("cameras") ?? true;
+
     /// <summary>팝업 오픈 시 ONVIF PTZ 준비(InitializeFull + GetNode space) → IsPtzCapable 설정(게이팅 진실원). (FR-GATE-01)</summary>
     private async Task EnsurePtzReadyAsync(CameraStreamPopupViewModel vm, ICameraDeviceModel cam)
     {
@@ -674,7 +695,7 @@ public class MapViewModel : BasePanelViewModel,
             };
             _log?.Info($"[CameraPopup] PTZ 준비 시도 cam={vm.CameraId} {cam.IpAddress}:{conn.PortOnvif}");
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
-            await OnUiAsync(() => { vm.IsPtzCapable = ok; vm.IsImagingCapable = ptz.IsImagingCapable(vm.CameraId); vm.IsPtzLoading = false; }).ConfigureAwait(false);
+            await OnUiAsync(() => { vm.IsPtzCapable = ok && CanControlCamera(); vm.IsImagingCapable = ptz.IsImagingCapable(vm.CameraId); vm.IsPtzLoading = false; }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} capable={ok} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
         }
         catch (Exception ex)
@@ -708,7 +729,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPtzDragRequested(object? sender, PtzDragEventArgs e)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzDragAsync(vm, e);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePtzDragAsync(vm, e);   // cam:control 게이팅 (FR-EN-06)
     }
 
     /// <summary>좌버튼 드래그 릴리즈 → 드래그 방향으로 ContinuousMove, 길이 비례 시간 후 Stop. FOV(부채꼴)는 NVR→NATS가 갱신. (FR-DRAG-03)</summary>
@@ -744,6 +765,7 @@ public class MapViewModel : BasePanelViewModel,
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
         if (ptz == null) return;
+        if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06)
         BeginPtzGesture(vm.CameraId);   // 드래그/줌 대기 취소(앞 Stop이 패드 이동 끊지 않게)
         _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0);
     }
@@ -757,7 +779,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPtzZoom(object? sender, int direction)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePtzZoomAsync(vm, direction);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePtzZoomAsync(vm, direction);   // cam:control (FR-EN-06)
     }
 
     /// <summary>영상 휠 → 줌 방향 ContinuousMove 펄스 후 Stop. FOV는 NVR→NATS가 갱신. (FR-PTZCTL-03)</summary>
@@ -781,7 +803,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz != null) _ = ptz.MoveFocusAsync(vm.CameraId, direction);
+        if (ptz != null && CanControlCamera()) _ = ptz.MoveFocusAsync(vm.CameraId, direction);   // cam:imaging→잠정 cam:control (FR-EN-06)
     }
 
     /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
@@ -803,7 +825,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetGoto(object? sender, IPtzPresetModel preset)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetGotoAsync(vm, preset);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetGotoAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
     /// <summary>프리셋 이동 = AbsoluteMove(저장 좌표). FOV(부채꼴)는 NVR→NATS가 갱신. (FR-PRESET-02)</summary>
@@ -821,7 +843,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetSave(object? sender, string name)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetSaveAsync(vm, name);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetSaveAsync(vm, name);   // cam:control (FR-EN-06)
     }
 
     /// <summary>프리셋 저장 = 현재 위치(GetStatus) 읽어 DB Upsert. 위치 못 읽으면 중단(쓰레기 좌표 금지). (FR-PRESET-03)</summary>
@@ -852,7 +874,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetDelete(object? sender, IPtzPresetModel preset)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetDeleteAsync(vm, preset);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetDeleteAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
     private async Task HandlePresetDeleteAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
@@ -867,7 +889,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupPresetHome(object? sender, IPtzPresetModel preset)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandlePresetHomeAsync(vm, preset);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetHomeAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
     private async Task HandlePresetHomeAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
@@ -907,7 +929,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupIrCutFilter(object? sender, string mode)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandleIrCutFilterAsync(vm, mode);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandleIrCutFilterAsync(vm, mode);   // cam:imaging→잠정 cam:control (OQ-PG-04 전, FR-EN-06)
     }
 
     private async Task HandleIrCutFilterAsync(CameraStreamPopupViewModel vm, string mode)
@@ -924,7 +946,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private void OnCameraPopupAutoFocus(object? sender, bool auto)
     {
-        if (sender is CameraStreamPopupViewModel vm) _ = HandleAutoFocusAsync(vm, auto);
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandleAutoFocusAsync(vm, auto);   // cam:imaging→잠정 cam:control (OQ-PG-04 전, FR-EN-06)
     }
 
     private async Task HandleAutoFocusAsync(CameraStreamPopupViewModel vm, bool auto)
