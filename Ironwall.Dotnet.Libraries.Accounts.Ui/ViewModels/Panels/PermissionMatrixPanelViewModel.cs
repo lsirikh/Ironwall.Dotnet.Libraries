@@ -201,7 +201,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel
                 {
                     GroupId = g.Id,
                     GroupName = _levels[g.Name].label,   // 한글 등급 라벨
-                    UserCount = g.UserCount ?? 0,
+                    UserCount = countByRole.TryGetValue(g.Name.ToUpperInvariant(), out var uc) ? uc : 0,   // 역할(role)별 실제 계정 수
                     Active = g.IsActive ? "사용" : "미사용",
                     ViewCount = v,
                     EditCount = e,
