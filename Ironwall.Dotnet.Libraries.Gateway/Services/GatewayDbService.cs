@@ -134,17 +134,17 @@ internal class GatewayDbService : TaskService, IGatewayDbService
             if (_conn == null || _conn.State != ConnectionState.Open)
                 throw new Exception("Gateway DB 연결이 이루어지지 않았습니다.");
 
+            // 신규 설치 스키마: 레거시 단일 `Group` 컬럼/IX_Group 없음.
+            // 그룹은 N:N 연결 테이블 `GatewayEventGroups`가 단일 출처(single source of truth)다.
             var createGatewayEventsTable = @"
                 CREATE TABLE IF NOT EXISTS `GatewayEvents` (
                     `Id`          INT AUTO_INCREMENT PRIMARY KEY,
                     `EventName`   VARCHAR(255) NOT NULL UNIQUE,
-                    `Group`       INT          NOT NULL DEFAULT 0,
                     `IsEnable`    BOOLEAN      NOT NULL DEFAULT TRUE,
                     `Description` TEXT,
                     `CreatedAt`   DATETIME     DEFAULT CURRENT_TIMESTAMP,
                     `UpdatedAt`   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX `IX_EventName` (`EventName`),
-                    INDEX `IX_Group` (`Group`),
                     INDEX `IX_IsEnable` (`IsEnable`)
                 );";
 
@@ -159,20 +159,64 @@ internal class GatewayDbService : TaskService, IGatewayDbService
                     INDEX `IX_GEG_GroupId` (`GroupId`)
                 );";
 
-            // 기존 Group>0 데이터를 연결 테이블로 이행 (INSERT IGNORE — 멱등)
-            var migrateGroupData = @"
-                INSERT IGNORE INTO `GatewayEventGroups` (`EventId`, `GroupId`)
-                SELECT `Id`, `Group` FROM `GatewayEvents` WHERE `Group` > 0;";
-
             await _conn.ExecuteAsync(createGatewayEventsTable);
             await _conn.ExecuteAsync(createGatewayEventGroupsTable);
-            await _conn.ExecuteAsync(migrateGroupData);
-            _log?.Info("GatewayEvents / GatewayEventGroups 테이블 생성/확인 및 데이터 이행 완료.");
+
+            // 레거시 단일 `Group` 컬럼을 1회만 마무리(이행→좀비정리→DROP)한다.
+            // 과거 상시 이행 쿼리는 매 시작 레거시값을 연결 테이블로 '부활'시켜
+            // 쓰레기 그룹(예: "1, 116")을 만들었다 — 그 경로를 제거한다.
+            await FinalizeLegacyGroupColumnAsync();
+
+            _log?.Info("GatewayEvents / GatewayEventGroups 테이블 생성/확인 완료.");
         }
         catch (Exception ex)
         {
             _log?.Error($"Gateway BuildSchemeAsync Error: {ex}");
         }
+    }
+
+    /// <summary>
+    /// 레거시 단일 <c>GatewayEvents.Group</c> 컬럼을 1회 정리하고 제거한다(자기비활성화·멱등).
+    /// </summary>
+    /// <remarks>
+    /// N:N 전환(GatewayEventGroups) 이전의 단일 그룹값이 시작 시마다 연결 테이블로 부활(resurrection)하던
+    /// 결함을 차단한다. 컬럼이 이미 없으면(=정리 완료) 즉시 반환한다.
+    /// <para>좀비 식별 근거: 현재 UI(GatewayEventViewModel.SelectedGroup)는 이벤트당 단일 그룹만 지정 가능하므로,
+    /// 한 이벤트의 그룹이 2개 이상이면 초과분은 부활된 레거시값 = 좀비다. 레거시값이 유일 그룹(count=1)이면
+    /// 정당한 단일 지정으로 보존한다.</para>
+    /// <para>호출 스레드: <see cref="StartService"/>(단일 스레드) — 동시 호출 없음.</para>
+    /// </remarks>
+    private async Task FinalizeLegacyGroupColumnAsync()
+    {
+        // 1) 레거시 컬럼 존재 여부 — 없으면 이미 마무리됨 → 스킵(멱등)
+        const string columnExistsSql = @"
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME   = 'GatewayEvents'
+               AND COLUMN_NAME  = 'Group';";
+
+        var hasLegacyColumn = await _conn!.ExecuteScalarAsync<long>(columnExistsSql) > 0;
+        if (!hasLegacyColumn)
+            return;
+
+        // 2) 최종 안전 이행 — 아직 연결 테이블에 없는 Group>0 값 보존(유실 방지)
+        await _conn.ExecuteAsync(@"
+            INSERT IGNORE INTO `GatewayEventGroups` (`EventId`, `GroupId`)
+            SELECT `Id`, `Group` FROM `GatewayEvents` WHERE `Group` > 0;");
+
+        // 3) 좀비 정리 — 그룹이 2개 이상인 이벤트에서 '레거시 Group == GroupId' 행 제거(count>1 가드로 유일값 보존)
+        var zombieRemoved = await _conn.ExecuteAsync(@"
+            DELETE g FROM `GatewayEventGroups` g
+            JOIN `GatewayEvents` e ON g.`EventId` = e.`Id`
+            JOIN (SELECT `EventId`, COUNT(*) AS c
+                    FROM `GatewayEventGroups` GROUP BY `EventId`) cnt
+              ON cnt.`EventId` = g.`EventId`
+            WHERE e.`Group` > 0 AND g.`GroupId` = e.`Group` AND cnt.c > 1;");
+
+        // 4) 레거시 컬럼 제거 — IX_Group은 컬럼 DROP 시 동반 삭제(MariaDB 검증 완료)
+        await _conn.ExecuteAsync("ALTER TABLE `GatewayEvents` DROP COLUMN `Group`;");
+
+        _log?.Info($"레거시 Group 컬럼 1회 마무리 완료 — 좀비 {zombieRemoved}건 제거 후 컬럼 DROP.");
     }
 
     public async Task FetchInstanceAsync(CancellationToken token = default)

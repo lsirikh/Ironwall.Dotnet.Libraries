@@ -371,10 +371,9 @@ public class GatewayDb_SchemaTests
         Assert.Equal("varchar", nameCol.DATA_TYPE);
         Assert.Equal("NO", nameCol.IS_NULLABLE);
 
-        // Group 컬럼
+        // 레거시 Group 컬럼은 신규 스키마에 존재하지 않아야 한다 (N:N GatewayEventGroups 단일 출처)
         var groupCol = columnList.FirstOrDefault(c => c.COLUMN_NAME == "Group");
-        Assert.NotNull(groupCol);
-        Assert.Equal("int", groupCol.DATA_TYPE);
+        Assert.Null(groupCol);
 
         // IsEnable 컬럼
         var enableCol = columnList.FirstOrDefault(c => c.COLUMN_NAME == "IsEnable");
