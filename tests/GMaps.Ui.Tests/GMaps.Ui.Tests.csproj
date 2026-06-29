@@ -14,6 +14,8 @@
     <!-- Press-Hold(CameraPopup_PressHold_PtzZoomFocus) 순수 헬퍼 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzGestureTag.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzFocusMath.cs" />
+    <!-- PTZ 속도 스케일(CameraPopup_PTZ_Responsiveness_Speed FR-PTR-02) -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\PtzVelocityMath.cs" />
     <!-- Tracking 달력/세션 분할 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\DateRangeCalendar.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\TrackSessionSplitter.cs" />

@@ -959,12 +959,11 @@ public class MapViewModel : BasePanelViewModel,
     private System.Threading.CancellationToken BeginPtzGesture(int cameraId)
     {
         var cts = new System.Threading.CancellationTokenSource();
-        if (_ptzGestureCts.TryRemove(cameraId, out var old))
-        {
-            try { old.Cancel(); } catch { /* 이미 종료 */ }
-            old.Dispose();
-        }
-        _ptzGestureCts[cameraId] = cts;
+        // 원자적 교체(F-06): TryRemove+인덱서 2단계 비원자 경합(직전 CTS 미취소/잘못된 토큰 저장) 방지.
+        // 직전 CTS는 update 콜백에서 취소·Dispose. add/update 모두 사전 생성한 동일 cts 반환 → 토큰 일관성 보장.
+        _ptzGestureCts.AddOrUpdate(cameraId,
+            _ => cts,
+            (_, old) => { try { old.Cancel(); old.Dispose(); } catch { /* 이미 종료 */ } return cts; });
         return cts.Token;
     }
 
@@ -1007,8 +1006,9 @@ public class MapViewModel : BasePanelViewModel,
         var ptz = ResolvePtzController();
         if (ptz == null) return;
         if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06)
-        BeginPtzGesture(vm.CameraId);   // 드래그/줌 대기 취소(앞 Stop이 패드 이동 끊지 않게)
-        _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0);
+        // FR-PTR-01: 취소토큰 전달 → 새 제스처가 직전 대기명령을 LWW 취소(Gate 큐 누적 제거). 드래그/휠과 동일.
+        var ct = BeginPtzGesture(vm.CameraId);
+        _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0, ct);
     }
 
     private void OnCameraPopupPtzStop(object? sender, EventArgs e)
@@ -1046,8 +1046,9 @@ public class MapViewModel : BasePanelViewModel,
         var ptz = ResolvePtzController();
         if (ptz == null) return;
         if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06) — 다른 PTZ 핸들러와 동일
-        BeginPtzGesture(vm.CameraId);   // 인플라이트 드래그/휠 펄스의 Delay·Stop 취소(새 hold 줌을 끊지 않게)
-        _ = ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed);   // 연속 — 뗄 때 StopAsync
+        // FR-PTR-01: 취소토큰 전달 → 직전 인플라이트 펄스/대기명령 LWW 취소(큐 누적 제거).
+        var ct = BeginPtzGesture(vm.CameraId);
+        _ = ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct);   // 연속 — 뗄 때 StopAsync
     }
 
     /// <summary>포커스 버튼 누름 → 연속 포커스 시작(near/far). 뗌/캡처분실/닫기는 OnCameraPopupFocusStop. direction +1=far/-1=near. (FR-PH-02)</summary>

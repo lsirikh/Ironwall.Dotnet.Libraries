@@ -65,7 +65,10 @@ public sealed class PtzController : IPtzController
         string? AbsZoomUri, double AbsZMin, double AbsZMax,
         bool HasRelZoom, string? RelZoomUri, double RelZMin, double RelZMax,
         // ContinuousMove velocity space URI(공백이면 카메라가 velocity를 무시할 수 있음 → ContinuousMove 무동작 원인).
-        string? ContPtUri, string? ContZoomUri);
+        string? ContPtUri, string? ContZoomUri,
+        // ContinuousMove velocity space 범위(FR-PTR-02 속도 스케일 진실원). 미제공 시 [-1,1] 폴백(=항등).
+        double ContPtXMin, double ContPtXMax, double ContPtYMin, double ContPtYMax,
+        double ContZMin, double ContZMax);
 
     /*──────────────── 공개 API ────────────────*/
 
@@ -157,12 +160,17 @@ public sealed class PtzController : IPtzController
                 // velocity space를 GetNode의 ContinuousPanTilt/ZoomVelocitySpace로 명시 — 공백이면 일부 카메라가
                 // velocity를 무시해 무동작(이 카메라 증상). space가 null이면 카메라 기본 space 사용.
                 var sp = ctx.Spaces;
+                // FR-PTR-02: 정규화 속도(방향×사용자 PanTiltSpeed/ZoomSpeed)를 카메라 연속속도 범위로 스케일 → 속도 슬라이더 실반영.
+                // sp==null(GetNode 미로드)이면 원값. 범위 미제공 시 [-1,1] 폴백 → 스케일=항등(기존 동작 안전).
+                var sPan  = sp != null ? PtzVelocityMath.ScaleToRange(panVel,  sp.ContPtXMin, sp.ContPtXMax) : panVel;
+                var sTilt = sp != null ? PtzVelocityMath.ScaleToRange(tiltVel, sp.ContPtYMin, sp.ContPtYMax) : tiltVel;
+                var sZoom = sp != null ? PtzVelocityMath.ScaleToRange(zoomVel, sp.ContZMin,  sp.ContZMax)  : zoomVel;
                 var speed = new PtzSpeedDto
                 {
-                    PanTilt = new Vector2DDto { X = (float)panVel, Y = (float)tiltVel, Space = sp?.ContPtUri },
-                    Zoom = new Vector1DDto { X = (float)zoomVel, Space = sp?.ContZoomUri },
+                    PanTilt = new Vector2DDto { X = (float)sPan, Y = (float)sTilt, Space = sp?.ContPtUri },
+                    Zoom = new Vector1DDto { X = (float)sZoom, Space = sp?.ContZoomUri },
                 };
-                _log?.Info($"[PTZ] ContinuousMove cam={cameraId} pan={panVel:F2} tilt={tiltVel:F2} zoom={zoomVel:F2} ptSpace={(sp?.ContPtUri ?? "null")} zSpace={(sp?.ContZoomUri ?? "null")} gateWait={__swGate.ElapsedMilliseconds}ms");
+                _log?.Info($"[PTZ] ContinuousMove cam={cameraId} norm(pan={panVel:F2},tilt={tiltVel:F2},zoom={zoomVel:F2})→scaled(pan={sPan:F2},tilt={sTilt:F2},zoom={sZoom:F2}) ptRange=[{(sp?.ContPtXMin ?? -1):F2},{(sp?.ContPtXMax ?? 1):F2}] zRange=[{(sp?.ContZMin ?? -1):F2},{(sp?.ContZMax ?? 1):F2}] gateWait={__swGate.ElapsedMilliseconds}ms");
                 var __swMove = System.Diagnostics.Stopwatch.StartNew();   // [진단] WCF ContinuousMove 호출 왕복
                 await _onvif.MovePTZ(ctx.Model.PtzClient, speed, ctx.ProfileToken, "PT10S").ConfigureAwait(false);
                 __swMove.Stop();
@@ -425,6 +433,11 @@ public sealed class PtzController : IPtzController
             var contPt = sp.ContinuousPanTiltVelocitySpace?.FirstOrDefault();   // ContinuousMove 팬틸트 velocity space
             var contZ = sp.ContinuousZoomVelocitySpace?.FirstOrDefault();       // ContinuousMove 줌 velocity space
 
+            // FR-PTR-02 진단(code-review MED): 연속속도 범위가 단방향/비대칭(min≥0)이면 역방향(음수)이 0으로 죽어
+            // "한 방향만 안 움직임" 오진을 유발 → 1회 경고로 필드 진단 가능하게.
+            if ((contPt?.XRange?.Min ?? -1d) >= 0d || (contPt?.YRange?.Min ?? -1d) >= 0d || (contZ?.XRange?.Min ?? -1d) >= 0d)
+                _log?.Warning($"[PTZ] 연속속도 범위 단방향/비대칭 — ptX.min={(contPt?.XRange?.Min ?? -1d):F2} ptY.min={(contPt?.YRange?.Min ?? -1d):F2} z.min={(contZ?.XRange?.Min ?? -1d):F2}. 역방향(음수) 이동이 0으로 제한될 수 있음(카메라 space 특성).");
+
             return new SpaceInfo(
                 HasRel: rel != null,
                 RelPtUri: rel?.URI,
@@ -438,7 +451,11 @@ public sealed class PtzController : IPtzController
                 AbsZMin: absZ?.XRange?.Min ?? 0d, AbsZMax: absZ?.XRange?.Max ?? 1d,
                 HasRelZoom: relZ != null, RelZoomUri: relZ?.URI,
                 RelZMin: relZ?.XRange?.Min ?? -1d, RelZMax: relZ?.XRange?.Max ?? 1d,
-                ContPtUri: contPt?.URI, ContZoomUri: contZ?.URI);
+                ContPtUri: contPt?.URI, ContZoomUri: contZ?.URI,
+                // 연속속도 범위(FR-PTR-02). 미제공 → [-1,1] 폴백(스케일 항등 = 기존 동작 안전).
+                ContPtXMin: contPt?.XRange?.Min ?? -1d, ContPtXMax: contPt?.XRange?.Max ?? 1d,
+                ContPtYMin: contPt?.YRange?.Min ?? -1d, ContPtYMax: contPt?.YRange?.Max ?? 1d,
+                ContZMin: contZ?.XRange?.Min ?? -1d, ContZMax: contZ?.XRange?.Max ?? 1d);
         }
         catch (Exception ex)
         {
