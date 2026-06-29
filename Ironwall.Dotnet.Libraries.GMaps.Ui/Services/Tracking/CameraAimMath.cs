@@ -29,4 +29,19 @@ public static class CameraAimMath
         if (!TrackingMath.IsValidLatLng(clickLat, clickLng)) return false;
         return TrackingMath.HaversineMeters(centerLat, centerLng, clickLat, clickLng) <= radiusMeters;
     }
+
+    /// <summary>
+    /// aim 반경(m) 선택 — 우선순위: ①카메라 최대탐지거리 → ②심볼 탐지범위 → ③글로벌 폴백.
+    /// 각 단계 값이 0 이하/null이면 다음으로. 결과는 [1, maxClamp]로 클램프.
+    /// </summary>
+    public static double ResolveAimRadius(double? maxDetectionRange, double detectionRange, double globalDefault, double maxClamp = 5000d)
+    {
+        double r = maxDetectionRange.GetValueOrDefault();
+        if (r <= 0d) r = detectionRange;
+        if (r <= 0d) r = globalDefault;
+        if (r <= 0d) r = 30d;                  // 최후 기본값
+        if (r < 1d) r = 1d;
+        if (r > maxClamp) r = maxClamp;
+        return r;
+    }
 }

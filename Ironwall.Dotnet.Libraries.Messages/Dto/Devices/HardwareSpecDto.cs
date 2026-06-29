@@ -33,4 +33,8 @@ public class HardwareSpecDto
 
     [JsonProperty("onvif_version", Order = 9)]
     public string OnvifVersion { get; set; } = string.Empty;
+
+    /// <summary>최대 탐지거리(m) — GIS "특정 위치 확인" aim 반경/FOV 산출용. 미설정 시 직렬화 생략.</summary>
+    [JsonProperty("max_detection_range", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
+    public double? MaxDetectionRange { get; set; }
 }

@@ -1431,6 +1431,25 @@ public class DtoToModelHelperCameraTests
         Assert.Equal("2.4", model.OnvifVersion);
     }
 
+    [Fact(DisplayName = "MaxDetectionRange: HardwareSpec dto↔model 라운드트립 (Symbol_Apply_DeviceLocation)")]
+    [Trait("Category", "DtoToModel")]
+    public void should_roundtrip_max_detection_range_through_camera_mapper()
+    {
+        // model → dto → model 라운드트립 + 카메라 전체 매퍼 경유 보존 검증
+        var dto = new HardwareSpecDto { Model = "XNP-6400", MaxDetectionRange = 175.0 };
+        var info = DtoToModelHelper.ToCameraInfoModel(dto);
+        Assert.Equal(175.0, info.MaxDetectionRange);
+
+        var camModel = new CameraDeviceModel { Id = 7, HardwareSpec = info };
+        var camDto = camModel.ToCameraDeviceDto();
+        Assert.NotNull(camDto.HardwareSpec);
+        Assert.Equal(175.0, camDto.HardwareSpec!.MaxDetectionRange);   // model→dto 보존(H1 라운드트립)
+
+        var back = camDto.ToCameraDeviceModel();
+        Assert.NotNull(back.HardwareSpec);
+        Assert.Equal(175.0, back.HardwareSpec!.MaxDetectionRange);     // dto→model 보존(aim 소비 경로)
+    }
+
     [Fact(DisplayName = "A19.6-2: CameraUrlsDto → ICameraUrlsModel 변환")]
     [Trait("Category", "DtoToModel")]
     public void CameraUrlsDto_ToICameraUrlsModel()

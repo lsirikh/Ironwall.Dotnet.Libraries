@@ -59,6 +59,40 @@ public class CameraAimMathTests
         Assert.False(CameraAimMath.IsWithinRadius(CenterLat, CenterLng, CenterLat, 999d, 30d));
     }
 
+    // ── ResolveAimRadius: 카메라 최대탐지거리 → 심볼 탐지범위 → 글로벌 폴백 우선순위 ──
+
+    [Fact]
+    public void should_use_max_detection_range_when_present()
+    {
+        Assert.Equal(120d, CameraAimMath.ResolveAimRadius(120d, 30d, 50d));
+    }
+
+    [Fact]
+    public void should_fallback_to_detection_range_when_max_null_or_zero()
+    {
+        Assert.Equal(30d, CameraAimMath.ResolveAimRadius(null, 30d, 50d));
+        Assert.Equal(30d, CameraAimMath.ResolveAimRadius(0d, 30d, 50d));
+    }
+
+    [Fact]
+    public void should_fallback_to_global_when_max_and_detection_zero()
+    {
+        Assert.Equal(50d, CameraAimMath.ResolveAimRadius(null, 0d, 50d));
+        Assert.Equal(50d, CameraAimMath.ResolveAimRadius(0d, 0d, 50d));
+    }
+
+    [Fact]
+    public void should_default_30_when_all_zero()
+    {
+        Assert.Equal(30d, CameraAimMath.ResolveAimRadius(0d, 0d, 0d));
+    }
+
+    [Fact]
+    public void should_clamp_to_max_when_exceeds()
+    {
+        Assert.Equal(5000d, CameraAimMath.ResolveAimRadius(99999d, 30d, 50d));
+    }
+
     /// <summary>위도 고정, 경도만 동쪽으로 meters 이동(테스트용 근사).</summary>
     private static (double lat, double lng) OffsetEastMeters(double lat, double lng, double meters)
     {

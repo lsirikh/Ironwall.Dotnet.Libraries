@@ -168,7 +168,28 @@ public static class DtoToModelHelper
         MapGeolocationToDto(model, dto);
         if (model.Urls != null)
             dto.Urls = ToCameraUrlsDto(model.Urls);
+        if (model.HardwareSpec != null)
+            dto.HardwareSpec = ToHardwareSpecDto(model.HardwareSpec);   // 라운드트립(H1 보강 + max_detection_range 저장)
         return dto;
+    }
+
+    /// <summary>CameraInfoModel(HardwareSpec) → HardwareSpecDto (model→dto).</summary>
+    public static HardwareSpecDto ToHardwareSpecDto(ICameraInfoModel model)
+    {
+        if (model == null) throw new ArgumentNullException(nameof(model));
+        return new HardwareSpecDto
+        {
+            Name = model.Name ?? string.Empty,
+            Location = model.Location ?? string.Empty,
+            Manufacturer = model.Manufacturer ?? string.Empty,
+            Model = model.Model ?? string.Empty,
+            Hardware = model.Hardware ?? string.Empty,
+            Firmware = model.Firmware ?? string.Empty,
+            DeviceId = model.DeviceId ?? string.Empty,
+            MacAddress = model.MacAddress ?? string.Empty,
+            OnvifVersion = model.OnvifVersion ?? string.Empty,
+            MaxDetectionRange = model.MaxDetectionRange
+        };
     }
 
     /// <summary>
@@ -416,7 +437,8 @@ public static class DtoToModelHelper
             Firmware = dto.Firmware,
             DeviceId = dto.DeviceId,
             MacAddress = dto.MacAddress,
-            OnvifVersion = dto.OnvifVersion
+            OnvifVersion = dto.OnvifVersion,
+            MaxDetectionRange = dto.MaxDetectionRange
         };
     }
 

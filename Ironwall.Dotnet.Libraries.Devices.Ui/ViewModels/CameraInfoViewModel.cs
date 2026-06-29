@@ -77,5 +77,12 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.ViewModels{
             set { _model.OnvifVersion = value; NotifyOfPropertyChange(() => OnvifVersion); }
         }
 
+        /// <summary>최대 탐지거리(m) — GIS "특정 위치 확인" aim 반경/FOV 산출용(운영자 수동 입력, ONVIF 아님).</summary>
+        public double? MaxDetectionRange
+        {
+            get => _model.MaxDetectionRange;
+            set { _model.MaxDetectionRange = value; NotifyOfPropertyChange(() => MaxDetectionRange); }
+        }
+
     }
 }

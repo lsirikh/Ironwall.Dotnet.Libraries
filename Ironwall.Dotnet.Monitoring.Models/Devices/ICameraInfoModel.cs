@@ -13,4 +13,6 @@ public interface ICameraInfoModel : IBaseModel
     string? Model { get; set; }
     string? Name { get; set; }
     string? OnvifVersion { get; set; }
+    /// <summary>최대 탐지거리(m) — GIS aim 반경/FOV 산출용.</summary>
+    double? MaxDetectionRange { get; set; }
 }

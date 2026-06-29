@@ -516,10 +516,11 @@ public class MapViewModel : BasePanelViewModel,
             CancelConflictingModesForAim();
 
             _aimCamera = cam;
-            // 반경 = 그 카메라의 탐지범위(DetectionRange) — 지도 FOV 부채꼴이 닿는 거리와 동일. 미설정 시 글로벌 폴백.
-            double radius = marker.DetectionRange;
-            if (radius <= 0d) radius = _trackingSetupModel?.CameraAimRadiusMeters ?? 30d;
-            _aimRadiusMeters = Math.Clamp(radius, 1d, 5000d);
+            // 반경 우선순위: ①카메라 최대탐지거리(HardwareSpec.MaxDetectionRange) → ②심볼 탐지범위(DetectionRange) → ③글로벌 폴백
+            _aimRadiusMeters = Services.Tracking.CameraAimMath.ResolveAimRadius(
+                cam.HardwareSpec?.MaxDetectionRange,
+                marker.DetectionRange,
+                _trackingSetupModel?.CameraAimRadiusMeters ?? 30d);
             unchecked { _aimGeneration++; }
 
             MainMap.AimOverlayCenter = new PointLatLng(centerLat, centerLng);
