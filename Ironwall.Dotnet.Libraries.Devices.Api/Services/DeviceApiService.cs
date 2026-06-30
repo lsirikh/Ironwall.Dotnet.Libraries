@@ -532,6 +532,28 @@ public class DeviceApiService : IDeviceApiService
     }
 
     /// <summary>
+    /// 카메라 hardware_spec만 PATCH — MaxDetectionRange 포함 전체 HardwareSpec 전송, 그 외 카메라 필드(비번 등)는 미전송 보존.
+    /// (Camera_PTZ_AimLocation / Symbol_Apply_DeviceLocation — full PUT의 H1 소거 위험 회피)
+    /// </summary>
+    public async Task<ApiResponse<object>> PatchHardwareSpecAsync(int id, HardwareSpecDto hardwareSpec, CancellationToken token = default)
+    {
+        try
+        {
+            var body = new { hardware_spec = hardwareSpec };
+            var url = $"{_setupModel.Url}/devices/cameras/{id}";
+            _log?.Info($"[PatchHardwareSpecAsync] PATCH {url} body={Newtonsoft.Json.JsonConvert.SerializeObject(body)}");
+            var response = await _apiService.PatchRequestAsync(url, body);
+            _log?.Info($"[PatchHardwareSpecAsync] 응답 status={(int)response.StatusCode} {response.StatusCode}");
+            return await response.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchHardwareSpecAsync)}] Error: {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"Failed to patch hardware_spec cameras/{id}", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// GOP API를 통해 특정 Camera의 전체 정보를 수정합니다(전체 업데이트).
     /// <para>PUT /devices/cameras/{id} 엔드포인트를 호출</para>
     /// <para>DTO의 모든 속성을 업데이트됩니다</para>
