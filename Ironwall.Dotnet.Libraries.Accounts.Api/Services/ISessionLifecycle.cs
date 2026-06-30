@@ -30,4 +30,9 @@ public interface ISessionLifecycle
 
     /// <summary>강제 로그아웃 1회 발화(reason 동반). lock 밖에서 발화(재진입 방지). 구독자=GIS/셸.</summary>
     event Action<EnumRevokeReason>? ForceLogoutRequested;
+
+    /// <summary>로그인 성공 직후 발화(B 연계: GIS init·Device fetch 트리거). 토큰·권한 적용 완료 후.</summary>
+    event Action? LoginSucceeded;
+    /// <summary>로그인 성공 통지 — ApiAccountGateway가 ResetForLogin 직후 호출. 구독자(GIS)가 데이터 로드 시작.</summary>
+    void NotifyLoginSucceeded();
 }

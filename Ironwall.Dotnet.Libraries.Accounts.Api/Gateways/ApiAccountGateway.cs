@@ -54,6 +54,9 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         //   모든 Can*/IsAdmin/HasRole 무력(게이팅 dead). 여기서 채워야 UI 게이팅이 살아난다. PermissionsChanged 발화.
         _permission.Apply(user);
         _lifecycle?.ResetForLogin();   // FR-FL-04: 새 로그인 → 강제 로그아웃 once-guard 재무장
+        _log?.Info($"[PERMDIAG][ApiGW] Apply 완료 — 인스턴스#{_permission.GetHashCode()} role={user.Role} permsNull={user.Permissions == null} " +
+                   $"CanView(events)={_permission.CanView("events")} CanControl(events)={_permission.CanControl("events")} IsAdmin={_permission.IsAdmin}");
+        _lifecycle?.NotifyLoginSucceeded();   // B 연계: 로그인 게이팅 — GIS init/Device fetch 트리거(토큰·권한 적용 후)
 
         var account = AccountDtoMapper.ToAccountModel(user);
         var permissions = PermissionsFlattener.Flatten(user.Permissions);

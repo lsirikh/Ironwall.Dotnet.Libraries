@@ -48,4 +48,13 @@ public class SessionLifecycle : ISessionLifecycle
     }
 
     public void ResetForLogin() => Interlocked.Exchange(ref _loggingOut, 0);
+
+    public event Action? LoginSucceeded;
+
+    public void NotifyLoginSucceeded()
+    {
+        // 구독자(GIS init/Device fetch) 예외 격리. 토큰·권한은 이미 적용된 상태에서 호출됨.
+        try { LoginSucceeded?.Invoke(); }
+        catch (Exception ex) { _log?.Warning($"[SessionLifecycle] LoginSucceeded 구독자 예외: {ex.Message}"); }
+    }
 }

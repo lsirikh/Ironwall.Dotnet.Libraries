@@ -56,7 +56,20 @@ public class LoginPanelViewModel : BasePanelViewModel
         });
 
     public async Task ClickCancel()
-        => await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
+    {
+        if (IsForced) return;   // 강제 로그인(B 게이팅) — 취소(닫기) 불가
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
+    }
+
+    /// <summary>강제 로그인 — B(로그인 게이팅)가 startup 시 true. 취소 버튼 비활성·ClickCancel 무시(닫기 차단).</summary>
+    private bool _isForced;
+    public bool IsForced
+    {
+        get => _isForced;
+        set { if (_isForced == value) return; _isForced = value; NotifyOfPropertyChange(() => IsForced); NotifyOfPropertyChange(() => CanClickCancel); }
+    }
+    /// <summary>Caliburn 가드 — 강제 로그인 시 취소 버튼 비활성.</summary>
+    public bool CanClickCancel => !_isForced;
 
     public async Task ClickOk()
     {
