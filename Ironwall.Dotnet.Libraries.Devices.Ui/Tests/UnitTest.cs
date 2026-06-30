@@ -1216,6 +1216,17 @@ public class MockDeviceProviderService : IDeviceProviderService
 
     public Task RemoveDeviceGroupByIdAsync(int resourceId)
         => Task.CompletedTask;
+
+    // 로그인 게이팅(Login_Gated_GIS_Init)
+    public bool TriggerInitFetchAsyncCalled { get; private set; }
+    public Task TriggerInitFetchAsync(CancellationToken externalToken = default)
+    {
+        TriggerInitFetchAsyncCalled = true;
+        return Task.CompletedTask;
+    }
+
+    public bool CancelInitFetchCalled { get; private set; }
+    public void CancelInitFetch() => CancelInitFetchCalled = true;
 }
 #endregion
 

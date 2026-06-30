@@ -1,4 +1,6 @@
 using Autofac;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Modules;
 using Ironwall.Dotnet.Libraries.Api.Services;
@@ -38,7 +40,22 @@ public class DeviceApiModule : Module
             // 1. ApiModule 등록 (내부에서 IApiService 등록)
             // ApiSetupModel은 이제 Timeout 속성을 포함하므로 직접 사용 가능
             //builder.RegisterModule(new ApiModule(_log, setupModel, "MediaMTX"));
-            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count));
+            // 로그인 게이팅(Login_Gated_GIS_Init, FR-BR/D5): Device·Server fetch에 Bearer 부착(서버 token 강화 대비).
+            // ITokenStorageService(AccountApiModule 등록) 공유 → 토큰 자동 동기. 미등록(DB모드)이면 핸들러 미부착(하위호환).
+            // 401 시 single-flight refresh + 최종실패 SessionExpired→ForceLogoutOnce (AccountApiModule와 동일 패턴).
+            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count, authHandlerFactory: ctx =>
+            {
+                var store = ctx.ResolveOptional<ITokenStorageService>();
+                if (store is null) return null;   // DB모드 등 미등록 → Bearer 미부착
+                var scope = ctx.Resolve<ILifetimeScope>();
+                var handler = new BearerAuthHandler(store, () => scope.Resolve<IAccountApiService>(), _log);
+                handler.SessionExpired += () =>
+                {
+                    try { scope.Resolve<ISessionLifecycle>().ForceLogoutOnce(EnumRevokeReason.Unauthorized); }
+                    catch (Exception ex) { _log?.Warning($"[{nameof(DeviceApiModule)}] SessionExpired→ForceLogout 실패: {ex.Message}"); }
+                };
+                return handler;
+            }));
 
             // 2. ApiSetupModel 등록
             builder.RegisterInstance(_setup).Named<ApiSetupModel>(_name).SingleInstance();

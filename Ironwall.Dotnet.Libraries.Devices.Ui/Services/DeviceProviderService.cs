@@ -72,9 +72,13 @@ public class DeviceProviderService : IDeviceProviderService
     /// <summary>
     /// IService.ExecuteAsync 구현 - StartService를 호출합니다.
     /// </summary>
-    public async Task ExecuteAsync(CancellationToken token = default)
+    public Task ExecuteAsync(CancellationToken token = default)
     {
-        await StartService(token);
+        // 로그인 게이팅(Login_Gated_GIS_Init, PRD-GIS-INIT-01):
+        // 부팅 시 무조건 fetch 금지 — 토큰 없는 로그인 전 fetch는 서버 token 강화 시 401→빈 캐시→심볼 연계붕괴.
+        // 실제 fetch는 로그인 성공 후 ShellViewModel이 TriggerInitFetchAsync로 구동(ISessionLifecycle.LoginSucceeded 구독).
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(ExecuteAsync)} — 로그인 게이팅: 부팅 fetch 보류(로그인 후 트리거 대기)");
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -98,11 +102,50 @@ public class DeviceProviderService : IDeviceProviderService
             await FetchAllDevicesAsync(token);
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(StartService)} completed successfully");
         }
+        catch (OperationCanceledException)
+        {
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(StartService)} canceled");
+            throw;
+        }
         catch (Exception ex)
         {
             _log?.Error($"{nameof(DeviceProviderService)}.{nameof(StartService)} failed: {ex.Message}");
             throw;
         }
+    }
+
+    /// <summary>
+    /// 로그인 게이팅 — 로그인 성공 후 Device 전수 fetch + 캐시 구축을 시작합니다(트리거).
+    /// 재진입(재로그인) 시 진행 중 fetch를 취소하고 최신 데이터로 재시작합니다. 내부 CTS로 ForceLogout 취소 지원.
+    /// </summary>
+    public async Task TriggerInitFetchAsync(CancellationToken externalToken = default)
+    {
+        CancellationTokenSource cts;
+        lock (_fetchGate)
+        {
+            // 재진입(재로그인): 진행 중 fetch 취소 후 최신 데이터로 재시작
+            _fetchCts?.Cancel();
+            _fetchCts?.Dispose();
+            cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
+            _fetchCts = cts;
+        }
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(TriggerInitFetchAsync)} — 로그인 후 Device fetch 시작");
+        try
+        {
+            await StartService(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(TriggerInitFetchAsync)} 취소됨(로그아웃/재로그인) — 커버 유지");
+        }
+        // 그 외 예외(예: 401/네트워크)는 상위(ShellViewModel)로 전파 → 401 완화·커버 유지 처리
+    }
+
+    /// <summary>진행 중 Device fetch를 취소합니다(강제 로그아웃/세션 만료 시). AllDevicesLoaded 미발화 → 커버 유지.</summary>
+    public void CancelInitFetch()
+    {
+        lock (_fetchGate) { _fetchCts?.Cancel(); }
+        _log?.Info($"{nameof(DeviceProviderService)}.{nameof(CancelInitFetch)} — 진행 중 fetch 취소 요청");
     }
 
     /// <summary>
@@ -117,6 +160,7 @@ public class DeviceProviderService : IDeviceProviderService
 
             // ──────────── 0. Servers (스피커 드롭다운 — 디바이스 로드와 독립, 내부 try/catch라 실패해도 디바이스 로드 계속) ────────────
             await FetchServersAsync(token);
+            await ReportFetchProgress(token, "서버", 1);
 
             //_deviceProvider.Clear();
             // ──────────── 1. Controllers (먼저 로딩) ────────────
@@ -129,6 +173,7 @@ public class DeviceProviderService : IDeviceProviderService
 
             _log?.Info($"Controllers loaded: {controllers.Count} items");
             await PublishSplashMessage("ControllerProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "컨트롤러", 2);
 
             // ──────────── 2. Sensors (Navigation Mapping) ────────────
             var controllerDict = controllers.ToDictionary(c => c.Id, c => c);
@@ -141,6 +186,7 @@ public class DeviceProviderService : IDeviceProviderService
 
             _log?.Info($"Sensors loaded: {sensors.Count} items");
             await PublishSplashMessage("SensorProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "센서", 3);
 
             // ──────────── 3. Cameras ────────────
             var cameras = await FetchCamerasAsync(token);
@@ -152,6 +198,7 @@ public class DeviceProviderService : IDeviceProviderService
 
             _log?.Info($"Cameras loaded: {cameras.Count} items");
             await PublishSplashMessage("CameraProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "카메라", 4);
 
             // ──────────── 4. Speakers ────────────
             var speakers = await FetchSpeakersAsync(token);
@@ -159,6 +206,7 @@ public class DeviceProviderService : IDeviceProviderService
 
             _log?.Info($"Speakers loaded: {speakers.Count} items");
             await PublishSplashMessage("SpeakerProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "스피커", 5);
 
             // ──────────── 5. Enclosures ────────────
             var enclosures = await FetchEnclosuresAsync(token);
@@ -166,6 +214,7 @@ public class DeviceProviderService : IDeviceProviderService
 
             _log?.Info($"Enclosures loaded: {enclosures.Count} items");
             await PublishSplashMessage("EnclosureProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "외함", 6);
 
             // ──────────── 6. Lamps ────────────
             var lamps = await FetchLampsAsync(token);
@@ -173,14 +222,23 @@ public class DeviceProviderService : IDeviceProviderService
 
             _log?.Info($"Lamps loaded: {lamps.Count} items");
             await PublishSplashMessage("LampProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "램프", 7);
 
             // ──────────── 7. DeviceGroups ────────────
             await FetchDeviceGroupsAsync(token);
+            await ReportFetchProgress(token, "그룹", 8);
 
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
 
             // FR-08a: 전체 Device 로딩 완료 → SymbolEventManager 일괄 동기화 트리거
+            // 로그인 게이팅: 여기까지 도달 = fetch 정상 완료 → 커버 제거 신호(AllDevicesLoaded). 취소 시엔 도달 전 throw → 미발화.
             await _eventAggregator.PublishOnUIThreadAsync(new AllDevicesLoadedMessage());
+        }
+        catch (OperationCanceledException)
+        {
+            // 로그인 게이팅: 로그아웃/재로그인으로 취소 — AllDevicesLoaded 미발화(커버 유지). 상위로 전파.
+            _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} canceled — AllDevicesLoaded 미발화");
+            throw;
         }
         catch (Exception ex)
         {
@@ -813,6 +871,17 @@ public class DeviceProviderService : IDeviceProviderService
                     Message = message
                 });
     }
+
+    /// <summary>
+    /// 로그인 게이팅 — 커버 진행바용 Device fetch 단계 진행 알림 + 취소 체크포인트.
+    /// <para>각 단계 완료 후 호출. 취소 요청 시 ThrowIfCancellationRequested로 즉시 throw → AllDevicesLoaded 미발화(커버 유지).</para>
+    /// </summary>
+    private async Task ReportFetchProgress(CancellationToken token, string step, int index)
+    {
+        token.ThrowIfCancellationRequested();
+        if (_eventAggregator != null)
+            await _eventAggregator.PublishOnUIThreadAsync(new DeviceFetchProgressMessage(step, index, 8));
+    }
     #endregion
 
     #region - Attributes -
@@ -998,5 +1067,9 @@ public class DeviceProviderService : IDeviceProviderService
     private readonly DeviceGroupProvider _deviceGroupProvider;
     private readonly IServerApiService _serverApiService;
     private readonly ServerProvider _serverProvider;
+
+    // 로그인 게이팅(Login_Gated_GIS_Init) — fetch 트리거/취소용 CTS (다중 스레드 접근: UI 트리거 + 배경 ForceLogout → _fetchGate lock)
+    private readonly object _fetchGate = new();
+    private CancellationTokenSource? _fetchCts;
     #endregion
 }

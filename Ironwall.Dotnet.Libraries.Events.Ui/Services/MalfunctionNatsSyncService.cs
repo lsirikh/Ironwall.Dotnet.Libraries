@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Newtonsoft.Json.Linq;
 using Ironwall.Dotnet.Libraries.Nats.Models;
 using Ironwall.Dotnet.Libraries.Nats.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using System;
 using System.Windows;
 using System.Windows.Threading;
@@ -30,7 +31,8 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
         ISymbolEventManager symbolEventManager,
         IEventQueueManager eventQueueManager,
         IEventSetupModel eventSetupModel,
-        IEventAggregator? eventAggregator = null)
+        IEventAggregator? eventAggregator = null,
+        ITokenStorageService? tokenStorage = null)
     {
         _log = log;
         _natsService = natsService;
@@ -38,6 +40,7 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
         _eventQueueManager = eventQueueManager;
         _eventSetupModel = eventSetupModel;
         _eventAggregator = eventAggregator;
+        _tokenStorage = tokenStorage;
     }
     #endregion
 
@@ -67,6 +70,9 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     #region - Processes -
     private Task OnNatsMalfunctionAsync(MessageArgsModel e)
     {
+        // 로그인 게이팅(Login_Gated_GIS_Init): 로그인 전 NATS 이벤트 수신 차단 — 맵/캐시 미구축 상태에서 알람 방지.
+        // 미조치 이벤트는 서버 DB에 영속 → 로그인 후 이력 패널 조회로 후처리. _tokenStorage 미주입 시 게이트 비활성(하위호환).
+        if (_tokenStorage is { IsAuthenticated: false }) return Task.CompletedTask;
         try
         {
             if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
@@ -131,5 +137,6 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     private readonly IEventQueueManager _eventQueueManager;
     private readonly IEventSetupModel _eventSetupModel;
     private readonly IEventAggregator? _eventAggregator;
+    private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
     #endregion
 }

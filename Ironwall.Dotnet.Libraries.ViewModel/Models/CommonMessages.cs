@@ -12,7 +12,11 @@ namespace Ironwall.Dotnet.Libraries.ViewModel.Models;
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
 public class CloseAllMessageModel;
-public class OpenLoginPanelMessageModel;
+public class OpenLoginPanelMessageModel
+{
+    /// <summary>로그인 게이팅(Login_Gated_GIS_Init) — 강제 로그인 모드(닫기 불가). 부팅/세션만료 시 true.</summary>
+    public bool IsForced { get; set; }
+}
 public class OpenLogoutPanelMessageModel;
 public class OpenWindyPanelMessageModel;
 public class OpenSetupPanelMessageModel;
@@ -92,6 +96,9 @@ public record SendWindyModeMessage(EnumWindyMode Mode);
 
 /// <summary>디바이스 초기 로딩 완료 알림 — SymbolEventManager 일괄 동기화 트리거</summary>
 public record AllDevicesLoadedMessage();
+
+/// <summary>로그인 게이팅(Login_Gated_GIS_Init) — Device fetch 진행 단계 알림(커버 진행바). StepIndex 1..TotalSteps.</summary>
+public record DeviceFetchProgressMessage(string Step, int StepIndex, int TotalSteps);
 
 /// <summary>NatsSync 기반 단일 디바이스 Status 변경 알림</summary>
 public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType, EnumDeviceStatus Status);
