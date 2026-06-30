@@ -165,6 +165,17 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
 
     /// <summary>Caliburn 버튼 가드 — 서버 가용 시에만 저장.</summary>
     public bool CanClickSave => ServerSettingsAvailable;
+
+    // ── 레거시 호환 스텁 ──
+    // 메인솔루션 AccountSetupViewModel(옛 설정탭 래퍼)가 이 프로퍼티들을 참조(appsettings 영속).
+    // 설정탭은 제거됐고 새 View(세션 정책)는 바인딩하지 않아 사실상 미사용 — 래퍼 컴파일 유지용.
+    // 래퍼/등록 정리(메인솔루션) 후 제거 예정.
+    private bool _isVisible = true;
+    public bool IsVisible { get => _isVisible; set { if (_isVisible == value) return; _isVisible = value; NotifyOfPropertyChange(() => IsVisible); } }
+    private bool _isSession;
+    public bool IsSession { get => _isSession; set { if (_isSession == value) return; _isSession = value; NotifyOfPropertyChange(() => IsSession); } }
+    private int _sessionExpiration;
+    public int SessionExpiration { get => _sessionExpiration; set { if (_sessionExpiration == value) return; _sessionExpiration = value; NotifyOfPropertyChange(() => SessionExpiration); } }
     #endregion
     #region - Attributes -
     private IAccountApiService? _api;
