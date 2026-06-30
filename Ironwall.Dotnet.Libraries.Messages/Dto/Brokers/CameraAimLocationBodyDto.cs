@@ -7,8 +7,8 @@ namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
                   지도에서 클릭한 타겟 좌표로 카메라를 향하게 하라는 요청.
                   클라는 좌표만 전달하고, 실제 PTZ 회전(geo bearing→pan/tilt)은
                   서버/NVRManager가 수행한다.
-                  Subject: "{DomainNats}.{GroupNats}.nvr_manager.camera-aim"
-                  cmd: "CAMERA_AIM_LOCATION"
+                  Subject: "{DomainNats}.{GroupNats}.nvr_manager.ptz" (PTZ_* Absolute)
+                  cmd: "PTZ_AIM_LOCATION"
    Created By   : GHLee
    Created On   : 2026-06-29
    Department   : SW Team
