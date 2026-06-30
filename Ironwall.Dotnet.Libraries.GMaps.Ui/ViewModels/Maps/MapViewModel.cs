@@ -458,6 +458,7 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.OnMapClicked -= OnMapClicked;
             MainMap.TargetAimClicked -= OnTargetAimClicked;
             MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForAim;
+            if (_aimEscWindow != null) { _aimEscWindow.PreviewKeyDown -= OnMapPreviewKeyDownForAim; _aimEscWindow = null; }
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
             MainMap.MarkerEditCancelled -= OnMarkerEditCancelled;
@@ -516,6 +517,7 @@ public class MapViewModel : BasePanelViewModel,
             CancelConflictingModesForAim();
 
             _aimCamera = cam;
+            _aimCenter = new PointLatLng(centerLat, centerLng);   // 심볼 위치 = 원·히트테스트·메시지 공통 중심(중심 불일치 방지)
             // 반경 우선순위: ①카메라 최대탐지거리(HardwareSpec.MaxDetectionRange) → ②심볼 탐지범위(DetectionRange) → ③글로벌 폴백
             _aimRadiusMeters = Services.Tracking.CameraAimMath.ResolveAimRadius(
                 cam.HardwareSpec?.MaxDetectionRange,
@@ -523,11 +525,12 @@ public class MapViewModel : BasePanelViewModel,
                 _trackingSetupModel?.CameraAimRadiusMeters ?? 30d);
             unchecked { _aimGeneration++; }
 
-            MainMap.AimOverlayCenter = new PointLatLng(centerLat, centerLng);
+            MainMap.AimOverlayCenter = _aimCenter;
             MainMap.AimOverlayRadiusMeters = _aimRadiusMeters;
             MainMap.IsTargetAimMode = true;
             System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
-            MainMap.Focus();                 // ESC 키 수신을 위해 포커스 확보
+            EnsureAimEscWindowHook();        // ESC: 윈도우 레벨 후킹(맵이 포커스를 못 받아도 수신)
+            MainMap.Focus();                 // 보조 — 맵 포커스 확보 시도
             MainMap.InvalidateVisual();
 
             SetAimStatus($"특정 위치 확인 — 탐지범위 {_aimRadiusMeters:F0}m 안을 클릭하세요. (ESC·영역 밖 클릭 = 취소)");
@@ -585,8 +588,9 @@ public class MapViewModel : BasePanelViewModel,
         var cam = _aimCamera;
         if (cam == null) { ExitTargetAimMode(); return; }
 
+        // 중심 = 진입 시 스냅샷(_aimCenter, 심볼 위치) — 그려진 원과 동일 기준으로 판정(cam 디바이스 좌표 불일치 방지)
         bool inside = Services.Tracking.CameraAimMath
-            .IsWithinRadius(cam.Latitude, cam.Longitude, geo.Lat, geo.Lng, _aimRadiusMeters);
+            .IsWithinRadius(_aimCenter.Lat, _aimCenter.Lng, geo.Lat, geo.Lng, _aimRadiusMeters);
 
         if (!inside)
         {
@@ -597,7 +601,7 @@ public class MapViewModel : BasePanelViewModel,
         }
 
         var body = Services.Tracking.CameraAimRequestBuilder
-            .Build(cam.Id, cam.Latitude, cam.Longitude, geo.Lat, geo.Lng, Environment.UserName);
+            .Build(cam.Id, _aimCenter.Lat, _aimCenter.Lng, geo.Lat, geo.Lng, Environment.UserName);
         if (body == null)
         {
             ExitTargetAimMode();
@@ -632,6 +636,19 @@ public class MapViewModel : BasePanelViewModel,
                     SetAimStatus("회전요청 전송에 실패했습니다.", autoHide: true);
             });
         }
+    }
+
+    /// <summary>ESC 취소를 위해 윈도우 PreviewKeyDown을 1회 후킹(맵 컨트롤이 키보드 포커스를 못 받는 경우 대비). cleanup에서 해제.</summary>
+    private void EnsureAimEscWindowHook()
+    {
+        try
+        {
+            if (_aimEscWindow != null || MainMap == null) return;
+            _aimEscWindow = System.Windows.Window.GetWindow(MainMap);
+            if (_aimEscWindow != null)
+                _aimEscWindow.PreviewKeyDown += OnMapPreviewKeyDownForAim;
+        }
+        catch (Exception ex) { _log?.Warning($"[CameraAim] ESC 윈도우 후킹 경고: {ex.Message}"); }
     }
 
     /// <summary>ESC = 타겟 모드 취소.</summary>
@@ -7174,6 +7191,8 @@ public class MapViewModel : BasePanelViewModel,
     private ICameraDeviceModel? _aimCamera;      // 현재 타겟 모드 대상 카메라(UI 스레드 전용)
     private double _aimRadiusMeters;             // 진입 시 반경 스냅샷(m)
     private int _aimGeneration;                  // stale-await 가드(취소 시 ++)
+    private PointLatLng _aimCenter;              // 진입 시 중심 스냅샷(=심볼 위치). 원/히트테스트/메시지 모두 동일 중심 사용(중심 불일치 버그 방지)
+    private System.Windows.Window? _aimEscWindow; // ESC 취소용 윈도우 레벨 후킹(맵 포커스 상실 무관)
 
     // UI 상태 필드
     private string? _scale;
