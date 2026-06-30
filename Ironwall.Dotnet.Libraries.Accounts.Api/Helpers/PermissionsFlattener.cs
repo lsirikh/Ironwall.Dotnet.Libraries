@@ -13,8 +13,13 @@ public static class PermissionsFlattener
     {
         if (permissions is null) return Array.Empty<string>();
 
+        // ★ 실서버 형식은 {"modules": {"events": {...}}, "device_groups": [...]} envelope (§2.3.2).
+        //   envelope 이면 modules 안을 평탄화한다(이전엔 "modules"를 모듈로 오인해 토큰 0개 → 비ADMIN 전부 차단 버그).
+        //   envelope 없는 평탄형식({"events":"rw"} / {"events":{"view":true}})도 그대로 수용(하위호환).
+        var source = permissions["modules"] is JObject modulesObj ? modulesObj : permissions;
+
         var result = new List<string>();
-        foreach (var prop in permissions.Properties())
+        foreach (var prop in source.Properties())
         {
             var module = prop.Name;
             var value = prop.Value;

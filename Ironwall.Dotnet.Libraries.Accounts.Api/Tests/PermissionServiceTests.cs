@@ -173,4 +173,19 @@ public class PermissionServiceTests
         Assert.True(s.CanControl("cameras"));    // 올바른 모듈명
         Assert.False(s.CanControl("cam"));       // 오기 → 차단
     }
+
+    [Fact]
+    public void should_grant_from_server_modules_envelope_format()
+    {
+        // ★ 실서버 형식 {"modules":{...}} envelope — 평탄형식 외 래퍼도 수용해야 함.
+        //   이전 Flattener가 래퍼 미언랩 → 토큰 0개 → OPERATOR 전부차단 버그(로그 PERMDIAG로 확인). 회귀 가드.
+        var s = new PermissionService();
+        s.Apply(User("OPERATOR", @"{""modules"":{""events"":{""view"":true,""control"":true},""devices"":{""view"":true},""cameras"":{""view"":true,""control"":true}}}"));
+
+        Assert.True(s.CanView("events"));
+        Assert.True(s.CanControl("events"));     // OPERATOR 조치보고 ⭕
+        Assert.True(s.CanView("devices"));
+        Assert.False(s.CanEdit("devices"));      // 편집은 차단
+        Assert.True(s.CanControl("cameras"));    // PTZ ⭕
+    }
 }
