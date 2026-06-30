@@ -1,5 +1,6 @@
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -71,8 +72,8 @@ public class LayerTreeNode : INotifyPropertyChanged
                 _isUpdatingChildren = false;
             }
 
-            // 자식 → 부모 전파
-            if (!_isUpdatingChildren && Parent != null)
+            // 자식 → 부모 전파 (부모가 일괄 cascade 중이면 건너뜀 — 대형 카테고리 토글 시 O(n^2) 재계산 방지, FR-03)
+            if (!_isUpdatingChildren && Parent != null && !Parent._isUpdatingChildren)
             {
                 Parent.UpdateCheckStateFromChildren();
             }
@@ -81,7 +82,11 @@ public class LayerTreeNode : INotifyPropertyChanged
             if (Model != null)
                 Model.IsVisible = value ?? true;
 
-            // Leaf 노드 체크 변경 시 이벤트 발생
+            // 개별 심볼 가시성 영속 필드(ShowShape) 동기화 — 실제 마커 토글은 CheckChanged 핸들러가 수행(FR-03)
+            if (Symbol != null && value.HasValue)
+                Symbol.ShowShape = value.Value;
+
+            // Leaf 노드 체크 변경 시 이벤트 발생 (개별 심볼 리프 포함)
             if (NodeType == LayerNodeType.Leaf)
                 CheckChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -157,9 +162,17 @@ public class LayerTreeNode : INotifyPropertyChanged
     public bool HasOpacitySlider { get; set; }
 
     /// <summary>
-    /// DB 모델 참조 (Leaf 노드만, Group/Section은 null)
+    /// DB 모델 참조 (Overlay Leaf / Category 노드, Group/Section/SymbolLeaf은 null)
     /// </summary>
     public IMapLayerModel? Model { get; set; }
+
+    /// <summary>
+    /// 개별 심볼 리프 전용 페이로드(ISymbolModel). Model(IMapLayerModel)과 상속관계 없으므로 별도 슬롯(FR-01 이음새).
+    /// </summary>
+    public ISymbolModel? Symbol { get; set; }
+
+    /// <summary>개별 심볼 리프 여부 — 액션 게이팅·템플릿 분기·이벤트 라우팅용.</summary>
+    public bool IsSymbolLeaf => Symbol != null;
 
     /// <summary>
     /// DB Category 값 (필터링/매핑용)
@@ -259,15 +272,55 @@ public class LayerTreeNode : INotifyPropertyChanged
         };
     }
 
+    /// <summary>
+    /// 카테고리 노드 생성 (펼치면 개별 심볼 자식). 기본 접힘 — 대량 심볼 시 지연 생성(FR-02/07).
+    /// </summary>
+    public static LayerTreeNode CreateCategory(string name, string iconKind, string category,
+        IMapLayerModel? model = null, bool isExpanded = false)
+    {
+        return new LayerTreeNode
+        {
+            Name = name,
+            IconKind = iconKind,
+            Category = category,
+            Model = model,
+            NodeType = LayerNodeType.Category,
+            IsExpanded = isExpanded,
+            HasOpacitySlider = false
+        };
+    }
+
+    /// <summary>
+    /// 개별 심볼 리프 노드 생성 (ISymbolModel 페이로드). 체크=ShowShape, opacity 없음(FR-01/03).
+    /// </summary>
+    public static LayerTreeNode CreateSymbolLeaf(ISymbolModel symbol, string displayName, string iconKind)
+    {
+        return new LayerTreeNode
+        {
+            Symbol = symbol,
+            Name = displayName,
+            IconKind = iconKind,
+            IsChecked = symbol.ShowShape,
+            Category = symbol.Category.ToString(),
+            NodeType = LayerNodeType.Leaf,
+            HasOpacitySlider = false
+        };
+    }
+
     #endregion
 
     #region ContextMenu Commands
 
-    /// <summary>삭제 가능 여부 — OverlayMap/OverlayImage Leaf만</summary>
+    /// <summary>
+    /// 삭제 가능 여부 — Overlay Leaf(Model 보유)만.
+    /// 개별 심볼 리프(Symbol≠null)는 v1 비활성(파괴적, 별도 동기 경로 필요).
+    /// ★ Model=null 일 때 `Model?.LayerType != "Symbol"`가 TRUE로 역전되던 버그 방지 위해 Symbol==null 가드 선행.
+    /// </summary>
     public bool CanDelete => NodeType == LayerNodeType.Leaf
+        && Symbol == null
         && Model?.LayerType != "Symbol";
 
-    /// <summary>이름 바꾸기 가능 여부 — Overlay Leaf (편집 모드 무관)</summary>
+    /// <summary>이름 바꾸기 가능 여부 — Overlay Leaf만(개별 심볼 v1 비활성).</summary>
     public bool CanRename => CanDelete;
 
     /// <summary>위로 이동 가능 여부 — Parent.Children 내 첫 번째가 아닌 경우</summary>
@@ -324,7 +377,8 @@ public class LayerTreeNode : INotifyPropertyChanged
     public ICommand NavigateCommand => _navigateCommand ??=
         new RelayCommand(
             _ => OnNavigateAction?.Invoke(this),
-            _ => NodeType == LayerNodeType.Leaf && Model?.LayerType != "Symbol");
+            // Overlay Leaf(Model 보유) 또는 개별 심볼 리프(Symbol 보유)는 navigate 가능. 카테고리 토글 전용 Leaf는 불가.
+            _ => NodeType == LayerNodeType.Leaf && (Symbol != null || Model?.LayerType != "Symbol"));
 
     #endregion
 
@@ -338,6 +392,7 @@ public class LayerTreeNode : INotifyPropertyChanged
 public enum LayerNodeType
 {
     Section,  // 최상위: OVERLAY MAP, OVERLAY IMAGE, SYMBOLS
-    Group,    // 중간: PIDS 장비, 기하학/인프라
-    Leaf      // 개별: 카메라, 센서, 군사부호 등
+    Group,    // 중간: PIDS 장비
+    Category, // 카테고리: 카메라/센서/군사 등 — 펼치면 개별 심볼 자식(FR-01)
+    Leaf      // 개별 항목: 오버레이 아이템 / 개별 심볼(IsSymbolLeaf=true)
 }

@@ -42,6 +42,16 @@
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="LeafNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
 		<Grid Height="20" Margin="10,3,0,3" ToolTip="{Binding Name}">
+			<!-- 개별 심볼 리프 컨텍스트(이동만 활성, NavigateCommand 게이팅). 카테고리 단위 레거시 Leaf에선 비활성(FR-04). -->
+			<Grid.ContextMenu>
+				<ContextMenu>
+					<MenuItem Header="중앙으로 이동" Command="{Binding NavigateCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="CrosshairsGps" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
+				</ContextMenu>
+			</Grid.ContextMenu>
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="Auto" />
@@ -198,7 +208,9 @@
 	</DataTemplate>
 
 	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- Group 노드 (Expander 제거 → 직접 구현, 공간 최소화) -->
+	<!-- Group / Category 노드 (체크 + 아이콘 + 이름 + 배지 + 셰브런) -->
+	<!-- Category 노드도 이 템플릿 재사용(SectionChildTemplate에서 분기). -->
+	<!-- 자식은 SectionChildTemplate로 라우팅 → Category(재귀) / 개별 심볼 Leaf 모두 처리(FR-02). -->
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="GroupNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
 		<StackPanel Margin="0,2,0,0">
@@ -284,7 +296,8 @@
 					</ToggleButton.Style>
 				</ToggleButton>
 			</Grid>
-			<!-- 자식 Leaf 노드 (접기 가능) -->
+			<!-- 자식 노드 (접기 가능) — Category(재귀 Group 템플릿) 또는 개별 심볼 Leaf로 라우팅. -->
+			<!-- SectionChildTemplate은 뒤에 정의되므로 DynamicResource(전방참조 허용). -->
 			<ItemsControl Margin="20,0,0,0" ItemsSource="{Binding Children}">
 				<ItemsControl.Style>
 					<Style TargetType="ItemsControl">
@@ -298,7 +311,7 @@
 				</ItemsControl.Style>
 				<ItemsControl.ItemTemplate>
 					<DataTemplate DataType="{x:Type models:LayerTreeNode}">
-						<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource LeafNodeTemplate}" />
+						<ContentPresenter Content="{Binding}" ContentTemplate="{DynamicResource SectionChildTemplate}" />
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>
 			</ItemsControl>
@@ -306,7 +319,7 @@
 	</DataTemplate>
 
 	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- Section 자식 자동 선택 (Group / Leaf / Overlay)     -->
+	<!-- Section 자식 자동 선택 (Group / Category / Leaf / Overlay) -->
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="SectionChildTemplate" DataType="{x:Type models:LayerTreeNode}">
 		<ContentPresenter Content="{Binding}">
@@ -315,6 +328,10 @@
 					<Setter Property="ContentTemplate" Value="{StaticResource LeafNodeTemplate}" />
 					<Style.Triggers>
 						<DataTrigger Binding="{Binding NodeType}" Value="Group">
+							<Setter Property="ContentTemplate" Value="{StaticResource GroupNodeTemplate}" />
+						</DataTrigger>
+						<!-- 카테고리 = Group 템플릿 재사용(체크박스+아이콘+이름+개수배지+셰브런 동일), 자식=개별 심볼(FR-02). -->
+						<DataTrigger Binding="{Binding NodeType}" Value="Category">
 							<Setter Property="ContentTemplate" Value="{StaticResource GroupNodeTemplate}" />
 						</DataTrigger>
 						<DataTrigger Binding="{Binding HasOpacitySlider}" Value="True">
@@ -443,8 +460,8 @@
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type ctrl:LayerPanelControl}">
+					<!-- Width/Height는 컨트롤(LayerPanelControl)이 구동 — 고정 Width 제거(리사이즈 FR-05). -->
 					<Border
-						Width="250"
 						Background="{DynamicResource SurfaceBrush}"
 						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"
@@ -511,6 +528,52 @@
 									ItemTemplate="{StaticResource SectionNodeTemplate}"
 									ItemsSource="{Binding TreeNodes, RelativeSource={RelativeSource TemplatedParent}}" />
 							</ScrollViewer>
+
+							<!-- ═══ 리사이즈 그립 (E/S/SE) — 본문 행(Row=1)에만 둬 헤더 이동영역(Row=0)과 분리(FR-05) ═══ -->
+							<Thumb
+								x:Name="PART_ResizeRight"
+								Grid.Row="1"
+								Width="6"
+								Margin="0,0,0,14"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Stretch"
+								Cursor="SizeWE">
+								<Thumb.Template>
+									<ControlTemplate TargetType="Thumb"><Border Background="Transparent" /></ControlTemplate>
+								</Thumb.Template>
+							</Thumb>
+							<Thumb
+								x:Name="PART_ResizeBottom"
+								Grid.Row="1"
+								Height="6"
+								Margin="8,0,14,0"
+								HorizontalAlignment="Stretch"
+								VerticalAlignment="Bottom"
+								Cursor="SizeNS">
+								<Thumb.Template>
+									<ControlTemplate TargetType="Thumb"><Border Background="Transparent" /></ControlTemplate>
+								</Thumb.Template>
+							</Thumb>
+							<Thumb
+								x:Name="PART_ResizeCorner"
+								Grid.Row="1"
+								Width="14"
+								Height="14"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Bottom"
+								Cursor="SizeNWSE">
+								<Thumb.Template>
+									<ControlTemplate TargetType="Thumb">
+										<Grid Background="Transparent">
+											<Path
+												Stroke="{DynamicResource BorderBrush}"
+												StrokeThickness="1"
+												SnapsToDevicePixels="True"
+												Data="M13,3 L3,13 M13,7 L7,13 M13,11 L11,13" />
+										</Grid>
+									</ControlTemplate>
+								</Thumb.Template>
+							</Thumb>
 						</Grid>
 					</Border>
 				</ControlTemplate>

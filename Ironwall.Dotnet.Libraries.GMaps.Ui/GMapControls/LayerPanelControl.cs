@@ -60,16 +60,19 @@ public class LayerPanelControl : Control
             leaf.OnMoveUpAction = RaiseLayerMoveUpRequested;
             leaf.OnMoveDownAction = RaiseLayerMoveDownRequested;
             leaf.OnRenameAction = RaiseLayerRenameRequested;
-            leaf.OnNavigateAction = RaiseLayerNavigateRequested;
+            // 개별 심볼 리프는 심볼 전용 navigate, 그 외(오버레이 Leaf)는 기존 레이어 navigate (FR-01/04)
+            leaf.OnNavigateAction = leaf.IsSymbolLeaf ? RaiseSymbolNavigateRequested : RaiseLayerNavigateRequested;
         }
     }
 
     private void OnLeafCheckChanged(object? sender, EventArgs e)
     {
-        if (sender is LayerTreeNode node && node.Model != null)
-        {
+        if (sender is not LayerTreeNode node) return;
+        // 개별 심볼 리프(Model=null, Symbol≠null)는 심볼 전용 이벤트로 라우팅 — Model 게이팅에 막히지 않게(FR-01)
+        if (node.IsSymbolLeaf && node.Symbol != null)
+            SymbolVisibilityChanged?.Invoke(this, new SymbolVisibilityChangedEventArgs(node.Symbol, node.IsChecked ?? true));
+        else if (node.Model != null)
             LayerVisibilityChanged?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked ?? true));
-        }
     }
 
     private void OnLeafOpacityChanged(object? sender, EventArgs e)
@@ -116,6 +119,10 @@ public class LayerPanelControl : Control
     public event EventHandler<LayerChangedEventArgs>? LayerMoveDownRequested;
     public event EventHandler<LayerRenameEventArgs>? LayerRenameRequested;
     public event EventHandler<LayerChangedEventArgs>? LayerNavigateRequested;
+    public event EventHandler<SymbolVisibilityChangedEventArgs>? SymbolVisibilityChanged;
+    public event EventHandler<SymbolNavigateRequestedEventArgs>? SymbolNavigateRequested;
+    /// <summary>리사이즈 드래그 완료 시 최종 크기(영속용, FR-06).</summary>
+    public event EventHandler<Size>? PanelSizeCommitted;
 
     internal void RaiseLayerDeleteRequested(LayerTreeNode node)
     {
@@ -147,6 +154,12 @@ public class LayerPanelControl : Control
             LayerNavigateRequested?.Invoke(this, new LayerChangedEventArgs(node.Model, node.IsChecked == true));
     }
 
+    internal void RaiseSymbolNavigateRequested(LayerTreeNode node)
+    {
+        if (node.Symbol != null)
+            SymbolNavigateRequested?.Invoke(this, new SymbolNavigateRequestedEventArgs(node.Symbol));
+    }
+
     #endregion
 
     #region Constructor
@@ -157,6 +170,11 @@ public class LayerPanelControl : Control
         InitializeDragSupport();
         _opacityDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _opacityDebounceTimer.Tick += OnOpacityDebounce;
+
+        // 리사이즈 경계(FR-05). 폭=고정 250 기본, 높이=초기 Auto + MaxHeight 캡(off-canvas·무한성장 차단).
+        Width = MinPanelWidth;
+        MinWidth = MinPanelWidth; MaxWidth = MaxPanelWidth;
+        MaxHeight = MaxPanelHeight;
 
         // CheckBox 이벤트는 LayerTreeNode.CheckChanged로 직접 구독 (OnTreeNodesChanged에서)
     }
@@ -171,6 +189,10 @@ public class LayerPanelControl : Control
 
         if (GetTemplateChild("PART_CloseButton") is Button closeButton)
             closeButton.Click += (s, e) => OnCloseRequested();
+
+        WireResizeGrip(GetTemplateChild("PART_ResizeRight") as System.Windows.Controls.Primitives.Thumb, resizeW: true, resizeH: false);
+        WireResizeGrip(GetTemplateChild("PART_ResizeBottom") as System.Windows.Controls.Primitives.Thumb, resizeW: false, resizeH: true);
+        WireResizeGrip(GetTemplateChild("PART_ResizeCorner") as System.Windows.Controls.Primitives.Thumb, resizeW: true, resizeH: true);
     }
 
     #endregion
@@ -220,6 +242,7 @@ public class LayerPanelControl : Control
 
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (_isResizing) return;                 // 리사이즈 중에는 이동 비활성(영역 분리 보강)
         var position = e.GetPosition(this);
         if (position.Y > 36) return;
 
@@ -271,6 +294,66 @@ public class LayerPanelControl : Control
         while (parent != null && parent is not T)
             parent = VisualTreeHelper.GetParent(parent);
         return parent as T;
+    }
+
+    #endregion
+
+    #region Resize (E/S/SE 그립 — 좌상단 앵커 고정, FR-05/06)
+
+    private const double MinPanelWidth = 250, MaxPanelWidth = 375;
+    private const double MinPanelHeight = 420, MaxPanelHeight = 630;
+    private bool _isResizing;
+
+    private void WireResizeGrip(System.Windows.Controls.Primitives.Thumb? thumb, bool resizeW, bool resizeH)
+    {
+        if (thumb == null) return;
+        thumb.DragStarted += (s, e) => _isResizing = true;
+        thumb.DragDelta += (s, e) => OnResizeDelta(e, resizeW, resizeH);
+        thumb.DragCompleted += (s, e) =>
+        {
+            _isResizing = false;
+            PanelSizeCommitted?.Invoke(this, new Size(ActualWidth, ActualHeight));
+        };
+    }
+
+    private void OnResizeDelta(System.Windows.Controls.Primitives.DragDeltaEventArgs e, bool resizeW, bool resizeH)
+    {
+        var cp = FindParent<ContentPresenter>(this);
+        var canvas = cp?.Parent as Canvas;
+
+        if (resizeW)
+        {
+            double newW = Math.Min(Math.Max(ActualWidth + e.HorizontalChange, MinPanelWidth), MaxPanelWidth);
+            if (canvas != null && cp != null)
+            {
+                double left = Canvas.GetLeft(cp); if (double.IsNaN(left)) left = 0;
+                newW = Math.Min(newW, Math.Max(MinPanelWidth, canvas.ActualWidth - left - 8));   // Canvas 경계 2차 클램프
+            }
+            Width = newW;
+        }
+        if (resizeH)
+        {
+            if (double.IsNaN(Height)) Height = ActualHeight;     // 초기 Auto → 드래그 시점에 명시 높이로 전환
+            if (MinHeight < MinPanelHeight) MinHeight = MinPanelHeight;
+            double newH = Math.Min(Math.Max(Height + e.VerticalChange, MinPanelHeight), MaxPanelHeight);
+            if (canvas != null && cp != null)
+            {
+                double top = Canvas.GetTop(cp); if (double.IsNaN(top)) top = 0;
+                newH = Math.Min(newH, Math.Max(MinPanelHeight, canvas.ActualHeight - top - 8));
+            }
+            Height = newH;
+        }
+    }
+
+    /// <summary>영속된 크기 복원(FR-06). 범위 밖이면 해당 축 무시.</summary>
+    public void SetPanelSize(double width, double height)
+    {
+        if (width >= MinPanelWidth && width <= MaxPanelWidth) Width = width;
+        if (height >= MinPanelHeight && height <= MaxPanelHeight)
+        {
+            MinHeight = MinPanelHeight;
+            Height = height;
+        }
     }
 
     #endregion

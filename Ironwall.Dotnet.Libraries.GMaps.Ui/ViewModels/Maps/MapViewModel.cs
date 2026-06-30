@@ -7663,6 +7663,11 @@ public class MapViewModel : BasePanelViewModel,
         LayerPanel.LayerMoveDownRequested += OnLayerMoveDownRequested;
         LayerPanel.LayerRenameRequested += OnLayerRenameRequested;
         LayerPanel.LayerNavigateRequested += OnLayerNavigateRequested;
+        LayerPanel.SymbolVisibilityChanged += OnSymbolVisibilityChanged;   // FR-03 개별 심볼 토글
+        LayerPanel.SymbolNavigateRequested += OnSymbolNavigateRequested;   // FR-04 개별 심볼 이동
+        LayerPanel.PanelSizeCommitted += OnPanelSizeCommitted;             // FR-05/06 리사이즈 크기(세션 기억)
+        if (_lastPanelSize.HasValue)
+            LayerPanel.SetPanelSize(_lastPanelSize.Value.Width, _lastPanelSize.Value.Height);
         LayerPanel.CloseRequested += (s, e) => HideLayerPanel();
         IsLayerPanelVisible = true;
         // 위치 먼저 잡은 후 Opacity 1로 표시 (점프 방지)
@@ -7685,10 +7690,52 @@ public class MapViewModel : BasePanelViewModel,
             LayerPanel.LayerMoveDownRequested -= OnLayerMoveDownRequested;
             LayerPanel.LayerRenameRequested -= OnLayerRenameRequested;
             LayerPanel.LayerNavigateRequested -= OnLayerNavigateRequested;
+            LayerPanel.SymbolVisibilityChanged -= OnSymbolVisibilityChanged;
+            LayerPanel.SymbolNavigateRequested -= OnSymbolNavigateRequested;
+            LayerPanel.PanelSizeCommitted -= OnPanelSizeCommitted;
             LayerPanel = null;
         }
         IsLayerPanelVisible = false;
     }
+
+    #region - 개별 심볼 노드 핸들러 (FR-03/04/05) -
+
+    private System.Windows.Size? _lastPanelSize;   // 세션 내 리사이즈 크기 기억(재오픈 복원). 세션 간 영속=v2.
+
+    /// <summary>개별 심볼 가시성 토글 → 해당 마커(Id 일치)의 IsLayerEnabled/IsVisible/ShowShape 적용(런타임). DB 영속=v2.</summary>
+    private void OnSymbolVisibilityChanged(object? sender, SymbolVisibilityChangedEventArgs e)
+    {
+        try
+        {
+            var marker = MainMap?.Markers
+                .OfType<GMapSymbols.IEditableMarker>()
+                .FirstOrDefault(m => m.Id == e.Symbol.Id);
+            if (marker == null) return;
+
+            marker.IsLayerEnabled = e.IsVisible;
+            marker.ShowShape = e.IsVisible;
+            marker.IsVisible = e.IsVisible && MainMap!.Zoom >= marker.Zoom;   // 유효 가시성 = 토글 AND 줌
+            MainMap?.InvalidateVisual();
+        }
+        catch (Exception ex) { _log?.Error($"심볼 가시성 변경 실패: {ex.Message}"); }
+    }
+
+    /// <summary>개별 심볼 '중앙으로 이동' → 맵을 심볼 좌표로 팬(FR-04).</summary>
+    private void OnSymbolNavigateRequested(object? sender, SymbolNavigateRequestedEventArgs e)
+    {
+        try
+        {
+            if (MainMap == null) return;
+            MainMap.Position = new PointLatLng(e.Symbol.Latitude, e.Symbol.Longitude);
+            _log?.Info($"심볼 이동: {e.Symbol.Title} ({e.Symbol.Latitude:F6},{e.Symbol.Longitude:F6})");
+        }
+        catch (Exception ex) { _log?.Error($"심볼 이동 실패: {ex.Message}"); }
+    }
+
+    /// <summary>리사이즈 완료 크기를 세션 내 기억(재오픈 복원, FR-06). 세션 간 영속(MapSettings)=v2.</summary>
+    private void OnPanelSizeCommitted(object? sender, System.Windows.Size e) => _lastPanelSize = e;
+
+    #endregion
 
     private async Task LoadLayersFromDbAsync()
     {
@@ -7697,7 +7744,8 @@ public class MapViewModel : BasePanelViewModel,
             await _gMapDbService.SeedDefaultSymbolLayersAsync();
             var list = await _gMapDbService.FetchMapLayersAsync();
 
-            _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>());
+            // 개별 심볼(_symbolProvider) 전달 → 카테고리 아래 개별 심볼 자식 노드 생성(FR-02)
+            _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>(), _symbolProvider);
 
             if (LayerPanel != null)
                 LayerPanel.TreeNodes = _layerTreeNodes;

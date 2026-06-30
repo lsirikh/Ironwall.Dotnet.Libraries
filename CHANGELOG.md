@@ -14,6 +14,14 @@
 
 ## [Unreleased]
 
+### Added
+- **레이어 패널 재설계 v1 — 카테고리별 개별 Overlay 심볼 트리노드 + 드래그 리사이즈** ([PRD](docs/prds/LayerPanel_SymbolNesting_Resize-prd.md) · [스토리보드](Docs/reports/LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html) · 태그 `before-layerpanel-symbol-nesting` · GMaps.Ui)
+  - **개별 심볼 노드화(FR-01~04)**: SYMBOLS 섹션의 카테고리(카메라/센서/군사 등)를 펼침 노드로 승격하고 그 아래에 `_symbolProvider`의 개별 심볼을 자식 노드로 노출(비균일 4단계, PIDS=Section›Group›Category›Symbol). 개별 심볼 체크박스로 마커 가시성 토글(`ShowShape`/`IsLayerEnabled`, 런타임), 우클릭 '중앙으로 이동'으로 맵 팬. tri-state 카테고리→그룹→섹션 4단 전파.
+  - **모델 이음새 해소**: 개별 심볼 리프는 `IMapLayerModel`이 아닌 신규 `ISymbolModel? Symbol` 페이로드 + 신규 `NodeType.Category` + 심볼 전용 이벤트(`SymbolVisibilityChanged`/`SymbolNavigateRequested`). 기존 `CanDelete = Model?.LayerType != "Symbol"`가 Model=null에서 TRUE로 역전되던 잠재버그를 leaf-kind 게이팅으로 차단. 카테고리 일괄 cascade로 tri-state O(n²) 재계산 제거.
+  - **카테고리 조인**: 비PIDS는 `EnumMarkerCategory` 직매핑(**VEHICLES 보강**), PIDS는 `DeviceType`로 6 하위카테고리 분기, 미매핑은 '기타' 폴백, Title 공백/중복은 `{카테고리} #{Id}` 폴백.
+  - **드래그 리사이즈(FR-05/06)**: E/S/SE Thumb 그립, 250×420→375×630(각 +50%), 좌상단 앵커 고정, Canvas 경계 2차 클램프, 높이 초기 Auto+MaxHeight 캡(off-canvas 차단). 크기는 세션 내 기억(세션 간 영속=v2).
+  - GMaps.Ui 빌드0 · 단위테스트 **148/148**(신규 19: DeviceType 분기·심볼 중첩·폴백·cascade·레거시 호환) · 설계검증 wf_d15d5365(4 렌즈+2 적대비평) 반영. **v2 보류**: 개별 심볼 삭제/이름변경·전면 가상화·검색바·세션간 크기 영속. ⚠앱 재빌드 후 E2E 런타임 검증 필요.
+
 ### Fixed
 - **3rd Party(Gateway) 이벤트 그룹 쓰레기값("1, 116") 근본수정 — 레거시 `Group` 컬럼 부활 차단** ([PRD](docs/prds/GatewayEvent_Group_Resurrection_Fix-prd.md) · [Plan](docs/plans/GatewayEvent_Group_Resurrection_Fix-prd-plan.md) · Gateway lib · `0275776`)
   - 증상: 설정 > 3rd Party 이벤트 설정의 "그룹" 컬럼에 의도치 않은 그룹 ID가 섞여 표시(예: Event_A가 `116`이어야 하는데 `1, 116`). 원인은 **DataGrid가 아니라 DB 프로바이더 측**.
