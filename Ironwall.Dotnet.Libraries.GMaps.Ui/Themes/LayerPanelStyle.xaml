@@ -41,7 +41,7 @@
 	<!-- Leaf 노드 (심볼: 체크 + 아이콘 + 이름)             -->
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="LeafNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
-		<Grid Height="20" Margin="10,3,0,3" ToolTip="{Binding Name}">
+		<Grid Height="20" Margin="2,3,0,3" ToolTip="{Binding Name}">
 			<!-- 개별 심볼 리프 컨텍스트(이동만 활성, NavigateCommand 게이팅). 카테고리 단위 레거시 Leaf에선 비활성(FR-04). -->
 			<Grid.ContextMenu>
 				<ContextMenu>
@@ -208,97 +208,100 @@
 	</DataTemplate>
 
 	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- Group / Category 노드 (체크 + 아이콘 + 이름 + 배지 + 셰브런) -->
-	<!-- Category 노드도 이 템플릿 재사용(SectionChildTemplate에서 분기). -->
-	<!-- 자식은 SectionChildTemplate로 라우팅 → Category(재귀) / 개별 심볼 Leaf 모두 처리(FR-02). -->
+	<!-- 노드 헤더 행 (Group/Category 공용: 체크 + 아이콘 + 이름 + 배지 + 셰브런) -->
 	<!-- ═══════════════════════════════════════════════════ -->
-	<DataTemplate x:Key="GroupNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
+	<DataTemplate x:Key="NodeRowTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<Grid Height="24" Margin="6,0,4,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<CheckBox
+				Grid.Column="0"
+				IsChecked="{Binding IsChecked, Mode=TwoWay}"
+				IsThreeState="True"
+				Style="{StaticResource LayerCheckBox}" />
+			<md:PackIcon
+				Grid.Column="1"
+				Width="15"
+				Height="15"
+				Margin="0,0,4,0"
+				VerticalAlignment="Center"
+				Foreground="{DynamicResource PrimaryBrush}"
+				Kind="{Binding IconKind}" />
+			<TextBlock
+				Grid.Column="2"
+				VerticalAlignment="Center"
+				FontSize="12"
+				FontWeight="SemiBold"
+				Foreground="{DynamicResource TextPrimaryBrush}"
+				Text="{Binding Name}"
+				TextTrimming="CharacterEllipsis"
+				TextOptions.TextRenderingMode="ClearType"
+				TextOptions.TextFormattingMode="Display" />
+			<ContentPresenter
+				Grid.Column="4"
+				Content="{Binding ItemCount}"
+				ContentTemplate="{StaticResource CountBadge}" />
+			<!-- 접기/펼치기 토글 -->
+			<ToggleButton
+				Grid.Column="5"
+				Width="18"
+				Height="18"
+				Margin="4,0,0,0"
+				IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+				Background="Transparent"
+				BorderThickness="0"
+				Cursor="Hand">
+				<ToggleButton.Style>
+					<Style TargetType="ToggleButton">
+						<Setter Property="Template">
+							<Setter.Value>
+								<ControlTemplate TargetType="ToggleButton">
+									<Border Background="Transparent">
+										<md:PackIcon
+											x:Name="Arrow"
+											Width="14"
+											Height="14"
+											HorizontalAlignment="Center"
+											VerticalAlignment="Center"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Kind="ChevronDown"
+											RenderTransformOrigin="0.5,0.5">
+											<md:PackIcon.RenderTransform>
+												<RotateTransform Angle="0" />
+											</md:PackIcon.RenderTransform>
+										</md:PackIcon>
+									</Border>
+									<ControlTemplate.Triggers>
+										<Trigger Property="IsChecked" Value="False">
+											<Setter TargetName="Arrow" Property="RenderTransform">
+												<Setter.Value>
+													<RotateTransform Angle="-90" />
+												</Setter.Value>
+											</Setter>
+										</Trigger>
+									</ControlTemplate.Triggers>
+								</ControlTemplate>
+							</Setter.Value>
+						</Setter>
+					</Style>
+				</ToggleButton.Style>
+			</ToggleButton>
+		</Grid>
+	</DataTemplate>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Category 노드 (헤더 + 개별 심볼 Leaf 자식). 전부 StaticResource(전방참조 없음). -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="CategoryNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
 		<StackPanel Margin="0,2,0,0">
-			<!-- 그룹 헤더 (클릭 시 접기/펼치기) -->
-			<Grid Height="24" Margin="10,0,4,0">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="Auto" />
-					<ColumnDefinition Width="Auto" />
-				</Grid.ColumnDefinitions>
-				<CheckBox
-					Grid.Column="0"
-					IsChecked="{Binding IsChecked, Mode=TwoWay}"
-					IsThreeState="True"
-					Style="{StaticResource LayerCheckBox}" />
-				<md:PackIcon
-					Grid.Column="1"
-					Width="15"
-					Height="15"
-					Margin="0,0,4,0"
-					VerticalAlignment="Center"
-					Foreground="{DynamicResource PrimaryBrush}"
-					Kind="{Binding IconKind}" />
-				<TextBlock
-					Grid.Column="2"
-					VerticalAlignment="Center"
-					FontSize="12"
-					FontWeight="SemiBold"
-					Foreground="{DynamicResource TextPrimaryBrush}"
-					Text="{Binding Name}"
-					TextOptions.TextRenderingMode="ClearType"
-					TextOptions.TextFormattingMode="Display" />
-				<ContentPresenter
-					Grid.Column="4"
-					Content="{Binding ItemCount}"
-					ContentTemplate="{StaticResource CountBadge}" />
-				<!-- 접기/펼치기 토글 -->
-				<ToggleButton
-					Grid.Column="5"
-					Width="18"
-					Height="18"
-					Margin="4,0,0,0"
-					IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-					Background="Transparent"
-					BorderThickness="0"
-					Cursor="Hand">
-					<ToggleButton.Style>
-						<Style TargetType="ToggleButton">
-							<Setter Property="Template">
-								<Setter.Value>
-									<ControlTemplate TargetType="ToggleButton">
-										<Border Background="Transparent">
-											<md:PackIcon
-												x:Name="Arrow"
-												Width="14"
-												Height="14"
-												HorizontalAlignment="Center"
-												VerticalAlignment="Center"
-												Foreground="{DynamicResource TextMutedBrush}"
-												Kind="ChevronDown"
-												RenderTransformOrigin="0.5,0.5">
-												<md:PackIcon.RenderTransform>
-													<RotateTransform Angle="0" />
-												</md:PackIcon.RenderTransform>
-											</md:PackIcon>
-										</Border>
-										<ControlTemplate.Triggers>
-											<Trigger Property="IsChecked" Value="False">
-												<Setter TargetName="Arrow" Property="RenderTransform">
-													<Setter.Value>
-														<RotateTransform Angle="-90" />
-													</Setter.Value>
-												</Setter>
-											</Trigger>
-										</ControlTemplate.Triggers>
-									</ControlTemplate>
-								</Setter.Value>
-							</Setter>
-						</Style>
-					</ToggleButton.Style>
-				</ToggleButton>
-			</Grid>
-			<!-- 자식 노드 (접기 가능) — Category(재귀 Group 템플릿) 또는 개별 심볼 Leaf로 라우팅. -->
-			<!-- SectionChildTemplate은 뒤에 정의되므로 DynamicResource(전방참조 허용). -->
-			<ItemsControl Margin="20,0,0,0" ItemsSource="{Binding Children}">
+			<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource NodeRowTemplate}" />
+			<ItemsControl Margin="12,0,0,0" ItemsSource="{Binding Children}">
 				<ItemsControl.Style>
 					<Style TargetType="ItemsControl">
 						<Setter Property="Visibility" Value="Visible" />
@@ -311,7 +314,33 @@
 				</ItemsControl.Style>
 				<ItemsControl.ItemTemplate>
 					<DataTemplate DataType="{x:Type models:LayerTreeNode}">
-						<ContentPresenter Content="{Binding}" ContentTemplate="{DynamicResource SectionChildTemplate}" />
+						<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource LeafNodeTemplate}" />
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</StackPanel>
+	</DataTemplate>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Group 노드 (헤더 + Category 자식). PIDS 장비 전용. -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<DataTemplate x:Key="GroupNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
+		<StackPanel Margin="0,2,0,0">
+			<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource NodeRowTemplate}" />
+			<ItemsControl Margin="12,0,0,0" ItemsSource="{Binding Children}">
+				<ItemsControl.Style>
+					<Style TargetType="ItemsControl">
+						<Setter Property="Visibility" Value="Visible" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsExpanded}" Value="False">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</ItemsControl.Style>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate DataType="{x:Type models:LayerTreeNode}">
+						<ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource CategoryNodeTemplate}" />
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>
 			</ItemsControl>
@@ -330,9 +359,8 @@
 						<DataTrigger Binding="{Binding NodeType}" Value="Group">
 							<Setter Property="ContentTemplate" Value="{StaticResource GroupNodeTemplate}" />
 						</DataTrigger>
-						<!-- 카테고리 = Group 템플릿 재사용(체크박스+아이콘+이름+개수배지+셰브런 동일), 자식=개별 심볼(FR-02). -->
 						<DataTrigger Binding="{Binding NodeType}" Value="Category">
-							<Setter Property="ContentTemplate" Value="{StaticResource GroupNodeTemplate}" />
+							<Setter Property="ContentTemplate" Value="{StaticResource CategoryNodeTemplate}" />
 						</DataTrigger>
 						<DataTrigger Binding="{Binding HasOpacitySlider}" Value="True">
 							<Setter Property="ContentTemplate" Value="{StaticResource OverlayLeafTemplate}" />
