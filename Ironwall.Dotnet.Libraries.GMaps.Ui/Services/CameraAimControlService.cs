@@ -12,8 +12,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services;
 
 /****************************************************************************
    Purpose      : 카메라 "특정 위치 확인" 회전요청 NATS 발행 서비스.
-                  CAMERA_AIM_LOCATION 메시지를 PUB(fire-and-forget) 발행한다.
-                  Subject: "{DomainNats}.{GroupNats}.nvr_manager.camera-aim"
+                  PTZ_AIM_LOCATION 메시지를 PUB(fire-and-forget) 발행한다.
+                  Subject: "{DomainNats}.{GroupNats}.nvr_manager.ptz" (PTZ_* Absolute, GPS 조준)
                   ※ BroadcastControlService 패턴을 따르되, 라이브러리 규칙에 맞게
                     경계검증 + try/catch + ConfigureAwait(false) + 로깅을 보강했다.
    Created By   : GHLee
@@ -56,9 +56,9 @@ public class CameraAimControlService : ICameraAimControlService
         try
         {
             ct.ThrowIfCancellationRequested();
-            var msg = body.ToBrokerPublish(nameof(Ironwall.Dotnet.Libraries.Enums.EnumGopCommand.CAMERA_AIM_LOCATION), "GIS");
+            var msg = body.ToBrokerPublish(nameof(Ironwall.Dotnet.Libraries.Enums.EnumGopCommand.PTZ_AIM_LOCATION), "GIS");
             var json = msg.ToJson();   // NullValueHandling.Ignore (BrokerMessageHelper._jsonSettings)
-            var subject = BuildSubject("camera-aim");
+            var subject = BuildSubject("ptz");   // 문서 컨벤션: 모든 PTZ 제어는 nvr_manager.ptz
             await _natsService.PublishAsync(subject, json).ConfigureAwait(false);
             _log?.Info($"[CameraAim] 발행 — cam={body.CameraId} → ({body.Latitude:F6},{body.Longitude:F6}) " +
                        $"dist={body.DistanceM:F1}m brg={body.BearingDeg:F0}° subject={subject}");

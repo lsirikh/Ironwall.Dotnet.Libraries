@@ -35,8 +35,8 @@ public enum EnumGopCommand
     SYNC_DEVICE = 12,
     // 장치 그룹 동기화 알림 (DBApi가 DeviceGroup CRUD 시 발행)
     SYNC_DEVICE_GROUP = 13,
-    // 카메라 특정위치 확인 — 지도 클릭 좌표로 PTZ 회전 요청 (GIS→nvr_manager PUB)
-    CAMERA_AIM_LOCATION = 14,
+    // 카메라 특정위치 확인(GPS 조준) — 지도 클릭 좌표로 nvr_manager.ptz PTZ 회전 요청 (GIS→NVRManager, PUB). PTZ_* Absolute 패밀리.
+    PTZ_AIM_LOCATION = 14,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }
