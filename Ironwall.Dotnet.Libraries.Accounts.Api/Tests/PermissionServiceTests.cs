@@ -60,14 +60,18 @@ public class PermissionServiceTests
     }
 
     [Fact]
-    public void should_access_audit_when_maintainer_but_not_operator()
+    public void should_access_audit_via_matrix_not_role()
     {
+        // ADR v5.2: 감사 접근 = audit_logs:view 매트릭스(role 라벨 아님). role(MAINTAINER)만으론 불가.
         var s = new PermissionService();
-        s.Apply(User("MAINTAINER", "{}"));
-        Assert.True(s.CanAccessAuditLogs());
+        s.Apply(User("MAINTAINER", @"{""modules"":{""audit_logs"":{""view"":true}}}"));
+        Assert.True(s.CanAccessAuditLogs());   // 매트릭스에 audit_logs:view → true
 
-        s.Apply(User("OPERATOR", "{}"));
-        Assert.False(s.CanAccessAuditLogs());
+        s.Apply(User("MAINTAINER", "{}"));
+        Assert.False(s.CanAccessAuditLogs());  // role만 MAINTAINER·매트릭스 없음 → false (역할 효력0, v5.2)
+
+        s.Apply(User("ADMIN", "{}"));
+        Assert.True(s.CanAccessAuditLogs());   // ADMIN bypass(전권)
     }
 
     [Fact]

@@ -20,7 +20,9 @@ public class PermissionService : IPermissionService
     public EnumUserRole Role { get { lock (_gate) return _role; } }
     public bool IsAdmin { get { lock (_gate) return _role == EnumUserRole.ADMIN; } }
     public bool HasRole(EnumUserRole required) { lock (_gate) return _role >= required; }
-    public bool CanAccessAuditLogs() { lock (_gate) return _role is EnumUserRole.ADMIN or EnumUserRole.MAINTAINER; }
+    // ADR v5.2: 감사 접근 = `audit_logs:view` 매트릭스로 판정(role 라벨 아님). ADMIN은 Has() bypass로 통과.
+    //   (이전 role(ADMIN|MAINTAINER) 기반 → v5.2 위반이라 매트릭스 기반으로 교체. ADMIN/MAINTAINER 그룹에 audit_logs:view=true 확인됨.)
+    public bool CanAccessAuditLogs() => CanView("audit_logs");
 
     // flat 토큰: "rw" → r/w, nested → view/edit/control/delete. 긴 형태 또는 짧은 형태 둘 다 수용.
     public bool CanView(string module)    => Has(module, "view", "r");
