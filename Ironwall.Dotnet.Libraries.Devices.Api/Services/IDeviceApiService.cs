@@ -257,6 +257,15 @@ public interface IDeviceApiService : IService
         CancellationToken token = default);
 
     /// <summary>
+    /// 카메라 hardware_spec만 부분 수정(PATCH) — MaxDetectionRange 등. 좌표/이름/IP/비번 등 다른 필드는 전송 안 해 보존.
+    /// <para>PATCH /devices/cameras/{id} body = { hardware_spec }. hardware_spec JSONB는 전체 교체되므로 보존 하위필드 포함 전송.</para>
+    /// </summary>
+    Task<ApiResponse<object>> PatchHardwareSpecAsync(
+        int id,
+        HardwareSpecDto hardwareSpec,
+        CancellationToken token = default);
+
+    /// <summary>
     /// GOP API를 통해 Camera의 전체 데이터를 교체합니다 (PUT).
     /// <para>모든 필드가 제공된 값으로 완전히 교체됩니다.</para>
     /// </summary>

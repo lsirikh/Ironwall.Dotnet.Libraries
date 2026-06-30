@@ -18,5 +18,7 @@ namespace Ironwall.Dotnet.Libraries.Enums
         Servers,     // "servers"     서버모니터
         Map,         // "map"         상황도(심볼/오버레이/ROI 편집) — View/Edit (FR-EN-05)
         Broadcast,   // "broadcast"   방송(스피커/TTS) — View/Control (FR-EN-05)
+        SetupSystem,  // "setup_system"  시스템 설정 — View/Edit (v5.2 ADR)
+        SetupFeature, // "setup_feature" 기능 설정 — View/Edit (v5.2 ADR)
     }
 }

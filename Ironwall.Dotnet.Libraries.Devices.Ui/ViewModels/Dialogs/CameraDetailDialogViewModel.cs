@@ -35,7 +35,24 @@ public class CameraDetailDialogViewModel : Conductor<BasePanelViewModel>.Collect
     {
         await base.OnActivateAsync(cancellationToken);
 
-        var infoVm = new CameraInfoViewModel(_model.HardwareSpec ?? new CameraInfoModel());
+        // 상세 GET으로 전체 HardwareSpec 로드 — 상세보기는 목록 모델을 받아 HW spec가 부분/누락일 수 있음.
+        // → 영속된 MaxDetectionRange가 화면에 표시되고(반영), PATCH 시 전체 spec를 전송(JSONB 전체 교체 대비)한다.
+        try
+        {
+            if (_model.Id > 0)
+            {
+                var detail = await IoC.Get<IDeviceApiService>().GetCameraByIdAsync(_model.Id, cancellationToken);
+                if (detail?.Success == true && detail.Data?.HardwareSpec != null)
+                    _model.HardwareSpec = DtoToModelHelper.ToCameraInfoModel(detail.Data.HardwareSpec);
+            }
+        }
+        catch { /* 상세 로드 실패 → 목록 모델 유지 */ }
+
+        // HW Spec 편집값(MaxDetectionRange 등)이 저장되도록 _model.HardwareSpec에 직접 연결(없으면 생성).
+        // 과거: `?? new CameraInfoModel()`로 분리 인스턴스를 넘겨 편집값이 _model에 반영 안 돼 저장 누락됐음.
+        if (_model.HardwareSpec == null)
+            _model.HardwareSpec = new CameraInfoModel();
+        var infoVm = new CameraInfoViewModel(_model.HardwareSpec);
         infoVm.DisplayName = "HW Spec";
         await ActivateItemAsync(infoVm, cancellationToken);
 
@@ -90,6 +107,13 @@ public class CameraDetailDialogViewModel : Conductor<BasePanelViewModel>.Collect
             {
                 var cResp = await api.UpdateCameraAsync(_model.Id, concrete.ToCameraDeviceDto(), token);
                 if (cResp?.Success != true) return false;
+            }
+
+            // 3) HardwareSpec(MaxDetectionRange 등) — 전용 PATCH로 안전 저장(full PUT의 비번/타필드 소거 회피, hardware_spec JSONB 전체 교체)
+            if (_model.HardwareSpec != null)
+            {
+                var hwResp = await api.PatchHardwareSpecAsync(_model.Id, DtoToModelHelper.ToHardwareSpecDto(_model.HardwareSpec), token);
+                if (hwResp?.Success != true) return false;
             }
 
             return true;

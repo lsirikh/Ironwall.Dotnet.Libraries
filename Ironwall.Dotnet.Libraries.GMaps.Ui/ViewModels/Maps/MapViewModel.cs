@@ -7790,7 +7790,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
-            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 잠금 변경 차단"); ShowNoMapEditPermissionInfo(); return; }
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 잠금 변경 차단(UI 비활성 백스톱)"); return; }
             var marker = MainMap?.Markers
                 .OfType<GMapSymbols.IEditableMarker>()
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
@@ -7808,7 +7808,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
-            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 잠금 변경 차단"); ShowNoMapEditPermissionInfo(); return; }
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 잠금 변경 차단(UI 비활성 백스톱)"); return; }
             if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
             {
                 var marker = FindImageMarkerByFilePath(e.Layer.FilePath);
@@ -7840,8 +7840,11 @@ public class MapViewModel : BasePanelViewModel,
 
             // 오버레이 이미지 leaf 잠금 상태를 마커에서 초기화(H-2). 심볼 leaf는 CreateSymbolLeaf에서 처리됨.
             // InitIsLocked는 LockChanged를 발화하지 않아 DB 재기록/피드백 루프 없음.
+            // 또한 맵 편집 권한을 각 leaf에 주입 → 권한 없으면 잠금 토글이 비활성(아이콘 변화·desync 차단, 사용자 피드백).
+            var canEditMap = CanEditMap();
             foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes))
             {
+                leaf.IsMapEditable = canEditMap;
                 if (leaf.Symbol == null && leaf.Model?.LayerType == "OverlayImage" && !string.IsNullOrEmpty(leaf.Model.FilePath))
                 {
                     var imgMarker = FindImageMarkerByFilePath(leaf.Model.FilePath);

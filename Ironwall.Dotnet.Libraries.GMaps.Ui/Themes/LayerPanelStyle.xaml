@@ -101,6 +101,16 @@
 				BorderThickness="0"
 				Cursor="Hand"
 				ToolTip="잠금/잠금해제">
+				<Button.Style>
+					<Style TargetType="Button">
+						<Style.Triggers>
+							<!-- 맵 편집 권한 없음(CanExecute=false) → 자물쇠 흐림 처리(비활성 가시화) -->
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.35" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</Button.Style>
 				<Button.Template>
 					<ControlTemplate TargetType="Button">
 						<Border Background="Transparent">
@@ -272,6 +282,16 @@
 				BorderThickness="0"
 				Cursor="Hand"
 				ToolTip="잠금/잠금해제">
+				<Button.Style>
+					<Style TargetType="Button">
+						<Style.Triggers>
+							<!-- 맵 편집 권한 없음(CanExecute=false) → 자물쇠 흐림 처리(비활성 가시화) -->
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.35" />
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</Button.Style>
 				<Button.Template>
 					<ControlTemplate TargetType="Button">
 						<Border Background="Transparent">
