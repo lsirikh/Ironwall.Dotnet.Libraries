@@ -425,6 +425,69 @@ public class DeviceProviderServiceTests
     }
     #endregion
 
+    #region - Login Gating Tests (Login_Gated_GIS_Init) -
+
+    [Fact]
+    public async Task should_not_fetch_devices_when_ExecuteAsync_called()
+    {
+        // Arrange — 로그인 게이팅: 부팅(ExecuteAsync)은 fetch 보류(no-op)
+        var mockApi = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApi);
+
+        // Act
+        await service.ExecuteAsync();
+
+        // Assert — 부팅 시 Device fetch 미수행(로그인 후 트리거 대기)
+        Assert.False(mockApi.GetControllersCalled);
+        Assert.False(mockApi.GetSensorsCalled);
+        Assert.False(mockApi.GetCamerasCalled);
+    }
+
+    [Fact]
+    public async Task should_fetch_devices_when_TriggerInitFetchAsync_called()
+    {
+        // Arrange — 로그인 성공 트리거(ShellViewModel이 LoginSucceeded에서 호출)
+        var mockApi = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApi);
+
+        // Act
+        await service.TriggerInitFetchAsync();
+
+        // Assert — 로그인 후 트리거로 전수 fetch 수행
+        Assert.True(mockApi.GetControllersCalled);
+        Assert.True(mockApi.GetSensorsCalled);
+        Assert.True(mockApi.GetCamerasCalled);
+    }
+
+    [Fact]
+    public void should_not_throw_when_CancelInitFetch_called_without_active_fetch()
+    {
+        // Arrange
+        var service = CreateDeviceProviderService(new MockDeviceApiService());
+
+        // Act + Assert — 진행 중 fetch 없을 때 취소는 무해
+        var ex = Record.Exception(() => service.CancelInitFetch());
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public async Task should_skip_device_fetch_when_token_already_cancelled()
+    {
+        // Arrange — 외부 토큰이 이미 취소(로그아웃 직후 트리거 등)
+        var mockApi = new MockDeviceApiService();
+        var service = CreateDeviceProviderService(mockApi);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act — 취소 전파로 컨트롤러 fetch 전 중단(OperationCanceledException은 트리거 내부서 흡수)
+        await service.TriggerInitFetchAsync(cts.Token);
+
+        // Assert — 취소로 디바이스 fetch 미도달 → 빈 캐시 진입 차단(커버 유지)
+        Assert.False(mockApi.GetControllersCalled);
+    }
+
+    #endregion
+
     #region - Phase 19: DeviceProvider Update Tests (TDD) -
 
     /// <summary>
