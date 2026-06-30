@@ -110,7 +110,7 @@
 					Grid.Column="8"
 					IsEnabled="{Binding IsButtonEnable}"
 					Style="{StaticResource IconButtonStyle}"
-					ToolTip="추가하기">
+					ToolTip="추가하기" Visibility="{Binding CanInsertEvent, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
@@ -125,7 +125,7 @@
 					Grid.Column="10"
 					IsEnabled="{Binding IsButtonEnable}"
 					Style="{StaticResource IconButtonStyle}"
-					ToolTip="삭제하기">
+					ToolTip="삭제하기" Visibility="{Binding CanDeleteEvent, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
@@ -172,7 +172,7 @@
 					md:RippleAssist.IsCentered="True"
 					IsEnabled="{Binding IsButtonEnable}"
 					Style="{StaticResource MaterialDesignIconButton}"
-					ToolTip="저장하기">
+					ToolTip="저장하기" Visibility="{Binding CanSaveEvent, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
 						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
