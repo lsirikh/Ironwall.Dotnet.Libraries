@@ -21,6 +21,8 @@ public interface IEditableMarker : IDisposable
     bool IsSelected { get; set; }
     bool IsVisible { get; set; }
     bool IsLayerEnabled { get; set; }
+    /// <summary>잠금 상태 — true면 맵에서 클릭/선택 불가(모델 IsLocked 연동·영속).</summary>
+    bool IsLocked { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
     EnumColorType FillColor { get; set; }

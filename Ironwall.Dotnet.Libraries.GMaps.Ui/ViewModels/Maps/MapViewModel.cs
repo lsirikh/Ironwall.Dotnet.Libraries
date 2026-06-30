@@ -677,6 +677,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            if (marker?.IsLocked == true) return;   // 잠긴 심볼은 편집모드 ON에서도 클릭/선택 차단
             //_log?.Info($"=== 마커 클릭 시작 ===");
             //_log?.Info($"클릭 전 - {GetMarkerInfo(marker)}");
             //_log?.Info($"OnMapMarkerClicked 호출됨: {marker.Title}, 편집모드: {IsEditModeEnabled}");
@@ -7665,6 +7666,9 @@ public class MapViewModel : BasePanelViewModel,
         LayerPanel.LayerNavigateRequested += OnLayerNavigateRequested;
         LayerPanel.SymbolVisibilityChanged += OnSymbolVisibilityChanged;   // FR-03 개별 심볼 토글
         LayerPanel.SymbolNavigateRequested += OnSymbolNavigateRequested;   // FR-04 개별 심볼 이동
+        LayerPanel.SymbolRenameRequested += OnSymbolRenameRequested;       // 심볼 이름변경 싱크(FR-04)
+        LayerPanel.SymbolLockChanged += OnSymbolLockChanged;               // 심볼 잠금(FR-03)
+        LayerPanel.LayerLockChanged += OnLayerLockChanged;                 // 이미지 잠금(FR-03)
         LayerPanel.PanelSizeCommitted += OnPanelSizeCommitted;             // FR-05/06 리사이즈 크기(세션 기억)
         if (_lastPanelSize.HasValue)
             LayerPanel.SetPanelSize(_lastPanelSize.Value.Width, _lastPanelSize.Value.Height);
@@ -7692,6 +7696,9 @@ public class MapViewModel : BasePanelViewModel,
             LayerPanel.LayerNavigateRequested -= OnLayerNavigateRequested;
             LayerPanel.SymbolVisibilityChanged -= OnSymbolVisibilityChanged;
             LayerPanel.SymbolNavigateRequested -= OnSymbolNavigateRequested;
+            LayerPanel.SymbolRenameRequested -= OnSymbolRenameRequested;
+            LayerPanel.SymbolLockChanged -= OnSymbolLockChanged;
+            LayerPanel.LayerLockChanged -= OnLayerLockChanged;
             LayerPanel.PanelSizeCommitted -= OnPanelSizeCommitted;
             LayerPanel.UnsubscribeLeaves();   // leaf 구독·델리게이트 해제(닫힌 컨트롤 누수 방지)
             LayerPanel = null;
@@ -7734,6 +7741,69 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Error($"심볼 이동 실패: {ex.Message}"); }
     }
 
+    /// <summary>개별 심볼 이름변경 → symbol.Title + DB 영속 + 마커/속성창 싱크(FR-04, Overlay Image 패턴).</summary>
+    private async void OnSymbolRenameRequested(object? sender, SymbolRenameRequestedEventArgs e)
+    {
+        try
+        {
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 이름 변경 차단"); ShowNoMapEditPermissionInfo(); return; }
+            var newName = e.NewName?.Trim();
+            if (string.IsNullOrEmpty(newName)) return;
+
+            e.Symbol.Title = newName;
+            await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // 공통 Symbols 행(Title) 영속 — 타입 무관
+
+            var marker = MainMap?.Markers
+                .OfType<GMapSymbols.IEditableMarker>()
+                .FirstOrDefault(m => m.Id == e.Symbol.Id);
+            if (marker != null)
+            {
+                marker.Title = newName;
+                if (PropertyPanel?.SelectedMarker == marker) PropertyPanel.MarkerTitle = newName;
+            }
+            _log?.Info($"심볼 이름변경: Id={e.Symbol.Id} → {newName}");
+        }
+        catch (Exception ex) { _log?.Error($"심볼 이름변경 실패: {ex.Message}"); }
+    }
+
+    /// <summary>개별 심볼 잠금 토글 → 마커 IsLocked(즉시 클릭차단) + DB 영속(FR-03).</summary>
+    private async void OnSymbolLockChanged(object? sender, SymbolLockChangedEventArgs e)
+    {
+        try
+        {
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 잠금 변경 차단"); ShowNoMapEditPermissionInfo(); return; }
+            var marker = MainMap?.Markers
+                .OfType<GMapSymbols.IEditableMarker>()
+                .FirstOrDefault(m => m.Id == e.Symbol.Id);
+            if (marker != null) marker.IsLocked = e.IsLocked;
+
+            e.Symbol.IsLocked = e.IsLocked;
+            await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // IsLocked 공통 Symbols 행 영속
+            _log?.Info($"심볼 잠금 {(e.IsLocked ? "ON" : "OFF")}: {e.Symbol.Title}(Id={e.Symbol.Id})");
+        }
+        catch (Exception ex) { _log?.Error($"심볼 잠금 변경 실패: {ex.Message}"); }
+    }
+
+    /// <summary>Overlay 이미지 잠금 토글 → 이미지 마커 IsLocked + DB 영속(FR-03).</summary>
+    private async void OnLayerLockChanged(object? sender, LayerLockChangedEventArgs e)
+    {
+        try
+        {
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 이미지 잠금 변경 차단"); ShowNoMapEditPermissionInfo(); return; }
+            if (e.Layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(e.Layer.FilePath))
+            {
+                var marker = FindImageMarkerByFilePath(e.Layer.FilePath);
+                if (marker != null)
+                {
+                    marker.IsLocked = e.IsLocked;
+                    await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
+                }
+            }
+            _log?.Info($"이미지 잠금 {(e.IsLocked ? "ON" : "OFF")}: {e.Layer.Name}");
+        }
+        catch (Exception ex) { _log?.Error($"이미지 잠금 변경 실패: {ex.Message}"); }
+    }
+
     /// <summary>리사이즈 완료 크기를 세션 내 기억(재오픈 복원, FR-06). 세션 간 영속(MapSettings)=v2.</summary>
     private void OnPanelSizeCommitted(object? sender, System.Windows.Size e) => _lastPanelSize = e;
 
@@ -7748,6 +7818,17 @@ public class MapViewModel : BasePanelViewModel,
 
             // 개별 심볼(_symbolProvider) 전달 → 카테고리 아래 개별 심볼 자식 노드 생성(FR-02)
             _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>(), _symbolProvider);
+
+            // 오버레이 이미지 leaf 잠금 상태를 마커에서 초기화(H-2). 심볼 leaf는 CreateSymbolLeaf에서 처리됨.
+            // InitIsLocked는 LockChanged를 발화하지 않아 DB 재기록/피드백 루프 없음.
+            foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes))
+            {
+                if (leaf.Symbol == null && leaf.Model?.LayerType == "OverlayImage" && !string.IsNullOrEmpty(leaf.Model.FilePath))
+                {
+                    var imgMarker = FindImageMarkerByFilePath(leaf.Model.FilePath);
+                    if (imgMarker != null) leaf.InitIsLocked(imgMarker.IsLocked);
+                }
+            }
 
             if (LayerPanel != null)
                 LayerPanel.TreeNodes = _layerTreeNodes;

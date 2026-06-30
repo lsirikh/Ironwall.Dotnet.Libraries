@@ -89,6 +89,8 @@ public class SymbolModel : BaseModel, ISymbolModel
     public EnumMarkerCategory Category { get; set; }
     public bool ShowShape { get; set; }
     public bool ShowTitle { get; set; }
+    /// <summary>잠금 상태 — true면 맵에서 클릭/선택 불가(레이어 패널에서만 토글). 기본 false.</summary>
+    public bool IsLocked { get; set; }
     public EnumColorType FillColor { get; set; } = EnumColorType.Blue;
     public EnumColorType StrokeColor { get; set; } = EnumColorType.White;
     public double StrokeThickness { get; set; } = 1.0;

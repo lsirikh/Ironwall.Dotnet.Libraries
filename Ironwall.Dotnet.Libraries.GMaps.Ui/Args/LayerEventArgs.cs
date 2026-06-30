@@ -68,3 +68,42 @@ public class SymbolNavigateRequestedEventArgs : EventArgs
         Symbol = symbol;
     }
 }
+
+/// <summary>개별 심볼 이름변경 요청 — symbol.Title 갱신 + DB 영속(FR-04).</summary>
+public class SymbolRenameRequestedEventArgs : EventArgs
+{
+    public ISymbolModel Symbol { get; }
+    public string NewName { get; }
+
+    public SymbolRenameRequestedEventArgs(ISymbolModel symbol, string newName)
+    {
+        Symbol = symbol;
+        NewName = newName;
+    }
+}
+
+/// <summary>개별 심볼 잠금 상태 변경 — 마커 IsLocked 적용 + DB 영속(FR-03).</summary>
+public class SymbolLockChangedEventArgs : EventArgs
+{
+    public ISymbolModel Symbol { get; }
+    public bool IsLocked { get; }
+
+    public SymbolLockChangedEventArgs(ISymbolModel symbol, bool isLocked)
+    {
+        Symbol = symbol;
+        IsLocked = isLocked;
+    }
+}
+
+/// <summary>Overlay 이미지 잠금 상태 변경 — 이미지 마커 IsLocked + DB 영속(FR-03).</summary>
+public class LayerLockChangedEventArgs : EventArgs
+{
+    public IMapLayerModel Layer { get; }
+    public bool IsLocked { get; }
+
+    public LayerLockChangedEventArgs(IMapLayerModel layer, bool isLocked)
+    {
+        Layer = layer;
+        IsLocked = isLocked;
+    }
+}

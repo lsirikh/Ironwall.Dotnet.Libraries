@@ -304,6 +304,7 @@ public class LayerTreeNode : INotifyPropertyChanged
             Name = displayName,
             IconKind = iconKind,
             IsChecked = symbol.ShowShape,
+            IsLocked = symbol.IsLocked,
             Category = symbol.Category.ToString(),
             NodeType = LayerNodeType.Leaf,
             HasOpacitySlider = false
@@ -323,8 +324,9 @@ public class LayerTreeNode : INotifyPropertyChanged
         && Symbol == null
         && Model?.LayerType != "Symbol";
 
-    /// <summary>이름 바꾸기 가능 여부 — Overlay Leaf만(개별 심볼 v1 비활성).</summary>
-    public bool CanRename => CanDelete;
+    /// <summary>이름 바꾸기 가능 여부 — Overlay Leaf 또는 개별 심볼 리프(FR-04). 카테고리 토글 전용 Leaf는 불가.</summary>
+    public bool CanRename => NodeType == LayerNodeType.Leaf
+        && (Symbol != null || (Model != null && Model.LayerType != "Symbol"));
 
     /// <summary>위로 이동 가능 여부 — Parent.Children 내 첫 번째가 아닌 경우</summary>
     public bool CanMoveUp => Parent != null
@@ -382,6 +384,40 @@ public class LayerTreeNode : INotifyPropertyChanged
             _ => OnNavigateAction?.Invoke(this),
             // Overlay Leaf(Model 보유) 또는 개별 심볼 리프(Symbol 보유)는 navigate 가능. 카테고리 토글 전용 Leaf는 불가.
             _ => NodeType == LayerNodeType.Leaf && (Symbol != null || Model?.LayerType != "Symbol"));
+
+    private bool _isLocked;
+    private ICommand? _toggleLockCommand;
+
+    /// <summary>잠금 상태 — 심볼/이미지 맵 클릭 차단. 패널 아이콘·우클릭 메뉴·맵이 싱크. Symbol.IsLocked 연동(FR-03).</summary>
+    public bool IsLocked
+    {
+        get => _isLocked;
+        set
+        {
+            if (_isLocked == value) return;
+            _isLocked = value;
+            OnPropertyChanged();
+            if (Symbol != null) Symbol.IsLocked = value;
+            LockChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>잠금 상태를 LockChanged 발화 없이 초기화 — 패널 빌드 시 모델/마커 기준 동기화용(DB 재기록·피드백 루프 방지).</summary>
+    internal void InitIsLocked(bool locked)
+    {
+        _isLocked = locked;
+        OnPropertyChanged(nameof(IsLocked));
+    }
+
+    /// <summary>잠금 변경 시 발생 — 컨트롤이 VM으로 라우팅(마커 적용 + DB 영속).</summary>
+    public event EventHandler? LockChanged;
+
+    /// <summary>잠금 가능 — 개별 심볼 리프 또는 Overlay 이미지 리프.</summary>
+    public bool CanLock => NodeType == LayerNodeType.Leaf
+        && (Symbol != null || Model?.LayerType == "OverlayImage");
+
+    public ICommand ToggleLockCommand => _toggleLockCommand ??=
+        new RelayCommand(_ => { if (CanLock) IsLocked = !IsLocked; });
 
     #endregion
 

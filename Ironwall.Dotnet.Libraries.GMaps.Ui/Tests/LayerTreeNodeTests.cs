@@ -1,4 +1,5 @@
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Tests;
@@ -120,6 +121,51 @@ public class LayerTreeNodeTests
 
         // Assert: 부모 true
         Assert.True(group.IsChecked);
+    }
+
+    #endregion
+
+    #region Test: 잠금 / 이름변경 (FR-03/04)
+
+    [Fact(DisplayName = "Lock — CreateSymbolLeaf가 symbol.IsLocked로 초기화")]
+    public void should_init_IsLocked_from_symbol_when_create_symbol_leaf()
+    {
+        var symbol = new SymbolModel { Id = 7, Title = "카메라1", IsLocked = true };
+        var node = LayerTreeNode.CreateSymbolLeaf(symbol, "카메라1", "Cctv");
+        Assert.True(node.IsLocked);
+    }
+
+    [Fact(DisplayName = "Lock — IsLocked setter가 Symbol.IsLocked 동기화 + LockChanged 발화")]
+    public void should_sync_symbol_and_raise_when_node_locked()
+    {
+        var symbol = new SymbolModel { Id = 7, Title = "센서1", IsLocked = false };
+        var node = LayerTreeNode.CreateSymbolLeaf(symbol, "센서1", "Cctv");
+        var raised = false;
+        node.LockChanged += (_, _) => raised = true;
+
+        node.IsLocked = true;
+
+        Assert.True(symbol.IsLocked);
+        Assert.True(raised);
+    }
+
+    [Fact(DisplayName = "Rename — 개별 심볼 리프는 이름변경 가능(FR-04)")]
+    public void should_allow_rename_when_symbol_leaf()
+    {
+        var symbol = new SymbolModel { Id = 7, Title = "함체1" };
+        var node = LayerTreeNode.CreateSymbolLeaf(symbol, "함체1", "Cctv");
+        Assert.True(node.CanRename);
+    }
+
+    [Fact(DisplayName = "Lock — 심볼 리프만 잠금 가능, 카테고리 토글 Leaf는 불가")]
+    public void should_allow_lock_only_for_symbol_leaf()
+    {
+        var symbol = new SymbolModel { Id = 7, Title = "조명1" };
+        var symbolLeaf = LayerTreeNode.CreateSymbolLeaf(symbol, "조명1", "Cctv");
+        var categoryToggleLeaf = CreateLeaf("카메라", "PidsCamera");  // Symbol=null, Model=null
+
+        Assert.True(symbolLeaf.CanLock);
+        Assert.False(categoryToggleLeaf.CanLock);
     }
 
     #endregion

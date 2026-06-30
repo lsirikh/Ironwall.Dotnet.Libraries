@@ -54,13 +54,15 @@ public class LayerPanelControl : Control
             leaf.CheckChanged += OnLeafCheckChanged;
             leaf.OpacityChanged -= OnLeafOpacityChanged;
             leaf.OpacityChanged += OnLeafOpacityChanged;
+            leaf.LockChanged -= OnLeafLockChanged;
+            leaf.LockChanged += OnLeafLockChanged;
 
             // ContextMenu Command → 이벤트 라우팅
             leaf.OnDeleteAction = RaiseLayerDeleteRequested;
             leaf.OnMoveUpAction = RaiseLayerMoveUpRequested;
             leaf.OnMoveDownAction = RaiseLayerMoveDownRequested;
-            leaf.OnRenameAction = RaiseLayerRenameRequested;
-            // 개별 심볼 리프는 심볼 전용 navigate, 그 외(오버레이 Leaf)는 기존 레이어 navigate (FR-01/04)
+            // 개별 심볼 리프는 심볼 전용 rename/navigate, 그 외(오버레이 Leaf)는 기존 레이어 경로 (FR-01/04)
+            leaf.OnRenameAction = leaf.IsSymbolLeaf ? RaiseSymbolRenameRequested : RaiseLayerRenameRequested;
             leaf.OnNavigateAction = leaf.IsSymbolLeaf ? RaiseSymbolNavigateRequested : RaiseLayerNavigateRequested;
         }
     }
@@ -73,6 +75,7 @@ public class LayerPanelControl : Control
         {
             leaf.CheckChanged -= OnLeafCheckChanged;
             leaf.OpacityChanged -= OnLeafOpacityChanged;
+            leaf.LockChanged -= OnLeafLockChanged;
             leaf.OnDeleteAction = null;
             leaf.OnMoveUpAction = null;
             leaf.OnMoveDownAction = null;
@@ -138,6 +141,9 @@ public class LayerPanelControl : Control
     public event EventHandler<LayerChangedEventArgs>? LayerNavigateRequested;
     public event EventHandler<SymbolVisibilityChangedEventArgs>? SymbolVisibilityChanged;
     public event EventHandler<SymbolNavigateRequestedEventArgs>? SymbolNavigateRequested;
+    public event EventHandler<SymbolRenameRequestedEventArgs>? SymbolRenameRequested;
+    public event EventHandler<SymbolLockChangedEventArgs>? SymbolLockChanged;
+    public event EventHandler<LayerLockChangedEventArgs>? LayerLockChanged;
     /// <summary>리사이즈 드래그 완료 시 최종 크기(영속용, FR-06).</summary>
     public event EventHandler<Size>? PanelSizeCommitted;
 
@@ -175,6 +181,22 @@ public class LayerPanelControl : Control
     {
         if (node.Symbol != null)
             SymbolNavigateRequested?.Invoke(this, new SymbolNavigateRequestedEventArgs(node.Symbol));
+    }
+
+    internal void RaiseSymbolRenameRequested(LayerTreeNode node, string newName)
+    {
+        if (node.Symbol != null)
+            SymbolRenameRequested?.Invoke(this, new SymbolRenameRequestedEventArgs(node.Symbol, newName));
+    }
+
+    /// <summary>잠금 토글 라우팅 — 심볼 리프는 SymbolLockChanged, Overlay 이미지 리프는 LayerLockChanged(FR-03).</summary>
+    private void OnLeafLockChanged(object? sender, EventArgs e)
+    {
+        if (sender is not LayerTreeNode node) return;
+        if (node.IsSymbolLeaf && node.Symbol != null)
+            SymbolLockChanged?.Invoke(this, new SymbolLockChangedEventArgs(node.Symbol, node.IsLocked));
+        else if (node.Model != null)
+            LayerLockChanged?.Invoke(this, new LayerLockChangedEventArgs(node.Model, node.IsLocked));
     }
 
     #endregion

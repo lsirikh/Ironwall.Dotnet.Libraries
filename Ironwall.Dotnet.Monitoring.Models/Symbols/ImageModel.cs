@@ -103,6 +103,7 @@ public class ImageModel : BaseModel, IImageModel
         Width = model.Width;
         Height = model.Height;
         Visibility = model.Visibility;
+        IsLocked = model.IsLocked;
         Opacity = model.Opacity;
         Zoom = model.Zoom;
         ZOrder = model.ZOrder;
@@ -149,6 +150,8 @@ public class ImageModel : BaseModel, IImageModel
     /// <summary>사용자 편집 회전 각도(도). DB 영속 대상 = GMapCustomImage.UserRotation. 맵 보정(-MapRotation)은 런타임 전용이라 여기 저장하지 않는다.</summary>
     public double Rotation { get; set; }
     public bool Visibility { get; set; }
+    /// <summary>잠금 상태 — true면 맵에서 클릭/선택 불가. 기본 false.</summary>
+    public bool IsLocked { get; set; }
     public double Opacity { get; set; }
 
     /// <summary>

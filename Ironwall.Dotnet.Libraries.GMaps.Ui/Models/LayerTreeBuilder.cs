@@ -246,6 +246,7 @@ public static class LayerTreeBuilder
                 Name = img.Title ?? Path.GetFileName(img.FilePath ?? "이미지"),
                 IconKind = "Image",
                 IsChecked = img.Visibility,
+                IsLocked = img.IsLocked,
                 Opacity = img.Opacity,
                 Category = $"Image_{img.Id}",
                 NodeType = LayerNodeType.Leaf,

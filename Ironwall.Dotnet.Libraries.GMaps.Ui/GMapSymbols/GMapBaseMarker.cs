@@ -511,6 +511,17 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    /// <summary>잠금 상태 — 모델 IsLocked 연동(영속). 맵 클릭 차단은 GMapCustomControl 히트테스트/선택 가드가 처리.</summary>
+    public bool IsLocked
+    {
+        get => _model?.IsLocked ?? false;
+        set
+        {
+            if (_model != null) _model.IsLocked = value;
+            OnPropertyChanged(nameof(IsLocked));
+        }
+    }
+
     public bool EnableShapeAnimation
     {
         get => _enableShapeAnimation;

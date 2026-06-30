@@ -16,6 +16,7 @@ public interface ISymbolModel : IBaseModel
     double Bearing { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
+    bool IsLocked { get; set; }
     EnumColorType FillColor { get; set; }
     EnumColorType StrokeColor { get; set; }
     double StrokeThickness { get; set; }

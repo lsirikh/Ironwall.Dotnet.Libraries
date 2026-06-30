@@ -19,6 +19,8 @@ public interface IImageModel : IBaseModel
     string? Title { get; set; }
     double Top { get; set; }
     bool Visibility { get; set; }
+    /// <summary>잠금 상태 — true면 맵에서 클릭/선택 불가(레이어 패널에서만 토글). 기본 false.</summary>
+    bool IsLocked { get; set; }
     double Width { get; set; }
 
     /// <summary>

@@ -918,6 +918,7 @@ public class GMapCustomControl : GMapControl
             try
             {
                 if (marker.IsDisposed) continue;
+                if (marker.IsLocked) continue;            // 잠긴 심볼은 클릭/선택 대상에서 제외(좌·우클릭 차단)
                 if (!SetMarkerVisibility(marker)) continue;
 
                 var markerScreenPos = FromLatLngToLocal(marker.Position);

@@ -50,19 +50,84 @@
 							<md:PackIcon Kind="CrosshairsGps" Width="16" Height="16" />
 						</MenuItem.Icon>
 					</MenuItem>
+					<MenuItem Header="이름 바꾸기" Command="{Binding RenameCommand}">
+						<MenuItem.Icon>
+							<md:PackIcon Kind="RenameBox" Width="16" Height="16" />
+						</MenuItem.Icon>
+					</MenuItem>
+					<MenuItem Command="{Binding ToggleLockCommand}">
+						<MenuItem.Style>
+							<Style TargetType="MenuItem">
+								<Setter Property="Header" Value="잠금" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsLocked}" Value="True">
+										<Setter Property="Header" Value="잠금 해제" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</MenuItem.Style>
+						<MenuItem.Icon>
+							<md:PackIcon Width="16" Height="16">
+								<md:PackIcon.Style>
+									<Style TargetType="md:PackIcon">
+										<Setter Property="Kind" Value="LockOpenVariantOutline" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsLocked}" Value="True">
+												<Setter Property="Kind" Value="Lock" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</md:PackIcon.Style>
+							</md:PackIcon>
+						</MenuItem.Icon>
+					</MenuItem>
 				</ContextMenu>
 			</Grid.ContextMenu>
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
 			</Grid.ColumnDefinitions>
-			<CheckBox
+			<!-- 잠금 토글 아이콘 (열림/잠김) — FR-03 -->
+			<Button
 				Grid.Column="0"
+				Width="18"
+				Height="18"
+				Margin="0,0,1,0"
+				Padding="0"
+				Command="{Binding ToggleLockCommand}"
+				Background="Transparent"
+				BorderThickness="0"
+				Cursor="Hand"
+				ToolTip="잠금/잠금해제">
+				<Button.Template>
+					<ControlTemplate TargetType="Button">
+						<Border Background="Transparent">
+							<md:PackIcon Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center">
+								<md:PackIcon.Style>
+									<Style TargetType="md:PackIcon">
+										<Setter Property="Kind" Value="LockOpenVariantOutline" />
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsLocked}" Value="True">
+												<Setter Property="Kind" Value="Lock" />
+												<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</md:PackIcon.Style>
+							</md:PackIcon>
+						</Border>
+					</ControlTemplate>
+				</Button.Template>
+			</Button>
+			<CheckBox
+				Grid.Column="1"
 				IsChecked="{Binding IsChecked, Mode=TwoWay}"
 				Style="{StaticResource LayerCheckBox}" />
 			<md:PackIcon
-				Grid.Column="1"
+				Grid.Column="2"
 				Width="14"
 				Height="14"
 				Margin="0,0,5,0"
@@ -79,25 +144,48 @@
 					</Style>
 				</md:PackIcon.Style>
 			</md:PackIcon>
-			<TextBlock
-				Grid.Column="2"
-				VerticalAlignment="Center"
-				FontSize="12"
-				TextTrimming="CharacterEllipsis"
-				TextOptions.TextRenderingMode="ClearType"
-				TextOptions.TextFormattingMode="Display">
-				<TextBlock.Style>
-					<Style TargetType="TextBlock">
-						<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-						<Style.Triggers>
-							<DataTrigger Binding="{Binding IsChecked}" Value="False">
-								<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-							</DataTrigger>
-						</Style.Triggers>
-					</Style>
-				</TextBlock.Style>
-				<Run Text="{Binding Name, Mode=OneWay}" />
-			</TextBlock>
+			<!-- 이름 표시 / 인라인 편집(FR-04) -->
+			<Grid Grid.Column="3">
+				<TextBlock
+					VerticalAlignment="Center"
+					FontSize="12"
+					Text="{Binding Name}"
+					TextTrimming="CharacterEllipsis"
+					TextOptions.TextRenderingMode="ClearType"
+					TextOptions.TextFormattingMode="Display">
+					<TextBlock.Style>
+						<Style TargetType="TextBlock">
+							<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsEditing}" Value="True">
+									<Setter Property="Visibility" Value="Collapsed" />
+								</DataTrigger>
+								<DataTrigger Binding="{Binding IsChecked}" Value="False">
+									<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBlock.Style>
+				</TextBlock>
+				<TextBox
+					VerticalAlignment="Center"
+					FontSize="12"
+					Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					utils:TextBoxRenameHelper.IsRenaming="{Binding IsEditing}"
+					utils:TextBoxRenameHelper.CommitCommand="{Binding CommitRenameCommand}"
+					utils:TextBoxRenameHelper.CancelCommand="{Binding CancelRenameCommand}">
+					<TextBox.Style>
+						<Style TargetType="TextBox">
+							<Setter Property="Visibility" Value="Collapsed" />
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding IsEditing}" Value="True">
+									<Setter Property="Visibility" Value="Visible" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</TextBox.Style>
+				</TextBox>
+			</Grid>
 		</Grid>
 	</DataTemplate>
 
@@ -135,20 +223,82 @@
 							<md:PackIcon Kind="CrosshairsGps" Width="16" Height="16" />
 						</MenuItem.Icon>
 					</MenuItem>
+					<Separator />
+					<MenuItem Command="{Binding ToggleLockCommand}">
+						<MenuItem.Style>
+							<Style TargetType="MenuItem">
+								<Setter Property="Header" Value="잠금" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsLocked}" Value="True">
+										<Setter Property="Header" Value="잠금 해제" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</MenuItem.Style>
+						<MenuItem.Icon>
+							<md:PackIcon Width="16" Height="16">
+								<md:PackIcon.Style>
+									<Style TargetType="md:PackIcon">
+										<Setter Property="Kind" Value="LockOpenVariantOutline" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsLocked}" Value="True">
+												<Setter Property="Kind" Value="Lock" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</md:PackIcon.Style>
+							</md:PackIcon>
+						</MenuItem.Icon>
+					</MenuItem>
 				</ContextMenu>
 			</Grid.ContextMenu>
 			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
 				<ColumnDefinition Width="60" />
 				<ColumnDefinition Width="30" />
 			</Grid.ColumnDefinitions>
-			<CheckBox
+			<!-- 잠금 토글 아이콘 (열림/잠김) — FR-03 -->
+			<Button
 				Grid.Column="0"
+				Width="18"
+				Height="18"
+				Margin="0,0,1,0"
+				Padding="0"
+				VerticalAlignment="Center"
+				Command="{Binding ToggleLockCommand}"
+				Background="Transparent"
+				BorderThickness="0"
+				Cursor="Hand"
+				ToolTip="잠금/잠금해제">
+				<Button.Template>
+					<ControlTemplate TargetType="Button">
+						<Border Background="Transparent">
+							<md:PackIcon Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center">
+								<md:PackIcon.Style>
+									<Style TargetType="md:PackIcon">
+										<Setter Property="Kind" Value="LockOpenVariantOutline" />
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding IsLocked}" Value="True">
+												<Setter Property="Kind" Value="Lock" />
+												<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</md:PackIcon.Style>
+							</md:PackIcon>
+						</Border>
+					</ControlTemplate>
+				</Button.Template>
+			</Button>
+			<CheckBox
+				Grid.Column="1"
 				IsChecked="{Binding IsChecked, Mode=TwoWay}"
 				Style="{StaticResource LayerCheckBox}" />
 			<!-- 이름 표시 / 인라인 편집 -->
-			<Grid Grid.Column="1">
+			<Grid Grid.Column="2">
 				<TextBlock
 					VerticalAlignment="Center"
 					FontSize="12"
@@ -188,7 +338,7 @@
 				</TextBox>
 			</Grid>
 			<Slider
-				Grid.Column="2"
+				Grid.Column="3"
 				VerticalAlignment="Center"
 				IsEnabled="{Binding IsChecked}"
 				Maximum="100"
@@ -199,7 +349,7 @@
 				IsSnapToTickEnabled="True"
 				Value="{Binding Opacity, Mode=TwoWay, Converter={StaticResource OpacityToPercent}}" />
 			<TextBlock
-				Grid.Column="3"
+				Grid.Column="4"
 				VerticalAlignment="Center"
 				FontSize="9"
 				Foreground="{DynamicResource TextMutedBrush}"

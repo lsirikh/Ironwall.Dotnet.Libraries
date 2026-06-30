@@ -391,6 +391,17 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
+    /// <summary>잠금 상태 — 이미지 모델 IsLocked 연동(영속). 맵 클릭 차단은 히트테스트 가드가 처리.</summary>
+    public bool IsLocked
+    {
+        get => _imageModel?.IsLocked ?? false;
+        set
+        {
+            if (_imageModel != null) _imageModel.IsLocked = value;
+            OnPropertyChanged(nameof(IsLocked));
+        }
+    }
+
     /// <summary>형태 표시 여부</summary>
     public bool ShowShape
     {
