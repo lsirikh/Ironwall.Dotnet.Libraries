@@ -14,6 +14,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- **3rd Party(Gateway) 이벤트 그룹 쓰레기값("1, 116") 근본수정 — 레거시 `Group` 컬럼 부활 차단** ([PRD](docs/prds/GatewayEvent_Group_Resurrection_Fix-prd.md) · [Plan](docs/plans/GatewayEvent_Group_Resurrection_Fix-prd-plan.md) · Gateway lib · `0275776`)
+  - 증상: 설정 > 3rd Party 이벤트 설정의 "그룹" 컬럼에 의도치 않은 그룹 ID가 섞여 표시(예: Event_A가 `116`이어야 하는데 `1, 116`). 원인은 **DataGrid가 아니라 DB 프로바이더 측**.
+  - 근본 원인: `GatewayDbService.BuildSchemeAsync`의 레거시 이행 쿼리(`INSERT IGNORE SELECT Id,Group WHERE Group>0`)가 **매 앱 시작마다** 실행되어, N:N 전환 후에도 남은 단일 `GatewayEvents.Group` 값을 연결 테이블로 **부활(resurrection)**시킴. `UpdateGatewayEventAsync`가 레거시 컬럼을 비우지 않아 영구 반복. (선행 `GatewayEvent_Group_NtoN_Migration` PRD가 "다음 릴리스"로 연기한 컬럼 DROP의 부작용.)
+  - 수정: 상시 이행 쿼리 제거 + `information_schema`로 레거시 컬럼 존재 시에만 **1회 실행되는 자기비활성화 마무리 블록**(`FinalizeLegacyGroupColumnAsync`) — ①최종 안전 이행 → ②좀비 정리(그룹 2개 이상 이벤트에서 `GroupId=레거시 Group` 행 삭제, count>1 가드로 유일값 보존) → ③`Group` 컬럼·`IX_Group` DROP. 신규 설치 DDL에서도 레거시 컬럼 제거. 외부 솔루션 무변경(`NatsDomainService` 이미 Intersect).
+  - 검증: 통합 5종(좀비 제거·Group=0 무영향·유일값 보존·컬럼 DROP·이중실행 멱등) + 실 `monitor_DB` 덤프 사본 E2E(실 코드 경로 Event_A→`116`/Event_B→`117`·컬럼 제거·멱등) 통과. MariaDB 12.2 `DROP COLUMN`→`IX_Group` 동반삭제 실측. 빌드0.
+
 ### Added
 - **강제 로그아웃 전파 — GIS(클라) Phase 1** ([PRD](docs/prds/GOP_Force_Logout_Propagation-prd.md) · [보고서](docs/reports/GOP_Force_Logout_Client_Phase1-report.md) · Accounts.Api/GMaps.Ui · `b15359b`)
   - 단일 멱등 진입점 `ISessionLifecycle.ForceLogoutOnce`(Interlocked once-guard — NATS/401/수동 수렴) + TokenStorage jti·세대가드(refresh 부활 차단, FR-FL-05) + `BearerAuthHandler` 401폴백 배선 + GMaps `ForceLogoutRequested` 구독→PTZ정지·팝업(스트림)해제(FR-FL-07).
