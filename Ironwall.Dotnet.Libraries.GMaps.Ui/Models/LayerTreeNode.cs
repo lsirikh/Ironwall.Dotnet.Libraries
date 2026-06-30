@@ -416,8 +416,20 @@ public class LayerTreeNode : INotifyPropertyChanged
     public bool CanLock => NodeType == LayerNodeType.Leaf
         && (Symbol != null || Model?.LayerType == "OverlayImage");
 
+    private bool _isMapEditable = true;
+    /// <summary>맵 편집 권한 — false면 잠금 토글 비활성(권한 없으면 아이콘 변화·동작 차단해 desync 방지). VM이 빌드 시 CanEditMap()로 설정.</summary>
+    public bool IsMapEditable
+    {
+        get => _isMapEditable;
+        set { if (_isMapEditable == value) return; _isMapEditable = value; OnPropertyChanged(); }
+    }
+
+    // CanExecute에 권한(IsMapEditable)을 포함 → 권한 없으면 자물쇠 버튼·메뉴가 비활성(WPF Command 자동 IsEnabled).
+    // 따라서 권한 없으면 토글 자체가 막혀 노드 IsLocked가 바뀌지 않음(아이콘 안 바뀜, 팝업 불필요).
     public ICommand ToggleLockCommand => _toggleLockCommand ??=
-        new RelayCommand(_ => { if (CanLock) IsLocked = !IsLocked; });
+        new RelayCommand(
+            _ => { if (CanLock && IsMapEditable) IsLocked = !IsLocked; },
+            _ => CanLock && IsMapEditable);
 
     #endregion
 
