@@ -1,267 +1,159 @@
-﻿<UserControl
+<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.AccountSetupPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
-	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
-	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-	xmlns:sys="clr-namespace:System;assembly=mscorlib"
-	xmlns:utilPass="clr-namespace:Ironwall.Dotnet.Libraries.Utils.PasswordControl;assembly=Ironwall.Dotnet.Libraries.Utils"
-	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
-	d:DesignHeight="450"
-	d:DesignWidth="800"
+	d:DesignHeight="500"
+	d:DesignWidth="700"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
-	<ScrollViewer>
-		<StackPanel Margin="15,0,10,0" Orientation="Vertical">
-			<Grid Margin="15,0,10,0">
-				<Grid>
-					<Grid Height="300">
-						<!--  ProgressBar section  -->
-						<ProgressBar
-							Width="100"
-							Height="20"
-							IsIndeterminate="True">
-							<ProgressBar.Style>
-                                <Style BasedOn="{StaticResource MaterialDesignCircularProgressBar}" TargetType="ProgressBar">
-									<!--  기본값은 표시 안 함  -->
-									<Setter Property="Visibility" Value="Collapsed" />
-									<Style.Triggers>
-										<!--  If IsVisible == false, show ProgressBar  -->
-										<DataTrigger Binding="{Binding IsVisible}" Value="False">
-											<Setter Property="Visibility" Value="Visible" />
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</ProgressBar.Style>
-						</ProgressBar>
-					</Grid>
-					<Grid>
-						<Grid.Style>
-							<Style TargetType="Grid">
-								<Setter Property="Visibility" Value="Hidden" />
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding IsVisible}" Value="True">
-										<Setter Property="Visibility" Value="Visible" />
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</Grid.Style>
-						<md:TransitioningContent>
-							<md:TransitioningContent.OpeningEffects>
-								<md:TransitionEffect Kind="FadeIn" Duration="0:0:0.3" />
-							</md:TransitioningContent.OpeningEffects>
-							<Grid Margin="16,24,24,0" IsEnabled="{Binding LoginViewModel.Level, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource AdminLevelAllowConverter}}">
-								<Grid.RowDefinitions>
-									<RowDefinition Height="Auto" />
-									<RowDefinition Height="Auto" />
-								</Grid.RowDefinitions>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="Auto" />
-									<ColumnDefinition Width="16" />
-									<ColumnDefinition Width="*" />
-									<ColumnDefinition Width="*" />
-									<ColumnDefinition Width="Auto" />
-								</Grid.ColumnDefinitions>
 
-								<Grid.Resources>
-									<Style TargetType="TextBlock">
-										<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
-										<Setter Property="FontSize" Value="16" />
-										<Setter Property="Opacity" Value="0.75" />
-									</Style>
-								</Grid.Resources>
+	<!--  세션 정책 — 전부 서버 세션 정책(GET/PUT /settings/session)을 불러와 설정·저장. 단일 일관 폼.  -->
+	<ScrollViewer VerticalScrollBarVisibility="Auto">
+		<StackPanel Margin="24,20,24,20">
 
-								<md:PackIcon
-									Grid.Column="0"
-									Width="18"
-									Height="18"
-									VerticalAlignment="Center"
-									Foreground="{Binding ElementName=TextBlockSession, Path=Foreground}"
-									Kind="ClockCheck" />
+			<!--  헤더  -->
+			<StackPanel Margin="0,0,0,4" Orientation="Horizontal">
+				<md:PackIcon
+					Width="22"
+					Height="22"
+					Margin="0,0,8,0"
+					VerticalAlignment="Center"
+					Foreground="{DynamicResource TextSecondaryBrush}"
+					Kind="ShieldLockOutline" />
+				<TextBlock
+					FontSize="18"
+					FontWeight="Bold"
+					Text="세션 정책" />
+			</StackPanel>
+			<TextBlock
+				Margin="0,0,0,16"
+				FontSize="12"
+				Foreground="{DynamicResource TextSecondaryBrush}"
+				Text="서버가 발급하는 세션/토큰 정책. 변경은 신규 발급 토큰부터 적용됩니다." />
 
-								<TextBlock
-									x:Name="TextBlockSession"
-									Grid.Column="2"
-									IsEnabled="{Binding ElementName=ToggleButtonSessionTime, Path=IsChecked}"
-									Text="세션 설정">
+			<!--  상태 배너(미배포/미가용) — 자체완결 DataTrigger(외부 컨버터 비의존)  -->
+			<Border
+				Margin="0,0,0,16"
+				Padding="10,8"
+				Background="{DynamicResource SurfaceBrush}"
+				BorderBrush="{DynamicResource StatusCriticalBrush}"
+				BorderThickness="1"
+				CornerRadius="4">
+				<Border.Style>
+					<Style TargetType="Border">
+						<Setter Property="Visibility" Value="Collapsed" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding HasServerStatus}" Value="True">
+								<Setter Property="Visibility" Value="Visible" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Border.Style>
+				<TextBlock
+					Foreground="{DynamicResource StatusCriticalBrush}"
+					Text="{Binding ServerStatus}"
+					TextWrapping="Wrap" />
+			</Border>
 
-									<TextBlock.Style>
-										<Style TargetType="TextBlock">
-											<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRRegular}" />
-											<Setter Property="FontSize" Value="16" />
-											<Setter Property="Opacity" Value="0.75" />
+			<!--  편집 폼 — 서버 가용 시에만 활성  -->
+			<Grid IsEnabled="{Binding ServerSettingsAvailable}">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="150" />
+				</Grid.ColumnDefinitions>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="12" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="12" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="12" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
 
-											<Style.Triggers>
-												<Trigger Property="TextBlock.IsEnabled" Value="False">
-													<Setter Property="TextBlock.Foreground" Value="{DynamicResource TextMutedBrush}" />
-												</Trigger>
-											</Style.Triggers>
-										</Style>
-									</TextBlock.Style>
-								</TextBlock>
+				<TextBlock
+					Grid.Row="0"
+					Grid.Column="0"
+					VerticalAlignment="Center"
+					Text="세션(액세스 토큰) 만료 — 시간 (1~168)" />
+				<TextBox
+					Grid.Row="0"
+					Grid.Column="1"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
 
-								<ToggleButton
-									x:Name="ToggleButtonSessionTime"
-									Grid.Column="4"
-									IsChecked="{Binding IsSession, Mode=TwoWay}"
-									Style="{StaticResource MaterialDesignSwitchToggleButton}"
-									ToolTip="MaterialDesignSwitchToggleButton" />
+				<TextBlock
+					Grid.Row="2"
+					Grid.Column="0"
+					VerticalAlignment="Center"
+					Text="Refresh 유효기간 — 일 (1~90)" />
+				<TextBox
+					Grid.Row="2"
+					Grid.Column="1"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
 
-								<Grid
-									Grid.Row="2"
-									Grid.Column="2"
-									Grid.ColumnSpan="9"
-									Margin="0,16,0,0">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="Auto" />
-										<ColumnDefinition Width="16" />
-										<ColumnDefinition Width="*" />
-									</Grid.ColumnDefinitions>
+				<TextBlock
+					Grid.Row="4"
+					Grid.Column="0"
+					VerticalAlignment="Center"
+					Text="로그인 잠금 임계 — 횟수 (0=비활성, 3~20)" />
+				<TextBox
+					Grid.Row="4"
+					Grid.Column="1"
+					Style="{StaticResource TextBoxInput}"
+					Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
 
-									<md:PackIcon
-										Width="16"
-										Height="16"
-										VerticalAlignment="Center"
-										Foreground="{Binding ElementName=TextBlockSession, Path=Foreground}"
-										Kind="AlarmCheck" />
-
-									<md:TimePicker
-										x:Name="SessionTimePicker"
-										Grid.Column="2"
-										VerticalAlignment="Center"
-										HorizontalContentAlignment="Right"
-										md:HintAssist.FloatingScale="1"
-										md:HintAssist.Hint="세션 기한 설정"
-										md:HintAssist.IsFloating="True"
-										Is24Hours="True"
-										IsEnabled="{Binding ElementName=ToggleButtonSessionTime, Path=IsChecked}"
-										Text="{Binding SessionExpiration, UpdateSourceTrigger=LostFocus, Mode=TwoWay, Converter={StaticResource TimeFormatConverter}}" />
-								</Grid>
-							</Grid>
-						</md:TransitioningContent>
-					</Grid>
-				</Grid>
+				<TextBlock
+					Grid.Row="6"
+					Grid.Column="0"
+					VerticalAlignment="Center"
+					Text="세션 만료 사용" />
+				<ToggleButton
+					Grid.Row="6"
+					Grid.Column="1"
+					HorizontalAlignment="Left"
+					IsChecked="{Binding SessionPolicyEnabled}"
+					Style="{StaticResource MaterialDesignSwitchToggleButton}" />
 			</Grid>
 
-			<!--  서버 세션 정책 (GOP_Session_Settings_Admin) — 서버 API 미배포 시 비활성 + 안내(가짜 UI 회피)  -->
+			<!--  읽기전용(배포/.env 전용)  -->
 			<Border
-				Margin="16,24,24,8"
-				Padding="14"
+				Margin="0,18,0,0"
+				Padding="10,8"
 				BorderBrush="{DynamicResource DividerBrush}"
-				BorderThickness="1"
-				CornerRadius="6">
-				<StackPanel>
+				BorderThickness="0,1,0,0">
+				<StackPanel Orientation="Horizontal">
+					<TextBlock VerticalAlignment="Center" Text="인증 모드 (읽기전용, 배포 설정): " />
 					<TextBlock
-						Margin="0,0,0,10"
-						FontSize="16"
+						VerticalAlignment="Center"
 						FontWeight="Bold"
-						Text="서버 세션 정책" />
-
-					<!--  미배포/미가용 안내(자체완결 DataTrigger — 외부 컨버터 비의존)  -->
-					<TextBlock
-						Margin="0,0,0,12"
-						FontStyle="Italic"
-						Foreground="{DynamicResource StatusCriticalBrush}"
-						Text="{Binding ServerStatus}"
-						TextWrapping="Wrap">
-						<TextBlock.Style>
-							<Style TargetType="TextBlock">
-								<Setter Property="Visibility" Value="Collapsed" />
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding HasServerStatus}" Value="True">
-										<Setter Property="Visibility" Value="Visible" />
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</TextBlock.Style>
-					</TextBlock>
-
-					<Grid IsEnabled="{Binding ServerSettingsAvailable}">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="*" />
-							<ColumnDefinition Width="130" />
-						</Grid.ColumnDefinitions>
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="10" />
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="10" />
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="10" />
-							<RowDefinition Height="Auto" />
-						</Grid.RowDefinitions>
-
-						<TextBlock
-							Grid.Row="0"
-							Grid.Column="0"
-							VerticalAlignment="Center"
-							Text="세션(액세스 토큰) 만료 (시간, 1~168)" />
-						<TextBox
-							Grid.Row="0"
-							Grid.Column="1"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
-
-						<TextBlock
-							Grid.Row="2"
-							Grid.Column="0"
-							VerticalAlignment="Center"
-							Text="Refresh 유효기간 (일, 1~90)" />
-						<TextBox
-							Grid.Row="2"
-							Grid.Column="1"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
-
-						<TextBlock
-							Grid.Row="4"
-							Grid.Column="0"
-							VerticalAlignment="Center"
-							Text="로그인 잠금 임계 (0=비활성, 3~20)" />
-						<TextBox
-							Grid.Row="4"
-							Grid.Column="1"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
-
-						<TextBlock
-							Grid.Row="6"
-							Grid.Column="0"
-							VerticalAlignment="Center"
-							Text="세션 만료 사용" />
-						<ToggleButton
-							Grid.Row="6"
-							Grid.Column="1"
-							HorizontalAlignment="Left"
-							IsChecked="{Binding SessionPolicyEnabled}"
-							Style="{StaticResource MaterialDesignSwitchToggleButton}" />
-					</Grid>
-
-					<!--  읽기전용(배포/.env 전용)  -->
-					<StackPanel Margin="0,12,0,0" Orientation="Horizontal">
-						<TextBlock VerticalAlignment="Center" Text="인증 모드 (읽기전용): " />
-						<TextBlock
-							VerticalAlignment="Center"
-							FontWeight="Bold"
-							Text="{Binding AuthMode}" />
-					</StackPanel>
-
-					<Button
-						x:Name="ClickSaveServerSettings"
-						Margin="0,14,0,0"
-						HorizontalAlignment="Right"
-						Content="서버 정책 저장"
-						Style="{StaticResource MaterialDesignFlatDarkBgButton}" />
+						Text="{Binding AuthMode}" />
 				</StackPanel>
 			</Border>
+
+			<!--  액션  -->
+			<StackPanel
+				Margin="0,20,0,0"
+				HorizontalAlignment="Right"
+				Orientation="Horizontal">
+				<Button
+					x:Name="ClickReload"
+					Width="100"
+					Margin="0,0,8,0"
+					Content="새로고침"
+					Style="{StaticResource MaterialDesignFlatButton}" />
+				<Button
+					x:Name="ClickSave"
+					Width="120"
+					Content="저장"
+					Style="{StaticResource MaterialDesignFlatDarkBgButton}" />
+			</StackPanel>
 
 		</StackPanel>
 	</ScrollViewer>
 </UserControl>
-
