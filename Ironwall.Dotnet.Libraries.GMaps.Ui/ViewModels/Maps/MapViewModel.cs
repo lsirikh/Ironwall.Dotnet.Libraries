@@ -7693,6 +7693,7 @@ public class MapViewModel : BasePanelViewModel,
             LayerPanel.SymbolVisibilityChanged -= OnSymbolVisibilityChanged;
             LayerPanel.SymbolNavigateRequested -= OnSymbolNavigateRequested;
             LayerPanel.PanelSizeCommitted -= OnPanelSizeCommitted;
+            LayerPanel.UnsubscribeLeaves();   // leaf 구독·델리게이트 해제(닫힌 컨트롤 누수 방지)
             LayerPanel = null;
         }
         IsLayerPanelVisible = false;
@@ -7707,6 +7708,7 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            // Id는 Symbols 테이블 단일 PK(전 심볼 타입 공유·전역 유일) → marker.Id==symbol.Id 가 타입무관 유일 식별.
             var marker = MainMap?.Markers
                 .OfType<GMapSymbols.IEditableMarker>()
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
@@ -8154,14 +8156,19 @@ public class MapViewModel : BasePanelViewModel,
 
     private int UpdateNodeCounts(LayerTreeNode node)
     {
-        if (node.NodeType == LayerNodeType.Leaf && !string.IsNullOrEmpty(node.Category))
+        // 카테고리 노드: 빌더가 설정한 개별 심볼 자식 수(ItemCount)를 그대로 사용.
+        // (개별 심볼 Leaf의 Category=EnumMarkerCategory 이름이라 MatchMarkerToCategory 키와 불일치 → 재계산 시 0 회귀 방지)
+        if (node.NodeType == LayerNodeType.Category)
+            return node.ItemCount;
+
+        if (node.NodeType == LayerNodeType.Leaf && node.Symbol == null && !string.IsNullOrEmpty(node.Category))
         {
-            // 심볼 Leaf: 맵에서 해당 카테고리 마커 개수
+            // 레거시 카테고리 단위 Leaf: 맵에서 해당 카테고리 마커 개수
             node.ItemCount = MainMap!.Markers.Count(m => MatchMarkerToCategory(m, node.Category));
             return node.ItemCount;
         }
 
-        // Group/Section: 자식 합계
+        // Group/Section: 자식 합계 (Category 자식은 위에서 ItemCount 반환)
         int total = 0;
         foreach (var child in node.Children)
         {

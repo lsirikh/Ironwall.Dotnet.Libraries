@@ -67,9 +67,12 @@ public class LayerTreeNode : INotifyPropertyChanged
             if (!_isUpdatingParent && Children.Count > 0 && value.HasValue)
             {
                 _isUpdatingChildren = true;
-                foreach (var child in Children)
-                    child.IsChecked = value.Value;
-                _isUpdatingChildren = false;
+                try
+                {
+                    foreach (var child in Children)
+                        child.IsChecked = value.Value;
+                }
+                finally { _isUpdatingChildren = false; }   // 예외 시 플래그 고착(roll-up 영구 비활성) 방지
             }
 
             // 자식 → 부모 전파 (부모가 일괄 cascade 중이면 건너뜀 — 대형 카테고리 토글 시 O(n^2) 재계산 방지, FR-03)

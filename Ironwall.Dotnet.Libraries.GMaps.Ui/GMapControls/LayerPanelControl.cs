@@ -65,6 +65,23 @@ public class LayerPanelControl : Control
         }
     }
 
+    /// <summary>패널 닫힘/트리 교체 시 leaf 구독·델리게이트 해제 — 닫힌 컨트롤이 트리 노드에 잡혀 누수되는 것 방지.</summary>
+    internal void UnsubscribeLeaves()
+    {
+        if (TreeNodes == null) return;
+        foreach (var leaf in LayerTreeBuilder.Flatten(TreeNodes))
+        {
+            leaf.CheckChanged -= OnLeafCheckChanged;
+            leaf.OpacityChanged -= OnLeafOpacityChanged;
+            leaf.OnDeleteAction = null;
+            leaf.OnMoveUpAction = null;
+            leaf.OnMoveDownAction = null;
+            leaf.OnRenameAction = null;
+            leaf.OnNavigateAction = null;
+        }
+        _opacityDebounceTimer.Stop();
+    }
+
     private void OnLeafCheckChanged(object? sender, EventArgs e)
     {
         if (sender is not LayerTreeNode node) return;
@@ -323,7 +340,8 @@ public class LayerPanelControl : Control
 
         if (resizeW)
         {
-            double newW = Math.Min(Math.Max(ActualWidth + e.HorizontalChange, MinPanelWidth), MaxPanelWidth);
+            double curW = double.IsNaN(Width) ? ActualWidth : Width;   // 백킹값 사용(빠른 드래그 시 ActualWidth 지연 방지)
+            double newW = Math.Min(Math.Max(curW + e.HorizontalChange, MinPanelWidth), MaxPanelWidth);
             if (canvas != null && cp != null)
             {
                 double left = Canvas.GetLeft(cp); if (double.IsNaN(left)) left = 0;
