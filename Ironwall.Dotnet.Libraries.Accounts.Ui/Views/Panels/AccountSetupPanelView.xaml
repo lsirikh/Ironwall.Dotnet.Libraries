@@ -149,6 +149,118 @@
 				</Grid>
 			</Grid>
 
+			<!--  서버 세션 정책 (GOP_Session_Settings_Admin) — 서버 API 미배포 시 비활성 + 안내(가짜 UI 회피)  -->
+			<Border
+				Margin="16,24,24,8"
+				Padding="14"
+				BorderBrush="{DynamicResource DividerBrush}"
+				BorderThickness="1"
+				CornerRadius="6">
+				<StackPanel>
+					<TextBlock
+						Margin="0,0,0,10"
+						FontSize="16"
+						FontWeight="Bold"
+						Text="서버 세션 정책" />
+
+					<!--  미배포/미가용 안내(자체완결 DataTrigger — 외부 컨버터 비의존)  -->
+					<TextBlock
+						Margin="0,0,0,12"
+						FontStyle="Italic"
+						Foreground="{DynamicResource StatusCriticalBrush}"
+						Text="{Binding ServerStatus}"
+						TextWrapping="Wrap">
+						<TextBlock.Style>
+							<Style TargetType="TextBlock">
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding HasServerStatus}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
+
+					<Grid IsEnabled="{Binding ServerSettingsAvailable}">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="130" />
+						</Grid.ColumnDefinitions>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="10" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="10" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="10" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							VerticalAlignment="Center"
+							Text="세션(액세스 토큰) 만료 (시간, 1~168)" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding TimeoutHours, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Row="2"
+							Grid.Column="0"
+							VerticalAlignment="Center"
+							Text="Refresh 유효기간 (일, 1~90)" />
+						<TextBox
+							Grid.Row="2"
+							Grid.Column="1"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding RefreshDays, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Row="4"
+							Grid.Column="0"
+							VerticalAlignment="Center"
+							Text="로그인 잠금 임계 (0=비활성, 3~20)" />
+						<TextBox
+							Grid.Row="4"
+							Grid.Column="1"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock
+							Grid.Row="6"
+							Grid.Column="0"
+							VerticalAlignment="Center"
+							Text="세션 만료 사용" />
+						<ToggleButton
+							Grid.Row="6"
+							Grid.Column="1"
+							HorizontalAlignment="Left"
+							IsChecked="{Binding SessionPolicyEnabled}"
+							Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+					</Grid>
+
+					<!--  읽기전용(배포/.env 전용)  -->
+					<StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+						<TextBlock VerticalAlignment="Center" Text="인증 모드 (읽기전용): " />
+						<TextBlock
+							VerticalAlignment="Center"
+							FontWeight="Bold"
+							Text="{Binding AuthMode}" />
+					</StackPanel>
+
+					<Button
+						x:Name="ClickSaveServerSettings"
+						Margin="0,14,0,0"
+						HorizontalAlignment="Right"
+						Content="서버 정책 저장"
+						Style="{StaticResource MaterialDesignFlatDarkBgButton}" />
+				</StackPanel>
+			</Border>
+
 		</StackPanel>
 	</ScrollViewer>
 </UserControl>

@@ -100,6 +100,27 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiListResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    // ── 세션 설정 (GOP_Session_Settings_Admin FR-SS-C1) — 서버 API 미배포 시 404 → res.Success=false (클라 graceful) ──
+    public async Task<ApiResponse<SessionSettingsDto>> GetSessionSettingsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.GetRequestAsync("settings/session").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<SessionSettingsDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<SessionSettingsDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<SessionSettingsDto>> UpdateSessionSettingsAsync(SessionSettingsDto dto, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PutRequestAsync("settings/session", dto).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<SessionSettingsDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<SessionSettingsDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiResponse<AuthUserDto>> CreateUserAsync(UserCreateDto dto, CancellationToken ct = default)
     {
         try

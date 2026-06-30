@@ -59,4 +59,13 @@ public interface IAccountApiService
         => throw new NotImplementedException();
     /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit). action_type/resource_type=str(tolerant).</summary>
     Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default);
+
+    // ── 세션 설정 (GOP_Session_Settings_Admin FR-SS-C1) ──
+    /// <summary>GET /api/settings/session — 세션/인증 정책(ADMIN). 서버 API 미배포 시 404 → 클라 graceful.
+    /// 기본구현=미지원(테스트 스텁 무수정) — 실제 구현은 AccountApiService.</summary>
+    Task<ApiResponse<SessionSettingsDto>> GetSessionSettingsAsync(CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>PUT /api/settings/session — 편집 부분집합(만료/refresh/잠금/세션사용) 변경(ADMIN). 기본구현=미지원.</summary>
+    Task<ApiResponse<SessionSettingsDto>> UpdateSessionSettingsAsync(SessionSettingsDto dto, CancellationToken ct = default)
+        => throw new NotImplementedException();
 }
