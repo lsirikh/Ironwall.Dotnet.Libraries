@@ -123,9 +123,9 @@ public class DeviceProviderService : IDeviceProviderService
         CancellationTokenSource cts;
         lock (_fetchGate)
         {
-            // 재진입(재로그인): 진행 중 fetch 취소 후 최신 데이터로 재시작
+            // 재진입(재로그인): 진행 중 fetch는 취소만 — 사용 중 CTS Dispose 금지(ObjectDisposedException 위험).
+            // Dispose는 각 호출이 자기 소유 CTS를 자기 작업 종료 후(finally) 수행.
             _fetchCts?.Cancel();
-            _fetchCts?.Dispose();
             cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
             _fetchCts = cts;
         }
@@ -138,7 +138,12 @@ public class DeviceProviderService : IDeviceProviderService
         {
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(TriggerInitFetchAsync)} 취소됨(로그아웃/재로그인) — 커버 유지");
         }
-        // 그 외 예외(예: 401/네트워크)는 상위(ShellViewModel)로 전파 → 401 완화·커버 유지 처리
+        finally
+        {
+            lock (_fetchGate) { if (ReferenceEquals(_fetchCts, cts)) _fetchCts = null; }
+            cts.Dispose();
+        }
+        // 그 외 예외(예: 401/네트워크)는 상위(Conductor RunLoginInitAsync)로 전파 → 실패 안내+재로그인 복구 처리
     }
 
     /// <summary>진행 중 Device fetch를 취소합니다(강제 로그아웃/세션 만료 시). AllDevicesLoaded 미발화 → 커버 유지.</summary>
@@ -232,6 +237,8 @@ public class DeviceProviderService : IDeviceProviderService
 
             // FR-08a: 전체 Device 로딩 완료 → SymbolEventManager 일괄 동기화 트리거
             // 로그인 게이팅: 여기까지 도달 = fetch 정상 완료 → 커버 제거 신호(AllDevicesLoaded). 취소 시엔 도달 전 throw → 미발화.
+            // 마지막 단계(8) 이후 발행 직전 취소가 끼어든 경우도 차단 — 로그아웃 상태서 stale 완료로 커버 내려가는 것 방지.
+            token.ThrowIfCancellationRequested();
             await _eventAggregator.PublishOnUIThreadAsync(new AllDevicesLoadedMessage());
         }
         catch (OperationCanceledException)
