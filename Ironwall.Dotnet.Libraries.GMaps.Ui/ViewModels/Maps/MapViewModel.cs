@@ -1636,6 +1636,7 @@ public class MapViewModel : BasePanelViewModel,
         try
         {
             if (image == null) return;
+            if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 이미지 편집 영속 차단(백스톱)"); return; }
 
             // GMapCustomImage.Model은 ImageBounds(Deconstruct)·UserRotation(_model.Rotation)이 동기화된 상태.
             // MapCorrectionRotation은 런타임 전용이라 모델에 반영되지 않음 → DB엔 UserRotation만 저장됨 (NFR-6).
@@ -1694,6 +1695,7 @@ public class MapViewModel : BasePanelViewModel,
                 {
                     try
                     {
+                        if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 이미지 회전 차단"); ShowNoMapEditPermissionInfo(); return; }
                         image.UserRotation = angle;     // EffectiveRotation 자동 갱신
                         MainMap?.InvalidateVisual();
                         if (image.Id > 0)
@@ -1764,6 +1766,7 @@ public class MapViewModel : BasePanelViewModel,
         _log?.Info($"마커 편집 완료: {e.Marker.Title}");
         _log?.Info($"변경사항: {e.GetChangesSummary()}");
 
+        if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 마커 편집 영속 차단(백스톱)"); return; }
         await DbUpdateProcess(e.Marker);
 
         // UI 상태 업데이트
@@ -1823,7 +1826,7 @@ public class MapViewModel : BasePanelViewModel,
         {
             //_log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
 
-            if(SelectedMarker != null)
+            if(SelectedMarker != null && CanEditMap())
                 await DbUpdateProcess(SelectedMarker);
 
             // 이전 선택 해제
@@ -2881,7 +2884,9 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 편집 모드 토글 명령어
     /// </summary>
-    private bool CanExecuteToggleEditMode(object arg) => true;
+    // 편집모드 진입은 맵 편집 권한 필요(RBAC). 이미 진입 중이면 해제는 항상 허용. → 버튼 자동 비활성(WPF Command).
+    // 이 게이트가 어도너 드래그/이동/회전/크기·선택·속성영속 경로를 한 번에 차단(심층방어 1차).
+    private bool CanExecuteToggleEditMode(object arg) => IsEditModeEnabled || CanEditMap();
     private async void ExecuteToggleEditMode(object obj)
     {
         IsEditModeEnabled = !IsEditModeEnabled;
@@ -4388,6 +4393,7 @@ public class MapViewModel : BasePanelViewModel,
                 _log?.Warning("복제할 마커가 선택되지 않았습니다.");
                 return;
             }
+            if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 심볼 복제 차단"); ShowNoMapEditPermissionInfo(); return; }
 
             _log?.Info($"마커 복제 시작: {SelectedMarker.Title}");
 
@@ -6752,7 +6758,7 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
     {
-        if (IsEditModeEnabled && !_isMarkerEditing)
+        if (IsEditModeEnabled && !_isMarkerEditing && CanEditMap())
         {
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
             await DbUpdateProcess(e.Marker);
