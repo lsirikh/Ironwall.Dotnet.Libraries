@@ -46,6 +46,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         await base.OnActivateAsync(cancellationToken);
         // (FR-EN-11) 역할강등 재평가 구독
         { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged += OnPermissionsChanged; }
+        OnPermissionsChanged();   // (FR-EN-09 초기화 수정) 로그인 후 활성화 시 PermissionsChanged 이미 발화됨 → 초기 IsButtonEnable/SaveButtonEnable 권한 미반영(버튼 살아있는 버그). 활성화 시 1회 계산.
         // (P2-S5) 초기 로딩도 _processGate 직렬화 — 로딩 중 Insert/Save/Delete 경합 차단.
         if (!await _processGate.WaitAsync(0)) return;
         try
