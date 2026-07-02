@@ -6798,8 +6798,12 @@ public class MapViewModel : BasePanelViewModel,
 
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
     {
-        if (IsEditModeEnabled && !_isMarkerEditing && CanEditMap())
+        if (IsEditModeEnabled && !_isMarkerEditing)
         {
+            // 맵편집 권한 게이트(RBAC, 2안) — 디바이스 연결(LinkedDevice) 포함 속성 영속은 map:edit 필요.
+            // 조용한 실패(연결된 듯 보이나 미저장 → 재시작 시 원복) 대신 명시 팝업 피드백.
+            // (OPERATOR는 편집모드 진입 자체가 게이팅돼 여기 도달 전 차단됨 — 이 가드는 세션 중 역할강등 등 백스톱)
+            if (!CanEditMap()) { _log?.Warning($"[RBAC] 맵 편집 권한 없음 — 속성 저장 차단: {e.PropertyName}"); ShowNoMapEditPermissionInfo(); return; }
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
             await DbUpdateProcess(e.Marker);
 
