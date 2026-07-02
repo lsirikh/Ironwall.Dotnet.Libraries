@@ -1,5 +1,7 @@
 using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 
@@ -12,10 +14,10 @@ namespace Ironwall.Dotnet.Libraries.Devices.Ui.Helpers;
 internal static class DevicePermissionGate
 {
     /// <summary>장비 추가·저장 가능 여부 (CanEdit "devices"). 미등록 → true(전체허용).</summary>
-    internal static bool CanEdit() => Resolve()?.CanEdit("devices") ?? true;
+    internal static bool CanEdit() => PermissionUiPolicy.Allowed(Resolve(), "devices", EnumPermissionVerb.Edit);
 
-    /// <summary>장비 삭제 가능 여부 (CanDelete "devices"). 미등록 → true(전체허용).</summary>
-    internal static bool CanDelete() => Resolve()?.CanDelete("devices") ?? true;
+    /// <summary>장비 삭제 가능 여부 (CanDelete "devices"). 미등록 → true(전체허용). T6 중앙 필터(PermissionUiPolicy) 경유.</summary>
+    internal static bool CanDelete() => PermissionUiPolicy.Allowed(Resolve(), "devices", EnumPermissionVerb.Delete);
 
     /// <summary>
     /// IPermissionService IoC lazy 해석. 미등록(오프라인/테스트/DI 미설정) 시 null 반환.
