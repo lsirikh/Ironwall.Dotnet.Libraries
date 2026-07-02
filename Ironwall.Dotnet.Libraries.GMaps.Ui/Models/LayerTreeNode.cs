@@ -343,21 +343,24 @@ public class LayerTreeNode : INotifyPropertyChanged
     internal Action<LayerTreeNode, string>? OnRenameAction { get; set; }
     internal Action<LayerTreeNode>? OnNavigateAction { get; set; }
 
+    // 편집성 명령(삭제/이동/이름변경)은 맵편집 권한(IsMapEditable) 필요 → 권한 없으면 컨텍스트 메뉴가
+    // WPF Command로 자동 비활성(회색). 이름변경은 진입 자체가 막혀 인라인 편집·노드명 변경도 안 일어남(맵/패널 desync 차단).
+    // NavigateCommand(중앙으로 이동)는 조회성이라 게이팅 제외.
     public ICommand DeleteCommand => _deleteCommand ??=
-        new RelayCommand(_ => OnDeleteAction?.Invoke(this), _ => CanDelete);
+        new RelayCommand(_ => OnDeleteAction?.Invoke(this), _ => CanDelete && IsMapEditable);
 
     public ICommand MoveUpCommand => _moveUpCommand ??=
-        new RelayCommand(_ => OnMoveUpAction?.Invoke(this), _ => CanMoveUp);
+        new RelayCommand(_ => OnMoveUpAction?.Invoke(this), _ => CanMoveUp && IsMapEditable);
 
     public ICommand MoveDownCommand => _moveDownCommand ??=
-        new RelayCommand(_ => OnMoveDownAction?.Invoke(this), _ => CanMoveDown);
+        new RelayCommand(_ => OnMoveDownAction?.Invoke(this), _ => CanMoveDown && IsMapEditable);
 
     public ICommand RenameCommand => _renameCommand ??=
         new RelayCommand(_ =>
         {
             _editingName = Name;
             IsEditing = true;
-        }, _ => CanRename);
+        }, _ => CanRename && IsMapEditable);
 
     public ICommand CommitRenameCommand => _commitRenameCommand ??=
         new RelayCommand(_ =>
@@ -397,16 +400,22 @@ public class LayerTreeNode : INotifyPropertyChanged
             if (_isLocked == value) return;
             _isLocked = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(LockToggleHeader));
             if (Symbol != null) Symbol.IsLocked = value;
             LockChanged?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    /// <summary>우클릭 메뉴 '잠금/잠금 해제' 헤더 — MenuItem.Header 직접 바인딩용.
+    /// (인라인 <c>Style TargetType="MenuItem"</c>이 MaterialDesign 암시 스타일을 덮어써 아이콘·색이 어긋나던 문제 회피, FR-03 정렬 수정.)</summary>
+    public string LockToggleHeader => IsLocked ? "잠금 해제" : "잠금";
 
     /// <summary>잠금 상태를 LockChanged 발화 없이 초기화 — 패널 빌드 시 모델/마커 기준 동기화용(DB 재기록·피드백 루프 방지).</summary>
     internal void InitIsLocked(bool locked)
     {
         _isLocked = locked;
         OnPropertyChanged(nameof(IsLocked));
+        OnPropertyChanged(nameof(LockToggleHeader));
     }
 
     /// <summary>잠금 변경 시 발생 — 컨트롤이 VM으로 라우팅(마커 적용 + DB 영속).</summary>

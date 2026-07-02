@@ -41,7 +41,7 @@
 	<!-- Leaf 노드 (심볼: 체크 + 아이콘 + 이름)             -->
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="LeafNodeTemplate" DataType="{x:Type models:LayerTreeNode}">
-		<Grid Height="20" Margin="2,3,0,3" ToolTip="{Binding Name}">
+		<Grid Height="20" Margin="0,3,0,3" ToolTip="{Binding Name}">
 			<!-- 개별 심볼 리프 컨텍스트(이동만 활성, NavigateCommand 게이팅). 카테고리 단위 레거시 Leaf에선 비활성(FR-04). -->
 			<Grid.ContextMenu>
 				<ContextMenu>
@@ -55,17 +55,7 @@
 							<md:PackIcon Kind="RenameBox" Width="16" Height="16" />
 						</MenuItem.Icon>
 					</MenuItem>
-					<MenuItem Command="{Binding ToggleLockCommand}">
-						<MenuItem.Style>
-							<Style TargetType="MenuItem">
-								<Setter Property="Header" Value="잠금" />
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding IsLocked}" Value="True">
-										<Setter Property="Header" Value="잠금 해제" />
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</MenuItem.Style>
+					<MenuItem Header="{Binding LockToggleHeader}" Command="{Binding ToggleLockCommand}">
 						<MenuItem.Icon>
 							<md:PackIcon Width="16" Height="16">
 								<md:PackIcon.Style>
@@ -86,15 +76,18 @@
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="*" />
 			</Grid.ColumnDefinitions>
-			<!-- 잠금 토글 아이콘 (열림/잠김) — FR-03 -->
-			<Button
+			<CheckBox
 				Grid.Column="0"
+				IsChecked="{Binding IsChecked, Mode=TwoWay}"
+				Style="{StaticResource LayerCheckBox}" />
+			<!-- 잠금 토글 아이콘 (열림/잠김) — FR-03. 체크박스 뒤로 이동 (순서 교환). -->
+			<Button
+				Grid.Column="1"
 				Width="18"
 				Height="18"
-				Margin="0,0,1,0"
+				Margin="0,0,4,0"
 				Padding="0"
 				Command="{Binding ToggleLockCommand}"
 				Background="Transparent"
@@ -132,30 +125,8 @@
 					</ControlTemplate>
 				</Button.Template>
 			</Button>
-			<CheckBox
-				Grid.Column="1"
-				IsChecked="{Binding IsChecked, Mode=TwoWay}"
-				Style="{StaticResource LayerCheckBox}" />
-			<md:PackIcon
-				Grid.Column="2"
-				Width="14"
-				Height="14"
-				Margin="0,0,5,0"
-				VerticalAlignment="Center"
-				Kind="{Binding IconKind}">
-				<md:PackIcon.Style>
-					<Style TargetType="md:PackIcon">
-						<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-						<Style.Triggers>
-							<DataTrigger Binding="{Binding IsChecked}" Value="False">
-								<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
-							</DataTrigger>
-						</Style.Triggers>
-					</Style>
-				</md:PackIcon.Style>
-			</md:PackIcon>
-			<!-- 이름 표시 / 인라인 편집(FR-04) -->
-			<Grid Grid.Column="3">
+			<!-- 이름 표시 / 인라인 편집(FR-04). 실제 심볼 리프는 제목 앞 아이콘 제외(요청). -->
+			<Grid Grid.Column="2">
 				<TextBlock
 					VerticalAlignment="Center"
 					FontSize="12"
@@ -234,17 +205,7 @@
 						</MenuItem.Icon>
 					</MenuItem>
 					<Separator />
-					<MenuItem Command="{Binding ToggleLockCommand}">
-						<MenuItem.Style>
-							<Style TargetType="MenuItem">
-								<Setter Property="Header" Value="잠금" />
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding IsLocked}" Value="True">
-										<Setter Property="Header" Value="잠금 해제" />
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</MenuItem.Style>
+					<MenuItem Header="{Binding LockToggleHeader}" Command="{Binding ToggleLockCommand}">
 						<MenuItem.Icon>
 							<md:PackIcon Width="16" Height="16">
 								<md:PackIcon.Style>
@@ -269,12 +230,16 @@
 				<ColumnDefinition Width="60" />
 				<ColumnDefinition Width="30" />
 			</Grid.ColumnDefinitions>
-			<!-- 잠금 토글 아이콘 (열림/잠김) — FR-03 -->
-			<Button
+			<CheckBox
 				Grid.Column="0"
+				IsChecked="{Binding IsChecked, Mode=TwoWay}"
+				Style="{StaticResource LayerCheckBox}" />
+			<!-- 잠금 토글 아이콘 (열림/잠김) — FR-03. 체크박스 뒤로 이동 (순서 교환). -->
+			<Button
+				Grid.Column="1"
 				Width="18"
 				Height="18"
-				Margin="0,0,1,0"
+				Margin="0,0,4,0"
 				Padding="0"
 				VerticalAlignment="Center"
 				Command="{Binding ToggleLockCommand}"
@@ -313,10 +278,6 @@
 					</ControlTemplate>
 				</Button.Template>
 			</Button>
-			<CheckBox
-				Grid.Column="1"
-				IsChecked="{Binding IsChecked, Mode=TwoWay}"
-				Style="{StaticResource LayerCheckBox}" />
 			<!-- 이름 표시 / 인라인 편집 -->
 			<Grid Grid.Column="2">
 				<TextBlock
@@ -381,7 +342,7 @@
 	<!-- 노드 헤더 행 (Group/Category 공용: 체크 + 아이콘 + 이름 + 배지 + 셰브런) -->
 	<!-- ═══════════════════════════════════════════════════ -->
 	<DataTemplate x:Key="NodeRowTemplate" DataType="{x:Type models:LayerTreeNode}">
-		<Grid Height="24" Margin="6,0,4,0">
+		<Grid Height="24" Margin="0,0,4,0">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="Auto" />
