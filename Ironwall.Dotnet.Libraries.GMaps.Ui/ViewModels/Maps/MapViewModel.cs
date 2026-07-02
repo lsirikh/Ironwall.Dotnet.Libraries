@@ -843,6 +843,7 @@ public class MapViewModel : BasePanelViewModel,
             try { m.IsLocked = locked; await DbUpdateProcess(m); n++; }
             catch (Exception ex) { _log?.Error($"그룹 잠금 변경 실패: {ex.Message}"); }
         }
+        SyncLayerNodesFromMarkers(_groupSelection.Selection);   // D: 레이어 트리 노드 잠금 상태 동기화
         _groupSelection.RefreshAdorner();
         NotifyOfPropertyChange(nameof(SelectedMarkers));
         SetAimStatus($"{n}개 {(locked ? "잠금" : "잠금 해제")}", true);
@@ -865,9 +866,25 @@ public class MapViewModel : BasePanelViewModel,
             m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
             n++;
         }
+        SyncLayerNodesFromMarkers(_groupSelection.Selection);   // D: 레이어 트리 노드 체크(가시성) 동기화
         MainMap?.InvalidateVisual();
         _groupSelection.RefreshAdorner();
         SetAimStatus($"{n}개 {(show ? "표시" : "숨김")}", true);
+    }
+
+    /// <summary>그룹 잠금/가시성 변경 후 레이어 트리 심볼 리프 노드 동기화(D — 마커→노드, 피드백 없음). Id 매칭, InitIsLocked/SetCheckedSilently.</summary>
+    private void SyncLayerNodesFromMarkers(IReadOnlyList<IEditableMarker> markers)
+    {
+        if (_layerTreeNodes == null || markers == null || markers.Count == 0) return;
+        var byId = new Dictionary<int, IEditableMarker>();
+        foreach (var mm in markers) if (mm != null && !mm.IsDisposed && mm.Id > 0) byId[mm.Id] = mm;
+        if (byId.Count == 0) return;
+        foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
+            if (byId.TryGetValue(leaf.Symbol!.Id, out var mk))
+            {
+                leaf.InitIsLocked(mk.IsLocked);          // 잠금 아이콘/헤더 갱신(LockChanged 미발화, desync 방지)
+                leaf.SetCheckedSilently(mk.ShowShape);   // 가시성 체크 갱신(CheckChanged 미발화)
+            }
     }
 
     /// <summary>그룹 Z순서 — 선택 멤버를 심볼 밴드 최상단(toFront)/최하단으로 일괄. BatchUpdateZOrderAsync 영속. CanEditMap 게이트.</summary>

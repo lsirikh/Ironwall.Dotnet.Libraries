@@ -52,7 +52,8 @@ public sealed class GroupSelectionService : IDisposable
 
         _selection = markers.Where(m => m != null && !m.IsDisposed).ToList();
         if (_selection.Count == 0) return;
-        foreach (var m in _selection) m.IsSelected = true;
+        // IsSelected는 설정하지 않음 — 심볼별 선택표시는 GroupSelectionAdorner 정밀 박스가 균일 담당
+        // (템플릿 PART_SelectionHighlight 불일치·부정확 회피). 그룹 이동/삭제/잠금은 _selection 기준.
 
         _layer = AdornerLayer.GetAdornerLayer(_map);
         if (_layer == null) { _log?.Error("GroupSelectionService: AdornerLayer 없음"); return; }

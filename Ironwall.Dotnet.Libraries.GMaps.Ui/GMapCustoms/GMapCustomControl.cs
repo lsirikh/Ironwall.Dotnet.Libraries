@@ -424,11 +424,8 @@ public class GMapCustomControl : GMapControl
         // 카메라 "특정 위치 확인" 반경 오버레이는 AimOverlayAdorner(맵 AdornerLayer)로 이전 —
         //   심볼·이미지 위 표시 + 등장/리플 애니메이션(FR-AIM-01~03). OnRender 직접 렌더 제거.
 
-        // Shift+드래그 러버밴드 마퀴 — 반투명 채움 + 점선 외곽 (FR-MS-01)
-        if (_isRubberBanding && _rubberStart.HasValue && _rubberCurrent.HasValue)
-        {
-            drawingContext.DrawRectangle(_rubberFill, _rubberPen, new Rect(_rubberStart.Value, _rubberCurrent.Value));
-        }
+        // Shift+드래그 러버밴드 마퀴는 RubberBandAdorner(맵 AdornerLayer, 이미지·마커 위)로 이전 —
+        //   OnRender 직접 렌더는 자식 이미지마커(GMapImageMarker)에 가려짐. OnRender 마퀴 제거.
     }
 
     #endregion
@@ -791,9 +788,10 @@ public class GMapCustomControl : GMapControl
             _isRubberBanding = true;
             _rubberStart = mousePos;
             _rubberCurrent = mousePos;
+            ShowRubberBand();       // 마퀴는 어도너(이미지·마커 위)로 렌더 — 오버레이 이미지에 안 가려짐
+            UpdateRubberBand();
             CaptureMouse();
             e.Handled = true;
-            InvalidateVisual();
             return;
         }
 
@@ -861,7 +859,7 @@ public class GMapCustomControl : GMapControl
         if (_isRubberBanding)
         {
             _rubberCurrent = e.GetPosition(this);
-            InvalidateVisual();
+            UpdateRubberBand();   // 어도너 마퀴 갱신(OnRender 아님 → 이미지·마커 위)
             return;
         }
 
@@ -903,7 +901,7 @@ public class GMapCustomControl : GMapControl
                     hits = GetMarkersInRect(rect);
             }
             _rubberStart = null; _rubberCurrent = null;
-            InvalidateVisual();
+            HideRubberBand();   // 마퀴 어도너 제거
             MarkersRubberBandSelected?.Invoke(hits);
             return;
         }
@@ -2039,6 +2037,40 @@ public class GMapCustomControl : GMapControl
     // AdornerManager 미사용 — 5분 정리타이머·per-marker 딕셔너리와 무관한 전용 소유(불변식 준수).
     private Adorners.AimOverlayAdorner? _aimOverlayAdorner;
 
+    // ── 러버밴드 마퀴 어도너(맵 AdornerLayer, 이미지·마커 위 — OnRender 마퀴가 이미지마커에 가려지는 문제 해소) ──
+    private Adorners.RubberBandAdorner? _rubberBandAdorner;
+
+    /// <summary>러버밴드 마퀴 어도너 부착(러버밴드 시작 시).</summary>
+    private void ShowRubberBand()
+    {
+        try
+        {
+            var layer = System.Windows.Documents.AdornerLayer.GetAdornerLayer(this);
+            if (layer == null) return;
+            if (_rubberBandAdorner == null)
+            {
+                _rubberBandAdorner = new Adorners.RubberBandAdorner(this);
+                layer.Add(_rubberBandAdorner);
+            }
+        }
+        catch (Exception ex) { _log?.Error($"러버밴드 오버레이 표시 실패: {ex.Message}"); }
+    }
+
+    /// <summary>러버밴드 마퀴 사각형 갱신(드래그 중).</summary>
+    private void UpdateRubberBand()
+    {
+        if (_rubberBandAdorner != null && _rubberStart.HasValue && _rubberCurrent.HasValue)
+            _rubberBandAdorner.Update(new Rect(_rubberStart.Value, _rubberCurrent.Value));
+    }
+
+    /// <summary>러버밴드 마퀴 어도너 제거(종료/취소).</summary>
+    private void HideRubberBand()
+    {
+        if (_rubberBandAdorner == null) return;
+        try { System.Windows.Documents.AdornerLayer.GetAdornerLayer(this)?.Remove(_rubberBandAdorner); } catch { /* 레이어 정리 중 */ }
+        _rubberBandAdorner = null;
+    }
+
     /// <summary>반경 오버레이 adorner 부착 + 등장 애니 시작(IsTargetAimMode=true 시).</summary>
     private void ShowAimOverlay()
     {
@@ -2356,6 +2388,10 @@ public class GMapCustomControl : GMapControl
                 ResetDragState();
                 _log?.Info("SetEditMode(false) — 진행 중 드래그 강제 종료(CaptureMouse 해제)");
             }
+
+            // 진행 중 러버밴드 취소 + 마퀴 어도너 제거(편집 종료 시 잔존 방지)
+            if (_isRubberBanding) { _isRubberBanding = false; _rubberStart = null; _rubberCurrent = null; if (IsMouseCaptured) ReleaseMouseCapture(); }
+            HideRubberBand();
 
             // 편집 모드 해제 시 모든 선택 해제
             foreach (var img in CustomImages) img.IsSelected = false;

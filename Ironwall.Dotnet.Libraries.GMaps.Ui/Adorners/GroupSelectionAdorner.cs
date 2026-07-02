@@ -92,30 +92,24 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>마커의 화면 사각형(중심±렌더크기/2, 폴백 32).</summary>
+    /// <summary>마커의 화면 사각형 — 실제 렌더 위치·크기(Offset/회전 반영, map 좌표계). 폴백=중심±렌더크기/2(32).</summary>
     private Rect MarkerRect(IEditableMarker m)
     {
-        var sp = _map.FromLatLngToLocal(m.Position);
         var shape = (m as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
+        if (shape != null && shape.ActualWidth > 0 && shape.ActualHeight > 0)
+        {
+            try
+            {
+                // 실제 렌더 bounds(Offset·회전 반영) → 심볼 크기에 정확히 맞춘 박스(FR-MS-03)
+                var b = shape.TransformToVisual(_map).TransformBounds(new Rect(0, 0, shape.ActualWidth, shape.ActualHeight));
+                if (b.Width > 0 && b.Height > 0) return b;
+            }
+            catch { /* 비주얼트리 분리 등 → 폴백 */ }
+        }
+        var sp = _map.FromLatLngToLocal(m.Position);
         double w = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32d;
         double h = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32d;
         return new Rect(sp.X - w / 2d, sp.Y - h / 2d, w, h);
-    }
-
-    private Rect ComputeBox()
-    {
-        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
-        bool any = false;
-        foreach (var m in _markers)
-        {
-            if (m == null || m.IsDisposed) continue;
-            var r = MarkerRect(m);
-            minX = Math.Min(minX, r.Left); minY = Math.Min(minY, r.Top);
-            maxX = Math.Max(maxX, r.Right); maxY = Math.Max(maxY, r.Bottom);
-            any = true;
-        }
-        if (!any) return Rect.Empty;
-        return new Rect(minX - 4d, minY - 4d, (maxX - minX) + 8d, (maxY - minY) + 8d);
     }
 
     /// <summary>p(adorner 공간)가 선택 마커 중 하나의 화면 사각형 안인가 — 좌드래그 이동/우클릭 메뉴 hit 영역.</summary>
@@ -134,9 +128,15 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         try
         {
             if (_markers.Count == 0) return;
-            var box = ComputeBox();
-            if (box.IsEmpty || box.Width <= 0 || box.Height <= 0) return;
-            dc.DrawRectangle(null, _boxPen, box);   // 점선 바운딩박스(선택 표시). 이동핸들 없음 — 심볼 위 좌드래그로 이동.
+            // 심볼별 정밀 점선 박스 — 전 심볼에 균일 표시(바운딩박스 1개 아님, 템플릿 하이라이트 불일치 대체, FR-MS-03).
+            foreach (var m in _markers)
+            {
+                if (m == null || m.IsDisposed) continue;
+                var r = MarkerRect(m);
+                if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) continue;
+                r.Inflate(1.5d, 1.5d);   // 심볼 가장자리 살짝 밖(가시성)
+                dc.DrawRectangle(null, _boxPen, r);
+            }
         }
         catch (Exception ex) { _log?.Error($"GroupSelectionAdorner 렌더 실패: {ex.Message}"); }
     }
