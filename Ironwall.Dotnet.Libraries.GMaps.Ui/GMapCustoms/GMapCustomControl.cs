@@ -134,7 +134,18 @@ public class GMapCustomControl : GMapControl
     /// ON이면 좌클릭을 가로채 <see cref="TargetAimClicked"/>로 전달(맵 팬·마커선택·이미지편집·더블클릭 모두 차단).
     /// 라인드로잉/편집 모드와 상호배타(ViewModel이 진입 시 강제 종료).
     /// </summary>
-    public bool IsTargetAimMode { get; set; }
+    private bool _isTargetAimMode;
+    public bool IsTargetAimMode
+    {
+        get => _isTargetAimMode;
+        set
+        {
+            if (_isTargetAimMode == value) return;
+            _isTargetAimMode = value;
+            // 반경 오버레이 adorner attach/detach (렌더는 AimOverlayAdorner로 이전 — 심볼·이미지 위, FR-AIM-01)
+            if (value) ShowAimOverlay(); else HideAimOverlay();
+        }
+    }
 
     /// <summary>타겟 조준 반경 원의 중심(카메라 위치, WGS84). 타겟 모드 진입 시 설정, 종료 시 null.</summary>
     public PointLatLng? AimOverlayCenter { get; set; }
@@ -410,11 +421,8 @@ public class GMapCustomControl : GMapControl
             RenderRotationInfo(drawingContext);
         }
 
-        // 카메라 "특정 위치 확인" 타겟 반경 오버레이 (지오 앵커 — 팬/줌/디지털줌 자동 추종)
-        if (IsTargetAimMode && AimOverlayCenter.HasValue && AimOverlayRadiusMeters > 0d)
-        {
-            DrawAimRadius(drawingContext);
-        }
+        // 카메라 "특정 위치 확인" 반경 오버레이는 AimOverlayAdorner(맵 AdornerLayer)로 이전 —
+        //   심볼·이미지 위 표시 + 등장/리플 애니메이션(FR-AIM-01~03). OnRender 직접 렌더 제거.
     }
 
     #endregion
@@ -1926,7 +1934,7 @@ public class GMapCustomControl : GMapControl
     /// 미터 반경 → 현재 줌의 화면 픽셀 반경. 중심에서 동쪽으로 meters 이동한 지오점의 화면거리로 산출.
     /// (GMapMarkerPidsControl.ConvertMetersToPixels 와 동일 공식 — 컨트롤 자족 구현.)
     /// </summary>
-    private double MetersToScreenPixels(double meters, PointLatLng center)
+    internal double MetersToScreenPixels(double meters, PointLatLng center)
     {
         const double earthRadius = 6_371_000d;
         if (Math.Abs(center.Lat) > 89.9d) return 0d;        // 극점 인근 방어(cos→0 발산 회피)
@@ -1940,6 +1948,59 @@ public class GMapCustomControl : GMapControl
         double dx = tPx.X - cPx.X;
         double dy = tPx.Y - cPx.Y;
         return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    // ── 카메라 반경 오버레이 adorner (Camera_Aim_Overlay_Animation) ──
+    // AdornerManager 미사용 — 5분 정리타이머·per-marker 딕셔너리와 무관한 전용 소유(불변식 준수).
+    private Adorners.AimOverlayAdorner? _aimOverlayAdorner;
+
+    /// <summary>반경 오버레이 adorner 부착 + 등장 애니 시작(IsTargetAimMode=true 시).</summary>
+    private void ShowAimOverlay()
+    {
+        try
+        {
+            var layer = System.Windows.Documents.AdornerLayer.GetAdornerLayer(this);
+            if (layer == null) return;
+            if (_aimOverlayAdorner == null)
+            {
+                _aimOverlayAdorner = new Adorners.AimOverlayAdorner(this, _log);
+                layer.Add(_aimOverlayAdorner);
+            }
+            _aimOverlayAdorner.StartGrowIn();
+        }
+        catch (Exception ex) { _log?.Error($"aim 오버레이 표시 실패: {ex.Message}"); }
+    }
+
+    /// <summary>반경 오버레이 adorner 제거 + Dispose(구독해제, 누수방지). IsTargetAimMode=false 시.</summary>
+    private void HideAimOverlay()
+    {
+        try
+        {
+            if (_aimOverlayAdorner == null) return;
+            System.Windows.Documents.AdornerLayer.GetAdornerLayer(this)?.Remove(_aimOverlayAdorner);
+            _aimOverlayAdorner.Dispose();
+            _aimOverlayAdorner = null;
+        }
+        catch (Exception ex) { _log?.Error($"aim 오버레이 제거 실패: {ex.Message}"); }
+    }
+
+    /// <summary>유효 클릭 지점에 주황 리플 1회 재생. aim 모드 종료(단발) 이후에도 보이도록 전이(transient) adorner로 재생.</summary>
+    public void TriggerAimRipple(PointLatLng geo)
+    {
+        try
+        {
+            var layer = System.Windows.Documents.AdornerLayer.GetAdornerLayer(this);
+            if (layer == null) return;
+            var ripple = new Adorners.AimOverlayAdorner(this, _log);
+            layer.Add(ripple);
+            ripple.RippleCompleted += () =>
+            {
+                try { System.Windows.Documents.AdornerLayer.GetAdornerLayer(this)?.Remove(ripple); } catch { }
+                ripple.Dispose();
+            };
+            ripple.TriggerRipple(geo);
+        }
+        catch (Exception ex) { _log?.Error($"aim 리플 실패: {ex.Message}"); }
     }
 
     /// <summary>

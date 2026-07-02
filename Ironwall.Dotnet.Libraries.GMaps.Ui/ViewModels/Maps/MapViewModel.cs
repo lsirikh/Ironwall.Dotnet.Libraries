@@ -609,6 +609,9 @@ public class MapViewModel : BasePanelViewModel,
             return;
         }
 
+        // 유효 클릭 지점 주황 리플(확대+페이드) — 전이 adorner라 아래 즉시 종료 후에도 재생(FR-AIM-03)
+        MainMap?.TriggerAimRipple(geo);
+
         // 모드 즉시 종료(단발성) → 종료 후 세대 캡처. 발행 완료 시 그 사이 새 세션 진입했으면 안내 생략(M3)
         ExitTargetAimMode();
         _ = HandleTargetAimPublishAsync(body, _aimGeneration);
