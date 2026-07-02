@@ -34,8 +34,12 @@ public class RoleMappingHelperTests
         => Assert.Equal(EnumLevelType.USER, RoleMappingHelper.ToLevel(EnumUserRole.VIEWER));
 
     [Fact]
-    public void should_map_user_level_to_operator_role()
-        => Assert.Equal(EnumUserRole.OPERATOR, RoleMappingHelper.ToRole(EnumLevelType.USER));
+    public void should_map_user_level_to_user_role()
+        => Assert.Equal(EnumUserRole.USER, RoleMappingHelper.ToRole(EnumLevelType.USER));
+
+    [Fact]
+    public void should_parse_user_role_when_v5_4()   // v5.4 Role Simplification — 서버가 role="USER" 발행
+        => Assert.Equal(EnumUserRole.USER, RoleMappingHelper.ParseRole("USER"));
 
     [Fact]
     public void should_satisfy_hasrole_when_role_meets_required()

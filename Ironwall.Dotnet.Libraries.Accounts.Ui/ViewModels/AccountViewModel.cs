@@ -113,6 +113,10 @@ public class AccountViewModel : BaseCustomViewModel<IAccountModel>
         }
     }
 
+    /// <summary>role 드롭다운 항목 — v5.4 서버 Role 축소(ADMIN/USER 2종). 레거시 5등급(VIEWER/OPERATOR/MAINTAINER/GUEST)은 서버 미발행이라 배제(생성 시 422 방지).</summary>
+    public System.Collections.Generic.IReadOnlyList<EnumUserRole> AvailableRoles { get; }
+        = new[] { EnumUserRole.ADMIN, EnumUserRole.USER };
+
     public EnumUsedType Used
     {
         get => Model.Used;

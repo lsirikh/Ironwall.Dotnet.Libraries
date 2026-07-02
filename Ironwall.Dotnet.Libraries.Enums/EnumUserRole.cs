@@ -1,18 +1,18 @@
 namespace Ironwall.Dotnet.Libraries.Enums
 {
     /// <summary>
-    /// GOP 서버 권위 RBAC 역할 (권한 강도 오름차순).
-    /// 오름차순 정렬이므로 HasRole(required) 판정을 (role &gt;= required) 단순 비교로 처리할 수 있다.
-    /// 레거시 <see cref="EnumLevelType"/>(ADMIN/USER 2단계)와는 <see cref="RoleMappingHelper"/>로만 상호 변환한다
-    /// (정수값이 서로 달라 직접 캐스팅 금지). — GOP-00 PRD FR-2.
+    /// GOP 서버 권위 RBAC 역할. <b>v5.4(Role Simplification)부터 서버는 ADMIN/USER 2종만 발행</b> — 실권한은 group_id 매트릭스로만 판정.
+    /// 레거시 5단계(GUEST/VIEWER/OPERATOR/MAINTAINER)는 하위호환 표시용으로 보존(서버 미발행). 오름차순이라 HasRole=(role &gt;= required) 비교 가능하나,
+    /// v5.4 권한 판정 권위는 매트릭스(CanView 등)이고 role은 ADMIN bypass 라벨. 정수 직접 캐스팅 금지(<see cref="RoleMappingHelper"/> 경유). — GOP-00 FR-2 / v5.4
     /// </summary>
     public enum EnumUserRole
     {
         UNDEFINED  = 0,
-        GUEST      = 1,
-        VIEWER     = 2,
-        OPERATOR   = 3,
-        MAINTAINER = 4,
-        ADMIN      = 5,
+        GUEST      = 1,   // [레거시] v5.4 서버 미발행
+        VIEWER     = 2,   // [레거시]
+        OPERATOR   = 3,   // [레거시]
+        MAINTAINER = 4,   // [레거시]
+        USER       = 5,   // v5.4 표준 일반 사용자 — 권한은 group_id 매트릭스로만 (ADMIN 미만 유지: HasRole 안전)
+        ADMIN      = 6,   // 특권(require_admin bypass, 매트릭스 무관)
     }
 }

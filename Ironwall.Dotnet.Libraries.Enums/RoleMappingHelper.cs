@@ -1,9 +1,9 @@
 namespace Ironwall.Dotnet.Libraries.Enums
 {
     /// <summary>
-    /// <see cref="EnumUserRole"/>(GOP 5단계) ↔ <see cref="EnumLevelType"/>(레거시 2단계) 상호 변환 + 문자열 파싱.
-    /// 두 enum의 정수값이 서로 다르므로(예: <c>EnumLevelType.ADMIN=1</c> vs <c>EnumUserRole.ADMIN=5</c>)
-    /// 정수 직접 캐스팅을 금지하고 반드시 본 헬퍼를 통한다. — GOP-00 PRD FR-2.
+    /// <see cref="EnumUserRole"/> ↔ <see cref="EnumLevelType"/>(레거시 2단계) 상호 변환 + 문자열 파싱.
+    /// v5.4 서버는 role=ADMIN/USER만 발행(Role Simplification) — ParseRole이 "USER"도 매핑(레거시 5단계는 하위호환 보존).
+    /// 두 enum 정수값이 다르므로(예: <c>EnumLevelType.ADMIN=1</c> vs <c>EnumUserRole.ADMIN=6</c>) 직접 캐스팅 금지·본 헬퍼 경유. — GOP-00 FR-2 / v5.4
     /// </summary>
     public static class RoleMappingHelper
     {
@@ -21,11 +21,11 @@ namespace Ironwall.Dotnet.Libraries.Enums
         public static EnumLevelType ToLevel(EnumUserRole role)
             => role == EnumUserRole.ADMIN ? EnumLevelType.ADMIN : EnumLevelType.USER;
 
-        /// <summary>레거시 2단계 → 5단계. ADMIN→ADMIN, USER→OPERATOR(운영 승인), 그 외 GUEST.</summary>
+        /// <summary>레거시 2단계 → EnumUserRole. ADMIN→ADMIN, USER→USER(v5.4 표준), 그 외 GUEST.</summary>
         public static EnumUserRole ToRole(EnumLevelType level) => level switch
         {
             EnumLevelType.ADMIN => EnumUserRole.ADMIN,
-            EnumLevelType.USER  => EnumUserRole.OPERATOR,
+            EnumLevelType.USER  => EnumUserRole.USER,
             _                   => EnumUserRole.GUEST,
         };
 
