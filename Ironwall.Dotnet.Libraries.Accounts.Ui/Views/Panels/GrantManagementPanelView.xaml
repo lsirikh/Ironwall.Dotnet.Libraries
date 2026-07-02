@@ -77,8 +77,8 @@
 			RowStyle="{StaticResource ModernDataGridRow}"
 			Style="{StaticResource ModernDataGrid}">
 			<DataGrid.Columns>
+				<DataGridTextColumn Width="130" Binding="{Binding UserLabel}" Header="계정" />
 				<DataGridTextColumn Width="150" Binding="{Binding GroupName}" Header="그룹" />
-				<DataGridTextColumn Width="70" Binding="{Binding GroupId}" Header="그룹ID" />
 				<DataGridTextColumn Width="160" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 시작" />
 				<DataGridTextColumn Width="160" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 종료" />
 				<DataGridTextColumn Width="100" Binding="{Binding Status}" Header="상태" />

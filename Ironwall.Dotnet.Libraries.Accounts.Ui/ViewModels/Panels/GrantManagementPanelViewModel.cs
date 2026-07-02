@@ -39,6 +39,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     {
         await base.OnActivateAsync(cancellationToken);
         await LoadAccountsAndGroupsAsync(cancellationToken);
+        await LoadAllGrantsAsync();   // 탭 열자마자 전체 부여 현황 표시(계정 미선택에도 목록이 비지 않도록)
     }
     #endregion
 
@@ -46,7 +47,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     public async Task OnClickReloadButton()
     {
         await LoadAccountsAndGroupsAsync(CancellationToken.None);   // item3: 계정/그룹 목록도 재조회 — 권한설정서 새 그룹 추가 시 부여 탭에 반영
-        await ReloadGrantsAsync();
+        await LoadAllGrantsAsync();
     }
 
     /// <summary>부여 실행 — 클라 1차 경계검증(until>from) 후 POST. 서버 422가 최종.</summary>
@@ -68,11 +69,12 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
             {
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "권한 부여", Explain = $"'{acc.LoginId}'에게 '{grp.Name}' 부여 완료." });
-                // item4(사용자 요청): 부여 후 폼 초기화 — 그룹/기간 리셋 + 계정 리셋(SelectedAccount 세터가 grants 목록도 정리).
+                // item4(사용자 요청): 부여 후 폼 초기화 — 그룹/기간/계정 리셋.
                 SelectedGroup = null;
                 ValidUntil = null;
                 ValidFrom = DateTime.Now;
                 SelectedAccount = null;
+                await LoadAllGrantsAsync();   // 새 부여를 전체 목록에 즉시 반영
             }
             else
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
@@ -101,7 +103,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         try
         {
             var res = await _api.DeleteGrantAsync(grant.Id);
-            if (res.Success) await ReloadGrantsAsync();
+            if (res.Success) await LoadAllGrantsAsync();
             else await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
             { Title = "권한 회수", Explain = $"회수 실패: {res.Error?.Message ?? res.Message}" });
         }
@@ -131,31 +133,36 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 계정/그룹 로드 실패: {ex.Message}"); }
     }
 
-    private async Task ReloadGrantsAsync()
+    /// <summary>전체 계정의 부여를 집계해 목록 표시 — 서버에 list-all 엔드포인트가 없어(GET /users/{id}/grants만)
+    ///   계정별 조회를 병합하고 각 행에 계정 라벨(UserLabel) 태깅. 현재 소규모(계정 8)라 순차 조회로 충분.
+    ///   ⚠ 계정 수가 커지면 서버 GET /grants(전체) 신설이 바람직 — 요청서 docs/coordination/REQ_Server_Grants_ListAll.md.</summary>
+    private async Task LoadAllGrantsAsync()
     {
         Grants.Clear();
-        var acc = SelectedAccount;
-        if (acc is null) return;
-        try
+        foreach (var acc in Accounts)
         {
-            var res = await _api.GetUserGrantsAsync(acc.Id);
-            if (res.Success && res.Data is not null)
-                foreach (var gr in res.Data) Grants.Add(gr);
-            else if (!res.Success)
-                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "권한 부여", Explain = $"부여 목록 불러오기 실패: {res.Error?.Message ?? res.Message}" });
+            try
+            {
+                var res = await _api.GetUserGrantsAsync(acc.Id);
+                if (res.Success && res.Data is not null)
+                    foreach (var gr in res.Data)
+                    {
+                        gr.UserLabel = acc.LoginId;   // 표시용 계정 태깅(UserId→LoginId)
+                        Grants.Add(gr);
+                    }
+            }
+            catch (Exception ex) { _log?.Error($"[GrantMgmt] '{acc.LoginId}' 부여 조회 실패: {ex.Message}"); }
         }
-        catch (Exception ex) { _log?.Error($"[GrantMgmt] 부여 목록 로드 실패: {ex.Message}"); }
     }
     #endregion
 
     #region - Properties -
     private AuthUserDto? _selectedAccount;
-    /// <summary>선택 계정 — 변경 시 해당 사용자 부여 목록 재조회.</summary>
+    /// <summary>선택 계정 — 부여 폼의 대상 지정 전용. 목록은 전체 집계라 선택에 반응하지 않음('갑자기 나타남' 버그 제거).</summary>
     public AuthUserDto? SelectedAccount
     {
         get => _selectedAccount;
-        set { _selectedAccount = value; NotifyOfPropertyChange(() => SelectedAccount); NotifyOfPropertyChange(nameof(CanCreateGrant)); _ = ReloadGrantsAsync(); }
+        set { _selectedAccount = value; NotifyOfPropertyChange(() => SelectedAccount); NotifyOfPropertyChange(nameof(CanCreateGrant)); }
     }
 
     private UserGroupDto? _selectedGroup;
