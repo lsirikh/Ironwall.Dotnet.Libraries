@@ -65,6 +65,9 @@
 					<TabItem Header="감사 로그" Visibility="{Binding CanSeeAudit, Converter={StaticResource BooleanToVisibilityConverter}}">
 						<ContentControl x:Name="AuditLogPanelViewModel" />
 					</TabItem>
+					<TabItem Header="권한 부여" Visibility="{Binding CanSeeGrants, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<ContentControl x:Name="GrantManagementPanelViewModel" />
+					</TabItem>
 				</TabControl>
 
 				<!--  풋터  -->

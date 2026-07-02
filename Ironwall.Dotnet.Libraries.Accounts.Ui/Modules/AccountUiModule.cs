@@ -120,7 +120,8 @@ public class AccountUiModule : Module
                 builder.RegisterType<PermissionMatrixPanelViewModel>().SingleInstance();
                 builder.RegisterType<UserSessionPanelViewModel>().SingleInstance();
                 builder.RegisterType<AuditLogPanelViewModel>().SingleInstance();
-                builder.RegisterType<AccountConsolePanelViewModel>().SingleInstance();   // 계정·권한 관리 콘솔(4탭 호스트)
+                builder.RegisterType<GrantManagementPanelViewModel>().SingleInstance();   // T4/FR-GS-06: 권한그룹 한시부여 관리(ADMIN)
+                builder.RegisterType<AccountConsolePanelViewModel>().SingleInstance();   // 계정·권한 관리 콘솔(탭 호스트)
             }
         }
         catch
