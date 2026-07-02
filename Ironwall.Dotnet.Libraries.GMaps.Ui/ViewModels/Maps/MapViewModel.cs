@@ -601,7 +601,7 @@ public class MapViewModel : BasePanelViewModel,
         }
 
         var body = Services.Tracking.CameraAimRequestBuilder
-            .Build(cam.Id, _aimCenter.Lat, _aimCenter.Lng, geo.Lat, geo.Lng, Environment.UserName);
+            .Build(cam.Id, _aimCenter.Lat, _aimCenter.Lng, geo.Lat, geo.Lng, CurrentRequestedBy());
         if (body == null)
         {
             ExitTargetAimMode();
@@ -1045,6 +1045,26 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[ForceLogout] SessionLifecycle 미해석(GIS 강제로그아웃 정리 비활성): {ex.Message}"); _sessionLifecycle = null; }
         return _sessionLifecycle;
     }
+
+    // requested_by = 로그인 계정 식별자(login_id). 서버 JWT sub=login_id 이므로 ITokenStorageService.UserId 가 곧 login_id.
+    //   ITokenStorageService 도 IoC lazy(미등록/미로그인 시 null → Windows 사용자명 폴백).
+    private ITokenStorageService? _tokenStorage;
+    private bool _tokenStorageResolved;
+    private ITokenStorageService? ResolveTokenStorage()
+    {
+        if (_tokenStorageResolved) return _tokenStorage;
+        _tokenStorageResolved = true;
+        try { _tokenStorage = IoC.Get<ITokenStorageService>(); }
+        catch (Exception ex) { _log?.Warning($"[CameraAim] TokenStorage 미해석(requested_by 폴백): {ex.Message}"); _tokenStorage = null; }
+        return _tokenStorage;
+    }
+    /// <summary>회전요청 requested_by — 로그인 계정 login_id(JWT sub). 미로그인/미해석 시 Windows 사용자명 폴백.</summary>
+    private string CurrentRequestedBy()
+    {
+        var loginId = ResolveTokenStorage()?.UserId;
+        return string.IsNullOrWhiteSpace(loginId) ? Environment.UserName : loginId;
+    }
+
     /// <summary>강제 로그아웃 콜백(배경스레드 가능). 진행 중 PTZ 제스처 즉시 취소 + 열린 카메라 팝업 닫기(스트림 해제).</summary>
     private void OnForceLogoutRequested(EnumRevokeReason reason)
     {
