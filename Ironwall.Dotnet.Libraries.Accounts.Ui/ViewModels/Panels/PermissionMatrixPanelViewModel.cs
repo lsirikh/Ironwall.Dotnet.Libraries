@@ -27,16 +27,10 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     private readonly IAccountApiService _api;
     private List<UserGroupDto> _raw = new();
 
-    // 예약 등급(역할명 그룹): 한글 라벨 + 정렬 우대 + 삭제/개명 금지
-    private static readonly Dictionary<string, (int rank, string label)> _levels =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["ADMIN"] = (5, "관리자"),
-            ["MAINTAINER"] = (4, "유지보수자"),
-            ["OPERATOR"] = (3, "운영자"),
-            ["VIEWER"] = (2, "조회자"),
-            ["GUEST"] = (1, "게스트"),
-        };
+    // v5.4 Role Simplification(서버 v57): ADMIN/GUEST 등급그룹 DROP + 나머지 'Preset - X'로 rename + 편집 허용(NOTIFY §8.2).
+    // → 예약 보호 없음(전 그룹 편집/삭제 가능). 'Preset' 접두는 표시/정렬용으로만 인식.
+    private const string PresetPrefix = "Preset";
+    private static bool IsPresetGroup(string name) => name.StartsWith(PresetPrefix, StringComparison.OrdinalIgnoreCase);
 
     public PermissionMatrixPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api)
         : base(eventAggregator, log) => _api = api;
@@ -83,7 +77,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     }
 
     /// <summary>선택 그룹이 예약 등급이 아님 → 삭제/이름수정 가능(구성원 관리는 예약 그룹도 허용).</summary>
-    public bool CanModifySelectedGroup => _selectedGroup is { IsReserved: false };
+    public bool CanModifySelectedGroup => HasSelectedGroup;   // v5.4: 예약 보호 없음 — 선택 시 편집/삭제 가능
 
     // ── 매트릭스 상세 ──
     private string _detailGroupName = string.Empty;
@@ -175,7 +169,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     public void OnClickRenameGroup()
     {
         var row = SelectedGroup;
-        if (row is null || row.IsReserved) return;
+        if (row is null) return;
         var g = _raw.FirstOrDefault(x => x.Id == row.GroupId);
         _formGroupId = row.GroupId;
         FormName = g?.Name ?? row.GroupName;
@@ -212,7 +206,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     public async Task OnClickDeleteGroup()
     {
         var row = SelectedGroup;
-        if (row is null || row.IsReserved) return;
+        if (row is null) return;
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Title = "권한 그룹 삭제",
@@ -329,14 +323,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                                       .ToDictionary(x => x.Key, x => x.Count());
 
             Groups.Clear();
-            // 예약 등급 우선(랭크 desc) → 임의 그룹(이름 asc)
+            // v5.4: 팀 그룹 먼저 → Preset 그룹, 각 이름 asc. 예약 보호 없음(전 그룹 편집/삭제 가능).
             var ordered = _raw
-                .Select(g => new { g, reserved = _levels.ContainsKey(g.Name) })
-                .OrderByDescending(x => x.reserved ? _levels[x.g.Name].rank : 0)
-                .ThenBy(x => x.reserved ? string.Empty : x.g.Name, StringComparer.OrdinalIgnoreCase);
-            foreach (var item in ordered)
+                .OrderBy(g => IsPresetGroup(g.Name) ? 1 : 0)
+                .ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase);
+            foreach (var g in ordered)
             {
-                var g = item.g;
                 int v = 0, e = 0, d = 0, c = 0;
                 if (g.Permissions?.Modules is { } mods)
                     foreach (var kv in mods.Values)
@@ -349,8 +341,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                 Groups.Add(new PermissionGroupRowViewModel
                 {
                     GroupId = g.Id,
-                    GroupName = item.reserved ? _levels[g.Name].label : g.Name,
-                    IsReserved = item.reserved,
+                    GroupName = g.Name,
                     UserCount = countByGroupId.TryGetValue(g.Id, out var uc) ? uc : 0,
                     Active = g.IsActive ? "사용" : "미사용",
                     ViewCount = v,

@@ -26,11 +26,11 @@
 						<cal:Message.Attach>[Event Click] = [Action OnClickNewGroup()]</cal:Message.Attach>
 						<md:PackIcon Width="20" Height="20" Kind="Plus" />
 					</Button>
-					<Button IsEnabled="{Binding CanModifySelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="이름/설명 수정 (예약 등급 제외)">
+					<Button IsEnabled="{Binding CanModifySelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="이름/설명 수정">
 						<cal:Message.Attach>[Event Click] = [Action OnClickRenameGroup()]</cal:Message.Attach>
 						<md:PackIcon Width="20" Height="20" Kind="Pencil" />
 					</Button>
-					<Button IsEnabled="{Binding CanModifySelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="그룹 삭제 (예약 등급 제외)">
+					<Button IsEnabled="{Binding CanModifySelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="그룹 삭제">
 						<cal:Message.Attach>[Event Click] = [Action OnClickDeleteGroup()]</cal:Message.Attach>
 						<md:PackIcon Width="20" Height="20" Kind="TrashCanOutline" />
 					</Button>
@@ -99,7 +99,7 @@
 				Grid.Row="3"
 				Margin="0,8,0,0"
 				Style="{StaticResource PanelFieldLabel}"
-				Text="※ 그룹을 더블클릭하면 권한(모듈×동작)을 편집·저장할 수 있습니다. 예약 등급(관리자/운영자 등)은 삭제·개명 불가(매트릭스 편집만). 계정 배정은 [구성원] 버튼. (ADMIN)" />
+				Text="※ 그룹을 더블클릭하면 권한(모듈×동작)을 편집·저장할 수 있습니다. 팀/Preset 그룹 모두 생성·이름수정·삭제 가능(v5.4). 계정 배정은 [구성원] 버튼. (ADMIN)" />
 		</Grid>
 
 		<!--  ② 그룹 상세 (모듈 × 동작 매트릭스)  -->
