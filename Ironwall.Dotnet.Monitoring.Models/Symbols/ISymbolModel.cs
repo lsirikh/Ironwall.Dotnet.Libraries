@@ -24,4 +24,8 @@ public interface ISymbolModel : IBaseModel
     EnumOperationState OperationState { get; set; }
     int ZOrder { get; set; }
 
+    /// <summary>라벨(제목) 상대 오프셋 X(화면 픽셀, 아이콘 중심 기준). 0=기본위치. 라벨 분리·드래그 영속(Symbol_Label_Decouple FR-LB-01).</summary>
+    double LabelOffsetX { get; set; }
+    /// <summary>라벨(제목) 상대 오프셋 Y(화면 픽셀, 아이콘 중심 기준). 0=기본위치.</summary>
+    double LabelOffsetY { get; set; }
 }

@@ -100,4 +100,11 @@ public class SymbolModel : BaseModel, ISymbolModel
     public int ZOrder { get; set; } = 10;
     #endregion
 
+    #region - 라벨 오프셋 (Symbol_Label_Decouple) -
+    /// <summary>라벨 상대 오프셋 X(화면 픽셀, 아이콘 중심 기준). 0=기본위치.</summary>
+    public double LabelOffsetX { get; set; }
+    /// <summary>라벨 상대 오프셋 Y(화면 픽셀, 아이콘 중심 기준). 0=기본위치.</summary>
+    public double LabelOffsetY { get; set; }
+    #endregion
+
 }
