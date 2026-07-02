@@ -34,7 +34,10 @@ public class LoginPanelViewModel : BasePanelViewModel
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        ViewModel.Clear();
+        // ⚠ T2 재로그인 먹통 근본수정: Clear()는 IsLogin을 안 내림 → 강제로그아웃(세션 만료/자기 세션 revoke)
+        //    경로는 IsLogin=true 로 남아 ClickOk의 `if(ViewModel.IsLogin) return;` 가드가 재로그인을 차단했다.
+        //    로그인 패널이 열린다=로그아웃 상태이므로 Logout()으로 IsLogin/Token/LoginTime 전부 리셋한다.
+        ViewModel.Logout();
         ClearLoginPanel();
 
         var latest = await _gateway.GetLatestLoginAsync(cancellationToken);
