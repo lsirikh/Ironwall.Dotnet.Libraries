@@ -85,7 +85,10 @@ public class EventUiModule : Module
                 c.Resolve<ISymbolEventManager>(),
                 c.Resolve<IEventQueueManager>(),
                 _eventSetup,
-                c.Resolve<Caliburn.Micro.IEventAggregator>()
+                c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                // 로그인 게이팅(Login_Gated_GIS_Init): 수동 팩토리 new라 옵셔널 파라미터가 자동 주입되지 않음 —
+                // 명시 전달 필수(누락 시 게이트 무력 → 로그아웃 상태 알람 수신 + EQM 자동조치보고 유출).
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()
             )).As<IDetectionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 1)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();
@@ -95,7 +98,8 @@ public class EventUiModule : Module
                 c.Resolve<ISymbolEventManager>(),
                 c.Resolve<IEventQueueManager>(),
                 _eventSetup,
-                c.Resolve<Caliburn.Micro.IEventAggregator>()
+                c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
             )).As<IMalfunctionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 2)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();
