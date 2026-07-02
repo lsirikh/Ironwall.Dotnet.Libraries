@@ -817,6 +817,8 @@ public class MapViewModel : BasePanelViewModel,
         _groupSelection.Clear();
         NotifyOfPropertyChange(nameof(SelectedMarkers));
         HidePropertyPanel();
+        // 레이어 패널 트리 동기화 — 그룹(다중) 삭제 경로도 누락돼 있어 스테일 노드가 남던 버그 보강.
+        if (del > 0) await LoadLayersFromDbAsync();
         MainMap?.InvalidateVisual();
         SetAimStatus(skipped > 0 ? $"{del}개 삭제(잠금 {skipped}개 제외)" : $"{del}개 삭제", true);
     }
@@ -3119,6 +3121,10 @@ public class MapViewModel : BasePanelViewModel,
                     // 에러가 발생해도 SelectedMarker는 null로 설정
                     SelectedMarker = null;
                 }
+
+                // 레이어 패널 트리 동기화 — 삭제된 심볼 노드 제거(_symbolProvider는 DbDeleteProcess→DeleteXxxAsync에서 갱신됨).
+                // 이미지 분기엔 LoadLayersFromDbAsync가 있으나 심볼 분기엔 누락돼 트리에 스테일 노드가 남던 버그.
+                await LoadLayersFromDbAsync();
             }
             // 8. 화면 갱신
             MainMap?.InvalidateVisual();
