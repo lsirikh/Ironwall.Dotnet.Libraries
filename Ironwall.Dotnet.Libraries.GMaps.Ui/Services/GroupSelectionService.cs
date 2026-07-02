@@ -39,6 +39,10 @@ public sealed class GroupSelectionService : IDisposable
     public event System.Action? GroupDeleteRequested;
     /// <summary>그룹 잠금/해제 요청(true=잠금) — VM 처리(FR-MS-06).</summary>
     public event System.Action<bool>? GroupLockRequested;
+    /// <summary>그룹 표시/숨김 요청(true=표시) — VM 처리(런타임 가시성).</summary>
+    public event System.Action<bool>? GroupVisibilityRequested;
+    /// <summary>그룹 Z순서 요청(true=맨위로) — VM 처리(BatchUpdateZOrderAsync).</summary>
+    public event System.Action<bool>? GroupZOrderRequested;
 
     /// <summary>러버밴드 결과 설정 — 이전 그룹 clear 후 새 집합에 adorner 부착·IsSelected 표시. 빈 목록=clear.</summary>
     public void SetSelection(IReadOnlyList<IEditableMarker>? markers)
@@ -57,6 +61,8 @@ public sealed class GroupSelectionService : IDisposable
         _adorner.GroupMoveCompleted += OnAdornerMoveCompleted;
         _adorner.GroupDeleteRequested += OnAdornerDeleteRequested;
         _adorner.GroupLockRequested += OnAdornerLockRequested;
+        _adorner.GroupVisibilityRequested += OnAdornerVisibilityRequested;
+        _adorner.GroupZOrderRequested += OnAdornerZOrderRequested;
         _adorner.SetMarkers(_selection);
         _layer.Add(_adorner);
         _log?.Info($"그룹 선택 {_selection.Count}개");
@@ -65,6 +71,8 @@ public sealed class GroupSelectionService : IDisposable
     private void OnAdornerMoveCompleted() => GroupMoveCompleted?.Invoke();
     private void OnAdornerDeleteRequested() => GroupDeleteRequested?.Invoke();
     private void OnAdornerLockRequested(bool locked) => GroupLockRequested?.Invoke(locked);
+    private void OnAdornerVisibilityRequested(bool show) => GroupVisibilityRequested?.Invoke(show);
+    private void OnAdornerZOrderRequested(bool toFront) => GroupZOrderRequested?.Invoke(toFront);
 
     /// <summary>선택집합에서 일부 제거(그룹 삭제 후) 후 adorner 갱신. 남은 게 없으면 Clear.</summary>
     public void RemoveAndRefresh(IEnumerable<IEditableMarker> removed)
@@ -89,6 +97,8 @@ public sealed class GroupSelectionService : IDisposable
             _adorner.GroupMoveCompleted -= OnAdornerMoveCompleted;
             _adorner.GroupDeleteRequested -= OnAdornerDeleteRequested;
             _adorner.GroupLockRequested -= OnAdornerLockRequested;
+            _adorner.GroupVisibilityRequested -= OnAdornerVisibilityRequested;
+            _adorner.GroupZOrderRequested -= OnAdornerZOrderRequested;
             try { _layer?.Remove(_adorner); } catch { /* 레이어 정리 중 */ }
             _adorner.Dispose();
             _adorner = null;

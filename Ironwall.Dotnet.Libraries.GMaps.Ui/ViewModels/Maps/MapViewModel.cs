@@ -426,6 +426,8 @@ public class MapViewModel : BasePanelViewModel,
             _groupSelection.GroupMoveCompleted += OnGroupMoveCompleted;
             _groupSelection.GroupDeleteRequested += OnGroupDeleteRequested;
             _groupSelection.GroupLockRequested += OnGroupLockRequested;
+            _groupSelection.GroupVisibilityRequested += OnGroupVisibilityRequested;
+            _groupSelection.GroupZOrderRequested += OnGroupZOrderRequested;
 
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
             // AdornerManager 이벤트 구독
@@ -483,6 +485,8 @@ public class MapViewModel : BasePanelViewModel,
                 _groupSelection.GroupMoveCompleted -= OnGroupMoveCompleted;
                 _groupSelection.GroupDeleteRequested -= OnGroupDeleteRequested;
                 _groupSelection.GroupLockRequested -= OnGroupLockRequested;
+                _groupSelection.GroupVisibilityRequested -= OnGroupVisibilityRequested;
+                _groupSelection.GroupZOrderRequested -= OnGroupZOrderRequested;
                 _groupSelection.Dispose();
                 _groupSelection = null;
             }
@@ -805,6 +809,65 @@ public class MapViewModel : BasePanelViewModel,
         _groupSelection.RefreshAdorner();
         NotifyOfPropertyChange(nameof(SelectedMarkers));
         SetAimStatus($"{n}개 {(locked ? "잠금" : "잠금 해제")}", true);
+    }
+
+    private void OnGroupVisibilityRequested(bool show) => ExecuteGroupVisibility(show);
+    private async void OnGroupZOrderRequested(bool toFront) => await ExecuteGroupZOrder(toFront);
+
+    /// <summary>그룹 표시/숨김 — 멤버 가시성 런타임 토글(ShowShape/IsLayerEnabled/IsVisible). DB영속=v2. CanEditMap 게이트.</summary>
+    private void ExecuteGroupVisibility(bool show)
+    {
+        if (_groupSelection == null || !_groupSelection.HasSelection) return;
+        if (!CanEditMap()) { SetAimStatus("편집 권한이 없습니다.", true); return; }
+        int n = 0;
+        foreach (var m in _groupSelection.Selection.ToList())
+        {
+            if (m == null || m.IsDisposed) continue;
+            m.IsLayerEnabled = show;
+            m.ShowShape = show;
+            m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
+            n++;
+        }
+        MainMap?.InvalidateVisual();
+        _groupSelection.RefreshAdorner();
+        SetAimStatus($"{n}개 {(show ? "표시" : "숨김")}", true);
+    }
+
+    /// <summary>그룹 Z순서 — 선택 멤버를 심볼 밴드 최상단(toFront)/최하단으로 일괄. BatchUpdateZOrderAsync 영속. CanEditMap 게이트.</summary>
+    private async Task ExecuteGroupZOrder(bool toFront)
+    {
+        if (_groupSelection == null || !_groupSelection.HasSelection || MainMap?.Markers == null) return;
+        if (!CanEditMap()) { SetAimStatus("편집 권한이 없습니다.", true); return; }
+        try
+        {
+            var selected = _groupSelection.Selection.Where(m => m is GMapMarker && !m.IsDisposed).ToList();
+            if (selected.Count == 0) return;
+            var selIds = new HashSet<int>(selected.Select(m => m.Id));
+
+            // 심볼 밴드(비-이미지, 선택 외) 현재 ZIndex 수집 → 최상단/최하단 기준
+            var bandZ = MainMap.Markers.OfType<GMapMarker>()
+                .Where(g => g.Shape is UIElement && g is IEditableMarker em && em is not IImageEditableMarker && !selIds.Contains(em.Id))
+                .Select(g => System.Windows.Controls.Panel.GetZIndex(g.Shape as UIElement))
+                .ToList();
+            int baseZ = bandZ.Count > 0 ? (toFront ? bandZ.Max() + 1 : bandZ.Min() - selected.Count) : 1000;
+
+            var changes = new List<(int id, int zOrder)>();
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var m = selected[i];
+                int newZ = baseZ + i;
+                if (m is GMapMarker gm && gm.Shape is UIElement shape)
+                {
+                    ApplyMarkerZOrderLocal(gm, shape, newZ);
+                    if (m.Id > 0) changes.Add((m.Id, newZ));
+                }
+            }
+            if (changes.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
+            MainMap.InvalidateVisual();
+            _groupSelection.RefreshAdorner();
+            SetAimStatus($"{changes.Count}개 {(toFront ? "맨 위로" : "맨 아래로")}", true);
+        }
+        catch (Exception ex) { _log?.Error($"그룹 Z순서 변경 실패: {ex.Message}"); }
     }
     #endregion
 
