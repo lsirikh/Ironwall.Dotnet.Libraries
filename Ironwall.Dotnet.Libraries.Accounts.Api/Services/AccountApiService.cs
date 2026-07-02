@@ -192,6 +192,22 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    // GET /grants — 전체 부여(REQ_Server_Grants_ListAll). 계정별 N-순회 대체.
+    public async Task<ApiListResponse<GrantDto>> GetAllGrantsAsync(int page = 1, int size = 20, int? userId = null, int? groupId = null, string? status = null, bool activeOnly = false, CancellationToken ct = default)
+    {
+        try
+        {
+            var query = new Dictionary<string, string> { ["page"] = page.ToString(), ["size"] = size.ToString() };
+            if (userId.HasValue) query["user_id"] = userId.Value.ToString();
+            if (groupId.HasValue) query["group_id"] = groupId.Value.ToString();
+            if (!string.IsNullOrEmpty(status)) query["status"] = status;
+            if (activeOnly) query["active_only"] = "true";
+            var res = await _api.GetRequestAsync("grants", query).ConfigureAwait(false);
+            return await res.ToApiListResponseAsync<GrantDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiListResponse<GrantDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiResponse<object>> ResetUserPasswordAsync(int id, string newPassword, CancellationToken ct = default)
     {
         try

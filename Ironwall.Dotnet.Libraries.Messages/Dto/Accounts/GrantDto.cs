@@ -11,6 +11,8 @@ public class GrantDto
 {
     [JsonProperty("id")] public int Id { get; set; }
     [JsonProperty("user_id")] public int UserId { get; set; }
+    [JsonProperty("user_login_id")] public string? UserLogin { get; set; }   // v5.4 GET /grants 보강 — 비정규화 계정 로그인 ID
+    [JsonProperty("user_name")] public string? UserName { get; set; }         // v5.4 GET /grants 보강 — 비정규화 계정 이름
     [JsonProperty("group_id")] public int GroupId { get; set; }
     [JsonProperty("group_name")] public string? GroupName { get; set; }
     [JsonProperty("valid_from")] public DateTime ValidFrom { get; set; }

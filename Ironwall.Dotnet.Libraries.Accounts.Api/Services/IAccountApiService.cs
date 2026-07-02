@@ -86,6 +86,10 @@ public interface IAccountApiService
     /// <summary>DELETE /api/grants/{grantId} — 부여 회수(soft, ADMIN).</summary>
     Task<ApiResponse<object>> DeleteGrantAsync(int grantId, CancellationToken ct = default)
         => throw new NotImplementedException();
+    /// <summary>GET /api/grants — 전체 부여 목록(ADMIN, REQ_Server_Grants_ListAll). page/size/user_id/group_id/status/active_only 필터.
+    /// 계정별 N-순회 대체(단일 호출). v5.4 응답에 user_login_id/user_name 비정규화 포함.</summary>
+    Task<ApiListResponse<GrantDto>> GetAllGrantsAsync(int page = 1, int size = 20, int? userId = null, int? groupId = null, string? status = null, bool activeOnly = false, CancellationToken ct = default)
+        => throw new NotImplementedException();
     /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit). action_type/resource_type=str(tolerant).</summary>
     Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default);
 

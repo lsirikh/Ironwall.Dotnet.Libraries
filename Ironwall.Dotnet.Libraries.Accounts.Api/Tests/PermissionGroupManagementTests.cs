@@ -124,6 +124,22 @@ public class PermissionGroupManagementTests
         Assert.False(res.Success);
     }
 
+    [Fact]
+    public async Task should_hit_grants_endpoint_and_parse_account_fields_when_list_all()
+    {
+        var fake = new CapturingApiService(HttpStatusCode.OK,
+            @"{""success"":true,""data"":[{""id"":1,""user_id"":3,""user_login_id"":""op1"",""user_name"":""운영자"",""group_id"":10,""group_name"":""야간조"",""valid_from"":""2026-07-03T00:00:00+09:00"",""is_active"":true,""status"":""ACTIVE"",""created_at"":""2026-07-03T00:00:00+09:00""}],""total"":1}");
+        var svc = new AccountApiService(fake);
+
+        var res = await svc.GetAllGrantsAsync(1, 20, activeOnly: true);
+
+        Assert.True(res.Success);
+        Assert.Equal("grants", fake.LastGetEndpoint);
+        Assert.Single(res.Data!);
+        Assert.Equal("op1", res.Data![0].UserLogin);   // v5.4 비정규화 계정 필드 파싱
+        Assert.Equal("운영자", res.Data![0].UserName);
+    }
+
     /// <summary>엔드포인트/본문을 캡처하고 설정 응답을 반환하는 IApiService 더미(모든 verb 구현).</summary>
     private sealed class CapturingApiService : IApiService
     {
