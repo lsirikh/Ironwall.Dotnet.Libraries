@@ -23,6 +23,10 @@ public sealed class LabelAdornerService : IDisposable
     private AdornerLayer? _layer;
     private bool _disposed;
 
+    /// <summary>라벨 오프셋 드래그 완료 — VM이 DB 영속(FR-LB-05).</summary>
+    public event System.Action<IEditableMarker>? LabelOffsetChanged;
+    private void OnLabelMoved(IEditableMarker m) => LabelOffsetChanged?.Invoke(m);
+
     public LabelAdornerService(GMapCustomControl map, ILogService? log = null)
     {
         _map = map ?? throw new ArgumentNullException(nameof(map));
@@ -35,6 +39,7 @@ public sealed class LabelAdornerService : IDisposable
         _layer ??= AdornerLayer.GetAdornerLayer(_map);
         if (_layer == null) { _log?.Error("LabelAdornerService: AdornerLayer 없음"); return; }
         var a = new LabelAdorner(_map, marker, _log);
+        a.LabelOffsetChanged += OnLabelMoved;   // 오프셋 드래그 완료 → VM 영속 포워딩
         _layer.Add(a);
         _labels[marker] = a;
     }
@@ -42,6 +47,7 @@ public sealed class LabelAdornerService : IDisposable
     public void Detach(IEditableMarker marker)
     {
         if (marker == null || !_labels.TryGetValue(marker, out var a)) return;
+        a.LabelOffsetChanged -= OnLabelMoved;
         try { (_layer ?? AdornerLayer.GetAdornerLayer(_map))?.Remove(a); } catch { /* 레이어 정리 중 */ }
         a.Dispose();
         _labels.Remove(marker);

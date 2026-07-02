@@ -431,6 +431,7 @@ public class MapViewModel : BasePanelViewModel,
 
             // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
             _labelService = new LabelAdornerService(MainMap, _log);
+            _labelService.LabelOffsetChanged += OnLabelOffsetChanged;   // 라벨 드래그 → 오프셋 DB 영속(FR-LB-05)
             MainMap.Markers.CollectionChanged += Markers_CollectionChangedForLabels;
             _labelService.Sync(MainMap.Markers);   // 이미 로드된 마커 부착
 
@@ -498,6 +499,7 @@ public class MapViewModel : BasePanelViewModel,
 
             // 심볼 라벨 분리 오버레이 정리
             MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForLabels;
+            if (_labelService != null) _labelService.LabelOffsetChanged -= OnLabelOffsetChanged;
             _labelService?.Dispose();
             _labelService = null;
 
@@ -523,6 +525,14 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>마커 추가/제거 시 라벨 adorner 동기화(신규 부착·제거 detach).</summary>
     private void Markers_CollectionChangedForLabels(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         => _labelService?.Sync(MainMap?.Markers);
+
+    /// <summary>라벨 드래그 완료 → 심볼 모델 DB 영속(LabelOffsetX/Y 포함). RBAC 게이트(FR-LB-05).</summary>
+    private async void OnLabelOffsetChanged(IEditableMarker marker)
+    {
+        if (marker == null || !CanEditMap()) return;
+        try { await DbUpdateProcess(marker); }
+        catch (Exception ex) { _log?.Error($"라벨 오프셋 영속 실패: {ex.Message}"); }
+    }
     #endregion
 
     #region - 카메라 특정위치 확인 (타겟 조준 모드, Camera_PTZ_AimLocation) -
