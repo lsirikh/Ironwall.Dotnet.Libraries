@@ -58,6 +58,11 @@ public class GMapUiModule: Module
         builder.RegisterType<GMapControl>().SingleInstance();
         builder.RegisterType<GMapCustomControl>().SingleInstance();
         builder.RegisterType<MapViewModel>().SingleInstance();
+        // Undo/Redo (Map_Edit_Undo_Redo) — 편집 사후기록/스택 서비스. MapViewModel에 IEditRecorder/IUndoService 주입.
+        builder.RegisterType<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.UndoService>()
+               .As<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IUndoService>().SingleInstance();
+        builder.RegisterType<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.EditRecorder>()
+               .As<Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IEditRecorder>().SingleInstance();
         // PTZ 제어(CameraPopup_PTZ_Control) — IOnvifService(OnvifServiceModule)·ILogService 의존, 메인 Bootstrapper에서 OnvifServiceModule 등록 필요
         builder.RegisterType<PtzController>().As<IPtzController>().SingleInstance();
         // Tracking GIS 오버레이(FR-15) — IClock + 설정모델 + 단일 진입점 매니저(라이브러리 자족, EXT-01 없이 동작)

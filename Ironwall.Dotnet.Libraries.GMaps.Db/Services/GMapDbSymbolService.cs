@@ -23,7 +23,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Services;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
+internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 {
     #region - Ctors -
     /// <summary>

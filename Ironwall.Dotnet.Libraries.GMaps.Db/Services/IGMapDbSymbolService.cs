@@ -529,6 +529,16 @@ public interface IGMapDbSymbolService
     /// </remarks>
     Task<int> InsertImageAsync(IImageModel model, CancellationToken token = default);
 
+    // ── 삭제 취소용 Id 보존 복원(Map_Edit_Undo_Redo FR-06). Id 점유 시 IdCollisionException → 호출부 폴백. ──
+    Task<int> RestoreSymbolAsync(ISymbolModel model, CancellationToken token = default);
+    Task<int> RestoreGeometrySymbolAsync(IGeometricSymbolModel model, CancellationToken token = default);
+    Task<int> RestorePidsSymbolAsync(IPidsSymbolModel model, CancellationToken token = default);
+    Task<int> RestoreMilitarySymbolAsync(IMilitarySymbolModel model, CancellationToken token = default);
+    Task<int> RestoreLineSymbolAsync(ILineSymbolModel model, CancellationToken token = default);
+    Task<int> RestoreInfraSymbolAsync(IInfraSymbolModel model, CancellationToken token = default);
+    Task<int> RestorePidsGroupSymbolAsync(IPidsGroupSymbolModel model, CancellationToken token = default);
+    Task<int> RestoreImageAsync(IImageModel model, CancellationToken token = default);
+
     /// <summary>이미지를 업데이트합니다</summary>
     /// <param name="model">Image 모델</param>
     /// <param name="token">취소 토큰</param>

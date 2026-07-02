@@ -335,6 +335,20 @@
 							ToolTip="선택 항목 삭제">
 							<md:PackIcon Kind="Delete" />
 						</Button>
+						<Button
+							Command="{Binding UndoCommand}"
+							IsEnabled="{Binding CanUndo}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="{Binding NextUndoDescription, StringFormat='실행 취소 (Ctrl+Z): {0}', TargetNullValue='실행 취소 (Ctrl+Z)'}">
+							<md:PackIcon Kind="Undo" />
+						</Button>
+						<Button
+							Command="{Binding RedoCommand}"
+							IsEnabled="{Binding CanRedo}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="{Binding NextRedoDescription, StringFormat='다시 실행 (Ctrl+Y): {0}', TargetNullValue='다시 실행 (Ctrl+Y)'}">
+							<md:PackIcon Kind="Redo" />
+						</Button>
 					</StackPanel>
 				</Border>
 

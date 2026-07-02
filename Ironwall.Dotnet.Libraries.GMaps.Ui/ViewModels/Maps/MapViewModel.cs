@@ -66,7 +66,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
-public class MapViewModel : BasePanelViewModel,
+public partial class MapViewModel : BasePanelViewModel,
                             IHandle<AllDevicesLoadedMessage>,
                             IHandle<CallDeleteMapRoiProcessMessageModel>,
                             IHandle<CallDeleteMapLayerProcessMessageModel>,
@@ -107,6 +107,8 @@ public class MapViewModel : BasePanelViewModel,
                         , IGMapDbService gMapDbService
                         , CustomMapOverlayService customMapOverlayService
                         , IImageFileService imageFileService
+                        , Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IEditRecorder editRecorder
+                        , Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IUndoService undoService
                         , TrackingOverlayManager? trackingOverlay = null
                         , PlaybackViewModel? playbackVm = null
                         , TrackingSetupViewModel? trackingSetupVm = null
@@ -129,11 +131,14 @@ public class MapViewModel : BasePanelViewModel,
         _trackingSetupModel = trackingSetupModel;
         _customMapOverlayService = customMapOverlayService;
         _imageFileService = imageFileService;
+        _editRecorder = editRecorder;
+        _undoService = undoService;
         _trackingOverlay = trackingOverlay;
         _playbackVm = playbackVm;
         _trackingSetupVm = trackingSetupVm;
         DeviceProvider = deviceProvider;
         InitializeCommands();
+        InitializeUndoRedo();
     }
     #endregion
 
@@ -536,7 +541,7 @@ public class MapViewModel : BasePanelViewModel,
     private async void OnLabelOffsetChanged(IEditableMarker marker)
     {
         if (marker == null || !CanEditMap()) return;
-        try { await DbUpdateProcess(marker); }
+        try { await DbUpdateProcess(marker); _editRecorder?.RecordLabelOffset(marker); }
         catch (Exception ex) { _log?.Error($"라벨 오프셋 영속 실패: {ex.Message}"); }
     }
     #endregion
@@ -778,6 +783,19 @@ public class MapViewModel : BasePanelViewModel,
         {
             e.Handled = true;
             await ExecuteGroupDelete();
+            return;
+        }
+
+        // Undo/Redo 단축키 (FR-11) — 편집모드∧권한 시에만(Command CanExecute). Ctrl+Z=Undo, Ctrl+Y·Ctrl+Shift+Z=Redo.
+        var ctrl = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+        var shift = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+        if (ctrl && e.Key == System.Windows.Input.Key.Z && !shift)
+        {
+            if (UndoCommand?.CanExecute(null) == true) { e.Handled = true; UndoCommand.Execute(null); }
+        }
+        else if (ctrl && (e.Key == System.Windows.Input.Key.Y || (e.Key == System.Windows.Input.Key.Z && shift)))
+        {
+            if (RedoCommand?.CanExecute(null) == true) { e.Handled = true; RedoCommand.Execute(null); }
         }
     }
 
@@ -806,21 +824,26 @@ public class MapViewModel : BasePanelViewModel,
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
         if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
         int del = 0, skipped = 0;
-        foreach (var m in _groupSelection.Selection.ToList())
+        using (_editRecorder?.BeginBatch("그룹 삭제"))
         {
-            if (m == null || m.IsDisposed) continue;
-            if (m.IsLocked) { skipped++; continue; }
-            try
+            foreach (var m in _groupSelection.Selection.ToList())
             {
-                MainMap?.DeselectMarker(m);
-                if (m is GMapMarker gm) MainMap?.Markers?.Remove(gm);
-                await DbDeleteProcess(m);
-                var s = _symbolProvider.FirstOrDefault(x => x.Id == m.Id);   // 캐시 동기(감사 P0, provider.Remove 미머지)
-                if (s != null) _symbolProvider.Remove(s);
-                m.Dispose();
-                del++;
+                if (m == null || m.IsDisposed) continue;
+                if (m.IsLocked) { skipped++; continue; }
+                try
+                {
+                    var snap = _editRecorder?.CaptureForDelete(m);   // 삭제 전 스냅샷(Undo용)
+                    MainMap?.DeselectMarker(m);
+                    if (m is GMapMarker gm) MainMap?.Markers?.Remove(gm);
+                    await DbDeleteProcess(m);
+                    var s = _symbolProvider.FirstOrDefault(x => x.Id == m.Id);   // 캐시 동기(감사 P0, provider.Remove 미머지)
+                    if (s != null) _symbolProvider.Remove(s);
+                    m.Dispose();
+                    _editRecorder?.RecordDelete(snap);   // Undo 기록(배치 멤버)
+                    del++;
+                }
+                catch (Exception ex) { _log?.Error($"그룹 삭제 실패: {ex.Message}"); }
             }
-            catch (Exception ex) { _log?.Error($"그룹 삭제 실패: {ex.Message}"); }
         }
         _groupSelection.Clear();
         NotifyOfPropertyChange(nameof(SelectedMarkers));
@@ -2045,6 +2068,7 @@ public class MapViewModel : BasePanelViewModel,
 
         if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 마커 편집 영속 차단(백스톱)"); return; }
         await DbUpdateProcess(e.Marker);
+        _editRecorder?.RecordTransform(e);   // Undo 기록(이동/크기/회전)
 
         // UI 상태 업데이트
         IsMarkerEditing = false;
@@ -2103,8 +2127,10 @@ public class MapViewModel : BasePanelViewModel,
         {
             //_log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
 
-            if(SelectedMarker != null && CanEditMap())
+            if(SelectedMarker != null && CanEditMap() && !_isApplyingUndo)
                 await DbUpdateProcess(SelectedMarker);
+
+            _editRecorder?.CaptureSelectionBaseline(marker);   // 라벨/속성 before용 baseline
 
             // 이전 선택 해제
             ClearAllSelections();
@@ -3097,6 +3123,7 @@ public class MapViewModel : BasePanelViewModel,
             {
                 var markerTitle = SelectedMarker.Title ?? "Unknown";
                 var markerId = SelectedMarker.Id;
+                var delSnapshot = _editRecorder?.CaptureForDelete(SelectedMarker);   // 삭제 전 스냅샷(Undo용)
 
                 _log?.Info($"마커 삭제 시작: {markerTitle} (ID: {markerId})");
 
@@ -3141,6 +3168,7 @@ public class MapViewModel : BasePanelViewModel,
                     SelectedMarker = null;
 
                     _log?.Info($"마커 '{markerTitle}' 삭제 완료");
+                    _editRecorder?.RecordDelete(delSnapshot);   // Undo 기록(삭제)
 
                 }
                 catch (Exception markerEx)
@@ -4562,6 +4590,7 @@ public class MapViewModel : BasePanelViewModel,
                 if (!_symbolProvider.Any(s => ReferenceEquals(s, symbolModel)))
                     _symbolProvider.Add(symbolModel);
                 _ = LoadLayersFromDbAsync();   // 패널 열려있으면 새 노드 반영(트리 리빌드, 내부 try/catch)
+                if (marker is IEditableMarker em && em.Id > 0) _editRecorder?.RecordAdd(em);   // Undo 기록(추가). Id=0(AddPidsSingle 버그) 제외
             }
 
             _log?.Info($"마커 추가 완료: {symbolModel.Title}");
@@ -7063,6 +7092,7 @@ public class MapViewModel : BasePanelViewModel,
             if (!CanEditMap()) { _log?.Warning($"[RBAC] 맵 편집 권한 없음 — 속성 저장 차단: {e.PropertyName}"); ShowNoMapEditPermissionInfo(); return; }
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
             await DbUpdateProcess(e.Marker);
+            _editRecorder?.RecordPropertyChange(e.Marker, e.PropertyName, e.OldValue, e.NewValue);   // Undo 기록(coalescing)
 
             // 심볼 Title(이름) 변경 → 레이어 트리 노드 이름 동기화(맵→패널). marker.Model이 _symbolProvider
             // 인스턴스와 공유되므로 리빌드가 새 이름을 반영(감사 P1). 이미지는 아래 SyncOverlayImageLayer가 처리.
@@ -7240,6 +7270,8 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Info($"지도 변경 스킵 (전환 진행 중): {targetMap.Name}");
             return;
         }
+
+        ClearUndoStack();   // 맵 전환 → Undo 스택 비움(외부 상태 충돌 방지, FR-12)
 
         try
         {
