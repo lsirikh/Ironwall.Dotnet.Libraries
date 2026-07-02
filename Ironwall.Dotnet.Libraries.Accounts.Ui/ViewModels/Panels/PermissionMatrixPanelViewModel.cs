@@ -288,15 +288,22 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         catch (Exception ex) { _log?.Error($"[PermGroup] 구성원 추가 실패: {ex.Message}"); }
     }
 
-    /// <summary>구성원 해제(user.group_id = null).</summary>
+    /// <summary>구성원 해제(user.group_id = null).
+    /// ⚠ 서버 update_user(users.py: `if group_id is not None`)가 null을 무시할 수 있음 → 반환 사용자 group_id로 실제 반영 확인,
+    /// 미반영 시 무증상 실패 대신 안내(서버 수정 대기, PRD V-03).</summary>
     public async Task OnClickRemoveMember(AuthUserDto member)
     {
         if (member is null) return;
         try
         {
             var res = await _api.AssignUserGroupAsync(member.Id, null);
-            if (res.Success) await ReloadMembersAsync();
-            else await Info($"해제 실패: {res.Error?.Message ?? res.Message}");
+            if (!res.Success) { await Info($"해제 실패: {res.Error?.Message ?? res.Message}"); return; }
+            if (res.Data?.GroupId == _membersGroupId)
+            {
+                await Info("서버가 그룹 해제(group_id=null)를 반영하지 않습니다. 서버 수정이 필요합니다(구성원 해제 보류).");
+                return;
+            }
+            await ReloadMembersAsync();
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 구성원 해제 실패: {ex.Message}"); }
     }
