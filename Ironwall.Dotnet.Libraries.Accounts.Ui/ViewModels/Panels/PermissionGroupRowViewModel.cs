@@ -11,6 +11,9 @@ public class PermissionGroupRowViewModel
     public int UserCount { get; init; }
     public string Active { get; init; } = string.Empty;   // "사용"/"미사용"
 
+    /// <summary>예약 5등급(ADMIN/MAINTAINER/OPERATOR/VIEWER/GUEST) 여부 — true면 삭제·개명 금지(매트릭스 편집만 허용).</summary>
+    public bool IsReserved { get; init; }
+
     public int ViewCount { get; init; }
     public int EditCount { get; init; }
     public int DeleteCount { get; init; }

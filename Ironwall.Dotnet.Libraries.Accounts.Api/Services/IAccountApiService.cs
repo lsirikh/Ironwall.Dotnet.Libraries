@@ -51,6 +51,24 @@ public interface IAccountApiService
     /// 일반 PUT 은 권한상승 방지로 permissions 차단 → 이 전용 경로로만 변경. 기본구현=미지원(테스트 스텁 무수정 목적).</summary>
     Task<ApiResponse<UserGroupDto>> UpdateGroupPermissionsAsync(int groupId, PermissionsDto permissions, CancellationToken ct = default)
         => throw new NotImplementedException();
+
+    // ── 권한 그룹 CRUD (GOP_Permission_Group_Management). 기본구현=미지원(테스트 스텁 무수정) ──
+    /// <summary>POST /api/user-groups — 권한 그룹 생성(ADMIN). name 필수, 중복명 409. (FR-01)</summary>
+    Task<ApiResponse<UserGroupDto>> CreateUserGroupAsync(UserGroupCreateDto dto, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>PUT /api/user-groups/{id} — 그룹 메타(name/description/is_active) 수정(ADMIN). permissions 는 전용 경로. (FR-02)</summary>
+    Task<ApiResponse<UserGroupDto>> UpdateUserGroupAsync(int groupId, UserGroupUpdateDto dto, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>DELETE /api/user-groups/{id} — 그룹 삭제(ADMIN). 소속 계정 group_id→NULL. (FR-03)</summary>
+    Task<ApiResponse<object>> DeleteUserGroupAsync(int groupId, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>GET /api/user-groups/{id}/users — 그룹 소속 계정 목록(ADMIN). (FR-04)</summary>
+    Task<ApiListResponse<AuthUserDto>> GetUserGroupUsersAsync(int groupId, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>PUT /api/users/{id} — 계정 상시 그룹 배정/해제(ADMIN). group_id 항상 전송(null=해제). (FR-07)</summary>
+    Task<ApiResponse<AuthUserDto>> AssignUserGroupAsync(int userId, int? groupId, CancellationToken ct = default)
+        => throw new NotImplementedException();
+
     /// <summary>GET /api/user-sessions — 세션 목록(ADMIN).</summary>
     Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default);
     /// <summary>DELETE /api/user-sessions/{session_id} — 세션 강제 로그아웃(ADMIN).
