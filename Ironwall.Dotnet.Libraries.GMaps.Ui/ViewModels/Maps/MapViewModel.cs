@@ -327,6 +327,12 @@ public class MapViewModel : BasePanelViewModel,
 
                 if (symbol != null)
                 {
+                    // ★ 런타임 LinkedDevice 객체 재바인딩 — 카메라/제어기 재시작 연결끊김 근본수정(조사 결함1).
+                    //   심볼 로드(MarkerFactory) 시점엔 로그인-게이팅으로 DeviceProvider가 비어 LinkedDevice=null이 됨.
+                    //   여기(디바이스 로드 후 매칭 성공 지점)에서 실제 device 객체를 다시 붙여야 속성창 콤보·PTZ·
+                    //   홈페이지 메뉴·'현재위치 적용' 등 객체 의존 기능이 복구됨. LinkedDeviceId는 이미 DB에서 정상 로드.
+                    //   (그룹은 LinkedDeviceGroup 정수 링크라 객체 해석이 불필요 → 이 문제 없음)
+                    symbol.LinkedDevice = device;
                     _symbolEventManager.RegisterDeviceSymbol(device, symbol.Model);
                     registeredCount++;
                 }
