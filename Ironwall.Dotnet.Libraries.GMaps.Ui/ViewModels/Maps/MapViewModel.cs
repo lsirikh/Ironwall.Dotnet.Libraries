@@ -1028,6 +1028,7 @@ public class MapViewModel : BasePanelViewModel,
         {
             NotifyOfPropertyChange(nameof(CanMapEdit));        // T5: 편집/방송 버튼 시각 비활성 재평가(권한 상실/획득)
             NotifyOfPropertyChange(nameof(CanMapBroadcast));
+            if (!CanEditMap() && IsEditModeEnabled) IsEditModeEnabled = false;   // T6 2회차(H-17/19): 맵편집권한 상실(역할강등) 시 편집모드 강제 종료 — 버튼 비활성과 상태 정합
             if (_cameraPopups == null) return;
             foreach (var vm in _cameraPopups) vm.IsPtzCapable = vm.IsPtzCapable && canCtrl;   // 권한 상실→비활성(복구는 팝업 재오픈)
         });
@@ -1052,6 +1053,7 @@ public class MapViewModel : BasePanelViewModel,
         foreach (var cts in _ptzGestureCts.Values) { try { cts.Cancel(); } catch { /* 이미 종료 */ } }
         _ = OnUiAsync(() =>
         {
+            if (IsEditModeEnabled) IsEditModeEnabled = false;   // T6 2회차(G-14): 강제 로그아웃 시 편집모드 강제 종료 — 버튼 비활성과 상태 정합(개별 액션은 CanEditMap 백스톱)
             if (_cameraPopups == null) return;
             foreach (var vm in _cameraPopups.ToList()) _ = CloseCameraPopupAsync(vm);   // 순회 중 Remove 재진입 방어, 비동기 해제
         });
