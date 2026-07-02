@@ -439,6 +439,18 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    /// <summary>라벨 상대 오프셋 — 모델 연동(영속). LabelAdorner가 읽고 드래그 시 갱신(Symbol_Label_Decouple).</summary>
+    public double LabelOffsetX
+    {
+        get => _model?.LabelOffsetX ?? 0d;
+        set { if (_model != null) _model.LabelOffsetX = value; OnPropertyChanged(nameof(LabelOffsetX)); }
+    }
+    public double LabelOffsetY
+    {
+        get => _model?.LabelOffsetY ?? 0d;
+        set { if (_model != null) _model.LabelOffsetY = value; OnPropertyChanged(nameof(LabelOffsetY)); }
+    }
+
     public EnumColorType FillColor
     {
         get => _model.FillColor;

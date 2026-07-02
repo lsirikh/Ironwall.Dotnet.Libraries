@@ -25,6 +25,9 @@ public interface IEditableMarker : IDisposable
     bool IsLocked { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
+    /// <summary>라벨 상대 오프셋(화면 픽셀, 아이콘 하단 기본위치 기준). LabelAdorner 위치·DB 영속(Symbol_Label_Decouple).</summary>
+    double LabelOffsetX { get; set; }
+    double LabelOffsetY { get; set; }
     EnumColorType FillColor { get; set; }
     EnumColorType StrokeColor { get; set; }
     double StrokeThickness { get; set; }

@@ -247,6 +247,10 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
+    /// <summary>이미지 마커는 라벨 분리 대상 아님 — IEditableMarker 충족용(오프셋 미사용).</summary>
+    public double LabelOffsetX { get; set; }
+    public double LabelOffsetY { get; set; }
+
     /// <summary>제목 글자 크기</summary>
     public double TitleSize
     {

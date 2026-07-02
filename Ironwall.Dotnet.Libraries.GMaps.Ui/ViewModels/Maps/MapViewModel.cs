@@ -429,6 +429,11 @@ public class MapViewModel : BasePanelViewModel,
             _groupSelection.GroupVisibilityRequested += OnGroupVisibilityRequested;
             _groupSelection.GroupZOrderRequested += OnGroupZOrderRequested;
 
+            // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
+            _labelService = new LabelAdornerService(MainMap, _log);
+            MainMap.Markers.CollectionChanged += Markers_CollectionChangedForLabels;
+            _labelService.Sync(MainMap.Markers);   // 이미 로드된 마커 부착
+
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
             // AdornerManager 이벤트 구독
             MainMap.MarkerEditStarted += OnMarkerEditStarted;
@@ -490,6 +495,12 @@ public class MapViewModel : BasePanelViewModel,
                 _groupSelection.Dispose();
                 _groupSelection = null;
             }
+
+            // 심볼 라벨 분리 오버레이 정리
+            MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForLabels;
+            _labelService?.Dispose();
+            _labelService = null;
+
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
             MainMap.MarkerEditCancelled -= OnMarkerEditCancelled;
@@ -506,6 +517,12 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Error($"Adorner 시스템 정리 실패: {ex.Message}");
         }
     }
+
+    // 심볼 라벨 분리 오버레이 서비스 (Symbol_Label_Decouple Phase 2) — AdornerManager 밖 소유.
+    private Ironwall.Dotnet.Libraries.GMaps.Ui.Services.LabelAdornerService? _labelService;
+    /// <summary>마커 추가/제거 시 라벨 adorner 동기화(신규 부착·제거 detach).</summary>
+    private void Markers_CollectionChangedForLabels(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => _labelService?.Sync(MainMap?.Markers);
     #endregion
 
     #region - 카메라 특정위치 확인 (타겟 조준 모드, Camera_PTZ_AimLocation) -
