@@ -12,6 +12,10 @@ public interface IPermissionService
 {
     EnumUserRole Role { get; }
     bool IsAdmin { get; }
+    /// <summary>로그인 계정 login_id (JWT sub 와 동일). 미로그인 시 null.</summary>
+    string? LoginId { get; }
+    /// <summary>로그인 계정 표시이름(user.name). 로그인 응답에만 존재(JWT 미포함). 미로그인 시 null. — 회전요청 등 requested_by 소스.</summary>
+    string? Name { get; }
     /// <summary>보유 역할이 요구 역할 이상인가(강도 비교).</summary>
     bool HasRole(EnumUserRole required);
 

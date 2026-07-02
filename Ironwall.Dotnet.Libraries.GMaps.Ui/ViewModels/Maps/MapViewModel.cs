@@ -1059,10 +1059,12 @@ public class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[CameraAim] TokenStorage 미해석(requested_by 폴백): {ex.Message}"); _tokenStorage = null; }
         return _tokenStorage;
     }
-    /// <summary>회전요청 requested_by — 로그인 계정 login_id(JWT sub). 미로그인/미해석 시 Windows 사용자명 폴백.</summary>
+    /// <summary>회전요청 requested_by — 로그인 계정 표시이름(user.name) 우선 → login_id(JWT sub) → Windows 사용자명 폴백.</summary>
     private string CurrentRequestedBy()
     {
-        var loginId = ResolveTokenStorage()?.UserId;
+        var name = ResolvePermissionService()?.Name;          // 표시이름(로그인 응답 user.name) 우선
+        if (!string.IsNullOrWhiteSpace(name)) return name;
+        var loginId = ResolveTokenStorage()?.UserId;          // JWT sub=login_id 폴백
         return string.IsNullOrWhiteSpace(loginId) ? Environment.UserName : loginId;
     }
 

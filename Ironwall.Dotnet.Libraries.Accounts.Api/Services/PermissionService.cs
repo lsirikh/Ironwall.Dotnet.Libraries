@@ -14,11 +14,15 @@ public class PermissionService : IPermissionService
     private EnumUserRole _role = EnumUserRole.UNDEFINED;
     private HashSet<string> _tokens = new(StringComparer.OrdinalIgnoreCase);
     private List<int> _deviceGroups = new();
+    private string? _loginId;
+    private string? _name;
 
     public event Action? PermissionsChanged;
 
     public EnumUserRole Role { get { lock (_gate) return _role; } }
     public bool IsAdmin { get { lock (_gate) return _role == EnumUserRole.ADMIN; } }
+    public string? LoginId { get { lock (_gate) return _loginId; } }
+    public string? Name    { get { lock (_gate) return _name; } }
     public bool HasRole(EnumUserRole required) { lock (_gate) return _role >= required; }
     // ADR v5.2: 감사 접근 = `audit_logs:view` 매트릭스로 판정(role 라벨 아님). ADMIN은 Has() bypass로 통과.
     //   (이전 role(ADMIN|MAINTAINER) 기반 → v5.2 위반이라 매트릭스 기반으로 교체. ADMIN/MAINTAINER 그룹에 audit_logs:view=true 확인됨.)
@@ -40,6 +44,8 @@ public class PermissionService : IPermissionService
             _role = RoleMappingHelper.ParseRole(user.Role);
             _tokens = new HashSet<string>(PermissionsFlattener.Flatten(user.Permissions), StringComparer.OrdinalIgnoreCase);
             _deviceGroups = ExtractDeviceGroups(user.Permissions);
+            _loginId = user.LoginId;
+            _name = user.Name;   // 표시이름(회전요청 등 requested_by 소스). 로그인 응답에만 존재.
         }
         PermissionsChanged?.Invoke();
     }
@@ -51,6 +57,8 @@ public class PermissionService : IPermissionService
             _role = EnumUserRole.UNDEFINED;
             _tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _deviceGroups = new List<int>();
+            _loginId = null;
+            _name = null;
         }
         PermissionsChanged?.Invoke();
     }
