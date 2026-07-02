@@ -74,20 +74,12 @@ public class LoginPanelViewModel : BasePanelViewModel
     /// <summary>Caliburn 가드 — 강제 로그인 시 취소 버튼 비활성.</summary>
     public bool CanClickCancel => !_isForced;
 
-    private bool _isAuthenticating;   // 재진입(더블클릭) 가드 — IsLogin(로그인 성공 상태)과 분리
-
     public async Task ClickOk()
     {
-        // 재로그인 먹통 근본수정: 기존 `if (ViewModel.IsLogin) return;` 는 강제로그아웃 후 IsLogin 이 리셋되지
-        //   않으면(ViewModel.Clear()는 IsLogin 미리셋) 재로그인 클릭을 영구 무시 → 별도 재진입 플래그로 대체.
-        if (_isAuthenticating) return;
-        _isAuthenticating = true;
-        // 활성화 CTS(_cancellationTokenSource)는 강제로그아웃 후 패널 미재활성화 시 취소·Dispose된 채 남아
-        //   .Token 접근이 ObjectDisposedException/취소를 유발(먹통·합성504). 로그인=사용자 조작이라 전용 CTS 생성.
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var ct = cts.Token;
+        var ct = _cancellationTokenSource?.Token ?? CancellationToken.None;
         try
         {
+            if (ViewModel.IsLogin) return;
             ClearLoginStatus();
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel());
 
@@ -119,7 +111,6 @@ public class LoginPanelViewModel : BasePanelViewModel
             await Task.Delay(TimeSpan.FromSeconds(2));
             ClearLoginStatus();
         }
-        finally { _isAuthenticating = false; }
     }
     #endregion
     #region - Processes -
