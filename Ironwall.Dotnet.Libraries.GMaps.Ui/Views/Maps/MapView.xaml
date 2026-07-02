@@ -316,6 +316,7 @@
 							x:Name="EditModeToggle"
 							Command="{Binding ToggleEditModeCommand}"
 							IsChecked="{Binding IsEditModeEnabled, Mode=OneWay}"
+							IsEnabled="{Binding CanMapEdit}"
 							Style="{StaticResource MaterialDesignSwitchToggleButton}"
 							ToolTip="편집 모드 전환">
 							<md:PackIcon Kind="Draw" />

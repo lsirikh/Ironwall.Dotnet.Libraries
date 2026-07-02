@@ -977,6 +977,12 @@ public class MapViewModel : BasePanelViewModel,
     /// <summary>상황도 편집 권한(map:edit). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "map" 고정. (FR-EN-08)</summary>
     private bool CanEditMap() => ResolvePermissionService()?.CanEdit("map") ?? true;
 
+    // ── T5: verb→버튼 시각 게이팅(비활성) 바인딩용 공개 프로퍼티. 표시모델=disable(권한없음→회색). 액션차단 가드는 safety net 유지. ──
+    /// <summary>상황도 편집 버튼 활성 여부(map:edit). PermissionsChanged 시 재평가(OnPtzPermissionsChanged).</summary>
+    public bool CanMapEdit => CanEditMap();
+    /// <summary>방송 버튼 활성 여부(broadcast:control).</summary>
+    public bool CanMapBroadcast => CanBroadcast();
+
     /// <summary>맵 편집 권한 부재 안내 팝업(FR-EN-08). 게이트 차단 시 사용자에게 가시적 통지(조용한 무동작 방지).</summary>
     private void ShowNoMapEditPermissionInfo()
     {
@@ -1020,6 +1026,8 @@ public class MapViewModel : BasePanelViewModel,
             foreach (var cts in _ptzGestureCts.Values) { try { cts.Cancel(); } catch { /* 이미 종료 */ } }
         _ = OnUiAsync(() =>
         {
+            NotifyOfPropertyChange(nameof(CanMapEdit));        // T5: 편집/방송 버튼 시각 비활성 재평가(권한 상실/획득)
+            NotifyOfPropertyChange(nameof(CanMapBroadcast));
             if (_cameraPopups == null) return;
             foreach (var vm in _cameraPopups) vm.IsPtzCapable = vm.IsPtzCapable && canCtrl;   // 권한 상실→비활성(복구는 팝업 재오픈)
         });
