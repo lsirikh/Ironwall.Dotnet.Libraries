@@ -133,7 +133,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         if (IsOnHandle(p))
         {
             _dragging = true;
-            _grabScreen = p;
+            _grabScreen = e.GetPosition(_map);   // 델타는 맵컨트롤 공간(WPF가 디지털줌 RenderTransform.Inverse 자동적용, 불변식#10)
             _origPositions = _markers.Select(m => m.Position).ToArray();
             CaptureMouse();
             e.Handled = true;
@@ -145,7 +145,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     {
         if (_dragging)
         {
-            var cur = e.GetPosition(this);
+            var cur = e.GetPosition(_map);   // 맵컨트롤 공간(디지털줌 자동 역보정) — _grabScreen과 동일 공간
             var gGrab = _map.FromLocalToLatLng((int)_grabScreen.X, (int)_grabScreen.Y);   // inner공간(디지털줌 역보정 금지 불변식#10)
             var gCur = _map.FromLocalToLatLng((int)cur.X, (int)cur.Y);
             double dLat = gCur.Lat - gGrab.Lat, dLng = gCur.Lng - gGrab.Lng;
