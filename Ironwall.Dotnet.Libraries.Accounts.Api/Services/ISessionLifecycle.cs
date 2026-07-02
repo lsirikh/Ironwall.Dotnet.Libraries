@@ -11,6 +11,10 @@ public enum EnumRevokeReason
     Unauthorized,
     /// <summary>토큰 만료.</summary>
     TokenExpired,
+    /// <summary>다른 위치에서 동일 계정 로그인으로 기존 세션이 밀려남(서버 단일 세션 정책 evict → NATS revoke).
+    /// 클라 처리는 <see cref="SessionRevoked"/> 와 동일(토큰·권한 폐기)이나, 셸이 "다른 곳에서 로그인되어 로그아웃되었습니다"로 구분 안내.
+    /// ⚠ 끝에 추가(정수값 4) — 기존 값 shift 금지. 서버 evict+revoke 및 셸 문구 매핑은 미구현(계약만 정의).</summary>
+    Superseded,
 }
 
 /// <summary>

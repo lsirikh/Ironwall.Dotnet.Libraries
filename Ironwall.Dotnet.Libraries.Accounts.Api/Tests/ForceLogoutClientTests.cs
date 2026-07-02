@@ -114,6 +114,22 @@ public class ForceLogoutClientTests
     }
 
     [Fact]
+    public void should_clear_token_and_fire_with_superseded_reason_when_evicted()
+    {
+        // 단일 세션 정책: 다른 곳 로그인으로 밀려남 → 서버 revoke → 클라도 SessionRevoked 와 동일하게 폐기(사유만 구분).
+        var (store, perm, life) = LoggedIn();
+        int fired = 0; EnumRevokeReason? last = null;
+        life.ForceLogoutRequested += r => { fired++; last = r; };
+
+        life.ForceLogoutOnce(EnumRevokeReason.Superseded);
+
+        Assert.Equal(1, fired);
+        Assert.Equal(EnumRevokeReason.Superseded, last);
+        Assert.Null(store.AccessToken);
+        Assert.Equal(EnumUserRole.UNDEFINED, perm.Role);
+    }
+
+    [Fact]
     public void should_ignore_repeated_force_logout_until_reset_for_login()
     {
         var (_, _, life) = LoggedIn();
