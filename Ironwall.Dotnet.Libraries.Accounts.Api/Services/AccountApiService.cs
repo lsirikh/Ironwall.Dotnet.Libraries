@@ -276,6 +276,57 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<UserGroupDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    // ── 권한 그룹 CRUD (GOP_Permission_Group_Management) — 서버 user-groups API 소비 ──
+    public async Task<ApiResponse<UserGroupDto>> CreateUserGroupAsync(UserGroupCreateDto dto, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PostRequestAsync("user-groups", dto).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<UserGroupDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<UserGroupDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<UserGroupDto>> UpdateUserGroupAsync(int groupId, UserGroupUpdateDto dto, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PutRequestAsync($"user-groups/{groupId}", dto).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<UserGroupDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<UserGroupDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<object>> DeleteUserGroupAsync(int groupId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.DeleteRequestAsync($"user-groups/{groupId}").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<object>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiListResponse<AuthUserDto>> GetUserGroupUsersAsync(int groupId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.GetRequestAsync($"user-groups/{groupId}/users").ConfigureAwait(false);
+            return await res.ToApiListResponseAsync<AuthUserDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiListResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<AuthUserDto>> AssignUserGroupAsync(int userId, int? groupId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PutRequestAsync($"users/{userId}", new UserGroupAssignDto { GroupId = groupId }).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<AuthUserDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default)
     {
         try

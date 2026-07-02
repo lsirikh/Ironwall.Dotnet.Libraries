@@ -11,24 +11,71 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<Grid Margin="6">
-		<!--  ① 등급 목록 (요약) — 권한 = 역할(등급) 단위(OQ-PG-01 Option A)  -->
+		<!--  ① 그룹 목록 + CRUD (OQ-PG-01 확장: 임의 그룹 생성/삭제/이름수정 + 구성원 배정)  -->
 		<Grid Visibility="{Binding IsListView, Converter={StaticResource BooleanToVisibilityConverter}}">
 			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
 				<RowDefinition Height="Auto" />
 				<RowDefinition Height="*" />
 				<RowDefinition Height="Auto" />
 			</Grid.RowDefinitions>
 			<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
-				<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="권한 등급" />
+				<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="권한 그룹" />
 				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+					<Button Style="{StaticResource ModernToolbarButton}" ToolTip="새 권한 그룹">
+						<cal:Message.Attach>[Event Click] = [Action OnClickNewGroup()]</cal:Message.Attach>
+						<md:PackIcon Width="20" Height="20" Kind="Plus" />
+					</Button>
+					<Button IsEnabled="{Binding CanModifySelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="이름/설명 수정 (예약 등급 제외)">
+						<cal:Message.Attach>[Event Click] = [Action OnClickRenameGroup()]</cal:Message.Attach>
+						<md:PackIcon Width="20" Height="20" Kind="Pencil" />
+					</Button>
+					<Button IsEnabled="{Binding CanModifySelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="그룹 삭제 (예약 등급 제외)">
+						<cal:Message.Attach>[Event Click] = [Action OnClickDeleteGroup()]</cal:Message.Attach>
+						<md:PackIcon Width="20" Height="20" Kind="TrashCanOutline" />
+					</Button>
+					<Button IsEnabled="{Binding HasSelectedGroup}" Style="{StaticResource ModernToolbarButton}" ToolTip="구성원(계정) 배정">
+						<cal:Message.Attach>[Event Click] = [Action OnClickManageMembers()]</cal:Message.Attach>
+						<md:PackIcon Width="20" Height="20" Kind="AccountMultipleOutline" />
+					</Button>
 					<Button Style="{StaticResource ModernToolbarButton}" ToolTip="갱신">
 						<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
 						<md:PackIcon Width="20" Height="20" Kind="Refresh" />
 					</Button>
 				</StackPanel>
 			</DockPanel>
-			<DataGrid
+
+			<!--  그룹 생성/이름수정 폼 (IsGroupFormOpen)  -->
+			<Border
 				Grid.Row="1"
+				Margin="0,0,0,8"
+				Padding="10,8"
+				Background="{DynamicResource MaterialDesignCardBackground}"
+				CornerRadius="4"
+				Visibility="{Binding IsGroupFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel Orientation="Vertical">
+					<TextBlock Margin="0,0,0,6" Style="{StaticResource PanelSectionLabel}" Text="{Binding FormTitle}" />
+					<WrapPanel Orientation="Horizontal">
+						<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="이름" />
+						<TextBox Width="160" Margin="0,0,12,0" Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}" />
+						<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="설명" />
+						<TextBox Width="260" Margin="0,0,12,0" Text="{Binding FormDescription, UpdateSourceTrigger=PropertyChanged}" />
+						<Button
+							Margin="4,0,0,0"
+							Content="저장"
+							IsEnabled="{Binding CanSaveGroupForm}"
+							Style="{StaticResource MaterialDesignFlatButton}">
+							<cal:Message.Attach>[Event Click] = [Action ClickSaveGroupForm()]</cal:Message.Attach>
+						</Button>
+						<Button Margin="4,0,0,0" Content="취소" Style="{StaticResource MaterialDesignFlatButton}">
+							<cal:Message.Attach>[Event Click] = [Action ClickCancelGroupForm()]</cal:Message.Attach>
+						</Button>
+					</WrapPanel>
+				</StackPanel>
+			</Border>
+
+			<DataGrid
+				Grid.Row="2"
 				cal:Message.Attach="[Event MouseDoubleClick] = [Action OnClickGroupDetail()]"
 				AutoGenerateColumns="False"
 				Background="Transparent"
@@ -42,20 +89,20 @@
 				SelectedItem="{Binding SelectedGroup}"
 				Style="{StaticResource ModernDataGrid}">
 				<DataGrid.Columns>
-					<DataGridTextColumn Width="200" Binding="{Binding GroupName}" Header="등급" />
+					<DataGridTextColumn Width="200" Binding="{Binding GroupName}" Header="그룹" />
 					<DataGridTextColumn Width="90" Binding="{Binding UserCount}" Header="사용자" />
 					<DataGridTextColumn Width="80" Binding="{Binding Active}" Header="활성" />
 					<DataGridTextColumn Width="*" Binding="{Binding Summary}" Header="권한 요약" />
 				</DataGrid.Columns>
 			</DataGrid>
 			<TextBlock
-				Grid.Row="2"
+				Grid.Row="3"
 				Margin="0,8,0,0"
 				Style="{StaticResource PanelFieldLabel}"
-				Text="※ 등급을 더블클릭하면 전체 권한(모듈 × 동작)을 보고 편집·저장할 수 있습니다 (ADMIN). 계정의 '구분'이 곧 권한 등급입니다." />
+				Text="※ 그룹을 더블클릭하면 권한(모듈×동작)을 편집·저장할 수 있습니다. 예약 등급(관리자/운영자 등)은 삭제·개명 불가(매트릭스 편집만). 계정 배정은 [구성원] 버튼. (ADMIN)" />
 		</Grid>
 
-		<!--  ② 등급 상세 (모듈 × 동작 매트릭스)  -->
+		<!--  ② 그룹 상세 (모듈 × 동작 매트릭스)  -->
 		<Grid Visibility="{Binding IsDetailView, Converter={StaticResource BooleanToVisibilityConverter}}">
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto" />
@@ -72,7 +119,7 @@
 					VerticalAlignment="Center"
 					DockPanel.Dock="Left"
 					Style="{StaticResource PanelSectionLabel}"
-					Text="{Binding DetailGroupName, StringFormat='권한 등급 — {0}'}" />
+					Text="{Binding DetailGroupName, StringFormat='권한 그룹 — {0}'}" />
 			</DockPanel>
 			<DataGrid
 				Grid.Row="1"
@@ -91,40 +138,28 @@
 					<DataGridTemplateColumn Width="90" Header="조회">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
-								<CheckBox
-									HorizontalAlignment="Center"
-									IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-									IsEnabled="{Binding ViewEnabled}" />
+								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding View, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ViewEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
 					<DataGridTemplateColumn Width="90" Header="편집">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
-								<CheckBox
-									HorizontalAlignment="Center"
-									IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-									IsEnabled="{Binding EditEnabled}" />
+								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding Edit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding EditEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
 					<DataGridTemplateColumn Width="90" Header="삭제">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
-								<CheckBox
-									HorizontalAlignment="Center"
-									IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-									IsEnabled="{Binding DeleteEnabled}" />
+								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DeleteEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
 					<DataGridTemplateColumn Width="90" Header="제어">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
-								<CheckBox
-									HorizontalAlignment="Center"
-									IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-									IsEnabled="{Binding ControlEnabled}" />
+								<CheckBox HorizontalAlignment="Center" IsChecked="{Binding Control, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding ControlEnabled}" />
 							</DataTemplate>
 						</DataGridTemplateColumn.CellTemplate>
 					</DataGridTemplateColumn>
@@ -139,12 +174,91 @@
 					Content="저장"
 					IsEnabled="{Binding CanSave}"
 					Style="{StaticResource ModernSecondaryButton}"
-					ToolTip="이 등급의 권한(모듈×동작)을 저장합니다 (ADMIN)" />
+					ToolTip="이 그룹의 권한(모듈×동작)을 저장합니다 (ADMIN)" />
 				<TextBlock
 					VerticalAlignment="Center"
 					Style="{StaticResource PanelFieldLabel}"
-					Text="※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 체크 후 [저장]을 누르면 이 등급의 권한이 반영됩니다 (ADMIN)." />
+					Text="※ 비활성(흐림) 칸은 해당 모듈에 그 동작이 없음. 체크 후 [저장]을 누르면 이 그룹의 권한이 반영됩니다 (ADMIN)." />
 			</DockPanel>
+		</Grid>
+
+		<!--  ③ 구성원(계정) 배정 화면  -->
+		<Grid Visibility="{Binding IsMembersView, Converter={StaticResource BooleanToVisibilityConverter}}">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="*" />
+			</Grid.RowDefinitions>
+			<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+				<Button DockPanel.Dock="Left" Style="{StaticResource ModernToolbarButton}" ToolTip="목록으로">
+					<cal:Message.Attach>[Event Click] = [Action OnClickBackFromMembers()]</cal:Message.Attach>
+					<md:PackIcon Width="20" Height="20" Kind="ArrowLeft" />
+				</Button>
+				<TextBlock
+					Margin="8,0,0,0"
+					VerticalAlignment="Center"
+					DockPanel.Dock="Left"
+					Style="{StaticResource PanelSectionLabel}"
+					Text="{Binding MembersGroupName, StringFormat='구성원 — {0}'}" />
+			</DockPanel>
+
+			<!--  계정 추가 바  -->
+			<Border
+				Grid.Row="1"
+				Margin="0,0,0,8"
+				Padding="10,8"
+				Background="{DynamicResource MaterialDesignCardBackground}"
+				CornerRadius="4">
+				<WrapPanel Orientation="Horizontal">
+					<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="계정 추가" />
+					<ComboBox
+						Width="180"
+						Margin="0,0,12,0"
+						DisplayMemberPath="LoginId"
+						ItemsSource="{Binding AddableAccounts}"
+						SelectedItem="{Binding SelectedAddAccount, Mode=TwoWay}" />
+					<Button
+						Content="그룹에 배정"
+						IsEnabled="{Binding CanAddMember}"
+						Style="{StaticResource MaterialDesignFlatButton}">
+						<cal:Message.Attach>[Event Click] = [Action ClickAddMember()]</cal:Message.Attach>
+					</Button>
+				</WrapPanel>
+			</Border>
+
+			<DataGrid
+				Grid.Row="2"
+				AutoGenerateColumns="False"
+				Background="Transparent"
+				CanUserAddRows="False"
+				CellStyle="{StaticResource ModernDataGridCell}"
+				ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+				IsReadOnly="True"
+				ItemsSource="{Binding Members}"
+				RowHeight="38"
+				RowStyle="{StaticResource ModernDataGridRow}"
+				Style="{StaticResource ModernDataGrid}">
+				<DataGrid.Columns>
+					<DataGridTextColumn Width="160" Binding="{Binding LoginId}" Header="로그인 ID" />
+					<DataGridTextColumn Width="160" Binding="{Binding Name}" Header="이름" />
+					<DataGridTextColumn Width="120" Binding="{Binding Role}" Header="역할" />
+					<DataGridTextColumn Width="*" Header="" />
+					<DataGridTemplateColumn Width="90" Header="해제">
+						<DataGridTemplateColumn.CellTemplate>
+							<DataTemplate>
+								<Button
+									HorizontalAlignment="Left"
+									VerticalAlignment="Center"
+									Style="{StaticResource ModernToolbarButton}"
+									ToolTip="이 그룹에서 계정 해제">
+									<cal:Message.Attach>[Event Click] = [Action OnClickRemoveMember($dataContext)]</cal:Message.Attach>
+									<md:PackIcon Width="20" Height="20" Kind="AccountRemoveOutline" />
+								</Button>
+							</DataTemplate>
+						</DataGridTemplateColumn.CellTemplate>
+					</DataGridTemplateColumn>
+				</DataGrid.Columns>
+			</DataGrid>
 		</Grid>
 	</Grid>
 </UserControl>

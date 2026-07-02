@@ -106,10 +106,14 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     {
         try
         {
-            var usersRes = await _api.GetUsersAsync(1, 200, ct);
+            // ⚠ 서버 /users limit 상한=100(le=100) — 초과 지정 시 422 → 계정 목록이 비어 콤보가 안 뜬다.
+            var usersRes = await _api.GetUsersAsync(1, 100, ct);
             Accounts.Clear();
             if (usersRes.Success && usersRes.Data is not null)
                 foreach (var u in usersRes.Data) Accounts.Add(u);
+            else
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "권한 부여", Explain = $"계정 목록 불러오기 실패: {usersRes.Error?.Message ?? usersRes.Message}" });
 
             var groupsRes = await _api.GetUserGroupsAsync(ct);
             Groups.Clear();
