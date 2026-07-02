@@ -161,6 +161,37 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    // ── Grant Scheduling (T4/FR-GS-06) — 서버 grants API 소비 ──
+    public async Task<ApiListResponse<GrantDto>> GetUserGrantsAsync(int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.GetRequestAsync($"users/{userId}/grants").ConfigureAwait(false);
+            return await res.ToApiListResponseAsync<GrantDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiListResponse<GrantDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<GrantDto>> CreateGrantAsync(int userId, GrantCreateDto dto, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PostRequestAsync($"users/{userId}/grants", dto).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<GrantDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<GrantDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<object>> DeleteGrantAsync(int grantId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.DeleteRequestAsync($"grants/{grantId}").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<object>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiResponse<object>> ResetUserPasswordAsync(int id, string newPassword, CancellationToken ct = default)
     {
         try

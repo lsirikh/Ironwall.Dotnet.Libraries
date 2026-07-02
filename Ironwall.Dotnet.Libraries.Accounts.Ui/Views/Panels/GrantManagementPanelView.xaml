@@ -1,0 +1,104 @@
+<UserControl
+	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.GrantManagementPanelView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:cal="http://caliburnmicro.com"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="450"
+	d:DesignWidth="900"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	mc:Ignorable="d">
+	<Grid Margin="6">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+		</Grid.RowDefinitions>
+
+		<!--  헤더  -->
+		<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+			<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="권한그룹 한시부여 (Grant Scheduling)" />
+			<Button DockPanel.Dock="Right" Style="{StaticResource ModernToolbarButton}" ToolTip="갱신">
+				<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
+				<md:PackIcon Width="20" Height="20" Kind="Refresh" />
+			</Button>
+		</DockPanel>
+
+		<!--  부여 폼  -->
+		<Border
+			Grid.Row="1"
+			Margin="0,0,0,8"
+			Padding="10,8"
+			Background="{DynamicResource MaterialDesignCardBackground}"
+			CornerRadius="4">
+			<WrapPanel Orientation="Horizontal">
+				<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="계정" />
+				<ComboBox
+					Width="150"
+					Margin="0,0,12,0"
+					DisplayMemberPath="LoginId"
+					ItemsSource="{Binding Accounts}"
+					SelectedItem="{Binding SelectedAccount, Mode=TwoWay}" />
+				<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="그룹" />
+				<ComboBox
+					Width="150"
+					Margin="0,0,12,0"
+					DisplayMemberPath="Name"
+					ItemsSource="{Binding Groups}"
+					SelectedItem="{Binding SelectedGroup, Mode=TwoWay}" />
+				<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="시작" />
+				<mah:DateTimePicker Width="180" Margin="0,0,12,0" SelectedDateTime="{Binding ValidFrom, Mode=TwoWay}" />
+				<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="종료(생략=상시)" />
+				<mah:DateTimePicker Width="180" Margin="0,0,12,0" SelectedDateTime="{Binding ValidUntil, Mode=TwoWay}" />
+				<Button
+					Margin="4,0,0,0"
+					Content="부여"
+					IsEnabled="{Binding CanCreateGrant}"
+					Style="{StaticResource MaterialDesignFlatButton}">
+					<cal:Message.Attach>[Event Click] = [Action ClickCreateGrant()]</cal:Message.Attach>
+				</Button>
+			</WrapPanel>
+		</Border>
+
+		<!--  부여 목록  -->
+		<DataGrid
+			Grid.Row="2"
+			RowHeight="38"
+			AutoGenerateColumns="False"
+			Background="Transparent"
+			CanUserAddRows="False"
+			CellStyle="{StaticResource ModernDataGridCell}"
+			ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+			IsReadOnly="True"
+			ItemsSource="{Binding Grants}"
+			RowStyle="{StaticResource ModernDataGridRow}"
+			Style="{StaticResource ModernDataGrid}">
+			<DataGrid.Columns>
+				<DataGridTextColumn Width="150" Binding="{Binding GroupName}" Header="그룹" />
+				<DataGridTextColumn Width="70" Binding="{Binding GroupId}" Header="그룹ID" />
+				<DataGridTextColumn Width="160" Binding="{Binding ValidFrom, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 시작" />
+				<DataGridTextColumn Width="160" Binding="{Binding ValidUntil, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="유효 종료" />
+				<DataGridTextColumn Width="100" Binding="{Binding Status}" Header="상태" />
+				<DataGridTextColumn Width="160" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Header="부여시각" />
+				<DataGridTemplateColumn Width="80" Header="회수">
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<Button
+								HorizontalAlignment="Left"
+								VerticalAlignment="Center"
+								IsEnabled="{Binding IsActive}"
+								Style="{StaticResource ModernToolbarButton}"
+								ToolTip="부여 회수">
+								<cal:Message.Attach>[Event Click] = [Action OnClickRevoke($dataContext)]</cal:Message.Attach>
+								<md:PackIcon Width="20" Height="20" Kind="DeleteClockOutline" />
+							</Button>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+			</DataGrid.Columns>
+		</DataGrid>
+	</Grid>
+</UserControl>

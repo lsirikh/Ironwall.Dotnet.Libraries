@@ -127,6 +127,9 @@ public class EventUiModule : Module
             {
                 var eqm = scope.Resolve<EventQueueManager>();
                 var sem = scope.Resolve<SymbolEventManager>();
+                // 로그인 게이팅(Login_Gated_GIS_Init T3 연장): 무인 자동조치보고 차단용 인증 소스.
+                // 미등록(DB모드)=null=게이트 비활성(하위호환). ADR: 로그아웃 상태서 조치보고 발송 절대 금지(사용자 요구).
+                var tokenStorage = scope.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>();
 
                 // 개별 심볼: SSOT 복합 상태 전이 단일 경로 (OnDeviceStateChanged)
                 // OnDeviceFirstEvent/OnDeviceEmpty 경로 제거 — OnDeviceStateChanged 발화 순서가 앞서므로 중복
@@ -147,6 +150,15 @@ public class EventUiModule : Module
                 // 자동 조치보고: 타임아웃 만료 시 API 보고 → Dequeue → 카드 제거
                 eqm.OnAutoReport += entry =>
                 {
+                    // 로그인 게이팅: 로그인 전/로그아웃 상태에서는 자동조치보고 발송 차단(무인 조치보고 금지, 사용자 요구).
+                    // 로그인 중 Enqueue된 항목이 로그아웃 후 타임아웃되는 경계 케이스 — NATS 수신 게이트로도 못 막는 잔여 경로.
+                    // 미발송·미Dequeue → 재로그인(=담당자 복귀) 시 다음 틱에 정상 보고. AutoReportInFlight만 해제.
+                    if (tokenStorage is { IsAuthenticated: false })
+                    {
+                        _log?.Warning($"[AutoReport] 미인증 상태 — 자동조치보고 발송 보류(entry={entry.EntryId})");
+                        entry.AutoReportInFlight = false;
+                        return;
+                    }
                     var task = elp.HandleAutoReportAsync(entry);
                     task.ContinueWith(t =>
                     {

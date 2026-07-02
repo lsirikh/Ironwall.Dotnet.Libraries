@@ -57,6 +57,17 @@ public interface IAccountApiService
     /// 기본구현=미지원(테스트 스텁 무수정 목적) — 실제 구현은 AccountApiService.</summary>
     Task<ApiResponse<object>> ForceLogoutSessionAsync(int sessionId, CancellationToken ct = default)
         => throw new NotImplementedException();
+
+    // ── Grant Scheduling (T4/FR-GS-06) — 서버 grants API. 기본구현=미지원(테스트 스텁 무수정) ──
+    /// <summary>GET /api/users/{userId}/grants — 사용자 권한그룹 부여 목록(ADMIN). status=ACTIVE/PENDING/EXPIRED/REVOKED.</summary>
+    Task<ApiListResponse<GrantDto>> GetUserGrantsAsync(int userId, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>POST /api/users/{userId}/grants — 한시 권한그룹 부여(ADMIN). valid_until 생략=상시. 경계위반(과거·until≤from) 422.</summary>
+    Task<ApiResponse<GrantDto>> CreateGrantAsync(int userId, GrantCreateDto dto, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>DELETE /api/grants/{grantId} — 부여 회수(soft, ADMIN).</summary>
+    Task<ApiResponse<object>> DeleteGrantAsync(int grantId, CancellationToken ct = default)
+        => throw new NotImplementedException();
     /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit). action_type/resource_type=str(tolerant).</summary>
     Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default);
 
