@@ -418,6 +418,15 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.TargetAimClicked += OnTargetAimClicked;                  // 카메라 특정위치 확인 — 좌클릭 좌표 수신
             MainMap.PreviewKeyDown += OnMapPreviewKeyDownForAim;             // ESC 취소
 
+            // 그룹(러버밴드) 다중선택 (GMap_RubberBand_MultiSelect) — AdornerManager 밖 전용 서비스
+            _groupSelection = new GroupSelectionService(MainMap, _log);
+            MainMap.RubberBandStarted += OnRubberBandStarted;
+            MainMap.MarkersRubberBandSelected += OnMarkersRubberBandSelected;
+            MainMap.PreviewKeyDown += OnMapPreviewKeyDownForGroup;           // Del=그룹 삭제
+            _groupSelection.GroupMoveCompleted += OnGroupMoveCompleted;
+            _groupSelection.GroupDeleteRequested += OnGroupDeleteRequested;
+            _groupSelection.GroupLockRequested += OnGroupLockRequested;
+
             _log?.Info("GMapCustomControl 이벤트 구독 완료");
             // AdornerManager 이벤트 구독
             MainMap.MarkerEditStarted += OnMarkerEditStarted;
@@ -464,6 +473,19 @@ public class MapViewModel : BasePanelViewModel,
             MainMap.TargetAimClicked -= OnTargetAimClicked;
             MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForAim;
             if (_aimEscWindow != null) { _aimEscWindow.PreviewKeyDown -= OnMapPreviewKeyDownForAim; _aimEscWindow = null; }
+
+            // 그룹(러버밴드) 다중선택 정리
+            MainMap.RubberBandStarted -= OnRubberBandStarted;
+            MainMap.MarkersRubberBandSelected -= OnMarkersRubberBandSelected;
+            MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForGroup;
+            if (_groupSelection != null)
+            {
+                _groupSelection.GroupMoveCompleted -= OnGroupMoveCompleted;
+                _groupSelection.GroupDeleteRequested -= OnGroupDeleteRequested;
+                _groupSelection.GroupLockRequested -= OnGroupLockRequested;
+                _groupSelection.Dispose();
+                _groupSelection = null;
+            }
             MainMap.MarkerEditStarted -= OnMarkerEditStarted;
             MainMap.MarkerEditCompleted -= OnMarkerEditCompleted;
             MainMap.MarkerEditCancelled -= OnMarkerEditCancelled;
@@ -694,6 +716,98 @@ public class MapViewModel : BasePanelViewModel,
 
     #endregion
 
+    #region - 그룹(러버밴드) 다중선택 (GMap_RubberBand_MultiSelect FR-MS-03~09) -
+    private GroupSelectionService? _groupSelection;
+
+    /// <summary>현재 그룹(러버밴드) 선택집합 — 그룹 이동/삭제/잠금 대상.</summary>
+    public IReadOnlyList<IEditableMarker> SelectedMarkers => _groupSelection?.Selection ?? System.Array.Empty<IEditableMarker>();
+
+    /// <summary>Shift+드래그 시작 — 기존 단일 선택 해제(그룹과 공존, FR-MS-08).</summary>
+    private void OnRubberBandStarted() => SelectedMarker = null;
+
+    /// <summary>Shift+드래그 릴리스 — 사각형 내 마커 그룹 선택(빈 목록=해제).</summary>
+    private void OnMarkersRubberBandSelected(IReadOnlyList<IEditableMarker> hits)
+    {
+        _groupSelection?.SetSelection(hits);
+        NotifyOfPropertyChange(nameof(SelectedMarkers));
+        if (hits != null && hits.Count > 0)
+            SetAimStatus($"{hits.Count}개 선택 — 핸들 드래그=이동 · 핸들 우클릭=삭제/잠금 · Del=삭제", autoHide: true);
+    }
+
+    /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
+    private async void OnMapPreviewKeyDownForGroup(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Delete && (_groupSelection?.HasSelection ?? false))
+        {
+            e.Handled = true;
+            await ExecuteGroupDelete();
+        }
+    }
+
+    /// <summary>그룹 이동 완료 → 멤버별 DB 영속(잠금 멤버 스킵, FR-MS-05/08). RBAC 게이트.</summary>
+    private async void OnGroupMoveCompleted()
+    {
+        if (_groupSelection == null) return;
+        if (!CanEditMap()) { SetAimStatus("편집 권한이 없습니다.", true); return; }
+        int moved = 0, skipped = 0;
+        foreach (var m in _groupSelection.Selection.ToList())
+        {
+            if (m == null || m.IsDisposed) continue;
+            if (m.IsLocked) { skipped++; continue; }
+            try { await DbUpdateProcess(m); moved++; } catch (Exception ex) { _log?.Error($"그룹 이동 영속 실패: {ex.Message}"); }
+        }
+        _groupSelection.RefreshAdorner();
+        SetAimStatus(skipped > 0 ? $"{moved}개 이동 저장(잠금 {skipped}개 제외)" : $"{moved}개 이동 저장", true);
+    }
+
+    private async void OnGroupDeleteRequested() => await ExecuteGroupDelete();
+    private async void OnGroupLockRequested(bool locked) => await ExecuteGroupLock(locked);
+
+    /// <summary>그룹 삭제 — 잠긴 멤버 스킵(FR-MS-08), CanEditMap 게이트.</summary>
+    private async Task ExecuteGroupDelete()
+    {
+        if (_groupSelection == null || !_groupSelection.HasSelection) return;
+        if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
+        int del = 0, skipped = 0;
+        foreach (var m in _groupSelection.Selection.ToList())
+        {
+            if (m == null || m.IsDisposed) continue;
+            if (m.IsLocked) { skipped++; continue; }
+            try
+            {
+                MainMap?.DeselectMarker(m);
+                if (m is GMapMarker gm) MainMap?.Markers?.Remove(gm);
+                await DbDeleteProcess(m);
+                m.Dispose();
+                del++;
+            }
+            catch (Exception ex) { _log?.Error($"그룹 삭제 실패: {ex.Message}"); }
+        }
+        _groupSelection.Clear();
+        NotifyOfPropertyChange(nameof(SelectedMarkers));
+        HidePropertyPanel();
+        MainMap?.InvalidateVisual();
+        SetAimStatus(skipped > 0 ? $"{del}개 삭제(잠금 {skipped}개 제외)" : $"{del}개 삭제", true);
+    }
+
+    /// <summary>그룹 잠금/해제 — 전체 적용(FR-MS-06). marker.IsLocked 모델 연동 후 DB 영속.</summary>
+    private async Task ExecuteGroupLock(bool locked)
+    {
+        if (_groupSelection == null || !_groupSelection.HasSelection) return;
+        if (!CanEditMap()) { SetAimStatus("잠금 변경 권한이 없습니다.", true); return; }
+        int n = 0;
+        foreach (var m in _groupSelection.Selection.ToList())
+        {
+            if (m == null || m.IsDisposed) continue;
+            try { m.IsLocked = locked; await DbUpdateProcess(m); n++; }
+            catch (Exception ex) { _log?.Error($"그룹 잠금 변경 실패: {ex.Message}"); }
+        }
+        _groupSelection.RefreshAdorner();
+        NotifyOfPropertyChange(nameof(SelectedMarkers));
+        SetAimStatus($"{n}개 {(locked ? "잠금" : "잠금 해제")}", true);
+    }
+    #endregion
+
     #region - GMapCustomControl 이벤트 핸들러 -
     /// <summary>
     /// 지도 마커 클릭 이벤트 핸들러
@@ -702,6 +816,12 @@ public class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            // 단일 클릭(Shift 없음) = 그룹 선택 해제 후 단일선택 폴백(공존, FR-MS-08)
+            if (_groupSelection?.HasSelection ?? false)
+            {
+                _groupSelection.Clear();
+                NotifyOfPropertyChange(nameof(SelectedMarkers));
+            }
             if (marker?.IsLocked == true) return;   // 잠긴 심볼은 편집모드 ON에서도 클릭/선택 차단
             //_log?.Info($"=== 마커 클릭 시작 ===");
             //_log?.Info($"클릭 전 - {GetMarkerInfo(marker)}");
