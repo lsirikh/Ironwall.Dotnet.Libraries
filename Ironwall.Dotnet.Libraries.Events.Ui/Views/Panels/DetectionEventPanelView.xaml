@@ -109,10 +109,9 @@
 				<!--  Add Button  -->
 				<Button
 					Grid.Column="8"
-					IsEnabled="{Binding IsButtonEnable}"
+					IsEnabled="{Binding CanInsertEvent}"
 					Style="{StaticResource IconButtonStyle}"
-					ToolTip="추가하기"
-					Visibility="{Binding CanInsertEvent, Converter={StaticResource BooleanToVisibilityConverter}}">
+					ToolTip="추가하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickInsertButton" />
 					</i:Interaction.Behaviors>
@@ -125,10 +124,9 @@
 				<!--  Remove Button  -->
 				<Button
 					Grid.Column="10"
-					IsEnabled="{Binding IsButtonEnable}"
+					IsEnabled="{Binding CanDeleteEvent}"
 					Style="{StaticResource IconButtonStyle}"
-					ToolTip="삭제하기"
-					Visibility="{Binding CanDeleteEvent, Converter={StaticResource BooleanToVisibilityConverter}}">
+					ToolTip="삭제하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickDeleteButton" />
 					</i:Interaction.Behaviors>
@@ -173,10 +171,9 @@
 					Margin="2,2"
 					VerticalAlignment="Center"
 					md:RippleAssist.IsCentered="True"
-					IsEnabled="{Binding IsButtonEnable}"
+					IsEnabled="{Binding CanSaveEvent}"
 					Style="{StaticResource MaterialDesignIconButton}"
-					ToolTip="저장하기"
-					Visibility="{Binding CanSaveEvent, Converter={StaticResource BooleanToVisibilityConverter}}">
+					ToolTip="저장하기">
 					<i:Interaction.Behaviors>
 						<behavior:ButtonClickBehavior MethodName="OnClickSaveButton" />
 						<behavior_inner:CommitEditOnClickBehavior DataGrid="{Binding ElementName=DataGridUsers}" />
