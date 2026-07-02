@@ -19,9 +19,10 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLogoutSessionMessageModel>
 {
     private readonly IAccountApiService _api;
+    private readonly ITokenStorageService _tokenStore;
 
-    public UserSessionPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api)
-        : base(eventAggregator, log) => _api = api;
+    public UserSessionPanelViewModel(IEventAggregator eventAggregator, ILogService log, IAccountApiService api, ITokenStorageService tokenStore)
+        : base(eventAggregator, log) { _api = api; _tokenStore = tokenStore; }
 
     /// <summary>접속 세션 목록. DataGrid ItemsSource.</summary>
     public ObservableCollection<UserSessionDto> Items { get; } = new();
@@ -54,6 +55,8 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
         try
         {
             var res = await _api.ForceLogoutSessionAsync(session.Id);
+            // 확인팝업 종료 — ConfirmPopupDialog.ClickOk은 MessageModel만 발행하고 안 닫음(grant/group과 동형).
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
             if (res.Success)
                 await ReloadAsync(CancellationToken.None);
             else
@@ -71,7 +74,9 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
             Items.Clear();
             if (res.Success && res.Data is not null)
                 foreach (var d in res.Data) Items.Add(d);
-            else
+            // 자기 세션 강제로그아웃 직후 재조회는 토큰 teardown과 레이스 → 취소(합성504). 로그아웃 전환 중
+            //   (IsAuthenticated=false)이면 폐기 세션 재조회 실패는 정상 → '불러오기 실패' 팝업 억제(스샷 010431).
+            else if (_tokenStore.IsAuthenticated)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "세션 관리", Explain = $"불러오기 실패: {res.Error?.Message ?? res.Message}" });
         }
