@@ -43,7 +43,11 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     #endregion
 
     #region - Binding Methods -
-    public async Task OnClickReloadButton() => await ReloadGrantsAsync();
+    public async Task OnClickReloadButton()
+    {
+        await LoadAccountsAndGroupsAsync(CancellationToken.None);   // item3: 계정/그룹 목록도 재조회 — 권한설정서 새 그룹 추가 시 부여 탭에 반영
+        await ReloadGrantsAsync();
+    }
 
     /// <summary>부여 실행 — 클라 1차 경계검증(until>from) 후 POST. 서버 422가 최종.</summary>
     public async Task ClickCreateGrant()
@@ -62,9 +66,13 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
             var res = await _api.CreateGrantAsync(acc.Id, dto);
             if (res.Success)
             {
-                await ReloadGrantsAsync();
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "권한 부여", Explain = $"'{acc.LoginId}'에게 '{grp.Name}' 부여 완료." });
+                // item4(사용자 요청): 부여 후 폼 초기화 — 그룹/기간 리셋 + 계정 리셋(SelectedAccount 세터가 grants 목록도 정리).
+                SelectedGroup = null;
+                ValidUntil = null;
+                ValidFrom = DateTime.Now;
+                SelectedAccount = null;
             }
             else
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
