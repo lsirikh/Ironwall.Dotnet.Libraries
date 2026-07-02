@@ -1243,6 +1243,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, IsLocked = @IsLocked,
                 FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
                 CreatedBy = @CreatedBy
             WHERE Id = @Id;";
 
@@ -1623,6 +1624,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             Bearing = @Bearing, Width = @Width, Height = @Height,
             Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, IsLocked = @IsLocked,
             FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+            LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
             CreatedBy = @CreatedBy
         WHERE Id = @Id;";
 
@@ -1968,6 +1970,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 Bearing = @Bearing, Width = @Width, Height = @Height,
                 Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, IsLocked = @IsLocked,
                 FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
                 CreatedBy = @CreatedBy
             WHERE Id = @Id;";
 
@@ -2301,6 +2304,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             Bearing = @Bearing, Width = @Width, Height = @Height,
             Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, IsLocked = @IsLocked,
             FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+            LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
             CreatedBy = @CreatedBy
         WHERE Id = @Id;";
 
@@ -2603,6 +2607,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             Bearing = @Bearing, Width = @Width, Height = @Height,
             Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, IsLocked = @IsLocked,
             FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+            LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
             CreatedBy = @CreatedBy
         WHERE Id = @Id;";
 
@@ -2936,6 +2941,7 @@ internal class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     Bearing = @Bearing, Width = @Width, Height = @Height,
                     Category = @Category, ShowShape = @ShowShape, ShowTitle = @ShowTitle, IsLocked = @IsLocked,
                     FillColor = @FillColor, StrokeColor = @StrokeColor, StrokeThickness = @StrokeThickness, ZOrder = @ZOrder,
+                    LabelOffsetX = @LabelOffsetX, LabelOffsetY = @LabelOffsetY,
                     CreatedBy = @CreatedBy
                 WHERE Id = @Id;";
 

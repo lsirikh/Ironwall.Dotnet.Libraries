@@ -114,12 +114,12 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
     // 라벨박스에서만 hit(그 외 투과, 불변식#3). MarkerEditAdorner 아이콘 핸들과 비겹침(라벨=아이콘 하단 오프셋).
     protected override HitTestResult HitTestCore(PointHitTestParameters hitTestParameters)
-        => !_labelRect.IsEmpty && _labelRect.Contains(hitTestParameters.HitPoint)
+        => _map.IsEditMode && !_labelRect.IsEmpty && _labelRect.Contains(hitTestParameters.HitPoint)   // 편집모드일 때만 히트(그 외 클릭스루=이동 불가, L2)
             ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null!;
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        if (!_labelRect.IsEmpty && _labelRect.Contains(e.GetPosition(this)))
+        if (_map.IsEditMode && !_labelRect.IsEmpty && _labelRect.Contains(e.GetPosition(this)))   // 라벨 이동은 맵 편집모드 ON일 때만(L2)
         {
             _labelDragging = true;
             _grabScreen = e.GetPosition(_map);   // 델타는 맵컨트롤 공간(디지털줌 자동 역보정, 불변식#10)

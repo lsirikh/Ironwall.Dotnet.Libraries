@@ -2181,6 +2181,9 @@ public class MapViewModel : BasePanelViewModel,
             // Adorner 모든 해제
             MainMap?.DeselectAllMarkers();
 
+            // 그룹(러버밴드) 다중선택 해제 — 빈공간 클릭·편집모드 종료 시 함께 취소(M2/M3)
+            _groupSelection?.Clear();
+
             // 이미지 선택 해제
             if (MainMap?.CustomImages != null)
             {

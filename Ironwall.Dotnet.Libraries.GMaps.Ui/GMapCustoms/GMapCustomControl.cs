@@ -728,7 +728,7 @@ public class GMapCustomControl : GMapControl
     /// <summary>Shift+드래그 릴리스 — 사각형 내 편집가능 마커(잠금 포함, FR-MS-07) 집합 통지. 비어도 발화(그룹 해제).</summary>
     public event System.Action<IReadOnlyList<IEditableMarker>>? MarkersRubberBandSelected;
 
-    /// <summary>화면 사각형과 교차하는 편집가능 마커 목록(가시성 필터, 잠금 포함). AABB 교차(비회전 근사).</summary>
+    /// <summary>화면 사각형과 교차하는 편집가능 마커 목록(가시·비잠금·비이미지 마커만). AABB 교차(비회전 근사).</summary>
     internal IReadOnlyList<IEditableMarker> GetMarkersInRect(Rect screenRect)
     {
         var result = new List<IEditableMarker>();
@@ -738,12 +738,13 @@ public class GMapCustomControl : GMapControl
             try
             {
                 if (marker.IsDisposed) continue;
-                if (!SetMarkerVisibility(marker)) continue;   // 가시(레이어/줌) 마커만. 잠금은 포함(FR-MS-07)
-                var sp = FromLatLngToLocal(marker.Position);
+                if (marker.IsLocked) continue;                // 잠금 심볼 제외(M1 — 사용자 요청: 그룹 대상서 배제)
+                if (!SetMarkerVisibility(marker)) continue;   // 가시(레이어/줌) 마커만
                 var shape = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
-                double w, h;
-                if (shape is GMapMarkerImageControl ic && ic.RenderedScreenWidth > 0) { w = ic.RenderedScreenWidth; h = ic.RenderedScreenHeight; }
-                else { w = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0; h = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0; }
+                if (shape is GMapMarkerImageControl) continue;   // 오버레이 이미지 마커 제외(M1)
+                var sp = FromLatLngToLocal(marker.Position);
+                double w = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0;
+                double h = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0;
                 var mrect = new Rect(sp.X - w / 2.0, sp.Y - h / 2.0, w, h);
                 if (screenRect.IntersectsWith(mrect)) result.Add(marker);
             }
