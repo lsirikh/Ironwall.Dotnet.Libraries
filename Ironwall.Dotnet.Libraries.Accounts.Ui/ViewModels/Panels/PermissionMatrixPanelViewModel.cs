@@ -197,6 +197,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                 if (!res.Success) { await Info($"생성 실패: {res.Error?.Message ?? res.Message}"); return; }
             }
             IsGroupFormOpen = false;
+            await Info(_formGroupId > 0 ? "그룹 정보를 수정했습니다." : "새 권한 그룹을 생성했습니다.");   // 성공 피드백(grant 생성 패턴 정합·진단)
             await ReloadAsync(CancellationToken.None);
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 그룹 저장 실패: {ex.Message}"); }
@@ -221,6 +222,9 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         try
         {
             var res = await _api.DeleteUserGroupAsync(message.GroupId);
+            // ⚠ ConfirmPopupDialog.ClickOk 은 MessageModel 만 발행하고 팝업을 닫지 않음(디바이스 패널 등은 핸들러가 ClosePopup 발행).
+            //    → 여기서 닫지 않으면 삭제 확인 팝업이 잔존한다(사용자 실측 버그 ②).
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
             if (res.Success) await ReloadAsync(CancellationToken.None);
             else await Info($"삭제 실패: {res.Error?.Message ?? res.Message}");
         }
