@@ -131,4 +131,41 @@ public class ForceLogoutClientTests
 
         Assert.Equal(2, fired);                                  // 다시 발화
     }
+
+    // ─────────────── T1: 세션 만료 능동 감지 ───────────────
+
+    [Fact]
+    public void should_force_logout_when_token_expired()
+    {
+        // 이미 만료된 access → ResetForLogin(만료 타이머 무장) 시 즉시 ForceLogoutOnce(TokenExpired). 서버 401 없이 유령세션 차단.
+        var store = new TokenStorageService();
+        var perm = new PermissionService();
+        store.SetTokens(Jwt("j1", "1", DateTime.UtcNow.AddSeconds(-5)));
+        perm.Apply(new AuthUserDto { Role = "ADMIN", Permissions = JObject.Parse("{}") });
+        var life = new SessionLifecycle(store, perm);
+        int fired = 0; EnumRevokeReason? last = null;
+        life.ForceLogoutRequested += r => { fired++; last = r; };
+
+        life.ResetForLogin();
+
+        Assert.Equal(1, fired);
+        Assert.Equal(EnumRevokeReason.TokenExpired, last);
+        Assert.Null(store.AccessToken);
+    }
+
+    [Fact]
+    public void should_not_force_logout_when_token_not_expired()
+    {
+        // 미래 만료 → 타이머만 무장, 즉시 발화 없음(정상 세션).
+        var store = new TokenStorageService();
+        var perm = new PermissionService();
+        store.SetTokens(Jwt("j1", "1", Future));
+        var life = new SessionLifecycle(store, perm);
+        int fired = 0;
+        life.ForceLogoutRequested += _ => fired++;
+
+        life.ResetForLogin();
+
+        Assert.Equal(0, fired);
+    }
 }
