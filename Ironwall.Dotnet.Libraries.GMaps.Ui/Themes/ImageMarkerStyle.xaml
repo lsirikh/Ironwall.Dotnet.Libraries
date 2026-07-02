@@ -89,18 +89,18 @@
 						<!-- Selected State -->
 						<Trigger Property="IsSelected" Value="True">
 							<Setter TargetName="PART_SelectionBorder" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!-- ShowTitle=True -->
 						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!-- Mouse Over State -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_HoverBorder" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!-- Disabled State -->

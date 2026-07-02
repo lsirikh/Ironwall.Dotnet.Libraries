@@ -200,12 +200,12 @@
 
 						<!--  ShowTitle=True일 때 라벨 표시  -->
 						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  IsSelected=True일 때 선택 상태 표시  -->
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_InfoText" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_LinePointsContainer" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_EndpointMarkers" Property="Visibility" Value="Visible" />
@@ -222,7 +222,7 @@
 
 						<!--  IsMouseOver=True일 때 호버 효과  -->
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_MainPolyline" Property="Effect">
 								<Setter.Value>
 									<DropShadowEffect

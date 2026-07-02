@@ -1228,11 +1228,11 @@
 						</Trigger>
 
 						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  ===============================================  -->
@@ -1240,7 +1240,7 @@
 						<!--  ===============================================  -->
 
 						<Trigger Property="IsMouseOver" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 
 							<!--  Friendly Frame 그림자 효과  -->
 							<Setter TargetName="PART_Frame_Friendly_Air" Property="Effect">

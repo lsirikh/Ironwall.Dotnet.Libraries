@@ -418,17 +418,17 @@
 
 						<!--  라벨 표시 조건  -->
 						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  Mouse Over Effects  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  ShowShape=False일 때  -->

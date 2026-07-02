@@ -205,18 +205,18 @@
 
 						<!--  라벨 표시 조건  -->
 						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  IsSelected=True일 때 라벨 표시  -->
 						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  IsMouseOver=True일 때 라벨 표시 + 효과  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_HoverHighlight" Property="Opacity" Value="0.15" />
-							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 
 							<!--  Mouse Over Effects for All Shapes  -->
 							<Setter TargetName="PART_CircleShape" Property="Effect">

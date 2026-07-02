@@ -1070,21 +1070,21 @@
 								<Condition Property="DeviceType" Value="Controller" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Controller" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Controller" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_ControllerLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  Multi 라벨  -->
@@ -1093,21 +1093,21 @@
 								<Condition Property="DeviceType" Value="Multi" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Multi" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Multi" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  Fence 라벨  -->
@@ -1116,21 +1116,21 @@
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="Fence" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_FenceLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  Camera 라벨  -->
@@ -1139,21 +1139,21 @@
 								<Condition Property="DeviceType" Value="IpCamera" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="IpCamera" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="IpCamera" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_CameraLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  Speaker 라벨  -->
@@ -1162,21 +1162,21 @@
 								<Condition Property="DeviceType" Value="IpSpeaker" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="IpSpeaker" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="IpSpeaker" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SpeakerLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  SmartSensor 라벨 (SmartSensor / SmartSensor2 / SmartCompound)  -->
@@ -1185,63 +1185,63 @@
 								<Condition Property="DeviceType" Value="SmartSensor" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartSensor" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartSensor" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartSensor2" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartSensor2" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartSensor2" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartCompound" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartCompound" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartCompound" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_SmartSensorLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  SmartMultisensor2 라벨 (Multi 섹션 사용)  -->
@@ -1250,21 +1250,21 @@
 								<Condition Property="DeviceType" Value="SmartMultisensor2" />
 								<Condition Property="IsSelected" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartMultisensor2" />
 								<Condition Property="ShowTitle" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 						<MultiTrigger>
 							<MultiTrigger.Conditions>
 								<Condition Property="DeviceType" Value="SmartMultisensor2" />
 								<Condition Property="IsMouseOver" Value="True" />
 							</MultiTrigger.Conditions>
-							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_MultiLabelContainer" Property="Visibility" Value="Collapsed" />
 						</MultiTrigger>
 
 						<!--  Mouse Over Effects  -->
