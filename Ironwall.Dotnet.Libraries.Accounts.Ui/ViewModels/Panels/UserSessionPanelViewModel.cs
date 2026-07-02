@@ -1,5 +1,6 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -15,7 +16,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
    Notes        : IAccountApiService 직접 주입(GOP 모드 전용). 강제 로그아웃(쓰기)은 서버/배선 후속 — 현재 조회만.
                   AuditLog/PermissionMatrix와 동일 패턴(BasePanelViewModel + ObservableCollection<DTO>).
 ****************************************************************************/
-public class UserSessionPanelViewModel : BasePanelViewModel
+public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLogoutSessionMessageModel>
 {
     private readonly IAccountApiService _api;
 
@@ -33,9 +34,22 @@ public class UserSessionPanelViewModel : BasePanelViewModel
 
     public async Task OnClickReloadButton() => await ReloadAsync(CancellationToken.None);
 
-    /// <summary>세션 강제 로그아웃(ADMIN) — DELETE /user-sessions/{id} 후 목록 갱신. 비활성 세션은 무시.</summary>
+    /// <summary>세션 강제 로그아웃(ADMIN) 클릭 — 즉시 실행 않고 Confirm 다이얼로그. Yes 시 CallForceLogoutSessionMessageModel 발행. (T2)</summary>
     public async Task OnClickForceLogout(UserSessionDto session)
     {
+        if (session is null || !session.IsActive) return;
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "세션 관리",
+            Explain = $"'{session.LoginId}' ({session.IpAddress}) 세션을 강제 로그아웃하시겠습니까?",
+            MessageModel = new CallForceLogoutSessionMessageModel { Session = session }
+        });
+    }
+
+    /// <summary>Confirm→Yes 확인 후 실제 DELETE /user-sessions/{id} + 목록 갱신. 비활성 세션은 무시. (T2)</summary>
+    public async Task HandleAsync(CallForceLogoutSessionMessageModel message, CancellationToken cancellationToken)
+    {
+        var session = message.Session;
         if (session is null || !session.IsActive) return;
         try
         {
@@ -63,4 +77,10 @@ public class UserSessionPanelViewModel : BasePanelViewModel
         }
         catch (Exception ex) { _log?.Error($"[UserSession] 로드 실패: {ex.Message}"); }
     }
+}
+
+/// <summary>세션 강제 로그아웃 확인 트리거 — Confirm 다이얼로그 Yes 시 발행되어 UserSessionPanelViewModel.HandleAsync가 실제 DELETE 수행. (T2)</summary>
+public class CallForceLogoutSessionMessageModel : IMessageModel
+{
+    public UserSessionDto Session { get; set; } = default!;
 }

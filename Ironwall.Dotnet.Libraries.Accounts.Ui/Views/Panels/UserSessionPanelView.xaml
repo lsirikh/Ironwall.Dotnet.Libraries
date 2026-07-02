@@ -44,7 +44,7 @@
 				<DataGridTextColumn Width="150" Binding="{Binding LoggedOutAt}" Header="로그아웃" />
 				<DataGridTextColumn Width="130" Binding="{Binding LogoutReason}" Header="사유" />
 				<DataGridTextColumn Width="160" Binding="{Binding CreatedAt}" Header="로그인시각" />
-				<DataGridTemplateColumn Width="*" Header="관리">
+				<DataGridTemplateColumn Width="80" Header="관리">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
 							<Button
