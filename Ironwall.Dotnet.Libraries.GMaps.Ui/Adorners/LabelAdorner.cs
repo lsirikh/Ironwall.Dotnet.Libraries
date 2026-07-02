@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Documents;
@@ -31,7 +32,6 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
     private static readonly Brush _bg = Frozen(new SolidColorBrush(Color.FromArgb(205, 28, 30, 34)));
     private static readonly Brush _fg = Frozen(new SolidColorBrush(Color.FromArgb(240, 240, 244, 248)));
-    private static readonly Pen _border = FrozenPen(Color.FromArgb(160, 0, 170, 255), 1d);
     private static readonly Pen _leaderPen = FrozenDashPen(Color.FromArgb(200, 0, 170, 255), 1.5d);   // 라벨 드래그 중 점선 리더선
 
     private const double PadX = 5d, PadY = 2d, IconGap = 8d;
@@ -54,9 +54,14 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
         _map.OnMapZoomChanged += OnMapChanged;   // geo-앵커 재렌더(줌/팬 추종)
         _map.OnMapDrag += OnMapChanged;
+        if (_marker is INotifyPropertyChanged npc)   // 제목/제목크기/제목표시·가시성 변경 즉시 반영(속성패널)
+            npc.PropertyChanged += OnMarkerPropertyChanged;
     }
 
     private void OnMapChanged() => InvalidateVisual();
+
+    // 마커 속성(Title/TitleSize/ShowTitle/Position/크기/줌·레이어 가시성) 변경 시 라벨 재렌더 → 속성패널 즉시 반영.
+    private void OnMarkerPropertyChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
 
     /// <summary>아이콘 스크린 중심.</summary>
     private Point IconCenter()
@@ -82,6 +87,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
             var title = _marker.Title;
             if (string.IsNullOrWhiteSpace(title)) return;
             if (!_marker.ShowTitle) return;   // 기존 라벨 가시성 규칙(ShowTitle) 존중
+            // 줌 가시성 — 심볼이 현재 줌/레이어로 숨겨지면 라벨도 함께 숨김(GMapCustomControl.SetMarkerVisibility 동일 술어).
+            if (_map.Zoom < _marker.Zoom || !_marker.IsLayerEnabled) return;
 
             double dpi = VisualTreeHelper.GetDpi(_map).PixelsPerDip;
             var ft = new FormattedText(title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
@@ -98,7 +105,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
             if (_labelDragging)
                 dc.DrawLine(_leaderPen, IconCenter(), c);
 
-            dc.DrawRoundedRectangle(_bg, _border, box, 3d, 3d);
+            // 테두리 없이 배경 칩만 — MarkerEditAdorner 편집박스와 혼동(adorner 박스 2개처럼 보임) 방지. 가독성용 배경만 유지.
+            dc.DrawRoundedRectangle(_bg, null, box, 3d, 3d);
             dc.DrawText(ft, new Point(box.X + PadX, box.Y + PadY));
         }
         catch (Exception ex) { _log?.Error($"LabelAdorner 렌더 실패: {ex.Message}"); }
@@ -174,11 +182,11 @@ public sealed class LabelAdorner : Adorner, IDisposable
         if (IsMouseCaptured) ReleaseMouseCapture();
         _map.OnMapZoomChanged -= OnMapChanged;
         _map.OnMapDrag -= OnMapChanged;
+        if (_marker is INotifyPropertyChanged npc) npc.PropertyChanged -= OnMarkerPropertyChanged;
         LabelOffsetChanged = null;
     }
 
     private static Brush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
-    private static Pen FrozenPen(Color c, double t) { var p = new Pen(Frozen(new SolidColorBrush(c)), t); p.Freeze(); return p; }
     private static Pen FrozenDashPen(Color c, double t)
     { var p = new Pen(Frozen(new SolidColorBrush(c)), t) { DashStyle = new DashStyle(new double[] { 5, 3 }, 0) }; p.Freeze(); return p; }
 }
