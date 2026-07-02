@@ -1,4 +1,6 @@
 using Autofac;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Modules;
 using Ironwall.Dotnet.Libraries.Api.Services;
@@ -37,7 +39,21 @@ public class TrackingApiModule : Module
         try
         {
             // 1. ApiModule 등록 (내부에서 Named<IApiService> 등록)
-            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count));
+            // T7/레거시 통일 방향: 추적 이력 조회에도 Bearer 부착(AUTH_MODE=token 대비). Device/Event와 동일 패턴.
+            //   ITokenStorageService 공유(미등록=DB모드→미부착 하위호환), 401 최종실패 시 SessionExpired→ForceLogoutOnce.
+            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count, authHandlerFactory: ctx =>
+            {
+                var store = ctx.ResolveOptional<ITokenStorageService>();
+                if (store is null) return null;   // DB모드 등 미등록 → Bearer 미부착
+                var scope = ctx.Resolve<ILifetimeScope>();
+                var handler = new BearerAuthHandler(store, () => scope.Resolve<IAccountApiService>(), _log);
+                handler.SessionExpired += () =>
+                {
+                    try { scope.Resolve<ISessionLifecycle>().ForceLogoutOnce(EnumRevokeReason.Unauthorized); }
+                    catch (Exception ex) { _log?.Warning($"[{nameof(TrackingApiModule)}] SessionExpired→ForceLogout 실패: {ex.Message}"); }
+                };
+                return handler;
+            }));
 
             // 2. ApiSetupModel Named 등록
             builder.RegisterInstance(_setup).Named<ApiSetupModel>(_name).SingleInstance();
