@@ -1,4 +1,6 @@
 using Autofac;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Api.Modules;
 using Ironwall.Dotnet.Libraries.Api.Services;
@@ -36,8 +38,21 @@ public class EventApiModule : Module
         try
         {
             // 1. ApiModule 등록 (내부에서 IApiService 등록)
-            // ApiSetupModel은 partial이므로 _setup을 그대로 사용 가능
-            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count));
+            // T7(로그인 게이팅 FR-BR): Event fetch/CRUD에 Bearer 부착(AUTH_MODE=token 대비). DeviceApiModule과 동일 패턴.
+            //   ITokenStorageService 공유(미등록=DB모드→미부착 하위호환), 401 시 single-flight refresh + 최종실패 SessionExpired→ForceLogoutOnce.
+            builder.RegisterModule(new ApiModule(_log, _setup, $"{_name}", _count, authHandlerFactory: ctx =>
+            {
+                var store = ctx.ResolveOptional<ITokenStorageService>();
+                if (store is null) return null;   // DB모드 등 미등록 → Bearer 미부착
+                var scope = ctx.Resolve<ILifetimeScope>();
+                var handler = new BearerAuthHandler(store, () => scope.Resolve<IAccountApiService>(), _log);
+                handler.SessionExpired += () =>
+                {
+                    try { scope.Resolve<ISessionLifecycle>().ForceLogoutOnce(EnumRevokeReason.Unauthorized); }
+                    catch (Exception ex) { _log?.Warning($"[{nameof(EventApiModule)}] SessionExpired→ForceLogout 실패: {ex.Message}"); }
+                };
+                return handler;
+            }));
 
             // 2. ApiSetupModel 등록
             builder.RegisterInstance(_setup).Named<ApiSetupModel>(_name).SingleInstance();
