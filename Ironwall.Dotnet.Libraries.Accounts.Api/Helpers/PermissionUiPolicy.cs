@@ -23,10 +23,15 @@ public enum EnumUiGate
 /// </summary>
 public static class PermissionUiPolicy
 {
-    /// <summary>verb별 권한 보유 여부. perm null → true(폴백 허용).</summary>
+    /// <summary>
+    /// verb별 권한 보유 여부. <paramref name="perm"/> null → <b>true (fail-open 폴백 — 의도된 설계, T6 2회차 결정)</b>.
+    /// <para>근거(ADR v5.2): ① 비GOP(DB인증)·오프라인 배포엔 RBAC 개념이 없으므로 막으면 앱이 무력화 → 허용.
+    /// ② GOP+token 모드에선 IPermissionService가 반드시 등록되어 실제 권한이 반환되고(폴백 미발동), 클라 우회 시에도 서버 403이 최종 차단.
+    /// fail-closed(`?? false`)로 바꾸면 DB모드 전 기능이 비활성되므로 채택 안 함. GMaps `MapViewModel` L969/972/975 `?? true`도 동일 근거.</para>
+    /// </summary>
     public static bool Allowed(IPermissionService? perm, string module, EnumPermissionVerb verb)
     {
-        if (perm is null) return true;   // 미등록(오프라인/테스트/DB모드) → 전체허용 폴백
+        if (perm is null) return true;   // fail-open 폴백(의도) — 위 XML 근거 참조
         return verb switch
         {
             EnumPermissionVerb.View    => perm.CanView(module),
