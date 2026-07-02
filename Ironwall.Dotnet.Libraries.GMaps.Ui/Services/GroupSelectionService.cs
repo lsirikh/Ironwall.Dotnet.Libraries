@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Documents;
+using GMap.NET;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
@@ -34,7 +35,7 @@ public sealed class GroupSelectionService : IDisposable
     public bool HasSelection => _selection.Count > 0;
 
     /// <summary>그룹 이동 드래그 완료 — VM이 멤버별 DB 영속(FR-MS-05).</summary>
-    public event System.Action? GroupMoveCompleted;
+    public event System.Action<IReadOnlyList<(IEditableMarker marker, PointLatLng before)>>? GroupMoveCompleted;
     /// <summary>그룹 삭제 요청(핸들 메뉴) — VM 처리(FR-MS-05).</summary>
     public event System.Action? GroupDeleteRequested;
     /// <summary>그룹 잠금/해제 요청(true=잠금) — VM 처리(FR-MS-06).</summary>
@@ -69,7 +70,7 @@ public sealed class GroupSelectionService : IDisposable
         _log?.Info($"그룹 선택 {_selection.Count}개");
     }
 
-    private void OnAdornerMoveCompleted() => GroupMoveCompleted?.Invoke();
+    private void OnAdornerMoveCompleted(IReadOnlyList<(IEditableMarker marker, PointLatLng before)> moves) => GroupMoveCompleted?.Invoke(moves);
     private void OnAdornerDeleteRequested() => GroupDeleteRequested?.Invoke();
     private void OnAdornerLockRequested(bool locked) => GroupLockRequested?.Invoke(locked);
     private void OnAdornerVisibilityRequested(bool show) => GroupVisibilityRequested?.Invoke(show);

@@ -1,0 +1,305 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using GMap.NET;
+using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.GMaps.Db.Services;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
+using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using Xunit;
+
+namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Tests;
+
+/// <summary>Map_Edit_Undo_Redo — UndoService/커맨드/스냅샷/coalescing/재진입 단위테스트(격리: 페이크 seam).</summary>
+public class UndoRedoTests
+{
+    // ─────────────── Fakes ───────────────
+    private sealed class FakeEditableMarker : IEditableMarker
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public double TitleSize { get; set; }
+        public PointLatLng Position { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public double Zoom { get; set; }
+        public double Bearing { get; set; }
+        public bool IsSelected { get; set; }
+        public bool IsVisible { get; set; }
+        public bool IsLayerEnabled { get; set; }
+        public bool IsLocked { get; set; }
+        public bool ShowShape { get; set; }
+        public bool ShowTitle { get; set; }
+        public double LabelOffsetX { get; set; }
+        public double LabelOffsetY { get; set; }
+        public EnumColorType FillColor { get; set; }
+        public EnumColorType StrokeColor { get; set; }
+        public double StrokeThickness { get; set; }
+        public int ZOrder { get; set; }
+        public EnumOperationState OperationState { get; set; }
+        public bool IsDisposed { get; private set; }
+        public bool EnableShapeAnimation { get; set; }
+        public void UpdateLocation(PointLatLng p) => Position = p;
+        public void UpdateSize(double w, double h) { Width = w; Height = h; }
+        public void UpdateRotation(double b) => Bearing = b;
+        public void Dispose() => IsDisposed = true;
+    }
+
+    private sealed class FakeApplyContext : IUndoApplyContext
+    {
+        public readonly Dictionary<int, IEditableMarker> Markers = new();
+        public int ApplyCount;
+        public IReadOnlyList<(int id, int zOrder)>? LastZOrder;
+        public readonly List<int> Removed = new();
+        public readonly List<int> Restored = new();
+        public IGMapDbSymbolService Db => null!;
+        public IEditableMarker? FindMarkerById(int id) => Markers.TryGetValue(id, out var m) ? m : null;
+        public Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default) { ApplyCount++; return Task.CompletedTask; }
+        public Task<IEditableMarker?> RestoreDeletedAsync(ISymbolSnapshot snap, CancellationToken ct = default)
+        {
+            var m = new FakeEditableMarker { Id = snap.Id };
+            Markers[snap.Id] = m; Restored.Add(snap.Id);
+            return Task.FromResult<IEditableMarker?>(m);
+        }
+        public Task RemoveMarkerAsync(IEditableMarker marker, CancellationToken ct = default)
+        { Markers.Remove(marker.Id); Removed.Add(marker.Id); return Task.CompletedTask; }
+        public Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
+        { LastZOrder = pairs; return Task.CompletedTask; }
+        public void ResyncTree() { }
+    }
+
+    /// <summary>공유 셀을 토글하는 단순 커맨드 — UndoService 메커니즘 검증.</summary>
+    private sealed class ValueCommand : IUndoableCommand
+    {
+        private readonly int[] _cell; private readonly int _before, _after;
+        public ValueCommand(int[] cell, int before, int after) { _cell = cell; _before = before; _after = after; }
+        public string Description => "값";
+        public int ScopeMapId { get; set; }
+        public Task ExecuteAsync(CancellationToken ct = default) { _cell[0] = _after; return Task.CompletedTask; }
+        public Task UndoAsync(CancellationToken ct = default) { _cell[0] = _before; return Task.CompletedTask; }
+    }
+
+    /// <summary>undo 순서 검증용 로그 커맨드.</summary>
+    private sealed class LogCommand : IUndoableCommand
+    {
+        private readonly List<string> _log; private readonly string _name;
+        public LogCommand(List<string> log, string name) { _log = log; _name = name; }
+        public string Description => _name;
+        public int ScopeMapId { get; set; }
+        public Task ExecuteAsync(CancellationToken ct = default) { _log.Add("E:" + _name); return Task.CompletedTask; }
+        public Task UndoAsync(CancellationToken ct = default) { _log.Add("U:" + _name); return Task.CompletedTask; }
+    }
+
+    private sealed class Probe { public int Concurrent; public int Max; }
+    /// <summary>실행 중 동시성 카운터 — 직렬화 검증.</summary>
+    private sealed class ProbeCommand : IUndoableCommand
+    {
+        private readonly Probe _p; public ProbeCommand(Probe p) => _p = p;
+        public string Description => "probe"; public int ScopeMapId { get; set; }
+        public Task ExecuteAsync(CancellationToken ct = default) => Run();
+        public Task UndoAsync(CancellationToken ct = default) => Run();
+        private async Task Run()
+        {
+            int now = Interlocked.Increment(ref _p.Concurrent);
+            if (now > _p.Max) _p.Max = now;
+            await Task.Delay(20);
+            Interlocked.Decrement(ref _p.Concurrent);
+        }
+    }
+
+    // ─────────────── UndoService ───────────────
+    [Fact(DisplayName = "UndoService — push→undo→redo가 상태를 원복/재적용")]
+    public async Task should_restore_state_when_undo_then_redo()
+    {
+        var svc = new UndoService();
+        var cell = new[] { 5 };
+        svc.Push(new ValueCommand(cell, before: 1, after: 5));
+        Assert.True(svc.CanUndo);
+        await svc.UndoAsync();
+        Assert.Equal(1, cell[0]);
+        Assert.True(svc.CanRedo);
+        await svc.RedoAsync();
+        Assert.Equal(5, cell[0]);
+    }
+
+    [Fact(DisplayName = "UndoService — 새 push 시 redo 스택 비움")]
+    public async Task should_clear_redo_when_new_push()
+    {
+        var svc = new UndoService(); var cell = new[] { 1 };
+        svc.Push(new ValueCommand(cell, 0, 1));
+        await svc.UndoAsync();
+        Assert.True(svc.CanRedo);
+        svc.Push(new ValueCommand(cell, 0, 2));
+        Assert.False(svc.CanRedo);
+    }
+
+    [Fact(DisplayName = "UndoService — 깊이 50 초과 시 가장 오래된 것 트림")]
+    public async Task should_trim_oldest_when_exceeding_depth_50()
+    {
+        var svc = new UndoService(); var cell = new[] { 0 };
+        for (int i = 0; i < 60; i++) svc.Push(new ValueCommand(cell, i, i + 1));
+        int count = 0;
+        while (svc.CanUndo) { await svc.UndoAsync(); count++; }
+        Assert.Equal(50, count);
+    }
+
+    [Fact(DisplayName = "UndoService — 억제 스코프 중 push 무시")]
+    public void should_ignore_push_when_recording_suspended()
+    {
+        var svc = new UndoService();
+        using (svc.SuspendRecording())
+            svc.Push(new ValueCommand(new[] { 0 }, 0, 1));
+        Assert.False(svc.CanUndo);
+    }
+
+    [Fact(DisplayName = "UndoService — 배치는 1 undo 단위, 자식 역순 실행")]
+    public async Task should_group_children_reverse_when_batch()
+    {
+        var svc = new UndoService(); var log = new List<string>();
+        using (svc.BeginBatch("batch"))
+        {
+            svc.Push(new LogCommand(log, "A"));
+            svc.Push(new LogCommand(log, "B"));
+            svc.Push(new LogCommand(log, "C"));
+        }
+        Assert.True(svc.CanUndo);
+        await svc.UndoAsync();
+        Assert.False(svc.CanUndo);   // 1 단위 → 한 번에 소진
+        Assert.Equal(new[] { "U:C", "U:B", "U:A" }, log);
+    }
+
+    [Fact(DisplayName = "UndoService — push/undo/redo 시 StateChanged 발화")]
+    public async Task should_raise_statechanged_when_push_undo_redo()
+    {
+        var svc = new UndoService(); int n = 0; svc.StateChanged += (_, _) => n++;
+        svc.Push(new ValueCommand(new[] { 0 }, 0, 1));
+        await svc.UndoAsync();
+        await svc.RedoAsync();
+        Assert.True(n >= 3);
+    }
+
+    [Fact(DisplayName = "UndoService — 동시 Undo 호출은 직렬화(인터리브 없음)")]
+    public async Task should_serialize_when_concurrent_undo()
+    {
+        var svc = new UndoService(); var p = new Probe();
+        svc.Push(new ProbeCommand(p));
+        svc.Push(new ProbeCommand(p));
+        await Task.WhenAll(svc.UndoAsync(), svc.UndoAsync());
+        Assert.True(p.Max <= 1);
+    }
+
+    // ─────────────── 커맨드 왕복(페이크 seam) ───────────────
+    [Fact(DisplayName = "TransformCommand — undo/redo가 위치·크기·방위 원복/재적용")]
+    public async Task should_restore_transform_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 7 };
+        ctx.Markers[7] = m;
+        var before = (new PointLatLng(10, 20), 50.0, 60.0, 30.0);
+        var after = (new PointLatLng(11, 21), 55.0, 65.0, 45.0);
+        m.Position = after.Item1; m.Width = 55; m.Height = 65; m.Bearing = 45;   // 편집 후 상태
+        var cmd = new TransformCommand(ctx, 7, before, after);
+
+        await cmd.UndoAsync();
+        Assert.Equal(10, m.Position.Lat); Assert.Equal(50, m.Width); Assert.Equal(30, m.Bearing);
+        await cmd.ExecuteAsync();
+        Assert.Equal(11, m.Position.Lat); Assert.Equal(55, m.Width); Assert.Equal(45, m.Bearing);
+    }
+
+    [Fact(DisplayName = "PropertyChangeCommand — undo/redo가 Title 값 원복/재적용")]
+    public async Task should_restore_property_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 4, Title = "new" };
+        ctx.Markers[4] = m;
+        var cmd = new PropertyChangeCommand(ctx, 4, "Title", "old", "new");
+        await cmd.UndoAsync();
+        Assert.Equal("old", m.Title);
+        await cmd.ExecuteAsync();
+        Assert.Equal("new", m.Title);
+    }
+
+    [Fact(DisplayName = "LabelOffsetCommand — undo/redo가 오프셋 원복/재적용")]
+    public async Task should_restore_offset_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 2, LabelOffsetX = 30, LabelOffsetY = 40 };
+        ctx.Markers[2] = m;
+        var cmd = new LabelOffsetCommand(ctx, 2, (0, 0), (30, 40));
+        await cmd.UndoAsync();
+        Assert.Equal(0, m.LabelOffsetX); Assert.Equal(0, m.LabelOffsetY);
+        await cmd.ExecuteAsync();
+        Assert.Equal(30, m.LabelOffsetX); Assert.Equal(40, m.LabelOffsetY);
+    }
+
+    [Fact(DisplayName = "LockCommand — undo/redo가 잠금상태 원복/재적용")]
+    public async Task should_restore_lock_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 1, IsLocked = true };
+        ctx.Markers[1] = m;
+        var cmd = new LockCommand(ctx, 1, before: false, after: true);
+        await cmd.UndoAsync();
+        Assert.False(m.IsLocked);
+        await cmd.ExecuteAsync();
+        Assert.True(m.IsLocked);
+    }
+
+    [Fact(DisplayName = "RenameSymbolCommand — undo/redo가 이름 원복/재적용")]
+    public async Task should_restore_name_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 8, Title = "새이름" };
+        ctx.Markers[8] = m;
+        var cmd = new RenameSymbolCommand(ctx, 8, "옛이름", "새이름");
+        await cmd.UndoAsync();
+        Assert.Equal("옛이름", m.Title);
+        await cmd.ExecuteAsync();
+        Assert.Equal("새이름", m.Title);
+    }
+
+    [Fact(DisplayName = "DeleteSymbolCommand — undo가 스냅샷으로 복원, redo가 재삭제")]
+    public async Task should_restore_deleted_when_undo_and_remove_when_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var model = new SymbolModel { Id = 12, Title = "삭제대상" };
+        var snap = SymbolSnapshot.Capture(model, 12, "GMapCustomMarker", false)!;
+        var cmd = new DeleteSymbolCommand(ctx, snap);
+        await cmd.UndoAsync();                       // 복원
+        Assert.Contains(12, ctx.Restored);
+        Assert.True(ctx.Markers.ContainsKey(12));
+        await cmd.ExecuteAsync();                    // 재삭제
+        Assert.Contains(12, ctx.Removed);
+    }
+
+    // ─────────────── coalescing ───────────────
+    [Fact(DisplayName = "EditRecorder — 같은 속성 연속 변경은 1 undo 단위로 병합(earliest before)")]
+    public async Task should_coalesce_when_same_property_changed_twice()
+    {
+        var svc = new UndoService();
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 3, Title = "b" };
+        ctx.Markers[3] = m;
+        var rec = new EditRecorder(svc) { Context = ctx };
+        rec.RecordPropertyChange(m, "Title", "orig", "a");
+        rec.RecordPropertyChange(m, "Title", "a", "b");
+        await svc.UndoAsync();
+        Assert.Equal("orig", m.Title);   // 병합된 earliest before
+        Assert.False(svc.CanUndo);       // 1 단위였음
+    }
+
+    // ─────────────── snapshot 독립성 ───────────────
+    [Fact(DisplayName = "SymbolSnapshot — 원본 모델 변경이 스냅샷에 영향 없음(딥클론)")]
+    public void should_be_independent_when_original_mutated()
+    {
+        var model = new SymbolModel { Id = 9, Title = "orig", Width = 50 };
+        var snap = SymbolSnapshot.Capture(model, 9, "GMapCustomMarker", false);
+        Assert.NotNull(snap);
+        model.Title = "changed"; model.Width = 999;
+        var cloned = (SymbolModel)snap!.Model;
+        Assert.Equal("orig", cloned.Title);
+        Assert.Equal(50, cloned.Width);
+    }
+}

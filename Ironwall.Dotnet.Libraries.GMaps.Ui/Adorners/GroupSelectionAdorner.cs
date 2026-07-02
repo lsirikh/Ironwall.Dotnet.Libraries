@@ -35,8 +35,8 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     private PointLatLng[] _origPositions = Array.Empty<PointLatLng>();
     private bool _disposed;
 
-    /// <summary>그룹 이동 드래그 완료 — 서비스/VM이 멤버별 DB 영속(FR-MS-05).</summary>
-    public event System.Action? GroupMoveCompleted;
+    /// <summary>그룹 이동 드래그 완료 — 멤버별 (마커,이동전위치) 목록 전달(멤버 DB 영속 + Undo 기록, FR-MS-05).</summary>
+    public event System.Action<IReadOnlyList<(IEditableMarker marker, PointLatLng before)>>? GroupMoveCompleted;
     /// <summary>그룹 삭제 요청(우클릭 메뉴/Del) — VM이 멤버 삭제(FR-MS-05).</summary>
     public event System.Action? GroupDeleteRequested;
     /// <summary>그룹 잠금/해제 요청(우클릭 메뉴, true=잠금) — VM이 멤버 IsLocked+영속(FR-MS-06).</summary>
@@ -178,6 +178,21 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         base.OnMouseMove(e);
     }
 
+    /// <summary>이동한 멤버의 (마커, 이동 전 위치) 목록 — Undo/영속용. 미이동(잠금) 멤버 제외.</summary>
+    private IReadOnlyList<(IEditableMarker marker, PointLatLng before)> BuildMoveList()
+    {
+        var list = new List<(IEditableMarker marker, PointLatLng before)>();
+        for (int i = 0; i < _markers.Count && i < _origPositions.Length; i++)
+        {
+            var m = _markers[i];
+            if (m == null || m.IsDisposed) continue;
+            var b = _origPositions[i];
+            if (m.Position.Lat == b.Lat && m.Position.Lng == b.Lng) continue;   // 미이동(잠금 멤버)
+            list.Add((m, b));
+        }
+        return list;
+    }
+
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         if (_dragging)
@@ -185,14 +200,14 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
             _dragging = false;
             if (IsMouseCaptured) ReleaseMouseCapture();
             e.Handled = true;
-            GroupMoveCompleted?.Invoke();   // lock 밖 발화(멤버별 DB 영속은 서비스/VM)
+            GroupMoveCompleted?.Invoke(BuildMoveList());   // lock 밖 발화(멤버별 DB 영속·Undo는 서비스/VM)
         }
         base.OnMouseLeftButtonUp(e);
     }
 
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
-        if (_dragging) { _dragging = false; GroupMoveCompleted?.Invoke(); }
+        if (_dragging) { _dragging = false; GroupMoveCompleted?.Invoke(BuildMoveList()); }
         base.OnLostMouseCapture(e);
     }
 

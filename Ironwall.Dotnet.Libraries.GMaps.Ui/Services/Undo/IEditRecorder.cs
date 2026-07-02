@@ -1,4 +1,5 @@
 using System;
+using GMap.NET;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -39,6 +40,15 @@ public interface IEditRecorder
     /// <summary>ZOrder 일괄 변경 기록.</summary>
     void RecordZOrder(System.Collections.Generic.IReadOnlyList<(int id, int zOrder)> before,
                       System.Collections.Generic.IReadOnlyList<(int id, int zOrder)> after);
+
+    /// <summary>위치 변경(그룹 이동 멤버) 기록 — before=이동 전 위치, after=현재 마커 위치.</summary>
+    void RecordPositionChange(IEditableMarker marker, PointLatLng before);
+
+    /// <summary>잠금 변경 기록(레이어트리/개별 심볼).</summary>
+    void RecordLock(IEditableMarker marker, bool before, bool after);
+
+    /// <summary>이름(Title) 변경 기록(레이어트리).</summary>
+    void RecordRename(IEditableMarker marker, string before, string after);
 
     /// <summary>배치 스코프(그룹 이동/삭제 등) — Dispose까지 1 undo 단위.</summary>
     IDisposable BeginBatch(string description);

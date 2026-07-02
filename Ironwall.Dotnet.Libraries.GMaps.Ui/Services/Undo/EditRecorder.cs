@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GMap.NET;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
@@ -116,6 +117,35 @@ public sealed class EditRecorder : IEditRecorder
         if (!Ready || before == null || after == null || after.Count == 0) return;
         ResetCoalesce();
         _undo.Push(new ZOrderBatchCommand(Context!, before, after));
+    }
+
+    public void RecordPositionChange(IEditableMarker marker, PointLatLng before)
+    {
+        if (!Ready || marker == null) return;
+        var after = marker.Position;
+        if (before.Lat == after.Lat && before.Lng == after.Lng) return;   // 이동 없음(잠금 멤버)
+        try
+        {
+            // 위치 전용 변경 = TransformCommand(크기·방위 불변). 배치 중이면 매크로에 합류.
+            _undo.Push(new TransformCommand(Context!, marker.Id,
+                (before, marker.Width, marker.Height, marker.Bearing),
+                (after, marker.Width, marker.Height, marker.Bearing)));
+        }
+        catch (Exception ex) { _log?.Error($"RecordPositionChange 실패: {ex.Message}"); }
+    }
+
+    public void RecordLock(IEditableMarker marker, bool before, bool after)
+    {
+        if (!Ready || marker == null || before == after) return;
+        ResetCoalesce();
+        _undo.Push(new LockCommand(Context!, marker.Id, before, after));
+    }
+
+    public void RecordRename(IEditableMarker marker, string before, string after)
+    {
+        if (!Ready || marker == null || string.Equals(before, after)) return;
+        ResetCoalesce();
+        _undo.Push(new RenameSymbolCommand(Context!, marker.Id, before ?? string.Empty, after ?? string.Empty));
     }
 
     public IDisposable BeginBatch(string description)

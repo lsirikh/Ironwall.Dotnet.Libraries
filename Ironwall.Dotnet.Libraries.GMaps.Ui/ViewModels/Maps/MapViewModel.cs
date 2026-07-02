@@ -800,7 +800,7 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>그룹 이동 완료 → 멤버별 DB 영속(잠금 멤버 스킵, FR-MS-05/08). RBAC 게이트.</summary>
-    private async void OnGroupMoveCompleted()
+    private async void OnGroupMoveCompleted(System.Collections.Generic.IReadOnlyList<(GMapSymbols.IEditableMarker marker, GMap.NET.PointLatLng before)> moves)
     {
         if (_groupSelection == null) return;
         if (!CanEditMap()) { SetAimStatus("편집 권한이 없습니다.", true); return; }
@@ -811,6 +811,11 @@ public partial class MapViewModel : BasePanelViewModel,
             if (m.IsLocked) { skipped++; continue; }
             try { await DbUpdateProcess(m); moved++; } catch (Exception ex) { _log?.Error($"그룹 이동 영속 실패: {ex.Message}"); }
         }
+        // Undo 기록 — 멤버별 위치변경을 1 매크로로(그룹 이동)
+        if (moves != null && moves.Count > 0)
+            using (_editRecorder?.BeginBatch($"그룹 이동 {moves.Count}개"))
+                foreach (var mv in moves)
+                    _editRecorder?.RecordPositionChange(mv.marker, mv.before);
         _groupSelection.RefreshAdorner();
         SetAimStatus(skipped > 0 ? $"{moved}개 이동 저장(잠금 {skipped}개 제외)" : $"{moved}개 이동 저장", true);
     }
@@ -4067,6 +4072,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     System.Windows.Controls.Panel.SetZIndex(shapeEl, marker.ZIndex);
                 }
                 _log?.Info($"이미지 마커 추가 완료: {imageModel.Title}");
+                if (marker is GMapSymbols.IEditableMarker iem && iem.Id > 0) _editRecorder?.RecordAdd(iem);   // Undo 기록(이미지 마커 추가)
             }
             else
             {
@@ -4376,7 +4382,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
             var symbolId = await _gMapDbSymbolService.InsertPidsSymbolAsync(symbolModel);
             var savedSymbol = await _gMapDbSymbolService.FetchPidsSymbolAsync(symbolId);
-            AddMarkerFromSymbol(symbolModel);
+            AddMarkerFromSymbol(savedSymbol ?? symbolModel);   // 저장된(Id 부여) 모델 사용 — Id=0 버그 수정(Undo 추가기록 활성화)
 
             // 강제 새로고침
             MainMap?.InvalidateVisual();
@@ -8113,6 +8119,7 @@ public partial class MapViewModel : BasePanelViewModel,
             var newName = e.NewName?.Trim();
             if (string.IsNullOrEmpty(newName)) return;
 
+            var oldName = e.Symbol.Title;   // Undo용 이전 이름
             e.Symbol.Title = newName;
             await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // 공통 Symbols 행(Title) 영속 — 타입 무관
 
@@ -8123,6 +8130,7 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 marker.Title = newName;
                 if (PropertyPanel?.SelectedMarker == marker) PropertyPanel.MarkerTitle = newName;
+                _editRecorder?.RecordRename(marker, oldName, newName);   // Undo 기록(트리 이름변경)
             }
             _log?.Info($"심볼 이름변경: Id={e.Symbol.Id} → {newName}");
         }
@@ -8138,10 +8146,12 @@ public partial class MapViewModel : BasePanelViewModel,
             var marker = MainMap?.Markers
                 .OfType<GMapSymbols.IEditableMarker>()
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
+            var oldLocked = marker?.IsLocked ?? e.Symbol.IsLocked;   // Undo용 이전 잠금상태
             if (marker != null) marker.IsLocked = e.IsLocked;
 
             e.Symbol.IsLocked = e.IsLocked;
             await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // IsLocked 공통 Symbols 행 영속
+            if (marker != null) _editRecorder?.RecordLock(marker, oldLocked, e.IsLocked);   // Undo 기록(트리 잠금)
             _log?.Info($"심볼 잠금 {(e.IsLocked ? "ON" : "OFF")}: {e.Symbol.Title}(Id={e.Symbol.Id})");
         }
         catch (Exception ex) { _log?.Error($"심볼 잠금 변경 실패: {ex.Message}"); }
