@@ -809,6 +809,8 @@ public class MapViewModel : BasePanelViewModel,
                 MainMap?.DeselectMarker(m);
                 if (m is GMapMarker gm) MainMap?.Markers?.Remove(gm);
                 await DbDeleteProcess(m);
+                var s = _symbolProvider.FirstOrDefault(x => x.Id == m.Id);   // 캐시 동기(감사 P0, provider.Remove 미머지)
+                if (s != null) _symbolProvider.Remove(s);
                 m.Dispose();
                 del++;
             }
@@ -3122,8 +3124,11 @@ public class MapViewModel : BasePanelViewModel,
                     SelectedMarker = null;
                 }
 
-                // 레이어 패널 트리 동기화 — 삭제된 심볼 노드 제거(_symbolProvider는 DbDeleteProcess→DeleteXxxAsync에서 갱신됨).
-                // 이미지 분기엔 LoadLayersFromDbAsync가 있으나 심볼 분기엔 누락돼 트리에 스테일 노드가 남던 버그.
+                // 레이어 패널 트리 동기화 — 삭제된 심볼을 _symbolProvider 캐시에서 직접 제거 후 리빌드.
+                // ★ v2.6엔 DeleteXxxAsync의 provider.Remove(7394b7b)가 미머지 → 여기서 제거 안 하면 리빌드가
+                //   스테일 스냅샷을 다시 읽어 노드가 부활함(감사 P0). Id로 매칭 제거.
+                var deletedSym = _symbolProvider.FirstOrDefault(s => s.Id == markerId);
+                if (deletedSym != null) _symbolProvider.Remove(deletedSym);
                 await LoadLayersFromDbAsync();
             }
             // 8. 화면 갱신
@@ -4522,6 +4527,16 @@ public class MapViewModel : BasePanelViewModel,
 
             // 2. 지도에 추가
             AddMarkerToMap(marker, isExistingMarker);
+
+            // 3. 사용자 추가 심볼을 _symbolProvider 캐시에 동기화 + 레이어 트리 갱신(맵→패널 싱크).
+            //    부팅 복원(isExistingMarker=true)은 이미 provider에 있으므로 제외(중복 방지).
+            //    provider는 부팅 스냅샷이라 세션 중 추가/삭제를 여기서 반영해야 트리가 일치함(감사 P0).
+            if (!isExistingMarker)
+            {
+                if (!_symbolProvider.Any(s => ReferenceEquals(s, symbolModel)))
+                    _symbolProvider.Add(symbolModel);
+                _ = LoadLayersFromDbAsync();   // 패널 열려있으면 새 노드 반영(트리 리빌드, 내부 try/catch)
+            }
 
             _log?.Info($"마커 추가 완료: {symbolModel.Title}");
         }
@@ -7023,6 +7038,11 @@ public class MapViewModel : BasePanelViewModel,
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
             await DbUpdateProcess(e.Marker);
 
+            // 심볼 Title(이름) 변경 → 레이어 트리 노드 이름 동기화(맵→패널). marker.Model이 _symbolProvider
+            // 인스턴스와 공유되므로 리빌드가 새 이름을 반영(감사 P1). 이미지는 아래 SyncOverlayImageLayer가 처리.
+            if (e.PropertyName == "Title" && e.Marker is not GMapSymbols.GMapImageMarker)
+                _ = LoadLayersFromDbAsync();
+
             // LinkedDevice 변경 → _deviceSymbolLookup 즉시 재등록 (AllDevicesLoadedMessage 대기 불필요)
             if (e.PropertyName == "LinkedDevice"
                 && e.Marker is GMapPidsMarker pidsMarker
@@ -8101,6 +8121,12 @@ public class MapViewModel : BasePanelViewModel,
             await _gMapDbService.SeedDefaultSymbolLayersAsync();
             var list = await _gMapDbService.FetchMapLayersAsync();
 
+            // 리빌드 전 펼침(IsExpanded) 상태 캡처 — LayerTreeBuilder가 카테고리/그룹을 접힘으로 재생성하므로
+            // 복원하지 않으면 추가/삭제/이름변경 때마다 사용자가 펼친 카테고리가 모두 접힘(UX 저하, 감사 C).
+            var expandedNames = _layerTreeNodes == null
+                ? new System.Collections.Generic.HashSet<string>()
+                : LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsExpanded).Select(n => n.Name).ToHashSet();
+
             // 개별 심볼(_symbolProvider) 전달 → 카테고리 아래 개별 심볼 자식 노드 생성(FR-02)
             _layerTreeNodes = LayerTreeBuilder.Build(list ?? Enumerable.Empty<IMapLayerModel>(), _symbolProvider);
 
@@ -8117,6 +8143,11 @@ public class MapViewModel : BasePanelViewModel,
                     if (imgMarker != null) leaf.InitIsLocked(imgMarker.IsLocked);
                 }
             }
+
+            // 펼침 상태 복원(이름 기준 매칭) — 리빌드로 접힌 카테고리/그룹/섹션을 사용자 상태로 되돌림.
+            if (expandedNames.Count > 0)
+                foreach (var node in LayerTreeBuilder.Flatten(_layerTreeNodes))
+                    if (expandedNames.Contains(node.Name)) node.IsExpanded = true;
 
             if (LayerPanel != null)
                 LayerPanel.TreeNodes = _layerTreeNodes;
