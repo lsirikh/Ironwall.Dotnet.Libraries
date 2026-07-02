@@ -1196,7 +1196,7 @@ public class GMapCustomControl : GMapControl
 
             if (Markers != null)
             {
-                foreach (IEditableMarker marker in Markers)
+                foreach (var marker in Markers.OfType<IEditableMarker>())   // 불변식#8: 트레일/추적(비-IEditableMarker) 하드캐스트 크래시 방지
                 {
                     marker.IsSelected = false;
                 }
@@ -1420,7 +1420,7 @@ public class GMapCustomControl : GMapControl
                 //}
                 //_log?.Info($"모든 마커 선택 완료: {CustomMarkers.Count}개");
 
-                foreach (IEditableMarker marker in Markers)
+                foreach (var marker in Markers.OfType<IEditableMarker>())   // 불변식#8: 하드캐스트 크래시 방지
                 {
                     SelectMarker(marker);
                 }
@@ -2275,7 +2275,7 @@ public class GMapCustomControl : GMapControl
             // 편집 모드 해제 시 모든 선택 해제
             foreach (var img in CustomImages) img.IsSelected = false;
             //foreach (var marker in CustomMarkers) marker.IsSelected = false;
-            foreach (IEditableMarker marker in Markers) marker.IsSelected = false;
+            foreach (var marker in Markers.OfType<IEditableMarker>()) marker.IsSelected = false;   // 불변식#8: 하드캐스트 크래시 방지
 
             // 모든 Adorner 제거
             AdornerManager?.DeselectAllMarkers(this);
