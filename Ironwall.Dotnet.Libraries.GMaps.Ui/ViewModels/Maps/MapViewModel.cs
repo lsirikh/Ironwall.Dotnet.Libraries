@@ -182,6 +182,13 @@ public class MapViewModel : BasePanelViewModel,
         {
             await base.OnActivateAsync(cancellationToken);
 
+            // ★ 디바이스-심볼 재매칭 신뢰성(재시작·재로그인 연결 끊김 근본수정): EventAggregator 구독을 활성화 맨 앞으로 이동.
+            //   심볼은 로컬DB에서 로그인 무관하게 일찍 로드되나, 디바이스는 로그인 후 늦게 fetch됨(로그인 게이팅).
+            //   구독이 뒤(구 위치)에 있으면 그 사이 발행되는 AllDevicesLoadedMessage를 놓치거나(레이스),
+            //   중간 await 예외로 구독 자체가 스킵돼 세션 내내 재매칭이 안 되던 결함. → 맨 앞 구독으로 어떤
+            //   로드 순서·중간 예외에도 재매칭 신호를 확실히 수신(재로그인 재fetch도 동일 커버). 재매칭은 멱등(304 Dispose+재구성).
+            _eventAggregator.SubscribeOnPublishedThread(this);
+
             // FR-EN-11: 역할강등/세션변경 시 PTZ 권한 재평가 구독(진행 중 이동 취소·팝업 비활성)
             SubscribePtzPermission();
 
@@ -236,9 +243,7 @@ public class MapViewModel : BasePanelViewModel,
             NotifyOfPropertyChange(nameof(SelectedMapItem));
 
             // 빈 타일 버그 해결됨 — MBTilesMapProvider MinZoom/MaxZoom shadowing 제거 (2026-03-24)
-
-            _eventAggregator.SubscribeOnPublishedThread(this);
-
+            // (구독은 활성화 맨 앞으로 이동 — 위 SubscribeOnPublishedThread 참조. 재매칭 신호 유실 방지)
         }
         catch (Exception ex)
         {
