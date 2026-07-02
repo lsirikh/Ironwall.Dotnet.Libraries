@@ -123,9 +123,9 @@
 					</Grid>
 
 					<ControlTemplate.Triggers>
-						<!--  Title 표시 트리거  -->
+						<!--  Title 표시 트리거 — 라벨은 맵레벨 LabelAdorner가 전담. 옛 템플릿 라벨 비표시 유지(Phase 3 누락분 보강).  -->
 						<Trigger Property="ShowTitle" Value="True">
-							<Setter TargetName="PART_TitleContainer" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_TitleContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
 						<!--  선택 상태 트리거  -->
