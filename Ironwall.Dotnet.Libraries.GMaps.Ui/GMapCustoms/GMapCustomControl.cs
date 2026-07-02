@@ -423,6 +423,12 @@ public class GMapCustomControl : GMapControl
 
         // 카메라 "특정 위치 확인" 반경 오버레이는 AimOverlayAdorner(맵 AdornerLayer)로 이전 —
         //   심볼·이미지 위 표시 + 등장/리플 애니메이션(FR-AIM-01~03). OnRender 직접 렌더 제거.
+
+        // Shift+드래그 러버밴드 마퀴 — 반투명 채움 + 점선 외곽 (FR-MS-01)
+        if (_isRubberBanding && _rubberStart.HasValue && _rubberCurrent.HasValue)
+        {
+            drawingContext.DrawRectangle(_rubberFill, _rubberPen, new Rect(_rubberStart.Value, _rubberCurrent.Value));
+        }
     }
 
     #endregion
@@ -709,6 +715,43 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 마우스 왼쪽 버튼 클릭
     /// </summary>
+    // ─── Shift+드래그 러버밴드 영역 다중선택 (GMap_RubberBand_MultiSelect FR-MS-01/02) ───
+    private bool _isRubberBanding;
+    private Point? _rubberStart;
+    private Point? _rubberCurrent;
+    private static readonly Pen _rubberPen = CreateDashedPen(Color.FromArgb(210, 0, 170, 255), 1.5d);
+    private static readonly Brush _rubberFill = CreateFrozenBrush(Color.FromArgb(40, 0, 170, 255));
+    private static Brush CreateFrozenBrush(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+
+    /// <summary>Shift+드래그 선택 시작 — VM/서비스가 이전 그룹·단일선택 clear.</summary>
+    public event System.Action? RubberBandStarted;
+    /// <summary>Shift+드래그 릴리스 — 사각형 내 편집가능 마커(잠금 포함, FR-MS-07) 집합 통지. 비어도 발화(그룹 해제).</summary>
+    public event System.Action<IReadOnlyList<IEditableMarker>>? MarkersRubberBandSelected;
+
+    /// <summary>화면 사각형과 교차하는 편집가능 마커 목록(가시성 필터, 잠금 포함). AABB 교차(비회전 근사).</summary>
+    internal IReadOnlyList<IEditableMarker> GetMarkersInRect(Rect screenRect)
+    {
+        var result = new List<IEditableMarker>();
+        if (Markers == null) return result;
+        foreach (var marker in Markers.OfType<IEditableMarker>())
+        {
+            try
+            {
+                if (marker.IsDisposed) continue;
+                if (!SetMarkerVisibility(marker)) continue;   // 가시(레이어/줌) 마커만. 잠금은 포함(FR-MS-07)
+                var sp = FromLatLngToLocal(marker.Position);
+                var shape = (marker as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
+                double w, h;
+                if (shape is GMapMarkerImageControl ic && ic.RenderedScreenWidth > 0) { w = ic.RenderedScreenWidth; h = ic.RenderedScreenHeight; }
+                else { w = shape?.ActualWidth is > 0 ? shape.ActualWidth : 32.0; h = shape?.ActualHeight is > 0 ? shape.ActualHeight : 32.0; }
+                var mrect = new Rect(sp.X - w / 2.0, sp.Y - h / 2.0, w, h);
+                if (screenRect.IntersectsWith(mrect)) result.Add(marker);
+            }
+            catch (Exception ex) { _log?.Error($"GetMarkersInRect 실패 '{marker.Title}': {ex.Message}"); }
+        }
+        return result;
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         //_log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 시작 ===");
@@ -736,6 +779,20 @@ public class GMapCustomControl : GMapControl
         {
             OnMapClicked?.Invoke(geoPos, mousePos);
             e.Handled = true;
+            return;
+        }
+
+        // [Rubber-band] 편집 모드 Shift+좌드래그 = 영역 다중선택 시작. base 전 가로채기 = 팬 미Armed(불변식#5). (FR-MS-01)
+        if (IsEditMode && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            AdornerManager?.DeselectAllMarkers(this);   // 그룹 진입 = 기존 단일 adorner 억제(FR-MS-08)
+            RubberBandStarted?.Invoke();
+            _isRubberBanding = true;
+            _rubberStart = mousePos;
+            _rubberCurrent = mousePos;
+            CaptureMouse();
+            e.Handled = true;
+            InvalidateVisual();
             return;
         }
 
@@ -799,6 +856,14 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        // [Rubber-band] 마퀴 갱신 (base 미호출 = 팬 방지, FR-MS-01)
+        if (_isRubberBanding)
+        {
+            _rubberCurrent = e.GetPosition(this);
+            InvalidateVisual();
+            return;
+        }
+
         // [FP-2] 이미지 드래그 활성 시 base 호출 차단.
         // base.OnMouseMove가 _core.BeginDrag()를 발동시켜 맵 팬이 이중으로 적용되는 것을 방지.
         // CaptureMouse() 상태이므로 base 건너뜀이 다른 수신자에 영향을 주지 않는다.
@@ -823,6 +888,25 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        // [Rubber-band] 릴리스 → 사각형 내 마커 산출·통지 (FR-MS-02)
+        if (_isRubberBanding)
+        {
+            _isRubberBanding = false;
+            if (IsMouseCaptured) ReleaseMouseCapture();
+            e.Handled = true;
+            IReadOnlyList<IEditableMarker> hits = System.Array.Empty<IEditableMarker>();
+            if (_rubberStart.HasValue && _rubberCurrent.HasValue)
+            {
+                var rect = new Rect(_rubberStart.Value, _rubberCurrent.Value);
+                if (rect.Width >= 3 && rect.Height >= 3)   // 최소 드래그(오클릭 방지)
+                    hits = GetMarkersInRect(rect);
+            }
+            _rubberStart = null; _rubberCurrent = null;
+            InvalidateVisual();
+            MarkersRubberBandSelected?.Invoke(hits);
+            return;
+        }
+
         // [FP-3] 이미지 드래그 완료 시 ResetDragState() 먼저 실행 후 return.
         // 팬이 미Armed 상태(FP-1 효과)이므로 base의 GMap.NET EndDrag 처리가 불필요하고,
         // ReleaseMouseCapture()를 먼저 실행해야 WPF 이벤트 라우팅이 즉시 정상화된다.
