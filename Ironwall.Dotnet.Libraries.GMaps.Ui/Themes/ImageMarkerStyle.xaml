@@ -97,11 +97,15 @@
 							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 						</Trigger>
 
-						<!-- Mouse Over State -->
-						<Trigger Property="IsMouseOver" Value="True">
+						<!-- Mouse Over State — 잠금 시 호버 Edge 하이라이트 억제(IsLocked=False일 때만) -->
+						<MultiTrigger>
+							<MultiTrigger.Conditions>
+								<Condition Property="IsMouseOver" Value="True" />
+								<Condition Property="IsLocked" Value="False" />
+							</MultiTrigger.Conditions>
 							<Setter TargetName="PART_HoverBorder" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
-						</Trigger>
+						</MultiTrigger>
 
 						<!-- Disabled State -->
 						<Trigger Property="IsEnabled" Value="False">

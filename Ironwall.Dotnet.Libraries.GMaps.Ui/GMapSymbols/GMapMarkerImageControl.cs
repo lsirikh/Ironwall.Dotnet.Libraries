@@ -84,6 +84,17 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         DependencyProperty.Register(nameof(ImageOpacity), typeof(double), typeof(GMapMarkerImageControl),
             new PropertyMetadata(1.0, OnImageOpacityChanged));
 
+    /// <summary>잠금 여부 — 잠긴 오버레이 이미지는 호버 Edge 하이라이트 억제(스타일 MultiTrigger 조건).</summary>
+    public bool IsLocked
+    {
+        get => (bool)GetValue(IsLockedProperty);
+        set => SetValue(IsLockedProperty, value);
+    }
+
+    public static readonly DependencyProperty IsLockedProperty =
+        DependencyProperty.Register(nameof(IsLocked), typeof(bool), typeof(GMapMarkerImageControl),
+            new PropertyMetadata(false));
+
     private static void OnImageOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is GMapMarkerImageControl control)
@@ -171,6 +182,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
 
         // Image 전용 바인딩
         SetupPropertyBinding(ImageOpacityProperty, nameof(Marker.Opacity));
+        SetupPropertyBinding(IsLockedProperty, nameof(Marker.IsLocked));   // 잠금 → 호버 하이라이트 억제(스타일 MultiTrigger)
 
         // ImageSource는 직접 바인딩 (읽기 전용)
         var imageSourceBinding = new Binding(nameof(Marker.ImageSource))
