@@ -45,6 +45,17 @@ public abstract class UndoableCommandBase : IUndoableCommand
         }
     }
 
+    /// <summary>ApplyProperty가 실제로 복원 가능한 속성명인지 — 미지원명은 죽은 undo 엔트리이므로
+    /// EditRecorder에서 기록 억제(CMD-02). 이 목록은 위 switch의 단일 출처.</summary>
+    public static bool IsReplayableProperty(string? prop) => prop switch
+    {
+        "Title" or "TitleSize" or "Bearing" or "Width" or "Height" or "Zoom"
+        or "StrokeThickness" or "LabelOffsetX" or "LabelOffsetY" or "ZOrder"
+        or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
+        or "StrokeColor" or "OperationState" => true,
+        _ => false,
+    };
+
     private static double ToD(object? v) => v == null ? 0d : Convert.ToDouble(v);
     private static int ToI(object? v) => v == null ? 0 : Convert.ToInt32(v);
     private static bool ToB(object? v) => v != null && Convert.ToBoolean(v);

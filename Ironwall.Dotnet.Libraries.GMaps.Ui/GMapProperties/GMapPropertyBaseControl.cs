@@ -612,7 +612,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 //System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Height = {control.MarkerHeight}");
                 control.SelectedMarker.Height = control.MarkerHeight;
-                control.OnMarkerPropertyChanged("Size", null, new { Width = control.MarkerWidth, Height = control.MarkerHeight });
+                // 실제 "Height" 발화(과거 합성 "Size"+null before는 ApplyProperty 미지원→undo 무효, CMD-01)
+                control.OnMarkerPropertyChanged("Height", e.OldValue, e.NewValue);
             }
         }
 
@@ -624,7 +625,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             {
                 //System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Width = {control.MarkerWidth}");
                 control.SelectedMarker.Width = control.MarkerWidth;
-                control.OnMarkerPropertyChanged("Size", null, new { Width = control.MarkerWidth, Height = control.MarkerHeight });
+                // 실제 "Width" 발화(과거 합성 "Size"+null before는 ApplyProperty 미지원→undo 무효, CMD-01)
+                control.OnMarkerPropertyChanged("Width", e.OldValue, e.NewValue);
             }
         }
 

@@ -56,6 +56,7 @@ public sealed class EditRecorder : IEditRecorder
     public void RecordPropertyChange(IEditableMarker marker, string property, object? oldValue, object? newValue)
     {
         if (!Ready || marker == null || string.IsNullOrEmpty(property)) return;
+        if (!Commands.UndoableCommandBase.IsReplayableProperty(property)) return;   // 복원 불가 속성=죽은 undo 엔트리 방지(CMD-02)
         if (Equals(oldValue, newValue)) return;
         try
         {

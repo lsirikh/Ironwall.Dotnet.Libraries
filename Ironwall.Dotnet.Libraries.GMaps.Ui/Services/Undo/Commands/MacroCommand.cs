@@ -33,7 +33,9 @@ public sealed class MacroCommand : IUndoableCommand
     {
         foreach (var c in _children)
         {
-            try { await c.ExecuteAsync(ct).ConfigureAwait(false); }
+            // no ConfigureAwait(false): 자식 경계마다 UI 스레드(캡처된 Dispatcher)로 재진입 →
+            // 자식의 동기 WPF 마커 변형이 UI에서 실행. 그룹 재실행 "하나만 반영" 회귀 차단(THREAD-01).
+            try { await c.ExecuteAsync(ct); }
             catch (Exception ex) { _log?.Error($"[Undo] 매크로 자식 재실행 실패(계속): {ex.Message}"); }
         }
     }
@@ -42,7 +44,9 @@ public sealed class MacroCommand : IUndoableCommand
     {
         for (int i = _children.Count - 1; i >= 0; i--)
         {
-            try { await _children[i].UndoAsync(ct).ConfigureAwait(false); }
+            // no ConfigureAwait(false): 자식 경계마다 UI 스레드로 재진입(위 ExecuteAsync 주석 참조).
+            // 그룹 이동 undo "하나만 돌아온다" 회귀의 직접 원인이었음(THREAD-01/02).
+            try { await _children[i].UndoAsync(ct); }
             catch (Exception ex) { _log?.Error($"[Undo] 매크로 자식 취소 실패(계속): {ex.Message}"); }
         }
     }

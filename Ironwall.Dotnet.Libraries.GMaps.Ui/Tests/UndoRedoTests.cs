@@ -454,4 +454,55 @@ public class UndoRedoTests
         Assert.True(svc.CanUndo);    // 실패 → undo 스택 유지
         Assert.False(svc.CanRedo);   // redo로 이동 안 함
     }
+
+    // ─────────────── 재감사 수정(CMD-01/CMD-02) ───────────────
+    [Fact(DisplayName = "PropertyChangeCommand — Width undo/redo 복원(CMD-01)")]
+    public async Task should_restore_width_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 6, Width = 80, Height = 40 };
+        ctx.Markers[6] = m;
+        var cmd = new PropertyChangeCommand(ctx, 6, "Width", 50.0, 80.0);
+        await cmd.UndoAsync();
+        Assert.Equal(50, m.Width);
+        await cmd.ExecuteAsync();
+        Assert.Equal(80, m.Width);
+    }
+
+    [Fact(DisplayName = "PropertyChangeCommand — Height undo/redo 복원(CMD-01)")]
+    public async Task should_restore_height_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 6, Width = 40, Height = 60 };
+        ctx.Markers[6] = m;
+        var cmd = new PropertyChangeCommand(ctx, 6, "Height", 30.0, 60.0);
+        await cmd.UndoAsync();
+        Assert.Equal(30, m.Height);
+        await cmd.ExecuteAsync();
+        Assert.Equal(60, m.Height);
+    }
+
+    [Fact(DisplayName = "EditRecorder — 복원 불가 속성은 undo 엔트리 미생성(CMD-02)")]
+    public void should_drop_undo_entry_when_property_not_replayable()
+    {
+        var svc = new UndoService();
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 3 };
+        ctx.Markers[3] = m;
+        var rec = new EditRecorder(svc) { Context = ctx };
+        rec.RecordPropertyChange(m, "FOVColor", "Purple", "Red");   // ApplyProperty 미지원 → 죽은 엔트리 방지
+        Assert.False(svc.CanUndo);
+    }
+
+    [Fact(DisplayName = "EditRecorder — 복원 가능 속성은 undo 엔트리 생성(CMD-02)")]
+    public void should_keep_undo_entry_when_property_replayable()
+    {
+        var svc = new UndoService();
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 3, Title = "b" };
+        ctx.Markers[3] = m;
+        var rec = new EditRecorder(svc) { Context = ctx };
+        rec.RecordPropertyChange(m, "Title", "a", "b");
+        Assert.True(svc.CanUndo);
+    }
 }

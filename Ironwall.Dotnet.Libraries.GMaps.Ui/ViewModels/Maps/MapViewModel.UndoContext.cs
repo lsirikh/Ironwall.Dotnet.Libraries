@@ -89,39 +89,43 @@ public partial class MapViewModel : IUndoApplyContext
     public IEditableMarker? FindMarkerById(int id)
         => MainMap?.Markers?.OfType<IEditableMarker>().FirstOrDefault(m => !m.IsDisposed && m.Id == id);
 
-    /// <summary>호출자가 이미 마커 모델을 세팅 → 타입별 DbUpdate 영속 + 시각 갱신. (기록 억제 하 실행)</summary>
-    public async Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default)
-    {
-        if (marker == null || marker.IsDisposed) return;
-        try { await DbUpdateProcess(marker); MainMap?.InvalidateVisual(); }
-        catch (Exception ex) { _log?.Error($"[Undo] 마커 업데이트 적용 실패: {ex.Message}"); }
-    }
-
-    /// <summary>스냅샷으로 삭제 심볼 복원(Id 보존 Restore → 실패 시 새 Id Insert) + 마커/트리 재구성.</summary>
-    public async Task<IEditableMarker?> RestoreDeletedAsync(ISymbolSnapshot snapshot, CancellationToken ct = default)
-    {
-        if (snapshot == null) return null;
-        try
+    /// <summary>호출자가 이미 마커 모델을 세팅 → 타입별 DbUpdate 영속 + 시각 갱신. (기록 억제 하 실행)
+    /// UI 스레드 보장(v2 seam과 동일 — 그룹 replay 크로스스레드 방지, THREAD-02).</summary>
+    public Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
         {
-            var model = snapshot.CloneModel();
-            if (snapshot.IsImage && model is IImageModel img)
+            if (marker == null || marker.IsDisposed) return;
+            try { await DbUpdateProcess(marker); MainMap?.InvalidateVisual(); }
+            catch (Exception ex) { _log?.Error($"[Undo] 마커 업데이트 적용 실패: {ex.Message}"); }
+        });
+
+    /// <summary>스냅샷으로 삭제 심볼 복원(Id 보존 Restore → 실패 시 새 Id Insert) + 마커/트리 재구성.
+    /// UI 스레드 보장 — 복원 후 AddMarkerFromSymbol/AddImageMarkerFromModel(WPF)가 DB await 이후 UI에서 실행(THREAD-02).</summary>
+    public Task<IEditableMarker?> RestoreDeletedAsync(ISymbolSnapshot snapshot, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
+        {
+            if (snapshot == null) return (IEditableMarker?)null;
+            try
             {
-                try { await _gMapDbSymbolService.RestoreImageAsync(img, ct); }
-                catch (IdCollisionException) { await _gMapDbSymbolService.InsertImageAsync(img, ct); }
-                if (img.Id > 0) snapshot.Id = img.Id;   // Id 충돌 폴백 시 새 Id 반영(FindMarkerById·이후 undo 정합, FIX 6)
-                AddImageMarkerFromModel(img);
-                ResyncTree();                            // 이미지 노드도 트리 반영(AddImageMarkerFromModel은 트리 리로드 안 함, FIX 5)
+                var model = snapshot.CloneModel();
+                if (snapshot.IsImage && model is IImageModel img)
+                {
+                    try { await _gMapDbSymbolService.RestoreImageAsync(img, ct); }
+                    catch (IdCollisionException) { await _gMapDbSymbolService.InsertImageAsync(img, ct); }
+                    if (img.Id > 0) snapshot.Id = img.Id;   // Id 충돌 폴백 시 새 Id 반영(FindMarkerById·이후 undo 정합, FIX 6)
+                    AddImageMarkerFromModel(img);
+                    ResyncTree();                            // 이미지 노드도 트리 반영(AddImageMarkerFromModel은 트리 리로드 안 함, FIX 5)
+                }
+                else if (model is ISymbolModel sym)
+                {
+                    await RestoreOrInsertSymbolAsync(snapshot.MarkerTypeName, sym, ct);
+                    if (sym.Id > 0) snapshot.Id = sym.Id;   // Id 충돌 폴백 시 새 Id 반영(FIX 6)
+                    AddMarkerFromSymbol(sym);                // 마커 재생성 + _symbolProvider + 트리
+                }
+                return FindMarkerById(snapshot.Id);
             }
-            else if (model is ISymbolModel sym)
-            {
-                await RestoreOrInsertSymbolAsync(snapshot.MarkerTypeName, sym, ct);
-                if (sym.Id > 0) snapshot.Id = sym.Id;   // Id 충돌 폴백 시 새 Id 반영(FIX 6)
-                AddMarkerFromSymbol(sym);                // 마커 재생성 + _symbolProvider + 트리
-            }
-            return FindMarkerById(snapshot.Id);
-        }
-        catch (Exception ex) { _log?.Error($"[Undo] 복원 실패(Id={snapshot.Id}): {ex.Message}"); return null; }
-    }
+            catch (Exception ex) { _log?.Error($"[Undo] 복원 실패(Id={snapshot.Id}): {ex.Message}"); return (IEditableMarker?)null; }
+        });
 
     /// <summary>타입별 Id 보존 Restore, Id 충돌 시 새 Id Insert 폴백.</summary>
     private async Task RestoreOrInsertSymbolAsync(string markerType, ISymbolModel sym, CancellationToken ct)
@@ -155,53 +159,65 @@ public partial class MapViewModel : IUndoApplyContext
         }
     }
 
-    /// <summary>마커 제거(DB 삭제 + 맵/provider/트리 제거). Add 취소 / Delete 재실행 시.</summary>
-    public async Task RemoveMarkerAsync(IEditableMarker marker, CancellationToken ct = default)
-    {
-        if (marker == null || marker.IsDisposed) return;
-        try
+    /// <summary>마커 제거(DB 삭제 + 맵/provider/트리 제거). Add 취소 / Delete 재실행 시.
+    /// UI 스레드 보장 — DeselectMarker/Markers.Remove/Dispose 등 동기 WPF 접근 크로스스레드 방지(THREAD-02).</summary>
+    public Task RemoveMarkerAsync(IEditableMarker marker, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
         {
-            int id = marker.Id;
-            if (SelectedMarker is IEditableMarker sm && sm.Id == id) HidePropertyPanel();   // 열린 패널이 dispose 마커 참조 방지(FIX 7)
-            MainMap?.DeselectMarker(marker);
-            if (marker is GMapMarker gm) MainMap?.Markers?.Remove(gm);
-            await DbDeleteProcess(marker);
-            var s = _symbolProvider.FirstOrDefault(x => x.Id == id);
-            if (s != null) _symbolProvider.Remove(s);
-            try { marker.Dispose(); } catch { /* 무시 */ }
-            await LoadLayersFromDbAsync();
-        }
-        catch (Exception ex) { _log?.Error($"[Undo] 제거 실패: {ex.Message}"); }
-    }
-
-    /// <summary>ZOrder 일괄 적용((id,z) 페어) + 로컬 렌더순서 반영.</summary>
-    public async Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
-    {
-        if (pairs == null || pairs.Count == 0) return;
-        try
-        {
-            await _gMapDbSymbolService.BatchUpdateZOrderAsync(pairs.Select(p => (p.id, p.zOrder)).ToList(), ct);
-            foreach (var (id, z) in pairs)
+            if (marker == null || marker.IsDisposed) return;
+            try
             {
-                if (FindMarkerById(id) is GMapMarker gm && gm.Shape is UIElement shape)
-                {
-                    ((IEditableMarker)gm).ZOrder = z;
-                    System.Windows.Controls.Panel.SetZIndex(shape, z);
-                    gm.ZIndex = z;
-                }
+                int id = marker.Id;
+                if (SelectedMarker is IEditableMarker sm && sm.Id == id) HidePropertyPanel();   // 열린 패널이 dispose 마커 참조 방지(FIX 7)
+                MainMap?.DeselectMarker(marker);
+                if (marker is GMapMarker gm) MainMap?.Markers?.Remove(gm);
+                await DbDeleteProcess(marker);
+                var s = _symbolProvider.FirstOrDefault(x => x.Id == id);
+                if (s != null) _symbolProvider.Remove(s);
+                try { marker.Dispose(); } catch { /* 무시 */ }
+                await LoadLayersFromDbAsync();
             }
-            MainMap?.InvalidateVisual();
-            if (SelectedMarker is IEditableMarker sel && pairs.Any(p => p.id == sel.Id))
-                RefreshPropertyPanelZOrder();   // 선택 마커 순서표시 갱신(FIX 8)
-        }
-        catch (Exception ex) { _log?.Error($"[Undo] ZOrder 적용 실패: {ex.Message}"); }
-    }
+            catch (Exception ex) { _log?.Error($"[Undo] 제거 실패: {ex.Message}"); }
+        });
+
+    /// <summary>ZOrder 일괄 적용((id,z) 페어) + 로컬 렌더순서 반영.
+    /// UI 스레드 보장 — Panel.SetZIndex/InvalidateVisual이 DB await 이후 UI에서 실행(THREAD-02).</summary>
+    public Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
+        {
+            if (pairs == null || pairs.Count == 0) return;
+            try
+            {
+                await _gMapDbSymbolService.BatchUpdateZOrderAsync(pairs.Select(p => (p.id, p.zOrder)).ToList(), ct);
+                foreach (var (id, z) in pairs)
+                {
+                    if (FindMarkerById(id) is GMapMarker gm && gm.Shape is UIElement shape)
+                    {
+                        ((IEditableMarker)gm).ZOrder = z;
+                        System.Windows.Controls.Panel.SetZIndex(shape, z);
+                        gm.ZIndex = z;
+                    }
+                }
+                MainMap?.InvalidateVisual();
+                if (SelectedMarker is IEditableMarker sel && pairs.Any(p => p.id == sel.Id))
+                    RefreshPropertyPanelZOrder();   // 선택 마커 순서표시 갱신(FIX 8)
+            }
+            catch (Exception ex) { _log?.Error($"[Undo] ZOrder 적용 실패: {ex.Message}"); }
+        });
 
     public void ResyncTree() => _ = LoadLayersFromDbAsync();
 
     /// <summary>UI 스레드 보장 실행 — Undo/Redo가 세마포어 경합(급속 Ctrl+Z)으로 스레드풀에서 재개돼도
     /// WPF 마커/맵/트리 접근이 크로스스레드가 되지 않게 본문 전체를 디스패처로 마샬. 예외는 호출자로 전파(BUG-05~09).</summary>
     private Task RunOnUiAsync(Func<Task> body)
+    {
+        var disp = System.Windows.Application.Current?.Dispatcher;
+        if (disp == null || disp.CheckAccess()) return body();
+        return disp.InvokeAsync(body).Task.Unwrap();
+    }
+
+    /// <summary>RunOnUiAsync의 반환값 버전 — RestoreDeletedAsync 등 Task&lt;T&gt; seam용.</summary>
+    private Task<T> RunOnUiAsync<T>(Func<Task<T>> body)
     {
         var disp = System.Windows.Application.Current?.Dispatcher;
         if (disp == null || disp.CheckAccess()) return body();

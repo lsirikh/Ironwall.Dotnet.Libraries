@@ -76,11 +76,15 @@ public sealed class UndoService : IUndoService
         lock (_gate) { cmd = Current().Undo.Last?.Value; }
         if (cmd == null) return false;
 
-        await _runLock.WaitAsync(ct).ConfigureAwait(false);
+        // NOTE: no ConfigureAwait(false) on the replay path — undo/redo replay is UI-affine
+        // (커맨드가 WPF 마커/맵을 동기 변형). UI 스레드(AsyncRelayCommand 람다)에서 진입하므로
+        // 캡처된 Dispatcher 컨텍스트로 되돌아와 마커 변형이 UI 스레드에서 실행됨. 세마포어 경합 없이도
+        // MacroCommand 자식 2번째부터 스레드풀로 새던 그룹이동 무음실패(THREAD-01/02) 차단.
+        await _runLock.WaitAsync(ct);
         using var _ = SuspendRecording();
         try
         {
-            await cmd.UndoAsync(ct).ConfigureAwait(false);
+            await cmd.UndoAsync(ct);
             lock (_gate)
             {
                 var h = Current();
@@ -99,11 +103,11 @@ public sealed class UndoService : IUndoService
         lock (_gate) { cmd = Current().Redo.Last?.Value; }
         if (cmd == null) return false;
 
-        await _runLock.WaitAsync(ct).ConfigureAwait(false);
+        await _runLock.WaitAsync(ct);   // UI-affine replay — see UndoAsync note (THREAD-01/02)
         using var _ = SuspendRecording();
         try
         {
-            await cmd.ExecuteAsync(ct).ConfigureAwait(false);
+            await cmd.ExecuteAsync(ct);
             lock (_gate)
             {
                 var h = Current();
