@@ -4,7 +4,9 @@ using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using Microsoft.Win32;
 using System;
+using System.IO;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs;
 /****************************************************************************
@@ -23,12 +25,14 @@ public class EditorDialogViewModel : BasePanelViewModel
                                 , ILogService log
                                 , AccountViewModel accountViewModel
                                 , IUserDirectoryGateway gateway
-                                , ISessionConfigService session)
+                                , ISessionConfigService session
+                                , IProfileImageService profileImage)
                                 : base(eventAggregator, log)
     {
         ViewModel = accountViewModel;
         _gateway = gateway;
         _session = session;
+        _profileImage = profileImage;
     }
     #endregion
     #region - Binding Methods -
@@ -48,6 +52,32 @@ public class EditorDialogViewModel : BasePanelViewModel
 
     public async Task ClickCancel()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseDialogMessageModel());
+
+    /// <summary>사진 추가 — 파일 선택 후 IProfileImageService로 저장. 등록(Register)·마이페이지엔 있으나 변경(Editor) 다이얼로그엔
+    ///   누락돼 사진 버튼이 무반응이던 버그 수정(사용자 실측). Register 패턴과 동일.</summary>
+    public async Task ClickAddPicture()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Images|*.bmp;*.jpg;*.gif;*.png;*.tiff|All files|*.*",
+            Title = "이미지 선택",
+            RestoreDirectory = true
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        var ct = _cancellationTokenSource?.Token ?? CancellationToken.None;
+        try
+        {
+            var key = $"{DateTime.Now:yyyyMMddHHmmssfff}";
+            var saved = await _profileImage.SaveAsync(dlg.FileName, key, ct);
+            ViewModel.Image = Path.GetFileName(saved);
+        }
+        catch (ArgumentException ex)
+        {
+            _log?.Warning(ex.Message);
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = ex.Message });
+        }
+    }
     #endregion
     #region - IHanldes -
     public async Task HandleAsync(CallResetPasswordAdminProcessMessageModel message, CancellationToken cancellationToken)
@@ -106,5 +136,6 @@ public class EditorDialogViewModel : BasePanelViewModel
     #region - Attributes -
     private readonly IUserDirectoryGateway _gateway;
     private readonly ISessionConfigService _session;
+    private readonly IProfileImageService _profileImage;
     #endregion
 }

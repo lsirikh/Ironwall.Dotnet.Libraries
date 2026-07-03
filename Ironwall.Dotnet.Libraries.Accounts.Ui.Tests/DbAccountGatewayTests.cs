@@ -14,7 +14,7 @@ public class DbAccountGatewayTests
         => new(db.Object, new TokenGenerator());
 
     [Fact]
-    public async Task should_return_null_when_credentials_invalid()
+    public async Task should_return_failure_outcome_when_credentials_invalid()
     {
         var db = new Mock<IAccountDbService>();
         db.Setup(x => x.FetchAccountAsync("u", "bad", It.IsAny<CancellationToken>()))
@@ -23,7 +23,10 @@ public class DbAccountGatewayTests
         var sut = BuildSut(db);
         var result = await sut.AuthenticateAsync("u", "bad");
 
-        Assert.Null(result);
+        // AuthOutcome 리팩터 후: 실패 시 null 이 아니라 Success=false 아웃컴(Result=null) 반환.
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Null(result.Result);
     }
 
     [Fact]
@@ -38,9 +41,10 @@ public class DbAccountGatewayTests
         var result = await sut.AuthenticateAsync("u", "pw");
 
         Assert.NotNull(result);
-        Assert.Same(acc, result!.Account);
-        Assert.Equal("ADMIN", result.Role);                 // Level → role
-        Assert.Empty(result.Permissions);                   // Direct: 빈 배열
+        Assert.True(result.Success);
+        Assert.Same(acc, result.Result!.Account);           // AuthOutcome.Result 래핑 반영(옛 직접접근 → .Result 경유, 리팩터 후 미갱신 수정)
+        Assert.Equal("ADMIN", result.Result.Role);          // Level → role
+        Assert.Empty(result.Result.Permissions);            // Direct: 빈 배열
     }
 
     [Fact]
