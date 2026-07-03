@@ -148,9 +148,10 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
             if (res.Success && res.Data is not null)
             {
                 foreach (var gr in res.Data) Grants.Add(gr);
-                if (res.Data.Count >= size)   // size 가득 = 더 있을 수 있음 → 무성 truncation 방지 안내
+                var total = res.Pagination?.Total ?? res.Data.Count;   // 서버 total 사용(Count>=size 오탐 제거 — 정확히 size건일 때 가짜경고 방지)
+                if (total > res.Data.Count)   // 실제 더 있을 때만 무성 truncation 안내
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                    { Title = "권한 부여", Explain = $"부여가 {size}건 이상입니다 — 최근 {size}건만 표시됩니다(페이지네이션 필요)." });
+                    { Title = "권한 부여", Explain = $"부여 {total}건 중 {res.Data.Count}건만 표시됩니다(페이지네이션 필요)." });
             }
             else if (!res.Success)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
