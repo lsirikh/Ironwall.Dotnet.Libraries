@@ -439,6 +439,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.MarkersRubberBandSelected += OnMarkersRubberBandSelected;
             MainMap.MarkerToggleRequested += OnMapMarkerToggleRequested;   // Ctrl+클릭 토글
             MainMap.PreviewKeyDown += OnMapPreviewKeyDownForGroup;           // Del=그룹 삭제
+            EnsureGroupKeyWindowHook();                                       // 방향키 등은 윈도우서도 후킹(포커스 무관, #7)
             _groupSelection.GroupMoveCompleted += OnGroupMoveCompleted;
             _groupSelection.GroupDeleteRequested += OnGroupDeleteRequested;
             _groupSelection.GroupLockRequested += OnGroupLockRequested;
@@ -502,6 +503,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.RubberBandStarted -= OnRubberBandStarted;
             MainMap.MarkersRubberBandSelected -= OnMarkersRubberBandSelected;
             MainMap.MarkerToggleRequested -= OnMapMarkerToggleRequested;
+            if (_groupKeyWindow != null) { _groupKeyWindow.PreviewKeyDown -= OnMapPreviewKeyDownForGroup; _groupKeyWindow = null; }
             MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForGroup;
             if (_groupSelection != null)
             {
@@ -729,6 +731,27 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[CameraAim] ESC 윈도우 후킹 경고: {ex.Message}"); }
     }
 
+    private System.Windows.Window? _groupKeyWindow;
+
+    /// <summary>그룹 단축키(방향키/Del/Ctrl+Z)를 윈도우 PreviewKeyDown에도 후킹 — 맵이 키보드 포커스를 못 받거나
+    /// 포커스가 메뉴/다른 심볼로 이동해도 방향키 격자이동이 동작하도록(#7). 방향키는 WPF 포커스 이동키라 맵 단독 후킹은 불안정.</summary>
+    private void EnsureGroupKeyWindowHook()
+    {
+        try
+        {
+            if (_groupKeyWindow != null || MainMap == null) return;
+            void Hook()
+            {
+                if (_groupKeyWindow != null) return;
+                var w = System.Windows.Window.GetWindow(MainMap);
+                if (w != null) { _groupKeyWindow = w; _groupKeyWindow.PreviewKeyDown += OnMapPreviewKeyDownForGroup; }
+            }
+            Hook();
+            if (_groupKeyWindow == null) MainMap.Loaded += (_, __) => Hook();
+        }
+        catch (Exception ex) { _log?.Warning($"[그룹키] 윈도우 후킹 경고: {ex.Message}"); }
+    }
+
     /// <summary>ESC = 타겟 모드 취소.</summary>
     private void OnMapPreviewKeyDownForAim(object sender, System.Windows.Input.KeyEventArgs e)
     {
@@ -778,53 +801,64 @@ public partial class MapViewModel : BasePanelViewModel,
         SelectedMarker = null;
     }
 
-    /// <summary>Shift+드래그 릴리스 — 사각형 내 마커를 기존 선택에 추가/토글 병합(추가선택). 빈 드래그면 유지.</summary>
+    /// <summary>Shift+드래그 릴리스 — 사각형 내 마커를 기존 선택에 추가/토글 병합(겹치는 것만 토글, 나머지 유지). 빈 드래그면 유지.</summary>
     private void OnMarkersRubberBandSelected(IReadOnlyList<IEditableMarker> hits)
     {
-        var set = CurrentSelectionSet();
+        var ids = CurrentSelectionIds();
         if (hits != null)
             foreach (var h in hits)
-                if (h != null && !h.IsDisposed) { if (!set.Add(h)) set.Remove(h); }   // 있으면 해제(토글), 없으면 추가
-        ApplyGroupSelection(set);
-        if (set.Count > 0)
-            SetAimStatus($"{set.Count}개 선택 — 드래그=이동·Del=삭제 · Ctrl+클릭/Shift+드래그=추가·해제", autoHide: true);
+                if (h != null && !h.IsDisposed && h.Id > 0) { if (!ids.Add(h.Id)) ids.Remove(h.Id); }   // 겹치면 해제(토글), 아니면 추가
+        ApplyGroupSelectionByIds(ids);
+        if (ids.Count > 0)
+            SetAimStatus($"{ids.Count}개 선택 — 드래그=이동·Del=삭제 · Ctrl+클릭/Shift+드래그=추가·해제", autoHide: true);
     }
 
-    /// <summary>Ctrl+클릭 — 해당 심볼/이미지마커를 그룹 선택에 토글(추가/해제).</summary>
+    /// <summary>Ctrl+클릭 — 해당 심볼/이미지마커를 그룹 선택에 토글(추가/해제, 나머지 유지).</summary>
     private void OnMapMarkerToggleRequested(IEditableMarker marker)
     {
-        if (marker == null || marker.IsDisposed || !IsEditModeEnabled) return;
+        if (marker == null || marker.IsDisposed || marker.Id <= 0 || !IsEditModeEnabled) return;
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
-        var set = CurrentSelectionSet();
-        if (!set.Add(marker)) set.Remove(marker);   // 있으면 해제, 없으면 추가
-        ApplyGroupSelection(set);
-        SetAimStatus(set.Count > 0 ? $"{set.Count}개 선택(Ctrl+클릭·Shift+드래그로 추가·해제)" : "선택 해제", autoHide: true);
+        var ids = CurrentSelectionIds();
+        if (!ids.Add(marker.Id)) ids.Remove(marker.Id);   // 이미 선택→해제, 아니면 추가(나머지 유지)
+        ApplyGroupSelectionByIds(ids);
+        SetAimStatus(ids.Count > 0 ? $"{ids.Count}개 선택(Ctrl+클릭·Shift+드래그로 추가·해제)" : "선택 해제", autoHide: true);
     }
 
-    /// <summary>현재 선택 집합(그룹 ∪ 단일) — 추가/토글 병합 기준.</summary>
-    private System.Collections.Generic.HashSet<IEditableMarker> CurrentSelectionSet()
+    /// <summary>현재 선택 집합을 Id로 수집(그룹 ∪ 단일). Id 기준이라 리로드로 인스턴스가 바뀌어도 안전.</summary>
+    private System.Collections.Generic.HashSet<int> CurrentSelectionIds()
     {
-        var set = new System.Collections.Generic.HashSet<IEditableMarker>();
+        var ids = new System.Collections.Generic.HashSet<int>();
         if (_groupSelection?.Selection != null)
             foreach (var m in _groupSelection.Selection)
-                if (m != null && !m.IsDisposed) set.Add(m);
-        if (SelectedMarker != null && !SelectedMarker.IsDisposed) set.Add(SelectedMarker);
-        return set;
+                if (m != null && m.Id > 0) ids.Add(m.Id);
+        if (SelectedMarker != null && SelectedMarker.Id > 0) ids.Add(SelectedMarker.Id);
+        return ids;
     }
 
-    /// <summary>계산된 집합을 그룹 선택으로 적용 — 단일 편집 adorner/패널 정리 후 그룹 세팅(빈 집합=전체 해제).</summary>
-    private void ApplyGroupSelection(System.Collections.Generic.ICollection<IEditableMarker> set)
+    /// <summary>Id 집합을 라이브 마커로 해석해 그룹 선택 적용 — 단일 adorner/패널 정리 후 세팅(빈 집합=전체 해제).</summary>
+    private void ApplyGroupSelectionByIds(System.Collections.Generic.ICollection<int> ids)
     {
         MainMap?.DeselectAllMarkers();   // 단일 편집 adorner 정리(그룹으로 전환)
         SelectedMarker = null;
         HidePropertyPanel();
-        _groupSelection?.SetSelection(set.Count > 0 ? set.ToList() : null);
+        System.Collections.Generic.List<IEditableMarker>? live = null;
+        if (ids != null && ids.Count > 0 && MainMap?.Markers != null)
+        {
+            var idset = new System.Collections.Generic.HashSet<int>(ids);
+            live = MainMap.Markers.OfType<IEditableMarker>()
+                .Where(m => m != null && !m.IsDisposed && idset.Contains(m.Id)).ToList();
+        }
+        _groupSelection?.SetSelection(live != null && live.Count > 0 ? live : null);
         NotifyOfPropertyChange(nameof(SelectedMarkers));
     }
 
     /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
     private async void OnMapPreviewKeyDownForGroup(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        // 텍스트 입력 중이면 그룹 단축키(Del/방향키 등) 가로채지 않음 — 윈도우 레벨 후킹이 광범위하므로(#7).
+        if (System.Windows.Input.Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase
+            || e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase) return;
+
         if (e.Key == System.Windows.Input.Key.Delete && (_groupSelection?.HasSelection ?? false))
         {
             e.Handled = true;

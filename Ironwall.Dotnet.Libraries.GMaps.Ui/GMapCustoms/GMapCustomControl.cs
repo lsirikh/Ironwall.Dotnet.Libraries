@@ -798,20 +798,6 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
-        // [Ctrl+클릭] 편집 모드 Ctrl+좌클릭(Shift 없음) = 그룹 선택 토글. base 전 가로채기 = 팬 미Armed.
-        // 마커/이미지마커 위일 때만 소비 — 빈공간 Ctrl+클릭은 통과(기본 동작 유지).
-        if (IsEditMode && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
-            && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
-        {
-            var ctrlMarker = GetMarkerAtScreen(mousePos);
-            if (ctrlMarker != null)
-            {
-                MarkerToggleRequested?.Invoke(ctrlMarker);
-                e.Handled = true;
-                return;
-            }
-        }
-
         if (IsEditMode)
         {
             //_log?.Info("편집 모드에서 처리 시작");
@@ -835,6 +821,14 @@ public class GMapCustomControl : GMapControl
 
         if (clickedMarker != null)
         {
+            // [Ctrl+클릭] Shift 없이 Ctrl+클릭 = 그룹 선택 토글(단일선택/더블클릭 대신).
+            // base 이후 동일 clickedMarker 사용 = 일반 클릭이 찾는 마커와 항상 동일(히트 신뢰).
+            if (IsEditMode && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+                && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
+            {
+                MarkerToggleRequested?.Invoke(clickedMarker);
+                return;
+            }
             // 더블클릭 감지(컨트롤 레벨 — 자식 Shape에 의존하지 않아 편집/일반 모드 공통 동작)
             var nowClick = DateTime.Now;
             if (ReferenceEquals(clickedMarker, _lastClickedMarkerForDbl)
