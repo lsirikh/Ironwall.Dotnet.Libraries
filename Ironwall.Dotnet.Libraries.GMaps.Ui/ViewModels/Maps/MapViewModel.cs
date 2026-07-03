@@ -8474,6 +8474,8 @@ public partial class MapViewModel : BasePanelViewModel,
                 {
                     marker.IsLocked = e.IsLocked;
                     await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
+                    // 트리에서 잠금 시 그룹 선택 점선박스 즉시 재렌더(ExecuteGroupLock과 달리 이 경로엔 누락됐던 갱신).
+                    if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();
                 }
             }
             _log?.Info($"이미지 잠금 {(e.IsLocked ? "ON" : "OFF")}: {e.Layer.Name}");

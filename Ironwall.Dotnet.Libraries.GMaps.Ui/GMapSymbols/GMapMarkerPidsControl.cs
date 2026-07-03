@@ -221,6 +221,12 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         {
             _mapControl.OnMapZoomChanged += OnMapZoomChanged;
         }
+
+        // 초기추가 보강: 생성자 단계(UpdateFromSpecificMarker/OnApplyTemplate)의 UpdateFOVPath는
+        // 맵 미부착(_mapControl==null → early-return)으로 스킵된다. 맵 부착이 완료된 이 시점에
+        // ShowFOV면 1회 재트리거해, 줌 조작 없이도 신규 카메라 FOV 부채꼴이 즉시 그려지도록 보장.
+        if (ShowFOV)
+            UpdateFOVPath();
     }
 
     private void GMapMarkerPidsControl_Unloaded(object sender, RoutedEventArgs e)

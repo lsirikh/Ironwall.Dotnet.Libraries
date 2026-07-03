@@ -117,7 +117,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     {
         foreach (var m in _markers)
         {
-            if (m == null || m.IsDisposed) continue;
+            if (m == null || m.IsDisposed || m.IsLocked) continue;   // 잠금 멤버는 드래그/우클릭 hit 제외(클릭 투과)
             if (MarkerRect(m).Contains(p)) return true;
         }
         return false;
@@ -131,7 +131,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
             // 심볼별 정밀 점선 박스 — 전 심볼에 균일 표시(바운딩박스 1개 아님, 템플릿 하이라이트 불일치 대체, FR-MS-03).
             foreach (var m in _markers)
             {
-                if (m == null || m.IsDisposed) continue;
+                if (m == null || m.IsDisposed || m.IsLocked) continue;   // FR-MS-08: 잠금 멤버는 선택 점선박스 미표시
                 var r = MarkerRect(m);
                 if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) continue;
                 r.Inflate(1.5d, 1.5d);   // 심볼 가장자리 살짝 밖(가시성)
