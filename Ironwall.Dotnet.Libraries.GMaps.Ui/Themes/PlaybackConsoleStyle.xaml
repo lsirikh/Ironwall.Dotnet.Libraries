@@ -40,6 +40,16 @@
 		</Style.Triggers>
 	</Style>
 
+	<!-- 재생 버튼: 재생 중(IsPlaying)일 때만 배속 활성 칩과 동일 하이라이트(PrimaryBrush), 정지 시 배경색 -->
+	<Style x:Key="PbPlayToggle" TargetType="Button" BasedOn="{StaticResource PanelSecondaryButtonStyle}">
+		<Style.Triggers>
+			<DataTrigger Binding="{Binding IsPlaying}" Value="True">
+				<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+				<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+			</DataTrigger>
+		</Style.Triggers>
+	</Style>
+
 	<!-- 입력칸(from/to) -->
 	<Style x:Key="PbInput" TargetType="TextBox">
 		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
@@ -264,9 +274,9 @@
 
 							<!-- 바디 (DataContext = PlaybackViewModel) -->
 							<StackPanel Grid.Row="1">
-								<!-- ① 기간 -->
+								<!-- 기간 -->
 								<StackPanel Margin="12,10,12,8">
-									<TextBlock Style="{StaticResource PbSectionLabel}" Text="① 기간" />
+									<TextBlock Style="{StaticResource PbSectionLabel}" Text="기간" />
 									<StackPanel Margin="0,0,0,6" Orientation="Horizontal">
 										<Button Style="{StaticResource PbChip}" Command="{Binding PresetCommand}" CommandParameter="5" Content="최근 5분" />
 										<Button Style="{StaticResource PbChip}" Command="{Binding PresetCommand}" CommandParameter="30" Content="30분" />
@@ -372,9 +382,9 @@
 
 								<Border Height="1" Background="{DynamicResource BorderBrush}" />
 
-								<!-- ② 이벤트 -->
+								<!-- 탐지 세션 -->
 								<StackPanel Margin="12,8">
-																		<TextBlock Style="{StaticResource PbSectionLabel}" Text="② 탐지 세션 — 더블클릭=그 시각 재생 · ⌖ 위치보기 · 헤더 클릭=정렬" />
+																		<TextBlock Style="{StaticResource PbSectionLabel}" Text="탐지 세션" />
 									<Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Height="250">
 										<DataGrid Style="{StaticResource PbDataGrid}" ItemsSource="{Binding Events}">
 											<DataGrid.InputBindings>
@@ -419,9 +429,9 @@
 
 								<Border Height="1" Background="{DynamicResource BorderBrush}" />
 
-								<!-- ③ 재생 -->
+								<!-- 재생 -->
 								<StackPanel Margin="12,8,12,12">
-									<TextBlock Style="{StaticResource PbSectionLabel}" Text="③ 재생" />
+									<TextBlock Style="{StaticResource PbSectionLabel}" Text="재생" />
 									<Grid>
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto" />
@@ -432,7 +442,7 @@
 											Grid.Column="0"
 											Width="36" Height="36"
 											FontSize="15" FontWeight="Bold"
-											Style="{StaticResource PanelPrimaryButtonStyle}"
+											Style="{StaticResource PbPlayToggle}"
 											Command="{Binding PlayPauseCommand}"
 											Content="{Binding PlayPauseGlyph}" />
 										<Slider Grid.Column="1" Margin="9,0" VerticalAlignment="Center" Minimum="0" Maximum="100"
