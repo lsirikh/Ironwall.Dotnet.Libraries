@@ -53,11 +53,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         protected override void SetupSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== PidsGroupControl SetupSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsGroupControl SetupSpecificBindings 시작 ===");
 
             if (SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker)
             {
-                System.Diagnostics.Debug.WriteLine($"바인딩 대상: {pidsGroupMarker.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {pidsGroupMarker.GetType().Name}");
 
                 // Line 스타일 속성 바인딩
                 var linePatternBinding = CreateTwoWayBinding(nameof(pidsGroupMarker.LinePattern));
@@ -93,7 +93,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 SetBinding(PointCountProperty, pointCountBinding);
             }
 
-            System.Diagnostics.Debug.WriteLine("=== PidsGroupControl SetupSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== PidsGroupControl SetupSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)
@@ -111,7 +111,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             this.LinkedDeviceGroup = pidsGroupMarker.LinkedDeviceGroup;
             this.EventStatus = pidsGroupMarker.EventStatus;
 
-            System.Diagnostics.Debug.WriteLine($"PidsGroup 마커에서 속성 로드 완료");
+            //System.Diagnostics.Debug.WriteLine($"PidsGroup 마커에서 속성 로드 완료");
         }
 
         protected override void UpdateSpecificProperties()
@@ -265,7 +265,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnLinePatternChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLinePatternChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLinePatternChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsGroupControl control &&
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
@@ -278,7 +278,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnLineOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLineOpacityChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLineOpacityChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsGroupControl control &&
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
@@ -291,7 +291,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnIsClosedPathChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnIsClosedPathChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnIsClosedPathChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsGroupControl control &&
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
@@ -308,7 +308,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnLinkedDeviceGroupChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceGroupChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceGroupChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsGroupControl control &&
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&
@@ -321,7 +321,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnEventStatusChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnEventStatusChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnEventStatusChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsGroupControl control &&
                 control.SelectedMarker is IPidsGroupEditableMarker pidsGroupMarker &&

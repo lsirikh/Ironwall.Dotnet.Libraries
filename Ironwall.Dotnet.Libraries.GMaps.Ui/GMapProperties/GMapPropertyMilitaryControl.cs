@@ -49,11 +49,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         protected override void SetupSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== MilitaryControl SetupSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== MilitaryControl SetupSpecificBindings 시작 ===");
 
             if (SelectedMarker is IMilitarySymbolEditableMarker militaryMarker)
             {
-                System.Diagnostics.Debug.WriteLine($"바인딩 대상: {militaryMarker.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {militaryMarker.GetType().Name}");
 
                 // 군사 심볼 핵심 속성 바인딩
                 var affiliationBinding = CreateTwoWayBinding(nameof(militaryMarker.Affiliation));
@@ -85,7 +85,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
                 SetBinding(CountryCodeProperty, countryCodeBinding);
             }
 
-            System.Diagnostics.Debug.WriteLine("=== MilitaryControl SetupSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== MilitaryControl SetupSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)
@@ -102,7 +102,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
             this.CallSign = militaryMarker.CallSign ?? string.Empty;
             this.CountryCode = militaryMarker.CountryCode ?? string.Empty;
 
-            System.Diagnostics.Debug.WriteLine($"군사 심볼 마커에서 속성 로드 완료");
+            //System.Diagnostics.Debug.WriteLine($"군사 심볼 마커에서 속성 로드 완료");
         }
 
         protected override void UpdateSpecificProperties()
@@ -274,7 +274,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnAffiliationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnAffiliationChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnAffiliationChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -287,7 +287,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnBattleDimensionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnBattleDimensionChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnBattleDimensionChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -300,7 +300,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnStandardIdentityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnStandardIdentityChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnStandardIdentityChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -313,7 +313,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnUnitTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnUnitTypeChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnUnitTypeChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -326,7 +326,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnUnitSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnUnitSizeChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnUnitSizeChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -339,7 +339,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnUnitDesignatorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnUnitDesignatorChanged: '{e.OldValue}' → '{e.NewValue}'");
+            //System.Diagnostics.Debug.WriteLine($"OnUnitDesignatorChanged: '{e.OldValue}' → '{e.NewValue}'");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -352,7 +352,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnHigherFormationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnHigherFormationChanged: '{e.OldValue}' → '{e.NewValue}'");
+            //System.Diagnostics.Debug.WriteLine($"OnHigherFormationChanged: '{e.OldValue}' → '{e.NewValue}'");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -365,7 +365,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnCallSignChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnCallSignChanged: '{e.OldValue}' → '{e.NewValue}'");
+            //System.Diagnostics.Debug.WriteLine($"OnCallSignChanged: '{e.OldValue}' → '{e.NewValue}'");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&
@@ -378,7 +378,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties;
 
         private static void OnCountryCodeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnCountryCodeChanged: '{e.OldValue}' → '{e.NewValue}'");
+            //System.Diagnostics.Debug.WriteLine($"OnCountryCodeChanged: '{e.OldValue}' → '{e.NewValue}'");
 
             if (d is GMapPropertyMilitaryControl control &&
                 control.SelectedMarker is IMilitarySymbolEditableMarker militaryMarker &&

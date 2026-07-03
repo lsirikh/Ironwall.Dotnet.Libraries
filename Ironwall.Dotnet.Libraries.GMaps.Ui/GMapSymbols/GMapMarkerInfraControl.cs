@@ -176,7 +176,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         protected override void OnControlInitialized()
         {
             base.OnControlInitialized();
-            System.Diagnostics.Debug.WriteLine("GMapMarkerInfraControl 초기화 완료");
+            //System.Diagnostics.Debug.WriteLine("GMapMarkerInfraControl 초기화 완료");
         }
 
         protected override void UpdateMarkerAppearance()

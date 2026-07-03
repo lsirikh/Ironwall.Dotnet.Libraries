@@ -180,10 +180,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             this.BasementFloorCount = infraMarker.BasementFloorCount;
             this.BuildingArea = infraMarker.BuildingArea;
 
-            System.Diagnostics.Debug.WriteLine($"인프라 마커 속성 로드:");
-            System.Diagnostics.Debug.WriteLine($"  BuildingType: {infraMarker.BuildingType}");
-            System.Diagnostics.Debug.WriteLine($"  FloorCount: B{infraMarker.BasementFloorCount}/F{infraMarker.FloorCount}");
-            System.Diagnostics.Debug.WriteLine($"  BuildingArea: {infraMarker.BuildingArea}㎡");
+            //System.Diagnostics.Debug.WriteLine($"인프라 마커 속성 로드:");
+            //System.Diagnostics.Debug.WriteLine($"  BuildingType: {infraMarker.BuildingType}");
+            //System.Diagnostics.Debug.WriteLine($"  FloorCount: B{infraMarker.BasementFloorCount}/F{infraMarker.FloorCount}");
+            //System.Diagnostics.Debug.WriteLine($"  BuildingArea: {infraMarker.BuildingArea}㎡");
         }
 
         protected override void UpdateSpecificProperties()

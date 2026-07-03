@@ -118,7 +118,7 @@ public class GMapGeometricMarkerControl : GMapMarkerBaseControl<GMapGeometricMar
     protected override void OnControlInitialized()
     {
         base.OnControlInitialized();
-        System.Diagnostics.Debug.WriteLine("GMapGeometricMarkerControl 초기화 완료");
+        //System.Diagnostics.Debug.WriteLine("GMapGeometricMarkerControl 초기화 완료");
     }
 
     /// <summary>

@@ -758,7 +758,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(s => s.ToDomain())
                 .ToList();
 
-            _log?.Info($"FetchSymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchSymbolsAsync 완료 - {list.Count}건");
             return list.OfType<ISymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -788,9 +788,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var symbolDto = await conn.QuerySingleOrDefaultAsync<SymbolSQL>(sql, new { Id = id });
             var symbol = symbolDto?.ToDomain();
 
-            _log?.Info(symbol != null
-                ? $"FetchSymbolAsync 완료 - Id={symbol.Id}"
-                : $"FetchSymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(symbol != null
+                //? $"FetchSymbolAsync 완료 - Id={symbol.Id}"
+                //: $"FetchSymbolAsync 대상 없음 - Id={id}");
 
             return symbol;
         }
@@ -821,9 +821,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var symbolDto = await conn.QuerySingleOrDefaultAsync<SymbolSQL>(sql, new { Pid = pid });
             var symbol = symbolDto?.ToDomain();
 
-            _log?.Info(symbol != null
-                ? $"FetchSymbolByPidAsync 완료 - Pid={symbol.Pid}"
-                : $"FetchSymbolByPidAsync 대상 없음 - Pid={pid}");
+            //_log?.Info(symbol != null
+                //? $"FetchSymbolByPidAsync 완료 - Pid={symbol.Pid}"
+                //: $"FetchSymbolByPidAsync 대상 없음 - Pid={pid}");
 
             return symbol;
         }
@@ -853,7 +853,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(s => s.ToDomain())
                 .ToList();
 
-            _log?.Info($"FetchSymbolsByCategoryAsync 완료 - Category={category}, {list.Count}건");
+            //_log?.Info($"FetchSymbolsByCategoryAsync 완료 - Category={category}, {list.Count}건");
             return list.OfType<ISymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -965,7 +965,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             if (affected == 0)
                 throw new KeyNotFoundException($"Symbol not found. Id={model.Id}");
 
-            _log?.Info($"Symbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"Symbol 업데이트 완료 - Id={model.Id}");
             return await FetchSymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -982,7 +982,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             await using var conn = await OpenConnectionAsync(token);
             const string sql = "UPDATE Symbols SET ZOrder = @ZOrder WHERE Id = @Id;";
             await conn.ExecuteAsync(sql, new { ZOrder = zOrder, Id = symbolId });
-            _log?.Info($"Symbol ZOrder 업데이트 완료 — Id={symbolId}, ZOrder={zOrder}");
+            //_log?.Info($"Symbol ZOrder 업데이트 완료 — Id={symbolId}, ZOrder={zOrder}");
         }
         catch (Exception ex)
         {
@@ -1002,7 +1002,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var ids = string.Join(",", changes.Select(c => c.id));
             var sql = $"UPDATE Symbols SET ZOrder = CASE Id\n{cases}\nEND\nWHERE Id IN ({ids});";
             await conn.ExecuteAsync(sql);
-            _log?.Info($"[ZOrder] Batch UPDATE 완료 — {changes.Count}건");
+            //_log?.Info($"[ZOrder] Batch UPDATE 완료 — {changes.Count}건");
         }
         catch (Exception ex)
         {
@@ -1020,9 +1020,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteSymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteSymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteSymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -1043,9 +1043,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Pid = @Pid;";
             int ret = await conn.ExecuteAsync(sql, new { Pid = pid });
 
-            _log?.Info(ret > 0
-                ? $"DeleteSymbolByPidAsync 완료 - Pid={pid}"
-                : $"DeleteSymbolByPidAsync 대상 없음 - Pid={pid}");
+            //_log?.Info(ret > 0
+                //? $"DeleteSymbolByPidAsync 완료 - Pid={pid}"
+                //: $"DeleteSymbolByPidAsync 대상 없음 - Pid={pid}");
 
             return ret > 0;
         }
@@ -1065,7 +1065,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Category = @Category;";
             int ret = await conn.ExecuteAsync(sql, new { Category = category.ToString() });
 
-            _log?.Info($"DeleteSymbolsByCategoryAsync 완료 - Category={category}, {ret}건 삭제");
+            //_log?.Info($"DeleteSymbolsByCategoryAsync 완료 - Category={category}, {ret}건 삭제");
             return ret;
         }
         catch (Exception ex)
@@ -1102,7 +1102,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(j => j.ToGeometryDomain())
                 .ToList();
 
-            _log?.Info($"FetchGeometrySymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchGeometrySymbolsAsync 완료 - {list.Count}건");
             return list.OfType<IGeometricSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -1137,9 +1137,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var joinResult = await conn.QuerySingleOrDefaultAsync<GeometrySymbolSQL>(sql, new { Id = id });
             var geometrySymbol = joinResult?.ToGeometryDomain();
 
-            _log?.Info(geometrySymbol != null
-                ? $"FetchGeometrySymbolAsync 완료 - Id={geometrySymbol.Id}, ShapeType={geometrySymbol.ShapeType}"
-                : $"FetchGeometrySymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(geometrySymbol != null
+                //? $"FetchGeometrySymbolAsync 완료 - Id={geometrySymbol.Id}, ShapeType={geometrySymbol.ShapeType}"
+                //: $"FetchGeometrySymbolAsync 대상 없음 - Id={id}");
 
             return geometrySymbol;
         }
@@ -1293,7 +1293,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"GeometrySymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"GeometrySymbol 업데이트 완료 - Id={model.Id}");
             return await FetchGeometrySymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -1318,9 +1318,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteGeometrySymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteGeometrySymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteGeometrySymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteGeometrySymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -1355,7 +1355,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(j => j.ToGeometryDomain())
                 .ToList();
 
-            _log?.Info($"FetchGeometrySymbolsByShapeTypeAsync 완료 - ShapeType={shapeType}, {list.Count}건");
+            //_log?.Info($"FetchGeometrySymbolsByShapeTypeAsync 완료 - ShapeType={shapeType}, {list.Count}건");
             return list.OfType<IGeometricSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -1393,7 +1393,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(p => p.ToPidsDomain())
                 .ToList();
 
-            _log?.Info($"FetchPidsSymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchPidsSymbolsAsync 완료 - {list.Count}건");
             return list.OfType<IPidsSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -1428,9 +1428,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var joinResult = await conn.QuerySingleOrDefaultAsync<PidsSymbolSQL>(sql, new { Id = id });
             var pidsSymbol = joinResult?.ToPidsDomain();
 
-            _log?.Info(pidsSymbol != null
-                ? $"FetchPidsSymbolAsync 완료 - Id={pidsSymbol.Id}, DeviceType={pidsSymbol.DeviceType}"
-                : $"FetchPidsSymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(pidsSymbol != null
+                //? $"FetchPidsSymbolAsync 완료 - Id={pidsSymbol.Id}, DeviceType={pidsSymbol.DeviceType}"
+                //: $"FetchPidsSymbolAsync 대상 없음 - Id={id}");
 
             return pidsSymbol;
         }
@@ -1466,9 +1466,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var joinResult = await conn.QuerySingleOrDefaultAsync<PidsSymbolSQL>(sql, new { DeviceId = deviceId });
             var pidsSymbol = joinResult?.ToPidsDomain();
 
-            _log?.Info(pidsSymbol != null
-                ? $"FetchPidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}, Id={pidsSymbol.Id}"
-                : $"FetchPidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
+            //_log?.Info(pidsSymbol != null
+                //? $"FetchPidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}, Id={pidsSymbol.Id}"
+                //: $"FetchPidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
 
             return pidsSymbol;
         }
@@ -1503,7 +1503,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(p => p.ToPidsDomain())
                 .ToList();
 
-            _log?.Info($"FetchPidsSymbolsByDeviceTypeAsync 완료 - DeviceType={deviceType}, {list.Count}건");
+            //_log?.Info($"FetchPidsSymbolsByDeviceTypeAsync 완료 - DeviceType={deviceType}, {list.Count}건");
             return list.OfType<IPidsSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -1681,7 +1681,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"PidsSymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"PidsSymbol 업데이트 완료 - Id={model.Id}");
             return await FetchPidsSymbolAsync(model.Id, token);
         }
         catch (MySqlException mex) when (mex.Message.Contains("Record has changed"))
@@ -1712,9 +1712,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeletePidsSymbolAsync 완료 - Id={model.Id}"
-                : $"DeletePidsSymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeletePidsSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeletePidsSymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -1742,9 +1742,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             int ret = await conn.ExecuteAsync(sql, new { DeviceId = deviceId });
 
-            _log?.Info(ret > 0
-                ? $"DeletePidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}"
-                : $"DeletePidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
+            //_log?.Info(ret > 0
+                //? $"DeletePidsSymbolByDeviceIdAsync 완료 - DeviceId={deviceId}"
+                //: $"DeletePidsSymbolByDeviceIdAsync 대상 없음 - DeviceId={deviceId}");
 
             return ret > 0;
         }
@@ -1779,7 +1779,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(p => p.ToPidsDomain())
                 .ToList();
 
-            _log?.Info($"FetchPidsSymbolsByEventStatusAsync 완료 - EventStatus={eventStatus}, {list.Count}건");
+            //_log?.Info($"FetchPidsSymbolsByEventStatusAsync 완료 - EventStatus={eventStatus}, {list.Count}건");
             return list.OfType<IPidsSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -1818,7 +1818,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(m => m.ToMilitaryDomain())
                 .ToList();
 
-            _log?.Info($"FetchMilitarySymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchMilitarySymbolsAsync 완료 - {list.Count}건");
             return list.OfType<IMilitarySymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -1854,9 +1854,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var joinResult = await conn.QuerySingleOrDefaultAsync<MilitarySymbolSQL>(sql, new { Id = id });
             var militarySymbol = joinResult?.ToMilitaryDomain();
 
-            _log?.Info(militarySymbol != null
-                ? $"FetchMilitarySymbolAsync 완료 - Id={militarySymbol.Id}, UnitType={militarySymbol.UnitType}"
-                : $"FetchMilitarySymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(militarySymbol != null
+                //? $"FetchMilitarySymbolAsync 완료 - Id={militarySymbol.Id}, UnitType={militarySymbol.UnitType}"
+                //: $"FetchMilitarySymbolAsync 대상 없음 - Id={id}");
 
             return militarySymbol;
         }
@@ -2029,7 +2029,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"MilitarySymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"MilitarySymbol 업데이트 완료 - Id={model.Id}");
             return await FetchMilitarySymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -2054,9 +2054,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteMilitarySymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteMilitarySymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteMilitarySymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteMilitarySymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -2120,7 +2120,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 }
             }
 
-            _log?.Info($"FetchLineSymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchLineSymbolsAsync 완료 - {list.Count}건");
             return list.OfType<ILineSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -2168,9 +2168,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 lineSymbol.LinePoints = points.Select(p => p.ToGeoPoint()).ToList();
             }
 
-            _log?.Info(lineSymbol != null
-                ? $"FetchLineSymbolAsync 완료 - Id={lineSymbol.Id}, Points={lineSymbol.LinePoints.Count}개"
-                : $"FetchLineSymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(lineSymbol != null
+                //? $"FetchLineSymbolAsync 완료 - Id={lineSymbol.Id}, Points={lineSymbol.LinePoints.Count}개"
+                //: $"FetchLineSymbolAsync 대상 없음 - Id={id}");
 
             return lineSymbol;
         }
@@ -2379,7 +2379,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"LineSymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"LineSymbol 업데이트 완료 - Id={model.Id}");
             return await FetchLineSymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -2408,9 +2408,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteLineSymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteLineSymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteLineSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteLineSymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -2449,7 +2449,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 .Select(i => i.ToInfraDomain())
                 .ToList();
 
-            _log?.Info($"FetchInfraSymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchInfraSymbolsAsync 완료 - {list.Count}건");
             return list.OfType<IInfraSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -2484,9 +2484,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             var joinResult = await conn.QuerySingleOrDefaultAsync<InfraSymbolSQL>(sql, new { Id = id });
             var infraSymbol = joinResult?.ToInfraDomain();
 
-            _log?.Info(infraSymbol != null
-                ? $"FetchInfraSymbolAsync 완료 - Id={infraSymbol.Id}, BuildingType={infraSymbol.BuildingType}"
-                : $"FetchInfraSymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(infraSymbol != null
+                //? $"FetchInfraSymbolAsync 완료 - Id={infraSymbol.Id}, BuildingType={infraSymbol.BuildingType}"
+                //: $"FetchInfraSymbolAsync 대상 없음 - Id={id}");
 
             return infraSymbol;
         }
@@ -2662,7 +2662,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"InfraSymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"InfraSymbol 업데이트 완료 - Id={model.Id}");
             return await FetchInfraSymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -2687,9 +2687,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeleteInfraSymbolAsync 완료 - Id={model.Id}"
-                : $"DeleteInfraSymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeleteInfraSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeleteInfraSymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -2754,7 +2754,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 }
             }
 
-            _log?.Info($"FetchPidsGroupSymbolsAsync 완료 - {list.Count}건");
+            //_log?.Info($"FetchPidsGroupSymbolsAsync 완료 - {list.Count}건");
             return list.OfType<IPidsGroupSymbolModel>().ToList();
         }
         catch (Exception ex)
@@ -2803,9 +2803,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 pidsGroupSymbol.LinePoints = points.Select(p => p.ToGeoPoint()).ToList();
             }
 
-            _log?.Info(pidsGroupSymbol != null
-                ? $"FetchPidsGroupSymbolAsync 완료 - Id={pidsGroupSymbol.Id}, Points={pidsGroupSymbol.LinePoints.Count}개"
-                : $"FetchPidsGroupSymbolAsync 대상 없음 - Id={id}");
+            //_log?.Info(pidsGroupSymbol != null
+                //? $"FetchPidsGroupSymbolAsync 완료 - Id={pidsGroupSymbol.Id}, Points={pidsGroupSymbol.LinePoints.Count}개"
+                //: $"FetchPidsGroupSymbolAsync 대상 없음 - Id={id}");
 
             return pidsGroupSymbol;
         }
@@ -3019,7 +3019,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             await transaction.CommitAsync(token);
 
-            _log?.Info($"PidsGroupSymbol 업데이트 완료 - Id={model.Id}");
+            //_log?.Info($"PidsGroupSymbol 업데이트 완료 - Id={model.Id}");
             return await FetchPidsGroupSymbolAsync(model.Id, token);
         }
         catch (Exception ex)
@@ -3047,9 +3047,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = "DELETE FROM Symbols WHERE Id = @Id;";
             int ret = await conn.ExecuteAsync(sql, new { Id = model.Id });
 
-            _log?.Info(ret > 0
-                ? $"DeletePidsGroupSymbolAsync 완료 - Id={model.Id}"
-                : $"DeletePidsGroupSymbolAsync 대상 없음 - Id={model.Id}");
+            //_log?.Info(ret > 0
+                //? $"DeletePidsGroupSymbolAsync 완료 - Id={model.Id}"
+                //: $"DeletePidsGroupSymbolAsync 대상 없음 - Id={model.Id}");
 
             return ret > 0;
         }
@@ -3077,9 +3077,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             int ret = await conn.ExecuteAsync(sql, new { DeviceGroup = deviceGroup });
 
-            _log?.Info(ret > 0
-                ? $"DeletePidsGroupSymbolByDeviceGroupAsync 완료 - DeviceGroup={deviceGroup}"
-                : $"DeletePidsGroupSymbolByDeviceGroupAsync 대상 없음 - DeviceGroup={deviceGroup}");
+            //_log?.Info(ret > 0
+                //? $"DeletePidsGroupSymbolByDeviceGroupAsync 완료 - DeviceGroup={deviceGroup}"
+                //: $"DeletePidsGroupSymbolByDeviceGroupAsync 대상 없음 - DeviceGroup={deviceGroup}");
 
             return ret > 0;
         }

@@ -285,8 +285,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     {
         if (Marker == null) return;
 
-        _log?.Info($"[OnControlInitialized] Marker.ShowTitle: {Marker.ShowTitle}");
-        _log?.Info($"[OnControlInitialized] Marker 타입: {Marker.GetType().Name}");
+        //_log?.Info($"[OnControlInitialized] Marker.ShowTitle: {Marker.ShowTitle}");
+        //_log?.Info($"[OnControlInitialized] Marker 타입: {Marker.GetType().Name}");
 
         MarkerTitle = Marker.Title ?? "Unnamed Marker";
         Width = Marker.Width;
@@ -302,7 +302,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         MarkerStroke = ColorHelper.ToBrush(Marker.StrokeColor);
         MarkerStrokeThickness = Marker.StrokeThickness;
         EnableShapeAnimation = Marker.EnableShapeAnimation;
-        _log?.Info($"[OnControlInitialized] 설정 후 ShowTitle: {ShowTitle}");
+        //_log?.Info($"[OnControlInitialized] 설정 후 ShowTitle: {ShowTitle}");
 
 
     }
@@ -477,8 +477,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         if (ShowTitle)
         {
             var labelContainer = GetTemplateChild("PART_LabelContainer") as Border;
-            _log?.Info($"ShowTitle=true, PART_LabelContainer Visibility: {labelContainer?.Visibility}");
-            _log?.Info($"MarkerTitle: '{MarkerTitle}'");
+            //_log?.Info($"ShowTitle=true, PART_LabelContainer Visibility: {labelContainer?.Visibility}");
+            //_log?.Info($"MarkerTitle: '{MarkerTitle}'");
         }
 
         InvalidateVisual();
@@ -640,11 +640,11 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
             scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
 
-            System.Diagnostics.Debug.WriteLine($"애니메이션 실행 - 기존 회전 보존: {existingRotate?.Angle ?? 0:F1}°");
+            //System.Diagnostics.Debug.WriteLine($"애니메이션 실행 - 기존 회전 보존: {existingRotate?.Angle ?? 0:F1}°");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"클릭 애니메이션 실행 실패: {ex.Message}");
+            //System.Diagnostics.Debug.WriteLine($"클릭 애니메이션 실행 실패: {ex.Message}");
         }
     }
 
@@ -734,12 +734,12 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
             if (control is GMapMarkerLineControl lineControl && lineControl.MainPolyline != null)
             {
                 lineControl.MainPolyline.StrokeThickness = (double)e.NewValue;
-                System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
+                //System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
             }
             else if (d is GMapMarkerPidsGroupControl pGroupControl && pGroupControl.MainPolyline != null)
             {
                 pGroupControl.MainPolyline.StrokeThickness = (double)e.NewValue;
-                System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
+                //System.Diagnostics.Debug.WriteLine($"Polyline StrokeThickness 업데이트: {e.NewValue}");
             }
 
             // UI 강제 새로고침
@@ -765,7 +765,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     protected static void OnRotationAngleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine($"OnRotationAngleChanged: {e.OldValue} -> {e.NewValue}");
+        //System.Diagnostics.Debug.WriteLine($"OnRotationAngleChanged: {e.OldValue} -> {e.NewValue}");
 
         if (d is GMapMarkerBaseControl<T> control)
         {

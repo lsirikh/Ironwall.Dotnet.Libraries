@@ -308,12 +308,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
 
             if (previewControl != null)
             {
-                System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 찾음");
+                //System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 찾음");
 
                 // 미리보기 컨트롤의 Loaded 이벤트에서 초기화
                 previewControl.Loaded += (s, e) =>
                 {
-                    System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 Loaded 이벤트");
+                    //System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 Loaded 이벤트");
 
                     // 현재 속성값으로 강제 업데이트
                     previewControl.Affiliation = this.Affiliation;
@@ -325,7 +325,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
                     Dispatcher.BeginInvoke(new System.Action(() =>
                     {
                         previewControl.InvalidateVisual();
-                        System.Diagnostics.Debug.WriteLine("미리보기 강제 업데이트 완료");
+                        //System.Diagnostics.Debug.WriteLine("미리보기 강제 업데이트 완료");
                     }), System.Windows.Threading.DispatcherPriority.Loaded);
                 };
             }
@@ -477,14 +477,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
             if (d is GMapMilitarySymbolRegisterControl control)
             {
                 // UnitType 변경 시 미리보기 업데이트 등 추가 로직
-                System.Diagnostics.Debug.WriteLine($"[Register] Affiliation 변경: {e.OldValue} → {e.NewValue}");
+                //System.Diagnostics.Debug.WriteLine($"[Register] Affiliation 변경: {e.OldValue} → {e.NewValue}");
                 // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
                 if (control.Template != null)
                 {
                     var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
                     if (preview != null)
                     {
-                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        //System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
                         preview.Affiliation = (EnumMilitaryAffiliation)e.NewValue;
                     }
                 }
@@ -497,14 +497,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
             if (d is GMapMilitarySymbolRegisterControl control)
             {
                 // BattleDimension 변경 시 미리보기 업데이트 등 추가 로직
-                System.Diagnostics.Debug.WriteLine($"[Register] BattleDimension 변경: {e.OldValue} → {e.NewValue}");
+                //System.Diagnostics.Debug.WriteLine($"[Register] BattleDimension 변경: {e.OldValue} → {e.NewValue}");
                 // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
                 if (control.Template != null)
                 {
                     var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
                     if (preview != null)
                     {
-                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        //System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
                         preview.BattleDimension = (EnumMilitaryBattleDimension)e.NewValue;
                     }
                 }
@@ -516,7 +516,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
             if (d is GMapMilitarySymbolRegisterControl control)
             {
                 // UnitType 변경 시 미리보기 업데이트 등 추가 로직
-                System.Diagnostics.Debug.WriteLine($"[Register] UnitType 변경: {e.OldValue} → {e.NewValue}");
+                //System.Diagnostics.Debug.WriteLine($"[Register] UnitType 변경: {e.OldValue} → {e.NewValue}");
                 // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
 
                 if (control.Template != null)
@@ -524,7 +524,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
                     var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
                     if (preview != null)
                     {
-                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        //System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
                         preview.UnitType = (EnumMilitaryUnitType)e.NewValue;
                     }
                 }
@@ -536,14 +536,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapMilitary{
             if (d is GMapMilitarySymbolRegisterControl control)
             {
                 // UnitSize 변경 시 미리보기 업데이트 등 추가 로직
-                System.Diagnostics.Debug.WriteLine($"UnitSize 변경: {e.OldValue} → {e.NewValue}");
+                //System.Diagnostics.Debug.WriteLine($"UnitSize 변경: {e.OldValue} → {e.NewValue}");
                 // 템플릿에서 미리보기 컨트롤 직접 찾아서 업데이트
                 if (control.Template != null)
                 {
                     var preview = control.Template.FindName("PART_MilitarySymbolPreview", control) as GMapMilitarySymbolMarkerControl;
                     if (preview != null)
                     {
-                        System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
+                        //System.Diagnostics.Debug.WriteLine("미리보기 컨트롤 직접 업데이트 시도");
                         preview.UnitSize = (EnumMilitaryUnitSize)e.NewValue;
                     }
                 }

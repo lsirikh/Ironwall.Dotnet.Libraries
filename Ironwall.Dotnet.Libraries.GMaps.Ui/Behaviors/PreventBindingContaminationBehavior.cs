@@ -84,7 +84,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
                 // 핵심: 새 마커 설정 전에 바인딩 정리
                 if (oldMarker != null && newMarker != null && oldMarker != newMarker)
                 {
-                    System.Diagnostics.Debug.WriteLine("바인딩 오염 방지를 위해 ClearAllBindings 실행");
+                    //System.Diagnostics.Debug.WriteLine("바인딩 오염 방지를 위해 ClearAllBindings 실행");
 
                     // AssociatedObject에서 ClearAllBindings 호출
                     AssociatedObject.ClearAllBindings();
@@ -95,7 +95,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Behavior 처리 중 오류: {ex.Message}");
+                //System.Diagnostics.Debug.WriteLine($"Behavior 처리 중 오류: {ex.Message}");
             }
         }
 
@@ -120,7 +120,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"이전 마커 연결 해제 실패: {ex.Message}");
+                //System.Diagnostics.Debug.WriteLine($"이전 마커 연결 해제 실패: {ex.Message}");
             }
         }
 

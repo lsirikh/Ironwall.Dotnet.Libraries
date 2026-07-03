@@ -86,7 +86,7 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     {
         // GMapCustomMarker 전용 초기화 로직
         base.OnControlInitialized();
-        System.Diagnostics.Debug.WriteLine("GMapMarkerCustomControl 초기화 완료");
+        //System.Diagnostics.Debug.WriteLine("GMapMarkerCustomControl 초기화 완료");
     }
 
     /// <summary>

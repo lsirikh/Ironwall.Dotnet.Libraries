@@ -160,7 +160,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             geometricControl.Loaded += (s, e) =>
             {
                 // 추가 초기화 작업
-                System.Diagnostics.Debug.WriteLine("GeometricControl 로딩 완료");
+                //System.Diagnostics.Debug.WriteLine("GeometricControl 로딩 완료");
             };
         }
 
@@ -169,7 +169,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             // Custom 전용 처리
             customControl.Loaded += (s, e) =>
             {
-                System.Diagnostics.Debug.WriteLine("CustomControl 로딩 완료");
+                //System.Diagnostics.Debug.WriteLine("CustomControl 로딩 완료");
             };
         }
 
@@ -199,7 +199,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Behaviors{
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ZOrderChange] 오류: {ex.Message}");
+                //System.Diagnostics.Debug.WriteLine($"[ZOrderChange] 오류: {ex.Message}");
             }
         }
 

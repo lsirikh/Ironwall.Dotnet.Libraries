@@ -424,7 +424,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
             if (position.Y > 45)
             {
-                System.Diagnostics.Debug.WriteLine("헤더 영역 밖 클릭");
+                //System.Diagnostics.Debug.WriteLine("헤더 영역 밖 클릭");
                 return;
             }
 
@@ -434,7 +434,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
             if (canvas == null)
             {
-                System.Diagnostics.Debug.WriteLine("Canvas를 찾을 수 없어서 드래그 시작 불가");
+                //System.Diagnostics.Debug.WriteLine("Canvas를 찾을 수 없어서 드래그 시작 불가");
                 return;
             }
 
@@ -457,7 +457,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             var contentPresenter = FindParentOfType<ContentPresenter>(this);
             if (contentPresenter == null)
             {
-                System.Diagnostics.Debug.WriteLine("ContentPresenter를 찾을 수 없음");
+                //System.Diagnostics.Debug.WriteLine("ContentPresenter를 찾을 수 없음");
                 return;
             }
 
@@ -467,7 +467,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             var canvas = contentPresenter.Parent as Canvas;
             if (canvas == null)
             {
-                System.Diagnostics.Debug.WriteLine($"Canvas를 찾을 수 없음. ContentPresenter.Parent: {contentPresenter.Parent?.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"Canvas를 찾을 수 없음. ContentPresenter.Parent: {contentPresenter.Parent?.GetType().Name}");
                 return;
             }
 
@@ -714,7 +714,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"SetupMarkerBindings 실패: {ex.Message}");
+                //System.Diagnostics.Debug.WriteLine($"SetupMarkerBindings 실패: {ex.Message}");
             }
         }
 
@@ -851,7 +851,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (e.OriginalSource is not Button btn || btn.Name != "PART_ApplyDeviceLocationButton")
                 return;
-            System.Diagnostics.Debug.WriteLine("[DeviceLocation] PART_ApplyDeviceLocationButton 클릭 감지");
+            //System.Diagnostics.Debug.WriteLine("[DeviceLocation] PART_ApplyDeviceLocationButton 클릭 감지");
             if (_applyLocBusy) { e.Handled = true; return; }   // 진행 중 재클릭 무시
             _applyLocBtn = btn;
             BeginDeviceLocationApply();

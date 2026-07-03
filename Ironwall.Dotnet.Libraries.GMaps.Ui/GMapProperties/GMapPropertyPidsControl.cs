@@ -297,7 +297,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnLinkedDeviceIdChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceIdChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceIdChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -313,7 +313,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnLinkedDeviceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLinkedDeviceChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -328,7 +328,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnDetectionRangeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnDetectionRangeChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnDetectionRangeChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -342,7 +342,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnDetectionAngleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnDetectionAngleChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnDetectionAngleChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -356,7 +356,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnDetectionBearingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnDetectionBearingChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnDetectionBearingChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -370,7 +370,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnBaseBearingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnBaseBearingChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnBaseBearingChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control &&
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -383,7 +383,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnShowFOVChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnShowFOVChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnShowFOVChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control && 
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -396,7 +396,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnFOVColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnFOVColorChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnFOVColorChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control && 
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
@@ -409,7 +409,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         private static void OnFOVOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnFOVOpacityChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnFOVOpacityChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyPidsControl control && 
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&

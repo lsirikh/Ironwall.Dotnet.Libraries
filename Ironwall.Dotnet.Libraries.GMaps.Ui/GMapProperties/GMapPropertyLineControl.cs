@@ -45,11 +45,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         protected override void SetupSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== LineControl SetupSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== LineControl SetupSpecificBindings 시작 ===");
 
             if (SelectedMarker is ILineEditableMarker lineMarker)
             {
-                System.Diagnostics.Debug.WriteLine($"바인딩 대상: {lineMarker.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {lineMarker.GetType().Name}");
 
                 // 라인 스타일 속성 바인딩
                 var linePatternBinding = CreateTwoWayBinding(nameof(lineMarker.LinePattern));
@@ -80,7 +80,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 SetBinding(PointCountProperty, pointCountBinding);
             }
 
-            System.Diagnostics.Debug.WriteLine("=== LineControl SetupSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== LineControl SetupSpecificBindings 완료 ===");
         }
 
         protected override void SetupSpecificPropertiesFromMarker(IEditableMarker marker)
@@ -93,7 +93,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             this.TotalDistance = lineMarker.TotalDistance;
             this.PointCount = lineMarker.RuntimePoints?.Count ?? 0;
 
-            System.Diagnostics.Debug.WriteLine($"라인 마커에서 속성 로드 완료");
+            //System.Diagnostics.Debug.WriteLine($"라인 마커에서 속성 로드 완료");
         }
 
         protected override void UpdateSpecificProperties()
@@ -191,7 +191,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnLinePatternChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLinePatternChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLinePatternChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyLineControl control &&
                 control.SelectedMarker is ILineEditableMarker lineMarker &&
@@ -204,7 +204,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnLineOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnLineOpacityChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnLineOpacityChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyLineControl control &&
                 control.SelectedMarker is ILineEditableMarker lineMarker &&
@@ -217,7 +217,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnIsClosedPathChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"OnIsClosedPathChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnIsClosedPathChanged: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyLineControl control &&
                 control.SelectedMarker is ILineEditableMarker lineMarker &&

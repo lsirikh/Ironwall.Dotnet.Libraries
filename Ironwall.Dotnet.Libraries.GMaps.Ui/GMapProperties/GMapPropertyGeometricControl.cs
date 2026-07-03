@@ -40,17 +40,17 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         protected override void SetupSpecificBindings()
         {
-            System.Diagnostics.Debug.WriteLine("=== SetupSpecificBindings 시작 ===");
+            //System.Diagnostics.Debug.WriteLine("=== SetupSpecificBindings 시작 ===");
 
             if (SelectedMarker is IGeoEditableMarker geoMarker)
             {
-                System.Diagnostics.Debug.WriteLine($"바인딩 대상: {geoMarker.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"바인딩 대상: {geoMarker.GetType().Name}");
 
                 var binding = CreateTwoWayBinding(nameof(geoMarker.Opacity));
                 SetBinding(MarkerOpacityProperty, binding);
             }
 
-            System.Diagnostics.Debug.WriteLine("=== SetupSpecificBindings 완료 ===");
+            //System.Diagnostics.Debug.WriteLine("=== SetupSpecificBindings 완료 ===");
 
         }
 
@@ -61,7 +61,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             //geoMarker.ShapeType = this.ShapeType;
             this.MarkerOpacity = geoMarker.Opacity;
 
-            System.Diagnostics.Debug.WriteLine($"마커에서 MarkerOpacity 로드: {geoMarker.Opacity}");
+            //System.Diagnostics.Debug.WriteLine($"마커에서 MarkerOpacity 로드: {geoMarker.Opacity}");
 
         }
 
@@ -86,29 +86,29 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private static void OnMarkerOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
 
-            System.Diagnostics.Debug.WriteLine($"=== PropertyPanel.OnMarkerOpacityChanged ===");
-            System.Diagnostics.Debug.WriteLine($"값 변경: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"=== PropertyPanel.OnMarkerOpacityChanged ===");
+            //System.Diagnostics.Debug.WriteLine($"값 변경: {e.OldValue} → {e.NewValue}");
 
             if (d is GMapPropertyGeometricControl control)
             {
-                System.Diagnostics.Debug.WriteLine($"컨트롤 확인: {control.GetType().Name}");
-                System.Diagnostics.Debug.WriteLine($"_isInitializing: {control._isInitializing}");
-                System.Diagnostics.Debug.WriteLine($"_isClearingBindings: {control._isClearingBindings}");
-                System.Diagnostics.Debug.WriteLine($"SelectedMarker: {control.SelectedMarker?.Title ?? "null"}");
+                //System.Diagnostics.Debug.WriteLine($"컨트롤 확인: {control.GetType().Name}");
+                //System.Diagnostics.Debug.WriteLine($"_isInitializing: {control._isInitializing}");
+                //System.Diagnostics.Debug.WriteLine($"_isClearingBindings: {control._isClearingBindings}");
+                //System.Diagnostics.Debug.WriteLine($"SelectedMarker: {control.SelectedMarker?.Title ?? "null"}");
 
                 if (control.SelectedMarker is IGeoEditableMarker geoMarker)
                 {
-                    System.Diagnostics.Debug.WriteLine($"마커 Opacity (변경 전): {geoMarker.Opacity}");
+                    //System.Diagnostics.Debug.WriteLine($"마커 Opacity (변경 전): {geoMarker.Opacity}");
 
                     if (!control._isInitializing && !control._isClearingBindings)
                     {
                         geoMarker.Opacity = (double)e.NewValue;
                         control.OnMarkerPropertyChanged("MarkerOpacity", e.OldValue, e.NewValue);
-                        System.Diagnostics.Debug.WriteLine($"마커 Opacity 업데이트 완료: {geoMarker.Opacity}");
+                        //System.Diagnostics.Debug.WriteLine($"마커 Opacity 업데이트 완료: {geoMarker.Opacity}");
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine("플래그로 인해 마커 업데이트 생략");
+                        //System.Diagnostics.Debug.WriteLine("플래그로 인해 마커 업데이트 생략");
                     }
                 }
             }

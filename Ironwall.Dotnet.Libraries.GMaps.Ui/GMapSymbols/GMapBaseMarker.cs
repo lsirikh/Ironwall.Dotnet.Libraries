@@ -42,7 +42,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         if (Shape is System.Windows.UIElement shapeElement)
             System.Windows.Controls.Panel.SetZIndex(shapeElement, ZIndex);
 
-        _log?.Info($"마커 생성: {symbolModel.Title} ({symbolModel.Latitude:F6}, {symbolModel.Longitude:F6})");
+        //_log?.Info($"마커 생성: {symbolModel.Title} ({symbolModel.Latitude:F6}, {symbolModel.Longitude:F6})");
     }
     #endregion
     #region - Dispose Pattern -
@@ -186,7 +186,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             _model.UpdatePosition(newPosition);
 
             OnPropertyChanged(nameof(Position));
-            _log?.Info($"마커 '{Title}' 위치 업데이트: ({newPosition.Lat:F6}, {newPosition.Lng:F6})");
+            //_log?.Info($"마커 '{Title}' 위치 업데이트: ({newPosition.Lat:F6}, {newPosition.Lng:F6})");
         }
         catch (Exception ex)
         {
@@ -212,7 +212,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
             OnPropertyChanged(nameof(Width));
             OnPropertyChanged(nameof(Height));
 
-            _log?.Info($"마커 '{Title}' 크기 업데이트: {Width:F0}x{Height:F0}");
+            //_log?.Info($"마커 '{Title}' 크기 업데이트: {Width:F0}x{Height:F0}");
         }
         catch (Exception ex)
         {
@@ -244,7 +244,7 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         {
             _model.SetBearing(newBearing);
             OnPropertyChanged(nameof(Bearing));
-            _log?.Info($"마커 '{Title}' 회전 업데이트: {Bearing:F1}°");
+            //_log?.Info($"마커 '{Title}' 회전 업데이트: {Bearing:F1}°");
         }
         catch (Exception ex)
         {

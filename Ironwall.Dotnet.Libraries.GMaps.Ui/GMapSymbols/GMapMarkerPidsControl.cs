@@ -237,7 +237,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         if (ShowFOV && DeviceType == EnumDeviceType.IpCamera)
         {
-            System.Diagnostics.Debug.WriteLine($"[FOV] OnMapZoomChanged 호출됨 - Zoom: {_mapControl?.Zoom}");
+            //System.Diagnostics.Debug.WriteLine($"[FOV] OnMapZoomChanged 호출됨 - Zoom: {_mapControl?.Zoom}");
             UpdateFOVPath();
         }
     }
@@ -314,7 +314,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         base.OnControlInitialized();
         ApplyDeviceTypeDefaults();
-        System.Diagnostics.Debug.WriteLine("GMapMarkerPidsControl 초기화 완료");
+        //System.Diagnostics.Debug.WriteLine("GMapMarkerPidsControl 초기화 완료");
     }
 
     /// <summary>
@@ -499,12 +499,12 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                         targetRadius, targetBearing, targetAngle);
                 }
 
-                System.Diagnostics.Debug.WriteLine($"[FOV] Zoom:{mapControl.Zoom}, Range:{DetectionRange}m, Radius:{targetRadius:F1}px, Bearing:{targetBearing}, Angle:{targetAngle}, Animate:{animate}");
+                //System.Diagnostics.Debug.WriteLine($"[FOV] Zoom:{mapControl.Zoom}, Range:{DetectionRange}m, Radius:{targetRadius:F1}px, Bearing:{targetBearing}, Angle:{targetAngle}, Animate:{animate}");
             }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"FOV Path 업데이트 실패: {ex.Message}");
+            //System.Diagnostics.Debug.WriteLine($"FOV Path 업데이트 실패: {ex.Message}");
         }
     }
 
@@ -625,7 +625,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"거리 변환 실패: {ex.Message}");
+            //System.Diagnostics.Debug.WriteLine($"거리 변환 실패: {ex.Message}");
             // 폴백: 간단한 스케일 사용
             return meters * 0.1; // 대략적인 스케일
         }
@@ -669,7 +669,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 control.Marker.EventStatus = (EnumEventStatus)e.NewValue;
             }
 
-            System.Diagnostics.Debug.WriteLine($"EventStatus 변경: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"EventStatus 변경: {e.OldValue} → {e.NewValue}");
         }
     }
 
@@ -706,7 +706,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         if (d is GMapMarkerPidsControl control && control.Marker != null)
         {
-            System.Diagnostics.Debug.WriteLine($"OnFOVOpacityChanged: {e.OldValue} → {e.NewValue}");
+            //System.Diagnostics.Debug.WriteLine($"OnFOVOpacityChanged: {e.OldValue} → {e.NewValue}");
             control.Marker.FOVOpacity = (double)e.NewValue;
         }
     }

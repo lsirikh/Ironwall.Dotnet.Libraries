@@ -268,7 +268,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"GMapMarkerImageControl.OnRender 오류: {ex.Message}");
+            //System.Diagnostics.Debug.WriteLine($"GMapMarkerImageControl.OnRender 오류: {ex.Message}");
         }
     }
 
@@ -345,7 +345,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"UpdateGeometryFromBounds 오류: {ex.Message}");
+            //System.Diagnostics.Debug.WriteLine($"UpdateGeometryFromBounds 오류: {ex.Message}");
         }
     }
 

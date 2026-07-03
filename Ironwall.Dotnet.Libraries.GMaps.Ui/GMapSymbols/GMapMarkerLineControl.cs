@@ -158,14 +158,14 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
     #region Lifecycle Events
     private void OnControlLoaded(object sender, RoutedEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine("=== GMapMarkerLineControl Loaded ===");
+        //System.Diagnostics.Debug.WriteLine("=== GMapMarkerLineControl Loaded ===");
 
         // Visual Tree가 완성된 후 MapControl 찾기
         _mapControl = FindParentMapControl();
 
         if (_mapControl != null)
         {
-            System.Diagnostics.Debug.WriteLine($"MapControl 찾음: {_mapControl.GetType().Name}");
+            //System.Diagnostics.Debug.WriteLine($"MapControl 찾음: {_mapControl.GetType().Name}");
 
             // 지도 이벤트 구독
             _mapControl.OnMapZoomChanged += OnMapChanged;
@@ -177,7 +177,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("MapControl을 찾을 수 없음!");
+            //System.Diagnostics.Debug.WriteLine("MapControl을 찾을 수 없음!");
         }
 
         // IsVisible 변경 감지: Visibility=false 후 true로 복원 시 기하 재계산
@@ -300,7 +300,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             MainPolyline.StrokeThickness = Marker.StrokeThickness;
             MainPolyline.Opacity = Marker.LineOpacity;
         }
-        System.Diagnostics.Debug.WriteLine("GMapMarkerLineControl 초기화 완료");
+        //System.Diagnostics.Debug.WriteLine("GMapMarkerLineControl 초기화 완료");
     }
 
     /// <summary>
@@ -334,7 +334,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             MainPolyline.Opacity = Marker.LineOpacity;
         }
 
-        System.Diagnostics.Debug.WriteLine($"Template 적용: Canvas={_lineCanvas != null}, Polyline={MainPolyline != null}");
+        //System.Diagnostics.Debug.WriteLine($"Template 적용: Canvas={_lineCanvas != null}, Polyline={MainPolyline != null}");
     }
 
     /// <summary>
@@ -480,7 +480,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"라인 업데이트 오류: {ex.Message}");
+            //System.Diagnostics.Debug.WriteLine($"라인 업데이트 오류: {ex.Message}");
         }
     }
 
