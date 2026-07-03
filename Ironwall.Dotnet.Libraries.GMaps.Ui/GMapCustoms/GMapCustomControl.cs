@@ -725,6 +725,9 @@ public class GMapCustomControl : GMapControl
     /// <summary>Shift+드래그 릴리스 — 사각형 내 편집가능 마커(잠금 포함, FR-MS-07) 집합 통지. 비어도 발화(그룹 해제).</summary>
     public event System.Action<IReadOnlyList<IEditableMarker>>? MarkersRubberBandSelected;
 
+    /// <summary>Ctrl+클릭 — 해당 심볼/이미지마커를 그룹 선택에 토글(추가/해제). VM 처리.</summary>
+    public event System.Action<IEditableMarker>? MarkerToggleRequested;
+
     /// <summary>화면 사각형과 교차하는 편집가능 마커 목록(가시·비잠금·비이미지 마커만). AABB 교차(비회전 근사).</summary>
     internal IReadOnlyList<IEditableMarker> GetMarkersInRect(Rect screenRect)
     {
@@ -793,6 +796,20 @@ public class GMapCustomControl : GMapControl
             CaptureMouse();
             e.Handled = true;
             return;
+        }
+
+        // [Ctrl+클릭] 편집 모드 Ctrl+좌클릭(Shift 없음) = 그룹 선택 토글. base 전 가로채기 = 팬 미Armed.
+        // 마커/이미지마커 위일 때만 소비 — 빈공간 Ctrl+클릭은 통과(기본 동작 유지).
+        if (IsEditMode && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+            && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
+        {
+            var ctrlMarker = GetMarkerAtScreen(mousePos);
+            if (ctrlMarker != null)
+            {
+                MarkerToggleRequested?.Invoke(ctrlMarker);
+                e.Handled = true;
+                return;
+            }
         }
 
         if (IsEditMode)

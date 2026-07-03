@@ -437,6 +437,7 @@ public partial class MapViewModel : BasePanelViewModel,
             _groupSelection = new GroupSelectionService(MainMap, _log);
             MainMap.RubberBandStarted += OnRubberBandStarted;
             MainMap.MarkersRubberBandSelected += OnMarkersRubberBandSelected;
+            MainMap.MarkerToggleRequested += OnMapMarkerToggleRequested;   // Ctrl+클릭 토글
             MainMap.PreviewKeyDown += OnMapPreviewKeyDownForGroup;           // Del=그룹 삭제
             _groupSelection.GroupMoveCompleted += OnGroupMoveCompleted;
             _groupSelection.GroupDeleteRequested += OnGroupDeleteRequested;
@@ -500,6 +501,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 그룹(러버밴드) 다중선택 정리
             MainMap.RubberBandStarted -= OnRubberBandStarted;
             MainMap.MarkersRubberBandSelected -= OnMarkersRubberBandSelected;
+            MainMap.MarkerToggleRequested -= OnMapMarkerToggleRequested;
             MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForGroup;
             if (_groupSelection != null)
             {
@@ -768,16 +770,56 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>현재 그룹(러버밴드) 선택집합 — 그룹 이동/삭제/잠금 대상.</summary>
     public IReadOnlyList<IEditableMarker> SelectedMarkers => _groupSelection?.Selection ?? System.Array.Empty<IEditableMarker>();
 
-    /// <summary>Shift+드래그 시작 — 기존 단일 선택 해제(그룹과 공존, FR-MS-08).</summary>
-    private void OnRubberBandStarted() => SelectedMarker = null;
+    /// <summary>Shift+드래그 시작 — 단일 선택 중이었으면 그룹에 흡수(추가선택 유지) 후 단일 해제.</summary>
+    private void OnRubberBandStarted()
+    {
+        if (SelectedMarker != null && !SelectedMarker.IsDisposed && !(_groupSelection?.HasSelection ?? false))
+            _groupSelection?.SetSelection(new System.Collections.Generic.List<IEditableMarker> { SelectedMarker });
+        SelectedMarker = null;
+    }
 
-    /// <summary>Shift+드래그 릴리스 — 사각형 내 마커 그룹 선택(빈 목록=해제).</summary>
+    /// <summary>Shift+드래그 릴리스 — 사각형 내 마커를 기존 선택에 추가/토글 병합(추가선택). 빈 드래그면 유지.</summary>
     private void OnMarkersRubberBandSelected(IReadOnlyList<IEditableMarker> hits)
     {
-        _groupSelection?.SetSelection(hits);
+        var set = CurrentSelectionSet();
+        if (hits != null)
+            foreach (var h in hits)
+                if (h != null && !h.IsDisposed) { if (!set.Add(h)) set.Remove(h); }   // 있으면 해제(토글), 없으면 추가
+        ApplyGroupSelection(set);
+        if (set.Count > 0)
+            SetAimStatus($"{set.Count}개 선택 — 드래그=이동·Del=삭제 · Ctrl+클릭/Shift+드래그=추가·해제", autoHide: true);
+    }
+
+    /// <summary>Ctrl+클릭 — 해당 심볼/이미지마커를 그룹 선택에 토글(추가/해제).</summary>
+    private void OnMapMarkerToggleRequested(IEditableMarker marker)
+    {
+        if (marker == null || marker.IsDisposed || !IsEditModeEnabled) return;
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
+        var set = CurrentSelectionSet();
+        if (!set.Add(marker)) set.Remove(marker);   // 있으면 해제, 없으면 추가
+        ApplyGroupSelection(set);
+        SetAimStatus(set.Count > 0 ? $"{set.Count}개 선택(Ctrl+클릭·Shift+드래그로 추가·해제)" : "선택 해제", autoHide: true);
+    }
+
+    /// <summary>현재 선택 집합(그룹 ∪ 단일) — 추가/토글 병합 기준.</summary>
+    private System.Collections.Generic.HashSet<IEditableMarker> CurrentSelectionSet()
+    {
+        var set = new System.Collections.Generic.HashSet<IEditableMarker>();
+        if (_groupSelection?.Selection != null)
+            foreach (var m in _groupSelection.Selection)
+                if (m != null && !m.IsDisposed) set.Add(m);
+        if (SelectedMarker != null && !SelectedMarker.IsDisposed) set.Add(SelectedMarker);
+        return set;
+    }
+
+    /// <summary>계산된 집합을 그룹 선택으로 적용 — 단일 편집 adorner/패널 정리 후 그룹 세팅(빈 집합=전체 해제).</summary>
+    private void ApplyGroupSelection(System.Collections.Generic.ICollection<IEditableMarker> set)
+    {
+        MainMap?.DeselectAllMarkers();   // 단일 편집 adorner 정리(그룹으로 전환)
+        SelectedMarker = null;
+        HidePropertyPanel();
+        _groupSelection?.SetSelection(set.Count > 0 ? set.ToList() : null);
         NotifyOfPropertyChange(nameof(SelectedMarkers));
-        if (hits != null && hits.Count > 0)
-            SetAimStatus($"{hits.Count}개 선택 — 핸들 드래그=이동 · 핸들 우클릭=삭제/잠금 · Del=삭제", autoHide: true);
     }
 
     /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
