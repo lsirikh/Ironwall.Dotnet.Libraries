@@ -1,0 +1,34 @@
+<UserControl
+    x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportTemplateView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:cal="http://caliburnmicro.com">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,8">
+            <Button x:Name="LoadAsync" Content="새로고침" Width="90" />
+            <Button x:Name="Delete" Content="삭제" Width="72" Margin="8,0,0,0" IsEnabled="{Binding CanDelete}" />
+        </StackPanel>
+        <DataGrid Grid.Row="1" x:Name="Items" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectedItem="{Binding SelectedItem}" CanUserAddRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" Background="Transparent" RowHeight="30">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" />
+                <DataGridTextColumn Header="이름" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="설명" Binding="{Binding Description}" Width="200" />
+                <DataGridTextColumn Header="유형" Binding="{Binding ReportType}" Width="90" />
+                <DataGridCheckBoxColumn Header="공개" Binding="{Binding IsPublic}" Width="60" />
+                <DataGridTextColumn Header="기본기간" Binding="{Binding DefaultPeriod}" Width="80" />
+            </DataGrid.Columns>
+        </DataGrid>
+        <TextBlock Grid.Row="1" Text="저장된 템플릿이 없습니다." HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+    </Grid>
+</UserControl>

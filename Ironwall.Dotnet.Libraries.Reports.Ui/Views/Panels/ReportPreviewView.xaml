@@ -1,0 +1,86 @@
+<UserControl
+    x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportPreviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:cal="http://caliburnmicro.com">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,4">
+            <Button DockPanel.Dock="Right" x:Name="Download" Content="PDF 다운로드" Width="110" />
+            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+        </DockPanel>
+        <TextBlock Grid.Row="1" Text="{Binding MetaText}" Margin="0,0,0,8"
+                   Foreground="{DynamicResource TextMutedBrush}" />
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="Sections">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,0,0,14">
+                            <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="13"
+                                       Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4" />
+
+                            <!-- 표(grid) -->
+                            <ItemsControl ItemsSource="{Binding Grids}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                                CornerRadius="3" Padding="6" Margin="0,2,0,6">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontStyle="Italic"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                <ItemsControl ItemsSource="{Binding Columns}">
+                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                                        <TextBlock Text="{Binding}" Width="110" FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <ItemsControl ItemsSource="{Binding Rows}">
+                                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                                        <ItemsControl ItemsSource="{Binding}">
+                                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate><DataTemplate>
+                                                                <TextBlock Text="{Binding}" Width="110"
+                                                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                            </DataTemplate></ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- 차트(요약 텍스트) -->
+                            <ItemsControl ItemsSource="{Binding Charts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2">
+                                            <Run Text="◔ " /><Run Text="{Binding Title, Mode=OneWay}" />
+                                            <Run Text=" [" /><Run Text="{Binding Kind, Mode=OneWay}" /><Run Text="]" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="2" Text="미리보기 데이터가 없습니다." HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+    </Grid>
+</UserControl>
