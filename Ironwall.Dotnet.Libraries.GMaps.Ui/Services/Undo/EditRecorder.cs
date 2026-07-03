@@ -169,6 +169,14 @@ public sealed class EditRecorder : IEditRecorder
         _undo.Push(new CustomImageRotationCommand(Context!, imageId, before, after));
     }
 
+    public void RecordCustomImageEdit(int imageId, RectLatLng beforeBounds, double beforeRotation, RectLatLng afterBounds, double afterRotation)
+    {
+        if (!Ready || imageId <= 0) return;
+        if (beforeBounds.Equals(afterBounds) && beforeRotation == afterRotation) return;   // 변화 없음(짧은클릭 등)
+        ResetCoalesce();
+        _undo.Push(new CustomImageEditCommand(Context!, imageId, beforeBounds, beforeRotation, afterBounds, afterRotation));
+    }
+
     public void RecordLayerChange(string description,
         System.Collections.Generic.IReadOnlyList<LayerFields> before,
         System.Collections.Generic.IReadOnlyList<LayerFields> after)

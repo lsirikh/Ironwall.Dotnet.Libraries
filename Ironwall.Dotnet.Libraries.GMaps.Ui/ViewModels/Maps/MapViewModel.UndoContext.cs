@@ -248,6 +248,21 @@ public partial class MapViewModel : IUndoApplyContext
         catch (Exception ex) { _log?.Error($"[Undo] 이미지 회전 적용 실패: {ex.Message}"); }
     }
 
+    /// <summary>파일 오버레이 이미지 이동/크기/회전 적용 + 영속(D1 핸들 편집).</summary>
+    public async Task ApplyCustomImageEditAsync(int id, GMap.NET.RectLatLng bounds, double rotation, CancellationToken ct = default)
+    {
+        try
+        {
+            var img = MainMap?.CustomImages?.FirstOrDefault(i => i.Id == id);
+            if (img == null) return;
+            img.ImageBounds = bounds;      // Model(Deconstruct) 동기화
+            img.UserRotation = rotation;
+            MainMap?.InvalidateVisual();
+            if (img.Id > 0) await _gMapDbSymbolService.UpdateImageAsync(img.Model);
+        }
+        catch (Exception ex) { _log?.Error($"[Undo] 이미지 편집 적용 실패: {ex.Message}"); }
+    }
+
     /// <summary>MapLayers 노드 필드 적용(이름/투명도/ZOrder) + OverlayImage 마커 동기화 + 트리 리로드.</summary>
     public async Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
     {

@@ -46,6 +46,9 @@ public interface IUndoApplyContext
     /// <summary>파일 오버레이 이미지(GMapCustomImage) 회전 적용 + UpdateImageAsync 영속.</summary>
     Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default);
 
+    /// <summary>파일 오버레이 이미지 이동/크기/회전(ImageBounds+UserRotation) 적용 + UpdateImageAsync 영속(D1 핸들 편집).</summary>
+    Task ApplyCustomImageEditAsync(int id, GMap.NET.RectLatLng bounds, double rotation, CancellationToken ct = default);
+
     /// <summary>MapLayers 노드 필드(이름/투명도/ZOrder, null=미변경) 적용 + 이미지마커 동기화 + 트리 리로드.</summary>
     Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default);
 }

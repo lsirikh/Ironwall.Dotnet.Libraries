@@ -194,7 +194,7 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 이미지 편집(이동/리사이즈/회전) 완료 이벤트 - DB 영속화 트리거 (FR-8)
     /// </summary>
-    public Action<GMapCustomImage>? OnImageEditCompleted;
+    public Action<GMapCustomImage, GMap.NET.RectLatLng, double>? OnImageEditCompleted;   // (편집됨, before Bounds, before Rotation) — Undo before-state 포함(D1)
 
     /// <summary>
     /// 마커 편집 관련 이벤트들 (외부로 전파)
@@ -913,8 +913,10 @@ public class GMapCustomControl : GMapControl
         {
             // ★ FR-8 — ResetDragState가 _draggedImage를 null로 만들기 전에 캡처 후 편집완료 발화(DB 영속화)
             var edited = _draggedImage;
+            var beforeBounds = _dragStartBounds;          // Undo before-state(D1)
+            var beforeRot = _dragStartUserRotation;
             ResetDragState();
-            if (edited != null) OnImageEditCompleted?.Invoke(edited);
+            if (edited != null) OnImageEditCompleted?.Invoke(edited, beforeBounds, beforeRot);
             _log?.Info("이미지 드래그 완료");
             e.Handled = true;
             return;
@@ -1553,6 +1555,8 @@ public class GMapCustomControl : GMapControl
         _dragStartPoint = mousePos;
         _isDragging = true;
         _isImageDrag = true;
+        _dragStartBounds = image.ImageBounds;          // Undo before-state(D1) — 이동/크기/회전 공통
+        _dragStartUserRotation = image.UserRotation;
 
         // ★ 회전 드래그: 이미지 중심/시작각/기준 회전값 캐싱 (FR-5, 절대각 누적 기반)
         if (handle == ResizeHandle.Rotate)
@@ -2950,6 +2954,8 @@ public class GMapCustomControl : GMapControl
     private Point _rotationCenterScreen;        // 이미지 중심 화면 좌표 (드래그 시작 시 캐싱)
     private double _rotationStartAngle;         // 드래그 시작 시 atan2 절대각
     private double _rotationBaseUserRotation;   // 드래그 시작 시 UserRotation 스냅샷
+    private GMap.NET.RectLatLng _dragStartBounds;      // Undo before-state(D1) — 이미지 편집 시작 시 Bounds
+    private double _dragStartUserRotation;             // Undo before-state(D1) — 이미지 편집 시작 시 UserRotation
     private const double ROTATE_HANDLE_DISTANCE = 30; // 상단 중앙에서 위쪽 오프셋(px)
     #endregion
 }

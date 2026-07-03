@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using GMap.NET;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
 
@@ -34,6 +35,20 @@ public sealed class CustomImageRotationCommand : UndoableCommandBase
     public override string Description => "이미지 회전";
     public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageRotationAsync(_id, _after, ct);
     public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageRotationAsync(_id, _before, ct);
+}
+
+/// <summary>파일 오버레이 이미지(GMapCustomImage) 이동/크기/회전 핸들 편집 취소·재실행(ImageBounds+UserRotation, UpdateImageAsync 영속, D1).</summary>
+public sealed class CustomImageEditCommand : UndoableCommandBase
+{
+    private readonly int _id;
+    private readonly RectLatLng _beforeBounds, _afterBounds;
+    private readonly double _beforeRot, _afterRot;
+    public CustomImageEditCommand(IUndoApplyContext ctx, int id, RectLatLng beforeBounds, double beforeRot, RectLatLng afterBounds, double afterRot) : base(ctx)
+    { _id = id; _beforeBounds = beforeBounds; _beforeRot = beforeRot; _afterBounds = afterBounds; _afterRot = afterRot; }
+
+    public override string Description => "이미지 편집";
+    public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageEditAsync(_id, _afterBounds, _afterRot, ct);
+    public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyCustomImageEditAsync(_id, _beforeBounds, _beforeRot, ct);
 }
 
 /// <summary>MapLayers 노드 필드(이름/투명도/ZOrder) 스냅샷 — null=미변경.</summary>

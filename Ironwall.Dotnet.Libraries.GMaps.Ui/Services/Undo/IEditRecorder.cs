@@ -60,6 +60,9 @@ public interface IEditRecorder
     /// <summary>파일 오버레이 이미지 회전 기록.</summary>
     void RecordCustomImageRotation(int imageId, double before, double after);
 
+    /// <summary>파일 오버레이 이미지 핸들 편집(이동/크기/회전) 기록(D1) — before/after Bounds+Rotation.</summary>
+    void RecordCustomImageEdit(int imageId, GMap.NET.RectLatLng beforeBounds, double beforeRotation, GMap.NET.RectLatLng afterBounds, double afterRotation);
+
     /// <summary>MapLayers 노드 조작(이름/ZOrder) 기록.</summary>
     void RecordLayerChange(string description,
         System.Collections.Generic.IReadOnlyList<Commands.LayerFields> before,

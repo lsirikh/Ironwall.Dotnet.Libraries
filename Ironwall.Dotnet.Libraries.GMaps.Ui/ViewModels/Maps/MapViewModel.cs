@@ -1944,7 +1944,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 지도 이미지 편집(이동/리사이즈/회전) 완료 핸들러 — UserRotation/Bounds DB 영속화 (FR-8, NFR-6)
     /// </summary>
-    private async void OnMapImageEditCompleted(GMapCustomImage image)
+    private async void OnMapImageEditCompleted(GMapCustomImage image, GMap.NET.RectLatLng beforeBounds, double beforeRotation)
     {
         try
         {
@@ -1963,6 +1963,9 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 _log?.Warning($"[IMG-EDIT-DONE] 영속 경로 없음(Id<=0) — DB 저장 생략: {image.Title}");
             }
+            // Undo 기록(D1) — 핸들 편집(이동/크기/회전). IsApplyingUndo 중이면 recorder가 무시.
+            if (image.Id > 0)
+                _editRecorder?.RecordCustomImageEdit(image.Id, beforeBounds, beforeRotation, image.ImageBounds, image.UserRotation);
         }
         catch (Exception ex)
         {

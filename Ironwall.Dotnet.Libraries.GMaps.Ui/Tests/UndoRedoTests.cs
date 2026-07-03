@@ -77,6 +77,8 @@ public class UndoRedoTests
         public Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default) { VisApplied.Add((id, show)); return Task.CompletedTask; }
         public readonly List<(int id, double rot)> RotApplied = new();
         public Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default) { RotApplied.Add((id, rotation)); return Task.CompletedTask; }
+        public readonly List<(int id, GMap.NET.RectLatLng bounds, double rot)> ImgEditApplied = new();
+        public Task ApplyCustomImageEditAsync(int id, GMap.NET.RectLatLng bounds, double rotation, CancellationToken ct = default) { ImgEditApplied.Add((id, bounds, rotation)); return Task.CompletedTask; }
         public readonly List<(int id, string? name, double? opacity, int? zOrder)> LayerApplied = new();
         public Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
         { LayerApplied.Add((layerId, name, opacity, zOrder)); return Task.CompletedTask; }
@@ -393,6 +395,20 @@ public class UndoRedoTests
         Assert.Equal((3, 0d), ctx.RotApplied[^1]);
         await svc.RedoAsync();
         Assert.Equal((3, 90d), ctx.RotApplied[^1]);
+    }
+
+    [Fact(DisplayName = "CustomImageEditCommand — 핸들 편집(bounds+rotation) do→undo→redo (D1)")]
+    public async Task should_edit_customimage_bounds_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var svc = new UndoService();
+        var beforeB = new GMap.NET.RectLatLng(37.0, 127.0, 0.10, 0.10);
+        var afterB = new GMap.NET.RectLatLng(37.5, 127.5, 0.20, 0.20);
+        svc.Push(new CustomImageEditCommand(ctx, id: 8, beforeBounds: beforeB, beforeRot: 0, afterBounds: afterB, afterRot: 45));
+        await svc.UndoAsync();
+        Assert.Equal((8, beforeB, 0d), ctx.ImgEditApplied[^1]);   // undo → before
+        await svc.RedoAsync();
+        Assert.Equal((8, afterB, 45d), ctx.ImgEditApplied[^1]);   // redo → after
     }
 
     [Fact(DisplayName = "LayerNodeCommand — 이름 필드 do→undo→redo")]
