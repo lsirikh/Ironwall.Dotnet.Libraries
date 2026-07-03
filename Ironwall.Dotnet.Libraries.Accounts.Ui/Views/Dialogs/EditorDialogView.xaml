@@ -280,7 +280,6 @@
 							Grid.Row="7"
 							Grid.Column="2"
 							VerticalAlignment="Center"
-							IsDefault="True"
 							Style="{StaticResource MaterialDesignFlatButton}">
 							<Button.Content>
 								<StackPanel VerticalAlignment="Center" Orientation="Horizontal">

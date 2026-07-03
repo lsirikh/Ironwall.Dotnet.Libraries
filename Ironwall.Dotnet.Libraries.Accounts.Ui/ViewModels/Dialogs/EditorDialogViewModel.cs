@@ -26,13 +26,15 @@ public class EditorDialogViewModel : BasePanelViewModel
                                 , AccountViewModel accountViewModel
                                 , IUserDirectoryGateway gateway
                                 , ISessionConfigService session
-                                , IProfileImageService profileImage)
+                                , IProfileImageService profileImage
+                                , IProfileGateway profileGateway)
                                 : base(eventAggregator, log)
     {
         ViewModel = accountViewModel;
         _gateway = gateway;
         _session = session;
         _profileImage = profileImage;
+        _profileGateway = profileGateway;
     }
     #endregion
     #region - Binding Methods -
@@ -69,13 +71,23 @@ public class EditorDialogViewModel : BasePanelViewModel
         try
         {
             var key = $"{DateTime.Now:yyyyMMddHHmmssfff}";
-            var saved = await _profileImage.SaveAsync(dlg.FileName, key, ct);
+            var saved = await _profileImage.SaveAsync(dlg.FileName, key, ct);   // 검증(확장자/크기)+로컬 복사(즉시표시/DB모드)
             ViewModel.Image = Path.GetFileName(saved);
+
+            // API 모드: 원본을 서버에 업로드 → photo_url(절대 URL)로 영속·표시(타 클라 이미지 깨짐 방지, W1).
+            //   DB 모드는 null 반환이라 로컬 파일명 유지. MyPagePanelViewModel과 동일 — Register(로컬만) 패턴은 API모드서 오답이었음.
+            var url = await _profileGateway.UploadPhotoAsync(dlg.FileName, ct);
+            if (!string.IsNullOrEmpty(url)) ViewModel.Image = url;
         }
-        catch (ArgumentException ex)
+        catch (ArgumentException ex)   // 검증 실패(확장자/크기)
         {
             _log?.Warning(ex.Message);
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = ex.Message });
+        }
+        catch (Exception ex)           // 업로드 IO/네트워크 실패 — 크래시 방지(Caliburn 액션 예외 전파 차단)
+        {
+            _log?.Error($"[Editor] 사진 처리 실패: {ex.Message}");
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = "사진 처리에 실패했습니다." });
         }
     }
     #endregion
@@ -137,5 +149,6 @@ public class EditorDialogViewModel : BasePanelViewModel
     private readonly IUserDirectoryGateway _gateway;
     private readonly ISessionConfigService _session;
     private readonly IProfileImageService _profileImage;
+    private readonly IProfileGateway _profileGateway;
     #endregion
 }
