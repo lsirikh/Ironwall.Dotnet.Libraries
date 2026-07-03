@@ -3901,17 +3901,24 @@ public partial class MapViewModel : BasePanelViewModel,
                 .Select(f => System.IO.Path.GetFileName(f))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // 1. 폴더에 파일이 없는 DB 엔트리 삭제 (고아 정리)
+            // 1. 폴더에 파일이 없는 DB 엔트리 삭제 (고아 정리) — 엔트리별 격리(한 건 실패가 전체 중단 금지)
             foreach (var dbMap in existingMBTiles)
             {
-                if (!folderFileNames.Contains(dbMap.ServiceUrl))
+                try
                 {
-                    await _gMapDbService.DeleteDefinedMapAsync(new DefinedMapModel { Id = dbMap.Id });
-                    var toRemove = _mapProvider.FirstOrDefault(m => m.Name == dbMap.Name);
-                    if (toRemove != null) _mapProvider.Remove(toRemove);
-                    var toRemoveDef = _definedMapProvider.FirstOrDefault(m => m.Name == dbMap.Name);
-                    if (toRemoveDef != null) _definedMapProvider.Remove(toRemoveDef);
-                    _log?.Info($"MBTiles DB 엔트리 삭제 (파일 없음): {dbMap.ServiceUrl}");
+                    if (!folderFileNames.Contains(dbMap.ServiceUrl))
+                    {
+                        await _gMapDbService.DeleteDefinedMapAsync(new DefinedMapModel { Id = dbMap.Id });
+                        var toRemove = _mapProvider.FirstOrDefault(m => m.Name == dbMap.Name);
+                        if (toRemove != null) _mapProvider.Remove(toRemove);
+                        var toRemoveDef = _definedMapProvider.FirstOrDefault(m => m.Name == dbMap.Name);
+                        if (toRemoveDef != null) _definedMapProvider.Remove(toRemoveDef);
+                        _log?.Info($"MBTiles DB 엔트리 삭제 (파일 없음): {dbMap.ServiceUrl}");
+                    }
+                }
+                catch (Exception exOrphan)
+                {
+                    _log?.Error($"MBTiles 고아정리 실패(이 엔트리만 스킵): {dbMap?.ServiceUrl} — {exOrphan.Message}");
                 }
             }
 
@@ -3920,6 +3927,11 @@ public partial class MapViewModel : BasePanelViewModel,
             foreach (var filePath in mbtilesFiles)
             {
                 var fileName = System.IO.Path.GetFileName(filePath);
+
+                // 파일별 격리 — 한 파일에서 예외(NRE 등)가 나도 나머지 기본지도(위성/일반) 시드는 계속.
+                // RC: DB 초기화 후 위성 파일 처리 중 NRE로 루프 전체가 중단 → 위성지도 유실 회귀(2026-07-03). 재발 차단.
+                try
+                {
                 var fileInfo = new System.IO.FileInfo(filePath);
 
                 // 2. 이미 DB에 있는 파일 → 변경 감지
@@ -3997,6 +4009,12 @@ public partial class MapViewModel : BasePanelViewModel,
                 _log?.Info($"MBTiles 맵 등록: {displayName} ({fileName}), Id={id}, " +
                            $"Zoom={model.MinZoomLevel}~{model.MaxZoomLevel}, " +
                            $"Bounds=[{model.MinLatitude:F4}~{model.MaxLatitude:F4}, {model.MinLongitude:F4}~{model.MaxLongitude:F4}]");
+                }
+                catch (Exception exFile)
+                {
+                    // 이 파일만 스킵 — 다른 기본지도(위성/일반)는 계속 시드해 항상 존재하도록 보장.
+                    _log?.Error($"MBTiles 시드 실패(이 파일만 스킵): {fileName} — {exFile.Message}");
+                }
             }
         }
         catch (Exception ex)
