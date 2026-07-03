@@ -1479,12 +1479,15 @@ public partial class MapViewModel : BasePanelViewModel,
     private IPermissionService? ResolvePermissionService()
     {
         if (_permissionResolved) return _permissionService;
-        _permissionResolved = true;
-        try { _permissionService = IoC.Get<IPermissionService>(); }
+        try
+        {
+            _permissionService = IoC.Get<IPermissionService>();
+            _permissionResolved = _permissionService != null;   // 성공 시에만 캐시 확정 — 실패 시 재시도 허용(영구 null캐시=영구 fail-open 방지)
+        }
         catch (Exception ex)
         {
             _log?.Warning($"[CameraPopup] PermissionService 미해석(권한 게이팅 전체허용 폴백): {ex.Message}");
-            _permissionService = null;
+            _permissionService = null;   // _permissionResolved 미설정 → 다음 호출 재시도
         }
         return _permissionService;
     }

@@ -68,8 +68,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private IPermissionService? ResolvePermissionService()
         {
             if (_permissionResolved) return _permissionService;
-            _permissionResolved = true;
-            try { _permissionService = IoC.Get<IPermissionService>(); }
+            try { _permissionService = IoC.Get<IPermissionService>(); _permissionResolved = _permissionService != null; }   // 성공 시에만 캐시(영구 fail-open 방지)
             catch (Exception ex)
             {
                 _log?.Warning($"[{nameof(EventCardListPanelViewModel)}] PermissionService 미해석(전체허용 폴백): {ex.Message}");
