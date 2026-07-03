@@ -53,7 +53,7 @@ public sealed class GMapDbFixture : IAsyncLifetime
     {
         IpDbServer = "127.0.0.1",
         PortDbServer = 3306,
-        DbDatabase = "monitor_db",
+        DbDatabase = GMapTestDb.Name,   // 운영 monitor_db 금지 — 격리 DB(DROP TABLE 안전)
         UidDbServer = "root",
         PasswordDbServer = "root"
     };
@@ -75,6 +75,7 @@ public sealed class GMapDbFixture : IAsyncLifetime
             DefinedMapProvider,
             _setup);
 
+        await GMapTestDb.EnsureAsync(_setup);   // 격리 테스트 DB 없으면 생성(운영 DB 오염 방지)
         await DropTablesAsync();               // 깨끗한 DB 확보
 
         await Svc.StartService(Cts.Token);     // Connect + BuildScheme + FetchInstance

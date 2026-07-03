@@ -27,7 +27,7 @@ public sealed class MapLayerTestFixture : IAsyncLifetime
     private readonly GMapDbSetupModel _setup = new()
     {
         IpDbServer = "127.0.0.1", PortDbServer = 3306,
-        DbDatabase = "monitor_db", UidDbServer = "root", PasswordDbServer = "root"
+        DbDatabase = GMapTestDb.Name, UidDbServer = "root", PasswordDbServer = "root"   // 운영 monitor_db 금지 — 격리 DB
     };
 
     public async Task InitializeAsync()
@@ -37,6 +37,7 @@ public sealed class MapLayerTestFixture : IAsyncLifetime
         CustomMapProvider = new CustomMapProvider(log, MapProvider);
         DefinedMapProvider = new DefinedMapProvider(log, MapProvider);
         Svc = new GMapDbService(log, ea, MapProvider, CustomMapProvider, DefinedMapProvider, _setup);
+        await GMapTestDb.EnsureAsync(_setup);   // 격리 테스트 DB 없으면 생성(운영 DB 오염 방지)
         await DropTablesAsync();
         await Svc.StartService(Cts.Token);
         Assert.True(Svc.IsConnected);
