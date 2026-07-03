@@ -505,4 +505,31 @@ public class UndoRedoTests
         rec.RecordPropertyChange(m, "Title", "a", "b");
         Assert.True(svc.CanUndo);
     }
+
+    // ─────────────── 스냅샷 딥클론 — 런타임 인터페이스 프로퍼티(이슈②) ───────────────
+    [Fact(DisplayName = "SymbolSnapshot — 디바이스연결된 카메라도 스냅샷 성공(과거 STJ가 null 반환, 이슈②)")]
+    public void should_capture_snapshot_when_pids_symbol_has_bound_linked_device()
+    {
+        // Arrange — LinkedDevice(런타임 IBaseDeviceModel) 바인딩. setter가 LinkedDeviceId=2 동기화.
+        var model = new PidsSymbolModel { Id = 5 };
+        model.LinkedDevice = new Ironwall.Dotnet.Monitoring.Models.Devices.CameraDeviceModel(2);
+
+        // Act — 과거 STJ 딥클론은 인터페이스 역직렬화 실패로 null → RecordDelete no-op → 카메라 undo 유실.
+        var snap = SymbolSnapshot.Capture(model, 5, nameof(GMapPidsMarker), isImage: false);
+
+        // Assert — Newtonsoft 전환 후 스냅샷 성공 + 영속 필드 보존, 런타임 객체는 [JsonIgnore]로 제외(복원 시 재바인딩).
+        Assert.NotNull(snap);
+        var cloned = (IPidsSymbolModel)snap!.Model;
+        Assert.Equal(2, cloned.LinkedDeviceId);
+        Assert.Null(cloned.LinkedDevice);
+    }
+
+    [Fact(DisplayName = "SymbolSnapshot — LinkedDevice 없는 심볼 대조군 스냅샷 성공(이슈②)")]
+    public void should_capture_snapshot_when_no_linked_device()
+    {
+        var model = new PidsSymbolModel { Id = 6 };
+        var snap = SymbolSnapshot.Capture(model, 6, nameof(GMapPidsMarker), isImage: false);
+        Assert.NotNull(snap);
+        Assert.Equal(6, snap!.Id);
+    }
 }

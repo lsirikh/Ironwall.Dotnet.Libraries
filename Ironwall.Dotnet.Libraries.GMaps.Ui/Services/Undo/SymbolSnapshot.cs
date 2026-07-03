@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Text.Json;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo;
@@ -13,8 +12,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo;
 ****************************************************************************/
 public sealed class SymbolSnapshot : ISymbolSnapshot
 {
-    private static readonly JsonSerializerOptions _opts = new() { IncludeFields = false };
-
     public int Id { get; set; }
     public object Model { get; }
     public Type ModelType { get; }
@@ -69,9 +66,12 @@ public sealed class SymbolSnapshot : ISymbolSnapshot
     {
         try
         {
+            // Newtonsoft 사용 — 모델의 [JsonProperty]/[JsonIgnore](Newtonsoft) 계약을 준수.
+            // STJ는 Newtonsoft [JsonIgnore]를 무시 → 런타임 인터페이스 프로퍼티(PidsSymbolModel.LinkedDevice)를
+            // 역직렬화하려다 NotSupportedException → 스냅샷 null → 디바이스연결된 카메라 delete/undo 유실(이슈② 근본원인).
             var type = src.GetType();
-            var json = JsonSerializer.Serialize(src, type, _opts);
-            return JsonSerializer.Deserialize(json, type, _opts);
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(src);
+            return Newtonsoft.Json.JsonConvert.DeserializeObject(json, type);
         }
         catch (Exception ex)
         {

@@ -95,7 +95,13 @@ public partial class MapViewModel : IUndoApplyContext
         => RunOnUiAsync(async () =>
         {
             if (marker == null || marker.IsDisposed) return;
-            try { await DbUpdateProcess(marker); MainMap?.InvalidateVisual(); }
+            try
+            {
+                await DbUpdateProcess(marker);
+                MainMap?.InvalidateVisual();
+                // 그룹 선택 중이면 점선박스도 마커 복귀/변경 위치로 재계산(undo 후 박스 미추종 방지, 이슈①).
+                if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();
+            }
             catch (Exception ex) { _log?.Error($"[Undo] 마커 업데이트 적용 실패: {ex.Message}"); }
         });
 
