@@ -431,6 +431,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.DigitalZoomLevelChanged += OnMapDigitalZoomLevelChanged; // 디지털 줌 → 축척바 갱신
             MainMap.OnMapClicked += OnMapClicked;
             MainMap.TargetAimClicked += OnTargetAimClicked;                  // 카메라 특정위치 확인 — 좌클릭 좌표 수신
+            MainMap.SymbolPlacementClicked += OnSymbolPlacementClicked;      // 추가 버튼 배치 모드 — 좌클릭 위치에 심볼 추가(#4)
             MainMap.PreviewKeyDown += OnMapPreviewKeyDownForAim;             // ESC 취소
 
             // 그룹(러버밴드) 다중선택 (GMap_RubberBand_MultiSelect) — AdornerManager 밖 전용 서비스
@@ -496,6 +497,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.DigitalZoomLevelChanged -= OnMapDigitalZoomLevelChanged;
             MainMap.OnMapClicked -= OnMapClicked;
             MainMap.TargetAimClicked -= OnTargetAimClicked;
+            MainMap.SymbolPlacementClicked -= OnSymbolPlacementClicked;
             MainMap.PreviewKeyDown -= OnMapPreviewKeyDownForAim;
             if (_aimEscWindow != null) { _aimEscWindow.PreviewKeyDown -= OnMapPreviewKeyDownForAim; _aimEscWindow = null; }
 
@@ -644,6 +646,64 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
+    // ─────────────── 심볼 배치 모드(#4 — 추가 버튼 → 클릭으로 배치) ───────────────
+    private EnumMarkerCategory _placeCategory;
+    private object? _placeType;
+    private string? _placeTitle;
+
+    /// <summary>추가 버튼 → 배치 모드 진입(타겟조준 패턴). 커서 십자 + 다음 좌클릭 위치에 심볼 추가. 편집모드는 유지.</summary>
+    private void EnterSymbolPlacementMode(EnumMarkerCategory category, object type, string title)
+    {
+        if (MainMap == null || type == null) return;
+        // 충돌 모드 정리(타겟조준·라인드로잉). 배치는 편집모드와 공존(편집모드 종료 안 함).
+        if (MainMap.IsTargetAimMode) ExitTargetAimMode();
+        if (MainMap.IsLineDrawing) _ = MainMap.LineDrawingService?.CancelDrawingAsync();
+        _placeCategory = category; _placeType = type; _placeTitle = title;
+        MainMap.IsSymbolPlacementMode = true;
+        System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
+        EnsureAimEscWindowHook();   // ESC 취소(윈도우 후킹 재사용)
+        MainMap.Focus();
+        SetAimStatus($"클릭한 위치에 '{title}' 배치 — (ESC = 취소)");
+    }
+
+    /// <summary>배치 모드 종료(취소/완료 공통) — 커서·상태·대기정보 정리.</summary>
+    private void ExitSymbolPlacementMode()
+    {
+        _placeType = null; _placeTitle = null;
+        if (MainMap != null) MainMap.IsSymbolPlacementMode = false;
+        if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
+            System.Windows.Input.Mouse.OverrideCursor = null;
+        IsAimStatusVisible = false;
+    }
+
+    /// <summary>배치 모드 좌클릭 수신 — 클릭 위치에 대기 심볼 추가 후 모드 종료(단발).</summary>
+    private async void OnSymbolPlacementClicked(PointLatLng geo, Point screen)
+    {
+        if (MainMap == null || !MainMap.IsSymbolPlacementMode) return;
+        var category = _placeCategory; var type = _placeType; var title = _placeTitle ?? GetSymbolTitle();
+        ExitSymbolPlacementMode();   // 단발 — 먼저 종료(재진입/중복 방지)
+        if (type == null) return;
+        try
+        {
+            switch (category)
+            {
+                case EnumMarkerCategory.BASIC_SHAPES:
+                    if (type is string bt) await AddBasicShapeMarker(geo, bt, title);
+                    break;
+                case EnumMarkerCategory.GEOMETRICS:
+                    if (type is EnumShapeType gt) await AddGeometricMarker(geo, gt, title);
+                    break;
+                case EnumMarkerCategory.PIDS_EQUIPMENT:
+                    if (type is EnumDeviceType dt) await AddPidsMarker(geo, dt, title);
+                    break;
+                case EnumMarkerCategory.INFRASTRUCTURE:
+                    if (type is string it) await AddInfraMarker(geo, it, title);
+                    break;
+            }
+        }
+        catch (Exception ex) { _log?.Error($"심볼 배치 실패: {ex.Message}"); }
+    }
+
     /// <summary>타겟 모드 진입 시 충돌 모드(라인드로잉) 종료. (편집 모드 좌클릭은 타겟 분기가 선점)</summary>
     private void CancelConflictingModesForAim()
     {
@@ -755,10 +815,17 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>ESC = 타겟 모드 취소.</summary>
     private void OnMapPreviewKeyDownForAim(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == System.Windows.Input.Key.Escape && (MainMap?.IsTargetAimMode ?? false))
+        if (e.Key != System.Windows.Input.Key.Escape) return;
+        if (MainMap?.IsTargetAimMode ?? false)
         {
             ExitTargetAimMode();
             SetAimStatus("취소했습니다.", autoHide: true);
+            e.Handled = true;
+        }
+        else if (MainMap?.IsSymbolPlacementMode ?? false)   // 배치 모드도 ESC 취소(#4)
+        {
+            ExitSymbolPlacementMode();
+            SetAimStatus("배치를 취소했습니다.", autoHide: true);
             e.Handled = true;
         }
     }
@@ -967,6 +1034,12 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
         if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
+        int deletable = _groupSelection.Selection.Count(m => m != null && !m.IsDisposed && !m.IsLocked);
+        if (deletable <= 0) { SetAimStatus("삭제할 항목이 없습니다(잠금 제외).", true); return; }
+        // 다중 삭제 확인 — 파괴적 작업(Ctrl+Z 가능하나 실수 방지용 확인창).
+        if (System.Windows.MessageBox.Show($"선택한 {deletable}개 심볼을 삭제할까요?", "그룹 삭제 확인",
+                System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning)
+            != System.Windows.MessageBoxResult.Yes) return;
         int del = 0, skipped = 0;
         using (_editRecorder?.BeginBatch("그룹 삭제"))
         {
@@ -1004,12 +1077,18 @@ public partial class MapViewModel : BasePanelViewModel,
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
         if (!CanEditMap()) { SetAimStatus("잠금 변경 권한이 없습니다.", true); return; }
         int n = 0;
+        var lockChanges = new System.Collections.Generic.List<(IEditableMarker m, bool before)>();
         foreach (var m in _groupSelection.Selection.ToList())
         {
             if (m == null || m.IsDisposed) continue;
-            try { m.IsLocked = locked; await DbUpdateProcess(m); n++; }
+            var before = m.IsLocked;
+            try { m.IsLocked = locked; await DbUpdateProcess(m); if (before != locked) lockChanges.Add((m, before)); n++; }
             catch (Exception ex) { _log?.Error($"그룹 잠금 변경 실패: {ex.Message}"); }
         }
+        // Undo 기록 — 그룹 잠금/해제를 1 매크로로(개별 잠금과 동일 RecordLock). 누락 시 Ctrl+Z 무반응이었음(버그 B).
+        if (lockChanges.Count > 0)
+            using (_editRecorder?.BeginBatch(locked ? "그룹 잠금" : "그룹 잠금 해제"))
+                foreach (var c in lockChanges) _editRecorder?.RecordLock(c.m, c.before, locked);
         SyncLayerNodesFromMarkers(_groupSelection.Selection);   // D: 레이어 트리 노드 잠금 상태 동기화
         _groupSelection.RefreshAdorner();
         NotifyOfPropertyChange(nameof(SelectedMarkers));
@@ -2188,7 +2267,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             ClickedCurrentPosition = geoPos;
-            _log?.Info($"지도 클릭: ({geoPos.Lat:F6}, {geoPos.Lng:F6})");
+            //_log?.Info($"지도 클릭: ({geoPos.Lat:F6}, {geoPos.Lng:F6})");
 
             // 편집 모드에서 빈 공간 클릭 시 모든 선택 해제
             if (IsEditModeEnabled)
@@ -3244,6 +3323,8 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void ExecuteDeleteSelected(object obj)
     {
         if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 선택 삭제 차단"); ShowNoMapEditPermissionInfo(); return; }
+        // 멀티셀렉트(그룹) 상태면 그룹 삭제로 위임 — 상단 메뉴 삭제 버튼도 다중삭제·확인창 적용(A).
+        if (_groupSelection?.HasSelection ?? false) { await ExecuteGroupDelete(); return; }
         try
         {
             if (SelectedImage != null)
@@ -3497,18 +3578,15 @@ public partial class MapViewModel : BasePanelViewModel,
 
             switch (SelectedMarkerCategory)
             {
+                // 점 심볼(#4) — 즉시 추가 대신 배치 모드 진입(클릭으로 위치 지정).
                 case EnumMarkerCategory.BASIC_SHAPES:
                     if (SelectedSymbolType is string basicType)
-                    {
-                        await AddBasicShapeMarker(position, basicType, symbolTitle);
-                    }
+                        EnterSymbolPlacementMode(SelectedMarkerCategory, basicType, symbolTitle);
                     break;
 
                 case EnumMarkerCategory.GEOMETRICS:
                     if (SelectedSymbolType is EnumShapeType shapeType)
-                    {
-                        await AddGeometricMarker(position, shapeType, symbolTitle);
-                    }
+                        EnterSymbolPlacementMode(SelectedMarkerCategory, shapeType, symbolTitle);
                     break;
 
                 case EnumMarkerCategory.VEHICLES:
@@ -3516,28 +3594,22 @@ public partial class MapViewModel : BasePanelViewModel,
                     break;
 
                 case EnumMarkerCategory.MILITARY_SYMBOLS:
-                    ShowMilitarySymbolRegisterPanel();
+                    ShowMilitarySymbolRegisterPanel();   // 군대부호 = 등록 패널(배치모드 아님)
                     break;
 
                 case EnumMarkerCategory.PIDS_EQUIPMENT:
                     if (System.Enum.TryParse<EnumDeviceType>(SelectedSymbolType.ToString(), out var deviceType))
-                    {
-                        await AddPidsMarker(position, deviceType, symbolTitle);
-                    }
+                        EnterSymbolPlacementMode(SelectedMarkerCategory, deviceType, symbolTitle);
                     break;
 
                 case EnumMarkerCategory.AREA_BOUNDARY:
                     if (SelectedSymbolType is string areaType)
-                    {
-                        await AddAreaBoundaryMarker(position, areaType, symbolTitle);
-                    }
+                        await AddAreaBoundaryMarker(position, areaType, symbolTitle);   // 라인/영역 = 기존 드로잉 유지
                     break;
 
                 case EnumMarkerCategory.INFRASTRUCTURE:
                     if (SelectedSymbolType is string infraType)
-                    {
-                        await AddInfraMarker(position, infraType, symbolTitle);
-                    }
+                        EnterSymbolPlacementMode(SelectedMarkerCategory, infraType, symbolTitle);
                     break;
 
              
@@ -4407,7 +4479,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 강제 새로고침
             MainMap?.InvalidateVisual();
 
-            _log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
+            //_log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
             _log?.Info($"현재 총 마커 수: {MainMap?.Markers.Count}");
         }
         catch (Exception ex)
@@ -4448,7 +4520,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 강제 새로고침
             MainMap?.InvalidateVisual();
 
-            _log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
+            //_log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
             _log?.Info($"현재 총 마커 수: {MainMap?.Markers.Count}");
         }
         catch (Exception ex)
@@ -4539,7 +4611,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 강제 새로고침
             MainMap?.InvalidateVisual();
 
-            _log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
+            //_log?.Info($"마커 추가 완료: {title} at ({position.Lat:F6}, {position.Lng:F6})");
             _log?.Info($"현재 총 마커 수: {MainMap?.Markers.Count}");
         }
         catch (Exception ex)
@@ -4732,7 +4804,7 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         try
         {
-            _log?.Info($"마커 생성 시작: Type={symbolModel.GetType().Name}, Title={symbolModel.Title}");
+            //_log?.Info($"마커 생성 시작: Type={symbolModel.GetType().Name}, Title={symbolModel.Title}");
 
             // 1. Factory로 마커 생성
             var marker = _markerFactory.CreateMarker(symbolModel);
@@ -4751,7 +4823,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (marker is IEditableMarker em && em.Id > 0) _editRecorder?.RecordAdd(em);   // Undo 기록(추가). Id=0(AddPidsSingle 버그) 제외
             }
 
-            _log?.Info($"마커 추가 완료: {symbolModel.Title}");
+            //_log?.Info($"마커 추가 완료: {symbolModel.Title}");
         }
         catch (Exception ex)
         {
@@ -4797,7 +4869,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
         // Shape 확인 로그
         var shapeType = gMapMarker.Shape?.GetType().Name ?? "null";
-        _log?.Info($"마커 '{marker.Title}' 추가됨, Shape: {shapeType}");
+        //_log?.Info($"마커 '{marker.Title}' 추가됨, Shape: {shapeType}");
     }
 
     /// <summary>
@@ -6952,14 +7024,16 @@ public partial class MapViewModel : BasePanelViewModel,
                 _isEditModeEnabled = value;
                 MainMap.SetEditMode(value);
 
-                // 편집 모드 해제 시 모든 선택 해제
+                // 편집 모드 해제 시 모든 선택 해제 + 배치 모드 취소(#4)
                 if (!value)
                 {
                     ClearAllSelections();
+                    ExitSymbolPlacementMode();
                 }
 
                 NotifyOfPropertyChange(nameof(IsEditModeEnabled));
                 NotifyOfPropertyChange(nameof(CanEditMarker));
+                NotifyOfPropertyChange(nameof(CanAddSymbol));   // 추가 버튼 활성 갱신(#3)
                 if (PropertyPanel != null)
                     PropertyPanel.IsEditModeEnabled = value;
                 _log?.Info($"편집 모드: {(value ? "활성화" : "비활성화")}");
@@ -7547,7 +7621,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 심볼 추가 가능 여부
     /// </summary>
-    public bool CanAddSymbol => SelectedSymbolType != null;
+    public bool CanAddSymbol => SelectedSymbolType != null && IsEditModeEnabled;   // 편집모드에서만 추가(#3)
     public EnumColorType[] AvailableColors => ColorHelper.GetCommonColors();
     public double[] AvailableSize => Enumerable.Range(1, 20).Select(i => i * 0.5).ToArray();
 
@@ -8402,7 +8476,7 @@ public partial class MapViewModel : BasePanelViewModel,
             UpdateLayerItemCounts();
 
             var leafCount = LayerTreeBuilder.Flatten(_layerTreeNodes).Count();
-            _log?.Info($"레이어 트리 빌드 완료 ({leafCount}개 Leaf 노드)");
+            //_log?.Info($"레이어 트리 빌드 완료 ({leafCount}개 Leaf 노드)");
         }
         catch (Exception ex)
         {

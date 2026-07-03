@@ -153,6 +153,10 @@ public class GMapCustomControl : GMapControl
     /// <summary>타겟 조준 반경(m). 화면 원 크기 산출에 사용(지오→픽셀, 줌마다 재계산).</summary>
     public double AimOverlayRadiusMeters { get; set; }
 
+    /// <summary>심볼 배치 모드 — ON이면 좌클릭을 가로채 <see cref="SymbolPlacementClicked"/>로 전달(그 위치에 심볼 추가).
+    /// ViewModel(추가 버튼)이 진입/종료. 타겟조준·라인드로잉과 동급의 base-전 가로채기 모드.</summary>
+    public bool IsSymbolPlacementMode { get; set; }
+
     #endregion
 
     #region Integration Events
@@ -165,6 +169,9 @@ public class GMapCustomControl : GMapControl
     /// 타겟 조준 모드 좌클릭 - 클릭 지점 좌표를 ViewModel에 전달(카메라 회전요청 발행용).
     /// </summary>
     public event Action<PointLatLng, Point>? TargetAimClicked;
+
+    /// <summary>심볼 배치 모드 좌클릭 - 클릭 지점 좌표를 ViewModel에 전달(그 위치에 심볼 추가).</summary>
+    public event Action<PointLatLng, Point>? SymbolPlacementClicked;
 
     /// <summary>
     /// 마커 클릭 이벤트 - ViewModel에 클릭된 마커 전달
@@ -582,7 +589,7 @@ public class GMapCustomControl : GMapControl
                     RegisterMarkerForAdorner(newItem);
                     //_log?.Info($"마커 Adorner 등록: {newItem.Title}");
                 }
-                _log?.Info($"Markers 최종 개수: {Markers.Count}");
+                //_log?.Info($"Markers 최종 개수: {Markers.Count}");
                 break;
 
             case NotifyCollectionChangedAction.Remove:
@@ -776,6 +783,14 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [심볼 배치] 추가 버튼으로 진입한 배치 모드 — 클릭 위치에 심볼 추가(타겟조준과 동급, base 전 가로채기).
+        if (IsSymbolPlacementMode)
+        {
+            SymbolPlacementClicked?.Invoke(geoPos, mousePos);
+            e.Handled = true;
+            return;
+        }
+
         if (IsLineDrawing)
         {
             OnMapClicked?.Invoke(geoPos, mousePos);
@@ -854,7 +869,7 @@ public class GMapCustomControl : GMapControl
         }
         else
         {
-            _log?.Info("빈 공간 클릭 이벤트 발생");
+            //_log?.Info("빈 공간 클릭 이벤트 발생");
             OnMapClicked?.Invoke(geoPos, mousePos);
         }
 
@@ -1081,7 +1096,7 @@ public class GMapCustomControl : GMapControl
 
         if (candidates.Count == 0)
         {
-            _log?.Info("클릭 위치에서 마커를 찾을 수 없음");
+            //_log?.Info("클릭 위치에서 마커를 찾을 수 없음");
             return null;
         }
 
@@ -1144,7 +1159,7 @@ public class GMapCustomControl : GMapControl
             if (marker != null && AdornerManager != null)
             {
                 // Adorner는 선택 시에만 생성되므로 여기서는 등록만
-                _log?.Info($"마커 Adorner 등록: {marker.Title}");
+                //_log?.Info($"마커 Adorner 등록: {marker.Title}");
             }
         }
         catch (Exception ex)
@@ -1164,7 +1179,7 @@ public class GMapCustomControl : GMapControl
             {
                 // 선택 해제하여 Adorner 제거
                 AdornerManager.DeselectMarker(marker, this);
-                _log?.Info($"마커 Adorner 해제: {marker.Title}");
+                //_log?.Info($"마커 Adorner 해제: {marker.Title}");
             }
         }
         catch (Exception ex)
