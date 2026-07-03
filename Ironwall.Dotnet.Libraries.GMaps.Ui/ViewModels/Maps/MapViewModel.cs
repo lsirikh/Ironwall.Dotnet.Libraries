@@ -5212,7 +5212,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     Header = "맨 위로",
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseUp, Width = 16, Height = 16 }
                 };
-                moveTopItem.Click += (s, e) => MoveMarkerToTop(marker);
+                moveTopItem.Click += (s, e) => { var zb = IsApplyingUndo ? null : CaptureZOrderPairs(); MoveMarkerToTop(marker); if (zb != null) RecordZOrderDiff(zb); };   // V4 undo 기록
                 menu.Items.Add(moveTopItem);
 
                 var moveUpItem = new MenuItem
@@ -5220,7 +5220,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     Header = "한 칸 위로",
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowUp, Width = 16, Height = 16 }
                 };
-                moveUpItem.Click += (s, e) => MoveMarkerUp(marker);
+                moveUpItem.Click += (s, e) => { var zb = IsApplyingUndo ? null : CaptureZOrderPairs(); MoveMarkerUp(marker); if (zb != null) RecordZOrderDiff(zb); };   // V4 undo 기록
                 menu.Items.Add(moveUpItem);
 
                 var moveDownItem = new MenuItem
@@ -5228,7 +5228,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     Header = "한 칸 아래로",
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowDown, Width = 16, Height = 16 }
                 };
-                moveDownItem.Click += (s, e) => MoveMarkerDown(marker);
+                moveDownItem.Click += (s, e) => { var zb = IsApplyingUndo ? null : CaptureZOrderPairs(); MoveMarkerDown(marker); if (zb != null) RecordZOrderDiff(zb); };   // V4 undo 기록
                 menu.Items.Add(moveDownItem);
 
                 var moveBottomItem = new MenuItem
@@ -5236,7 +5236,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     Header = "맨 아래로",
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ArrowCollapseDown, Width = 16, Height = 16 }
                 };
-                moveBottomItem.Click += (s, e) => MoveMarkerToBottom(marker);
+                moveBottomItem.Click += (s, e) => { var zb = IsApplyingUndo ? null : CaptureZOrderPairs(); MoveMarkerToBottom(marker); if (zb != null) RecordZOrderDiff(zb); };   // V4 undo 기록
                 menu.Items.Add(moveBottomItem);
             }
 
@@ -7209,6 +7209,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private void OnPropertyPanelZOrderChangeRequested(object? sender, ZOrderChangeRequestedEventArgs e)
     {
         if (SelectedMarker == null || MainMap == null) return;
+        var zBefore = IsApplyingUndo ? null : CaptureZOrderPairs();   // V4 — 단일 순서변경 undo 기록(라이브 패널 경로)
         switch (e.Direction)
         {
             case ZOrderDirection.Up:       MoveMarkerUp(SelectedMarker);       break;
@@ -7217,6 +7218,7 @@ public partial class MapViewModel : BasePanelViewModel,
             case ZOrderDirection.ToBottom: MoveMarkerToBottom(SelectedMarker); break;
         }
         RefreshPropertyPanelZOrder();
+        if (zBefore != null) RecordZOrderDiff(zBefore);
     }
 
     private void HidePropertyPanel()

@@ -202,6 +202,9 @@ public partial class MapViewModel : IUndoApplyContext
     /// <summary>단일 심볼 리프 노드만 라이브 마커 기준 갱신(이름/잠금/체크) — 전체 리로드 회피(열린 패널 dispose 방지, FIX 4).</summary>
     public void SyncMarkerNode(int id)
     {
+        // 트리 노드 INotifyPropertyChanged는 UI 스레드에서만 발화(백그라운드 replay 안전, V6 하드닝)
+        var disp = System.Windows.Application.Current?.Dispatcher;
+        if (disp != null && !disp.CheckAccess()) { disp.Invoke(() => SyncMarkerNode(id)); return; }
         var m = FindMarkerById(id);
         if (m == null || _layerTreeNodes == null) return;
         foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
