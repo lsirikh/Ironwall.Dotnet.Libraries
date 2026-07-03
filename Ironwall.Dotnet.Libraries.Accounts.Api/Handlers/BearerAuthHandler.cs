@@ -32,12 +32,21 @@ public class BearerAuthHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        var isAuth = IsAuthEndpoint(request.RequestUri);
+
+        // 로그인/갱신은 Bearer 미부착(로그인=신규 자격, 갱신=바디 refresh_token). 로그아웃·그 외는 access 토큰 부착.
         var staleToken = _store.AccessToken;
-        ApplyBearer(request, staleToken);
+        if (!IsLoginOrRefresh(request.RequestUri))
+            ApplyBearer(request, staleToken);
 
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.Unauthorized)
             return response;   // 200/403 등 — 403 은 권한 문제라 refresh 미시도
+
+        // ★ auth 엔드포인트(로그인/갱신/로그아웃)의 401은 refresh·세션만료로 처리하지 않는다:
+        //    오답 로그인 401을 '세션 만료'로 오인해 가짜 ForceLogout 하거나, /auth/refresh 재진입으로 _refreshLock 이 스톨하던 문제 차단.
+        if (isAuth)
+            return response;
 
         var refreshed = await TryRefreshSingleFlightAsync(staleToken, cancellationToken).ConfigureAwait(false);
         if (!refreshed)
@@ -53,6 +62,17 @@ public class BearerAuthHandler : DelegatingHandler
         ApplyBearer(retry, _store.AccessToken);
         return await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>auth 액션 엔드포인트(로그인/갱신/로그아웃) 여부 — 401 refresh·세션만료 로직 제외 대상.</summary>
+    private static bool IsAuthEndpoint(Uri? uri)
+        => MatchesPath(uri, "/auth/login") || MatchesPath(uri, "/auth/refresh") || MatchesPath(uri, "/auth/logout");
+
+    /// <summary>Bearer 미부착 대상 — 로그인(신규 자격)·갱신(바디 refresh_token 사용).</summary>
+    private static bool IsLoginOrRefresh(Uri? uri)
+        => MatchesPath(uri, "/auth/login") || MatchesPath(uri, "/auth/refresh");
+
+    private static bool MatchesPath(Uri? uri, string suffix)
+        => uri is not null && uri.AbsolutePath.TrimEnd('/').EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
 
     private static void ApplyBearer(HttpRequestMessage request, string? token)
     {

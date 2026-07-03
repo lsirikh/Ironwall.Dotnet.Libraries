@@ -70,6 +70,25 @@ public class BearerAuthHandlerTests
         Assert.Equal(1, inner.Calls);
     }
 
+    [Fact]
+    public async Task should_not_signal_session_expired_when_auth_endpoint_401()
+    {
+        // 오답 로그인 401은 '세션 만료'가 아니다 — auth 엔드포인트(login/refresh/logout)는 refresh·SessionExpired 제외.
+        var store = new TokenStorageService();            // 미로그인(토큰 없음)
+        var api = new FakeAccountApi(refreshOk: false);
+        var inner = new SequenceHandler(HttpStatusCode.Unauthorized);
+        var client = BuildClient(inner, store, api, out var handler);
+        var expired = false;
+        handler.SessionExpired += () => expired = true;
+
+        var res = await client.PostAsync("auth/login", new StringContent("{}"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+        Assert.False(expired);                            // ★ 가짜 세션만료/ForceLogout 없음
+        Assert.Equal(0, api.RefreshCalls);                // refresh 미시도
+        Assert.Equal(1, inner.Calls);                     // 재시도 없음
+    }
+
     // ── 테스트 더블 ──────────────────────────────────────────────
 
     private sealed class SequenceHandler : HttpMessageHandler
