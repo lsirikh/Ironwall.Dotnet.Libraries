@@ -80,8 +80,12 @@ public class UndoRedoTests
         public readonly List<(int id, GMap.NET.RectLatLng bounds, double rot)> ImgEditApplied = new();
         public Task ApplyCustomImageEditAsync(int id, GMap.NET.RectLatLng bounds, double rotation, CancellationToken ct = default) { ImgEditApplied.Add((id, bounds, rotation)); return Task.CompletedTask; }
         public readonly List<(int id, string? name, double? opacity, int? zOrder)> LayerApplied = new();
+        public bool ThrowOnLayer;   // BUG-04 검증 — apply 실패(DB오류 등) 모사
         public Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
-        { LayerApplied.Add((layerId, name, opacity, zOrder)); return Task.CompletedTask; }
+        {
+            if (ThrowOnLayer) throw new System.InvalidOperationException("db fail");
+            LayerApplied.Add((layerId, name, opacity, zOrder)); return Task.CompletedTask;
+        }
     }
 
     /// <summary>Undo 시 예외를 던지는 커맨드 — 매크로 자식별 격리 검증용.</summary>
@@ -423,5 +427,31 @@ public class UndoRedoTests
         Assert.Equal("옛이름", ctx.LayerApplied[^1].name);
         await svc.RedoAsync();
         Assert.Equal("새이름", ctx.LayerApplied[^1].name);
+    }
+
+    // ─────────────── silent-success 방지(감사 Round1 — BUG-03/04) ───────────────
+    [Fact(DisplayName = "UndoService — 커맨드 예외 시 undo 스택 유지·redo로 이동 안 함(silent-success 방지)")]
+    public async Task should_keep_in_undo_stack_when_command_throws()
+    {
+        var svc = new UndoService();
+        svc.Push(new ThrowingCommand());
+        var ok = await svc.UndoAsync();
+        Assert.False(ok);            // 실패를 보고(true 아님)
+        Assert.True(svc.CanUndo);    // undo 스택에 유지 → 재시도 가능
+        Assert.False(svc.CanRedo);   // 실패인데 redo로 잘못 이동하지 않음
+    }
+
+    [Fact(DisplayName = "LayerNodeCommand — apply 예외 전파 시 UndoService가 실패 인지(redo 오이동 방지, BUG-04)")]
+    public async Task should_not_move_to_redo_when_layer_apply_throws()
+    {
+        var ctx = new FakeApplyContext { ThrowOnLayer = true };   // 실 ApplyLayerFieldsAsync가 swallow 대신 전파하도록 수정된 계약
+        var svc = new UndoService();
+        var before = new[] { new LayerFields(5, "옛이름", null, null) };
+        var after = new[] { new LayerFields(5, "새이름", null, null) };
+        svc.Push(new LayerNodeCommand(ctx, "이름 변경", before, after));
+        var ok = await svc.UndoAsync();
+        Assert.False(ok);
+        Assert.True(svc.CanUndo);    // 실패 → undo 스택 유지
+        Assert.False(svc.CanRedo);   // redo로 이동 안 함
     }
 }

@@ -199,6 +199,15 @@ public partial class MapViewModel : IUndoApplyContext
 
     public void ResyncTree() => _ = LoadLayersFromDbAsync();
 
+    /// <summary>UI 스레드 보장 실행 — Undo/Redo가 세마포어 경합(급속 Ctrl+Z)으로 스레드풀에서 재개돼도
+    /// WPF 마커/맵/트리 접근이 크로스스레드가 되지 않게 본문 전체를 디스패처로 마샬. 예외는 호출자로 전파(BUG-05~09).</summary>
+    private Task RunOnUiAsync(Func<Task> body)
+    {
+        var disp = System.Windows.Application.Current?.Dispatcher;
+        if (disp == null || disp.CheckAccess()) return body();
+        return disp.InvokeAsync(body).Task.Unwrap();
+    }
+
     /// <summary>단일 심볼 리프 노드만 라이브 마커 기준 갱신(이름/잠금/체크) — 전체 리로드 회피(열린 패널 dispose 방지, FIX 4).</summary>
     public void SyncMarkerNode(int id)
     {
@@ -206,7 +215,12 @@ public partial class MapViewModel : IUndoApplyContext
         var disp = System.Windows.Application.Current?.Dispatcher;
         if (disp != null && !disp.CheckAccess()) { disp.Invoke(() => SyncMarkerNode(id)); return; }
         var m = FindMarkerById(id);
-        if (m == null || _layerTreeNodes == null) return;
+        if (m == null) return;
+        // 열린 속성패널이 이 마커면 제목 표시도 동기화 — 심볼 이름 undo 시 패널 stale 방지(BUG-02 대칭, P7).
+        // MarkerTitle은 marker.Title을 자동추적하지 않음(forward OnLayerRenameRequested:8442가 명시 세팅). 에코는 IsApplyingUndo로 억제.
+        if (PropertyPanel?.SelectedMarker is IEditableMarker psel && psel.Id == id)
+            PropertyPanel.MarkerTitle = m.Title ?? string.Empty;
+        if (_layerTreeNodes == null) return;
         bool matched = false;
         foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
             if (leaf.Symbol!.Id == id)
@@ -216,42 +230,39 @@ public partial class MapViewModel : IUndoApplyContext
                 leaf.SetCheckedSilently(m.ShowShape);
                 matched = true;
             }
-        // AREA 4: 심볼 리프에 없으면(이미지 마커=오버레이 이미지 노드) 전체 리로드로 트리 반영
-        if (!matched && m is GMapSymbols.GMapImageMarker) ResyncTree();
+        // AREA 4: 심볼 리프에 없으면(이미지 마커=오버레이 이미지 노드 OR 트리 누락 심볼) 전체 리로드로 트리 반영(BUG-01)
+        if (!matched) ResyncTree();
     }
 
     // ── v2 커버리지 seam 구현 ──
     /// <summary>런타임 가시성 적용(DB 미영속) — 마커 상태 + 시각 + 트리 체크 갱신.</summary>
     public Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default)
-    {
-        var m = FindMarkerById(id);
-        if (m == null) return Task.CompletedTask;
-        m.IsLayerEnabled = show;
-        m.ShowShape = show;
-        m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
-        MainMap?.InvalidateVisual();
-        SyncMarkerNode(id);   // 트리 체크박스 반영(UI 스레드 마샬 내장)
-        return Task.CompletedTask;
-    }
+        => RunOnUiAsync(() =>
+        {
+            var m = FindMarkerById(id);
+            if (m == null) return Task.CompletedTask;
+            m.IsLayerEnabled = show;
+            m.ShowShape = show;
+            m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
+            MainMap?.InvalidateVisual();
+            SyncMarkerNode(id);   // 트리 체크박스 반영
+            return Task.CompletedTask;
+        });
 
-    /// <summary>파일 오버레이 이미지 회전 적용 + 영속.</summary>
-    public async Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default)
-    {
-        try
+    /// <summary>파일 오버레이 이미지 회전 적용 + 영속. 예외는 UndoService로 전파(실패 시 redo 오이동 방지, BUG-03/04).</summary>
+    public Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
         {
             var img = MainMap?.CustomImages?.FirstOrDefault(i => i.Id == id);
             if (img == null) return;
             img.UserRotation = rotation;   // EffectiveRotation 자동 갱신
             MainMap?.InvalidateVisual();
             if (img.Id > 0) await _gMapDbSymbolService.UpdateImageAsync(img.Model);
-        }
-        catch (Exception ex) { _log?.Error($"[Undo] 이미지 회전 적용 실패: {ex.Message}"); }
-    }
+        });
 
-    /// <summary>파일 오버레이 이미지 이동/크기/회전 적용 + 영속(D1 핸들 편집).</summary>
-    public async Task ApplyCustomImageEditAsync(int id, GMap.NET.RectLatLng bounds, double rotation, CancellationToken ct = default)
-    {
-        try
+    /// <summary>파일 오버레이 이미지 이동/크기/회전 적용 + 영속(D1 핸들 편집). 예외는 UndoService로 전파(BUG-03/04).</summary>
+    public Task ApplyCustomImageEditAsync(int id, GMap.NET.RectLatLng bounds, double rotation, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
         {
             var img = MainMap?.CustomImages?.FirstOrDefault(i => i.Id == id);
             if (img == null) return;
@@ -259,14 +270,12 @@ public partial class MapViewModel : IUndoApplyContext
             img.UserRotation = rotation;
             MainMap?.InvalidateVisual();
             if (img.Id > 0) await _gMapDbSymbolService.UpdateImageAsync(img.Model);
-        }
-        catch (Exception ex) { _log?.Error($"[Undo] 이미지 편집 적용 실패: {ex.Message}"); }
-    }
+        });
 
-    /// <summary>MapLayers 노드 필드 적용(이름/투명도/ZOrder) + OverlayImage 마커 동기화 + 트리 리로드.</summary>
-    public async Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
-    {
-        try
+    /// <summary>MapLayers 노드 필드 적용(이름/투명도/ZOrder) + OverlayImage 마커 동기화 + 트리 리로드.
+    /// UI스레드 마샬(BUG-06/08/09), 예외는 UndoService로 전파(BUG-04).</summary>
+    public Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
+        => RunOnUiAsync(async () =>
         {
             var layers = await _gMapDbService.FetchMapLayersAsync();
             var layer = layers?.FirstOrDefault(l => l.Id == layerId);
@@ -281,15 +290,19 @@ public partial class MapViewModel : IUndoApplyContext
                 var marker = FindImageMarkerByFilePath(layer.FilePath);
                 if (marker != null)
                 {
-                    if (name != null) { marker.Title = name; await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel); }
+                    if (name != null)
+                    {
+                        marker.Title = name;
+                        await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
+                        // 열린 속성패널이 이 마커 선택 중이면 제목 반영(forward OnLayerRenameRequested 미러, BUG-02)
+                        if (PropertyPanel?.SelectedMarker == marker) PropertyPanel.MarkerTitle = name;
+                    }
                     if (opacity.HasValue) marker.Opacity = opacity.Value;
                 }
             }
             if (zOrder.HasValue) SyncMapRenderingOrder(layer);   // ZOrder 변경 시 렌더순서 동기화
             await LoadLayersFromDbAsync();
             MainMap?.InvalidateVisual();
-        }
-        catch (Exception ex) { _log?.Error($"[Undo] 레이어 필드 적용 실패: {ex.Message}"); }
-    }
+        });
     #endregion
 }
