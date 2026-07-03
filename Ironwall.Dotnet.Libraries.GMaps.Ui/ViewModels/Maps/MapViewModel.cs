@@ -70,6 +70,7 @@ public partial class MapViewModel : BasePanelViewModel,
                             IHandle<AllDevicesLoadedMessage>,
                             IHandle<CallDeleteMapRoiProcessMessageModel>,
                             IHandle<CallDeleteMapLayerProcessMessageModel>,
+                            IHandle<CallDeleteGroupSymbolsProcessMessageModel>,
                             IHandle<ZOrderChangeRequestedEvent>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
@@ -1029,21 +1030,43 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void OnGroupDeleteRequested() => await ExecuteGroupDelete();
     private async void OnGroupLockRequested(bool locked) => await ExecuteGroupLock(locked);
 
-    /// <summary>그룹 삭제 — 잠긴 멤버 스킵(FR-MS-08), CanEditMap 게이트.</summary>
+    // 그룹 삭제 확인 대기 스냅샷 — 확인 팝업 발행 시 대상 마커를 담고, Handle에서 소비.
+    private System.Collections.Generic.List<IEditableMarker>? _pendingGroupDelete;
+
+    /// <summary>그룹 삭제 요청 — 파괴적 작업이라 표준 확인 팝업(EventAggregator) 발행. 확인 시
+    /// <see cref="HandleAsync(CallDeleteGroupSymbolsProcessMessageModel, CancellationToken)"/> 가 실제 삭제 수행.
+    /// 잠긴 멤버 스킵(FR-MS-08), CanEditMap 게이트.</summary>
     private async Task ExecuteGroupDelete()
     {
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
         if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
-        int deletable = _groupSelection.Selection.Count(m => m != null && !m.IsDisposed && !m.IsLocked);
-        if (deletable <= 0) { SetAimStatus("삭제할 항목이 없습니다(잠금 제외).", true); return; }
-        // 다중 삭제 확인 — 파괴적 작업(Ctrl+Z 가능하나 실수 방지용 확인창).
-        if (System.Windows.MessageBox.Show($"선택한 {deletable}개 심볼을 삭제할까요?", "그룹 삭제 확인",
-                System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning)
-            != System.Windows.MessageBoxResult.Yes) return;
+        var targets = _groupSelection.Selection.Where(m => m != null && !m.IsDisposed && !m.IsLocked).ToList();
+        if (targets.Count == 0) { SetAimStatus("삭제할 항목이 없습니다(잠금 제외).", true); return; }
+
+        _pendingGroupDelete = targets;
+        // raw MessageBox 금지 — 프로젝트 표준 확인 팝업 패턴(ROI 삭제와 동일). 확인 콜백 = CallDeleteGroupSymbolsProcessMessageModel.
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "그룹 삭제",
+            Explain = $"선택한 {targets.Count}개 심볼을 삭제하시겠습니까?",
+            MessageModel = new CallDeleteGroupSymbolsProcessMessageModel()
+        });
+    }
+
+    #region - Group Delete IHandle -
+
+    /// <summary>그룹 삭제 확인 콜백 — 사용자가 확인 팝업에서 "확인" 시 발행됨. 실제 다중 삭제 수행(Undo 1 매크로).</summary>
+    public async Task HandleAsync(CallDeleteGroupSymbolsProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        var targets = _pendingGroupDelete;
+        _pendingGroupDelete = null;
+        if (targets == null || targets.Count == 0) return;
+        if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
+
         int del = 0, skipped = 0;
         using (_editRecorder?.BeginBatch("그룹 삭제"))
         {
-            foreach (var m in _groupSelection.Selection.ToList())
+            foreach (var m in targets)
             {
                 if (m == null || m.IsDisposed) continue;
                 if (m.IsLocked) { skipped++; continue; }
@@ -1062,7 +1085,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 catch (Exception ex) { _log?.Error($"그룹 삭제 실패: {ex.Message}"); }
             }
         }
-        _groupSelection.Clear();
+        _groupSelection?.Clear();
         NotifyOfPropertyChange(nameof(SelectedMarkers));
         HidePropertyPanel();
         // 레이어 패널 트리 동기화 — 그룹(다중) 삭제 경로도 누락돼 있어 스테일 노드가 남던 버그 보강.
@@ -1070,6 +1093,8 @@ public partial class MapViewModel : BasePanelViewModel,
         MainMap?.InvalidateVisual();
         SetAimStatus(skipped > 0 ? $"{del}개 삭제(잠금 {skipped}개 제외)" : $"{del}개 삭제", true);
     }
+
+    #endregion
 
     /// <summary>그룹 잠금/해제 — 전체 적용(FR-MS-06). marker.IsLocked 모델 연동 후 DB 영속.</summary>
     private async Task ExecuteGroupLock(bool locked)
