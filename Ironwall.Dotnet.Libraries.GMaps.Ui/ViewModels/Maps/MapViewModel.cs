@@ -365,6 +365,10 @@ public partial class MapViewModel : BasePanelViewModel,
             _log?.Error($"장비-심볼 매핑 실패: {ex.Message}");
         }
 
+        // 시작(로그인 후 최종 로드) 시 undo 이력 초기화 — 시드 오버레이/심볼 등록 등 부팅 중 기록된 항목이
+        // 사용자 편집으로 오인돼 Undo되는 사고 방지(예: 이미지 오버레이 소실). 재로그인마다 깨끗한 상태.
+        ClearUndoStack();
+
         return Task.CompletedTask;
     }
 

@@ -90,6 +90,9 @@ public sealed class EditRecorder : IEditRecorder
     public void RecordAdd(IEditableMarker marker)
     {
         if (!Ready || marker == null) return;
+        // 오버레이 이미지(GMapImageMarker)는 undo 대상에서 제외 — 물리 파일 백업 + 하드 삭제(DeleteLocalImage)라
+        // undo(=RemoveMarker)가 PNG를 영구 삭제하고 복원은 DB 행만 되살려 파일이 사라진다(데이터 손실). 시드/복원 로드 오염도 차단.
+        if (marker is GMapImageMarker) return;
         ResetCoalesce();
         try
         {
@@ -101,7 +104,9 @@ public sealed class EditRecorder : IEditRecorder
 
     public ISymbolSnapshot? CaptureForDelete(IEditableMarker marker)
     {
-        try { return marker == null ? null : SymbolSnapshot.Capture(marker); }
+        // 오버레이 이미지는 undo 제외(파일 하드삭제·복구 불가) → 스냅샷 안 뜸 → RecordDelete(null) no-op.
+        if (marker == null || marker is GMapImageMarker) return null;
+        try { return SymbolSnapshot.Capture(marker); }
         catch (Exception ex) { _log?.Error($"CaptureForDelete 실패: {ex.Message}"); return null; }
     }
 
