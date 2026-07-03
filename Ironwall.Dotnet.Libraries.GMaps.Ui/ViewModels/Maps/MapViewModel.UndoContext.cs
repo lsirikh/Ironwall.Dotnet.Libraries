@@ -7,6 +7,7 @@ using System.Windows;
 using GMap.NET.WindowsPresentation;
 using Ironwall.Dotnet.Libraries.GMaps.Db.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
@@ -26,8 +27,10 @@ public partial class MapViewModel : IUndoApplyContext
     private IEditRecorder _editRecorder = default!;
     private IUndoService _undoService = default!;
 
-    /// <summary>Undo/Redo 재적용 중 — SelectMarkerForEditing의 deselect 암묵저장을 스킵(이미 명시 영속).</summary>
-    private bool _isApplyingUndo;
+    /// <summary>Undo/Redo 재적용 중 — deselect 암묵저장·바인딩 에코 재실행을 스킵. 재진입 depth 카운터로
+    /// 매크로 자식별 apply가 조기 리셋하지 못하게(전체 replay 동안 유지). UndoCommand/RedoCommand 람다가 브래킷.</summary>
+    private int _applyingUndoDepth;
+    internal bool IsApplyingUndo => System.Threading.Volatile.Read(ref _applyingUndoDepth) > 0;
 
     #region - Undo/Redo 커맨드·상태 (FR-11) -
     public AsyncRelayCommand? UndoCommand { get; private set; }
@@ -45,15 +48,15 @@ public partial class MapViewModel : IUndoApplyContext
         if (_undoService == null) return;
         UndoCommand = new AsyncRelayCommand(async () =>
         {
-            _isApplyingUndo = true;
+            System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.UndoAsync(); }
-            finally { _isApplyingUndo = false; }
+            finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
         }, () => CanUndo);
         RedoCommand = new AsyncRelayCommand(async () =>
         {
-            _isApplyingUndo = true;
+            System.Threading.Interlocked.Increment(ref _applyingUndoDepth);
             try { await _undoService.RedoAsync(); }
-            finally { _isApplyingUndo = false; }
+            finally { System.Threading.Interlocked.Decrement(ref _applyingUndoDepth); }
         }, () => CanRedo);
 
         _undoService.StateChanged += OnUndoStateChanged;
@@ -90,17 +93,14 @@ public partial class MapViewModel : IUndoApplyContext
     public async Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default)
     {
         if (marker == null || marker.IsDisposed) return;
-        _isApplyingUndo = true;
         try { await DbUpdateProcess(marker); MainMap?.InvalidateVisual(); }
         catch (Exception ex) { _log?.Error($"[Undo] 마커 업데이트 적용 실패: {ex.Message}"); }
-        finally { _isApplyingUndo = false; }
     }
 
     /// <summary>스냅샷으로 삭제 심볼 복원(Id 보존 Restore → 실패 시 새 Id Insert) + 마커/트리 재구성.</summary>
     public async Task<IEditableMarker?> RestoreDeletedAsync(ISymbolSnapshot snapshot, CancellationToken ct = default)
     {
         if (snapshot == null) return null;
-        _isApplyingUndo = true;
         try
         {
             var model = snapshot.CloneModel();
@@ -108,17 +108,19 @@ public partial class MapViewModel : IUndoApplyContext
             {
                 try { await _gMapDbSymbolService.RestoreImageAsync(img, ct); }
                 catch (IdCollisionException) { await _gMapDbSymbolService.InsertImageAsync(img, ct); }
+                if (img.Id > 0) snapshot.Id = img.Id;   // Id 충돌 폴백 시 새 Id 반영(FindMarkerById·이후 undo 정합, FIX 6)
                 AddImageMarkerFromModel(img);
+                ResyncTree();                            // 이미지 노드도 트리 반영(AddImageMarkerFromModel은 트리 리로드 안 함, FIX 5)
             }
             else if (model is ISymbolModel sym)
             {
                 await RestoreOrInsertSymbolAsync(snapshot.MarkerTypeName, sym, ct);
-                AddMarkerFromSymbol(sym);   // 마커 재생성 + _symbolProvider + 트리
+                if (sym.Id > 0) snapshot.Id = sym.Id;   // Id 충돌 폴백 시 새 Id 반영(FIX 6)
+                AddMarkerFromSymbol(sym);                // 마커 재생성 + _symbolProvider + 트리
             }
             return FindMarkerById(snapshot.Id);
         }
         catch (Exception ex) { _log?.Error($"[Undo] 복원 실패(Id={snapshot.Id}): {ex.Message}"); return null; }
-        finally { _isApplyingUndo = false; }
     }
 
     /// <summary>타입별 Id 보존 Restore, Id 충돌 시 새 Id Insert 폴백.</summary>
@@ -157,10 +159,10 @@ public partial class MapViewModel : IUndoApplyContext
     public async Task RemoveMarkerAsync(IEditableMarker marker, CancellationToken ct = default)
     {
         if (marker == null || marker.IsDisposed) return;
-        _isApplyingUndo = true;
         try
         {
             int id = marker.Id;
+            if (SelectedMarker is IEditableMarker sm && sm.Id == id) HidePropertyPanel();   // 열린 패널이 dispose 마커 참조 방지(FIX 7)
             MainMap?.DeselectMarker(marker);
             if (marker is GMapMarker gm) MainMap?.Markers?.Remove(gm);
             await DbDeleteProcess(marker);
@@ -170,14 +172,12 @@ public partial class MapViewModel : IUndoApplyContext
             await LoadLayersFromDbAsync();
         }
         catch (Exception ex) { _log?.Error($"[Undo] 제거 실패: {ex.Message}"); }
-        finally { _isApplyingUndo = false; }
     }
 
     /// <summary>ZOrder 일괄 적용((id,z) 페어) + 로컬 렌더순서 반영.</summary>
     public async Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
     {
         if (pairs == null || pairs.Count == 0) return;
-        _isApplyingUndo = true;
         try
         {
             await _gMapDbSymbolService.BatchUpdateZOrderAsync(pairs.Select(p => (p.id, p.zOrder)).ToList(), ct);
@@ -191,11 +191,26 @@ public partial class MapViewModel : IUndoApplyContext
                 }
             }
             MainMap?.InvalidateVisual();
+            if (SelectedMarker is IEditableMarker sel && pairs.Any(p => p.id == sel.Id))
+                RefreshPropertyPanelZOrder();   // 선택 마커 순서표시 갱신(FIX 8)
         }
         catch (Exception ex) { _log?.Error($"[Undo] ZOrder 적용 실패: {ex.Message}"); }
-        finally { _isApplyingUndo = false; }
     }
 
     public void ResyncTree() => _ = LoadLayersFromDbAsync();
+
+    /// <summary>단일 심볼 리프 노드만 라이브 마커 기준 갱신(이름/잠금/체크) — 전체 리로드 회피(열린 패널 dispose 방지, FIX 4).</summary>
+    public void SyncMarkerNode(int id)
+    {
+        var m = FindMarkerById(id);
+        if (m == null || _layerTreeNodes == null) return;
+        foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
+            if (leaf.Symbol!.Id == id)
+            {
+                leaf.Name = m.Title ?? string.Empty;
+                leaf.InitIsLocked(m.IsLocked);
+                leaf.SetCheckedSilently(m.ShowShape);
+            }
+    }
     #endregion
 }

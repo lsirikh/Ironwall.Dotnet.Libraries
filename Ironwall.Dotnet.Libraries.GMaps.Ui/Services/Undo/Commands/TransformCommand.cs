@@ -30,9 +30,10 @@ public sealed class TransformCommand : UndoableCommandBase
     {
         var m = Ctx.FindMarkerById(_id);
         if (m == null) return;
-        m.UpdateSize(s.w, s.h);
-        m.UpdateRotation(s.bearing);
-        m.UpdateLocation(s.pos);
+        // 개별 마커 변형 예외(예: 라인/그룹 마커의 크로스스레드 UI 접근)가 배치 전체를 막지 않도록 흡수.
+        // 마커 base 메서드는 내부에서 로그하며, 데이터(위치/크기/방위)는 UI 예외 이전에 이미 반영됨.
+        try { m.UpdateSize(s.w, s.h); m.UpdateRotation(s.bearing); m.UpdateLocation(s.pos); }
+        catch { /* 마커 변형 흡수 — 아래 영속·재렌더는 계속 */ }
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
     }
 }

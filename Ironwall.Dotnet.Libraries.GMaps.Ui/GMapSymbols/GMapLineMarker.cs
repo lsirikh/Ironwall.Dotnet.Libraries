@@ -56,39 +56,39 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         /// </summary>
         public override void UpdateLocation(PointLatLng newPosition)
         {
-            // 이동 거리 계산
-            var deltaLat = newPosition.Lat - Position.Lat;
-            var deltaLng = newPosition.Lng - Position.Lng;
-
-            _log?.Info($"[UpdateLocation] 이동 거리: deltaLat={deltaLat}, deltaLng={deltaLng}");
-
-            // 기본 위치 업데이트
-            base.UpdateLocation(newPosition);
-
-            // 모든 포인트를 동일한 거리만큼 이동
-            for (int i = 0; i < _runtimePoints.Count; i++)
+            try
             {
-                var oldPoint = _runtimePoints[i];
-                _runtimePoints[i] = new PointLatLng(
-                    oldPoint.Lat + deltaLat,
-                    oldPoint.Lng + deltaLng
-                );
+                // 이동 거리 계산
+                var deltaLat = newPosition.Lat - Position.Lat;
+                var deltaLng = newPosition.Lng - Position.Lng;
+
+                // 기본 위치 업데이트
+                base.UpdateLocation(newPosition);
+
+                // 모든 포인트를 동일한 거리만큼 이동
+                for (int i = 0; i < _runtimePoints.Count; i++)
+                {
+                    var oldPoint = _runtimePoints[i];
+                    _runtimePoints[i] = new PointLatLng(oldPoint.Lat + deltaLat, oldPoint.Lng + deltaLng);
+                }
+
+                // 모델 동기화
+                SyncModelPoints();
+
+                // UI 알림/리드로우는 UI 스레드로 마샬 — Undo 재적용이 백그라운드 스레드일 수 있어 크로스스레드 예외 방지.
+                var _d = System.Windows.Application.Current?.Dispatcher;
+                System.Action _ui = () =>
+                {
+                    try
+                    {
+                        NotifyPointsChanged();
+                        if (Shape is GMapMarkerLineControl lineControl) lineControl.InvalidateVisual();
+                    }
+                    catch { }
+                };
+                if (_d == null || _d.CheckAccess()) _ui(); else _d.BeginInvoke(_ui);
             }
-
-            // 모델 동기화
-            SyncModelPoints();
-
-            // UI 업데이트 알림
-            NotifyPointsChanged();
-
-            // Shape가 GMapMarkerLineControl이면 강제 업데이트
-            if (Shape is GMapMarkerLineControl lineControl)
-            {
-                // UpdateLineGeometry를 다시 호출하도록 트리거
-                lineControl.InvalidateVisual();
-            }
-
-            _log?.Info($"[UpdateLocation] 라인 포인트 {_runtimePoints.Count}개 이동 완료");
+            catch (System.Exception ex) { _log?.Error($"[UpdateLocation] 실패: {ex.Message}"); }
         }
 
         #region ILineEditableMarker 구현 (편집 기능용)

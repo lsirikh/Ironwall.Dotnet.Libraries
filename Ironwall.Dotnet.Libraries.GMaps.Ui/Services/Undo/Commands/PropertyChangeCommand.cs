@@ -33,5 +33,8 @@ public sealed class PropertyChangeCommand : UndoableCommandBase
         if (m == null) return;
         ApplyProperty(m, Property, v);
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
+        // 트리 노드에 표시되는 속성(이름/체크/잠금)은 노드 캐시가 별도 → 타겟 동기화(전체 리로드 회피).
+        if (Property is "Title" or "ShowShape" or "IsLocked")
+            Ctx.SyncMarkerNode(_id);
     }
 }

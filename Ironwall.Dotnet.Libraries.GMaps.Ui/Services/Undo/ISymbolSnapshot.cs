@@ -10,8 +10,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo;
 ****************************************************************************/
 public interface ISymbolSnapshot
 {
-    /// <summary>스냅샷 대상 심볼 Id(삭제 취소 시 이 Id로 복원 시도).</summary>
-    int Id { get; }
+    /// <summary>스냅샷 대상 심볼 Id(삭제 취소 시 이 Id로 복원 시도). Id 충돌 폴백(새 Id Insert) 시 갱신되므로 settable.</summary>
+    int Id { get; set; }
 
     /// <summary>딥클론된 모델(ISymbolModel 하위 또는 IImageModel). 복원 시 이 객체를 사용.</summary>
     object Model { get; }

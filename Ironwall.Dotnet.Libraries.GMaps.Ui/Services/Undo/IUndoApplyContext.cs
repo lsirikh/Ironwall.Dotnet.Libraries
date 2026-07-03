@@ -33,6 +33,9 @@ public interface IUndoApplyContext
     /// <summary>ZOrder 일괄 적용((id,zOrder) 페어) + 렌더순서 반영.</summary>
     Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default);
 
-    /// <summary>레이어 트리 노드 동기화(잠금/가시성/이름 반영).</summary>
+    /// <summary>레이어 트리 전체 재구성(추가/삭제 후 — 전체 리로드).</summary>
     void ResyncTree();
+
+    /// <summary>단일 심볼 리프 노드만 라이브 마커 기준으로 갱신(이름/잠금/체크). 전체 리로드 없이(열린 패널 dispose 회피).</summary>
+    void SyncMarkerNode(int id);
 }

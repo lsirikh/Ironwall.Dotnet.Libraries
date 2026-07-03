@@ -925,6 +925,8 @@ public partial class MapViewModel : BasePanelViewModel,
             var selected = _groupSelection.Selection.Where(m => m is GMapMarker && !m.IsDisposed).ToList();
             if (selected.Count == 0) return;
             var selIds = new HashSet<int>(selected.Select(m => m.Id));
+            var zBefore = IsApplyingUndo ? null : selected.Where(m => m.Id > 0)
+                .Select(m => (id: m.Id, zOrder: m.ZOrder)).ToList();   // FIX 8 — 순서변경 undo 기록용(변경 전)
 
             // 심볼 밴드(비-이미지, 선택 외) 현재 ZIndex 수집 → 최상단/최하단 기준
             var bandZ = MainMap.Markers.OfType<GMapMarker>()
@@ -945,6 +947,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 }
             }
             if (changes.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
+            if (zBefore != null && changes.Count > 0) _editRecorder?.RecordZOrder(zBefore, changes);   // FIX 8
             MainMap.InvalidateVisual();
             _groupSelection.RefreshAdorner();
             SetAimStatus($"{changes.Count}개 {(toFront ? "맨 위로" : "맨 아래로")}", true);
@@ -2132,7 +2135,7 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             //_log?.Info($"편집을 위한 마커 선택 시작: {marker.Title}");
 
-            if(SelectedMarker != null && CanEditMap() && !_isApplyingUndo)
+            if(SelectedMarker != null && CanEditMap() && !IsApplyingUndo)
                 await DbUpdateProcess(SelectedMarker);
 
             _editRecorder?.CaptureSelectionBaseline(marker);   // 라벨/속성 before용 baseline
@@ -5503,6 +5506,7 @@ public partial class MapViewModel : BasePanelViewModel,
     public Task HandleAsync(ZOrderChangeRequestedEvent message, CancellationToken cancellationToken)
     {
         if (message?.Marker == null || MainMap == null) return Task.CompletedTask;
+        var zBefore = IsApplyingUndo ? null : CaptureZOrderPairs();   // FIX 8 — 순서변경 undo 기록용 스냅샷
         switch (message.Direction)
         {
             case ZOrderDirection.Up:       MoveMarkerUp(message.Marker);       break;
@@ -5511,7 +5515,27 @@ public partial class MapViewModel : BasePanelViewModel,
             case ZOrderDirection.ToBottom: MoveMarkerToBottom(message.Marker); break;
         }
         RefreshPropertyPanelZOrder();
+        if (zBefore != null) RecordZOrderDiff(zBefore);
         return Task.CompletedTask;
+    }
+
+    /// <summary>현재 편집가능 마커들의 (Id,ZOrder) 스냅샷 — ZOrder undo 기록용(FIX 8).</summary>
+    private System.Collections.Generic.List<(int id, int zOrder)> CaptureZOrderPairs()
+        => MainMap?.Markers?.OfType<IEditableMarker>().Where(m => !m.IsDisposed && m.Id > 0)
+               .Select(m => (id: m.Id, zOrder: m.ZOrder)).ToList()
+           ?? new System.Collections.Generic.List<(int id, int zOrder)>();
+
+    /// <summary>ZOrder 변경 전 스냅샷 대비 변경분만 ZOrderBatchCommand로 Undo 기록(FIX 8).</summary>
+    private void RecordZOrderDiff(System.Collections.Generic.List<(int id, int zOrder)> before)
+    {
+        if (before == null || _editRecorder == null) return;
+        var beforeMap = before.ToDictionary(p => p.id, p => p.zOrder);
+        var changedBefore = new System.Collections.Generic.List<(int id, int zOrder)>();
+        var changedAfter = new System.Collections.Generic.List<(int id, int zOrder)>();
+        foreach (var (id, z) in CaptureZOrderPairs())
+            if (beforeMap.TryGetValue(id, out var oldZ) && oldZ != z)
+            { changedBefore.Add((id, oldZ)); changedAfter.Add((id, z)); }
+        if (changedAfter.Count > 0) _editRecorder.RecordZOrder(changedBefore, changedAfter);
     }
 
     private void RefreshPropertyPanelZOrder()
@@ -7090,6 +7114,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
     {
+        if (IsApplyingUndo) return;   // Undo/Redo 재적용 중 바인딩 에코 → 중복 DbUpdate/트리리로드/이미지싱크 방지(FIX 2)
         if (IsEditModeEnabled && !_isMarkerEditing)
         {
             // 맵편집 권한 게이트(RBAC, 2안) — 디바이스 연결(LinkedDevice) 포함 속성 영속은 map:edit 필요.

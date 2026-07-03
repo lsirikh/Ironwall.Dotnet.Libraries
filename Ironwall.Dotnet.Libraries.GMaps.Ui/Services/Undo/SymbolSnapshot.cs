@@ -15,7 +15,7 @@ public sealed class SymbolSnapshot : ISymbolSnapshot
 {
     private static readonly JsonSerializerOptions _opts = new() { IncludeFields = false };
 
-    public int Id { get; }
+    public int Id { get; set; }
     public object Model { get; }
     public Type ModelType { get; }
     public string MarkerTypeName { get; }
@@ -73,8 +73,10 @@ public sealed class SymbolSnapshot : ISymbolSnapshot
             var json = JsonSerializer.Serialize(src, type, _opts);
             return JsonSerializer.Deserialize(json, type, _opts);
         }
-        catch
+        catch (Exception ex)
         {
+            // 침묵 금지 — 딥클론 실패는 복원 데이터 유실이므로 로그로 표면화(Trace로 무주입).
+            System.Diagnostics.Trace.WriteLine($"[SymbolSnapshot] DeepClone 실패({src?.GetType().Name}): {ex.Message}");
             return null;
         }
     }

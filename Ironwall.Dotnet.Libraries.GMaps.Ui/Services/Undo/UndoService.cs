@@ -166,7 +166,7 @@ public sealed class UndoService : IUndoService
             if (_done) return; _done = true;
             _s._activeBatch = null;
             if (_children.Count == 0) return;
-            var macro = _children.Count == 1 ? _children[0] : new MacroCommand(_desc, _children);
+            var macro = _children.Count == 1 ? _children[0] : new MacroCommand(_desc, _children, _s._log);
             _s.Push(macro);
         }
     }

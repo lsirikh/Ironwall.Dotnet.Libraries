@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
+using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
 using Xunit;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Tests;
@@ -68,6 +69,16 @@ public class UndoRedoTests
         public Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
         { LastZOrder = pairs; return Task.CompletedTask; }
         public void ResyncTree() { }
+        public readonly List<int> SyncedNodes = new();
+        public void SyncMarkerNode(int id) => SyncedNodes.Add(id);
+    }
+
+    /// <summary>Undo 시 예외를 던지는 커맨드 — 매크로 자식별 격리 검증용.</summary>
+    private sealed class ThrowingCommand : IUndoableCommand
+    {
+        public string Description => "throw"; public int ScopeMapId { get; set; }
+        public Task ExecuteAsync(CancellationToken ct = default) => throw new System.InvalidOperationException("boom");
+        public Task UndoAsync(CancellationToken ct = default) => throw new System.InvalidOperationException("boom");
     }
 
     /// <summary>공유 셀을 토글하는 단순 커맨드 — UndoService 메커니즘 검증.</summary>
@@ -301,5 +312,52 @@ public class UndoRedoTests
         var cloned = (SymbolModel)snap!.Model;
         Assert.Equal("orig", cloned.Title);
         Assert.Equal(50, cloned.Width);
+    }
+
+    // ─────────────── 회귀수정 검증(감사 Round1) ───────────────
+    [Fact(DisplayName = "MacroCommand — 자식 하나가 예외를 던져도 나머지 형제는 계속 취소(그룹이동 회귀)")]
+    public async Task should_continue_siblings_when_one_child_throws()
+    {
+        var log = new List<string>();
+        var macro = new MacroCommand("group", new IUndoableCommand[]
+        {
+            new LogCommand(log, "A"),
+            new ThrowingCommand(),
+            new LogCommand(log, "C"),
+        });
+        await macro.UndoAsync();   // 역순: C, throw(흡수), A
+        Assert.Contains("U:C", log);
+        Assert.Contains("U:A", log);   // 예외에도 A까지 취소됨(중단 안 됨)
+    }
+
+    [Fact(DisplayName = "PropertyChangeCommand — Title undo 시 트리 노드 타겟 동기화 호출(SyncMarkerNode)")]
+    public async Task should_sync_tree_node_when_undo_title_change()
+    {
+        var ctx = new FakeApplyContext();
+        var m = new FakeEditableMarker { Id = 5, Title = "new" };
+        ctx.Markers[5] = m;
+        var cmd = new PropertyChangeCommand(ctx, 5, "Title", "old", "new");
+        await cmd.UndoAsync();
+        Assert.Contains(5, ctx.SyncedNodes);   // 트리 노드 이름 동기화 호출됨
+    }
+
+    [Fact(DisplayName = "SymbolSnapshot — Line 모델의 LinePoints가 딥클론서 보존(개수·값)")]
+    public void should_preserve_linepoints_when_snapshot_line()
+    {
+        var model = new LineSymbolModel
+        {
+            Id = 21,
+            Title = "라인",
+            LinePoints = new List<GeoPoint> { new GeoPoint(10, 20, 1), new GeoPoint(30, 40, 2), new GeoPoint(50, 60, 3) }
+        };
+        var snap = SymbolSnapshot.Capture(model, 21, "GMapLineMarker", false);
+        Assert.NotNull(snap);
+        var clone = (LineSymbolModel)snap!.Model;
+        Assert.Equal(3, clone.LinePoints.Count);
+        Assert.Equal(30, clone.LinePoints[1].Latitude);
+        Assert.Equal(40, clone.LinePoints[1].Longitude);
+        // 독립성 — 원본 변경이 스냅샷에 영향 없음
+        model.LinePoints.Add(new GeoPoint(70, 80, 4));
+        Assert.Equal(3, clone.LinePoints.Count);
     }
 }
