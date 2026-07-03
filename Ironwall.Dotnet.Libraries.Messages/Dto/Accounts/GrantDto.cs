@@ -22,9 +22,6 @@ public class GrantDto
     [JsonProperty("granted_by")] public int? GrantedBy { get; set; }
     [JsonProperty("revoked_at")] public DateTime? RevokedAt { get; set; }
     [JsonProperty("created_at")] public DateTime CreatedAt { get; set; }
-
-    /// <summary>표시용 계정 라벨(UserId→LoginId). 전체 부여 집계 시 클라가 태깅 — 직렬화 제외.</summary>
-    [JsonIgnore] public string? UserLabel { get; set; }
 }
 
 /// <summary>권한그룹 부여 요청 — 서버 <c>GrantCreate</c> 대응. <c>valid_until</c> 생략/null = 상시.</summary>

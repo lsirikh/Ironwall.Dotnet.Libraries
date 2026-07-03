@@ -136,26 +136,27 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 계정/그룹 로드 실패: {ex.Message}"); }
     }
 
-    /// <summary>전체 계정의 부여를 집계해 목록 표시 — 서버에 list-all 엔드포인트가 없어(GET /users/{id}/grants만)
-    ///   계정별 조회를 병합하고 각 행에 계정 라벨(UserLabel) 태깅. 현재 소규모(계정 8)라 순차 조회로 충분.
-    ///   ⚠ 계정 수가 커지면 서버 GET /grants(전체) 신설이 바람직 — 요청서 docs/coordination/REQ_Server_Grants_ListAll.md.</summary>
+    /// <summary>전체 부여를 서버 GET /grants(단일 호출)로 조회 — 각 행 계정은 서버 비정규화(user_login_id/user_name) 사용.
+    ///   (구 인터림=계정 N-순회 집계 → REQ_Server_Grants_ListAll 서버 반영으로 단일콜 교체. B 씸 `2d90bfc` 소비.)</summary>
     private async Task LoadAllGrantsAsync()
     {
         Grants.Clear();
-        foreach (var acc in Accounts)
+        try
         {
-            try
+            const int size = 100;
+            var res = await _api.GetAllGrantsAsync(page: 1, size: size);
+            if (res.Success && res.Data is not null)
             {
-                var res = await _api.GetUserGrantsAsync(acc.Id);
-                if (res.Success && res.Data is not null)
-                    foreach (var gr in res.Data)
-                    {
-                        gr.UserLabel = acc.LoginId;   // 표시용 계정 태깅(UserId→LoginId)
-                        Grants.Add(gr);
-                    }
+                foreach (var gr in res.Data) Grants.Add(gr);
+                if (res.Data.Count >= size)   // size 가득 = 더 있을 수 있음 → 무성 truncation 방지 안내
+                    await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                    { Title = "권한 부여", Explain = $"부여가 {size}건 이상입니다 — 최근 {size}건만 표시됩니다(페이지네이션 필요)." });
             }
-            catch (Exception ex) { _log?.Error($"[GrantMgmt] '{acc.LoginId}' 부여 조회 실패: {ex.Message}"); }
+            else if (!res.Success)
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "권한 부여", Explain = $"부여 목록 불러오기 실패: {res.Error?.Message ?? res.Message}" });
         }
+        catch (Exception ex) { _log?.Error($"[GrantMgmt] 전체 부여 로드 실패: {ex.Message}"); }
     }
     #endregion
 
