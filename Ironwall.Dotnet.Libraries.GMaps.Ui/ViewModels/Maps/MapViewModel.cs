@@ -790,6 +790,15 @@ public partial class MapViewModel : BasePanelViewModel,
             return;
         }
 
+        // 방향키 격자 이동 — 격자스냅 ON + 선택 심볼을 화살표로 격자 한 칸씩 이동(요청 기능).
+        // 스냅 OFF거나 선택 없으면 미처리 → 기본 동작(맵 패닝) 유지.
+        if (e.Key is System.Windows.Input.Key.Left or System.Windows.Input.Key.Right
+            or System.Windows.Input.Key.Up or System.Windows.Input.Key.Down)
+        {
+            if (await TryMoveSelectionByGridAsync(e.Key)) e.Handled = true;
+            return;
+        }
+
         // Undo/Redo 단축키 (FR-11) — 편집모드∧권한 시에만(Command CanExecute). Ctrl+Z=Undo, Ctrl+Y·Ctrl+Shift+Z=Redo.
         var ctrl = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
         var shift = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
@@ -801,6 +810,56 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             if (RedoCommand?.CanExecute(null) == true) { e.Handled = true; RedoCommand.Execute(null); }
         }
+    }
+
+    /// <summary>방향키로 선택 심볼을 격자 한 칸씩 이동(격자스냅 ON일 때만). 각 칸 이동은 격자 교점에 스냅.
+    /// 그룹 선택 우선(전체 이동, 잠금 제외), 없으면 단일 선택. DB 영속 + Undo 기록(그룹=1 매크로). 편집모드·권한 게이트.</summary>
+    private async System.Threading.Tasks.Task<bool> TryMoveSelectionByGridAsync(System.Windows.Input.Key key)
+    {
+        if (MainMap == null || !IsEditModeEnabled || !MainMap.IsSnapToGridEnabled) return false;
+
+        // 대상 수집(잠금·dispose 제외). 그룹 우선, 없으면 단일.
+        var targets = (_groupSelection?.HasSelection ?? false)
+            ? _groupSelection!.Selection.Where(m => m != null && !m.IsDisposed && !m.IsLocked).ToList()
+            : (SelectedMarker != null && !SelectedMarker.IsDisposed && !SelectedMarker.IsLocked
+                ? new System.Collections.Generic.List<GMapSymbols.IEditableMarker> { SelectedMarker }
+                : new System.Collections.Generic.List<GMapSymbols.IEditableMarker>());
+        if (targets.Count == 0) return false;
+
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return true; }   // 처리됨(권한없음 안내) — 패닝 방지
+
+        int sx = key == System.Windows.Input.Key.Left ? -1 : key == System.Windows.Input.Key.Right ? 1 : 0;
+        int sy = key == System.Windows.Input.Key.Up ? -1 : key == System.Windows.Input.Key.Down ? 1 : 0;
+        if (sx == 0 && sy == 0) return false;
+
+        double gridPx = SnapGridOverlayService.EffectiveGridPx(MainMap.GridSizePx);
+        var (x0, y0) = SnapGridOverlayService.ComputeOrigin(MainMap, gridPx);
+
+        // 이동 + 영속(그룹 이동과 동일 패턴). before는 이동 전 위치(Undo용).
+        var moves = new System.Collections.Generic.List<(GMapSymbols.IEditableMarker marker, GMap.NET.PointLatLng before)>();
+        foreach (var m in targets)
+        {
+            var before = m.Position;
+            var p = MainMap.FromLatLngToLocal(m.Position);   // 화면 픽셀(RenderOffset 포함)
+            // 가장 가까운 격자 교점 인덱스 + 한 칸 → 항상 교점에 안착(시각=스냅 단일원천 재사용).
+            double ix = System.Math.Round((p.X - x0) / gridPx) + sx;
+            double iy = System.Math.Round((p.Y - y0) / gridPx) + sy;
+            var np = MainMap.FromLocalToLatLng((int)System.Math.Round(x0 + ix * gridPx), (int)System.Math.Round(y0 + iy * gridPx));
+            m.UpdateLocation(np);
+            moves.Add((m, before));
+            try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"격자 이동 영속 실패: {ex.Message}"); }
+        }
+
+        // Undo 기록 — 단일=직접, 다중=1 매크로.
+        if (moves.Count == 1)
+            _editRecorder?.RecordPositionChange(moves[0].marker, moves[0].before);
+        else
+            using (_editRecorder?.BeginBatch($"격자 이동 {moves.Count}개"))
+                foreach (var mv in moves) _editRecorder?.RecordPositionChange(mv.marker, mv.before);
+
+        if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();
+        MainMap.InvalidateVisual();
+        return true;
     }
 
     /// <summary>그룹 이동 완료 → 멤버별 DB 영속(잠금 멤버 스킵, FR-MS-05/08). RBAC 게이트.</summary>
