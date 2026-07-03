@@ -1373,16 +1373,14 @@ public class GMapCustomControl : GMapControl
         {
             switch (e.Key)
             {
+                // 지도 회전(Ctrl+←/→) 비활성 — Shift+휠과 동일 사유(회전 싱크 미지원 → 배치 깨짐).
+                //   회전 트리거만 차단하고 Ctrl+R 리셋은 유지. 기존: RotateMap(∓5)
                 case Key.Left:
-                    RotateMap(-5);
-                    e.Handled = true;
-                    break;
                 case Key.Right:
-                    RotateMap(5);
-                    e.Handled = true;
+                    e.Handled = true;   // 회전 차단(소비만)
                     break;
                 case Key.R:
-                    ResetRotation();
+                    ResetRotation();    // 기존 회전 상태 0으로 복구(유지)
                     e.Handled = true;
                     break;
                 case Key.A: // Ctrl+A: 모든 마커 선택 (다중 선택 모드에서)
@@ -1493,11 +1491,12 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // 지도 회전(Shift+휠) 비활성 — 심볼/이미지/히트테스트/FOV/어도너가 맵 회전과 싱크되지 않아
+        //   회전 시 배치가 깨짐(격자스냅도 FR-12로 이미 회전 시 비활성). 전면 회전 싱크는 대규모 작업이라
+        //   사용자 요청으로 회전 트리거를 차단. Ctrl+R(ResetRotation)은 유지(복구용). 기존: RotateMap(e.Delta>0?5:-5)
         if (Keyboard.Modifiers == ModifierKeys.Shift)
         {
-            double rotationDelta = e.Delta > 0 ? 5 : -5;
-            RotateMap(rotationDelta);
-            e.Handled = true;
+            e.Handled = true;   // 휠 소비만 — 회전·줌 없음
             return;
         }
 
