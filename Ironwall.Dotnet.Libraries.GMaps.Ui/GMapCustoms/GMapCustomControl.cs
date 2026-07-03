@@ -544,6 +544,18 @@ public class GMapCustomControl : GMapControl
 
     private bool SetMarkerVisibility(IEditableMarker marker)
         => Zoom >= marker.Zoom && marker.IsLayerEnabled;
+
+    /// <summary>
+    /// 단일 마커의 유효 가시성을 현재 줌/레이어 기준으로 즉시 재계산 + 리렌더.
+    /// 속성창에서 "최소 줌"(marker.Zoom)/레이어토글(IsLayerEnabled) 편집 시 호출 — 팬/줌 전에도 즉시 반영.
+    /// 게이트 술어는 <see cref="SetMarkerVisibility"/> 단일원천을 재사용(드리프트 방지).
+    /// </summary>
+    public void RefreshMarkerVisibility(IEditableMarker marker)
+    {
+        if (marker == null) return;
+        marker.IsVisible = SetMarkerVisibility(marker);
+        InvalidateVisual();
+    }
     /// <summary>
     /// 지도 영역 변경 이벤트
     /// </summary>

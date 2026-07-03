@@ -7385,6 +7385,15 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 await SyncOverlayImageLayer(imgMarker.FilePath, e.PropertyName, e.NewValue);
             }
+
+            // 최소 줌(Zoom)·레이어토글(IsLayerEnabled) 변경 → 편집 마커의 유효 가시성 즉시 재계산 + 리렌더.
+            // (기존 결함: 캐시된 IsVisible는 UpdateMarkersVisibilityByZoom(OnAreaChange=팬/줌)에서만 갱신 →
+            //  최소줌 편집이 다음 팬/줌 전까지 미반영. 심볼·DB이미지마커 공통. 술어=SetMarkerVisibility 단일원천)
+            if ((e.PropertyName == "Zoom" || e.PropertyName == "IsLayerEnabled")
+                && e.Marker is GMapSymbols.IEditableMarker zoomMarker)
+            {
+                MainMap?.RefreshMarkerVisibility(zoomMarker);
+            }
         }
     }
 
@@ -8478,7 +8487,14 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (leaf.Symbol == null && leaf.Model?.LayerType == "OverlayImage" && !string.IsNullOrEmpty(leaf.Model.FilePath))
                 {
                     var imgMarker = FindImageMarkerByFilePath(leaf.Model.FilePath);
-                    if (imgMarker != null) leaf.InitIsLocked(imgMarker.IsLocked);
+                    if (imgMarker != null)
+                    {
+                        leaf.InitIsLocked(imgMarker.IsLocked);
+                        // 레이어 체크 ↔ 실제 이미지 가시성 동기화(desync 수정). AggregateLeafCheckedFromMarkers는
+                        // Symbol leaf만 재동기화 → 이미지 leaf는 DB MapLayer.IsVisible(로드값)에 고정돼,
+                        // 이미지가 켜져 있어도 트리엔 꺼짐으로 표시됐음. 실제 마커 IsLayerEnabled 기준으로 맞춤.
+                        leaf.SetCheckedSilently(imgMarker.IsLayerEnabled);
+                    }
                 }
             }
 
