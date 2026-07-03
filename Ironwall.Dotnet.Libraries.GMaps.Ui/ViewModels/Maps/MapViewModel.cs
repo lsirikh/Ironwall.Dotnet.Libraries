@@ -886,13 +886,18 @@ public partial class MapViewModel : BasePanelViewModel,
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
         if (!CanEditMap()) { SetAimStatus("편집 권한이 없습니다.", true); return; }
         int n = 0;
-        foreach (var m in _groupSelection.Selection.ToList())
+        using (_editRecorder?.BeginBatch(show ? "그룹 표시" : "그룹 숨김"))   // AREA 1: 그룹 가시성 1 undo 단위
         {
-            if (m == null || m.IsDisposed) continue;
-            m.IsLayerEnabled = show;
-            m.ShowShape = show;
-            m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
-            n++;
+            foreach (var m in _groupSelection.Selection.ToList())
+            {
+                if (m == null || m.IsDisposed) continue;
+                var beforeShow = m.ShowShape;
+                m.IsLayerEnabled = show;
+                m.ShowShape = show;
+                m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
+                _editRecorder?.RecordVisibility(m, beforeShow, show);
+                n++;
+            }
         }
         SyncLayerNodesFromMarkers(_groupSelection.Selection);   // D: 레이어 트리 노드 체크(가시성) 동기화
         MainMap?.InvalidateVisual();
@@ -2004,10 +2009,12 @@ public partial class MapViewModel : BasePanelViewModel,
                     try
                     {
                         if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 이미지 회전 차단"); ShowNoMapEditPermissionInfo(); return; }
+                        var beforeRot = image.UserRotation;   // Undo용 이전 회전(AREA 2)
                         image.UserRotation = angle;     // EffectiveRotation 자동 갱신
                         MainMap?.InvalidateVisual();
                         if (image.Id > 0)
                             await _gMapDbSymbolService.UpdateImageAsync(image.Model);  // UserRotation만 영속 (NFR-6)
+                        if (image.Id > 0) _editRecorder?.RecordCustomImageRotation(image.Id, beforeRot, angle);   // Undo 기록
                     }
                     catch (Exception ex) { _log?.Error($"이미지 회전 설정 저장 실패: {ex.Message}"); }
                 };
@@ -8117,10 +8124,12 @@ public partial class MapViewModel : BasePanelViewModel,
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
             if (marker == null) return;
 
+            var beforeShow = marker.ShowShape;   // Undo용 이전 가시성(AREA 1)
             marker.IsLayerEnabled = e.IsVisible;
             marker.ShowShape = e.IsVisible;
             marker.IsVisible = e.IsVisible && MainMap!.Zoom >= marker.Zoom;   // 유효 가시성 = 토글 AND 줌
             MainMap?.InvalidateVisual();
+            _editRecorder?.RecordVisibility(marker, beforeShow, e.IsVisible);   // Undo 기록(런타임 가시성, DB 미영속)
         }
         catch (Exception ex) { _log?.Error($"심볼 가시성 변경 실패: {ex.Message}"); }
     }
@@ -8406,11 +8415,15 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             var layer = e.Layer;
             var newName = e.NewName;
+            var oldName = layer.Name;   // Undo용 이전 이름(AREA 3)
             _log?.Info($"[레이어 이름변경] {layer.Name} → {newName} (LayerType={layer.LayerType})");
 
             // 1. MapLayers DB 갱신
             layer.Name = newName;
             await _gMapDbService.UpdateMapLayerAsync(layer);
+            _editRecorder?.RecordLayerChange("레이어 이름 변경",
+                new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(layer.Id, oldName, null, null) },
+                new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(layer.Id, newName, null, null) });
 
             // 2. OverlayImage인 경우 Images DB + Property Panel 동기화
             if (layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(layer.FilePath))
@@ -8464,6 +8477,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (idx < 0 || siblingIdx < 0 || siblingIdx >= sametype.Count) return;
 
         var sibling = sametype[siblingIdx];
+        int oldLayerZ = layer.ZOrder, oldSiblingZ = sibling.ZOrder;   // Undo용 이전 순서(AREA 3)
         _log?.Info($"[레이어 순서] 스왑 시작: {layer.Name}(Z={layer.ZOrder}) ↔ {sibling.Name}(Z={sibling.ZOrder}), direction={direction}");
 
         if (layer.ZOrder != sibling.ZOrder)
@@ -8484,6 +8498,9 @@ public partial class MapViewModel : BasePanelViewModel,
 
         await _gMapDbService.UpdateMapLayerAsync(layer);
         await _gMapDbService.UpdateMapLayerAsync(sibling);
+        _editRecorder?.RecordLayerChange("레이어 순서 변경",
+            new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(layer.Id, null, null, oldLayerZ), new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(sibling.Id, null, null, oldSiblingZ) },
+            new[] { new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(layer.Id, null, null, layer.ZOrder), new Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.LayerFields(sibling.Id, null, null, sibling.ZOrder) });
 
         // 맵 위 렌더링 순서 동기화
         SyncMapRenderingOrder(layer);

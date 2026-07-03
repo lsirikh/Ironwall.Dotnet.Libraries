@@ -38,4 +38,14 @@ public interface IUndoApplyContext
 
     /// <summary>단일 심볼 리프 노드만 라이브 마커 기준으로 갱신(이름/잠금/체크). 전체 리로드 없이(열린 패널 dispose 회피).</summary>
     void SyncMarkerNode(int id);
+
+    // ── v2 커버리지 seam ──
+    /// <summary>런타임 가시성(ShowShape/IsLayerEnabled/IsVisible) 적용 + 시각·트리 노드 갱신(DB 미영속).</summary>
+    Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default);
+
+    /// <summary>파일 오버레이 이미지(GMapCustomImage) 회전 적용 + UpdateImageAsync 영속.</summary>
+    Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default);
+
+    /// <summary>MapLayers 노드 필드(이름/투명도/ZOrder, null=미변경) 적용 + 이미지마커 동기화 + 트리 리로드.</summary>
+    Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default);
 }

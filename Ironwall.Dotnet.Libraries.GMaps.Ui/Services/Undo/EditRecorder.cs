@@ -153,4 +153,28 @@ public sealed class EditRecorder : IEditRecorder
         ResetCoalesce();
         return _undo.BeginBatch(description);
     }
+
+    // ── v2 커버리지 ──
+    public void RecordVisibility(IEditableMarker marker, bool before, bool after)
+    {
+        if (!Ready || marker == null || before == after) return;
+        ResetCoalesce();
+        _undo.Push(new VisibilityCommand(Context!, marker.Id, before, after));
+    }
+
+    public void RecordCustomImageRotation(int imageId, double before, double after)
+    {
+        if (!Ready || before == after) return;
+        ResetCoalesce();
+        _undo.Push(new CustomImageRotationCommand(Context!, imageId, before, after));
+    }
+
+    public void RecordLayerChange(string description,
+        System.Collections.Generic.IReadOnlyList<LayerFields> before,
+        System.Collections.Generic.IReadOnlyList<LayerFields> after)
+    {
+        if (!Ready || before == null || after == null || before.Count == 0) return;
+        ResetCoalesce();
+        _undo.Push(new LayerNodeCommand(Context!, description, before, after));
+    }
 }

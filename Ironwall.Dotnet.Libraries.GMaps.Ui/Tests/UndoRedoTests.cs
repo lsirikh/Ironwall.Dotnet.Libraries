@@ -71,6 +71,15 @@ public class UndoRedoTests
         public void ResyncTree() { }
         public readonly List<int> SyncedNodes = new();
         public void SyncMarkerNode(int id) => SyncedNodes.Add(id);
+
+        // v2 커버리지 fake
+        public readonly List<(int id, bool show)> VisApplied = new();
+        public Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default) { VisApplied.Add((id, show)); return Task.CompletedTask; }
+        public readonly List<(int id, double rot)> RotApplied = new();
+        public Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default) { RotApplied.Add((id, rotation)); return Task.CompletedTask; }
+        public readonly List<(int id, string? name, double? opacity, int? zOrder)> LayerApplied = new();
+        public Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
+        { LayerApplied.Add((layerId, name, opacity, zOrder)); return Task.CompletedTask; }
     }
 
     /// <summary>Undo 시 예외를 던지는 커맨드 — 매크로 자식별 격리 검증용.</summary>
@@ -359,5 +368,44 @@ public class UndoRedoTests
         // 독립성 — 원본 변경이 스냅샷에 영향 없음
         model.LinePoints.Add(new GeoPoint(70, 80, 4));
         Assert.Equal(3, clone.LinePoints.Count);
+    }
+
+    // ─────────────── v2 커버리지 ───────────────
+    [Fact(DisplayName = "VisibilityCommand — 표시/숨김 do→undo→redo")]
+    public async Task should_toggle_visibility_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var svc = new UndoService();
+        svc.Push(new VisibilityCommand(ctx, id: 7, before: true, after: false));   // 숨김 do
+        await svc.UndoAsync();   // before=표시
+        Assert.Equal((7, true), ctx.VisApplied[^1]);
+        await svc.RedoAsync();   // after=숨김
+        Assert.Equal((7, false), ctx.VisApplied[^1]);
+    }
+
+    [Fact(DisplayName = "CustomImageRotationCommand — 회전 do→undo→redo")]
+    public async Task should_rotate_customimage_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var svc = new UndoService();
+        svc.Push(new CustomImageRotationCommand(ctx, id: 3, before: 0, after: 90));
+        await svc.UndoAsync();
+        Assert.Equal((3, 0d), ctx.RotApplied[^1]);
+        await svc.RedoAsync();
+        Assert.Equal((3, 90d), ctx.RotApplied[^1]);
+    }
+
+    [Fact(DisplayName = "LayerNodeCommand — 이름 필드 do→undo→redo")]
+    public async Task should_apply_layerfields_when_undo_redo()
+    {
+        var ctx = new FakeApplyContext();
+        var svc = new UndoService();
+        var before = new[] { new LayerFields(5, "옛이름", null, null) };
+        var after = new[] { new LayerFields(5, "새이름", null, null) };
+        svc.Push(new LayerNodeCommand(ctx, "이름 변경", before, after));
+        await svc.UndoAsync();
+        Assert.Equal("옛이름", ctx.LayerApplied[^1].name);
+        await svc.RedoAsync();
+        Assert.Equal("새이름", ctx.LayerApplied[^1].name);
     }
 }

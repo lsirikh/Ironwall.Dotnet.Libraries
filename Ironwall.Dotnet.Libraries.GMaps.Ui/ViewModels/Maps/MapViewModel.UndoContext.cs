@@ -207,13 +207,74 @@ public partial class MapViewModel : IUndoApplyContext
         if (disp != null && !disp.CheckAccess()) { disp.Invoke(() => SyncMarkerNode(id)); return; }
         var m = FindMarkerById(id);
         if (m == null || _layerTreeNodes == null) return;
+        bool matched = false;
         foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
             if (leaf.Symbol!.Id == id)
             {
                 leaf.Name = m.Title ?? string.Empty;
                 leaf.InitIsLocked(m.IsLocked);
                 leaf.SetCheckedSilently(m.ShowShape);
+                matched = true;
             }
+        // AREA 4: 심볼 리프에 없으면(이미지 마커=오버레이 이미지 노드) 전체 리로드로 트리 반영
+        if (!matched && m is GMapSymbols.GMapImageMarker) ResyncTree();
+    }
+
+    // ── v2 커버리지 seam 구현 ──
+    /// <summary>런타임 가시성 적용(DB 미영속) — 마커 상태 + 시각 + 트리 체크 갱신.</summary>
+    public Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default)
+    {
+        var m = FindMarkerById(id);
+        if (m == null) return Task.CompletedTask;
+        m.IsLayerEnabled = show;
+        m.ShowShape = show;
+        m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
+        MainMap?.InvalidateVisual();
+        SyncMarkerNode(id);   // 트리 체크박스 반영(UI 스레드 마샬 내장)
+        return Task.CompletedTask;
+    }
+
+    /// <summary>파일 오버레이 이미지 회전 적용 + 영속.</summary>
+    public async Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default)
+    {
+        try
+        {
+            var img = MainMap?.CustomImages?.FirstOrDefault(i => i.Id == id);
+            if (img == null) return;
+            img.UserRotation = rotation;   // EffectiveRotation 자동 갱신
+            MainMap?.InvalidateVisual();
+            if (img.Id > 0) await _gMapDbSymbolService.UpdateImageAsync(img.Model);
+        }
+        catch (Exception ex) { _log?.Error($"[Undo] 이미지 회전 적용 실패: {ex.Message}"); }
+    }
+
+    /// <summary>MapLayers 노드 필드 적용(이름/투명도/ZOrder) + OverlayImage 마커 동기화 + 트리 리로드.</summary>
+    public async Task ApplyLayerFieldsAsync(int layerId, string? name, double? opacity, int? zOrder, CancellationToken ct = default)
+    {
+        try
+        {
+            var layers = await _gMapDbService.FetchMapLayersAsync();
+            var layer = layers?.FirstOrDefault(l => l.Id == layerId);
+            if (layer == null) return;
+            if (name != null) layer.Name = name;
+            if (opacity.HasValue) layer.Opacity = opacity.Value;
+            if (zOrder.HasValue) layer.ZOrder = zOrder.Value;
+            await _gMapDbService.UpdateMapLayerAsync(layer);
+            // OverlayImage 이름/투명도 → 이미지 마커 동기화
+            if (layer.LayerType == "OverlayImage" && !string.IsNullOrEmpty(layer.FilePath))
+            {
+                var marker = FindImageMarkerByFilePath(layer.FilePath);
+                if (marker != null)
+                {
+                    if (name != null) { marker.Title = name; await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel); }
+                    if (opacity.HasValue) marker.Opacity = opacity.Value;
+                }
+            }
+            if (zOrder.HasValue) SyncMapRenderingOrder(layer);   // ZOrder 변경 시 렌더순서 동기화
+            await LoadLayersFromDbAsync();
+            MainMap?.InvalidateVisual();
+        }
+        catch (Exception ex) { _log?.Error($"[Undo] 레이어 필드 적용 실패: {ex.Message}"); }
     }
     #endregion
 }

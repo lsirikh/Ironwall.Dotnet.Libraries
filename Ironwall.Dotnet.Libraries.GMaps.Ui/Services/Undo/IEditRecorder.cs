@@ -52,4 +52,16 @@ public interface IEditRecorder
 
     /// <summary>배치 스코프(그룹 이동/삭제 등) — Dispose까지 1 undo 단위.</summary>
     IDisposable BeginBatch(string description);
+
+    // ── v2 커버리지 기록 ──
+    /// <summary>런타임 가시성 토글 기록(개별/그룹, DB 미영속).</summary>
+    void RecordVisibility(IEditableMarker marker, bool before, bool after);
+
+    /// <summary>파일 오버레이 이미지 회전 기록.</summary>
+    void RecordCustomImageRotation(int imageId, double before, double after);
+
+    /// <summary>MapLayers 노드 조작(이름/ZOrder) 기록.</summary>
+    void RecordLayerChange(string description,
+        System.Collections.Generic.IReadOnlyList<Commands.LayerFields> before,
+        System.Collections.Generic.IReadOnlyList<Commands.LayerFields> after);
 }
