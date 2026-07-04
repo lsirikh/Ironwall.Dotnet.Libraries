@@ -142,7 +142,15 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     }
 
     protected override HitTestResult HitTestCore(PointHitTestParameters hitTestParameters)
-        => IsOverSelected(hitTestParameters.HitPoint) ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null!;   // 선택 마커 외 투과(불변식#3)
+    {
+        // Ctrl/Shift = 멀티셀렉션 토글·러버밴드(그룹 '이동' 아님) → adorner 투과시켜 아래 마커 Shape/GMapCustomControl이
+        //   클릭을 받아 MarkerToggleRequested가 발화되게 함. (미투과 시 그룹 내 마커 위 Ctrl+클릭을 adorner가 e.Handled로
+        //   삼켜 '제외'가 영구 불가 — 추가만 되고 제외/모든 시나리오 실패의 실제 원인)
+        if ((System.Windows.Input.Keyboard.Modifiers
+            & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)
+            return null!;
+        return IsOverSelected(hitTestParameters.HitPoint) ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null!;   // 선택 마커 외 투과(불변식#3)
+    }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {

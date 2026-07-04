@@ -24,8 +24,8 @@ public sealed class LabelAdornerService : IDisposable
     private bool _disposed;
 
     /// <summary>라벨 오프셋 드래그 완료 — VM이 DB 영속(FR-LB-05).</summary>
-    public event System.Action<IEditableMarker>? LabelOffsetChanged;
-    private void OnLabelMoved(IEditableMarker m) => LabelOffsetChanged?.Invoke(m);
+    public event System.Action<IEditableMarker, double, double>? LabelOffsetChanged;
+    private void OnLabelMoved(IEditableMarker m, double bx, double by) => LabelOffsetChanged?.Invoke(m, bx, by);
 
     public LabelAdornerService(GMapCustomControl map, ILogService? log = null)
     {

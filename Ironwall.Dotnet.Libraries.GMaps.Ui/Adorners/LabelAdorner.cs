@@ -41,8 +41,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
     private Point _grabScreen;               // _map 공간
     private double _origOffsetX, _origOffsetY;
 
-    /// <summary>라벨 드래그 완료 — 서비스/VM이 오프셋 DB 영속(FR-LB-05).</summary>
-    public event System.Action<IEditableMarker>? LabelOffsetChanged;
+    /// <summary>라벨 드래그 완료 — 서비스/VM이 오프셋 DB 영속(FR-LB-05). (marker, beforeOffsetX, beforeOffsetY) — undo before 명시 전달.</summary>
+    public event System.Action<IEditableMarker, double, double>? LabelOffsetChanged;
 
     public LabelAdorner(GMapCustomControl map, IEditableMarker marker, ILogService? log = null) : base(map)
     {
@@ -159,7 +159,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
             if (IsMouseCaptured) ReleaseMouseCapture();
             e.Handled = true;
             InvalidateVisual();
-            LabelOffsetChanged?.Invoke(_marker);   // lock 밖 발화 — 오프셋 DB 영속(서비스/VM)
+            LabelOffsetChanged?.Invoke(_marker, _origOffsetX, _origOffsetY);   // lock 밖 발화 — 오프셋 DB 영속 + undo(before=드래그시작 오프셋)
         }
         base.OnMouseLeftButtonUp(e);
     }
@@ -170,7 +170,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
         {
             _labelDragging = false;
             InvalidateVisual();
-            LabelOffsetChanged?.Invoke(_marker);   // 캡처 손실 시에도 영속(유실 방지)
+            LabelOffsetChanged?.Invoke(_marker, _origOffsetX, _origOffsetY);   // 캡처 손실 시에도 영속+undo(유실 방지)
         }
         base.OnLostMouseCapture(e);
     }

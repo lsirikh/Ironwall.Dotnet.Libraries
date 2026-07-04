@@ -73,13 +73,14 @@ public sealed class EditRecorder : IEditRecorder
         catch (Exception ex) { _log?.Error($"RecordPropertyChange 실패: {ex.Message}"); }
     }
 
-    public void RecordLabelOffset(IEditableMarker marker)
+    public void RecordLabelOffset(IEditableMarker marker, double beforeX, double beforeY)
     {
         if (!Ready || marker == null) return;
         ResetCoalesce();
         try
         {
-            var before = _labelBaseline.TryGetValue(marker.Id, out var b) ? b : (marker.LabelOffsetX, marker.LabelOffsetY);
+            // before=드래그 시작 시점 오프셋(caller 명시 전달) — 마커 선택 여부와 무관하게 항상 정확(RecordPositionChange 동형).
+            var before = (beforeX, beforeY);
             var after = (marker.LabelOffsetX, marker.LabelOffsetY);
             if (before.Equals(after)) return;
             _undo.Push(new LabelOffsetCommand(Context!, marker.Id, before, after));

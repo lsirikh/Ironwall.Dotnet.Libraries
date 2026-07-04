@@ -549,10 +549,10 @@ public partial class MapViewModel : BasePanelViewModel,
         => _labelService?.Sync(MainMap?.Markers);
 
     /// <summary>라벨 드래그 완료 → 심볼 모델 DB 영속(LabelOffsetX/Y 포함). RBAC 게이트(FR-LB-05).</summary>
-    private async void OnLabelOffsetChanged(IEditableMarker marker)
+    private async void OnLabelOffsetChanged(IEditableMarker marker, double beforeX, double beforeY)
     {
         if (marker == null || !CanEditMap()) return;
-        try { await DbUpdateProcess(marker); _editRecorder?.RecordLabelOffset(marker); }
+        try { await DbUpdateProcess(marker); _editRecorder?.RecordLabelOffset(marker, beforeX, beforeY); }   // before=드래그 시작 오프셋(선택 무관 정확)
         catch (Exception ex) { _log?.Error($"라벨 오프셋 영속 실패: {ex.Message}"); }
     }
     #endregion

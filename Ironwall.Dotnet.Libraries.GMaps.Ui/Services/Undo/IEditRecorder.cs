@@ -25,8 +25,8 @@ public interface IEditRecorder
     /// <summary>속성 변경 기록(coalescing).</summary>
     void RecordPropertyChange(IEditableMarker marker, string property, object? oldValue, object? newValue);
 
-    /// <summary>라벨 오프셋 드래그 완료 기록(before=baseline, after=현재).</summary>
-    void RecordLabelOffset(IEditableMarker marker);
+    /// <summary>라벨 오프셋 드래그 완료 기록(before=드래그 시작 오프셋 명시 전달, after=현재). 선택 여부 무관.</summary>
+    void RecordLabelOffset(IEditableMarker marker, double beforeX, double beforeY);
 
     /// <summary>심볼 추가 기록(after=현재 모델, Id 포함).</summary>
     void RecordAdd(IEditableMarker marker);
