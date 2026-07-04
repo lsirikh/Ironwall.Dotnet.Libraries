@@ -66,7 +66,7 @@ public sealed class EditRecorder : IEditRecorder
                 _lastProp.After = newValue;
                 return;
             }
-            var cmd = new PropertyChangeCommand(Context!, marker.Id, property, oldValue, newValue);
+            var cmd = new PropertyChangeCommand(Context!, marker.Id, property, oldValue, newValue, marker is GMapImageMarker);
             _undo.Push(cmd);
             _lastProp = cmd; _lastPropId = marker.Id; _lastPropName = property;
         }
@@ -83,7 +83,7 @@ public sealed class EditRecorder : IEditRecorder
             var before = (beforeX, beforeY);
             var after = (marker.LabelOffsetX, marker.LabelOffsetY);
             if (before.Equals(after)) return;
-            _undo.Push(new LabelOffsetCommand(Context!, marker.Id, before, after));
+            _undo.Push(new LabelOffsetCommand(Context!, marker.Id, before, after, marker is GMapImageMarker));
             _labelBaseline[marker.Id] = after;   // 다음 드래그 before
         }
         catch (Exception ex) { _log?.Error($"RecordLabelOffset 실패: {ex.Message}"); }
@@ -145,14 +145,14 @@ public sealed class EditRecorder : IEditRecorder
     {
         if (!Ready || marker == null || before == after) return;
         ResetCoalesce();
-        _undo.Push(new LockCommand(Context!, marker.Id, before, after));
+        _undo.Push(new LockCommand(Context!, marker.Id, before, after, marker is GMapImageMarker));
     }
 
     public void RecordRename(IEditableMarker marker, string before, string after)
     {
         if (!Ready || marker == null || string.Equals(before, after)) return;
         ResetCoalesce();
-        _undo.Push(new RenameSymbolCommand(Context!, marker.Id, before ?? string.Empty, after ?? string.Empty));
+        _undo.Push(new RenameSymbolCommand(Context!, marker.Id, before ?? string.Empty, after ?? string.Empty, marker is GMapImageMarker));
     }
 
     public IDisposable BeginBatch(string description)

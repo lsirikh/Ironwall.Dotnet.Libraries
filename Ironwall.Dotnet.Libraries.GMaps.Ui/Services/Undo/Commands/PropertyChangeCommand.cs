@@ -11,15 +11,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
 public sealed class PropertyChangeCommand : UndoableCommandBase
 {
     private readonly int _id;
+    private readonly bool _isImage;   // Id 충돌 대비 대상 타입 캡처(이미지↔심볼 오적용 방지 — TransformCommand 동형)
     public string Property { get; }
     public int MarkerId => _id;
     public object? Before { get; }
     /// <summary>coalescing 시 최신값으로 갱신(EditRecorder 전용).</summary>
     public object? After { get; internal set; }
 
-    public PropertyChangeCommand(IUndoApplyContext ctx, int markerId, string property, object? before, object? after) : base(ctx)
+    public PropertyChangeCommand(IUndoApplyContext ctx, int markerId, string property, object? before, object? after, bool isImage = false) : base(ctx)
     {
-        _id = markerId; Property = property; Before = before; After = after;
+        _id = markerId; Property = property; Before = before; After = after; _isImage = isImage;
     }
 
     public override string Description => $"속성 변경: {Property}";
@@ -29,7 +30,7 @@ public sealed class PropertyChangeCommand : UndoableCommandBase
 
     private async Task Apply(object? v, CancellationToken ct)
     {
-        var m = Ctx.FindMarkerById(_id);
+        var m = Ctx.FindMarkerById(_id, _isImage);   // 타입인지 조회 — 속성창 이미지 크기(Width/Height) undo가 엉뚱한 Controller에 적용되던 손상 차단
         if (m == null) return;
         ApplyProperty(m, Property, v);
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
