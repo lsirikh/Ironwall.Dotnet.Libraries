@@ -784,6 +784,10 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             _imageModel.Top = newTop;
             _imageModel.Bottom = newBottom;
 
+            // Position(중심점)을 바운즈 중심과 동기 — UpdateLocation/ImageBounds setter와 정합.
+            //   (미동기 시 리사이즈 후 Position이 stale → 편집시작 OriginalPosition 오캡처 → undo가 위치를 엉뚱한 곳으로 이동)
+            Position = Center;
+
             OnPropertyChanged(nameof(ImageBounds));
             OnPropertyChanged(nameof(Left));
             OnPropertyChanged(nameof(Right));
@@ -792,6 +796,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             OnPropertyChanged(nameof(AspectRatio));
             OnPropertyChanged(nameof(Width));
             OnPropertyChanged(nameof(Height));
+            OnPropertyChanged(nameof(Center));
         }
         catch (Exception ex)
         {
