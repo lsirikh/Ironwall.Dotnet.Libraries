@@ -47,6 +47,29 @@
         <Setter Property="md:ButtonAssist.CornerRadius" Value="{DynamicResource RadiusSmall}" />
     </Style>
 
+    <!-- 패널 헤더 닫기(원형 아이콘) — 앱 표준 PanelCloseButtonStyle 답습(26×26 원형 + 호버). 시안 헤더 위 OnPrimaryFixed. -->
+    <Style x:Key="ModernPanelCloseButton" TargetType="Button">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTip" Value="닫기" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="13">
+                        <md:PackIcon Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     Foreground="{DynamicResource OnPrimaryFixedBrush}" Kind="Close" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ═══════════════ TextBox / PasswordBox / ComboBox ═══════════════ -->
 
     <Style x:Key="ModernTextBox" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignTextBox}">

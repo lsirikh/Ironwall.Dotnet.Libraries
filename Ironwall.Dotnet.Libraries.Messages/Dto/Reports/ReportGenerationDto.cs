@@ -37,7 +37,7 @@ public class ReportGenerationDto : BaseDto
     [JsonProperty("generator_name", Order = 9, NullValueHandling = NullValueHandling.Ignore)]
     public string? GeneratorName { get; set; }
 
-    /// <summary>PENDING | GENERATING | COMPLETED | FAILED</summary>
+    /// <summary>PENDING | GENERATING | COMPLETED | FAILED | CANCELLED</summary>
     [JsonProperty("status", Order = 10)]
     public string Status { get; set; } = "PENDING";
 
@@ -61,6 +61,7 @@ public class ReportGenerationDto : BaseDto
     [JsonIgnore] public bool IsCompleted => string.Equals(Status, "COMPLETED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsFailed => string.Equals(Status, "FAILED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsInProgress => Status is "PENDING" or "GENERATING";
+    [JsonIgnore] public bool IsCancelled => string.Equals(Status, "CANCELLED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsCustom => string.Equals(ReportType, "CUSTOM", System.StringComparison.OrdinalIgnoreCase);
 }
 

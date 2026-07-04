@@ -31,16 +31,19 @@
 					Grid.Row="0"
 					CornerRadius="8,8,0,0"
 					Style="{StaticResource ModernDialogHeader}">
-					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-						<md:PackIcon
-							Width="20"
-							Height="20"
-							Margin="0,0,8,0"
-							VerticalAlignment="Center"
-							Foreground="{DynamicResource OnPrimaryFixedBrush}"
-							Kind="AccountCog" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="계정·권한 관리" />
-					</StackPanel>
+					<DockPanel VerticalAlignment="Center">
+						<Button DockPanel.Dock="Right" x:Name="ClickClose" Style="{StaticResource ModernPanelCloseButton}" />
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="20"
+								Height="20"
+								Margin="0,0,8,0"
+								VerticalAlignment="Center"
+								Foreground="{DynamicResource OnPrimaryFixedBrush}"
+								Kind="AccountCog" />
+							<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="계정·권한 관리" />
+						</StackPanel>
+					</DockPanel>
 				</Border>
 
 				<!--  상단 수평 탭  -->
@@ -70,22 +73,7 @@
 					</TabItem>
 				</TabControl>
 
-				<!--  풋터  -->
-				<Border
-					Grid.Row="2"
-					BorderBrush="{DynamicResource DividerBrush}"
-					BorderThickness="0,1,0,0">
-					<StackPanel
-						Margin="12"
-						HorizontalAlignment="Right"
-						Orientation="Horizontal">
-						<Button
-							x:Name="ClickClose"
-							Width="100"
-							Content="닫기"
-							Style="{StaticResource ModernSecondaryButton}" />
-					</StackPanel>
-				</Border>
+				<!--  닫기는 헤더 ✕(ModernPanelCloseButton)로 이동 — 앱 표준 통일  -->
 			</Grid>
 		</md:Card>
 	</md:DialogHost>

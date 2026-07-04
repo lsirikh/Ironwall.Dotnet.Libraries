@@ -23,6 +23,7 @@ public class OpenSetupPanelMessageModel;
 public class OpenMyPagePanelMessageModel;
 public class OpenDevicePanelMessageModel;
 public class OpenEventPanelMessageModel;
+public class OpenReportPanelMessageModel;
 public class OpenAccountManagerPanelMessageModel;
 public class OpenVcaPanelMessageModel;
 public class ClosePanelMessageModel;

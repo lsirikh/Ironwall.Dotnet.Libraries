@@ -180,6 +180,20 @@ public class ReportApiService : IReportApiService
         }
     }
 
+    public async Task<ApiResponse<object>> DeleteGenerationAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var res = await _apiService.DeleteRequestAsync($"{_setupModel.Url}/reports/generations/{id}");
+            return await res.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DeleteGenerationAsync)}] {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"생성 이력 {id} 삭제 실패", ex.Message);
+        }
+    }
+
     public async Task<ApiResponse<ReportPreviewDto>> GetPreviewAsync(int id, CancellationToken token = default)
     {
         try
@@ -191,6 +205,40 @@ public class ReportApiService : IReportApiService
         {
             _log?.Error($"[{nameof(GetPreviewAsync)}] {ex.Message}");
             return ApiResponse<ReportPreviewDto>.CreateError("INTERNAL_ERROR", $"미리보기 {id} 조회 실패", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<object>> CancelGenerationAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var res = await _apiService.PostRequestAsync($"{_setupModel.Url}/reports/generations/{id}/cancel", new { });
+            return await res.ToApiResponseAsync<object>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(CancelGenerationAsync)}] {ex.Message}");
+            return ApiResponse<object>.CreateError("INTERNAL_ERROR", $"생성 취소 실패(id={id})", ex.Message);
+        }
+    }
+
+    public async Task<string?> GetPreviewHtmlAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            // /api/reports/preview/{id} 는 text/html(봉투 아님) — Bearer는 파이프라인 자동부착.
+            var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/preview/{id}");
+            if (!res.IsSuccessStatusCode)
+            {
+                _log?.Warning($"[{nameof(GetPreviewHtmlAsync)}] HTTP {(int)res.StatusCode} — 미리보기 HTML 조회 실패(id={id})");
+                return null;
+            }
+            return await res.Content.ReadAsStringAsync(token);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetPreviewHtmlAsync)}] {ex.Message}");
+            return null;
         }
     }
 

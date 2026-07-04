@@ -28,8 +28,9 @@ public class ReportUiModule : Module
     {
         try
         {
-            if (_apiSetup is not ApiSetupModel setup)
-                throw new InvalidOperationException("ReportUiModule: apiSetup(ApiSetupModel — GOP 서버 URL)이 필요합니다.");
+            // apiSetup(IApiSetupModel) → 구체 ApiSetupModel 로 복제(EventUiModule 패턴).
+            // 앱은 SetupModel(IApiSetupModel 구현, ApiSetupModel 아님)을 넘기므로 하드캐스트 금지 — 복사 생성자로 수용.
+            var setup = new ApiSetupModel(_apiSetup);
 
             // 1) 보고서 API(Bearer 파이프라인 + ReportApiService)
             builder.RegisterModule(new ReportApiModule(_log, setup, name: _name, count: _count));
@@ -38,6 +39,7 @@ public class ReportUiModule : Module
             builder.RegisterType<ReportListViewModel>().SingleInstance();
             builder.RegisterType<ReportCreateViewModel>().SingleInstance();
             builder.RegisterType<ReportTemplateViewModel>().SingleInstance();
+            builder.RegisterType<ReportTemplateEditViewModel>().SingleInstance();
             builder.RegisterType<ReportPreviewViewModel>().SingleInstance();
             builder.RegisterType<ReportConsoleViewModel>().SingleInstance();
 

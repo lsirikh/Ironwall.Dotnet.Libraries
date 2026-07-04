@@ -40,16 +40,14 @@
 					Grid.Row="0"
 					Margin="-20,-20,-20,8"
 					Style="{StaticResource ModernDialogHeader}">
-					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-						<md:PackIcon
+					<DockPanel VerticalAlignment="Center"><Button DockPanel.Dock="Right" x:Name="ClickCancel" Style="{StaticResource ModernPanelCloseButton}" /><StackPanel Orientation="Horizontal"><md:PackIcon
 							Width="20"
 							Height="20"
 							Margin="0,0,8,0"
 							VerticalAlignment="Center"
 							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Kind="AccountDetails" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="내 정보" />
-					</StackPanel>
+						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="내 정보" /></StackPanel></DockPanel>
 				</Border>
 
 				<StackPanel Grid.Row="2" Orientation="Vertical">
@@ -373,13 +371,9 @@
 						</Button.Content>
 					</Button>
 
-					<Separator
-						Grid.Row="1"
-						Grid.ColumnSpan="4"
-						Background="{DynamicResource DividerBrush}"
-						Style="{StaticResource MaterialDesignLightSeparator}" />
+					
 
-					<Button
+					<!--<Button
 						x:Name="ClickCancel"
 						Grid.Row="2"
 						Grid.ColumnSpan="3"
@@ -392,7 +386,8 @@
 								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="닫기" />
 							</StackPanel>
 						</Button.Content>
-					</Button>
+					</Button>-->
+					<!-- close moved to header -->
 				</Grid>
 
 			</Grid>

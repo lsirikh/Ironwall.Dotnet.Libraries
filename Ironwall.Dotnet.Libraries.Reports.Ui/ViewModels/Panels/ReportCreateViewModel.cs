@@ -8,7 +8,8 @@ using System.Collections.ObjectModel;
 namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 
 /// <summary>
-/// 보고서 생성 탭(S3) — 정형(STANDARD) / 비정형(CUSTOM 컴포넌트 선택) + 생성 요청 + 폴링(S4).
+/// 보고서 생성 탭(S3) — ①표준 전체(STANDARD, 전 섹션) 또는 ②템플릿 기반(CUSTOM: 저장 템플릿 선택) + 제목/기간 → 생성 + 폴링(S4).
+/// 컴포넌트 구성은 템플릿 탭에서만 관리(여기선 만들어진 템플릿을 고르기만).
 /// </summary>
 public class ReportCreateViewModel : BasePanelViewModel
 {
@@ -29,30 +30,24 @@ public class ReportCreateViewModel : BasePanelViewModel
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        if (Components.Count == 0) await LoadComponentsAsync();
+        await LoadTemplatesAsync();
     }
     #endregion
 
     #region - Processes -
-    /// <summary>비정형 컴포넌트 카탈로그 로드(GET /components).</summary>
-    public async Task LoadComponentsAsync()
+    /// <summary>템플릿 드롭다운 로드(GET /templates) — 템플릿 기반 선택용.</summary>
+    public async Task LoadTemplatesAsync()
     {
         try
         {
-            var res = await _api.GetComponentsAsync();
-            Components.Clear();
+            var res = await _api.GetTemplatesAsync(1, 100);
+            Templates.Clear();
             if (res.Success && res.Data != null)
-            {
-                foreach (var cat in res.Data)
-                {
-                    var items = cat.Components ?? cat.Items;
-                    if (items == null) continue;
-                    foreach (var it in items)
-                        Components.Add(new ComponentPick(it.Id, it.Title ?? it.Name ?? it.Id, cat.Label ?? cat.Category));
-                }
-            }
+                foreach (var t in res.Data) Templates.Add(t);
+            if (SelectedTemplate is null && Templates.Count > 0) SelectedTemplate = Templates[0];
+            NotifyOfPropertyChange(nameof(HasTemplates));
         }
-        catch (Exception ex) { _log?.Error($"[ReportCreate] LoadComponents: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[ReportCreate] LoadTemplates: {ex.Message}"); }
     }
 
     /// <summary>보고서 생성 요청 → 폴링(COMPLETED/FAILED).</summary>
@@ -60,36 +55,19 @@ public class ReportCreateViewModel : BasePanelViewModel
     {
         if (IsGenerating) return;
         var title = (Title ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(title)) { StatusText = "제목을 입력하세요."; NotifyOfPropertyChange(nameof(StatusText)); return; }
+        if (string.IsNullOrEmpty(title)) { StatusText = "제목을 입력하세요."; return; }
+        if (IsTemplateBased && SelectedTemplate is null) { StatusText = "템플릿을 선택하세요."; return; }
 
         try
         {
             IsGenerating = true;
             StatusText = "보고서 생성 요청 중…";
-            int? templateId = null;
-
-            if (IsCustom)
-            {
-                // 선택 컴포넌트로 임시 템플릿 생성 → template_id 확보
-                var picks = Components.Where(c => c.Enabled).ToList();
-                if (picks.Count == 0) { StatusText = "컴포넌트를 1개 이상 선택하세요."; IsGenerating = false; return; }
-                var tplRes = await _api.CreateTemplateAsync(new ReportTemplateCreateDto
-                {
-                    Name = $"{title} ({SelectedPeriod.Value})",
-                    ReportType = "CUSTOM",
-                    DefaultPeriod = SelectedPeriod.Value,
-                    Components = picks.Select((c, i) => new ReportComponentConfigDto { Id = c.Id, Order = i, Enabled = true }).ToList(),
-                });
-                if (!tplRes.Success || tplRes.Data is null) { StatusText = $"템플릿 생성 실패: {tplRes.Message}"; IsGenerating = false; return; }
-                templateId = tplRes.Data.Id;
-            }
-
             var req = new ReportGenerateRequestDto
             {
-                ReportType = IsCustom ? "CUSTOM" : "STANDARD",
+                ReportType = IsTemplateBased ? "CUSTOM" : "STANDARD",
                 Title = title,
                 PeriodType = SelectedPeriod.Value,
-                TemplateId = templateId,
+                TemplateId = IsTemplateBased ? SelectedTemplate!.Id : null,
             };
             var genRes = await _api.GenerateAsync(req);
             if (!genRes.Success || genRes.Data is null) { StatusText = $"생성 요청 실패: {genRes.Message}"; IsGenerating = false; return; }
@@ -97,33 +75,25 @@ public class ReportCreateViewModel : BasePanelViewModel
             var id = genRes.Data.Id;
             StatusText = "생성 중… (GENERATING)";
             var completed = await PollUntilDoneAsync(id);
-            if (completed != null && completed.IsCompleted)
-            {
-                StatusText = "완료됨.";
-                Generated?.Invoke(id);
-            }
-            else if (completed != null && completed.IsFailed)
-                StatusText = $"실패: {completed.ErrorMessage}";
-            else
-                StatusText = "시간 초과(폴링 중단).";
+            if (completed != null && completed.IsCompleted) { StatusText = "완료됨."; Generated?.Invoke(id); }
+            else if (completed != null && completed.IsCancelled) StatusText = "취소됨.";
+            else if (completed != null && completed.IsFailed) StatusText = $"실패: {completed.ErrorMessage}";
+            else StatusText = "시간 초과(폴링 중단).";
         }
         catch (Exception ex) { _log?.Error($"[ReportCreate] Generate: {ex.Message}"); StatusText = $"오류: {ex.Message}"; }
         finally { IsGenerating = false; }
     }
 
-    /// <summary>폴링(1.5s 간격, ≤120s). 완료/실패 시 DTO 반환, 시간초과 null.</summary>
+    /// <summary>폴링(1.5s 간격). 완료/실패 시 DTO 반환, 시간초과 null.</summary>
     private async Task<ReportGenerationDto?> PollUntilDoneAsync(int id)
     {
-        var deadline = 120; var waited = 0;
-        while (waited < deadline)
+        var waited = 0;
+        while (waited < 180)
         {
             await Task.Delay(1500);
             waited += 2;
             var res = await _api.GetGenerationByIdAsync(id);
-            if (res.Success && res.Data != null)
-            {
-                if (res.Data.IsCompleted || res.Data.IsFailed) return res.Data;
-            }
+            if (res.Success && res.Data != null && (res.Data.IsCompleted || res.Data.IsFailed || res.Data.IsCancelled)) return res.Data;
         }
         return null;
     }
@@ -131,11 +101,31 @@ public class ReportCreateViewModel : BasePanelViewModel
 
     #region - Properties -
     public ObservableCollection<PeriodOption> Periods { get; }
-    public ObservableCollection<ComponentPick> Components { get; } = new();
+    public ObservableCollection<ReportTemplateDto> Templates { get; } = new();
+    public bool HasTemplates => Templates.Count > 0;
 
-    private bool _isCustom;
-    public bool IsCustom { get => _isCustom; set { _isCustom = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsStandard)); } }
-    public bool IsStandard => !_isCustom;
+    private bool _isTemplateBased;
+    /// <summary>false = 표준 전체(STANDARD, 전 섹션) · true = 템플릿 기반(CUSTOM, 저장 템플릿 선택).</summary>
+    public bool IsTemplateBased { get => _isTemplateBased; set { _isTemplateBased = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsStandard)); } }
+    /// <summary>표준 전체 라디오용(settable) — true 설정 시 템플릿모드 해제.</summary>
+    public bool IsStandard { get => !_isTemplateBased; set { if (value) IsTemplateBased = false; } }
+
+    private ReportTemplateDto? _selectedTemplate;
+    public ReportTemplateDto? SelectedTemplate
+    {
+        get => _selectedTemplate;
+        set
+        {
+            _selectedTemplate = value;
+            NotifyOfPropertyChange();
+            // 템플릿의 기본기간을 기간에 반영(사용자가 다시 바꿀 수 있음)
+            if (value != null)
+            {
+                var p = Periods.FirstOrDefault(x => x.Value == value.DefaultPeriod);
+                if (p != null) SelectedPeriod = p;
+            }
+        }
+    }
 
     private string? _title;
     public string? Title { get => _title; set { _title = value; NotifyOfPropertyChange(); } }
@@ -150,7 +140,7 @@ public class ReportCreateViewModel : BasePanelViewModel
     private string _statusText = string.Empty;
     public string StatusText { get => _statusText; set { _statusText = value; NotifyOfPropertyChange(); } }
 
-    /// <summary>생성 완료(generation id) — 콘솔이 구독(미리보기 오픈 등).</summary>
+    /// <summary>생성 완료(generation id) — 콘솔이 구독(목록 새로고침 + 미리보기).</summary>
     public event Action<int>? Generated;
     #endregion
 
@@ -162,7 +152,7 @@ public class ReportCreateViewModel : BasePanelViewModel
 /// <summary>기간 선택 옵션(표시명/값).</summary>
 public sealed record PeriodOption(string Display, string Value);
 
-/// <summary>비정형 컴포넌트 선택 항목.</summary>
+/// <summary>템플릿 컴포넌트 선택 항목(템플릿 편집 다이얼로그에서 사용).</summary>
 public sealed class ComponentPick : PropertyChangedBase
 {
     public ComponentPick(string id, string display, string? category) { Id = id; Display = display; Category = category; }

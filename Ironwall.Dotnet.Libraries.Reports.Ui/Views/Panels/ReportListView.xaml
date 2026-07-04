@@ -2,7 +2,8 @@
     x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportListView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:cal="http://caliburnmicro.com">
+    xmlns:cal="http://caliburnmicro.com"
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
@@ -14,39 +15,87 @@
         </Grid.RowDefinitions>
 
         <!-- 툴바 -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,8">
-            <TextBlock Text="상태" VerticalAlignment="Center" Margin="2,0,6,0"
-                       Foreground="{DynamicResource TextSecondaryBrush}" />
-            <ComboBox Width="140" ItemsSource="{Binding StatusFilters}"
-                      SelectedItem="{Binding SelectedStatusFilter}" />
-            <Button x:Name="LoadAsync" Content="검색" Width="72" Margin="8,0,0,0" />
-            <Button x:Name="Preview" Content="미리보기" Width="90" Margin="16,0,0,0"
-                    IsEnabled="{Binding CanDownload}" />
-            <Button x:Name="Download" Content="PDF 다운로드" Width="110" Margin="6,0,0,0"
-                    IsEnabled="{Binding CanDownload}" />
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="상태" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource PanelFieldLabel}" />
+                <ComboBox Width="150" ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}"
+                          Style="{StaticResource ModernComboBox}" />
+                <Button x:Name="LoadAsync" Content="검색" MinWidth="76" Margin="10,0,0,0"
+                        Style="{StaticResource ModernSecondaryButton}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="Preview" Content="미리보기" MinWidth="92"
+                        Style="{StaticResource ModernSecondaryButton}" IsEnabled="{Binding CanDownload}" />
+                <Button x:Name="Download" Content="PDF 다운로드" MinWidth="112" Margin="8,0,0,0"
+                        Style="{StaticResource ModernPrimaryButton}" IsEnabled="{Binding CanDownload}" />
+                <Button x:Name="Cancel" Content="취소" MinWidth="64" Margin="8,0,0,0"
+                        Style="{StaticResource ModernSecondaryButton}" IsEnabled="{Binding CanCancel}"
+                        ToolTip="진행 중(대기/생성중) 보고서 취소" />
+                <Button x:Name="Delete" Content="삭제" MinWidth="64" Margin="8,0,0,0"
+                        Style="{StaticResource ModernDangerButton}" IsEnabled="{Binding CanDelete}" />
+            </StackPanel>
+        </Grid>
 
         <!-- 목록 -->
-        <DataGrid Grid.Row="1" x:Name="Items" AutoGenerateColumns="False" IsReadOnly="True"
-                  SelectedItem="{Binding SelectedItem}" CanUserAddRows="False"
-                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  Background="Transparent" RowHeight="30">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" />
-                <DataGridTextColumn Header="제목" Binding="{Binding Title}" Width="*" />
-                <DataGridTextColumn Header="유형" Binding="{Binding ReportType}" Width="90" />
-                <DataGridTextColumn Header="기간" Binding="{Binding PeriodType}" Width="70" />
-                <DataGridTextColumn Header="상태" Binding="{Binding Status}" Width="110" />
-                <DataGridTextColumn Header="생성일시" Binding="{Binding CreatedAt}" Width="150" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <Border Grid.Row="1" Style="{StaticResource StandardPanelCard}">
+            <DataGrid x:Name="Items" AutoGenerateColumns="False" IsReadOnly="True"
+                      SelectedItem="{Binding SelectedItem}" CanUserAddRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      RowHeight="38" FontSize="13"
+                      Style="{StaticResource ModernDataGrid}"
+                      ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+                      CellStyle="{StaticResource ModernDataGridCell}"
+                      RowStyle="{StaticResource ModernDataGridRow}"
+                      BorderThickness="0" Background="Transparent">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="52" />
+                    <DataGridTextColumn Header="제목" Binding="{Binding Title}" Width="*" MinWidth="200" />
+                    <DataGridTextColumn Header="유형" Binding="{Binding ReportType}" Width="90" />
+                    <DataGridTextColumn Header="기간" Binding="{Binding PeriodType}" Width="70" />
+                    <DataGridTemplateColumn Header="상태" Width="110">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border x:Name="Chip" CornerRadius="9" Padding="10,2" Background="#555F6B"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ChipText" Text="{Binding Status}" Foreground="White"
+                                               FontSize="11" FontWeight="Medium" />
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="PENDING">
+                                        <Setter TargetName="Chip" Property="Background" Value="#EF6C00" />
+                                        <Setter TargetName="ChipText" Property="Text" Value="대기" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="GENERATING">
+                                        <Setter TargetName="Chip" Property="Background" Value="#1565C0" />
+                                        <Setter TargetName="ChipText" Property="Text" Value="생성중" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="COMPLETED">
+                                        <Setter TargetName="Chip" Property="Background" Value="#2E7D32" />
+                                        <Setter TargetName="ChipText" Property="Text" Value="완료" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="FAILED">
+                                        <Setter TargetName="Chip" Property="Background" Value="#C62828" />
+                                        <Setter TargetName="ChipText" Property="Text" Value="실패" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="CANCELLED">
+                                        <Setter TargetName="Chip" Property="Background" Value="#546E7A" />
+                                        <Setter TargetName="ChipText" Property="Text" Value="취소됨" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="생성일시" Binding="{Binding CreatedAt}" Width="150" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
 
         <!-- 빈 상태 -->
         <TextBlock Grid.Row="1" Text="생성된 보고서가 없습니다." HorizontalAlignment="Center" VerticalAlignment="Center"
                    Foreground="{DynamicResource TextMutedBrush}"
                    Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-        <TextBlock Grid.Row="2" Margin="4,6,0,0" Foreground="{DynamicResource TextMutedBrush}"
+        <TextBlock Grid.Row="2" Margin="2,8,0,0" Foreground="{DynamicResource TextMutedBrush}"
                    Text="{Binding Items.Count, StringFormat=로드 {0}건}" />
     </Grid>
 </UserControl>

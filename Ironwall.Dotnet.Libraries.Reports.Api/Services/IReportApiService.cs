@@ -25,7 +25,17 @@ public interface IReportApiService : IService
     Task<ApiResponse<ReportGenerationDto>> GenerateAsync(ReportGenerateRequestDto dto, CancellationToken token = default);
     Task<ApiListResponse<ReportGenerationDto>> GetGenerationsAsync(int page = 1, int limit = 20, string? status = null, CancellationToken token = default);
     Task<ApiResponse<ReportGenerationDto>> GetGenerationByIdAsync(int id, CancellationToken token = default);
+
+    /// <summary>생성 이력 삭제(DELETE /generations/{id}) — DB row + PDF 파일 정리. reports:delete 필요.</summary>
+    Task<ApiResponse<object>> DeleteGenerationAsync(int id, CancellationToken token = default);
+
+    /// <summary>생성 취소(POST /generations/{id}/cancel) — PENDING/GENERATING만 CANCELLED. 이미 종료=400. reports:delete 필요.</summary>
+    Task<ApiResponse<object>> CancelGenerationAsync(int id, CancellationToken token = default);
+
     Task<ApiResponse<ReportPreviewDto>> GetPreviewAsync(int id, CancellationToken token = default);
+
+    /// <summary>미리보기 페이지 원시 HTML(자립형: 인라인 CSS/Chart.js) — WebView2 embed용. reports:view 필요. 실패 시 null.</summary>
+    Task<string?> GetPreviewHtmlAsync(int id, CancellationToken token = default);
 
     /// <summary>
     /// PDF 다운로드(FileResponse, 봉투 아님) — COMPLETED 아니면 400, 파일부재 404.

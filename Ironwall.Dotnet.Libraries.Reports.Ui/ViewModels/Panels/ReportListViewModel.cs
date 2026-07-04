@@ -87,6 +87,38 @@ public class ReportListViewModel : BasePanelViewModel
         if (item is null || !item.IsCompleted) return;
         PreviewRequested?.Invoke(item.Id);
     }
+
+    /// <summary>선택 보고서 삭제(DELETE /generations/{id}) — 상태 무관.</summary>
+    public async Task Delete()
+    {
+        var item = SelectedItem;
+        if (item is null) return;
+        try
+        {
+            var res = await _api.DeleteGenerationAsync(item.Id);
+            if (res.Success) { Items.Remove(item); NotifyOfPropertyChange(nameof(IsEmpty)); }
+            else _log?.Warning($"[ReportList] 삭제 실패: {res.Message}");
+        }
+        catch (Exception ex) { _log?.Error($"[ReportList] Delete: {ex.Message}"); }
+    }
+
+    /// <summary>선택 보고서 생성 취소(진행중만) — Confirm 후 POST cancel → 목록 새로고침.</summary>
+    public async Task Cancel()
+    {
+        var item = SelectedItem;
+        if (item is null || !item.IsInProgress) return;
+        var confirm = System.Windows.MessageBox.Show(
+            $"'{item.Title}' 보고서 생성을 취소하시겠습니까?", "생성 취소",
+            System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+        if (confirm != System.Windows.MessageBoxResult.Yes) return;
+        try
+        {
+            var res = await _api.CancelGenerationAsync(item.Id);
+            if (res.Success) await LoadAsync();   // CANCELLED 반영
+            else _log?.Warning($"[ReportList] 취소 실패: {res.Message}");
+        }
+        catch (Exception ex) { _log?.Error($"[ReportList] Cancel: {ex.Message}"); }
+    }
     #endregion
 
     #region - Properties -
@@ -98,8 +130,10 @@ public class ReportListViewModel : BasePanelViewModel
     public ReportGenerationDto? SelectedItem
     {
         get => _selectedItem;
-        set { _selectedItem = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanDownload)); }
+        set { _selectedItem = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanDownload)); NotifyOfPropertyChange(nameof(CanDelete)); NotifyOfPropertyChange(nameof(CanCancel)); }
     }
+    public bool CanDelete => SelectedItem != null;
+    public bool CanCancel => SelectedItem?.IsInProgress == true;
 
     private string? _selectedStatusFilter;
     public string? SelectedStatusFilter
