@@ -102,6 +102,7 @@
 							<MultiTrigger.Conditions>
 								<Condition Property="IsMouseOver" Value="True" />
 								<Condition Property="IsLocked" Value="False" />
+								<Condition Property="IsMultiSelectActive" Value="False" />
 							</MultiTrigger.Conditions>
 							<Setter TargetName="PART_HoverBorder" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />

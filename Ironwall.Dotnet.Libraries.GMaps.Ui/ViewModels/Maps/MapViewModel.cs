@@ -918,6 +918,7 @@ public partial class MapViewModel : BasePanelViewModel,
         }
         _groupSelection?.SetSelection(live != null && live.Count > 0 ? live : null);
         NotifyOfPropertyChange(nameof(SelectedMarkers));
+        NotifyOfPropertyChange(nameof(HasSelectedItem));   // 그룹선택 변경 → 쓰레기통·선택취소 버튼 활성 갱신
     }
 
     /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
@@ -2520,6 +2521,7 @@ public partial class MapViewModel : BasePanelViewModel,
             SelectedImage = null;
 
             HidePropertyPanel();
+            NotifyOfPropertyChange(nameof(HasSelectedItem));   // 전체 해제 → 버튼 비활성 갱신
 
             //_log?.Info("모든 선택 해제 완료");
         }
@@ -7179,7 +7181,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 선택된 항목이 있는지 여부
     /// </summary>
-    public bool HasSelectedItem => (SelectedImage != null || SelectedMarker != null) && IsEditModeEnabled;
+    public bool HasSelectedItem => (SelectedImage != null || SelectedMarker != null || (_groupSelection?.HasSelection ?? false)) && IsEditModeEnabled;
     #endregion
 
     #region - 회전 관련 속성 -

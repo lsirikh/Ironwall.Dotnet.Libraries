@@ -544,6 +544,14 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
         if (mapControl != null && !mapControl.IsEditMode)
             return;
 
+        // ★ 수정키(Ctrl/Shift)+편집모드 = 그룹 멀티셀렉션/러버밴드 클릭 → 자식의 단일선택(TriggerMarkerClicked→
+        //   SelectedMarker 세팅)을 건너뛰고 부모(GMapCustomControl)에 소유권 양도. e.Handled 미설정으로 버블 유지.
+        //   (미양도 시 부모 Ctrl 토글의 CurrentSelectionIds가 방금 세팅된 SelectedMarker를 포함→Add가 Remove로 자기상쇄=선택 0)
+        if (mapControl != null
+            && (System.Windows.Input.Keyboard.Modifiers
+                & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)
+            return;
+
         try
         {
             Focus();

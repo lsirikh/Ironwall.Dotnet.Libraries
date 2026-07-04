@@ -2093,8 +2093,19 @@ public class GMapCustomControl : GMapControl
                 _rubberBandAdorner = new Adorners.RubberBandAdorner(this);
                 layer.Add(_rubberBandAdorner);
             }
+            SetImagesMultiSelectActive(true);   // 러버밴드(멀티셀렉트) 중 오버레이 이미지 호버 Edge 억제(B1)
         }
         catch (Exception ex) { _log?.Error($"러버밴드 오버레이 표시 실패: {ex.Message}"); }
+    }
+
+    /// <summary>러버밴드(멀티셀렉트) 활성 상태를 오버레이 이미지 컨트롤에 전파 — 활성 중 호버 Edge 억제(B1).
+    /// 이미지는 멀티셀렉트 대상서 제외(M1)라 러버밴드 중 아무 반응도 없어야 함.</summary>
+    private void SetImagesMultiSelectActive(bool active)
+    {
+        if (Markers == null) return;
+        foreach (var m in Markers)
+            if ((m as GMap.NET.WindowsPresentation.GMapMarker)?.Shape is GMapMarkerImageControl c)
+                c.IsMultiSelectActive = active;
     }
 
     /// <summary>러버밴드 마퀴 사각형 갱신(드래그 중).</summary>
@@ -2107,6 +2118,7 @@ public class GMapCustomControl : GMapControl
     /// <summary>러버밴드 마퀴 어도너 제거(종료/취소).</summary>
     private void HideRubberBand()
     {
+        SetImagesMultiSelectActive(false);   // 러버밴드 종료/취소 → 이미지 호버 원복(B1). 종료·취소 전 경로가 이 메서드 경유.
         if (_rubberBandAdorner == null) return;
         try { System.Windows.Documents.AdornerLayer.GetAdornerLayer(this)?.Remove(_rubberBandAdorner); } catch { /* 레이어 정리 중 */ }
         _rubberBandAdorner = null;

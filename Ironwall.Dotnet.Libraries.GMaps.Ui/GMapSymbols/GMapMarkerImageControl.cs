@@ -95,6 +95,18 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         DependencyProperty.Register(nameof(IsLocked), typeof(bool), typeof(GMapMarkerImageControl),
             new PropertyMetadata(false));
 
+    /// <summary>러버밴드(멀티셀렉트) 진행 중 여부 — 활성 시 호버 Edge 억제(이미지는 멀티셀렉트 대상 제외라 반응 없어야 함).
+    /// GMapCustomControl.ShowRubberBand/HideRubberBand에서 코드로 직접 설정(모델 바인딩 아님).</summary>
+    public bool IsMultiSelectActive
+    {
+        get => (bool)GetValue(IsMultiSelectActiveProperty);
+        set => SetValue(IsMultiSelectActiveProperty, value);
+    }
+
+    public static readonly DependencyProperty IsMultiSelectActiveProperty =
+        DependencyProperty.Register(nameof(IsMultiSelectActive), typeof(bool), typeof(GMapMarkerImageControl),
+            new PropertyMetadata(false));
+
     private static void OnImageOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is GMapMarkerImageControl control)
