@@ -728,6 +728,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     /// <param name="height">높이 (픽셀 또는 위도)</param>
     public void UpdateSize(double width, double height)
     {
+        var __diagCenterBefore = Center; var __diagPosBefore = Position;   // 진단
         try
         {
             // Phase 33: 픽셀 vs 위경도 자동 감지
@@ -787,6 +788,9 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             // Position(중심점)을 바운즈 중심과 동기 — UpdateLocation/ImageBounds setter와 정합.
             //   (미동기 시 리사이즈 후 Position이 stale → 편집시작 OriginalPosition 오캡처 → undo가 위치를 엉뚱한 곳으로 이동)
             Position = Center;
+
+            // 진단: UpdateSize 전후 중심/위치 좌표 — undo에서 중심이 옮겨지는지 확인용
+            _log?.Info($"[DIAG-USZ] w={width:F0} centerBefore={__diagCenterBefore.Lat:F6},{__diagCenterBefore.Lng:F6} → centerAfter={Center.Lat:F6},{Center.Lng:F6} | posBefore={__diagPosBefore.Lat:F6},{__diagPosBefore.Lng:F6} → posAfter={Position.Lat:F6},{Position.Lng:F6} | modelLatLng={_imageModel.Latitude:F6},{_imageModel.Longitude:F6}");
 
             OnPropertyChanged(nameof(ImageBounds));
             OnPropertyChanged(nameof(Left));
