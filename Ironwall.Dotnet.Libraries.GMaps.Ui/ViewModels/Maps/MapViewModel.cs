@@ -5802,20 +5802,22 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>현재 편집가능 마커들의 (Id,ZOrder) 스냅샷 — ZOrder undo 기록용(FIX 8).</summary>
-    private System.Collections.Generic.List<(int id, int zOrder)> CaptureZOrderPairs()
+    private System.Collections.Generic.List<(bool isImage, int id, int zOrder)> CaptureZOrderPairs()
         => MainMap?.Markers?.OfType<IEditableMarker>().Where(m => !m.IsDisposed && m.Id > 0)
-               .Select(m => (id: m.Id, zOrder: m.ZOrder)).ToList()
-           ?? new System.Collections.Generic.List<(int id, int zOrder)>();
+               .Select(m => (isImage: m is GMapSymbols.GMapImageMarker, id: m.Id, zOrder: m.ZOrder)).ToList()
+           ?? new System.Collections.Generic.List<(bool isImage, int id, int zOrder)>();
 
     /// <summary>ZOrder 변경 전 스냅샷 대비 변경분만 ZOrderBatchCommand로 Undo 기록(FIX 8).</summary>
-    private void RecordZOrderDiff(System.Collections.Generic.List<(int id, int zOrder)> before)
+    private void RecordZOrderDiff(System.Collections.Generic.List<(bool isImage, int id, int zOrder)> before)
     {
         if (before == null || _editRecorder == null) return;
-        var beforeMap = before.ToDictionary(p => p.id, p => p.zOrder);
+        // 복합키(isImage,id) — 이미지(Images.Id)와 심볼(Symbols.Id)이 같은 숫자 Id로 한 Markers 컬렉션에 공존 →
+        //   기존 ToDictionary(p=>p.id)가 중복키 크래시("동일 키 1")를 냈음. 밴드 구분키로 방지.
+        var beforeMap = before.ToDictionary(p => (p.isImage, p.id), p => p.zOrder);
         var changedBefore = new System.Collections.Generic.List<(int id, int zOrder)>();
         var changedAfter = new System.Collections.Generic.List<(int id, int zOrder)>();
-        foreach (var (id, z) in CaptureZOrderPairs())
-            if (beforeMap.TryGetValue(id, out var oldZ) && oldZ != z)
+        foreach (var (isImage, id, z) in CaptureZOrderPairs())
+            if (beforeMap.TryGetValue((isImage, id), out var oldZ) && oldZ != z)
             { changedBefore.Add((id, oldZ)); changedAfter.Add((id, z)); }
         if (changedAfter.Count > 0) _editRecorder.RecordZOrder(changedBefore, changedAfter);
     }
