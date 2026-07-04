@@ -33,7 +33,16 @@ public sealed class TransformCommand : UndoableCommandBase
         if (m == null) return;
         // 개별 마커 변형 예외(예: 라인/그룹 마커의 크로스스레드 UI 접근)가 배치 전체를 막지 않도록 흡수.
         // 마커 base 메서드는 내부에서 로그하며, 데이터(위치/크기/방위)는 UI 예외 이전에 이미 반영됨.
-        try { m.UpdateSize(s.w, s.h); m.UpdateRotation(s.bearing); m.UpdateLocation(s.pos); }
+        // ★ 위치가 이 편집에서 실제로 변한 경우에만 위치 복원. 순수 리사이즈(before.pos==after.pos)는 위치를
+        //   건드리지 않음 — 이미지 Position이 바운즈 중심과 어긋나(desync) 있어도 undo가 엉뚱한 위치로 점프시키지 않음.
+        //   (증상: 이미지 이동 undo는 정상인데 리사이즈 undo만 위치가 튀던 문제)
+        bool posChanged = _before.pos.Lat != _after.pos.Lat || _before.pos.Lng != _after.pos.Lng;
+        try
+        {
+            m.UpdateSize(s.w, s.h);
+            m.UpdateRotation(s.bearing);
+            if (posChanged) m.UpdateLocation(s.pos);
+        }
         catch { /* 마커 변형 흡수 — 아래 영속·재렌더는 계속 */ }
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
     }

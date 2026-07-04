@@ -870,6 +870,9 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
 
             _log?.Info($"[DEBUG-SCALE] 결과: newBounds=L:{newLeft:F6},T:{newTop:F6},R:{newRight:F6},B:{newBottom:F6}, W={_imageModel.Width},H={_imageModel.Height}");
 
+            // Position(중심점)을 바운즈 중심과 동기 — Width/Height setter 경로도 desync 없게(UpdateSize/UpdateLocation과 정합).
+            Position = Center;
+
             // PropertyChanged 알림
             OnPropertyChanged(nameof(ImageBounds));
             OnPropertyChanged(nameof(Left));
@@ -877,6 +880,7 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             OnPropertyChanged(nameof(Top));
             OnPropertyChanged(nameof(Bottom));
             OnPropertyChanged(nameof(AspectRatio));
+            OnPropertyChanged(nameof(Center));
         }
         catch (Exception ex)
         {
