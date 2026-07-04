@@ -25,7 +25,7 @@ public sealed class AddSymbolCommand : UndoableCommandBase
 
     public override async Task UndoAsync(CancellationToken ct = default)
     {
-        var m = Ctx.FindMarkerById(_snapshot.Id);
+        var m = Ctx.FindMarkerById(_snapshot.Id, _snapshot.IsImage);   // 타입인지 — 같은 Id의 반대타입 마커 오제거 차단
         if (m != null) await Ctx.RemoveMarkerAsync(m, ct).ConfigureAwait(false);
     }
 }
@@ -40,7 +40,7 @@ public sealed class DeleteSymbolCommand : UndoableCommandBase
 
     public override async Task ExecuteAsync(CancellationToken ct = default)
     {
-        var m = Ctx.FindMarkerById(_snapshot.Id);
+        var m = Ctx.FindMarkerById(_snapshot.Id, _snapshot.IsImage);   // 타입인지 — 같은 Id의 반대타입 마커 오제거 차단
         if (m != null) await Ctx.RemoveMarkerAsync(m, ct).ConfigureAwait(false);
     }
 

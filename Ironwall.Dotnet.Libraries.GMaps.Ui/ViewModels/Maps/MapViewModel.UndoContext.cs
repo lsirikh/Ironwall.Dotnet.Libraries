@@ -139,7 +139,7 @@ public partial class MapViewModel : IUndoApplyContext
                     if (sym.Id > 0) snapshot.Id = sym.Id;   // Id 충돌 폴백 시 새 Id 반영(FIX 6)
                     AddMarkerFromSymbol(sym);                // 마커 재생성 + _symbolProvider + 트리
                 }
-                return FindMarkerById(snapshot.Id);
+                return FindMarkerById(snapshot.Id, snapshot.IsImage);   // 타입인지 — 복원 반환이 같은 Id 반대타입 마커로 새지 않게
             }
             catch (Exception ex) { _log?.Error($"[Undo] 복원 실패(Id={snapshot.Id}): {ex.Message}"); return (IEditableMarker?)null; }
         });
