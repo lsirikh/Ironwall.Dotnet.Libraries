@@ -1060,38 +1060,51 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         var targets = _pendingGroupDelete;
         _pendingGroupDelete = null;
-        if (targets == null || targets.Count == 0) return;
-        if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
-
-        int del = 0, skipped = 0;
-        using (_editRecorder?.BeginBatch("그룹 삭제"))
+        try
         {
-            foreach (var m in targets)
+            // 확인 팝업 → 진행 팝업으로 전환(확인 창 닫힘). ROI 삭제와 동일 패턴.
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+
+            if (targets == null || targets.Count == 0) return;
+            if (!CanEditMap()) { SetAimStatus("삭제 권한이 없습니다.", true); return; }
+
+            int del = 0, skipped = 0;
+            using (_editRecorder?.BeginBatch("그룹 삭제"))
             {
-                if (m == null || m.IsDisposed) continue;
-                if (m.IsLocked) { skipped++; continue; }
-                try
+                foreach (var m in targets)
                 {
-                    var snap = _editRecorder?.CaptureForDelete(m);   // 삭제 전 스냅샷(Undo용)
-                    MainMap?.DeselectMarker(m);
-                    if (m is GMapMarker gm) MainMap?.Markers?.Remove(gm);
-                    await DbDeleteProcess(m);
-                    var s = _symbolProvider.FirstOrDefault(x => x.Id == m.Id);   // 캐시 동기(감사 P0, provider.Remove 미머지)
-                    if (s != null) _symbolProvider.Remove(s);
-                    m.Dispose();
-                    _editRecorder?.RecordDelete(snap);   // Undo 기록(배치 멤버)
-                    del++;
+                    if (m == null || m.IsDisposed) continue;
+                    if (m.IsLocked) { skipped++; continue; }
+                    try
+                    {
+                        var snap = _editRecorder?.CaptureForDelete(m);   // 삭제 전 스냅샷(Undo용)
+                        MainMap?.DeselectMarker(m);
+                        if (m is GMapMarker gm) MainMap?.Markers?.Remove(gm);
+                        await DbDeleteProcess(m);
+                        var s = _symbolProvider.FirstOrDefault(x => x.Id == m.Id);   // 캐시 동기(감사 P0, provider.Remove 미머지)
+                        if (s != null) _symbolProvider.Remove(s);
+                        m.Dispose();
+                        _editRecorder?.RecordDelete(snap);   // Undo 기록(배치 멤버)
+                        del++;
+                    }
+                    catch (Exception ex) { _log?.Error($"그룹 삭제 실패: {ex.Message}"); }
                 }
-                catch (Exception ex) { _log?.Error($"그룹 삭제 실패: {ex.Message}"); }
             }
+            _groupSelection?.Clear();
+            NotifyOfPropertyChange(nameof(SelectedMarkers));
+            HidePropertyPanel();
+            // 레이어 패널 트리 동기화 — 그룹(다중) 삭제 경로도 누락돼 있어 스테일 노드가 남던 버그 보강.
+            if (del > 0) await LoadLayersFromDbAsync();
+            MainMap?.InvalidateVisual();
+            SetAimStatus(skipped > 0 ? $"{del}개 삭제(잠금 {skipped}개 제외)" : $"{del}개 삭제", true);
         }
-        _groupSelection?.Clear();
-        NotifyOfPropertyChange(nameof(SelectedMarkers));
-        HidePropertyPanel();
-        // 레이어 패널 트리 동기화 — 그룹(다중) 삭제 경로도 누락돼 있어 스테일 노드가 남던 버그 보강.
-        if (del > 0) await LoadLayersFromDbAsync();
-        MainMap?.InvalidateVisual();
-        SetAimStatus(skipped > 0 ? $"{del}개 삭제(잠금 {skipped}개 제외)" : $"{del}개 삭제", true);
+        catch (Exception ex) { _log?.Error($"그룹 삭제 처리 실패: {ex.Message}"); }
+        finally
+        {
+            // 확인/진행 팝업 닫기 — 콜백 발행 후 자동으로 닫히지 않으므로 모든 경로에서 명시적 Close 필수(083ac4d 누락 수정).
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
     }
 
     #endregion
