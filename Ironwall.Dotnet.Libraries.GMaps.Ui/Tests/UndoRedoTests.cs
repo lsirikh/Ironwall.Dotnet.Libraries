@@ -57,6 +57,7 @@ public class UndoRedoTests
         public readonly List<int> Restored = new();
         public IGMapDbSymbolService Db => null!;
         public IEditableMarker? FindMarkerById(int id) => Markers.TryGetValue(id, out var m) ? m : null;
+        public IEditableMarker? FindMarkerById(int id, bool isImage) => FindMarkerById(id);
         public Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default) { ApplyCount++; return Task.CompletedTask; }
         public Task<IEditableMarker?> RestoreDeletedAsync(ISymbolSnapshot snap, CancellationToken ct = default)
         {
@@ -226,7 +227,7 @@ public class UndoRedoTests
         var before = (new PointLatLng(10, 20), 50.0, 60.0, 30.0);
         var after = (new PointLatLng(11, 21), 55.0, 65.0, 45.0);
         m.Position = after.Item1; m.Width = 55; m.Height = 65; m.Bearing = 45;   // 편집 후 상태
-        var cmd = new TransformCommand(ctx, 7, before, after);
+        var cmd = new TransformCommand(ctx, 7, false, before, after);
 
         await cmd.UndoAsync();
         Assert.Equal(10, m.Position.Lat); Assert.Equal(50, m.Width); Assert.Equal(30, m.Bearing);

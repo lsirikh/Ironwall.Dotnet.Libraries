@@ -94,6 +94,12 @@ public partial class MapViewModel : IUndoApplyContext
     public IEditableMarker? FindMarkerById(int id)
         => MainMap?.Markers?.OfType<IEditableMarker>().FirstOrDefault(m => !m.IsDisposed && m.Id == id);
 
+    /// <summary>타입 인지 조회 — 이미지(Images.Id)와 심볼(Symbols.Id)의 Id가 같은 Markers 컬렉션서 충돌할 때
+    /// 올바른 대상만 선택(undo가 엉뚱한 마커에 이미지 크기 등 적용=데이터손상 차단). isImage=true→이미지, false→심볼.</summary>
+    public IEditableMarker? FindMarkerById(int id, bool isImage)
+        => MainMap?.Markers?.OfType<IEditableMarker>()
+            .FirstOrDefault(m => !m.IsDisposed && m.Id == id && (m is GMapSymbols.GMapImageMarker) == isImage);
+
     /// <summary>호출자가 이미 마커 모델을 세팅 → 타입별 DbUpdate 영속 + 시각 갱신. (기록 억제 하 실행)
     /// UI 스레드 보장(v2 seam과 동일 — 그룹 replay 크로스스레드 방지, THREAD-02).</summary>
     public Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default)

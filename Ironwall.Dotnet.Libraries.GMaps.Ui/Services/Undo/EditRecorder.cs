@@ -48,7 +48,7 @@ public sealed class EditRecorder : IEditRecorder
         {
             var before = (e.OriginalPosition, e.OriginalWidth, e.OriginalHeight, e.OriginalBearing);
             var after = (e.FinalPosition, e.FinalSize.Width, e.FinalSize.Height, e.FinalBearing);
-            _undo.Push(new TransformCommand(Context!, e.Marker.Id, before, after));
+            _undo.Push(new TransformCommand(Context!, e.Marker.Id, e.Marker is GMapImageMarker, before, after));
         }
         catch (Exception ex) { _log?.Error($"RecordTransform 실패: {ex.Message}"); }
     }
@@ -134,7 +134,7 @@ public sealed class EditRecorder : IEditRecorder
         try
         {
             // 위치 전용 변경 = TransformCommand(크기·방위 불변). 배치 중이면 매크로에 합류.
-            _undo.Push(new TransformCommand(Context!, marker.Id,
+            _undo.Push(new TransformCommand(Context!, marker.Id, marker is GMapImageMarker,
                 (before, marker.Width, marker.Height, marker.Bearing),
                 (after, marker.Width, marker.Height, marker.Bearing)));
         }

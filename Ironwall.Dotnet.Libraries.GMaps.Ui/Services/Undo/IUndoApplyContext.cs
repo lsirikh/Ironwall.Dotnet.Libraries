@@ -21,6 +21,10 @@ public interface IUndoApplyContext
     /// <summary>현재 맵의 라이브 마커를 Id로 조회(없으면 null).</summary>
     IEditableMarker? FindMarkerById(int id);
 
+    /// <summary>타입 인지 조회 — Id 네임스페이스 충돌(이미지 Images.Id ↔ 심볼 Symbols.Id, 같은 Markers 컬렉션) 시
+    /// 올바른 대상만 반환. isImage=true→이미지 마커, false→비이미지(심볼). undo가 엉뚱한 마커 변형(데이터손상) 방지.</summary>
+    IEditableMarker? FindMarkerById(int id, bool isImage);
+
     /// <summary>호출자가 이미 마커 모델/속성을 세팅한 상태 → 타입별 DbUpdate 영속 + 시각/트리 동기화.</summary>
     Task ApplyMarkerUpdateAsync(IEditableMarker marker, CancellationToken ct = default);
 
