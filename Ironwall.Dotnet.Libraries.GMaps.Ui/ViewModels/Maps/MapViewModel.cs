@@ -7080,6 +7080,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 NotifyOfPropertyChange(nameof(IsEditModeEnabled));
                 NotifyOfPropertyChange(nameof(CanEditMarker));
                 NotifyOfPropertyChange(nameof(CanAddSymbol));   // 추가 버튼 활성 갱신(#3)
+                RaiseUndoRedoState();   // Undo/Redo 버튼 갱신(C#2) — CanUndo/CanRedo가 IsEditModeEnabled 포함
                 if (PropertyPanel != null)
                     PropertyPanel.IsEditModeEnabled = value;
                 _log?.Info($"편집 모드: {(value ? "활성화" : "비활성화")}");

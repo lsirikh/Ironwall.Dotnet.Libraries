@@ -63,7 +63,12 @@ public partial class MapViewModel : IUndoApplyContext
         if (_editRecorder != null) _editRecorder.Context = this;   // 커맨드 적용 seam 연결(순환주입 회피)
     }
 
-    private void OnUndoStateChanged(object? sender, EventArgs e)
+    private void OnUndoStateChanged(object? sender, EventArgs e) => RaiseUndoRedoState();
+
+    /// <summary>Undo/Redo 가시상태 갱신(CanUndo/CanRedo·설명·Command CanExecute). 스택 변경뿐 아니라
+    /// CanUndo/CanRedo 조건에 포함된 IsEditModeEnabled·CanEditMap() 변경(편집모드 토글·권한 회수) 시에도
+    /// 호출해야 버튼 시각상태가 실제 조건과 동기화됨(C#2 유령 활성 방지). UI 스레드 마샬.</summary>
+    internal void RaiseUndoRedoState()
     {
         void Refresh()
         {
