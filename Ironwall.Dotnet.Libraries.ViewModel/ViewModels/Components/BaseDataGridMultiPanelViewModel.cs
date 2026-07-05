@@ -275,6 +275,18 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
             NotifyOfPropertyChange(() => SaveButtonEnable);
         }
     }
+
+    /// <summary>실제 저장 동작 진행 중에만 true. 저장버튼 스피너(ProgressCircle) 표시 전용 —
+    /// 권한/활성 상태(SaveButtonEnable·IsButtonEnable)와 분리(권한 없는 계정 스피너 영구표시 버그 수정).</summary>
+    public bool IsSaving
+    {
+        get { return _isSaving; }
+        set
+        {
+            _isSaving = value;
+            NotifyOfPropertyChange(() => IsSaving);
+        }
+    }
     public ObservableCollection<T> ViewModelProvider { get; set; }
 
     #endregion
@@ -283,6 +295,7 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
     private bool _isButtonEnable;
     private bool _reloadButtonEnable;
     private bool _saveButtonEnable;
+    private bool _isSaving;
     protected readonly SemaphoreSlim _processGate = new(1, 1);
     protected readonly List<int> _deleteFailures = new();
     #endregion

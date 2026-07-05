@@ -195,34 +195,50 @@ public static class MapSettingsHelper
         }, log);
     }
 
-    /// <summary>appsettings(AppSettings.Tracking)에서 추적 설정 로드(없으면 기본값).</summary>
+    /// <summary>appsettings(AppSettings.Tracking)에서 추적 설정 로드(async, 없으면 기본값).</summary>
     public static async Task<TrackingSetupModel> LoadTrackingSettingsAsync()
     {
-        var def = new TrackingSetupModel();
+        try { return MapTracking(JsonConvert.DeserializeObject<JObject>(await ReadSettingsFileAsync())?[APP_SETTINGS_SECTION]?["Tracking"]); }
+        catch (Exception) { return new TrackingSetupModel(); }
+    }
+
+    /// <summary>appsettings(AppSettings.Tracking)에서 추적 설정 <b>동기</b> 로드 — DI 등록(startup)용. 없으면 기본값.</summary>
+    public static TrackingSetupModel LoadTrackingSettings(ILogService? log = default)
+    {
         try
         {
-            var json = await ReadSettingsFileAsync();
-            var t = JsonConvert.DeserializeObject<JObject>(json)?[APP_SETTINGS_SECTION]?["Tracking"];
-            if (t == null) return def;
-            return new TrackingSetupModel
-            {
-                IsTrackingEnabled = t["IsTrackingEnabled"]?.ToObject<bool>() ?? def.IsTrackingEnabled,
-                TrailMaxPoints = t["TrailMaxPoints"]?.ToObject<int>() ?? def.TrailMaxPoints,
-                DefaultTtlSec = t["DefaultTtlSec"]?.ToObject<int>() ?? def.DefaultTtlSec,
-                LostTtlSec = t["LostTtlSec"]?.ToObject<int>() ?? def.LostTtlSec,
-                MinVisibleZoom = t["MinVisibleZoom"]?.ToObject<double>() ?? def.MinVisibleZoom,
-                MaxSpeedMs = t["MaxSpeedMs"]?.ToObject<double>() ?? def.MaxSpeedMs,
-                GapThresholdSec = t["GapThresholdSec"]?.ToObject<int>() ?? def.GapThresholdSec,
-                MaxPlaybackHours = t["MaxPlaybackHours"]?.ToObject<int>() ?? def.MaxPlaybackHours,
-                RetentionDays = t["RetentionDays"]?.ToObject<int>() ?? def.RetentionDays,
-                DataSource = t["DataSource"]?.ToObject<Ironwall.Dotnet.Libraries.Enums.EnumTrackDataSource>() ?? def.DataSource,
-                CameraAimRadiusMeters = t["CameraAimRadiusMeters"]?.ToObject<double>() ?? def.CameraAimRadiusMeters,
-            };
+            var fp = GetSettingsFilePath();
+            if (!File.Exists(fp)) return new TrackingSetupModel();
+            var model = MapTracking(JsonConvert.DeserializeObject<JObject>(File.ReadAllText(fp))?[APP_SETTINGS_SECTION]?["Tracking"]);
+            log?.Info($"[TrackingSetup] 로드(appsettings.Tracking): DataSource={model.DataSource}, MaxPlaybackHours={model.MaxPlaybackHours}");
+            return model;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return def;
+            log?.Warning($"[TrackingSetup] 로드 실패, 기본값 사용: {ex.Message}");
+            return new TrackingSetupModel();
         }
+    }
+
+    /// <summary>JToken(AppSettings.Tracking) → TrackingSetupModel. 누락 키는 기본값 폴백.</summary>
+    private static TrackingSetupModel MapTracking(JToken? t)
+    {
+        var def = new TrackingSetupModel();
+        if (t == null) return def;
+        return new TrackingSetupModel
+        {
+            IsTrackingEnabled = t["IsTrackingEnabled"]?.ToObject<bool>() ?? def.IsTrackingEnabled,
+            TrailMaxPoints = t["TrailMaxPoints"]?.ToObject<int>() ?? def.TrailMaxPoints,
+            DefaultTtlSec = t["DefaultTtlSec"]?.ToObject<int>() ?? def.DefaultTtlSec,
+            LostTtlSec = t["LostTtlSec"]?.ToObject<int>() ?? def.LostTtlSec,
+            MinVisibleZoom = t["MinVisibleZoom"]?.ToObject<double>() ?? def.MinVisibleZoom,
+            MaxSpeedMs = t["MaxSpeedMs"]?.ToObject<double>() ?? def.MaxSpeedMs,
+            GapThresholdSec = t["GapThresholdSec"]?.ToObject<int>() ?? def.GapThresholdSec,
+            MaxPlaybackHours = t["MaxPlaybackHours"]?.ToObject<int>() ?? def.MaxPlaybackHours,
+            RetentionDays = t["RetentionDays"]?.ToObject<int>() ?? def.RetentionDays,
+            DataSource = t["DataSource"]?.ToObject<Ironwall.Dotnet.Libraries.Enums.EnumTrackDataSource>() ?? def.DataSource,
+            CameraAimRadiusMeters = t["CameraAimRadiusMeters"]?.ToObject<double>() ?? def.CameraAimRadiusMeters,
+        };
     }
 
     #endregion

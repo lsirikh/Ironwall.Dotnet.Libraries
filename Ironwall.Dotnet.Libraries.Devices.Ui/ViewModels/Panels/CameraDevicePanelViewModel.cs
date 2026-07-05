@@ -138,7 +138,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
 
         try
         {
-            SaveButtonEnable = false;
+            IsSaving = true;
 
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
             {
@@ -200,7 +200,7 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         finally
         {
             UpdateAction?.Invoke();
-            SaveButtonEnable = true;
+            IsSaving = false;
             _processGate.Release();
         }
     }
@@ -272,7 +272,6 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         Execute.OnUIThread(() =>
         {
             IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
-            SaveButtonEnable = DevicePermissionGate.CanEdit();
         });
     }
 

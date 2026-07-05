@@ -12,6 +12,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services.Tracking;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Factories;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Tracking.Api.Modules;
 using Ironwall.Dotnet.Libraries.Tracking.Api.Services;
@@ -68,8 +69,9 @@ public class GMapUiModule: Module
         // Tracking GIS 오버레이(FR-15) — IClock + 설정모델 + 단일 진입점 매니저(라이브러리 자족, EXT-01 없이 동작)
         builder.RegisterType<SystemClock>().As<IClock>().SingleInstance();
         // ⚠ 복사생성자 TrackingSetupModel(ITrackingSetupModel) 를 Autofac이 greedy 선택 → 자기참조 순환.
-        //    명시적 기본생성자 팩토리로 등록(순환 회피).
-        builder.Register(_ => new TrackingSetupModel()).As<ITrackingSetupModel>().SingleInstance();
+        //    appsettings(AppSettings.Tracking)에서 동기 로드한 단일 인스턴스 등록 → 저장값 복원(재시작 유지) + 순환 회피.
+        builder.RegisterInstance(MapSettingsHelper.LoadTrackingSettings(_log))
+               .As<ITrackingSetupModel>().SingleInstance();
         builder.RegisterType<TrackingOverlayManager>().AsSelf().As<ITrackingOverlayManager>().SingleInstance();
         // 추적 좌표 로컬 DB 영속(P4) — write(ITrackPointWriter)만. read seam은 selector가 토글.
         builder.RegisterType<TrackPointStore>().AsSelf()

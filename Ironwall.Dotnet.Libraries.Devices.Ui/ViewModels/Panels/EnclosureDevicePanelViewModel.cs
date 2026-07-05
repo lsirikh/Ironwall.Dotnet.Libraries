@@ -123,7 +123,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         if (!await _processGate.WaitAsync(0)) return;
         try
         {
-            SaveButtonEnable = false;
+            IsSaving = true;
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
             {
                 _pCancellationTokenSource.Cancel();
@@ -183,7 +183,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         finally
         {
             UpdateAction?.Invoke();
-            SaveButtonEnable = true;
+            IsSaving = false;
             _processGate.Release();
         }
     }
@@ -242,7 +242,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         Execute.OnUIThread(() =>
         {
             IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
-            SaveButtonEnable = DevicePermissionGate.CanEdit();
+            // SaveButtonEnable = DevicePermissionGate.CanEdit(); // IsSaving 전용 플래그로 대체됨
         });
     }
 

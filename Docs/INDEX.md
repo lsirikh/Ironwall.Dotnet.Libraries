@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-29 (CameraPopup_PressHold_PtzZoomFocus PRD 신규 — 줌·포커스 press-hold 전환, 설계검증 wf_da23975b 반영)
-- **총 문서 수**: 217개
+- **마지막 갱신**: 2026-06-30 (LayerPanel 심볼 트리노드화 + 리사이즈 스토리보드/와이어프레임 HTML 신규 — 멀티에이전트 설계검증 wf_d15d5365)
+- **총 문서 수**: 219개
 
 ---
 
@@ -10,6 +10,8 @@
 
 | 파일 | 내용 | 날짜 |
 |------|------|------|
+| [Login_Gated_GIS_Init_Storyboard_Wireframe.html](reports/Login_Gated_GIS_Init_Storyboard_Wireframe.html) | **로그인 게이팅 GIS Init** (PRD-GIS-INIT-01) 스토리보드+와이어프레임 — 인터랙티브 생명주기 스테퍼(부팅→강제로그인→Device fetch 8단계 진행바→커버제거 심볼활성→로그아웃 재커버), 7컷 스토리보드, 커버 와이어프레임(전술다크그리드 #0A1014+32px격자+HUD+하단진행바), ZIndex 스택(커버400), 시퀀스(A↔B·LoginSucceeded 발화), NATS 게이트 비교(IsAuthenticated 드롭), A↔B 파티션표(A `85ba680` 완료/B dev대기). Tactical Command Dark 토큰 실값. ⚠PRD 검토용 preview(코드 미변경) | 2026-06-30 |
+| [LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html](reports/LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html) | 레이어 패널 재설계 기획 — ①카테고리별 개별 Overlay 심볼 트리노드화(비균일 4단계 Section›Group›Category›Symbol, 신규 NodeType.Category+ISymbolModel 페이로드, PIDS는 DeviceType 분기) ②드래그 리사이즈 +50%(250×420→375×630, E/S/SE 그립·좌상단 앵커·MapSettings 영속). 현행 BEFORE→AFTER, tri-state/AND마스킹/검색·가상화/리사이즈 트립틱/4컷 흐름. Tactical Dark 토큰 실값. 멀티에이전트 검증(wf_d15d5365, 4렌즈+2적대비평)이 잡은 GAP 8종(모델이음새·게이팅역전·O(n²)·높이모델모순 등) 결정표 포함. ⚠기획 단계(코드 미변경) | 2026-06-30 |
 | [Account_GOP_Integration_Storyboard.html](storyboards/Account_GOP_Integration_Storyboard.html) | GOP Account 연동 인터랙티브 스토리보드 v2.0 — WPF ShellView 기반 와이어프레임 (LoginGateOverlay·NATS Gate·MaterialDesignDataGrid·1차 인터랙션, 7화면) | 2026-06-21 |
 | [DevicePanel_EventPanel_Storyboard.html](storyboards/DevicePanel_EventPanel_Storyboard.html) | Device/Event 패널 스토리보드 | 2026-06-19 |
 
@@ -39,6 +41,11 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [Login_Gated_GIS_Init-prd.md](prds/Login_Gated_GIS_Init-prd.md) | **로그인 게이팅 GIS init 생명주기** (PRD-GIS-INIT-01) — 서버 token 강화 시 부팅 Device fetch(Order22, 토큰0·로그인전)가 401→빈캐시→심볼↔디바이스 연계붕괴를 선제 차단. 4게이트: ①맵 커버(전술다크그리드, MapView Row2 ZIndex400) ②강제로그인(부팅 자동표시·닫기불가)+커버 진행바(신규 DeviceFetchProgressMessage 8단계) ③Device fetch를 LoginSucceeded로 지연(ExecuteAsync=구독등록 no-op, BaseDeviceProdiver CollectionChanged 자동동기화) ④NATS는 IsAuthenticated 게이트(Events.Ui SyncService). 로그아웃→재로그인 재init. **A위임**=ISessionLifecycle.LoginSucceeded seam+LoginPanel 강제모드(원장 §5). Explore×4+architect(opus) 검증. FR-CV/LG/DF/PB/NG/RL/BR·R1~7·OQ1~6 (Track C, 세션 B) | Draft | 2026-06-30 |
+| [LayerPanel_SymbolNesting_Resize-prd.md](prds/LayerPanel_SymbolNesting_Resize-prd.md) | 레이어 패널 v1 — ①카테고리별 개별 Overlay 심볼 트리노드화(비균일 4단계 Section›Group›Category›Symbol, 신규 NodeType.Category+ISymbolModel 페이로드, PIDS=DeviceType 6분기·VEHICLES보강, 가시성토글=ShowShape/IsLayerEnabled·navigate, tri-state 일괄 O(n²)제거, 모델이음새/게이팅역전 해소) ②드래그 리사이즈(E/S/SE Thumb, 250×420→375×630, 좌상단앵커·Canvas클램프, 세션내 크기기억). **구현·커밋 `367e6f0`**(worktree feature/layerpanel-symbol-nesting off v2.6 dc87a39, 롤백 before-layerpanel-symbol-nesting) GMaps.Ui 빌드0·단위148/148(신규19). 설계검증 wf_d15d5365(4렌즈+2적대비평)+[스토리보드](reports/LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html). v2보류=삭제/이름변경·가상화·검색·세션간영속. ⚠머지/E2E 보류 (Track C) | 구현완료·머지보류 | 2026-06-30 |
+| [GMap_Delete_EditMode_BugFix-prd.md](prds/GMap_Delete_EditMode_BugFix-prd.md) | 검증된 GMap.UI 버그 2건. **BUG-CAST(버그2)**: 편집모드 토글 시 `InvalidCastException` — `GMapCustomControl.cs` 하드캐스트 3곳(`foreach (IEditableMarker marker in Markers)` @1190·1414·2215)이 라이브 추적의 `GMapTrailMarker`/`GMapTrackingMarker`(sealed:GMapMarker, IEditableMarker 미구현)를 만나 throw(2215=try/catch無→앱크래시). 수정=`Markers.OfType<IEditableMarker>()`(동파일 507/608/910 선례). **BUG-DEL(버그1)**: 심볼삭제 세션 중 부활 — `GMapDbSymbolService.DeleteXxxAsync`가 SQL DELETE만·`_symbolProvider` 캐시 미제거 → `SymbolConfigureAsync`(OnActivate) stale 캐시로 마커 재생성. 콜드재시작=DB재로딩=정상삭제("껐다켜니 또 지워진다"). 수정=Delete 7종에 캐시 Remove. 두 버그 同뿌리·無인과(검증으로 "크래시가 삭제차단" 가설 반박). 멀티에이전트 wf_53e628e6(trace4+verify3). FR-01~03/NFR4/V-01~04/리스크4 (Track B/C) | Draft | 2026-06-29 |
+| [Symbol_Apply_DeviceLocation_Api-prd.md](prds/Symbol_Apply_DeviceLocation_Api-prd.md) | 장비 심볼 속성창 "현재위치 적용" 버튼 → 심볼 현재 지도위치(lat/lng)+방위(BaseBearing→Heading)를 **디바이스 Model 반영 + 서버 API PATCH 저장**. 핵심: 심볼위치≠디바이스좌표(별도 저장소), 드래그는 심볼DB만 저장→디바이스 API 미반영 단절을 메움([[Camera_PTZ_AimLocation_Nats]] (0,0) 문제 근본해소). 설계=인라인 최소 geolocation DTO PATCH(타입별 Patch{Camera/Sensor/Controller/Speaker/Enclosure/Lamp}Async, Devices.Ui 매퍼 결합회피)+GMaps.Ui→Devices.Api 참조(순환無)+lazy 옵셔널 IDeviceApiService+진행팝업. 대상=LinkedDevice 보유 모든 PIDS심볼. ⚠V-01: PATCH 부분수용 선검증. FR-01~07/NFR4/V-01~05 (Track C) | Draft | 2026-06-29 |
+| [GatewayEvent_Group_Resurrection_Fix-prd.md](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | 3rd Party(Gateway) 이벤트 그룹 **쓰레기값("1, 116")** 근본수정. 진범=**Provider/DB**(DataGrid 무죄). 레거시 `GatewayEvents.Group` 단일컬럼이 `BuildSchemeAsync` 상시 이행쿼리로 **매 시작 부활**(INSERT IGNORE SELECT Group>0) + Update가 레거시컬럼 미클리어 → 사용자지정 116과 합쳐져 `[1,116]`. **DB증거 확정**(Event_A Group=1→조인{(1,1),(1,116)}, Event_B Group=0→{117} 정상). 선행 NtoN PRD가 **연기한 Step3(컬럼 DROP)** 완료 = A안: 상시쿼리→가드형 1회 마무리블록(최종이행→좀비정리 count>1 규칙→DROP COLUMN+IX_Group). 단일선택 UI(V-02)라 2개↑=좀비 확정. lib Gateway 단독, 외부 무변경(NatsDomainService 이미 Intersect). FR-01~05/NFR4/V-01~05/리스크4 (Track B) | Draft | 2026-06-29 |
 | [Camera_PTZ_AimLocation_Nats-prd.md](prds/Camera_PTZ_AimLocation_Nats-prd.md) | 맵 PTZ 카메라 우클릭→"특정 위치 확인"→타겟 커서+반경 30m 영역→영역 내 클릭→**NATS PUB로 카메라 회전요청+좌표 발행**(회전은 서버/NVR 집행, 클라 직접회전X). 게이팅=`ICameraDeviceModel.Category==EnumCameraType.PTZ`(동기·DB변경X). 신규 `CameraAimControlService`(BroadcastControlService 패턴)+`CameraAimLocationBodyDto`+`EnumGopCommand.CAMERA_AIM_LOCATION`+순수로직 `CameraAimMath`/`Builder`. 반경판정=지오도메인(줌무관). 좌클릭 가로채기=OnMouseLeftButtonDown IsLineDrawing 분기점. Explore×4+architect+code-reviewer 체인. FR-01~12/NFR6/V-01~07/리스크8 (Track C) | Draft | 2026-06-29 |
 | [GOP_Permission_Enforcement-prd.md](prds/GOP_Permission_Enforcement-prd.md) | 권한 **실제 집행** — 등급 권한을 앱 전반(장비/이벤트/맵/PTZ)에 적용. 멀티에이전트 시뮬 **218시나리오·99발견·8도메인**. FR-EN-01~15(P0=T4긴급·reports무인증·3선결조건·require_perm·모듈정의 / P1=PTZ·방송·맵·장비·이벤트 게이팅+역할강등재평가+마지막ADMIN / P2=device_groups스코프·감사append-only·콘솔). ★PTZ=서버 미중계(ONVIF직결, /ptz 경로 전무)→클라 MapViewModel 9핸들러 `CanControl("cameras")` 단독집행(Stop제외). PRD-GOP-01 집행부 구체화 (Track C) | Draft | 2026-06-29 |
 | [CameraPopup_PressHold_PtzZoomFocus-prd.md](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | 줌·포커스 버튼을 click-pulse→**press-hold-continuous + release-stop**으로 전환(방향 패드 패턴 통일). 통합 Tag 메커니즘(ParseGestureTag)+CaptureMouse 안전망. **설계검증 wf_da23975b**: architect SOUND_WITH_CHANGES + code-reviewer FLAWED→교정 반영(🔴 포커스 Stop은 ImagingClient 별도경로=StopFocusAsync 4곳 라우팅·pre-Stop awaited 순서보장·Tag 콜론파싱·Command제거). FR-PH-01~09. 비목표=F클램프(R1 런타임 1순위 리스크)·Gate분리. lib GMaps.Ui 단독 6파일 (Track C) | Draft | 2026-06-29 |
@@ -116,6 +123,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [GatewayEvent_Group_Resurrection_Fix-prd-plan.md](plans/GatewayEvent_Group_Resurrection_Fix-prd-plan.md) | [PRD](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | 15/16 — **구현·v2.6 머지완료** tip `0275776`(FF off 23f6f4b). 통합5/5+실DB사본E2E통과·빌드0. IMPL-04(obsolete) 보류·CHANGELOG 재기재 보류. GatewayDbService.cs 단독, 외부 무변경 | 2026-06-30 |
 | [GOP_Account_Auth_Integration-prd-plan.md](plans/GOP_Account_Auth_Integration-prd-plan.md) | [PRD](prds/GOP_Account_Auth_Integration-prd.md) | 0/46 (~116h, 3버킷 A/B/C + FR-21 + V-01~08) — dev 대기(SETUP-01 0순위, 버킷C 사전통지) | 2026-06-25 |
 | [Tracking_GIS_Visualization_Playback-prd-plan.md](plans/Tracking_GIS_Visualization_Playback-prd-plan.md) | [PRD](prds/Tracking_GIS_Visualization_Playback-prd.md) | 0/58 (P1~P3 범위, ~103h) — dev 대기(VER-01 0순위) | 2026-06-24 |
 | [CameraPopup_DigitalZoom_Alignment-prd-plan.md](plans/CameraPopup_DigitalZoom_Alignment-prd-plan.md) | [PRD](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 14/14 (완료·머지 `2062caf`) | 2026-06-23 |

@@ -104,7 +104,7 @@
 				<ControlTemplate TargetType="Button">
 					<Border
 						x:Name="Bd"
-						Padding="10,7"
+						Padding="7,7"
 						Background="{TemplateBinding Background}"
 						BorderBrush="{DynamicResource BorderBrush}"
 						BorderThickness="1"

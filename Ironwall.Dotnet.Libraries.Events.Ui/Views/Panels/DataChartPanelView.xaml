@@ -99,7 +99,7 @@
 				</Button>
 			</Grid>
 		</StackPanel>
-		<Grid Grid.Row="1" Margin="10, 0">
+		<Grid Grid.Row="1" Margin="6, 0">
 			<ProgressBar
 				Width="50"
 				Height="50"
@@ -109,6 +109,8 @@
 				Value="44" />
 			<lvc:CartesianChart
 				LegendPosition="Right"
+				LegendTextPaint="{Binding LegendTextPaint}"
+				LegendTextSize="12"
 				Series="{Binding Series}"
 				TooltipTextSize="12"
 				Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}"

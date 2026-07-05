@@ -123,7 +123,7 @@ public class LampDevicePanelViewModel : BaseDataGridMultiPanelViewModel<LampDevi
         if (!await _processGate.WaitAsync(0)) return;
         try
         {
-            SaveButtonEnable = false;
+            IsSaving = true;
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
             {
                 _pCancellationTokenSource.Cancel();
@@ -183,7 +183,7 @@ public class LampDevicePanelViewModel : BaseDataGridMultiPanelViewModel<LampDevi
         finally
         {
             UpdateAction?.Invoke();
-            SaveButtonEnable = true;
+            IsSaving = false;
             _processGate.Release();
         }
     }
@@ -242,7 +242,7 @@ public class LampDevicePanelViewModel : BaseDataGridMultiPanelViewModel<LampDevi
         Execute.OnUIThread(() =>
         {
             IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
-            SaveButtonEnable = DevicePermissionGate.CanEdit();
+            // SaveButtonEnable = DevicePermissionGate.CanEdit(); // (IsSaving 전환으로 제거)
         });
     }
 

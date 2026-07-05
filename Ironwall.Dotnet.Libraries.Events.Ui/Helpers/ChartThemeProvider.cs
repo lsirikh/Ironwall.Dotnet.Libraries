@@ -22,6 +22,15 @@ public static class ChartThemeProvider
             : new SKColor(0x13, 0x20, 0x2C);  // tactical Light textPrimary
 
     /// <summary>
+    /// 범례(legend) 라벨 전용 회색 계열 텍스트 색 — 축/툴팁의 고대비 본문색(<see cref="TextColor"/>)과 분리.
+    /// 시리즈 색 점 옆 라벨을 부드럽게(사용자 요청: 회색 계열). Light=슬레이트 #64748B, Dark=밝은 슬레이트 #94A3B8(양 테마 가독).
+    /// </summary>
+    public static SKColor LegendTextColor(BaseTheme theme)
+        => theme == BaseTheme.Dark
+            ? new SKColor(0x94, 0xA3, 0xB8)   // slate-400 (dark bg 가독)
+            : new SKColor(0x64, 0x74, 0x8B);  // slate-500 (light bg 가독)
+
+    /// <summary>
     /// 채도 높은 시리즈색 위에 얹는 고정 라벨/스트로크 색 — 양 테마 흰색(세그먼트 위라 테마 무관).
     /// </summary>
     public static SKColor OnSeriesFixed { get; } = new(255, 255, 255);

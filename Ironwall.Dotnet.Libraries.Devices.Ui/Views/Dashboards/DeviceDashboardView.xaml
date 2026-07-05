@@ -604,8 +604,8 @@
 
 		<TabControl
 			Grid.Row="1"
-			Height="440"
-			Margin="-15,20,15,0"
+			Height="390"
+			Margin="-15,0,15,0"
 			HorizontalAlignment="Stretch"
 			cal:Message.Attach="[Event SelectionChanged] = [Action OnActiveTab($source, $eventArgs)]"
 			md:NavigationRailAssist.ShowSelectionBackground="True"

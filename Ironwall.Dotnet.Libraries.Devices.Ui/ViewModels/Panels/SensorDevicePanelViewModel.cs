@@ -140,7 +140,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
 
         try
         {
-            SaveButtonEnable = false;
+            IsSaving = true;   // 저장 진행 중(스피너 전용) — 권한/활성과 분리
 
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource.IsCancellationRequested)
             {
@@ -202,7 +202,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         finally
         {
             UpdateAction?.Invoke();
-            SaveButtonEnable = true;
+            IsSaving = false;   // 저장 종료 → 스피너 숨김, Floppy 아이콘 복귀
             _processGate.Release();
         }
     }
@@ -274,7 +274,7 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         Execute.OnUIThread(() =>
         {
             IsButtonEnable = DevicePermissionGate.CanEdit() || DevicePermissionGate.CanDelete();
-            SaveButtonEnable = DevicePermissionGate.CanEdit();
+            // SaveButtonEnable 권한 세팅 제거 — 스피너는 IsSaving 전용, 저장버튼 활성은 IsButtonEnable이 담당(스피너 영구표시 버그 수정)
         });
     }
 

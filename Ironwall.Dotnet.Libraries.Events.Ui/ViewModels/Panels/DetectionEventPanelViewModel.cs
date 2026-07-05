@@ -228,7 +228,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
         try
         {
-            SaveButtonEnable = false;
+            IsSaving = true;
 
             if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
             {
@@ -301,7 +301,7 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         finally
         {
             //UpdateAction?.Invoke(_startDate, _endDate);
-            SaveButtonEnable = true;
+            IsSaving = false;
             _processGate.Release();                // 뮤텍스 해제
         }
     }

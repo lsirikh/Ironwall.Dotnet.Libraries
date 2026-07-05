@@ -57,9 +57,9 @@
 					<TextBlock Margin="0,0,0,6" Style="{StaticResource PanelSectionLabel}" Text="{Binding FormTitle}" />
 					<WrapPanel Orientation="Horizontal">
 						<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="이름" />
-						<TextBox Width="160" Margin="0,0,12,0" Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}" />
+						<TextBox Width="160" VerticalAlignment="Center" Margin="0,0,12,0" Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}" />
 						<TextBlock Margin="0,0,4,0" VerticalAlignment="Center" Text="설명" />
-						<TextBox Width="260" Margin="0,0,12,0" Text="{Binding FormDescription, UpdateSourceTrigger=PropertyChanged}" />
+						<TextBox Width="260" VerticalAlignment="Center" Margin="0,0,12,0" Text="{Binding FormDescription, UpdateSourceTrigger=PropertyChanged}" />
 						<Button
 							Margin="4,0,0,0"
 							Content="저장"

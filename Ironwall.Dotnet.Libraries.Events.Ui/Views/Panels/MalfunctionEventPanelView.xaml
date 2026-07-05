@@ -184,14 +184,14 @@
 								Height="30"
 								IsIndeterminate="True"
 								Style="{DynamicResource MaterialDesignCircularProgressBar}"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BoolToInverseVisibleConverter}}"
+								Visibility="{Binding IsSaving, Converter={StaticResource BooleanToVisibilityConverter}}"
 								Value="44" />
 							<md:PackIcon
 								Width="30"
 								Height="30"
 								Kind="Floppy"
 								ToolTip="저장하기"
-								Visibility="{Binding SaveButtonEnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+								Visibility="{Binding IsSaving, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 						</Grid>
 					</Button.Content>
 				</Button>

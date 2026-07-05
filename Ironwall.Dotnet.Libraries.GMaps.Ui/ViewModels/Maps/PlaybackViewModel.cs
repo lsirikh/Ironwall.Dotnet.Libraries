@@ -82,11 +82,10 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
         FromTime = start.Date;                              // 00:00:00
         ToTime = end.Date.AddDays(1).AddSeconds(-1);        // 23:59:59 (종료일 끝)
         IsCalendarOpen = false;
-        // MaxPlaybackHours 가드가 종일/다일 범위를 끝 N시간으로 클램프 → [불러오기] 전에 사전 안내
-        int maxH = _setup?.MaxPlaybackHours ?? 6;
-        Status = (ToTime - FromTime).TotalHours > maxH
-            ? $"{start:yyyy-MM-dd}~{end:yyyy-MM-dd} 선택 · ⚠ 최대 {maxH}시간만 재생됩니다(끝 구간) · [불러오기]"
+        Status = (ToTime - FromTime).TotalDays > 31
+            ? $"{start:yyyy-MM-dd}~{end:yyyy-MM-dd} 선택(범위 큼 — 시작부터 31일 제한될 수 있음) · [불러오기]"
             : $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd} 선택됨 · [불러오기]를 누르세요";
+        _log?.Info($"[Playback] 캘린더 범위 설정: start={start:yyyy-MM-dd} end={end:yyyy-MM-dd} → From={FromTime:yyyy-MM-dd HH:mm:ss} To={ToTime:yyyy-MM-dd HH:mm:ss}");
     }
 
     /// <summary>콘솔 닫기 — 재생 정지 + 재생 마커 제거 후 닫기 요청.</summary>
@@ -173,18 +172,19 @@ public sealed class PlaybackViewModel : PropertyChangedBase, IDisposable
 
     private async Task LoadAsync()
     {
+        _log?.Info($"[Playback] LoadAsync 진입: From={FromTime:yyyy-MM-dd HH:mm:ss} To={ToTime:yyyy-MM-dd HH:mm:ss}");
         var fromUtc = FromTime.ToUniversalTime();
         var toUtc = ToTime.ToUniversalTime();
         if (toUtc <= fromUtc) { Status = "종료 시각이 시작보다 빨라야 합니다."; return; }
 
-        // MaxPlaybackHours 가드 — 초과 시 시작을 당겨 제한
-        int maxH = _setup?.MaxPlaybackHours ?? 6;
-        if ((toUtc - fromUtc).TotalHours > maxH)
+        // 선택 범위를 '그대로' 조회한다(캘린더 다중일 범위 선택 존중).
+        // ⚠ 과거의 '끝 기준 N시간' 클램프는 ① 데이터를 놓쳐 0건 ② FromTime을 23:59로 덮어써 범위선택을 깨므로 폐기.
+        //    OOM은 '시작 기준' 31일 상한으로만 방어(From은 절대 변형하지 않음 → 표시/선택 그대로 유지).
+        const int maxSpanDays = 31;
+        if ((toUtc - fromUtc).TotalDays > maxSpanDays)
         {
-            fromUtc = toUtc.AddHours(-maxH);
-            FromTime = fromUtc.ToLocalTime();
-            NotifyOfPropertyChange(nameof(FromTime));
-            Status = $"최대 {maxH}시간으로 제한됨";
+            toUtc = fromUtc.AddDays(maxSpanDays);
+            Status = $"범위가 너무 커 시작부터 {maxSpanDays}일로 제한";
         }
 
         // 설정(트레일 길이·gap 분절)을 재생 엔진에 반영 — 라이브와 동일 기준
