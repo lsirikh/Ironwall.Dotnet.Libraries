@@ -112,13 +112,38 @@ public partial class MapViewModel : IUndoApplyContext
                 // 이미지 마커: undo/redo로 ImageBounds(크기)가 바뀌어도 Shape 컨트롤의 화면 픽셀크기는
                 // 어도너 드래그 경로만 갱신함 → 프로그램적 변경(undo)에선 컨트롤이 stale로 남아 화면상 이미지가 "튐".
                 // 줌 리프레시와 동일 경로(RefreshFromMarker→UpdateGeometryFromBounds)로 바운즈 기준 재계산해 동기화.
-                if (marker is GMapSymbols.GMapImageMarker img) img.UpdateScreenPosition(MainMap);
+                if (marker is GMapSymbols.GMapImageMarker img)
+                {
+                    img.UpdateScreenPosition(MainMap);
+                    // 라이브 rename은 마커 Title(Images)과 MapLayers.Name을 함께 바꾸지만(SyncOverlayImageLayer),
+                    // undo(PropertyChangeCommand Title)는 마커 Title만 되돌림 → MapLayers.Name이 이전 이름에 고착돼
+                    // 레이어 트리가 desync. 마커 제목 기준으로 MapLayers.Name을 재동기(이름이 실제 바뀐 경우만 트리 재로드).
+                    await SyncOverlayImageLayerNameAsync(img);
+                }
                 MainMap?.InvalidateVisual();
                 // 그룹 선택 중이면 점선박스도 마커 복귀/변경 위치로 재계산(undo 후 박스 미추종 방지, 이슈①).
                 if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();
             }
             catch (Exception ex) { _log?.Error($"[Undo] 마커 업데이트 적용 실패: {ex.Message}"); }
         });
+
+    /// <summary>이미지 undo/redo 후 MapLayers.Name을 마커 제목과 동기 — 이름이 실제 다를 때만 갱신+트리 재로드
+    /// (리사이즈/투명도 undo에선 재로드 생략). 라이브 rename의 MapLayers 변경이 undo에 안 잡혀 생기던 desync 차단.</summary>
+    private async Task SyncOverlayImageLayerNameAsync(GMapSymbols.GMapImageMarker img)
+    {
+        if (string.IsNullOrEmpty(img.FilePath)) return;
+        try
+        {
+            var layers = await _gMapDbService.FetchMapLayersAsync();
+            var layer = layers?.FirstOrDefault(l => l.LayerType == "OverlayImage"
+                && string.Equals(l.FilePath, img.FilePath, System.StringComparison.OrdinalIgnoreCase));
+            if (layer == null || string.Equals(layer.Name, img.Title, System.StringComparison.Ordinal)) return;   // 변경 없으면 생략
+            layer.Name = img.Title ?? layer.Name;
+            await _gMapDbService.UpdateMapLayerAsync(layer);
+            await LoadLayersFromDbAsync();
+        }
+        catch (System.Exception ex) { _log?.Error($"[Undo] 오버레이 이미지 레이어 이름 동기 실패: {ex.Message}"); }
+    }
 
     /// <summary>스냅샷으로 삭제 심볼 복원(Id 보존 Restore → 실패 시 새 Id Insert) + 마커/트리 재구성.
     /// UI 스레드 보장 — 복원 후 AddMarkerFromSymbol/AddImageMarkerFromModel(WPF)가 DB await 이후 UI에서 실행(THREAD-02).</summary>
