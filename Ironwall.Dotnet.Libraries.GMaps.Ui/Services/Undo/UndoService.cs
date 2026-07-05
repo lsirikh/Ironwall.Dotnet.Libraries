@@ -93,7 +93,7 @@ public sealed class UndoService : IUndoService
             RaiseChanged();
             return true;
         }
-        catch (Exception ex) { _log?.Error($"Undo 실패 '{cmd.Description}': {ex.Message}"); return false; }
+        catch (Exception ex) { _log?.Error($"Undo 실패 '{cmd.Description}': {ex.Message}"); return false; }   // 실패 시 커맨드 유지(BUG-04, redo 오이동 방지)
         finally { _runLock.Release(); }
     }
 
@@ -116,7 +116,7 @@ public sealed class UndoService : IUndoService
             RaiseChanged();
             return true;
         }
-        catch (Exception ex) { _log?.Error($"Redo 실패 '{cmd.Description}': {ex.Message}"); return false; }
+        catch (Exception ex) { _log?.Error($"Redo 실패 '{cmd.Description}': {ex.Message}"); return false; }   // 실패 시 커맨드 유지(BUG-04)
         finally { _runLock.Release(); }
     }
 
