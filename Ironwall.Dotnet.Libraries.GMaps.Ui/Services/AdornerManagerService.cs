@@ -530,6 +530,13 @@ public class AdornerManagerService : IDisposable
     /// </summary>
     public void TrimMemory()
     {
+        // 크로스스레드 안전 — 5분 주기 _cleanupTimer(System.Threading.Timer)가 스레드풀 스레드에서 호출하므로
+        // UI 소유 WPF 어도너 접근을 반드시 Dispatcher로 마샬한다. 미마샬 시 MarkerAdornerLayer.RemoveAdornerInternal이
+        // 크로스스레드 예외("다른 스레드가 이 개체를 소유")를 내고, 이것이 편집 이벤트(EditStarted/Completed) 배선을
+        // 손상시켜 이후 리사이즈가 IsMarkerEditing 미설정 상태로 속성창 경로에 누수→undo 위치드리프트를 유발했다(조사 확정).
+        var disp = System.Windows.Application.Current?.Dispatcher;
+        if (disp != null && !disp.CheckAccess()) { disp.InvokeAsync(TrimMemory); return; }
+
         lock (_lock)
         {
             try
