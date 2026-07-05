@@ -71,6 +71,7 @@ public partial class MapViewModel : BasePanelViewModel,
                             IHandle<CallDeleteMapRoiProcessMessageModel>,
                             IHandle<CallDeleteMapLayerProcessMessageModel>,
                             IHandle<CallDeleteGroupSymbolsProcessMessageModel>,
+                            IHandle<CallDeleteSelectedProcessMessageModel>,
                             IHandle<ZOrderChangeRequestedEvent>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
@@ -3363,18 +3364,49 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 선택된 항목 삭제 실행
     /// </summary>
+    // 단일 삭제 확인 대기 대상(확인 팝업 왕복 중 SelectedMarker 변경 대비 캡처).
+    private IEditableMarker? _pendingDeleteMarker;
+    private GMapCustomImage? _pendingDeleteImage;
+
     private async void ExecuteDeleteSelected(object obj)
     {
         if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 선택 삭제 차단"); ShowNoMapEditPermissionInfo(); return; }
         // 멀티셀렉트(그룹) 상태면 그룹 삭제로 위임 — 상단 메뉴 삭제 버튼도 다중삭제·확인창 적용(A).
         if (_groupSelection?.HasSelection ?? false) { await ExecuteGroupDelete(); return; }
+        if (SelectedImage == null && SelectedMarker == null) return;
+
+        // ★ 확인 없이 즉시 삭제하던 경로 차단 — Delete 키 오입력 한 번에 오버레이 이미지(PNG 파일+DB)가
+        //   영구 삭제(Undo 불가)되는 데이터 손실 방지. 그룹 삭제와 동일한 표준 확인 팝업 패턴.
+        _pendingDeleteImage = SelectedImage;
+        _pendingDeleteMarker = SelectedMarker;
+        bool irreversibleImage = SelectedImage != null || SelectedMarker is GMapSymbols.GMapImageMarker;
+        string name = SelectedMarker?.Title ?? SelectedImage?.Title ?? "선택 항목";
+        string explain = irreversibleImage
+            ? $"'{name}' 오버레이 이미지를 삭제하시겠습니까?\n※ 이미지 파일이 영구 삭제되며 되돌리기(Undo)가 불가합니다."
+            : $"'{name}'을(를) 삭제하시겠습니까?";
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "삭제 확인",
+            Explain = explain,
+            MessageModel = new CallDeleteSelectedProcessMessageModel()
+        });
+    }
+
+    /// <summary>단일 삭제 확인 콜백 — 확인 팝업에서 "확인" 시 실제 삭제 수행. 이미지=PNG+DB 영구삭제(Undo 불가),
+    /// 심볼=스냅샷 기록(Undo 가능). raw MessageBox 금지 — 그룹 삭제와 동일 EventAggregator 패턴.</summary>
+    public async Task HandleAsync(CallDeleteSelectedProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        var image = _pendingDeleteImage; var marker = _pendingDeleteMarker;
+        _pendingDeleteImage = null; _pendingDeleteMarker = null;
         try
         {
-            if (SelectedImage != null)
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+            if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 선택 삭제 차단(확인 후)"); return; }
+            if (image != null)
             {
-                var deletedFilePath = SelectedImage.FilePath;
-                MainMap.RemoveImageOverlay(SelectedImage);
-                SelectedImage = null;
+                var deletedFilePath = image.FilePath;
+                MainMap.RemoveImageOverlay(image);
+                if (SelectedImage == image) SelectedImage = null;
                 _log?.Info("선택된 이미지 삭제 완료");
 
                 // MapLayers에서 OverlayImage 레코드 삭제 (레이어 패널 연동)
@@ -3400,33 +3432,27 @@ public partial class MapViewModel : BasePanelViewModel,
                 }
             }
 
-            if (SelectedMarker != null)
+            if (marker != null)
             {
-                var markerTitle = SelectedMarker.Title ?? "Unknown";
-                var markerId = SelectedMarker.Id;
-                var delSnapshot = _editRecorder?.CaptureForDelete(SelectedMarker);   // 삭제 전 스냅샷(Undo용)
+                var markerTitle = marker.Title ?? "Unknown";
+                var markerId = marker.Id;
+                var delSnapshot = _editRecorder?.CaptureForDelete(marker);   // 삭제 전 스냅샷(Undo용, 이미지는 null=Undo 불가)
 
                 _log?.Info($"마커 삭제 시작: {markerTitle} (ID: {markerId})");
 
                 try
                 {
                     // 1. Adorner 먼저 제거
-                    MainMap?.DeselectMarker(SelectedMarker);
+                    MainMap?.DeselectMarker(marker);
 
                     // 2. GMap.NET 마커 컬렉션에서 제거
-                    if (SelectedMarker is GMapMarker gMapMarker)
+                    if (marker is GMapMarker gMapMarker)
                     {
                         MainMap?.Markers?.Remove(gMapMarker);
                     }
 
-                    //// 3. CustomMarkers 컬렉션에서 제거
-                    //if (MainMap?.CustomMarkers?.Contains(SelectedMarker) == true)
-                    //{
-                    //    MainMap.CustomMarkers.Remove(SelectedMarker);
-                    //}
-
                     // 4. DB에서 삭제
-                    var dbResult = await DbDeleteProcess(SelectedMarker);
+                    var dbResult = await DbDeleteProcess(marker);
                     if (dbResult)
                         _log?.Info($"마커({markerId}) DB 삭제 성공");
                     else
@@ -3438,25 +3464,24 @@ public partial class MapViewModel : BasePanelViewModel,
                     // 6. 마커 리소스 정리
                     try
                     {
-                        SelectedMarker.Dispose();
+                        marker.Dispose();
                     }
                     catch (Exception disposeEx)
                     {
                         _log?.Warning($"마커 Dispose 실패: {disposeEx.Message}");
                     }
 
-                    // 7. SelectedMarker null로 설정
-                    SelectedMarker = null;
+                    // 7. SelectedMarker null로 설정(현재 선택이 삭제 대상일 때만)
+                    if (SelectedMarker == marker) SelectedMarker = null;
 
                     _log?.Info($"마커 '{markerTitle}' 삭제 완료");
-                    _editRecorder?.RecordDelete(delSnapshot);   // Undo 기록(삭제)
+                    _editRecorder?.RecordDelete(delSnapshot);   // Undo 기록(삭제, 이미지는 no-op)
 
                 }
                 catch (Exception markerEx)
                 {
                     _log?.Error($"마커 삭제 중 오류: {markerEx.Message}");
-                    // 에러가 발생해도 SelectedMarker는 null로 설정
-                    SelectedMarker = null;
+                    if (SelectedMarker == marker) SelectedMarker = null;
                 }
 
                 // 레이어 패널 트리 동기화 — 삭제된 심볼을 _symbolProvider 캐시에서 직접 제거 후 리빌드.
@@ -3474,6 +3499,12 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"선택 항목 삭제 실패: {ex.Message}");
+        }
+        finally
+        {
+            // 확인/진행 팝업 닫기 — 그룹 삭제와 동일(콜백 발행 후 자동으로 닫히지 않으므로 명시 Close 필수).
+            if (_eventAggregator != null)
+                await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
         }
     }
 

@@ -14,3 +14,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /// (raw <c>MessageBox.Show</c> 대신 프로젝트 표준 EventAggregator 확인 팝업 패턴 — ROI 삭제와 동일 방식)
 /// </summary>
 public class CallDeleteGroupSymbolsProcessMessageModel : IMessageModel { }
+
+/// <summary>
+/// 단일 선택(마커/오버레이 이미지) 삭제 확인 콜백. 사용자가 "확인"을 누르면 <c>MapViewModel.HandleAsync</c> 가
+/// 실제 삭제 수행. 오버레이 이미지 삭제는 PNG 파일까지 영구 삭제되고 Undo가 불가하므로 확인 없이 삭제되던
+/// 위험(Delete 키 오입력 시 데이터 손실)을 차단하기 위해 도입.
+/// </summary>
+public class CallDeleteSelectedProcessMessageModel : IMessageModel { }
