@@ -797,6 +797,11 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             OnPropertyChanged(nameof(Width));
             OnPropertyChanged(nameof(Height));
             OnPropertyChanged(nameof(Center));
+
+            // 심볼 GMapBaseMarker.UpdateSize→UpdateOffset 등가 — 크기(bounds) 변경 즉시 Offset을 재파생 + 캔버스
+            // 재투영해 "렌더 지연 파생" 의존을 제거. Position(=Center) 불변인 순수 리사이즈/undo도 core에서 자기치유
+            // (심볼처럼 UpdateSize 자체가 재앵커) → 리사이즈 undo 위치 튐을 구조적으로 차단.
+            ReanchorOffsetFromBounds();
         }
         catch (Exception ex)
         {
@@ -881,11 +886,35 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
             OnPropertyChanged(nameof(Bottom));
             OnPropertyChanged(nameof(AspectRatio));
             OnPropertyChanged(nameof(Center));
+
+            ReanchorOffsetFromBounds();   // 크기변경 즉시 Offset 재파생+재투영(심볼 UpdateOffset 등가, UpdateSize와 동일)
         }
         catch (Exception ex)
         {
             _log?.Error($"UpdateBoundsFromPixelScale 실패: {ex.Message}");
         }
+    }
+
+    /// <summary>심볼 GMapBaseMarker.UpdateOffset 등가 — 현재 ImageBounds를 화면으로 투영해 Offset=-(화면크기/2)로
+    /// 재계산하고 마커를 즉시 재투영(ForceUpdateLocalPosition). Position(중심) 불변이어도 크기변경만으로 재앵커되게 하여
+    /// 렌더 지연 파생에 의존하던 리사이즈/undo 위치 튐을 core에서 제거. Offset 절대대입=멱등, Map 미부착(로드 전)=no-op.</summary>
+    private void ReanchorOffsetFromBounds()
+    {
+        try
+        {
+            var map = Map;   // 벤더 GMapMarker.Map — 비주얼트리로 해소, 미부착이면 null → 이후 OnRender가 처리
+            if (map == null) return;
+            var tl = map.FromLatLngToLocal(_imageBounds.LocationTopLeft);
+            var br = map.FromLatLngToLocal(_imageBounds.LocationRightBottom);
+            double sw = br.X - tl.X;
+            double sh = br.Y - tl.Y;
+            const double MinSize = 10.0;
+            if (sw < MinSize) sw = MinSize;
+            if (sh < MinSize) sh = MinSize;
+            Offset = new System.Windows.Point(-sw / 2.0, -sh / 2.0);   // Offset setter가 값변경 시 UpdateLocalPosition 발화
+            ForceUpdateLocalPosition(map);                              // 확실히 재투영(멱등)
+        }
+        catch (Exception ex) { _log?.Error($"이미지 재앵커 실패: {ex.Message}"); }
     }
 
     /// <summary>
