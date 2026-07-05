@@ -114,7 +114,11 @@ public partial class MapViewModel : IUndoApplyContext
                 // 줌 리프레시와 동일 경로(RefreshFromMarker→UpdateGeometryFromBounds)로 바운즈 기준 재계산해 동기화.
                 if (marker is GMapSymbols.GMapImageMarker img)
                 {
-                    img.UpdateScreenPosition(MainMap);
+                    img.UpdateScreenPosition(MainMap);   // 컨트롤 화면 크기 + Offset(=-크기/2) 바운즈 기준 재계산
+                    // ★ 리사이즈 undo 위치 튐 근본차단: 순수 리사이즈는 Position(Center) 불변이라 GMap이 마커를
+                    //   재배치하지 않음 → UpdateSize로 바뀐 Offset(=-크기/2)이 캔버스에 반영 안 됨(이동 undo는 Position이
+                    //   바뀌어 자동 재배치되므로 정상). 마커 로컬위치를 명시 재투영해 새 Offset을 확실히 적용.
+                    if (MainMap != null) img.ForceUpdateLocalPosition(MainMap);
                     // 라이브 rename은 마커 Title(Images)과 MapLayers.Name을 함께 바꾸지만(SyncOverlayImageLayer),
                     // undo(PropertyChangeCommand Title)는 마커 Title만 되돌림 → MapLayers.Name이 이전 이름에 고착돼
                     // 레이어 트리가 desync. 마커 제목 기준으로 MapLayers.Name을 재동기(이름이 실제 바뀐 경우만 트리 재로드).
