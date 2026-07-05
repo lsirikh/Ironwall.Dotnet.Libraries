@@ -36,6 +36,7 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "LabelOffsetX": m.LabelOffsetX = ToD(v); break;
             case "LabelOffsetY": m.LabelOffsetY = ToD(v); break;
             case "ZOrder": m.ZOrder = ToI(v); break;
+            case "Opacity": if (m is GMapImageMarker imOp) imOp.Opacity = ToD(v); break;   // 투명도 undo(D2) — 이미지 전용 UI속성
             case "ShowShape": m.ShowShape = ToB(v); break;
             case "ShowTitle": m.ShowTitle = ToB(v); break;
             case "IsLocked": m.IsLocked = ToB(v); break;
@@ -51,7 +52,7 @@ public abstract class UndoableCommandBase : IUndoableCommand
     {
         "Title" or "TitleSize" or "Bearing" or "Width" or "Height" or "Zoom"
         or "StrokeThickness" or "LabelOffsetX" or "LabelOffsetY" or "ZOrder"
-        or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
+        or "Opacity" or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
         or "StrokeColor" or "OperationState" => true,
         _ => false,
     };

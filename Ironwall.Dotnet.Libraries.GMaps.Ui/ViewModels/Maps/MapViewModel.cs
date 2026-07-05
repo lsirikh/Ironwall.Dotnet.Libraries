@@ -1189,7 +1189,7 @@ public partial class MapViewModel : BasePanelViewModel,
             if (selected.Count == 0) return;
             var selIds = new HashSet<int>(selected.Select(m => m.Id));
             var zBefore = IsApplyingUndo ? null : selected.Where(m => m.Id > 0)
-                .Select(m => (id: m.Id, zOrder: m.ZOrder)).ToList();   // FIX 8 — 순서변경 undo 기록용(변경 전)
+                .Select(m => (isImage: m is GMapSymbols.GMapImageMarker, id: m.Id, zOrder: m.ZOrder)).ToList();   // FIX 8 — 순서변경 undo 기록용(변경 전, isImage 보존 D1)
 
             // 심볼 밴드(비-이미지, 선택 외) 현재 ZIndex 수집 → 최상단/최하단 기준
             var bandZ = MainMap.Markers.OfType<GMapMarker>()
@@ -1198,7 +1198,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 .ToList();
             int baseZ = bandZ.Count > 0 ? (toFront ? bandZ.Max() + 1 : bandZ.Min() - selected.Count) : 1000;
 
-            var changes = new List<(int id, int zOrder)>();
+            var changes = new List<(bool isImage, int id, int zOrder)>();
             for (int i = 0; i < selected.Count; i++)
             {
                 var m = selected[i];
@@ -1206,10 +1206,10 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (m is GMapMarker gm && gm.Shape is UIElement shape)
                 {
                     ApplyMarkerZOrderLocal(gm, shape, newZ);
-                    if (m.Id > 0) changes.Add((m.Id, newZ));
+                    if (m.Id > 0) changes.Add((m is GMapSymbols.GMapImageMarker, m.Id, newZ));   // isImage 보존(D1, 그룹밴드는 심볼전용이라 사실상 false)
                 }
             }
-            if (changes.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(changes);
+            if (changes.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(changes.Select(c => (c.id, c.zOrder)).ToList());
             if (zBefore != null && changes.Count > 0) _editRecorder?.RecordZOrder(zBefore, changes);   // FIX 8
             MainMap.InvalidateVisual();
             _groupSelection.RefreshAdorner();
@@ -5845,11 +5845,11 @@ public partial class MapViewModel : BasePanelViewModel,
         // 복합키(isImage,id) — 이미지(Images.Id)와 심볼(Symbols.Id)이 같은 숫자 Id로 한 Markers 컬렉션에 공존 →
         //   기존 ToDictionary(p=>p.id)가 중복키 크래시("동일 키 1")를 냈음. 밴드 구분키로 방지.
         var beforeMap = before.ToDictionary(p => (p.isImage, p.id), p => p.zOrder);
-        var changedBefore = new System.Collections.Generic.List<(int id, int zOrder)>();
-        var changedAfter = new System.Collections.Generic.List<(int id, int zOrder)>();
+        var changedBefore = new System.Collections.Generic.List<(bool isImage, int id, int zOrder)>();
+        var changedAfter = new System.Collections.Generic.List<(bool isImage, int id, int zOrder)>();
         foreach (var (isImage, id, z) in CaptureZOrderPairs())
             if (beforeMap.TryGetValue((isImage, id), out var oldZ) && oldZ != z)
-            { changedBefore.Add((id, oldZ)); changedAfter.Add((id, z)); }
+            { changedBefore.Add((isImage, id, oldZ)); changedAfter.Add((isImage, id, z)); }   // isImage 보존(D1)
         if (changedAfter.Count > 0) _editRecorder.RecordZOrder(changedBefore, changedAfter);
     }
 
@@ -7442,6 +7442,10 @@ public partial class MapViewModel : BasePanelViewModel,
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
             await DbUpdateProcess(e.Marker);
             _editRecorder?.RecordPropertyChange(e.Marker, e.PropertyName, e.OldValue, e.NewValue);   // Undo 기록(coalescing)
+            // "Visibility"는 IsReplayableProperty 미포함이라 RecordPropertyChange가 드롭 → 전용 VisibilityCommand로
+            //   라우팅해 속성창 가시성 변경도 Undo 가능하게(D2). (레이어 트리 체크박스와 동일 경로 재사용)
+            if (e.PropertyName == "Visibility" && e.OldValue is bool visBefore && e.NewValue is bool visAfter && visBefore != visAfter)
+                _editRecorder?.RecordVisibility(e.Marker, visBefore, visAfter);
 
             // 심볼 Title(이름) 변경 → 레이어 트리 노드 이름 동기화(맵→패널). marker.Model이 _symbolProvider
             // 인스턴스와 공유되므로 리빌드가 새 이름을 반영(감사 P1). 이미지는 아래 SyncOverlayImageLayer가 처리.

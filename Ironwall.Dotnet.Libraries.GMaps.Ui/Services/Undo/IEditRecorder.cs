@@ -37,9 +37,9 @@ public interface IEditRecorder
     /// <summary>삭제 기록(사전 스냅샷).</summary>
     void RecordDelete(ISymbolSnapshot? snapshot);
 
-    /// <summary>ZOrder 일괄 변경 기록.</summary>
-    void RecordZOrder(System.Collections.Generic.IReadOnlyList<(int id, int zOrder)> before,
-                      System.Collections.Generic.IReadOnlyList<(int id, int zOrder)> after);
+    /// <summary>ZOrder 일괄 변경 기록. isImage=밴드 구분(이미지↔심볼 같은 Id 충돌 시 undo가 올바른 마커에 적용).</summary>
+    void RecordZOrder(System.Collections.Generic.IReadOnlyList<(bool isImage, int id, int zOrder)> before,
+                      System.Collections.Generic.IReadOnlyList<(bool isImage, int id, int zOrder)> after);
 
     /// <summary>위치 변경(그룹 이동 멤버) 기록 — before=이동 전 위치, after=현재 마커 위치.</summary>
     void RecordPositionChange(IEditableMarker marker, PointLatLng before);

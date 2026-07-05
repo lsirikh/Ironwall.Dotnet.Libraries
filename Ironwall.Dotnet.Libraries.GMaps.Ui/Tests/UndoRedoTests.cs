@@ -52,7 +52,7 @@ public class UndoRedoTests
     {
         public readonly Dictionary<int, IEditableMarker> Markers = new();
         public int ApplyCount;
-        public IReadOnlyList<(int id, int zOrder)>? LastZOrder;
+        public IReadOnlyList<(bool isImage, int id, int zOrder)>? LastZOrder;
         public readonly List<int> Removed = new();
         public readonly List<int> Restored = new();
         public IGMapDbSymbolService Db => null!;
@@ -67,7 +67,7 @@ public class UndoRedoTests
         }
         public Task RemoveMarkerAsync(IEditableMarker marker, CancellationToken ct = default)
         { Markers.Remove(marker.Id); Removed.Add(marker.Id); return Task.CompletedTask; }
-        public Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
+        public Task ApplyZOrderAsync(IReadOnlyList<(bool isImage, int id, int zOrder)> pairs, CancellationToken ct = default)
         { LastZOrder = pairs; return Task.CompletedTask; }
         public void ResyncTree() { }
         public readonly List<int> SyncedNodes = new();
@@ -379,6 +379,28 @@ public class UndoRedoTests
         var cmd = new VisibilityCommand(ctx, 1, before: true, after: false, isImage: true);
         await cmd.ExecuteAsync();
         Assert.Contains((1, false, true), ctx.VisAppliedTyped);   // 타입인지로 가시성 토글
+    }
+
+    [Fact(DisplayName = "D2 — Opacity가 replayable(undo 기록 대상), Visibility는 전용 경로라 미포함")]
+    public void should_be_replayable_when_property_is_opacity()
+    {
+        // 회귀: 이미지 투명도 undo 미기록(IsReplayableProperty 누락) 결함 잠금
+        Assert.True(UndoableCommandBase.IsReplayableProperty("Opacity"));
+        Assert.False(UndoableCommandBase.IsReplayableProperty("Visibility"));   // Visibility는 RecordVisibility 전용 라우팅
+    }
+
+    [Fact(DisplayName = "D1 — ZOrderBatchCommand undo가 isImage 포함 페어를 타입인지로 적용")]
+    public async Task should_apply_zorder_type_aware_pairs_when_undo()
+    {
+        // 회귀: ZOrder undo가 isImage 유실로 같은 Id 반대타입 오적용하던 결함 잠금
+        var ctx = new FakeApplyContext();
+        var before = new System.Collections.Generic.List<(bool isImage, int id, int zOrder)> { (true, 1, 5), (false, 1, 3) };
+        var after = new System.Collections.Generic.List<(bool isImage, int id, int zOrder)> { (true, 1, 9), (false, 1, 7) };
+        var cmd = new ZOrderBatchCommand(ctx, before, after);
+        await cmd.UndoAsync();
+        Assert.Equal(before, ctx.LastZOrder);                 // undo=before 페어 적용
+        Assert.Contains((true, 1, 5), ctx.LastZOrder!);        // isImage 보존(이미지 Id=1)
+        Assert.Contains((false, 1, 3), ctx.LastZOrder!);       // 심볼 Id=1 별도 유지
     }
 
     [Fact(DisplayName = "SymbolSnapshot — Line 모델의 LinePoints가 딥클론서 보존(개수·값)")]

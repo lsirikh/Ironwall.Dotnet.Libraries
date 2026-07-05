@@ -34,8 +34,8 @@ public interface IUndoApplyContext
     /// <summary>마커 제거(DB 삭제 + 맵/provider/트리 제거). Add 취소 시 사용.</summary>
     Task RemoveMarkerAsync(IEditableMarker marker, CancellationToken ct = default);
 
-    /// <summary>ZOrder 일괄 적용((id,zOrder) 페어) + 렌더순서 반영.</summary>
-    Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default);
+    /// <summary>ZOrder 일괄 적용((isImage,id,zOrder) 페어) + 렌더순서 반영. isImage=밴드 구분(같은 Id 반대타입 오적용 차단).</summary>
+    Task ApplyZOrderAsync(IReadOnlyList<(bool isImage, int id, int zOrder)> pairs, CancellationToken ct = default);
 
     /// <summary>레이어 트리 전체 재구성(추가/삭제 후 — 전체 리로드).</summary>
     void ResyncTree();

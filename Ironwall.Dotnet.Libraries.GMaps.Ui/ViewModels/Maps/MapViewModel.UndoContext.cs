@@ -232,16 +232,16 @@ public partial class MapViewModel : IUndoApplyContext
 
     /// <summary>ZOrder 일괄 적용((id,z) 페어) + 로컬 렌더순서 반영.
     /// UI 스레드 보장 — Panel.SetZIndex/InvalidateVisual이 DB await 이후 UI에서 실행(THREAD-02).</summary>
-    public Task ApplyZOrderAsync(IReadOnlyList<(int id, int zOrder)> pairs, CancellationToken ct = default)
+    public Task ApplyZOrderAsync(IReadOnlyList<(bool isImage, int id, int zOrder)> pairs, CancellationToken ct = default)
         => RunOnUiAsync(async () =>
         {
             if (pairs == null || pairs.Count == 0) return;
             try
             {
                 await _gMapDbSymbolService.BatchUpdateZOrderAsync(pairs.Select(p => (p.id, p.zOrder)).ToList(), ct);
-                foreach (var (id, z) in pairs)
+                foreach (var (isImage, id, z) in pairs)
                 {
-                    if (FindMarkerById(id) is GMapMarker gm && gm.Shape is UIElement shape)
+                    if (FindMarkerById(id, isImage) is GMapMarker gm && gm.Shape is UIElement shape)   // 타입인지 — 같은 Id 반대타입 마커 ZIndex 오적용 차단(D1)
                     {
                         ((IEditableMarker)gm).ZOrder = z;
                         System.Windows.Controls.Panel.SetZIndex(shape, z);

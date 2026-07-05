@@ -119,7 +119,7 @@ public sealed class EditRecorder : IEditRecorder
         _undo.Push(new DeleteSymbolCommand(Context!, snapshot));
     }
 
-    public void RecordZOrder(IReadOnlyList<(int id, int zOrder)> before, IReadOnlyList<(int id, int zOrder)> after)
+    public void RecordZOrder(IReadOnlyList<(bool isImage, int id, int zOrder)> before, IReadOnlyList<(bool isImage, int id, int zOrder)> after)
     {
         if (!Ready || before == null || after == null || after.Count == 0) return;
         ResetCoalesce();

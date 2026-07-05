@@ -11,9 +11,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
 ****************************************************************************/
 public sealed class ZOrderBatchCommand : UndoableCommandBase
 {
-    private readonly IReadOnlyList<(int id, int zOrder)> _before, _after;
+    private readonly IReadOnlyList<(bool isImage, int id, int zOrder)> _before, _after;
     public ZOrderBatchCommand(IUndoApplyContext ctx,
-        IReadOnlyList<(int id, int zOrder)> before, IReadOnlyList<(int id, int zOrder)> after) : base(ctx)
+        IReadOnlyList<(bool isImage, int id, int zOrder)> before, IReadOnlyList<(bool isImage, int id, int zOrder)> after) : base(ctx)
     { _before = before; _after = after; }
 
     public override string Description => "순서 변경";
