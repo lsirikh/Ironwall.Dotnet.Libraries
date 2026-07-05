@@ -71,11 +71,14 @@ public class UndoRedoTests
         { LastZOrder = pairs; return Task.CompletedTask; }
         public void ResyncTree() { }
         public readonly List<int> SyncedNodes = new();
-        public void SyncMarkerNode(int id) => SyncedNodes.Add(id);
+        public readonly List<(int id, bool isImage)> SyncedNodesTyped = new();
+        public void SyncMarkerNode(int id) => SyncMarkerNode(id, false);
+        public void SyncMarkerNode(int id, bool isImage) { SyncedNodes.Add(id); SyncedNodesTyped.Add((id, isImage)); }
 
         // v2 커버리지 fake
         public readonly List<(int id, bool show)> VisApplied = new();
-        public Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default) { VisApplied.Add((id, show)); return Task.CompletedTask; }
+        public readonly List<(int id, bool show, bool isImage)> VisAppliedTyped = new();
+        public Task ApplyVisibilityAsync(int id, bool show, bool isImage = false, CancellationToken ct = default) { VisApplied.Add((id, show)); VisAppliedTyped.Add((id, show, isImage)); return Task.CompletedTask; }
         public readonly List<(int id, double rot)> RotApplied = new();
         public Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default) { RotApplied.Add((id, rotation)); return Task.CompletedTask; }
         public readonly List<(int id, GMap.NET.RectLatLng bounds, double rot)> ImgEditApplied = new();
@@ -355,6 +358,27 @@ public class UndoRedoTests
         var cmd = new PropertyChangeCommand(ctx, 5, "Title", "old", "new");
         await cmd.UndoAsync();
         Assert.Contains(5, ctx.SyncedNodes);   // 트리 노드 이름 동기화 호출됨
+    }
+
+    [Fact(DisplayName = "PropertyChangeCommand(이미지) — Title undo 시 타입인지 노드 동기화(isImage=true) — 같은 Id 심볼 오염 차단")]
+    public async Task should_sync_node_type_aware_when_undo_image_title_change()
+    {
+        // 이미지(Id=1)와 심볼(Id=1)이 같은 컬렉션에 공존 → 이미지 이름 undo가 심볼 노드를 건드리면 "제어기1" 증상.
+        var ctx = new FakeApplyContext();
+        ctx.Markers[1] = new FakeEditableMarker { Id = 1, Title = "안양발전소" };
+        var cmd = new PropertyChangeCommand(ctx, 1, "Title", "안양발전소", "안양발전소1", isImage: true);
+        await cmd.UndoAsync();
+        Assert.Contains((1, true), ctx.SyncedNodesTyped);   // 타입인지 동기화 — 같은 Id 심볼 노드로 새지 않음
+    }
+
+    [Fact(DisplayName = "VisibilityCommand(이미지) — 가시성 적용이 타입인지(isImage=true)로 전달")]
+    public async Task should_apply_visibility_type_aware_when_image()
+    {
+        var ctx = new FakeApplyContext();
+        ctx.Markers[1] = new FakeEditableMarker { Id = 1, Title = "안양발전소" };
+        var cmd = new VisibilityCommand(ctx, 1, before: true, after: false, isImage: true);
+        await cmd.ExecuteAsync();
+        Assert.Contains((1, false, true), ctx.VisAppliedTyped);   // 타입인지로 가시성 토글
     }
 
     [Fact(DisplayName = "SymbolSnapshot — Line 모델의 LinePoints가 딥클론서 보존(개수·값)")]

@@ -43,9 +43,14 @@ public interface IUndoApplyContext
     /// <summary>단일 심볼 리프 노드만 라이브 마커 기준으로 갱신(이름/잠금/체크). 전체 리로드 없이(열린 패널 dispose 회피).</summary>
     void SyncMarkerNode(int id);
 
+    /// <summary>타입 인지 노드 동기화 — 이미지↔심볼 Id 충돌 시 올바른 마커로 패널 제목/트리 리프 갱신
+    /// (비타입 조회가 같은 Id의 반대타입 마커를 잡아 패널에 엉뚱한 이름 표시=제어기1 증상 차단). isImage=true→이미지.</summary>
+    void SyncMarkerNode(int id, bool isImage);
+
     // ── v2 커버리지 seam ──
-    /// <summary>런타임 가시성(ShowShape/IsLayerEnabled/IsVisible) 적용 + 시각·트리 노드 갱신(DB 미영속).</summary>
-    Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default);
+    /// <summary>런타임 가시성(ShowShape/IsLayerEnabled/IsVisible) 적용 + 시각·트리 노드 갱신(DB 미영속).
+    /// isImage=대상 타입(Id 충돌 시 올바른 마커만 토글).</summary>
+    Task ApplyVisibilityAsync(int id, bool show, bool isImage = false, CancellationToken ct = default);
 
     /// <summary>파일 오버레이 이미지(GMapCustomImage) 회전 적용 + UpdateImageAsync 영속.</summary>
     Task ApplyCustomImageRotationAsync(int id, double rotation, CancellationToken ct = default);

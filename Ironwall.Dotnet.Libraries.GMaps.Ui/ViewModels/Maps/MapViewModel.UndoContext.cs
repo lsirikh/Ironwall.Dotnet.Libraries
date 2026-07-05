@@ -242,43 +242,50 @@ public partial class MapViewModel : IUndoApplyContext
     }
 
     /// <summary>단일 심볼 리프 노드만 라이브 마커 기준 갱신(이름/잠금/체크) — 전체 리로드 회피(열린 패널 dispose 방지, FIX 4).</summary>
-    public void SyncMarkerNode(int id)
+    public void SyncMarkerNode(int id) => SyncMarkerNode(id, false);
+
+    /// <summary>타입 인지 노드 동기화 — 이미지↔심볼 Id 충돌 시 올바른 마커로 패널 제목/트리 리프 갱신.
+    /// 비타입 조회가 같은 Id의 반대타입 마커(제어기1)를 잡아 패널에 엉뚱한 이름을 표시/심볼리프를 오염시키던 손상 차단.</summary>
+    public void SyncMarkerNode(int id, bool isImage)
     {
         // 트리 노드 INotifyPropertyChanged는 UI 스레드에서만 발화(백그라운드 replay 안전, V6 하드닝)
         var disp = System.Windows.Application.Current?.Dispatcher;
-        if (disp != null && !disp.CheckAccess()) { disp.Invoke(() => SyncMarkerNode(id)); return; }
-        var m = FindMarkerById(id);
+        if (disp != null && !disp.CheckAccess()) { disp.Invoke(() => SyncMarkerNode(id, isImage)); return; }
+        var m = FindMarkerById(id, isImage);   // 타입인지 — 같은 Id의 반대타입 마커로 새지 않게
         if (m == null) return;
         // 열린 속성패널이 이 마커면 제목 표시도 동기화 — 심볼 이름 undo 시 패널 stale 방지(BUG-02 대칭, P7).
-        // MarkerTitle은 marker.Title을 자동추적하지 않음(forward OnLayerRenameRequested:8442가 명시 세팅). 에코는 IsApplyingUndo로 억제.
-        if (PropertyPanel?.SelectedMarker is IEditableMarker psel && psel.Id == id)
+        // 패널 선택 마커도 타입까지 일치해야 함(같은 Id의 이미지↔심볼이 동시 존재 → 타입 불일치면 스킵).
+        if (PropertyPanel?.SelectedMarker is IEditableMarker psel && psel.Id == id
+            && (psel is GMapSymbols.GMapImageMarker) == isImage)
             PropertyPanel.MarkerTitle = m.Title ?? string.Empty;
         if (_layerTreeNodes == null) return;
         bool matched = false;
-        foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
-            if (leaf.Symbol!.Id == id)
-            {
-                leaf.Name = m.Title ?? string.Empty;
-                leaf.InitIsLocked(m.IsLocked);
-                leaf.SetCheckedSilently(m.ShowShape);
-                matched = true;
-            }
+        // 이미지는 심볼 리프가 아님 — 심볼 리프 동기화는 심볼 대상일 때만(이미지가 같은 Id 심볼리프를 오염하는 것 차단).
+        if (!isImage)
+            foreach (var leaf in LayerTreeBuilder.Flatten(_layerTreeNodes).Where(n => n.IsSymbolLeaf && n.Symbol != null))
+                if (leaf.Symbol!.Id == id)
+                {
+                    leaf.Name = m.Title ?? string.Empty;
+                    leaf.InitIsLocked(m.IsLocked);
+                    leaf.SetCheckedSilently(m.ShowShape);
+                    matched = true;
+                }
         // AREA 4: 심볼 리프에 없으면(이미지 마커=오버레이 이미지 노드 OR 트리 누락 심볼) 전체 리로드로 트리 반영(BUG-01)
         if (!matched) ResyncTree();
     }
 
     // ── v2 커버리지 seam 구현 ──
     /// <summary>런타임 가시성 적용(DB 미영속) — 마커 상태 + 시각 + 트리 체크 갱신.</summary>
-    public Task ApplyVisibilityAsync(int id, bool show, CancellationToken ct = default)
+    public Task ApplyVisibilityAsync(int id, bool show, bool isImage = false, CancellationToken ct = default)
         => RunOnUiAsync(() =>
         {
-            var m = FindMarkerById(id);
+            var m = FindMarkerById(id, isImage);   // 타입인지 — 같은 Id의 반대타입 마커 가시성 오토글 차단
             if (m == null) return Task.CompletedTask;
             m.IsLayerEnabled = show;
             m.ShowShape = show;
             m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
             MainMap?.InvalidateVisual();
-            SyncMarkerNode(id);   // 트리 체크박스 반영
+            SyncMarkerNode(id, isImage);   // 트리 체크박스 반영
             return Task.CompletedTask;
         });
 

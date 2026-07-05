@@ -35,7 +35,8 @@ public sealed class PropertyChangeCommand : UndoableCommandBase
         ApplyProperty(m, Property, v);
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
         // 트리 노드에 표시되는 속성(이름/체크/잠금)은 노드 캐시가 별도 → 타겟 동기화(전체 리로드 회피).
+        // 타입인지 — 속성창 이미지 이름변경 undo가 같은 Id 심볼(제어기1)을 패널에 표시하던 손상 차단.
         if (Property is "Title" or "ShowShape" or "IsLocked")
-            Ctx.SyncMarkerNode(_id);
+            Ctx.SyncMarkerNode(_id, _isImage);
     }
 }

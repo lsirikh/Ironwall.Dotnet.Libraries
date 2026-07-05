@@ -166,7 +166,7 @@ public sealed class EditRecorder : IEditRecorder
     {
         if (!Ready || marker == null || before == after) return;
         ResetCoalesce();
-        _undo.Push(new VisibilityCommand(Context!, marker.Id, before, after));
+        _undo.Push(new VisibilityCommand(Context!, marker.Id, before, after, marker is GMapImageMarker));
     }
 
     public void RecordCustomImageRotation(int imageId, double before, double after)

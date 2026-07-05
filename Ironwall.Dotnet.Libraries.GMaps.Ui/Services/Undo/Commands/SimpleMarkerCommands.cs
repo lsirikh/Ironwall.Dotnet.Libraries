@@ -44,7 +44,7 @@ public sealed class LockCommand : UndoableCommandBase
         var m = Ctx.FindMarkerById(_id, _isImage); if (m == null) return;
         m.IsLocked = v;
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
-        Ctx.SyncMarkerNode(_id);   // 타겟 노드 잠금아이콘 갱신(전체 리로드→열린 패널 dispose 회피)
+        Ctx.SyncMarkerNode(_id, _isImage);   // 타겟 노드 잠금아이콘 갱신(타입인지 — 같은 Id 반대타입 오염 차단)
     }
 }
 
@@ -64,6 +64,6 @@ public sealed class RenameSymbolCommand : UndoableCommandBase
         var m = Ctx.FindMarkerById(_id, _isImage); if (m == null) return;
         m.Title = v;
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
-        Ctx.SyncMarkerNode(_id);   // 타겟 노드 이름 갱신(전체 리로드→열린 패널 dispose 회피)
+        Ctx.SyncMarkerNode(_id, _isImage);   // 타겟 노드 이름 갱신(타입인지 — 같은 Id 반대타입 오염 차단)
     }
 }

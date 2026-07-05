@@ -16,12 +16,13 @@ public sealed class VisibilityCommand : UndoableCommandBase
 {
     private readonly int _id;
     private readonly bool _before, _after;
-    public VisibilityCommand(IUndoApplyContext ctx, int id, bool before, bool after) : base(ctx)
-    { _id = id; _before = before; _after = after; }
+    private readonly bool _isImage;   // Id 충돌 대비 대상 타입 캡처(이미지도 가시성 토글 대상 — TransformCommand 동형)
+    public VisibilityCommand(IUndoApplyContext ctx, int id, bool before, bool after, bool isImage = false) : base(ctx)
+    { _id = id; _before = before; _after = after; _isImage = isImage; }
 
     public override string Description => _after ? "표시" : "숨김";
-    public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyVisibilityAsync(_id, _after, ct);
-    public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyVisibilityAsync(_id, _before, ct);
+    public override Task ExecuteAsync(CancellationToken ct = default) => Ctx.ApplyVisibilityAsync(_id, _after, _isImage, ct);
+    public override Task UndoAsync(CancellationToken ct = default) => Ctx.ApplyVisibilityAsync(_id, _before, _isImage, ct);
 }
 
 /// <summary>파일 기반 오버레이 이미지(GMapCustomImage) 회전 프리셋 취소/재실행(UserRotation, UpdateImageAsync 영속).</summary>
