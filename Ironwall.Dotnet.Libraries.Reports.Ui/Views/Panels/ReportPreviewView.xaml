@@ -31,6 +31,10 @@
                 <TextBlock Text="불러오는 중…" VerticalAlignment="Center" Margin="16,0,0,0"
                            Foreground="{DynamicResource TextMutedBrush}"
                            Visibility="{Binding IsBusy, Converter={StaticResource B2V}}" />
+                <!-- 다운로드 실패 인라인 안내 (WebView2 airspace 때문에 팝업 대신 툴바 표기) -->
+                <TextBlock Text="{Binding DownloadStatus}" VerticalAlignment="Center" Margin="16,0,0,0"
+                           Foreground="#FF6B6B" FontWeight="Medium" TextTrimming="CharacterEllipsis" MaxWidth="380"
+                           Visibility="{Binding HasDownloadStatus, Converter={StaticResource B2V}}" />
             </StackPanel>
         </DockPanel>
 

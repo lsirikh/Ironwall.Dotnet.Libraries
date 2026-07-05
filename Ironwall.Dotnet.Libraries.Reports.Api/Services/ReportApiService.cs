@@ -248,7 +248,17 @@ public class ReportApiService : IReportApiService
         {
             var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/generations/{id}/download");
             if (!res.IsSuccessStatusCode)
-                return ReportPdfResult.Fail($"다운로드 실패(HTTP {(int)res.StatusCode}) — 생성 완료 상태인지 확인");
+            {
+                // v6.0: 410 파일 소실 / 404 없음 / 400 미완료 분화 (NOTIFY §1-2)
+                var msg = (int)res.StatusCode switch
+                {
+                    410 => "PDF가 서버에서 소실되었습니다. 보고서를 다시 생성해 주세요.",
+                    404 => "PDF 파일이 없습니다. 보고서를 다시 생성해 주세요.",
+                    400 => "아직 생성이 완료되지 않았습니다. 완료 후 다시 시도하세요.",
+                    _ => $"다운로드 실패(HTTP {(int)res.StatusCode})."
+                };
+                return ReportPdfResult.Fail(msg);
+            }
 
             var bytes = await res.Content.ReadAsByteArrayAsync(token);
             // Content-Disposition: attachment; filename*=UTF-8''{title}.pdf

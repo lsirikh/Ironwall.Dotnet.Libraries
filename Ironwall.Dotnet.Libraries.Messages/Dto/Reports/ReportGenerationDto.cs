@@ -58,11 +58,35 @@ public class ReportGenerationDto : BaseDto
     [JsonProperty("pdf_download_url", Order = 15, NullValueHandling = NullValueHandling.Ignore)]
     public string? PdfDownloadUrl { get; set; }
 
+    /// <summary>진행률 %(0~100) — v6.0-report_progress_perf. GET /generations/{id} 응답.</summary>
+    [JsonProperty("progress_pct", Order = 16, NullValueHandling = NullValueHandling.Ignore)]
+    public int ProgressPct { get; set; }
+
+    /// <summary>진행 단계: start(5)/setup(10)/master_data(60)/html(80)/pdf(95)/done(100).</summary>
+    [JsonProperty("progress_stage", Order = 17, NullValueHandling = NullValueHandling.Ignore)]
+    public string? ProgressStage { get; set; }
+
+    [JsonProperty("progress_updated_at", Order = 18, NullValueHandling = NullValueHandling.Ignore)]
+    public string? ProgressUpdatedAt { get; set; }
+
     [JsonIgnore] public bool IsCompleted => string.Equals(Status, "COMPLETED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsFailed => string.Equals(Status, "FAILED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsInProgress => Status is "PENDING" or "GENERATING";
     [JsonIgnore] public bool IsCancelled => string.Equals(Status, "CANCELLED", System.StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsCustom => string.Equals(ReportType, "CUSTOM", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>진행 단계 한국어 라벨(생성 탭 표시용).</summary>
+    [JsonIgnore]
+    public string ProgressStageLabel => ProgressStage switch
+    {
+        "start" => "시작",
+        "setup" => "준비",
+        "master_data" => "데이터 수집",
+        "html" => "문서 렌더",
+        "pdf" => "PDF 생성",
+        "done" => "완료",
+        _ => ProgressStage ?? ""
+    };
 }
 
 /// <summary>

@@ -29,15 +29,10 @@ public class ReportConsoleViewModel : BasePanelViewModel
         PreviewViewModel = preview;
         EditViewModel = edit;
 
-        // 목록 미리보기 요청 → 미리보기 오버레이 / 생성 완료 → 목록 새로고침 + 미리보기
-        ListViewModel.PreviewRequested += OnPreviewRequested;
-        CreateViewModel.Generated += OnReportGenerated;
-        // 템플릿 추가/수정 요청 → 편집 오버레이
-        TemplateViewModel.EditRequested += OnEditRequested;
-        TemplateViewModel.CreateRequested += OnTemplateCreateRequested;
-        EditViewModel.Saved += OnEditSaved;
-        EditViewModel.Cancelled += OnEditCancelled;
-        _permission.PermissionsChanged += OnPermissionsChanged;
+        // ⚠ 이벤트 구독은 생성자가 아니라 OnActivateAsync에서 수행한다.
+        // 이 VM들은 전부 SingleInstance(ReportUiModule) → 생성자는 앱 수명당 1회만 실행.
+        // "생성자 구독 + OnDeactivate 해제" 조합이면 두 번째 열 때 재구독이 안 돼
+        // 미리보기/생성완료→미리보기/템플릿 편집 이벤트가 전부 죽는다(수명주기 비대칭 버그).
     }
     #endregion
 
@@ -45,6 +40,7 @@ public class ReportConsoleViewModel : BasePanelViewModel
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        Subscribe();   // 매 활성화마다 재구독 — 싱글턴 재사용 대비(재열기 시 이벤트 부활)
         await ScreenExtensions.TryActivateAsync(ListViewModel, cancellationToken);
         await ScreenExtensions.TryActivateAsync(CreateViewModel, cancellationToken);
         await ScreenExtensions.TryActivateAsync(TemplateViewModel, cancellationToken);
@@ -56,25 +52,42 @@ public class ReportConsoleViewModel : BasePanelViewModel
         await ScreenExtensions.TryDeactivateAsync(ListViewModel, close, cancellationToken);
         await ScreenExtensions.TryDeactivateAsync(CreateViewModel, close, cancellationToken);
         await ScreenExtensions.TryDeactivateAsync(TemplateViewModel, close, cancellationToken);
-        if (close)
-        {
-            ListViewModel.PreviewRequested -= OnPreviewRequested;
-            CreateViewModel.Generated -= OnReportGenerated;
-            TemplateViewModel.EditRequested -= OnEditRequested;
-            TemplateViewModel.CreateRequested -= OnTemplateCreateRequested;
-            EditViewModel.Saved -= OnEditSaved;
-            EditViewModel.Cancelled -= OnEditCancelled;
-            _permission.PermissionsChanged -= OnPermissionsChanged;
-        }
+        Unsubscribe();   // close 여부 무관 — 매 비활성화 해제(다음 OnActivate의 Subscribe가 재구독)
         await base.OnDeactivateAsync(close, cancellationToken);
     }
     #endregion
 
     #region - Processes -
+    /// <summary>이벤트 구독 — OnActivate에서 호출. 방어적으로 먼저 해제 후 구독(중복 발화 방지).</summary>
+    private void Subscribe()
+    {
+        Unsubscribe();
+        ListViewModel.PreviewRequested += OnPreviewRequested;
+        CreateViewModel.Generated += OnReportGenerated;
+        TemplateViewModel.EditRequested += OnEditRequested;
+        TemplateViewModel.CreateRequested += OnTemplateCreateRequested;
+        EditViewModel.Saved += OnEditSaved;
+        EditViewModel.Cancelled += OnEditCancelled;
+        _permission.PermissionsChanged += OnPermissionsChanged;
+    }
+
+    /// <summary>이벤트 해제 — OnDeactivate에서 호출(close 무관).</summary>
+    private void Unsubscribe()
+    {
+        ListViewModel.PreviewRequested -= OnPreviewRequested;
+        CreateViewModel.Generated -= OnReportGenerated;
+        TemplateViewModel.EditRequested -= OnEditRequested;
+        TemplateViewModel.CreateRequested -= OnTemplateCreateRequested;
+        EditViewModel.Saved -= OnEditSaved;
+        EditViewModel.Cancelled -= OnEditCancelled;
+        _permission.PermissionsChanged -= OnPermissionsChanged;
+    }
+
     private async void OnPreviewRequested(int generationId)
     {
         try
         {
+            _log?.Info($"[ReportConsole] OnPreviewRequested 수신(id={generationId}) → 오버레이 표시");
             IsPreviewVisible = true;
             await ScreenExtensions.TryActivateAsync(PreviewViewModel);
             await PreviewViewModel.LoadAsync(generationId);

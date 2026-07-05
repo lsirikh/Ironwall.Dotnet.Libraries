@@ -89,6 +89,9 @@ public class OpenProgressPopupMessageModel : IMessageModel { }
 public class CallAllEventReportMessageModel : IMessageModel { }
 public class CallDeleteMapRoiProcessMessageModel : IMessageModel { }
 public class CallDeleteMapLayerProcessMessageModel : IMessageModel { }
+public class CallCancelReportGenerationProcessMessageModel : IMessageModel { }
+public class CallDeleteReportGenerationProcessMessageModel : IMessageModel { }
+public class CallDeleteReportTemplateProcessMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }

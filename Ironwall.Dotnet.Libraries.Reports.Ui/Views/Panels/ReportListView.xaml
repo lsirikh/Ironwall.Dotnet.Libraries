@@ -26,13 +26,13 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button x:Name="Preview" Content="미리보기" MinWidth="92"
                         Style="{StaticResource ModernSecondaryButton}" IsEnabled="{Binding CanDownload}" />
-                <Button x:Name="Download" Content="PDF 다운로드" MinWidth="112" Margin="8,0,0,0"
-                        Style="{StaticResource ModernPrimaryButton}" IsEnabled="{Binding CanDownload}" />
-                <Button x:Name="Cancel" Content="취소" MinWidth="64" Margin="8,0,0,0"
-                        Style="{StaticResource ModernSecondaryButton}" IsEnabled="{Binding CanCancel}"
-                        ToolTip="진행 중(대기/생성중) 보고서 취소" />
+                <Button x:Name="Download" Content="다운로드" MinWidth="92" Margin="8,0,0,0"
+                        Style="{StaticResource ModernPrimaryButton}" IsEnabled="{Binding CanDownload}"
+                        ToolTip="PDF로 다운로드" />
                 <Button x:Name="Delete" Content="삭제" MinWidth="64" Margin="8,0,0,0"
                         Style="{StaticResource ModernDangerButton}" IsEnabled="{Binding CanDelete}" />
+                <Button x:Name="Reload" Content="갱신" MinWidth="64" Margin="8,0,0,0"
+                        Style="{StaticResource ModernSecondaryButton}" ToolTip="목록 새로고침" />
             </StackPanel>
         </Grid>
 
@@ -52,22 +52,40 @@
                     <DataGridTextColumn Header="제목" Binding="{Binding Title}" Width="*" MinWidth="200" />
                     <DataGridTextColumn Header="유형" Binding="{Binding ReportType}" Width="90" />
                     <DataGridTextColumn Header="기간" Binding="{Binding PeriodType}" Width="70" />
-                    <DataGridTemplateColumn Header="상태" Width="110">
+                    <DataGridTemplateColumn Header="상태" Width="150">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Border x:Name="Chip" CornerRadius="9" Padding="10,2" Background="#555F6B"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ChipText" Text="{Binding Status}" Foreground="White"
-                                               FontSize="11" FontWeight="Medium" />
-                                </Border>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="Chip" CornerRadius="9" Padding="10,2" Background="#555F6B"
+                                            VerticalAlignment="Center">
+                                        <TextBlock x:Name="ChipText" Text="{Binding Status}" Foreground="White"
+                                                   FontSize="11" FontWeight="Medium" />
+                                    </Border>
+                                    <!-- 진행중(대기/생성중): 원형 프로그레스 — 앱 표준 MaterialDesignCircularProgressBar -->
+                                    <ProgressBar x:Name="RowSpinner" Style="{DynamicResource MaterialDesignCircularProgressBar}"
+                                                 IsIndeterminate="True" Width="14" Height="14" Margin="6,0,0,0"
+                                                 VerticalAlignment="Center" Foreground="White" Visibility="Collapsed" />
+                                    <!-- 진행중(대기/생성중)만: 인라인 취소 x → 확인 팝업 → CancelRow -->
+                                    <Button x:Name="RowCancelBtn" Width="20" Height="20" Margin="6,0,0,0" Padding="0"
+                                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                            Visibility="Collapsed" ToolTip="생성 취소"
+                                            cal:Action.TargetWithoutContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                            cal:Message.Attach="[Event Click] = [Action CancelRow($dataContext)]">
+                                        <md:PackIcon Kind="CloseCircle" Width="15" Height="15" Foreground="#EF6C00" />
+                                    </Button>
+                                </StackPanel>
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding Status}" Value="PENDING">
                                         <Setter TargetName="Chip" Property="Background" Value="#EF6C00" />
                                         <Setter TargetName="ChipText" Property="Text" Value="대기" />
+                                        <Setter TargetName="RowSpinner" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="RowCancelBtn" Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Status}" Value="GENERATING">
                                         <Setter TargetName="Chip" Property="Background" Value="#1565C0" />
                                         <Setter TargetName="ChipText" Property="Text" Value="생성중" />
+                                        <Setter TargetName="RowSpinner" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="RowCancelBtn" Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Status}" Value="COMPLETED">
                                         <Setter TargetName="Chip" Property="Background" Value="#2E7D32" />
@@ -91,9 +109,16 @@
         </Border>
 
         <!-- 빈 상태 -->
-        <TextBlock Grid.Row="1" Text="생성된 보고서가 없습니다." HorizontalAlignment="Center" VerticalAlignment="Center"
+        <TextBlock Grid.Row="1" Text="{Binding EmptyStateText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
                    Foreground="{DynamicResource TextMutedBrush}"
                    Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+        <!-- 로딩 스피너 — 검색/갱신/최초 로드 중(IsBusy) DataGrid 위 중앙. 앱 표준 MaterialDesignCircularProgressBar -->
+        <ProgressBar Grid.Row="1" Style="{DynamicResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
+                     Width="44" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Foreground="{DynamicResource PrimaryBrush}"
+                     Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
         <TextBlock Grid.Row="2" Margin="2,8,0,0" Foreground="{DynamicResource TextMutedBrush}"
                    Text="{Binding Items.Count, StringFormat=로드 {0}건}" />

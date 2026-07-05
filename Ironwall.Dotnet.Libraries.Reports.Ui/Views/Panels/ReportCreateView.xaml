@@ -48,15 +48,21 @@
         </StackPanel>
 
         <!-- 생성 -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0">
-            <Button x:Name="Generate" Content="생성" MinWidth="96" Style="{StaticResource ModernPrimaryButton}"
-                    IsEnabled="{Binding CanGenerate}" />
-            <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
-                         Width="22" Height="22" Margin="12,0,0,0" VerticalAlignment="Center"
-                         Foreground="{DynamicResource PrimaryBrush}"
+        <StackPanel Grid.Row="4" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="Generate" Content="생성" MinWidth="96" Style="{StaticResource ModernPrimaryButton}"
+                        IsEnabled="{Binding CanGenerate}" />
+                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
+                             Width="22" Height="22" Margin="12,0,0,0" VerticalAlignment="Center"
+                             Foreground="{DynamicResource PrimaryBrush}"
+                             Visibility="{Binding IsGenerating, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="10,0,0,0"
+                           Style="{StaticResource PanelFieldLabel}" />
+            </StackPanel>
+            <!-- 진행률 결정형 바 (서버 progress_pct, 생성 중만) -->
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding GenProgress}" Height="6" Margin="0,10,0,0"
+                         Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource PrimaryBrush}"
                          Visibility="{Binding IsGenerating, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="10,0,0,0"
-                       Style="{StaticResource PanelFieldLabel}" />
         </StackPanel>
     </Grid>
 </UserControl>

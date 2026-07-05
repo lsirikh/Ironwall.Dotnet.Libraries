@@ -61,6 +61,7 @@ public class ReportCreateViewModel : BasePanelViewModel
         try
         {
             IsGenerating = true;
+            GenProgress = 0;
             StatusText = "보고서 생성 요청 중…";
             var req = new ReportGenerateRequestDto
             {
@@ -75,10 +76,10 @@ public class ReportCreateViewModel : BasePanelViewModel
             var id = genRes.Data.Id;
             StatusText = "생성 중… (GENERATING)";
             var completed = await PollUntilDoneAsync(id);
-            if (completed != null && completed.IsCompleted) { StatusText = "완료됨."; Generated?.Invoke(id); }
+            if (completed != null && completed.IsCompleted) { GenProgress = 100; StatusText = "완료됨."; Generated?.Invoke(id); }
             else if (completed != null && completed.IsCancelled) StatusText = "취소됨.";
-            else if (completed != null && completed.IsFailed) StatusText = $"실패: {completed.ErrorMessage}";
-            else StatusText = "시간 초과(폴링 중단).";
+            else if (completed != null && completed.IsFailed) StatusText = $"실패: {FailReason(completed.ErrorMessage)}";
+            else StatusText = "시간 초과(폴링 중단). 목록에서 상태를 확인하세요.";
         }
         catch (Exception ex) { _log?.Error($"[ReportCreate] Generate: {ex.Message}"); StatusText = $"오류: {ex.Message}"; }
         finally { IsGenerating = false; }
@@ -93,9 +94,24 @@ public class ReportCreateViewModel : BasePanelViewModel
             await Task.Delay(1500);
             waited += 2;
             var res = await _api.GetGenerationByIdAsync(id);
-            if (res.Success && res.Data != null && (res.Data.IsCompleted || res.Data.IsFailed || res.Data.IsCancelled)) return res.Data;
+            if (res.Success && res.Data != null)
+            {
+                var d = res.Data;
+                if (d.IsInProgress) { GenProgress = d.ProgressPct; StatusText = $"생성 중… {d.ProgressPct}% · {d.ProgressStageLabel}"; }
+                if (d.IsCompleted || d.IsFailed || d.IsCancelled) return d;
+            }
         }
         return null;
+    }
+
+    /// <summary>서버 error_message → 사용자 안내 문구 분화(v6.0).</summary>
+    private static string FailReason(string? msg)
+    {
+        if (string.IsNullOrWhiteSpace(msg)) return "생성 실패";
+        if (msg.Contains("server restarted")) return "서버 재시작으로 실패 — 재생성하세요";
+        if (msg.Contains("stalled")) return "생성 지연으로 중단 — 재시도하세요";
+        if (msg.Contains("Cancelled")) return "취소됨";
+        return msg;
     }
     #endregion
 
@@ -136,6 +152,10 @@ public class ReportCreateViewModel : BasePanelViewModel
     private bool _isGenerating;
     public bool IsGenerating { get => _isGenerating; set { _isGenerating = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanGenerate)); } }
     public bool CanGenerate => !_isGenerating;
+
+    private int _genProgress;
+    /// <summary>생성 진행률 %(0~100) — 폴링이 서버 progress_pct로 갱신. 생성 탭 결정형 진행바.</summary>
+    public int GenProgress { get => _genProgress; set { _genProgress = value; NotifyOfPropertyChange(); } }
 
     private string _statusText = string.Empty;
     public string StatusText { get => _statusText; set { _statusText = value; NotifyOfPropertyChange(); } }
