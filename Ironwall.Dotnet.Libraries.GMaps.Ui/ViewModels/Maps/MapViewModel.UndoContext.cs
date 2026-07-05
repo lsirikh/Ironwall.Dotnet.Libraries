@@ -109,6 +109,10 @@ public partial class MapViewModel : IUndoApplyContext
             try
             {
                 await DbUpdateProcess(marker);
+                // 이미지 마커: undo/redo로 ImageBounds(크기)가 바뀌어도 Shape 컨트롤의 화면 픽셀크기는
+                // 어도너 드래그 경로만 갱신함 → 프로그램적 변경(undo)에선 컨트롤이 stale로 남아 화면상 이미지가 "튐".
+                // 줌 리프레시와 동일 경로(RefreshFromMarker→UpdateGeometryFromBounds)로 바운즈 기준 재계산해 동기화.
+                if (marker is GMapSymbols.GMapImageMarker img) img.UpdateScreenPosition(MainMap);
                 MainMap?.InvalidateVisual();
                 // 그룹 선택 중이면 점선박스도 마커 복귀/변경 위치로 재계산(undo 후 박스 미추종 방지, 이슈①).
                 if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();

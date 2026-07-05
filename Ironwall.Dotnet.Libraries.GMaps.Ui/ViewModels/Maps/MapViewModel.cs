@@ -8448,9 +8448,11 @@ public partial class MapViewModel : BasePanelViewModel,
             e.Symbol.Title = newName;
             await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // 공통 Symbols 행(Title) 영속 — 타입 무관
 
+            // 타입인지 — 심볼 이름변경은 이미지가 아닌 마커만 대상. 같은 Id의 오버레이 이미지(제어기1↔안양발전소 Id=1 충돌)를
+            // 잡아 이미지 Title/속성창을 심볼 이름으로 오염시키던 경로 차단.
             var marker = MainMap?.Markers
                 .OfType<GMapSymbols.IEditableMarker>()
-                .FirstOrDefault(m => m.Id == e.Symbol.Id);
+                .FirstOrDefault(m => m.Id == e.Symbol.Id && m is not GMapSymbols.GMapImageMarker);
             if (marker != null)
             {
                 marker.Title = newName;
