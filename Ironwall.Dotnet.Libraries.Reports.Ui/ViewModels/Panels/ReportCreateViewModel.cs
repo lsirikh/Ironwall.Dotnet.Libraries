@@ -23,6 +23,8 @@ public class ReportCreateViewModel : BasePanelViewModel
             new("최근 7일", "7d"), new("최근 30일", "30d"), new("최근 90일", "90d"), new("최근 1년", "1y"),
         };
         SelectedPeriod = Periods[0];
+        EndDate = DateTime.Today;
+        StartDate = DateTime.Today.AddDays(-7);
     }
     #endregion
 
@@ -57,6 +59,11 @@ public class ReportCreateViewModel : BasePanelViewModel
         var title = (Title ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(title)) { StatusText = "제목을 입력하세요."; return; }
         if (IsTemplateBased && SelectedTemplate is null) { StatusText = "템플릿을 선택하세요."; return; }
+        if (IsCustomRange)
+        {
+            if (StartDate is null || EndDate is null) { StatusText = "시작일과 끝일을 지정하세요."; return; }
+            if (EndDate < StartDate) { StatusText = "끝일이 시작일보다 빠릅니다."; return; }
+        }
 
         try
         {
@@ -67,8 +74,10 @@ public class ReportCreateViewModel : BasePanelViewModel
             {
                 ReportType = IsTemplateBased ? "CUSTOM" : "STANDARD",
                 Title = title,
-                PeriodType = SelectedPeriod.Value,
+                PeriodType = IsCustomRange ? "custom" : SelectedPeriod.Value,
                 TemplateId = IsTemplateBased ? SelectedTemplate!.Id : null,
+                StartDate = IsCustomRange ? StartDate?.ToString("yyyy-MM-dd") : null,
+                EndDate = IsCustomRange ? EndDate?.ToString("yyyy-MM-dd") : null,
             };
             var genRes = await _api.GenerateAsync(req);
             if (!genRes.Success || genRes.Data is null) { StatusText = $"생성 요청 실패: {genRes.Message}"; IsGenerating = false; return; }
@@ -148,6 +157,17 @@ public class ReportCreateViewModel : BasePanelViewModel
 
     private PeriodOption _selectedPeriod = null!;
     public PeriodOption SelectedPeriod { get => _selectedPeriod; set { _selectedPeriod = value; NotifyOfPropertyChange(); } }
+
+    private bool _isCustomRange;
+    /// <summary>false=프리셋(7d…) · true=직접 지정(시작/끝 DatePicker). ⚠ 서버 PRD #6 반영 후 정식 동작(그전엔 custom 전송 시 422).</summary>
+    public bool IsCustomRange { get => _isCustomRange; set { _isCustomRange = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsPreset)); } }
+    /// <summary>프리셋 라디오용(settable).</summary>
+    public bool IsPreset { get => !_isCustomRange; set { if (value) IsCustomRange = false; } }
+
+    private DateTime? _startDate;
+    public DateTime? StartDate { get => _startDate; set { _startDate = value; NotifyOfPropertyChange(); } }
+    private DateTime? _endDate;
+    public DateTime? EndDate { get => _endDate; set { _endDate = value; NotifyOfPropertyChange(); } }
 
     private bool _isGenerating;
     public bool IsGenerating { get => _isGenerating; set { _isGenerating = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanGenerate)); } }

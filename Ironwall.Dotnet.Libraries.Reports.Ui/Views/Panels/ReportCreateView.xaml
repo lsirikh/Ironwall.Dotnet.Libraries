@@ -43,8 +43,25 @@
             <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource ModernTextBox}"
                      md:HintAssist.Hint="보고서 제목" Margin="0,0,0,10" />
             <TextBlock Text="기간 *" Style="{StaticResource PanelFieldLabel}" Margin="0,0,0,2" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <RadioButton Content="프리셋" GroupName="RangeKind" IsChecked="{Binding IsPreset, Mode=TwoWay}"
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                <RadioButton Content="직접 지정(달력)" GroupName="RangeKind" IsChecked="{Binding IsCustomRange, Mode=TwoWay}"
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="18,0,0,0" />
+            </StackPanel>
+            <!-- 프리셋(7d/30d/…) -->
             <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding SelectedPeriod}" DisplayMemberPath="Display"
-                      Style="{StaticResource ModernComboBox}" Width="200" HorizontalAlignment="Left" />
+                      Style="{StaticResource ModernComboBox}" Width="200" HorizontalAlignment="Left"
+                      Visibility="{Binding IsPreset, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <!-- 직접 지정: 시작 ~ 끝 (달력). ※ 서버 커스텀 날짜 반영 후 정식 동작 -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"
+                        Visibility="{Binding IsCustomRange, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <DatePicker SelectedDate="{Binding StartDate}" Width="150" />
+                <TextBlock Text="~" VerticalAlignment="Center" Margin="8,0" Foreground="{DynamicResource TextMutedBrush}" />
+                <DatePicker SelectedDate="{Binding EndDate}" Width="150" />
+                <TextBlock Text="(끝일 포함)" VerticalAlignment="Center" Margin="10,0,0,0"
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+            </StackPanel>
         </StackPanel>
 
         <!-- 생성 -->

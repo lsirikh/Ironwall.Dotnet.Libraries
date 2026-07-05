@@ -42,6 +42,10 @@ public interface IReportApiService : IService
     /// 성공 시 (bytes, fileName), 실패 시 (null, null, error).
     /// </summary>
     Task<ReportPdfResult> DownloadPdfAsync(int id, CancellationToken token = default);
+
+    /// <summary>상세 CSV 다운로드(GET /generations/{id}/detail.csv?type=) — BOM+UTF-8, FileResponse.
+    /// type: detection/malfunction/action/system/config/audit/login/session. reports:view 필요. (v6.0 NOTIFY §1-3)</summary>
+    Task<ReportPdfResult> DownloadDetailCsvAsync(int id, string type, CancellationToken token = default);
 }
 
 /// <summary>PDF 다운로드 결과 — 봉투 밖 원시 바이트 + 파일명(Content-Disposition) 또는 에러.</summary>

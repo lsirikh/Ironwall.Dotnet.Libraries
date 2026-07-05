@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
+using System.Collections.ObjectModel;
 using System.IO;
 
 namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
@@ -18,6 +19,12 @@ public class ReportPreviewViewModel : BasePanelViewModel
         : base(eventAggregator, log)
     {
         _api = api;
+        CsvTypes = new ObservableCollection<CsvTypeOption>
+        {
+            new("탐지", "detection"), new("장애", "malfunction"), new("조치", "action"), new("시스템", "system"),
+            new("설정", "config"), new("감사", "audit"), new("로그인", "login"), new("세션", "session"),
+        };
+        SelectedCsvType = CsvTypes[0];
     }
     #endregion
 
@@ -79,6 +86,35 @@ public class ReportPreviewViewModel : BasePanelViewModel
         catch (Exception ex) { _log?.Error($"[ReportPreview] Download: {ex.Message}"); }
     }
 
+    /// <summary>상세 CSV 다운로드(선택 유형) → SaveFileDialog. 실패는 툴바 인라인(WebView2 airspace 회피).</summary>
+    public async Task DownloadCsv()
+    {
+        if (GenerationId <= 0 || SelectedCsvType is null) return;
+        try
+        {
+            DownloadStatus = null;
+            var result = await _api.DownloadDetailCsvAsync(GenerationId, SelectedCsvType.Value);
+            if (!result.Success || result.Bytes is null)
+            {
+                _log?.Warning($"[ReportPreview] CSV 실패: {result.Error}");
+                DownloadStatus = "CSV 실패 — " + (result.Error ?? "다운로드하지 못했습니다.");
+                return;
+            }
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "CSV 파일 (*.csv)|*.csv",
+                FileName = string.IsNullOrWhiteSpace(result.FileName) ? $"report_{GenerationId}_{SelectedCsvType.Value}.csv" : result.FileName,
+                RestoreDirectory = true,
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                await File.WriteAllBytesAsync(dlg.FileName, result.Bytes);
+                _log?.Info($"[ReportPreview] CSV 저장: {dlg.FileName}");
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[ReportPreview] DownloadCsv: {ex.Message}"); }
+    }
+
     // 미리보기 확대/축소 — WebView2.ZoomFactor 에 바인딩(0.5~3.0, 10%씩)
     public void ZoomIn() => ZoomFactor = Math.Min(3.0, Math.Round(ZoomFactor + 0.1, 2));
     public void ZoomOut() => ZoomFactor = Math.Max(0.5, Math.Round(ZoomFactor - 0.1, 2));
@@ -87,6 +123,11 @@ public class ReportPreviewViewModel : BasePanelViewModel
 
     #region - Properties -
     public int GenerationId { get; private set; }
+
+    public ObservableCollection<CsvTypeOption> CsvTypes { get; }
+    private CsvTypeOption? _selectedCsvType;
+    /// <summary>상세 CSV 유형 선택(8종).</summary>
+    public CsvTypeOption? SelectedCsvType { get => _selectedCsvType; set { _selectedCsvType = value; NotifyOfPropertyChange(); } }
 
     private string? _html;
     /// <summary>WebView2 로 NavigateToString 할 자립형 HTML.</summary>
@@ -115,3 +156,6 @@ public class ReportPreviewViewModel : BasePanelViewModel
         "미리보기를 불러오지 못했습니다. (권한 또는 서버 상태 확인)</body></html>";
     #endregion
 }
+
+/// <summary>상세 CSV 유형 옵션(표시명/서버 type 값).</summary>
+public sealed record CsvTypeOption(string Display, string Value);

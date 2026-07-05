@@ -102,9 +102,17 @@ public class ReportGenerateRequestDto
     [JsonProperty("title")]
     public string Title { get; set; } = string.Empty;
 
-    /// <summary>7d | 30d | 90d | 1y (필수)</summary>
+    /// <summary>7d | 30d | 90d | 1y | custom (필수)</summary>
     [JsonProperty("period_type")]
     public string PeriodType { get; set; } = "7d";
+
+    /// <summary>커스텀 시작일(yyyy-MM-dd, KST) — period_type="custom"일 때 서버가 사용. 서버 PRD #6 반영 후 활성.</summary>
+    [JsonProperty("start_date", NullValueHandling = NullValueHandling.Ignore)]
+    public string? StartDate { get; set; }
+
+    /// <summary>커스텀 끝일(yyyy-MM-dd, 끝일 포함).</summary>
+    [JsonProperty("end_date", NullValueHandling = NullValueHandling.Ignore)]
+    public string? EndDate { get; set; }
 
     /// <summary>CUSTOM일 때 컴포넌트 필터 근거</summary>
     [JsonProperty("template_id", NullValueHandling = NullValueHandling.Ignore)]

@@ -273,6 +273,35 @@ public class ReportApiService : IReportApiService
             return ReportPdfResult.Fail(ex.Message);
         }
     }
+
+    public async Task<ReportPdfResult> DownloadDetailCsvAsync(int id, string type, CancellationToken token = default)
+    {
+        try
+        {
+            var res = await _apiService.GetRequestAsync($"{_setupModel.Url}/reports/generations/{id}/detail.csv?type={type}");
+            if (!res.IsSuccessStatusCode)
+            {
+                var msg = (int)res.StatusCode switch
+                {
+                    400 => "아직 생성이 완료되지 않았습니다.",
+                    404 => "보고서를 찾을 수 없습니다.",
+                    422 => "지원하지 않는 CSV 유형입니다.",
+                    _ => $"CSV 다운로드 실패(HTTP {(int)res.StatusCode})."
+                };
+                return ReportPdfResult.Fail(msg);
+            }
+            var bytes = await res.Content.ReadAsByteArrayAsync(token);
+            var cd = res.Content.Headers.ContentDisposition;
+            var name = (cd?.FileNameStar ?? cd?.FileName)?.Trim('"');
+            if (string.IsNullOrWhiteSpace(name)) name = $"report_{id}_{type}.csv";
+            return ReportPdfResult.Ok(bytes, name);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(DownloadDetailCsvAsync)}] {ex.Message}");
+            return ReportPdfResult.Fail(ex.Message);
+        }
+    }
     #endregion
 
     #region - Attributes -

@@ -18,6 +18,11 @@
         <DockPanel Grid.Row="0" Margin="12,10,12,8">
             <Button DockPanel.Dock="Right" x:Name="Download" Content="PDF 다운로드" MinWidth="112"
                     Style="{StaticResource ModernPrimaryButton}" />
+            <Button DockPanel.Dock="Right" x:Name="DownloadCsv" Content="상세 CSV" MinWidth="90" Margin="0,0,8,0"
+                    Style="{StaticResource ModernSecondaryButton}" ToolTip="선택 유형 전량 이벤트 CSV(엑셀 호환)" />
+            <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding CsvTypes}" SelectedItem="{Binding SelectedCsvType}"
+                      DisplayMemberPath="Display" Width="100" Margin="0,0,8,0" VerticalAlignment="Center"
+                      Style="{StaticResource ModernComboBox}" ToolTip="CSV 유형" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="확대" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource PanelFieldLabel}" />
                 <Button x:Name="ZoomOut" Content="−" Width="32" Padding="0" ToolTip="축소"
