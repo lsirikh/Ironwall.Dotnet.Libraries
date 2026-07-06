@@ -30,10 +30,11 @@ public sealed class SessionConfigService : ISessionConfigService
     #region - Processes -
     public void ApplySession(bool isSession, int expirationMinutes)
     {
+        // 설정값만 보존한다. [레거시 제거] TokenGenerator 로컬 타이머는 더 이상 세션 권위가 아니다 —
+        //   GOP 모드 세션 만료는 서버 JWT + SessionLifecycle(ArmExpiryTimer)가 단일 권위로 처리한다.
+        //   (레거시 30분 타이머가 24h 세션 중 오발화 → 회색지대 로그아웃 사고, 배선 전면 제거.)
         _setup.IsSession = isSession;
         _setup.SessionExpiration = expirationMinutes;
-        _tokenGenerator.SetTimerEnable(isSession);     // 세션 타이머 단일 소스
-        _tokenGenerator.SetSession(expirationMinutes);
     }
     #endregion
 
