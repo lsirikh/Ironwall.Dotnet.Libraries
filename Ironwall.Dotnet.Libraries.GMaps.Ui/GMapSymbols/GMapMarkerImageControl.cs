@@ -250,10 +250,14 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         base.OnRender(dc);
 
         if (Marker == null || ImageSource == null) return;
-        if (!IsMarkerVisible) return;   // 레이어 체크 OFF/undo/줌게이트 → 이미지 숨김(이전엔 플래그 무시로 항상 그려짐)
+        if (!IsMarkerVisible) return;   // 레이어 체크(IsVisible) OFF/undo → 이미지 숨김(이전엔 플래그 무시로 항상 그려짐)
 
         var mapControl = FindParentMapControl();
         if (mapControl == null) return;
+
+        // 최소 줌 게이트 — 현재 줌 < 이미지 최소줌(Marker.Zoom, 속성창 Zoom)이면 숨김(심볼과 동형). Zoom=0=모든 줌 표시.
+        //   OnMapZoomChanged→InvalidateVisual로 줌 변경 시 재평가됨.
+        if (Marker.Zoom > 0 && mapControl.Zoom < Marker.Zoom) return;
 
         try
         {
