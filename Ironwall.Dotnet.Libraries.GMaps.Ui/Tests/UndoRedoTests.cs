@@ -403,6 +403,19 @@ public class UndoRedoTests
         Assert.Contains((false, 1, 3), ctx.LastZOrder!);       // 심볼 Id=1 별도 유지
     }
 
+    [Fact(DisplayName = "Bug B — ImageTransformCommand는 이미지 아닌 마커엔 no-op(타입가드, 같은 Id 심볼 오적용 차단)")]
+    public async Task should_noop_when_target_is_not_image_for_image_transform()
+    {
+        // 지리 bounds 기반 이미지 transform은 이미지 전용 — 같은 Id 심볼을 잡아 UpdateBounds하지 않음
+        var ctx = new FakeApplyContext();
+        ctx.Markers[1] = new FakeEditableMarker { Id = 1 };   // 비이미지(심볼 역)
+        var before = (new GMap.NET.RectLatLng(37.4, 126.9, 0.005, 0.003), 0d);
+        var after = (new GMap.NET.RectLatLng(37.4, 126.9, 0.008, 0.005), 0d);
+        var cmd = new ImageTransformCommand(ctx, 1, before, after);
+        await cmd.UndoAsync();
+        Assert.Equal(0, ctx.ApplyCount);   // 이미지 아니면 UpdateBounds/영속 미실행(줌불변 bounds 복원은 실앱 Manual 검증)
+    }
+
     [Fact(DisplayName = "SymbolSnapshot — Line 모델의 LinePoints가 딥클론서 보존(개수·값)")]
     public void should_preserve_linepoints_when_snapshot_line()
     {

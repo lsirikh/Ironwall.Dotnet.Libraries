@@ -19,8 +19,12 @@ public interface IEditRecorder
     /// <summary>선택 시 baseline 캡처(before 없는 라벨 등에 사용).</summary>
     void CaptureSelectionBaseline(IEditableMarker marker);
 
-    /// <summary>이동/크기/회전 완료 기록(before/after는 args).</summary>
+    /// <summary>이동/크기/회전 완료 기록(before/after는 args). 심볼용(픽셀 w/h).</summary>
     void RecordTransform(MarkerEditCompletedEventArgs e);
+
+    /// <summary>이미지 어도너 편집(이동/크기/회전) — 지리 ImageBounds(도) 기준 기록(줌 불변). 픽셀 저장의 줌-간섭 오차 회피.</summary>
+    void RecordImageTransform(IEditableMarker marker, GMap.NET.RectLatLng beforeBounds, double beforeBearing,
+                              GMap.NET.RectLatLng afterBounds, double afterBearing);
 
     /// <summary>속성 변경 기록(coalescing).</summary>
     void RecordPropertyChange(IEditableMarker marker, string property, object? oldValue, object? newValue);
