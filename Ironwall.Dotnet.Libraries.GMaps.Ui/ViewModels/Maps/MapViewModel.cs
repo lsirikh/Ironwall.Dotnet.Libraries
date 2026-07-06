@@ -876,7 +876,8 @@ public partial class MapViewModel : BasePanelViewModel,
         var ids = CurrentSelectionIds();
         if (hits != null)
             foreach (var h in hits)
-                if (h != null && !h.IsDisposed && h.Id > 0) { if (!ids.Add(h.Id)) ids.Remove(h.Id); }   // 겹치면 해제(토글), 아니면 추가
+                if (h != null && !h.IsDisposed && h.Id > 0)
+                { var k = (h is GMapSymbols.GMapImageMarker, h.Id); if (!ids.Add(k)) ids.Remove(k); }   // 겹치면 해제(토글), 아니면 추가(타입인지)
         ApplyGroupSelectionByIds(ids);
         if (ids.Count > 0)
             SetAimStatus($"{ids.Count}개 선택 — 드래그=이동·Del=삭제 · Ctrl+클릭/Shift+드래그=추가·해제", autoHide: true);
@@ -888,24 +889,26 @@ public partial class MapViewModel : BasePanelViewModel,
         if (marker == null || marker.IsDisposed || marker.Id <= 0 || !IsEditModeEnabled) return;
         if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return; }
         var ids = CurrentSelectionIds();
-        if (!ids.Add(marker.Id)) ids.Remove(marker.Id);   // 이미 선택→해제, 아니면 추가(나머지 유지)
+        var key = (marker is GMapSymbols.GMapImageMarker, marker.Id);
+        if (!ids.Add(key)) ids.Remove(key);   // 이미 선택→해제, 아니면 추가(나머지 유지, 타입인지)
         ApplyGroupSelectionByIds(ids);
         SetAimStatus(ids.Count > 0 ? $"{ids.Count}개 선택(Ctrl+클릭·Shift+드래그로 추가·해제)" : "선택 해제", autoHide: true);
     }
 
-    /// <summary>현재 선택 집합을 Id로 수집(그룹 ∪ 단일). Id 기준이라 리로드로 인스턴스가 바뀌어도 안전.</summary>
-    private System.Collections.Generic.HashSet<int> CurrentSelectionIds()
+    /// <summary>현재 선택 집합을 (타입,Id)로 수집(그룹 ∪ 단일). 이미지↔심볼 같은 Id 충돌 시 함께 잡히지 않게 타입 구분.
+    /// (타입,Id) 기준이라 리로드로 인스턴스가 바뀌어도 안전.</summary>
+    private System.Collections.Generic.HashSet<(bool isImage, int id)> CurrentSelectionIds()
     {
-        var ids = new System.Collections.Generic.HashSet<int>();
+        var ids = new System.Collections.Generic.HashSet<(bool isImage, int id)>();
         if (_groupSelection?.Selection != null)
             foreach (var m in _groupSelection.Selection)
-                if (m != null && m.Id > 0) ids.Add(m.Id);
-        if (SelectedMarker != null && SelectedMarker.Id > 0) ids.Add(SelectedMarker.Id);
+                if (m != null && m.Id > 0) ids.Add((m is GMapSymbols.GMapImageMarker, m.Id));
+        if (SelectedMarker != null && SelectedMarker.Id > 0) ids.Add((SelectedMarker is GMapSymbols.GMapImageMarker, SelectedMarker.Id));
         return ids;
     }
 
-    /// <summary>Id 집합을 라이브 마커로 해석해 그룹 선택 적용 — 단일 adorner/패널 정리 후 세팅(빈 집합=전체 해제).</summary>
-    private void ApplyGroupSelectionByIds(System.Collections.Generic.ICollection<int> ids)
+    /// <summary>(타입,Id) 집합을 라이브 마커로 해석해 그룹 선택 적용 — 단일 adorner/패널 정리 후 세팅(빈 집합=전체 해제).</summary>
+    private void ApplyGroupSelectionByIds(System.Collections.Generic.ICollection<(bool isImage, int id)> ids)
     {
         MainMap?.DeselectAllMarkers();   // 단일 편집 adorner 정리(그룹으로 전환)
         SelectedMarker = null;
@@ -913,9 +916,9 @@ public partial class MapViewModel : BasePanelViewModel,
         System.Collections.Generic.List<IEditableMarker>? live = null;
         if (ids != null && ids.Count > 0 && MainMap?.Markers != null)
         {
-            var idset = new System.Collections.Generic.HashSet<int>(ids);
+            var idset = new System.Collections.Generic.HashSet<(bool isImage, int id)>(ids);
             live = MainMap.Markers.OfType<IEditableMarker>()
-                .Where(m => m != null && !m.IsDisposed && idset.Contains(m.Id)).ToList();
+                .Where(m => m != null && !m.IsDisposed && idset.Contains((m is GMapSymbols.GMapImageMarker, m.Id))).ToList();   // 타입인지 — 같은 Id 반대타입 미포함
         }
         _groupSelection?.SetSelection(live != null && live.Count > 0 ? live : null);
         NotifyOfPropertyChange(nameof(SelectedMarkers));
