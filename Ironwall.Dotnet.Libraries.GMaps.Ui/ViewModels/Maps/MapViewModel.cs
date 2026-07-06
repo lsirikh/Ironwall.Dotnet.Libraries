@@ -2329,20 +2329,12 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 마커 편집 시작 이벤트 핸들러
     /// </summary>
-    // 이미지 어도너 편집 전 지리 bounds/회전 스냅샷 — undo를 줌 불변 bounds로 기록(Bug B).
-    private GMap.NET.RectLatLng _editStartImageBounds;
-    private double _editStartImageBearing;
-
     private void OnMarkerEditStarted(object? sender, MarkerEditStartedEventArgs e)
     {
         _log?.Info($"마커 편집 시작: {e.Marker.Title}, 핸들: {e.Handle}");
 
         // UI 상태 업데이트
         IsMarkerEditing = true;
-
-        // 이미지는 편집 시작 시 지리 bounds/회전 캡처(완료 시 RecordImageTransform의 before로 사용 — 줌 불변)
-        if (e.Marker is GMapSymbols.GMapImageMarker img)
-        { _editStartImageBounds = img.ImageBounds; _editStartImageBearing = img.Bearing; }
     }
 
     /// <summary>
@@ -2355,11 +2347,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
         if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 마커 편집 영속 차단(백스톱)"); return; }
         await DbUpdateProcess(e.Marker);
-        // 이미지는 픽셀 w/h(줌 의존) 대신 지리 bounds(줌 불변)로 undo 기록 → 줌 바뀐 뒤 undo 크기 어긋남 방지(Bug B).
-        if (e.Marker is GMapSymbols.GMapImageMarker imgDone)
-            _editRecorder?.RecordImageTransform(imgDone, _editStartImageBounds, _editStartImageBearing, imgDone.ImageBounds, imgDone.Bearing);
-        else
-            _editRecorder?.RecordTransform(e);   // Undo 기록(이동/크기/회전) — 심볼
+        _editRecorder?.RecordTransform(e);   // Undo 기록(이동/크기/회전)
 
         // UI 상태 업데이트
         IsMarkerEditing = false;

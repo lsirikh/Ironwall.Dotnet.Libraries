@@ -53,20 +53,6 @@ public sealed class EditRecorder : IEditRecorder
         catch (Exception ex) { _log?.Error($"RecordTransform 실패: {ex.Message}"); }
     }
 
-    public void RecordImageTransform(IEditableMarker marker, GMap.NET.RectLatLng beforeBounds, double beforeBearing,
-                                     GMap.NET.RectLatLng afterBounds, double afterBearing)
-    {
-        if (!Ready || marker == null) return;
-        ResetCoalesce();
-        if (beforeBounds.Equals(afterBounds) && beforeBearing == afterBearing) return;   // 변화 없음 스킵
-        try
-        {
-            _undo.Push(new ImageTransformCommand(Context!, marker.Id,
-                (beforeBounds, beforeBearing), (afterBounds, afterBearing)));
-        }
-        catch (Exception ex) { _log?.Error($"RecordImageTransform 실패: {ex.Message}"); }
-    }
-
     public void RecordPropertyChange(IEditableMarker marker, string property, object? oldValue, object? newValue)
     {
         if (!Ready || marker == null || string.IsNullOrEmpty(property)) return;

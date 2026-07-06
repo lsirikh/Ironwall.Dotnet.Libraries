@@ -935,20 +935,8 @@ public class GMapCustomControl : GMapControl
             if (_rubberStart.HasValue && _rubberCurrent.HasValue)
             {
                 var rect = new Rect(_rubberStart.Value, _rubberCurrent.Value);
-                if (rect.Width >= 3 && rect.Height >= 3)   // 최소 드래그(오클릭 방지) = 영역 선택
+                if (rect.Width >= 3 && rect.Height >= 3)   // 최소 드래그(오클릭 방지)
                     hits = GetMarkersInRect(rect);
-                else
-                {
-                    // Shift+클릭(드래그 아님)이 마커/오버레이이미지 위면 = Ctrl+클릭처럼 개별 토글(추가/제거).
-                    // 러버밴드는 Shift+드래그로 유지. (사용자 신고: Shift로 멀티셀렉 포함이 안 되던 문제)
-                    var clicked = GetMarkerAtScreen(_rubberCurrent.Value);
-                    if (clicked != null)
-                    {
-                        _rubberStart = null; _rubberCurrent = null; HideRubberBand();
-                        MarkerToggleRequested?.Invoke(clicked);
-                        return;
-                    }
-                }
             }
             _rubberStart = null; _rubberCurrent = null;
             HideRubberBand();   // 마퀴 어도너 제거
