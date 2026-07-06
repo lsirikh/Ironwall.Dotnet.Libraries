@@ -45,9 +45,16 @@
             </DataGrid>
         </Border>
 
-        <!-- 빈 상태 -->
-        <TextBlock Grid.Row="1" Text="저장된 템플릿이 없습니다." HorizontalAlignment="Center" VerticalAlignment="Center"
+        <!-- 빈 상태 / 연결 실패 -->
+        <TextBlock Grid.Row="1" Text="{Binding EmptyStateText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
                    Foreground="{DynamicResource TextMutedBrush}"
                    Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+        <!-- 로딩 스피너 — 새로고침 중(IsBusy) DataGrid 위 중앙. 목록 탭과 동일 패턴 -->
+        <ProgressBar Grid.Row="1" Style="{DynamicResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
+                     Width="44" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Foreground="{DynamicResource PrimaryBrush}"
+                     Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
     </Grid>
 </UserControl>

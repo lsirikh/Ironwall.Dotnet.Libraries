@@ -40,7 +40,15 @@ public class ReportTemplateViewModel : BasePanelViewModel
             var res = await _api.GetTemplatesAsync(1, 100);
             Items.Clear();
             if (res.Success && res.Data != null)
+            {
                 foreach (var t in res.Data) Items.Add(t);
+                LoadError = null;
+            }
+            else
+            {
+                _log?.Warning($"[ReportTemplate] 조회 실패: {res.Message}");
+                LoadError = "서버에 연결하지 못했습니다. 잠시 후 [새로고침]을 눌러 다시 시도하세요.";
+            }
             NotifyOfPropertyChange(nameof(IsEmpty));
         }
         catch (Exception ex) { _log?.Error($"[ReportTemplate] Load: {ex.Message}"); }
@@ -102,6 +110,11 @@ public class ReportTemplateViewModel : BasePanelViewModel
     #region - Properties -
     public ObservableCollection<ReportTemplateDto> Items { get; } = new();
     public bool IsEmpty => Items.Count == 0 && !IsBusy;
+
+    private string? _loadError;
+    /// <summary>조회 실패 사유(연결 실패 등) — 빈 목록을 "템플릿 없음"과 구분해 안내(목록 탭과 동일 패턴).</summary>
+    public string? LoadError { get => _loadError; set { _loadError = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(EmptyStateText)); } }
+    public string EmptyStateText => LoadError ?? "저장된 템플릿이 없습니다.";
 
     private ReportTemplateDto? _selectedItem;
     public ReportTemplateDto? SelectedItem { get => _selectedItem; set { _selectedItem = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(CanDelete)); NotifyOfPropertyChange(nameof(CanEdit)); } }
