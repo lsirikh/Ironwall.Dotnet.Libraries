@@ -107,6 +107,18 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         DependencyProperty.Register(nameof(IsMultiSelectActive), typeof(bool), typeof(GMapMarkerImageControl),
             new PropertyMetadata(false));
 
+    /// <summary>레이어 가시성 — false면 OnRender가 그리기 스킵. Marker.IsVisible 바인딩(레이어 체크박스·undo·줌게이트 공통).
+    /// 기본 true(로드 시 Marker.IsVisible=DB 가시성으로 즉시 갱신). 이미지 컨트롤이 가시성 플래그를 무시하던 버그 수정.</summary>
+    public bool IsMarkerVisible
+    {
+        get => (bool)GetValue(IsMarkerVisibleProperty);
+        set => SetValue(IsMarkerVisibleProperty, value);
+    }
+
+    public static readonly DependencyProperty IsMarkerVisibleProperty =
+        DependencyProperty.Register(nameof(IsMarkerVisible), typeof(bool), typeof(GMapMarkerImageControl),
+            new PropertyMetadata(true, OnImageOpacityChanged));   // 변경 시 InvalidateVisual(재렌더) 재사용
+
     private static void OnImageOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is GMapMarkerImageControl control)
@@ -195,6 +207,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         // Image 전용 바인딩
         SetupPropertyBinding(ImageOpacityProperty, nameof(Marker.Opacity));
         SetupPropertyBinding(IsLockedProperty, nameof(Marker.IsLocked));   // 잠금 → 호버 하이라이트 억제(스타일 MultiTrigger)
+        SetupPropertyBinding(IsMarkerVisibleProperty, nameof(Marker.IsVisible));   // 레이어 체크/undo/줌 가시성 → OnRender 스킵
 
         // ImageSource는 직접 바인딩 (읽기 전용)
         var imageSourceBinding = new Binding(nameof(Marker.ImageSource))
@@ -237,6 +250,7 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         base.OnRender(dc);
 
         if (Marker == null || ImageSource == null) return;
+        if (!IsMarkerVisible) return;   // 레이어 체크 OFF/undo/줌게이트 → 이미지 숨김(이전엔 플래그 무시로 항상 그려짐)
 
         var mapControl = FindParentMapControl();
         if (mapControl == null) return;
