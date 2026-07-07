@@ -266,7 +266,7 @@
 										Margin="-5"
 										HorizontalAlignment="Center"
 										VerticalAlignment="Center"
-										Source="{Binding Image, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
+										Source="{Binding Image, Mode=OneWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
 										Stretch="Uniform">
 										<Image.ToolTip>
 											<ToolTip Placement="Bottom">

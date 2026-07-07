@@ -34,6 +34,9 @@ public sealed class ImageConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        throw new NotSupportedException();
+        // ⚠ 크래시 근본수정: 이미지 로드 실패 시 Image.OnSourceFailed → WPF가 바인딩 되쓰기 시도 → 여기 호출.
+        //   기존 throw NotSupportedException 은 미처리 예외로 앱을 죽였다(원격 photo_url 로드 실패 등).
+        //   단방향 표시 전용 컨버터이므로 되쓰기를 무시(Binding.DoNothing)해 크래시를 원천 차단한다.
+        return Binding.DoNothing;
     }
 }

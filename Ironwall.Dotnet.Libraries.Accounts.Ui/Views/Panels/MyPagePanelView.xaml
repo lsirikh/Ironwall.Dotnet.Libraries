@@ -78,7 +78,7 @@
 								Grid.Row="0"
 								Width="120"
 								Height="120"
-								Source="{Binding ViewModel.Image, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
+								Source="{Binding ViewModel.Image, Mode=OneWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
 								Stretch="Uniform"
 								ToolTip="{Binding ViewModel.Image}" />
 
