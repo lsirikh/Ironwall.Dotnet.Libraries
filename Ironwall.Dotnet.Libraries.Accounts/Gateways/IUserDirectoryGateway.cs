@@ -26,4 +26,8 @@ public interface IUserDirectoryGateway
 
     /// <summary>관리자 강제 비밀번호 초기화(현재 비밀번호 검증 없음).</summary>
     Task<IAccountModel?> ResetAccountPasswordAsync(IAccountModel acc, string newPassword, CancellationToken ct = default);
+
+    /// <summary>계정 잠금 해제(ADMIN). Api=POST /users/{id}/unlock, Db=미지원(no-op false). 성공 여부 반환.</summary>
+    Task<bool> UnlockAccountAsync(int id, CancellationToken ct = default)
+        => Task.FromResult(false);
 }

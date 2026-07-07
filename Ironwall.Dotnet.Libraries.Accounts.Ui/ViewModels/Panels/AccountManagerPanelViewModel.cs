@@ -1,7 +1,10 @@
 using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
+using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Providers;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs;
+using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -20,6 +23,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 ****************************************************************************/
 public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountViewModel>
                                           , IHandle<CallDeleteAccountAdminProcessMessageModel>
+                                          , IHandle<CallUnlockAccountMessageModel>
                                           , IHandle<RefreshAccountsMessageModel>
 {
     #region - Ctors -
@@ -35,6 +39,25 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
         _editorDialogViewModel = editorDialogViewModel;
         _accountProvider = accountProvider;
         _gateway = gateway;
+    }
+
+    /// <summary>권한 서비스 optional 해석(Events/GMaps 패턴) — 미등록/일시실패 시 재시도 허용(영구 null캐시 방지). FR-05.</summary>
+    private IPermissionService? _permissionService;
+    private bool _permissionResolved;
+    private IPermissionService? ResolvePermissionService()
+    {
+        if (_permissionResolved) return _permissionService;
+        try
+        {
+            _permissionService = IoC.Get<IPermissionService>();
+            _permissionResolved = _permissionService != null;
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[AccountManager] PermissionService 미해석(전체허용 폴백): {ex.Message}");
+            _permissionService = null;
+        }
+        return _permissionService;
     }
     #endregion
     #region - Overrides -
@@ -177,6 +200,26 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
         _editorDialogViewModel.ViewModel.Insert(SelectedItem.Model);
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenEditAccountDialogMessageModel());
     }
+
+    /// <summary>계정 잠금 해제 클릭 — 즉시 실행 않고 Confirm. Yes 시 CallUnlockAccountMessageModel 발행(FR-02).</summary>
+    public async Task OnClickUnlock(AccountViewModel account)
+    {
+        if (account is null || !account.IsLocked) return;
+        // FR-05 백스톱: users:control 없으면 서버 호출 전 안내(콘솔은 IsAdmin 진입이 1차 게이팅, 서버가 최종 403 집행).
+        //   ADMIN 대상 계정 해제는 base-ADMIN 전용(NOTIFY §4) — 비ADMIN이면 서버가 403, 아래 HandleAsync가 안내.
+        if (!PermissionUiPolicy.Allowed(ResolvePermissionService(), "users", EnumPermissionVerb.Control))
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "계정 잠금 해제", Explain = "계정 잠금 해제 권한이 없습니다." });
+            return;
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "계정 잠금 해제",
+            Explain = $"'{account.Username}' 계정의 잠금을 해제하시겠습니까?",
+            MessageModel = new CallUnlockAccountMessageModel { Account = account }
+        });
+    }
     #endregion
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteAccountAdminProcessMessageModel message, CancellationToken cancellationToken)
@@ -231,6 +274,42 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사용자 삭제", Explain = explain });
     }
 
+    /// <summary>Confirm→Yes 후 실제 잠금 해제 — POST /users/{id}/unlock + 목록 갱신. 팝업은 finally 청산(FR-02).</summary>
+    public async Task HandleAsync(CallUnlockAccountMessageModel message, CancellationToken cancellationToken)
+    {
+        var account = message.Account;
+        if (account is null) return;
+        // (INV-4) Confirm ClickOk은 self-close 안 함 → 진입 청산 + Progress는 finally 청산(삭제 핸들러 동형).
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        string explain;
+        try
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+            var ok = await _gateway.UnlockAccountAsync(account.Model.Id, cancellationToken);
+            if (ok)
+            {
+                // 목록 재조회로 IsLocked 갱신 반영(NFR-03)
+                var fetched = await _gateway.GetAllAccountsAsync(cancellationToken);
+                if (fetched != null)
+                {
+                    _accountProvider.Clear();
+                    fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc));
+                    await DataInitialize(cancellationToken).ConfigureAwait(false);
+                }
+                explain = $"'{account.Username}' 계정의 잠금을 해제했습니다.";
+            }
+            else   // 403(권한/ADMIN 대상) 또는 네트워크 실패 — 서버가 최종 집행
+                explain = "잠금 해제에 실패했습니다. 권한(ADMIN)·서버 상태를 확인하세요.";
+        }
+        catch (OperationCanceledException) { _log?.Warning("잠금 해제 취소/타임아웃"); explain = "잠금 해제가 취소되었습니다."; }
+        catch (Exception ex) { _log?.Error($"[AccountManager] 잠금 해제 실패: {ex.Message}"); explain = "잠금 해제 중 오류가 발생했습니다."; }
+        finally
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());   // Progress 항상 청산
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "계정 잠금 해제", Explain = explain });
+    }
+
     public async Task HandleAsync(RefreshAccountsMessageModel message, CancellationToken cancellationToken)
         => await DataInitialize(cancellationToken).ConfigureAwait(false);
     #endregion
@@ -242,4 +321,10 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
     private readonly AccountProvider _accountProvider;
     private readonly IUserDirectoryGateway _gateway;
     #endregion
+}
+
+/// <summary>계정 잠금 해제 확인 트리거 — Confirm 다이얼로그 Yes 시 발행되어 HandleAsync가 실제 unlock 수행(FR-02).</summary>
+public class CallUnlockAccountMessageModel : IMessageModel
+{
+    public AccountViewModel Account { get; set; } = default!;
 }

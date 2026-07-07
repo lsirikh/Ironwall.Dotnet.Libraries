@@ -31,6 +31,8 @@ public class AccountModel : IAccountModel
     public string? Position { get; set; }                        //12
     public string? Department { get; set; }                    //13
     public string? Company { get; set; }                      //14
+    public bool IsLocked { get; set; }                         //15 계정 잠금(서버 is_locked)
+    public string? LockReason { get; set; }                    //16 잠금 사유(서버 lock_reason)
     #endregion
 
 
@@ -66,6 +68,8 @@ public class AccountModel : IAccountModel
         Position = model.Position;
         Department = model.Department;
         Company = model.Company;
+        IsLocked = model.IsLocked;
+        LockReason = model.LockReason;
     }
 
 
@@ -92,5 +96,7 @@ public class AccountModel : IAccountModel
         Position = null;
         Department = null;
         Company = null;
+        IsLocked = false;
+        LockReason = null;
     }
 }

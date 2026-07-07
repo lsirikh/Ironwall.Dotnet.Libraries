@@ -216,5 +216,27 @@ public class AccountViewModel : BaseCustomViewModel<IAccountModel>
             NotifyOfPropertyChange(() => Company);
         }
     }
+
+    /// <summary>계정 잠금 상태(서버 is_locked) — 목록 🔒 표시·잠금해제 버튼 가시성 바인딩. 표시 전용(읽기).</summary>
+    public bool IsLocked
+    {
+        get => Model.IsLocked;
+        set
+        {
+            Model.IsLocked = value;
+            NotifyOfPropertyChange(() => IsLocked);
+        }
+    }
+
+    /// <summary>잠금 사유(서버 lock_reason) — 툴팁 표시용. 표시 전용(읽기).</summary>
+    public string? LockReason
+    {
+        get => Model.LockReason;
+        set
+        {
+            Model.LockReason = value;
+            NotifyOfPropertyChange(() => LockReason);
+        }
+    }
     #endregion
 }

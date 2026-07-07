@@ -26,6 +26,8 @@ public static class AccountDtoMapper
         Role  = RoleMappingHelper.ParseRole(d.Role),     // GOP 5단계 전체 보존(구분 표시/편집)
         Image = d.PhotoUrl,                              // 서버 photo_url 표시(URL 형태)
         Used = d.IsActive ? EnumUsedType.USED : EnumUsedType.NOT_USED,
+        IsLocked = d.IsLocked,                           // 잠금 상태 표시·해제 게이팅용(계정 목록)
+        LockReason = d.LockReason,                       // 잠금 사유(툴팁)
     };
 
     /// <summary>AccountModel → POST /users 본문. role 은 Level(2단계)→5단계 매핑(ToRole).</summary>

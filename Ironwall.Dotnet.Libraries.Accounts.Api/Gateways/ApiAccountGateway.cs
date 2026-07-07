@@ -146,6 +146,13 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success ? acc : null;   // 서버 {success:true}(user 본문 없음) → 입력 모델 에코
     }
 
+    /// <summary>계정 잠금 해제 — POST /users/{id}/unlock. 서버 {success:true} → true. 403(권한)/실패=false.</summary>
+    public async Task<bool> UnlockAccountAsync(int id, CancellationToken ct = default)
+    {
+        var res = await _api.UnlockUserAsync(id, ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
     // ──────────────── IProfileGateway (FR-17) ────────────────
 
     /// <summary>GET /users/me = 토큰 소유자(본인). accountId 는 정보용(서버는 토큰 기준).</summary>

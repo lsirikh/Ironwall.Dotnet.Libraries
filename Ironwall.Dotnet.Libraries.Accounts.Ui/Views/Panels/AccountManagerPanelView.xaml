@@ -465,6 +465,42 @@
 							</DataGridTextColumn.ElementStyle>
 						</DataGridTextColumn>
 
+						<!--  잠금 (FR-01/02) — is_locked 계정만 🔒 + 잠금해제 버튼  -->
+						<DataGridTemplateColumn
+							Width="90"
+							Header="잠금"
+							IsReadOnly="True">
+							<DataGridTemplateColumn.HeaderStyle>
+								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+									<Setter Property="HorizontalAlignment" Value="Center" />
+								</Style>
+							</DataGridTemplateColumn.HeaderStyle>
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Orientation="Horizontal"
+										Visibility="{Binding IsLocked, Converter={StaticResource BooleanToVisibilityConverter}}">
+										<md:PackIcon
+											Width="18"
+											Height="18"
+											VerticalAlignment="Center"
+											Foreground="#E53935"
+											Kind="LockOutline"
+											ToolTip="{Binding LockReason}" />
+										<Button
+											Margin="4,0,0,0"
+											VerticalAlignment="Center"
+											Content="해제"
+											ToolTip="계정 잠금 해제">
+											<cal:Message.Attach>[Event Click] = [Action OnClickUnlock($dataContext)]</cal:Message.Attach>
+										</Button>
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
 					</DataGrid.Columns>
 				</DataGrid>
 				<StackPanel

@@ -218,6 +218,17 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    // POST /users/{id}/unlock — 계정 잠금 해제(ADMIN). 서버 권한: users:control(ADMIN 대상은 base-ADMIN). 실패=403/네트워크.
+    public async Task<ApiResponse<object>> UnlockUserAsync(int id, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.PostRequestAsync($"users/{id}/unlock", new { }).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<object>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiResponse<AuthUserDto>> GetMyProfileAsync(CancellationToken ct = default)
     {
         try

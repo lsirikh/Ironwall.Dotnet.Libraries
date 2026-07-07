@@ -33,6 +33,9 @@ public interface IAccountApiService
     Task<ApiResponse<object>> DeleteUserAsync(int id, CancellationToken ct = default);
     /// <summary>POST /api/users/{id}/reset-password — {new_password}, 응답 {success:true}(C-3).</summary>
     Task<ApiResponse<object>> ResetUserPasswordAsync(int id, string newPassword, CancellationToken ct = default);
+    /// <summary>POST /api/users/{id}/unlock — 계정 잠금 해제(ADMIN, users:control). 응답 {success:true}. default=미구현(하위호환).</summary>
+    Task<ApiResponse<object>> UnlockUserAsync(int id, CancellationToken ct = default)
+        => throw new NotImplementedException();
 
     // ── 본인 프로필 (FR-17) ──
     /// <summary>GET /api/users/me — 본인 프로필(envelope, A-4). permissions 미포함.</summary>

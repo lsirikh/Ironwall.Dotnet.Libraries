@@ -63,4 +63,26 @@ public class AccountMappingTests
         Assert.Equal(EnumLevelType.USER, m.Level);      // 비ADMIN → USER level
         Assert.Equal(EnumUsedType.NOT_USED, m.Used);
     }
+
+    [Fact]
+    public void should_map_islocked_when_dto_locked()
+    {
+        // FR-03: 잠금 상태·사유가 목록 표시용으로 모델에 전달되어야 함
+        var dto = new AuthUserDto { LoginId = "u", Role = "USER", IsActive = true, IsLocked = true, LockReason = "Too many failed login attempts" };
+
+        var m = AccountDtoMapper.ToAccountModel(dto);
+
+        Assert.True(m.IsLocked);
+        Assert.Equal("Too many failed login attempts", m.LockReason);
+    }
+
+    [Fact]
+    public void should_map_unlocked_when_dto_not_locked()
+    {
+        var dto = new AuthUserDto { LoginId = "u", Role = "USER", IsActive = true, IsLocked = false };
+
+        var m = AccountDtoMapper.ToAccountModel(dto);
+
+        Assert.False(m.IsLocked);
+    }
 }

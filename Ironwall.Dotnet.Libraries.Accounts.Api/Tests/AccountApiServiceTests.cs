@@ -83,19 +83,45 @@ public class AccountApiServiceTests
         Assert.Null(await svc.GetMeAsync());
     }
 
+    [Fact]
+    public async Task should_post_unlock_endpoint_when_unlock_called()
+    {
+        // FR-04: POST users/{id}/unlock 경로로 요청 + 200 {success:true} → Success (TEST-02)
+        var fake = new FakeApiService(HttpStatusCode.OK, @"{""success"":true}");
+        var svc = new AccountApiService(fake);
+
+        var res = await svc.UnlockUserAsync(42);
+
+        Assert.True(res.Success);
+        Assert.Equal("users/42/unlock", fake.LastEndpoint);
+    }
+
+    [Fact]
+    public async Task should_return_error_when_unlock_forbidden()
+    {
+        // 403(권한/ADMIN 대상)은 Success=false 로 승격 → VM이 안내(NFR-02)
+        var svc = new AccountApiService(new FakeApiService(HttpStatusCode.Forbidden,
+            @"{""success"":false,""error"":{""code"":""FORBIDDEN"",""message"":""Only ADMIN role can modify an ADMIN account""}}"));
+
+        var res = await svc.UnlockUserAsync(1);
+
+        Assert.False(res.Success);
+    }
+
     /// <summary>설정된 상태/본문을 모든 호출에 그대로 반환하는 IApiService 더미.</summary>
     private sealed class FakeApiService : IApiService
     {
         private readonly HttpStatusCode _status;
         private readonly string _json;
         public FakeApiService(HttpStatusCode status, string json) { _status = status; _json = json; }
+        public string? LastEndpoint { get; private set; }
 
         private HttpResponseMessage Make() => new(_status)
         {
             Content = new StringContent(_json, Encoding.UTF8, "application/json")
         };
 
-        public Task<HttpResponseMessage> PostRequestAsync<T>(string endpoint, T body) => Task.FromResult(Make());
+        public Task<HttpResponseMessage> PostRequestAsync<T>(string endpoint, T body) { LastEndpoint = endpoint; return Task.FromResult(Make()); }
         public Task<HttpResponseMessage> GetRequestAsync(string endpoint, Dictionary<string, string>? parameters = null) => Task.FromResult(Make());
 
         public Task<HttpResponseMessage> DeleteRequestAsync(string endpoint) => throw new NotImplementedException();
