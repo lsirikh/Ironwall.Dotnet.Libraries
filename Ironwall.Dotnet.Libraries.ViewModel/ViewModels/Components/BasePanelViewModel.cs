@@ -37,6 +37,7 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
     {
         try
         {
+            _isTearingDown = false;   // (INV-15) 재활성 시 teardown 가드 해제
             base.OnActivateAsync(cancellationToken);
             _log?.Info($"######### {_className} OnActivate!! #########");
             _eventAggregator?.SubscribeOnUIThread(this);
@@ -52,6 +53,7 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
 
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
+        _isTearingDown = true;   // (INV-15) in-flight CRUD 오퍼레이션이 teardown 이후 진입하지 못하게 차단
         try
         {
             base.OnDeactivateAsync(close, cancellationToken);
@@ -60,6 +62,7 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
                 _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;   // (crash B) Dispose 후 null화 — disposed CTS 재접근 ObjectDisposedException 차단
         }
         catch (Exception ex)
         {
@@ -86,6 +89,8 @@ public abstract class BasePanelViewModel : Conductor<IScreen>
     protected IEventAggregator? _eventAggregator;
     protected ILogService? _log;
     protected CancellationTokenSource? _cancellationTokenSource;
+    /// <summary>(INV-15) OnDeactivate 진입 시 true — CRUD 봉투가 teardown 중 새 오퍼레이션 진입을 차단.</summary>
+    protected volatile bool _isTearingDown;
     public const int ACTION_TOKEN_TIMEOUT = 5000;
     public const int PREPARING_TIME_MS = 500;
     #endregion

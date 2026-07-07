@@ -103,14 +103,17 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         try
         {
             var res = await _api.DeleteGrantAsync(grant.Id);
-            // ⚠ ConfirmPopupDialog.ClickOk 은 MessageModel 만 발행하고 팝업을 닫지 않음 → 핸들러가 ClosePopup 발행해야 함
-            //    (B 지적 43ddb62, 그룹삭제 ②와 동형 버그 — 회수 확인팝업도 Yes 후 잔존했음).
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
             if (res.Success) await LoadAllGrantsAsync();
             else await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
             { Title = "권한 회수", Explain = $"회수 실패: {res.Error?.Message ?? res.Message}" });
         }
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 회수 실패: {ex.Message}"); }
+        finally
+        {
+            // (MC-GM-2/INV-4) ConfirmPopupDialog.ClickOk은 MessageModel만 발행·self-close 안 함(그룹삭제 ②와 동형).
+            //   → DeleteGrantAsync throw 시에도 회수 확인팝업 잔존 방지 위해 finally에서 청산.
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+        }
     }
     #endregion
 

@@ -43,14 +43,24 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
         await base.OnActivateAsync(cancellationToken);
         // 최초 진입 시에도 서버에서 계정을 로드한다. 기존엔 _accountProvider(인메모리)에서 복사만 해
         // '갱신' 버튼을 눌러야만 fetch 돼 첫 화면이 비어 보였음.
-        var fetched = await _gateway.GetAllAccountsAsync(cancellationToken).ConfigureAwait(false);
-        if (fetched != null)
+        // (MC-AM-4/INV-9) 활성화 중 서버 예외가 Caliburn 활성화 파이프라인으로 전파되지 않도록 포획.
+        try
         {
-            _accountProvider.Clear();
-            fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
+            var fetched = await _gateway.GetAllAccountsAsync(cancellationToken).ConfigureAwait(false);
+            if (fetched != null)
+            {
+                _accountProvider.Clear();
+                fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
+            }
+            else   // W5: fetch 실패 시 빈 화면 + 무안내 방지
+            {
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "계정 관리", Explain = "계정 목록을 불러오지 못했습니다. 서버 연결을 확인하세요." });
+            }
         }
-        else   // W5: fetch 실패 시 빈 화면 + 무안내 방지
+        catch (Exception ex)
         {
+            _log?.Error($"[AccountManager] 활성화 로드 실패: {ex.Message}");
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
             { Title = "계정 관리", Explain = "계정 목록을 불러오지 못했습니다. 서버 연결을 확인하세요." });
         }
@@ -136,16 +146,26 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
 
     public override async void OnClickReloadButton(object sender, RoutedEventArgs e)
     {
-        var fetched = await _gateway.GetAllAccountsAsync();
-        if (fetched == null)   // W4: 서버 실패 시 기존 목록 보존 + 안내(무조건 Clear 금지)
+        // (MC-AM-4/INV-9) async void — 예외가 escape하면 앱 크래시. GetAllAccountsAsync는 null이 아니라 throw할 수 있음(서버 다운/타임아웃).
+        try
         {
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "갱신", Explain = "계정 목록을 불러오지 못했습니다. 기존 목록을 유지합니다." });
-            return;
+            var fetched = await _gateway.GetAllAccountsAsync();
+            if (fetched == null)   // W4: 서버 실패 시 기존 목록 보존 + 안내(무조건 Clear 금지)
+            {
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "갱신", Explain = "계정 목록을 불러오지 못했습니다. 기존 목록을 유지합니다." });
+                return;
+            }
+            _accountProvider.Clear();
+            fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
+            await DataInitialize().ConfigureAwait(false);
         }
-        _accountProvider.Clear();
-        fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순(Id=SERIAL=created_at순)
-        await DataInitialize().ConfigureAwait(false);
+        catch (Exception ex)
+        {
+            _log?.Error($"[AccountManager] 갱신 실패: {ex.Message}");
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "갱신", Explain = "계정 목록 갱신 중 오류가 발생했습니다. 기존 목록을 유지합니다." });
+        }
     }
 
     public async Task ClickCancel()
@@ -161,6 +181,10 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteAccountAdminProcessMessageModel message, CancellationToken cancellationToken)
     {
+        // (MC-AM-1/INV-4) Confirm 팝업의 ClickOk은 MessageModel만 발행하고 self-close 안 함(시블링 PM:227/Grant:108 동형).
+        //   → 진입 시 Confirm 청산 + Progress는 예외/취소 무관 finally에서 청산. 기존엔 어떤 경로도 Close 없어 팝업 소프트락(HIGH-1).
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        string explain;
         try
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
@@ -185,16 +209,26 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
 
             await DataInitialize(cancellationToken).ConfigureAwait(false);
 
-            var explain = selected == 0 ? "선택된 계정이 없습니다."
-                        : failed.Count == 0 ? $"{deleted}개 계정을 삭제했습니다."
-                        : $"{deleted}/{selected}개 삭제. 실패: {string.Join(", ", failed)} (서버 거부/오류)";
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사용자 삭제", Explain = explain });
+            explain = selected == 0 ? "선택된 계정이 없습니다."
+                    : failed.Count == 0 ? $"{deleted}개 계정을 삭제했습니다."
+                    : $"{deleted}/{selected}개 삭제. 실패: {string.Join(", ", failed)} (서버 거부/오류)";
+        }
+        catch (OperationCanceledException)   // (INV-9) 취소/타임아웃은 오류와 분리
+        {
+            _log?.Warning("계정 삭제 취소/타임아웃");
+            explain = "계정 삭제가 취소되었습니다.";
         }
         catch (Exception ex)
         {
             _log?.Info(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사용자 삭제", Explain = "계정 삭제를 실패하였습니다." });
+            explain = "계정 삭제를 실패하였습니다.";
         }
+        finally
+        {
+            // (MC-AM-1/INV-4) Progress는 예외/취소 무관 항상 청산 — 스피너 영구 잔존 차단.
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사용자 삭제", Explain = explain });
     }
 
     public async Task HandleAsync(RefreshAccountsMessageModel message, CancellationToken cancellationToken)

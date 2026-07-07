@@ -1215,6 +1215,35 @@ public class EventProviderServiceTests
         Assert.True(result);
     }
 
+    // 회귀 방지: 실서버 DELETE는 {success:true, data:null} 반환 → ApiResponse<bool>.Data=false.
+    // 과거 provider가 response.Data를 반환 → 서버 성공을 "삭제 실패"로 오판(조치보고 600건 삭제 버그).
+    // .Success로 판정해야 true. (옛 코드면 이 테스트 실패, 수정본이면 통과)
+    [Fact]
+    public async Task should_return_true_when_server_delete_succeeds_with_null_data()
+    {
+        // Arrange
+        var mockApiService = new Mock<IEventApiService>();
+        var mockLogService = new Mock<ILogService>();
+
+        var apiResponse = new ApiResponse<bool>
+        {
+            Success = true,
+            Data = false   // 서버 data:null → 역직렬화 시 bool 기본값 false
+        };
+
+        mockApiService
+            .Setup(x => x.DeleteActionEventAsync(400, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiResponse);
+
+        var service = new EventProviderService(mockLogService.Object, mockApiService.Object);
+
+        // Act
+        var result = await service.DeleteActionEventAsync(400);
+
+        // Assert
+        Assert.True(result);
+    }
+
     #endregion
 }
 

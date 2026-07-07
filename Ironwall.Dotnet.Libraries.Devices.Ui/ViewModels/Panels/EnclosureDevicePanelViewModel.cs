@@ -66,6 +66,7 @@ public class EnclosureDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Enc
         // (FR-EN-09) 삭제 권한 게이트
         if (!DevicePermissionGate.CanDelete()) { _log?.Warning("[FR-EN-09] 삭제 권한 없음(devices)"); return; }
         if (SelectedItemCount == 0) return;
+        if (IsDeleteBatchExceeded(SelectedItemCount)) return;   // (CRUD 표준) 한 번에 최대 MAX_DELETE_COUNT건 초과 차단
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = "선택한 함체 장비를 정말로 삭제하시겠습니까?",

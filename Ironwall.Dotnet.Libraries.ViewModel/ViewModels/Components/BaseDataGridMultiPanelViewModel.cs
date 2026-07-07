@@ -121,7 +121,8 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
         Func<T, int> getId,
         Func<int, CancellationToken, Task<bool>> deleteApi,
         Action<T> removeLocal,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool suppressNotify = false)   // (INV-5) 봉투 경유 시 true — 통지를 ClosePopup 이후로 미룸(Progress 위 중첩 방지)
     {
         _deleteFailures.Clear();
         foreach (var row in items)
@@ -138,7 +139,8 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
         }
 
         // 부분 삭제 실패 통지(중앙화) — 미통지 시 "삭제했는데 행이 조용히 복귀"가 사용자에게 노출됨
-        if (_deleteFailures.Count > 0)
+        // (INV-5) suppressNotify=true(봉투 경유)면 여기서 발행하지 않고 봉투가 ClosePopup 이후 단일 통지.
+        if (!suppressNotify && _deleteFailures.Count > 0)
         {
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
             {
@@ -146,6 +148,119 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
                 Explain = $"{_deleteFailures.Count}건 삭제에 실패했습니다. 서버에 남아있는 항목은 재조회 시 다시 표시됩니다.\n(Id: {string.Join(", ", _deleteFailures.Take(10))})"
             }, ct);
         }
+    }
+
+    // ───────────────────────── CRUD 표준 오케스트레이션 봉투 (PRD DataGridPanel_CRUD_Standard_Convention) ─────────────────────────
+    /// <summary>process CTS 재생성 — 조건 없이 항상 Dispose 후 new(NRE/ObjectDisposed 방지, INV-3).</summary>
+    protected void RegenerateProcessCts()
+    {
+        try { _pCancellationTokenSource?.Dispose(); } catch { /* 이미 dispose됨 무시 */ }
+        _pCancellationTokenSource = new CancellationTokenSource();
+    }
+
+    /// <summary>
+    /// 모든 CRUD 오퍼레이션(Save/Reload/Delete)이 공유하는 오케스트레이션 봉투.
+    /// 게이트 상호배타(INV-1/2) · linked+timeout CTS(INV-12) · Progress Close-in-finally(INV-4) ·
+    /// 단일 통지-after-close(INV-5) · teardown 가드(INV-15). 호출 스레드: UI.
+    /// </summary>
+    protected async Task RunCrudOperationAsync(CrudOperationSpec spec)
+    {
+        if (_isTearingDown) return;                                             // INV-15
+        if (!await _processGate.WaitAsync(0))                                   // INV-1 재진입 배타
+        {
+            _log?.Warning($"[{_className}] {spec.OperationName} 처리 중 — 중복 진입 차단");
+            return;
+        }
+        spec.SetBusyFlag?.Invoke(true);
+        var outcome = new OperationOutcome();
+        try                                                                     // ── outer
+        {
+            RegenerateProcessCts();                                            // ★envelope가 process-CTS 수명 소유
+            using var timeoutCts = new CancellationTokenSource(spec.Timeout);  // INV-12
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                _pCancellationTokenSource!.Token, spec.CallerToken, timeoutCts.Token); // INV-3 process 토큰 정본
+            if (spec.ShowProgress)
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenProgressPopupMessageModel());   // INV-16 UI 마샬
+            try                                                               // ── inner
+            {
+                outcome = await spec.Work(linked.Token) ?? outcome;
+            }
+            catch (OperationCanceledException) { _log?.Warning($"[{_className}] {spec.OperationName} 취소/타임아웃"); outcome.Canceled = true; }
+            catch (Exception ex) { _log?.Error($"[{_className}] {spec.OperationName} 오류: {ex.Message}"); outcome.Error = ex; }
+            finally
+            {
+                if (spec.ShowProgress)
+                    await _eventAggregator.PublishOnUIThreadAsync(new ClosePopupMessageModel());       // ★INV-4 Close는 inner finally
+            }
+            if (spec.Notify != null) await spec.Notify(outcome);              // INV-5 Close 이후 단일 통지
+        }
+        finally                                                               // ── outer
+        {
+            spec.SetBusyFlag?.Invoke(false);
+            _processGate.Release();                                           // ★INV-2 항상 해제
+        }
+    }
+
+    /// <summary>Delete 특수화 — Progress 모달 + ExecuteDeleteAsync + ClosePopup 이후 단일 통지.</summary>
+    protected Task RunDeleteOperationAsync(
+        IReadOnlyList<T> snapshot,
+        Func<T, int> getId,
+        Func<int, CancellationToken, Task<bool>> deleteApi,
+        Action<T> removeLocal,
+        Func<CancellationToken, Task> fetchAndReinit,   // device=FetchAll+DataInitialize / event=DataInitialize
+        CancellationToken callerToken)
+        => RunCrudOperationAsync(new CrudOperationSpec
+        {
+            OperationName = "삭제",
+            ShowProgress = true,
+            CallerToken = callerToken,
+            Work = async ct =>
+            {
+                await ExecuteDeleteAsync(snapshot, getId, deleteApi, removeLocal, ct, suppressNotify: true);
+                await fetchAndReinit(ct);
+                var failed = _deleteFailures.ToArray();
+                return new OperationOutcome
+                {
+                    FailedIds = failed,
+                    SuccessCount = Math.Max(0, snapshot.Count - failed.Length),
+                };
+            },
+            Notify = NotifyDeleteResultAsync,
+        });
+
+    /// <summary>삭제 결과 통지(Close 이후 1회). 전건 성공=무통지(정책).</summary>
+    protected async Task NotifyDeleteResultAsync(OperationOutcome o)
+    {
+        if (o.Canceled)
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "삭제 시간 초과", Explain = "삭제가 취소되었거나 시간이 초과되었습니다. 목록을 새로고침해 확인하세요." });
+        else if (o.Error != null)
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "삭제 오류", Explain = "삭제 중 오류가 발생했습니다. 로그를 확인하세요." });
+        else if (o.FailedIds.Count > 0)
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "삭제 일부 실패", Explain = $"{o.FailedIds.Count}건 삭제에 실패했습니다. 서버에 남은 항목은 재조회 시 다시 표시됩니다.\n(Id: {string.Join(", ", o.FailedIds.Take(10))})" });
+        // 전건 성공 = 무통지(정책 §11-8)
+    }
+
+    // ───────────────────────── 삭제 개수 상한 가드 (CRUD 표준) ─────────────────────────
+    /// <summary>한 번에 삭제 허용하는 최대 선택 수 — 순차 삭제 시간(봉투 타임아웃)·오삭제·게이트 장기점유 방지. PRD DataGridPanel_CRUD_Standard_Convention.</summary>
+    public const int MAX_DELETE_COUNT = 500;
+
+    /// <summary>
+    /// 삭제 선택 수가 <see cref="MAX_DELETE_COUNT"/>를 초과하면 안내 팝업 발행 후 true 반환(호출부는 즉시 return).
+    /// 각 패널 OnClickDeleteButton에서 Confirm 발행 전에 호출. 호출 스레드: UI(INV-16).
+    /// </summary>
+    protected bool IsDeleteBatchExceeded(int count)
+    {
+        if (count <= MAX_DELETE_COUNT) return false;
+        _log?.Warning($"[{_className}] 삭제 개수 상한 초과: {count} > {MAX_DELETE_COUNT} — 삭제 차단");
+        _ = _eventAggregator?.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+        {
+            Title = "삭제 개수 초과",
+            Explain = $"한 번에 최대 {MAX_DELETE_COUNT}건까지 삭제할 수 있습니다.\n선택을 {MAX_DELETE_COUNT}건 이하로 줄여 다시 시도하세요. (현재 {count}건 선택)"
+        });
+        return true;
     }
 
     // ───────────────────────── Temp-state 통일 공통 루프 (PR-A) ─────────────────────────
@@ -305,3 +420,27 @@ public abstract class BaseDataGridMultiPanelViewModel<T> : BaseDataGridMultiView
 /// Temp-state Create/Update 루프용 경량 API 결과. 패널이 ApiResponse&lt;T&gt;를 이걸로 변환해 베이스에 전달.
 /// </summary>
 public readonly record struct ApiResultLite(bool Success, int StatusCode, string? Details);
+
+/// <summary>CRUD 봉투 결과 — 성공/부분실패/보류/취소/오류를 모두 표현(침묵 무통지 방지).</summary>
+public sealed record OperationOutcome
+{
+    public IReadOnlyList<int> FailedIds { get; init; } = Array.Empty<int>();      // Delete 실패 Id
+    public IReadOnlyList<string> Failures { get; init; } = Array.Empty<string>(); // Save 실패(마스킹됨)
+    public int HeldCount { get; init; }        // Save 보류
+    public bool IncompleteFetch { get; init; } // Save/Reload 서버 스냅샷 불완전
+    public int SuccessCount { get; init; }
+    public bool Canceled { get; set; }         // 봉투가 설정(취소/타임아웃)
+    public Exception? Error { get; set; }       // 봉투가 설정
+}
+
+/// <summary>CRUD 오케스트레이션 봉투 사양 — 오퍼레이션별 가변축을 파라미터/hook으로.</summary>
+public sealed class CrudOperationSpec
+{
+    public required string OperationName { get; init; }
+    public required Func<CancellationToken, Task<OperationOutcome>> Work { get; init; }
+    public bool ShowProgress { get; init; }                          // Delete=true, Save/Reload=false
+    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
+    public CancellationToken CallerToken { get; init; } = default;   // event delete의 EA 토큰
+    public Func<OperationOutcome, Task>? Notify { get; init; }       // Close 이후 1회. null=무통지
+    public Action<bool>? SetBusyFlag { get; init; }                 // IsSaving / ReloadButtonEnable
+}

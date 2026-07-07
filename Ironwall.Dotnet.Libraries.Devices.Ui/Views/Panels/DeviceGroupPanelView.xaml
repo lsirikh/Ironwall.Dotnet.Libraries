@@ -149,6 +149,8 @@
 			Background="Transparent"
 			Margin="10 0"
 			BorderThickness="1"
+			HeadersVisibility="Column"
+			RowHeaderWidth="0"
 			AlternationCount="{Binding Items.Count, RelativeSource={RelativeSource Self}}"
 			AutoGenerateColumns="False"
 			ItemsSource="{Binding ViewModelProvider}"

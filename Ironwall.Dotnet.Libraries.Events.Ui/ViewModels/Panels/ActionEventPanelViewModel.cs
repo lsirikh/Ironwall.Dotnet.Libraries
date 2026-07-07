@@ -116,6 +116,7 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
             return;
         }
         if (SelectedItemCount == 0) return;
+        if (IsDeleteBatchExceeded(SelectedItemCount)) return;   // (CRUD 표준) 한 번에 최대 MAX_DELETE_COUNT건 초과 차단
         _pendingDeleteItems = SelectedItems.ToList();
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
@@ -547,27 +548,17 @@ public class ActionEventPanelViewModel : BaseDataGridMultiPanelViewModel<ActionE
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteActionEventProcessMessageModel message, CancellationToken cancellationToken)
     {
-        // 1. 진행중 UI 표시
-        await _eventAggregator.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
-
-        // 2. 비동기 작업 (UI 스레드와 분리)
-        await Task.Run(async () =>
-        {
-            // CRUD 통일: Id<=0(Draft 미저장)은 로컬만 제거(API 미호출), Id>0만 DELETE + 성공 시 제거
-            await ExecuteDeleteAsync(
-                _pendingDeleteItems,
-                r => r.Model.Id,
-                (id, t) => _providerService.DeleteActionEventAsync(id, t),
-                r => EventProvider.Remove(r.Model),
-                cancellationToken);
-            _pendingDeleteItems = [];
-        }, cancellationToken);
-
-        await DataInitialize().ConfigureAwait(false);
-        UpdateAction?.Invoke(_startDate, _endDate);
-
-        // 4. 진행중 UI 닫기
-        await _eventAggregator.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        // (CRUD 표준 봉투) event delete에 게이트(INV-1)·2단catch(INV-9)·타임아웃(INV-12)·Close-in-finally(INV-4)·
+        //   토큰관통 도입 — 기존 무게이트·무try/catch·무토큰 DataInitialize 결함 일괄 해소.
+        var snapshot = _pendingDeleteItems.ToList();   // (INV-14) OnClickDeleteButton 스냅샷 사용
+        _pendingDeleteItems = [];                       // (M5) 스냅샷 1회성
+        await RunDeleteOperationAsync(
+            snapshot,
+            r => r.Model.Id,
+            (id, ct) => _providerService.DeleteActionEventAsync(id, ct),
+            r => EventProvider.Remove(r.Model),
+            ct => DataInitialize(ct),   // event: DataInitialize가 fetch+재구성+UpdateAction(finally) 담당(fetchAll=null)
+            cancellationToken);
     }
     #endregion
     #region - Properties -

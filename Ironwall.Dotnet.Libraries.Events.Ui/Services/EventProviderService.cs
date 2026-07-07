@@ -547,7 +547,7 @@ public class EventProviderService
             }
 
             _log?.Info($"DeleteDetectionEventAsync() completed for ID {id}");
-            return response.Data;
+            return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
         catch (Exception ex)
         {
@@ -640,7 +640,7 @@ public class EventProviderService
             }
 
             _log?.Info($"DeleteMalfunctionEventAsync() completed for ID {id}");
-            return response.Data;
+            return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
         catch (Exception ex)
         {
@@ -733,7 +733,7 @@ public class EventProviderService
             }
 
             _log?.Info($"DeleteConnectionEventAsync() completed for ID {id}");
-            return response.Data;
+            return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
         catch (Exception ex)
         {
@@ -835,7 +835,7 @@ public class EventProviderService
             }
 
             _log?.Info($"DeleteActionEventAsync() completed for ID {id}");
-            return response.Data;
+            return response.Success;   // 서버 DELETE는 data:null 반환 → .Data(false)가 아닌 .Success로 성공 판정(device 삭제와 동일)
         }
         catch (Exception ex)
         {

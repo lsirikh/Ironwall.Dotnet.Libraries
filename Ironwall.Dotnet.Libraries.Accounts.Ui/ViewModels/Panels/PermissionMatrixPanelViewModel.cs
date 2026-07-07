@@ -222,13 +222,16 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
         try
         {
             var res = await _api.DeleteUserGroupAsync(message.GroupId);
-            // ⚠ ConfirmPopupDialog.ClickOk 은 MessageModel 만 발행하고 팝업을 닫지 않음(디바이스 패널 등은 핸들러가 ClosePopup 발행).
-            //    → 여기서 닫지 않으면 삭제 확인 팝업이 잔존한다(사용자 실측 버그 ②).
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
             if (res.Success) await ReloadAsync(CancellationToken.None);
             else await Info($"삭제 실패: {res.Error?.Message ?? res.Message}");
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 그룹 삭제 실패: {ex.Message}"); }
+        finally
+        {
+            // (MC-PM-4/INV-4) ConfirmPopupDialog.ClickOk은 MessageModel만 발행·self-close 안 함(사용자 실측 버그 ②).
+            //   → 예외/성공 무관 finally에서 청산(DeleteUserGroupAsync throw 시에도 확인팝업 잔존 방지).
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+        }
     }
     #endregion
 
@@ -317,7 +320,12 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
             IsGroupFormOpen = false;
             SetMode(PanelMode.List);
             var res = await _api.GetUserGroupsAsync(ct);
-            _raw = (res.Success && res.Data is not null) ? res.Data : new List<UserGroupDto>();
+            if (!res.Success || res.Data is null)   // (MC-PM-1/INV-13) swap-on-success — 실패 시 Groups.Clear 전 return(기존 목록 보존, 화면 공백 방지)
+            {
+                await Info($"불러오기 실패: {res.Error?.Message ?? res.Message}");
+                return;
+            }
+            _raw = res.Data;
 
             // ⚠ 서버 /users limit 상한=100(le=100). 그룹별 사용자 수 = group_id 소속 계정 수(상시 배정).
             var usersRes = await _api.GetUsersAsync(1, 100, ct);
@@ -354,8 +362,7 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
                     ControlCount = c,
                 });
             }
-            if (!res.Success)
-                await Info($"불러오기 실패: {res.Error?.Message ?? res.Message}");
+            // (MC-PM-1) 실패 통지는 위 swap-on-success 가드로 이동(여기 도달 = 성공).
         }
         catch (Exception ex) { _log?.Error($"[PermGroup] 로드 실패: {ex.Message}"); }
     }
@@ -364,11 +371,15 @@ public class PermissionMatrixPanelViewModel : BasePanelViewModel, IHandle<CallDe
     {
         try
         {
-            Members.Clear();
             var res = await _api.GetUserGroupUsersAsync(_membersGroupId);
-            var members = (res.Success && res.Data is not null) ? res.Data : new List<AuthUserDto>();
+            if (!res.Success || res.Data is null)   // (MC-PM-1/INV-13) 실패 시 Members.Clear 전 return(기존 구성원 보존)
+            {
+                await Info($"구성원 불러오기 실패: {res.Error?.Message ?? res.Message}");
+                return;
+            }
+            var members = res.Data;
+            Members.Clear();
             foreach (var u in members) Members.Add(u);
-            if (!res.Success) await Info($"구성원 불러오기 실패: {res.Error?.Message ?? res.Message}");
 
             // 추가 후보 = 전체 계정 − 현재 구성원
             AddableAccounts.Clear();

@@ -92,43 +92,71 @@ public class MyPagePanelViewModel : BasePanelViewModel
     #region - IHanldes -
     public async Task HandleAsync(CallResetProcessMessageModel message, CancellationToken cancellationToken)
     {
-        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+        // (MC-MP-1/INV-4) Confirm(ClickResetAccount)은 ClickOk이 self-close 안 함 → 진입 청산 + Progress는 finally 청산.
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        string explain;
         try
         {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
             var fetchAcc = await _gateway.GetProfileAsync(ViewModel.Model.Id, cancellationToken);
             if (fetchAcc == null) throw new Exception("변경 전 정보를 불러오는 과정에서 문제가 발생하였습니다.");
             ViewModel.Insert(fetchAcc);
             _log?.Info("초기화 성공");
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = "변경 전 정보를 정상적으로 불러왔습니다." }, cancellationToken);
+            explain = "변경 전 정보를 정상적으로 불러왔습니다.";
+        }
+        catch (OperationCanceledException)   // (INV-9) 취소/타임아웃 분리
+        {
+            _log?.Warning("초기화 취소");
+            explain = "초기화가 취소되었습니다.";
         }
         catch (Exception ex)
         {
             _log?.Error(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = ex.Message }, cancellationToken);
+            explain = ex.Message;
         }
+        finally
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());   // Progress 항상 청산
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = explain });
     }
 
     public async Task HandleAsync(CallEditProcessMessageModel message, CancellationToken cancellationToken)
     {
-        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
+        // (MC-MP-1/INV-4) Confirm(ClickApplyAccount)은 ClickOk이 self-close 안 함 → 진입 청산 + Progress는 finally 청산.
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        string explain;
         try
         {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenProgressPopupMessageModel(), cancellationToken);
             var ret = await _gateway.UpdateProfileAsync(ViewModel.Model, cancellationToken);
             if (ret == null)   // 서버 저장 실패(null)인데 "완료"로 오인 표시하던 버그 — 실패 노출 후 종료
             {
                 _log?.Warning("사용자 정보 변경 실패 — 서버가 저장하지 못함(null)");
-                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "내 정보", Explain = "사용자 정보 변경이 반영되지 않았습니다. 다시 시도해 주세요." }, cancellationToken);
-                return;
+                explain = "사용자 정보 변경이 반영되지 않았습니다. 다시 시도해 주세요.";
             }
-            ViewModel.Insert(ret);   // 서버 에코(저장된 실제 값)로 화면 갱신
-            _log?.Info("사용자 정보 변경작업 성공");
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "내 정보", Explain = "사용자 정보 변경이 정상적으로 완료되었습니다." }, cancellationToken);
+            else
+            {
+                ViewModel.Insert(ret);   // 서버 에코(저장된 실제 값)로 화면 갱신
+                _log?.Info("사용자 정보 변경작업 성공");
+                explain = "사용자 정보 변경이 정상적으로 완료되었습니다.";
+            }
+        }
+        catch (OperationCanceledException)   // (INV-9) 취소/타임아웃 분리
+        {
+            _log?.Warning("사용자 정보 변경 취소");
+            explain = "변경이 취소되었습니다.";
         }
         catch (Exception ex)
         {
             _log?.Info($"변경작업 실패 : {ex.Message}");
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Explain = "사용자 정보 변경이 실패하였습니다." }, cancellationToken);
+            explain = "사용자 정보 변경이 실패하였습니다.";
         }
+        finally
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());   // Progress 항상 청산
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "내 정보", Explain = explain });
     }
     #endregion
     #region - Properties -

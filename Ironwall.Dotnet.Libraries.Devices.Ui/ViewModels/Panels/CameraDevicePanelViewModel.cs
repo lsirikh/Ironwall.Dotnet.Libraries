@@ -76,6 +76,8 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
         // (FR-EN-09) 삭제 권한 게이트
         if (!DevicePermissionGate.CanDelete()) { _log?.Warning("[FR-EN-09] 삭제 권한 없음(devices)"); return; }
         if (SelectedItemCount == 0) return;
+        if (IsDeleteBatchExceeded(SelectedItemCount)) return;   // (CRUD 표준) 한 번에 최대 MAX_DELETE_COUNT건 초과 차단
+        _pendingDeleteItems = SelectedItems.ToList();   // (INV-14) Confirm 시점 pre-snapshot — 응답 지연 중 선택 변경 오삭제 방지
         await _eventAggregator.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Explain = "선택한 카메라 장비를 정말로 삭제하시겠습니까?",
@@ -417,45 +419,22 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     #region - IHanldes -
     public async Task HandleAsync(CallDeleteCameraDeviceProcessMessageModel message, CancellationToken cancellationToken)
     {
-        // (P2-S3) 삭제 _processGate 직렬화 + 베이스 ExecuteDeleteAsync(Id<=0 로컬/Id>0 verify-after-success/부분실패 통지).
-        if (!await _processGate.WaitAsync(0)) return;
-        try
-        {
-            // Progress Popup 표시
-            await _eventAggregator.PublishOnCurrentThreadAsync(
-                new OpenProgressPopupMessageModel(),
-                cancellationToken);
-
-            // 삭제 처리 (UI 스레드와 분리)
-            await Task.Run(async () =>
+        // (CRUD 표준 봉투) 게이트·Progress·타임아웃·재조회·2단catch·Close-in-finally·통지 = base RunDeleteOperationAsync.
+        //   기존 결함 일괄 해소: lifecycle CTS 오용(INV-3)·ClosePopup try본문(INV-4)·catch부재(INV-9)·타임아웃부재(INV-12)·live SelectedItems(INV-14).
+        var snapshot = _pendingDeleteItems ?? SelectedItems.ToList();
+        _pendingDeleteItems = null;                                   // (M5) 스냅샷 1회성
+        await RunDeleteOperationAsync(
+            snapshot,
+            r => r.Model.Id,
+            async (id, ct) => (await _apiService.DeleteCameraAsync(id, ct)).Success,
+            r => _deviceProvider.Remove((ICameraDeviceModel)r.Model),
+            async ct =>
             {
-                await ExecuteDeleteAsync(
-                    SelectedItems.ToList(),
-                    r => r.Model.Id,
-                    async (id, ct) => (await _apiService.DeleteCameraAsync(id, ct)).Success,
-                    r => _deviceProvider.Remove((ICameraDeviceModel)r.Model),
-                    cancellationToken);
-            }, cancellationToken);
-
-            // 취소 토큰 재생성
-            if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
-            {
-                _cancellationTokenSource.Cancel();
-                _cancellationTokenSource.Dispose();
-                _cancellationTokenSource = new CancellationTokenSource();
-            }
-
-            // 재조회
-            await _deviceProviderService.FetchAllDevicesAsync(_cancellationTokenSource!.Token);
-            await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
-            UpdateAction?.Invoke();
-
-            // Progress Popup 닫기
-            await _eventAggregator.PublishOnCurrentThreadAsync(
-                new ClosePopupMessageModel(),
-                cancellationToken);
-        }
-        finally { _processGate.Release(); }
+                await _deviceProviderService.FetchAllDevicesAsync(ct);
+                await DataInitialize(ct);
+                Execute.OnUIThread(() => UpdateAction?.Invoke());
+            },
+            cancellationToken);
     }
     #endregion
     #region - Properties -
@@ -465,5 +444,6 @@ public class CameraDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Camera
     private readonly IDeviceApiService _apiService;
     private readonly CameraDeviceProvider _deviceProvider;
     private readonly IDeviceProviderService _deviceProviderService;
+    private IReadOnlyList<CameraDeviceViewModel>? _pendingDeleteItems;   // (INV-14) Confirm 시점 삭제대상 스냅샷
     #endregion
 }
