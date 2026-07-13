@@ -840,6 +840,12 @@ public class GMapCustomControl : GMapControl
     private bool _isRubberBanding;
     private Point? _rubberStart;
     private Point? _rubberCurrent;
+    // [앵커 그리기] 사이트 고정 영역을 지도에서 드래그로 그리는 모드 — 러버밴드 마퀴 재사용, 릴리스 시 NW/SE 통지. (FR-B3)
+    private bool _rubberForAnchor;
+    /// <summary>앵커(사이트 고정) 영역 그리기 모드 — true면 좌드래그가 러버밴드로 구역을 그린다.</summary>
+    public bool IsAnchorDrawMode { get; set; }
+    /// <summary>앵커 영역 드래그 완료 — (NW, SE) 지리좌표 통지. VM이 구역 입력을 채운다.</summary>
+    public event System.Action<PointLatLng, PointLatLng>? AnchorAreaDrawn;
     private static readonly Pen _rubberPen = CreateDashedPen(Color.FromArgb(210, 0, 170, 255), 1.5d);
     private static readonly Brush _rubberFill = CreateFrozenBrush(Color.FromArgb(40, 0, 170, 255));
     private static Brush CreateFrozenBrush(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
@@ -912,6 +918,20 @@ public class GMapCustomControl : GMapControl
         if (IsHomePlacementMode)
         {
             HomePlacementClicked?.Invoke(geoPos, mousePos);
+            e.Handled = true;
+            return;
+        }
+
+        // [앵커 그리기] 사이트 고정 영역 드래그 시작 — 러버밴드 마퀴 재사용(base 전 가로채기 = 팬 미Armed). (FR-B3)
+        if (IsAnchorDrawMode)
+        {
+            _rubberForAnchor = true;
+            _isRubberBanding = true;
+            _rubberStart = mousePos;
+            _rubberCurrent = mousePos;
+            ShowRubberBand();
+            UpdateRubberBand();
+            CaptureMouse();
             e.Handled = true;
             return;
         }
@@ -1060,6 +1080,29 @@ public class GMapCustomControl : GMapControl
             _isRubberBanding = false;
             if (IsMouseCaptured) ReleaseMouseCapture();
             e.Handled = true;
+
+            // [앵커 그리기] 릴리스 → 사각형 화면좌표를 NW/SE 지리좌표로 변환해 통지(마커선택과 분기). (FR-B3)
+            //   FromLocalToLatLng은 WPF가 e.GetPosition에 RenderTransform.Inverse를 자동 적용하므로 디지털줌(17+)에서도 정확.
+            if (_rubberForAnchor)
+            {
+                _rubberForAnchor = false;
+                HideRubberBand();
+                if (_rubberStart.HasValue && _rubberCurrent.HasValue)
+                {
+                    var ar = new Rect(_rubberStart.Value, _rubberCurrent.Value);   // 두 점의 바운딩박스(정규화)
+                    if (ar.Width >= 4 && ar.Height >= 4)   // 최소 드래그(오클릭 방지)
+                    {
+                        IsAnchorDrawMode = false;                                    // 유효 드래그 → 모드 종료
+                        var nw = FromLocalToLatLng((int)ar.Left, (int)ar.Top);       // 좌상 = 북서(north-west)
+                        var se = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);   // 우하 = 남동(south-east)
+                        AnchorAreaDrawn?.Invoke(nw, se);                             // VM이 채우고 ExitAnchorDrawMode(커서 복원)
+                    }
+                    // 너무 작은 드래그(오클릭)면 모드 유지 → 재시도 또는 ESC 취소
+                }
+                _rubberStart = null; _rubberCurrent = null;
+                return;
+            }
+
             IReadOnlyList<IEditableMarker> hits = System.Array.Empty<IEditableMarker>();
             if (_rubberStart.HasValue && _rubberCurrent.HasValue)
             {

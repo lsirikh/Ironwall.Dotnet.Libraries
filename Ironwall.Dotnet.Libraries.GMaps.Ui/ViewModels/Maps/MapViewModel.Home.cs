@@ -25,6 +25,14 @@ public partial class MapViewModel
         var center = _setupModel?.MapAnchor?.Center;
         if (center == null || HomePosition == null) return;
 
+        // ★ 홈 오염 차단(사용자 사고): 앵커 중심이 (0,0) 또는 CoordinateModel 기본값(37.648425,126.904284) 근방이면
+        //   config binder가 채우지 못한 퇴화/기본 앵커 → 홈을 덮어쓰지 않는다(실제 그린 앵커=사이트 좌표만 허용).
+        if (IsDegenerateOrDefaultCoord(center.Latitude, center.Longitude))
+        {
+            _log?.Warning($"[MapAnchor] 홈 자동세팅 스킵 — 앵커 중심이 퇴화/기본값({center.Latitude:F6},{center.Longitude:F6})");
+            return;
+        }
+
         HomePosition.Position = new CoordinateModel(center.Latitude, center.Longitude, 0.0);
         HomePosition.IsAvailable = true;
         MoveHomeLocationCommand?.RaiseCanExecuteChanged();
@@ -33,6 +41,11 @@ public partial class MapViewModel
 
         await MapSettingsHelper.SaveHomePositionAsync(HomePosition, _log);
     }
+
+    /// <summary>(0,0) 또는 CoordinateModel 기본 위치(37.648425,126.904284) 근방 = 미설정/퇴화 좌표(홈 오염 방어용).</summary>
+    private static bool IsDegenerateOrDefaultCoord(double lat, double lng)
+        => (System.Math.Abs(lat) < 1e-6 && System.Math.Abs(lng) < 1e-6)
+        || (System.Math.Abs(lat - 37.648425) < 1e-3 && System.Math.Abs(lng - 126.904284) < 1e-3);
 
     // ─────────── FR-H2: 홈 "설정" 과녁(크로스헤어) 클릭 (심볼배치 패턴 재사용) ───────────
     private bool _homePlacementSubscribed;

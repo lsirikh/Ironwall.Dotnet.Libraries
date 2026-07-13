@@ -145,6 +145,10 @@ public partial class MapViewModel
     /// <summary>UI 값 → MapAnchorModel 저장·적용(+홈 자동세팅).</summary>
     public RelayCommand SaveMapAnchorCommand => _saveMapAnchorCommand ??= new RelayCommand(_ => SaveMapAnchorFromUi());
 
+    private RelayCommand? _drawAnchorAreaCommand;
+    /// <summary>지도에서 드래그로 앵커 영역 그리기 모드 진입(현재화면 캡처 대체 — 정확·직관).</summary>
+    public RelayCommand DrawAnchorAreaCommand => _drawAnchorAreaCommand ??= new RelayCommand(_ => EnterAnchorDrawMode(), _ => MainMap != null);
+
     private void ToggleMapAnchorPanel()
     {
         if (!IsMapAnchorPanelVisible) LoadAnchorToUi();
@@ -187,6 +191,46 @@ public partial class MapViewModel
         AnchorSeLng = centerLng + halfLng;                 // east(우)
         AnchorMinZoom = (int)Math.Round(Zoom);             // ★ 최소 줌 = 현재 줌 반영 — 이 줌 이하로 축소 차단
         _log?.Info($"[MapAnchor] 현재 화면(보이는 영역, digScale={s:F2})을 구역으로: 중심({centerLat:F6},{centerLng:F6}) NW({AnchorNwLat:F6},{AnchorNwLng:F6}) SE({AnchorSeLat:F6},{AnchorSeLng:F6}) minZoom={AnchorMinZoom}");
+    }
+
+    // ─────────── FR-B3: 지도에서 드래그로 영역 그리기 (러버밴드 재사용) ───────────
+    private bool _anchorDrawSubscribed;
+
+    /// <summary>지도에서 드래그로 영역 그리기 모드 진입 — 드래그한 사각형이 앵커 구역이 된다(캡처보다 정확·직관).</summary>
+    private void EnterAnchorDrawMode()
+    {
+        if (MainMap == null) return;
+        if (!_anchorDrawSubscribed)
+        {
+            MainMap.AnchorAreaDrawn += OnAnchorAreaDrawn;
+            _anchorDrawSubscribed = true;
+        }
+        MainMap.IsAnchorDrawMode = true;
+        System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
+        EnsureAimEscWindowHook();
+        MainMap.Focus();
+        SetAimStatus("지도에서 드래그해 사이트 고정 영역을 그리세요 — (ESC = 취소)");
+    }
+
+    /// <summary>영역 그리기 모드 종료(취소/완료 공통).</summary>
+    private void ExitAnchorDrawMode()
+    {
+        if (MainMap != null) MainMap.IsAnchorDrawMode = false;
+        if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
+            System.Windows.Input.Mouse.OverrideCursor = null;
+        IsAimStatusVisible = false;
+    }
+
+    /// <summary>드래그한 사각형(NW/SE 지리좌표)을 앵커 구역 입력으로 채운다(단발). 최소줌=현재줌.</summary>
+    private void OnAnchorAreaDrawn(PointLatLng nw, PointLatLng se)
+    {
+        ExitAnchorDrawMode();
+        AnchorNwLat = nw.Lat;
+        AnchorNwLng = nw.Lng;
+        AnchorSeLat = se.Lat;
+        AnchorSeLng = se.Lng;
+        AnchorMinZoom = (int)Math.Round(Zoom);
+        _log?.Info($"[MapAnchor] 지도 드래그로 구역 지정: NW({nw.Lat:F6},{nw.Lng:F6}) SE({se.Lat:F6},{se.Lng:F6}) minZoom={AnchorMinZoom}");
     }
 
     /// <summary>UI 값으로 MapAnchorModel 구성 → 저장·즉시 적용(+활성 시 홈=중심).</summary>

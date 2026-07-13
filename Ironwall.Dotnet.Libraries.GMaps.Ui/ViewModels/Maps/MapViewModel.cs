@@ -842,6 +842,12 @@ public partial class MapViewModel : BasePanelViewModel,
             SetAimStatus("홈 설정을 취소했습니다.", autoHide: true);
             e.Handled = true;
         }
+        else if (MainMap?.IsAnchorDrawMode ?? false)   // 앵커 영역 그리기 ESC 취소 (FR-B3)
+        {
+            ExitAnchorDrawMode();
+            SetAimStatus("영역 그리기를 취소했습니다.", autoHide: true);
+            e.Handled = true;
+        }
     }
 
     /// <summary>타겟 모드 상태 안내(상단 배너 + 로그). autoHide=true면 2.5초 후 숨김(세대 유지 시).</summary>
