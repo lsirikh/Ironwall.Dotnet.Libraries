@@ -59,36 +59,17 @@ public class EditorDialogViewModel : BasePanelViewModel
     ///   누락돼 사진 버튼이 무반응이던 버그 수정(사용자 실측). Register 패턴과 동일.</summary>
     public async Task ClickAddPicture()
     {
-        var dlg = new OpenFileDialog
+        // ⚠ [데이터 무결성 사고 차단] EditorDialog 는 '관리자가 타 계정을 편집'하는 다이얼로그다.
+        //   기존엔 _profileGateway.UploadPhotoAsync(파일)이 서버 POST /users/me/photo(=토큰 소유자=로그인 관리자 '본인')를
+        //   호출해, m_manager 편집 중 사진을 올리면 '관리자 자신(admin)'의 사진이 오염됐다(admin↔m_manager 동일 사진 사고).
+        //   서버에 관리자용 POST /users/{id}/photo 가 없어 '대상 계정' 업로드가 불가하다(REQ_Server_Admin_Photo_Upload).
+        //   → 서버 엔드포인트 배포 전까지 EditorDialog 사진 변경은 차단한다. 본인 사진은 마이페이지(POST /me/photo)에서.
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
         {
-            Filter = "Images|*.bmp;*.jpg;*.gif;*.png;*.tiff|All files|*.*",
-            Title = "이미지 선택",
-            RestoreDirectory = true
-        };
-        if (dlg.ShowDialog() != true) return;
-
-        var ct = _cancellationTokenSource?.Token ?? CancellationToken.None;
-        try
-        {
-            var key = $"{DateTime.Now:yyyyMMddHHmmssfff}";
-            var saved = await _profileImage.SaveAsync(dlg.FileName, key, ct);   // 검증(확장자/크기)+로컬 복사(즉시표시/DB모드)
-            ViewModel.Image = Path.GetFileName(saved);
-
-            // API 모드: 원본을 서버에 업로드 → photo_url(절대 URL)로 영속·표시(타 클라 이미지 깨짐 방지, W1).
-            //   DB 모드는 null 반환이라 로컬 파일명 유지. MyPagePanelViewModel과 동일 — Register(로컬만) 패턴은 API모드서 오답이었음.
-            var url = await _profileGateway.UploadPhotoAsync(dlg.FileName, ct);
-            if (!string.IsNullOrEmpty(url)) ViewModel.Image = url;
-        }
-        catch (ArgumentException ex)   // 검증 실패(확장자/크기)
-        {
-            _log?.Warning(ex.Message);
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = ex.Message });
-        }
-        catch (Exception ex)           // 업로드 IO/네트워크 실패 — 크래시 방지(Caliburn 액션 예외 전파 차단)
-        {
-            _log?.Error($"[Editor] 사진 처리 실패: {ex.Message}");
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = "사진 처리에 실패했습니다." });
-        }
+            Title = "사진 변경 안내",
+            Explain = "다른 계정의 사진 변경은 현재 서버에서 지원되지 않습니다.\n" +
+                      "본인 사진은 '마이페이지'에서 변경하세요. (관리자용 타 계정 업로드 API 준비 중)"
+        });
     }
     #endregion
     #region - IHanldes -
