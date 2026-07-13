@@ -16,6 +16,11 @@
 
 ### Added
 - **통합웹 접속 트리거 메시지 `CallWebApiProcessMessageModel`** ([PRD](docs/prds/LeftMenu_IntegratedWeb_Button-prd.md) · [Plan](docs/plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) · ViewModel.Models/CommonMessages.cs) — LeftMenu "통합웹" 버튼의 확인 팝업 '확인' 시 발행되어, 크롬 앱 모드로 통합 웹 대시보드(`http://{웹서버IP}:{포트}`)를 여는 트리거(`IMessageModel` 마커 타입). 순수 추가(기존 타입 무변경). 소비측=메인 Monitoring `LeftMenuSectionViewModel`(권한 게이팅→웹설정 `IsWebServerEnabled` 게이팅으로 교체, DATABASE 메뉴→통합웹). ⚠앱 재빌드 후 반영.
+- **맵 심볼 제어 단축키 — Delete(확인삭제) / Ctrl+C(복사) / Ctrl+V(붙여넣기)** ([PRD](docs/prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) · [Plan](docs/plans/MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md) · 태그 `before-mapsymbol-shortcuts` · worktree `feature/mapsymbol-shortcuts` · GMaps.Ui)
+  - **Delete(FR-05)**: 선택 심볼/이미지 삭제(단일·그룹)를 단일 진입점 `ExecuteDeleteSelected`(EventAggregator 표준 확인팝업)로 통일. **P0 갭 수정** — 단일 Delete 키가 원래 동작하지 않던 문제(어도너 `RequestMarkerDeletion`이 no-op 스텁인데 `e.Handled=true`로 키를 삼킴)를 `OnMapPreviewKeyDownForGroup` 단일 분기 추가 + 어도너 Delete case 제거로 해소(이중처리 차단).
+  - **Ctrl+C/Ctrl+V(FR-02/03)**: 인메모리 클립보드 — 단일/멀티 선택 복사, 붙여넣기는 **마우스 커서 위치**(멀티는 앵커 기준 상대 간격 유지). 배치 Undo(`BeginBatch` 1매크로) + 트리 1회 리빌드 + 결과 자동선택. 반복 붙여넣기 가능. 오버레이 이미지는 v1 제외(삭제는 포함). 커서 추적=`GMapCustomControl.GetLastCursorLatLng`(맵 밖 폴백=뷰 중앙).
+  - **복제 코어 통합 + P0 버그 수정(FR-01)**: `DuplicateSelectedMarker`의 300줄 타입별 switch를 `CreateSymbolCopyAsync`(스냅샷 딥클론 재사용) 코어로 추출 — Duplicate(오프셋)/Paste(커서) 공유. **PIDS 복제 버그 2건 수정**: ①`duplicatedSymbol = pidsSymbol`(Fetch Id 유실→Undo 누락) 제거, DB 발급 Id 사용 ②`LinkedDeviceId + 1000`(실장비 오참조) 제거 → PIDS·PidsGroup 붙여넣기는 미링크(0). 붙여넣기 제목은 `_Copy` 미부가(복제 버튼은 유지).
+  - **검증**: GMaps.Ui 빌드 0오류. 신규 단위테스트 `SymbolCopyTransformTests` 7/7 통과(미링크·Id리셋·재배치·LinePoints 평행이동·제목정책) + 회귀 `UndoRedoTests` 34/34 통과. ⚠전체 복사/붙여넣기/삭제 플로우 및 키 후킹은 앱 재빌드 후 런타임 검증(V-01~V-06).
 
 ### Removed
 - **`group_device`(deprecated 단일 그룹) 죽은 코드 정리** (태그 `before-remove-group-device` · Devices.Api/Ui) — `device_groups`(N:N EventMapping) 전환으로 deprecated된 `group_device`의 잔재 제거. `IDeviceApiService`/`DeviceApiService` 6개 조회 메서드의 **미사용 쿼리 필터 파라미터** `int? groupDevice` + XML doc + `MockDeviceApiService` 시그니처 정합. **DTO/Model엔 이미 프로퍼티 없음**(전환 완료·제거 대상 없음). 호출자 30곳 전부 named-arg/무인자라 무영향(빌드 검증: Devices.Api/Ui 0오류). 메인 솔루션 참조 0. (Messages/Tests 하위호환 JSON 픽스처는 유지 — 구서버 group_device 수신 시 무시됨을 검증.)
