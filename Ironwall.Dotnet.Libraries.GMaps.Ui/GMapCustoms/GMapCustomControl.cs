@@ -173,6 +173,13 @@ public class GMapCustomControl : GMapControl
     /// <summary>심볼 배치 모드 좌클릭 - 클릭 지점 좌표를 ViewModel에 전달(그 위치에 심볼 추가).</summary>
     public event Action<PointLatLng, Point>? SymbolPlacementClicked;
 
+    /// <summary>홈 위치 배치 모드 — ON이면 좌클릭을 가로채 <see cref="HomePlacementClicked"/>로 전달(그 위치를 홈으로).
+    /// 심볼배치와 동급 base-전 가로채기. ViewModel(홈 설정 버튼)이 진입/종료. (PRD GMap_Zoom_Anchor_Home FR-H2)</summary>
+    public bool IsHomePlacementMode { get; set; }
+
+    /// <summary>홈 배치 모드 좌클릭 - 클릭 지점 좌표를 ViewModel에 전달(그 위치를 홈으로).</summary>
+    public event Action<PointLatLng, Point>? HomePlacementClicked;
+
     /// <summary>
     /// 마커 클릭 이벤트 - ViewModel에 클릭된 마커 전달
     /// </summary>
@@ -869,6 +876,14 @@ public class GMapCustomControl : GMapControl
         if (IsSymbolPlacementMode)
         {
             SymbolPlacementClicked?.Invoke(geoPos, mousePos);
+            e.Handled = true;
+            return;
+        }
+
+        // [홈 배치] 홈 설정 버튼으로 진입한 배치 모드 — 클릭 위치를 홈으로(심볼배치와 동급). (FR-H2)
+        if (IsHomePlacementMode)
+        {
+            HomePlacementClicked?.Invoke(geoPos, mousePos);
             e.Handled = true;
             return;
         }

@@ -830,6 +830,12 @@ public partial class MapViewModel : BasePanelViewModel,
             SetAimStatus("배치를 취소했습니다.", autoHide: true);
             e.Handled = true;
         }
+        else if (MainMap?.IsHomePlacementMode ?? false)   // 홈 배치 모드 ESC 취소 (FR-H2)
+        {
+            ExitHomePlacementMode();
+            SetAimStatus("홈 설정을 취소했습니다.", autoHide: true);
+            e.Handled = true;
+        }
     }
 
     /// <summary>타겟 모드 상태 안내(상단 배너 + 로그). autoHide=true면 2.5초 후 숨김(세대 유지 시).</summary>
@@ -3333,14 +3339,14 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 홈 위치 설정 명령어 실행 가능 여부
     /// </summary>
-    private bool CanExecuteSetHomeLocation(object arg) => HomePosition?.IsAvailable == true;
+    private bool CanExecuteSetHomeLocation(object arg) => HomePosition != null;   // FR-H2: 과녁 설정은 항상 가능(최초 홈 설정 허용)
 
     /// <summary>
-    /// 홈 위치 설정 실행
+    /// 홈 위치 설정 실행 — 과녁(크로스헤어) 클릭으로 홈 지정 (FR-H2, 기존 "마지막 클릭 위치" 방식 대체)
     /// </summary>
     private void ExecuteSetHomeLocation(object obj)
     {
-        SetHomePosition();
+        EnterHomePlacementMode();
     }
     #endregion
 
