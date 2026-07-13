@@ -16,6 +16,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Api.Models;
 using Ironwall.Dotnet.Libraries.Tracking.Api.Modules;
 using Ironwall.Dotnet.Libraries.Tracking.Api.Services;
+using Ironwall.Dotnet.Libraries.SystemResources.Modules;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Modules;
 /****************************************************************************
@@ -68,6 +69,8 @@ public class GMapUiModule: Module
         builder.RegisterType<PtzController>().As<IPtzController>().SingleInstance();
         // Tracking GIS 오버레이(FR-15) — IClock + 설정모델 + 단일 진입점 매니저(라이브러리 자족, EXT-01 없이 동작)
         builder.RegisterType<SystemClock>().As<IClock>().SingleInstance();
+        // 시스템 리소스 모니터(SystemResources) — 툴바 우측 CPU/GPU/RAM. 위 IClock 등록 뒤라 IfNotRegistered가 중복 없이 스킵.
+        builder.RegisterModule(new SystemResourceModule());
         // ⚠ 복사생성자 TrackingSetupModel(ITrackingSetupModel) 를 Autofac이 greedy 선택 → 자기참조 순환.
         //    appsettings(AppSettings.Tracking)에서 동기 로드한 단일 인스턴스 등록 → 저장값 복원(재시작 유지) + 순환 회피.
         builder.RegisterInstance(MapSettingsHelper.LoadTrackingSettings(_log))

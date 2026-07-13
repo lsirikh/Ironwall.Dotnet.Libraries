@@ -111,6 +111,7 @@ public partial class MapViewModel : BasePanelViewModel,
                         , IImageFileService imageFileService
                         , Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IEditRecorder editRecorder
                         , Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IUndoService undoService
+                        , Ironwall.Dotnet.Libraries.SystemResources.Services.ISystemResourceMonitor resourceMonitor
                         , TrackingOverlayManager? trackingOverlay = null
                         , PlaybackViewModel? playbackVm = null
                         , TrackingSetupViewModel? trackingSetupVm = null
@@ -135,6 +136,7 @@ public partial class MapViewModel : BasePanelViewModel,
         _imageFileService = imageFileService;
         _editRecorder = editRecorder;
         _undoService = undoService;
+        _resourceMonitor = resourceMonitor;
         _trackingOverlay = trackingOverlay;
         _playbackVm = playbackVm;
         _trackingSetupVm = trackingSetupVm;
@@ -198,6 +200,9 @@ public partial class MapViewModel : BasePanelViewModel,
 
             // FR-EN-11: 역할강등/세션변경 시 PTZ 권한 재평가 구독(진행 중 이동 취소·팝업 비활성)
             SubscribePtzPermission();
+
+            // 툴바 우측 CPU/GPU/RAM 사용률 표시 시작(UI DispatcherTimer로 Sample 구동)
+            StartResourceMonitor();
 
             // 1. 저장된 커스텀 맵들 로드
             await _customMapService.LoadCustomMapsAsync();
@@ -268,6 +273,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
+            StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
 
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 

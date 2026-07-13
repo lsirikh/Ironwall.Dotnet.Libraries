@@ -41,6 +41,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ironwall.Dotnet.Libraries.W
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ironwall.Dotnet.Libraries.Watchdog.Tests", "Ironwall.Dotnet.Libraries.Watchdog.Tests\Ironwall.Dotnet.Libraries.Watchdog.Tests.csproj", "{5E4A355D-3FC0-48FC-8108-29A891447F65}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ironwall.Dotnet.Libraries.SystemResources", "Ironwall.Dotnet.Libraries.SystemResources\Ironwall.Dotnet.Libraries.SystemResources.csproj", "{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -279,6 +281,18 @@ Global
 		{5E4A355D-3FC0-48FC-8108-29A891447F65}.Release|x64.Build.0 = Release|Any CPU
 		{5E4A355D-3FC0-48FC-8108-29A891447F65}.Release|x86.ActiveCfg = Release|Any CPU
 		{5E4A355D-3FC0-48FC-8108-29A891447F65}.Release|x86.Build.0 = Release|Any CPU
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Debug|x64.ActiveCfg = Debug|x64
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Debug|x64.Build.0 = Debug|x64
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Debug|x86.ActiveCfg = Debug|x86
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Debug|x86.Build.0 = Debug|x86
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x64.ActiveCfg = Release|x64
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x64.Build.0 = Release|x64
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x86.ActiveCfg = Release|x86
+		{7F250088-4E9A-4B31-AEFE-B77ADDF6A5AD}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
