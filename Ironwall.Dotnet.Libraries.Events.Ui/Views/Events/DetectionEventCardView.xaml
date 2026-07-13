@@ -119,7 +119,7 @@
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
 								Opacity="1"
-								Text="{Binding Device.DeviceGroupsText}"
+								Text="{Binding DeviceGroupsText}"
 								TextAlignment="Center" />
 							<TextBlock
 								Grid.Column="2"

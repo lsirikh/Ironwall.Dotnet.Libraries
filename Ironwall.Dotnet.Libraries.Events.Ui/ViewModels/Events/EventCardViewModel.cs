@@ -1,5 +1,6 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Comms;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -73,6 +74,27 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             not null => "센서",
             null => null
         };
+
+        /// <summary>
+        /// 이벤트 장비가 속한 그룹(구역) 이름 목록을 ", "로 결합.
+        /// N:N — 다중 그룹이면 "1, 10", 단일 그룹이면 "1". DeviceGroupProvider로 Id→Name 조회(미발견 시 Id로 fallback).
+        /// (장비 관리 패널 BaseDeviceViewModel.DeviceGroupsText 와 동일 패턴)
+        /// </summary>
+        public string DeviceGroupsText
+        {
+            get
+            {
+                var ids = Device?.DeviceGroups;
+                if (ids == null || ids.Count == 0) return string.Empty;
+                try
+                {
+                    var provider = IoC.Get<DeviceGroupProvider>();
+                    return string.Join(", ", ids.Select(id =>
+                        provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+                }
+                catch { return string.Join(", ", ids); }
+            }
+        }
         #endregion
         #region - Attributes -
         protected readonly T _model;

@@ -3540,6 +3540,38 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     }
     #endregion
 
+    #region Test 2.5: DetectionEventCardView — 구역이 VM DeviceGroupsText(이름 변환)에 바인딩
+    [Fact]
+    public void DetectionEventCardView_ZoneBindsToViewModelDeviceGroupsText()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", "DetectionEventCardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // Assert: 그룹 Id 숫자를 그대로 노출하는 모델 바인딩(Device.DeviceGroupsText)이 없어야 함
+        Assert.DoesNotContain("Device.DeviceGroupsText", xamlContent);
+        // Assert: 존재하지 않는 Device.Name 바인딩이 없어야 함
+        Assert.DoesNotContain("{Binding Device.Name}", xamlContent);
+        // Assert: 대신 이름 변환 VM 속성(DeviceGroupsText)에 바인딩되어야 함
+        Assert.Contains("{Binding DeviceGroupsText}", xamlContent);
+    }
+    #endregion
+
+    #region Test 2.6: MalfunctionEventCardView — 구역이 VM DeviceGroupsText(이름 변환)에 바인딩
+    [Fact]
+    public void MalfunctionEventCardView_ZoneBindsToViewModelDeviceGroupsText()
+    {
+        var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+            "..", "..", "..", "Views", "Events", "MalfunctionEventCardView.xaml");
+        var xamlContent = File.ReadAllText(xamlPath);
+
+        // Assert: 그룹 Id 숫자를 그대로 노출하는 모델 바인딩(Device.DeviceGroupsText)이 없어야 함
+        Assert.DoesNotContain("Device.DeviceGroupsText", xamlContent);
+        // Assert: 대신 이름 변환 VM 속성(DeviceGroupsText)에 바인딩되어야 함
+        Assert.Contains("{Binding DeviceGroupsText}", xamlContent);
+    }
+    #endregion
+
     #region Test 3.1: DetectionEventPanelView — 구역 컬럼 없음 + 조치보고 컬럼 있음
     [Fact]
     public void DetectionEventPanelView_HasNoDeviceGroupsColumn_AndHasActionReportedColumn()
