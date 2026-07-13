@@ -96,12 +96,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
         private void OnMarkerPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(GMapPidsGroupMarker.IsVisible)
-                && Marker?.IsVisible == true
-                && _mapControl != null)
+            if (_mapControl == null) return;
+
+            // 점 변경(리사이즈 스케일·Undo)에 폴리라인/하위오버레이 재계산 — 이전엔 IsVisible만 반응해
+            // ApplyGeometry로 점을 바꿔도 미갱신(화면 stale, 창 전환 전까지 안 보임·Undo 후 어긋남). LineArea_Symbol_Resize 수정.
+            if (e.PropertyName == nameof(GMapPidsGroupMarker.RuntimePoints)
+                || e.PropertyName == nameof(GMapPidsGroupMarker.LinePoints))
             {
-                // Visibility가 false→true로 바뀔 때 형상 재계산.
-                // RestoreLayerVisibility() 이후 On 시 Offset/Points가 stale한 상태를 복구.
+                Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
+                return;
+            }
+
+            // Visibility가 false→true로 바뀔 때 형상 재계산(RestoreLayerVisibility 이후 stale 복구).
+            if (e.PropertyName == nameof(GMapPidsGroupMarker.IsVisible) && Marker?.IsVisible == true)
+            {
                 Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
             }
         }
