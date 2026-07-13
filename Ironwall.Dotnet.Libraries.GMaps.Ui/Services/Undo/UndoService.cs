@@ -73,8 +73,10 @@ public sealed class UndoService : IUndoService
     public async Task<bool> UndoAsync(CancellationToken ct = default)
     {
         IUndoableCommand? cmd;
-        lock (_gate) { cmd = Current().Undo.Last?.Value; }
+        int uc, rc;
+        lock (_gate) { var h = Current(); cmd = h.Undo.Last?.Value; uc = h.Undo.Count; rc = h.Redo.Count; }
         if (cmd == null) return false;
+        _log?.Info($"[UNDO-DIAG] UNDO '{cmd.Description}' (undo={uc} redo={rc})");
 
         // NOTE: no ConfigureAwait(false) on the replay path — undo/redo replay is UI-affine
         // (커맨드가 WPF 마커/맵을 동기 변형). UI 스레드(AsyncRelayCommand 람다)에서 진입하므로
@@ -100,8 +102,10 @@ public sealed class UndoService : IUndoService
     public async Task<bool> RedoAsync(CancellationToken ct = default)
     {
         IUndoableCommand? cmd;
-        lock (_gate) { cmd = Current().Redo.Last?.Value; }
+        int uc, rc;
+        lock (_gate) { var h = Current(); cmd = h.Redo.Last?.Value; uc = h.Undo.Count; rc = h.Redo.Count; }
         if (cmd == null) return false;
+        _log?.Info($"[UNDO-DIAG] REDO '{cmd.Description}' (undo={uc} redo={rc})");
 
         await _runLock.WaitAsync(ct);   // UI-affine replay — see UndoAsync note (THREAD-01/02)
         using var _ = SuspendRecording();
