@@ -22,6 +22,10 @@ public interface IEditRecorder
     /// <summary>이동/크기/회전 완료 기록(before/after는 args).</summary>
     void RecordTransform(MarkerEditCompletedEventArgs e);
 
+    /// <summary>라인/폴리곤 리사이즈(점 스케일) 완료 기록 — before=드래그시작 점+위치(명시 전달), after=현재 마커 점+위치.
+    /// **`HasChanges` 게이트 무관·점/위치 실제 diff로 판정**(line 스케일은 W/H 불변이라 HasChanges=false → 기존 경로는 undo 미기록+즉시영속 파괴적, §5-C R-07). LineArea_Symbol_Resize FR-04.</summary>
+    void RecordLineGeometry(IEditableMarker marker, System.Collections.Generic.List<PointLatLng> beforePoints, PointLatLng beforePosition);
+
     /// <summary>속성 변경 기록(coalescing).</summary>
     void RecordPropertyChange(IEditableMarker marker, string property, object? oldValue, object? newValue);
 

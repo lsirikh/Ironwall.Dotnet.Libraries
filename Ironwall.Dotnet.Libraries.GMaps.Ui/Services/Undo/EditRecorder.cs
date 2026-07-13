@@ -53,6 +53,32 @@ public sealed class EditRecorder : IEditRecorder
         catch (Exception ex) { _log?.Error($"RecordTransform 실패: {ex.Message}"); }
     }
 
+    public void RecordLineGeometry(IEditableMarker marker, List<PointLatLng> beforePoints, PointLatLng beforePosition)
+    {
+        // ★ HasChanges 게이트 없음 — line 스케일은 _model.Width 불변이라 HasChanges=false. 점/위치 실제 diff로 판정(§5-C R-07).
+        if (!Ready || marker is not ILineEditableMarker line || beforePoints == null) return;
+        ResetCoalesce();
+        try
+        {
+            var afterPoints = line.RuntimePoints;   // 현재(스케일된) 점
+            var afterPosition = marker.Position;
+            if (SamePoints(beforePoints, afterPoints) && SamePos(beforePosition, afterPosition)) return;   // 실제 변화 없으면 미기록
+            _undo.Push(new LineGeometryCommand(Context!, marker.Id,
+                (new List<PointLatLng>(beforePoints), beforePosition),
+                (new List<PointLatLng>(afterPoints), afterPosition)));
+        }
+        catch (Exception ex) { _log?.Error($"RecordLineGeometry 실패: {ex.Message}"); }
+    }
+
+    private static bool SamePos(PointLatLng a, PointLatLng b) => a.Lat == b.Lat && a.Lng == b.Lng;
+    private static bool SamePoints(List<PointLatLng> a, List<PointLatLng> b)
+    {
+        if (a == null || b == null || a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+            if (a[i].Lat != b[i].Lat || a[i].Lng != b[i].Lng) return false;
+        return true;
+    }
+
     public void RecordPropertyChange(IEditableMarker marker, string property, object? oldValue, object? newValue)
     {
         if (!Ready || marker == null || string.IsNullOrEmpty(property)) return;

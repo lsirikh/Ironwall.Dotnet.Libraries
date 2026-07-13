@@ -168,6 +168,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         }
 
         /// <summary>
+        /// 런타임 점 전체 교체 + 중심(Position) 갱신 — 리사이즈 스케일·Undo 복원 공용(LineArea_Symbol_Resize FR-01/04).
+        /// 점을 이미 계산된 값으로 대입하므로 UpdateLocation(평행이동)과 달리 델타 적용 없음.
+        /// base.UpdateLocation(=GMapBaseMarker, 점 미변경)으로 Position/모델좌표만 갱신 → SyncModelPoints → UI마샬 재렌더.
+        /// </summary>
+        public void ApplyGeometry(System.Collections.Generic.IReadOnlyList<PointLatLng> points, PointLatLng position)
+        {
+            try
+            {
+                if (points == null) return;
+                _runtimePoints = points.ToList();          // in-place 교체(public LinePoints setter 경유 금지)
+                base.UpdateLocation(position);             // Position + _model 좌표만(점 평행이동 없음)
+                SyncModelPoints();                         // _model.LinePoints 최신화(마지막 문장 규약, FR-06)
+
+                var _d = System.Windows.Application.Current?.Dispatcher;
+                System.Action _ui = () =>
+                {
+                    try
+                    {
+                        NotifyPointsChanged();
+                        if (Shape is GMapMarkerLineControl lineControl) lineControl.InvalidateVisual();
+                    }
+                    catch { }
+                };
+                if (_d == null || _d.CheckAccess()) _ui(); else _d.BeginInvoke(_ui);
+            }
+            catch (System.Exception ex) { _log?.Error($"[ApplyGeometry] 실패: {ex.Message}"); }
+        }
+
+        /// <summary>
         /// 드로잉 시작 (Adorner 방식에서는 사용 안 함)
         /// </summary>
         public void StartDrawing()
