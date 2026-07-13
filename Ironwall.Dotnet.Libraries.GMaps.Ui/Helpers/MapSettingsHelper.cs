@@ -39,6 +39,14 @@ public static class MapSettingsHelper
     }
 
     /// <summary>
+    /// 맵 앵커(사이트 고정) 설정을 JSON에 저장 (AppSettings.MapAnchor)
+    /// </summary>
+    public static async Task SaveMapAnchorAsync(MapAnchorModel anchor, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapAnchor", anchor, log);
+    }
+
+    /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>
     public static async Task SaveMapTypeAsync(string mapType, ILogService? log = default)
@@ -163,6 +171,7 @@ public static class MapSettingsHelper
             var mapSettings = new GMapSetupModel
             {
                 HomePosition = appSettings["HomePosition"]?.ToObject<HomePositionModel>(),
+                MapAnchor = appSettings["MapAnchor"]?.ToObject<MapAnchorModel>(),
                 MapType = appSettings["MapType"]?.ToString(),
                 MapMode = appSettings["MapMode"]?.ToString(),
                 MapName = appSettings["MapName"]?.ToString()

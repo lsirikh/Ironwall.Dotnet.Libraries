@@ -3,6 +3,7 @@
 public interface IGMapSetupModel
 {
     HomePositionModel? HomePosition { get; set; }
+    MapAnchorModel? MapAnchor { get; set; }
     string? MapMode { get; set; }
     string? MapName { get; set; }
     string? MapType { get; set; }

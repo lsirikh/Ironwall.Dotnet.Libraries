@@ -53,6 +53,7 @@ public class GMapSetupModel : IGMapSetupModel
             throw new ArgumentNullException(nameof(source));
 
         HomePosition = source.HomePosition;
+        MapAnchor = source.MapAnchor;
         MapType = source.MapType;
         MapMode = source.MapMode;
         MapName = source.MapName;
@@ -71,6 +72,7 @@ public class GMapSetupModel : IGMapSetupModel
     #endregion
     #region - Properties -
     public HomePositionModel? HomePosition { get; set; }
+    public MapAnchorModel? MapAnchor { get; set; }
     public string? MapType { get; set; }
     public string? MapMode { get; set; }
     public string? MapName { get; set; }

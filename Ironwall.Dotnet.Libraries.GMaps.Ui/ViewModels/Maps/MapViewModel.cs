@@ -4241,6 +4241,8 @@ public partial class MapViewModel : BasePanelViewModel,
         MainMap.ShowCenter = true;
         MainMap_OnMapZoomChanged();
 
+        ApplyMapAnchor();   // [MapAnchor] 사이트 고정: BoundsOfMap/MinZoom 적용 (증분2 · 앵커 비활성 시 해제)
+
         SetInitialHomePosition();
     }
 
