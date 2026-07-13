@@ -484,7 +484,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var createdModel = response.Data.ToDetectionEventModel();
+            var createdModel = response.Data.ToDetectionEventModel(_deviceProvider);
             _log?.Info($"InsertDetectionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
@@ -516,7 +516,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var updatedModel = response.Data.ToDetectionEventModel();
+            var updatedModel = response.Data.ToDetectionEventModel(_deviceProvider);
             _log?.Info($"UpdateDetectionEventAsync() completed for ID {model.Id}");
             return updatedModel;
         }
@@ -577,7 +577,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var createdModel = response.Data.ToMalfunctionEventModel();
+            var createdModel = response.Data.ToMalfunctionEventModel(_deviceProvider);
             _log?.Info($"InsertMalfunctionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
@@ -609,7 +609,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var updatedModel = response.Data.ToMalfunctionEventModel();
+            var updatedModel = response.Data.ToMalfunctionEventModel(_deviceProvider);
             _log?.Info($"UpdateMalfunctionEventAsync() completed for ID {model.Id}");
             return updatedModel;
         }
@@ -670,7 +670,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var createdModel = response.Data.ToConnectionEventModel();
+            var createdModel = response.Data.ToConnectionEventModel(_deviceProvider);
             _log?.Info($"InsertConnectionEventAsync() completed: Created ID {createdModel.Id}");
             return createdModel;
         }
@@ -702,7 +702,7 @@ public class EventProviderService
                 throw new InvalidOperationException(errorMsg);
             }
 
-            var updatedModel = response.Data.ToConnectionEventModel();
+            var updatedModel = response.Data.ToConnectionEventModel(_deviceProvider);
             _log?.Info($"UpdateConnectionEventAsync() completed for ID {model.Id}");
             return updatedModel;
         }
