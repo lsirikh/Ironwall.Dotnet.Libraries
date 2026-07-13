@@ -440,10 +440,10 @@
 		<Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
 		<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
 		<Setter Property="BorderThickness" Value="1" />
-		<Setter Property="CornerRadius" Value="8" />
-		<Setter Property="Padding" Value="7,2" />
-		<Setter Property="MinWidth" Value="58" />
-		<Setter Property="Margin" Value="4,0,0,0" />
+		<Setter Property="CornerRadius" Value="10" />
+		<Setter Property="Padding" Value="9,3" />
+		<Setter Property="MinWidth" Value="72" />
+		<Setter Property="Margin" Value="5,0,0,0" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="SnapsToDevicePixels" Value="True" />
 		<!-- 정상 = Tactical 시안 (자식 아이콘/수치가 TextElement.Foreground 상속) -->
@@ -470,17 +470,17 @@
 
 	<!-- 칩 내부 아이콘(Foreground는 부모 칩에서 상속) -->
 	<Style x:Key="SysResChipIcon" TargetType="md:PackIcon">
-		<Setter Property="Width" Value="15" />
-		<Setter Property="Height" Value="15" />
+		<Setter Property="Width" Value="19" />
+		<Setter Property="Height" Value="19" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 	</Style>
 
 	<!-- 칩 내부 수치(고정폭 Consolas — 폭 지터 방지) -->
 	<Style x:Key="SysResChipText" TargetType="TextBlock">
-		<Setter Property="Margin" Value="4,0,0,0" />
+		<Setter Property="Margin" Value="5,0,0,0" />
 		<Setter Property="VerticalAlignment" Value="Center" />
 		<Setter Property="FontFamily" Value="Consolas" />
-		<Setter Property="FontSize" Value="12" />
+		<Setter Property="FontSize" Value="15" />
 		<Setter Property="FontWeight" Value="Medium" />
 	</Style>
 
