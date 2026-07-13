@@ -136,7 +136,7 @@
 
 			<!--  읽기전용(배포/.env 전용)  -->
 			<Border
-				Margin="0,18,0,0"
+				Margin="0,140,0,0"
 				Padding="10,8"
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="0,1,0,0">

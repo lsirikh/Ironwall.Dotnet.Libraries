@@ -105,15 +105,15 @@
 								<ColumnDefinition Width="Auto" />
 								<ColumnDefinition Width="Auto" />
 							</Grid.ColumnDefinitions>
-							<TextBlock
+							<!--<TextBlock
 								Grid.Column="0"
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
 								Opacity="1"
 								Text="구역"
-								TextAlignment="Center" />
+								TextAlignment="Center" />-->
 							<TextBlock
-								Grid.Column="1"
+								Grid.Column="0"
 								Margin="5,0"
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
@@ -121,7 +121,7 @@
 								Text="{Binding DeviceGroupsText}"
 								TextAlignment="Center" />
 							<TextBlock
-								Grid.Column="2"
+								Grid.Column="1"
 								Margin="5,0"
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
@@ -129,7 +129,7 @@
 								Text="-"
 								TextAlignment="Center" />
 							<TextBlock
-								Grid.Column="3"
+								Grid.Column="2"
 								Margin="5,0"
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
@@ -137,7 +137,7 @@
 								Text="{Binding DeviceTypeName, FallbackValue=센서}"
 								TextAlignment="Center" />
 							<TextBlock
-								Grid.Column="4"
+								Grid.Column="3"
 								Margin="5,0"
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"

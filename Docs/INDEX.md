@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-07-13 (advance-phase 자동)
-- **총 문서 수**: 322개
+- **총 문서 수**: 329개
 
 ---
 
@@ -10,6 +10,8 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
+| [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-13 |
 | [GMap_Rotation_Overlay_Desync-analysis.md](analyses/GMap_Rotation_Overlay_Desync-analysis.md) | GMap_Rotation_Overlay_Desync | 2026-07-13 |
 | [GMap_RDP_Overlay_Desync-analysis.md](analyses/GMap_RDP_Overlay_Desync-analysis.md) | GMap_RDP_Overlay_Desync | 2026-07-07 |
 | [Map_Edit_Undo_Redo-analysis.md](analyses/Map_Edit_Undo_Redo-analysis.md) | Map_Edit_Undo_Redo | 2026-07-02 |
@@ -23,8 +25,11 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | Line(폴리라인)·Area(닫힌 폴리곤 IsClosedPath)·PidsGroup 심볼이 어도너 박스 리사이즈로 안 커지는 문제 해결(방향 🅐). 근본=크기가 LinePoints 파생값(UpdateLineGeometry가 매 리드로우 W/H 재계산·SetSize 200클램프)+어도너 line 핸들 미렌더(isLineMarker 가드). 설계=신규 seam `ScaleAround(center,sx,sy)`(화면좌표 프레임 점 스케일+SyncModelPoints 4단계 규약), 핸들 가드 완화(열린선=코너/닫힘=+변, 점 bbox 기준), `ProcessLineScale` 절대배율. **P0=Undo**: TransformCommand는 점 미복원+스케일 결과 재영속 desync→신규 스냅샷 `LineGeometryCommand`(SymbolSnapshot 재사용)+RecordLineGeometry 분기. 정점편집(🅑)=후속. Explore×2+architect+code-reviewer. FR-01~06/NFR4/V-01~07/D-01~05/OQ-01~05 (Track C) | Draft | 2026-07-13 |
+| [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator (CPU/GPU/RAM 툴바 지표) | Draft | 2026-07-13 |
+| [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
+| [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | Draft | 2026-07-13 |
 | [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
+| [GIS.md](prds/GIS.md) | GIS.md | Draft | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
 | [LeftMenu_IntegratedWeb_Button-prd.md](prds/LeftMenu_IntegratedWeb_Button-prd.md) | LeftMenu_IntegratedWeb_Button | Approved | 2026-07-13 |
 | [GMap_Zoom_Anchor_Home-prd.md](prds/GMap_Zoom_Anchor_Home-prd.md) | GMap_Zoom_Anchor_Home | Draft | 2026-07-13 |
@@ -146,8 +151,11 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [GMap_SystemResource_Indicator-prd-plan.md](plans/GMap_SystemResource_Indicator-prd-plan.md) | [PRD](prds/GMap_SystemResource_Indicator-prd.md) | 28/33 | 2026-07-13 |
+| [LineArea_Symbol_Resize-prd-plan.md](plans/LineArea_Symbol_Resize-prd-plan.md) | [PRD](prds/LineArea_Symbol_Resize-prd.md) | 0/26 | 2026-07-13 |
+| [GMap_Zoom_Anchor_Home-prd-plan.md](plans/GMap_Zoom_Anchor_Home-prd-plan.md) | [PRD](prds/GMap_Zoom_Anchor_Home-prd.md) | 6/40 | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md](plans/MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md) | [PRD](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | 0/27 | 2026-07-13 |
-| [LeftMenu_IntegratedWeb_Button-prd-plan.md](plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) | [PRD](prds/LeftMenu_IntegratedWeb_Button-prd.md) | 0/13 | 2026-07-13 |
+| [LeftMenu_IntegratedWeb_Button-prd-plan.md](plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) | [PRD](prds/LeftMenu_IntegratedWeb_Button-prd.md) | 7/13 | 2026-07-13 |
 | [Watchdog_Modern_Rebuild-prd-plan.md](plans/Watchdog_Modern_Rebuild-prd-plan.md) | [PRD](prds/Watchdog_Modern_Rebuild-prd.md) | 0/46 | 2026-07-13 |
 | [Action_Report_Nats_FullDto_Contract-prd-plan.md](plans/Action_Report_Nats_FullDto_Contract-prd-plan.md) | [PRD](prds/Action_Report_Nats_FullDto_Contract-prd.md) | 10/10 | 2026-07-11 |
 | [Account_Lock_Management-prd-plan.md](plans/Account_Lock_Management-prd-plan.md) | [PRD](prds/Account_Lock_Management-prd.md) | 2/26 | 2026-07-07 |
