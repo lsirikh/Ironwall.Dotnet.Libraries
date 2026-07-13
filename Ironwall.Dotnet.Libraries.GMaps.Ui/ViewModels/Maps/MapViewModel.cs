@@ -2370,7 +2370,12 @@ public partial class MapViewModel : BasePanelViewModel,
 
         if (!CanEditMap()) { _log?.Warning("[RBAC] 맵 편집 권한 없음 — 마커 편집 영속 차단(백스톱)"); return; }
         await DbUpdateProcess(e.Marker);
-        _editRecorder?.RecordTransform(e);   // Undo 기록(이동/크기/회전)
+        // Line/Area 리사이즈(점 스케일)는 스냅샷 점 커맨드로 — TransformCommand는 점 미복원 + line은 HasChanges=false라
+        // early-return되어 undo 미기록+즉시영속 파괴적(§5-C R-07). 어도너가 line resize일 때만 OriginalLinePoints 세팅.
+        if (e.Marker is GMapSymbols.ILineEditableMarker && e.OriginalLinePoints != null)
+            _editRecorder?.RecordLineGeometry(e.Marker, e.OriginalLinePoints, e.OriginalPosition);
+        else
+            _editRecorder?.RecordTransform(e);   // Undo 기록(이동/크기/회전 — 비-line 또는 line 이동/회전)
 
         // UI 상태 업데이트
         IsMarkerEditing = false;

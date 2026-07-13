@@ -91,6 +91,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             catch (System.Exception ex) { _log?.Error($"[UpdateLocation] 실패: {ex.Message}"); }
         }
 
+        /// <summary>
+        /// 런타임 점 전체 교체 + 중심(Position) 갱신 — 리사이즈 스케일·Undo 복원 공용(LineArea_Symbol_Resize FR-01/04).
+        /// PidsGroup 컨트롤(GMapMarkerBaseControl)은 GMapMarkerLineControl이 아니므로 제네릭 UIElement로 재렌더 —
+        /// InvalidateVisual→UpdateLineGeometry가 하위 Event/Detection 오버레이까지 RuntimePoints에서 재파생(§5-C S-P9 load-bearing).
+        /// </summary>
+        public void ApplyGeometry(System.Collections.Generic.IReadOnlyList<PointLatLng> points, PointLatLng position)
+        {
+            try
+            {
+                if (points == null) return;
+                _runtimePoints = points.ToList();
+                base.UpdateLocation(position);
+                SyncModelPoints();
+
+                var _d = System.Windows.Application.Current?.Dispatcher;
+                System.Action _ui = () =>
+                {
+                    try
+                    {
+                        NotifyPointsChanged();
+                        (Shape as System.Windows.UIElement)?.InvalidateVisual();
+                    }
+                    catch { }
+                };
+                if (_d == null || _d.CheckAccess()) _ui(); else _d.BeginInvoke(_ui);
+            }
+            catch (System.Exception ex) { _log?.Error($"[ApplyGeometry] 실패: {ex.Message}"); }
+        }
+
 
         protected override UIElement CreateMarkerControl()
         {

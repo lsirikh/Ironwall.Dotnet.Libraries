@@ -59,6 +59,13 @@ public interface ILineEditableMarker : IEditableMarker
     void RemoveLastPoint();
 
     /// <summary>
+    /// 런타임 점 리스트 전체 교체 + 중심(Position) 갱신(리사이즈 스케일·Undo 복원 공용 seam, LineArea_Symbol_Resize FR-01/04).
+    /// _runtimePoints in-place 교체 → SyncModelPoints → UI마샬 재렌더(UpdateLocation과 동일 4단계 규약).
+    /// public LinePoints setter 경유 금지(재빌드로 in-flight 스케일 덮어씀).
+    /// </summary>
+    void ApplyGeometry(System.Collections.Generic.IReadOnlyList<PointLatLng> points, PointLatLng position);
+
+    /// <summary>
     /// 그리기 시작
     /// </summary>
     void StartDrawing();
