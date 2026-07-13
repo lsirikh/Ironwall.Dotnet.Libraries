@@ -93,6 +93,22 @@ public sealed class ConnectionWatchdog : IConnectionWatchdog
         _log?.Info("[Watchdog] 의도적 종료 신호 발화 — 와치독 재시작 방지.");
     }
 
+    /// <summary>
+    /// 런타임 감시 중지 — 실행 중 와치독을 graceful 종료 유도하고 앱측 재기동/하트비트를 중단한다.
+    /// 옵션 Enabled=false로 재기동 타이머·다음 부팅도 비활성. 이후 <see cref="Start"/>로 재활성 가능.
+    /// </summary>
+    public void StopWatching()
+    {
+        _opt.Enabled = false;                                    // 재기동 타이머·다음 부팅 차단
+        try { _relaunchTimer?.Dispose(); _relaunchTimer = null; } catch { }
+        try { _shutdown?.SignalGraceful(); } catch { }           // 실행 중 와치독 → graceful 종료
+        try { _shutdown?.Dispose(); _shutdown = null; } catch { }
+        try { _heartbeat?.Dispose(); _heartbeat = null; } catch { }
+        try { _statusClient = null; } catch { }
+        _started = false;                                        // 재활성(Start) 가능하게
+        _log?.Info("[Watchdog] 런타임 감시 중지(사용자 비활성) — 와치독 종료 유도 + 재기동 차단.");
+    }
+
     private void SafeEnsureRunning()
     {
         try

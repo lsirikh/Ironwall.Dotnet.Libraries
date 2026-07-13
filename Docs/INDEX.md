@@ -23,10 +23,10 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
 | [LeftMenu_IntegratedWeb_Button-prd.md](prds/LeftMenu_IntegratedWeb_Button-prd.md) | LeftMenu_IntegratedWeb_Button | Approved | 2026-07-13 |
 | [GMap_Zoom_Anchor_Home-prd.md](prds/GMap_Zoom_Anchor_Home-prd.md) | GMap_Zoom_Anchor_Home | Draft | 2026-07-13 |
-| [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
 | [Watchdog_Modern_Rebuild-prd.md](prds/Watchdog_Modern_Rebuild-prd.md) | Watchdog_Modern_Rebuild | Approved | 2026-07-13 |
 | [Startup_Unresolved_Fault_Reconciliation-prd.md](prds/Startup_Unresolved_Fault_Reconciliation-prd.md) | Startup_Unresolved_Fault_Reconciliation | Draft | 2026-07-11 |
 | [GMap_RDP_Overlay_Desync-prd.md](prds/GMap_RDP_Overlay_Desync-prd.md) | GMap_RDP_Overlay_Desync | Draft | 2026-07-11 |

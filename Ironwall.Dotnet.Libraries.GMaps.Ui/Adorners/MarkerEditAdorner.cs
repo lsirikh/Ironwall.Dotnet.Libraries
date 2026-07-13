@@ -514,11 +514,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
                     e.Handled = true;
                     break;
 
-                case Key.Delete:
-                    // 마커 삭제 요청
-                    RequestMarkerDeletion();
-                    e.Handled = true;
-                    break;
+                // Delete는 여기서 처리하지 않는다 — RequestMarkerDeletion()이 no-op 스텁이라 무확인·무동작으로
+                // 키를 삼키던 갭(FR-05). 윈도우 레벨 OnMapPreviewKeyDownForGroup → ExecuteDeleteSelected(확인팝업)로
+                // 버블링시켜 단일 진입점 유지. (PreviewKeyDown 터널이 이 버블 OnKeyDown보다 먼저 발화)
 
                 case Key.Enter:
                     if (_isDragging)
@@ -1285,15 +1283,7 @@ public class MarkerEditAdorner : Adorner, IDisposable
     //}
     #endregion
 
-    /// <summary>
-    /// 마커 삭제 요청
-    /// </summary>
-    private void RequestMarkerDeletion()
-    {
-        // 마커 삭제는 외부에서 처리하도록 이벤트 발생
-        // TODO: MarkerDeletionRequested 이벤트 추가 고려
-        _log?.Info($"마커 삭제 요청: {_targetMarker?.Title}");
-    }
+    // (RequestMarkerDeletion 스텁 제거 — Delete는 윈도우 핸들러 ExecuteDeleteSelected 확인팝업 경로로 통일. FR-05)
 
     #endregion
 

@@ -109,6 +109,9 @@ public record DeviceFetchProgressMessage(string Step, int StepIndex, int TotalSt
 /// <summary>NatsSync 기반 단일 디바이스 Status 변경 알림</summary>
 public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType, EnumDeviceStatus Status);
 
+/// <summary>웹서버 설정(IsWebServerEnabled) 변경 알림 — SETUP 웹설정 토글 시 발행. LeftMenu 통합웹 버튼 가시성 라이브 갱신용(FR-05).</summary>
+public record WebServerEnabledChangedMessage(bool IsEnabled);
+
 public class StatusMessageModel
 {
     public StatusMessageModel()

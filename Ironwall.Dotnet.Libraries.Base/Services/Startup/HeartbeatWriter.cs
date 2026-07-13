@@ -49,11 +49,14 @@ internal sealed class HeartbeatWriter : IDisposable
         }
 
         // 반드시 UI 스레드에서 타이머 생성/시작 (프리즈 감지 정확성).
+        // ⚠ Normal 우선순위 — Background는 UI가 바쁠 때(GIS 렌더/이벤트 폭주 등) 굶어(starve) 하트비트가
+        //   정체 → 건강한 앱을 '프리즈'로 오판(거짓 kill). Normal은 Render/Input/Background보다 위라
+        //   부하 중에도 확실히 발화하고, 진짜 Dispatcher 데드락일 때만 미발화 → 정확한 프리즈 감지.
         dispatcher.Invoke(() =>
         {
             _timer = new DispatcherTimer(
                 TimeSpan.FromMilliseconds(_intervalMs),
-                DispatcherPriority.Background,
+                DispatcherPriority.Normal,
                 (_, _) => WriteBeat(),
                 dispatcher);
             _timer.Start();
@@ -86,7 +89,22 @@ internal sealed class HeartbeatWriter : IDisposable
         {
             var t = _timer;
             if (t != null)
-                t.Dispatcher.Invoke(() => t.Stop());
+            {
+                var d = t.Dispatcher;
+                if (d.HasShutdownStarted || d.HasShutdownFinished)
+                {
+                    // Dispatcher가 이미 종료 중 — 타이머는 함께 소멸. Invoke 시 블록/예외 위험이라 스킵.
+                }
+                else if (d.CheckAccess())
+                {
+                    t.Stop();
+                }
+                else
+                {
+                    // 논블로킹 — 앱 종료 중 UI 스레드 대기(최대 10초 안전망)로 '안 닫힘'처럼 보이던 지연 방지
+                    d.BeginInvoke(new Action(() => { try { t.Stop(); } catch { } }));
+                }
+            }
         }
         catch { /* 종료 경합 무시 */ }
         try { _accessor?.Dispose(); } catch { }

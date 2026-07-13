@@ -139,8 +139,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
             var cur = e.GetPosition(_map);
             double nx = _origOffsetX + (cur.X - _grabScreen.X);
             double ny = _origOffsetY + (cur.Y - _grabScreen.Y);
-            // 상한: 오프셋 벡터 길이 ≤ max(W,H)/2 × 1.5 (너무 멀어져 안 보임 방지, FR-LB-04)
-            double cap = Math.Max(_marker.Width, _marker.Height) / 2.0 * 1.5;
+            // 상한: 오프셋 벡터 길이 ≤ 심볼 최대 반지름(max(W,H)/2)의 2배 (= max(W,H)). 너무 멀어져 안 보임 방지, FR-LB-04.
+            double cap = Math.Max(_marker.Width, _marker.Height) / 2.0 * 2.0;
             double len = Math.Sqrt(nx * nx + ny * ny);
             if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
             _marker.LabelOffsetX = nx;

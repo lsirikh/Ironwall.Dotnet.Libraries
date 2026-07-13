@@ -25,8 +25,8 @@ public sealed class WatchdogClientOptions
     /// <summary>하트비트 기록 주기(ms). 기본 3000.</summary>
     public int HeartbeatIntervalMs { get; set; } = 3000;
 
-    /// <summary>와치독이 프리즈로 판정하는 하트비트 stale 임계(ms). 기본 15000. 와치독에 인자로 전달.</summary>
-    public int FreezeThresholdMs { get; set; } = 15000;
+    /// <summary>와치독이 프리즈로 판정하는 하트비트 stale 임계(ms). 기본 30000(부하 중 거짓 프리즈 방지). 와치독에 인자로 전달.</summary>
+    public int FreezeThresholdMs { get; set; } = 30000;
 
     /// <summary>와치독 폴 주기(ms). 기본 5000. 와치독에 인자로 전달.</summary>
     public int PollIntervalMs { get; set; } = 5000;

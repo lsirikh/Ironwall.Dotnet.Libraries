@@ -934,15 +934,29 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
     private async void OnMapPreviewKeyDownForGroup(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        // 텍스트 입력 중이면 그룹 단축키(Del/방향키 등) 가로채지 않음 — 윈도우 레벨 후킹이 광범위하므로(#7).
-        if (System.Windows.Input.Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase
-            || e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase) return;
+        // 텍스트/콤보 입력 중이면 단축키(Del/방향키/Ctrl+C·V 등) 가로채지 않음 — 윈도우 레벨 후킹이 광범위하므로(#7, RISK-02).
+        var focused = System.Windows.Input.Keyboard.FocusedElement;
+        if (focused is System.Windows.Controls.Primitives.TextBoxBase
+            || e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase
+            || focused is System.Windows.Controls.ComboBox
+            || focused is System.Windows.Controls.PasswordBox) return;
 
-        if (e.Key == System.Windows.Input.Key.Delete && (_groupSelection?.HasSelection ?? false))
+        // Delete = 선택 심볼/이미지 삭제(단일·그룹) — 단일 진입점 ExecuteDeleteSelected(확인팝업 경유)로 통일.
+        //   그룹 선택 시 내부에서 ExecuteGroupDelete로 위임. 단일 Delete 키 경로는 원래 부재(어도너 스텁=no-op)였어 신규 배선(FR-05).
+        if (e.Key == System.Windows.Input.Key.Delete
+            && ((_groupSelection?.HasSelection ?? false) || SelectedMarker != null || SelectedImage != null))
         {
             e.Handled = true;
-            await ExecuteGroupDelete();
+            ExecuteDeleteSelected(null);
             return;
+        }
+
+        // Ctrl+C / Ctrl+V = 심볼 복사 / 붙여넣기(마우스 커서 위치). 맵 활성·편집모드 시에만(윈도우 광역 후킹 격리, FR-06).
+        var ctrlC = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+        if (ctrlC && IsMapShortcutContextActive())
+        {
+            if (e.Key == System.Windows.Input.Key.C) { e.Handled = true; CopySelectionToBuffer(); return; }
+            if (e.Key == System.Windows.Input.Key.V) { e.Handled = true; PasteFromBufferAsync(); return; }
         }
 
         // 방향키 격자 이동 — 격자스냅 ON + 선택 심볼을 화살표로 격자 한 칸씩 이동(요청 기능).
@@ -4903,7 +4917,10 @@ public partial class MapViewModel : BasePanelViewModel,
     // <summary>
     /// 심볼로부터 마커 추가
     /// </summary>
-    private void AddMarkerFromSymbol(ISymbolModel symbolModel, bool isExistingMarker = false)
+    /// <param name="deferLayerSync">true면 레이어 트리 리빌드(LoadLayersFromDbAsync)를 생략 — 배치 붙여넣기에서
+    /// 항목마다 N회 리빌드하지 않고 호출측이 배치 완료 후 1회만 리빌드하도록(NFR-01). RecordAdd/provider 동기화는 유지.</param>
+    /// <returns>생성·추가된 마커(붙여넣기 후 자동선택용). 실패 시 null.</returns>
+    private IEditableMarker? AddMarkerFromSymbol(ISymbolModel symbolModel, bool isExistingMarker = false, bool deferLayerSync = false)
     {
         try
         {
@@ -4922,15 +4939,18 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 if (!_symbolProvider.Any(s => ReferenceEquals(s, symbolModel)))
                     _symbolProvider.Add(symbolModel);
-                _ = LoadLayersFromDbAsync();   // 패널 열려있으면 새 노드 반영(트리 리빌드, 내부 try/catch)
+                if (!deferLayerSync)
+                    _ = LoadLayersFromDbAsync();   // 패널 열려있으면 새 노드 반영(트리 리빌드, 내부 try/catch)
                 if (marker is IEditableMarker em && em.Id > 0) _editRecorder?.RecordAdd(em);   // Undo 기록(추가). Id=0(AddPidsSingle 버그) 제외
             }
 
             //_log?.Info($"마커 추가 완료: {symbolModel.Title}");
+            return marker as IEditableMarker;
         }
         catch (Exception ex)
         {
             _log?.Error($"마커 추가 실패: {ex.Message}");
+            return null;
         }
     }
 
@@ -5060,282 +5080,18 @@ public partial class MapViewModel : BasePanelViewModel,
             var originalPos = SelectedMarker.Position;
             var newPos = new PointLatLng(originalPos.Lat + 0.0001, originalPos.Lng + 0.0001);
 
-            // 2. 마커 타입별로 SymbolModel 생성 및 복제
+            // 2. 심볼 스냅샷 딥클론 → 복사 코어(CreateSymbolCopyAsync) 재사용. Duplicate(오프셋)/Paste(커서) 공유.
+            //    이미지 마커는 복제 대상 아님(v1). PIDS Id 유실(`= pidsSymbol`)·`+1000` 실장비 충돌 버그는
+            //    코어에서 근본 수정(미링크 0 + Fetch Id 사용).
             ISymbolModel? duplicatedSymbol = null;
-            int newSymbolId = 0;
-
-            switch (SelectedMarker)
+            var dupSnap = Services.Undo.SymbolSnapshot.Capture(SelectedMarker);
+            if (dupSnap == null || dupSnap.IsImage)
             {
-                case GMapCustomMarker customMarker:
-                    // SymbolModel 복제
-                    var originalCustomModel = customMarker.Model as SymbolModel;
-                    if (originalCustomModel != null)
-                    {
-                        var customSymbol = new SymbolModel
-                        {
-                            Title = $"{originalCustomModel.Title}_Copy",
-                            TitleSize = originalCustomModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalCustomModel.Zoom,
-                            Width = originalCustomModel.Width,
-                            Height = originalCustomModel.Height,
-                            Bearing = originalCustomModel.Bearing,
-                            Category = originalCustomModel.Category,
-                            ShowShape = originalCustomModel.ShowShape,
-                            ShowTitle = originalCustomModel.ShowTitle,
-                            OperationState = originalCustomModel.OperationState,
-                            FillColor = originalCustomModel.FillColor,
-                            StrokeColor = originalCustomModel.StrokeColor,
-                            StrokeThickness = originalCustomModel.StrokeThickness
-                        };
-
-                        newSymbolId = await _gMapDbSymbolService.InsertSymbolAsync(customSymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchSymbolAsync(newSymbolId);
-                    }
-                    break;
-
-                case GMapGeometricMarker geometricMarker:
-                    // GeometricSymbolModel 복제
-                    var originalGeoModel = geometricMarker.Model as GeometricSymbolModel;
-                    if (originalGeoModel != null)
-                    {
-                        var geoSymbol = new GeometricSymbolModel
-                        {
-                            Title = $"{originalGeoModel.Title}_Copy",
-                            TitleSize = originalGeoModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalGeoModel.Zoom,
-                            Width = originalGeoModel.Width,
-                            Height = originalGeoModel.Height,
-                            Bearing = originalGeoModel.Bearing,
-                            Category = originalGeoModel.Category,
-                            ShowShape = originalGeoModel.ShowShape,
-                            ShowTitle = originalGeoModel.ShowTitle,
-                            OperationState = originalGeoModel.OperationState,
-                            FillColor = originalGeoModel.FillColor,
-                            StrokeColor = originalGeoModel.StrokeColor,
-                            StrokeThickness = originalGeoModel.StrokeThickness,
-                            Opacity = originalGeoModel.Opacity,
-                            ShapeType = originalGeoModel.ShapeType
-                        };
-
-                        newSymbolId = await _gMapDbSymbolService.InsertGeometrySymbolAsync(geoSymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchGeometrySymbolAsync(newSymbolId);
-                    }
-                    break;
-
-                case GMapPidsMarker pidsMarker:
-                    // PidsSymbolModel 복제
-                    var originalPidsModel = pidsMarker.Model as PidsSymbolModel;
-                    if (originalPidsModel != null)
-                    {
-                        var pidsSymbol = new PidsSymbolModel
-                        {
-                            Title = $"{originalPidsModel.Title}_Copy",
-                            TitleSize = originalPidsModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalPidsModel.Zoom,
-                            Width = originalPidsModel.Width,
-                            Height = originalPidsModel.Height,
-                            Bearing = originalPidsModel.Bearing,
-                            Category = originalPidsModel.Category,
-                            ShowShape = originalPidsModel.ShowShape,
-                            ShowTitle = originalPidsModel.ShowTitle,
-                            OperationState = originalPidsModel.OperationState,
-                            FillColor = originalPidsModel.FillColor,
-                            StrokeColor = originalPidsModel.StrokeColor,
-                            StrokeThickness = originalPidsModel.StrokeThickness,
-                            LinkedDeviceId = originalPidsModel.LinkedDeviceId + 1000, // 중복 방지
-                            DeviceType = originalPidsModel.DeviceType,
-                            DetectionRange = originalPidsModel.DetectionRange,
-                            DetectionAngle = originalPidsModel.DetectionAngle,
-                            DetectionBearing = originalPidsModel.DetectionBearing,
-                            ShowFOV = originalPidsModel.ShowFOV,
-                            EventStatus = originalPidsModel.EventStatus,
-                            FOVColor = originalPidsModel.FOVColor,
-                            FOVOpacity = originalPidsModel.FOVOpacity
-                        };
-
-                        // TODO: PidsSymbol DB 저장 구현 후 활성화
-                        newSymbolId = await _gMapDbSymbolService.InsertPidsSymbolAsync(pidsSymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchPidsSymbolAsync(newSymbolId);
-
-                        // 임시로 직접 추가 (DB 저장 미구현)
-                        duplicatedSymbol = pidsSymbol;
-                    }
-                    break;
-                case GMapMilitarySymbolMarker militaryMarker:
-                    // MilitarySymbolModel 복제
-                    var originalMilitaryModel = militaryMarker.Model as MilitarySymbolModel;
-                    if (originalMilitaryModel != null)
-                    {
-                        var militarySymbol = new MilitarySymbolModel
-                        {
-                            Title = $"{originalMilitaryModel.Title}_Copy",
-                            TitleSize = originalMilitaryModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalMilitaryModel.Zoom,
-                            Width = originalMilitaryModel.Width,
-                            Height = originalMilitaryModel.Height,
-                            Bearing = originalMilitaryModel.Bearing,
-                            Category = originalMilitaryModel.Category,
-                            ShowShape = originalMilitaryModel.ShowShape,
-                            ShowTitle = originalMilitaryModel.ShowTitle,
-                            OperationState = originalMilitaryModel.OperationState,
-                            FillColor = originalMilitaryModel.FillColor,
-                            StrokeColor = originalMilitaryModel.StrokeColor,
-                            StrokeThickness = originalMilitaryModel.StrokeThickness,
-
-                            // MilitarySymbol 전용 속성들
-                            Affiliation = originalMilitaryModel.Affiliation,
-                            BattleDimension = originalMilitaryModel.BattleDimension,
-                            StandardIdentity = originalMilitaryModel.StandardIdentity,
-                            UnitType = originalMilitaryModel.UnitType,
-                            UnitSize = originalMilitaryModel.UnitSize,
-                            UnitDesignator = originalMilitaryModel.UnitDesignator,
-                            HigherFormation = originalMilitaryModel.HigherFormation,
-                            CallSign = originalMilitaryModel.CallSign,
-                            CountryCode = originalMilitaryModel.CountryCode
-                        };
-
-                        newSymbolId = await _gMapDbSymbolService.InsertMilitarySymbolAsync(militarySymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchMilitarySymbolAsync(newSymbolId);
-                    }
-                    break;
-
-                case GMapLineMarker lineMarker:
-                    // LineSymbolModel 복제
-                    var originalLineModel = lineMarker.Model as LineSymbolModel;
-                    if (originalLineModel != null)
-                    {
-                        var lineSymbol = new LineSymbolModel
-                        {
-                            Title = $"{originalLineModel.Title}_Copy",
-                            TitleSize = originalLineModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalLineModel.Zoom,
-                            Width = originalLineModel.Width,
-                            Height = originalLineModel.Height,
-                            Bearing = originalLineModel.Bearing,
-                            Category = originalLineModel.Category,
-                            ShowShape = originalLineModel.ShowShape,
-                            ShowTitle = originalLineModel.ShowTitle,
-                            OperationState = originalLineModel.OperationState,
-                            FillColor = originalLineModel.FillColor,
-                            StrokeColor = originalLineModel.StrokeColor,
-                            StrokeThickness = originalLineModel.StrokeThickness,
-
-                            // LineSymbol 전용 속성들
-                            LineOpacity = originalLineModel.LineOpacity,
-                            IsClosedPath = originalLineModel.IsClosedPath,
-                            ShowArrowHead = originalLineModel.ShowArrowHead,
-                            LinePattern = originalLineModel.LinePattern,
-
-                            // LinePoints 복제 (각 포인트도 약간 이동)
-                            LinePoints = originalLineModel.LinePoints?.Select(p =>
-                                new GeoPoint(
-                                    p.Latitude + 0.0001,
-                                    p.Longitude + 0.0001,
-                                    p.Altitude
-                                )).ToList() ?? new List<GeoPoint>()
-                        };
-
-                        newSymbolId = await _gMapDbSymbolService.InsertLineSymbolAsync(lineSymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchLineSymbolAsync(newSymbolId);
-                    }
-                    break;
-                case GMapInfraMarker infraMarker:
-                    // InfraSymbolModel 복제
-                    var originalInfraModel = infraMarker.Model as InfraSymbolModel;
-                    if (originalInfraModel != null)
-                    {
-                        var infraSymbol = new InfraSymbolModel
-                        {
-                            Title = $"{originalInfraModel.Title}_Copy",
-                            TitleSize = originalInfraModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalInfraModel.Zoom,
-                            Width = originalInfraModel.Width,
-                            Height = originalInfraModel.Height,
-                            Bearing = originalInfraModel.Bearing,
-                            Category = originalInfraModel.Category,
-                            ShowShape = originalInfraModel.ShowShape,
-                            ShowTitle = originalInfraModel.ShowTitle,
-                            OperationState = originalInfraModel.OperationState,
-                            FillColor = originalInfraModel.FillColor,
-                            StrokeColor = originalInfraModel.StrokeColor,
-                            StrokeThickness = originalInfraModel.StrokeThickness,
-
-                            // InfraSymbol 전용 속성들
-                            BuildingType = originalInfraModel.BuildingType,
-                            BuildingUsage = originalInfraModel.BuildingUsage,
-                            FloorCount = originalInfraModel.FloorCount,
-                            BasementFloorCount = originalInfraModel.BasementFloorCount,
-                            BuildingArea = originalInfraModel.BuildingArea
-                        };
-
-                        newSymbolId = await _gMapDbSymbolService.InsertInfraSymbolAsync(infraSymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchInfraSymbolAsync(newSymbolId);
-                    }
-                    break;
-
-                case GMapPidsGroupMarker pidGroupMarker:
-                    // PidGroupSymbolModel 복제
-                    var originalPidsGroupModel = pidGroupMarker.Model as PidsGroupSymbolModel;
-                    if (originalPidsGroupModel != null)
-                    {
-                        var pidsGroupSymbol = new PidsGroupSymbolModel
-                        {
-                            Title = $"{originalPidsGroupModel.Title}_Copy",
-                            TitleSize = originalPidsGroupModel.TitleSize,
-                            Latitude = newPos.Lat,
-                            Longitude = newPos.Lng,
-                            Zoom = originalPidsGroupModel.Zoom,
-                            Width = originalPidsGroupModel.Width,
-                            Height = originalPidsGroupModel.Height,
-                            Bearing = originalPidsGroupModel.Bearing,
-                            Category = originalPidsGroupModel.Category,
-                            ShowShape = originalPidsGroupModel.ShowShape,
-                            ShowTitle = originalPidsGroupModel.ShowTitle,
-                            OperationState = originalPidsGroupModel.OperationState,
-                            FillColor = originalPidsGroupModel.FillColor,
-                            StrokeColor = originalPidsGroupModel.StrokeColor,
-                            StrokeThickness = originalPidsGroupModel.StrokeThickness,
-
-                            LinkedDeviceGroup = originalPidsGroupModel.LinkedDeviceGroup,
-                            EventStatus = originalPidsGroupModel.EventStatus,
-
-                            // LineSymbol 전용 속성들
-                            LineOpacity = originalPidsGroupModel.LineOpacity,
-                            IsClosedPath = originalPidsGroupModel.IsClosedPath,
-                            ShowArrowHead = originalPidsGroupModel.ShowArrowHead,
-                            LinePattern = originalPidsGroupModel.LinePattern,
-
-                            // LinePoints 복제 (각 포인트도 약간 이동)
-                            LinePoints = originalPidsGroupModel.LinePoints?.Select(p =>
-                                new GeoPoint(
-                                    p.Latitude + 0.0001,
-                                    p.Longitude + 0.0001,
-                                    p.Altitude
-                                )).ToList() ?? new List<GeoPoint>()
-
-                        };
-
-                        // DB 저장
-                        newSymbolId = await _gMapDbSymbolService.InsertPidsGroupSymbolAsync(pidsGroupSymbol);
-                        duplicatedSymbol = await _gMapDbSymbolService.FetchPidsGroupSymbolAsync(newSymbolId);
-                    }
-                    break;
-                default:
-                    _log?.Warning($"지원되지 않는 마커 타입: {SelectedMarker.GetType().Name}");
-                    return;
+                _log?.Warning("복제 실패 — 스냅샷 생성 불가(또는 이미지 마커는 복제 미지원).");
+                return;
             }
+            if (dupSnap.CloneModel() is ISymbolModel dupClone)
+                duplicatedSymbol = await CreateSymbolCopyAsync(dupClone, originalPos, newPos, appendCopySuffix: true);
 
             // 3. 복제된 심볼로 마커 생성 및 지도에 추가
             if (duplicatedSymbol != null)
