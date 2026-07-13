@@ -1,76 +1,95 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-06-30 (LayerPanel 심볼 트리노드화 + 리사이즈 스토리보드/와이어프레임 HTML 신규 — 멀티에이전트 설계검증 wf_d15d5365)
-- **총 문서 수**: 219개
+- **마지막 갱신**: 2026-07-13 (advance-phase 자동)
+- **총 문서 수**: 322개
 
 ---
 
-## 스토리보드 (Docs/storyboards/)
-
-| 파일 | 내용 | 날짜 |
-|------|------|------|
-| [Login_Gated_GIS_Init_Storyboard_Wireframe.html](reports/Login_Gated_GIS_Init_Storyboard_Wireframe.html) | **로그인 게이팅 GIS Init** (PRD-GIS-INIT-01) 스토리보드+와이어프레임 — 인터랙티브 생명주기 스테퍼(부팅→강제로그인→Device fetch 8단계 진행바→커버제거 심볼활성→로그아웃 재커버), 7컷 스토리보드, 커버 와이어프레임(전술다크그리드 #0A1014+32px격자+HUD+하단진행바), ZIndex 스택(커버400), 시퀀스(A↔B·LoginSucceeded 발화), NATS 게이트 비교(IsAuthenticated 드롭), A↔B 파티션표(A `85ba680` 완료/B dev대기). Tactical Command Dark 토큰 실값. ⚠PRD 검토용 preview(코드 미변경) | 2026-06-30 |
-| [LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html](reports/LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html) | 레이어 패널 재설계 기획 — ①카테고리별 개별 Overlay 심볼 트리노드화(비균일 4단계 Section›Group›Category›Symbol, 신규 NodeType.Category+ISymbolModel 페이로드, PIDS는 DeviceType 분기) ②드래그 리사이즈 +50%(250×420→375×630, E/S/SE 그립·좌상단 앵커·MapSettings 영속). 현행 BEFORE→AFTER, tri-state/AND마스킹/검색·가상화/리사이즈 트립틱/4컷 흐름. Tactical Dark 토큰 실값. 멀티에이전트 검증(wf_d15d5365, 4렌즈+2적대비평)이 잡은 GAP 8종(모델이음새·게이팅역전·O(n²)·높이모델모순 등) 결정표 포함. ⚠기획 단계(코드 미변경) | 2026-06-30 |
-| [Account_GOP_Integration_Storyboard.html](storyboards/Account_GOP_Integration_Storyboard.html) | GOP Account 연동 인터랙티브 스토리보드 v2.0 — WPF ShellView 기반 와이어프레임 (LoginGateOverlay·NATS Gate·MaterialDesignDataGrid·1차 인터랙션, 7화면) | 2026-06-21 |
-| [DevicePanel_EventPanel_Storyboard.html](storyboards/DevicePanel_EventPanel_Storyboard.html) | Device/Event 패널 스토리보드 | 2026-06-19 |
-
----
-
-## 분석 (docs/analysis/)
+## 분석 (docs/analyses/)
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [nats-tracking-message-flow-analysis.md](analyses/nats-tracking-message-flow-analysis.md) | NATS Tracking 메시지 수신 흐름 — 핸들러=로그-only stub(FR-15 미구현)·와일드카드 구독·공동구독자 5·DTO 구계약 잔재(targets[]). 계약 SoT=prds/NATS-Tracking-Geolocation-메시지정리.md §2.2 | 2026-06-23 |
-| [Client_API_Conformance_Audit-analysis.md](analysis/Client_API_Conformance_Audit-analysis.md) | Client_API_Conformance_Audit | 2026-06-19 |
-| [GOP_API_v4_Changes_ClientImpact-analysis.md](analysis/GOP_API_v4_Changes_ClientImpact-analysis.md) | GOP_API_v4_Changes_ClientImpact | 2026-06-19 |
-| [OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md](analysis/OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md) | OverlayImage_Rotation_Zoom_AABB_RootCause | 2026-06-12 |
-| [RapidEventBurst_Stutter_Analysis.md](analysis/RapidEventBurst_Stutter_Analysis.md) | RapidEventBurst_Stutter_Analysis.md | 2026-06-04 |
-| [Multisensor_Symbol_Bug_Analysis.md](analysis/Multisensor_Symbol_Bug_Analysis.md) | Multisensor_Symbol_Bug_Analysis.md | 2026-06-04 |
-| [EventStateSyncArchitecture_Analysis.md](analysis/EventStateSyncArchitecture_Analysis.md) | EventStateSyncArchitecture_Analysis.md | 2026-06-04 |
-| [BatchReport_SymbolLeak_Analysis.md](analysis/BatchReport_SymbolLeak_Analysis.md) | BatchReport_SymbolLeak_Analysis.md | 2026-06-04 |
-| [OverlayMap-Performance-Analysis.md](analysis/OverlayMap-Performance-Analysis.md) | OverlayMap-Performance-Analysis.md | 2026-05-27 |
-| [EVENT_PROCESS_VISUALIZATION.md](analysis/EVENT_PROCESS_VISUALIZATION.md) | EVENT_PROCESS_VISUALIZATION.md | 2026-05-22 |
-| [ANALYSIS_Skillset_Issues_And_Improvements.md](analysis/ANALYSIS_Skillset_Issues_And_Improvements.md) | ANALYSIS_Skillset_Issues_And_Improvements.md | 2026-05-19 |
-| [ANALYSIS_View_Architecture.md](analysis/ANALYSIS_View_Architecture.md) | ANALYSIS_View_Architecture.md | 2026-05-18 |
-| [ANALYSIS_Detection_Action_Process_Flow.md](analysis/ANALYSIS_Detection_Action_Process_Flow.md) | ANALYSIS_Detection_Action_Process_Flow.md | 2026-05-18 |
-| [NATS_Detection_Redis_Flow.md](analysis/NATS_Detection_Redis_Flow.md) | NATS_Detection_Redis_Flow.md | 2026-05-15 |
-| [ANALYSIS_GatewayEvent_Group_NtoN_Migration.md](analysis/ANALYSIS_GatewayEvent_Group_NtoN_Migration.md) | ANALYSIS_GatewayEvent_Group_NtoN_Migration.md | 2026-05-15 |
+| [GMap_Rotation_Overlay_Desync-analysis.md](analyses/GMap_Rotation_Overlay_Desync-analysis.md) | GMap_Rotation_Overlay_Desync | 2026-07-13 |
+| [GMap_RDP_Overlay_Desync-analysis.md](analyses/GMap_RDP_Overlay_Desync-analysis.md) | GMap_RDP_Overlay_Desync | 2026-07-07 |
+| [Map_Edit_Undo_Redo-analysis.md](analyses/Map_Edit_Undo_Redo-analysis.md) | Map_Edit_Undo_Redo | 2026-07-02 |
+| [GMap_Adorner_System-analysis.md](analyses/GMap_Adorner_System-analysis.md) | GMap_Adorner_System | 2026-07-02 |
+| [Tracking_Playback_DataSource_Toggle-analysis.md](analyses/Tracking_Playback_DataSource_Toggle-analysis.md) | Tracking_Playback_DataSource_Toggle | 2026-06-26 |
+| [Tracking_API_vs_LocalDB-analysis.md](analyses/Tracking_API_vs_LocalDB-analysis.md) | Tracking_API_vs_LocalDB | 2026-06-26 |
+| [Http_To_Https_Migration_Impact-analysis.md](analyses/Http_To_Https_Migration_Impact-analysis.md) | Http_To_Https_Migration_Impact | 2026-06-25 |
+| [nats-tracking-message-flow-analysis.md](analyses/nats-tracking-message-flow-analysis.md) | nats-tracking-message-flow | 2026-06-23 |
 
 ## 요구사항 정의서 (docs/prds/)
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | 맵 심볼 **단축키 3종**(Delete/Ctrl+C/Ctrl+V). **P0 확정**: ①단일 Delete 키 경로 부재(`MarkerEditAdorner.RequestMarkerDeletion`=no-op 스텁인데 `e.Handled=true`로 Delete 삼킴) ②PIDS 복제 Id 유실(`=pidsSymbol` @5159가 Fetch Id 덮어씀→Undo누락) ③PIDS `+1000` 실장비충돌. 설계=`DuplicateSelectedMarker`→`CreateSymbolCopyAsync(source,targetPos)` 코어 추출(Duplicate/Paste 공유), 인메모리 클립보드 버퍼(딥클론+앵커), Ctrl+V=커서 위경도(`GetLastCursorLatLng` 신설·GMapCustomControl `_lastMouseScreen`)에 멀티 상대배치, 배치 Undo=`BeginBatch`, 삭제=단일진입점 `ExecuteDeleteSelected`(확인팝업 `OpenConfirmPopupMessageModel`)+어도너 Delete case 제거. 키후킹=`OnMapPreviewKeyDownForGroup` 확장(텍스트/콤보 가드+맵활성 게이트). 이미지 복사=v1 제외(삭제는 포함). Explore×3+architect+code-reviewer 체인. FR-01~06/NFR5/V-01~06/D-01~05/OQ-01~06 (Track C) | Draft | 2026-07-13 |
-| [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | **F11 전체화면 토글**(메인 솔루션 `ShellView`=MahApps MetroWindow). 현재 전체화면 기능 전무(grep 0). F11 PreviewKeyDown(터널링·포커스무관)→`ToggleFullScreen()` 코드비하인드(테마토글 EXT-06 선례). 진입=ShowTitleBar false+IgnoreTaskbarOnMaximize+Maximized+NoResize, 해제=진입전 상태 저장·복원. F11만 Handled(Esc 미개입=팝업충돌 회피). ⚠외부 메인솔루션 2파일. FR-01~04/NFR3/V-01~03 (Track B) | Draft | 2026-07-13 |
-| [Watchdog_Modern_Rebuild-prd.md](prds/Watchdog_Modern_Rebuild-prd.md) | 레거시 .NET FW 와치독(이름폴링·프리즈 미감지·runas·크래시루프 무방비)을 **.NET 8 전면 재구축**. 신규 headless exe `Ironwall.Dotnet.Watchdog`(Generic Host)+인앱 `IConnectionWatchdog` 구현(하트비트 writer). 핵심: **프리즈 감지=DispatcherTimer(UI스레드)로 Named MMF(`Global\IW_HB_{PID}`) 하트비트**(스레드풀 타이머면 오판), 종료핸드셰이크=EventWaitHandle(사용자종료vs크래시 구분), 상태채널=Named Pipe→Setup탭 라이브표시, 크래시루프=지수백오프+서킷브레이커(DEGRADED), 상호감시=per-user 로그온 예약작업+단일뮤텍스, kill=PID+절대경로+StartTime 3중확인(이름충돌 오킬 방지·runas제거). Setup 와치독 탭(WatchdogSetupViewModel:BaseSetupViewModel)+메인솔루션 3파일 배선(⚠사전통지). Explore×2+architect(opus) 종합. FR-01~10/NFR6/V-01~07/리스크6 (Track C) | Draft | 2026-07-12 |
-| [Login_Gated_GIS_Init-prd.md](prds/Login_Gated_GIS_Init-prd.md) | **로그인 게이팅 GIS init 생명주기** (PRD-GIS-INIT-01) — 서버 token 강화 시 부팅 Device fetch(Order22, 토큰0·로그인전)가 401→빈캐시→심볼↔디바이스 연계붕괴를 선제 차단. 4게이트: ①맵 커버(전술다크그리드, MapView Row2 ZIndex400) ②강제로그인(부팅 자동표시·닫기불가)+커버 진행바(신규 DeviceFetchProgressMessage 8단계) ③Device fetch를 LoginSucceeded로 지연(ExecuteAsync=구독등록 no-op, BaseDeviceProdiver CollectionChanged 자동동기화) ④NATS는 IsAuthenticated 게이트(Events.Ui SyncService). 로그아웃→재로그인 재init. **A위임**=ISessionLifecycle.LoginSucceeded seam+LoginPanel 강제모드(원장 §5). Explore×4+architect(opus) 검증. FR-CV/LG/DF/PB/NG/RL/BR·R1~7·OQ1~6 (Track C, 세션 B) | Draft | 2026-06-30 |
-| [LayerPanel_SymbolNesting_Resize-prd.md](prds/LayerPanel_SymbolNesting_Resize-prd.md) | 레이어 패널 v1 — ①카테고리별 개별 Overlay 심볼 트리노드화(비균일 4단계 Section›Group›Category›Symbol, 신규 NodeType.Category+ISymbolModel 페이로드, PIDS=DeviceType 6분기·VEHICLES보강, 가시성토글=ShowShape/IsLayerEnabled·navigate, tri-state 일괄 O(n²)제거, 모델이음새/게이팅역전 해소) ②드래그 리사이즈(E/S/SE Thumb, 250×420→375×630, 좌상단앵커·Canvas클램프, 세션내 크기기억). **구현·커밋 `367e6f0`**(worktree feature/layerpanel-symbol-nesting off v2.6 dc87a39, 롤백 before-layerpanel-symbol-nesting) GMaps.Ui 빌드0·단위148/148(신규19). 설계검증 wf_d15d5365(4렌즈+2적대비평)+[스토리보드](reports/LayerPanel_SymbolNesting_Resize_Storyboard_Wireframe.html). v2보류=삭제/이름변경·가상화·검색·세션간영속. ⚠머지/E2E 보류 (Track C) | 구현완료·머지보류 | 2026-06-30 |
-| [GMap_Delete_EditMode_BugFix-prd.md](prds/GMap_Delete_EditMode_BugFix-prd.md) | 검증된 GMap.UI 버그 2건. **BUG-CAST(버그2)**: 편집모드 토글 시 `InvalidCastException` — `GMapCustomControl.cs` 하드캐스트 3곳(`foreach (IEditableMarker marker in Markers)` @1190·1414·2215)이 라이브 추적의 `GMapTrailMarker`/`GMapTrackingMarker`(sealed:GMapMarker, IEditableMarker 미구현)를 만나 throw(2215=try/catch無→앱크래시). 수정=`Markers.OfType<IEditableMarker>()`(동파일 507/608/910 선례). **BUG-DEL(버그1)**: 심볼삭제 세션 중 부활 — `GMapDbSymbolService.DeleteXxxAsync`가 SQL DELETE만·`_symbolProvider` 캐시 미제거 → `SymbolConfigureAsync`(OnActivate) stale 캐시로 마커 재생성. 콜드재시작=DB재로딩=정상삭제("껐다켜니 또 지워진다"). 수정=Delete 7종에 캐시 Remove. 두 버그 同뿌리·無인과(검증으로 "크래시가 삭제차단" 가설 반박). 멀티에이전트 wf_53e628e6(trace4+verify3). FR-01~03/NFR4/V-01~04/리스크4 (Track B/C) | Draft | 2026-06-29 |
-| [Symbol_Apply_DeviceLocation_Api-prd.md](prds/Symbol_Apply_DeviceLocation_Api-prd.md) | 장비 심볼 속성창 "현재위치 적용" 버튼 → 심볼 현재 지도위치(lat/lng)+방위(BaseBearing→Heading)를 **디바이스 Model 반영 + 서버 API PATCH 저장**. 핵심: 심볼위치≠디바이스좌표(별도 저장소), 드래그는 심볼DB만 저장→디바이스 API 미반영 단절을 메움([[Camera_PTZ_AimLocation_Nats]] (0,0) 문제 근본해소). 설계=인라인 최소 geolocation DTO PATCH(타입별 Patch{Camera/Sensor/Controller/Speaker/Enclosure/Lamp}Async, Devices.Ui 매퍼 결합회피)+GMaps.Ui→Devices.Api 참조(순환無)+lazy 옵셔널 IDeviceApiService+진행팝업. 대상=LinkedDevice 보유 모든 PIDS심볼. ⚠V-01: PATCH 부분수용 선검증. FR-01~07/NFR4/V-01~05 (Track C) | Draft | 2026-06-29 |
-| [GatewayEvent_Group_Resurrection_Fix-prd.md](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | 3rd Party(Gateway) 이벤트 그룹 **쓰레기값("1, 116")** 근본수정. 진범=**Provider/DB**(DataGrid 무죄). 레거시 `GatewayEvents.Group` 단일컬럼이 `BuildSchemeAsync` 상시 이행쿼리로 **매 시작 부활**(INSERT IGNORE SELECT Group>0) + Update가 레거시컬럼 미클리어 → 사용자지정 116과 합쳐져 `[1,116]`. **DB증거 확정**(Event_A Group=1→조인{(1,1),(1,116)}, Event_B Group=0→{117} 정상). 선행 NtoN PRD가 **연기한 Step3(컬럼 DROP)** 완료 = A안: 상시쿼리→가드형 1회 마무리블록(최종이행→좀비정리 count>1 규칙→DROP COLUMN+IX_Group). 단일선택 UI(V-02)라 2개↑=좀비 확정. lib Gateway 단독, 외부 무변경(NatsDomainService 이미 Intersect). FR-01~05/NFR4/V-01~05/리스크4 (Track B) | Draft | 2026-06-29 |
-| [Camera_PTZ_AimLocation_Nats-prd.md](prds/Camera_PTZ_AimLocation_Nats-prd.md) | 맵 PTZ 카메라 우클릭→"특정 위치 확인"→타겟 커서+반경 30m 영역→영역 내 클릭→**NATS PUB로 카메라 회전요청+좌표 발행**(회전은 서버/NVR 집행, 클라 직접회전X). 게이팅=`ICameraDeviceModel.Category==EnumCameraType.PTZ`(동기·DB변경X). 신규 `CameraAimControlService`(BroadcastControlService 패턴)+`CameraAimLocationBodyDto`+`EnumGopCommand.CAMERA_AIM_LOCATION`+순수로직 `CameraAimMath`/`Builder`. 반경판정=지오도메인(줌무관). 좌클릭 가로채기=OnMouseLeftButtonDown IsLineDrawing 분기점. Explore×4+architect+code-reviewer 체인. FR-01~12/NFR6/V-01~07/리스크8 (Track C) | Draft | 2026-06-29 |
-| [GOP_Permission_Enforcement-prd.md](prds/GOP_Permission_Enforcement-prd.md) | 권한 **실제 집행** — 등급 권한을 앱 전반(장비/이벤트/맵/PTZ)에 적용. 멀티에이전트 시뮬 **218시나리오·99발견·8도메인**. FR-EN-01~15(P0=T4긴급·reports무인증·3선결조건·require_perm·모듈정의 / P1=PTZ·방송·맵·장비·이벤트 게이팅+역할강등재평가+마지막ADMIN / P2=device_groups스코프·감사append-only·콘솔). ★PTZ=서버 미중계(ONVIF직결, /ptz 경로 전무)→클라 MapViewModel 9핸들러 `CanControl("cameras")` 단독집행(Stop제외). PRD-GOP-01 집행부 구체화 (Track C) | Draft | 2026-06-29 |
-| [CameraPopup_PressHold_PtzZoomFocus-prd.md](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | 줌·포커스 버튼을 click-pulse→**press-hold-continuous + release-stop**으로 전환(방향 패드 패턴 통일). 통합 Tag 메커니즘(ParseGestureTag)+CaptureMouse 안전망. **설계검증 wf_da23975b**: architect SOUND_WITH_CHANGES + code-reviewer FLAWED→교정 반영(🔴 포커스 Stop은 ImagingClient 별도경로=StopFocusAsync 4곳 라우팅·pre-Stop awaited 순서보장·Tag 콜론파싱·Command제거). FR-PH-01~09. 비목표=F클램프(R1 런타임 1순위 리스크)·Gate분리. lib GMaps.Ui 단독 6파일 (Track C) | Draft | 2026-06-29 |
-| [CameraPopup_PTZ_Control-prd.md](prds/CameraPopup_PTZ_Control-prd.md) | 맵 RTSP 팝업 PTZ 제어 — 우버튼 드래그 PTZ(벡터 시각화→**RelativeMove** 1회)+단일 선택+팝업 내 [PTZ][프리셋][옵션] 탭. 프리셋=로컬DB(이동 AbsoluteMove/저장 GetStatus/편집). 옵션 v1=주야간·포커스(ONVIF live). 신규 `IPtzController`+ONVIF 래퍼(Relative/Absolute/GetStatus/GetNode)+Imaging 쓰기 역매퍼. OnvifSolution(실동작 WCF/SOAP) 재사용. 디스커버리+옵션식별+5카테고리 시뮬레이션+적대적비평 종합. FR 35+/NFR 11/리스크 9(3 Critical: FOV폴백·space clamp·좌표 round-trip)/VER 6/미결 7. **HTML 스토리보드/와이어프레임**=`reports/CameraPopup_PTZ_Storyboard_Wireframe.html` (Track C) | Draft | 2026-06-23 |
-| [Tracking_GIS_Visualization_Playback-prd.md](prds/Tracking_GIS_Visualization_Playback-prd.md) | 실시간 GIS 추적 시각화(타입별 심볼·위험도 테두리·방향)+이동경로 트레일(점선/페이드/속도)+TTL 수명+설정(appsettings/맵세팅UI)+**서버 API 영속(§8 가이드: 서버 NATS 인제스트+GET, 클라는 조회만)**+별도 Playback 창(옵션B/타임라인/배속)+MP4(P6 후반). 6 Phase·46 FR·11 NFR·13 V·미결 D-05~D-21/D-A1~4. 자산발견+90시나리오+2회 시뮬레이션 architect(opus) 종합. 계약 SoT=NATS-Tracking §2.2 (Track C) | **Approved (P1~P3)** | 2026-06-24 |
-| [CameraPopup_DigitalZoom_Alignment-prd.md](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 디지털 줌 활성 시 카메라 RTSP 팝업·연결선이 심볼에서 어긋남 수정 · RC-1 좌표 도메인 비대칭(마커=RenderTransform 안 / 팝업=형제 PropertyPanelCanvas 밖에서 FromLatLngToLocal inner 좌표 직접 사용) · RC-2 디지털줌 갱신 트리거 부재 · 옵션 A: InnerToOuter/OuterToInner 헬퍼 + DigitalZoomLevelChanged→RefreshCameraPopupPositions · 회전 독립합성 검증(V-01) · scale=1 항등→회귀0 · **머지 `2062caf`·빌드0·격리테스트61·code-review(opus) MERGE** ※메인솔루션 재빌드 후 런타임검증 (Track B/C) | 구현완료 | 2026-06-23 |
-| [CameraPopup_Snapshot_UX-prd.md](prds/CameraPopup_Snapshot_UX-prd.md) | 카메라 팝업 스냅샷 UX · 저장폴더 설정화(EventSetupView 옵션+찾아보기, appsettings/SetupModel/StreamingSetupModel SnapshotPath) + 폴더 자동생성(기존엔 폴더없으면 저장실패) · 플래시 효과(흰 번쩍) · OSD "스냅샷 저장" 우상단 1초 · **구현·커밋(lib 7b3e984, 메인 fe276ee) 빌드0** ※앱 닫고 재빌드 검증 (Track C) | 구현완료 | 2026-06-23 |
-| [CameraPopup_Streaming_Settings-prd.md](prds/CameraPopup_Streaming_Settings-prd.md) | 카메라 팝업 설정 연동(EventSetupView↔맵) · SetupModel:IStreamingSetupModel 인터페이스 주입(IGMapSetupModel 패턴) · 더블클릭 게이팅(IsCameraPopupUsed) · 자동해제 타이머(IsAutoDiscard/TimeoutSeconds·상호작용 리셋) · 카메라심볼↔팝업 연결선(Leader Line·팬/줌/드래그 추종) · **구현·커밋(lib 04005a2/b57de1a/fb6ea46, 메인 3dcc6fe) code-review H-1/H-2/M-3 반영·빌드0** ※앱 닫고 재빌드 후 런타임 검증 (Track C) | 구현완료 | 2026-06-23 |
-| [Rtsp_Map_Popup-prd.md](prds/Rtsp_Map_Popup-prd.md) | 맵 카메라 더블클릭→Geo앵커 이동식 RTSP 팝업(위치기억) · 참조 Dotnet.Rtsp.Viewer.Ui LibVLCSharp Streaming 이식 · 관심지역/레이어 창 답습(384×300, Hub WriteableBitmap airspace 회피) · **위치영속=DB(다중클라 공유)** · 스토리보드+와이어프레임 · FR12/리스크9 · v1.1 미결4건 확정(DB/카메라Id/포커스/Hub) · 5영역 워크플로우+architect(opus) · **구현·머지 완료(lib `c9fcd8d` v2.6 / 메인솔루션 `1ee7ae8` v0.5) 8/8단계, 빌드0·48테스트·code-review H-1수정·네이티브배포** ※런타임 검증 대기 (Track C) | 구현완료 | 2026-06-23 |
-| [EnclosureThresholdDialog-prd.md](prds/EnclosureThresholdDialog-prd.md) | 함체 임계값(온/습도·진동) 설정 다이얼로그 · 카메라 상세 패턴 복제(양 repo) · threshold_config 매핑 보강(양방향 드롭 해소)+M1 가드 · **구현·머지(5616dd3/ea4eb68/bd612bd, review C/H 0)** | 구현완료 | 2026-06-22 |
-| [BaseMap_NoData_DefaultTile-prd.md](prds/BaseMap_NoData_DefaultTile-prd.md) | MBTiles 베이스맵 커버리지 밖 흰 화면에 "깔끔/모던" 기본 타일(격자 타일링) · DefaultTileBytes+GetTileImage 분기(c)+DefaultTileImageFactory · xUnit 41통과 · **구현·머지(a8d968b)** + v1.1 각 타일 중앙 센서웨이 로고(`cead507`) ※GMap.NET 고아 서브모듈=Core 1파일 git외+수동백업 (Track C) | 구현완료 | 2026-06-22 |
-| [SpeakerServerAssignment-prd.md](prds/SpeakerServerAssignment-prd.md) | 스피커 방송서버(server_id) 배정 · 12-Agent opus 시뮬레이션(5블로커/1High) · 매핑 비대칭(write server_id↔read nested) · ServerProvider 신설 · 해제없음+첫서버 자동배정 (Track C) · **구현·머지 완료(0913360)** | 구현완료 | 2026-06-22 |
-| [DevicePropertyPanel_Layout_Redesign-prd.md](prds/DevicePropertyPanel_Layout_Redesign-prd.md) | 6패널 속성 4구역 레이아웃+스크롤+Bearing/Alt 왕복 · 6차원 시뮬레이션 · **구현·머지 완료(c92344a)** | 구현완료 | 2026-06-22 |
-| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP REST API **v4.9** Account/Auth JWT 연동 · PRD-GOP-00 · **v2.2 완성: 서버 회신(§2.3)+seam 정합(§2.4)+FR정합·FR-21·§5-A·DoD** — 3버킷(A:신규 ApiAccountGateway·B:공유.Api·C:앱)·FR-21 계약확장(G1 typed실패+G2 LogoutAsync)·VM편집 2곳·permissions flat·v4.10 게이트(B-4/5)·V-01~08 | Draft | 2026-06-25 |
-| [GOP_Permission_Gate_Feature-prd.md](prds/GOP_Permission_Gate_Feature-prd.md) | PRD-GOP-01: IPermissionService + MinRoleConverter + ConductorControlViewModel 3중 방어선 (P1, 18 STEP) | Draft | 2026-06-20 |
-| [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | PRD-GOP-02: AccountManager/Register/Editor/Delete→GOP API 전환 · 하드코딩 비밀번호 CRITICAL 해소 (P1, 26 STEP) | Draft | 2026-06-20 |
-| [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | PRD-GOP-03: MyPage 자기정보 GOP 전환 · role덮어쓰기 방지 · 세션관리 섹션 신규 (P1, 18 STEP) | Draft | 2026-06-20 |
-| [GOP_Menu_Role_Visibility-prd.md](prds/GOP_Menu_Role_Visibility-prd.md) | PRD-GOP-04: LeftMenu 5단계 role 가시성 · Label 오타 3건 · Tag 우회 차단 (P2, 12 STEP) | Draft | 2026-06-20 |
-| [GOP_UserSession_AuditLog_UI-prd.md](prds/GOP_UserSession_AuditLog_UI-prd.md) | PRD-GOP-05: 세션모니터/그룹관리/감사로그/설정변경이력 신규 UI (P2, 28 STEP) | Draft | 2026-06-20 |
-| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts.Ui 신규 라이브러리 구축 + VM/View 이관 (Track C). **R3: Gateway seam(§6.3a, GOP-00 API 주입점) · C-2 정정 · OQ-1/4/6 해소** | Draft (R3) | 2026-06-23 |
-| [GOP_PreAuth_Overlay_NatsGate-prd.md](prds/GOP_PreAuth_Overlay_NatsGate-prd.md) | PRD-GOP-07: 미인증 LoginGateOverlay + EventCardPanel 숨김 + NATS IsLogin 게이팅 (P1, 14 STEP) | Draft | 2026-06-21 |
-| [GOP_Session_Resilience_Lifecycle-prd.md](prds/GOP_Session_Resilience_Lifecycle-prd.md) | PRD-GOP-06: 앱재시작복원·선제Refresh·강제로그아웃·지수백오프·OnExit통보 (P2, 20 STEP) | Draft | 2026-06-20 |
+| [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
+| [LeftMenu_IntegratedWeb_Button-prd.md](prds/LeftMenu_IntegratedWeb_Button-prd.md) | LeftMenu_IntegratedWeb_Button | Approved | 2026-07-13 |
+| [GMap_Zoom_Anchor_Home-prd.md](prds/GMap_Zoom_Anchor_Home-prd.md) | GMap_Zoom_Anchor_Home | Draft | 2026-07-13 |
+| [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
+| [Watchdog_Modern_Rebuild-prd.md](prds/Watchdog_Modern_Rebuild-prd.md) | Watchdog_Modern_Rebuild | Approved | 2026-07-13 |
+| [Startup_Unresolved_Fault_Reconciliation-prd.md](prds/Startup_Unresolved_Fault_Reconciliation-prd.md) | Startup_Unresolved_Fault_Reconciliation | Draft | 2026-07-11 |
+| [GMap_RDP_Overlay_Desync-prd.md](prds/GMap_RDP_Overlay_Desync-prd.md) | GMap_RDP_Overlay_Desync | Draft | 2026-07-11 |
+| [EventCard_Detection_Malfunction_Refinement-prd.md](prds/EventCard_Detection_Malfunction_Refinement-prd.md) | EventCard_Detection_Malfunction_Refinement | Draft | 2026-07-11 |
+| [Action_Report_Nats_FullDto_Contract-prd.md](prds/Action_Report_Nats_FullDto_Contract-prd.md) | Action_Report_Nats_FullDto_Contract | Draft | 2026-07-11 |
+| [Device_Event_API_NATS_SSOT_Sync-prd.md](prds/Device_Event_API_NATS_SSOT_Sync-prd.md) | Device_Event_API_NATS_SSOT_Sync | Draft | 2026-07-07 |
+| [Account_Lock_Management-prd.md](prds/Account_Lock_Management-prd.md) | Account_Lock_Management | Approved | 2026-07-07 |
+| [Account_Permission_CRUD_Hardening-prd.md](prds/Account_Permission_CRUD_Hardening-prd.md) | Account_Permission_CRUD_Hardening | Draft | 2026-07-06 |
+| [GOP_Force_Logout_Propagation-prd.md](prds/GOP_Force_Logout_Propagation-prd.md) | GOP_Force_Logout_Propagation | Approved | 2026-07-05 |
+| [DataGridPanel_CRUD_Standard_Convention-prd.md](prds/DataGridPanel_CRUD_Standard_Convention-prd.md) | DataGridPanel_CRUD_Standard_Convention | Draft | 2026-07-05 |
+| [Report_Client_v6_Integration-prd.md](prds/Report_Client_v6_Integration-prd.md) | Report_Client_v6_Integration | Draft | 2026-07-05 |
+| [GMap_Edit_Integration_Manual-prd.md](prds/GMap_Edit_Integration_Manual-prd.md) | GMap_Edit_Integration_Manual | Draft | 2026-07-05 |
+| [GMap_Edit_Integration_Sim-prd.md](prds/GMap_Edit_Integration_Sim-prd.md) | GMap_Edit_Integration_Sim | Draft | 2026-07-05 |
+| [Device_Delete_Standard_Process-prd.md](prds/Device_Delete_Standard_Process-prd.md) | Device_Delete_Standard_Process | Draft | 2026-07-05 |
+| [Save_Spinner_Permission_Fix-prd.md](prds/Save_Spinner_Permission_Fix-prd.md) | Save_Spinner_Permission_Fix | Approved | 2026-07-04 |
+| [Panel_Design_Unification-prd.md](prds/Panel_Design_Unification-prd.md) | Panel_Design_Unification | Approved | 2026-07-03 |
+| [Report_Generation_Feature-prd.md](prds/Report_Generation_Feature-prd.md) | Report_Generation_Feature | Draft | 2026-07-02 |
+| [Map_Edit_Undo_Redo-prd.md](prds/Map_Edit_Undo_Redo-prd.md) | Map_Edit_Undo_Redo | Approved | 2026-07-02 |
+| [Symbol_Label_Decouple-prd.md](prds/Symbol_Label_Decouple-prd.md) | Symbol_Label_Decouple | Approved | 2026-07-02 |
+| [GOP_Permission_Group_Management-prd.md](prds/GOP_Permission_Group_Management-prd.md) | GOP_Permission_Group_Management | Draft | 2026-07-02 |
+| [GMap_RubberBand_MultiSelect-prd.md](prds/GMap_RubberBand_MultiSelect-prd.md) | GMap_RubberBand_MultiSelect | Approved | 2026-07-02 |
+| [Camera_Aim_Overlay_Animation-prd.md](prds/Camera_Aim_Overlay_Animation-prd.md) | Camera_Aim_Overlay_Animation | Approved | 2026-07-02 |
+| [GMap_Delete_EditMode_BugFix-prd.md](prds/GMap_Delete_EditMode_BugFix-prd.md) | GMap_Delete_EditMode_BugFix | Approved | 2026-07-02 |
+| [Grant_Scheduling_Client-prd.md](prds/Grant_Scheduling_Client-prd.md) | Grant_Scheduling_Client | Approved | 2026-07-01 |
+| [Login_Gated_GIS_Init-prd.md](prds/Login_Gated_GIS_Init-prd.md) | Login_Gated_GIS_Init | Draft | 2026-06-30 |
+| [GUIDE_Grant_Scheduling_Client_v5.2.md](prds/GUIDE_Grant_Scheduling_Client_v5.2.md) | GUIDE_Grant_Scheduling_Client_v5.2.md | Draft | 2026-06-30 |
+| [Symbol_Lock_And_RenameSync-prd.md](prds/Symbol_Lock_And_RenameSync-prd.md) | Symbol_Lock_And_RenameSync | Draft | 2026-06-30 |
+| [LayerPanel_SymbolNesting_Resize-prd.md](prds/LayerPanel_SymbolNesting_Resize-prd.md) | LayerPanel_SymbolNesting_Resize | Draft | 2026-06-30 |
+| [tracking-ptz-publisher-prd.md](prds/tracking-ptz-publisher-prd.md) | tracking-ptz-publisher | Draft | 2026-06-29 |
+| [GatewayEvent_Group_Resurrection_Fix-prd.md](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | GatewayEvent_Group_Resurrection_Fix | Approved | 2026-06-29 |
+| [CameraPopup_PTZ_Responsiveness_Speed-prd.md](prds/CameraPopup_PTZ_Responsiveness_Speed-prd.md) | CameraPopup_PTZ_Responsiveness_Speed | Draft | 2026-06-29 |
+| [GOP_Session_Settings_Admin-prd.md](prds/GOP_Session_Settings_Admin-prd.md) | GOP_Session_Settings_Admin | Draft | 2026-06-29 |
+| [Symbol_Apply_DeviceLocation_Api-prd.md](prds/Symbol_Apply_DeviceLocation_Api-prd.md) | Symbol_Apply_DeviceLocation_Api | Approved | 2026-06-29 |
+| [CameraPopup_PressHold_PtzZoomFocus-prd.md](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | CameraPopup_PressHold_PtzZoomFocus | Draft | 2026-06-29 |
+| [Camera_PTZ_AimLocation_Nats-prd.md](prds/Camera_PTZ_AimLocation_Nats-prd.md) | Camera_PTZ_AimLocation_Nats | Approved | 2026-06-29 |
+| [GOP_Permission_Enforcement-prd.md](prds/GOP_Permission_Enforcement-prd.md) | GOP_Permission_Enforcement | Draft | 2026-06-29 |
+| [GOP_Permission_Gate_Feature-prd.md](prds/GOP_Permission_Gate_Feature-prd.md) | GOP_Permission_Gate_Feature | Draft | 2026-06-29 |
+| [Tracking_Playback_DataSource_Toggle-prd.md](prds/Tracking_Playback_DataSource_Toggle-prd.md) | Tracking_Playback_DataSource_Toggle | Draft | 2026-06-26 |
+| [GOP_Profile_Photo_Upload-prd.md](prds/GOP_Profile_Photo_Upload-prd.md) | GOP_Profile_Photo_Upload | Draft | 2026-06-26 |
+| [Tracking_GIS_Visualization_Playback-prd.md](prds/Tracking_GIS_Visualization_Playback-prd.md) | Tracking_GIS_Visualization_Playback | Draft | 2026-06-25 |
+| [GOP_Account_Auth_Integration-prd.md](prds/GOP_Account_Auth_Integration-prd.md) | GOP_Account_Auth_Integration | Draft | 2026-06-25 |
+| [UI_ModernTheme_DesignSystem-prd.md](prds/UI_ModernTheme_DesignSystem-prd.md) | UI_ModernTheme_DesignSystem | Draft | 2026-06-24 |
+| [CameraPopup_PTZ_Control-prd.md](prds/CameraPopup_PTZ_Control-prd.md) | CameraPopup_PTZ_Control | Draft | 2026-06-23 |
+| [Accounts_Ui_Library_Extraction-prd.md](prds/Accounts_Ui_Library_Extraction-prd.md) | Accounts_Ui_Library_Extraction | Draft | 2026-06-23 |
+| [CameraPopup_DigitalZoom_Alignment-prd.md](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | CameraPopup_DigitalZoom_Alignment | Draft | 2026-06-23 |
+| [CameraPopup_Snapshot_UX-prd.md](prds/CameraPopup_Snapshot_UX-prd.md) | CameraPopup_Snapshot_UX | Draft | 2026-06-23 |
+| [CameraPopup_Streaming_Settings-prd.md](prds/CameraPopup_Streaming_Settings-prd.md) | CameraPopup_Streaming_Settings | Draft | 2026-06-23 |
+| [Event_FollowupAction_ContextMenu-prd.md](prds/Event_FollowupAction_ContextMenu-prd.md) | Event_FollowupAction_ContextMenu | Draft | 2026-06-22 |
+| [EventPanel_Immutable_Guard-prd.md](prds/EventPanel_Immutable_Guard-prd.md) | EventPanel_Immutable_Guard | Draft | 2026-06-22 |
+| [Rtsp_Map_Popup-prd.md](prds/Rtsp_Map_Popup-prd.md) | Rtsp_Map_Popup | Approved | 2026-06-22 |
+| [EventPanel_CRUD_Api_Alignment-prd.md](prds/EventPanel_CRUD_Api_Alignment-prd.md) | EventPanel_CRUD_Api_Alignment | Draft | 2026-06-22 |
+| [BaseMap_NoData_DefaultTile-prd.md](prds/BaseMap_NoData_DefaultTile-prd.md) | BaseMap_NoData_DefaultTile | Approved | 2026-06-22 |
+| [EnclosureThresholdDialog-prd.md](prds/EnclosureThresholdDialog-prd.md) | EnclosureThresholdDialog | Draft | 2026-06-22 |
+| [SpeakerServerAssignment-prd.md](prds/SpeakerServerAssignment-prd.md) | SpeakerServerAssignment | Draft | 2026-06-22 |
+| [DevicePropertyPanel_Layout_Redesign-prd.md](prds/DevicePropertyPanel_Layout_Redesign-prd.md) | DevicePropertyPanel_Layout_Redesign | Draft | 2026-06-22 |
+| [DevicePanel_TempState_Unification-prd.md](prds/DevicePanel_TempState_Unification-prd.md) | DevicePanel_TempState_Unification | Draft | 2026-06-20 |
+| [GOP_UserSession_AuditLog_UI-prd.md](prds/GOP_UserSession_AuditLog_UI-prd.md) | GOP_UserSession_AuditLog_UI | Draft | 2026-06-20 |
+| [GOP_PreAuth_Overlay_NatsGate-prd.md](prds/GOP_PreAuth_Overlay_NatsGate-prd.md) | GOP_PreAuth_Overlay_NatsGate | Draft | 2026-06-20 |
+| [GOP_Menu_Role_Visibility-prd.md](prds/GOP_Menu_Role_Visibility-prd.md) | GOP_Menu_Role_Visibility | Draft | 2026-06-20 |
+| [DataGridPanel_Delete_Centralization-prd.md](prds/DataGridPanel_Delete_Centralization-prd.md) | DataGridPanel_Delete_Centralization | Draft | 2026-06-20 |
+| [GOP_Session_Resilience_Lifecycle-prd.md](prds/GOP_Session_Resilience_Lifecycle-prd.md) | GOP_Session_Resilience_Lifecycle | Draft | 2026-06-20 |
+| [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | GOP_MyPage_UI | Draft | 2026-06-20 |
+| [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | GOP_AccountManager_UI | Draft | 2026-06-20 |
 | [Client_API_v46_Conformance-prd.md](prds/Client_API_v46_Conformance-prd.md) | Client_API_v46_Conformance | Approved | 2026-06-19 |
 | [NATS-Tracking-Geolocation-메시지정리.md](prds/NATS-Tracking-Geolocation-메시지정리.md) | NATS-Tracking-Geolocation-메시지정리.md | Draft | 2026-06-19 |
 | [DevicePanel_CRUD_API_Sync-prd.md](prds/DevicePanel_CRUD_API_Sync-prd.md) | DevicePanel_CRUD_API_Sync | Draft | 2026-06-17 |
@@ -126,11 +145,45 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [GatewayEvent_Group_Resurrection_Fix-prd-plan.md](plans/GatewayEvent_Group_Resurrection_Fix-prd-plan.md) | [PRD](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | 15/16 — **구현·v2.6 머지완료** tip `0275776`(FF off 23f6f4b). 통합5/5+실DB사본E2E통과·빌드0. IMPL-04(obsolete) 보류·CHANGELOG 재기재 보류. GatewayDbService.cs 단독, 외부 무변경 | 2026-06-30 |
-| [GOP_Account_Auth_Integration-prd-plan.md](plans/GOP_Account_Auth_Integration-prd-plan.md) | [PRD](prds/GOP_Account_Auth_Integration-prd.md) | 0/46 (~116h, 3버킷 A/B/C + FR-21 + V-01~08) — dev 대기(SETUP-01 0순위, 버킷C 사전통지) | 2026-06-25 |
-| [Tracking_GIS_Visualization_Playback-prd-plan.md](plans/Tracking_GIS_Visualization_Playback-prd-plan.md) | [PRD](prds/Tracking_GIS_Visualization_Playback-prd.md) | 0/58 (P1~P3 범위, ~103h) — dev 대기(VER-01 0순위) | 2026-06-24 |
-| [CameraPopup_DigitalZoom_Alignment-prd-plan.md](plans/CameraPopup_DigitalZoom_Alignment-prd-plan.md) | [PRD](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 14/14 (완료·머지 `2062caf`) | 2026-06-23 |
-| [Accounts_Ui_Library_Extraction-prd-plan.md](plans/Accounts_Ui_Library_Extraction-prd-plan.md) | [PRD](prds/Accounts_Ui_Library_Extraction-prd.md) | 24/39 (Phase4✅ VM11+View7 자립, 테스트14/14) | 2026-06-24 |
+| [MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md](plans/MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md) | [PRD](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | 0/27 | 2026-07-13 |
+| [LeftMenu_IntegratedWeb_Button-prd-plan.md](plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) | [PRD](prds/LeftMenu_IntegratedWeb_Button-prd.md) | 0/13 | 2026-07-13 |
+| [Watchdog_Modern_Rebuild-prd-plan.md](plans/Watchdog_Modern_Rebuild-prd-plan.md) | [PRD](prds/Watchdog_Modern_Rebuild-prd.md) | 0/46 | 2026-07-13 |
+| [Action_Report_Nats_FullDto_Contract-prd-plan.md](plans/Action_Report_Nats_FullDto_Contract-prd-plan.md) | [PRD](prds/Action_Report_Nats_FullDto_Contract-prd.md) | 10/10 | 2026-07-11 |
+| [Account_Lock_Management-prd-plan.md](plans/Account_Lock_Management-prd-plan.md) | [PRD](prds/Account_Lock_Management-prd.md) | 2/26 | 2026-07-07 |
+| [GMap_Edit_Integration_Sim-prd-plan.md](plans/GMap_Edit_Integration_Sim-prd-plan.md) | [PRD](prds/GMap_Edit_Integration_Sim-prd.md) | 0/27 | 2026-07-05 |
+| [GOP_Force_Logout_Propagation-prd-plan.md](plans/GOP_Force_Logout_Propagation-prd-plan.md) | [PRD](prds/GOP_Force_Logout_Propagation-prd.md) | 0/5 | 2026-07-03 |
+| [Panel_Design_Unification-prd-plan.md](plans/Panel_Design_Unification-prd-plan.md) | [PRD](prds/Panel_Design_Unification-prd.md) | 1/19 | 2026-07-03 |
+| [Map_Edit_Undo_Redo-prd-plan.md](plans/Map_Edit_Undo_Redo-prd-plan.md) | [PRD](prds/Map_Edit_Undo_Redo-prd.md) | 0/22 | 2026-07-02 |
+| [Symbol_Label_Decouple-prd-plan.md](plans/Symbol_Label_Decouple-prd-plan.md) | [PRD](prds/Symbol_Label_Decouple-prd.md) | 0/15 | 2026-07-02 |
+| [GMap_RubberBand_MultiSelect-prd-plan.md](plans/GMap_RubberBand_MultiSelect-prd-plan.md) | [PRD](prds/GMap_RubberBand_MultiSelect-prd.md) | 0/17 | 2026-07-02 |
+| [Camera_Aim_Overlay_Animation-prd-plan.md](plans/Camera_Aim_Overlay_Animation-prd-plan.md) | [PRD](prds/Camera_Aim_Overlay_Animation-prd.md) | 0/15 | 2026-07-02 |
+| [GMap_Delete_EditMode_BugFix-prd-plan.md](plans/GMap_Delete_EditMode_BugFix-prd-plan.md) | [PRD](prds/GMap_Delete_EditMode_BugFix-prd.md) | 5/22 | 2026-07-02 |
+| [Login_Gated_GIS_Init-prd-plan.md](plans/Login_Gated_GIS_Init-prd-plan.md) | [PRD](prds/Login_Gated_GIS_Init-prd.md) | 0/43 | 2026-07-02 |
+| [Grant_Scheduling_Client-prd-plan.md](plans/Grant_Scheduling_Client-prd-plan.md) | [PRD](prds/Grant_Scheduling_Client-prd.md) | 7/32 | 2026-07-01 |
+| [GatewayEvent_Group_Resurrection_Fix-prd-plan.md](plans/GatewayEvent_Group_Resurrection_Fix-prd-plan.md) | [PRD](prds/GatewayEvent_Group_Resurrection_Fix-prd.md) | 0/29 | 2026-06-29 |
+| [Symbol_Apply_DeviceLocation_Api-prd-plan.md](plans/Symbol_Apply_DeviceLocation_Api-prd-plan.md) | [PRD](prds/Symbol_Apply_DeviceLocation_Api-prd.md) | 14/16 | 2026-06-29 |
+| [CameraPopup_PressHold_PtzZoomFocus-prd-plan.md](plans/CameraPopup_PressHold_PtzZoomFocus-prd-plan.md) | [PRD](prds/CameraPopup_PressHold_PtzZoomFocus-prd.md) | 28/29 | 2026-06-29 |
+| [GOP_Permission_Enforcement-prd-plan.md](plans/GOP_Permission_Enforcement-prd-plan.md) | [PRD](prds/GOP_Permission_Enforcement-prd.md) | 5/11 | 2026-06-29 |
+| [Camera_PTZ_AimLocation_Nats-prd-plan.md](plans/Camera_PTZ_AimLocation_Nats-prd-plan.md) | [PRD](prds/Camera_PTZ_AimLocation_Nats-prd.md) | 0/34 | 2026-06-29 |
+| [GOP_Permission_Gate_Feature-prd-plan.md](plans/GOP_Permission_Gate_Feature-prd-plan.md) | [PRD](prds/GOP_Permission_Gate_Feature-prd.md) | 10/22 | 2026-06-29 |
+| [Tracking_Playback_DataSource_Toggle-prd-plan.md](plans/Tracking_Playback_DataSource_Toggle-prd-plan.md) | [PRD](prds/Tracking_Playback_DataSource_Toggle-prd.md) | 0/43 | 2026-06-26 |
+| [Tracking_GIS_Visualization_Playback-prd-plan.md](plans/Tracking_GIS_Visualization_Playback-prd-plan.md) | [PRD](prds/Tracking_GIS_Visualization_Playback-prd.md) | 8/63 | 2026-06-26 |
+| [GOP_Profile_Photo_Upload-prd-plan.md](plans/GOP_Profile_Photo_Upload-prd-plan.md) | [PRD](prds/GOP_Profile_Photo_Upload-prd.md) | 2/21 | 2026-06-26 |
+| [GOP_Account_Auth_Integration-prd-plan.md](plans/GOP_Account_Auth_Integration-prd-plan.md) | [PRD](prds/GOP_Account_Auth_Integration-prd.md) | 28/62 | 2026-06-25 |
+| [UI_ModernTheme_DesignSystem-prd-plan.md](plans/UI_ModernTheme_DesignSystem-prd-plan.md) | [PRD](prds/UI_ModernTheme_DesignSystem-prd.md) | 30/75 | 2026-06-24 |
+| [CameraPopup_PTZ_Control-prd-plan.md](plans/CameraPopup_PTZ_Control-prd-plan.md) | [PRD](prds/CameraPopup_PTZ_Control-prd.md) | 16/48 | 2026-06-24 |
+| [Accounts_Ui_Library_Extraction-prd-plan.md](plans/Accounts_Ui_Library_Extraction-prd-plan.md) | [PRD](prds/Accounts_Ui_Library_Extraction-prd.md) | 24/40 | 2026-06-23 |
+| [CameraPopup_DigitalZoom_Alignment-prd-plan.md](plans/CameraPopup_DigitalZoom_Alignment-prd-plan.md) | [PRD](prds/CameraPopup_DigitalZoom_Alignment-prd.md) | 21/21 | 2026-06-23 |
+| [CameraPopup_Streaming_Settings-prd-plan.md](plans/CameraPopup_Streaming_Settings-prd-plan.md) | [PRD](prds/CameraPopup_Streaming_Settings-prd.md) | 0/0 | 2026-06-23 |
+| [Event_FollowupAction_ContextMenu-prd-plan.md](plans/Event_FollowupAction_ContextMenu-prd-plan.md) | [PRD](prds/Event_FollowupAction_ContextMenu-prd.md) | 0/0 | 2026-06-22 |
+| [Rtsp_Map_Popup-prd-plan.md](plans/Rtsp_Map_Popup-prd-plan.md) | [PRD](prds/Rtsp_Map_Popup-prd.md) | 0/37 | 2026-06-22 |
+| [EventPanel_CRUD_Api_Alignment-prd-plan.md](plans/EventPanel_CRUD_Api_Alignment-prd-plan.md) | [PRD](prds/EventPanel_CRUD_Api_Alignment-prd.md) | 0/0 | 2026-06-22 |
+| [BaseMap_NoData_DefaultTile-prd-plan.md](plans/BaseMap_NoData_DefaultTile-prd-plan.md) | [PRD](prds/BaseMap_NoData_DefaultTile-prd.md) | 1/21 | 2026-06-22 |
+| [DataGrid_Column_Curation-plan.md](plans/DataGrid_Column_Curation-plan.md) | [PRD](prds/DataGrid_Column_Curation-prd.md) | 0/0 | 2026-06-22 |
+| [SpeakerServerAssignment-prd-plan.md](plans/SpeakerServerAssignment-prd-plan.md) | [PRD](prds/SpeakerServerAssignment-prd.md) | 0/14 | 2026-06-22 |
+| [DevicePropertyPanel_Layout_Redesign-prd-plan.md](plans/DevicePropertyPanel_Layout_Redesign-prd-plan.md) | [PRD](prds/DevicePropertyPanel_Layout_Redesign-prd.md) | 0/14 | 2026-06-22 |
+| [DevicePanel_TempState_Unification-prd-plan.md](plans/DevicePanel_TempState_Unification-prd-plan.md) | [PRD](prds/DevicePanel_TempState_Unification-prd.md) | 0/18 | 2026-06-20 |
+| [DataGridPanel_Delete_Centralization-prd-plan.md](plans/DataGridPanel_Delete_Centralization-prd-plan.md) | [PRD](prds/DataGridPanel_Delete_Centralization-prd.md) | 0/0 | 2026-06-20 |
 | [Client_API_v46_Conformance-prd-plan.md](plans/Client_API_v46_Conformance-prd-plan.md) | [PRD](prds/Client_API_v46_Conformance-prd.md) | 0/0 | 2026-06-19 |
 | [EventProcess_ContaminationFix-prd-plan.md](plans/EventProcess_ContaminationFix-prd-plan.md) | [PRD](prds/EventProcess_ContaminationFix-prd.md) | 0/14 | 2026-06-15 |
 | [GridSnap_System-prd-plan.md](plans/GridSnap_System-prd-plan.md) | [PRD](prds/GridSnap_System-prd.md) | 11/32 | 2026-06-15 |
@@ -172,12 +225,29 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
+| [GMap_Edit_Integration_Sim-test-result.md](tests/GMap_Edit_Integration_Sim-test-result.md) | -% | -% | 2026-07-05 |
+| [TEST_SCENARIOS_GOP_Account_RBAC.md](tests/TEST_SCENARIOS_GOP_Account_RBAC.md) | -% | -% | 2026-07-04 |
 | [TEST_ImageOverlay_FileCopy_On_Register.md](tests/TEST_ImageOverlay_FileCopy_On_Register.md) | -% | -% | 2026-05-13 |
 
 ## 완료 리포트 (docs/reports/)
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [Event_CRUD_Standard_Simulation-report.md](reports/Event_CRUD_Standard_Simulation-report.md) | [PRD](prds/Event_CRUD_Standard_Simulation-prd.md) → [Plan](plans/Event_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
+| [Device_CRUD_Standard_Simulation-report.md](reports/Device_CRUD_Standard_Simulation-report.md) | [PRD](prds/Device_CRUD_Standard_Simulation-prd.md) → [Plan](plans/Device_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
+| [TEST_VERIFICATION_CHECKLIST_2026-07-04.md](reports/TEST_VERIFICATION_CHECKLIST_2026-07-04.md) | [PRD](prds/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd.md) → [Plan](plans/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd-plan.md) | 2026-07-04 |
+| [Permission_Simulation_Round2-report.md](reports/Permission_Simulation_Round2-report.md) | [PRD](prds/Permission_Simulation_Round2-prd.md) → [Plan](plans/Permission_Simulation_Round2-prd-plan.md) | 2026-07-02 |
+| [Permission_Simulation_Round1-report.md](reports/Permission_Simulation_Round1-report.md) | [PRD](prds/Permission_Simulation_Round1-prd.md) → [Plan](plans/Permission_Simulation_Round1-prd-plan.md) | 2026-07-02 |
+| [GOP_Force_Logout_Client_Phase1-report.md](reports/GOP_Force_Logout_Client_Phase1-report.md) | [PRD](prds/GOP_Force_Logout_Client_Phase1-prd.md) → [Plan](plans/GOP_Force_Logout_Client_Phase1-prd-plan.md) | 2026-06-29 |
+| [2026-06-23_Event_Domain_Session_Report.md](reports/2026-06-23_Event_Domain_Session_Report.md) | [PRD](prds/2026-06-23_Event_Domain_Session_Report.md-prd.md) → [Plan](plans/2026-06-23_Event_Domain_Session_Report.md-prd-plan.md) | 2026-06-22 |
+| [API_Group_DeviceCount_Cascade-report.md](reports/API_Group_DeviceCount_Cascade-report.md) | [PRD](prds/API_Group_DeviceCount_Cascade-prd.md) → [Plan](plans/API_Group_DeviceCount_Cascade-prd-plan.md) | 2026-06-21 |
+| [API_Delete_Response_Inconsistency-report.md](reports/API_Delete_Response_Inconsistency-report.md) | [PRD](prds/API_Delete_Response_Inconsistency-prd.md) → [Plan](plans/API_Delete_Response_Inconsistency-prd-plan.md) | 2026-06-21 |
+| [DevicePanel_TempState_QA-checklist.md](reports/DevicePanel_TempState_QA-checklist.md) | [PRD](prds/DevicePanel_TempState_QA-checklist.md-prd.md) → [Plan](plans/DevicePanel_TempState_QA-checklist.md-prd-plan.md) | 2026-06-21 |
+| [DevicePanel_TempState_Unification-report.md](reports/DevicePanel_TempState_Unification-report.md) | [PRD](prds/DevicePanel_TempState_Unification-prd.md) → [Plan](plans/DevicePanel_TempState_Unification-prd-plan.md) | 2026-06-21 |
+| [Controller_422_Fix-report.md](reports/Controller_422_Fix-report.md) | [PRD](prds/Controller_422_Fix-prd.md) → [Plan](plans/Controller_422_Fix-prd-plan.md) | 2026-06-20 |
+| [DataGridPanel_CRUD_Phase2_3-report.md](reports/DataGridPanel_CRUD_Phase2_3-report.md) | [PRD](prds/DataGridPanel_CRUD_Phase2_3-prd.md) → [Plan](plans/DataGridPanel_CRUD_Phase2_3-prd-plan.md) | 2026-06-20 |
+| [DataGridPanel_CRUD_Phase1-report.md](reports/DataGridPanel_CRUD_Phase1-report.md) | [PRD](prds/DataGridPanel_CRUD_Phase1-prd.md) → [Plan](plans/DataGridPanel_CRUD_Phase1-prd-plan.md) | 2026-06-19 |
+| [Client_API_v46_Conformance_Batch2-report.md](reports/Client_API_v46_Conformance_Batch2-report.md) | [PRD](prds/Client_API_v46_Conformance_Batch2-prd.md) → [Plan](plans/Client_API_v46_Conformance_Batch2-prd-plan.md) | 2026-06-19 |
 | [Client_API_v46_Conformance_Phase0-report.md](reports/Client_API_v46_Conformance_Phase0-report.md) | [PRD](prds/Client_API_v46_Conformance_Phase0-prd.md) → [Plan](plans/Client_API_v46_Conformance_Phase0-prd-plan.md) | 2026-06-19 |
 | [DigitalZoom_RenderTransform-report.md](reports/DigitalZoom_RenderTransform-report.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) → [Plan](plans/DigitalZoom_RenderTransform-prd-plan.md) | 2026-06-15 |
 | [WebServer_Enable_Feature-report.md](reports/WebServer_Enable_Feature-report.md) | [PRD](prds/WebServer_Enable_Feature-prd.md) → [Plan](plans/WebServer_Enable_Feature-prd-plan.md) | 2026-06-05 |

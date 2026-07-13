@@ -69,6 +69,8 @@ public class CallEditProcessMessageModel : IMessageModel { }
 public class CallResetProcessMessageModel : IMessageModel { }
 public class CallResetPasswordProcessMessageModel : IMessageModel { }
 public class CallDeleteProcessMessageModel : IMessageModel { }
+/// <summary>통합웹 접속 실행 트리거 — 확인 팝업 '확인' 시 발행. LeftMenuSectionViewModel이 IHandle로 수신해 크롬 앱 모드로 웹 대시보드를 실행한다.</summary>
+public class CallWebApiProcessMessageModel : IMessageModel { }
 public class CallDeleteControllerDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteCameraDeviceProcessMessageModel : IMessageModel { }
 public class CallDeleteSensorDeviceProcessMessageModel : IMessageModel { }

@@ -3481,25 +3481,27 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     }
     #endregion
 
-    #region Test 2.1: DetectionEventCardView_ControllerId_BindsToViewModelProperty
+    #region Test 2.1: DetectionEventCardView_ControllerField_BindsToViewModelProperty
     [Fact]
-    public void DetectionEventCardView_ControllerId_BindsToViewModelProperty()
+    public void DetectionEventCardView_ControllerField_BindsToViewModelProperty()
     {
-        // XAML 파일에서 Device.Controller.Id 깨진 바인딩이 없어야 한다
+        // XAML 파일에서 Device.Controller.* 깨진 바인딩이 없어야 한다
+        // (Device는 IBaseDeviceModel이라 Controller 미노출 → 안전 캐스트 VM 속성 경유)
         var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "Views", "Events", "DetectionEventCardView.xaml");
         var xamlContent = File.ReadAllText(xamlPath);
 
         // Assert: 깨진 Device.Controller 경로가 없어야 함
         Assert.DoesNotContain("Device.Controller.Id", xamlContent);
-        // Assert: 대신 ControllerId 바인딩이 있어야 함
-        Assert.Contains("ControllerId", xamlContent);
+        Assert.DoesNotContain("Device.Controller.DeviceNumber", xamlContent);
+        // Assert: 제어기 필드는 VM 속성 ControllerDeviceNumber(제어기 번호)에 바인딩되어야 함
+        Assert.Contains("ControllerDeviceNumber", xamlContent);
     }
     #endregion
 
-    #region Test 2.2: MalfunctionEventCardView_ControllerId_BindsToViewModelProperty
+    #region Test 2.2: MalfunctionEventCardView_ControllerField_BindsToViewModelProperty
     [Fact]
-    public void MalfunctionEventCardView_ControllerId_BindsToViewModelProperty()
+    public void MalfunctionEventCardView_ControllerField_BindsToViewModelProperty()
     {
         var xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "Views", "Events", "MalfunctionEventCardView.xaml");
@@ -3508,9 +3510,9 @@ public class EventUiDevicePropertyBindingTests : IDisposable
         // Assert: 깨진 Device.Controller 경로가 없어야 함
         Assert.DoesNotContain("Device.Controller.Id", xamlContent);
         Assert.DoesNotContain("Device.Controller.DeviceNumber", xamlContent);
-        // Assert: 대신 ViewModel 속성 바인딩이 있어야 함
-        Assert.Contains("ControllerId", xamlContent);
-        Assert.Contains("ControllerDeviceNumber", xamlContent);
+        // Assert: 장애 카드는 장애타입 인지 표시 속성(ControllerDisplay/SensorDisplay)에 바인딩되어야 함
+        Assert.Contains("ControllerDisplay", xamlContent);
+        Assert.Contains("SensorDisplay", xamlContent);
     }
     #endregion
 

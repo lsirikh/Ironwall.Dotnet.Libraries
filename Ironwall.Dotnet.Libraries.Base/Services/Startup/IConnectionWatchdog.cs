@@ -14,4 +14,7 @@ public interface IConnectionWatchdog : IService, IDisposable
 
     /// <summary>현재 와치독 상태 조회(Setup 패널 폴링용). 미연결 시 null.</summary>
     WatchdogStatus? QueryStatus();
+
+    /// <summary>사용자 의도 종료 확정 시 호출 — 와치독이 재시작하지 않도록 graceful 신호를 즉시 발화한다.</summary>
+    void NotifyIntentionalShutdown();
 }

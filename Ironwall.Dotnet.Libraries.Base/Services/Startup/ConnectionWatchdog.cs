@@ -82,6 +82,17 @@ public sealed class ConnectionWatchdog : IConnectionWatchdog
         return _started ? _statusClient?.Query() : null;
     }
 
+    /// <summary>
+    /// 사용자 의도 종료 확정 시 호출 — 와치독이 재시작하지 않도록 graceful 신호를 즉시 발화한다
+    /// (종료 이벤트 Set + app.pid sentinel 삭제). 이후 정상 종료 경로의 <see cref="Dispose"/>(StopAsync)와
+    /// 중복 호출돼도 무해하다. 비활성/미시작 시 no-op.
+    /// </summary>
+    public void NotifyIntentionalShutdown()
+    {
+        try { _shutdown?.SignalGraceful(); } catch { }
+        _log?.Info("[Watchdog] 의도적 종료 신호 발화 — 와치독 재시작 방지.");
+    }
+
     private void SafeEnsureRunning()
     {
         try
