@@ -25,6 +25,18 @@ public class DetectionDetailDto
     public int? InferenceMs { get; set; }
 
     /// <summary>
+    /// AI 추론 프레임 폭(px). 설계 GIS.md v1.5 DETECT(AI) — bbox 좌표 스케일 해석 기준. optional.
+    /// </summary>
+    [JsonProperty("frame_width")]
+    public int? FrameWidth { get; set; }
+
+    /// <summary>
+    /// AI 추론 프레임 높이(px). 설계 GIS.md v1.5 DETECT(AI) — bbox 좌표 스케일 해석 기준. optional.
+    /// </summary>
+    [JsonProperty("frame_height")]
+    public int? FrameHeight { get; set; }
+
+    /// <summary>
     /// Backend에서 추가되는 미지 필드 보존
     /// </summary>
     [JsonExtensionData]

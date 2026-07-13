@@ -375,14 +375,37 @@ public static class DtoToModelHelper
             TypeDevice = device.DeviceType.ToString(),
             NameDevice = device.DeviceName ?? string.Empty,
             NumberDevice = device.DeviceNumber,
-            // 설계 Gop_Message_Broker §6.4 device 필드 준수(status/version/geolocation/controller_id).
-            // device_groups는 공용 DTO 구조(name_group) 결정 대기 → 별도(미포함). group_device는 deprecated로 제거됨.
+            // 설계 GIS.md v1.5 §2.1/§6.4 device 필드 준수(status/version/geolocation/controller_id/device_groups).
             Status = device.Status.ToString(),
             Version = device.Version ?? string.Empty,
             ControllerId = (device as ISensorDeviceModel)?.Controller?.Id,
-            Geolocation = (device.Latitude != 0 || device.Longitude != 0)
-                ? new GeolocationDto { Latitude = device.Latitude, Longitude = device.Longitude }
-                : null
+            // device_groups: 수신자 N:N EventMapping 라우팅 키. 모델은 그룹 id(List<int>)만 보유하므로
+            // id 채움(name/description/device_count 이름 보강은 Stage 1 DeviceGroupProvider seam에서 수행).
+            DeviceGroups = device.DeviceGroups is { Count: > 0 }
+                ? device.DeviceGroups.Select(gid => new DeviceGroupDto { Id = gid }).ToList()
+                : null,
+            Geolocation = BuildGeolocationDto(device)
+        };
+    }
+
+    /// <summary>
+    /// IBaseDeviceModel → GeolocationDto (설계 GIS.md v1.5: location/latitude/longitude/altitude/heading).
+    /// 좌표/고도/방위/설명 중 하나라도 유의미할 때만 생성, 전부 비면 null(직렬화 생략).
+    /// </summary>
+    private static GeolocationDto? BuildGeolocationDto(IBaseDeviceModel device)
+    {
+        bool hasCoord = device.Latitude != 0 || device.Longitude != 0;
+        if (!hasCoord && device.Altitude is null && device.Heading is null
+            && string.IsNullOrEmpty(device.Location))
+            return null;
+
+        return new GeolocationDto
+        {
+            Location = device.Location,
+            Latitude = device.Latitude,
+            Longitude = device.Longitude,
+            Altitude = device.Altitude,
+            Heading = device.Heading
         };
     }
 

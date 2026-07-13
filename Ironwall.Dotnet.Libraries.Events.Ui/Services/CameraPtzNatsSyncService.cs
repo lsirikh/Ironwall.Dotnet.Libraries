@@ -18,7 +18,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 ****************************************************************************/
 /// <summary>
 /// NVRManager가 발행하는 PTZ_STATUS 메시지를 수신하여 GIS 심볼의 FOV 방향을 업데이트합니다.
-/// <para>Subject: sensorway.{부대ID}.nvr_manager.ptz-status</para>
+/// <para>Subject: sensorway.{부대ID}.gis.ptz-status (스펙 GIS.md v1.5 §3.6, REST v4.6)</para>
+/// <para>과도기: 구 subject sensorway.{부대ID}.nvr_manager.ptz-status 도 병행 수용(서버 버전 무관 무회귀).</para>
 /// </summary>
 public class CameraPtzNatsSyncService : ICameraPtzNatsSyncService
 {
@@ -57,8 +58,9 @@ public class CameraPtzNatsSyncService : ICameraPtzNatsSyncService
     {
         try
         {
-            // Subject 필터: nvr_manager.ptz-status subject만 처리
-            if (e.Subject?.Contains("nvr_manager.ptz-status") != true) return Task.CompletedTask;
+            // Subject 필터: 스펙 v1.5 subject는 gis.ptz-status(§3.6). 구 nvr_manager.ptz-status 도
+            // 과도기 병행 수용하여 서버 버전에 무관하게 무회귀 보장.
+            if (!IsPtzStatusSubject(e.Subject)) return Task.CompletedTask;
             if (string.IsNullOrWhiteSpace(e.Data)) return Task.CompletedTask;
 
             // 전체 envelope 파싱 (BaseMessage<T>가 abstract이므로 JObject 사용)
@@ -79,6 +81,14 @@ public class CameraPtzNatsSyncService : ICameraPtzNatsSyncService
         }
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// PTZ_STATUS subject 판별. 스펙 GIS.md v1.5 = gis.ptz-status(§3.6),
+    /// 구 subject nvr_manager.ptz-status 도 과도기 병행 수용(서버 버전 무관 무회귀).
+    /// </summary>
+    internal static bool IsPtzStatusSubject(string? subject) =>
+        subject is not null &&
+        (subject.Contains("gis.ptz-status") || subject.Contains("nvr_manager.ptz-status"));
     #endregion
 
     #region - Attributes -

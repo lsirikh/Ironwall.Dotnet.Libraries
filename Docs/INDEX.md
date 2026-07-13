@@ -23,6 +23,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | Line(폴리라인)·Area(닫힌 폴리곤 IsClosedPath)·PidsGroup 심볼이 어도너 박스 리사이즈로 안 커지는 문제 해결(방향 🅐). 근본=크기가 LinePoints 파생값(UpdateLineGeometry가 매 리드로우 W/H 재계산·SetSize 200클램프)+어도너 line 핸들 미렌더(isLineMarker 가드). 설계=신규 seam `ScaleAround(center,sx,sy)`(화면좌표 프레임 점 스케일+SyncModelPoints 4단계 규약), 핸들 가드 완화(열린선=코너/닫힘=+변, 점 bbox 기준), `ProcessLineScale` 절대배율. **P0=Undo**: TransformCommand는 점 미복원+스케일 결과 재영속 desync→신규 스냅샷 `LineGeometryCommand`(SymbolSnapshot 재사용)+RecordLineGeometry 분기. 정점편집(🅑)=후속. Explore×2+architect+code-reviewer. FR-01~06/NFR4/V-01~07/D-01~05/OQ-01~05 (Track C) | Draft | 2026-07-13 |
 | [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
 | [LeftMenu_IntegratedWeb_Button-prd.md](prds/LeftMenu_IntegratedWeb_Button-prd.md) | LeftMenu_IntegratedWeb_Button | Approved | 2026-07-13 |

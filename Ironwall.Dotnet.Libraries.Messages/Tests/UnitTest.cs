@@ -1753,6 +1753,31 @@ public class DetectionDetailDtoTests
         Assert.Equal(0.92, d.Confidence);
         Assert.Equal(4, d.Bbox?.Count);
     }
+
+    [Fact(DisplayName = "A2.8-4: DetectionDetailDto frame_width/frame_height(AI bbox 스케일) 왕복 — FR-03")]
+    [Trait("Category", "DTO")]
+    public void should_roundtrip_frame_width_and_height_when_ai_detection_detail()
+    {
+        // Arrange — AI DETECT 프레임 해상도(GIS.md v1.5 §DETECT)
+        var dto = new DetectionDetailDto
+        {
+            Signal = 90,
+            Model = "yolov8n",
+            FrameWidth = 1920,
+            FrameHeight = 1080
+        };
+
+        // Act
+        var json = JsonConvert.SerializeObject(dto);
+        var d = JsonConvert.DeserializeObject<DetectionDetailDto>(json);
+
+        // Assert
+        Assert.Contains("\"frame_width\":1920", json);
+        Assert.Contains("\"frame_height\":1080", json);
+        Assert.NotNull(d);
+        Assert.Equal(1920, d!.FrameWidth);
+        Assert.Equal(1080, d.FrameHeight);
+    }
 }
 
 /// <summary>

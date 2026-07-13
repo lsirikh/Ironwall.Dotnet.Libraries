@@ -328,6 +328,80 @@ public class DtoToModelHelperTests
         Assert.Contains("\"controller_id\":1", json);
         Assert.Contains("\"status\":\"ACTIVATED\"", json);
     }
+
+    /// <summary>
+    /// FR-02/FR-04(GIS.md v1.5 §2.1/§6.4): ACTION_REPORT from_event.device 가
+    /// device_groups(N:N EventMapping 라우팅 키 id) + geolocation 전필드(location/altitude/heading)를 담는다.
+    /// </summary>
+    [Fact]
+    public void should_carry_device_groups_and_full_geolocation_when_action_report_published()
+    {
+        // Arrange — 그룹 소속 + 고도/방위/설명 있는 장비
+        var origin = new DetectionEventModel
+        {
+            Id = 1002,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc),
+            Device = new SensorDeviceModel
+            {
+                Id = 202,
+                DeviceType = EnumDeviceType.Fence,
+                DeviceName = "Sensor-B-11",
+                DeviceNumber = 11,
+                Status = EnumDeviceStatus.ERROR,
+                Version = "v1.5.0",
+                Controller = new ControllerDeviceModel { Id = 2 },
+                DeviceGroups = new List<int> { 1, 10 },
+                Latitude = 37.5,
+                Longitude = 127.0,
+                Altitude = 42.5,
+                Heading = 135.0,
+                Location = "북측 울타리 A구간"
+            }
+        };
+        var actionModel = new ActionEventModel
+        {
+            Id = 4002,
+            MessageType = EnumEventType.Action,
+            DateTime = new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc),
+            Content = "동물",
+            User = "운영자",
+            OriginEvent = origin
+        };
+
+        // Act — 발행부와 동일 경로
+        var dto = actionModel.ToActionEventDto();
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(
+            dto.ToBrokerPublish(EnumGopCommand.ACTION_REPORT.ToString(), "GIS"));
+
+        // Assert — device_groups(라우팅 키 id) + geolocation 전필드
+        var dev = ((DetectionEventDto)dto.FromEvent!).Device!;
+        Assert.NotNull(dev.DeviceGroups);
+        Assert.Equal(new[] { 1, 10 }, dev.DeviceGroups!.Select(g => g.Id).ToArray());
+        Assert.NotNull(dev.Geolocation);
+        Assert.Equal(42.5, dev.Geolocation!.Altitude);
+        Assert.Equal(135.0, dev.Geolocation!.Heading);
+        Assert.Equal("북측 울타리 A구간", dev.Geolocation!.Location);
+        Assert.Contains("\"device_groups\"", json);
+        Assert.Contains("\"altitude\":42.5", json);
+    }
+}
+
+/// <summary>
+/// FR-01(GIS.md v1.5 §3.6): PTZ_STATUS subject 판별 — 스펙 gis.ptz-status + 구 nvr_manager.ptz-status 병행 수용.
+/// </summary>
+public class CameraPtzSubjectFilterTests
+{
+    [Theory]
+    [InlineData("sensorway.HQ.gis.ptz-status", true)]          // 스펙 v1.5
+    [InlineData("sensorway.HQ.nvr_manager.ptz-status", true)]  // 구 subject 과도기
+    [InlineData("sensorway.HQ.gis.tracking-status", false)]    // 타 gis 메시지
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void should_match_ptz_status_subject_when_gis_or_legacy_token(string? subject, bool expected)
+        => Assert.Equal(
+            expected,
+            Ironwall.Dotnet.Libraries.Events.Ui.Services.CameraPtzNatsSyncService.IsPtzStatusSubject(subject));
 }
 
 public class EventProviderServiceTests

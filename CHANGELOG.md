@@ -26,6 +26,13 @@
 - **`group_device`(deprecated 단일 그룹) 죽은 코드 정리** (태그 `before-remove-group-device` · Devices.Api/Ui) — `device_groups`(N:N EventMapping) 전환으로 deprecated된 `group_device`의 잔재 제거. `IDeviceApiService`/`DeviceApiService` 6개 조회 메서드의 **미사용 쿼리 필터 파라미터** `int? groupDevice` + XML doc + `MockDeviceApiService` 시그니처 정합. **DTO/Model엔 이미 프로퍼티 없음**(전환 완료·제거 대상 없음). 호출자 30곳 전부 named-arg/무인자라 무영향(빌드 검증: Devices.Api/Ui 0오류). 메인 솔루션 참조 0. (Messages/Tests 하위호환 JSON 픽스처는 유지 — 구서버 group_device 수신 시 무시됨을 검증.)
 
 ### Fixed
+- **GIS NATS Stage 0 — PTZ_STATUS 수신 복구 + ACTION_REPORT device_groups/geolocation + DETECT frame 필드** ([PRD](docs/prds/GIS_Nats_Full_Integration-prd.md) · [검증](docs/analyses/GIS_Nats_Simulation_Verification.md) · 태그 `before-gis-nats-stage0` · Events.Ui/Messages)
+  - **배경**: GIS.md v1.5(REST v4.6) 스펙 대비 26개 NATS 메시지 **225 시나리오 전수 시뮬 검증**(SIM 발행/이벤트/상태/SYNC/REQ-RSP) → 활성 21중 🔴11 결함. Stage 0=긴급·라이브러리 한정 4건(통합 PRD 6단계 중 1단계).
+  - **FR-01 PTZ_STATUS subject 복구(🔴 실운용 전면 미수신)**: `CameraPtzNatsSyncService`가 구 subject `nvr_manager.ptz-status`만 필터 → 스펙 v1.5 subject `gis.ptz-status`(§3.6)로 오는 메시지를 **전량 드롭**했음(형제 `TrackingStatusNatsSyncService`가 `gis.tracking-status`로 정상 동작 → 브로커가 `gis.*` 전달함이 지상 증명). **두 subject 병행 수용**(`IsPtzStatusSubject` 추출)으로 서버 버전 무관 무회귀 복구.
+  - **FR-02 ACTION_REPORT/DETECT device_groups(라우팅 키)**: `ConvertDeviceToDto`가 device_groups 미채움 → 수신자(NVR/방송/경광등/VMS) N:N EventMapping **라우팅 키 결손**. 모델 그룹 id(List<int>)로 `device_groups`(DeviceGroupDto) 채움. (name/description/device_count 이름 보강은 Stage 1 DeviceGroupProvider seam으로 분리 — 라우팅은 id로 즉시 동작.)
+  - **FR-03 DETECT frame_width/frame_height**: `DetectionDetailDto`에 AI bbox 좌표 스케일 해석용 프레임 해상도 필드(optional) 추가.
+  - **FR-04 geolocation 전필드**: `ConvertDeviceToDto`가 위경도만 채우던 것을 location/altitude/heading 포함 전필드로(`BuildGeolocationDto`).
+  - **검증**: Messages 빌드 0오류·`DetectionDetailDtoTests` 4/4 · Events.Ui 빌드 0오류·`DtoToModelHelperTests`+`CameraPtzSubjectFilterTests` 15/15 통과(신규: device_groups+geolocation 왕복, PTZ subject Theory 5케이스, frame 왕복). ⚠앱 재빌드 후 런타임 반영. **D-4**: 서버가 실제 `gis.ptz-status`로 발행하는지는 배포 전 실 NATS 확인 권장(병행 수용으로 무회귀 보장).
 - **이벤트 카드 "구역" 표시 — 그룹 Id 숫자 → 구역 이름(N:N)** (태그 `before-event-card-zone-name` · Events.Ui)
   - **결함**: 탐지/장애 이벤트 카드의 "구역" 칸이 구역 **이름** 대신 값이 이상하게 표시됨 — 장애 카드는 그룹 **DB Id 숫자**(`Device.DeviceGroupsText` = `string.Join(", ", List<int>)` 모델 구현)를 "1, 116"처럼 노출, 탐지 카드는 존재하지 않는 `Device.Name` 바인딩으로 **빈칸**. 근본원인=`DtoToModelHelper`가 서버 DTO의 그룹 `name`을 버리고 `id`만 매핑(`Select(g => g.Id)`) + 카드가 이름 변환 없는 모델 속성에 직접 바인딩.
   - **수정**: `EventCardViewModel<T>`에 이름 변환 `DeviceGroupsText` 속성 추가(`DeviceGroupProvider`로 Id→`DeviceGroupModel.Name` 조회, 미발견 시 Id fallback — 장비 관리 패널 `BaseDeviceViewModel` 패턴 재사용). 두 카드 뷰 바인딩을 VM `DeviceGroupsText`로 통일. N:N 다중 그룹="구역 1, 10", 단일="구역 1".
