@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 상태 리포팅 Named Pipe 서버(Setup 패널 폴링 대상).
    Created By   : GHLee

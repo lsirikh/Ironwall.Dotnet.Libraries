@@ -1,4 +1,4 @@
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 와치독 실행 설정(CLI 인자 파싱).
    Created By   : GHLee

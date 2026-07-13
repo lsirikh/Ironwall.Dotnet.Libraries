@@ -20,7 +20,7 @@ public sealed class WatchdogClientOptions
     /// 와치독 실행파일 경로. 상대경로면 <see cref="AppContext.BaseDirectory"/> 기준으로 절대화한다
     /// (이름폴링/CWD 하이재킹 방지).
     /// </summary>
-    public string WatchdogExePath { get; set; } = "Ironwall.Dotnet.Watchdog.exe";
+    public string WatchdogExePath { get; set; } = "Ironwall.Dotnet.Libraries.Watchdog.exe";
 
     /// <summary>하트비트 기록 주기(ms). 기본 3000.</summary>
     public int HeartbeatIntervalMs { get; set; } = 3000;

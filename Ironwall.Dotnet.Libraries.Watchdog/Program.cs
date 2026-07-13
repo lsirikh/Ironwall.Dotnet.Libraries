@@ -1,5 +1,5 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
-using Ironwall.Dotnet.Watchdog;
+using Ironwall.Dotnet.Libraries.Watchdog;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 

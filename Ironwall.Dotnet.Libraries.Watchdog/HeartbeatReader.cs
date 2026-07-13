@@ -1,7 +1,7 @@
 using System.IO.MemoryMappedFiles;
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 하트비트 공유메모리 판독(대상 PID 기준, PID 변경 시 재오픈).
    Created By   : GHLee

@@ -1,4 +1,4 @@
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 시간 변환 헬퍼(UTC → Unix epoch ms).
    Created By   : GHLee

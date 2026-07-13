@@ -3,7 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 using Microsoft.Extensions.Hosting;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 감시 폴 루프 — 종료/크래시/프리즈 판정 + 재시작 정책 적용.
    Created By   : GHLee

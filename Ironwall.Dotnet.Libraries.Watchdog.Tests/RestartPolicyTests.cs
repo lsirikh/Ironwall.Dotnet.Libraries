@@ -1,7 +1,7 @@
 using System;
 using Xunit;
 
-namespace Ironwall.Dotnet.Watchdog.Tests;
+namespace Ironwall.Dotnet.Libraries.Watchdog.Tests;
 /****************************************************************************
    Purpose      : RestartPolicy 단위 테스트 — 지수 백오프 + 서킷브레이커(FR-03).
 ****************************************************************************/

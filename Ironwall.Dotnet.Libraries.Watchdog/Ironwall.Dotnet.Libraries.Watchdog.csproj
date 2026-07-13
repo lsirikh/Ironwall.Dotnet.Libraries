@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>AnyCPU;x86;x64</Platforms>
-    <AssemblyName>Ironwall.Dotnet.Watchdog</AssemblyName>
-    <RootNamespace>Ironwall.Dotnet.Watchdog</RootNamespace>
+    <AssemblyName>Ironwall.Dotnet.Libraries.Watchdog</AssemblyName>
+    <RootNamespace>Ironwall.Dotnet.Libraries.Watchdog</RootNamespace>
     <Version>1.0</Version>
     <UseWPF>false</UseWPF>
     <UseWindowsForms>false</UseWindowsForms>
@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Ironwall.Dotnet.Watchdog.Tests" />
+    <InternalsVisibleTo Include="Ironwall.Dotnet.Libraries.Watchdog.Tests" />
   </ItemGroup>
 
   <ItemGroup>

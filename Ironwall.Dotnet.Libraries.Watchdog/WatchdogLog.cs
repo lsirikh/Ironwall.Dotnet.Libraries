@@ -1,6 +1,6 @@
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 와치독 파일 로거(스레드 안전 append).
    Created By   : GHLee

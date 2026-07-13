@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 상호감시 — per-user 로그온 예약작업 등록(비승격).
    Created By   : GHLee

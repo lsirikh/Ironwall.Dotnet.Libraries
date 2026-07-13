@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <!-- 와치독 프로젝트만 참조(링크된 IClock 중복 회피) -->
-    <ProjectReference Include="..\Ironwall.Dotnet.Watchdog\Ironwall.Dotnet.Watchdog.csproj" />
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Watchdog\Ironwall.Dotnet.Libraries.Watchdog.csproj" />
   </ItemGroup>
 
 </Project>

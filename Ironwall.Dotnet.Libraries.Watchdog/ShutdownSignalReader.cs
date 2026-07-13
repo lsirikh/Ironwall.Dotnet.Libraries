@@ -1,6 +1,6 @@
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 정상 종료 신호(EventWaitHandle) 판독.
    Created By   : GHLee

@@ -89,7 +89,7 @@ internal sealed class WatchdogLauncher
     private string ResolveExePath()
     {
         var p = string.IsNullOrWhiteSpace(_opt.WatchdogExePath)
-            ? "Ironwall.Dotnet.Watchdog.exe"
+            ? "Ironwall.Dotnet.Libraries.Watchdog.exe"
             : _opt.WatchdogExePath;
         if (!Path.IsPathRooted(p))
             p = Path.Combine(AppContext.BaseDirectory, p);

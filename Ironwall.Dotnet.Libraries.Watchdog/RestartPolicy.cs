@@ -1,6 +1,6 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 재시작 정책 — 지수 백오프 + 슬라이딩 윈도우 서킷브레이커.
    Created By   : GHLee

@@ -1,7 +1,7 @@
 using System;
 using Ironwall.Dotnet.Libraries.Base.Services;
 
-namespace Ironwall.Dotnet.Watchdog.Tests;
+namespace Ironwall.Dotnet.Libraries.Watchdog.Tests;
 /****************************************************************************
    Purpose      : 테스트용 고정/전진 시계(규칙 I-02).
 ****************************************************************************/

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 대상 프로세스 식별/생존확인/kill/재기동(PID+경로+StartTime 3중).
    Created By   : GHLee

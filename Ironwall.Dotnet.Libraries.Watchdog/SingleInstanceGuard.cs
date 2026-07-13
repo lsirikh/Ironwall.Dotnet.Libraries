@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Ironwall.Dotnet.Libraries.Base.Services.Startup;
 
-namespace Ironwall.Dotnet.Watchdog;
+namespace Ironwall.Dotnet.Libraries.Watchdog;
 /****************************************************************************
    Purpose      : 세션당 와치독 단일 인스턴스 보장(뮤텍스).
    Created By   : GHLee
