@@ -1,5 +1,6 @@
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.GMaps.Models;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Utils;
 using System;
@@ -29,8 +30,9 @@ public partial class MapViewModel
         var anchor = _setupModel?.MapAnchor;
         if (anchor == null || !anchor.IsAvailable)
         {
-            // 앵커 비활성 → 구역 제약 해제(MinZoom은 ConfigureCommonMapSettings가 SelectedMap 값으로 유지)
+            // 앵커 비활성/무효 → 패닝 구역 해제 + 앵커가 올렸던 최소줌을 지도 기본값으로 복원(줌아웃 복구, 사용자 지적)
             MainMap.BoundsOfMap = null;
+            RestoreBaseMinZoom();
             return;
         }
 
@@ -38,6 +40,7 @@ public partial class MapViewModel
         if (rect == null)
         {
             MainMap.BoundsOfMap = null;
+            RestoreBaseMinZoom();
             return;
         }
 
@@ -53,6 +56,13 @@ public partial class MapViewModel
             SetHomeToAnchorCenter();
 
         _log?.Info($"[MapAnchor] 적용: strict={anchor.StrictContainment}, minZoom={ZoomMin}, bounds={MainMap.BoundsOfMap}");
+    }
+
+    /// <summary>앵커가 올렸던 MinZoom을 지도 기본(SelectedMap.MinZoomLevel)으로 복원. 앵커 해제 시 줌아웃 복구(사용자 지적).</summary>
+    private void RestoreBaseMinZoom()
+    {
+        if (SelectedMap != null && SelectedMap.MinZoomLevel >= 0)
+            ZoomMin = SelectedMap.MinZoomLevel;
     }
 
     /// <summary>NW/SE 좌표 → GMap RectLatLng. Contains(west≤lng&lt;east, south&lt;lat≤north) 규약에 맞춤.</summary>
@@ -99,6 +109,15 @@ public partial class MapViewModel
         set { _isMapAnchorPanelVisible = value; NotifyOfPropertyChange(nameof(IsMapAnchorPanelVisible)); }
     }
 
+    private MapAnchorPanelControl? _mapAnchorPanel;
+    /// <summary>사이트 고정 오버레이 패널(OverlayWindow 패턴 Control). DataContext=this로 폼 필드 바인딩, 헤더 X=토글.</summary>
+    public MapAnchorPanelControl MapAnchorPanel => _mapAnchorPanel ??= new MapAnchorPanelControl
+    {
+        DataContext = this,
+        PanelTitle = "사이트 고정 (Map Anchor)",
+        CloseCommand = ShowMapAnchorPanelCommand,
+    };
+
     private bool _anchorEnabled;
     public bool AnchorEnabled { get => _anchorEnabled; set { _anchorEnabled = value; NotifyOfPropertyChange(nameof(AnchorEnabled)); } }
 
@@ -143,18 +162,31 @@ public partial class MapViewModel
         AnchorNwLng = a?.NorthWest?.Longitude ?? 0;
         AnchorSeLat = a?.SouthEast?.Latitude ?? 0;
         AnchorSeLng = a?.SouthEast?.Longitude ?? 0;
+
+        // "앵커 구역 자동으로 안 잡힌다" 대응 — 구역 미설정(모두 0)이면 패널 열 때
+        //   현재 화면(ViewArea)을 기본 구역으로 즉시 자동 캡처. 사용자는 바로 조정/저장만.
+        if (AnchorNwLat == 0 && AnchorNwLng == 0 && AnchorSeLat == 0 && AnchorSeLng == 0)
+            SetAnchorFromCurrentView();
     }
 
     /// <summary>현재 화면(ViewArea)의 NW/SE를 구역 입력으로 채운다.</summary>
     private void SetAnchorFromCurrentView()
     {
         if (MainMap == null) return;
-        var v = MainMap.ViewArea;                 // RectLatLng: Lat=north, Lng=west
-        AnchorNwLat = v.Lat;                       // north
-        AnchorNwLng = v.Lng;                       // west
-        AnchorSeLat = v.Lat - v.HeightLat;         // south
-        AnchorSeLng = v.Lng + v.WidthLng;          // east
-        _log?.Info($"[MapAnchor] 현재 화면을 구역으로: NW({AnchorNwLat:F6},{AnchorNwLng:F6}) SE({AnchorSeLat:F6},{AnchorSeLng:F6})");
+        // ViewArea는 코어(정수줌) 영역이라 디지털 줌(17+, RenderTransform 1.25×)을 반영 못 함 →
+        //   실제 "보이는 영역"은 중심 기준 1/digScale 로 축소. 화면과 정확히 일치하도록 보정. (사용자 지적)
+        var v = MainMap.ViewArea;                          // RectLatLng: Lat=north, Lng=west
+        double s = MainMap.DigitalZoomScale;               // 1.0 / 1.25(17+) / …
+        double centerLat = v.Lat - v.HeightLat / 2.0;      // 화면 중심(위경도)
+        double centerLng = v.Lng + v.WidthLng / 2.0;
+        double halfLat = (v.HeightLat / 2.0) / s;          // 디지털 줌 시 보이는 반-높이
+        double halfLng = (v.WidthLng / 2.0) / s;
+        AnchorNwLat = centerLat + halfLat;                 // north(위)
+        AnchorNwLng = centerLng - halfLng;                 // west(좌)
+        AnchorSeLat = centerLat - halfLat;                 // south(아래)
+        AnchorSeLng = centerLng + halfLng;                 // east(우)
+        AnchorMinZoom = (int)Math.Round(Zoom);             // ★ 최소 줌 = 현재 줌 반영 — 이 줌 이하로 축소 차단
+        _log?.Info($"[MapAnchor] 현재 화면(보이는 영역, digScale={s:F2})을 구역으로: 중심({centerLat:F6},{centerLng:F6}) NW({AnchorNwLat:F6},{AnchorNwLng:F6}) SE({AnchorSeLat:F6},{AnchorSeLng:F6}) minZoom={AnchorMinZoom}");
     }
 
     /// <summary>UI 값으로 MapAnchorModel 구성 → 저장·즉시 적용(+활성 시 홈=중심).</summary>

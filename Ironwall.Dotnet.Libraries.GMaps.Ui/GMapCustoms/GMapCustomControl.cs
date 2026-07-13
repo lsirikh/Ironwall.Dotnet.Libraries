@@ -507,6 +507,10 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [MapAnchor] 사이트 고정: 이동/드래그 종료 후 중심이 앵커 구역 밖이면 안으로 되돌림(BoundsOfMap 강제).
+        //   벤더 GMapControl이 BoundsOfMap을 패닝에 enforce하지 않으므로 여기서 직접 클램프. (FR-B1)
+        if (!_isClampingToBounds && ClampCenterToBounds(point)) return;
+
         try
         {
             var viewArea = ViewArea;
@@ -520,6 +524,30 @@ public class GMapCustomControl : GMapControl
         {
             _log?.Error($"위치 변경 처리 실패: {ex.Message}");
         }
+    }
+
+    // [MapAnchor] 패닝 구역 강제 클램프(재진입 방지 플래그 + 로직) — 벤더 BoundsOfMap 미enforce 보완. (FR-B1)
+    private bool _isClampingToBounds;
+
+    /// <summary>지도 중심(point)이 BoundsOfMap(앵커 구역) 밖이면 경계 안으로 되돌린다. 되돌렸으면 true.</summary>
+    private bool ClampCenterToBounds(PointLatLng point)
+    {
+        var bounds = BoundsOfMap;
+        if (bounds == null) return false;
+        var r = bounds.Value;
+        double west = r.Lng, east = r.Lng + r.WidthLng;     // RectLatLng: Lng=west(left), +WidthLng=east
+        double north = r.Lat, south = r.Lat - r.HeightLat;  //             Lat=north(top),  -HeightLat=south
+        if (east <= west || north <= south) return false;   // 퇴화 구역 방어
+
+        double lng = Math.Clamp(point.Lng, west, east);
+        double lat = Math.Clamp(point.Lat, south, north);
+        if (Math.Abs(lng - point.Lng) < 1e-9 && Math.Abs(lat - point.Lat) < 1e-9)
+            return false;                                    // 이미 구역 안 — 클램프 불필요
+
+        _isClampingToBounds = true;
+        try { Position = new PointLatLng(lat, lng); }        // 중심을 경계 안으로 되돌림(재진입은 위 가드로 스킵)
+        finally { _isClampingToBounds = false; }
+        return true;
     }
 
     /* [임시 진단 제거] RDP 오버레이 desync 확정 계측 — 현장 검증 완료(canvasSame/transformSame=True, err 약 0). 필요 시 이 블록주석 해제.
@@ -1070,7 +1098,10 @@ public class GMapCustomControl : GMapControl
             //var elapsed = (DateTime.Now - _panStartTime).TotalMilliseconds;
             //_log?.Info($"[PAN] ===DRAG-END=== t={DateTime.Now:HH:mm:ss.fff} skippedFrames={_panSkipCount} elapsed={elapsed:F0}ms → TriggerSelectionChange once");
 
-            // OnPositionChanged를 드래그 중 skip했으므로 종료 시점에 한 번 영역 갱신
+            // [MapAnchor] 드래그-팬 종료 시 중심이 앵커 구역 밖이면 안으로 되돌림(BoundsOfMap 강제 — 벤더 미enforce 보완, FR-B1)
+            ClampCenterToBounds(Position);
+
+            // OnPositionChanged를 드래그 중 skip했으므로 종료 시점에 한 번 영역 갱신(클램프된 위치 반영)
             TriggerSelectionChange(ViewArea, Zoom, false);
         }
     }
@@ -1500,8 +1531,9 @@ public class GMapCustomControl : GMapControl
 
     // 불변식: ScaleMode(Integer)·Zoom·_core.Zoom/ScaleX/Y는 절대 변경하지 않는다. RenderTransform만 변경.
     //   WPF가 e.GetPosition(this)에 RenderTransform.Inverse를 자동 적용하므로 히트테스트 수동 보정 금지(이중변환 버그).
-    public const int DIGITAL_ZOOM_MAX = 2;
-    private static readonly double[] DIGITAL_SCALE_TABLE = { 1.0, 1.5, 2.0 };
+    public const int DIGITAL_ZOOM_MAX = 3;
+    // level 1 = 1.25× → 정수줌 사이 "중간 스텝"(예: z17 50m→40m). level 2/3 = 1.5/2.0 (MaxZoom 위 소프트 줌). (FR-A 줌 40m)
+    private static readonly double[] DIGITAL_SCALE_TABLE = { 1.0, 1.25, 1.5, 2.0 };
 
     /// <summary>디지털 줌 레벨 변경 시 발화 (arg = 새 레벨 0~2). 축척바 동기화용.</summary>
     public event Action<int>? DigitalZoomLevelChanged;
@@ -1604,29 +1636,56 @@ public class GMapCustomControl : GMapControl
 
         bool zoomUp = InvertedMouseWheelZooming ? e.Delta < 0 : e.Delta > 0;
 
-        // ★ FR-1: MaxZoom 도달 후 휠업 → 디지털 줌 진입 (타일 줌/_core 불변, RenderTransform만 확대)
-        if (zoomUp && Zoom >= MaxZoom)
+        // ─────────────────────────────────────────────────────────────────────────────
+        //  줌 40m 세분화 (FR-A) — 정수줌 사이에 디지털 1.25× "중간 스텝" 삽입.
+        //  래더(오름차순): (17,0)=50m → (17,1)=40m → (18,0)=30m → (18,1)=24m → (19,0)…
+        //    · Zoom<MaxZoom: level 0↔1(1.25× 중간). 휠업 at level1 → 다음 정수. 휠다운 대칭(Z→Z-1+중간).
+        //    · Zoom>=MaxZoom: 기존 above-max 소프트 줌(level 1/2/3 = 1.25/1.5/2.0).
+        //  타일 Zoom/_core는 정수만 변경(불변식 유지), 중간은 RenderTransform. 스케일바("40m")·라벨("17+")은
+        //  DigitalZoomScale로 자동 계산. reset+base는 한 핸들러 내 동기 실행이라 중간 프레임 렌더 없음(플리커 없음).
+        // ─────────────────────────────────────────────────────────────────────────────
+        if (zoomUp)
         {
-            if (DigitalZoomLevel < DIGITAL_ZOOM_MAX) StepDigitalZoom(+1);
-            e.Handled = true;
-            return;
+            if (Zoom < MaxZoom)
+            {
+                if (DigitalZoomLevel == 0)              // 정수 → 40m 중간 스텝
+                {
+                    StepDigitalZoom(+1);                // → level 1 (1.25×)
+                    e.Handled = true;
+                    return;
+                }
+                ResetDigitalZoom();                     // 중간 → 다음 정수(아래 base 정수 줌인)
+            }
+            else                                         // ★ FR-1: MaxZoom 위 소프트 줌(기존)
+            {
+                if (DigitalZoomLevel < DIGITAL_ZOOM_MAX) StepDigitalZoom(+1);
+                e.Handled = true;
+                return;
+            }
         }
-        // ★ FR-2: 디지털 줌 활성 중 휠다운 → 디지털 감소 우선 (0 도달 후 다음 휠다운부터 정상 줌아웃)
-        if (!zoomUp && DigitalZoomLevel > 0)
+        else // zoomDown
         {
-            StepDigitalZoom(-1);
-            e.Handled = true;
-            return;
-        }
-        // ★ T2: MinZoom 하한 가드 — GMap.NET base는 휠 시 Position을 먼저 옮긴 뒤 Zoom 클램프하므로
-        //   경계에서 "줌 그대로/중심만 점프"를 막기 위해 base 호출 자체를 차단.
-        if (!zoomUp && Zoom <= MinZoom)
-        {
+            // ★ FR-2: 디지털(중간/소프트) 활성 중 휠다운 → 디지털 감소 우선
+            if (DigitalZoomLevel > 0)
+            {
+                StepDigitalZoom(-1);
+                e.Handled = true;
+                return;
+            }
+            // ★ T2: MinZoom 하한 가드 — base는 Position 먼저 옮긴 뒤 Zoom 클램프 → 경계 중심점프 차단
+            if (Zoom <= MinZoom)
+            {
+                e.Handled = true;
+                return;
+            }
+            // 정수(level0) → 아래 정수의 40m 중간 스텝 (Z→Z-1 후 1.25× 부여): 오름차순과 대칭(18→17+→17)
+            base.OnMouseWheel(e);                        // Zoom Z→Z-1 (정수 줌아웃)
+            if (Zoom < MaxZoom) StepDigitalZoom(+1);     // 아래 정수의 중간 스텝 부여
             e.Handled = true;
             return;
         }
 
-        base.OnMouseWheel(e);
+        base.OnMouseWheel(e);   // 정수 줌인(중간→다음 정수, 또는 MinZoom 근처 일반 줌인)
     }
 
     /// <summary>

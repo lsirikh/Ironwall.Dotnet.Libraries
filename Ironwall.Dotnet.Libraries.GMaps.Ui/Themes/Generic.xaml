@@ -39,6 +39,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/CameraStreamPopupStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/PlaybackConsoleStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/TrackingSettingsStyle.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MapAnchorPanelStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
 

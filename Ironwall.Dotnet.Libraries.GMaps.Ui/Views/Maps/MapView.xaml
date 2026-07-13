@@ -754,7 +754,7 @@
 				HorizontalAlignment="Right"
 				VerticalAlignment="Bottom"
 				DigitalZoomLevel="{Binding MainMap.DigitalZoomLevel, Mode=TwoWay}"
-				DigitalZoomSteps="2"
+				DigitalZoomSteps="3"
 				MaxZoom="{Binding ZoomMax}"
 				MinZoom="{Binding ZoomMin}"
 				Zoom="{Binding MainMap.Zoom, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -793,59 +793,14 @@
 					Content="{Binding MapRoiPanel}"
 					Visibility="{Binding IsMapRoiPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-				<!--  사이트 고정(맵 앵커) 설정 패널 (증분6, FR-B3)  -->
-				<Border
-					x:Name="MapAnchorPanel"
+				<!--  사이트 고정(맵 앵커) 설정 패널 (증분6, FR-B3) — OverlayWindow 패턴(Control+ControlTemplate, 헤더 드래그)  -->
+				<ContentPresenter
+					x:Name="MapAnchorPresenter"
 					Canvas.Left="90"
 					Canvas.Top="90"
-					Width="300"
 					Panel.ZIndex="120"
-					Background="{DynamicResource SurfaceBrush}"
-					BorderBrush="{DynamicResource DividerBrush}"
-					BorderThickness="1"
-					CornerRadius="8"
-					Visibility="{Binding IsMapAnchorPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-					<StackPanel>
-						<Border Background="{DynamicResource PrimaryBrush}" CornerRadius="8,8,0,0" Padding="12,8">
-							<Grid>
-								<TextBlock Text="사이트 고정 (Map Anchor)" FontWeight="Bold" VerticalAlignment="Center" Foreground="{DynamicResource OnPrimaryFixedBrush}" />
-								<Button HorizontalAlignment="Right" Command="{Binding ShowMapAnchorPanelCommand}" Content="✕" Background="Transparent" BorderThickness="0" Padding="6,0" Foreground="{DynamicResource OnPrimaryFixedBrush}" />
-							</Grid>
-						</Border>
-						<StackPanel Margin="12">
-							<CheckBox Content="사이트 고정 활성" IsChecked="{Binding AnchorEnabled}" Margin="0,0,0,10" />
-							<Button Content="현재 화면을 구역으로 지정" Command="{Binding SetAnchorFromViewCommand}" Margin="0,0,0,12" />
-							<TextBlock Text="앵커 구역 — 북서(NW) 위도 / 경도" FontSize="11" Opacity="0.7" Margin="0,0,0,3" />
-							<Grid Margin="0,0,0,8">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition />
-									<ColumnDefinition />
-								</Grid.ColumnDefinitions>
-								<TextBox Grid.Column="0" Margin="0,0,4,0" Text="{Binding AnchorNwLat, StringFormat=F6}" />
-								<TextBox Grid.Column="1" Text="{Binding AnchorNwLng, StringFormat=F6}" />
-							</Grid>
-							<TextBlock Text="앵커 구역 — 남동(SE) 위도 / 경도" FontSize="11" Opacity="0.7" Margin="0,0,0,3" />
-							<Grid Margin="0,0,0,12">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition />
-									<ColumnDefinition />
-								</Grid.ColumnDefinitions>
-								<TextBox Grid.Column="0" Margin="0,0,4,0" Text="{Binding AnchorSeLat, StringFormat=F6}" />
-								<TextBox Grid.Column="1" Text="{Binding AnchorSeLng, StringFormat=F6}" />
-							</Grid>
-							<Grid Margin="0,0,0,12">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="Auto" />
-									<ColumnDefinition />
-								</Grid.ColumnDefinitions>
-								<TextBlock Grid.Column="0" Text="최소 줌" VerticalAlignment="Center" Margin="0,0,10,0" />
-								<TextBox Grid.Column="1" Text="{Binding AnchorMinZoom}" />
-							</Grid>
-							<CheckBox Content="엄격 컨테인먼트 (화면밖 완전차단)" IsChecked="{Binding AnchorStrict}" Margin="0,0,0,14" />
-							<Button Content="저장 · 적용" Command="{Binding SaveMapAnchorCommand}" HorizontalAlignment="Right" MinWidth="90" />
-						</StackPanel>
-					</StackPanel>
-				</Border>
+					Content="{Binding MapAnchorPanel}"
+					Visibility="{Binding IsMapAnchorPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 				<!--  음원 실행 패널  -->
 				<ContentPresenter
