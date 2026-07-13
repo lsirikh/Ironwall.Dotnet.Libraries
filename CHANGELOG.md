@@ -14,6 +14,9 @@
 
 ## [Unreleased]
 
+### Added
+- **통합웹 접속 트리거 메시지 `CallWebApiProcessMessageModel`** ([PRD](docs/prds/LeftMenu_IntegratedWeb_Button-prd.md) · [Plan](docs/plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) · ViewModel.Models/CommonMessages.cs) — LeftMenu "통합웹" 버튼의 확인 팝업 '확인' 시 발행되어, 크롬 앱 모드로 통합 웹 대시보드(`http://{웹서버IP}:{포트}`)를 여는 트리거(`IMessageModel` 마커 타입). 순수 추가(기존 타입 무변경). 소비측=메인 Monitoring `LeftMenuSectionViewModel`(권한 게이팅→웹설정 `IsWebServerEnabled` 게이팅으로 교체, DATABASE 메뉴→통합웹). ⚠앱 재빌드 후 반영.
+
 ### Removed
 - **`group_device`(deprecated 단일 그룹) 죽은 코드 정리** (태그 `before-remove-group-device` · Devices.Api/Ui) — `device_groups`(N:N EventMapping) 전환으로 deprecated된 `group_device`의 잔재 제거. `IDeviceApiService`/`DeviceApiService` 6개 조회 메서드의 **미사용 쿼리 필터 파라미터** `int? groupDevice` + XML doc + `MockDeviceApiService` 시그니처 정합. **DTO/Model엔 이미 프로퍼티 없음**(전환 완료·제거 대상 없음). 호출자 30곳 전부 named-arg/무인자라 무영향(빌드 검증: Devices.Api/Ui 0오류). 메인 솔루션 참조 0. (Messages/Tests 하위호환 JSON 픽스처는 유지 — 구서버 group_device 수신 시 무시됨을 검증.)
 
@@ -21,7 +24,10 @@
 - **이벤트 카드 "구역" 표시 — 그룹 Id 숫자 → 구역 이름(N:N)** (태그 `before-event-card-zone-name` · Events.Ui)
   - **결함**: 탐지/장애 이벤트 카드의 "구역" 칸이 구역 **이름** 대신 값이 이상하게 표시됨 — 장애 카드는 그룹 **DB Id 숫자**(`Device.DeviceGroupsText` = `string.Join(", ", List<int>)` 모델 구현)를 "1, 116"처럼 노출, 탐지 카드는 존재하지 않는 `Device.Name` 바인딩으로 **빈칸**. 근본원인=`DtoToModelHelper`가 서버 DTO의 그룹 `name`을 버리고 `id`만 매핑(`Select(g => g.Id)`) + 카드가 이름 변환 없는 모델 속성에 직접 바인딩.
   - **수정**: `EventCardViewModel<T>`에 이름 변환 `DeviceGroupsText` 속성 추가(`DeviceGroupProvider`로 Id→`DeviceGroupModel.Name` 조회, 미발견 시 Id fallback — 장비 관리 패널 `BaseDeviceViewModel` 패턴 재사용). 두 카드 뷰 바인딩을 VM `DeviceGroupsText`로 통일. N:N 다중 그룹="구역 1, 10", 단일="구역 1".
-  - **검증**: Events.Ui 빌드 0오류. 카드 회귀 테스트 2종(`Detection/MalfunctionEventCardView_ZoneBindsToViewModelDeviceGroupsText`) 통과. ⚠앱 재빌드 후 반영. (별개: 카드 `ControllerId` 테스트 2종은 커밋 HEAD부터 red — 카드 XAML에 해당 바인딩 부재, 본 변경과 무관.)
+  - **검증**: Events.Ui 빌드 0오류. 카드 회귀 테스트 2종(`Detection/MalfunctionEventCardView_ZoneBindsToViewModelDeviceGroupsText`) 통과. ⚠앱 재빌드 후 반영.
+- **이벤트 카드 제어기 필드 테스트 정정 — 낡은 `ControllerId` 기대값** (Events.Ui/Tests · 커밋 HEAD부터 red였던 사전 실패)
+  - **원인**: Phase19 테스트(`Detection/MalfunctionEventCardView_ControllerId_BindsToViewModelProperty`)가 카드 XAML에 `"ControllerId"` 문자열을 기대했으나, 카드 설계가 진화 — **탐지 카드=`ControllerDeviceNumber`(제어기 번호)**, **장애 카드=`ControllerDisplay`/`SensorDisplay`(장애타입 인지 표시)**. 바인딩은 전부 유효한 VM 속성(깨진 `Device.Controller.*` 경로 없음) → **XAML 정상, 테스트만 낡음**.
+  - **수정**: 두 테스트를 `..._ControllerField_BindsToViewModelProperty`로 정정 — 탐지=`ControllerDeviceNumber` 검증, 장애=`ControllerDisplay`+`SensorDisplay` 검증(+`Device.Controller.*` 부재 유지). 카드 관련 8/8 green.
 - **ACTION_REPORT NATS 발행 계약 복구 — from_event/device 누락 + from 오류** ([PRD](docs/prds/Action_Report_Nats_FullDto_Contract-prd.md) · [Plan](docs/plans/Action_Report_Nats_FullDto_Contract-prd-plan.md) · 태그 `before-action-report-fulldto` · Monitoring.Models/Events.Ui + 메인 솔루션 NatsDomainService)
   - **결함**: 조치보고 NATS `ACTION_REPORT` body가 `{content,user}`만 → `id`·`type_event`·`from_event`(이벤트/장비 식별자) 통째 누락 + `from`=SystemUuid(`"gis-monitoring"`). 수신자(NVR 카메라홈복귀/방송종료/경광등해제/VMS)가 대상 장비 식별 불가 → 복귀동작 마비. 원인=FR-01 "transport adapter" 리팩터가 Full DTO 채우던 로직 제거(설계 §2.4 Pattern1·§6.4 위반).
   - **수정**: `SendActionRequestMessage`에 `OriginEvent`(IExEventModel)+`ActionId` 추가 → 발행 5지점(수동 탐지/장애·배치·자동조치·자동복구)에서 채움 → `NatsDomainService`가 `ActionEventModel.ToActionEventDto()`로 from_event(device.id 포함) 구성 + `from="GIS"`. OriginEvent null 시 기존 최소 body fallback(하위호환).
