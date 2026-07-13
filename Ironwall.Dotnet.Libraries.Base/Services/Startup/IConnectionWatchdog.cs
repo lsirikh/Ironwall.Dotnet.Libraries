@@ -17,4 +17,7 @@ public interface IConnectionWatchdog : IService, IDisposable
 
     /// <summary>사용자 의도 종료 확정 시 호출 — 와치독이 재시작하지 않도록 graceful 신호를 즉시 발화한다.</summary>
     void NotifyIntentionalShutdown();
+
+    /// <summary>런타임 감시 중지(사용자 비활성) — 와치독 종료 유도 + 재기동 차단. 이후 <see cref="Start"/>로 재활성 가능.</summary>
+    void StopWatching();
 }

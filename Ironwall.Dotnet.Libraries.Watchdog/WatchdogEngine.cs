@@ -39,8 +39,9 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _status.Start(_cts.Token);
         ScheduledTaskInstaller.EnsureRegistered(Environment.ProcessPath ?? string.Empty); // FR-07 상호감시
+        _targetStartedMs = TimeUtil.ToUnixMs(_clock.UtcNow); // 부팅 유예 시작
         _loop = Task.Run(() => RunLoopAsync(_cts.Token));
-        WatchdogLog.Info($"와치독 감시 시작: targetPid={_opt.TargetPid}, target='{_opt.TargetExePath}', poll={_opt.PollIntervalMs}ms, freeze={_opt.FreezeThresholdMs}ms");
+        WatchdogLog.Info($"와치독 감시 시작: targetPid={_opt.TargetPid}, target='{_opt.TargetExePath}', poll={_opt.PollIntervalMs}ms, freeze={_opt.FreezeThresholdMs}ms, confirm={_opt.FreezeConfirmCount}, grace={_opt.StartupGraceMs}ms");
         return Task.CompletedTask;
     }
 
@@ -72,6 +73,7 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
         if (_opt.TargetPid <= 0)
         {
             if (!_guard.TryDiscoverTarget()) { _state = WatchdogState.Unknown; return; }
+            _targetStartedMs = TimeUtil.ToUnixMs(_clock.UtcNow); // discovery 직후 유예
         }
 
         int pid = _opt.TargetPid;
@@ -97,28 +99,34 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
             return;
         }
 
-        // 3) 하트비트 신선도
-        var epoch = _heartbeat.ReadEpochMs(pid);
-        bool hbOk;
-        if (epoch == null)
-        {
-            hbOk = true; // 공유메모리 아직 없음(초기 유예) — 살아있으면 정상 간주
-        }
-        else
-        {
-            long ageMs = TimeUtil.ToUnixMs(_clock.UtcNow) - epoch.Value;
-            hbOk = ageMs <= _opt.FreezeThresholdMs;
-        }
+        // 3) 하트비트 신선도 — 부팅 유예 + 연속 확인으로 거짓 프리즈(부하 중 하트비트 지연) 방지
+        long nowMs = TimeUtil.ToUnixMs(_clock.UtcNow);
+        bool inGrace = (nowMs - _targetStartedMs) < _opt.StartupGraceMs;
 
-        if (!hbOk)
+        var epoch = _heartbeat.ReadEpochMs(pid);
+        // epoch==null(공유메모리 아직 없음)은 초기 유예로 간주 → stale 아님
+        bool hbStale = epoch != null && (nowMs - epoch.Value) > _opt.FreezeThresholdMs;
+
+        if (hbStale && !inGrace)
         {
+            _consecutiveStale++;
+            if (_consecutiveStale < _opt.FreezeConfirmCount)
+            {
+                // 아직 확정 전 — 단발 지연(GC·순간부하)일 수 있어 관찰만(kill 안 함)
+                _state = WatchdogState.Running;
+                WatchdogLog.Warn($"하트비트 stale 관찰(pid={pid}, {_consecutiveStale}/{_opt.FreezeConfirmCount}) — 확정 전 유예");
+                return;
+            }
+            // 연속 stale 확정 → 진짜 프리즈로 판정
             _state = WatchdogState.Frozen;
-            WatchdogLog.Warn($"프리즈 감지(pid={pid}) — kill 후 재시작");
+            WatchdogLog.Warn($"프리즈 확정(pid={pid}, 연속 {_consecutiveStale}회 stale > {_opt.FreezeThresholdMs}ms) — kill 후 재시작");
+            _consecutiveStale = 0;
             if (_guard.KillIfMatches()) TryRestart("freeze");
             return;
         }
 
-        // 정상
+        // 정상(또는 유예 중) — 연속 카운터 리셋
+        _consecutiveStale = 0;
         _policy.NotifyHealthy();
         _state = _policy.IsDegraded ? WatchdogState.Degraded : WatchdogState.Running;
         ClearDegradedFlag();
@@ -141,6 +149,8 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
         {
             _policy.RecordRestart();
             _heartbeat.Dispose(); // 새 PID로 재오픈 유도
+            _targetStartedMs = TimeUtil.ToUnixMs(_clock.UtcNow); // 재기동 후 부팅 유예
+            _consecutiveStale = 0;
             WatchdogLog.Info($"재시작({reason}) 완료 — newPid={_opt.TargetPid}, count={_policy.RestartCount}");
         }
     }
@@ -211,5 +221,8 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private volatile WatchdogState _state = WatchdogState.Unknown;
+
+    private long _targetStartedMs;   // 대상 (재)기동/discovery 시각 — 부팅 유예 기준
+    private int _consecutiveStale;   // 연속 하트비트 stale 횟수 — 프리즈 확정용
     #endregion
 }

@@ -22,8 +22,14 @@ public sealed class WatchdogOptions
     /// <summary>폴 주기(ms).</summary>
     public int PollIntervalMs { get; set; } = 5000;
 
-    /// <summary>프리즈 판정 하트비트 stale 임계(ms).</summary>
-    public int FreezeThresholdMs { get; set; } = 15000;
+    /// <summary>프리즈 판정 하트비트 stale 임계(ms). 기본 30s — 부하(GIS 렌더 등) 중 거짓 프리즈 방지.</summary>
+    public int FreezeThresholdMs { get; set; } = 30000;
+
+    /// <summary>프리즈 확정에 필요한 연속 stale 폴 횟수. 단발 지연(GC·순간부하) 오탐 방지.</summary>
+    public int FreezeConfirmCount { get; set; } = 3;
+
+    /// <summary>대상 (재)기동 후 프리즈 판정 유예(ms) — 부팅·하트비트 시작 대기.</summary>
+    public int StartupGraceMs { get; set; } = 30000;
 
     /// <summary>윈도우당 최대 재시작 횟수(초과 시 DEGRADED).</summary>
     public int MaxRestartsPerWindow { get; set; } = 5;
