@@ -37,6 +37,17 @@ public enum EnumGopCommand
     SYNC_DEVICE_GROUP = 13,
     // 카메라 특정위치 확인(GPS 조준) — 지도 클릭 좌표로 nvr_manager.ptz PTZ 회전 요청 (GIS→NVRManager, PUB). PTZ_* Absolute 패밀리.
     PTZ_AIM_LOCATION = 14,
+    // ── SYNC 동기화 알림 (DBApi가 CRUD 시 all.sync.* 로 발행). cmd 문자열 이름 매칭(Enum.TryParse). ──
+    // 이벤트매핑 동기화 (all.sync.event_mapping)
+    SYNC_EVENT_MAPPING = 15,
+    // 프리셋 동기화 (all.sync.preset) — is_restricted_zone(감시금지구역, v4.6) 포함
+    SYNC_PRESET = 16,
+    // 이하 5종은 GIS 무시 가능 — cmd 인식(파싱)용으로만 정의(미정의 시 "Unknown" 경고 유발)
+    SYNC_SERVER = 17,
+    SYNC_CATEGORY = 18,
+    SYNC_FILE_GROUP = 19,
+    SYNC_CAMERA_SETTING = 20,
+    SYNC_PROXY_SETTING = 21,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

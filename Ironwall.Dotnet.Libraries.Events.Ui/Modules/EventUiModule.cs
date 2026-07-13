@@ -69,9 +69,8 @@ public class EventUiModule : Module
                    .AsSelf()
                    .As<ISymbolEventManager>()
                    .SingleInstance();
-            builder.RegisterType<DeviceNatsSyncService>()
-                   .As<IDeviceNatsSyncService>()
-                   .SingleInstance();
+            // DeviceNatsSyncService 제거(FR-08): As<IService> 미등록으로 StartService가 호출되지 않던 사문 서비스.
+            // SYNC_DEVICE는 메인 솔루션 NatsDomainService.ProcessSyncDeviceAsync가 CREATED/UPDATED/DELETED 전부 처리(권위 경로).
             builder.RegisterType<CameraPtzNatsSyncService>()
                    .As<ICameraPtzNatsSyncService>()
                    .SingleInstance();

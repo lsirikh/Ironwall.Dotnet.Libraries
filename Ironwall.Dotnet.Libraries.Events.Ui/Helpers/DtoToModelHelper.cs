@@ -1,3 +1,4 @@
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -379,11 +380,9 @@ public static class DtoToModelHelper
             Status = device.Status.ToString(),
             Version = device.Version ?? string.Empty,
             ControllerId = (device as ISensorDeviceModel)?.Controller?.Id,
-            // device_groups: 수신자 N:N EventMapping 라우팅 키. 모델은 그룹 id(List<int>)만 보유하므로
-            // id 채움(name/description/device_count 이름 보강은 Stage 1 DeviceGroupProvider seam에서 수행).
-            DeviceGroups = device.DeviceGroups is { Count: > 0 }
-                ? device.DeviceGroups.Select(gid => new DeviceGroupDto { Id = gid }).ToList()
-                : null,
+            // device_groups: 수신자 N:N EventMapping 라우팅 키(GIS.md v1.5 §2.1).
+            // 그룹 id + DeviceGroupProvider(IoC)로 name/description/device_count 보강(Stage 1).
+            DeviceGroups = BuildDeviceGroupDtos(device.DeviceGroups),
             Geolocation = BuildGeolocationDto(device)
         };
     }
@@ -407,6 +406,34 @@ public static class DtoToModelHelper
             Altitude = device.Altitude,
             Heading = device.Heading
         };
+    }
+
+    /// <summary>
+    /// 그룹 id 리스트 → device_groups(DeviceGroupDto). DeviceGroupProvider(IoC)로
+    /// name/description/device_count 보강(EventCardViewModel.DeviceGroupsText 패턴 재사용).
+    /// provider 미가용(테스트/부팅 전) 시 id만 채워 fallback — 라우팅 키는 항상 보존.
+    /// </summary>
+    private static List<DeviceGroupDto>? BuildDeviceGroupDtos(List<int>? groupIds)
+    {
+        if (groupIds is not { Count: > 0 }) return null;
+
+        DeviceGroupProvider? provider = null;
+        try { provider = IoC.Get<DeviceGroupProvider>(); }
+        catch { /* IoC 미구성 → id-only fallback */ }
+
+        return groupIds.Select(gid =>
+        {
+            var g = provider?.FirstOrDefault(x => x.Id == gid);
+            return g is null
+                ? new DeviceGroupDto { Id = gid }
+                : new DeviceGroupDto
+                {
+                    Id = gid,
+                    Name = g.Name,
+                    Description = g.Description,
+                    DeviceCount = g.DeviceCount
+                };
+        }).ToList();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
