@@ -46,6 +46,20 @@
   - **FR-03 DETECT frame_width/frame_height**: `DetectionDetailDto`에 AI bbox 좌표 스케일 해석용 프레임 해상도 필드(optional) 추가.
   - **FR-04 geolocation 전필드**: `ConvertDeviceToDto`가 위경도만 채우던 것을 location/altitude/heading 포함 전필드로(`BuildGeolocationDto`).
   - **검증**: Messages 빌드 0오류·`DetectionDetailDtoTests` 4/4 · Events.Ui 빌드 0오류·`DtoToModelHelperTests`+`CameraPtzSubjectFilterTests` 15/15 통과(신규: device_groups+geolocation 왕복, PTZ subject Theory 5케이스, frame 왕복). ⚠앱 재빌드 후 런타임 반영. **D-4**: 서버가 실제 `gis.ptz-status`로 발행하는지는 배포 전 실 NATS 확인 권장(병행 수용으로 무회귀 보장).
+- **GIS NATS Stage 1 — device_groups 이름 보강 + SYNC cmd enum 인식 + 사문 서비스 제거** ([PRD](docs/prds/GIS_Nats_Full_Integration-prd.md) · Events.Ui/Enums, 메인 솔루션 무변경)
+  - **FR-02b device_groups 이름 보강**: `ConvertDeviceToDto`가 그룹 id만 채우던 것을 `IoC.Get<DeviceGroupProvider>()`로 name/description/device_count까지 보강(`EventCardViewModel.DeviceGroupsText` 패턴 재사용, provider 미가용 시 id-only fallback). 라이브러리 한정.
+  - **FR-05 SYNC cmd enum 인식**: `EnumGopCommand`에 SYNC_EVENT_MAPPING(15)·SYNC_PRESET(16)·SYNC_SERVER/CATEGORY/FILE_GROUP/CAMERA_SETTING/PROXY_SETTING(17~21) 추가. `ResolveCommand`가 이름 매칭(Enum.TryParse ignoreCase)이라 재번호 불필요(PTZ_AIM_LOCATION=14 유지).
+  - **FR-08 사문 DeviceNatsSyncService 제거**: `As<IService>` 미등록으로 StartService가 호출되지 않던 사문 서비스+인터페이스 삭제 + EventUiModule 등록 제거. SYNC_DEVICE는 메인 `NatsDomainService.ProcessSyncDeviceAsync`가 전 action 처리(권위 경로), 메인 참조 0 확인.
+  - **범위 확정(실측)**: SYNC_EVENT_MAPPING·SYNC_PRESET 캐시/핸들러(FR-06/07)는 **GIS 소비처 부재**(EventMapping=수신자가 조회, Preset=Stage 2 마스킹 미구현) → **enum 인식만** 두고 추후 GIS 자동연동 전면 구현 시 도입. **FR-09(DELETED 심볼 제거)는 기각** — 심볼 생명주기는 장비 CRUD와 비결합(자동생성 안 하므로 자동삭제도 안 함).
+  - **검증**: Enums 빌드 0오류 · Events.Ui 15/15(FR-02 보강 후 회귀 없음). ⚠앱 재빌드 후 반영.
+- **GIS NATS Stage 3 — WINDY REQ/RSP 무응답 로직(실패·타임아웃 시 알림 + 서버 재동기화)** ([PRD](docs/prds/GIS_Nats_Full_Integration-prd.md) · 메인 솔루션 `NatsDomainService` 단일 파일)
+  - **결함**: WINDY 풍량 모드 변경 REQ가 RSP 무응답(타임아웃/연결없음)·서버거부 시 **로그만** 남기고 라디오 버튼은 낙관적으로 이동한 채 방치(롤백 없음). WINDY는 시스템 **유일의 라이브 NATS REQ/RSP**(`RequestAsync` 호출처=WINDY뿐, 3-agent 실측).
+  - **FR-15 무응답 로직**: `NatsDomainService.HandleAsync(SendWindyModeMessage)`가 `reply==null`(무응답)·`rsp.Success==false`(서버거부)·성공을 구별 → 실패 시 (1)`OpenInfoPopupMessageModel` 표준 팝업 알림(raw MessageBox 금지) + (2)`FetchProxySettingsAsync`로 서버 WindyMode 재조회→`ChangeModeWindyMessageModel` 발행→`WindyPanelViewModel` 라디오를 **서버 진실로 복원**. 로컬 롤백 대신 서버 재조회라 "타임아웃이지만 실제 적용됨" 케이스까지 정합. 타임아웃 5s→3s.
+  - **범위 확정(실측)**: LAMP_OFF REQ(FR-16)=트리거 전무(DTO만)=speculative→보류 · PTZ UI(FR-18)=ONVIF 직결로 NATS REQ 무관→보류 · ProcessResponseAsync 정리(FR-17)=테스트 결합("Step 3 마이그레이션" 소유)→드롭 · 결과타입/설정값화(FR-13/14)=단일 호출처엔 과설계→인라인. **라이브러리 무변경**.
+  - **검증**: 메인 솔루션 빌드 0오류(경고 995 기존분). ⚠앱 재빌드 후 런타임 E2E(실패 팝업 + 라디오 복원) 필요.
+- **GIS NATS Stage 2 — PtzStatusBodyDto v4.6 감시금지구역 필드(마스킹 적용은 보류)** ([PRD](docs/prds/GIS_Nats_Full_Integration-prd.md) · Messages)
+  - **FR-10**: `PtzStatusBodyDto`에 `current_preset`(int?)·`is_restricted`(bool) 추가 — v4.6 메시지 계약 완성(기존엔 파싱 시 **silent 손실**됐음). Messages 빌드 0오류.
+  - **마스킹(FR-11/12) 보류(사용자 결정)**: is_restricted는 **Preset 감시금지구역 속성 종속** → Preset 이벤트 맵핑/캐시(Stage 1 FR-07 보류)가 선결. 현재 GIS의 double-click→RTSP **단순 뷰 구조**가 관리형 마스킹에 부적합. **마스킹 인프라(`PlaybackState.Restricted`·🚫 오버레이·`IImprovedRtspStreamingService.RestrictStream`/`UnrestrictStreamAsync`·`IsHubMode` airspace 회피)는 이미 완비·미배선**(호출처 0) — Preset 인프라 도입 시 `cameraId→stream contextId` 라우팅만 추가하면 활성화.
 - **이벤트 카드 "구역" 표시 — 그룹 Id 숫자 → 구역 이름(N:N)** (태그 `before-event-card-zone-name` · Events.Ui)
   - **결함**: 탐지/장애 이벤트 카드의 "구역" 칸이 구역 **이름** 대신 값이 이상하게 표시됨 — 장애 카드는 그룹 **DB Id 숫자**(`Device.DeviceGroupsText` = `string.Join(", ", List<int>)` 모델 구현)를 "1, 116"처럼 노출, 탐지 카드는 존재하지 않는 `Device.Name` 바인딩으로 **빈칸**. 근본원인=`DtoToModelHelper`가 서버 DTO의 그룹 `name`을 버리고 `id`만 매핑(`Select(g => g.Id)`) + 카드가 이름 변환 없는 모델 속성에 직접 바인딩.
   - **수정**: `EventCardViewModel<T>`에 이름 변환 `DeviceGroupsText` 속성 추가(`DeviceGroupProvider`로 Id→`DeviceGroupModel.Name` 조회, 미발견 시 Id fallback — 장비 관리 패널 `BaseDeviceViewModel` 패턴 재사용). 두 카드 뷰 바인딩을 VM `DeviceGroupsText`로 통일. N:N 다중 그룹="구역 1, 10", 단일="구역 1".
