@@ -89,7 +89,22 @@ internal sealed class HeartbeatWriter : IDisposable
         {
             var t = _timer;
             if (t != null)
-                t.Dispatcher.Invoke(() => t.Stop());
+            {
+                var d = t.Dispatcher;
+                if (d.HasShutdownStarted || d.HasShutdownFinished)
+                {
+                    // Dispatcher가 이미 종료 중 — 타이머는 함께 소멸. Invoke 시 블록/예외 위험이라 스킵.
+                }
+                else if (d.CheckAccess())
+                {
+                    t.Stop();
+                }
+                else
+                {
+                    // 논블로킹 — 앱 종료 중 UI 스레드 대기(최대 10초 안전망)로 '안 닫힘'처럼 보이던 지연 방지
+                    d.BeginInvoke(new Action(() => { try { t.Stop(); } catch { } }));
+                }
+            }
         }
         catch { /* 종료 경합 무시 */ }
         try { _accessor?.Dispose(); } catch { }
