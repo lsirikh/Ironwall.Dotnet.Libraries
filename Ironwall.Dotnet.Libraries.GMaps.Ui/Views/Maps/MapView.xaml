@@ -386,6 +386,7 @@
 							Command="{Binding UndoCommand}"
 							IsEnabled="{Binding CanUndo}"
 							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTipService.ShowOnDisabled="True"
 							ToolTip="{Binding NextUndoDescription, StringFormat='실행 취소 (Ctrl+Z): {0}', TargetNullValue='실행 취소 (Ctrl+Z)'}">
 							<md:PackIcon Kind="Undo" />
 						</Button>
@@ -393,7 +394,8 @@
 							Command="{Binding RedoCommand}"
 							IsEnabled="{Binding CanRedo}"
 							Style="{StaticResource ToolbarButtonStyle}"
-							ToolTip="{Binding NextRedoDescription, StringFormat='다시 실행 (Ctrl+Y): {0}', TargetNullValue='다시 실행 (Ctrl+Y)'}">
+							ToolTipService.ShowOnDisabled="True"
+							ToolTip="{Binding NextRedoDescription, StringFormat='다시 실행 (Ctrl+Y / Ctrl+Shift+Z): {0}', TargetNullValue='다시 실행 (Ctrl+Y / Ctrl+Shift+Z)'}">
 							<md:PackIcon Kind="Redo" />
 						</Button>
 					</StackPanel>
