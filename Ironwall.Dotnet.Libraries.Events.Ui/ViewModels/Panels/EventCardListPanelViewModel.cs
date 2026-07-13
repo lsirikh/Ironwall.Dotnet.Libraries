@@ -442,7 +442,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                         EventType = eventModel?.MessageType ?? EnumEventType.Intrusion,
                         ActionDetails = "일괄처리",
                         ActionUser = _userModel.Name,
-                        ActionTime = DateTime.Now
+                        ActionTime = DateTime.Now,
+                        OriginEvent = eventModel as IExEventModel,   // NATS from_event(device) 원천
+                        ActionId = response.Data?.Id ?? 0            // 생성된 Action DB ID
                     });
 
                         await Task.Yield(); // Dispatcher 렌더 기회 보장 (Task.Delay(20) 대체)
@@ -570,7 +572,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     EventType = entry.EventType,
                     ActionDetails = content,
                     ActionUser = GetActorName(),
-                    ActionTime = DateTime.Now
+                    ActionTime = DateTime.Now,
+                    OriginEvent = card.Model as IExEventModel,   // NATS from_event(device) 원천
+                    ActionId = response.Data?.Id ?? 0            // 생성된 Action DB ID
                 });
 
                 _log?.Info($"AutoReport 완료: EventId({eventId}), EntryId({entryId})");
@@ -637,7 +641,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     EventType = eventModel.MessageType,
                     ActionDetails = "etc 자동복구",
                     ActionUser = _userModel.Name,
-                    ActionTime = DateTime.Now
+                    ActionTime = DateTime.Now,
+                    OriginEvent = eventModel as IExEventModel,   // NATS from_event(device) 원천
+                    ActionId = response.Data?.Id ?? 0            // 생성된 Action DB ID
                 });
 
                 _log?.Info($"AutoRecovery 완료: Event({eventModel.Id}), Entry({faultEntryId})");

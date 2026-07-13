@@ -74,7 +74,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                     EventType = EnumEventType.Intrusion,
                     ActionDetails = Contents,
                     ActionUser = IdUser,
-                    ActionTime = DateTime.Now
+                    ActionTime = DateTime.Now,
+                    OriginEvent = Model,                 // NATS from_event(device) 원천
+                    ActionId = response.Data?.Id ?? 0    // 생성된 Action DB ID
                 });
 
                 return await base.SendAction(content, idUser);

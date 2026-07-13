@@ -2,6 +2,7 @@ using Xunit;
 using Moq;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
@@ -266,6 +267,66 @@ public class DtoToModelHelperTests
         Assert.Equal("Action", dto.TypeEvent);
         Assert.Equal("Reset system", dto.Content);
         Assert.Equal("admin", dto.User);
+    }
+
+    /// <summary>
+    /// ACTION_REPORT NATS 발행 봉투 계약 검증 (Gop_Message_Broker §2.3·§2.4·§6.4).
+    /// NatsDomainService 발행 경로와 동일: OriginEvent 담은 ActionEventModel → ToActionEventDto() → ToBrokerPublish("GIS").
+    /// 회귀 방지: body가 {content,user}만이던 결함(from_event 누락) + from=SystemUuid 결함 재발 차단.
+    /// </summary>
+    [Fact]
+    public void ToBrokerPublish_ActionReport_ShouldCarryFullFromEventAndGisFrom()
+    {
+        // Arrange — 조치보고 원본(Detection + Device)
+        var origin = new DetectionEventModel
+        {
+            Id = 1001,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = new DateTime(2026, 7, 8, 5, 21, 31, DateTimeKind.Utc),
+            Device = new SensorDeviceModel
+            {
+                Id = 101,
+                DeviceType = EnumDeviceType.Fence,
+                DeviceName = "Sensor-A-1",
+                DeviceNumber = 1,
+                Status = EnumDeviceStatus.ACTIVATED,
+                Version = "v1.5.0",
+                Controller = new ControllerDeviceModel { Id = 1 },
+                Latitude = 37.5,
+                Longitude = 127.0
+            }
+        };
+        var actionModel = new ActionEventModel
+        {
+            Id = 4001,
+            MessageType = EnumEventType.Action,
+            DateTime = new DateTime(2026, 7, 8, 5, 21, 31, DateTimeKind.Utc),
+            Content = "야생동물출현",
+            User = "시스템 관리자",
+            OriginEvent = origin
+        };
+
+        // Act — 발행부(NatsDomainService)와 동일 경로
+        var dto = actionModel.ToActionEventDto();
+        var envelope = dto.ToBrokerPublish(EnumGopCommand.ACTION_REPORT.ToString(), "GIS");
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(envelope);
+
+        // Assert — 계약: from="GIS", cmd=ACTION_REPORT, body.from_event(device.id=101)
+        Assert.Equal("GIS", envelope.From);
+        Assert.Equal("ACTION_REPORT", envelope.Command);
+        Assert.NotNull(dto.FromEvent);
+        var dev = ((DetectionEventDto)dto.FromEvent!).Device!;
+        Assert.Equal(101, dev.Id);
+        Assert.Equal("ACTIVATED", dev.Status);      // §6.4 device.status
+        Assert.Equal("v1.5.0", dev.Version);        // §6.4 device.version
+        Assert.Equal(1, dev.ControllerId);          // §6.4 device.controller_id
+        Assert.NotNull(dev.Geolocation);            // §6.4 device.geolocation
+        Assert.Equal(4001, dto.Id);
+        Assert.Contains("\"from\":\"GIS\"", json);
+        Assert.Contains("\"from_event\"", json);
+        Assert.Contains("\"id\":101", json);            // from_event.device.id
+        Assert.Contains("\"controller_id\":1", json);
+        Assert.Contains("\"status\":\"ACTIVATED\"", json);
     }
 }
 

@@ -65,6 +65,12 @@ public class BaseDeviceDto : BaseDto
     public GeolocationDto? Geolocation { get; set; }
 
     /// <summary>
+    /// 소속 컨트롤러 ID (Sensor 등). 설계 Gop_Message_Broker §6.4 device.controller_id. optional.
+    /// </summary>
+    [JsonProperty("controller_id", Order = 11, NullValueHandling = NullValueHandling.Ignore)]
+    public int? ControllerId { get; set; }
+
+    /// <summary>
     /// 설계 문서 원칙: Event body의 nested device 객체에서는 created_at/updated_at 제외
     /// </summary>
     [JsonIgnore]

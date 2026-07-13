@@ -78,17 +78,13 @@ public class DeviceApiService : IDeviceApiService
     /// <summary>
     /// GOP API를 통해 Controller 목록을 조회합니다
     /// <para>GET /devices/controllers 엔드포인트를 호출</para>
-    /// </summary>
-    /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
-    /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
+    /// </summary>    /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
     /// <param name="includeSensors">연결된 센서 포함 여부 (선택, 기본값 false)</param>
     /// <param name="page">페이지 번호 (기본값 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Controller DTO 목록을 포함한 API 응답</returns>
-    public async Task<ApiListResponse<ControllerDeviceDto>> GetControllersAsync(
-        int? groupDevice = null,
-        string? status = null,
+    public async Task<ApiListResponse<ControllerDeviceDto>> GetControllersAsync(        string? status = null,
         bool includeSensors = false,
         int page = 1,
         int limit = 20,
@@ -96,9 +92,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var parameters = new Dictionary<string, string>();
-            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
-            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             if (includeSensors) parameters.Add("include_sensors", "true");
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
@@ -245,9 +239,7 @@ public class DeviceApiService : IDeviceApiService
     /// GOP API를 통해 Sensor 목록을 조회합니다
     /// <para>GET /devices/sensors 엔드포인트를 호출</para>
     /// </summary>
-    /// <param name="controllerId">Controller ID 필터 (선택)</param>
-    /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
-    /// <param name="typeDevice">디바이스 타입 필터 (PIR, Laser, Fence, IoController, Cable, Contact, Underground 등) (선택)</param>
+    /// <param name="controllerId">Controller ID 필터 (선택)</param>    /// <param name="typeDevice">디바이스 타입 필터 (PIR, Laser, Fence, IoController, Cable, Contact, Underground 등) (선택)</param>
     /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
     /// <param name="includeController">연결된 제어기 포함 여부 (선택, 기본값 false)</param>
     /// <param name="page">페이지 번호 (기본값 1)</param>
@@ -255,9 +247,7 @@ public class DeviceApiService : IDeviceApiService
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Sensor DTO 목록을 포함한 API 응답</returns>
     public async Task<ApiListResponse<SensorDeviceDto>> GetSensorsAsync(
-        int? controllerId = null,
-        int? groupDevice = null,
-        string? typeDevice = null,
+        int? controllerId = null,        string? typeDevice = null,
         string? status = null,
         bool includeController = false,
         int page = 1,
@@ -267,9 +257,7 @@ public class DeviceApiService : IDeviceApiService
         try
         {
             var parameters = new Dictionary<string, string>();
-            if (controllerId.HasValue) parameters.Add("controller_id", controllerId.Value.ToString());
-            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
-            if (!string.IsNullOrEmpty(typeDevice)) parameters.Add("type_device", typeDevice);
+            if (controllerId.HasValue) parameters.Add("controller_id", controllerId.Value.ToString());            if (!string.IsNullOrEmpty(typeDevice)) parameters.Add("type_device", typeDevice);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             if (includeController) parameters.Add("include_controller", "true");
             parameters.Add("page", page.ToString());
@@ -406,18 +394,14 @@ public class DeviceApiService : IDeviceApiService
     /// <summary>
     /// GOP API를 통해 Camera 목록을 조회합니다
     /// <para>GET /devices/cameras 엔드포인트를 호출</para>
-    /// </summary>
-    /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
-    /// <param name="mode">카메라 모드 필터 (Fixed, PTZ 등) (선택)</param>
+    /// </summary>    /// <param name="mode">카메라 모드 필터 (Fixed, PTZ 등) (선택)</param>
     /// <param name="category">카메라 분류 필터 (선택)</param>
     /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
     /// <param name="page">페이지 번호 (기본값 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Camera DTO 목록을 포함한 API 응답</returns>
-    public async Task<ApiListResponse<CameraDeviceDto>> GetCamerasAsync(
-        int? groupDevice = null,
-        string? mode = null,
+    public async Task<ApiListResponse<CameraDeviceDto>> GetCamerasAsync(        string? mode = null,
         string? category = null,
         string? status = null,
         int page = 1,
@@ -426,9 +410,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var parameters = new Dictionary<string, string>();
-            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
-            if (!string.IsNullOrEmpty(mode)) parameters.Add("mode", mode);
+            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(mode)) parameters.Add("mode", mode);
             if (!string.IsNullOrEmpty(category)) parameters.Add("category", category);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
@@ -881,9 +863,7 @@ public class DeviceApiService : IDeviceApiService
     #endregion
 
     #region - Speaker Device API -
-    public async Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(
-        int? groupDevice = null,
-        string? speakerType = null,
+    public async Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(        string? speakerType = null,
         string? status = null,
         int page = 1,
         int limit = 20,
@@ -891,9 +871,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var parameters = new Dictionary<string, string>();
-            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
-            if (!string.IsNullOrEmpty(speakerType)) parameters.Add("speaker_type", speakerType);
+            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(speakerType)) parameters.Add("speaker_type", speakerType);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
@@ -980,9 +958,7 @@ public class DeviceApiService : IDeviceApiService
     #endregion
 
     #region - Enclosure Device API -
-    public async Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(
-        int? groupDevice = null,
-        string? doorStatus = null,
+    public async Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(        string? doorStatus = null,
         string? status = null,
         int page = 1,
         int limit = 20,
@@ -990,9 +966,7 @@ public class DeviceApiService : IDeviceApiService
     {
         try
         {
-            var parameters = new Dictionary<string, string>();
-            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
-            if (!string.IsNullOrEmpty(doorStatus)) parameters.Add("door_status", doorStatus);
+            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(doorStatus)) parameters.Add("door_status", doorStatus);
             if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
@@ -1079,18 +1053,14 @@ public class DeviceApiService : IDeviceApiService
     #endregion
 
     #region - Lamp Device API -
-    public async Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(
-        int? groupDevice = null,
-        string? status = null,
+    public async Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(        string? status = null,
         int page = 1,
         int limit = 20,
         CancellationToken token = default)
     {
         try
         {
-            var parameters = new Dictionary<string, string>();
-            if (groupDevice.HasValue) parameters.Add("group_device", groupDevice.Value.ToString());
-            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            var parameters = new Dictionary<string, string>();            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 

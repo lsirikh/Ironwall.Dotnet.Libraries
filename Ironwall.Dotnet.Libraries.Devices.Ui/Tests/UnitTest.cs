@@ -904,9 +904,7 @@ public class MockDeviceApiService : IDeviceApiService
     private int _cameraPageIndex = 0;
 
     // ──────────────────────────── Controllers ────────────────────────────
-    public Task<ApiListResponse<ControllerDeviceDto>> GetControllersAsync(
-        int? groupDevice = null,
-        string? status = null,
+    public Task<ApiListResponse<ControllerDeviceDto>> GetControllersAsync(        string? status = null,
         bool includeSensors = false,
         int page = 1,
         int limit = 20,
@@ -943,9 +941,7 @@ public class MockDeviceApiService : IDeviceApiService
 
     // ──────────────────────────── Sensors ────────────────────────────
     public Task<ApiListResponse<SensorDeviceDto>> GetSensorsAsync(
-        int? controllerId = null,
-        int? groupDevice = null,
-        string? typeDevice = null,
+        int? controllerId = null,        string? typeDevice = null,
         string? status = null,
         bool includeController = false,
         int page = 1,
@@ -985,9 +981,7 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
     // ──────────────────────────── Cameras ────────────────────────────
-    public Task<ApiListResponse<CameraDeviceDto>> GetCamerasAsync(
-        int? groupDevice = null,
-        string? mode = null,
+    public Task<ApiListResponse<CameraDeviceDto>> GetCamerasAsync(        string? mode = null,
         string? category = null,
         string? status = null,
         int page = 1,
@@ -1034,7 +1028,7 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<CameraSettingDto>.CreateError("NOT_IMPLEMENTED", "Mock method not implemented"));
 
     // ──────────────────────────── Speakers ────────────────────────────
-    public Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(int? groupDevice = null, string? speakerType = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(string? speakerType = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
         => Task.FromResult(ApiListResponse<SpeakerDeviceDto>.CreateSuccess(new List<SpeakerDeviceDto>()));
     public Task<ApiResponse<SpeakerDeviceDto>> GetSpeakerByIdAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<SpeakerDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1048,7 +1042,7 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Enclosures ────────────────────────────
-    public Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(int? groupDevice = null, string? doorStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(string? doorStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
         => Task.FromResult(ApiListResponse<EnclosureDeviceDto>.CreateSuccess(new List<EnclosureDeviceDto>()));
     public Task<ApiResponse<EnclosureDeviceDto>> GetEnclosureByIdAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
@@ -1062,7 +1056,7 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Lamps ────────────────────────────
-    public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(int? groupDevice = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+    public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
         => Task.FromResult(ApiListResponse<LampDeviceDto>.CreateSuccess(new List<LampDeviceDto>()));
     public Task<ApiResponse<LampDeviceDto>> GetLampByIdAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<LampDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));

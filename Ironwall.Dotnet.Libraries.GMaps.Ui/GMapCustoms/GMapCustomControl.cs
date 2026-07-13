@@ -392,13 +392,14 @@ public class GMapCustomControl : GMapControl
 
         base.OnInitialized(e);
 
-        var tier = System.Windows.Media.RenderCapability.Tier >> 16;
-        if (tier == 0)
-            _log?.Warning("[GMapCustomControl] 소프트웨어 렌더링 모드 감지 (Tier=0). RDP/가상화 환경 가능성. 패닝 성능 저하 예상.");
-        else if (tier == 1)
-            _log?.Info("[GMapCustomControl] 부분 하드웨어 가속 모드 (Tier=1).");
-        else
-            _log?.Info($"[GMapCustomControl] 하드웨어 가속 렌더링 (Tier={tier}).");
+        // [임시 진단 제거] 렌더 tier 감지 로그 (RDP 조사 종료). 필요 시(현장 SW렌더링 판별) 주석 해제.
+        //var tier = System.Windows.Media.RenderCapability.Tier >> 16;
+        //if (tier == 0)
+        //    _log?.Warning("[GMapCustomControl] 소프트웨어 렌더링 모드 감지 (Tier=0). RDP/가상화 환경 가능성. 패닝 성능 저하 예상.");
+        //else if (tier == 1)
+        //    _log?.Info("[GMapCustomControl] 부분 하드웨어 가속 모드 (Tier=1).");
+        //else
+        //    _log?.Info($"[GMapCustomControl] 하드웨어 가속 렌더링 (Tier={tier}).");
     }
 
     /// <summary>
@@ -453,6 +454,7 @@ public class GMapCustomControl : GMapControl
         try
         {
             _log?.Info($"줌 변경됨: {Zoom}");
+            //LogOverlayDesyncDiag("ZOOM");   // [임시 진단 제거]
 
             // ViewArea 계산하여 OnAreaChange 이벤트 발생
             var viewArea = ViewArea;
@@ -476,26 +478,25 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     private void GMapCustomControl_OnPositionChanged(PointLatLng point)
     {
-        var now = DateTime.Now;
-
-        // 드래그 시작 감지 (false → true 전환)
-        if (IsDragging && !_prevDragging)
-        {
-            _panStartTime = now;
-            _panSkipCount = 0;
-            _log?.Info($"[PAN] ===DRAG-START=== t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5} zoom={Zoom}");
-        }
-        _prevDragging = IsDragging;
+        // [임시 진단 제거] 드래그 시작 계측 + 로그 (RDP desync 조사 종료)
+        //var now = DateTime.Now;
+        //if (IsDragging && !_prevDragging)
+        //{
+        //    _panStartTime = now;
+        //    _panSkipCount = 0;
+        //    _log?.Info($"[PAN] ===DRAG-START=== t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5} zoom={Zoom}");
+        //    LogOverlayDesyncDiag("DRAG-START");
+        //}
+        //_prevDragging = IsDragging;
 
         // 드래그 중에는 TriggerSelectionChange → OnAreaChange → UpdateMarkersVisibilityByZoom + InvalidateVisual
         // 체인이 매 프레임 실행되어 심볼이 타일과 어긋나는 버그 유발 (RDP 환경 특히 심각).
         // 드래그 완료 후(IsDragging=false)에만 영역 변경 처리를 허용한다.
         if (IsDragging)
         {
-            _panSkipCount++;
-            // RDP 이벤트 압축 진단: 10프레임마다 한 번 로그 (너무 많으면 로그 폭주)
-            //if (_panSkipCount % 10 == 1)
-            //    _log?.Info($"[PAN] SKIP#{_panSkipCount} t={now:HH:mm:ss.fff} lat={point.Lat:F5} lng={point.Lng:F5}");
+            // [임시 진단 제거] 팬 스킵 계측 (기능 가드/return 은 유지)
+            //_panSkipCount++;
+            //if (_panSkipCount % 5 == 1) LogOverlayDesyncDiag($"DRAG-SKIP#{_panSkipCount}");
             return;
         }
 
@@ -503,7 +504,9 @@ public class GMapCustomControl : GMapControl
         {
             var viewArea = ViewArea;
             var zoom = Zoom;
-            _log?.Info($"[PAN] OnPositionChanged EXEC — drag=false lat={point.Lat:F5} lng={point.Lng:F5} t={now:HH:mm:ss.fff}");
+            // [임시 진단 제거] 팬 실행 계측
+            //_log?.Info($"[PAN] OnPositionChanged EXEC — drag=false lat={point.Lat:F5} lng={point.Lng:F5} t={now:HH:mm:ss.fff}");
+            //LogOverlayDesyncDiag("DRAG-END/EXEC");
             TriggerSelectionChange(viewArea, zoom, false);
         }
         catch (Exception ex)
@@ -511,6 +514,73 @@ public class GMapCustomControl : GMapControl
             _log?.Error($"위치 변경 처리 실패: {ex.Message}");
         }
     }
+
+    /* [임시 진단 제거] RDP 오버레이 desync 확정 계측 — 현장 검증 완료(canvasSame/transformSame=True, err 약 0). 필요 시 이 블록주석 해제.
+    /// <summary>[임시 진단] RDP 오버레이 desync 확정용.
+    /// 기대 화면좌표(현재 투영 + Marker.Offset)와 실제 ItemContainer 화면좌표를 비교하고,
+    /// 실제 ItemsHost Canvas와 GMap이 캐시한 MapCanvas의 identity/transform/source 연결을 기록한다.</summary>
+    private void LogOverlayDesyncDiag(string tag)
+    {
+        try
+        {
+            int tier = RenderCapability.Tier >> 16;
+            var m = Markers?.FirstOrDefault(x => x is IEditableMarker) ?? Markers?.FirstOrDefault();
+            if (m == null)
+            {
+                _log?.Info($"[DESYNC-DIAG:{tag}] markers=0 center={Position.Lat:F6},{Position.Lng:F6} zoom={Zoom} drag={IsDragging} tier={tier}");
+                return;
+            }
+            var projected = FromLatLngToLocal(m.Position);
+            double expectedX = projected.X + m.Offset.X;
+            double expectedY = projected.Y + m.Offset.Y;
+
+            // Shape의 직계 부모는 보통 ContentPresenter이므로 Canvas가 나올 때까지 조상으로 올라간다.
+            System.Windows.Controls.Canvas? actualCanvas = null;
+            FrameworkElement? itemContainer = null;
+            DependencyObject? current = m.Shape;
+            while (current != null && !ReferenceEquals(current, this))
+            {
+                var parent = VisualTreeHelper.GetParent(current);
+                if (parent is System.Windows.Controls.Canvas canvas)
+                {
+                    actualCanvas = canvas;
+                    itemContainer = current as FrameworkElement;
+                    break;
+                }
+                current = parent;
+            }
+            // MapCanvas getter는 GMap이 최초 탐색 후 캐시한 Canvas를 반환한다.
+            var cachedCanvas = MapCanvas;
+            var mapSource = PresentationSource.FromVisual(this);
+            var cachedSource = cachedCanvas == null ? null : PresentationSource.FromVisual(cachedCanvas);
+            var actualSource = actualCanvas == null ? null : PresentationSource.FromVisual(actualCanvas);
+            bool canvasSame = actualCanvas != null && ReferenceEquals(actualCanvas, cachedCanvas);
+            bool transformSame = actualCanvas != null && cachedCanvas != null &&
+                                 ReferenceEquals(actualCanvas.RenderTransform, cachedCanvas.RenderTransform);
+            bool cachedSourceSame = cachedSource != null && ReferenceEquals(cachedSource, mapSource);
+            bool actualSourceSame = actualSource != null && ReferenceEquals(actualSource, mapSource);
+
+            var cachedMatrix = cachedCanvas?.RenderTransform?.Value ?? Matrix.Identity;
+            var actualMatrix = actualCanvas?.RenderTransform?.Value ?? Matrix.Identity;
+            string actual = "N/A";
+            try
+            {
+                if (itemContainer != null && itemContainer.IsLoaded)
+                {
+                    var screen = itemContainer.TransformToAncestor(this).Transform(new Point(0, 0));
+                    actual = $"({screen.X:F1},{screen.Y:F1}) err=({screen.X - expectedX:F1},{screen.Y - expectedY:F1})";
+                }
+            }
+            catch (Exception ex) { actual = $"ERR:{ex.GetType().Name}"; }
+            _log?.Info($"[DESYNC-DIAG:{tag}] center={Position.Lat:F6},{Position.Lng:F6} zoom={Zoom} drag={IsDragging} tier={tier} dzl={DigitalZoomLevel} " +
+                       $"markerPos={m.Position.Lat:F6},{m.Position.Lng:F6} offset=({m.Offset.X:F1},{m.Offset.Y:F1}) " +
+                       $"local=({m.LocalPositionX},{m.LocalPositionY}) expected=({expectedX:F1},{expectedY:F1}) actual={actual} " +
+                       $"canvasSame={canvasSame} transformSame={transformSame} cachedSourceSame={cachedSourceSame} actualSourceSame={actualSourceSame} " +
+                       $"cachedT=({cachedMatrix.OffsetX:F1},{cachedMatrix.OffsetY:F1}) actualT=({actualMatrix.OffsetX:F1},{actualMatrix.OffsetY:F1})");
+        }
+        catch (Exception ex) { _log?.Warning($"[DESYNC-DIAG:{tag}] {ex.Message}"); }
+    }
+    */
 
     /// <summary>
     /// 줌 레벨에 따른 마커 가시성 업데이트
@@ -965,8 +1035,9 @@ public class GMapCustomControl : GMapControl
         if (_isDragging)
         {
             ResetDragState();
-            var elapsed = (DateTime.Now - _panStartTime).TotalMilliseconds;
-            _log?.Info($"[PAN] ===DRAG-END=== t={DateTime.Now:HH:mm:ss.fff} skippedFrames={_panSkipCount} elapsed={elapsed:F0}ms → TriggerSelectionChange once");
+            // [임시 진단 제거] 드래그 종료 계측 로그
+            //var elapsed = (DateTime.Now - _panStartTime).TotalMilliseconds;
+            //_log?.Info($"[PAN] ===DRAG-END=== t={DateTime.Now:HH:mm:ss.fff} skippedFrames={_panSkipCount} elapsed={elapsed:F0}ms → TriggerSelectionChange once");
 
             // OnPositionChanged를 드래그 중 skip했으므로 종료 시점에 한 번 영역 갱신
             TriggerSelectionChange(ViewArea, Zoom, false);
@@ -2979,9 +3050,10 @@ public class GMapCustomControl : GMapControl
     private SnapGridOverlayService _snapGridOverlay = new();
 
     // 드래그 진단 필드 — RDP 패닝 버그 분석용
-    private bool _prevDragging;
-    private int _panSkipCount;
-    private DateTime _panStartTime;
+    // [임시 진단 제거] 팬 계측용 필드 (LogOverlayDesyncDiag 전용 — 위 블록주석과 함께 해제)
+    //private bool _prevDragging;
+    //private int _panSkipCount;
+    //private DateTime _panStartTime;
 
     // 상수
     public int VISIBILITY_ZOOM = 14;

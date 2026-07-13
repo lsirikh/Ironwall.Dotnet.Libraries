@@ -14,6 +14,16 @@
 
 ## [Unreleased]
 
+### Removed
+- **`group_device`(deprecated 단일 그룹) 죽은 코드 정리** (태그 `before-remove-group-device` · Devices.Api/Ui) — `device_groups`(N:N EventMapping) 전환으로 deprecated된 `group_device`의 잔재 제거. `IDeviceApiService`/`DeviceApiService` 6개 조회 메서드의 **미사용 쿼리 필터 파라미터** `int? groupDevice` + XML doc + `MockDeviceApiService` 시그니처 정합. **DTO/Model엔 이미 프로퍼티 없음**(전환 완료·제거 대상 없음). 호출자 30곳 전부 named-arg/무인자라 무영향(빌드 검증: Devices.Api/Ui 0오류). 메인 솔루션 참조 0. (Messages/Tests 하위호환 JSON 픽스처는 유지 — 구서버 group_device 수신 시 무시됨을 검증.)
+
+### Fixed
+- **ACTION_REPORT NATS 발행 계약 복구 — from_event/device 누락 + from 오류** ([PRD](docs/prds/Action_Report_Nats_FullDto_Contract-prd.md) · [Plan](docs/plans/Action_Report_Nats_FullDto_Contract-prd-plan.md) · 태그 `before-action-report-fulldto` · Monitoring.Models/Events.Ui + 메인 솔루션 NatsDomainService)
+  - **결함**: 조치보고 NATS `ACTION_REPORT` body가 `{content,user}`만 → `id`·`type_event`·`from_event`(이벤트/장비 식별자) 통째 누락 + `from`=SystemUuid(`"gis-monitoring"`). 수신자(NVR 카메라홈복귀/방송종료/경광등해제/VMS)가 대상 장비 식별 불가 → 복귀동작 마비. 원인=FR-01 "transport adapter" 리팩터가 Full DTO 채우던 로직 제거(설계 §2.4 Pattern1·§6.4 위반).
+  - **수정**: `SendActionRequestMessage`에 `OriginEvent`(IExEventModel)+`ActionId` 추가 → 발행 5지점(수동 탐지/장애·배치·자동조치·자동복구)에서 채움 → `NatsDomainService`가 `ActionEventModel.ToActionEventDto()`로 from_event(device.id 포함) 구성 + `from="GIS"`. OriginEvent null 시 기존 최소 body fallback(하위호환).
+  - **§6.4 device 필드 확장**: `ConvertDeviceToDto`에 `status`·`version`·`geolocation`(위·경도)·`controller_id`(`BaseDeviceDto` 신규 필드) 매핑 추가. 헤드리스 테스트가 `from="GIS"`+`device.id/status/version/controller_id` 검증.
+  - ⚠ **잔여 명세 차이(공용 DTO 구조 결정 대기)**: `device_groups`는 우리 `DeviceGroupDto`가 `name`(≠명세 `name_group`)+추가필드라 미포함(수신자 EventMapping 라우팅 키) · `group_device`는 의미/출처 미확정 · geolocation은 위·경도만(고도/설명 없음). ⚠ 메인 솔루션 재빌드(앱 종료 후) 필요.
+
 ### Added
 - **보고서(Report) 기능 — 표준/템플릿 생성·목록·템플릿 CRUD·미리보기(WebView2)·PDF** (Messages·Reports.Api·Reports.Ui 신규 + 외부 Monitoring 배선 · 태그 `before-report-feature` · `c896a63`/`f58add4`)
   - **신규 라이브러리**: `Reports.Api`(IReportApiService 14메서드 — 카탈로그/상태/템플릿 CRUD/생성/이력/삭제/미리보기HTML/PDF, EventApiModule 패턴 Bearer 파이프라인) + `Reports.Ui`(콘솔 셸 + 목록/생성/템플릿/편집/미리보기 VM·View, LiveCharts). DTO=Messages/Dto/Reports/*.

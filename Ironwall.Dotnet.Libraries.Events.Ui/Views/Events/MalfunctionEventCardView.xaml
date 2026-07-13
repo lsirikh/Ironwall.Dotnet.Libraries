@@ -130,7 +130,7 @@
 								TextAlignment="Center" />
 							<TextBlock
 								Grid.Column="3"
-								Margin="5,-4,0,0"
+								Margin="5,0"
 								FontFamily="{StaticResource NotoSansCJKkRMedium}"
 								FontSize="20"
 								Opacity="1"

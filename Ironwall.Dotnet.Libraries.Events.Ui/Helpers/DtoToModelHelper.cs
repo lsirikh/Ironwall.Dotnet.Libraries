@@ -374,7 +374,15 @@ public static class DtoToModelHelper
             Id = device.Id,
             TypeDevice = device.DeviceType.ToString(),
             NameDevice = device.DeviceName ?? string.Empty,
-            NumberDevice = device.DeviceNumber
+            NumberDevice = device.DeviceNumber,
+            // 설계 Gop_Message_Broker §6.4 device 필드 준수(status/version/geolocation/controller_id).
+            // device_groups는 공용 DTO 구조(name_group) 결정 대기 → 별도(미포함). group_device는 deprecated로 제거됨.
+            Status = device.Status.ToString(),
+            Version = device.Version ?? string.Empty,
+            ControllerId = (device as ISensorDeviceModel)?.Controller?.Id,
+            Geolocation = (device.Latitude != 0 || device.Longitude != 0)
+                ? new GeolocationDto { Latitude = device.Latitude, Longitude = device.Longitude }
+                : null
         };
     }
 

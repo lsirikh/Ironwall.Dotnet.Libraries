@@ -29,17 +29,13 @@ public interface IDeviceApiService : IService
 
     /// <summary>
     /// GOP API를 통해 Controller 목록을 조회합니다.
-    /// </summary>
-    /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
-    /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
+    /// </summary>    /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
     /// <param name="includeSensors">연결된 센서 포함 여부 (선택, 기본값: false)</param>
     /// <param name="page">페이지 번호 (기본값: 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Controller DTO 목록을 포함한 API 응답</returns>
-    Task<ApiListResponse<ControllerDeviceDto>> GetControllersAsync(
-        int? groupDevice = null,
-        string? status = null,
+    Task<ApiListResponse<ControllerDeviceDto>> GetControllersAsync(        string? status = null,
         bool includeSensors = false,
         int page = 1,
         int limit = 20,
@@ -109,9 +105,7 @@ public interface IDeviceApiService : IService
     /// <summary>
     /// GOP API를 통해 Sensor 목록을 조회합니다.
     /// </summary>
-    /// <param name="controllerId">부모 Controller ID 필터 (선택)</param>
-    /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
-    /// <param name="typeDevice">디바이스 타입 필터 (Fence, PIR, Contact, IoController, Laser, Cable) (선택)</param>
+    /// <param name="controllerId">부모 Controller ID 필터 (선택)</param>    /// <param name="typeDevice">디바이스 타입 필터 (Fence, PIR, Contact, IoController, Laser, Cable) (선택)</param>
     /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
     /// <param name="includeController">연결된 제어기 포함 여부 (선택, 기본값: false)</param>
     /// <param name="page">페이지 번호 (기본값: 1)</param>
@@ -119,9 +113,7 @@ public interface IDeviceApiService : IService
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Sensor DTO 목록을 포함한 API 응답</returns>
     Task<ApiListResponse<SensorDeviceDto>> GetSensorsAsync(
-        int? controllerId = null,
-        int? groupDevice = null,
-        string? typeDevice = null,
+        int? controllerId = null,        string? typeDevice = null,
         string? status = null,
         bool includeController = false,
         int page = 1,
@@ -190,18 +182,14 @@ public interface IDeviceApiService : IService
 
     /// <summary>
     /// GOP API를 통해 Camera 목록을 조회합니다.
-    /// </summary>
-    /// <param name="groupDevice">디바이스 그룹 필터 (선택)</param>
-    /// <param name="mode">카메라 모드 필터 (ONVIF, EMSTONE_API, INNODEP_API, ETC) (선택)</param>
+    /// </summary>    /// <param name="mode">카메라 모드 필터 (ONVIF, EMSTONE_API, INNODEP_API, ETC) (선택)</param>
     /// <param name="category">카메라 타입 필터 (FIXED, PTZ, FISHEYES, THERMAL) (선택)</param>
     /// <param name="status">상태 필터 (ACTIVATED, ERROR, DEACTIVATED) (선택)</param>
     /// <param name="page">페이지 번호 (기본값: 1)</param>
     /// <param name="limit">페이지당 항목 수 (기본값: 20)</param>
     /// <param name="token">취소 토큰 (선택)</param>
     /// <returns>Camera DTO 목록을 포함한 API 응답</returns>
-    Task<ApiListResponse<CameraDeviceDto>> GetCamerasAsync(
-        int? groupDevice = null,
-        string? mode = null,
+    Task<ApiListResponse<CameraDeviceDto>> GetCamerasAsync(        string? mode = null,
         string? category = null,
         string? status = null,
         int page = 1,
@@ -395,9 +383,7 @@ public interface IDeviceApiService : IService
 
     // ────────────────────────── Speaker Device CRUD ──────────────────────────
 
-    Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(
-        int? groupDevice = null,
-        string? speakerType = null,
+    Task<ApiListResponse<SpeakerDeviceDto>> GetSpeakersAsync(        string? speakerType = null,
         string? status = null,
         int page = 1,
         int limit = 20,
@@ -427,9 +413,7 @@ public interface IDeviceApiService : IService
 
     // ────────────────────────── Enclosure Device CRUD ──────────────────────────
 
-    Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(
-        int? groupDevice = null,
-        string? doorStatus = null,
+    Task<ApiListResponse<EnclosureDeviceDto>> GetEnclosuresAsync(        string? doorStatus = null,
         string? status = null,
         int page = 1,
         int limit = 20,
@@ -459,9 +443,7 @@ public interface IDeviceApiService : IService
 
     // ────────────────────────── Lamp Device CRUD ──────────────────────────
 
-    Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(
-        int? groupDevice = null,
-        string? status = null,
+    Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(        string? status = null,
         int page = 1,
         int limit = 20,
         CancellationToken token = default);
