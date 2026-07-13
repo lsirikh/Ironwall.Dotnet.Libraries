@@ -961,8 +961,13 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 마우스 이동
     /// </summary>
+    /// <summary>마지막 마우스 화면좌표(붙여넣기 기준점 — Ctrl+V at cursor). early-return 이전 무조건 갱신.</summary>
+    private Point _lastMouseScreen = new Point(double.NaN, double.NaN);
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        _lastMouseScreen = e.GetPosition(this);   // 커서 추적(붙여넣기 위치) — early-return 이전 무조건
+
         // [Rubber-band] 마퀴 갱신 (base 미호출 = 팬 방지, FR-MS-01)
         if (_isRubberBanding)
         {
@@ -988,6 +993,17 @@ public class GMapCustomControl : GMapControl
         }
 
         base.OnMouseMove(e);
+    }
+
+    /// <summary>마지막 마우스 화면좌표 → 위경도. 커서가 맵 밖/미설정(NaN)이면 뷰 중앙 폴백(붙여넣기 기준점).
+    /// FromLocalToLatLng는 WPF가 RenderTransform.Inverse를 e.GetPosition에 자동적용하므로 디지털줌 보정 불요.</summary>
+    public GMap.NET.PointLatLng GetLastCursorLatLng()
+    {
+        double w = ActualWidth, h = ActualHeight;
+        var p = _lastMouseScreen;
+        bool inside = !double.IsNaN(p.X) && p.X >= 0 && p.Y >= 0 && p.X <= w && p.Y <= h;
+        if (!inside) p = new Point(w / 2.0, h / 2.0);   // 맵 밖/미설정 → 뷰 중앙 폴백
+        return FromLocalToLatLng((int)p.X, (int)p.Y);
     }
 
     /// <summary>
