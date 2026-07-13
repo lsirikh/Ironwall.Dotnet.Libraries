@@ -38,9 +38,11 @@ public class MapAnchorModel : IMapAnchorModel
     public int MinZoomFloor { get; set; }
     public bool StrictContainment { get; set; }
 
-    /// <summary>구역이 유효한지(활성 + 양 코너 존재).</summary>
+    /// <summary>구역이 유효한지(활성 + 양 코너 존재 + (0,0) 퇴화 아님). (0,0) 방어 = 구버전 잔재 무효화.</summary>
     [JsonIgnore]
-    public bool IsAvailable => IsEnabled && NorthWest != null && SouthEast != null;
+    public bool IsAvailable => IsEnabled && NorthWest != null && SouthEast != null
+        && !(NorthWest.Latitude == 0 && NorthWest.Longitude == 0
+             && SouthEast.Latitude == 0 && SouthEast.Longitude == 0);
 
     /// <summary>구역 중심 좌표(홈 자동세팅용). 미유효 시 null.</summary>
     [JsonIgnore]

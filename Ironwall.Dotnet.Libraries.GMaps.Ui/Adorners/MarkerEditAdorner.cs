@@ -1195,16 +1195,34 @@ public class MarkerEditAdorner : Adorner, IDisposable
         return (maxX - minX, maxY - minY);
     }
 
-    /// <summary>라인 리사이즈 시작 시점 캡처(절대배율 앵커·ESC/undo before).</summary>
+    /// <summary>라인 리사이즈 시작 캡처 — 절대배율 앵커(맵 공간)·ESC/undo before·Position 재앵커(가이드박스 정합).</summary>
     private void CaptureLineStart(Point mousePos)
     {
         var line = TargetLine; if (line == null) return;
         _lineStartPoints = line.RuntimePoints;
-        _lineStartPosition = _targetMarker.Position;
-        _lineDragStart = mousePos;
+        _lineStartPosition = _targetMarker.Position;   // 재앵커 이전 원본(ESC 전체 복원용)
         _lineStartGeoCenter = Utils.LineGeometryUtils.BoundsCenter(_lineStartPoints);
         var (w, h) = LinePxBbox(_lineStartPoints);
         _lineStartBboxPx = new Size(w, h);
+        _lineDragStartMap = MouseToMap(mousePos);   // 맵 공간 고정 — 어도너/컨트롤이 움직여도 델타 안정(증상1)
+        _lineScaleTick = 0;
+
+        // 진단(1회): Position vs bbox중심 오프셋 → 가이드박스가 심볼 밖으로 나가는 원인(증상2) 확인.
+        var lb = GetActualLineBounds();
+        var posScreen = ToMap(_targetMarker.Position);
+        var centerScreen = ToMap(_lineStartGeoCenter);
+        double offX = centerScreen.X - posScreen.X, offY = centerScreen.Y - posScreen.Y;
+        _log?.Info($"[LINE-RESIZE][start] '{_targetMarker.Title}' handle={_activeHandle} pts={_lineStartPoints.Count} startBboxPx=({w:F1}x{h:F1}) " +
+                   $"posGeo=({_targetMarker.Position.Lat:F6},{_targetMarker.Position.Lng:F6}) centerGeo=({_lineStartGeoCenter.Lat:F6},{_lineStartGeoCenter.Lng:F6}) " +
+                   $"posScreen=({posScreen.X:F1},{posScreen.Y:F1}) centerScreen=({centerScreen.X:F1},{centerScreen.Y:F1}) offset=({offX:F1},{offY:F1}) " +
+                   $"ActualLineBounds=({lb.X:F1},{lb.Y:F1},{lb.Width:F1}x{lb.Height:F1}) RenderSize=({AdornedElement.RenderSize.Width:F1}x{AdornedElement.RenderSize.Height:F1})");
+
+        // Position ≠ bbox중심이면 리사이즈 시작 시 1회 재앵커(점 불변·지오 이동 없음) → 폴리라인이 컨트롤 중앙 정렬 → 가이드박스 정합.
+        if (System.Math.Abs(offX) > 0.5 || System.Math.Abs(offY) > 0.5)
+        {
+            try { line.ApplyGeometry(_lineStartPoints, _lineStartGeoCenter); } catch { }
+            _log?.Info($"[LINE-RESIZE][start] Position 재앵커 → bbox중심(가이드박스 정합, 증상2)");
+        }
     }
 
     /// <summary>라인 리사이즈 — 시작 bbox(map px) 대비 절대배율로 시작 점을 스케일(줌 stale 방지 §5-C B1) → ApplyGeometry.</summary>
@@ -1213,9 +1231,8 @@ public class MarkerEditAdorner : Adorner, IDisposable
         var line = TargetLine; if (line == null || _lineStartPoints == null || _lineStartPoints.Count < 2) return;
         try
         {
-            var startMap = MouseToMap(_lineDragStart);
             var curMap = MouseToMap(currentPos);
-            double tdx = curMap.X - startMap.X, tdy = curMap.Y - startMap.Y;
+            double tdx = curMap.X - _lineDragStartMap.X, tdy = curMap.Y - _lineDragStartMap.Y;   // 맵 공간 절대 델타(시작 고정, 안정)
             double w0 = _lineStartBboxPx.Width, h0 = _lineStartBboxPx.Height;
             double refD = System.Math.Max(1.0, (w0 + h0) / 2.0);
             double sx = 1, sy = 1;
@@ -1231,7 +1248,13 @@ public class MarkerEditAdorner : Adorner, IDisposable
                 case MarkerHandle.ResizeRight:  sx = Utils.LineGeometryUtils.SafeRatio(w0, w0 + tdx); break;
             }
             var scaled = Utils.LineGeometryUtils.Scale(_lineStartPoints, _lineStartGeoCenter, sx, sy, ToMap, ToGeo);
-            line.ApplyGeometry(scaled, Utils.LineGeometryUtils.BoundsCenter(scaled));
+            // Position=bbox중심(_lineStartGeoCenter) 고정 — 중심 기준 스케일은 중심 불변이라 매 프레임 동일값 →
+            // 컨트롤/어도너 재앵커링 없음(증상1 요동 제거). BoundsCenter(scaled) 대신 상수 사용.
+            line.ApplyGeometry(scaled, _lineStartGeoCenter);
+
+            if ((_lineScaleTick++ % 8) == 0 || sx > 4 || sy > 4 || sx < 0.25 || sy < 0.25)
+                _log?.Info($"[LINE-RESIZE][scale] t={_lineScaleTick} handle={_activeHandle} curMap=({curMap.X:F1},{curMap.Y:F1}) " +
+                           $"startMap=({_lineDragStartMap.X:F1},{_lineDragStartMap.Y:F1}) td=({tdx:F1},{tdy:F1}) w0h0=({w0:F1},{h0:F1}) refD={refD:F1} s=({sx:F3},{sy:F3})");
         }
         catch (Exception ex) { _log?.Error($"[ProcessLineScale] 실패: {ex.Message}"); }
     }
@@ -1414,9 +1437,10 @@ public class MarkerEditAdorner : Adorner, IDisposable
     // LineArea_Symbol_Resize FR-03/05 — 라인 리사이즈 절대배율 앵커(드래그 시작 고정, incremental 아님)
     private System.Collections.Generic.List<PointLatLng>? _lineStartPoints;
     private PointLatLng _lineStartPosition;
-    private Point _lineDragStart;
+    private Point _lineDragStartMap;      // 드래그 시작 마우스=맵 공간 고정(어도너 재앵커링에도 델타 안정, 증상1 수정)
     private Size _lineStartBboxPx;
     private PointLatLng _lineStartGeoCenter;
+    private int _lineScaleTick;           // 스케일 로그 throttle
     private readonly IEditableMarker _targetMarker;
 
     // 편집 상태

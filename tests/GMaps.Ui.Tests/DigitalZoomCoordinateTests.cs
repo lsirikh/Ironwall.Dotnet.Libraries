@@ -31,8 +31,8 @@ public class DigitalZoomCoordinateTests
         return (cx + (x - cx) / scale, cy + (y - cy) / scale);
     }
 
-    // 디지털 줌 레벨 → 배율 (GMapCustomControl.DIGITAL_SCALE_TABLE 복제)
-    private static readonly double[] DIGITAL_SCALE_TABLE = { 1.0, 1.5, 2.0 };
+    // 디지털 줌 레벨 → 배율 (GMapCustomControl.DIGITAL_SCALE_TABLE 복제) — level1=1.25×(40m 중간 스텝) 추가
+    private static readonly double[] DIGITAL_SCALE_TABLE = { 1.0, 1.25, 1.5, 2.0 };
 
     // ── 회귀 안전(NFR-01): 디지털 줌 OFF면 완전 항등 ──────────────────────────
     [Theory]
@@ -110,13 +110,14 @@ public class DigitalZoomCoordinateTests
         Assert.True(Math.Abs(o20.x - p.x) > Math.Abs(o15.x - p.x));
     }
 
-    // ── 배율 테이블 계약: level 0/1/2 → 1.0/1.5/2.0 ───────────────────────────
+    // ── 배율 테이블 계약: level 0/1/2/3 → 1.0/1.25/1.5/2.0 (40m 중간 스텝 포함) ──────
     [Theory]
     [InlineData(0, 1.0)]
-    [InlineData(1, 1.5)]
-    [InlineData(2, 2.0)]
+    [InlineData(1, 1.25)]
+    [InlineData(2, 1.5)]
+    [InlineData(3, 2.0)]
     public void should_map_level_to_scale_when_indexing(int level, double expected)
     {
-        Assert.Equal(expected, DIGITAL_SCALE_TABLE[Math.Clamp(level, 0, 2)], 6);
+        Assert.Equal(expected, DIGITAL_SCALE_TABLE[Math.Clamp(level, 0, 3)], 6);
     }
 }
