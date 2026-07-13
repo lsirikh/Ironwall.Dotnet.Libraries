@@ -15,6 +15,12 @@
 ## [Unreleased]
 
 ### Added
+- **GMap 툴바 CPU/GPU/RAM 사용량 표시 — 우측 정렬 아이콘+% 칩** ([PRD](docs/prds/GMap_SystemResource_Indicator-prd.md) · [Plan](docs/plans/GMap_SystemResource_Indicator-prd-plan.md) · 태그 `before-sysres-indicator` · worktree `feature/sysres-indicator` · 신규 라이브러리 `Ironwall.Dotnet.Libraries.SystemResources` + GMaps.Ui)
+  - **신규 라이브러리 `SystemResources`**(net8.0-windows, Base만 의존, 재사용 가능): OS 네이티브 PDH(pdh.dll)+kernel32로 CPU/GPU/RAM 사용률 취득. **보안**: LibreHardwareMonitor(WinRing0 커널드라이버=Defender 악성탐지 CVE-2020-14979) 배제 — 커널드라이버·관리자권한·서드파티 네이티브 바이너리 불요.
+  - **로케일 독립**: `PdhAddEnglishCounterW`(Perflib 인덱스 기반)로 ko-KR Windows에서도 영문 카운터 해석. CPU=`% Processor Utility`(폴백 `% Processor Time`, Turbo>100% clamp), GPU=`\GPU Engine(*)` 와일드카드→(luid,phys,eng) 집계 busiest(멀티GPU 블렌딩 방지), RAM=`GlobalMemoryStatusEx.dwMemoryLoad`.
+  - **설계**: `ISystemResourceMonitor : IDisposable`(IService 미구현=이중권위 회피). **WPF 비의존**(NFR-06) — 모니터는 타이머를 소유하지 않고 소비자(MapViewModel)의 UI-스레드 `DispatcherTimer`가 `Sample()` 구동 → 락/크로스스레드 마샬/재진입 원천 소멸(백그라운드 타이머+네이티브 핸들의 P0 UAF 크래시 회피). Fail-safe(PDH 실패=전체 N/A, UI 미전파, 1회 로깅). 히스테리시스 색 전환(정상 시안/경고 앰버/위험 빨강, 62-57/87-82 데드밴드).
+  - **UI**: `MapView.xaml` DockPanel 우측 `Dock=Right` 3칩(아이콘 `Cpu32Bit`/`Gpu`/`Memory` + 고정폭 수치 + 절대값 툴팁), GPU 부재 시 Hidden(공간 예약), 전부 DynamicResource(테마 스왑). 모니터는 활성 시 Start(멱등)·비활성 시 타이머만 정지(핸들 유지=워밍업 보존, 모든 deactivate 경로 대칭).
+  - **검증**: SystemResources 빌드 0 + **단위테스트 22/22**(GpuAggregator·Hysteresis·Monitor fail-safe/워밍업/생명주기) · GMaps.Ui 전체 빌드 0오류 · **실기 PDH 실측 정합**(CPU/GPU/RAM 실값). ⚠PackIcon 렌더·MonoFont·narrow창·통합 시각(VER-03/04/07·MANUAL-01)은 앱 재빌드 후 런타임 검증.
 - **Line/Area 심볼 리사이즈 — 어도너 박스 리사이즈로 폴리라인·폴리곤 크기조절** ([PRD](docs/prds/LineArea_Symbol_Resize-prd.md) · [Plan](docs/plans/LineArea_Symbol_Resize-prd-plan.md) · 태그 `before-linearea-resize` · worktree `feature/linearea-resize` · GMaps.Ui)
   - **근본원인**: Line/Area(`IsClosedPath` 닫힌폴리곤)는 `LinePoints`(위경도) 기반이라 크기가 파생값(`UpdateLineGeometry`가 매 리드로우 W/H 재계산) → 어도너 W/H 리사이즈 무효 + line엔 핸들 미렌더. **해법(🅐)=박스 리사이즈로 점을 중심 기준 스케일**.
   - **FR-01**: `LineGeometryUtils.Scale`(순수·퇴화가드 ε/IsFinite/부호반전) + `ILineEditableMarker.ApplyGeometry` seam(GMapLineMarker/PidsGroup, SyncModelPoints 4단계 규약).

@@ -210,6 +210,41 @@
 			</MenuItem>
 		</Menu>
 
+			<!--  시스템 리소스 표시(우측 정렬) — CPU/GPU/RAM 아이콘+% · SystemResources 라이브러리  -->
+			<StackPanel
+				DockPanel.Dock="Right"
+				Margin="0,0,10,0"
+				VerticalAlignment="Center"
+				Orientation="Horizontal">
+				<Border
+					Style="{StaticResource SysResChip}"
+					Tag="{Binding CpuLevel}"
+					ToolTip="{Binding CpuTooltip}">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="Cpu32Bit" />
+						<TextBlock Style="{StaticResource SysResChipText}" Text="{Binding CpuText}" />
+					</StackPanel>
+				</Border>
+				<Border
+					Style="{StaticResource SysResChipGpu}"
+					Tag="{Binding GpuLevel}"
+					ToolTip="{Binding GpuTooltip}">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="Gpu" />
+						<TextBlock Style="{StaticResource SysResChipText}" Text="{Binding GpuText}" />
+					</StackPanel>
+				</Border>
+				<Border
+					Style="{StaticResource SysResChip}"
+					Tag="{Binding RamLevel}"
+					ToolTip="{Binding RamTooltip}">
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="Memory" />
+						<TextBlock Style="{StaticResource SysResChipText}" Text="{Binding RamText}" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+
 			<ToolBarTray
 				VerticalAlignment="Center"
 				Background="{DynamicResource SurfaceBrush}"
