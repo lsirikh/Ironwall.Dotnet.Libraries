@@ -158,7 +158,16 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
     #region - Helpers -
     private bool IsGracefulBySentinel()
     {
-        try { return !File.Exists(WatchdogNaming.AppPidFile(_sessionId)); }
+        try
+        {
+            var file = WatchdogNaming.AppPidFile(_sessionId);
+            if (!File.Exists(file)) return true;   // sentinel 부재 = 사용자 정상종료
+            // sentinel이 내 대상과 '다른' pid면 새 인스턴스가 이미 교체함 → 내 대상은 정상종료로 간주.
+            //   (빠른 재시작 시 옛 와치독이 새 인스턴스를 크래시로 오판해 중복 기동하는 것 방지)
+            if (int.TryParse(File.ReadAllText(file).Trim(), out var spid) && spid != _opt.TargetPid)
+                return true;
+            return false;
+        }
         catch { return false; }
     }
 
