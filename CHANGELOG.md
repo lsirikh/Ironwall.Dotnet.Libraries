@@ -15,6 +15,13 @@
 ## [Unreleased]
 
 ### Added
+- **Line/Area 심볼 리사이즈 — 어도너 박스 리사이즈로 폴리라인·폴리곤 크기조절** ([PRD](docs/prds/LineArea_Symbol_Resize-prd.md) · [Plan](docs/plans/LineArea_Symbol_Resize-prd-plan.md) · 태그 `before-linearea-resize` · worktree `feature/linearea-resize` · GMaps.Ui)
+  - **근본원인**: Line/Area(`IsClosedPath` 닫힌폴리곤)는 `LinePoints`(위경도) 기반이라 크기가 파생값(`UpdateLineGeometry`가 매 리드로우 W/H 재계산) → 어도너 W/H 리사이즈 무효 + line엔 핸들 미렌더. **해법(🅐)=박스 리사이즈로 점을 중심 기준 스케일**.
+  - **FR-01**: `LineGeometryUtils.Scale`(순수·퇴화가드 ε/IsFinite/부호반전) + `ILineEditableMarker.ApplyGeometry` seam(GMapLineMarker/PidsGroup, SyncModelPoints 4단계 규약).
+  - **FR-02/03**: 어도너 핸들 노출(코너=모든 line·변=닫힌폴리곤) + `GetHandleBounds`=ActualLineBounds 통일(짧은선 불일치 해소), `ProcessLineScale`(시작 bbox 대비 절대배율·줌 stale 방지, TransformToAncestor로 map 좌표, Position=새 bbox중심).
+  - **FR-04 P0**: line 스케일은 W/H 불변→`HasChanges=false`→기존 Undo가 **미기록+즉시영속 파괴적**이던 결함을 신규 스냅샷 `LineGeometryCommand`(점+Position 복원, isImage=false)+`RecordLineGeometry`(HasChanges 우회)로 정합. **FR-05** ESC=스냅샷 점 복원. **FR-07** line 라벨 상한=절대 픽셀(파생 W/H 부작용 차단).
+  - **시뮬레이션**: 승인 후 4도메인 40+시나리오 사이드이펙트 시뮬(§5-C) → PRD v2.0 보강(지오앵커·퇴화가드·Position정합·P0 undo 재기술). 정점편집(🅑)=후속.
+  - **검증**: GMaps.Ui 빌드 0 · 단위 `LineScaleTests` 8/8 + `LineGeometryUndoTests` 4/4 + 회귀 `UndoRedoTests` 34/34. ⚠어도너 좌표 정합·핸들 표시(V-01/04/06/07)는 앱 재빌드 후 런타임 검증.
 - **통합웹 접속 트리거 메시지 `CallWebApiProcessMessageModel`** ([PRD](docs/prds/LeftMenu_IntegratedWeb_Button-prd.md) · [Plan](docs/plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) · ViewModel.Models/CommonMessages.cs) — LeftMenu "통합웹" 버튼의 확인 팝업 '확인' 시 발행되어, 크롬 앱 모드로 통합 웹 대시보드(`http://{웹서버IP}:{포트}`)를 여는 트리거(`IMessageModel` 마커 타입). 순수 추가(기존 타입 무변경). 소비측=메인 Monitoring `LeftMenuSectionViewModel`(권한 게이팅→웹설정 `IsWebServerEnabled` 게이팅으로 교체, DATABASE 메뉴→통합웹). ⚠앱 재빌드 후 반영.
 - **맵 심볼 제어 단축키 — Delete(확인삭제) / Ctrl+C(복사) / Ctrl+V(붙여넣기)** ([PRD](docs/prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) · [Plan](docs/plans/MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md) · 태그 `before-mapsymbol-shortcuts` · worktree `feature/mapsymbol-shortcuts` · GMaps.Ui)
   - **Delete(FR-05)**: 선택 심볼/이미지 삭제(단일·그룹)를 단일 진입점 `ExecuteDeleteSelected`(EventAggregator 표준 확인팝업)로 통일. **P0 갭 수정** — 단일 Delete 키가 원래 동작하지 않던 문제(어도너 `RequestMarkerDeletion`이 no-op 스텁인데 `e.Handled=true`로 키를 삼킴)를 `OnMapPreviewKeyDownForGroup` 단일 분기 추가 + 어도너 Delete case 제거로 해소(이중처리 차단).
