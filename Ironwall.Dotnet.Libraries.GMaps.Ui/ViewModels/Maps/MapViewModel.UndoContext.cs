@@ -168,14 +168,9 @@ public partial class MapViewModel : IUndoApplyContext
                 }
                 else if (model is ISymbolModel sym)
                 {
-                    int origId = snapshot.Id;
                     await RestoreOrInsertSymbolAsync(snapshot.MarkerTypeName, sym, ct);
                     if (sym.Id > 0) snapshot.Id = sym.Id;   // Id 충돌 폴백 시 새 Id 반영(FIX 6)
                     AddMarkerFromSymbol(sym);                // 마커 재생성 + _symbolProvider + 트리
-                    // [UNDO-DIAG] 중복 생성 추적 — sameIdMarkers>1이면 Add redo가 중복 마커 생성(누락 undo 후 재add).
-                    int sameId = MainMap?.Markers?.OfType<IEditableMarker>().Count(m => m.Id == sym.Id) ?? -1;
-                    int total = MainMap?.Markers?.OfType<IEditableMarker>().Count() ?? -1;
-                    _log?.Info($"[UNDO-DIAG] RestoreAdd type={snapshot.MarkerTypeName} origId={origId}→id={sym.Id} sameIdMarkers={sameId} total={total}");
                 }
                 return FindMarkerById(snapshot.Id, snapshot.IsImage);   // 타입인지 — 복원 반환이 같은 Id 반대타입 마커로 새지 않게
             }
@@ -231,9 +226,6 @@ public partial class MapViewModel : IUndoApplyContext
                 if (s != null) _symbolProvider.Remove(s);
                 try { marker.Dispose(); } catch { /* 무시 */ }
                 await LoadLayersFromDbAsync();
-                // [UNDO-DIAG] remainingSameId>0이면 같은 Id 마커가 또 남음(중복 미제거) = 스택/Id 어긋남.
-                int remaining = MainMap?.Markers?.OfType<IEditableMarker>().Count(m => m.Id == id) ?? -1;
-                _log?.Info($"[UNDO-DIAG] Remove id={id} remainingSameId={remaining} total={MainMap?.Markers?.OfType<IEditableMarker>().Count()}");
             }
             catch (Exception ex) { _log?.Error($"[Undo] 제거 실패: {ex.Message}"); }
         });
