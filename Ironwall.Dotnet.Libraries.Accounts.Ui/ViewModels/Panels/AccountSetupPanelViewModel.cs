@@ -43,10 +43,11 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             { Title = "세션 정책", Explain = "서버 세션설정 API가 아직 적용되지 않아 저장할 수 없습니다.\n(서버 배포 후 활성화)" });
             return;
         }
-        if (TimeoutHours is < 1 or > 168 || RefreshDays is < 1 or > 90 || LockoutThreshold is < 0 or > 20)
+        if (TimeoutHours is < 1 or > 168 || RefreshDays is < 1 or > 90 || LockoutThreshold is < 0 or > 20
+            || LockoutDurationMinutes is < 0 or > 1440)
         {
             await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-            { Title = "세션 정책", Explain = "값 범위를 확인하세요. 세션 만료 1~168h, refresh 1~90일, 잠금 임계 0~20." });
+            { Title = "세션 정책", Explain = "값 범위를 확인하세요. 세션 만료 1~168h, refresh 1~90일, 잠금 임계 0~20, 자동해제 0~1440분." });
             return;
         }
 
@@ -59,6 +60,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 SessionTimeoutHours = TimeoutHours,
                 RefreshExpirationDays = RefreshDays,
                 LockoutThreshold = LockoutThreshold,
+                LockoutDurationMinutes = LockoutDurationMinutes,
                 SessionEnabled = SessionPolicyEnabled,
             };
             var res = await api.UpdateSessionSettingsAsync(dto);
@@ -97,6 +99,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 TimeoutHours = d.SessionTimeoutHours ?? 24;
                 RefreshDays = d.RefreshExpirationDays ?? 7;
                 LockoutThreshold = d.LockoutThreshold ?? 5;
+                LockoutDurationMinutes = d.LockoutDurationMinutes ?? 30;
                 SessionPolicyEnabled = d.SessionEnabled ?? true;
                 AuthMode = d.AuthMode ?? "-";
                 JwtAlgorithm = d.JwtAlgorithm ?? "-";
@@ -118,7 +121,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     /// <summary>미가용 시: 알려진 기본값(서버 config 기본) 표시 + 편집 비활성 + 안내.</summary>
     private void ApplyUnavailable(string status)
     {
-        TimeoutHours = 24; RefreshDays = 7; LockoutThreshold = 5; SessionPolicyEnabled = true;
+        TimeoutHours = 24; RefreshDays = 7; LockoutThreshold = 5; LockoutDurationMinutes = 30; SessionPolicyEnabled = true;
         AuthMode = "(서버 조회 필요)"; JwtAlgorithm = "-";
         ServerSettingsAvailable = false;
         ServerStatus = status;
@@ -142,6 +145,10 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
 
     private int _lockoutThreshold = 5;
     public int LockoutThreshold { get => _lockoutThreshold; set { _lockoutThreshold = value; NotifyOfPropertyChange(() => LockoutThreshold); } }
+
+    /// <summary>잠금 자동해제 시간(분, 0=영구). v6.3 신규.</summary>
+    private int _lockoutDurationMinutes = 30;
+    public int LockoutDurationMinutes { get => _lockoutDurationMinutes; set { _lockoutDurationMinutes = value; NotifyOfPropertyChange(() => LockoutDurationMinutes); } }
 
     private bool _sessionPolicyEnabled = true;
     public bool SessionPolicyEnabled { get => _sessionPolicyEnabled; set { _sessionPolicyEnabled = value; NotifyOfPropertyChange(() => SessionPolicyEnabled); } }

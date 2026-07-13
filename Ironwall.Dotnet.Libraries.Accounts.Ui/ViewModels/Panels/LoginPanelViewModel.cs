@@ -126,15 +126,27 @@ public class LoginPanelViewModel : BasePanelViewModel
     private void SetLoginFailed(string message) { IsLoginSuccess = false; IsLoginFailed = true; Result = message; }
     private void ClearLoginStatus() { IsLoginSuccess = false; IsLoginFailed = false; Result = string.Empty; }
 
-    /// <summary>인증 실패 사유 → 사용자 메시지 (G1). 자격오류는 계정 존재 비노출(SEC-5) 위해 일반 문구.</summary>
-    private static string FailMessage(AuthOutcome o) => o.ErrorCode switch
+    /// <summary>인증 실패 사유 → 사용자 메시지 (G1). 자격오류는 계정 존재 비노출(SEC-5) 위해 일반 문구.
+    /// v6.3: 서버 잠금정책 잔여(details)가 있으면 "N회 중 M회 실패, K회 남음" 안내(details 우선, 메시지 문자열 파싱 안 함).</summary>
+    private static string FailMessage(AuthOutcome o)
     {
-        "LOCKED" or "423"     => string.IsNullOrEmpty(o.LockReason) ? "잠긴 계정입니다. 관리자에게 문의하세요." : $"잠긴 계정: {o.LockReason}",
-        "FORBIDDEN"           => "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.",   // W6: 잠금 사유 명확화
-        "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
-        "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",
-        _                     => "아이디 또는 비밀번호가 일치하지 않습니다.",
-    };
+        // 이번 실패로 잠김: 서버 message(자동해제 시간 M분 포함)를 우선 노출.
+        if (o.Locked == true)
+            return !string.IsNullOrWhiteSpace(o.Message) ? o.Message! : "실패 횟수 초과로 계정이 잠겼습니다. 관리자에게 문의하세요.";
+
+        // 잔여 시도 안내 (존재 계정 + 잠금 활성 시에만 서버가 details 제공; 미존재/비활성이면 null→아래 generic).
+        if (o.Remaining is int rem && o.FailedCount is int failed && o.Threshold is int th && th > 0)
+            return $"아이디 또는 비밀번호가 일치하지 않습니다. ({th}회 중 {failed}회 실패, {rem}회 남음)";
+
+        return o.ErrorCode switch
+        {
+            "LOCKED" or "423"     => string.IsNullOrEmpty(o.LockReason) ? "잠긴 계정입니다. 관리자에게 문의하세요." : $"잠긴 계정: {o.LockReason}",
+            "FORBIDDEN"           => "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.",   // W6: 잠금 사유 명확화
+            "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
+            "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",
+            _                     => "아이디 또는 비밀번호가 일치하지 않습니다.",
+        };
+    }
 
     public bool CanClickOk => !(string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(Password));
     #endregion

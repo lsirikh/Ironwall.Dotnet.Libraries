@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.IO;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
@@ -42,7 +43,16 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         if (!res.Success || res.Data?.User is null || string.IsNullOrEmpty(res.Data.AccessToken))
         {
             _log?.Warning($"[ApiAccountGateway] 로그인 실패: {res.Error?.Code ?? "UNKNOWN"}");
-            return AuthOutcome.Fail(res.Error?.Code ?? "UNAUTHORIZED", res.Error?.Message, res.Data?.User?.LockReason);
+            // v6.3 잠금정책: error.details {failed_count,threshold,remaining,locked} 파싱(있으면). 미존재 계정/잠금비활성이면 null(generic).
+            var d = res.Error?.DetailsToken;
+            return AuthOutcome.Fail(
+                res.Error?.Code ?? "UNAUTHORIZED",
+                res.Error?.Message,
+                res.Data?.User?.LockReason,
+                d?["failed_count"]?.Value<int?>(),
+                d?["threshold"]?.Value<int?>(),
+                d?["remaining"]?.Value<int?>(),
+                d?["locked"]?.Value<bool?>());
         }
 
         var data = res.Data;

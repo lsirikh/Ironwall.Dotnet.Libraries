@@ -19,6 +19,9 @@ public class SessionSettingsDto
     /// <summary>로그인 실패 잠금 임계(횟수, 0=비활성). 편집 가능.</summary>
     [JsonProperty("lockout_threshold")] public int? LockoutThreshold { get; set; }
 
+    /// <summary>잠금 자동해제 시간(분, 0=자동해제 없음=영구). 경과 후 로그인 시 자동해제+카운트 리셋. 편집 가능(1~1440). v6.3 신규.</summary>
+    [JsonProperty("lockout_duration_minutes")] public int? LockoutDurationMinutes { get; set; }
+
     /// <summary>세션 만료 enforce 사용여부. 편집 가능.</summary>
     [JsonProperty("session_enabled")] public bool? SessionEnabled { get; set; }
 

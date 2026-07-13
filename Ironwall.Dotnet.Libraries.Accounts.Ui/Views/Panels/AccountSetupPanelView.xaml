@@ -73,7 +73,9 @@
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="12" />
 					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
+					<RowDefinition Height="12" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
 
 				<TextBlock
 					Grid.Row="0"
@@ -108,13 +110,24 @@
 					Style="{StaticResource TextBoxInput}"
 					Text="{Binding LockoutThreshold, UpdateSourceTrigger=PropertyChanged}" />
 
+					<TextBlock
+						Grid.Row="6"
+						Grid.Column="0"
+						VerticalAlignment="Center"
+						Text="잠금 자동해제 — 분 (0=영구, 1~1440)" />
+					<TextBox
+						Grid.Row="6"
+						Grid.Column="1"
+						Style="{StaticResource TextBoxInput}"
+						Text="{Binding LockoutDurationMinutes, UpdateSourceTrigger=PropertyChanged}" />
+
 				<TextBlock
-					Grid.Row="6"
+					Grid.Row="8"
 					Grid.Column="0"
 					VerticalAlignment="Center"
 					Text="세션 만료 사용" />
 				<ToggleButton
-					Grid.Row="6"
+					Grid.Row="8"
 					Grid.Column="1"
 					HorizontalAlignment="Left"
 					IsChecked="{Binding SessionPolicyEnabled}"
