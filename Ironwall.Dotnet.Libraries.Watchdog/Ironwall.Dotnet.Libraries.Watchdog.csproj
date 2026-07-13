@@ -22,13 +22,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 공유 계약: Base의 순수 소스를 링크 컴파일(DLL 미참조 — 감시대상과 코드 격리) -->
-    <Compile Include="..\Ironwall.Dotnet.Libraries.Base\Services\Startup\WatchdogState.cs" Link="Contract\WatchdogState.cs" />
-    <Compile Include="..\Ironwall.Dotnet.Libraries.Base\Services\Startup\WatchdogStatus.cs" Link="Contract\WatchdogStatus.cs" />
-    <Compile Include="..\Ironwall.Dotnet.Libraries.Base\Services\Startup\WatchdogNaming.cs" Link="Contract\WatchdogNaming.cs" />
-    <Compile Include="..\Ironwall.Dotnet.Libraries.Base\Services\Startup\WatchdogHeartbeat.cs" Link="Contract\WatchdogHeartbeat.cs" />
-    <Compile Include="..\Ironwall.Dotnet.Libraries.Base\Services\IClock.cs" Link="Contract\IClock.cs" />
-    <Compile Include="..\Ironwall.Dotnet.Libraries.Base\Services\SystemClock.cs" Link="Contract\SystemClock.cs" />
+    <!-- Base가 계약 타입(WatchdogState/Status/Naming/Heartbeat)과 IClock/SystemClock의 단일 권위.
+         링크 복제 대신 Base를 참조해 동일 타입을 사용(중복 정의 제거 → CS0433 원천 차단).
+         단일파일 발행 시 Base 클로저가 exe에 번들되어 런타임 독립성 유지(앱 Base.dll 비의존). -->
+    <ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
   </ItemGroup>
 
 </Project>
