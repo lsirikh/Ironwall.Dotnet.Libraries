@@ -139,8 +139,12 @@ public sealed class LabelAdorner : Adorner, IDisposable
             var cur = e.GetPosition(_map);
             double nx = _origOffsetX + (cur.X - _grabScreen.X);
             double ny = _origOffsetY + (cur.Y - _grabScreen.Y);
-            // 상한: 오프셋 벡터 길이 ≤ 심볼 최대 반지름(max(W,H)/2)의 2배 (= max(W,H)). 너무 멀어져 안 보임 방지, FR-LB-04.
-            double cap = Math.Max(_marker.Width, _marker.Height) / 2.0 * 2.0;
+            // 상한: 오프셋 벡터 길이. 심볼=최대 반지름(max(W,H)/2)의 2배. 너무 멀어져 안 보임 방지, FR-LB-04.
+            // [LineArea_Symbol_Resize FR-07] line/폴리곤은 W/H가 파생·transient(리사이즈·줌마다 변함)라
+            // 절대 픽셀 상한 사용 — 라벨 허용범위가 리사이즈·줌에 흔들리는 부작용 차단(§5-C D3b).
+            double cap = _marker is GMapSymbols.ILineEditableMarker
+                ? 300.0
+                : Math.Max(_marker.Width, _marker.Height) / 2.0 * 2.0;
             double len = Math.Sqrt(nx * nx + ny * ny);
             if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
             _marker.LabelOffsetX = nx;

@@ -297,57 +297,52 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         var handleSize = MarkerEditSettings.HandleSize;
 
-        // AdornedElement.RenderSize 기준 사각형 (줌 레벨에 따라 자동 스케일링)
-        var markerBounds = CalculateEditBounds(markerCenter);
+        // 핸들 배치 bounds — line은 점 bbox(ActualLineBounds), 그 외 RenderSize(FR-02). 중심도 line=점 bbox 중심(D-06).
+        var markerBounds = GetHandleBounds(markerCenter);
+        var hc = GetHandleCenter(markerCenter);
 
-        // 라인 마커 체크
-        bool isLineMarker = _targetMarker is GMapLineMarker || _targetMarker is GMapPidsGroupMarker;
+        // 라인은 코너(균일)만, 닫힌 폴리곤(Area)은 코너+변(비균일). 비-line은 종전대로 코너+변(D-01).
+        bool isLineMarker = TargetLine != null;
+        bool showEdges = !isLineMarker || (TargetLine?.IsClosedPath ?? false);
 
         // 1. 이동 핸들 (중심, 원형, 파란색)
-        drawingContext.DrawEllipse(_moveHandleBrush, _handlePen, markerCenter, handleSize, handleSize);
+        drawingContext.DrawEllipse(_moveHandleBrush, _handlePen, hc, handleSize, handleSize);
 
         // 2. 회전 핸들 (북쪽, 원형, 초록색)
-        var rotateHandlePos = new Point(markerCenter.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
+        var rotateHandlePos = new Point(hc.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
         drawingContext.DrawEllipse(_rotateHandleBrush, _handlePen, rotateHandlePos, handleSize * 0.75, handleSize * 0.75);
 
         // 회전 핸들 연결선
         var connectionPen = new Pen(_rotateHandleBrush, 1) { DashStyle = DashStyles.Dot };
         drawingContext.DrawLine(connectionPen,
-            new Point(markerCenter.X, markerBounds.Top),
+            new Point(hc.X, markerBounds.Top),
             new Point(rotateHandlePos.X, rotateHandlePos.Y + handleSize * 0.75));
 
-        if (!isLineMarker)
+        // 3. 모서리 핸들들 (모든 타입 — line 포함, 균일 스케일)
+        var cornerHandleBrush = Brushes.Blue;
+        foreach (var handlePos in new[]
         {
-            // 3. 모서리 핸들들
-            var cornerHandleBrush = Brushes.Blue;
-            var cornerHandles = new[]
-            {
             new Point(markerBounds.Left, markerBounds.Top),
             new Point(markerBounds.Right, markerBounds.Top),
             new Point(markerBounds.Right, markerBounds.Bottom),
             new Point(markerBounds.Left, markerBounds.Bottom)
-        };
+        })
+        {
+            drawingContext.DrawRectangle(cornerHandleBrush, _handlePen,
+                new Rect(handlePos.X - handleSize / 2, handlePos.Y - handleSize / 2, handleSize, handleSize));
+        }
 
-            foreach (var handlePos in cornerHandles)
-            {
-                var handleRect = new Rect(
-                    handlePos.X - handleSize / 2,
-                    handlePos.Y - handleSize / 2,
-                    handleSize, handleSize);
-                drawingContext.DrawRectangle(cornerHandleBrush, _handlePen, handleRect);
-            }
-
-            // 4. 변 중앙 핸들들
+        // 4. 변 중앙 핸들들 (비-line 또는 닫힌 폴리곤 — 비균일)
+        if (showEdges)
+        {
             var edgeHandleBrush = Brushes.Orange;
-            var edgeHandles = new[]
-                            {
-                                new Point(markerCenter.X, markerBounds.Top),
-                                new Point(markerBounds.Right, markerCenter.Y),
-                                new Point(markerCenter.X, markerBounds.Bottom),
-                                new Point(markerBounds.Left, markerCenter.Y)
-                            };
-
-            foreach (var handlePos in edgeHandles)
+            foreach (var handlePos in new[]
+            {
+                new Point(hc.X, markerBounds.Top),
+                new Point(markerBounds.Right, hc.Y),
+                new Point(hc.X, markerBounds.Bottom),
+                new Point(markerBounds.Left, hc.Y)
+            })
             {
                 drawingContext.DrawEllipse(edgeHandleBrush, _handlePen, handlePos, handleSize / 2, handleSize / 2);
             }
@@ -555,6 +550,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
         // 원본 데이터 백업
         BackupOriginalData();
 
+        // 라인/폴리곤 리사이즈 시작 — 절대배율 앵커·ESC/undo before 캡처(FR-03/05)
+        if (TargetLine != null && IsResizeHandle(_activeHandle)) CaptureLineStart(mousePos);
+
         // 회전 핸들인 경우 회전 초기화
         if (_activeHandle == MarkerHandle.Rotate)
         {
@@ -585,9 +583,13 @@ public class MarkerEditAdorner : Adorner, IDisposable
         // 마우스 캡처 해제
         this.ReleaseMouseCapture();
 
-        // 이벤트 발생
-        EditCompleted?.Invoke(this, new MarkerEditCompletedEventArgs(_targetMarker,
-            _originalPosition, _originalWidth, _originalHeight, _originalBearing));
+        // 이벤트 발생 — 라인 리사이즈면 시작 점(before)을 실어 RecordLineGeometry가 스냅샷 Undo 기록(FR-04)
+        var completedArgs = new MarkerEditCompletedEventArgs(_targetMarker,
+            _originalPosition, _originalWidth, _originalHeight, _originalBearing);
+        if (TargetLine != null && _lineStartPoints != null)
+            completedArgs.OriginalLinePoints = _lineStartPoints;
+        EditCompleted?.Invoke(this, completedArgs);
+        _lineStartPoints = null;
 
         _log?.Info($"편집 완료: {_targetMarker.Title}");
 
@@ -601,8 +603,13 @@ public class MarkerEditAdorner : Adorner, IDisposable
     {
         if (!_isDragging) return;
 
-        // 원본 데이터 복원
+        // 원본 데이터 복원 (비-line 스칼라) — line은 스칼라로 점 복원 불가라 스냅샷 점 되씌움(FR-05, §5-C A9)
         RestoreOriginalData();
+        if (TargetLine != null && _lineStartPoints != null)
+        {
+            try { TargetLine.ApplyGeometry(_lineStartPoints, _lineStartPosition); } catch { }
+            _lineStartPoints = null;
+        }
 
         _isDragging = false;
         _editState.IsEditing = false;
@@ -632,6 +639,15 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
         if (_activeHandle != MarkerHandle.Move)
             _log?.Info($"[DEBUG-DRAG] handle={_activeHandle}, dragStart=({_dragStartPoint.X:F1},{_dragStartPoint.Y:F1}), cur=({currentPos.X:F1},{currentPos.Y:F1}), delta=({deltaX:F1},{deltaY:F1})");
+
+        // 라인/폴리곤 리사이즈는 점 스케일(절대배율)로 분기 — 기존 W/H UpdateSize 경로는 line에 무의미(FR-03).
+        if (TargetLine != null && IsResizeHandle(_activeHandle))
+        {
+            ProcessLineScale(currentPos);
+            Editing?.Invoke(this, new MarkerEditingEventArgs(_targetMarker, _activeHandle, deltaX, deltaY));
+            _dragStartPoint = currentPos;
+            return;
+        }
 
         switch (_activeHandle)
         {
@@ -1088,73 +1104,138 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
         var tolerance = MarkerEditSettings.HandleTolerance;
 
-        var markerBounds = CalculateEditBounds(markerCenter);
-
-        // 실제 마커 크기를 기준으로 사각형 계산 (편집 영역과 동일)
-        var markerWidth = _targetMarker.Width;
-        var markerHeight = _targetMarker.Height;
-       
-        //var markerBounds = new Rect(
-        //    markerCenter.X - markerWidth / 2 - PADDING,
-        //    markerCenter.Y - markerHeight / 2 - PADDING,
-        //    markerWidth + PADDING * 2,
-        //    markerHeight + PADDING * 2);
-
-        //_log?.Info($"핸들 감지 - 마우스: ({mousePos.X:F1}, {mousePos.Y:F1}), 마커중심: ({markerCenter.X:F1}, {markerCenter.Y:F1})");
+        // line은 점 bbox(ActualLineBounds) 기준·중심(FR-02 §5-C B5), 그 외 RenderSize.
+        var markerBounds = GetHandleBounds(markerCenter);
+        var hc = GetHandleCenter(markerCenter);
+        bool showEdges = TargetLine == null || (TargetLine?.IsClosedPath ?? false);   // 열린선=코너만(D-01)
 
         // 1. 이동 핸들 (중심)
-        if (IsPointNear(mousePos, markerCenter, tolerance))
-        {
-            //_log?.Info("이동 핸들 감지됨");
+        if (IsPointNear(mousePos, hc, tolerance))
             return MarkerHandle.Move;
-        }
 
         // 2. 회전 핸들 (북쪽)
-        var rotateHandlePos = new Point(markerCenter.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
+        var rotateHandlePos = new Point(hc.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
         if (IsPointNear(mousePos, rotateHandlePos, tolerance))
-        {
-            //_log?.Info("회전 핸들 감지됨");
             return MarkerHandle.Rotate;
-        }
 
-        // 3. 모서리 핸들들 (비율 유지)
+        // 3. 모서리 핸들들 (모든 타입 — line 포함, 균일)
         var cornerHandles = new[]
         {
-        (new Point(markerBounds.Left, markerBounds.Top), MarkerHandle.ResizeTopLeft),
-        (new Point(markerBounds.Right, markerBounds.Top), MarkerHandle.ResizeTopRight),
-        (new Point(markerBounds.Right, markerBounds.Bottom), MarkerHandle.ResizeBottomRight),
-        (new Point(markerBounds.Left, markerBounds.Bottom), MarkerHandle.ResizeBottomLeft)
-    };
-
+            (new Point(markerBounds.Left, markerBounds.Top), MarkerHandle.ResizeTopLeft),
+            (new Point(markerBounds.Right, markerBounds.Top), MarkerHandle.ResizeTopRight),
+            (new Point(markerBounds.Right, markerBounds.Bottom), MarkerHandle.ResizeBottomRight),
+            (new Point(markerBounds.Left, markerBounds.Bottom), MarkerHandle.ResizeBottomLeft)
+        };
         foreach (var (handlePos, handleType) in cornerHandles)
-        {
-            if (IsPointNear(mousePos, handlePos, tolerance))
-            {
-                //_log?.Info($"{handleType} 핸들 감지됨 (비율 유지)");
-                return handleType;
-            }
-        }
+            if (IsPointNear(mousePos, handlePos, tolerance)) return handleType;
 
-        // 4. 변 중앙 핸들들 (자유 조정)
-        var edgeHandles = new[]
+        // 4. 변 중앙 핸들들 (비-line 또는 닫힌 폴리곤 — 비균일)
+        if (showEdges)
         {
-        (new Point(markerCenter.X, markerBounds.Top), MarkerHandle.ResizeTop),
-        (new Point(markerBounds.Right, markerCenter.Y), MarkerHandle.ResizeRight),
-        (new Point(markerCenter.X, markerBounds.Bottom), MarkerHandle.ResizeBottom),
-        (new Point(markerBounds.Left, markerCenter.Y), MarkerHandle.ResizeLeft)
-    };
-
-        foreach (var (handlePos, handleType) in edgeHandles)
-        {
-            if (IsPointNear(mousePos, handlePos, tolerance))
+            var edgeHandles = new[]
             {
-                //_log?.Info($"{handleType} 핸들 감지됨 (자유 조정)");
-                return handleType;
-            }
+                (new Point(hc.X, markerBounds.Top), MarkerHandle.ResizeTop),
+                (new Point(markerBounds.Right, hc.Y), MarkerHandle.ResizeRight),
+                (new Point(hc.X, markerBounds.Bottom), MarkerHandle.ResizeBottom),
+                (new Point(markerBounds.Left, hc.Y), MarkerHandle.ResizeLeft)
+            };
+            foreach (var (handlePos, handleType) in edgeHandles)
+                if (IsPointNear(mousePos, handlePos, tolerance)) return handleType;
         }
 
         return MarkerHandle.None;
     }
+
+    #region Line/Area Resize (LineArea_Symbol_Resize FR-02/03/05)
+    private GMapSymbols.ILineEditableMarker? TargetLine => _targetMarker as GMapSymbols.ILineEditableMarker;
+
+    private static bool IsResizeHandle(MarkerHandle h) =>
+        h is MarkerHandle.ResizeTopLeft or MarkerHandle.ResizeTopRight or MarkerHandle.ResizeBottomLeft
+          or MarkerHandle.ResizeBottomRight or MarkerHandle.ResizeTop or MarkerHandle.ResizeBottom
+          or MarkerHandle.ResizeLeft or MarkerHandle.ResizeRight;
+
+    /// <summary>라인 점 bbox(어도너 로컬 좌표) — 없으면 Rect.Empty.</summary>
+    private Rect GetActualLineBounds()
+    {
+        if (_targetMarker is GMapLineMarker && AdornedElement is GMapMarkerLineControl lc) return lc.ActualLineBounds;
+        if (_targetMarker is GMapPidsGroupMarker && AdornedElement is GMapMarkerPidsGroupControl gc) return gc.ActualLineBounds;
+        return Rect.Empty;
+    }
+
+    /// <summary>핸들 배치 bounds — line은 점 bbox(ActualLineBounds+PADDING), 그 외 RenderSize 기반(§5-C B5 짧은선 불일치 해소).</summary>
+    private Rect GetHandleBounds(Point markerCenter)
+    {
+        var lb = GetActualLineBounds();
+        if (TargetLine != null && !lb.IsEmpty) return CalculateLineEditBounds(lb);
+        return CalculateEditBounds(markerCenter);
+    }
+
+    /// <summary>핸들/이동/회전 중심 — line은 점 bbox 중심(D-06), 그 외 markerCenter.</summary>
+    private Point GetHandleCenter(Point markerCenter)
+    {
+        if (TargetLine == null) return markerCenter;
+        var b = GetHandleBounds(markerCenter);
+        return new Point(b.X + b.Width / 2.0, b.Y + b.Height / 2.0);
+    }
+
+    // geo ↔ map-space 픽셀 (FromLatLngToLocal는 맵 컨트롤 좌표계)
+    private Point ToMap(PointLatLng p) { var g = _mapControl.FromLatLngToLocal(p); return new Point(g.X, g.Y); }
+    private PointLatLng ToGeo(Point m) => _mapControl.FromLocalToLatLng((int)System.Math.Round(m.X), (int)System.Math.Round(m.Y));
+    private Point MouseToMap(Point adornerPos)
+    {
+        try { return AdornedElement.TransformToAncestor(_mapControl).Transform(adornerPos); }
+        catch { return adornerPos; }
+    }
+
+    private (double w, double h) LinePxBbox(System.Collections.Generic.IReadOnlyList<PointLatLng> pts)
+    {
+        if (pts == null || pts.Count == 0) return (0, 0);
+        double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+        foreach (var p in pts) { var m = ToMap(p); if (m.X < minX) minX = m.X; if (m.X > maxX) maxX = m.X; if (m.Y < minY) minY = m.Y; if (m.Y > maxY) maxY = m.Y; }
+        return (maxX - minX, maxY - minY);
+    }
+
+    /// <summary>라인 리사이즈 시작 시점 캡처(절대배율 앵커·ESC/undo before).</summary>
+    private void CaptureLineStart(Point mousePos)
+    {
+        var line = TargetLine; if (line == null) return;
+        _lineStartPoints = line.RuntimePoints;
+        _lineStartPosition = _targetMarker.Position;
+        _lineDragStart = mousePos;
+        _lineStartGeoCenter = Utils.LineGeometryUtils.BoundsCenter(_lineStartPoints);
+        var (w, h) = LinePxBbox(_lineStartPoints);
+        _lineStartBboxPx = new Size(w, h);
+    }
+
+    /// <summary>라인 리사이즈 — 시작 bbox(map px) 대비 절대배율로 시작 점을 스케일(줌 stale 방지 §5-C B1) → ApplyGeometry.</summary>
+    private void ProcessLineScale(Point currentPos)
+    {
+        var line = TargetLine; if (line == null || _lineStartPoints == null || _lineStartPoints.Count < 2) return;
+        try
+        {
+            var startMap = MouseToMap(_lineDragStart);
+            var curMap = MouseToMap(currentPos);
+            double tdx = curMap.X - startMap.X, tdy = curMap.Y - startMap.Y;
+            double w0 = _lineStartBboxPx.Width, h0 = _lineStartBboxPx.Height;
+            double refD = System.Math.Max(1.0, (w0 + h0) / 2.0);
+            double sx = 1, sy = 1;
+            switch (_activeHandle)
+            {
+                case MarkerHandle.ResizeTopLeft:     { double sc = -(tdx + tdy) / 2.0; sx = sy = Utils.LineGeometryUtils.SafeRatio(refD, refD + sc); break; }
+                case MarkerHandle.ResizeTopRight:    { double sc =  (tdx - tdy) / 2.0; sx = sy = Utils.LineGeometryUtils.SafeRatio(refD, refD + sc); break; }
+                case MarkerHandle.ResizeBottomLeft:  { double sc = (-tdx + tdy) / 2.0; sx = sy = Utils.LineGeometryUtils.SafeRatio(refD, refD + sc); break; }
+                case MarkerHandle.ResizeBottomRight: { double sc =  (tdx + tdy) / 2.0; sx = sy = Utils.LineGeometryUtils.SafeRatio(refD, refD + sc); break; }
+                case MarkerHandle.ResizeTop:    sy = Utils.LineGeometryUtils.SafeRatio(h0, h0 - tdy); break;
+                case MarkerHandle.ResizeBottom: sy = Utils.LineGeometryUtils.SafeRatio(h0, h0 + tdy); break;
+                case MarkerHandle.ResizeLeft:   sx = Utils.LineGeometryUtils.SafeRatio(w0, w0 - tdx); break;
+                case MarkerHandle.ResizeRight:  sx = Utils.LineGeometryUtils.SafeRatio(w0, w0 + tdx); break;
+            }
+            var scaled = Utils.LineGeometryUtils.Scale(_lineStartPoints, _lineStartGeoCenter, sx, sy, ToMap, ToGeo);
+            line.ApplyGeometry(scaled, Utils.LineGeometryUtils.BoundsCenter(scaled));
+        }
+        catch (Exception ex) { _log?.Error($"[ProcessLineScale] 실패: {ex.Message}"); }
+    }
+    #endregion
 
     /// <summary>
     /// 편집 반경 계산 — AdornedElement 실제 렌더 크기 기준 (줌 스케일링 반영)
@@ -1329,6 +1410,13 @@ public class MarkerEditAdorner : Adorner, IDisposable
     private readonly ILogService? _log;
     private bool _disposed = false;
     private readonly GMapControl _mapControl;
+
+    // LineArea_Symbol_Resize FR-03/05 — 라인 리사이즈 절대배율 앵커(드래그 시작 고정, incremental 아님)
+    private System.Collections.Generic.List<PointLatLng>? _lineStartPoints;
+    private PointLatLng _lineStartPosition;
+    private Point _lineDragStart;
+    private Size _lineStartBboxPx;
+    private PointLatLng _lineStartGeoCenter;
     private readonly IEditableMarker _targetMarker;
 
     // 편집 상태
