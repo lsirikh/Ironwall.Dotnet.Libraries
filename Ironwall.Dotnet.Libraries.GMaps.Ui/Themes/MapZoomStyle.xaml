@@ -87,7 +87,7 @@
 								SmallChange="1"
 								TickFrequency="1"
 								TickPlacement="Both"
-								ToolTip="MaxZoom 珥덇낵 援ш컙? ?붿???以??뚰봽???뺣?)"
+								ToolTip="MaxZoom 초과 구간은 디지털 줌(소프트 확대)"
 								Value="{Binding SliderValue, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
 
 							<!--  以??? -->
