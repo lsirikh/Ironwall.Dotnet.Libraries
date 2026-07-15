@@ -197,15 +197,17 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     /// </summary>
     public void SyncDeviceStatus(int deviceId, EnumDeviceType deviceType, EnumDeviceStatus status)
     {
-        var key = (deviceId, deviceType);
-        if (_deviceSymbolLookup.TryGetValue(key, out var lookup))
+        // (FR-B2) 재등록 desync 완화 — 복합 키(Id,Type) 실패 시 Id 단독 보조 인덱스로 폴백(TryResolveDevice).
+        //   장비 재등록으로 DeviceType이 바뀐 경우에도 Id로 심볼을 찾아 OperationState 동기화를 지속한다.
+        //   (Id 자체가 바뀐 재등록은 lookup 미스 → 아래 진단 경고. 심볼 재바인딩은 등록 경로에서 처리.)
+        if (TryResolveDevice(deviceId, deviceType, out var lookup))
         {
             lookup.SyncFromDevice(status);
             _log?.Info($"Device 상태 동기화: Device({deviceId}, {deviceType}) → {status}");
         }
         else
         {
-            _log?.Warning($"상태 동기화 실패 - 미등록 Device({deviceId}, {deviceType})");
+            _log?.Warning($"[SYNC_DEVICE] 상태 동기화 실패 - 미등록 Device({deviceId}, {deviceType}) — 재등록(Id 변경)/미배치 심볼 가능성");
         }
     }
 

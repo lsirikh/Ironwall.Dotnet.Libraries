@@ -5483,10 +5483,12 @@ public class DeviceSymbolLookupModelSyncTests
         symbolMock.VerifySet(s => s.OperationState = EnumOperationState.ERROR);
     }
 
+    // (FR-B1) SSOT 회귀 고정 — SyncFromDevice(Device.Status/SYNC_DEVICE)는 OperationState축만 갱신하고
+    //   EventStatus/CompositeStatus(이벤트축, EQM 전용)는 절대 건드리지 않는다. 이전 EventStatus 설정 계약은
+    //   SSOT 리팩터로 폐기됨(장애=CompositeStatus=Faulted만, OperationState는 ERROR≠Fault). 이중상태축 분리.
     [Fact]
-    public void SyncFromDevice_Error_SetsEventStatusFault()
+    public void should_set_operationstate_error_and_not_touch_eventstatus_when_sync_error()
     {
-        // SyncFromDevice(ERROR) → EventStatus=Fault (깜빡임 트리거)
         var lookup = CreateLookup();
         var symbolMock = new Mock<IPidsEventCapable>();
         symbolMock.SetupAllProperties();
@@ -5494,13 +5496,13 @@ public class DeviceSymbolLookupModelSyncTests
 
         lookup.SyncFromDevice(EnumDeviceStatus.ERROR);
 
-        symbolMock.VerifySet(s => s.EventStatus = EnumEventStatus.Fault);
+        symbolMock.VerifySet(s => s.OperationState = EnumOperationState.ERROR);
+        symbolMock.VerifySet(s => s.EventStatus = It.IsAny<EnumEventStatus>(), Times.Never);
     }
 
     [Fact]
-    public void SyncFromDevice_Activated_SetsEventStatusNormal()
+    public void should_set_operationstate_activated_and_not_touch_eventstatus_when_sync_activated()
     {
-        // SyncFromDevice(ACTIVATED) → EventStatus=Normal (깜빡임 정지)
         var lookup = CreateLookup();
         var symbolMock = new Mock<IPidsEventCapable>();
         symbolMock.SetupAllProperties();
@@ -5508,7 +5510,8 @@ public class DeviceSymbolLookupModelSyncTests
 
         lookup.SyncFromDevice(EnumDeviceStatus.ACTIVATED);
 
-        symbolMock.VerifySet(s => s.EventStatus = EnumEventStatus.Normal);
+        symbolMock.VerifySet(s => s.OperationState = EnumOperationState.ACTIVATED);
+        symbolMock.VerifySet(s => s.EventStatus = It.IsAny<EnumEventStatus>(), Times.Never);
     }
 
     [Fact]
@@ -5610,6 +5613,20 @@ public class SymbolEventManagerPhase4Tests
         manager.SyncDeviceStatus(1, EnumDeviceType.Fence, EnumDeviceStatus.DEACTIVATED);
 
         Assert.Equal(EnumOperationState.DEACTIVATED, symbol.Object.OperationState);
+    }
+
+    // (FR-B2) 재등록 desync — DeviceType이 바뀌어 복합 키(Id,Type)가 어긋나도 Id 폴백(TryResolveDevice)으로 동기화 지속.
+    [Fact]
+    public void should_sync_operationstate_via_id_fallback_when_devicetype_mismatched_after_reregistration()
+    {
+        var manager = CreateManager(out _);
+        var (device, symbol) = CreatePair(10, EnumDeviceType.Fence, EnumDeviceStatus.ACTIVATED);
+        manager.RegisterDeviceSymbol(device.Object, symbol.Object);
+
+        // 재등록으로 DeviceType이 Fence→Underground로 바뀐 상황(같은 Id) — 복합 키 미스, Id 폴백 성공 기대
+        manager.SyncDeviceStatus(10, EnumDeviceType.Underground, EnumDeviceStatus.ERROR);
+
+        Assert.Equal(EnumOperationState.ERROR, symbol.Object.OperationState);
     }
 
     // Test 4.2: RegisterDeviceSymbol 시 즉시 동기화
