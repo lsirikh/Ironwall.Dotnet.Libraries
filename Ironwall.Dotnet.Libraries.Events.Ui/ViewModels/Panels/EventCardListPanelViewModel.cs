@@ -659,6 +659,47 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             }
         }
 
+        /// <summary>
+        /// (C-2) 원격 ACTION_REPORT 수신 시 from_event.id로 활성 카드를 종결한다.
+        /// 다중 GIS/서브시스템이 이벤트를 공유하는 환경에서 타 GIS가 조치보고하면 본 GIS의 카드도 닫는다.
+        /// 자기 발행분 echo는 로컬에서 이미 닫혀 카드가 부재 → 멱등 no-op(false 반환, 예외·이중종결 없음).
+        /// 심볼 상태 복원(EQM Dequeue)까지 개별 조치보고(HandleAsync)와 동일 폴백 경로를 재사용한다.
+        /// ⚠ ViewModelProvider를 변경하므로 UI 스레드에서 호출할 것(호출부 NatsDomainService가 DispatcherService.Invoke로 감쌈).
+        /// </summary>
+        /// <returns>카드를 찾아 종결하면 true, 없으면(이미 닫힘/무관 이벤트) false.</returns>
+        public bool CloseCardByEventId(int eventId)
+        {
+            if (eventId <= 0) return false;
+            var card = ViewModelProvider.FirstOrDefault(c => c.Model?.Id == eventId);
+            if (card == null) return false;   // 멱등: 이미 종결됐거나 본 패널에 없는 이벤트
+
+            // EntryId 폴백 체인(개별 조치보고와 동일) — 1차 _pendingEntries, 2차 FindEntryByDevice.
+            if (card.EntryId == null && card.Model?.Id != null)
+            {
+                if (_pendingEntries.TryRemove(card.Model.Id, out var fallbackEntryId))
+                {
+                    card.EntryId = fallbackEntryId;
+                    _cardByEntryId[fallbackEntryId] = card;
+                }
+            }
+            if (card.EntryId != null)
+            {
+                _eventQueueManager.Dequeue(card.EntryId);
+            }
+            else if (card.Model?.Device != null)
+            {
+                var entry = _eventQueueManager.FindEntryByDevice(card.Model.Device.Id, card.Model.Device.DeviceType);
+                if (entry != null) _eventQueueManager.Dequeue(entry.EntryId);
+                else _log?.Warning($"[ACTION_REPORT] EntryId 복원 불가: Event({eventId}) — EQM 잔류 가능성");
+            }
+
+            if (card.EntryId != null) _cardByEntryId.TryRemove(card.EntryId, out _);
+            ViewModelProvider.Remove(card);
+            card.Dispose();
+            _log?.Info($"[ACTION_REPORT] 원격 조치보고로 카드 종결: Event({eventId})");
+            return true;
+        }
+
         public async Task HandleAsync(DetectionReportedMessageModel message, CancellationToken cancellationToken)
         {
             try

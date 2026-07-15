@@ -86,6 +86,54 @@ public class BatchActionReportTests
             .Returns(Task.FromResult(new ApiResponse<ActionEventDto> { Success = true, Data = new ActionEventDto() }));
     }
 
+    #region - C-2: 원격 ACTION_REPORT 카드 종결 (CloseCardByEventId) -
+
+    /// <summary>C-2: 원격 ACTION_REPORT(from_event.id 일치) 수신 → 활성 카드 종결 + EQM Dequeue(심볼 복원).</summary>
+    [Fact]
+    public void should_close_card_when_remote_action_report_matches_eventid()
+    {
+        // Arrange — 활성 카드(Event 1, EntryId 배정)
+        var sut = CreateSut();
+        var card = CreateDetectionCard(eventId: 1);
+        card.EntryId = "entry-1";
+        sut.ViewModelProvider.Add(card);
+
+        // Act — 원격 ACTION_REPORT(from_event.id=1) 수신 시뮬
+        var closed = sut.CloseCardByEventId(1);
+
+        // Assert — 카드 종결 + EQM Dequeue
+        Assert.True(closed);
+        Assert.Empty(sut.ViewModelProvider);
+        _mockEventQueueManager.Verify(m => m.Dequeue("entry-1"), Times.Once);
+    }
+
+    /// <summary>C-2: 자기 발행분 echo(이미 로컬서 종결·카드 부재) → 멱등 no-op(예외·Dequeue 없음).</summary>
+    [Fact]
+    public void should_noop_when_no_matching_card_for_action_report()
+    {
+        // Arrange — 부재 이벤트(이미 종결됨)
+        var sut = CreateSut();
+
+        // Act
+        var closed = sut.CloseCardByEventId(999);
+
+        // Assert — 멱등 no-op
+        Assert.False(closed);
+        _mockEventQueueManager.Verify(m => m.Dequeue(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>C-2: from_event.id 부재/비정상(≤0)이면 종결 skip(false).</summary>
+    [Fact]
+    public void should_return_false_when_action_report_eventid_invalid()
+    {
+        var sut = CreateSut();
+        Assert.False(sut.CloseCardByEventId(0));
+        Assert.False(sut.CloseCardByEventId(-5));
+        _mockEventQueueManager.Verify(m => m.Dequeue(It.IsAny<string>()), Times.Never);
+    }
+
+    #endregion
+
     #region - Phase 2: 핵심 배치 처리 로직 -
 
     [Fact]
