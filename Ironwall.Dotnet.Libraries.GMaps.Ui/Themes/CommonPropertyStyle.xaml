@@ -1,14 +1,111 @@
 ﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
 
 	<ResourceDictionary.MergedDictionaries>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/BasePropertyStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
-	<!--  멀티셀렉트 혼합 타입 공통 속성창 — BasePropertyStyle(공통 속성만) 상속. 타입 특화 영역은 HasSpecificProperties=false로 숨김  -->
-	<Style
-		BasedOn="{StaticResource BasePropertyStyle}"
-		TargetType="{x:Type properties:GMapPropertyCommonControl}" />
+	<!--  멀티셀렉트 혼합 타입 속성창 = "빈 상태" 안내 전용 (기능 ② 피드백).
+	      서로 다른 타입(군대부호+제어기, 이미지+심볼 등)은 속성이 서로 달라 하나의 값으로
+	      표현할 수 없으므로 편집 필드를 두지 않고 그 사실을 안내만 한다(오적용 원천 차단).
+	      크롬(헤더 드래그 PART_HeaderArea·닫기 PART_CloseButton)은 BasePropertyStyle과 동일.  -->
+	<Style TargetType="{x:Type properties:GMapPropertyCommonControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type properties:GMapPropertyCommonControl}">
+					<Border
+						x:Name="PART_MainBorder"
+						MinWidth="280"
+						MaxWidth="300"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="10">
+						<Border.Effect>
+							<DropShadowEffect
+								BlurRadius="8"
+								Opacity="0.12"
+								ShadowDepth="2"
+								Color="Black" />
+						</Border.Effect>
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="42" />
+								<RowDefinition Height="*" />
+							</Grid.RowDefinitions>
+
+							<!--  헤더 (드래그 영역)  -->
+							<Border
+								x:Name="PART_HeaderArea"
+								Grid.Row="0"
+								Background="{DynamicResource PrimaryBrush}"
+								CornerRadius="9,9,0,0"
+								Cursor="SizeAll">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="35" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="35" />
+									</Grid.ColumnDefinitions>
+									<md:PackIcon
+										Grid.Column="0"
+										Width="18"
+										Height="18"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Kind="SelectGroup" />
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="14"
+										FontWeight="Bold"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Text="선택 항목 속성" />
+									<Button
+										x:Name="PART_CloseButton"
+										Grid.Column="2"
+										Style="{StaticResource PanelCloseButtonStyle}" />
+								</Grid>
+							</Border>
+
+							<!--  빈 상태 안내 — 편집 필드 없음  -->
+							<StackPanel
+								Grid.Row="1"
+								Margin="20,28,20,28"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center">
+								<md:PackIcon
+									Width="34"
+									Height="34"
+									Margin="0,0,0,12"
+									HorizontalAlignment="Center"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Kind="ShapeOutline" />
+								<TextBlock
+									HorizontalAlignment="Center"
+									FontSize="12.5"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="선택한 항목들의 속성이 서로 다릅니다"
+									TextAlignment="Center" />
+								<TextBlock
+									Margin="0,6,0,0"
+									HorizontalAlignment="Center"
+									FontSize="11.5"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="종류가 달라 공통 속성으로 표현할 수 없습니다.&#10;같은 종류끼리 선택하면 일괄 편집할 수 있습니다."
+									TextAlignment="Center" />
+							</StackPanel>
+						</Grid>
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
 </ResourceDictionary>
