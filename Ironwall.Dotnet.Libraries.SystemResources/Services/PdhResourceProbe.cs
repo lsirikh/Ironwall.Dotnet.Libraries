@@ -20,8 +20,12 @@ namespace Ironwall.Dotnet.Libraries.SystemResources.Services;
 /// </summary>
 internal sealed class PdhResourceProbe : IResourceProbe
 {
-    private const string CpuUtilityPath = @"\Processor Information(_Total)\% Processor Utility";
-    private const string CpuTimePath = @"\Processor(_Total)\% Processor Time";
+    // CPU 사용률 = "바쁜 시간 %"(0..100).
+    // ⚠ % Processor Utility 금지: 주파수(Turbo) 배율(% Processor Performance)을 포함해 base 주파수 대비
+    //    실제 작업량을 재므로, 고주파 머신에서 busy% × 1.4~1.7로 부풀려져 중부하에서 100% 고정 + 작업관리자
+    //    체감치와 크게 벌어짐(실측: Performance 145% 머신에서 busy 67% → Utility 100%). → % Processor Time 사용.
+    private const string CpuTimePath = @"\Processor Information(_Total)\% Processor Time";   // Processor Information = >64 논리코어 지원
+    private const string CpuTimeFallbackPath = @"\Processor(_Total)\% Processor Time";       // 폴백(클래식 Processor, ≤64코어 그룹)
     private const string GpuPath = @"\GPU Engine(*)\Utilization Percentage";
 
     private readonly ILogService? _log;
@@ -43,12 +47,12 @@ internal sealed class PdhResourceProbe : IResourceProbe
         if (st != PdhInterop.ERROR_SUCCESS || _query == IntPtr.Zero)
             throw new InvalidOperationException($"PdhOpenQuery 실패 (0x{st:X8})");
 
-        // CPU: % Processor Utility(Task Manager 정합) → 실패 시 % Processor Time 폴백.
-        uint c = PdhInterop.PdhAddEnglishCounterW(_query, CpuUtilityPath, IntPtr.Zero, out _cpuCounter);
+        // CPU: % Processor Time(바쁜 시간 %, 주파수 무관) → 실패 시 클래식 Processor 폴백.
+        uint c = PdhInterop.PdhAddEnglishCounterW(_query, CpuTimePath, IntPtr.Zero, out _cpuCounter);
         if (c != PdhInterop.ERROR_SUCCESS)
         {
-            _log?.Warning($"[SysRes] '% Processor Utility' 미가용(0x{c:X8}) → '% Processor Time' 폴백");
-            c = PdhInterop.PdhAddEnglishCounterW(_query, CpuTimePath, IntPtr.Zero, out _cpuCounter);
+            _log?.Warning($"[SysRes] '{CpuTimePath}' 미가용(0x{c:X8}) → 클래식 Processor 폴백");
+            c = PdhInterop.PdhAddEnglishCounterW(_query, CpuTimeFallbackPath, IntPtr.Zero, out _cpuCounter);
         }
         _cpuAdded = c == PdhInterop.ERROR_SUCCESS;
         if (!_cpuAdded) _log?.Warning($"[SysRes] CPU 카운터 추가 실패(0x{c:X8})");
