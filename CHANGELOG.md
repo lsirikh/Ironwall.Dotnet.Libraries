@@ -15,6 +15,12 @@
 ## [Unreleased]
 
 ### Added
+- **장비 CRUD → DeviceProvider 캐시/패널 정합 (경로 B-패널, FR-D)** ([PRD](docs/prds/DeviceStatusSync_ActionReportPropagation-prd.md) · [Plan](docs/plans/DeviceStatusSync_ActionReportPropagation-prd-plan.md) · 태그 `before-devicesync-actionreport` · Devices.Ui/Events.Ui · 라이브러리 한정) — DeviceStatusSync PRD Phase 1. 장비 추가/삭제(SYNC_DEVICE)가 DeviceProvider 캐시를 넘어 파생 상태·열린 패널까지 정합되도록 4개 갭 해소.
+  - **FR-D2 🔴 (DeviceCount stale)**: `DeviceProviderService.RemoveDeviceByIdAsync`가 삭제 전 소속 그룹 스냅샷으로 `DeviceGroupProvider.DeviceCount`를 1씩 감소(음수가드·다중그룹·미발견 skip). 서버 재조회 전 그룹 카운트 과대표시 제거.
+  - **FR-D3 🟡 (그룹 멤버십 변경 미감지)**: `UpdateDeviceProperties`의 `DeviceGroups = new List` 재할당을 **기존 List Clear+AddRange**(참조 보존)로 교체 → UI 컬렉션 변경 감지.
+  - **FR-D1 🟡 (열린 패널 미반영)**: Controller/Sensor 장비패널에 **provider→panel 역방향 동기화** 신설 — `_deviceProvider.CollectionEntity.CollectionChanged` 구독으로 열린 DataGrid에 add/remove 즉시 반영. 단일 재진입 플래그(`_isSyncingFromProvider`)로 순방향↔역방향 상호 억제(무한루프/이중행 차단), Id 기준 멱등(Draft Id≤0 격리), 구독 수명은 순방향과 동일 3지점(OnDeactivate·DataInitialize -/+) 토글. ⚠나머지 4패널(Camera/Speaker/Enclosure/Lamp)은 재활성화 반영 유지(후속).
+  - **FR-D4 🟢 (삭제 device 참조 카드)**: `EventCardViewModel`의 Device 접근부는 이미 전부 null-safe(`?.`/가드) 확인 → null 계약·EQM 자동정리 규칙 XML-doc 명문화 + 회귀 테스트.
+  - **검증**: Devices.Ui **122/122**(FR-D2 5·FR-D1 3 신규) + Events.Ui FR-D4 테스트 green, 빌드 0오류. ⚠경로 C-2(원격 ACTION_REPORT 카드종결)/A(AI탐지 EQM일원화)/B(재등록 desync)는 메인 솔루션 수반 — Phase 2~4 사전통지 후 별도. [[project_pathb_works_pathc2_actionreport_gap]]
 - **카메라 팝업 RTSP 소스 우선순위 — URL조회/Onvif조회 설정 토글** ([PRD](docs/prds/CameraPopup_RtspSource_Priority-prd.md) · [Plan](docs/plans/CameraPopup_RtspSource_Priority-prd-plan.md) · 태그 `before-camerapopup-rtsp-source` · worktree `feature/camerapopup-rtsp-source` · Streaming(.Base)+GMaps.Ui)
   - **기능**: EventSetup 팝업 설정에서 연결 소스 선택 — `Url`(기본, 현행 무변경: 수동 RtspSub→RtspMain) / `Onvif`(계정·비번으로 ONVIF `GetStreamUri` 프로파일별 URL 조회 → 자격증명 URL-인코딩 임베드 재생, RTSP Basic/Digest-MD5는 LibVLC 자동 협상). **실패/타임아웃(12s) 시 URL조회 자동 폴백**, 둘 다 없으면 팝업 닫기.
   - **설계**: 계층 원칙(Streaming=메커니즘/GMaps.Ui=정책) — Streaming 변경은 설정 키 1개(default interface 구현 → 메인솔루션 미반영 시 Url 모드로 자립·컴파일 무파괴) + 플레이어 **late-bind 연결**(ConnectionInfo DP change 콜백, OnLoaded와 이중 연결 방지 가드). ONVIF 조회는 `PtzController` 워밍 재사용(이중 초기화 0, Gate 직렬화 I-05) + 조회 URL 캐시(Release 시 무효화). 신규 순수 헬퍼 `OnvifProfileSelector`(**해상도 최소→비오디오 우선→원 순서** — cam66 실측 8프로파일서 video1s 서브 정확 선택)·`OnvifRtspUrlComposer`(userinfo 치환·특수문자 인코딩). 팝업 "영상 주소 조회 중…(ONVIF)" 배지. MapViewModel 분기는 신규 partial(`MapViewModel.CameraPopupSource.cs`).
