@@ -114,20 +114,14 @@ public class RtspConnectionInfo : BaseModel
     }
 
     /// <summary>
-    /// 카메라 고유 키 — credential · query 제외, host:port/path 형식.
+    /// 카메라 고유 키 — credential만 제외, host:port/path[?query] 형식(쿼리 포함).
     /// Hub / SharedSession / Row 전체에서 동일한 키를 사용하기 위한 표준 메서드.
+    /// ※ 쿼리를 제외하면 <c>?channel=</c>류로만 구분되는 서로 다른 카메라가 같은 디코더로
+    ///   병합되어 두 팝업이 동일 영상을 공유한다(A/B 동일영상 버그) — 파생 로직은
+    ///   <see cref="RtspCameraKey.Derive"/>(순수 헬퍼, 단위테스트 소스링크 대상) 참조.
     /// </summary>
     public string GetCameraKey()
-    {
-        var fullUrl = GetFullUrl();
-        if (!string.IsNullOrEmpty(fullUrl) && Uri.TryCreate(fullUrl, UriKind.Absolute, out var uri))
-        {
-            var port = uri.Port > 0 ? uri.Port : 554;
-            var path = uri.AbsolutePath.TrimStart('/');
-            return $"{uri.Host}:{port}/{path}";
-        }
-        return $"{IpAddress}:{Port}/{StreamPath}";
-    }
+        => RtspCameraKey.Derive(GetFullUrl(), IpAddress, Port, StreamPath);
 
     /// <summary>
     /// 연결 정보 유효성 검사

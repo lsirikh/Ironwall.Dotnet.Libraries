@@ -91,6 +91,14 @@ public sealed class CameraStreamHub : ISharedCameraStreamHub, IDisposable
             }
         }
 
+        // 진단(F2): 키 재사용인데 URL이 다르면 — 두 장비의 URL이 같은 키로 병합된 상황이다
+        // (키 결함 또는 장비 URL 데이터 중복). 먼저 연 스트림이 표시되므로 "다른 카메라인데
+        // 같은 영상" 증상의 1차 단서로 즉시 가시화한다(자격증명 마스킹, 재생 URL은 엔트리 원본 유지).
+        var entryUrl = entry.ConnectionInfo?.GetFullUrl();
+        var requestUrl = info.GetFullUrl();
+        if (!string.IsNullOrEmpty(entryUrl) && !string.Equals(entryUrl, requestUrl, StringComparison.Ordinal))
+            _log?.Warning($"[CameraStreamHub] 키 동일·URL 상이 — 기존 엔트리 재사용(기존 스트림 표시). cameraId={request.CameraId}  entryUrl={MaskUrl(entryUrl)}  requestUrl={MaskUrl(requestUrl)}");
+
         // _leaseToCamera 등록을 AddRef() 전에 수행 — SweepDeadLeases 원자성 보장
         var lease = new CameraStreamLease(this, entry, request);
         _leaseToCamera[lease.LeaseId] = request.CameraId;
@@ -98,6 +106,10 @@ public sealed class CameraStreamHub : ISharedCameraStreamHub, IDisposable
         _log?.Info($"[CameraStreamHub] Lease issued  leaseId={lease.LeaseId}  cameraId={request.CameraId}  hasFrame={entry.SharedFrame != null}  refCount={entry.RefCount}");
         return lease;
     }
+
+    /// <summary>로그용 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host).</summary>
+    private static string MaskUrl(string? url)
+        => System.Text.RegularExpressions.Regex.Replace(url ?? string.Empty, @"//[^/@\s]+@", "//***@");
 
     // ── Entry 팩토리 ─────────────────────────────────────────────────────────
 
@@ -109,7 +121,7 @@ public sealed class CameraStreamHub : ISharedCameraStreamHub, IDisposable
         if (_setupModel != null)
         {
             // 프로덕션 경로: VLC MediaPlayer + SharedFrameBuffer
-            _log?.Info($"[CameraStreamHub] CreateEntry VLC  cameraId={cameraId}  src={info.GetFullUrl()}");
+            _log?.Info($"[CameraStreamHub] CreateEntry VLC  cameraId={cameraId}  src={MaskUrl(info.GetFullUrl())}");
             var libVlc = LibVLCInitializer.InitializeForHub(_setupModel);
             var entry = await CameraStreamEntry.CreateAsync(cameraId, info, libVlc, _gracePeriod, ct)
                 .ConfigureAwait(false);
@@ -119,7 +131,7 @@ public sealed class CameraStreamHub : ISharedCameraStreamHub, IDisposable
         else
         {
             // 테스트/레거시 경로: 메타데이터 전용 (동기, VLC 없음)
-            _log?.Info($"[CameraStreamHub] CreateEntry metadata  cameraId={cameraId}  src={info.GetFullUrl()}");
+            _log?.Info($"[CameraStreamHub] CreateEntry metadata  cameraId={cameraId}  src={MaskUrl(info.GetFullUrl())}");
             var entry = new CameraStreamEntry(cameraId, _gracePeriod) { ConnectionInfo = info };
             entry.MarkActive(info.GetFullUrl());
             return entry;

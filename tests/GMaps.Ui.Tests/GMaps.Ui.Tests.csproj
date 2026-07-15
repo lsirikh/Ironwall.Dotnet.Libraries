@@ -23,6 +23,8 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\CameraAimMath.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Services\Tracking\CameraAimRequestBuilder.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.Messages\Dto\Brokers\CameraAimLocationBodyDto.cs" />
+    <!-- 카메라 스트림 공유 키(A/B 동일영상 병합 버그 회귀 방지) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.Streaming.Base\Models\RtspCameraKey.cs" />
   </ItemGroup>
 
   <ItemGroup>

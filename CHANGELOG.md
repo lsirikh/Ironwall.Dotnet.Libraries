@@ -40,6 +40,10 @@
 - **`group_device`(deprecated 단일 그룹) 죽은 코드 정리** (태그 `before-remove-group-device` · Devices.Api/Ui) — `device_groups`(N:N EventMapping) 전환으로 deprecated된 `group_device`의 잔재 제거. `IDeviceApiService`/`DeviceApiService` 6개 조회 메서드의 **미사용 쿼리 필터 파라미터** `int? groupDevice` + XML doc + `MockDeviceApiService` 시그니처 정합. **DTO/Model엔 이미 프로퍼티 없음**(전환 완료·제거 대상 없음). 호출자 30곳 전부 named-arg/무인자라 무영향(빌드 검증: Devices.Api/Ui 0오류). 메인 솔루션 참조 0. (Messages/Tests 하위호환 JSON 픽스처는 유지 — 구서버 group_device 수신 시 무시됨을 검증.)
 
 ### Fixed
+- **카메라 팝업 A/B 동일 영상 버그 — 스트림 공유 키의 쿼리스트링 누락 수정** ([분석](docs/analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) · 태그 `before-camerakey-query-fix` · Streaming(.Base))
+  - **근본원인**: `RtspConnectionInfo.GetCameraKey()`가 쿼리를 버리고 `host:port/path`만 키로 사용 → `?channel=`류로만 구분되는 서로 다른 카메라가 Hub(및 폴백 SharedSession) **같은 디코더로 병합** → 두 팝업이 같은 WriteableBitmap 공유(먼저 연 쪽 영상이 둘 다 표시).
+  - **수정**: 키 파생을 순수 헬퍼 `RtspCameraKey.Derive`로 추출(테스트 소스링크)하고 **쿼리 포함**(`host:port/path[?query]`, 자격증명만 제외 — 무쿼리 URL 키는 기존 포맷 그대로라 회귀 0) + Hub `AcquireAsync`에 **키 동일·URL 상이 경고 로그**(데이터 중복 K2 즉시 가시화, 마스킹) + `CreateEntry` 로그 자격증명 평문 노출 마스킹(보안).
+  - **검증**: 신규 단위 `RtspCameraKeyTests` 6/6 포함 GMaps.Ui.Tests **180/180** · Streaming/GMaps.Ui 빌드 0오류. ⚠앱 재빌드 후 실카메라 A/B 동시 오픈 런타임 검증.
 - **GIS NATS Stage 0 — PTZ_STATUS 수신 복구 + ACTION_REPORT device_groups/geolocation + DETECT frame 필드** ([PRD](docs/prds/GIS_Nats_Full_Integration-prd.md) · [검증](docs/analyses/GIS_Nats_Simulation_Verification.md) · 태그 `before-gis-nats-stage0` · Events.Ui/Messages)
   - **배경**: GIS.md v1.5(REST v4.6) 스펙 대비 26개 NATS 메시지 **225 시나리오 전수 시뮬 검증**(SIM 발행/이벤트/상태/SYNC/REQ-RSP) → 활성 21중 🔴11 결함. Stage 0=긴급·라이브러리 한정 4건(통합 PRD 6단계 중 1단계).
   - **FR-01 PTZ_STATUS subject 복구(🔴 실운용 전면 미수신)**: `CameraPtzNatsSyncService`가 구 subject `nvr_manager.ptz-status`만 필터 → 스펙 v1.5 subject `gis.ptz-status`(§3.6)로 오는 메시지를 **전량 드롭**했음(형제 `TrackingStatusNatsSyncService`가 `gis.tracking-status`로 정상 동작 → 브로커가 `gis.*` 전달함이 지상 증명). **두 subject 병행 수용**(`IsPtzStatusSubject` 추출)으로 서버 버전 무관 무회귀 복구.
