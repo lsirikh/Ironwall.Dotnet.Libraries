@@ -200,31 +200,31 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 new PropertyMetadata(1.0, OnMarkerStrokeThicknessChanged));
 
         /// <summary>
-        /// Shape 표시 여부
+        /// Shape 표시 여부 — bool?(3상태): null=그룹 Pending(값 서로 다름, indeterminate 표시).
         /// </summary>
-        public bool ShowShape
+        public bool? ShowShape
         {
-            get { return (bool)GetValue(ShowShapeProperty); }
+            get { return (bool?)GetValue(ShowShapeProperty); }
             set { SetValue(ShowShapeProperty, value); }
         }
 
         public static readonly DependencyProperty ShowShapeProperty =
-            DependencyProperty.Register("ShowShape", typeof(bool),
+            DependencyProperty.Register("ShowShape", typeof(bool?),
                 typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(true, OnShowShapeChanged));
 
         /// <summary>
-        /// 제목 표시 여부
+        /// 제목 표시 여부 — bool?(3상태): null=그룹 Pending(값 서로 다름, indeterminate 표시).
         /// </summary>
-        public bool ShowTitle
+        public bool? ShowTitle
         {
-            get { return (bool)GetValue(ShowTitleProperty); }
+            get { return (bool?)GetValue(ShowTitleProperty); }
             set { SetValue(ShowTitleProperty, value); }
         }
 
 
         public static readonly DependencyProperty ShowTitleProperty =
-            DependencyProperty.Register("ShowTitle", typeof(bool),
+            DependencyProperty.Register("ShowTitle", typeof(bool?),
                 typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(false, OnShowTitleChanged));
 
@@ -672,8 +672,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                if (!control.IsGroupMode) control.SelectedMarker.ShowShape = (bool)e.NewValue;
-                control.OnMarkerPropertyChanged("ShowShape", e.OldValue, e.NewValue);
+                if (e.NewValue is not bool nsShape) return;   // null=그룹 Pending(indeterminate) — 마커 미전파
+                if (!control.IsGroupMode) control.SelectedMarker.ShowShape = nsShape;
+                control.OnMarkerPropertyChanged("ShowShape", e.OldValue, nsShape);
             }
         }
 
@@ -681,8 +682,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                if (!control.IsGroupMode) control.SelectedMarker.ShowTitle = (bool)e.NewValue;
-                control.OnMarkerPropertyChanged("ShowTitle", e.OldValue, e.NewValue);
+                if (e.NewValue is not bool nsTitle) return;   // null=그룹 Pending(indeterminate) — 마커 미전파
+                if (!control.IsGroupMode) control.SelectedMarker.ShowTitle = nsTitle;
+                control.OnMarkerPropertyChanged("ShowTitle", e.OldValue, nsTitle);
             }
         }
 
@@ -803,6 +805,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         /// <summary>그룹 선택(≥2) 시 대상 마커 집합. null/1개=단일 모드(기존 동작).</summary>
         public System.Collections.Generic.IReadOnlyList<IEditableMarker>? GroupMarkers { get; private set; }
 
+        /// <summary>그룹 편집 모드 여부(XAML 트리거용 — 예: 디바이스 연결 콤보 비활성).</summary>
+        public bool IsGroupEditing
+        {
+            get => (bool)GetValue(IsGroupEditingProperty);
+            set => SetValue(IsGroupEditingProperty, value);
+        }
+        public static readonly DependencyProperty IsGroupEditingProperty =
+            DependencyProperty.Register(nameof(IsGroupEditing), typeof(bool),
+                typeof(GMapPropertyBaseControl), new PropertyMetadata(false));
+
         /// <summary>그룹 편집 모드 여부 — 콜백의 대표마커 직접쓰기 억제 게이트(VM이 전원 일괄 적용).</summary>
         protected bool IsGroupMode => GroupMarkers is { Count: >= 2 };
 
@@ -816,16 +828,24 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (markers == null || markers.Count < 2) return;
             GroupMarkers = markers;
+            IsGroupEditing = true;
 
             _isInitializing = true;
             try
             {
                 ClearAllBindings();                 // DP가 기본값으로 리셋됨 → 아래서 전 필드 재구성
                 ApplyGroupPendingBlanks();
-                if (SelectedMarker != null)
-                    SetupSpecificPropertiesFromMarker(SelectedMarker);   // 특화 필드는 대표값 표시(대표 전용 편집)
+                ApplyGroupPendingSpecific();        // 특화 필드 — 기본=대표값, 타입 패널이 override로 Pending 확장(PIDS 등)
             }
             finally { _isInitializing = false; }
+        }
+
+        /// <summary>그룹 모드의 특화 필드 구성 — 기본: 대표 마커 값 표시(대표 전용 편집).
+        /// 타입 패널(PIDS 등)이 override하여 "동일=값/다름=Pending"으로 확장.</summary>
+        protected virtual void ApplyGroupPendingSpecific()
+        {
+            if (SelectedMarker != null)
+                SetupSpecificPropertiesFromMarker(SelectedMarker);
         }
 
         /// <summary>공통 필드별로 그룹 전원 값 비교 → 동일=그 값, 다름=Pending sentinel 세팅.</summary>
@@ -843,10 +863,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             MarkerStrokeThickness = AllEqual("StrokeThickness", out var st) ? ToD(st) : MIXED_DOUBLE;
             MarkerFillColor = AllEqual("FillColor", out var fc) && fc is EnumColorType f ? f : MIXED_COLOR;
             MarkerStrokeColor = AllEqual("StrokeColor", out var sc) && sc is EnumColorType s ? s : MIXED_COLOR;
-            // bool(모양/제목 표시)은 3상태 미지원 → 대표값 표시(변경 시엔 전원 일괄 적용됨)
-            var rep = SelectedMarker ?? g[0];
-            ShowShape = rep.ShowShape;
-            ShowTitle = rep.ShowTitle;
+            // bool(모양/제목 표시) 3상태: 다르면 null(indeterminate) — 클릭 시 true부터 순환(전원 적용)
+            ShowShape = AllEqual("ShowShape", out var ss) && ss is bool sb ? sb : (bool?)null;
+            ShowTitle = AllEqual("ShowTitle", out var stt) && stt is bool tb ? tb : (bool?)null;
 
             static double ToD(object? v) => v is double d ? d : MIXED_DOUBLE;
         }

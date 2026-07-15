@@ -7266,6 +7266,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (targets.Count == 0) return;
 
         // Pending sentinel 방어 — 정상 경로에선 미발생(패널 초기화 중 이벤트 억제)이나 값 오염 백스톱.
+        if (e.NewValue is null) return;
         if (e.NewValue is double nd && double.IsNaN(nd)) return;
         if (e.NewValue is Ironwall.Dotnet.Libraries.Enums.EnumColorType nc && (int)nc < 0) return;
 

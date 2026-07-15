@@ -129,7 +129,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             {
                 pidsMarker.LinkedDeviceId = this.LinkedDeviceId;
                 pidsMarker.LinkedDevice = this.LinkedDevice;
-                pidsMarker.ShowFOV = this.ShowFOV;
+                pidsMarker.ShowFOV = this.ShowFOV ?? pidsMarker.ShowFOV;   // null=그룹 Pending → 미변경
                 pidsMarker.FOVColor = this.FOVColor;
                 pidsMarker.FOVOpacity = this.FOVOpacity;
 
@@ -144,6 +144,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public override Type GetSupportedMarkerType()
         {
             return typeof(GMapPropertyPidsControl);
+        }
+
+        /// <summary>그룹 Pending — PIDS 특화 필드도 "전원 동일=값 / 다름=빈칸(3상태)"(기능 ② 확장).
+        /// 디바이스 연결은 심볼별 고유라 대표값 표시+비활성(IsGroupEditing 트리거).</summary>
+        protected override void ApplyGroupPendingSpecific()
+        {
+            var pids = GroupMarkers!.OfType<IPidsEditableMarker>().ToList();
+            if (pids.Count < 2) { base.ApplyGroupPendingSpecific(); return; }
+            var rep = (SelectedMarker as IPidsEditableMarker) ?? pids[0];
+
+            // 디바이스 연결: 대표값 표시(편집은 비활성 — PidsPropertyStyle DataTrigger)
+            LinkedDeviceId = rep.LinkedDeviceId;
+            LinkedDevice = rep.LinkedDevice;
+
+            ShowFOV = AllEq(pids, p => p.ShowFOV) ? rep.ShowFOV : (bool?)null;
+            FOVColor = AllEq(pids, p => p.FOVColor) ? rep.FOVColor : MIXED_COLOR;
+            FOVOpacity = AllEq(pids, p => p.FOVOpacity) ? rep.FOVOpacity : MIXED_DOUBLE;
+            BaseBearing = AllEq(pids, p => p.BaseBearing) ? rep.BaseBearing : MIXED_DOUBLE;
+            DetectionRange = AllEq(pids, p => p.DetectionRange) ? rep.DetectionRange : MIXED_DOUBLE;
+            DetectionAngle = AllEq(pids, p => p.DetectionAngle) ? rep.DetectionAngle : MIXED_DOUBLE;
+            DetectionBearing = AllEq(pids, p => p.DetectionBearing) ? rep.DetectionBearing : MIXED_DOUBLE;
+
+            static bool AllEq<T>(List<IPidsEditableMarker> list, Func<IPidsEditableMarker, T> sel)
+            {
+                var first = sel(list[0]);
+                for (int i = 1; i < list.Count; i++)
+                    if (!EqualityComparer<T>.Default.Equals(first, sel(list[i]))) return false;
+                return true;
+            }
         }
 
         #endregion
@@ -250,16 +279,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 new PropertyMetadata(0.0, OnBaseBearingChanged, CoerceDoubleValue));
 
         /// <summary>
-        /// FOV 표시 여부
+        /// FOV 표시 여부 — bool?(3상태): null=그룹 Pending(값 서로 다름, indeterminate 표시).
         /// </summary>
-        public bool ShowFOV
+        public bool? ShowFOV
         {
-            get { return (bool)GetValue(ShowFOVProperty); }
+            get { return (bool?)GetValue(ShowFOVProperty); }
             set { SetValue(ShowFOVProperty, value); }
         }
 
         public static readonly DependencyProperty ShowFOVProperty =
-            DependencyProperty.Register("ShowFOV", typeof(bool),
+            DependencyProperty.Register("ShowFOV", typeof(bool?),
                 typeof(GMapPropertyPidsControl),
                 new PropertyMetadata(false, OnShowFOVChanged));
 
@@ -303,6 +332,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
+                if (control.IsGroupMode) return;   // 그룹 편집: 디바이스 연결은 심볼별 고유 → 변경 금지(콤보 비활성)
                 pidsMarker.LinkedDeviceId = (int)e.NewValue;
                 // 주의: OnMarkerPropertyChanged 호출하지 않음
                 // LinkedDevice 변경 시 LinkedDeviceId가 자동 동기화되므로,
@@ -319,6 +349,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
+                if (control.IsGroupMode) return;   // 그룹 편집: 디바이스 연결은 심볼별 고유 → 변경 금지(콤보 비활성)
                 pidsMarker.LinkedDevice = (IBaseDeviceModel?)e.NewValue;
                 control.OnMarkerPropertyChanged("LinkedDevice", e.OldValue, e.NewValue);
             }
@@ -334,8 +365,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                // DetectionRange는 런타임 전용 (DB 저장 안 함)
-                pidsMarker.DetectionRange = (double)e.NewValue;
+                // DetectionRange는 런타임 전용 (DB 저장 안 함). 그룹=전원 직접 반영(무DB·무undo — 단일과 동일 의미).
+                if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel
+                if (control.IsGroupMode)
+                    foreach (var gm in control.GroupMarkers!.OfType<IPidsEditableMarker>()) gm.DetectionRange = (double)e.NewValue;
+                else pidsMarker.DetectionRange = (double)e.NewValue;
                 // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
             }
         }
@@ -348,8 +382,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                // DetectionAngle은 런타임 전용 (DB 저장 안 함)
-                pidsMarker.DetectionAngle = (double)e.NewValue;
+                // DetectionAngle은 런타임 전용 (DB 저장 안 함). 그룹=전원 직접 반영.
+                if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel
+                if (control.IsGroupMode)
+                    foreach (var gm in control.GroupMarkers!.OfType<IPidsEditableMarker>()) gm.DetectionAngle = (double)e.NewValue;
+                else pidsMarker.DetectionAngle = (double)e.NewValue;
                 // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
             }
         }
@@ -362,8 +399,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                // DetectionBearing은 런타임 전용 (DB 저장 안 함)
-                pidsMarker.DetectionBearing = (double)e.NewValue;
+                // DetectionBearing은 런타임 전용 (DB 저장 안 함). 그룹=전원 직접 반영.
+                if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel
+                if (control.IsGroupMode)
+                    foreach (var gm in control.GroupMarkers!.OfType<IPidsEditableMarker>()) gm.DetectionBearing = (double)e.NewValue;
+                else pidsMarker.DetectionBearing = (double)e.NewValue;
                 // OnMarkerPropertyChanged 호출 안 함 (DB UPDATE 트리거 방지)
             }
         }
@@ -376,7 +416,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsMarker.BaseBearing = (double)e.NewValue;
+                if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel — 미전파
+                if (!control.IsGroupMode) pidsMarker.BaseBearing = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("BaseBearing", e.OldValue, e.NewValue);
             }
         }
@@ -389,8 +430,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsMarker.ShowFOV = (bool)e.NewValue;
-                control.OnMarkerPropertyChanged("ShowFOV", e.OldValue, e.NewValue);
+                if (e.NewValue is not bool nsFov) return;   // null=그룹 Pending(indeterminate) — 마커 미전파
+                if (!control.IsGroupMode) pidsMarker.ShowFOV = nsFov;   // 그룹=VM이 전원 일괄 적용
+                control.OnMarkerPropertyChanged("ShowFOV", e.OldValue, nsFov);
             }
         }
 
@@ -402,7 +444,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsMarker.FOVColor = (EnumColorType)e.NewValue;
+                if ((int)(EnumColorType)e.NewValue < 0) return;   // 그룹 Pending sentinel — 미전파
+                if (!control.IsGroupMode) pidsMarker.FOVColor = (EnumColorType)e.NewValue;
                 control.OnMarkerPropertyChanged("FOVColor", e.OldValue, e.NewValue);
             }
         }
@@ -415,7 +458,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 control.SelectedMarker is IPidsEditableMarker pidsMarker &&
                 !control._isInitializing && !control._isClearingBindings)
             {
-                pidsMarker.FOVOpacity = (double)e.NewValue;
+                if (double.IsNaN((double)e.NewValue)) return;   // 그룹 Pending sentinel — 미전파
+                if (!control.IsGroupMode) pidsMarker.FOVOpacity = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("FOVOpacity", e.OldValue, e.NewValue);
             }
         }

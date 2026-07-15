@@ -44,6 +44,11 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "FillColor": m.FillColor = ToEnum<EnumColorType>(v); break;
             case "StrokeColor": m.StrokeColor = ToEnum<EnumColorType>(v); break;
             case "OperationState": m.OperationState = ToEnum<EnumOperationState>(v); break;
+            // PIDS 특화(그룹 일괄편집 + undo replay, 기능 ② 확장) — 비PIDS 마커엔 무시
+            case "ShowFOV": if (m is IPidsEditableMarker pFov) pFov.ShowFOV = ToB(v); break;
+            case "FOVColor": if (m is IPidsEditableMarker pFc) pFc.FOVColor = ToEnum<EnumColorType>(v); break;
+            case "FOVOpacity": if (m is IPidsEditableMarker pFo) pFo.FOVOpacity = ToD(v); break;
+            case "BaseBearing": if (m is IPidsEditableMarker pBb) pBb.BaseBearing = ToD(v); break;
         }
     }
 
@@ -68,6 +73,10 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "FillColor" => m.FillColor,
         "StrokeColor" => m.StrokeColor,
         "OperationState" => m.OperationState,
+        "ShowFOV" => m is IPidsEditableMarker pFov ? pFov.ShowFOV : null,
+        "FOVColor" => m is IPidsEditableMarker pFc ? pFc.FOVColor : null,
+        "FOVOpacity" => m is IPidsEditableMarker pFo ? pFo.FOVOpacity : null,
+        "BaseBearing" => m is IPidsEditableMarker pBb ? pBb.BaseBearing : null,
         _ => null,
     };
 
@@ -78,7 +87,8 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "Title" or "TitleSize" or "Bearing" or "Width" or "Height" or "Zoom"
         or "StrokeThickness" or "LabelOffsetX" or "LabelOffsetY" or "ZOrder"
         or "Opacity" or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
-        or "StrokeColor" or "OperationState" => true,
+        or "StrokeColor" or "OperationState"
+        or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" => true,
         _ => false,
     };
 

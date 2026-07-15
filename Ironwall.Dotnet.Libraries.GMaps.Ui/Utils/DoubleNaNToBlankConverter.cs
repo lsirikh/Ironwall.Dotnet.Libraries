@@ -18,13 +18,17 @@ public class DoubleNaNToBlankConverter : IValueConverter
     /// <summary>숫자 포맷(예: "F0"). 비면 기본 ToString.</summary>
     public string Format { get; set; } = string.Empty;
 
+    /// <summary>값 뒤에 붙일 단위(예: "m", "°"). NaN(Pending)일 땐 미부착.</summary>
+    public string Suffix { get; set; } = string.Empty;
+
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         double d = value is double dv ? dv : double.NaN;
         if (targetType == typeof(string))
         {
             if (double.IsNaN(d)) return BlankText;
-            return string.IsNullOrEmpty(Format) ? d.ToString(culture) : d.ToString(Format, culture);
+            var s = string.IsNullOrEmpty(Format) ? d.ToString(culture) : d.ToString(Format, culture);
+            return s + Suffix;
         }
         // double 타깃(Slider.Value 등): NaN은 RangeBase 검증에 거부되므로 0.0으로 파킹(표시값은 문자열 쪽이 담당)
         return double.IsNaN(d) ? 0.0 : d;
