@@ -94,9 +94,10 @@ public sealed class CameraStreamHub : ISharedCameraStreamHub, IDisposable
         // 진단(F2): 키 재사용인데 URL이 다르면 — 두 장비의 URL이 같은 키로 병합된 상황이다
         // (키 결함 또는 장비 URL 데이터 중복). 먼저 연 스트림이 표시되므로 "다른 카메라인데
         // 같은 영상" 증상의 1차 단서로 즉시 가시화한다(자격증명 마스킹, 재생 URL은 엔트리 원본 유지).
+        // ※비교는 마스킹본으로 — 자격증명만 다른 동일 스트림 공유(by-design)는 오탐하지 않는다(감사 L10).
         var entryUrl = entry.ConnectionInfo?.GetFullUrl();
         var requestUrl = info.GetFullUrl();
-        if (!string.IsNullOrEmpty(entryUrl) && !string.Equals(entryUrl, requestUrl, StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(entryUrl) && !string.Equals(MaskUrl(entryUrl), MaskUrl(requestUrl), StringComparison.Ordinal))
             _log?.Warning($"[CameraStreamHub] 키 동일·URL 상이 — 기존 엔트리 재사용(기존 스트림 표시). cameraId={request.CameraId}  entryUrl={MaskUrl(entryUrl)}  requestUrl={MaskUrl(requestUrl)}");
 
         // _leaseToCamera 등록을 AddRef() 전에 수행 — SweepDeadLeases 원자성 보장
