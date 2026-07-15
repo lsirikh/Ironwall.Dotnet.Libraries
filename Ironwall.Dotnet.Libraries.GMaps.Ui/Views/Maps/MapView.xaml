@@ -221,7 +221,7 @@
 					Tag="{Binding CpuLevel}"
 					ToolTip="{Binding CpuTooltip}">
 					<StackPanel Orientation="Horizontal">
-						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="Cpu32Bit" />
+						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="Chip" />
 						<TextBlock Style="{StaticResource SysResChipText}" Text="{Binding CpuText}" />
 					</StackPanel>
 				</Border>
@@ -239,7 +239,7 @@
 					Tag="{Binding RamLevel}"
 					ToolTip="{Binding RamTooltip}">
 					<StackPanel Orientation="Horizontal">
-						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="Memory" />
+						<md:PackIcon Style="{StaticResource SysResChipIcon}" Kind="ExpansionCardVariant" />
 						<TextBlock Style="{StaticResource SysResChipText}" Text="{Binding RamText}" />
 					</StackPanel>
 				</Border>
