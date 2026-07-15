@@ -26,7 +26,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority (URL조회/Onvif조회 토글) | Draft | 2026-07-15 |
+| [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority (URL조회/Onvif조회 토글) | Approved | 2026-07-15 |
 | [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator (CPU/GPU/RAM 툴바 지표) | Draft | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
 | [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | Draft | 2026-07-13 |
@@ -153,6 +153,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [CameraPopup_RtspSource_Priority-prd-plan.md](plans/CameraPopup_RtspSource_Priority-prd-plan.md) | [PRD](prds/CameraPopup_RtspSource_Priority-prd.md) | 17/20 | 2026-07-15 |
 | [GMap_SystemResource_Indicator-prd-plan.md](plans/GMap_SystemResource_Indicator-prd-plan.md) | [PRD](prds/GMap_SystemResource_Indicator-prd.md) | 28/33 | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd-plan.md](plans/LineArea_Symbol_Resize-prd-plan.md) | [PRD](prds/LineArea_Symbol_Resize-prd.md) | 0/26 | 2026-07-13 |
 | [GMap_Zoom_Anchor_Home-prd-plan.md](plans/GMap_Zoom_Anchor_Home-prd-plan.md) | [PRD](prds/GMap_Zoom_Anchor_Home-prd.md) | 6/40 | 2026-07-13 |

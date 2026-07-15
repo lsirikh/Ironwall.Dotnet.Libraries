@@ -452,6 +452,10 @@ public class ImprovedRtspPlayer : Control, IDisposable
             ct);
     }
 
+    /// <summary>로그용 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host). security.md — 자격증명 로그 금지.</summary>
+    private static string MaskUrlCredentials(string? url)
+        => System.Text.RegularExpressions.Regex.Replace(url ?? string.Empty, @"//[^/@\s]+@", "//***@");
+
     private async Task ConnectViaHubAsync(CameraViewModel vm)
     {
         if (ConnectionInfo == null) return;
@@ -462,7 +466,8 @@ public class ImprovedRtspPlayer : Control, IDisposable
         var streamOpts = StreamingOptions;
         var cameraId = connInfo.GetCameraKey();
 
-        _log?.Info($"[Player][HubPath] START  contextId={_cachedContextId}  src={connInfo.GetFullUrl()}");
+        // 감사(security-H): URL에 자격증명이 임베드될 수 있음(Onvif조회 조합 URL은 항상) → 마스킹 필수(security.md).
+        _log?.Info($"[Player][HubPath] START  contextId={_cachedContextId}  src={MaskUrlCredentials(connInfo.GetFullUrl())}");
 
         await Dispatcher.InvokeAsync(() =>
         {

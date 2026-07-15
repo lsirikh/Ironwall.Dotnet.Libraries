@@ -59,11 +59,18 @@ public partial class MapViewModel
                         Username = cam.UserName,
                         Password = cam.UserPassword,
                     };
-                    resolvedUri = await ptz.ResolveStreamUriAsync(vm.CameraId, conn, preferSub: true, cts.Token).ConfigureAwait(false);
+                    // 감사(perf-M): async 메서드의 첫 yield 전 동기 구간(ONVIF WCF 채널팩토리 생성 등)이
+                    // UI 스레드(발사점)에서 돌지 않도록 스레드풀로 오프로드 — 팝업 첫 렌더 지연 방지.
+                    resolvedUri = await Task.Run(
+                        () => ptz.ResolveStreamUriAsync(vm.CameraId, conn, preferSub: true, cts.Token)).ConfigureAwait(false);
                 }
                 finally
                 {
-                    _onvifResolveCts.TryRemove(vm.CameraId, out _);
+                    // 감사(concurrency-M): key-only TryRemove는 "닫기→빠른 재열기" 경합에서 새 조회의 CTS를
+                    // 오제거해 닫힘-취소 배선(M-6)을 무력화한다(옛 resolve의 finally가 WCF 타임아웃까지 지연 가능)
+                    // → 내 인스턴스일 때만 제거(값-조건부, CameraStreamHub.cs의 KVP TryRemove 패턴과 동일).
+                    _onvifResolveCts.TryRemove(
+                        new System.Collections.Generic.KeyValuePair<int, CancellationTokenSource>(vm.CameraId, cts));
                     cts.Dispose();   // Close 경로가 먼저 제거·Dispose했어도 CTS.Dispose는 멱등
                 }
             }
@@ -112,6 +119,10 @@ public partial class MapViewModel
                 return;
             }
             vm.ConnectionInfo = final;   // 세터가 StreamVm 동기 + PropertyChanged → 템플릿 바인딩 → 플레이어 late-bind 연결(FR-05)
+            // 감사(scenario-M): 자동해제 타이머는 "연결 시작" 시점부터 카운트 — 조회가 길어져(타임아웃 CTS가
+            // in-flight SOAP을 못 끊는 최악 ~수십 초) 타이머(TimeoutSeconds)가 조회 중 만료되면 폴백 재생도
+            // 못 보고 닫히는 경계(S6/S8) 방지. 오픈 시점 시작은 Onvif 모드에서 생략됨(OpenCameraStreamPopupAsync).
+            StartOrResetAutoCloseTimer(vm);
         }).ConfigureAwait(false);
     }
 }

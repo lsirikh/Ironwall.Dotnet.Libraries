@@ -49,8 +49,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         #region - IHanldes -
         #endregion
         #region - Properties -
-        public string? IdUser { get; set; } 
+        public string? IdUser { get; set; }
         public string? Contents { get; set; }
+        /// <summary>
+        /// 이 카드가 참조하는 장비. <b>null 가능</b> — 장비가 삭제(SYNC_DEVICE DELETED)되면
+        /// 이벤트 모델의 Device 참조가 끊길 수 있다(FR-D4). EQM은 장비 삭제 시 해당 심볼 엔트리를
+        /// 자동 정리하지만, 조치보고 전까지 카드 자체는 리스트에 잔류할 수 있으므로 파생 게터
+        /// (ControllerId/DeviceTypeName/DeviceGroupsText 등)는 모두 null-safe(?. + 가드)로 유지한다.
+        /// </summary>
         public IBaseDeviceModel? Device => _model.Device;
         public EnumTrueFalse Status => _model.Status;
         public EnumEventType MessageType => _model.MessageType;

@@ -287,7 +287,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 var url = connectionInfo!.GetFullUrl();
                 if (!RtspUrlValidator.IsValidUrl(url))
                 {
-                    _log?.Error($"[ImprovedRtspStreamingService] Invalid RTSP URL: {url}");
+                    _log?.Error($"[ImprovedRtspStreamingService] Invalid RTSP URL: {MaskUrlCredentials(url)}");
                     await CleanupContextAsync(contextId);
                     OnErrorOccurred(contextId, "Invalid RTSP URL", ErrorSeverity.Error);
                     return false;
@@ -358,7 +358,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
                 var url = connectionInfo!.GetFullUrl();
                 if (!RtspUrlValidator.IsValidUrl(url))
                 {
-                    _log?.Error($"[ImprovedRtspStreamingService] Invalid RTSP URL: {url}");
+                    _log?.Error($"[ImprovedRtspStreamingService] Invalid RTSP URL: {MaskUrlCredentials(url)}");
                     await CleanupContextAsync(contextId);
                     OnErrorOccurred(contextId, "Invalid RTSP URL", ErrorSeverity.Error);
                     return false;
@@ -488,7 +488,7 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
             }
 
             // 재생 시작 (백그라운드 스레드 OK)
-            _log?.Info($"[Service] MediaPlayer.Play() contextId={contextId}  url={url}");
+            _log?.Info($"[Service] MediaPlayer.Play() contextId={contextId}  url={MaskUrlCredentials(url)}");
             var result = context.MediaPlayer.Play();
             _log?.Info($"[Service] MediaPlayer.Play() result={result}  contextId={contextId}");
 
@@ -2053,6 +2053,11 @@ public class ImprovedRtspStreamingService : IPlayerRegistry, IImprovedRtspStream
         if (info == null) return string.Empty;
         return info.GetCameraKey();
     }
+
+    /// <summary>로그용 자격증명 마스킹(rtsp://user:pass@host → rtsp://***@host). security.md — 자격증명 로그 금지.
+    /// Onvif조회 모드(CameraPopup_RtspSource_Priority)는 조합 URL에 자격증명이 항상 임베드되므로 필수(감사 security-M).</summary>
+    private static string MaskUrlCredentials(string? url)
+        => System.Text.RegularExpressions.Regex.Replace(url ?? string.Empty, @"//[^/@\s]+@", "//***@");
 
     #endregion
 }

@@ -99,6 +99,14 @@ public sealed class PtzController : IPtzController
                         _log?.Warning($"[PTZ] ONVIF 초기화 실패 cam={cameraId} — 연결/인증 실패(포트/계정 확인). 워밍 안 함(재시도 허용).");
                         return false;
                     }
+                    // 감사(scenario-H): 인증/포트 실패에도 빌더가 "클라이언트 전무" 모델을 non-null로 반환할 수 있어
+                    // 그대로 캐시하면 실패가 세션 내내 고착(재시도 분기 데드코드화 — PTZ/Imaging/StreamUri 전부 불능).
+                    // 3개 클라이언트가 전부 null이면 연결 실패로 간주해 캐시하지 않는다(재시도 허용).
+                    if (model.PtzClient == null && model.MediaClient == null && model.ImagingClient == null)
+                    {
+                        _log?.Warning($"[PTZ] ONVIF 초기화 부분실패 cam={cameraId} — 클라이언트 전무(인증/포트 실패 추정). 워밍 안 함(재시도 허용).");
+                        return false;
+                    }
                     // 모델이 살아있으면 PTZ 미지원(고정 카메라)이라도 인스턴스를 캐시 유지(워밍).
                     // 고정 카메라도 ONVIF Imaging(주야간/포커스)을 제공하며, 재오픈마다 ~31초 재초기화를 막는다.
                     ctx.Model = model;
@@ -400,6 +408,18 @@ public sealed class PtzController : IPtzController
     public async Task<string?> ResolveStreamUriAsync(int cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default)
     {
         if (conn == null) return null;
+        // 캐시 fast-path(감사 perf-L6): 워밍된 재오픈은 EnsureReady 전체 재수행(Gate 2회+비PTZ 경고 로그) 없이
+        // Gate 1회로 즉시 반환. 캐시는 Resolve 성공 시에만 채워지고 Release 시 CamCtx째 사라지므로 안전.
+        if (_ctx.TryGetValue(cameraId, out var cached))
+        {
+            await cached.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (cached.ResolvedStreamUri != null && cached.ResolvedPreferSub == preferSub)
+                    return cached.ResolvedStreamUri;
+            }
+            finally { cached.Gate.Release(); }
+        }
         // 모델 확보 — InitializePtz 워밍 재사용(이중 초기화 0). PTZ capable 여부와 무관하게
         // MediaClient/Profiles만 있으면 조회 가능(비PTZ 고정 카메라 포함).
         // 오픈 시 EnsurePtzReadyAsync(PTZ 준비)와 동시 호출될 수 있음(H-2) — 같은 Gate로 직렬화되어

@@ -2130,7 +2130,10 @@ public partial class MapViewModel : BasePanelViewModel,
             CameraPopups.Add(vm);
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
             BringCameraPopupToFront(vm);       // 새 팝업 최상위(ZIndex)
-            StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
+            // 자동해제 타이머(IsAutoDiscard ON 시): Onvif조회 모드는 "연결 시작"(주입/폴백) 시점에 시작 —
+            // 조회가 길어져 타이머가 조회 중 만료돼 폴백 재생도 못 보고 닫히는 경계(S6/S8) 방지(감사 scenario-M).
+            if (!resolveViaOnvif)
+                StartOrResetAutoCloseTimer(vm);
 
             // Onvif조회 모드(FR-05/06): 팝업은 즉시 열고 URL은 비동기 확보 → late-bind 연결. 수동 URL(connInfo)은 폴백.
             if (resolveViaOnvif)

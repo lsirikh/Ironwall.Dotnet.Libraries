@@ -937,7 +937,15 @@ public class DeviceProviderService : IDeviceProviderService
     {
         // 공통 속성 업데이트
         existing.DeviceName = newDevice.DeviceName;
-        existing.DeviceGroups = newDevice.DeviceGroups;
+        // FR-D3: 리스트 참조 재할당 대신 in-place 갱신(기존 참조 유지) — DeviceGroups 참조를 잡고 있는
+        //   심볼/바인딩이 stale되지 않도록. newDevice.DeviceGroups==null이면 빈 목록으로 정리.
+        if (existing.DeviceGroups == null)
+            existing.DeviceGroups = newDevice.DeviceGroups == null ? null : new List<int>(newDevice.DeviceGroups);
+        else
+        {
+            existing.DeviceGroups.Clear();
+            if (newDevice.DeviceGroups != null) existing.DeviceGroups.AddRange(newDevice.DeviceGroups);
+        }
         existing.DeviceNumber = newDevice.DeviceNumber;
         existing.Status = newDevice.Status;
         existing.DeviceType = newDevice.DeviceType;
@@ -1032,6 +1040,9 @@ public class DeviceProviderService : IDeviceProviderService
                     && d.DeviceType.ToString().Equals(normalized, StringComparison.OrdinalIgnoreCase));
             if (device != null)
             {
+                // FR-D2: 제거 전 소속 그룹 스냅샷 확보 후 DeviceGroupProvider DeviceCount 감소(음수가드).
+                //   재조회(FetchDeviceGroupsAsync) 전까지 그룹 캐시 카운트가 stale(과대)되는 것 방지.
+                DecrementGroupCounts(device.DeviceGroups);
                 _deviceProvider.Remove(device);
                 _log?.Info($"RemoveDeviceByIdAsync: {normalized}({resourceId}) 제거 완료");
             }
@@ -1051,6 +1062,26 @@ public class DeviceProviderService : IDeviceProviderService
     /// NATS body의 type_device 문자열을 내부 타입명으로 정규화합니다.
     /// DBApi는 대문자("CAMERA")를 쓰고 API는 PascalCase("IpCamera")를 사용하므로 변환이 필요합니다.
     /// </summary>
+    /// <summary>
+    /// (FR-D2) 삭제된 device의 소속 그룹들의 DeviceCount를 1씩 감소(음수가드).
+    /// 서버 재조회 전까지 그룹 캐시 카운트가 과대표시되는 stale를 즉시 보정한다.
+    /// groupIds=null/빈 리스트면 no-op. 그룹 미발견 시 경고 로그 후 skip.
+    /// </summary>
+    private void DecrementGroupCounts(List<int>? groupIds)
+    {
+        if (groupIds == null || groupIds.Count == 0) return;
+        foreach (var gid in groupIds)
+        {
+            var group = _deviceGroupProvider.FirstOrDefault(g => g.Id == gid);
+            if (group == null)
+            {
+                _log?.Warning($"DecrementGroupCounts: DeviceGroup({gid}) 를 Provider에서 찾지 못함 — skip");
+                continue;
+            }
+            group.DeviceCount = Math.Max(0, group.DeviceCount - 1);
+        }
+    }
+
     private static string NormalizeTypeDevice(string typeDevice) =>
         typeDevice.ToUpperInvariant() switch
         {

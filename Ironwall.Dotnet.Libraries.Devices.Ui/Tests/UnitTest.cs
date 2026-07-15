@@ -666,6 +666,158 @@ public class DeviceProviderServiceTests
         Assert.Equal("제어기-1-NEW", controller.DeviceName);  // 제어기 업데이트됨
         Assert.NotNull(deviceProvider.OfType<SensorDeviceModel>().FirstOrDefault(d => d.Id == 1));  // 센서 유지
     }
+    #endregion
+
+    #region - FR-D2: DeviceGroup DeviceCount Sync on Delete -
+
+    /// <summary>
+    /// FR-D2: DELETED 수신(RemoveDeviceByIdAsync) 시 소속 DeviceGroup의 DeviceCount가 감소해야 한다.
+    /// 서버 재조회 전까지 그룹 캐시 카운트가 stale(과대)되는 것을 방지한다.
+    /// </summary>
+    [Fact]
+    public async Task should_decrement_devicegroup_count_when_device_deleted()
+    {
+        // Arrange
+        var deviceProvider = new DeviceProvider();
+        var groupProvider = new DeviceGroupProvider(new MockLogService());
+        groupProvider.Add(new DeviceGroupModel { Id = 5, Name = "A구역", DeviceCount = 3 });
+        deviceProvider.Add(new SensorDeviceModel
+        {
+            Id = 101,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceGroups = new List<int> { 5 }
+        });
+        var service = CreateDeviceProviderService(
+            new MockDeviceApiService(),
+            deviceProvider: deviceProvider,
+            deviceGroupProvider: groupProvider);
+
+        // Act
+        await service.RemoveDeviceByIdAsync("Fence", 101);
+
+        // Assert
+        Assert.Equal(2, groupProvider.First(g => g.Id == 5).DeviceCount);
+        Assert.Empty(deviceProvider);
+    }
+
+    /// <summary>
+    /// FR-D2: 그룹 DeviceCount가 이미 0이면 음수로 떨어지지 않고 0을 유지(음수 가드)해야 한다.
+    /// </summary>
+    [Fact]
+    public async Task should_not_go_negative_when_group_devicecount_already_zero()
+    {
+        // Arrange
+        var deviceProvider = new DeviceProvider();
+        var groupProvider = new DeviceGroupProvider(new MockLogService());
+        groupProvider.Add(new DeviceGroupModel { Id = 7, Name = "B구역", DeviceCount = 0 });
+        deviceProvider.Add(new SensorDeviceModel
+        {
+            Id = 202,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceGroups = new List<int> { 7 }
+        });
+        var service = CreateDeviceProviderService(
+            new MockDeviceApiService(),
+            deviceProvider: deviceProvider,
+            deviceGroupProvider: groupProvider);
+
+        // Act
+        await service.RemoveDeviceByIdAsync("Fence", 202);
+
+        // Assert
+        Assert.Equal(0, groupProvider.First(g => g.Id == 7).DeviceCount);
+    }
+
+    /// <summary>
+    /// FR-D2b: 다중 그룹 소속 장비 삭제 시 각 소속 그룹의 DeviceCount가 정확히 1씩 감소해야 한다.
+    /// </summary>
+    [Fact]
+    public async Task should_decrement_all_groups_when_device_belongs_to_multiple_groups()
+    {
+        // Arrange
+        var deviceProvider = new DeviceProvider();
+        var groupProvider = new DeviceGroupProvider(new MockLogService());
+        groupProvider.Add(new DeviceGroupModel { Id = 1, Name = "A구역", DeviceCount = 4 });
+        groupProvider.Add(new DeviceGroupModel { Id = 2, Name = "B구역", DeviceCount = 2 });
+        groupProvider.Add(new DeviceGroupModel { Id = 3, Name = "C구역", DeviceCount = 9 }); // 비소속 — 불변 검증
+        deviceProvider.Add(new SensorDeviceModel
+        {
+            Id = 303,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceGroups = new List<int> { 1, 2 }
+        });
+        var service = CreateDeviceProviderService(
+            new MockDeviceApiService(),
+            deviceProvider: deviceProvider,
+            deviceGroupProvider: groupProvider);
+
+        // Act
+        await service.RemoveDeviceByIdAsync("Fence", 303);
+
+        // Assert
+        Assert.Equal(3, groupProvider.First(g => g.Id == 1).DeviceCount);
+        Assert.Equal(1, groupProvider.First(g => g.Id == 2).DeviceCount);
+        Assert.Equal(9, groupProvider.First(g => g.Id == 3).DeviceCount); // 비소속 그룹은 불변
+    }
+
+    /// <summary>
+    /// FR-D2: 소속 그룹이 없는(빈 리스트) 장비 삭제 시 어떤 그룹 카운트도 변하지 않아야 한다(no-op).
+    /// </summary>
+    [Fact]
+    public async Task should_skip_count_decrement_when_device_has_no_groups()
+    {
+        // Arrange
+        var deviceProvider = new DeviceProvider();
+        var groupProvider = new DeviceGroupProvider(new MockLogService());
+        groupProvider.Add(new DeviceGroupModel { Id = 5, Name = "A구역", DeviceCount = 3 });
+        deviceProvider.Add(new SensorDeviceModel
+        {
+            Id = 404,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceGroups = new List<int>()
+        });
+        var service = CreateDeviceProviderService(
+            new MockDeviceApiService(),
+            deviceProvider: deviceProvider,
+            deviceGroupProvider: groupProvider);
+
+        // Act
+        await service.RemoveDeviceByIdAsync("Fence", 404);
+
+        // Assert
+        Assert.Equal(3, groupProvider.First(g => g.Id == 5).DeviceCount);
+        Assert.Empty(deviceProvider); // 장비 자체는 제거됨
+    }
+
+    /// <summary>
+    /// FR-D2: 소속 그룹 Id가 Provider에 없을 때 예외 없이 skip(경고 로그)하고 삭제는 정상 완료돼야 한다.
+    /// </summary>
+    [Fact]
+    public async Task should_not_throw_when_group_not_found_in_provider()
+    {
+        // Arrange
+        var deviceProvider = new DeviceProvider();
+        var groupProvider = new DeviceGroupProvider(new MockLogService());
+        groupProvider.Add(new DeviceGroupModel { Id = 5, Name = "A구역", DeviceCount = 3 });
+        deviceProvider.Add(new SensorDeviceModel
+        {
+            Id = 505,
+            DeviceType = EnumDeviceType.Fence,
+            DeviceGroups = new List<int> { 99 } // Provider에 없는 그룹
+        });
+        var service = CreateDeviceProviderService(
+            new MockDeviceApiService(),
+            deviceProvider: deviceProvider,
+            deviceGroupProvider: groupProvider);
+
+        // Act
+        var ex = await Record.ExceptionAsync(() => service.RemoveDeviceByIdAsync("Fence", 505));
+
+        // Assert
+        Assert.Null(ex);
+        Assert.Equal(3, groupProvider.First(g => g.Id == 5).DeviceCount); // 기존 그룹 불변
+        Assert.Empty(deviceProvider); // 삭제는 정상 완료
+    }
 
     #endregion
 }

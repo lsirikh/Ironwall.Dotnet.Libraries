@@ -3725,6 +3725,44 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     }
     #endregion
 
+    #region FR-D4: Card device-deleted null-safety
+    /// <summary>
+    /// FR-D4: 참조 장비가 삭제(SYNC_DEVICE DELETED)되어 Device=null이 된 카드의
+    /// 모든 파생 게터가 예외 없이 null/빈 값을 반환해야 한다.
+    /// </summary>
+    [Fact]
+    public void should_not_throw_when_card_device_deleted()
+    {
+        // Arrange — 장비 삭제로 Device 참조가 끊긴 이벤트(모델 Device=null)
+        var eventModel = new DetectionEventModel
+        {
+            Device = null,
+            MessageType = EnumEventType.Intrusion,
+            DateTime = System.DateTime.Now,
+            Result = EnumDetectionType.VIBRATION_SENSOR
+        };
+        var vm = new DetectionEventCardViewModel(eventModel);
+
+        // Act — 파생 게터 전수 접근
+        var ex = Record.Exception(() =>
+        {
+            _ = vm.Device;
+            _ = vm.DeviceTypeName;
+            _ = vm.ControllerId;
+            _ = vm.ControllerDeviceNumber;
+            _ = vm.DeviceGroupsText;
+        });
+
+        // Assert — 예외 없이 null/빈 값
+        Assert.Null(ex);
+        Assert.Null(vm.Device);
+        Assert.Null(vm.DeviceTypeName);
+        Assert.Null(vm.ControllerId);
+        Assert.Null(vm.ControllerDeviceNumber);
+        Assert.Equal(string.Empty, vm.DeviceGroupsText);
+    }
+    #endregion
+
     #region Test 4.2: MalfunctionSelectionVM_Device_AcceptsAllDeviceTypes
     [Fact]
     public void ExEventViewModel_Device_AcceptsEnclosureWithDeviceGroups()

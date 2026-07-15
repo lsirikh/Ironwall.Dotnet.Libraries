@@ -62,6 +62,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
         // (FR-EN-11) 역할강등 재평가 구독 해제
         { var _pgs = DevicePermissionGate.Resolve(); if (_pgs != null) _pgs.PermissionsChanged -= OnPermissionsChanged; }
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+        _deviceProvider.CollectionEntity.CollectionChanged -= DeviceProvider_CollectionChanged; // (FR-D1) 역방향 구독 해제
         if (_pCancellationTokenSource != null && !_pCancellationTokenSource!.IsCancellationRequested)
         {
             _pCancellationTokenSource.Cancel();
@@ -217,52 +218,100 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
 
     private void CollectionEntity_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        switch (e.Action)
+        // (FR-D1) 역방향(provider→panel) 동기화 중 발생한 ViewModelProvider 변경은 이미 _deviceProvider에
+        //   반영돼 있으므로 순방향 재투영을 건너뛴다. 순방향 자신도 전파 중 플래그를 세워 역방향 재진입(이중행/무한루프)을 막는다.
+        if (_isSyncingFromProvider) return;
+        _isSyncingFromProvider = true;
+        try
         {
-            case NotifyCollectionChangedAction.Add:
-                // (Draft 격리) Id≤0 미저장 Draft는 provider 미투영(공유 오염/이중행 차단).
-                if (e.NewItems == null) return;
-                foreach (IControllerDeviceViewModel newItem in e.NewItems)
-                {
-                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
-                    _deviceProvider.Add((IControllerDeviceModel)newItem.Model);
-                }
-                break;
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    // (Draft 격리) Id≤0 미저장 Draft는 provider 미투영(공유 오염/이중행 차단).
+                    if (e.NewItems == null) return;
+                    foreach (IControllerDeviceViewModel newItem in e.NewItems)
+                    {
+                        if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
+                        _deviceProvider.Add((IControllerDeviceModel)newItem.Model);
+                    }
+                    break;
 
-            case NotifyCollectionChangedAction.Remove:
-                // Items removed
-                if (e.OldItems == null) return;
-                foreach (IControllerDeviceViewModel oldItem in e.OldItems)
-                {
-                    _deviceProvider.Remove((IControllerDeviceModel)oldItem.Model);
-                }
-                break;
+                case NotifyCollectionChangedAction.Remove:
+                    // Items removed
+                    if (e.OldItems == null) return;
+                    foreach (IControllerDeviceViewModel oldItem in e.OldItems)
+                    {
+                        _deviceProvider.Remove((IControllerDeviceModel)oldItem.Model);
+                    }
+                    break;
 
-            case NotifyCollectionChangedAction.Replace:
-                // Some items replaced
-                if (e.OldItems == null) return;
-                foreach (IControllerDeviceViewModel oldItem in e.OldItems)
-                {
-                    _deviceProvider.Remove((IControllerDeviceModel)oldItem.Model);
-                }
-                if (e.NewItems == null) return;
-                foreach (IControllerDeviceViewModel newItem in e.NewItems)
-                {
-                    if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
-                    _deviceProvider.Add((IControllerDeviceModel)newItem.Model);
-                }
-                break;
+                case NotifyCollectionChangedAction.Replace:
+                    // Some items replaced
+                    if (e.OldItems == null) return;
+                    foreach (IControllerDeviceViewModel oldItem in e.OldItems)
+                    {
+                        _deviceProvider.Remove((IControllerDeviceModel)oldItem.Model);
+                    }
+                    if (e.NewItems == null) return;
+                    foreach (IControllerDeviceViewModel newItem in e.NewItems)
+                    {
+                        if (!ShouldProjectToProvider(newItem.Model.Id)) continue;
+                        _deviceProvider.Add((IControllerDeviceModel)newItem.Model);
+                    }
+                    break;
 
-            case NotifyCollectionChangedAction.Reset:
-                // The whole list is refreshed
-                ViewModelProvider.Clear();
-                foreach (var item in _deviceProvider.OfType<IControllerDeviceModel>())
-                {
-                    ViewModelProvider.Add(new ControllerDeviceViewModel(item));
-                }
+                case NotifyCollectionChangedAction.Reset:
+                    // The whole list is refreshed
+                    ViewModelProvider.Clear();
+                    foreach (var item in _deviceProvider.OfType<IControllerDeviceModel>())
+                    {
+                        ViewModelProvider.Add(new ControllerDeviceViewModel(item));
+                    }
 
-                break;
+                    break;
+            }
         }
+        finally { _isSyncingFromProvider = false; }
+    }
+
+    /// <summary>
+    /// (FR-D1) provider→panel 역방향 동기화. NATS SYNC_DEVICE 등으로 _deviceProvider(캐시)가
+    /// 변경되면 열린 패널의 ViewModelProvider(DataGrid)에 즉시 반영한다.
+    /// - Id≤0(Draft) 격리, Id 기준 멱등(존재 시 Add no-op / 부재 시 Remove no-op)으로 이중행·잔류 방지.
+    /// - 순방향(패널發) 전파 중이면 _isSyncingFromProvider 가드로 skip(무한루프 차단).
+    /// - Reset/Replace는 다루지 않는다(전량 재구성은 Reload/Save/Delete의 DataInitialize가 담당하며
+    ///   그 구간에는 본 핸들러가 구독 해제됨). 구독 수명은 순방향 핸들러와 동일 3지점에서 토글.
+    /// - 본 핸들러는 EntityCollectionProvider의 UI 스레드 마샬(DispatcherService.Invoke) 안에서 발화되므로 UI 스레드에서 실행된다.
+    /// </summary>
+    private void DeviceProvider_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_isSyncingFromProvider) return;
+        _isSyncingFromProvider = true;
+        try
+        {
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    if (e.NewItems == null) return;
+                    foreach (IControllerDeviceModel m in e.NewItems.OfType<IControllerDeviceModel>())
+                    {
+                        if (m.Id <= 0) continue;                                     // Draft 격리
+                        if (ViewModelProvider.Any(vm => vm.Model.Id == m.Id)) continue; // 이미 존재 → no-op
+                        ViewModelProvider.Add(new ControllerDeviceViewModel((ControllerDeviceModel)m) { Index = ViewModelProvider.Count + 1 });
+                    }
+                    break;
+
+                case NotifyCollectionChangedAction.Remove:
+                    if (e.OldItems == null) return;
+                    foreach (IControllerDeviceModel m in e.OldItems.OfType<IControllerDeviceModel>())
+                    {
+                        var vm = ViewModelProvider.FirstOrDefault(v => v.Model.Id == m.Id);
+                        if (vm != null) ViewModelProvider.Remove(vm);
+                    }
+                    break;
+            }
+        }
+        finally { _isSyncingFromProvider = false; }
     }
     #endregion
     #region - Binding Methods -
@@ -365,6 +414,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 await DispatcherService.BeginInvoke(() => { }, DispatcherPriority.Render);
 
                 ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+                _deviceProvider.CollectionEntity.CollectionChanged -= DeviceProvider_CollectionChanged; // (FR-D1) 재구성 구간 역방향 정지
                 await DispatcherService.BeginInvoke(() => ViewModelProvider.Clear());
 
                 var items = _deviceProvider.OfType<IControllerDeviceModel>().ToList();
@@ -385,6 +435,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
                 await DispatcherService.BeginInvoke(() => NotifyOfPropertyChange(() => ViewModelProvider));
 
                 ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
+                _deviceProvider.CollectionEntity.CollectionChanged += DeviceProvider_CollectionChanged; // (FR-D1) 정상상태 역방향 재구독
                 DispatcherService.Invoke(() => IsVisible = true);
             }
             catch (TaskCanceledException ex)
@@ -447,6 +498,7 @@ public class ControllerDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Co
     private readonly IDeviceApiService _apiService;
     private readonly ControllerDeviceProvider _deviceProvider;
     private readonly IDeviceProviderService _deviceProviderService;
+    private bool _isSyncingFromProvider;   // (FR-D1) 순방향↔역방향 상호 재진입 가드(UI 스레드 전용)
     #endregion
 
 }
