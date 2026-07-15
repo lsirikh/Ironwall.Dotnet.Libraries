@@ -171,6 +171,8 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             _mapControl.OnMapZoomChanged += OnMapChanged;
             _mapControl.OnMapDrag += OnMapChanged;
             _mapControl.OnPositionChanged += OnMapPositionChanged;
+            // [FR-C4] 창 리사이즈/모니터 이동 시 폴리라인 픽셀캐시 stale → 재계산(줌/팬 없이도). 2026-07-15 멀티모니터 소실.
+            _mapControl.SizeChanged += OnMapSizeChanged;
 
             // 초기 라인 그리기
             UpdateLineGeometry();
@@ -192,6 +194,7 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
             _mapControl.OnMapZoomChanged -= OnMapChanged;
             _mapControl.OnMapDrag -= OnMapChanged;
             _mapControl.OnPositionChanged -= OnMapPositionChanged;
+            _mapControl.SizeChanged -= OnMapSizeChanged;
         }
 
         if (Marker != null)
@@ -489,8 +492,20 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
         }
         catch (Exception ex)
         {
-            //System.Diagnostics.Debug.WriteLine($"라인 업데이트 오류: {ex.Message}");
+            // [FR-C4] 무음 삼킴 금지 — 기하 실패는 화면 소실로 직결(2026-07-15 분석 §6.2).
+            _log?.Warning($"[Line] UpdateLineGeometry 실패 '{Marker?.Title}': {ex.Message}");
         }
+    }
+
+    /// <summary>[FR-C4] 맵 크기 변경(창 리사이즈·최대화·모니터 이동 반영) → 폴리라인 재계산(레이아웃 안정 후).</summary>
+    private void OnMapSizeChanged(object sender, SizeChangedEventArgs e)
+        => Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
+
+    /// <summary>[FR-C4] 모니터 간 이동 등 DPI 변경 → 픽셀 좌표계 변화 반영(줌/팬 없이도 재계산).</summary>
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
     }
 
 

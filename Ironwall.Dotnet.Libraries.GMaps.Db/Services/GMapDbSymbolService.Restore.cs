@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using MySql.Data.MySqlClient;
 using System;
@@ -29,8 +29,10 @@ internal partial class GMapDbSymbolService
     private static async Task<bool> SymbolIdExistsAsync(MySqlConnection conn, IDbTransaction? tx, int id)
         => await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Symbols WHERE Id = @id;", new { id }, tx) > 0;
 
-    /// <summary>Symbols 행을 명시 Id로 삽입(전 타입 공통 컬럼). InsertSymbolAsync와 동일 컬럼 + Id.</summary>
-    private static async Task InsertSymbolRowWithIdAsync(MySqlConnection conn, IDbTransaction? tx, ISymbolModel model)
+    /// <summary>Symbols 행을 명시 Id로 삽입(전 타입 공통 컬럼). InsertSymbolAsync와 동일 컬럼 + Id.
+    /// categoryOverride: DB 판별자가 런타임 Category와 다른 타입(PidsGroup='PIDS_GROUP' — enum에 없는 DB 전용값)은
+    /// 명시 전달 필수 — 미전달 시 런타임값(AREA_BOUNDARY)이 기록돼 재부팅 로드에서 소실(2026-07-15 사고 계열).</summary>
+    private static async Task InsertSymbolRowWithIdAsync(MySqlConnection conn, IDbTransaction? tx, ISymbolModel model, string? categoryOverride = null)
     {
         const string sql = @"
             INSERT INTO Symbols
@@ -54,7 +56,7 @@ internal partial class GMapDbSymbolService
             model.Bearing,
             model.Width,
             model.Height,
-            Category = model.Category.ToString(),
+            Category = categoryOverride ?? model.Category.ToString(),
             model.ShowShape,
             model.IsLocked,
             model.ShowTitle,
@@ -198,7 +200,8 @@ internal partial class GMapDbSymbolService
         try
         {
             await GuardCollisionAsync(conn, tx, model.Id);
-            await InsertSymbolRowWithIdAsync(conn, tx, model);
+            // 판별자 고정 — PidsGroup 런타임 Category=AREA_BOUNDARY라 override 없이는 삭제-Undo 복원이 재부팅 소실됨(FR-C2)
+            await InsertSymbolRowWithIdAsync(conn, tx, model, categoryOverride: "PIDS_GROUP");
             await conn.ExecuteAsync(
                 "INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern) VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);",
                 new { SymbolId = model.Id, model.LinkedDeviceGroup, EventStatus = model.EventStatus.ToString(), model.LineOpacity, model.IsClosedPath, model.ShowArrowHead, LinePattern = model.LinePattern.ToString() }, tx);

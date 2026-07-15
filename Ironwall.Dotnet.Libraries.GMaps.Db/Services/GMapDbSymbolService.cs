@@ -2702,6 +2702,37 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
     #endregion
 
+    #region - 부분 UPDATE (판별자 보존) -
+
+    /// <summary>잠금만 부분 UPDATE. 전체 행 재기록이 Category 판별자('PIDS_GROUP' 등 DB 전용값)를
+    /// 런타임 Category로 덮어쓰던 오염(2026-07-15 현장 사고: 잠금 17건→재부팅 전멸) 원천 차단.</summary>
+    public async Task<bool> UpdateSymbolLockAsync(int id, bool isLocked, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET IsLocked = @IsLocked WHERE Id = @Id;", new { Id = id, IsLocked = isLocked });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 잠금 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    /// <summary>제목만 부분 UPDATE — 위와 동일 사유(레이어패널 이름변경 경로).</summary>
+    public async Task<bool> UpdateSymbolTitleAsync(int id, string title, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET Title = @Title WHERE Id = @Id;", new { Id = id, Title = title });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 제목 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
+    #endregion
+
     #region - PidsGroupSymbol CRUD -
 
     /// <summary>
@@ -2712,6 +2743,22 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         try
         {
             await using var conn = await OpenConnectionAsync(token);
+
+            // [자가치유] 공통 UPDATE/복원 경로가 남긴 Category 오염(≠'PIDS_GROUP') 정상화 — PidsGroupSymbols
+            //   JOIN(자식 테이블)이 타입의 진실이므로 안전. 오염된 현장 DB도 재기동만으로 복구(2026-07-15 사고 대응).
+            //   best-effort 격리: 치유 실패(권한/락 대기)가 부팅 로더를 죽이면 사고와 같은 증상이 되므로 로드는 계속(리뷰 warn).
+            try
+            {
+                int healed = await conn.ExecuteAsync(@"
+                    UPDATE Symbols s INNER JOIN PidsGroupSymbols pg ON pg.SymbolId = s.Id
+                    SET s.Category = 'PIDS_GROUP' WHERE s.Category <> 'PIDS_GROUP';");
+                if (healed > 0)
+                    _log?.Warning($"[자가치유] PidsGroup Category 오염 {healed}건 정상화('PIDS_GROUP') — 공통 업데이트/복원 경로 잔재");
+            }
+            catch (Exception healEx)
+            {
+                _log?.Warning($"[자가치유] Category 정상화 실패(무시, 로드는 계속): {healEx.Message}");
+            }
 
             const string sql = @"
                 SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,

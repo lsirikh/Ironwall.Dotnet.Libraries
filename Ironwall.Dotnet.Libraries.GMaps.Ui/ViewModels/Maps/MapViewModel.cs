@@ -8379,7 +8379,10 @@ public partial class MapViewModel : BasePanelViewModel,
 
             var oldName = e.Symbol.Title;   // Undo용 이전 이름
             e.Symbol.Title = newName;
-            await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // 공통 Symbols 행(Title) 영속 — 타입 무관
+            // ★ 부분 UPDATE(Title만) — 전체 행 재기록(UpdateSymbolAsync)은 PidsGroup의 DB 판별자('PIDS_GROUP')를
+            //   런타임 Category(AREA_BOUNDARY)로 덮어 재부팅 소실 유발(2026-07-15 사고, 잠금과 동일 경로). FR-C1.
+            if (!await _gMapDbSymbolService.UpdateSymbolTitleAsync(e.Symbol.Id, newName))
+                _log?.Warning($"심볼 이름변경 DB 미적용(행 없음, Id={e.Symbol.Id}) — 타 세션 삭제 가능성, UI-DB desync 주의");
 
             // 타입인지 — 심볼 이름변경은 이미지가 아닌 마커만 대상. 같은 Id의 오버레이 이미지(제어기1↔안양발전소 Id=1 충돌)를
             // 잡아 이미지 Title/속성창을 심볼 이름으로 오염시키던 경로 차단.
@@ -8410,7 +8413,10 @@ public partial class MapViewModel : BasePanelViewModel,
             if (marker != null) marker.IsLocked = e.IsLocked;
 
             e.Symbol.IsLocked = e.IsLocked;
-            await _gMapDbSymbolService.UpdateSymbolAsync(e.Symbol);   // IsLocked 공통 Symbols 행 영속
+            // ★ 부분 UPDATE(IsLocked만) — 전체 행 재기록이 PidsGroup Category를 'AREA_BOUNDARY'로 오염시켜
+            //   재부팅 시 17개 전멸했던 현장 사고(2026-07-15)의 원인 지점. FR-C1.
+            if (!await _gMapDbSymbolService.UpdateSymbolLockAsync(e.Symbol.Id, e.IsLocked))
+                _log?.Warning($"심볼 잠금 DB 미적용(행 없음, Id={e.Symbol.Id}) — 타 세션 삭제 가능성, UI-DB desync 주의");
             if (marker != null) _editRecorder?.RecordLock(marker, oldLocked, e.IsLocked);   // Undo 기록(트리 잠금)
             _log?.Info($"심볼 잠금 {(e.IsLocked ? "ON" : "OFF")}: {e.Symbol.Title}(Id={e.Symbol.Id})");
         }

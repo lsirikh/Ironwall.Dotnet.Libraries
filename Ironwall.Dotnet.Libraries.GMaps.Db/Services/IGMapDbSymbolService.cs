@@ -86,6 +86,13 @@ public interface IGMapDbSymbolService
     /// <returns>업데이트된 Symbol 모델</returns>
     Task<ISymbolModel?> UpdateSymbolAsync(ISymbolModel model, CancellationToken token = default);
 
+    /// <summary>잠금만 부분 UPDATE — 전체 행 재기록(UpdateSymbolAsync)이 Category 판별자를 런타임값으로
+    /// 덮어 PidsGroup이 재부팅 소실되던 사고(2026-07-15 현장) 차단. 레이어패널 잠금 등 타입 무관 경로 전용.</summary>
+    Task<bool> UpdateSymbolLockAsync(int id, bool isLocked, CancellationToken token = default);
+
+    /// <summary>제목만 부분 UPDATE — 위와 동일 사유(레이어패널 이름변경 경로).</summary>
+    Task<bool> UpdateSymbolTitleAsync(int id, string title, CancellationToken token = default);
+
     /// <summary>Symbol의 ZOrder만 업데이트합니다</summary>
     Task UpdateSymbolZOrderAsync(int symbolId, int zOrder, CancellationToken token = default);
 
