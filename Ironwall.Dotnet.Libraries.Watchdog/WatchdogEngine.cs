@@ -145,6 +145,11 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
             return;
         }
 
+        // 재시작 전 — 옛 인스턴스가 완전히 종료될 때까지 대기(최대 RestartDelayMs).
+        // 앱 단일인스턴스 가드가 프로세스 이름 개수(GetProcessesByName>1)로 판정하므로, teardown 중인
+        // 옛 프로세스와 새 인스턴스가 겹치면 새 인스턴스가 "Redundant Execution"으로 자멸 → 재시작 실패/루프.
+        if (!WaitForTargetGoneBeforeRestart()) return; // 와치독 종료(취소) 중이면 재시작 안 함
+
         if (_guard.StartTarget())
         {
             _policy.RecordRestart();
@@ -153,6 +158,41 @@ internal sealed class WatchdogEngine : IHostedService, IDisposable
             _consecutiveStale = 0;
             WatchdogLog.Info($"재시작({reason}) 완료 — newPid={_opt.TargetPid}, count={_policy.RestartCount}");
         }
+    }
+
+    /// <summary>
+    /// 재시작 직전, 대상 exe 이름의 프로세스가 모두 사라질 때까지 대기한다(최대 <see cref="WatchdogOptions.RestartDelayMs"/>).
+    /// 앱의 단일인스턴스 가드가 프로세스 개수로 중복을 판정하므로, 종료 중인 옛 프로세스와 겹치지 않게 하여
+    /// "Redundant Execution"으로 새 인스턴스가 자멸하는 것을 막는다.
+    /// </summary>
+    /// <returns>재시작을 진행해도 되면 true, 와치독 종료(취소) 중이면 false.</returns>
+    private bool WaitForTargetGoneBeforeRestart()
+    {
+        if (_opt.RestartDelayMs <= 0) return true;
+
+        string name;
+        try { name = Path.GetFileNameWithoutExtension(_opt.TargetExePath); }
+        catch { name = string.Empty; }
+        if (string.IsNullOrEmpty(name)) return true;
+
+        long deadline = TimeUtil.ToUnixMs(_clock.UtcNow) + _opt.RestartDelayMs;
+        while (TimeUtil.ToUnixMs(_clock.UtcNow) < deadline)
+        {
+            if (_cts?.IsCancellationRequested == true) return false; // 종료 중 → 재시작 취소
+
+            int alive;
+            try { alive = Process.GetProcessesByName(name).Length; }
+            catch { alive = 0; }
+
+            if (alive == 0)
+            {
+                WatchdogLog.Info("재시작 전 대기 — 옛 인스턴스 완전 종료 확인, 재시작 진행.");
+                return true;
+            }
+            Thread.Sleep(500);
+        }
+        WatchdogLog.Warn($"재시작 전 대기 만료({_opt.RestartDelayMs}ms) — 잔존 프로세스 존재, 그대로 재시작(중복가드 위험).");
+        return true;
     }
     #endregion
     #region - Helpers -

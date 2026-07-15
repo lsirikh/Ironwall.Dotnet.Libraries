@@ -30,4 +30,8 @@ public sealed class WatchdogClientOptions
 
     /// <summary>와치독 폴 주기(ms). 기본 5000. 와치독에 인자로 전달.</summary>
     public int PollIntervalMs { get; set; } = 5000;
+
+    /// <summary>크래시/프리즈 재시작 전 옛 인스턴스 종료 대기 상한(ms). 기본 10000 — 앱 단일인스턴스 가드
+    /// 오발동(종료 중 프로세스와 새 인스턴스 겹침 → "Redundant Execution") 방지. 와치독에 인자로 전달.</summary>
+    public int RestartDelayMs { get; set; } = 10000;
 }

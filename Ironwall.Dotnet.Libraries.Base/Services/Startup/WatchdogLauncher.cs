@@ -58,6 +58,7 @@ internal sealed class WatchdogLauncher
             psi.ArgumentList.Add("--target"); psi.ArgumentList.Add(targetExe);
             psi.ArgumentList.Add("--poll");   psi.ArgumentList.Add(_opt.PollIntervalMs.ToString());
             psi.ArgumentList.Add("--freeze"); psi.ArgumentList.Add(_opt.FreezeThresholdMs.ToString());
+            psi.ArgumentList.Add("--restart-delay"); psi.ArgumentList.Add(_opt.RestartDelayMs.ToString());
 
             Process.Start(psi);
             _log?.Info($"[Watchdog] 와치독 기동: {exePath} (target pid={Environment.ProcessId})");

@@ -20,7 +20,7 @@ public sealed class WatchdogOptions
     public string TargetExePath { get; set; } = string.Empty;
 
     /// <summary>폴 주기(ms).</summary>
-    public int PollIntervalMs { get; set; } = 5000;
+    public int PollIntervalMs { get; set; } = 1000;
 
     /// <summary>프리즈 판정 하트비트 stale 임계(ms). 기본 30s — 부하(GIS 렌더 등) 중 거짓 프리즈 방지.</summary>
     public int FreezeThresholdMs { get; set; } = 30000;
@@ -40,6 +40,10 @@ public sealed class WatchdogOptions
     /// <summary>백오프 상한(ms).</summary>
     public int MaxBackoffMs { get; set; } = 60000;
 
+    /// <summary>재시작 직전 옛 인스턴스 완전종료 대기 상한(ms). 0 이하=대기 없음.
+    /// (WatchdogEngine.WaitOldInstanceExit 소비 — 런처 <c>--restart-delay</c>로 전달, 클라 기본 10000과 일치)</summary>
+    public int RestartDelayMs { get; set; } = 10000;
+
     public static WatchdogOptions Parse(string[] args)
     {
         var o = new WatchdogOptions();
@@ -58,6 +62,9 @@ public sealed class WatchdogOptions
                     break;
                 case "--freeze":
                     if (int.TryParse(args[i + 1], out var fr)) o.FreezeThresholdMs = Math.Max(3000, fr);
+                    break;
+                case "--restart-delay":
+                    if (int.TryParse(args[i + 1], out var rd)) o.RestartDelayMs = Math.Max(0, rd);
                     break;
             }
         }

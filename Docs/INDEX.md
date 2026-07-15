@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz (A/B 동일영상 버그 원인 규명) | 2026-07-15 |
 | [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
 | [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-13 |
 | [GMap_Rotation_Overlay_Desync-analysis.md](analyses/GMap_Rotation_Overlay_Desync-analysis.md) | GMap_Rotation_Overlay_Desync | 2026-07-13 |
@@ -25,6 +26,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority (URL조회/Onvif조회 토글) | Draft | 2026-07-15 |
 | [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator (CPU/GPU/RAM 툴바 지표) | Draft | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
 | [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | Draft | 2026-07-13 |
