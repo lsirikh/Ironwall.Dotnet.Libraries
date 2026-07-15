@@ -120,7 +120,7 @@ public class ImprovedRtspPlayer : Control, IDisposable
             nameof(ConnectionInfo),
             typeof(RtspConnectionInfo),
             typeof(ImprovedRtspPlayer),
-            new PropertyMetadata(null));
+            new PropertyMetadata(null, OnConnectionInfoChanged));
 
     public RtspConnectionInfo ConnectionInfo
     {
@@ -345,33 +345,56 @@ public class ImprovedRtspPlayer : Control, IDisposable
         RegisterToService();
 
         // AutoPlay 처리 - 모든 바인딩 완료 후 여기서!
-        // WPF 렌더 파이프라인 지연 후에도 Row 취소 여부를 재확인
+        // ConnectionInfo가 아직 없으면(Onvif조회 모드 late-bind) OnConnectionInfoChanged가 이어받는다.
         if (AutoPlay && ConnectionInfo != null)
+            StartAutoConnect();
+    }
+
+    /// <summary>
+    /// AutoPlay 연결 시작(Hub/직결 분기). 호출 경로 2곳 — ① OnLoaded(오픈 시 ConnectionInfo 보유, 현행)
+    /// ② OnConnectionInfoChanged(Loaded 이후 late-bind — Onvif조회 모드가 URL 확보 후 주입, FR-05).
+    /// WPF 렌더 파이프라인 지연 후에도 Row 취소 여부를 재확인.
+    /// </summary>
+    private void StartAutoConnect()
+    {
+        if (ConnectionInfo == null) return;
+        if (DataContext is CameraViewModel vm)
         {
-            if (DataContext is CameraViewModel vm)
+            if (vm.IsConnectCancelled)
             {
-                if (vm.IsConnectCancelled)
-                {
-                    _log?.Info($"[ImprovedRtspPlayer] Skipping connect — row cancelled: {_cachedContextId}");
-                    return;
-                }
-                // Hub 경로: relay URL 경유 재생 (sout 재생성 없음)
-                if (vm.IsHubManaged)
-                {
-                    // AllowsTransparency 창에서 VideoView HWND가 airspace hole을 만들지 않도록
-                    // ConnectViaHubAsync 시작 전 동기로 IsHubMode=true 설정.
-                    // 이렇게 하면 OnApplyTemplate 이후 VideoView가 로드되어도 즉시 Collapsed.
-                    IsHubMode = true;
-                    _ = ConnectViaHubAsync(vm);
-                }
-                else
-                    _ = ConnectAsync();
+                _log?.Info($"[ImprovedRtspPlayer] Skipping connect — row cancelled: {_cachedContextId}");
+                return;
+            }
+            // Hub 경로: relay URL 경유 재생 (sout 재생성 없음)
+            if (vm.IsHubManaged)
+            {
+                // AllowsTransparency 창에서 VideoView HWND가 airspace hole을 만들지 않도록
+                // ConnectViaHubAsync 시작 전 동기로 IsHubMode=true 설정.
+                // 이렇게 하면 OnApplyTemplate 이후 VideoView가 로드되어도 즉시 Collapsed.
+                IsHubMode = true;
+                _ = ConnectViaHubAsync(vm);
             }
             else
-            {
                 _ = ConnectAsync();
-            }
         }
+        else
+        {
+            _ = ConnectAsync();
+        }
+    }
+
+    /// <summary>
+    /// ConnectionInfo가 Loaded 이후 뒤늦게 설정되면(Onvif조회 모드 late-bind) 여기서 연결을 시작한다.
+    /// 오픈 시 이미 값이 있는 경우 DP는 Loaded 전에 바인딩되므로 !IsLoaded로 스킵 — OnLoaded 경로가
+    /// 담당(이중 연결 없음). 이미 연결(중) 상태면 무시(최초 연결 전용). (FR-05)
+    /// </summary>
+    private static void OnConnectionInfoChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not ImprovedRtspPlayer player || e.NewValue is not RtspConnectionInfo) return;
+        if (!player.IsLoaded || !player.AutoPlay || player._disposed) return;
+        if (player.PlaybackState is not (PlaybackState.None or PlaybackState.Stopped
+            or PlaybackState.Disconnected or PlaybackState.Error)) return;
+        player.StartAutoConnect();
     }
 
     private async void OnUnloaded(object? sender, RoutedEventArgs e)

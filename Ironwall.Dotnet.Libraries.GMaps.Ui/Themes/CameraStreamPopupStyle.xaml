@@ -222,6 +222,16 @@
                                         </StackPanel>
                                     </Border>
 
+                                    <!--  Onvif조회 모드: 스트림 URL 조회 중 배지 — 하단 중앙(좌상=HUB/우상=Playing/중상=PTZ 배지와 충돌 회피). (CameraPopup_RtspSource_Priority FR-05)  -->
+                                    <Border Margin="0,0,0,8" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                            Background="#AA000000" CornerRadius="3" IsHitTestVisible="False"
+                                            Visibility="{Binding IsResolvingSource, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="8" Height="8" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#FF4FC3F7" />
+                                            <TextBlock FontSize="10" Foreground="White" VerticalAlignment="Center" Text="영상 주소 조회 중… (ONVIF)" />
+                                        </StackPanel>
+                                    </Border>
+
                                 </Grid>
                             </Border>
 

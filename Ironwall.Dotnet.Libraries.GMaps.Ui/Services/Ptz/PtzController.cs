@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models.Commons;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Models;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Services;
 using OnvifImaging = Ironwall.Dotnet.Libraries.OnvifSolution.Imaging;
+using OnvifMedia = Ironwall.Dotnet.Libraries.OnvifSolution.Media;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Ptz;
 
@@ -56,6 +57,10 @@ public sealed class PtzController : IPtzController
         public bool FocusOptLoaded;
         public double? FocusSpeedMin;
         public double? FocusSpeedMax;
+        // Onvif조회 모드(RTSP 소스) — GetStreamUri 결과 캐시(워밍 수명, Release 시 CamCtx째 무효화). (CameraPopup_RtspSource_Priority FR-03/07)
+        public string? ResolvedStreamUri;
+        public string? ResolvedProfileToken;
+        public bool ResolvedPreferSub;
     }
 
     /// <summary>GetNode로 읽은 카메라 좌표 space(변환/클램프 진실원). URI는 직렬화에 동봉.</summary>
@@ -388,6 +393,72 @@ public sealed class PtzController : IPtzController
             else _log?.Info("[PTZ] 포커스 ContinuousFocus 속도 옵션 없음 — 기본 폴백.");
         }
         catch (Exception ex) { _log?.Warning($"[PTZ] GetMoveOptions 실패(포커스 폴백): {Mask(ex.Message)}"); }
+    }
+
+    /*──────────────── RTSP 스트림 URL 조회(Onvif조회 모드 — CameraPopup_RtspSource_Priority FR-03/07/08) ────────────────*/
+
+    public async Task<string?> ResolveStreamUriAsync(int cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default)
+    {
+        if (conn == null) return null;
+        // 모델 확보 — InitializePtz 워밍 재사용(이중 초기화 0). PTZ capable 여부와 무관하게
+        // MediaClient/Profiles만 있으면 조회 가능(비PTZ 고정 카메라 포함).
+        await EnsureReadyAsync(cameraId, conn, ct).ConfigureAwait(false);
+        if (!_ctx.TryGetValue(cameraId, out var ctx)) return null;
+
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (ctx.ResolvedStreamUri != null && ctx.ResolvedPreferSub == preferSub)
+                    return ctx.ResolvedStreamUri;   // 캐시 적중(워밍 수명 — Release 시 CamCtx째 무효화, FR-07)
+
+                var media = ctx.Model?.MediaClient;
+                var profiles = ctx.Model?.Profiles;
+                if (media == null || profiles == null || profiles.Count == 0)
+                {
+                    _log?.Info($"[PTZ] StreamUri 조회 불가 cam={cameraId} — MediaClient/Profiles 없음(ONVIF 초기화 실패 또는 미디어 미지원).");
+                    return null;
+                }
+
+                // WCF Profile → 순수 선택기 입력 투영(해상도·오디오 유무). 규칙: 해상도 최소→비오디오→원 순서(OQ-01).
+                var infos = profiles
+                    .Where(p => p != null && !string.IsNullOrEmpty(p.token))
+                    .Select(p => new OnvifProfileSelector.ProfileInfo(
+                        p.token,
+                        p.VideoEncoderConfiguration?.Resolution?.Width ?? 0,
+                        p.VideoEncoderConfiguration?.Resolution?.Height ?? 0,
+                        p.AudioEncoderConfiguration != null))
+                    .ToList();
+                var token = OnvifProfileSelector.Select(infos, preferSub);
+                if (string.IsNullOrEmpty(token))
+                {
+                    _log?.Info($"[PTZ] StreamUri 조회 불가 cam={cameraId} — 선택 가능한 프로파일 토큰 없음(profiles={profiles.Count}).");
+                    return null;
+                }
+
+                var setup = new OnvifMedia.StreamSetup
+                {
+                    Stream = OnvifMedia.StreamType.RTPUnicast,
+                    Transport = new OnvifMedia.Transport { Protocol = OnvifMedia.TransportProtocol.RTSP },
+                };
+                var uri = (await media.GetStreamUriAsync(setup, token).ConfigureAwait(false))?.Uri;
+                if (string.IsNullOrWhiteSpace(uri))
+                {
+                    _log?.Warning($"[PTZ] GetStreamUri 빈 응답 cam={cameraId} profile={token}.");
+                    return null;
+                }
+
+                ctx.ResolvedStreamUri = uri;
+                ctx.ResolvedProfileToken = token;
+                ctx.ResolvedPreferSub = preferSub;
+                _log?.Info($"[PTZ] StreamUri 조회 cam={cameraId} profile={token} preferSub={preferSub} uri={Mask(uri)}");
+                return uri;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return null; }
+        catch (Exception ex) { _log?.Error($"[PTZ] StreamUri 조회 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
     }
 
     private bool TryImaging(int cameraId, out CamCtx ctx)

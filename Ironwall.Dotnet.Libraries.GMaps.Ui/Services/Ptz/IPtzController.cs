@@ -87,6 +87,14 @@ public interface IPtzController
     /// <summary>수동 포커스 정지(뗌) — ImagingClient.Stop. StopAsync(PTZ)와 별개 모터 경로(I-05 직교).</summary>
     Task StopFocusAsync(int cameraId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Onvif조회 모드(CameraPopup_RtspSource_Priority FR-03): ONVIF <c>GetStreamUri</c>로 재생용 RTSP URL 조회.
+    /// 워밍(EnsureReady 캐시) 재사용 — 이중 초기화 없음. 프로파일 선택은 해상도 최소→비오디오→원 순서(preferSub, OQ-01).
+    /// 결과는 카메라 워밍 수명 동안 캐시(FR-07, Release 시 무효화). 실패/미지원/취소 시 null(호출측 URL조회 폴백).
+    /// 반환 URL엔 자격증명이 없다 — 호출측이 조합(FR-04).
+    /// </summary>
+    Task<string?> ResolveStreamUriAsync(int cameraId, IConnectionModel conn, bool preferSub = true, CancellationToken ct = default);
+
     /// <summary>카메라 PTZ 리소스(딕셔너리 항목·space 캐시) 정리. 멱등(진행 중 태스크 안전, Semaphore 미Dispose). (FR-DISPOSE-01)</summary>
     void Release(int cameraId);
 }

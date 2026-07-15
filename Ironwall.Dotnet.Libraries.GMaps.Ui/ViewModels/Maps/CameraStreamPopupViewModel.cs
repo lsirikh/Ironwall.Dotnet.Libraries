@@ -80,12 +80,12 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public event EventHandler? FocusStopRequested;
     internal void RaiseFocusStop() => FocusStopRequested?.Invoke(this, EventArgs.Empty);
 
-    public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo connInfo,
+    public CameraStreamPopupViewModel(int cameraId, string? title, RtspConnectionInfo? connInfo,
         PointLatLng anchorGeo, ISharedCameraStreamHub hub)
     {
         CameraId = cameraId;
         Title = string.IsNullOrWhiteSpace(title) ? $"카메라 {cameraId}" : title!;
-        ConnectionInfo = connInfo;
+        _connectionInfo = connInfo;   // Onvif조회 모드(FR-05)는 null로 시작 — 조회 완료 후 세터 주입(late-bind)
         AnchorGeo = anchorGeo;
 
         _row = new CameraRowViewModel(cameraId.ToString(), Title, hub);
@@ -93,11 +93,11 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         {
             Guid = cameraId.ToString(),
             Title = Title,
-            ConnectionInfo = connInfo,
             StreamingOptions = StreamingOptions.CreateDefault(),
             AutoPlay = true,
             ShowControls = true,
         };
+        if (connInfo != null) model.ConnectionInfo = connInfo;
         // 플레이어 DataContext가 될 스트리밍 VM (OwnerRow를 통해 Hub Lease 획득)
         StreamVm = new CameraViewModel(model, _row.RowId, _row);
     }
@@ -105,7 +105,25 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>카메라 장비 Id(= PidsSymbol.LinkedDeviceId). 팝업 식별/위치 키.</summary>
     public int CameraId { get; }
     public string Title { get; }
-    public RtspConnectionInfo ConnectionInfo { get; }
+
+    private RtspConnectionInfo? _connectionInfo;
+    /// <summary>재생 연결정보. Onvif조회 모드에선 오픈 시 null → 조회 완료 후 주입 — 세터가 StreamVm 모델을
+    /// 동기하고 PropertyChanged를 발화해 팝업 템플릿 바인딩 → 플레이어 ConnectionInfo DP → late-bind 연결을
+    /// 트리거한다. (CameraPopup_RtspSource_Priority FR-05)</summary>
+    public RtspConnectionInfo? ConnectionInfo
+    {
+        get => _connectionInfo;
+        set
+        {
+            _connectionInfo = value;
+            if (value != null && StreamVm != null) StreamVm.ConnectionInfo = value;   // Row lease/모델 경로 일관
+            NotifyOfPropertyChange(nameof(ConnectionInfo));
+        }
+    }
+
+    private bool _isResolvingSource;
+    /// <summary>Onvif조회 모드에서 스트림 URL 조회(ONVIF GetStreamUri) 진행 중 — "영상 주소 조회 중…" 배지. (FR-05)</summary>
+    public bool IsResolvingSource { get => _isResolvingSource; set { if (_isResolvingSource == value) return; _isResolvingSource = value; NotifyOfPropertyChange(nameof(IsResolvingSource)); } }
 
     /// <summary>팝업 좌상단 코너의 위경도 앵커(드래그 완료 시 갱신 → DB 저장).</summary>
     public PointLatLng AnchorGeo { get; set; }

@@ -1358,16 +1358,21 @@ public partial class MapViewModel : BasePanelViewModel,
             }
 
             var connInfo = CameraConnectionAdapter.ToConnectionInfo(cameraModel, preferSub: true);
-            if (connInfo == null)
+            // RTSP 소스 모드(CameraPopup_RtspSource_Priority FR-05): Url=수동 URL(현행) / Onvif=ONVIF GetStreamUri
+            // 조회(실패 시 URL조회 폴백 — FR-06). Onvif 모드는 카메라 IP가 있어야 조회 가능.
+            var sourceMode = setup?.CameraPopupRtspSource ?? EnumCameraPopupRtspSource.Url;
+            var useOnvif = sourceMode == EnumCameraPopupRtspSource.Onvif
+                           && !string.IsNullOrWhiteSpace(cameraModel.IpAddress);
+            if (connInfo == null && !useOnvif)
             {
                 _log?.Warning($"[CameraPopup] RTSP URL 없음(영상 없음): {marker.Title} — 카메라 상세보기 > URLs 탭에 rtsp:// 입력 필요");
                 return;
             }
 
-            // 실제 접속 URL = 카메라 설정(Urls.RtspSub/RtspMain) 원본. VLC엔 원본 그대로, 로그만 자격증명 마스킹.
-            _log?.Info($"[CameraPopup] 카메라 {cameraModel.Id}({marker.Title}) RTSP 접속 URL(설정값)={MaskRtspCredentials(connInfo.GetFullUrl())}");
+            // 실제 접속 URL = Url 모드: 카메라 설정(Urls.RtspSub/RtspMain) 원본 / Onvif 모드: 조회 후 결정. 로그만 자격증명 마스킹.
+            _log?.Info($"[CameraPopup] 카메라 {cameraModel.Id}({marker.Title}) 소스모드={sourceMode} RTSP URL(설정값)={MaskRtspCredentials(connInfo?.GetFullUrl() ?? "(수동 URL 없음 — ONVIF 조회 대기)")}");
 
-            _ = OpenCameraStreamPopupAsync(cameraModel.Id, marker.Title, connInfo, marker);
+            _ = OpenCameraStreamPopupAsync(cameraModel.Id, marker.Title, connInfo, marker, useOnvif);
         }
         catch (Exception ex)
         {
@@ -2037,7 +2042,7 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
-    private async Task OpenCameraStreamPopupAsync(int cameraId, string? title, RtspConnectionInfo connInfo, IEditableMarker marker)
+    private async Task OpenCameraStreamPopupAsync(int cameraId, string? title, RtspConnectionInfo? connInfo, IEditableMarker marker, bool resolveViaOnvif = false)
     {
         try
         {
@@ -2082,7 +2087,8 @@ public partial class MapViewModel : BasePanelViewModel,
             // 연결선(Leader Line) 끝점1 = 카메라 심볼 중점(화면 outer 좌표)
             var cg = MainMap.FromLatLngToLocal(marker.Position);
             var camScreen = MainMap.InnerToOuter(new Point(cg.X, cg.Y));
-            var vm = new CameraStreamPopupViewModel(cameraId, title, connInfo, anchorGeo, hub)
+            // Onvif조회 모드(FR-05)는 late-bind: ctor엔 null(수동 URL로 먼저 붙는 것 방지) — 조회 후 ConnectionInfo 주입.
+            var vm = new CameraStreamPopupViewModel(cameraId, title, resolveViaOnvif ? null : connInfo, anchorGeo, hub)
             {
                 CanvasLeft = left,
                 CanvasTop = top,
@@ -2112,6 +2118,13 @@ public partial class MapViewModel : BasePanelViewModel,
             SelectedCameraPopup = vm;          // 오픈 시 자동 선택(단일)
             BringCameraPopupToFront(vm);       // 새 팝업 최상위(ZIndex)
             StartOrResetAutoCloseTimer(vm);   // 자동해제 타이머 시작(IsAutoDiscard ON 시)
+
+            // Onvif조회 모드(FR-05/06): 팝업은 즉시 열고 URL은 비동기 확보 → late-bind 연결. 수동 URL(connInfo)은 폴백.
+            if (resolveViaOnvif)
+            {
+                vm.IsResolvingSource = true;
+                _ = ResolveOnvifSourceAndConnectAsync(vm, (marker as IPidsEditableMarker)?.LinkedDevice as ICameraDeviceModel, connInfo);
+            }
 
             // ONVIF PTZ 준비(비동기) → IsPtzCapable 설정(PTZ 카메라만 우버튼 활성)
             if ((marker as IPidsEditableMarker)?.LinkedDevice is ICameraDeviceModel camModel)
