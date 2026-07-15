@@ -589,7 +589,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 //System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Title = '{e.NewValue}'");
-                control.SelectedMarker.Title = (string)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.Title = (string)e.NewValue;   // 그룹=VM이 전원 일괄 적용
                 control.OnMarkerPropertyChanged("Title", e.OldValue, e.NewValue);
             }
         }
@@ -600,7 +600,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 //System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.TitleSize = '{e.NewValue}'");
-                control.SelectedMarker.TitleSize = (double)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.TitleSize = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("TitleSize", e.OldValue, e.NewValue);
             }
         }
@@ -611,7 +611,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 //System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Height = {control.MarkerHeight}");
-                control.SelectedMarker.Height = control.MarkerHeight;
+                if (!control.IsGroupMode) control.SelectedMarker.Height = control.MarkerHeight;
                 // 실제 "Height" 발화(과거 합성 "Size"+null before는 ApplyProperty 미지원→undo 무효, CMD-01)
                 control.OnMarkerPropertyChanged("Height", e.OldValue, e.NewValue);
             }
@@ -624,7 +624,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
                 //System.Diagnostics.Debug.WriteLine($"  마커에 전파: SelectedMarker.Width = {control.MarkerWidth}");
-                control.SelectedMarker.Width = control.MarkerWidth;
+                if (!control.IsGroupMode) control.SelectedMarker.Width = control.MarkerWidth;
                 // 실제 "Width" 발화(과거 합성 "Size"+null before는 ApplyProperty 미지원→undo 무효, CMD-01)
                 control.OnMarkerPropertyChanged("Width", e.OldValue, e.NewValue);
             }
@@ -636,7 +636,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.Bearing = (double)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.Bearing = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("Bearing", e.OldValue, e.NewValue);
             }
         }
@@ -645,7 +645,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.FillColor = (EnumColorType)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.FillColor = (EnumColorType)e.NewValue;
                 control.OnMarkerPropertyChanged("FillColor", e.OldValue, e.NewValue);
             }
         }
@@ -654,7 +654,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.StrokeColor = (EnumColorType)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.StrokeColor = (EnumColorType)e.NewValue;
                 control.OnMarkerPropertyChanged("StrokeColor", e.OldValue, e.NewValue);
             }
         }
@@ -663,7 +663,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.StrokeThickness = (double)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.StrokeThickness = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("StrokeThickness", e.OldValue, e.NewValue);
             }
         }
@@ -672,7 +672,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.ShowShape = (bool)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.ShowShape = (bool)e.NewValue;
                 control.OnMarkerPropertyChanged("ShowShape", e.OldValue, e.NewValue);
             }
         }
@@ -681,7 +681,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.ShowTitle = (bool)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.ShowTitle = (bool)e.NewValue;
                 control.OnMarkerPropertyChanged("ShowTitle", e.OldValue, e.NewValue);
             }
         }
@@ -690,7 +690,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                control.SelectedMarker.Zoom = (double)e.NewValue;
+                if (!control.IsGroupMode) control.SelectedMarker.Zoom = (double)e.NewValue;
                 control.OnMarkerPropertyChanged("Zoom", e.OldValue, e.NewValue);
             }
         }
@@ -790,6 +790,78 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, ShowShapeProperty);
             BindingOperations.ClearBinding(this, ShowTitleProperty);
             BindingOperations.ClearBinding(this, MarkerZoomProperty);
+        }
+
+        #endregion
+
+        #region Group (멀티셀렉트) Pending 모드 — 기능 ② 피드백
+
+        // 그룹 Pending 표기 sentinel: 숫자=NaN, 색=(EnumColorType)(-1) → 콤보 무선택/텍스트 빈칸 렌더.
+        internal const double MIXED_DOUBLE = double.NaN;
+        internal static readonly EnumColorType MIXED_COLOR = (EnumColorType)(-1);
+
+        /// <summary>그룹 선택(≥2) 시 대상 마커 집합. null/1개=단일 모드(기존 동작).</summary>
+        public System.Collections.Generic.IReadOnlyList<IEditableMarker>? GroupMarkers { get; private set; }
+
+        /// <summary>그룹 편집 모드 여부 — 콜백의 대표마커 직접쓰기 억제 게이트(VM이 전원 일괄 적용).</summary>
+        protected bool IsGroupMode => GroupMarkers is { Count: >= 2 };
+
+        /// <summary>
+        /// 그룹 편집 모드 진입(팩토리에서 SelectedMarker 세팅 직후 호출).
+        /// ① 대표마커 TwoWay 바인딩 해제 — sentinel이 대표에 오염되거나 외부 갱신이 Pending을 덮는 것 차단.
+        /// ② 공통 필드를 "전원 동일=값 / 서로 다름=빈칸(Pending)"으로 재구성(VS 속성그리드 방식).
+        /// 이후 편집은 콜백이 이벤트만 발화 → MapViewModel이 전원(대표 포함)에 일괄 적용+배치 Undo.
+        /// </summary>
+        public void EnterGroupMode(System.Collections.Generic.IReadOnlyList<IEditableMarker> markers)
+        {
+            if (markers == null || markers.Count < 2) return;
+            GroupMarkers = markers;
+
+            _isInitializing = true;
+            try
+            {
+                ClearAllBindings();                 // DP가 기본값으로 리셋됨 → 아래서 전 필드 재구성
+                ApplyGroupPendingBlanks();
+                if (SelectedMarker != null)
+                    SetupSpecificPropertiesFromMarker(SelectedMarker);   // 특화 필드는 대표값 표시(대표 전용 편집)
+            }
+            finally { _isInitializing = false; }
+        }
+
+        /// <summary>공통 필드별로 그룹 전원 값 비교 → 동일=그 값, 다름=Pending sentinel 세팅.</summary>
+        private void ApplyGroupPendingBlanks()
+        {
+            var g = GroupMarkers;
+            if (g == null || g.Count == 0) return;
+
+            MarkerTitle = AllEqual("Title", out var title) ? (title as string ?? string.Empty) : string.Empty;
+            TitleSize = AllEqual("TitleSize", out var ts) ? ToD(ts) : MIXED_DOUBLE;
+            MarkerWidth = AllEqual("Width", out var w) ? ToD(w) : MIXED_DOUBLE;
+            MarkerHeight = AllEqual("Height", out var h) ? ToD(h) : MIXED_DOUBLE;
+            MarkerBearing = AllEqual("Bearing", out var br) ? ToD(br) : MIXED_DOUBLE;
+            MarkerZoom = AllEqual("Zoom", out var z) ? ToD(z) : MIXED_DOUBLE;
+            MarkerStrokeThickness = AllEqual("StrokeThickness", out var st) ? ToD(st) : MIXED_DOUBLE;
+            MarkerFillColor = AllEqual("FillColor", out var fc) && fc is EnumColorType f ? f : MIXED_COLOR;
+            MarkerStrokeColor = AllEqual("StrokeColor", out var sc) && sc is EnumColorType s ? s : MIXED_COLOR;
+            // bool(모양/제목 표시)은 3상태 미지원 → 대표값 표시(변경 시엔 전원 일괄 적용됨)
+            var rep = SelectedMarker ?? g[0];
+            ShowShape = rep.ShowShape;
+            ShowTitle = rep.ShowTitle;
+
+            static double ToD(object? v) => v is double d ? d : MIXED_DOUBLE;
+        }
+
+        /// <summary>그룹 전원의 prop 값이 동일한지(ReadProperty 단일출처). 동일하면 first에 그 값.</summary>
+        private bool AllEqual(string prop, out object? first)
+        {
+            var g = GroupMarkers!;
+            first = Services.Undo.Commands.UndoableCommandBase.ReadProperty(g[0], prop);
+            for (int i = 1; i < g.Count; i++)
+            {
+                var v = Services.Undo.Commands.UndoableCommandBase.ReadProperty(g[i], prop);
+                if (!Equals(first, v)) return false;
+            }
+            return true;
         }
 
         #endregion

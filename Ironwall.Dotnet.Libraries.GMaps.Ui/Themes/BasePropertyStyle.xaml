@@ -10,6 +10,13 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 	<utils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
+	<!--  그룹(멀티셀렉트) Pending: NaN=값 서로 다름 → 텍스트 빈칸/—, 슬라이더 0 파킹. 단일 모드엔 영향 없음  -->
+	<utils:DoubleNaNToBlankConverter x:Key="NaNBlank" />
+	<utils:DoubleNaNToBlankConverter x:Key="NaNBlankF0" Format="F0" />
+	<utils:DoubleNaNToBlankConverter
+		x:Key="NaNDashF0"
+		BlankText="—"
+		Format="F0" />
 
 	<Style x:Key="CompactTextBox" TargetType="TextBox">
 		<Setter Property="Margin" Value="2" />
@@ -184,7 +191,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding TitleSize, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+											Text="{Binding TitleSize, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlank}}" />
 									</Grid>
 
 									<!--  크기  -->
@@ -203,7 +210,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerWidth, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+											Text="{Binding MarkerWidth, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlank}}" />
 										<md:PackIcon
 											Grid.Column="2"
 											Width="10"
@@ -215,7 +222,7 @@
 										<TextBox
 											Grid.Column="3"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+											Text="{Binding MarkerHeight, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlank}}" />
 									</Grid>
 
 									<!--  회전 (슬라이더 + 직접입력 TextBox + ° 단위, MarkerBearing로 양방향 동기화)  -->
@@ -237,11 +244,11 @@
 											Maximum="360"
 											Minimum="0"
 											TickFrequency="5"
-											Value="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
+											Value="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, Converter={StaticResource NaNBlank}}" />
 										<TextBox
 											Grid.Column="2"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}" />
+											Text="{Binding MarkerBearing, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlankF0}}" />
 										<TextBlock
 											Grid.Column="3"
 											Margin="3,0,0,0"
@@ -422,13 +429,13 @@
 											Maximum="20"
 											Minimum="0"
 											TickFrequency="1"
-											Value="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}}" />
+											Value="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NaNBlank}}" />
 										<TextBlock
 											Grid.Column="2"
 											VerticalAlignment="Center"
 											FontSize="11"
 											Foreground="{DynamicResource TextSecondaryBrush}"
-											Text="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0:F0}}" />
+											Text="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NaNDashF0}}" />
 									</Grid>
 
 									<!--  구분선  -->

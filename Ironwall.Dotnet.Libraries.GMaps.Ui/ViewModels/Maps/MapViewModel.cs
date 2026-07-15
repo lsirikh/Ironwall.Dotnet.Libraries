@@ -7265,21 +7265,19 @@ public partial class MapViewModel : BasePanelViewModel,
         var targets = group.Where(m => m != null && !m.IsDisposed && !m.IsLocked).ToList();
         if (targets.Count == 0) return;
 
+        // Pending sentinel 방어 — 정상 경로에선 미발생(패널 초기화 중 이벤트 억제)이나 값 오염 백스톱.
+        if (e.NewValue is double nd && double.IsNaN(nd)) return;
+        if (e.NewValue is Ironwall.Dotnet.Libraries.Enums.EnumColorType nc && (int)nc < 0) return;
+
         bool titleChanged = false;
         using (_editRecorder?.BeginBatch($"그룹 속성 변경: {e.PropertyName} ({targets.Count}개)"))
         {
             foreach (var m in targets)
             {
-                object? before;
-                if (ReferenceEquals(m, e.Marker))
-                {
-                    before = e.OldValue;   // 대표: 패널이 이미 적용함
-                }
-                else
-                {
-                    before = ReadMarkerProperty(m, e.PropertyName);
-                    Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ApplyProperty(m, e.PropertyName, e.NewValue);   // 적용(단일 출처)
-                }
+                // 패널은 그룹 모드에서 대표에도 직접쓰기 안 함(직접쓰기 억제) → 전원 동일 경로:
+                //   before=마커 실값(ReadProperty) → 적용(ApplyProperty) → DB → 배치 record. Pending(빈칸) 필드도 undo 무결.
+                var before = Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ReadProperty(m, e.PropertyName);
+                Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ApplyProperty(m, e.PropertyName, e.NewValue);
                 try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"그룹 속성 영속 실패: {ex.Message}"); }
                 _editRecorder?.RecordPropertyChange(m, e.PropertyName, before, e.NewValue);   // 배치 합류(1 매크로)
                 if (e.PropertyName == "Title") titleChanged = true;
@@ -7290,26 +7288,6 @@ public partial class MapViewModel : BasePanelViewModel,
         _groupSelection?.RefreshAdorner();
         MainMap?.InvalidateVisual();
     }
-
-    /// <summary>IEditableMarker 편집 속성을 이름으로 읽기(그룹 undo의 before용). ApplyProperty 짝.</summary>
-    private static object? ReadMarkerProperty(GMapSymbols.IEditableMarker m, string prop) => prop switch
-    {
-        "Title" => m.Title,
-        "TitleSize" => m.TitleSize,
-        "Bearing" => m.Bearing,
-        "Width" => m.Width,
-        "Height" => m.Height,
-        "Zoom" => m.Zoom,
-        "StrokeThickness" => m.StrokeThickness,
-        "ZOrder" => m.ZOrder,
-        "Opacity" => m is GMapSymbols.GMapImageMarker im ? im.Opacity : (object?)null,
-        "ShowShape" => m.ShowShape,
-        "ShowTitle" => m.ShowTitle,
-        "IsLocked" => m.IsLocked,
-        "FillColor" => m.FillColor,
-        "StrokeColor" => m.StrokeColor,
-        _ => null
-    };
 
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
     {

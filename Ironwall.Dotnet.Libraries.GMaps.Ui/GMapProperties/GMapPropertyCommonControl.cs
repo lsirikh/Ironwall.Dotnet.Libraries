@@ -5,10 +5,11 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 {
     /// <summary>
-    /// 멀티셀렉션(혼합 타입) 속성창 = "빈 상태" 안내 전용 — GMapPropertyBaseControl(추상)의 concrete 최소 구현.
-    /// 서로 다른 타입(군대부호+제어기, 이미지+심볼 등)은 속성이 서로 달라 하나의 값으로 표현할 수 없으므로
-    /// 편집 필드 없이 그 사실만 안내한다(사용자 피드백 — 오적용 원천 차단). 스타일=CommonPropertyStyle(자체 템플릿).
-    /// 동종 타입 멀티셀렉션은 이 창이 아니라 해당 타입 패널이 뜬다(PropertyPanelFactory.CreateCommonPropertyPanel).
+    /// 멀티셀렉션(혼합 타입) 공통 속성창 — GMapPropertyBaseControl(추상)의 concrete 최소 구현.
+    /// 공통 속성 편집 필드(BasePropertyStyle)를 그대로 쓰되, 그룹 Pending 모드(EnterGroupMode)가
+    /// "전원 동일=값 / 서로 다름=빈칸(Pending)"으로 채운다(확정 스펙 — VS 속성그리드 방식).
+    /// 값 입력 시 MapViewModel이 선택된 전 마커에 일괄 적용(캐시+DB)+배치 Undo.
+    /// 동종 타입 멀티셀렉션은 이 창이 아니라 해당 타입 패널(같은 Pending 모드)이 뜬다.
     /// </summary>
     public class GMapPropertyCommonControl : GMapPropertyBaseControl
     {

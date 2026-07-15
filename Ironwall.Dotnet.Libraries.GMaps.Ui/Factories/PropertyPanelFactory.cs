@@ -95,10 +95,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             var firstType = rep.GetType();
             bool homogeneous = markers.All(m => m != null && !m.IsDisposed && m.GetType() == firstType);
             if (homogeneous && _markerToPanelMap.ContainsKey(firstType))
-                return CreatePropertyPanel(rep);   // 동종(예: 카메라+제어기=모두 GMapPidsMarker) → 해당 타입 패널
+            {
+                // 동종(예: 카메라+제어기=모두 GMapPidsMarker) → 해당 타입 패널 + 그룹 Pending 모드
+                var typed = CreatePropertyPanel(rep);
+                typed?.EnterGroupMode(markers);   // 동일값=값/다름=빈칸 + 대표 TwoWay 결합 해제(전원 일괄 적용은 VM)
+                return typed;
+            }
 
-            // 혼합(예: 군대부호+제어기, 이미지+심볼) → 공통 기본 속성창(최소 공통 = IEditableMarker).
+            // 혼합(예: 군대부호+제어기, 이미지+심볼) → 공통 기본 속성창(최소 공통 = IEditableMarker) + 그룹 Pending 모드.
             var common = new GMapPropertyCommonControl { SelectedMarker = rep };
+            common.EnterGroupMode(markers);
             _log?.Info($"공통 속성창(혼합 {markers.Count}개) 생성 — 대표 {rep.GetType().Name}");
             return common;
         }

@@ -47,6 +47,30 @@ public abstract class UndoableCommandBase : IUndoableCommand
         }
     }
 
+    /// <summary>IEditableMarker의 편집 속성을 이름으로 읽기 — <see cref="ApplyProperty"/>의 짝(단일 출처).
+    /// 그룹 일괄편집의 per-마커 before 캡처·Pending(혼합값) 판정에 사용. 미지원 속성은 null.</summary>
+    public static object? ReadProperty(IEditableMarker m, string prop) => prop switch
+    {
+        "Title" => m.Title,
+        "TitleSize" => m.TitleSize,
+        "Bearing" => m.Bearing,
+        "Width" => m.Width,
+        "Height" => m.Height,
+        "Zoom" => m.Zoom,
+        "StrokeThickness" => m.StrokeThickness,
+        "LabelOffsetX" => m.LabelOffsetX,
+        "LabelOffsetY" => m.LabelOffsetY,
+        "ZOrder" => m.ZOrder,
+        "Opacity" => m is GMapImageMarker imOp ? imOp.Opacity : null,
+        "ShowShape" => m.ShowShape,
+        "ShowTitle" => m.ShowTitle,
+        "IsLocked" => m.IsLocked,
+        "FillColor" => m.FillColor,
+        "StrokeColor" => m.StrokeColor,
+        "OperationState" => m.OperationState,
+        _ => null,
+    };
+
     /// <summary>ApplyProperty가 실제로 복원 가능한 속성명인지 — 미지원명은 죽은 undo 엔트리이므로
     /// EditRecorder에서 기록 억제(CMD-02). 이 목록은 위 switch의 단일 출처.</summary>
     public static bool IsReplayableProperty(string? prop) => prop switch
