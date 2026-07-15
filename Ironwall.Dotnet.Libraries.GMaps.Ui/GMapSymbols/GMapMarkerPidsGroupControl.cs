@@ -240,17 +240,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 MainPolyline.Opacity = Marker.LineOpacity;
             }
 
-            // EventPolyline (FaultOverlay) 초기 설정
+            // EventPolyline (FaultOverlay) — 두께를 Marker.StrokeThickness에 바인딩(로컬 할당은 변경추적을 덮음).
+            //   (사용자 지적: 탐지/장애 깜빡임 선 두께가 심볼 두께를 안 따르던 버그 — 기존엔 MainPolyline만 갱신)
             if (EventPolyline != null && Marker != null)
             {
-                EventPolyline.StrokeThickness = Marker.StrokeThickness;
+                EventPolyline.SetBinding(Polyline.StrokeThicknessProperty,
+                    new Binding(nameof(Marker.StrokeThickness)) { Source = Marker, Mode = BindingMode.OneWay });
                 EventPolyline.Opacity = Marker.LineOpacity;
             }
 
-            // DetectionPolyline (DetectionOverlay) 초기 설정
+            // DetectionPolyline (DetectionOverlay) — 동일하게 두께 바인딩(깜빡임 선도 심볼 두께 반영)
             if (DetectionPolyline != null && Marker != null)
             {
-                DetectionPolyline.StrokeThickness = Marker.StrokeThickness;
+                DetectionPolyline.SetBinding(Polyline.StrokeThicknessProperty,
+                    new Binding(nameof(Marker.StrokeThickness)) { Source = Marker, Mode = BindingMode.OneWay });
                 DetectionPolyline.Opacity = Marker.LineOpacity;
             }
 

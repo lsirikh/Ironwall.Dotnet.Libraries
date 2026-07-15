@@ -971,8 +971,8 @@ public partial class MapViewModel : BasePanelViewModel,
             if (e.Key == System.Windows.Input.Key.V) { e.Handled = true; PasteFromBufferAsync(); return; }
         }
 
-        // 방향키 격자 이동 — 격자스냅 ON + 선택 심볼을 화살표로 격자 한 칸씩 이동(요청 기능).
-        // 스냅 OFF거나 선택 없으면 미처리 → 기본 동작(맵 패닝) 유지.
+        // 방향키 이동 — 스냅 ON=격자 한 칸, 스냅 OFF=1px(Shift+방향키=5px). 선택된 심볼/이미지 대상.
+        // 선택 없으면 미처리 → 기본 동작(맵 패닝) 유지.
         if (e.Key is System.Windows.Input.Key.Left or System.Windows.Input.Key.Right
             or System.Windows.Input.Key.Up or System.Windows.Input.Key.Down)
         {
@@ -993,11 +993,11 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
-    /// <summary>방향키로 선택 심볼을 격자 한 칸씩 이동(격자스냅 ON일 때만). 각 칸 이동은 격자 교점에 스냅.
+    /// <summary>방향키로 선택 심볼/이미지 이동. 스냅 ON=격자 교점 한 칸, 스냅 OFF=방향키 1px·Shift+방향키 5px.
     /// 그룹 선택 우선(전체 이동, 잠금 제외), 없으면 단일 선택. DB 영속 + Undo 기록(그룹=1 매크로). 편집모드·권한 게이트.</summary>
     private async System.Threading.Tasks.Task<bool> TryMoveSelectionByGridAsync(System.Windows.Input.Key key)
     {
-        if (MainMap == null || !IsEditModeEnabled || !MainMap.IsSnapToGridEnabled) return false;
+        if (MainMap == null || !IsEditModeEnabled) return false;   // 스냅 ON=격자, OFF=픽셀(1/5) 둘 다 처리
 
         // 대상 수집(잠금·dispose 제외). 그룹 우선, 없으면 단일.
         var targets = (_groupSelection?.HasSelection ?? false)
@@ -1013,8 +1013,15 @@ public partial class MapViewModel : BasePanelViewModel,
         int sy = key == System.Windows.Input.Key.Up ? -1 : key == System.Windows.Input.Key.Down ? 1 : 0;
         if (sx == 0 && sy == 0) return false;
 
-        double gridPx = SnapGridOverlayService.EffectiveGridPx(MainMap.GridSizePx);
-        var (x0, y0) = SnapGridOverlayService.ComputeOrigin(MainMap, gridPx);
+        // 스냅 ON: 격자 교점 스냅. 스냅 OFF: 방향키=1px, Shift+방향키=5px.
+        bool snap = MainMap.IsSnapToGridEnabled;
+        double stepPx = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0 ? 5.0 : 1.0;
+        double gridPx = 0d, x0 = 0d, y0 = 0d;
+        if (snap)
+        {
+            gridPx = SnapGridOverlayService.EffectiveGridPx(MainMap.GridSizePx);
+            (x0, y0) = SnapGridOverlayService.ComputeOrigin(MainMap, gridPx);
+        }
 
         // 이동 + 영속(그룹 이동과 동일 패턴). before는 이동 전 위치(Undo용).
         var moves = new System.Collections.Generic.List<(GMapSymbols.IEditableMarker marker, GMap.NET.PointLatLng before)>();
@@ -1022,13 +1029,22 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             var before = m.Position;
             var p = MainMap.FromLatLngToLocal(m.Position);   // 화면 픽셀(RenderOffset 포함)
-            // 가장 가까운 격자 교점 인덱스 + 한 칸 → 항상 교점에 안착(시각=스냅 단일원천 재사용).
-            double ix = System.Math.Round((p.X - x0) / gridPx) + sx;
-            double iy = System.Math.Round((p.Y - y0) / gridPx) + sy;
-            var np = MainMap.FromLocalToLatLng((int)System.Math.Round(x0 + ix * gridPx), (int)System.Math.Round(y0 + iy * gridPx));
+            GMap.NET.PointLatLng np;
+            if (snap)
+            {
+                // 가장 가까운 격자 교점 인덱스 + 한 칸 → 항상 교점에 안착(시각=스냅 단일원천 재사용).
+                double ix = System.Math.Round((p.X - x0) / gridPx) + sx;
+                double iy = System.Math.Round((p.Y - y0) / gridPx) + sy;
+                np = MainMap.FromLocalToLatLng((int)System.Math.Round(x0 + ix * gridPx), (int)System.Math.Round(y0 + iy * gridPx));
+            }
+            else
+            {
+                // 스냅 OFF: 현재 화면 위치에서 방향×스텝(px)만큼 이동.
+                np = MainMap.FromLocalToLatLng((int)System.Math.Round(p.X + sx * stepPx), (int)System.Math.Round(p.Y + sy * stepPx));
+            }
             m.UpdateLocation(np);
             moves.Add((m, before));
-            try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"격자 이동 영속 실패: {ex.Message}"); }
+            try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"방향키 이동 영속 실패: {ex.Message}"); }
         }
 
         // Undo 기록 — 단일=직접, 다중=1 매크로.

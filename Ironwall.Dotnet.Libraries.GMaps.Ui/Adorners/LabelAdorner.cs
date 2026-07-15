@@ -142,9 +142,13 @@ public sealed class LabelAdorner : Adorner, IDisposable
             // 상한: 오프셋 벡터 길이. 심볼=최대 반지름(max(W,H)/2)의 2배. 너무 멀어져 안 보임 방지, FR-LB-04.
             // [LineArea_Symbol_Resize FR-07] line/폴리곤은 W/H가 파생·transient(리사이즈·줌마다 변함)라
             // 절대 픽셀 상한 사용 — 라벨 허용범위가 리사이즈·줌에 흔들리는 부작용 차단(§5-C D3b).
+            // 심볼 라벨 드래그 상한 = 반지름(max(W,H)/2)의 배수. line/폴리곤은 절대 픽셀 상한.
+            //   (사용자 요청 "반경의 몇 배까지" — 2배→4배 확대. 아래 상수만 조정하면 됨.)
+            const double SYMBOL_LABEL_RADIUS_MULT = 4.0;
+            const double LINE_LABEL_CAP_PX = 500.0;
             double cap = _marker is GMapSymbols.ILineEditableMarker
-                ? 300.0
-                : Math.Max(_marker.Width, _marker.Height) / 2.0 * 2.0;
+                ? LINE_LABEL_CAP_PX
+                : Math.Max(_marker.Width, _marker.Height) / 2.0 * SYMBOL_LABEL_RADIUS_MULT;
             double len = Math.Sqrt(nx * nx + ny * ny);
             if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
             _marker.LabelOffsetX = nx;
