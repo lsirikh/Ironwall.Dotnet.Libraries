@@ -496,5 +496,6 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
     private readonly IDeviceApiService _apiService;
     private readonly SensorDeviceProvider _deviceProvider;
     private readonly IDeviceProviderService _deviceProviderService;
+    private bool _isSyncingFromProvider;   // (FR-D1) 순방향↔역방향 상호 재진입 가드(UI 스레드 전용)
     #endregion
 }

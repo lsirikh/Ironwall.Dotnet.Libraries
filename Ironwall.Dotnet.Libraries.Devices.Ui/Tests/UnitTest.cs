@@ -2263,6 +2263,78 @@ public class ControllerPanelCacheTests : IDisposable
         Assert.False(mockApi.GetControllersCalled, "DataInitialize must not call API when provider has data");
         Assert.Equal(2, vm.ViewModelProvider.Count);
     }
+
+    // ── FR-D1: 열린 패널 provider→panel 역방향 실시간 반영 ──────────────────────
+
+    /// <summary>FR-D1: 패널 활성 중 캐시(provider)에 장비가 추가되면 열린 DataGrid에 즉시 행이 추가돼야 한다.</summary>
+    [Fact]
+    public async Task should_add_row_to_open_panel_when_device_added_to_provider()
+    {
+        // Arrange — 패널 활성(캐시 1건)
+        var mockApi = new MockDeviceApiService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+        var deviceProvider = new DeviceProvider();
+        var controllerProvider = new ControllerDeviceProvider(mockLog, deviceProvider);
+        deviceProvider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" });
+        var vm = new ControllerDevicePanelViewModel(ea, mockLog, mockApi, controllerProvider, new MockDeviceProviderService());
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+        Assert.Single(vm.ViewModelProvider);
+
+        // Act — NATS SYNC_DEVICE(CREATED) 시뮬: 캐시에 장비 추가
+        deviceProvider.Add(new ControllerDeviceModel { Id = 3, DeviceName = "Controller-3" });
+
+        // Assert — 열린 패널 DataGrid에 즉시 반영
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+        Assert.Contains(vm.ViewModelProvider, r => r.Model.Id == 3);
+    }
+
+    /// <summary>FR-D1: 패널 활성 중 캐시(provider)에서 장비가 제거되면 열린 DataGrid에서 즉시 행이 사라져야 한다.</summary>
+    [Fact]
+    public async Task should_remove_row_from_open_panel_when_device_removed_from_provider()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+        var deviceProvider = new DeviceProvider();
+        var controllerProvider = new ControllerDeviceProvider(mockLog, deviceProvider);
+        var toRemove = new ControllerDeviceModel { Id = 2, DeviceName = "Controller-2" };
+        deviceProvider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" });
+        deviceProvider.Add(toRemove);
+        var vm = new ControllerDevicePanelViewModel(ea, mockLog, mockApi, controllerProvider, new MockDeviceProviderService());
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+        Assert.Equal(2, vm.ViewModelProvider.Count);
+
+        // Act — NATS SYNC_DEVICE(DELETED) 시뮬: 캐시에서 장비 제거
+        deviceProvider.Remove(toRemove);
+
+        // Assert — 열린 패널에서 즉시 사라짐
+        Assert.Single(vm.ViewModelProvider);
+        Assert.DoesNotContain(vm.ViewModelProvider, r => r.Model.Id == 2);
+    }
+
+    /// <summary>FR-D1: 이미 표시 중인 Id를 provider가 중복 통지해도 Id 기준 멱등으로 행이 이중 추가되지 않아야 한다.</summary>
+    [Fact]
+    public async Task should_not_duplicate_row_when_provider_reports_existing_device()
+    {
+        // Arrange
+        var mockApi = new MockDeviceApiService();
+        var mockLog = new MockLogService();
+        var ea = new MockEventAggregator();
+        var deviceProvider = new DeviceProvider();
+        var controllerProvider = new ControllerDeviceProvider(mockLog, deviceProvider);
+        deviceProvider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1" });
+        var vm = new ControllerDevicePanelViewModel(ea, mockLog, mockApi, controllerProvider, new MockDeviceProviderService());
+        await ((IActivate)vm).ActivateAsync(CancellationToken.None);
+        Assert.Single(vm.ViewModelProvider);
+
+        // Act — 이미 표시 중인 Id의 중복 provider Add(멱등성 검증)
+        deviceProvider.Add(new ControllerDeviceModel { Id = 1, DeviceName = "Controller-1-dup" });
+
+        // Assert — Id 기준 멱등 → 행 증가 없음
+        Assert.Single(vm.ViewModelProvider);
+    }
 }
 
 /// <summary>
