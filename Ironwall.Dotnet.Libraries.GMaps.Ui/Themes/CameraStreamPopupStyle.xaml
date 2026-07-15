@@ -222,8 +222,9 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!--  Onvif조회 모드: 스트림 URL 조회 중 배지 — 하단 중앙(좌상=HUB/우상=Playing/중상=PTZ 배지와 충돌 회피). (CameraPopup_RtspSource_Priority FR-05)  -->
-                                    <Border Margin="0,0,0,8" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                    <!--  Onvif조회 모드: 스트림 URL 조회 중 배지 — 상단 중앙, PTZ 배지(Margin 0,5 / 높이 ~22) "바로 아래 스택".
+                                          ※하단 배치 금지: 오버레이가 플레이어 전체(상태띠+영상+하단 재생 컨트롤 바)를 덮어 하단 중앙=컨트롤 바 침범(스크린샷 144319). (CameraPopup_RtspSource_Priority FR-05)  -->
+                                    <Border Margin="0,32,0,0" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Top"
                                             Background="#AA000000" CornerRadius="3" IsHitTestVisible="False"
                                             Visibility="{Binding IsResolvingSource, Converter={StaticResource BoolToVis}}">
                                         <StackPanel Orientation="Horizontal">
