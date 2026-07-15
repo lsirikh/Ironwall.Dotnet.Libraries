@@ -1098,11 +1098,17 @@ public partial class MapViewModel : BasePanelViewModel,
         if (targets.Count == 0) { SetAimStatus("삭제할 항목이 없습니다(잠금 제외).", true); return; }
 
         _pendingGroupDelete = targets;
+        // ★ [P0-3] 이미지 포함 시 비가역 경고 — 이미지 삭제는 원본 파일 영구삭제 + Undo 미지원(확정 기조, 분석문서 §6.1).
+        int imgCount = targets.Count(t => t is GMapSymbols.GMapImageMarker);
+        int symCount = targets.Count - imgCount;
+        string explain = imgCount > 0
+            ? $"선택한 심볼 {symCount}개 + 이미지 {imgCount}개를 삭제하시겠습니까?\n※ 이미지는 원본 파일이 영구 삭제되며 실행취소(Undo)로 복구되지 않습니다."
+            : $"선택한 {targets.Count}개 심볼을 삭제하시겠습니까?";
         // raw MessageBox 금지 — 프로젝트 표준 확인 팝업 패턴(ROI 삭제와 동일). 확인 콜백 = CallDeleteGroupSymbolsProcessMessageModel.
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Title = "그룹 삭제",
-            Explain = $"선택한 {targets.Count}개 심볼을 삭제하시겠습니까?",
+            Explain = explain,
             MessageModel = new CallDeleteGroupSymbolsProcessMessageModel()
         });
     }
@@ -1261,7 +1267,12 @@ public partial class MapViewModel : BasePanelViewModel,
                     if (m.Id > 0) changes.Add((m is GMapSymbols.GMapImageMarker, m.Id, newZ));   // isImage 보존(D1, 그룹밴드는 심볼전용이라 사실상 false)
                 }
             }
-            if (changes.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(changes.Select(c => (c.id, c.zOrder)).ToList());
+            // ★ [P0-2] DB 배치는 심볼만 — 이미지 Id를 Symbols 테이블에 쓰면 동일 Id 심볼의 ZOrder가 오염됨(분석문서 §5).
+            //   이미지는 로컬 렌더순서만 적용(ImageModel엔 ZOrder 영속 필드 없음 — 영속화는 SSOT 결정 필요, P1 백로그).
+            var symbolChanges = changes.Where(c => !c.isImage).Select(c => (c.id, c.zOrder)).ToList();
+            if (symbolChanges.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(symbolChanges);
+            int imgSkipped = changes.Count - symbolChanges.Count;
+            if (imgSkipped > 0) _log?.Info($"[GroupZOrder] 이미지 {imgSkipped}개는 로컬 렌더순서만 적용(DB 미영속 — Symbols 오염 차단)");
             if (zBefore != null && changes.Count > 0) _editRecorder?.RecordZOrder(zBefore, changes);   // FIX 8
             MainMap.InvalidateVisual();
             _groupSelection.RefreshAdorner();
@@ -1279,13 +1290,15 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         try
         {
+            // ★ [P0-1] 잠금 검사를 그룹해제보다 먼저 — 잠긴 마커 클릭이 기존 그룹선택을 파괴하지 않게(분석문서 §2).
+            if (marker?.IsLocked == true) return;   // 잠긴 심볼은 편집모드 ON에서도 클릭/선택 차단
+
             // 단일 클릭(Shift 없음) = 그룹 선택 해제 후 단일선택 폴백(공존, FR-MS-08)
             if (_groupSelection?.HasSelection ?? false)
             {
                 _groupSelection.Clear();
                 NotifyOfPropertyChange(nameof(SelectedMarkers));
             }
-            if (marker?.IsLocked == true) return;   // 잠긴 심볼은 편집모드 ON에서도 클릭/선택 차단
             //_log?.Info($"=== 마커 클릭 시작 ===");
             //_log?.Info($"클릭 전 - {GetMarkerInfo(marker)}");
             //_log?.Info($"OnMapMarkerClicked 호출됨: {marker.Title}, 편집모드: {IsEditModeEnabled}");

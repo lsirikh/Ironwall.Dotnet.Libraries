@@ -238,7 +238,9 @@ public partial class MapViewModel : IUndoApplyContext
             if (pairs == null || pairs.Count == 0) return;
             try
             {
-                await _gMapDbSymbolService.BatchUpdateZOrderAsync(pairs.Select(p => (p.id, p.zOrder)).ToList(), ct);
+                // ★ [P0-2] DB 배치는 심볼만 — 이미지 Id가 Symbols 테이블로 가면 동일 Id 심볼 ZOrder 오염(분석문서 §5).
+                var symbolPairs = pairs.Where(p => !p.isImage).Select(p => (p.id, p.zOrder)).ToList();
+                if (symbolPairs.Count > 0) await _gMapDbSymbolService.BatchUpdateZOrderAsync(symbolPairs, ct);
                 foreach (var (isImage, id, z) in pairs)
                 {
                     if (FindMarkerById(id, isImage) is GMapMarker gm && gm.Shape is UIElement shape)   // 타입인지 — 같은 Id 반대타입 마커 ZIndex 오적용 차단(D1)

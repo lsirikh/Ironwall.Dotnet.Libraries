@@ -552,6 +552,17 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
                 & (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift)) != 0)
             return;
 
+        // ★ [P0-1] 잠긴 마커/이미지 = 자식 선택·클릭알림 차단(선택 테두리·SelectedMarker 오염 방지).
+        //   e.Handled 미설정 = 버블 유지 → 부모 팬/배치 처리는 정상 동작. (분석문서 §2)
+        if (Marker?.IsLocked == true) return;
+
+        // ★ [P0-1] 독점 입력 모드(심볼배치·타겟조준·홈배치·앵커그리기·라인드로잉) 중엔 자식 선택 스킵 —
+        //   부모(GMapCustomControl)가 base 전에 배치 클릭을 처리해야 하므로 자식이 선택을 선점하면 안 됨.
+        if (mapControl != null
+            && (mapControl.IsSymbolPlacementMode || mapControl.IsTargetAimMode
+                || mapControl.IsHomePlacementMode || mapControl.IsAnchorDrawMode || mapControl.IsLineDrawing))
+            return;
+
         try
         {
             Focus();
