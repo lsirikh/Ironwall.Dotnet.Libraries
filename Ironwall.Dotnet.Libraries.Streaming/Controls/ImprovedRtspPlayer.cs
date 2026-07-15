@@ -354,6 +354,8 @@ public class ImprovedRtspPlayer : Control, IDisposable
     /// AutoPlay 연결 시작(Hub/직결 분기). 호출 경로 2곳 — ① OnLoaded(오픈 시 ConnectionInfo 보유, 현행)
     /// ② OnConnectionInfoChanged(Loaded 이후 late-bind — Onvif조회 모드가 URL 확보 후 주입, FR-05).
     /// WPF 렌더 파이프라인 지연 후에도 Row 취소 여부를 재확인.
+    /// 재진입 방어(M-4)는 호출측이 담당 — OnLoaded는 로드당 1회, DP change는 PlaybackState 미연결 가드 +
+    /// 주입 경로 단일(Onvif 조회 1회 + VM 세터 멱등). 새 호출자를 추가하면 이 가정을 재검토할 것.
     /// </summary>
     private void StartAutoConnect()
     {

@@ -20,6 +20,10 @@ public partial class MapViewModel
     /// <summary>Onvif조회 전체 타임아웃 — InitializePtz 워밍(첫 오픈 &lt;5s) + GetStreamUri 왕복 여유. 초과 시 URL조회 폴백.</summary>
     private const int OnvifResolveTimeoutMs = 12000;
 
+    /// <summary>진행 중 Onvif조회 취소 소스(cameraId당 1개 — 팝업 dedupe로 카메라당 팝업 1개).
+    /// 팝업 닫힘/심볼 삭제 시 <see cref="CloseCameraPopupAsync"/>가 취소해 in-flight 조회를 끊는다(M-6, PRD §5-B).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource> _onvifResolveCts = new();
+
     /// <summary>
     /// Onvif조회 모드(FR-05/06/08): 팝업은 이미 열려 있음(IsResolvingSource=true) —
     /// ONVIF GetStreamUri로 프로파일별 URL 확보(<see cref="Services.Ptz.IPtzController.ResolveStreamUriAsync"/>)
@@ -43,16 +47,30 @@ public partial class MapViewModel
             }
             else
             {
-                using var cts = new CancellationTokenSource(OnvifResolveTimeoutMs);
-                var conn = new ConnectionModel
+                // 타임아웃 + 닫힘 취소 겸용 CTS(M-6) — 딕셔너리 등록으로 CloseCameraPopupAsync가 취소 가능.
+                var cts = new CancellationTokenSource(OnvifResolveTimeoutMs);
+                _onvifResolveCts[vm.CameraId] = cts;
+                try
                 {
-                    IpAddress = cam.IpAddress,
-                    PortOnvif = cam.IpPort > 0 ? cam.IpPort : 80,   // EnsurePtzReadyAsync와 동일 규칙(IpPort 겸용 함정 인지 — 분석 §6-3)
-                    Username = cam.UserName,
-                    Password = cam.UserPassword,
-                };
-                resolvedUri = await ptz.ResolveStreamUriAsync(vm.CameraId, conn, preferSub: true, cts.Token).ConfigureAwait(false);
+                    var conn = new ConnectionModel
+                    {
+                        IpAddress = cam.IpAddress,
+                        PortOnvif = cam.IpPort > 0 ? cam.IpPort : 80,   // EnsurePtzReadyAsync와 동일 규칙(IpPort 겸용 함정 인지 — 분석 §6-3)
+                        Username = cam.UserName,
+                        Password = cam.UserPassword,
+                    };
+                    resolvedUri = await ptz.ResolveStreamUriAsync(vm.CameraId, conn, preferSub: true, cts.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _onvifResolveCts.TryRemove(vm.CameraId, out _);
+                    cts.Dispose();   // Close 경로가 먼저 제거·Dispose했어도 CTS.Dispose는 멱등
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            _log?.Info($"[CameraPopup] Onvif조회 취소 cam={vm.CameraId} (팝업 닫힘 또는 타임아웃 {OnvifResolveTimeoutMs}ms) — URL조회 폴백.");
         }
         catch (Exception ex)
         {
@@ -71,7 +89,9 @@ public partial class MapViewModel
                 Password = cam?.UserPassword ?? string.Empty,
                 IpAddress = cam?.IpAddress ?? string.Empty,
                 Port = cam != null && cam.IpPort > 0 ? cam.IpPort : 554,
-                StreamType = 1,   // 서브 우선 조회(preferSub)
+                // 정보성 필드(스트림 키/재생 미사용) — preferSub 조회 의도 표기. 실제 선택 프로파일은
+                // 단일 프로파일 카메라 등에서 메인일 수 있음(M-2, 선택 토큰은 PtzController 로그로 추적).
+                StreamType = 1,
             };
             _log?.Info($"[CameraPopup] Onvif조회 성공 cam={vm.CameraId} URL={MaskRtspCredentials(composed)}");
         }

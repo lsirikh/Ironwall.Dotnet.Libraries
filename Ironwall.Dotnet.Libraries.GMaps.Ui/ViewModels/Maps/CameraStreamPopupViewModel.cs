@@ -115,6 +115,7 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         get => _connectionInfo;
         set
         {
+            if (ReferenceEquals(_connectionInfo, value)) return;   // 멱등(M-5) — 중복 주입 시 PropertyChanged 재발화→플레이어 재연결 트리거 방지
             _connectionInfo = value;
             if (value != null && StreamVm != null) StreamVm.ConnectionInfo = value;   // Row lease/모델 경로 일관
             NotifyOfPropertyChange(nameof(ConnectionInfo));

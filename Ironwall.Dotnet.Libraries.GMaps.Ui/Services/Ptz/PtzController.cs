@@ -402,11 +402,17 @@ public sealed class PtzController : IPtzController
         if (conn == null) return null;
         // 모델 확보 — InitializePtz 워밍 재사용(이중 초기화 0). PTZ capable 여부와 무관하게
         // MediaClient/Profiles만 있으면 조회 가능(비PTZ 고정 카메라 포함).
+        // 오픈 시 EnsurePtzReadyAsync(PTZ 준비)와 동시 호출될 수 있음(H-2) — 같은 Gate로 직렬화되어
+        // InitializePtz는 1회만 수행되고 나중 진입자는 캐시를 본다. 첫 오픈 최악 지연=init+LoadSpaces+GetStreamUri
+        // 직렬(호출측 12s 타임아웃이 안전망).
         await EnsureReadyAsync(cameraId, conn, ct).ConfigureAwait(false);
         if (!_ctx.TryGetValue(cameraId, out var ctx)) return null;
 
         try
         {
+            // ⚠ ctx.Gate 이중 획득 금지(H-1): 위 EnsureReadyAsync가 내부에서 Gate를 획득·해제(비재진입
+            //   SemaphoreSlim)한 뒤 여기서 "순차"로 다시 획득한다 — EnsureReady 로직을 이 Gate 블록 안으로
+            //   인라인하거나 전체를 단일 Gate로 감싸면 자기 데드락(취소 전까지 무한 대기)이 된다.
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {

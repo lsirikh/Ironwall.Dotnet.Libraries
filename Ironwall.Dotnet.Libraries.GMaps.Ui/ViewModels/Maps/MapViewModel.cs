@@ -2189,6 +2189,8 @@ public partial class MapViewModel : BasePanelViewModel,
                 _ = ptzOnClose.StopFocusAsync(vm.CameraId);   // 포커스 hold 중 닫기 → ImagingClient 모터 정지(F-03, 가드 내장)
             }
             if (_ptzGestureCts.TryRemove(vm.CameraId, out var gcts)) { try { gcts.Cancel(); } catch { } gcts.Dispose(); }
+            // Onvif조회 진행 중 닫힘 — in-flight 조회 취소(M-6, PRD §5-B). Gate 점유를 조기 반납해 재오픈 PTZ 지연 방지.
+            if (_onvifResolveCts.TryRemove(vm.CameraId, out var rcts)) { try { rcts.Cancel(); } catch { } rcts.Dispose(); }
             CameraPopups.Remove(vm);
             await vm.DisposeAsync();   // Hub Lease 해제(C-03)
         }
