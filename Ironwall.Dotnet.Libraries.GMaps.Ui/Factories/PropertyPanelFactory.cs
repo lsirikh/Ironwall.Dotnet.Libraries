@@ -84,6 +84,25 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Factories{
             return null;
         }
 
+        /// <summary>멀티셀렉션(≥2) 공통 속성창 — 모든 마커가 같은 concrete 타입이면 그 타입 패널(전용 속성 포함),
+        /// 서로 다른 타입이 섞이면 공통 기본 속성창(이름/색/두께/크기/가시성만). 대표=첫 유효 마커. (기능 ②)</summary>
+        public GMapPropertyBaseControl CreateCommonPropertyPanel(IReadOnlyList<IEditableMarker> markers)
+        {
+            if (markers == null || markers.Count == 0) return null;
+            var rep = markers.FirstOrDefault(m => m != null && !m.IsDisposed);
+            if (rep == null) return null;
+
+            var firstType = rep.GetType();
+            bool homogeneous = markers.All(m => m != null && !m.IsDisposed && m.GetType() == firstType);
+            if (homogeneous && _markerToPanelMap.ContainsKey(firstType))
+                return CreatePropertyPanel(rep);   // 동종(예: 카메라+제어기=모두 GMapPidsMarker) → 해당 타입 패널
+
+            // 혼합(예: 군대부호+제어기, 이미지+심볼) → 공통 기본 속성창(최소 공통 = IEditableMarker).
+            var common = new GMapPropertyCommonControl { SelectedMarker = rep };
+            _log?.Info($"공통 속성창(혼합 {markers.Count}개) 생성 — 대표 {rep.GetType().Name}");
+            return common;
+        }
+
         /// <summary>
         /// PIDS 마커의 DeviceType에 따라 FilteredDeviceList를 설정합니다.
         /// </summary>

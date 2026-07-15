@@ -941,6 +941,7 @@ public partial class MapViewModel : BasePanelViewModel,
         _groupSelection?.SetSelection(live != null && live.Count > 0 ? live : null);
         NotifyOfPropertyChange(nameof(SelectedMarkers));
         NotifyOfPropertyChange(nameof(HasSelectedItem));   // 그룹선택 변경 → 쓰레기통·선택취소 버튼 활성 갱신
+        ShowGroupPropertyPanelIfNeeded();   // 그룹 ≥2 → 공통 속성창(전체 반영). (기능 ②)
     }
 
     /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
@@ -7230,6 +7231,86 @@ public partial class MapViewModel : BasePanelViewModel,
         IsPropertyPanelVisible = true;
     }
 
+    // ─────────── 기능 ②: 멀티셀렉트 공통 속성창 + 전체 반영 + 배치 Undo ───────────
+
+    /// <summary>그룹 선택(≥2)이면 최소 공통 타입 속성창 표시. 변경은 OnMarkerPropertyChanged가 전체 반영. 1개 이하면 미표시. (기능 ②)</summary>
+    private void ShowGroupPropertyPanelIfNeeded()
+    {
+        var sel = _groupSelection?.Selection;
+        if (sel == null || sel.Count < 2) return;   // 단일/없음 → 그룹 공통창 미표시(단일 경로는 별개)
+        var rep = sel.FirstOrDefault(m => m != null && !m.IsDisposed);
+        if (rep == null) return;
+
+        HidePropertyPanel();
+        PropertyPanel = _propertyPanelFactory.CreateCommonPropertyPanel(sel);
+        if (PropertyPanel == null) return;
+
+        PropertyPanel.CloseRequested += OnPropertyPanelCloseRequested;
+        PropertyPanel.MarkerPropertyChanged += OnMarkerPropertyChanged;
+        PropertyPanel.ZOrderChangeRequested += OnPropertyPanelZOrderChangeRequested;
+        PropertyPanel.AvailableColors = AvailableColors;
+        PropertyPanel.AvailableSizes = AvailableSize;
+        PropertyPanel.IsDraggable = true;
+        PropertyPanel.IsEditModeEnabled = IsEditModeEnabled;
+        IsPropertyPanelVisible = true;
+        RefreshPropertyPanelZOrder();
+        _log?.Info($"그룹 공통 속성창 표시 — {sel.Count}개, {PropertyPanel.GetType().Name}");
+    }
+
+    /// <summary>그룹 공통 속성 변경을 선택된 전 마커에 적용 + 1개 매크로 Undo. 대표는 패널이 이미 적용(DB+record만),
+    /// 나머지는 ApplyProperty로 적용 후 record. (기능 ②-2)</summary>
+    private async System.Threading.Tasks.Task ApplyGroupPropertyChangeAsync(
+        System.Collections.Generic.IReadOnlyList<GMapSymbols.IEditableMarker> group, MarkerPropertyChangedEventArgs e)
+    {
+        var targets = group.Where(m => m != null && !m.IsDisposed && !m.IsLocked).ToList();
+        if (targets.Count == 0) return;
+
+        bool titleChanged = false;
+        using (_editRecorder?.BeginBatch($"그룹 속성 변경: {e.PropertyName} ({targets.Count}개)"))
+        {
+            foreach (var m in targets)
+            {
+                object? before;
+                if (ReferenceEquals(m, e.Marker))
+                {
+                    before = e.OldValue;   // 대표: 패널이 이미 적용함
+                }
+                else
+                {
+                    before = ReadMarkerProperty(m, e.PropertyName);
+                    Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.ApplyProperty(m, e.PropertyName, e.NewValue);   // 적용(단일 출처)
+                }
+                try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"그룹 속성 영속 실패: {ex.Message}"); }
+                _editRecorder?.RecordPropertyChange(m, e.PropertyName, before, e.NewValue);   // 배치 합류(1 매크로)
+                if (e.PropertyName == "Title") titleChanged = true;
+                if (e.PropertyName is "Zoom" or "IsLayerEnabled") MainMap?.RefreshMarkerVisibility(m);
+            }
+        }
+        if (titleChanged) _ = LoadLayersFromDbAsync();   // 레이어 트리 이름 동기(1회)
+        _groupSelection?.RefreshAdorner();
+        MainMap?.InvalidateVisual();
+    }
+
+    /// <summary>IEditableMarker 편집 속성을 이름으로 읽기(그룹 undo의 before용). ApplyProperty 짝.</summary>
+    private static object? ReadMarkerProperty(GMapSymbols.IEditableMarker m, string prop) => prop switch
+    {
+        "Title" => m.Title,
+        "TitleSize" => m.TitleSize,
+        "Bearing" => m.Bearing,
+        "Width" => m.Width,
+        "Height" => m.Height,
+        "Zoom" => m.Zoom,
+        "StrokeThickness" => m.StrokeThickness,
+        "ZOrder" => m.ZOrder,
+        "Opacity" => m is GMapSymbols.GMapImageMarker im ? im.Opacity : (object?)null,
+        "ShowShape" => m.ShowShape,
+        "ShowTitle" => m.ShowTitle,
+        "IsLocked" => m.IsLocked,
+        "FillColor" => m.FillColor,
+        "StrokeColor" => m.StrokeColor,
+        _ => null
+    };
+
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
     {
         if (IsApplyingUndo) return;   // Undo/Redo 재적용 중 바인딩 에코 → 중복 DbUpdate/트리리로드/이미지싱크 방지(FIX 2)
@@ -7240,6 +7321,16 @@ public partial class MapViewModel : BasePanelViewModel,
             // (OPERATOR는 편집모드 진입 자체가 게이팅돼 여기 도달 전 차단됨 — 이 가드는 세션 중 역할강등 등 백스톱)
             if (!CanEditMap()) { _log?.Warning($"[RBAC] 맵 편집 권한 없음 — 속성 저장 차단: {e.PropertyName}"); ShowNoMapEditPermissionInfo(); return; }
             _log?.Info($"속성창 변경에 의한 마커 속성 변경: {e.PropertyName} = {e.NewValue}");
+
+            // 그룹 선택(≥2) + 공통 속성창 변경 → 선택된 전 마커에 반영 + 배치 Undo(1 매크로). (기능 ②-2)
+            var groupSelForProp = _groupSelection?.Selection;
+            if (groupSelForProp != null && groupSelForProp.Count >= 2
+                && Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands.UndoableCommandBase.IsReplayableProperty(e.PropertyName))
+            {
+                await ApplyGroupPropertyChangeAsync(groupSelForProp, e);
+                return;
+            }
+
             await DbUpdateProcess(e.Marker);
             _editRecorder?.RecordPropertyChange(e.Marker, e.PropertyName, e.OldValue, e.NewValue);   // Undo 기록(coalescing)
             // "Visibility"는 IsReplayableProperty 미포함이라 RecordPropertyChange가 드롭 → 전용 VisibilityCommand로

@@ -26,6 +26,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/infraPropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/PidsGroupPropertyStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/ImagePropertyStyle.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/CommonPropertyStyle.xaml" />
 
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MilitarySymbolRegisterStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/MapRoiStyle.xaml" />

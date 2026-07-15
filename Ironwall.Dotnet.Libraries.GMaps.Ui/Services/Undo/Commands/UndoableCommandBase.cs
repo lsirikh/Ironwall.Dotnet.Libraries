@@ -21,8 +21,9 @@ public abstract class UndoableCommandBase : IUndoableCommand
     public abstract Task ExecuteAsync(CancellationToken ct = default);
     public abstract Task UndoAsync(CancellationToken ct = default);
 
-    /// <summary>IEditableMarker의 편집 속성을 이름으로 세팅(값 커맨드 공용). 미지원 속성은 무시.</summary>
-    protected static void ApplyProperty(IEditableMarker m, string prop, object? v)
+    /// <summary>IEditableMarker의 편집 속성을 이름으로 세팅(값 커맨드 공용). 미지원 속성은 무시.
+    /// public — 멀티셀렉트 그룹 속성 일괄반영(MapViewModel)에서도 재사용(단일 출처).</summary>
+    public static void ApplyProperty(IEditableMarker m, string prop, object? v)
     {
         switch (prop)
         {
