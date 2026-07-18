@@ -28,8 +28,6 @@
     <!-- 카메라 팝업 RTSP 소스 Onvif조회(CameraPopup_RtspSource_Priority FR-03/04) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\OnvifProfileSelector.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\OnvifRtspUrlComposer.cs" />
-    <!-- 카메라 클릭 FOV 켜기 정책(GMap_PidsCamera_FOV_Toggle_Persistence FR-03) — 실코드 링크 -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\FovClickPolicy.cs" />
   </ItemGroup>
 
   <ItemGroup>

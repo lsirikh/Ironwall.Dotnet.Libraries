@@ -430,7 +430,6 @@ public partial class MapViewModel : BasePanelViewModel,
             _log?.Info("Adorner 시스템 통합 시작");
             // GMapCustomControl 이벤트 구독
             MainMap.OnMarkerClicked += OnMapMarkerClicked;
-            MainMap.OnMarkerPropertyPersistRequested += OnMarkerClickPropertyPersistRequested;   // 클릭 기반 FOV 켜기 영속
             MainMap.OnMarkerRightClicked += OnMapMarkerRightClicked;
             MainMap.OnMarkerDoubleClicked += OnMapMarkerDoubleClicked;   // RTSP 카메라 팝업
             MainMap.Markers.CollectionChanged += Markers_CollectionChangedForCameraPopups;  // FR-13 심볼 제거 시 팝업 닫기
@@ -497,7 +496,6 @@ public partial class MapViewModel : BasePanelViewModel,
 
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
-            MainMap.OnMarkerPropertyPersistRequested -= OnMarkerClickPropertyPersistRequested;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
             MainMap.OnMarkerDoubleClicked -= OnMapMarkerDoubleClicked;
             MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForCameraPopups;
@@ -7321,38 +7319,6 @@ public partial class MapViewModel : BasePanelViewModel,
         if (titleChanged) _ = LoadLayersFromDbAsync();   // 레이어 트리 이름 동기(1회)
         _groupSelection?.RefreshAdorner();
         MainMap?.InvalidateVisual();
-    }
-
-    /// <summary>
-    /// 마커 컨트롤의 클릭 기반 속성 변경(예: 카메라 클릭 FOV 켜기)을 DB 영속 + Undo 기록한다.
-    /// 속성창 경로(OnMarkerPropertyChanged)와 달리 그룹 일괄적용 분기를 타지 않으며(단일 마커 대상),
-    /// 맵 편집 권한(CanEditMap)만 게이트한다. 정책: "클릭=FOV 켜기(영구)".
-    /// </summary>
-    private async void OnMarkerClickPropertyPersistRequested(object? sender, MarkerPropertyChangedEventArgs e)
-    {
-        if (IsApplyingUndo || e?.Marker == null) return;
-
-        // 맵 편집 권한(RBAC) 없으면 시각 변경을 되돌리고 조용히 종료(클릭 흐름 — 팝업 억제)
-        if (!CanEditMap())
-        {
-            if (e.PropertyName == nameof(GMapPidsMarker.ShowFOV)
-                && e.Marker is GMapPidsMarker pidsRevert && e.OldValue is bool ov)
-                pidsRevert.ShowFOV = ov;
-            _log?.Warning($"[RBAC] 맵 편집 권한 없음 — 클릭 속성 저장 차단: {e.PropertyName}");
-            return;
-        }
-
-        _log?.Info($"클릭 기반 마커 속성 영속: {e.PropertyName} = {e.NewValue}");
-        try
-        {
-            await DbUpdateProcess(e.Marker);
-            _editRecorder?.RecordPropertyChange(e.Marker, e.PropertyName, e.OldValue, e.NewValue);   // Undo 기록(coalescing)
-        }
-        catch (Exception ex)
-        {
-            // async void — 예외가 앱 크래시/무음 소멸로 이어지지 않도록 포착(주변 핸들러와 동일 패턴)
-            _log?.Error($"클릭 기반 속성 영속 실패: {e.PropertyName} — {ex.Message}");
-        }
     }
 
     private async void OnMarkerPropertyChanged(object? sender, MarkerPropertyChangedEventArgs e)
