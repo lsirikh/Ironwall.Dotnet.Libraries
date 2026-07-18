@@ -186,6 +186,13 @@ public class GMapCustomControl : GMapControl
     public event Action<IEditableMarker> OnMarkerClicked;
 
     /// <summary>
+    /// 마커 컨트롤이 클릭 기반 속성 변경(예: 카메라 클릭 FOV 켜기)의 DB 영속 + Undo 기록을 VM에 요청.
+    /// 속성창 경로(GMapPropertyBaseControl.MarkerPropertyChanged)와 별개로, 컨트롤이 DB 접근 없이
+    /// VM의 영속 로직을 재사용하기 위한 채널.
+    /// </summary>
+    public event EventHandler<MarkerPropertyChangedEventArgs>? OnMarkerPropertyPersistRequested;
+
+    /// <summary>
     /// 마커 우클릭 이벤트 - ViewModel에 우클릭된 마커 전달 (컨텍스트 메뉴용)
     /// </summary>
     public event Action<IEditableMarker>? OnMarkerRightClicked;
@@ -761,6 +768,29 @@ public class GMapCustomControl : GMapControl
         catch (Exception ex)
         {
             _log?.Error($"TriggerMarkerClicked 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 마커 컨트롤의 클릭 기반 속성 변경을 VM에 전달해 DB 영속 + Undo 기록을 요청한다.
+    /// (예: 카메라 클릭으로 FOV를 켰을 때 ShowFOV=true 를 영속)
+    /// </summary>
+    public void TriggerMarkerPropertyPersist(IEditableMarker marker, string property, object? oldValue, object? newValue)
+    {
+        try
+        {
+            if (marker == null || string.IsNullOrEmpty(property)) return;
+            OnMarkerPropertyPersistRequested?.Invoke(this, new MarkerPropertyChangedEventArgs
+            {
+                Marker = marker,
+                PropertyName = property,
+                OldValue = oldValue!,
+                NewValue = newValue!,
+            });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"TriggerMarkerPropertyPersist 실패: {ex.Message}");
         }
     }
 

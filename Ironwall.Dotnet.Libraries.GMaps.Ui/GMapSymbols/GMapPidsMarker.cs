@@ -95,12 +95,17 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     }
 
     /// <summary>
-    /// FOV 표시 토글
+    /// FOV 표시 토글 (low-level 프리미티브). ShowFOV 프로퍼티 경유로 PropertyChanged를 발화한다.
+    /// <para>주의: UI 클릭 정책("클릭=켜기 전용, 끄기는 속성패널")은 컨트롤 계층
+    /// (GMapMarkerPidsControl + FovClickPolicy)에서 집행된다. 이 메서드는 정책 게이트를 거치지 않는
+    /// 양방향 토글이므로 클릭 경로에서 호출하지 말 것.</para>
     /// </summary>
     public void ToggleFOVDisplay()
     {
-        _model.ShowFOV = !_model.ShowFOV;
-        _log?.Info($"FOV 표시 토글: {_model.ShowFOV}");
+        // ShowFOV 프로퍼티 setter 경유(OnPropertyChanged 발화) — _model 직접 반전 시 TwoWay 바인딩이
+        // 갱신되지 않아 컨트롤 DP·FOV 렌더가 반영 안 되고 desync가 발생하는 버그를 차단.
+        ShowFOV = !ShowFOV;
+        _log?.Info($"FOV 표시 토글: {ShowFOV}");
     }
 
     

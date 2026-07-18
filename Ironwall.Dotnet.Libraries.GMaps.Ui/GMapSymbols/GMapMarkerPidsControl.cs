@@ -426,10 +426,15 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         switch (DeviceType)
         {
             case EnumDeviceType.IpCamera:
-                // 카메라 클릭 시 FOV 표시
-                if (!ShowFOV && Marker != null)
+                // 카메라 클릭 = FOV 켜기(영구). 정책: 켜기 전용(이미 켜져 있으면 무동작 → 반복 클릭 desync 방지).
+                if (FovClickPolicy.ShouldTurnOnFov(ShowFOV) && Marker != null)
                 {
-                    Marker.ToggleFOVDisplay();
+                    var before = Marker.ShowFOV;   // 실제 이전 상태 캡처(하드코딩 대신 — RBAC 되돌림 정확성)
+                    // 프로퍼티 setter 경유 → OnPropertyChanged → TwoWay DP → OnShowFOVChanged → UpdateFOVPath(즉시 렌더)
+                    Marker.ShowFOV = true;
+                    // 컨트롤은 DB 접근이 없으므로 GMapCustomControl 이벤트로 VM에 영속(DB+Undo) 요청
+                    var map = _mapControl ?? FindParentMapControl();
+                    map?.TriggerMarkerPropertyPersist(Marker, nameof(GMapPidsMarker.ShowFOV), before, true);
                 }
                 break;
 
