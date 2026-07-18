@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [GMap_Rotation_FullSync_Design-analysis.md](analyses/GMap_Rotation_FullSync_Design-analysis.md) | GMap_Rotation_FullSync_Design (완전 싱크 설계 + (M−I)·T 스윔 정정, 블로커 3종) | 2026-07-18 |
 | [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz (A/B 동일영상 버그 원인 규명) | 2026-07-15 |
 | [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
 | [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-13 |
