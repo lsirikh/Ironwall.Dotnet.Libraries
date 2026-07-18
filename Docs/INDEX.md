@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-07-13 (advance-phase 자동)
-- **총 문서 수**: 329개
+- **마지막 갱신**: 2026-07-18 (advance-phase 자동)
+- **총 문서 수**: 346개
 
 ---
 
@@ -10,11 +10,13 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [GMap_Rotation_FullSync_Design-analysis.md](analyses/GMap_Rotation_FullSync_Design-analysis.md) | GMap_Rotation_FullSync_Design (완전 싱크 설계 + (M−I)·T 스윔 정정, 블로커 3종) | 2026-07-18 |
-| [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz (A/B 동일영상 버그 원인 규명) | 2026-07-15 |
+| [GMap_Rotation_FullSync_Design_Adversarial_Review-analysis.md](analyses/GMap_Rotation_FullSync_Design_Adversarial_Review-analysis.md) | GMap_Rotation_FullSync_Design_Adversarial_Review | 2026-07-18 |
+| [GMap_Rotation_Overlay_Desync-analysis.md](analyses/GMap_Rotation_Overlay_Desync-analysis.md) | GMap_Rotation_Overlay_Desync | 2026-07-18 |
+| [GMap_Rotation_FullSync_Design-analysis.md](analyses/GMap_Rotation_FullSync_Design-analysis.md) | GMap_Rotation_FullSync_Design | 2026-07-18 |
+| [GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md](analyses/GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md) | GMap_UI_Edit_Undo_Redo_MultiSelection | 2026-07-15 |
+| [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz | 2026-07-15 |
 | [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
 | [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-13 |
-| [GMap_Rotation_Overlay_Desync-analysis.md](analyses/GMap_Rotation_Overlay_Desync-analysis.md) | GMap_Rotation_Overlay_Desync | 2026-07-13 |
 | [GMap_RDP_Overlay_Desync-analysis.md](analyses/GMap_RDP_Overlay_Desync-analysis.md) | GMap_RDP_Overlay_Desync | 2026-07-07 |
 | [Map_Edit_Undo_Redo-analysis.md](analyses/Map_Edit_Undo_Redo-analysis.md) | Map_Edit_Undo_Redo | 2026-07-02 |
 | [GMap_Adorner_System-analysis.md](analyses/GMap_Adorner_System-analysis.md) | GMap_Adorner_System | 2026-07-02 |
@@ -27,10 +29,14 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority (URL조회/Onvif조회 토글) | Approved | 2026-07-15 |
-| [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator (CPU/GPU/RAM 툴바 지표) | Draft | 2026-07-13 |
-| [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
+| [GMap_PidsCamera_FOV_Toggle_Persistence-prd.md](prds/GMap_PidsCamera_FOV_Toggle_Persistence-prd.md) | GMap_PidsCamera_FOV_Toggle_Persistence | Approved | 2026-07-18 |
+| [GMap_Lock_Selection_ZOrder_Integrity-prd.md](prds/GMap_Lock_Selection_ZOrder_Integrity-prd.md) | GMap_Lock_Selection_ZOrder_Integrity | Approved | 2026-07-15 |
+| [DeviceStatusSync_ActionReportPropagation-prd.md](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | DeviceStatusSync_ActionReportPropagation | Draft | 2026-07-15 |
+| [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority | Approved | 2026-07-15 |
 | [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | Draft | 2026-07-13 |
+| [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator | Approved | 2026-07-13 |
+| [GOP_Server_API_GIS_v6.3_전달통지.md](prds/GOP_Server_API_GIS_v6.3_전달통지.md) | GOP_Server_API_GIS_v6.3_전달통지.md | Draft | 2026-07-13 |
+| [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
 | [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
 | [GIS.md](prds/GIS.md) | GIS.md | Draft | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
@@ -154,12 +160,13 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [CameraPopup_RtspSource_Priority-prd-plan.md](plans/CameraPopup_RtspSource_Priority-prd-plan.md) | [PRD](prds/CameraPopup_RtspSource_Priority-prd.md) | 17/20 | 2026-07-15 |
-| [GMap_SystemResource_Indicator-prd-plan.md](plans/GMap_SystemResource_Indicator-prd-plan.md) | [PRD](prds/GMap_SystemResource_Indicator-prd.md) | 28/33 | 2026-07-13 |
+| [DeviceStatusSync_ActionReportPropagation-prd-plan.md](plans/DeviceStatusSync_ActionReportPropagation-prd-plan.md) | [PRD](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | 0/30 | 2026-07-15 |
+| [CameraPopup_RtspSource_Priority-prd-plan.md](plans/CameraPopup_RtspSource_Priority-prd-plan.md) | [PRD](prds/CameraPopup_RtspSource_Priority-prd.md) | 24/27 | 2026-07-15 |
+| [GMap_SystemResource_Indicator-prd-plan.md](plans/GMap_SystemResource_Indicator-prd-plan.md) | [PRD](prds/GMap_SystemResource_Indicator-prd.md) | 0/45 | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd-plan.md](plans/LineArea_Symbol_Resize-prd-plan.md) | [PRD](prds/LineArea_Symbol_Resize-prd.md) | 0/26 | 2026-07-13 |
+| [LeftMenu_IntegratedWeb_Button-prd-plan.md](plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) | [PRD](prds/LeftMenu_IntegratedWeb_Button-prd.md) | 7/13 | 2026-07-13 |
 | [GMap_Zoom_Anchor_Home-prd-plan.md](plans/GMap_Zoom_Anchor_Home-prd-plan.md) | [PRD](prds/GMap_Zoom_Anchor_Home-prd.md) | 6/40 | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md](plans/MapSymbol_Shortcut_CopyPasteDelete-prd-plan.md) | [PRD](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | 0/27 | 2026-07-13 |
-| [LeftMenu_IntegratedWeb_Button-prd-plan.md](plans/LeftMenu_IntegratedWeb_Button-prd-plan.md) | [PRD](prds/LeftMenu_IntegratedWeb_Button-prd.md) | 7/13 | 2026-07-13 |
 | [Watchdog_Modern_Rebuild-prd-plan.md](plans/Watchdog_Modern_Rebuild-prd-plan.md) | [PRD](prds/Watchdog_Modern_Rebuild-prd.md) | 0/46 | 2026-07-13 |
 | [Action_Report_Nats_FullDto_Contract-prd-plan.md](plans/Action_Report_Nats_FullDto_Contract-prd-plan.md) | [PRD](prds/Action_Report_Nats_FullDto_Contract-prd.md) | 10/10 | 2026-07-11 |
 | [Account_Lock_Management-prd-plan.md](plans/Account_Lock_Management-prd-plan.md) | [PRD](prds/Account_Lock_Management-prd.md) | 2/26 | 2026-07-07 |
@@ -246,6 +253,10 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md](reports/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md) | [PRD](prds/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd.md) → [Plan](plans/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd-plan.md) | 2026-07-15 |
+| [ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md](reports/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md) | [PRD](prds/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd.md) → [Plan](plans/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd-plan.md) | 2026-07-15 |
+| [ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md](reports/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd.md) → [Plan](plans/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd-plan.md) | 2026-07-15 |
+| [ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md](reports/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md-prd.md) → [Plan](plans/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md-prd-plan.md) | 2026-07-15 |
 | [Event_CRUD_Standard_Simulation-report.md](reports/Event_CRUD_Standard_Simulation-report.md) | [PRD](prds/Event_CRUD_Standard_Simulation-prd.md) → [Plan](plans/Event_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
 | [Device_CRUD_Standard_Simulation-report.md](reports/Device_CRUD_Standard_Simulation-report.md) | [PRD](prds/Device_CRUD_Standard_Simulation-prd.md) → [Plan](plans/Device_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
 | [TEST_VERIFICATION_CHECKLIST_2026-07-04.md](reports/TEST_VERIFICATION_CHECKLIST_2026-07-04.md) | [PRD](prds/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd.md) → [Plan](plans/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd-plan.md) | 2026-07-04 |
