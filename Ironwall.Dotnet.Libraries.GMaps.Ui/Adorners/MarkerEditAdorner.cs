@@ -750,9 +750,18 @@ public class MarkerEditAdorner : Adorner, IDisposable
             double newPosX = posNow.X + (handleTarget.X - handleNow.X);
             double newPosY = posNow.Y + (handleTarget.Y - handleNow.Y);
 
-            var newGeoPos = _mapControl.FromLocalToLatLng(
-                (int)Math.Round(newPosX),
-                (int)Math.Round(newPosY));
+            // 서브픽셀 보간 — 정수 코어픽셀 반올림(FromLocalToLatLng(int)) 대신 인접 4점 이중선형 보간.
+            //   디지털 줌(1 코어픽셀 = 여러 화면픽셀)에서 심볼 드래그가 계단(뻑뻑함) 없이 매끄럽게 이동.
+            double baseX = Math.Floor(newPosX), baseY = Math.Floor(newPosY);
+            double fracX = newPosX - baseX, fracY = newPosY - baseY;
+            int ipx = (int)baseX, ipy = (int)baseY;
+            var g00 = _mapControl.FromLocalToLatLng(ipx, ipy);
+            var g10 = _mapControl.FromLocalToLatLng(ipx + 1, ipy);
+            var g01 = _mapControl.FromLocalToLatLng(ipx, ipy + 1);
+            var g11 = _mapControl.FromLocalToLatLng(ipx + 1, ipy + 1);
+            var (blat, blng) = SubPixelGeo.Bilinear(
+                (g00.Lat, g00.Lng), (g10.Lat, g10.Lng), (g01.Lat, g01.Lng), (g11.Lat, g11.Lng), fracX, fracY);
+            var newGeoPos = new PointLatLng(blat, blng);
 
             _targetMarker.UpdateLocation(newGeoPos);
         }
