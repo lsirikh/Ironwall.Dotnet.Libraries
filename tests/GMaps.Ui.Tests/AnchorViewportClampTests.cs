@@ -101,4 +101,19 @@ public class AnchorViewportClampTests
         Assert.Equal(5.0, w, 5);
         Assert.True(e > w && n > s);   // 벤더 BoundsOfMap 안전(퇴화 사각형 아님)
     }
+
+    [Fact]
+    public void should_collapse_stably_and_nondegenerate_near_fit_zoom()
+    {
+        // fit-zoom 부근(뷰포트≈사이트): 뷰포트가 미세하게 달라도(Mercator 위도변동 모사) inset이
+        //   '거의 0 퇴화(HeightLat=0)'가 아니라 동일한 안정 붕괴여야 → 중심 드리프트·요동 방지(로그 버그 회귀).
+        var a = AnchorViewportClamp.InsetBounds(N, S, E, W, (E - W) - 1e-7, (N - S) - 1e-7, 1.0); // inset ≈ +1e-7 (< MIN_INSET)
+        var b = AnchorViewportClamp.InsetBounds(N, S, E, W, (E - W) + 1e-7, (N - S) + 1e-7, 1.0); // inset ≈ -1e-7 (뷰포트 살짝 큼)
+
+        Assert.True(a.east - a.west > 0 && a.north - a.south > 0);   // 비퇴화(HeightLat≠0) — 벤더 안전
+        Assert.Equal(a.east - a.west, b.east - b.west, 12);          // 뷰포트 미세차에도 동일 폭(안정, 요동 없음)
+        Assert.Equal(a.north - a.south, b.north - b.south, 12);      // 동일 높이
+        Assert.Equal((E + W) / 2.0, (a.east + a.west) / 2.0, 5);     // 중심 lng = 사이트 중심
+        Assert.Equal((N + S) / 2.0, (a.north + a.south) / 2.0, 5);   // 중심 lat = 사이트 중심
+    }
 }

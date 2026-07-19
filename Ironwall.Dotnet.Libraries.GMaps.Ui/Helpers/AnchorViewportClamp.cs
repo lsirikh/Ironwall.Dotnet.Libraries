@@ -20,7 +20,11 @@
 /// </summary>
 internal static class AnchorViewportClamp
 {
-    private const double COLLAPSE_EPS = 1e-7;   // 뷰포트≥사이트 붕괴 시 중심 근방 폭(≈1cm) — 잠금
+    private const double COLLAPSE_EPS = 1e-7;   // 붕괴 시 중심 근방 반폭(≈1cm) — 잠금(비퇴화)
+    // 남는 이동여유(inset)가 이 값 이하면 붕괴 처리. fit-zoom 부근에서 (a)폭 0 퇴화 사각형 방지
+    //   (b)Mercator 위도변동(ViewArea.HeightLat이 위도별로 ~1e-7 흔들림)에 안 흔들리는 히스테리시스.
+    //   ≈0.1m 상당 — 이 미만 이동여유는 실질 "잠김"으로 간주.
+    private const double MIN_INSET = 1e-6;
 
     /// <summary>사이트(N/S/E/W)를 현재 뷰포트 절반만큼 안쪽으로 축소한 inset 경계를 반환.
     /// 축이 붕괴(뷰포트≥사이트)하면 그 축을 중심±ε으로(잠금). 디지털줌 보정(÷scale) 반영.</summary>
@@ -52,14 +56,17 @@ internal static class AnchorViewportClamp
         return (lat, lng);
     }
 
-    /// <summary>한 축 inset — 뷰포트(2·half)가 사이트 폭(max-min) 이상이면 중심±ε(잠금), 아니면 [min+half, max-half].</summary>
+    /// <summary>한 축 inset — 남는 이동여유(span-2·half)가 MIN_INSET 이하면 중심±ε으로 안정 붕괴(잠금·비퇴화),
+    /// 아니면 [min+half, max-half]. 붕괴 조건에 MIN_INSET 여유를 둬 fit-zoom 경계에서 퇴화·요동을 막는다.</summary>
     private static (double lo, double hi) InsetAxis(double min, double max, double half)
     {
         double span = max - min;
-        if (2.0 * half >= span)
+        // span - 2·half = 남는 이동여유. 이게 MIN_INSET 이하(음수 포함)면 붕괴 → 중심 근방 안정 잠금.
+        //   경계에서 '거의 0'인 non-degenerate inset(HeightLat≈0)을 만들지 않아 벤더 BoundsOfMap 오작동 차단.
+        if (span - 2.0 * half <= MIN_INSET)
         {
             double c = (min + max) / 2.0;
-            return (c - COLLAPSE_EPS, c + COLLAPSE_EPS);   // 뷰포트 ≥ 사이트 → 중심 근방으로 붕괴 = 잠금
+            return (c - COLLAPSE_EPS, c + COLLAPSE_EPS);   // 뷰포트 ≥ 사이트(≈) → 중심 근방으로 붕괴 = 잠금
         }
         return (min + half, max - half);
     }
