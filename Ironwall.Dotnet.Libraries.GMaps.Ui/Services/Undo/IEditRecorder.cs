@@ -48,6 +48,10 @@ public interface IEditRecorder
     /// <summary>위치 변경(그룹 이동 멤버) 기록 — before=이동 전 위치, after=현재 마커 위치.</summary>
     void RecordPositionChange(IEditableMarker marker, PointLatLng before);
 
+    /// <summary>명시적 before/after 스냅샷으로 위치 변경 기록 — 호출 시점 live 위치를 재읽지 않음
+    /// (방향키 nudge처럼 기록 후 위치가 더 진행될 수 있는 경로에서 after 오염 방지).</summary>
+    void RecordPositionChange(IEditableMarker marker, PointLatLng before, PointLatLng after);
+
     /// <summary>잠금 변경 기록(레이어트리/개별 심볼).</summary>
     void RecordLock(IEditableMarker marker, bool before, bool after);
 

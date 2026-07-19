@@ -944,8 +944,9 @@ public partial class MapViewModel : BasePanelViewModel,
         ShowGroupPropertyPanelIfNeeded();   // 그룹 ≥2 → 공통 속성창(전체 반영). (기능 ②)
     }
 
-    /// <summary>Del = 그룹 삭제(그룹 활성 시).</summary>
-    private async void OnMapPreviewKeyDownForGroup(object sender, System.Windows.Input.KeyEventArgs e)
+    /// <summary>Del = 그룹 삭제(그룹 활성 시). ★ 동기 핸들러 — 방향키 소비 판정·Handled를 await 전에
+    /// 확정해야 RoutedEvent가 기본 방향 포커스 네비/이중 터널링으로 새지 않는다(focus 표시 튐 방지).</summary>
+    private void OnMapPreviewKeyDownForGroup(object sender, System.Windows.Input.KeyEventArgs e)
     {
         // 텍스트/콤보 입력 중이면 단축키(Del/방향키/Ctrl+C·V 등) 가로채지 않음 — 윈도우 레벨 후킹이 광범위하므로(#7, RISK-02).
         var focused = System.Windows.Input.Keyboard.FocusedElement;
@@ -973,11 +974,18 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         // 방향키 이동 — 스냅 ON=격자 한 칸, 스냅 OFF=1px(Shift+방향키=5px). 선택된 심볼/이미지 대상.
-        // 선택 없으면 미처리 → 기본 동작(맵 패닝) 유지.
+        // 선택 없으면 미소비 → 기본 동작 유지.
         if (e.Key is System.Windows.Input.Key.Left or System.Windows.Input.Key.Right
             or System.Windows.Input.Key.Up or System.Windows.Input.Key.Down)
         {
-            if (await TryMoveSelectionByGridAsync(e.Key)) e.Handled = true;
+            // ★ 동기 판정 — 소비 여부를 먼저 정하고 e.Handled를 await보다 앞에 설정한다.
+            //   그래야 이 PreviewKeyDown이 계속 터널링(이중 핸들러 재이동)하거나 WPF 기본 방향 포커스
+            //   네비게이션으로 흘러 focus 표시가 이웃 심볼로 튀는 것을 막는다. UI 이동은 동기 완료, DB는 write-behind.
+            if (TryMoveSelectionByGrid(e.Key, out var moves))
+            {
+                e.Handled = true;
+                if (moves.Count > 0) _ = PersistNudgeMovesAsync(moves);
+            }
             return;
         }
 
@@ -994,10 +1002,13 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
-    /// <summary>방향키로 선택 심볼/이미지 이동. 스냅 ON=격자 교점 한 칸, 스냅 OFF=방향키 1px·Shift+방향키 5px.
-    /// 그룹 선택 우선(전체 이동, 잠금 제외), 없으면 단일 선택. DB 영속 + Undo 기록(그룹=1 매크로). 편집모드·권한 게이트.</summary>
-    private async System.Threading.Tasks.Task<bool> TryMoveSelectionByGridAsync(System.Windows.Input.Key key)
+    /// <summary>방향키로 선택 심볼/이미지 이동(★동기). 스냅 ON=격자 교점 한 칸, 스냅 OFF=방향키 1px·Shift+방향키 5px.
+    /// 그룹 우선(전체 이동, 잠금 제외), 없으면 단일. 전원 한 프레임 이동 + Undo(명시 after) 동기 기록.
+    /// DB 영속은 호출부가 PersistNudgeMovesAsync로 분리(write-behind). 반환=이 키를 소비했는가(권한없음도 소비=true).</summary>
+    private bool TryMoveSelectionByGrid(System.Windows.Input.Key key,
+        out System.Collections.Generic.List<(GMapSymbols.IEditableMarker marker, GMap.NET.PointLatLng before, GMap.NET.PointLatLng after)> moves)
     {
+        moves = new System.Collections.Generic.List<(GMapSymbols.IEditableMarker, GMap.NET.PointLatLng, GMap.NET.PointLatLng)>();
         if (MainMap == null || !IsEditModeEnabled) return false;   // 스냅 ON=격자, OFF=픽셀(1/5) 둘 다 처리
 
         // 대상 수집(잠금·dispose 제외). 그룹 우선, 없으면 단일.
@@ -1008,7 +1019,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 : new System.Collections.Generic.List<GMapSymbols.IEditableMarker>());
         if (targets.Count == 0) return false;
 
-        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return true; }   // 처리됨(권한없음 안내) — 패닝 방지
+        if (!CanEditMap()) { ShowNoMapEditPermissionInfo(); return true; }   // 소비(권한없음 안내) — 패닝 방지
 
         int sx = key == System.Windows.Input.Key.Left ? -1 : key == System.Windows.Input.Key.Right ? 1 : 0;
         int sy = key == System.Windows.Input.Key.Up ? -1 : key == System.Windows.Input.Key.Down ? 1 : 0;
@@ -1024,8 +1035,7 @@ public partial class MapViewModel : BasePanelViewModel,
             (x0, y0) = SnapGridOverlayService.ComputeOrigin(MainMap, gridPx);
         }
 
-        // 이동 + 영속(그룹 이동과 동일 패턴). before는 이동 전 위치(Undo용).
-        var moves = new System.Collections.Generic.List<(GMapSymbols.IEditableMarker marker, GMap.NET.PointLatLng before)>();
+        // 전원 동기 이동(한 프레임 — DB 대기 없음). after=이동 후 실제 위치(명시 스냅샷 → Undo after 오염 방지).
         foreach (var m in targets)
         {
             var before = m.Position;
@@ -1044,20 +1054,38 @@ public partial class MapViewModel : BasePanelViewModel,
                 np = MainMap.FromLocalToLatLng((int)System.Math.Round(p.X + sx * stepPx), (int)System.Math.Round(p.Y + sy * stepPx));
             }
             m.UpdateLocation(np);
-            moves.Add((m, before));
-            try { await DbUpdateProcess(m); } catch (System.Exception ex) { _log?.Error($"방향키 이동 영속 실패: {ex.Message}"); }
+            moves.Add((m, before, m.Position));
         }
 
-        // Undo 기록 — 단일=직접, 다중=1 매크로.
+        // Undo 기록 — 동기·명시 after. 단일=직접, 다중=1 매크로.
         if (moves.Count == 1)
-            _editRecorder?.RecordPositionChange(moves[0].marker, moves[0].before);
+            _editRecorder?.RecordPositionChange(moves[0].marker, moves[0].before, moves[0].after);
         else
             using (_editRecorder?.BeginBatch($"격자 이동 {moves.Count}개"))
-                foreach (var mv in moves) _editRecorder?.RecordPositionChange(mv.marker, mv.before);
+                foreach (var mv in moves) _editRecorder?.RecordPositionChange(mv.marker, mv.before, mv.after);
 
         if (_groupSelection?.HasSelection ?? false) _groupSelection.RefreshAdorner();
         MainMap.InvalidateVisual();
         return true;
+    }
+
+    private readonly System.Threading.SemaphoreSlim _nudgePersistGate = new System.Threading.SemaphoreSlim(1, 1);
+
+    /// <summary>방향키 이동 결과를 DB에 영속(write-behind). UI·Undo는 이미 동기 완료 — 시각은 DB 지연과 무관.
+    /// 게이트로 직렬화(중첩 DB 쓰기 방지). 각 DbUpdateProcess는 실행 시점 live 위치를 저장하므로 최종 위치로 수렴.</summary>
+    private async System.Threading.Tasks.Task PersistNudgeMovesAsync(
+        System.Collections.Generic.List<(GMapSymbols.IEditableMarker marker, GMap.NET.PointLatLng before, GMap.NET.PointLatLng after)> moves)
+    {
+        await _nudgePersistGate.WaitAsync();
+        try
+        {
+            foreach (var mv in moves)
+            {
+                try { await DbUpdateProcess(mv.marker); }
+                catch (System.Exception ex) { _log?.Error($"방향키 이동 영속 실패: {ex.Message}"); }
+            }
+        }
+        finally { _nudgePersistGate.Release(); }
     }
 
     /// <summary>그룹 이동 완료 → 멤버별 DB 영속(잠금 멤버 스킵, FR-MS-05/08). RBAC 게이트.</summary>

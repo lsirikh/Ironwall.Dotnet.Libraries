@@ -153,9 +153,11 @@ public sealed class EditRecorder : IEditRecorder
     }
 
     public void RecordPositionChange(IEditableMarker marker, PointLatLng before)
+        => RecordPositionChange(marker, before, marker?.Position ?? before);
+
+    public void RecordPositionChange(IEditableMarker marker, PointLatLng before, PointLatLng after)
     {
         if (!Ready || marker == null) return;
-        var after = marker.Position;
         if (before.Lat == after.Lat && before.Lng == after.Lng) return;   // 이동 없음(잠금 멤버)
         try
         {
