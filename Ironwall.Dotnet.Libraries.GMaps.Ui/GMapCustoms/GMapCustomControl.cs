@@ -1167,6 +1167,12 @@ public class GMapCustomControl : GMapControl
 
         base.OnMouseLeftButtonUp(e);
 
+        // [MapAnchor] 맵 팬 종료 복구(스턱 방지) — 맵 팬은 _isDragging(이미지 전용)을 세팅하지 않아 아래 이미지 블록을 안 탄다.
+        //   드래그 중 중심이 inset 밖으로 오버슈트하면 벤더가 이후 모든 드래그를 Contains-스킵해 '스턱'되고(줌 변경 전까지 복구 불가),
+        //   벤더 mouse-up 복원(LastLocationInBounds)은 스테일일 수 있다. 여기서 '현재 inset'으로 강제 클램프해 마우스 릴리즈 시 즉시 복구.
+        if (!_isDragging && !_isClampingToBounds)
+            ClampCenterToBounds(Position);
+
         if (_isDragging)
         {
             ResetDragState();
