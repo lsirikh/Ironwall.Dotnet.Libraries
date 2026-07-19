@@ -163,6 +163,14 @@
 										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding AnchorEnabled}" />
 
+									<!--  현재 보는 화면(디지털줌 17+/18+ 보정 포함)을 그대로 앵커 좌표로 캡처 — 드래그보다 쉬움  -->
+									<Button
+										Margin="0,0,0,10"
+										HorizontalAlignment="Stretch"
+										Command="{Binding SetAnchorFromViewCommand}"
+										Content="현재 화면 기준 (지금 보는 영역을 좌표로)"
+										Style="{StaticResource MapAnchorButton}" />
+
 									<Button
 										Margin="0,0,0,14"
 										HorizontalAlignment="Stretch"

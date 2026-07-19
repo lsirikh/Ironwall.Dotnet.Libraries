@@ -302,6 +302,18 @@
 							</Button.Style>
 							<md:PackIcon Kind="CropFree" />
 						</Button>
+						<Button Command="{Binding ToggleCenterCrosshairCommand}" ToolTip="화면 중앙 십자">
+							<Button.Style>
+								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsCenterCrosshairVisible}" Value="True">
+											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Button.Style>
+							<md:PackIcon Kind="Crosshairs" />
+						</Button>
 						<Button Command="{Binding ShowMapRoiPanelCommand}" ToolTip="관심지역 관리">
 							<Button.Style>
 								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
@@ -750,6 +762,39 @@
 				Longitude="{Binding CurrentCoordinatePosition.Longitude}"
 				MGRS="{Binding CurrentMGRS}"
 				UTM="{Binding CurrentUTM}" />
+
+			<!--  화면 정중앙 십자가(비상호작용 시각 기준) — IsCenterCrosshairVisible 토글. AdornerDecorator 형제라 디지털줌 RenderTransform 영향 없이 항상 화면 중앙  -->
+			<Grid
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Width="44"
+				Height="44"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				IsHitTestVisible="False"
+				Panel.ZIndex="250">
+				<Grid.Style>
+					<Style TargetType="Grid">
+						<Setter Property="Visibility" Value="Collapsed" />
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding IsCenterCrosshairVisible}" Value="True">
+								<Setter Property="Visibility" Value="Visible" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Grid.Style>
+				<Path
+					Stroke="#FF2196F3"
+					StrokeThickness="1.5"
+					Data="M22,2 L22,16 M22,28 L22,42 M2,22 L16,22 M28,22 L42,22" />
+				<Ellipse
+					Width="8"
+					Height="8"
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center"
+					Stroke="#FF2196F3"
+					StrokeThickness="1.5" />
+			</Grid>
 
 			<!--  카메라 특정위치 확인(타겟 조준) 상태 배너 — IsAimStatusVisible 시 상단 중앙 표시  -->
 			<Border
