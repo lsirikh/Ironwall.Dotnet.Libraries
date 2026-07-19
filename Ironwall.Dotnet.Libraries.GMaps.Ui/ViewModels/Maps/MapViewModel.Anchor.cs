@@ -48,14 +48,15 @@ public partial class MapViewModel
         if (anchor.MinZoomFloor > 0)
             ZoomMin = Math.Max(ZoomMin, anchor.MinZoomFloor);
 
-        // FR-B1/B4: 패닝 구역 — 엄격모드면 반-뷰포트 inset(화면밖 완전차단), 아니면 중심 클램프.
-        MainMap.BoundsOfMap = anchor.StrictContainment ? InsetByHalfViewport(rect.Value) : rect;
+        // FR-1: 패닝 구역 = 원본 사이트 사각형. 실질 뷰포트-가두기는 GMapCustomControl이 런타임(라이브)으로 수행
+        //   — 정적 inset 폐기(줌 변경 시 재계산·디지털줌 보정은 컨트롤이 담당). 컨테인먼트 상시-ON(FR-6, Strict 필드는 하위호환 존치).
+        MainMap.BoundsOfMap = rect;
 
         // FR-H1: 앵커 활성인데 홈이 미설정이면 홈=앵커 중심 자동 세팅(최초 적용).
         if (HomePosition == null || !HomePosition.IsAvailable)
             SetHomeToAnchorCenter();
 
-        _log?.Info($"[MapAnchor] 적용: strict={anchor.StrictContainment}, minZoom={ZoomMin}, bounds={MainMap.BoundsOfMap}");
+        _log?.Info($"[MapAnchor] 적용(뷰포트-가두기 상시): minZoom={ZoomMin}, bounds={MainMap.BoundsOfMap}");
     }
 
     /// <summary>앵커가 올렸던 MinZoom을 지도 기본(SelectedMap.MinZoomLevel)으로 복원. 앵커 해제 시 줌아웃 복구(사용자 지적).</summary>
@@ -75,27 +76,6 @@ public partial class MapViewModel
         double east = Math.Max(a.NorthWest.Longitude, a.SouthEast.Longitude);
         if (east <= west || north <= south) return null;
         // FromLTRB(leftLng, topLat, rightLng, bottomLat)
-        return RectLatLng.FromLTRB(west, north, east, south);
-    }
-
-    /// <summary>
-    /// 현재 뷰포트(ViewArea) 절반만큼 구역을 안쪽으로 축소 → 뷰포트가 구역 밖을 안 보이게(엄격모드, best-effort).
-    /// 줌 변경 시 뷰포트가 커지면 정밀도가 떨어지므로 후속(줌-change 재계산) 여지 있음. 구역이 뷰포트보다 작으면 원본 유지.
-    /// </summary>
-    private RectLatLng InsetByHalfViewport(RectLatLng rect)
-    {
-        var view = MainMap.ViewArea;   // 현재 화면 영역(RectLatLng)
-        double halfLat = view.HeightLat / 2.0;
-        double halfLng = view.WidthLng / 2.0;
-
-        double west = rect.Lng + halfLng;
-        double east = (rect.Lng + rect.WidthLng) - halfLng;
-        double north = rect.Lat - halfLat;                     // top(north)을 아래로
-        double south = (rect.Lat - rect.HeightLat) + halfLat;  // bottom(south)을 위로
-
-        if (east <= west || north <= south)
-            return rect;   // 구역이 뷰포트보다 작아 inset 불가 → 중심 클램프로 폴백
-
         return RectLatLng.FromLTRB(west, north, east, south);
     }
 

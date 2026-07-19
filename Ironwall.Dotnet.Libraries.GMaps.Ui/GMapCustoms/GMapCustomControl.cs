@@ -395,7 +395,7 @@ public class GMapCustomControl : GMapControl
         IgnoreMarkerOnMouseWheel = true;
 
         // ★ 디지털 줌(SE-1/NFR-4): 리사이즈 시 ScaleTransform 중심(ActualWidth/2)이 바뀌므로 재적용.
-        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0) ApplyDigitalZoomTransform(); };
+        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0) ApplyDigitalZoomTransform(); if (!_isClampingToBounds) ClampCenterToBounds(Position); };   // [MapAnchor] 크기 변경 시 뷰포트-가두기 재적용(FR-4)
 
         base.OnInitialized(e);
 
@@ -458,6 +458,9 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [MapAnchor] 줌 변경 시 유효 뷰포트가 달라지므로 뷰포트-가두기 재적용(FR-4).
+        if (!_isClampingToBounds) ClampCenterToBounds(Position);
+
         try
         {
             _log?.Info($"줌 변경됨: {Zoom}");
@@ -499,17 +502,15 @@ public class GMapCustomControl : GMapControl
         // 드래그 중에는 TriggerSelectionChange → OnAreaChange → UpdateMarkersVisibilityByZoom + InvalidateVisual
         // 체인이 매 프레임 실행되어 심볼이 타일과 어긋나는 버그 유발 (RDP 환경 특히 심각).
         // 드래그 완료 후(IsDragging=false)에만 영역 변경 처리를 허용한다.
+        // [MapAnchor] 라이브 뷰포트-가두기 — 드래그 중에도 매 위치변경마다 클램프(놓을 때 스냅 대신 실시간
+        //   경계 고정 → 밀렸다 튕김 제거). 벤더가 mouse 팬에 BoundsOfMap을 enforce하지 않으므로 직접 클램프. (FR-1/3)
+        if (!_isClampingToBounds && ClampCenterToBounds(point)) return;
+
         if (IsDragging)
         {
-            // [임시 진단 제거] 팬 스킵 계측 (기능 가드/return 은 유지)
-            //_panSkipCount++;
-            //if (_panSkipCount % 5 == 1) LogOverlayDesyncDiag($"DRAG-SKIP#{_panSkipCount}");
+            // 드래그 중에는 영역 변경 처리(TriggerSelectionChange) 스킵 — RDP 심볼-타일 어긋남 방지. 클램프는 위에서 수행.
             return;
         }
-
-        // [MapAnchor] 사이트 고정: 이동/드래그 종료 후 중심이 앵커 구역 밖이면 안으로 되돌림(BoundsOfMap 강제).
-        //   벤더 GMapControl이 BoundsOfMap을 패닝에 enforce하지 않으므로 여기서 직접 클램프. (FR-B1)
-        if (!_isClampingToBounds && ClampCenterToBounds(point)) return;
 
         try
         {
@@ -529,7 +530,8 @@ public class GMapCustomControl : GMapControl
     // [MapAnchor] 패닝 구역 강제 클램프(재진입 방지 플래그 + 로직) — 벤더 BoundsOfMap 미enforce 보완. (FR-B1)
     private bool _isClampingToBounds;
 
-    /// <summary>지도 중심(point)이 BoundsOfMap(앵커 구역) 밖이면 경계 안으로 되돌린다. 되돌렸으면 true.</summary>
+    /// <summary>지도 중심을 사이트 사각형(BoundsOfMap) "뷰포트-가두기"로 클램프 — 뷰포트 전체가 사이트를
+    /// 벗어나지 않도록(중심-가두기 아님). 뷰포트가 사이트보다 크면 중심을 사이트 중심에 고정(잠금). 되돌렸으면 true.</summary>
     private bool ClampCenterToBounds(PointLatLng point)
     {
         var bounds = BoundsOfMap;
@@ -539,13 +541,17 @@ public class GMapCustomControl : GMapControl
         double north = r.Lat, south = r.Lat - r.HeightLat;  //             Lat=north(top),  -HeightLat=south
         if (east <= west || north <= south) return false;   // 퇴화 구역 방어
 
-        double lng = Math.Clamp(point.Lng, west, east);
-        double lat = Math.Clamp(point.Lat, south, north);
-        if (Math.Abs(lng - point.Lng) < 1e-9 && Math.Abs(lat - point.Lat) < 1e-9)
-            return false;                                    // 이미 구역 안 — 클램프 불필요
+        // 현재 뷰포트(위경도 폭/높이)에 디지털줌 보정(÷scale)을 매 호출 런타임 계산 → 줌 변경 자동 반영(FR-4/5).
+        var view = ViewArea;
+        var (lat, lng) = Helpers.AnchorViewportClamp.ClampCenter(
+            point.Lat, point.Lng, north, south, east, west,
+            view.WidthLng, view.HeightLat, DigitalZoomScale);
+
+        if (Math.Abs(lng - point.Lng) < 1e-7 && Math.Abs(lat - point.Lat) < 1e-7)
+            return false;                                    // 이미 뷰포트가 안쪽 — 클램프 불필요(1e-7≈1cm, 부동소수 오차 흡수)
 
         _isClampingToBounds = true;
-        try { Position = new PointLatLng(lat, lng); }        // 중심을 경계 안으로 되돌림(재진입은 위 가드로 스킵)
+        try { Position = new PointLatLng(lat, lng); }        // 중심을 뷰포트-경계 안으로 (재진입은 위 가드로 스킵)
         finally { _isClampingToBounds = false; }
         return true;
     }
@@ -1141,11 +1147,11 @@ public class GMapCustomControl : GMapControl
             //var elapsed = (DateTime.Now - _panStartTime).TotalMilliseconds;
             //_log?.Info($"[PAN] ===DRAG-END=== t={DateTime.Now:HH:mm:ss.fff} skippedFrames={_panSkipCount} elapsed={elapsed:F0}ms → TriggerSelectionChange once");
 
-            // [MapAnchor] 드래그-팬 종료 시 중심이 앵커 구역 밖이면 안으로 되돌림(BoundsOfMap 강제 — 벤더 미enforce 보완, FR-B1)
-            ClampCenterToBounds(Position);
-
-            // OnPositionChanged를 드래그 중 skip했으므로 종료 시점에 한 번 영역 갱신(클램프된 위치 반영)
-            TriggerSelectionChange(ViewArea, Zoom, false);
+            // [MapAnchor] 드래그-팬 종료 정합 — 라이브 클램프가 매 프레임 경계를 유지하므로 보통 no-op.
+            //   재클램프가 위치를 바꾸면(true) 그 Position 설정이 OnPositionChanged 재발화 → (IsDragging=false이므로)
+            //   TriggerSelectionChange를 이미 수행하므로, 중복 렌더 방지를 위해 여기선 건너뛴다(H-2). 안 바뀌면 1회 갱신.
+            if (!ClampCenterToBounds(Position))
+                TriggerSelectionChange(ViewArea, Zoom, false);
         }
     }
 
@@ -1602,6 +1608,8 @@ public class GMapCustomControl : GMapControl
     {
         var c = (GMapCustomControl)d;
         c.ApplyDigitalZoomTransform();
+        // [MapAnchor] 디지털 줌 변경 시 보이는 영역이 달라지므로 뷰포트-가두기 재적용(FR-4/5).
+        if (!c._isClampingToBounds) c.ClampCenterToBounds(c.Position);
         c.DigitalZoomLevelChanged?.Invoke((int)e.NewValue);
     }
 

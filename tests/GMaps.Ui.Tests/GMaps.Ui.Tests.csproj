@@ -28,6 +28,8 @@
     <!-- 카메라 팝업 RTSP 소스 Onvif조회(CameraPopup_RtspSource_Priority FR-03/04) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\Ptz\OnvifProfileSelector.cs" />
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\OnvifRtspUrlComposer.cs" />
+    <!-- 사이트 고정 뷰포트-가두기 순수 수학(GMap_Anchor_Viewport_Lock FR-1/2/5) — 실코드 링크 -->
+    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\AnchorViewportClamp.cs" />
   </ItemGroup>
 
   <ItemGroup>
