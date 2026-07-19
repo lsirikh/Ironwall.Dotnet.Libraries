@@ -31,7 +31,7 @@ public partial class MapViewModel
         if (anchor == null || !anchor.IsAvailable)
         {
             // 앵커 비활성/무효 → 패닝 구역 해제 + 앵커가 올렸던 최소줌을 지도 기본값으로 복원(줌아웃 복구, 사용자 지적)
-            MainMap.BoundsOfMap = null;
+            MainMap.SetAnchorSite(null);   // 앵커 해제 → 컨트롤이 BoundsOfMap 해제
             RestoreBaseMinZoom();
             return;
         }
@@ -39,7 +39,7 @@ public partial class MapViewModel
         var rect = BuildAnchorRect(anchor);
         if (rect == null)
         {
-            MainMap.BoundsOfMap = null;
+            MainMap.SetAnchorSite(null);   // 앵커 해제 → 컨트롤이 BoundsOfMap 해제
             RestoreBaseMinZoom();
             return;
         }
@@ -48,9 +48,9 @@ public partial class MapViewModel
         if (anchor.MinZoomFloor > 0)
             ZoomMin = Math.Max(ZoomMin, anchor.MinZoomFloor);
 
-        // FR-1: 패닝 구역 = 원본 사이트 사각형. 실질 뷰포트-가두기는 GMapCustomControl이 런타임(라이브)으로 수행
-        //   — 정적 inset 폐기(줌 변경 시 재계산·디지털줌 보정은 컨트롤이 담당). 컨테인먼트 상시-ON(FR-6, Strict 필드는 하위호환 존치).
-        MainMap.BoundsOfMap = rect;
+        // FR-1: 원본 사이트 사각형을 컨트롤에 넘긴다. 컨트롤이 현재 뷰포트로 inset을 계산해 BoundsOfMap에 설정하고
+        //   줌/디지털줌/크기 변경 시 라이브 재계산 → 벤더의 드래그 Contains 스킵이 뷰포트-가두기가 됨. 컨테인먼트 상시-ON(FR-6).
+        MainMap.SetAnchorSite(rect);
 
         // FR-H1: 앵커 활성인데 홈이 미설정이면 홈=앵커 중심 자동 세팅(최초 적용).
         if (HomePosition == null || !HomePosition.IsAvailable)

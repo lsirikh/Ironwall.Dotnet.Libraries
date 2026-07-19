@@ -78,4 +78,27 @@ public class AnchorViewportClampTests
         Assert.Equal(10.0, lng, 6);   // east
         Assert.Equal(5.0, lat, 6);    // lat: half=2, 5 ∈ [2,8] → 5
     }
+
+    [Fact]
+    public void should_inset_bounds_by_half_viewport()
+    {
+        // 사이트 10x10, 뷰포트 4x4 → inset = N=8,S=2,E=8,W=2
+        var (n, s, e, w) = AnchorViewportClamp.InsetBounds(N, S, E, W, 4, 4, 1.0);
+        Assert.Equal(8.0, n, 6);
+        Assert.Equal(2.0, s, 6);
+        Assert.Equal(8.0, e, 6);
+        Assert.Equal(2.0, w, 6);
+    }
+
+    [Fact]
+    public void should_collapse_inset_to_center_when_viewport_ge_site()
+    {
+        // 뷰포트 12x12 ≥ 사이트 10x10 → inset이 중심(5,5) 근방으로 붕괴(잠금) — 단 비퇴화(e>w, n>s) 유지
+        var (n, s, e, w) = AnchorViewportClamp.InsetBounds(N, S, E, W, 12, 12, 1.0);
+        Assert.Equal(5.0, n, 5);
+        Assert.Equal(5.0, s, 5);
+        Assert.Equal(5.0, e, 5);
+        Assert.Equal(5.0, w, 5);
+        Assert.True(e > w && n > s);   // 벤더 BoundsOfMap 안전(퇴화 사각형 아님)
+    }
 }

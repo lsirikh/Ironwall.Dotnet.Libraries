@@ -395,7 +395,7 @@ public class GMapCustomControl : GMapControl
         IgnoreMarkerOnMouseWheel = true;
 
         // ★ 디지털 줌(SE-1/NFR-4): 리사이즈 시 ScaleTransform 중심(ActualWidth/2)이 바뀌므로 재적용.
-        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0) ApplyDigitalZoomTransform(); if (!_isClampingToBounds) ClampCenterToBounds(Position); };   // [MapAnchor] 크기 변경 시 뷰포트-가두기 재적용(FR-4)
+        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0) ApplyDigitalZoomTransform(); RecomputeAnchorViewportBounds(); };   // [MapAnchor] 크기 변경 시 inset 라이브 재계산(FR-4)
 
         base.OnInitialized(e);
 
@@ -458,8 +458,8 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
-        // [MapAnchor] 줌 변경 시 유효 뷰포트가 달라지므로 뷰포트-가두기 재적용(FR-4).
-        if (!_isClampingToBounds) ClampCenterToBounds(Position);
+        // [MapAnchor] 줌 변경 시 유효 뷰포트가 달라지므로 inset(BoundsOfMap) 라이브 재계산(FR-4).
+        RecomputeAnchorViewportBounds();
 
         try
         {
@@ -502,15 +502,14 @@ public class GMapCustomControl : GMapControl
         // 드래그 중에는 TriggerSelectionChange → OnAreaChange → UpdateMarkersVisibilityByZoom + InvalidateVisual
         // 체인이 매 프레임 실행되어 심볼이 타일과 어긋나는 버그 유발 (RDP 환경 특히 심각).
         // 드래그 완료 후(IsDragging=false)에만 영역 변경 처리를 허용한다.
-        // [MapAnchor] 라이브 뷰포트-가두기 — 드래그 중에도 매 위치변경마다 클램프(놓을 때 스냅 대신 실시간
-        //   경계 고정 → 밀렸다 튕김 제거). 벤더가 mouse 팬에 BoundsOfMap을 enforce하지 않으므로 직접 클램프. (FR-1/3)
-        if (!_isClampingToBounds && ClampCenterToBounds(point)) return;
-
         if (IsDragging)
         {
-            // 드래그 중에는 영역 변경 처리(TriggerSelectionChange) 스킵 — RDP 심볼-타일 어긋남 방지. 클램프는 위에서 수행.
             return;
         }
+
+        // [MapAnchor] 비드래그 위치 변경(프로그램적 이동 등)이 앵커 구역 밖이면 안으로 되돌림.
+        //   드래그 중 뷰포트-가두기는 벤더가 BoundsOfMap(=inset)의 Contains 스킵으로 직접 강제한다(RenderOffset 미이동, GMapControl:2090).
+        if (!_isClampingToBounds && ClampCenterToBounds(point)) return;
 
         try
         {
@@ -530,8 +529,8 @@ public class GMapCustomControl : GMapControl
     // [MapAnchor] 패닝 구역 강제 클램프(재진입 방지 플래그 + 로직) — 벤더 BoundsOfMap 미enforce 보완. (FR-B1)
     private bool _isClampingToBounds;
 
-    /// <summary>지도 중심을 사이트 사각형(BoundsOfMap) "뷰포트-가두기"로 클램프 — 뷰포트 전체가 사이트를
-    /// 벗어나지 않도록(중심-가두기 아님). 뷰포트가 사이트보다 크면 중심을 사이트 중심에 고정(잠금). 되돌렸으면 true.</summary>
+    /// <summary>지도 중심을 BoundsOfMap(= 라이브 뷰포트 inset 사각형) 안으로 클램프. BoundsOfMap이 이미 inset이므로
+    /// 단순 중심 클램프가 곧 뷰포트-가두기다. 줌 변경 후 중심을 새 inset 안으로 넣는 nudge에도 사용. 되돌렸으면 true.</summary>
     private bool ClampCenterToBounds(PointLatLng point)
     {
         var bounds = BoundsOfMap;
@@ -541,19 +540,47 @@ public class GMapCustomControl : GMapControl
         double north = r.Lat, south = r.Lat - r.HeightLat;  //             Lat=north(top),  -HeightLat=south
         if (east <= west || north <= south) return false;   // 퇴화 구역 방어
 
-        // 현재 뷰포트(위경도 폭/높이)에 디지털줌 보정(÷scale)을 매 호출 런타임 계산 → 줌 변경 자동 반영(FR-4/5).
-        var view = ViewArea;
-        var (lat, lng) = Helpers.AnchorViewportClamp.ClampCenter(
-            point.Lat, point.Lng, north, south, east, west,
-            view.WidthLng, view.HeightLat, DigitalZoomScale);
-
+        double lng = Math.Clamp(point.Lng, west, east);
+        double lat = Math.Clamp(point.Lat, south, north);
         if (Math.Abs(lng - point.Lng) < 1e-7 && Math.Abs(lat - point.Lat) < 1e-7)
-            return false;                                    // 이미 뷰포트가 안쪽 — 클램프 불필요(1e-7≈1cm, 부동소수 오차 흡수)
+            return false;                                    // 이미 안쪽 — 클램프 불필요(1e-7≈1cm, 부동소수 오차 흡수)
 
         _isClampingToBounds = true;
-        try { Position = new PointLatLng(lat, lng); }        // 중심을 뷰포트-경계 안으로 (재진입은 위 가드로 스킵)
+        try { Position = new PointLatLng(lat, lng); }        // 중심을 inset 경계 안으로 (재진입은 위 가드로 스킵)
         finally { _isClampingToBounds = false; }
         return true;
+    }
+
+    // [MapAnchor] 앵커 원본 사이트 사각형(뷰포트 inset의 원천). null=앵커 비활성.
+    private RectLatLng? _anchorSiteRect;
+
+    /// <summary>앵커 사이트 사각형 설정(활성) 또는 해제(null). 즉시 현재 뷰포트로 inset을 계산해 BoundsOfMap에 반영.
+    /// MapViewModel.ApplyMapAnchor에서 호출.</summary>
+    public void SetAnchorSite(RectLatLng? site)
+    {
+        _anchorSiteRect = site;
+        RecomputeAnchorViewportBounds();
+    }
+
+    /// <summary>_anchorSiteRect + 현재 뷰포트(디지털줌 보정)로 inset 사각형을 계산해 BoundsOfMap에 설정하고
+    /// 중심을 그 안으로 되돌린다(nudge). 줌/디지털줌/크기 변경 시 라이브 호출. 앵커 비활성이면 BoundsOfMap 해제.
+    /// BoundsOfMap=inset이므로 벤더의 드래그 Contains 스킵(GMapControl:2090)이 곧 뷰포트-가두기가 된다.</summary>
+    private void RecomputeAnchorViewportBounds()
+    {
+        if (_isClampingToBounds) return;
+        var site = _anchorSiteRect;
+        if (site == null) { BoundsOfMap = null; return; }
+        var r = site.Value;
+        double west = r.Lng, east = r.Lng + r.WidthLng;
+        double north = r.Lat, south = r.Lat - r.HeightLat;
+        if (east <= west || north <= south) { BoundsOfMap = null; return; }
+
+        var view = ViewArea;
+        var (n, s, e, w) = Helpers.AnchorViewportClamp.InsetBounds(
+            north, south, east, west, view.WidthLng, view.HeightLat, DigitalZoomScale);
+        BoundsOfMap = RectLatLng.FromLTRB(w, n, e, s);   // FromLTRB(leftLng, topLat, rightLng, bottomLat)
+        ClampCenterToBounds(Position);                   // 중심을 새 inset 안으로 nudge
+        _log?.Info($"[MapAnchor] inset 재계산: view=({view.WidthLng:F6}×{view.HeightLat:F6}) dz={DigitalZoomScale:F2} bounds={BoundsOfMap}");
     }
 
     /* [임시 진단 제거] RDP 오버레이 desync 확정 계측 — 현장 검증 완료(canvasSame/transformSame=True, err 약 0). 필요 시 이 블록주석 해제.
@@ -1608,8 +1635,8 @@ public class GMapCustomControl : GMapControl
     {
         var c = (GMapCustomControl)d;
         c.ApplyDigitalZoomTransform();
-        // [MapAnchor] 디지털 줌 변경 시 보이는 영역이 달라지므로 뷰포트-가두기 재적용(FR-4/5).
-        if (!c._isClampingToBounds) c.ClampCenterToBounds(c.Position);
+        // [MapAnchor] 디지털 줌 변경 시 보이는 영역이 달라지므로 inset 라이브 재계산(FR-4/5).
+        c.RecomputeAnchorViewportBounds();
         c.DigitalZoomLevelChanged?.Invoke((int)e.NewValue);
     }
 
