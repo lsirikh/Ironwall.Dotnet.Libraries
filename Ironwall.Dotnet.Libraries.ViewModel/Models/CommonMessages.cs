@@ -65,6 +65,7 @@ public class RefreshAccountsMessageModel;
 public class CallEditAccountAdminProcessMessageModel : IMessageModel { }
 public class CallDeleteAccountAdminProcessMessageModel : IMessageModel { }
 public class CallResetPasswordAdminProcessMessageModel : IMessageModel { }
+public class CallDeletePhotoAdminProcessMessageModel : IMessageModel { }
 public class CallEditProcessMessageModel : IMessageModel { }
 public class CallResetProcessMessageModel : IMessageModel { }
 public class CallResetPasswordProcessMessageModel : IMessageModel { }

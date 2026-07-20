@@ -186,6 +186,20 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success ? res.Data?.PhotoUrl : null;
     }
 
+    /// <summary>관리자: 대상 계정 사진 업로드 — POST /users/{id}/photo. 성공 시 서버 photo_url(절대 URL). 403/실패=null. — Admin_Photo_Upload</summary>
+    public async Task<string?> UploadPhotoAsync(int userId, string filePath, CancellationToken ct = default)
+    {
+        var res = await _api.UploadUserPhotoAsync(userId, filePath, ct).ConfigureAwait(false);
+        return res.Success ? res.Data?.PhotoUrl : null;
+    }
+
+    /// <summary>관리자: 대상 계정 사진 삭제 — DELETE /users/{id}/photo. 성공=true(default 아바타 복귀). 403/실패=false. — Admin_Photo_Upload</summary>
+    public async Task<bool> DeletePhotoAsync(int userId, CancellationToken ct = default)
+    {
+        var res = await _api.DeleteUserPhotoAsync(userId, ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
     /// <summary>PUT /users/me/password. 서버는 세션 무효화 안 함(F07-01) → 변경 후 강제 재로그인은 호스트 책임(§2.3.3).</summary>
     public async Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default)
     {

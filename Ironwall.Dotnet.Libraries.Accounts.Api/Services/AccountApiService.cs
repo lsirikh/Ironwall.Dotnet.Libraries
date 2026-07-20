@@ -283,6 +283,33 @@ public class AccountApiService : IAccountApiService
         _ => "image/jpeg",
     };
 
+    // ── 관리자: 대상 계정 사진 (Admin_Photo_Upload — 서버 v6.3 POST/DELETE /users/{id}/photo) ──
+    public async Task<ApiResponse<AuthUserDto>> UploadUserPhotoAsync(int userId, string filePath, CancellationToken ct = default)
+    {
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(filePath, ct).ConfigureAwait(false);
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(bytes);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(GuessImageMime(filePath));
+            content.Add(fileContent, "file", System.IO.Path.GetFileName(filePath));
+            // ⚠ 대상 계정 {id} (=본인 /me 아님). 서버가 base-ADMIN 상승가드 + actor≠target 감사 기록.
+            var res = await _api.PostFormDataRequestAsync($"users/{userId}/photo", content).ConfigureAwait(false);
+            return await res.ToApiResponseAsync<AuthUserDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
+    public async Task<ApiResponse<AuthUserDto>> DeleteUserPhotoAsync(int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.DeleteRequestAsync($"users/{userId}/photo").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<AuthUserDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
     {
         try

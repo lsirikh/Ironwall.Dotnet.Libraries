@@ -15,6 +15,12 @@
 ## [Unreleased]
 
 ### Added
+- **관리자 타 계정 프로필 사진 업로드/삭제 — EditorDialog `{id}` 배선** ([PRD](docs/prds/Admin_Photo_Upload-prd.md) · [Plan](docs/plans/Admin_Photo_Upload-prd-plan.md) · 태그 `before-admin-photo-upload` · worktree `feature/admin-photo-upload` · Accounts.Api/Accounts/Accounts.Ui/ViewModel · 라이브러리 한정)
+  - **배경**: 2026-07-13 오염 사고(관리자가 타 계정 편집 중 본인 `POST /me/photo` 재사용 → 로그인 관리자 사진 오염, `6842db5`로 차단)의 후속. 서버 `v6.3-admin_photo_upload`(`POST/DELETE /api/users/{id}/photo`, users:edit+base-ADMIN 상승가드+actor≠target 감사 via log_action_async) 배포로 클라 완결.
+  - **FR-01/02**: `AccountApiService.UploadUserPhotoAsync(id)`(`POST users/{id}/photo`, multipart `file`)·`DeleteUserPhotoAsync(id)`(`DELETE users/{id}/photo`, idempotent). 인터페이스는 default-impl(throw)로 기존 테스트 스텁 무수정.
+  - **FR-03**: `{id}` 사진 메서드를 self `IProfileGateway`가 아닌 관리자-타깃 `IUserDirectoryGateway`(default-impl null/false)에 배치 → self(오염원)/admin-target 경로를 **타입 레벨 분리**. `ApiAccountGateway` 오버라이드, `DbAccountGateway`=기본 상속(DB 모드 미지원 null).
+  - **FR-04/05**: `EditorDialogViewModel.ClickAddPicture` 차단 스텁 → **대상 `ViewModel.Model.Id`** 업로드(ProfileImageHelper 검증만=로컬 orphan 방지, 실패 시 표시 원복+graceful 팝업, 즉시커밋↔취소 비대칭 문서화) + `ClickDeletePicture`→확인 팝업→`HandleAsync`(영구삭제 확인 후 default 아바타 복귀). View에 삭제 버튼 추가.
+  - **검증**: 신규 계약 테스트 4(NFR-01 회귀=업로드/삭제 `users/{id}/photo` 타깃·`/me` 아님) + Accounts.Api **132/132**·Accounts.Ui.Tests **17/17** green, 빌드 0오류. **code-review(opus)**: P0 재오염 없음(타입+대상Id 추적 확증), P1 2건(삭제 확인 팝업·업로드 실패 orphan/원복) 반영. ⚠FR-06(버튼 권한 게이팅)=패널 진입 게이팅+서버 집행과 중복이라 보류. 런타임(타계정 업로드/삭제·감사기록·비-ADMIN 403)은 앱 재빌드 후.
 - **권한 부여 검증 + F-1(절단경고) + grant 만료 실시간 컷오프(FR-GS)** ([PRD](docs/prds/GrantList_TopLevelTotal_Fix-prd.md) · [PRD](docs/prds/Grant_LiveCutoff_Client-prd.md) · 태그 `before-grant-verification` · Accounts.Api/Accounts.Ui/Messages · 라이브러리 한정)
   - **검증**: GrantManagementPanelViewModel 119시나리오×2회 + AccountApiService 계약 14건(FakeGopServer=api-test-server grants 규칙 전사, 재현성 확인). 서버/클라 시간기반 집행 분석 MD 2종(`docs/analyses/Grant_Enforcement_{Server,Client}_Analysis.md`, 서버본은 api-test-server/docs 전달).
   - **F-1**: 서버 GET /grants 는 total 을 top-level 로 반환하나 클라가 pagination.total 만 읽어 절단경고(100건 초과)가 도달 불가였음 → `ApiListResponse.Total`(int?) 수신 + VM 소비. events 등 pagination 객체 경로 무영향(additive).

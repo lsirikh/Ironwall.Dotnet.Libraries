@@ -1,5 +1,6 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
+using Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
@@ -19,6 +20,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Dialogs;
 public class EditorDialogViewModel : BasePanelViewModel
                                     , IHandle<CallEditAccountAdminProcessMessageModel>
                                     , IHandle<CallResetPasswordAdminProcessMessageModel>
+                                    , IHandle<CallDeletePhotoAdminProcessMessageModel>
 {
     #region - Ctors -
     public EditorDialogViewModel(IEventAggregator eventAggregator
@@ -55,24 +57,84 @@ public class EditorDialogViewModel : BasePanelViewModel
     public async Task ClickCancel()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new CloseDialogMessageModel());
 
-    /// <summary>사진 추가 — 파일 선택 후 IProfileImageService로 저장. 등록(Register)·마이페이지엔 있으나 변경(Editor) 다이얼로그엔
-    ///   누락돼 사진 버튼이 무반응이던 버그 수정(사용자 실측). Register 패턴과 동일.</summary>
+    /// <summary>관리자: 대상 계정(ViewModel.Model) 프로필 사진 업로드. 서버 POST /users/{id}/photo 로 **대상 {id}** 를 향한다 —
+    ///   본인 /me/photo 재사용으로 로그인 관리자 사진이 오염되던 사고(2026-07-13, 6842db5 차단) 재발 원천 차단. — Admin_Photo_Upload FR-04
+    ///   ⚠ 업로드는 즉시 서버 커밋 — 다이얼로그 '취소'를 눌러도 사진 변경은 이미 반영됨(다른 필드와 비대칭).</summary>
     public async Task ClickAddPicture()
     {
-        // ⚠ [데이터 무결성 사고 차단] EditorDialog 는 '관리자가 타 계정을 편집'하는 다이얼로그다.
-        //   기존엔 _profileGateway.UploadPhotoAsync(파일)이 서버 POST /users/me/photo(=토큰 소유자=로그인 관리자 '본인')를
-        //   호출해, m_manager 편집 중 사진을 올리면 '관리자 자신(admin)'의 사진이 오염됐다(admin↔m_manager 동일 사진 사고).
-        //   서버에 관리자용 POST /users/{id}/photo 가 없어 '대상 계정' 업로드가 불가하다(REQ_Server_Admin_Photo_Upload).
-        //   → 서버 엔드포인트 배포 전까지 EditorDialog 사진 변경은 차단한다. 본인 사진은 마이페이지(POST /me/photo)에서.
-        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+        var dlg = new OpenFileDialog
         {
-            Title = "사진 변경 안내",
-            Explain = "다른 계정의 사진 변경은 현재 서버에서 지원되지 않습니다.\n" +
-                      "본인 사진은 '마이페이지'에서 변경하세요. (관리자용 타 계정 업로드 API 준비 중)"
-        });
+            Filter = "Images|*.bmp;*.jpg;*.jpeg;*.gif;*.png;*.webp|All files|*.*",
+            Title = "이미지 선택",
+            RestoreDirectory = true
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        // 이미지 검증만 수행(로컬 복사 없이) — 실패 업로드마다 로컬 orphan 이 쌓이던 문제 제거. 원본 경로를 그대로 서버 전송.
+        if (!ProfileImageHelper.IsValid(dlg.FileName, out var error))
+        {
+            _log?.Warning(error);
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "이미지", Explain = error });
+            return;
+        }
+
+        var oldImage = ViewModel.Image;   // 실패 시 표시 원복용
+        try
+        {
+            // ⚠ 반드시 대상 계정 {id} 로 업로드(=본인 /me 금지). 성공=서버 photo_url(절대 URL).
+            var url = await _gateway.UploadPhotoAsync(ViewModel.Model.Id, dlg.FileName, CancellationToken.None);
+            if (!string.IsNullOrEmpty(url))
+            {
+                ViewModel.Image = url;
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel());
+            }
+            else
+            {
+                // API 실패(403/네트워크) 또는 DB 모드(미지원) — 사진 미반영, 표시 원복.
+                ViewModel.Image = oldImage;
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 변경", Explain = "사진 변경이 반영되지 않았습니다. (권한 또는 서버 오류)" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[EditorDialog] 사진 업로드 실패: {ex.Message}");
+            ViewModel.Image = oldImage;
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 변경", Explain = "사진 업로드에 실패했습니다. 다시 시도해 주세요." });
+        }
     }
+
+    /// <summary>관리자: 대상 계정 프로필 사진 삭제 — 서버 영구삭제·되돌릴 수 없어 확인 팝업 후 실행(HandleAsync). — Admin_Photo_Upload FR-05</summary>
+    public async Task ClickDeletePicture()
+        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Explain = "이 계정의 프로필 사진을 삭제하시겠습니까?\n(서버에서 영구 삭제되며 되돌릴 수 없습니다.)",
+            MessageModel = new CallDeletePhotoAdminProcessMessageModel()
+        });
     #endregion
     #region - IHanldes -
+    /// <summary>사진 삭제 확인('확인') → 대상 계정 {id} 사진 서버 삭제 → default 아바타 복귀. — Admin_Photo_Upload FR-05</summary>
+    public async Task HandleAsync(CallDeletePhotoAdminProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ok = await _gateway.DeletePhotoAsync(ViewModel.Model.Id, cancellationToken);
+            if (ok)
+            {
+                ViewModel.Image = null;   // 서버 photo_url=null → default 아바타
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel(), cancellationToken);
+            }
+            else
+            {
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 삭제", Explain = "사진 삭제가 반영되지 않았습니다. (권한 또는 서버 오류)" }, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[EditorDialog] 사진 삭제 실패: {ex.Message}");
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 삭제", Explain = "사진 삭제에 실패했습니다. 다시 시도해 주세요." }, cancellationToken);
+        }
+    }
+
     public async Task HandleAsync(CallResetPasswordAdminProcessMessageModel message, CancellationToken cancellationToken)
     {
         try

@@ -30,4 +30,12 @@ public interface IUserDirectoryGateway
     /// <summary>계정 잠금 해제(ADMIN). Api=POST /users/{id}/unlock, Db=미지원(no-op false). 성공 여부 반환.</summary>
     Task<bool> UnlockAccountAsync(int id, CancellationToken ct = default)
         => Task.FromResult(false);
+
+    /// <summary>관리자: 대상 계정 프로필 사진 업로드. Api=POST /users/{id}/photo(성공 시 photo_url 반환), Db=미지원(null). 실패=null. — Admin_Photo_Upload</summary>
+    Task<string?> UploadPhotoAsync(int userId, string filePath, CancellationToken ct = default)
+        => Task.FromResult<string?>(null);
+
+    /// <summary>관리자: 대상 계정 프로필 사진 삭제. Api=DELETE /users/{id}/photo(성공 true), Db=미지원(false). idempotent. — Admin_Photo_Upload</summary>
+    Task<bool> DeletePhotoAsync(int userId, CancellationToken ct = default)
+        => Task.FromResult(false);
 }

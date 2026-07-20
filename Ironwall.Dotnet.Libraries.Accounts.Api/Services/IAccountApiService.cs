@@ -49,6 +49,12 @@ public interface IAccountApiService
     Task<ApiResponse<AuthUserDto>> UpdateMyProfileAsync(UserSelfUpdateDto dto, CancellationToken ct = default);
     /// <summary>POST /api/users/me/photo — 본인 프로필 사진 업로드(multipart). 서버가 photo_url(절대 URL) 갱신 후 사용자 반환.</summary>
     Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default);
+    /// <summary>POST /api/users/{id}/photo — 관리자: 대상 계정 사진 업로드(multipart, users:edit+base-ADMIN). 서버가 대상 photo_url 갱신 후 대상 user 반환. 기본구현=미지원(테스트 스텁 무수정). — Admin_Photo_Upload</summary>
+    Task<ApiResponse<AuthUserDto>> UploadUserPhotoAsync(int userId, string filePath, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    /// <summary>DELETE /api/users/{id}/photo — 관리자: 대상 계정 사진 삭제(idempotent). photo_url=null→default 아바타. 기본구현=미지원. — Admin_Photo_Upload</summary>
+    Task<ApiResponse<AuthUserDto>> DeleteUserPhotoAsync(int userId, CancellationToken ct = default)
+        => throw new NotImplementedException();
     /// <summary>PUT /api/users/me/password — {current_password,new_password(min6)}. 서버 세션무효화 없음(F07-01).</summary>
     Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default);
 

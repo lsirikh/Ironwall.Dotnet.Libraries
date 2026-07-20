@@ -274,22 +274,31 @@
 							IsEnabled="False"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.Image}" />
-						<!--  open file  -->
-						<Button
-							x:Name="ClickAddPicture"
+						<!--  photo add / delete (관리자: 대상 계정 {id} 사진 변경/삭제 — Admin_Photo_Upload)  -->
+						<StackPanel
 							Grid.Row="7"
 							Grid.Column="2"
 							VerticalAlignment="Center"
-							Style="{StaticResource MaterialDesignFlatButton}">
-							<Button.Content>
-								<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-									<md:PackIcon
-										Width="{StaticResource WidthIconSmall}"
-										Height="{StaticResource HeightIconSmall}"
-										Kind="ImageAdd" />
-								</StackPanel>
-							</Button.Content>
-						</Button>
+							Orientation="Horizontal">
+							<Button
+								x:Name="ClickAddPicture"
+								Style="{StaticResource MaterialDesignFlatButton}"
+								ToolTip="사진 변경">
+								<md:PackIcon
+									Width="{StaticResource WidthIconSmall}"
+									Height="{StaticResource HeightIconSmall}"
+									Kind="ImageAdd" />
+							</Button>
+							<Button
+								x:Name="ClickDeletePicture"
+								Style="{StaticResource MaterialDesignFlatButton}"
+								ToolTip="사진 삭제">
+								<md:PackIcon
+									Width="{StaticResource WidthIconSmall}"
+									Height="{StaticResource HeightIconSmall}"
+									Kind="ImageRemove" />
+							</Button>
+						</StackPanel>
 
 						<!--  Position  -->
 						<TextBlock
