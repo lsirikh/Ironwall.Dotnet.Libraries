@@ -89,6 +89,17 @@ public class AccountApiService : IAccountApiService
         }
     }
 
+    // GET /auth/me/permissions — 유효권한 스냅샷(FR-GS-01/02). 표준 envelope {success,data:{modules,device_groups,valid_until,server_time}}.
+    public async Task<ApiResponse<PermissionsSnapshotDto>> GetMyPermissionsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.GetRequestAsync("auth/me/permissions").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<PermissionsSnapshotDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<PermissionsSnapshotDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     public async Task<ApiListResponse<AuthUserDto>> GetUsersAsync(int page = 1, int limit = 100, CancellationToken ct = default)
     {
         try

@@ -35,6 +35,7 @@ public class AccountApiModule : Module
 
         // 토큰/권한 single source + 세션 라이프사이클(강제 로그아웃 단일 멱등 진입점, FR-FL-04)
         builder.RegisterType<TokenStorageService>().As<ITokenStorageService>().SingleInstance();
+        builder.RegisterType<SystemClock>().As<IClock>().SingleInstance().PreserveExistingDefaults();   // FR-GS-01 clockSkew 산출용(기존 등록 있으면 보존)
         builder.RegisterType<PermissionService>().As<IPermissionService>().SingleInstance();
         builder.RegisterType<SessionLifecycle>().As<ISessionLifecycle>().SingleInstance();
 
@@ -60,6 +61,17 @@ public class AccountApiModule : Module
         // Auth + User CRUD + 프로필 래퍼
         builder.Register(ctx => new AccountApiService(ctx.ResolveNamed<IApiService>(_name), _log))
             .As<IAccountApiService>().SingleInstance();
+
+        // FR-GS-03: grant 만료 능동 재조회(로그인→/me/permissions→valid_until 타이머). 앱 IService 러너가 기동/종료.
+        builder.Register(ctx => new PermissionRefreshService(
+                ctx.Resolve<IAccountApiService>(),
+                ctx.Resolve<IPermissionService>(),
+                ctx.Resolve<ISessionLifecycle>(),
+                ctx.Resolve<IClock>(),
+                _log))
+            .As<IPermissionRefreshService>()
+            .As<IService>()
+            .SingleInstance().WithMetadata("Order", _count + 1);
 
         // 게이트웨이 — 3 인터페이스 동시 등록(VM 무편집 스왑 지점)
         builder.Register(ctx => new ApiAccountGateway(

@@ -22,6 +22,11 @@ public interface IAccountApiService
     /// <summary>GET /api/auth/me — 평면(envelope 없음, A-4) 응답. 실패 시 null. permissions 미포함.</summary>
     Task<AuthUserDto?> GetMeAsync(CancellationToken ct = default);
 
+    /// <summary>GET /api/auth/me/permissions — 유효권한 스냅샷(modules/device_groups/valid_until/server_time).
+    /// grant 만료로 stale 된 권한 재평가용(FR-GS-01/02). 기본구현=미지원(테스트 스텁 무수정).</summary>
+    Task<ApiResponse<PermissionsSnapshotDto>> GetMyPermissionsAsync(CancellationToken ct = default)
+        => throw new NotImplementedException();
+
     // ── User CRUD (FR-19) ──
     /// <summary>GET /api/users — 계정 목록(pagination meta 없을 수 있음, B-8).</summary>
     Task<ApiListResponse<AuthUserDto>> GetUsersAsync(int page = 1, int limit = 100, CancellationToken ct = default);

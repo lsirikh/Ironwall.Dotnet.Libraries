@@ -15,6 +15,11 @@
 ## [Unreleased]
 
 ### Added
+- **권한 부여 검증 + F-1(절단경고) + grant 만료 실시간 컷오프(FR-GS)** ([PRD](docs/prds/GrantList_TopLevelTotal_Fix-prd.md) · [PRD](docs/prds/Grant_LiveCutoff_Client-prd.md) · 태그 `before-grant-verification` · Accounts.Api/Accounts.Ui/Messages · 라이브러리 한정)
+  - **검증**: GrantManagementPanelViewModel 119시나리오×2회 + AccountApiService 계약 14건(FakeGopServer=api-test-server grants 규칙 전사, 재현성 확인). 서버/클라 시간기반 집행 분석 MD 2종(`docs/analyses/Grant_Enforcement_{Server,Client}_Analysis.md`, 서버본은 api-test-server/docs 전달).
+  - **F-1**: 서버 GET /grants 는 total 을 top-level 로 반환하나 클라가 pagination.total 만 읽어 절단경고(100건 초과)가 도달 불가였음 → `ApiListResponse.Total`(int?) 수신 + VM 소비. events 등 pagination 객체 경로 무영향(additive).
+  - **FR-GS-01/02/03 (grant 만료 컷오프)**: `PermissionsSnapshotDto` + `IPermissionService.Refresh`(role/loginId/name 유지·clockSkew(server_time) 보정) + `GetMyPermissionsAsync`(/me/permissions) + `PermissionRefreshService`(valid_until 타이머·체인 재무장·fail-safe=권한확대 없음). 로그아웃 없이 만료 시 UI 권한 실시간 재게이팅(서버 403 권위 유지). 6c4ed0a(FR-GS-01/02) 설계 계승. **NATS 실시간 push(FR-GS-04)=서버 3-게이트 합동 Phase 2**(서버 NOTIFY §3 확정).
+  - **검증**: Accounts.Api **129/129** + Accounts.Ui.Tests **17/17** green(신규 테스트 +28). 검증 하네스+F-1 커밋 `bf23fb2`.
 - **장비 CRUD → DeviceProvider 캐시/패널 정합 (경로 B-패널, FR-D)** ([PRD](docs/prds/DeviceStatusSync_ActionReportPropagation-prd.md) · [Plan](docs/plans/DeviceStatusSync_ActionReportPropagation-prd-plan.md) · 태그 `before-devicesync-actionreport` · Devices.Ui/Events.Ui · 라이브러리 한정) — DeviceStatusSync PRD Phase 1. 장비 추가/삭제(SYNC_DEVICE)가 DeviceProvider 캐시를 넘어 파생 상태·열린 패널까지 정합되도록 4개 갭 해소.
   - **FR-D2 🔴 (DeviceCount stale)**: `DeviceProviderService.RemoveDeviceByIdAsync`가 삭제 전 소속 그룹 스냅샷으로 `DeviceGroupProvider.DeviceCount`를 1씩 감소(음수가드·다중그룹·미발견 skip). 서버 재조회 전 그룹 카운트 과대표시 제거.
   - **FR-D3 🟡 (그룹 멤버십 변경 미감지)**: `UpdateDeviceProperties`의 `DeviceGroups = new List` 재할당을 **기존 List Clear+AddRange**(참조 보존)로 교체 → UI 컬렉션 변경 감지.
