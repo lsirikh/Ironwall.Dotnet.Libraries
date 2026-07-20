@@ -32,8 +32,6 @@
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\AnchorViewportClamp.cs" />
     <!-- 디지털줌 드래그 서브픽셀 보간(심볼 이동 뻑뻑함 방지) — 실코드 링크 -->
     <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\SubPixelGeo.cs" />
-    <!-- 앵커 하드월 경계 클램프(오버슈트/튕김 제거) — 실코드 링크 -->
-    <Compile Include="..\..\Ironwall.Dotnet.Libraries.GMaps.Ui\Helpers\BoundaryLatLngClamp.cs" />
   </ItemGroup>
 
   <ItemGroup>

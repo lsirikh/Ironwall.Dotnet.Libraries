@@ -1997,7 +1997,6 @@ namespace GMap.NET.WindowsPresentation
                 }
 
                 _core.EndDrag();
-                _anchorPinRoX = null; _anchorPinRoY = null;   // [ANCHOR] 드래그 종료 → 경계 축 고정(pin) 리셋
 
                 if (BoundsOfMap.HasValue && !BoundsOfMap.Value.Contains(Position))
                 {
@@ -2088,11 +2087,11 @@ namespace GMap.NET.WindowsPresentation
                     Mouse.Capture(this);
                 }
 
-                // [ANCHOR HARD WALL] 앵커 뷰포트-락: 경계 밖이면 드래그를 스킵(→1프레임 오버슈트가 얼어
-                // 마우스업 스냅백=튕김)하던 것을, "항상 드래그 후 오버슈트면 경계로 RenderOffset 클램프"로
-                // 바꿔 맵을 벽처럼 매끄럽게 정지시킨다. 오버슈트는 렌더(InvalidateVisual) 전에 교정되어
-                // 화면에는 항상 클램프된 경계 위치만 그려진다(진동 없음). 튕김·TriggerSelectionChange 플리커·
-                // 타일↔오버레이 desync 스파이크가 함께 제거된다.
+                if (BoundsOfMap.HasValue && !BoundsOfMap.Value.Contains(Position))
+                {
+                    // ...
+                }
+                else
                 {
                     var p = e.GetPosition(this);
 
@@ -2107,11 +2106,6 @@ namespace GMap.NET.WindowsPresentation
                     _core.MouseCurrent.Y = (int)p.Y;
                     {
                         _core.Drag(_core.MouseCurrent);
-                    }
-
-                    if (BoundsOfMap.HasValue)
-                    {
-                        ClampDragToBounds(BoundsOfMap.Value);
                     }
 
                     if (IsRotated || _scaleMode != ScaleModes.Integer)
@@ -2797,67 +2791,6 @@ namespace GMap.NET.WindowsPresentation
             }
 
             return ret;
-        }
-
-        // [ANCHOR HARD WALL] 경계 접촉 시 넘은 축의 RenderOffset 고정값(첫 접촉 시점). 매 프레임 정수픽셀
-        //   재클램프로 위치가 ±1 core px 흔들리던 것(디지털줌 2.0×에서 ±2 device px로 확대→블링크/저킹)을 없앤다.
-        //   null=미고정. 드래그 종료 시 리셋(OnMouseLeftButtonUp), 원시 드래그가 다시 안쪽이면 축별 해제.
-        private long? _anchorPinRoX;
-        private long? _anchorPinRoY;
-
-        /// <summary>
-        /// [ANCHOR HARD WALL] 드래그 중심(Position)이 BoundsOfMap(inset) 경계를 넘으면, 넘은 축의 RenderOffset를
-        /// <b>첫 접촉 시점 값으로 고정(pin)</b>해 그 축을 벽에 붙여 멈춘다. 고정값이 프레임 간 불변이라 정수픽셀
-        /// 재클램프 저킹이 사라지고(2.0× 확대 블링크/저킹 제거), 안 넘은 축은 원시 드래그를 따라 경계를 따라 자유
-        /// 패닝된다. 원시 드래그가 다시 안쪽으로 오면 해제. 반열림 Contains 규약(Left ≤ lng &lt; Right, Bottom &lt; lat ≤ Top).
-        /// 재드래그로 타일 그리드까지 경계 기준 재계산(흰 여백 방지). 순수 클램프 좌표는 앱
-        /// <c>BoundaryLatLngClamp.Clamp</c>가 미러링(벤더는 앱 어셈블리 미참조라 인라인 — 함께 유지).
-        /// </summary>
-        private void ClampDragToBounds(RectLatLng b)
-        {
-            const double edgeEps = 1e-9;   // 반열림 모서리(Right·Bottom) 안쪽 여유(도 단위, 서브밀리미터)
-
-            double lng = Position.Lng, lat = Position.Lat;
-            bool outLng = lng < b.Left || lng >= b.Right;
-            bool outLat = lat > b.Top || lat <= b.Bottom;
-
-            // 경도 축: 넘었으면 첫 접촉 시 RenderOffset.X를 고정, 안쪽이면 해제(원시 드래그 사용).
-            if (outLng)
-            {
-                if (_anchorPinRoX == null)
-                {
-                    double clampedLng = lng < b.Left ? b.Left : b.Right - edgeEps;
-                    long boundaryX = _core.FromLatLngToLocal(new PointLatLng(lat, clampedLng)).X;
-                    long centerX = _core.FromLatLngToLocal(Position).X;
-                    _anchorPinRoX = _core.RenderOffset.X + (centerX - boundaryX);
-                }
-            }
-            else _anchorPinRoX = null;
-
-            // 위도 축 (Mercator: 로컬 Y는 위도에만 의존 → 경도 패닝과 무관하게 고정값 유효).
-            if (outLat)
-            {
-                if (_anchorPinRoY == null)
-                {
-                    double clampedLat = lat > b.Top ? b.Top : b.Bottom + edgeEps;
-                    long boundaryY = _core.FromLatLngToLocal(new PointLatLng(clampedLat, lng)).Y;
-                    long centerY = _core.FromLatLngToLocal(Position).Y;
-                    _anchorPinRoY = _core.RenderOffset.Y + (centerY - boundaryY);
-                }
-            }
-            else _anchorPinRoY = null;
-
-            if (_anchorPinRoX == null && _anchorPinRoY == null)
-                return;   // 완전히 안쪽 — 클램프 불필요
-
-            // 고정된 축의 RenderOffset가 되도록 드래그 타깃(MouseCurrent)을 보정해 재드래그.
-            //   Core.Drag가 RenderOffset+Position+타일 그리드를 고정값 기준으로 일관 재계산(흰 여백 방지).
-            //   고정값이 불변이라 그 축 위치가 안 흔들린다(저킹 제거). 미고정 축은 원시 드래그를 따라간다.
-            if (_anchorPinRoX != null)
-                _core.MouseCurrent.X += _anchorPinRoX.Value - _core.RenderOffset.X;
-            if (_anchorPinRoY != null)
-                _core.MouseCurrent.Y += _anchorPinRoY.Value - _core.RenderOffset.Y;
-            _core.Drag(_core.MouseCurrent);
         }
 
         public bool ShowExportDialog()
