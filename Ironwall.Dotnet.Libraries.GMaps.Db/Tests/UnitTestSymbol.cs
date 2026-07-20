@@ -254,6 +254,34 @@ public class GMapDbSymbol_BasicCrudTests
     }
 
     /// <summary>
+    /// 가시성(ShowShape)만 부분 UPDATE — 값이 영속되고 Category 판별자/타 필드는 보존되는지 검증.
+    /// 레이어패널 심볼 Visibility 토글의 DB 영속 경로(전체 행 재기록 회피, 2026-07-15 오염 사고 방지).
+    /// </summary>
+    /// <returns>Task</returns>
+    [Fact(DisplayName = "Symbols – UpdateShowShape (부분 UPDATE, 판별자 보존)")]
+    public async Task should_persist_showshape_and_preserve_discriminator_when_partial_update()
+    {
+        // Arrange
+        await _fx.SeedSymbolsAsync();
+        var before = await _fx.Svc.FetchSymbolAsync(_fx.InsertedSymbolIds.First());
+        Assert.NotNull(before);
+        var target = !before!.ShowShape;      // 현재값 반전 → 시드 기본값 무관하게 쓰기 검증
+        var beforeCategory = before.Category;  // 판별자 보존 검증용
+        var beforeTitle = before.Title;
+
+        // Act — 가시성만 부분 UPDATE
+        bool ok = await _fx.Svc.UpdateSymbolShowShapeAsync(before.Id, target);
+
+        // Assert
+        Assert.True(ok);
+        var after = await _fx.Svc.FetchSymbolAsync(before.Id);
+        Assert.NotNull(after);
+        Assert.Equal(target, after!.ShowShape);        // 가시성 영속
+        Assert.Equal(beforeCategory, after.Category);  // Category 판별자 오염 없음
+        Assert.Equal(beforeTitle, after.Title);        // 타 필드 불변
+    }
+
+    /// <summary>
     /// Symbol 삭제 테스트
     /// </summary>
     /// <returns>Task</returns>

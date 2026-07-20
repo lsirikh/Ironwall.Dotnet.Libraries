@@ -8366,8 +8366,9 @@ public partial class MapViewModel : BasePanelViewModel,
 
     private System.Windows.Size? _lastPanelSize;   // 세션 내 리사이즈 크기 기억(재오픈 복원). 세션 간 영속=v2.
 
-    /// <summary>개별 심볼 가시성 토글 → 해당 마커(Id 일치)의 IsLayerEnabled/IsVisible/ShowShape 적용(런타임). DB 영속=v2.</summary>
-    private void OnSymbolVisibilityChanged(object? sender, SymbolVisibilityChangedEventArgs e)
+    /// <summary>개별 심볼 가시성 토글 → 해당 마커(Id 일치)의 IsLayerEnabled/IsVisible/ShowShape 적용(런타임) + ShowShape DB 영속.
+    /// 잠금/이름변경 형제 핸들러와 동일한 부분-UPDATE 경로(판별자 오염 회피). 재시작 후 체크 상태 보존(FR-03).</summary>
+    private async void OnSymbolVisibilityChanged(object? sender, SymbolVisibilityChangedEventArgs e)
     {
         try
         {
@@ -8382,7 +8383,13 @@ public partial class MapViewModel : BasePanelViewModel,
             marker.ShowShape = e.IsVisible;
             marker.IsVisible = e.IsVisible && MainMap!.Zoom >= marker.Zoom;   // 유효 가시성 = 토글 AND 줌
             MainMap?.InvalidateVisual();
-            _editRecorder?.RecordVisibility(marker, beforeShow, e.IsVisible);   // Undo 기록(런타임 가시성, DB 미영속)
+            _editRecorder?.RecordVisibility(marker, beforeShow, e.IsVisible);   // Undo 기록(런타임 가시성)
+
+            // ★ 부분 UPDATE(ShowShape만) — 전체 행 재기록이 PidsGroup Category('PIDS_GROUP')를 런타임값으로 덮어
+            //   재부팅 소실시키던 오염(2026-07-15 사고)을 회피. 잠금/제목과 동일 경로. FR-C1.
+            e.Symbol.ShowShape = e.IsVisible;
+            if (!await _gMapDbSymbolService.UpdateSymbolShowShapeAsync(e.Symbol.Id, e.IsVisible))
+                _log?.Warning($"심볼 가시성 DB 미적용(행 없음, Id={e.Symbol.Id}) — 타 세션 삭제 가능성, UI-DB desync 주의");
         }
         catch (Exception ex) { _log?.Error($"심볼 가시성 변경 실패: {ex.Message}"); }
     }

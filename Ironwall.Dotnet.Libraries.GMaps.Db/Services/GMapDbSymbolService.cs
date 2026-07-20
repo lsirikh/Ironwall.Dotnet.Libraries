@@ -2731,6 +2731,20 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         catch (Exception ex) { _log?.Error($"Symbol 제목 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
     }
 
+    /// <summary>가시성(ShowShape)만 부분 UPDATE — 위와 동일 사유(레이어패널 심볼 Visibility 토글 경로).
+    /// 전체 행 재기록이 Category 판별자('PIDS_GROUP' 등)를 런타임값으로 덮는 오염을 회피.</summary>
+    public async Task<bool> UpdateSymbolShowShapeAsync(int id, bool showShape, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                "UPDATE Symbols SET ShowShape = @ShowShape WHERE Id = @Id;", new { Id = id, ShowShape = showShape });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 가시성 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
     #endregion
 
     #region - PidsGroupSymbol CRUD -
