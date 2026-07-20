@@ -16,6 +16,10 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 
+	<UserControl.Resources>
+		<utils:ImageConverter x:Key="ImageConverter" />
+	</UserControl.Resources>
+
 		<md:Card
 			x:Name="CardContents"
 			Height="550"
@@ -260,43 +264,64 @@
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding ViewModel.EMail}" />
 
-						<!--  Image  -->
+						<!--  Image — 미리보기(등록 여부 식별) + 변경/삭제 (관리자: 대상 계정 {id} 사진 — Admin_Photo_Upload)  -->
 						<TextBlock
 							Grid.Row="7"
 							Grid.Column="0"
+							VerticalAlignment="Center"
 							Style="{StaticResource TextBlockTitle}"
 							Text="사진" />
-						<TextBox
-							x:Name="EditorImage"
-							Grid.Row="7"
-							Grid.Column="1"
-							md:HintAssist.Hint="사진"
-							IsEnabled="False"
-							Style="{StaticResource TextBoxInput}"
-							Text="{Binding ViewModel.Image}" />
-						<!--  photo add / delete (관리자: 대상 계정 {id} 사진 변경/삭제 — Admin_Photo_Upload)  -->
 						<StackPanel
 							Grid.Row="7"
-							Grid.Column="2"
-							VerticalAlignment="Center"
+							Grid.Column="1"
+							Grid.ColumnSpan="2"
+							Margin="0,6"
 							Orientation="Horizontal">
+							<!--  미리보기: 사진 없으면 기본 아바타(ImageConverter), http photo_url 은 직접 렌더  -->
+							<Border
+								Width="56"
+								Height="56"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="1"
+								CornerRadius="4">
+								<Image
+									Source="{Binding ViewModel.Image, Mode=OneWay, Converter={StaticResource ImageConverter}, ConverterParameter='Full'}"
+									Stretch="UniformToFill"
+									ToolTip="{Binding ViewModel.Image}" />
+							</Border>
 							<Button
 								x:Name="ClickAddPicture"
+								Margin="10,0,0,0"
+								VerticalAlignment="Center"
 								Style="{StaticResource MaterialDesignFlatButton}"
-								ToolTip="사진 변경">
-								<md:PackIcon
-									Width="{StaticResource WidthIconSmall}"
-									Height="{StaticResource HeightIconSmall}"
-									Kind="ImageAdd" />
+								ToolTip="사진 변경(대상 계정)">
+								<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+									<md:PackIcon
+										Width="{StaticResource WidthIconSmall}"
+										Height="{StaticResource HeightIconSmall}"
+										Kind="ImageAdd" />
+									<TextBlock
+										Margin="4,0,0,0"
+										Style="{StaticResource ButtonTextBlock}"
+										Text="변경" />
+								</StackPanel>
 							</Button>
 							<Button
 								x:Name="ClickDeletePicture"
+								Margin="4,0,0,0"
+								VerticalAlignment="Center"
 								Style="{StaticResource MaterialDesignFlatButton}"
-								ToolTip="사진 삭제">
-								<md:PackIcon
-									Width="{StaticResource WidthIconSmall}"
-									Height="{StaticResource HeightIconSmall}"
-									Kind="ImageRemove" />
+								ToolTip="사진 삭제(대상 계정)">
+								<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+									<md:PackIcon
+										Width="{StaticResource WidthIconSmall}"
+										Height="{StaticResource HeightIconSmall}"
+										Kind="Delete" />
+									<TextBlock
+										Margin="4,0,0,0"
+										Style="{StaticResource ButtonTextBlock}"
+										Text="삭제" />
+								</StackPanel>
 							</Button>
 						</StackPanel>
 
