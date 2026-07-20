@@ -78,17 +78,32 @@ public sealed class LabelAdorner : Adorner, IDisposable
         return new Point(ic.X + _marker.LabelOffsetX, ic.Y + belowY + _marker.LabelOffsetY);
     }
 
+    /// <summary>라벨 렌더 가시성 게이트 — OnRender와 헤드리스 테스트가 공유하는 순수 술어.
+    /// 개별 심볼 가시성(ShowShape=false=레이어패널 언체크)이면 라벨도 숨김 — 재시작 후 IsLayerEnabled이
+    /// 기본 true로 남아 모양은 ShowShape 트리거로 숨되 라벨만 새어나오던 버그 수정.
+    /// PidsGroup은 ShowShape 트리거가 없고 기본 true라 제외(라벨 정책 불변, 전멸 방지).</summary>
+    internal static bool ShouldRenderLabel(bool isDisposed, string? title, bool showTitle,
+        bool showShape, bool isPidsGroup, double markerZoom, bool isLayerEnabled, double mapZoom)
+    {
+        if (isDisposed) return false;
+        if (string.IsNullOrWhiteSpace(title)) return false;
+        if (!showTitle) return false;                              // 기존 라벨 가시성 규칙(ShowTitle) 존중
+        if (!showShape && !isPidsGroup) return false;              // 개별 OFF면 라벨도 숨김(모양+타이틀 동반 제거)
+        if (mapZoom < markerZoom || !isLayerEnabled) return false; // 줌/레이어 게이트(SetMarkerVisibility 동일 술어)
+        return true;
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         try
         {
             _labelRect = Rect.Empty;
-            if (_marker.IsDisposed) return;
-            var title = _marker.Title;
-            if (string.IsNullOrWhiteSpace(title)) return;
-            if (!_marker.ShowTitle) return;   // 기존 라벨 가시성 규칙(ShowTitle) 존중
-            // 줌 가시성 — 심볼이 현재 줌/레이어로 숨겨지면 라벨도 함께 숨김(GMapCustomControl.SetMarkerVisibility 동일 술어).
-            if (_map.Zoom < _marker.Zoom || !_marker.IsLayerEnabled) return;
+            // 라벨 렌더 가시성 — 단일 술어(ShouldRenderLabel)로 통일. ShowShape 개별 OFF면 라벨도 숨김.
+            if (!ShouldRenderLabel(_marker.IsDisposed, _marker.Title, _marker.ShowTitle,
+                    _marker.ShowShape, _marker is GMapPidsGroupMarker, _marker.Zoom,
+                    _marker.IsLayerEnabled, _map.Zoom))
+                return;
+            var title = _marker.Title!;
 
             double dpi = VisualTreeHelper.GetDpi(_map).PixelsPerDip;
             var ft = new FormattedText(title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
