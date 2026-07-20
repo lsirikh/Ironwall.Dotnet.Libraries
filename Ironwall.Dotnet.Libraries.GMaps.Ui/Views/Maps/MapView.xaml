@@ -763,7 +763,8 @@
 				MGRS="{Binding CurrentMGRS}"
 				UTM="{Binding CurrentUTM}" />
 
-			<!--  화면 정중앙 십자가(비상호작용 시각 기준) — IsCenterCrosshairVisible 토글. AdornerDecorator 형제라 디지털줌 RenderTransform 영향 없이 항상 화면 중앙  -->
+			<!--  화면 정중앙 십자가(비상호작용 시각 기준) — IsCenterCrosshairVisible 토글. AdornerDecorator 형제라 디지털줌 RenderTransform 영향 없이 항상 화면 중앙.
+			      z-순서: 맵/심볼/오버레이이미지(GMapControl, ZIndex 0) 위 · OverlayWindow 패널(PropertyPanelCanvas, ZIndex 200) 아래 → ZIndex 150.  -->
 			<Grid
 				Grid.Row="2"
 				Grid.ColumnSpan="2"
@@ -772,7 +773,7 @@
 				HorizontalAlignment="Center"
 				VerticalAlignment="Center"
 				IsHitTestVisible="False"
-				Panel.ZIndex="250">
+				Panel.ZIndex="150">
 				<Grid.Style>
 					<Style TargetType="Grid">
 						<Setter Property="Visibility" Value="Collapsed" />
