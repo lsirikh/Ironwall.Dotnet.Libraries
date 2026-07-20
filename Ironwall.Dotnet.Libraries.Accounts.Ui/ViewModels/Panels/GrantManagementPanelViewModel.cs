@@ -151,7 +151,7 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
             if (res.Success && res.Data is not null)
             {
                 foreach (var gr in res.Data) Grants.Add(gr);
-                var total = res.Pagination?.Total ?? res.Data.Count;   // 서버 total 사용(Count>=size 오탐 제거 — 정확히 size건일 때 가짜경고 방지)
+                var total = res.Pagination?.Total ?? res.Total ?? res.Data.Count;   // (F-1) 서버 top-level total 우선 → pagination → Count. GET /grants 는 total을 top-level로 반환.
                 if (total > res.Data.Count)   // 실제 더 있을 때만 무성 truncation 안내
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                     { Title = "권한 부여", Explain = $"부여 {total}건 중 {res.Data.Count}건만 표시됩니다(페이지네이션 필요)." });

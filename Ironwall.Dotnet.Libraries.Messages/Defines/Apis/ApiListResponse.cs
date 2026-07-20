@@ -33,6 +33,14 @@ public class ApiListResponse<T>
     public PaginationDto? Pagination { get; set; }
 
     /// <summary>
+    /// 서버 top-level 전체 건수 (pagination 객체 없이 total 만 주는 엔드포인트용, 예: GET /grants). null=미제공.
+    /// <para>(F-1) 서버가 <c>{success,data,total}</c> 형태로 total 을 최상위에 반환하는 경우 이 필드로 수신한다.
+    /// pagination 객체를 쓰는 엔드포인트(events 등)는 이 값이 null 이고 <see cref="Pagination"/> 를 사용한다.</para>
+    /// </summary>
+    [JsonProperty("total", Order = 7)]
+    public int? Total { get; set; }
+
+    /// <summary>
     /// 에러 정보 (실패 시)
     /// </summary>
     [JsonProperty("error", Order = 5)]
