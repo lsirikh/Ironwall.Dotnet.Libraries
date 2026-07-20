@@ -408,3 +408,19 @@ install.js
 claude-skill-harness*/
 .skill-set-backup*
 # ── /Claude Skill Harness ──
+
+# ── GMap.NET 벤더 소스 편입 (orphan gitlink 해소) ──
+# 앱이 참조하는 2개 프로젝트(Core, WindowsPresentation)만 추적.
+# 나머지(Demo/Build/packages/미사용 UI 프로젝트)·빌드 산출물·로컬 백업은 제외.
+/GMap.NET/*
+!/GMap.NET/GMap.NET/
+/GMap.NET/GMap.NET/*
+!/GMap.NET/GMap.NET/GMap.NET.Core/
+!/GMap.NET/GMap.NET/GMap.NET.WindowsPresentation/
+GMap.NET/GMap.NET/GMap.NET.Core/bin/
+GMap.NET/GMap.NET/GMap.NET.Core/obj/
+GMap.NET/GMap.NET/GMap.NET.WindowsPresentation/bin/
+GMap.NET/GMap.NET/GMap.NET.WindowsPresentation/obj/
+GMap.NET/**/*.bak-*
+GMap.NET/**/*.DotSettings
+# ── /GMap.NET 벤더 ──
