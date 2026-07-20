@@ -302,7 +302,7 @@ public partial class MapViewModel : IUndoApplyContext
                 {
                     leaf.Name = m.Title ?? string.Empty;
                     leaf.InitIsLocked(m.IsLocked);
-                    leaf.SetCheckedSilently(m.ShowShape);
+                    leaf.SetCheckedSilently(m.Visible);   // 레이어 트리 체크=마스터 가시성(Visible), ShowShape(속성창 조건3) 아님 — 1263과 통일
                     matched = true;
                 }
         // AREA 4: 심볼 리프에 없으면(이미지 마커=오버레이 이미지 노드 OR 트리 누락 심볼) 전체 리로드로 트리 반영(BUG-01)
@@ -317,8 +317,8 @@ public partial class MapViewModel : IUndoApplyContext
             var m = FindMarkerById(id, isImage);   // 타입인지 — 같은 Id의 반대타입 마커 가시성 오토글 차단
             if (m == null) return Task.CompletedTask;
             m.IsLayerEnabled = show;
-            m.ShowShape = show;
-            m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
+            m.Visible = show;   // 레이어 마스터 가시성(구 ShowShape 대체) — undo/redo 런타임 복원
+            m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 마스터 AND 줌
             MainMap?.InvalidateVisual();
             SyncMarkerNode(id, isImage);   // 트리 체크박스 반영
             return Task.CompletedTask;

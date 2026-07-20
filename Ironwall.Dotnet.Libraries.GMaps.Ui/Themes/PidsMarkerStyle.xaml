@@ -1284,6 +1284,8 @@
 							<Setter TargetName="PART_CameraSection" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_SpeakerSection" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_SmartSensorSection" Property="Visibility" Value="Collapsed" />
+							<!--  FR-05: 모양(ShowShape) OFF 시 Event Status Indicator(동그란 표시)도 함께 숨김  -->
+							<Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Collapsed" />
 							<Setter Property="IsHitTestVisible" Value="False" />
 						</Trigger>
 

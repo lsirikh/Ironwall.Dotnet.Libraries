@@ -37,10 +37,10 @@ internal partial class GMapDbSymbolService
         const string sql = @"
             INSERT INTO Symbols
                 (Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, Bearing,
-                 Width, Height, Category, ShowShape, ShowTitle, IsLocked,
+                 Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked,
                  FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY, CreatedBy)
             VALUES (@Id, @Pid, @Title, @TitleSize, @OperationState, @Latitude, @Longitude, @Altitude, @Zoom, @Bearing,
-                    @Width, @Height, @Category, @ShowShape, @ShowTitle, @IsLocked,
+                    @Width, @Height, @Category, @ShowShape, @ShowTitle, @Visible, @IsLocked,
                     @FillColor, @StrokeColor, @StrokeThickness, @ZOrder, @LabelOffsetX, @LabelOffsetY, @CreatedBy);";
         await conn.ExecuteAsync(sql, new
         {
@@ -58,6 +58,7 @@ internal partial class GMapDbSymbolService
             model.Height,
             Category = categoryOverride ?? model.Category.ToString(),
             model.ShowShape,
+            model.Visible,
             model.IsLocked,
             model.ShowTitle,
             FillColor = model.FillColor.ToString(),

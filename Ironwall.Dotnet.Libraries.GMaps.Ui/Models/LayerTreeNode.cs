@@ -85,9 +85,10 @@ public class LayerTreeNode : INotifyPropertyChanged
             if (Model != null)
                 Model.IsVisible = value ?? true;
 
-            // 개별 심볼 가시성 영속 필드(ShowShape) 동기화 — 실제 마커 토글은 CheckChanged 핸들러가 수행(FR-03)
+            // 개별 심볼 레이어 마스터 가시성(Visible) 동기화 — 실제 마커 토글은 CheckChanged 핸들러가 수행(FR-02).
+            //   ShowShape(속성창 모양)와 독립: 레이어 체크는 마스터 Visible만 건드린다.
             if (Symbol != null && value.HasValue)
-                Symbol.ShowShape = value.Value;
+                Symbol.Visible = value.Value;
 
             // Leaf 노드 체크 변경 시 이벤트 발생 (개별 심볼 리프 포함)
             if (NodeType == LayerNodeType.Leaf)
@@ -294,7 +295,7 @@ public class LayerTreeNode : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 개별 심볼 리프 노드 생성 (ISymbolModel 페이로드). 체크=ShowShape, opacity 없음(FR-01/03).
+    /// 개별 심볼 리프 노드 생성 (ISymbolModel 페이로드). 체크=Visible(레이어 마스터), opacity 없음(FR-01/02).
     /// </summary>
     public static LayerTreeNode CreateSymbolLeaf(ISymbolModel symbol, string displayName, string iconKind)
     {
@@ -303,7 +304,7 @@ public class LayerTreeNode : INotifyPropertyChanged
             Symbol = symbol,
             Name = displayName,
             IconKind = iconKind,
-            IsChecked = symbol.ShowShape,
+            IsChecked = symbol.Visible,
             IsLocked = symbol.IsLocked,
             Category = symbol.Category.ToString(),
             NodeType = LayerNodeType.Leaf,

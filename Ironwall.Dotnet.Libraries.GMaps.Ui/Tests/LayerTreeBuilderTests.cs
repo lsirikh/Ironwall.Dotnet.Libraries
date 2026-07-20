@@ -197,7 +197,7 @@ public class LayerTreeBuilderTests
         Assert.Equal("카메라 #57", leaf.Name);
     }
 
-    [Fact(DisplayName = "tri-state — 카테고리 OFF → 자식 심볼 cascade OFF + ShowShape 동기")]
+    [Fact(DisplayName = "tri-state — 카테고리 OFF → 자식 심볼 cascade OFF + Visible 동기")]
     public void should_cascade_category_toggle_to_symbol_children()
     {
         var symbols = new List<ISymbolModel>
@@ -211,7 +211,7 @@ public class LayerTreeBuilderTests
         camera.IsChecked = false;   // 카테고리 마스터 OFF → cascade
 
         Assert.All(camera.Children, leaf => Assert.False(leaf.IsChecked));
-        Assert.All(camera.Children, leaf => Assert.False(leaf.Symbol!.ShowShape));   // ShowShape 영속필드 동기(FR-03)
+        Assert.All(camera.Children, leaf => Assert.False(leaf.Symbol!.Visible));   // Visible(레이어 마스터) 영속필드 동기(FR-02)
     }
 
     [Fact(DisplayName = "Build(symbols=null) — 레거시 카테고리 단위 Leaf 유지(무회귀)")]

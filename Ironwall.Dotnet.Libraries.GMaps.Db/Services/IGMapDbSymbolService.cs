@@ -97,6 +97,9 @@ public interface IGMapDbSymbolService
     /// 전체 행 재기록(UpdateSymbolAsync)이 Category 판별자를 오염시키므로 이 부분 경로만 사용.</summary>
     Task<bool> UpdateSymbolShowShapeAsync(int id, bool showShape, CancellationToken token = default);
 
+    /// <summary>레이어 마스터 가시성(Visible)만 부분 UPDATE — 레이어패널 심볼 Visibility 토글 경로(ShowShape와 독립 컬럼).</summary>
+    Task<bool> UpdateSymbolVisibleAsync(int id, bool visible, CancellationToken token = default);
+
     /// <summary>Symbol의 ZOrder만 업데이트합니다</summary>
     Task UpdateSymbolZOrderAsync(int symbolId, int zOrder, CancellationToken token = default);
 

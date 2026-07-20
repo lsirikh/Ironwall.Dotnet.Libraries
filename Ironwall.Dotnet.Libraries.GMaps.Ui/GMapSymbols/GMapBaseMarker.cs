@@ -429,6 +429,17 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    /// <summary>레이어 마스터 가시성(조건2) — 모델 Visible 연동(영속). false=심볼 전체 숨김. 속성창 ShowShape/ShowTitle(조건3)과 독립.</summary>
+    public bool Visible
+    {
+        get => _model.Visible;
+        set
+        {
+            _model.Visible = value;
+            OnPropertyChanged(nameof(Visible));
+        }
+    }
+
     public bool ShowTitle
     {
         get => _model.ShowTitle;

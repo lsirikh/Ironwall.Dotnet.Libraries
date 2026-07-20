@@ -32,6 +32,7 @@ public class UndoRedoTests
         public bool IsLayerEnabled { get; set; }
         public bool IsLocked { get; set; }
         public bool ShowShape { get; set; }
+        public bool Visible { get; set; } = true;
         public bool ShowTitle { get; set; }
         public double LabelOffsetX { get; set; }
         public double LabelOffsetY { get; set; }

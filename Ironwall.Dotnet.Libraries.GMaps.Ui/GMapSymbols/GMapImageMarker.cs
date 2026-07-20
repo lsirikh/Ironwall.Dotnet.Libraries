@@ -420,6 +420,21 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
+    /// <summary>레이어 마스터 가시성 — 이미지 모델 Visibility 연동(영속). 이미지는 IsVisible와 동일 원천(모양/제목 분리 없음).</summary>
+    public bool Visible
+    {
+        get => _imageModel.Visibility;
+        set
+        {
+            if (_imageModel.Visibility != value)
+            {
+                _imageModel.Visibility = value;
+                OnPropertyChanged(nameof(Visible));
+                OnPropertyChanged(nameof(IsVisible));
+            }
+        }
+    }
+
     /// <summary>제목 표시 여부</summary>
     public bool ShowTitle
     {

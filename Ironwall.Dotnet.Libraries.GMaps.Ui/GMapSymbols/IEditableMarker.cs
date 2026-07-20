@@ -25,6 +25,9 @@ public interface IEditableMarker : IDisposable
     bool IsLocked { get; set; }
     bool ShowShape { get; set; }
     bool ShowTitle { get; set; }
+    /// <summary>레이어 마스터 가시성(조건2) — 레이어패널 심볼 Visibility 체크. false=심볼 전체(모양+Indicator+제목) 숨김.
+    /// 속성창 ShowShape/ShowTitle(조건3)의 상위 게이트. 심볼=모델 Visible, 이미지=모델 Visibility 연동.</summary>
+    bool Visible { get; set; }
     /// <summary>라벨 상대 오프셋(화면 픽셀, 아이콘 하단 기본위치 기준). LabelAdorner 위치·DB 영속(Symbol_Label_Decouple).</summary>
     double LabelOffsetX { get; set; }
     double LabelOffsetY { get; set; }

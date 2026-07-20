@@ -1224,7 +1224,7 @@ public partial class MapViewModel : BasePanelViewModel,
     private void OnGroupVisibilityRequested(bool show) => ExecuteGroupVisibility(show);
     private async void OnGroupZOrderRequested(bool toFront) => await ExecuteGroupZOrder(toFront);
 
-    /// <summary>그룹 표시/숨김 — 멤버 가시성 런타임 토글(ShowShape/IsLayerEnabled/IsVisible). DB영속=v2. CanEditMap 게이트.</summary>
+    /// <summary>그룹 표시/숨김 — 멤버 레이어 마스터 가시성 런타임 토글(Visible/IsLayerEnabled/IsVisible). DB영속=v2. CanEditMap 게이트.</summary>
     private void ExecuteGroupVisibility(bool show)
     {
         if (_groupSelection == null || !_groupSelection.HasSelection) return;
@@ -1235,10 +1235,10 @@ public partial class MapViewModel : BasePanelViewModel,
             foreach (var m in _groupSelection.Selection.ToList())
             {
                 if (m == null || m.IsDisposed) continue;
-                var beforeShow = m.ShowShape;
+                var beforeShow = m.Visible;
                 m.IsLayerEnabled = show;
-                m.ShowShape = show;
-                m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 토글 AND 줌
+                m.Visible = show;   // 레이어 마스터 가시성(구 ShowShape 대체) — 트리 체크가 Visible을 읽음
+                m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 마스터 AND 줌
                 _editRecorder?.RecordVisibility(m, beforeShow, show);
                 n++;
             }
@@ -1260,7 +1260,7 @@ public partial class MapViewModel : BasePanelViewModel,
             if (byId.TryGetValue(leaf.Symbol!.Id, out var mk))
             {
                 leaf.InitIsLocked(mk.IsLocked);          // 잠금 아이콘/헤더 갱신(LockChanged 미발화, desync 방지)
-                leaf.SetCheckedSilently(mk.ShowShape);   // 가시성 체크 갱신(CheckChanged 미발화)
+                leaf.SetCheckedSilently(mk.Visible);     // 레이어 마스터 가시성 체크 갱신(CheckChanged 미발화)
             }
     }
 
@@ -5022,6 +5022,11 @@ public partial class MapViewModel : BasePanelViewModel,
             // 1. Factory로 마커 생성
             var marker = _markerFactory.CreateMarker(symbolModel);
 
+            // 1-b. 레이어 마스터 가시성(Visible) 복원 — 재시작 시 개별 OFF가 IsLayerEnabled 기본 true로 리셋되던 갭 차단(FR-06).
+            //   생성 시 개별 Visible 선반영(컬렉션 추가 전 → 첫 페인트 flash 방지). 카테고리는 이후 ApplyLayerVisibility가 합성.
+            if (marker is IEditableMarker vmMaster)
+                vmMaster.IsLayerEnabled = symbolModel.Visible;
+
             // 2. 지도에 추가
             AddMarkerToMap(marker, isExistingMarker);
 
@@ -8366,8 +8371,8 @@ public partial class MapViewModel : BasePanelViewModel,
 
     private System.Windows.Size? _lastPanelSize;   // 세션 내 리사이즈 크기 기억(재오픈 복원). 세션 간 영속=v2.
 
-    /// <summary>개별 심볼 가시성 토글 → 해당 마커(Id 일치)의 IsLayerEnabled/IsVisible/ShowShape 적용(런타임) + ShowShape DB 영속.
-    /// 잠금/이름변경 형제 핸들러와 동일한 부분-UPDATE 경로(판별자 오염 회피). 재시작 후 체크 상태 보존(FR-03).</summary>
+    /// <summary>개별 심볼 레이어 마스터 가시성(Visible) 토글 → 마커 전체 숨김/표시(모양+Indicator+제목) + Visible DB 영속 + 선택중이면 선택해제.
+    /// 마스터(조건2)는 속성창 ShowShape/ShowTitle(조건3)과 독립 — 토글해도 부분 상태 보존. 재시작 후 복원(FR-02/03/04/06).</summary>
     private async void OnSymbolVisibilityChanged(object? sender, SymbolVisibilityChangedEventArgs e)
     {
         try
@@ -8378,18 +8383,26 @@ public partial class MapViewModel : BasePanelViewModel,
                 .FirstOrDefault(m => m.Id == e.Symbol.Id);
             if (marker == null) return;
 
-            var beforeShow = marker.ShowShape;   // Undo용 이전 가시성(AREA 1)
-            marker.IsLayerEnabled = e.IsVisible;
-            marker.ShowShape = e.IsVisible;
-            marker.IsVisible = e.IsVisible && MainMap!.Zoom >= marker.Zoom;   // 유효 가시성 = 토글 AND 줌
+            var beforeVisible = marker.Visible;   // Undo용 이전 마스터 가시성
+            marker.Visible = e.IsVisible;
+            marker.IsLayerEnabled = e.IsVisible;   // 유효 IsLayerEnabled = 카테고리ON && Visible(개별 토글 → Visible 반영)
+            marker.IsVisible = e.IsVisible && MainMap!.Zoom >= marker.Zoom;   // 렌더 게이트 = 마스터 AND 줌
             MainMap?.InvalidateVisual();
-            _editRecorder?.RecordVisibility(marker, beforeShow, e.IsVisible);   // Undo 기록(런타임 가시성)
+            _editRecorder?.RecordVisibility(marker, beforeVisible, e.IsVisible);   // Undo 기록(마스터 가시성)
 
-            // ★ 부분 UPDATE(ShowShape만) — 전체 행 재기록이 PidsGroup Category('PIDS_GROUP')를 런타임값으로 덮어
-            //   재부팅 소실시키던 오염(2026-07-15 사고)을 회피. 잠금/제목과 동일 경로. FR-C1.
-            e.Symbol.ShowShape = e.IsVisible;
-            if (!await _gMapDbSymbolService.UpdateSymbolShowShapeAsync(e.Symbol.Id, e.IsVisible))
-                _log?.Warning($"심볼 가시성 DB 미적용(행 없음, Id={e.Symbol.Id}) — 타 세션 삭제 가능성, UI-DB desync 주의");
+            // 숨김 시 그 심볼이 선택 중이면 선택 해제(속성창 닫기 + Adorner 제거) — 숨긴 심볼은 선택 상태일 수 없음(FR-04, 기존 ClearAllSelections 재사용).
+            if (!e.IsVisible && SelectedMarker?.Id == marker.Id)
+                ClearAllSelections();
+
+            // ★ 부분 UPDATE(Visible만) — 전체 행 재기록의 PidsGroup Category 오염(2026-07-15 사고) 회피. ShowShape(속성창 조건3)는 미접촉.
+            e.Symbol.Visible = e.IsVisible;
+            if (CanEditMap())   // FR-EN-08: 무권한 세션은 로컬 렌더만 허용, DB 영속 차단(형제 핸들러·레이어 가시성과 일관)
+            {
+                if (!await _gMapDbSymbolService.UpdateSymbolVisibleAsync(e.Symbol.Id, e.IsVisible))
+                    _log?.Warning($"심볼 마스터 가시성 DB 미적용(행 없음, Id={e.Symbol.Id}) — 타 세션 삭제 가능성, UI-DB desync 주의");
+            }
+            else
+                _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 심볼 가시성 DB 저장 차단(로컬 렌더는 적용됨)");
         }
         catch (Exception ex) { _log?.Error($"심볼 가시성 변경 실패: {ex.Message}"); }
     }
@@ -8609,6 +8622,9 @@ public partial class MapViewModel : BasePanelViewModel,
                 {
                     marker.IsLayerEnabled = e.IsVisible;
                     marker.IsVisible = e.IsVisible;
+                    // 숨김 시 그 이미지가 선택 중이면 선택 해제(속성창·Adorner 제거) — 심볼과 동일 규칙(FR-04, 이미지 적용).
+                    if (!e.IsVisible && marker.IsSelected)
+                        ClearAllSelections();
                     MainMap?.InvalidateVisual();
                     await _gMapDbSymbolService.UpdateImageAsync(marker.ImageModel);
                 }
@@ -8870,16 +8886,10 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (!MatchMarkerToCategory(marker, layer.Category)) continue;
                 if (marker is not GMapSymbols.IEditableMarker em) continue;
 
-                em.IsLayerEnabled = layer.IsVisible;
-                if (!layer.IsVisible)
-                {
-                    em.IsVisible = false;
-                }
-                else
-                {
-                    bool zoomOk = MainMap!.Zoom >= em.Zoom;
-                    em.IsVisible = zoomOk;
-                }
+                // 유효 가시성 = 카테고리 레이어 && 개별 마스터(Visible) && 줌. 카테고리 토글이 개별 Visible을 덮지 않음(보존).
+                bool layerOn = layer.IsVisible && em.Visible;
+                em.IsLayerEnabled = layerOn;
+                em.IsVisible = layerOn && MainMap!.Zoom >= em.Zoom;
             }
             MainMap?.InvalidateVisual();
         }

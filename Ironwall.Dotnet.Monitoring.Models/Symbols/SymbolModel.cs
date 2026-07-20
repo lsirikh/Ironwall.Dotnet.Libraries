@@ -89,6 +89,9 @@ public class SymbolModel : BaseModel, ISymbolModel
     public EnumMarkerCategory Category { get; set; }
     public bool ShowShape { get; set; }
     public bool ShowTitle { get; set; }
+    /// <summary>레이어 마스터 가시성(조건2) — 레이어 패널 체크. false=심볼 전체(모양+Indicator+제목) 숨김.
+    /// 속성창 ShowShape/ShowTitle(조건3)과 독립·상위 게이트. 기본 true(전 생성자·전 파생 impl 자동 커버).</summary>
+    public bool Visible { get; set; } = true;
     /// <summary>잠금 상태 — true면 맵에서 클릭/선택 불가(레이어 패널에서만 토글). 기본 false.</summary>
     public bool IsLocked { get; set; }
     public EnumColorType FillColor { get; set; } = EnumColorType.Blue;

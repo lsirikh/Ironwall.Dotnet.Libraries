@@ -79,17 +79,16 @@ public sealed class LabelAdorner : Adorner, IDisposable
     }
 
     /// <summary>라벨 렌더 가시성 게이트 — OnRender와 헤드리스 테스트가 공유하는 순수 술어.
-    /// 개별 심볼 가시성(ShowShape=false=레이어패널 언체크)이면 라벨도 숨김 — 재시작 후 IsLayerEnabled이
-    /// 기본 true로 남아 모양은 ShowShape 트리거로 숨되 라벨만 새어나오던 버그 수정.
-    /// PidsGroup은 ShowShape 트리거가 없고 기본 true라 제외(라벨 정책 불변, 전멸 방지).</summary>
+    /// 제목 표시 = ShowTitle(속성창 조건3) && 줌 && IsLayerEnabled. 레이어 마스터(Visible)는 IsLayerEnabled에
+    /// 합성(카테고리 && Visible)되므로 마스터 OFF면 IsLayerEnabled=false로 라벨 자동 숨김.
+    /// ShowShape(속성창 모양)와 무관 — ShowShape=false·ShowTitle=true면 제목만 표시(title-only) 보존.</summary>
     internal static bool ShouldRenderLabel(bool isDisposed, string? title, bool showTitle,
-        bool showShape, bool isPidsGroup, double markerZoom, bool isLayerEnabled, double mapZoom)
+        double markerZoom, bool isLayerEnabled, double mapZoom)
     {
         if (isDisposed) return false;
         if (string.IsNullOrWhiteSpace(title)) return false;
-        if (!showTitle) return false;                              // 기존 라벨 가시성 규칙(ShowTitle) 존중
-        if (!showShape && !isPidsGroup) return false;              // 개별 OFF면 라벨도 숨김(모양+타이틀 동반 제거)
-        if (mapZoom < markerZoom || !isLayerEnabled) return false; // 줌/레이어 게이트(SetMarkerVisibility 동일 술어)
+        if (!showTitle) return false;                              // 제목 표시 여부(속성창 조건3)
+        if (mapZoom < markerZoom || !isLayerEnabled) return false; // 줌 && 마스터(IsLayerEnabled=카테고리&&Visible)
         return true;
     }
 
@@ -98,10 +97,9 @@ public sealed class LabelAdorner : Adorner, IDisposable
         try
         {
             _labelRect = Rect.Empty;
-            // 라벨 렌더 가시성 — 단일 술어(ShouldRenderLabel)로 통일. ShowShape 개별 OFF면 라벨도 숨김.
+            // 라벨 렌더 가시성 — 단일 술어(ShouldRenderLabel)로 통일. 마스터 OFF는 IsLayerEnabled 경유로 숨김.
             if (!ShouldRenderLabel(_marker.IsDisposed, _marker.Title, _marker.ShowTitle,
-                    _marker.ShowShape, _marker is GMapPidsGroupMarker, _marker.Zoom,
-                    _marker.IsLayerEnabled, _map.Zoom))
+                    _marker.Zoom, _marker.IsLayerEnabled, _map.Zoom))
                 return;
             var title = _marker.Title!;
 
