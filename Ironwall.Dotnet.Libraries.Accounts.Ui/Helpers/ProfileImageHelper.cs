@@ -9,7 +9,8 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Helpers;
 ****************************************************************************/
 public static class ProfileImageHelper
 {
-    public static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".bmp" };
+    // 서버 허용(jpeg/png/webp/gif)과 정렬. bmp/tiff 는 서버가 400 으로 거부하므로 클라에서 선제 배제, webp/gif 추가.
+    public static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
     public const long MaxBytes = 5 * 1024 * 1024;   // 5MB
 
     /// <summary>경로의 이미지가 허용 확장자/크기를 만족하는지 검증.</summary>

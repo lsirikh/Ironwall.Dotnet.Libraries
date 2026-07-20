@@ -64,7 +64,7 @@ public class EditorDialogViewModel : BasePanelViewModel
     {
         var dlg = new OpenFileDialog
         {
-            Filter = "Images|*.bmp;*.jpg;*.jpeg;*.gif;*.png;*.webp|All files|*.*",
+            Filter = "이미지 파일 (JPG/PNG/WebP/GIF)|*.jpg;*.jpeg;*.png;*.webp;*.gif|모든 파일|*.*",   // 서버 허용 형식과 정렬(bmp/tiff 제외)
             Title = "이미지 선택",
             RestoreDirectory = true
         };
@@ -115,6 +115,10 @@ public class EditorDialogViewModel : BasePanelViewModel
     /// <summary>사진 삭제 확인('확인') → 대상 계정 {id} 사진 서버 삭제 → default 아바타 복귀. — Admin_Photo_Upload FR-05</summary>
     public async Task HandleAsync(CallDeletePhotoAdminProcessMessageModel message, CancellationToken cancellationToken)
     {
+        // ⚠ Confirm 팝업은 self-close 안 함(시블링 핸들러 CallDeleteAccount/Unlock 동형) → 진입 시 반드시 청산.
+        //   기존엔 누락되어 '확인'을 눌러도 팝업이 남아 '삭제가 안 되는 것처럼' 보였다(소프트락).
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        string explain;
         try
         {
             var ok = await _gateway.DeletePhotoAsync(ViewModel.Model.Id, cancellationToken);
@@ -122,17 +126,17 @@ public class EditorDialogViewModel : BasePanelViewModel
             {
                 ViewModel.Image = null;   // 서버 photo_url=null → default 아바타
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new RefreshAccountsMessageModel(), cancellationToken);
+                explain = "프로필 사진을 삭제했습니다.";
             }
             else
-            {
-                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 삭제", Explain = "사진 삭제가 반영되지 않았습니다. (권한 또는 서버 오류)" }, cancellationToken);
-            }
+                explain = "사진 삭제가 반영되지 않았습니다. (권한 또는 서버 오류)";
         }
         catch (Exception ex)
         {
             _log?.Error($"[EditorDialog] 사진 삭제 실패: {ex.Message}");
-            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 삭제", Explain = "사진 삭제에 실패했습니다. 다시 시도해 주세요." }, cancellationToken);
+            explain = "사진 삭제 중 오류가 발생했습니다. 다시 시도해 주세요.";
         }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 삭제", Explain = explain }, cancellationToken);
     }
 
     public async Task HandleAsync(CallResetPasswordAdminProcessMessageModel message, CancellationToken cancellationToken)

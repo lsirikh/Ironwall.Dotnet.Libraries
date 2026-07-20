@@ -311,7 +311,22 @@ public class AccountManagerPanelViewModel : BaseDataGridPanelViewModel<AccountVi
     }
 
     public async Task HandleAsync(RefreshAccountsMessageModel message, CancellationToken cancellationToken)
-        => await DataInitialize(cancellationToken).ConfigureAwait(false);
+    {
+        // 편집/사진 변경은 EditorDialog 의 '복사본' Model 에 적용되므로, 인메모리 provider 재구성만으론
+        //   목록·상세에 반영되지 않았다(기존 버그: 사진 업로드/삭제·정보수정 후 갱신 버튼 전까지 stale).
+        //   → 서버에서 재조회(SSOT)해 목록을 갱신한다.
+        try
+        {
+            var fetched = await _gateway.GetAllAccountsAsync(cancellationToken);
+            if (fetched != null)
+            {
+                _accountProvider.Clear();
+                fetched.OrderByDescending(a => a.Role == EnumUserRole.ADMIN).ThenBy(a => a.Id).ToList().ForEach(acc => _accountProvider.Add(acc)); // ADMIN 최상단 + 생성순
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[AccountManager] 새로고침 재조회 실패: {ex.Message}"); }
+        await DataInitialize(cancellationToken).ConfigureAwait(false);
+    }
     #endregion
     #region - Properties -
     public LoginViewModel ViewModel { get; }
