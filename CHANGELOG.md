@@ -15,6 +15,11 @@
 ## [Unreleased]
 
 ### Added
+- **내정보 본인 프로필 사진 삭제 배선 (UI-only→서버 삭제)** ([PRD](docs/prds/MyPage_SelfPhoto_Delete_Fix-prd.md) · Accounts.Api/Accounts/Accounts.Ui/ViewModel · 라이브러리 한정)
+  - **근본**: 내정보 '사진 제거하기'(`MyPagePanelViewModel.ClickClearPicture`)가 `ViewModel.Image=null`(UI만)이라 서버 미삭제 → 재조회 시 사진 부활. 본인 삭제 API/게이트웨이 미구현(업로드만 존재), PUT /users/me 도 photo_url 무시(C-5).
+  - **수정(클라만, 서버 `DELETE /me/photo` 기존)**: `IAccountApiService.DeleteMyPhotoAsync`+`AccountApiService`(DELETE users/me/photo, idempotent) · `IProfileGateway.DeletePhotoAsync`(본인)+`ApiAccountGateway`/`DbAccountGateway`(false) · `CallDeletePhotoProcessMessageModel`+`MyPagePanelViewModel` 확인팝업→서버삭제(관리자 EditorDialog 패턴 미러).
+  - **NFR**: 본인 `users/me/photo` 고정(관리자 `{id}` 금지 — 토큰소유자 오염 방지). 파괴적 확인 팝업(EventAggregator 표준).
+  - **검증**: SelfPhotoDeleteContractTests +3(엔드포인트·{id}금지·실패graceful). Accounts.Api **136/136**·Accounts.Ui.Tests **20/20** green.
 - **관리자 타 계정 프로필 사진 업로드/삭제 — EditorDialog `{id}` 배선** ([PRD](docs/prds/Admin_Photo_Upload-prd.md) · [Plan](docs/plans/Admin_Photo_Upload-prd-plan.md) · 태그 `before-admin-photo-upload` · worktree `feature/admin-photo-upload` · Accounts.Api/Accounts/Accounts.Ui/ViewModel · 라이브러리 한정)
   - **배경**: 2026-07-13 오염 사고(관리자가 타 계정 편집 중 본인 `POST /me/photo` 재사용 → 로그인 관리자 사진 오염, `6842db5`로 차단)의 후속. 서버 `v6.3-admin_photo_upload`(`POST/DELETE /api/users/{id}/photo`, users:edit+base-ADMIN 상승가드+actor≠target 감사 via log_action_async) 배포로 클라 완결.
   - **FR-01/02**: `AccountApiService.UploadUserPhotoAsync(id)`(`POST users/{id}/photo`, multipart `file`)·`DeleteUserPhotoAsync(id)`(`DELETE users/{id}/photo`, idempotent). 인터페이스는 default-impl(throw)로 기존 테스트 스텁 무수정.

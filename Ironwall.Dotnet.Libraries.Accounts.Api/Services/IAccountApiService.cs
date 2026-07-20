@@ -49,6 +49,9 @@ public interface IAccountApiService
     Task<ApiResponse<AuthUserDto>> UpdateMyProfileAsync(UserSelfUpdateDto dto, CancellationToken ct = default);
     /// <summary>POST /api/users/me/photo — 본인 프로필 사진 업로드(multipart). 서버가 photo_url(절대 URL) 갱신 후 사용자 반환.</summary>
     Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default);
+    /// <summary>DELETE /api/users/me/photo — 본인 프로필 사진 삭제(idempotent). 서버가 photo_url=null(default 아바타) 갱신 후 사용자 반환. 기본구현=미지원(테스트 스텁 무수정). — MyPage_SelfPhoto_Delete_Fix</summary>
+    Task<ApiResponse<AuthUserDto>> DeleteMyPhotoAsync(CancellationToken ct = default)
+        => throw new NotImplementedException();
     /// <summary>POST /api/users/{id}/photo — 관리자: 대상 계정 사진 업로드(multipart, users:edit+base-ADMIN). 서버가 대상 photo_url 갱신 후 대상 user 반환. 기본구현=미지원(테스트 스텁 무수정). — Admin_Photo_Upload</summary>
     Task<ApiResponse<AuthUserDto>> UploadUserPhotoAsync(int userId, string filePath, CancellationToken ct = default)
         => throw new NotImplementedException();

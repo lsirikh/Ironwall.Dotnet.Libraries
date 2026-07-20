@@ -19,6 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 public class MyPagePanelViewModel : BasePanelViewModel
                                   , IHandle<CallResetProcessMessageModel>
                                   , IHandle<CallEditProcessMessageModel>
+                                  , IHandle<CallDeletePhotoProcessMessageModel>
 {
     #region - Ctors -
     public MyPagePanelViewModel(IEventAggregator eventAggregator
@@ -72,7 +73,14 @@ public class MyPagePanelViewModel : BasePanelViewModel
         }
     }
 
-    public void ClickClearPicture() => ViewModel.Image = null;
+    /// <summary>사진 제거 클릭 → 확인 팝업(파괴적). '확인' 시 HandleAsync가 서버 삭제. (기존 UI-only=서버 미삭제·부활 버그 수정) — MyPage_SelfPhoto_Delete_Fix</summary>
+    public async Task ClickClearPicture()
+        => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "사진 삭제",
+            Explain = "프로필 사진을 삭제하시겠습니까?\n(서버에서 삭제되며 기본 아바타로 복귀합니다.)",
+            MessageModel = new CallDeletePhotoProcessMessageModel()
+        });
 
     public async Task ClickPasswordReset()
         => await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenResetPasswordDialogMessageModel());
@@ -157,6 +165,30 @@ public class MyPagePanelViewModel : BasePanelViewModel
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());   // Progress 항상 청산
         }
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "내 정보", Explain = explain });
+    }
+
+    /// <summary>사진 삭제 확인('확인') → 본인 /me/photo 서버 삭제 → default 아바타. Confirm self-close 안 함 → 진입 시 ClosePopup 청산. — MyPage_SelfPhoto_Delete_Fix</summary>
+    public async Task HandleAsync(CallDeletePhotoProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        string explain;
+        try
+        {
+            var ok = await _gateway.DeletePhotoAsync(cancellationToken);
+            if (ok)
+            {
+                ViewModel.Image = null;   // 서버 photo_url=null → default 아바타
+                explain = "프로필 사진을 삭제했습니다.";
+            }
+            else
+                explain = "사진 삭제가 반영되지 않았습니다. 다시 시도해 주세요.";
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[MyPage] 사진 삭제 실패: {ex.Message}");
+            explain = "사진 삭제 중 오류가 발생했습니다. 다시 시도해 주세요.";
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = "사진 삭제", Explain = explain }, cancellationToken);
     }
     #endregion
     #region - Properties -

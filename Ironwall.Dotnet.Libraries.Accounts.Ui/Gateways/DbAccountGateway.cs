@@ -99,6 +99,10 @@ public sealed class DbAccountGateway : IAuthGateway, IUserDirectoryGateway, IPro
     public Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default)
         => Task.FromResult<string?>(null);
 
+    /// <summary>DB 모드는 서버 사진 삭제 미사용 — false 반환(본인 사진 삭제는 API 모드 전용). — MyPage_SelfPhoto_Delete_Fix</summary>
+    public Task<bool> DeletePhotoAsync(CancellationToken ct = default)
+        => Task.FromResult(false);
+
     public async Task<IAccountModel?> ChangePasswordAsync(IAccountModel acc, string currentPassword, string newPassword, CancellationToken ct = default)
     {
         // 본인 변경 — 현재 비밀번호 검증(acc.Password=해시) 후 변경

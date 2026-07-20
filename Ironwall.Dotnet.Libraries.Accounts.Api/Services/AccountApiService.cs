@@ -275,6 +275,17 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    // DELETE /users/me/photo — 본인 사진 삭제(idempotent). 서버가 photo_url=null(default 아바타) 후 사용자 반환. (MyPage_SelfPhoto_Delete_Fix)
+    public async Task<ApiResponse<AuthUserDto>> DeleteMyPhotoAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.DeleteRequestAsync("users/me/photo").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<AuthUserDto>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     private static string GuessImageMime(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
     {
         ".png" => "image/png",

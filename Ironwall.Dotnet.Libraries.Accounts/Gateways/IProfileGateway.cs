@@ -20,4 +20,7 @@ public interface IProfileGateway
 
     /// <summary>프로필 사진 업로드. API=서버 업로드 후 photo_url(절대 URL) 반환, DB=미지원(null). 실패 시 null.</summary>
     Task<string?> UploadPhotoAsync(string filePath, CancellationToken ct = default);
+
+    /// <summary>본인 프로필 사진 삭제(idempotent). API=서버 DELETE /users/me/photo 성공 여부, DB=미지원(false). 실패 시 false. — MyPage_SelfPhoto_Delete_Fix</summary>
+    Task<bool> DeletePhotoAsync(CancellationToken ct = default);
 }

@@ -186,6 +186,13 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         return res.Success ? res.Data?.PhotoUrl : null;
     }
 
+    /// <summary>DELETE /users/me/photo — 본인 사진 삭제(idempotent). 성공=true(default 아바타 복귀). 실패=false. — MyPage_SelfPhoto_Delete_Fix</summary>
+    public async Task<bool> DeletePhotoAsync(CancellationToken ct = default)
+    {
+        var res = await _api.DeleteMyPhotoAsync(ct).ConfigureAwait(false);
+        return res.Success;
+    }
+
     /// <summary>관리자: 대상 계정 사진 업로드 — POST /users/{id}/photo. 성공 시 서버 photo_url(절대 URL). 403/실패=null. — Admin_Photo_Upload</summary>
     public async Task<string?> UploadPhotoAsync(int userId, string filePath, CancellationToken ct = default)
     {
