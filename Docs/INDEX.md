@@ -29,6 +29,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [Admin_Photo_Upload-prd.md](prds/Admin_Photo_Upload-prd.md) | Admin_Photo_Upload (관리자 타계정 사진 업로드/삭제 클라 배선) | Draft | 2026-07-21 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-prd.md](prds/GMap_PidsCamera_FOV_Toggle_Persistence-prd.md) | GMap_PidsCamera_FOV_Toggle_Persistence | Approved | 2026-07-18 |
 | [GMap_Lock_Selection_ZOrder_Integrity-prd.md](prds/GMap_Lock_Selection_ZOrder_Integrity-prd.md) | GMap_Lock_Selection_ZOrder_Integrity | Approved | 2026-07-15 |
 | [DeviceStatusSync_ActionReportPropagation-prd.md](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | DeviceStatusSync_ActionReportPropagation | Draft | 2026-07-15 |
