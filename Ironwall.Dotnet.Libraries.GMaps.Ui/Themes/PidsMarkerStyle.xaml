@@ -3,11 +3,15 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols"
 	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
+	xmlns:util="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
 
 	<ResourceDictionary.MergedDictionaries>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
 	</ResourceDictionary.MergedDictionaries>
+
+	<!--  심볼 Edge 두께(double) → BorderThickness(Thickness) 변환  -->
+	<util:DoubleToThicknessConverter x:Key="DoubleToThicknessConverter" />
 
 	<!--  PIDS Device Marker Style  -->
 	<Style x:Key="BasePidsMarkerStyle" TargetType="{x:Type control:GMapMarkerPidsControl}">
@@ -28,7 +32,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Border Background="#4DFFFFFF" CornerRadius="100">
+								<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas
 									Name="PART_ControllerIconContainer"
 									Width="250"
@@ -160,7 +164,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-																<Border Background="#4DFFFFFF" CornerRadius="100">
+																<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas
 									Name="PART_MultiIconContainer"
 									Width="200"
@@ -344,7 +348,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-									<Border Background="#4DFFFFFF" CornerRadius="100">
+									<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 									<Canvas
 										Name="PART_FenceIconContainer"
 										Width="200"
@@ -455,7 +459,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Border Background="#4DFFFFFF" CornerRadius="100">
+								<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 									<Canvas
 										Name="PART_CameraIconContainer"
 										Width="200"
@@ -570,7 +574,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-							<Border Background="#4DFFFFFF" CornerRadius="100">
+							<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas
 									Name="PART_SpeakerIconContainer"
 									Width="247"
@@ -738,7 +742,7 @@
 								Stretch="Fill"
 								ToolTip="{TemplateBinding MarkerTitle}">
 
-								<Border Background="#4DFFFFFF" CornerRadius="100">
+								<Border Background="{TemplateBinding MarkerFill}" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource DoubleToThicknessConverter}}" CornerRadius="100">
 								<Canvas Name="PART_SmartSensorIconContainer" Width="200" Height="200">
 									<!--  SmartSensor SVG 아이콘  -->
 									<Path Fill="Black" Stroke="Black" StrokeThickness="0.7" StrokeMiterLimit="10" Data="M 150.79,94.19 L 147.77,92.06 L 147.43,91.11 V 73.08 L 149.12,71.42 V 68.42 L 147.08,67.02 V 51.81 L 149.01,50.15 V 47.29 L 146.86,45.63 V 37.7 C 146.86,33.23 144.06,29.87 141.18,28.48 L 97.01,5.21 C 95.14,4.26 93.71,4.01 92.05,4.71 L 79.75,9.92 L 78.26,9.11 C 76.79,8.31 75.02,8.23 73.47,8.97 L 51.99,18.13 C 49.11,19.25 48.78,22.91 48.78,24.96 V 31.17 L 48.21,32.12 V 34.72 L 48.78,35.78 V 54.67 L 48.21,56.06 V 57.93 L 48.78,58.88 V 67.11 C 48.78,68.91 49.26,69.72 50.02,70.91 L 61.69,88.39 C 62.35,89.41 63.22,90.08 64.41,90.56 V 100.08 C 64.41,103.08 65.92,105.38 67.96,106.86 V 143.75 L 65.36,146.47 V 158.66 C 65.36,161.93 67.31,164.68 69.91,165.99 L 119.81,195.13 C 122.2,196.49 124.72,196.11 126.12,195.31 L 127.78,195.8 C 128.89,196.11 129.98,195.76 130.82,194.92 L 134.02,192.71 L 135.13,193.02 L 148.97,184.01 C 150.44,182.96 151.01,180.91 151.01,179.11 L 150.79,94.19 Z"/>
