@@ -321,12 +321,12 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
     }
 
     // ── 라벨 스타일 — 모델 위임 + INPC(어도너 즉시 재렌더·속성패널 TwoWay) (Overlay_Title FR-05·13) ──
-    public int TitleColor
+    public EnumColorType TitleColor
     {
         get => _model.TitleColor;
         set { if (_model.TitleColor != value) { _model.TitleColor = value; OnPropertyChanged(nameof(TitleColor)); } }
     }
-    public int TitleBackground
+    public EnumColorType TitleBackground
     {
         get => _model.TitleBackground;
         set { if (_model.TitleBackground != value) { _model.TitleBackground = value; OnPropertyChanged(nameof(TitleBackground)); } }

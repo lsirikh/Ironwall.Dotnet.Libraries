@@ -1,4 +1,5 @@
 ﻿using Ironwall.Dotnet.Libraries.Base.Models;
+using Ironwall.Dotnet.Libraries.Enums;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Symbols;
 
@@ -38,11 +39,11 @@ public interface IImageModel : IBaseModel
     /// <summary>라벨 오프셋 V — 하프익스텐트(세로) 대비 비율 (FR-02).</summary>
     double LabelOffsetV { get; set; }
 
-    // ── 라벨 스타일 (FR-05·13) — ISymbolModel과 동일 규약, 기본값=종전 하드코딩 시각 동일(NFR-01). ──
-    /// <summary>라벨 글자색 — packed ARGB int.</summary>
-    int TitleColor { get; set; }
-    /// <summary>라벨 배경(칩)색 — packed ARGB int, 0=완전투명.</summary>
-    int TitleBackground { get; set; }
+    // ── 라벨 스타일 (FR-05·13 v2.5) — ISymbolModel과 동일 규약(EnumColorType, FillColor 파이프라인 재사용). ──
+    /// <summary>라벨 글자색(기본 White).</summary>
+    EnumColorType TitleColor { get; set; }
+    /// <summary>라벨 배경(칩)색 — 렌더 시 α 0xCD 합성, Transparent=배경 없음. 기본 Black.</summary>
+    EnumColorType TitleBackground { get; set; }
     /// <summary>라벨 폰트 패밀리 — 빈값=Segoe UI.</summary>
     string TitleFontFamily { get; set; }
     /// <summary>라벨 굵게.</summary>

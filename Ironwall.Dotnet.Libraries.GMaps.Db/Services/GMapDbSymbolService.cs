@@ -285,8 +285,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     `ZOrder`            INT DEFAULT 10,                                 -- 레이어 순서 (높을수록 위)
                     `LabelOffsetX`      DOUBLE DEFAULT 0,                               -- 라벨 상대 오프셋 X (화면 픽셀)
                     `LabelOffsetY`      DOUBLE DEFAULT 0,                               -- 라벨 상대 오프셋 Y (화면 픽셀)
-                    `TitleColor`        INT DEFAULT -252645128,                         -- 라벨 글자색 ARGB(=0xF0F0F4F8, Overlay_Title FR-06)
-                    `TitleBackground`   INT DEFAULT -853729758,                         -- 라벨 배경색 ARGB(=0xCD1C1E22), 0=투명
+                    `TitleColor`        VARCHAR(20) NOT NULL DEFAULT 'White',           -- 라벨 글자색(EnumColorType — FillColor 파이프라인, FR-06 v2.5)
+                    `TitleBackground`   VARCHAR(20) NOT NULL DEFAULT 'Black',           -- 라벨 배경색(EnumColorType, 렌더 α합성·Transparent=없음)
                     `TitleFontFamily`   VARCHAR(100) DEFAULT '',                        -- 라벨 폰트(빈값=Segoe UI)
                     `TitleBold`         BOOLEAN DEFAULT FALSE,                          -- 라벨 굵게
                     `TitleItalic`       BOOLEAN DEFAULT FALSE,                          -- 라벨 이탤릭
@@ -476,8 +476,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `ShowTitle`         BOOLEAN DEFAULT FALSE,                              -- 라벨 표시 여부 (FR-10)
                 `LabelOffsetU`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 U(하프익스텐트 비율, FR-02)
                 `LabelOffsetV`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 V(비율, FR-02)
-                `TitleColor`        INT DEFAULT -252645128,                             -- 라벨 글자색 ARGB(=0xF0F0F4F8, FR-06)
-                `TitleBackground`   INT DEFAULT -853729758,                             -- 라벨 배경색 ARGB(=0xCD1C1E22), 0=투명
+                `TitleColor`        VARCHAR(20) NOT NULL DEFAULT 'White',               -- 라벨 글자색(EnumColorType, FR-06 v2.5)
+                `TitleBackground`   VARCHAR(20) NOT NULL DEFAULT 'Black',               -- 라벨 배경색(EnumColorType, 렌더 α합성·Transparent=없음)
                 `TitleFontFamily`   VARCHAR(100) DEFAULT '',                            -- 라벨 폰트(빈값=Segoe UI)
                 `TitleBold`         BOOLEAN DEFAULT FALSE,                              -- 라벨 굵게
                 `TitleItalic`       BOOLEAN DEFAULT FALSE,                              -- 라벨 이탤릭
@@ -623,13 +623,22 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             catch { /* 이미 존재하면 무시 */ }
 
             // ── 라벨 스타일 컬럼 마이그레이션 — Symbols+Images 동시, 컬럼별 개별 try(부분 마이그레이션 안전 — Overlay_Title_ZoomStyle FR-06).
-            //    ARGB 기본값은 부호 리터럴: -252645128=0xF0F0F4F8(글자), -853729758=0xCD1C1E22(배경) — V-07.
+            //    v2.5: 색은 EnumColorType 문자열(FillColor 동형 — 심볼 기본 색상 콤보 재사용). 초기 v2.2 INT 스키마로
+            //    생성된 DB는 MODIFY로 교정(숫자 잔존값은 UPDATE로 기본값 정리, 로드는 EnumParseHelper 폴백이 이중 방어).
             foreach (var tbl in new[] { "Symbols", "Images" })
             {
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleColor` INT DEFAULT -252645128;", token); _log?.Info($"{tbl}.TitleColor 컬럼 추가 완료"); }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleColor` VARCHAR(20) NOT NULL DEFAULT 'White';", token); _log?.Info($"{tbl}.TitleColor 컬럼 추가 완료"); }
                 catch { /* 이미 존재하면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBackground` INT DEFAULT -853729758;", token); _log?.Info($"{tbl}.TitleBackground 컬럼 추가 완료"); }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBackground` VARCHAR(20) NOT NULL DEFAULT 'Black';", token); _log?.Info($"{tbl}.TitleBackground 컬럼 추가 완료"); }
                 catch { /* 이미 존재하면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `TitleColor` VARCHAR(20) NOT NULL DEFAULT 'White';", token); }
+                catch { /* 컬럼 없으면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `TitleBackground` VARCHAR(20) NOT NULL DEFAULT 'Black';", token); }
+                catch { /* 컬럼 없으면 무시 */ }
+                try { await conn.ExecuteAsync($"UPDATE `{tbl}` SET `TitleColor` = 'White' WHERE `TitleColor` REGEXP '^-?[0-9]+$';", token); }
+                catch { /* 정리 실패 무시(로드 폴백이 방어) */ }
+                try { await conn.ExecuteAsync($"UPDATE `{tbl}` SET `TitleBackground` = 'Black' WHERE `TitleBackground` REGEXP '^-?[0-9]+$';", token); }
+                catch { /* 정리 실패 무시 */ }
                 try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleFontFamily` VARCHAR(100) DEFAULT '';", token); _log?.Info($"{tbl}.TitleFontFamily 컬럼 추가 완료"); }
                 catch { /* 이미 존재하면 무시 */ }
                 try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBold` BOOLEAN DEFAULT FALSE;", token); _log?.Info($"{tbl}.TitleBold 컬럼 추가 완료"); }
@@ -2830,7 +2839,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
     /// <summary>라벨 스타일 6종만 부분 UPDATE — 타입별 전체 UPDATE에 스타일 컬럼을 넣지 않는 전략(Overlay_Title FR-06).
     /// 전체 행 재기록의 Category 판별자 오염 회피 선례(ShowShape/Visible)와 동일 사유. 심볼 영속 경로가 함께 호출.</summary>
-    public async Task<bool> UpdateSymbolLabelStyleAsync(int id, int titleColor, int titleBackground,
+    public async Task<bool> UpdateSymbolLabelStyleAsync(int id, EnumColorType titleColor, EnumColorType titleBackground,
         string titleFontFamily, bool titleBold, bool titleItalic, double titleMaxWidth, CancellationToken token = default)
     {
         try
@@ -2840,7 +2849,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 @"UPDATE Symbols SET TitleColor = @TitleColor, TitleBackground = @TitleBackground,
                     TitleFontFamily = @TitleFontFamily, TitleBold = @TitleBold,
                     TitleItalic = @TitleItalic, TitleMaxWidth = @TitleMaxWidth WHERE Id = @Id;",
-                new { Id = id, TitleColor = titleColor, TitleBackground = titleBackground,
+                new { Id = id, TitleColor = titleColor.ToString(), TitleBackground = titleBackground.ToString(),
                       TitleFontFamily = titleFontFamily ?? string.Empty, TitleBold = titleBold,
                       TitleItalic = titleItalic, TitleMaxWidth = titleMaxWidth });
             return ret > 0;
@@ -3386,8 +3395,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.ShowTitle,
                 model.LabelOffsetU,
                 model.LabelOffsetV,
-                model.TitleColor,
-                model.TitleBackground,
+                TitleColor = model.TitleColor.ToString(),
+                TitleBackground = model.TitleBackground.ToString(),
                 model.TitleFontFamily,
                 model.TitleBold,
                 model.TitleItalic,
@@ -3460,8 +3469,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.ShowTitle,
                 model.LabelOffsetU,
                 model.LabelOffsetV,
-                model.TitleColor,
-                model.TitleBackground,
+                TitleColor = model.TitleColor.ToString(),
+                TitleBackground = model.TitleBackground.ToString(),
                 model.TitleFontFamily,
                 model.TitleBold,
                 model.TitleItalic,
@@ -3622,9 +3631,9 @@ internal class SymbolSQL
     public double LabelOffsetX { get; set; }
     public double LabelOffsetY { get; set; }
 
-    // 라벨 스타일 (Overlay_Title FR-06) — DEFAULT는 부호 리터럴(-252645128/-853729758)
-    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
-    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    // 라벨 스타일 (Overlay_Title FR-06 v2.5) — 색=EnumColorType 문자열(FillColor 동형)
+    public string TitleColor { get; set; } = "White";
+    public string TitleBackground { get; set; } = "Black";
     public string TitleFontFamily { get; set; } = string.Empty;
     public bool TitleBold { get; set; }
     public bool TitleItalic { get; set; }
@@ -3669,8 +3678,8 @@ internal class SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
-        TitleColor = TitleColor,
-        TitleBackground = TitleBackground,
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
         TitleFontFamily = TitleFontFamily,
         TitleBold = TitleBold,
         TitleItalic = TitleItalic,
@@ -4174,9 +4183,9 @@ internal sealed class ImageSQL
     /// <summary>좌표계 (예: EPSG:4326)</summary>
     public string? CoordinateSystem { get; set; }
 
-    // 라벨 스타일 (FR-06)
-    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
-    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    // 라벨 스타일 (FR-06 v2.5) — 색=EnumColorType 문자열(FillColor 동형)
+    public string TitleColor { get; set; } = "White";
+    public string TitleBackground { get; set; } = "Black";
     public string TitleFontFamily { get; set; } = string.Empty;
     public bool TitleBold { get; set; }
     public bool TitleItalic { get; set; }
@@ -4228,8 +4237,8 @@ internal sealed class ImageSQL
         ShowTitle = ShowTitle,
         LabelOffsetU = LabelOffsetU,
         LabelOffsetV = LabelOffsetV,
-        TitleColor = TitleColor,
-        TitleBackground = TitleBackground,
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
         TitleFontFamily = TitleFontFamily,
         TitleBold = TitleBold,
         TitleItalic = TitleItalic,

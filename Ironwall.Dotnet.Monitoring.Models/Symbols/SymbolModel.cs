@@ -110,10 +110,10 @@ public class SymbolModel : BaseModel, ISymbolModel
     public double LabelOffsetY { get; set; }
     #endregion
 
-    #region - 라벨 스타일 (Overlay_Title_ZoomStyle FR-05·13) -
-    // 기본값=종전 LabelAdorner 하드코딩과 시각 동일(NFR-01 무변화 업그레이드). DB DEFAULT와 삼위일치.
-    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
-    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    #region - 라벨 스타일 (Overlay_Title_ZoomStyle FR-05·13 v2.5) -
+    // 색=FillColor와 동일 EnumColorType(심볼 기본 색상 콤보 재사용). White/Black(α합성)≈종전 하드코딩 시각. DB DEFAULT와 삼위일치.
+    public EnumColorType TitleColor { get; set; } = EnumColorType.White;
+    public EnumColorType TitleBackground { get; set; } = EnumColorType.Black;
     public string TitleFontFamily { get; set; } = string.Empty;   // 빈값=Segoe UI
     public bool TitleBold { get; set; }
     public bool TitleItalic { get; set; }

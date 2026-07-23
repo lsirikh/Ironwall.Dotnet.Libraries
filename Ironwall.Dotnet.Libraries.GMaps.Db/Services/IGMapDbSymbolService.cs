@@ -100,8 +100,9 @@ public interface IGMapDbSymbolService
     /// <summary>레이어 마스터 가시성(Visible)만 부분 UPDATE — 레이어패널 심볼 Visibility 토글 경로(ShowShape와 독립 컬럼).</summary>
     Task<bool> UpdateSymbolVisibleAsync(int id, bool visible, CancellationToken token = default);
 
-    /// <summary>라벨 스타일 6종만 부분 UPDATE — 타입별 전체 UPDATE에 스타일 컬럼 미포함 전략(Overlay_Title FR-06, 판별자 오염 회피 선례).</summary>
-    Task<bool> UpdateSymbolLabelStyleAsync(int id, int titleColor, int titleBackground,
+    /// <summary>라벨 스타일 6종만 부분 UPDATE — 타입별 전체 UPDATE에 스타일 컬럼 미포함 전략(Overlay_Title FR-06 v2.5, 판별자 오염 회피 선례).
+    /// 색=EnumColorType(FillColor 파이프라인 동형).</summary>
+    Task<bool> UpdateSymbolLabelStyleAsync(int id, EnumColorType titleColor, EnumColorType titleBackground,
         string titleFontFamily, bool titleBold, bool titleItalic, double titleMaxWidth, CancellationToken token = default);
 
     /// <summary>Symbol의 ZOrder만 업데이트합니다</summary>

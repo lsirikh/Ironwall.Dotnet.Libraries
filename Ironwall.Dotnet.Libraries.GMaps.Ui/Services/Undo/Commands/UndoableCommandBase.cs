@@ -36,9 +36,9 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "StrokeThickness": m.StrokeThickness = ToD(v); break;
             case "LabelOffsetX": m.LabelOffsetX = ToD(v); break;
             case "LabelOffsetY": m.LabelOffsetY = ToD(v); break;
-            // 라벨 스타일 (Overlay_Title FR-09) — 그룹 일괄편집·undo replay 공용
-            case "TitleColor": m.TitleColor = ToI(v); break;
-            case "TitleBackground": m.TitleBackground = ToI(v); break;
+            // 라벨 스타일 (Overlay_Title FR-09 v2.5) — 색=EnumColorType(FillColor 케이스 동형)
+            case "TitleColor": m.TitleColor = ToEnum<EnumColorType>(v); break;
+            case "TitleBackground": m.TitleBackground = ToEnum<EnumColorType>(v); break;
             case "TitleFontFamily": m.TitleFontFamily = v as string ?? string.Empty; break;
             case "TitleBold": m.TitleBold = ToB(v); break;
             case "TitleItalic": m.TitleItalic = ToB(v); break;

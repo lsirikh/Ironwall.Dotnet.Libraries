@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using GMap.NET;
 using Ironwall.Dotnet.Libraries.Base.Services;
+using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 
@@ -53,7 +54,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
     private FormattedText? _cachedText;
     private double _cachedDpi;
     private Brush? _cachedFg, _cachedBg;
-    private int _cachedFgArgb, _cachedBgArgb;
+    private EnumColorType _cachedFgColor, _cachedBgColor;   // v2.5: 색=EnumColorType(FillColor 파이프라인)
     private static readonly System.Collections.Generic.Dictionary<(string fam, bool b, bool i), Typeface> _typefaceCache = new();
     private static readonly object _typefaceGate = new();   // 정적 공유 캐시 — Typeface는 불변 값 객체(architect Q5)
 
@@ -204,13 +205,14 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 return;
             var title = _marker.Title!;
 
-            // 스타일 반영(FR-05·13) + 렌더 캐시(FR-08) — 기본값이면 종전 하드코딩과 시각 동일(NFR-01).
+            // 스타일 반영(FR-05·13 v2.5) + 렌더 캐시(FR-08) — 색=EnumColorType(심볼 색상 콤보 동형).
+            // 기본 White/Black(α합성)은 종전 하드코딩(#F0F0F4F8/#CD1C1E22)과 사실상 동일 시각.
             double dpi = VisualTreeHelper.GetDpi(_map).PixelsPerDip;
             double maxW = EffectiveMaxWidth(_marker.TitleMaxWidth);
-            if (_cachedFg == null || _cachedFgArgb != _marker.TitleColor)
-            { _cachedFgArgb = _marker.TitleColor; _cachedFg = BrushFromArgb(_cachedFgArgb, _fg); _cachedText = null; }
-            if (_cachedBg == null || _cachedBgArgb != _marker.TitleBackground)
-            { _cachedBgArgb = _marker.TitleBackground; _cachedBg = BrushFromArgb(_cachedBgArgb, _bg); }
+            if (_cachedFg == null || _cachedFgColor != _marker.TitleColor)
+            { _cachedFgColor = _marker.TitleColor; _cachedFg = BrushFromColorType(_cachedFgColor, null); _cachedText = null; }
+            if (_cachedBg == null || _cachedBgColor != _marker.TitleBackground)
+            { _cachedBgColor = _marker.TitleBackground; _cachedBg = BrushFromColorType(_cachedBgColor, ChipAlpha); }
             if (_cachedText == null || Math.Abs(_cachedDpi - dpi) > 0.001)
             {
                 var typeface = GetTypeface(_marker.TitleFontFamily, _marker.TitleBold, _marker.TitleItalic);
@@ -445,17 +447,25 @@ public sealed class LabelAdorner : Adorner, IDisposable
     internal static double EffectiveMaxWidth(double w)
         => w > 0 ? Math.Clamp(w, WIDTH_MIN, WIDTH_MAX) : DEFAULT_MAX_WIDTH;
 
-    /// <summary>packed ARGB int → Frozen 브러시. 0=완전투명. 캐시는 스테이지4(FR-08).</summary>
-    internal static Brush BrushFromArgb(int argb, Brush fallbackIfDefault)
+    /// <summary>배경 칩 고정 알파(종전 하드코딩 0xCD 유지) — Black 선택 시 #CD212121 ≈ 종전 #CD1C1E22.</summary>
+    internal const byte ChipAlpha = 0xCD;
+
+    /// <summary>EnumColorType → Frozen 브러시(FillColor 파이프라인 동형, v2.5). Transparent=완전투명.
+    /// overrideAlpha 지정 시(배경 칩) 해당 알파로 합성 — 글자색은 null(불투명).</summary>
+    internal static Brush BrushFromColorType(EnumColorType colorType, byte? overrideAlpha)
     {
-        unchecked
+        if (colorType == EnumColorType.Transparent) return Brushes.Transparent;
+        try
         {
-            if (argb == 0) return Brushes.Transparent;
-            var c = Color.FromArgb((byte)((argb >> 24) & 0xFF), (byte)((argb >> 16) & 0xFF),
-                                   (byte)((argb >> 8) & 0xFF), (byte)(argb & 0xFF));
+            var c = (Color)ColorConverter.ConvertFromString(Helpers.ColorHelper.ToHexString(colorType));
+            if (overrideAlpha.HasValue) c.A = overrideAlpha.Value;
             var b = new SolidColorBrush(c);
             b.Freeze();
             return b;
+        }
+        catch
+        {
+            return overrideAlpha.HasValue ? _bg : _fg;   // 변환 실패 폴백=종전 하드코딩 브러시
         }
     }
 

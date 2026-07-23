@@ -32,11 +32,11 @@ public interface ISymbolModel : IBaseModel
     /// <summary>라벨(제목) 상대 오프셋 Y(화면 픽셀, 아이콘 중심 기준). 0=기본위치.</summary>
     double LabelOffsetY { get; set; }
 
-    // ── 라벨 스타일 (Overlay_Title_ZoomStyle FR-05·13). 기본값=종전 하드코딩 렌더와 시각 동일(NFR-01). ──
-    /// <summary>라벨 글자색 — packed ARGB int. 기본 0xF0F0F4F8(종전 하드코딩).</summary>
-    int TitleColor { get; set; }
-    /// <summary>라벨 배경(칩)색 — packed ARGB int, 0=완전투명. 기본 0xCD1C1E22(종전 하드코딩).</summary>
-    int TitleBackground { get; set; }
+    // ── 라벨 스타일 (Overlay_Title_ZoomStyle FR-05·13 v2.5) — 색은 FillColor와 동일 EnumColorType 파이프라인. ──
+    /// <summary>라벨 글자색(기본 White).</summary>
+    EnumColorType TitleColor { get; set; }
+    /// <summary>라벨 배경(칩)색 — 렌더 시 α 0xCD 합성, Transparent=배경 없음. 기본 Black(≈종전 칩).</summary>
+    EnumColorType TitleBackground { get; set; }
     /// <summary>라벨 폰트 패밀리 — 빈값=Segoe UI(종전 하드코딩). 미설치 폰트는 렌더 시 폴백.</summary>
     string TitleFontFamily { get; set; }
     /// <summary>라벨 굵게.</summary>

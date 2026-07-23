@@ -295,12 +295,12 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     }
 
     // ── 라벨 스타일 — 모델 영속(Images.*, FR-05·13). GMapBaseMarker 미상속이라 별도 구현(체크리스트 ⑤). ──
-    public int TitleColor
+    public EnumColorType TitleColor
     {
         get => _imageModel.TitleColor;
         set { if (_imageModel.TitleColor != value) { _imageModel.TitleColor = value; OnPropertyChanged(nameof(TitleColor)); } }
     }
-    public int TitleBackground
+    public EnumColorType TitleBackground
     {
         get => _imageModel.TitleBackground;
         set { if (_imageModel.TitleBackground != value) { _imageModel.TitleBackground = value; OnPropertyChanged(nameof(TitleBackground)); } }

@@ -10,8 +10,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 	<utils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
-	<!--  라벨 스타일(Overlay_Title FR-07 v2.3): packed ARGB int → 팔레트 스와치 브러시  -->
-	<utils:ArgbToBrushConverter x:Key="ArgbBrush" />
+	<!--  라벨 색(v2.5)은 채우기/테두리와 동일한 ColorTypeToBrushConverter 파이프라인을 재사용  -->
 	<!--  그룹(멀티셀렉트) Pending: NaN=값 서로 다름 → 텍스트 빈칸/—, 슬라이더 0 파킹. 단일 모드엔 영향 없음  -->
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlank" />
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlankF0" Format="F0" />
@@ -387,7 +386,7 @@
 										Foreground="{DynamicResource PrimaryBrush}"
 										Text="LABEL" />
 
-									<!--  글자색 — 채우기 콤보와 동일 형식  -->
+									<!--  글자색 — 심볼 채우기/테두리 색상 콤보를 그대로 재사용(AvailableColors, v2.5)  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -400,9 +399,8 @@
 										<ComboBox
 											Background="Transparent"
 											Grid.Column="1"
-											ItemsSource="{x:Static properties:GMapPropertyBaseControl.LabelTextColorOptions}"
-											SelectedValue="{Binding TitleColorArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-											SelectedValuePath="Argb"
+											ItemsSource="{Binding AvailableColors, RelativeSource={RelativeSource TemplatedParent}}"
+											SelectedItem="{Binding TitleColorType, RelativeSource={RelativeSource TemplatedParent}}"
 											Style="{StaticResource CompactComboBox}">
 											<ComboBox.ItemTemplate>
 												<DataTemplate>
@@ -410,7 +408,7 @@
 														<Rectangle
 															Width="40"
 															Height="12"
-															Fill="{Binding Argb, Converter={StaticResource ArgbBrush}}"
+															Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
 															RadiusX="2"
 															RadiusY="2"
 															Stroke="{DynamicResource BorderBrush}"
@@ -420,14 +418,14 @@
 															FontSize="10"
 															Background="Transparent"
 															Foreground="{DynamicResource TextPrimaryBrush}"
-															Text="{Binding Name}" />
+															Text="{Binding}" />
 													</StackPanel>
 												</DataTemplate>
 											</ComboBox.ItemTemplate>
 										</ComboBox>
 									</Grid>
 
-									<!--  배경색 — 채우기 콤보와 동일 형식(투명·반투명 칩 포함)  -->
+									<!--  배경색 — 동일 콤보(Transparent 선택=배경 없음)  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -440,9 +438,8 @@
 										<ComboBox
 											Background="Transparent"
 											Grid.Column="1"
-											ItemsSource="{x:Static properties:GMapPropertyBaseControl.LabelBackgroundColorOptions}"
-											SelectedValue="{Binding TitleBackgroundArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-											SelectedValuePath="Argb"
+											ItemsSource="{Binding AvailableColors, RelativeSource={RelativeSource TemplatedParent}}"
+											SelectedItem="{Binding TitleBackgroundType, RelativeSource={RelativeSource TemplatedParent}}"
 											Style="{StaticResource CompactComboBox}">
 											<ComboBox.ItemTemplate>
 												<DataTemplate>
@@ -450,7 +447,7 @@
 														<Rectangle
 															Width="40"
 															Height="12"
-															Fill="{Binding Argb, Converter={StaticResource ArgbBrush}}"
+															Fill="{Binding Converter={StaticResource ColorTypeToBrushConverter}}"
 															RadiusX="2"
 															RadiusY="2"
 															Stroke="{DynamicResource BorderBrush}"
@@ -460,7 +457,7 @@
 															FontSize="10"
 															Background="Transparent"
 															Foreground="{DynamicResource TextPrimaryBrush}"
-															Text="{Binding Name}" />
+															Text="{Binding}" />
 													</StackPanel>
 												</DataTemplate>
 											</ComboBox.ItemTemplate>

@@ -192,9 +192,9 @@ public class ImageModel : BaseModel, IImageModel
     /// <summary>라벨 오프셋 V(하프익스텐트 비율) — Images.LabelOffsetV 영속 (FR-02).</summary>
     public double LabelOffsetV { get; set; }
 
-    // 라벨 스타일 (FR-05·13) — 기본값=종전 하드코딩 시각 동일(NFR-01). DB DEFAULT와 삼위일치.
-    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
-    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    // 라벨 스타일 (FR-05·13 v2.5) — 색=EnumColorType(FillColor 파이프라인 재사용). DB DEFAULT와 삼위일치.
+    public EnumColorType TitleColor { get; set; } = EnumColorType.White;
+    public EnumColorType TitleBackground { get; set; } = EnumColorType.Black;
     public string TitleFontFamily { get; set; } = string.Empty;   // 빈값=Segoe UI
     public bool TitleBold { get; set; }
     public bool TitleItalic { get; set; }

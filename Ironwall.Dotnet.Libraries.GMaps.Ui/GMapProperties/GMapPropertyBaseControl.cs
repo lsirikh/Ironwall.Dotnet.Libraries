@@ -228,27 +228,27 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(false, OnShowTitleChanged));
 
-        // ── 라벨 스타일 DP 6종 (Overlay_Title FR-07·13) — 기본값=마커/DB 기본값과 삼위일치(P2-06). ──
+        // ── 라벨 스타일 DP 6종 (Overlay_Title FR-07·13 v2.5) — 색은 채우기/테두리와 동일 EnumColorType 콤보 재사용. ──
 
-        /// <summary>라벨 글자색(packed ARGB). null=그룹 Pending.</summary>
-        public int? TitleColorArgb
+        /// <summary>라벨 글자색 — 채우기/테두리와 동일 파이프라인(AvailableColors 콤보). MIXED_COLOR=그룹 Pending.</summary>
+        public EnumColorType TitleColorType
         {
-            get { return (int?)GetValue(TitleColorArgbProperty); }
-            set { SetValue(TitleColorArgbProperty, value); }
+            get { return (EnumColorType)GetValue(TitleColorTypeProperty); }
+            set { SetValue(TitleColorTypeProperty, value); }
         }
-        public static readonly DependencyProperty TitleColorArgbProperty =
-            DependencyProperty.Register("TitleColorArgb", typeof(int?), typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(unchecked((int)0xF0F0F4F8), OnTitleColorArgbChanged));
+        public static readonly DependencyProperty TitleColorTypeProperty =
+            DependencyProperty.Register("TitleColorType", typeof(EnumColorType), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(EnumColorType.White, OnTitleColorTypeChanged));
 
-        /// <summary>라벨 배경색(packed ARGB, 0=투명). null=그룹 Pending.</summary>
-        public int? TitleBackgroundArgb
+        /// <summary>라벨 배경색 — 동일 콤보(Transparent=배경 없음). MIXED_COLOR=그룹 Pending.</summary>
+        public EnumColorType TitleBackgroundType
         {
-            get { return (int?)GetValue(TitleBackgroundArgbProperty); }
-            set { SetValue(TitleBackgroundArgbProperty, value); }
+            get { return (EnumColorType)GetValue(TitleBackgroundTypeProperty); }
+            set { SetValue(TitleBackgroundTypeProperty, value); }
         }
-        public static readonly DependencyProperty TitleBackgroundArgbProperty =
-            DependencyProperty.Register("TitleBackgroundArgb", typeof(int?), typeof(GMapPropertyBaseControl),
-                new PropertyMetadata(unchecked((int)0xCD1C1E22), OnTitleBackgroundArgbChanged));
+        public static readonly DependencyProperty TitleBackgroundTypeProperty =
+            DependencyProperty.Register("TitleBackgroundType", typeof(EnumColorType), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(EnumColorType.Black, OnTitleBackgroundTypeChanged));
 
         /// <summary>라벨 폰트 패밀리명(빈값=Segoe UI). 그룹 다름=빈값.</summary>
         public string TitleFontFamilyName
@@ -290,39 +290,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DependencyProperty.Register("TitleMaxWidthPx", typeof(double), typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(200.0, OnTitleMaxWidthPxChanged));
 
-        /// <summary>라벨 글자색 팔레트 — 기존 채우기/테두리 콤보 구조 차용(스와치+이름, SelectedValue=Argb).
-        /// 첫 항목=종전 하드코딩 기본값(선택 표시 보장). 편집 hex 콤보는 렌더 결함으로 폐기(v2.3).</summary>
-        public static LabelColorOption[] LabelTextColorOptions { get; } =
-        {
-            new("기본(밝음)", unchecked((int)0xF0F0F4F8)),
-            new("흰색", unchecked((int)0xFFFFFFFF)),
-            new("검정", unchecked((int)0xFF000000)),
-            new("빨강", unchecked((int)0xFFFF5252)),
-            new("주황", unchecked((int)0xFFFF8A65)),
-            new("노랑", unchecked((int)0xFFFFC107)),
-            new("초록", unchecked((int)0xFF4CAF50)),
-            new("하늘", unchecked((int)0xFF00AAFF)),
-            new("파랑", unchecked((int)0xFF2962FF)),
-            new("보라", unchecked((int)0xFFB388FF)),
-            new("회색", unchecked((int)0xFF9E9E9E)),
-        };
-
-        /// <summary>라벨 배경(칩)색 팔레트 — 투명·반투명 칩 중심 + 원색. 첫 항목=종전 기본 칩.</summary>
-        public static LabelColorOption[] LabelBackgroundColorOptions { get; } =
-        {
-            new("기본(칩)", unchecked((int)0xCD1C1E22)),
-            new("투명", 0),
-            new("검정 반투명", unchecked((int)0x99000000)),
-            new("흰색 반투명", unchecked((int)0xB3FFFFFF)),
-            new("검정", unchecked((int)0xFF000000)),
-            new("흰색", unchecked((int)0xFFFFFFFF)),
-            new("빨강", unchecked((int)0xFFB71C1C)),
-            new("파랑", unchecked((int)0xFF0D47A1)),
-            new("초록", unchecked((int)0xFF1B5E20)),
-            new("노랑", unchecked((int)0xFFF9A825)),
-        };
-
-        /// <summary>라벨 폰트 큐레이션 — 한글 Windows 표준 탑재 폰트 위주. 한글 폰트는 한글명, 영문 폰트는 영문명(v2.4).</summary>
+        /// <summary>라벨 폰트 큐레이션 — 한글 Windows 표준 탑재 폰트 위주. 한글 폰트는 한글명, 영문 폰트는 영문명(v2.4).
+        /// (라벨 색은 v2.5부터 채우기/테두리와 동일한 AvailableColors 콤보를 그대로 재사용 — 별도 팔레트 없음.)</summary>
         public static LabelFontOption[] LabelFontOptions { get; } =
         {
             new("기본 (Segoe UI)", string.Empty),
@@ -674,8 +643,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                     control.ShowShape = newMarker.ShowShape;
                     control.ShowTitle = newMarker.ShowTitle;
                     control.MarkerZoom = newMarker.Zoom;
-                    control.TitleColorArgb = newMarker.TitleColor;
-                    control.TitleBackgroundArgb = newMarker.TitleBackground;
+                    control.TitleColorType = newMarker.TitleColor;
+                    control.TitleBackgroundType = newMarker.TitleBackground;
                     control.TitleFontFamilyName = newMarker.TitleFontFamily;
                     control.TitleBoldFlag = newMarker.TitleBold;
                     control.TitleItalicFlag = newMarker.TitleItalic;
@@ -811,21 +780,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         // ── 라벨 스타일 콜백 6종 (FR-07) — 기존 패턴 답습: 3중 가드 + null(Pending) 미전파 + IsGroupMode 직접쓰기 억제. ──
 
-        private static void OnTitleColorArgbChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private static void OnTitleColorTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                if (e.NewValue is not int v) return;   // null=그룹 Pending — 마커 미전파
+                if (e.NewValue is not EnumColorType v || v == MIXED_COLOR) return;   // Pending 미전파(FillColor 동형)
                 if (!control.IsGroupMode) control.SelectedMarker.TitleColor = v;
                 control.OnMarkerPropertyChanged("TitleColor", e.OldValue, v);
             }
         }
 
-        private static void OnTitleBackgroundArgbChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private static void OnTitleBackgroundTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
             {
-                if (e.NewValue is not int v) return;
+                if (e.NewValue is not EnumColorType v || v == MIXED_COLOR) return;
                 if (!control.IsGroupMode) control.SelectedMarker.TitleBackground = v;
                 control.OnMarkerPropertyChanged("TitleBackground", e.OldValue, v);
             }
@@ -920,9 +889,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             SetBinding(MarkerFillColorProperty, CreateTwoWayBinding(nameof(SelectedMarker.FillColor)));
             SetBinding(MarkerStrokeColorProperty, CreateTwoWayBinding(nameof(SelectedMarker.StrokeColor)));
 
-            // 라벨 스타일 (FR-07) — Setup/Clear 쌍 유지(체크리스트 ⑦)
-            SetBinding(TitleColorArgbProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleColor)));
-            SetBinding(TitleBackgroundArgbProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleBackground)));
+            // 라벨 스타일 (FR-07 v2.5) — Setup/Clear 쌍 유지(체크리스트 ⑦)
+            SetBinding(TitleColorTypeProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleColor)));
+            SetBinding(TitleBackgroundTypeProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleBackground)));
             SetBinding(TitleFontFamilyNameProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleFontFamily)));
             SetBinding(TitleBoldFlagProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleBold)));
             SetBinding(TitleItalicFlagProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleItalic)));
@@ -983,8 +952,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, ShowShapeProperty);
             BindingOperations.ClearBinding(this, ShowTitleProperty);
             BindingOperations.ClearBinding(this, MarkerZoomProperty);
-            BindingOperations.ClearBinding(this, TitleColorArgbProperty);
-            BindingOperations.ClearBinding(this, TitleBackgroundArgbProperty);
+            BindingOperations.ClearBinding(this, TitleColorTypeProperty);
+            BindingOperations.ClearBinding(this, TitleBackgroundTypeProperty);
             BindingOperations.ClearBinding(this, TitleFontFamilyNameProperty);
             BindingOperations.ClearBinding(this, TitleBoldFlagProperty);
             BindingOperations.ClearBinding(this, TitleItalicFlagProperty);
@@ -1064,9 +1033,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             ShowShape = AllEqual("ShowShape", out var ss) && ss is bool sb ? sb : (bool?)null;
             ShowTitle = AllEqual("ShowTitle", out var stt) && stt is bool tb ? tb : (bool?)null;
 
-            // 라벨 스타일 (FR-07) — int?/bool?=null Pending, 폰트 다름=빈값, 폭 다름=NaN
-            TitleColorArgb = AllEqual("TitleColor", out var tcv) && tcv is int tci ? tci : (int?)null;
-            TitleBackgroundArgb = AllEqual("TitleBackground", out var tbv) && tbv is int tbi ? tbi : (int?)null;
+            // 라벨 스타일 (FR-07 v2.5) — 색=MIXED_COLOR Pending(FillColor 동형), 폰트 다름=빈값, 폭 다름=NaN
+            TitleColorType = AllEqual("TitleColor", out var tcv) && tcv is EnumColorType tce ? tce : MIXED_COLOR;
+            TitleBackgroundType = AllEqual("TitleBackground", out var tbv) && tbv is EnumColorType tbe ? tbe : MIXED_COLOR;
             TitleFontFamilyName = AllEqual("TitleFontFamily", out var tfv) ? (tfv as string ?? string.Empty) : string.Empty;
             TitleBoldFlag = AllEqual("TitleBold", out var tbf) && tbf is bool tbb ? tbb : (bool?)null;
             TitleItalicFlag = AllEqual("TitleItalic", out var tif) && tif is bool tib ? tib : (bool?)null;
@@ -1198,16 +1167,6 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         // 내용 스크롤(마커 전환 시 상단 복귀용)
         private ScrollViewer? _contentScroll;
         #endregion
-    }
-
-    /// <summary>라벨 색 팔레트 항목(이름 + packed ARGB) — 기존 채우기/테두리 색 콤보 구조를 라벨 색에 차용하기 위한
-    /// 아이템 모델(Overlay_Title FR-07 v2.3). SelectedValuePath=Argb로 int? DP와 직결.</summary>
-    public sealed class LabelColorOption
-    {
-        public string Name { get; }
-        public int Argb { get; }
-        public LabelColorOption(string name, int argb) { Name = name; Argb = argb; }
-        public override string ToString() => Name;
     }
 
     /// <summary>라벨 폰트 항목 — 큐레이션 리스트(한글 폰트=한글명, 영문 폰트=영문명, FR-07 v2.4).
