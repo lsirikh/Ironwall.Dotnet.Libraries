@@ -19,9 +19,13 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
    Notes        : IAccountApiService 직접 주입(GOP 모드 전용). 강제 로그아웃(쓰기)은 Confirm→DELETE→page1 재조회.
                   AuditLog 패널과 동일 페이지네이션 패턴(무한 스크롤, DataGridScrollEndBehavior). 날짜필터 없음.
                   swap-on-success + DispatcherService 마셜 + BasePanelViewModel 관리 토큰.
-                  is_active 필터: 기본 활성만(IsActiveOnly=true) — 변경 시 첫 페이지부터 재조회.
+                  is_active 필터: 기본 전체(IsActiveOnly=false, 정리=전체 조망) — 변경 시 첫 페이지부터 재조회.
+                  자동 갱신: 활성 중 ~20s 주기 재조회(page 1 · 로드 중 아닐 때만 — 무한스크롤 비방해).
+                    타이머는 OnActivate에서 시작, OnDeactivate에서 정지·폐기(리크·teardown 후 tick 방지).
 ****************************************************************************/
-public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLogoutSessionMessageModel>
+public class UserSessionPanelViewModel : BasePanelViewModel
+    , IHandle<CallForceLogoutSessionMessageModel>
+    , IHandle<CallForceLogoutAllUserSessionsMessageModel>
 {
     private readonly IAccountApiService _api;
     private readonly ITokenStorageService _tokenStore;
@@ -42,6 +46,13 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
     {
         await base.OnActivateAsync(cancellationToken);
         await ReloadAsync(_cancellationTokenSource?.Token ?? cancellationToken);
+        StartAutoRefresh();
+    }
+
+    protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
+    {
+        StopAutoRefresh();   // (R-1) 타이머 정지·폐기 — teardown 이후 tick·리크 방지
+        await base.OnDeactivateAsync(close, cancellationToken);
     }
 
     public async Task OnClickReloadButton() => await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);
@@ -77,6 +88,37 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
         catch (Exception ex) { _log?.Error($"[UserSession] 강제로그아웃 실패: {ex.Message}"); }
     }
 
+    /// <summary>'이 사용자 전체 세션 종료' 클릭 — 즉시 실행 않고 Confirm 다이얼로그. Yes 시 CallForceLogoutAllUserSessionsMessageModel 발행. (FR-2)</summary>
+    public async Task OnClickForceLogoutAllUserSessions(UserSessionDto session)
+    {
+        if (session is null || !session.IsActive) return;
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "세션 관리",
+            Explain = $"'{session.LoginId}' 사용자의 활성 세션을 모두 강제 로그아웃하시겠습니까?",
+            MessageModel = new CallForceLogoutAllUserSessionsMessageModel { Session = session }
+        });
+    }
+
+    /// <summary>Confirm→Yes 확인 후 실제 DELETE /user-sessions/user/{userId} + 목록 갱신. 실패(409 ADMIN 락아웃 등) 시 안내 팝업. (FR-2)</summary>
+    public async Task HandleAsync(CallForceLogoutAllUserSessionsMessageModel message, CancellationToken cancellationToken)
+    {
+        var session = message.Session;
+        if (session is null || !session.IsActive) return;
+        try
+        {
+            var res = await _api.ForceLogoutAllUserSessionsAsync(session.UserId);
+            // 확인팝업 종료 — ConfirmPopupDialog.ClickOk은 MessageModel만 발행하고 안 닫음(단일 케이스와 동형).
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+            if (res.Success)
+                await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 전체종료 후 첫 페이지부터 재조회
+            else
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "세션 관리", Explain = $"전체 세션 종료 실패: {res.Error?.Message ?? res.Message}" });   // (R-2) 409 ADMIN 락아웃 메시지 표면화
+        }
+        catch (Exception ex) { _log?.Error($"[UserSession] 전체세션 종료 실패: {ex.Message}"); }
+    }
+
     /// <summary>첫 페이지 조회 + swap-on-success. 페이지 상태를 리셋한다.</summary>
     private async Task ReloadAsync(CancellationToken ct)
     {
@@ -96,6 +138,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
 
                 DispatcherService.Invoke(() =>
                 {
+                    if (_isTearingDown) return;   // teardown 이 레이스 승리 — 늦은 타이머 tick의 stale swap 폐기(TOCTOU)
                     Items.Clear();
                     foreach (var d in res.Data) Items.Add(d);
                     NotifyOfPropertyChange(() => LoadedCountText);
@@ -146,8 +189,33 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
         }
     }
 
+    /// <summary>주기 자동 갱신 진입점(테스트 가능). page 1 · 로드 중 아닐 때만 첫 페이지 재조회 — 스크롤(2페이지+) 중이면 skip(무한스크롤 비방해). (FR-3)</summary>
+    public async Task TryAutoRefresh(CancellationToken ct = default)
+    {
+        if (_isTearingDown || _isLoadingMore || _currentPage > 1) return;
+        await ReloadAsync(ct);
+    }
+
+    /// <summary>자동 갱신 타이머 시작(OnActivate). 이미 있으면 재생성 없이 유지. System.Threading.Timer=헤드리스 안전(DispatcherTimer 아님).</summary>
+    private void StartAutoRefresh()
+    {
+        if (_autoRefreshTimer != null) return;
+        _autoRefreshTimer = new Timer(_ =>
+        {
+            // 타이머 스레드 → ReloadAsync가 DispatcherService.Invoke로 UI 마셜. 예외는 삼켜 tick 중단 방지.
+            _ = TryAutoRefresh(_cancellationTokenSource?.Token ?? CancellationToken.None);
+        }, null, AUTO_REFRESH_INTERVAL_MS, AUTO_REFRESH_INTERVAL_MS);
+    }
+
+    /// <summary>자동 갱신 타이머 정지·폐기(OnDeactivate) — 리크 및 teardown 이후 tick 방지. (R-1)</summary>
+    private void StopAutoRefresh()
+    {
+        _autoRefreshTimer?.Dispose();
+        _autoRefreshTimer = null;
+    }
+
     #region - Properties -
-    /// <summary>활성 세션만 조회 여부(기본 true). 변경 시 첫 페이지부터 재조회.</summary>
+    /// <summary>활성 세션만 조회 여부(기본 false=전체). 변경 시 첫 페이지부터 재조회.</summary>
     public bool IsActiveOnly
     {
         get => _isActiveOnly;
@@ -177,16 +245,24 @@ public class UserSessionPanelViewModel : BasePanelViewModel, IHandle<CallForceLo
     #endregion
     #region - Attributes -
     private const int PAGE_SIZE = 100;   // 서버 limit 최대치
+    private const int AUTO_REFRESH_INTERVAL_MS = 20_000;   // 자동 갱신 주기(~20s)
     private int _currentPage;
     private int _totalPages = 1;
     private int _totalCount;
     private bool _isLoadingMore;
-    private bool _isActiveOnly = true;   // 기본 활성만
+    private bool _isActiveOnly;   // 기본 전체(false) — 정리=전체 조망(FR-3). is_active 미전송 → 서버 전체 반환.
+    private Timer? _autoRefreshTimer;   // 주기 자동 갱신(활성 중만). OnActivate 시작 / OnDeactivate 폐기.
     #endregion
 }
 
 /// <summary>세션 강제 로그아웃 확인 트리거 — Confirm 다이얼로그 Yes 시 발행되어 UserSessionPanelViewModel.HandleAsync가 실제 DELETE 수행. (T2)</summary>
 public class CallForceLogoutSessionMessageModel : IMessageModel
+{
+    public UserSessionDto Session { get; set; } = default!;
+}
+
+/// <summary>사용자 전체 세션 종료 확인 트리거 — Confirm 다이얼로그 Yes 시 발행되어 UserSessionPanelViewModel.HandleAsync가 DELETE /user-sessions/user/{userId} 수행. (FR-2)</summary>
+public class CallForceLogoutAllUserSessionsMessageModel : IMessageModel
 {
     public UserSessionDto Session { get; set; } = default!;
 }

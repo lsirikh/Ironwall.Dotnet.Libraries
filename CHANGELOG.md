@@ -15,6 +15,11 @@
 ## [Unreleased]
 
 ### Added
+- **세션 관리 패널 정리 — 표시 포맷 · 사용자 전체 세션 종료 · 기본 동작** ([Plan](docs/plans/GOP_SessionPanel_Cleanup-prd-plan.md) · 태그 `before-session-panel-cleanup` · worktree `feature/session-panel-cleanup` · Accounts.Api/Accounts.Ui/Utils · 라이브러리 한정) — **API 서버 무변경**(기존 서버 지원만 소비).
+  - **표시**: 세션 날짜 컬럼(만료/로그아웃/로그인시각)이 `string?` ISO(+09:00)라 raw로 뜨던 것 → 신규 `IsoDateStringConverter`(Utils, `DateTime.TryParse`·파싱실패 시 원문 폴백)로 `yyyy-MM-dd HH:mm` 표시.
+  - **기능**: **사용자 전체 세션 종료** 배선 — `IAccountApiService.ForceLogoutAllUserSessionsAsync`(**DIM `=> throw`라 테스트 스텁 5곳 무수정**) + `AccountApiService`(`DELETE /user-sessions/user/{userId}`) + VM 확인팝업·`HandleAsync`(성공→page1 재조회 / **409 ADMIN 전원잠금 가드 안내**) + 뷰 행별 버튼. 서버 기존 엔드포인트 소비(무변경).
+  - **동작**: 기본을 **전체 표시**(활성만 언체크)로 전환 + **자동 갱신**(20s `System.Threading.Timer`, `OnActivate` 시작·`OnDeactivate` 폐기, 가드=`page1 && !loading && !teardown`이라 무한스크롤 방해 없음, teardown TOCTOU 하드닝).
+  - **검증**: code-review(opus) **READY**(P0/P1 0 — 타이머 수명·크로스스레드 심층검토 후 P1 teardown 하드닝 반영). 신규 테스트 8(전체종료·기본전체·자동갱신 가드·teardown·컨버터 2). Accounts.Ui.Tests **44**·Accounts.Api green·빌드0.
 - **심볼 우클릭 메뉴 — 뷰 모드 표시 + 잠금 게이트 v2** ([PRD](docs/prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) · [Plan](docs/plans/Symbol_ContextMenu_ViewMode_Lock-prd-plan.md) · 태그 `before-symbol-contextmenu-v2` · worktree `feature/symbol-contextmenu-v2` · GMaps.Ui 1파일) — 편집모드에서만 심볼 우클릭 메뉴가 뜨던 문제 해소.
   - 웹 의존 3종(장치페이지/상세/수정)=항상 표시+웹서버 OFF 시 비활성(disable 모델, 기존 편집모드 활성-데드링크도 해소) · 스피커 음원/TTS/Stop=웹서버 게이트 제거(NATS 기반인데 웹 조건 오결합) · **잠긴 심볼=메뉴 전체 미표시**(양 모드) · ZOrder=편집모드 전용 유지. 구 `ContextMenu_DisplayRules-prd.md`(6/10) Superseded.
 - **세션 관리 + 권한부여 — 무한 스크롤 페이지네이션** ([PRD](docs/prds/GOP_SessionGrant_Pagination-prd.md) · [Plan](docs/plans/GOP_SessionGrant_Pagination-prd-plan.md) · 태그 `before-session-grant-pagination` · worktree `feature/session-grant-pagination` · Accounts.Api/Accounts.Ui · 라이브러리 한정) — 감사로그 무한스크롤 패턴을 자매 패널 2곳에 이식.

@@ -172,6 +172,16 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
+    public async Task<ApiResponse<object>> ForceLogoutAllUserSessionsAsync(int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var res = await _api.DeleteRequestAsync($"user-sessions/user/{userId}").ConfigureAwait(false);
+            return await res.ToApiResponseAsync<object>().ConfigureAwait(false);
+        }
+        catch (Exception ex) { return ApiResponse<object>.CreateError("INTERNAL_ERROR", ex.Message); }
+    }
+
     // ── Grant Scheduling (T4/FR-GS-06) — 서버 grants API 소비 ──
     public async Task<ApiListResponse<GrantDto>> GetUserGrantsAsync(int userId, CancellationToken ct = default)
     {

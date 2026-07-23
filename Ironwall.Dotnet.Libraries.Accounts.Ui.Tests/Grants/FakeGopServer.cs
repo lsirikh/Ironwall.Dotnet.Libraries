@@ -69,6 +69,9 @@ internal sealed class FakeGopServer : IAccountApiService
     public bool? LastSessionIsActive { get; private set; }
     public int LastSessionPage { get; private set; }
     public int LastSessionLimit { get; private set; }
+    // ── 전체 세션 종료(DELETE /user-sessions/user/{id}) 캡처(부수효과 검증) ──
+    public int ForceLogoutAllCallCount { get; private set; }
+    public int? LastForceLogoutAllUserId { get; private set; }
 
     /// <summary>서버 UserGroupGrant 행 모사.</summary>
     internal sealed class GrantRow
@@ -330,6 +333,22 @@ internal sealed class FakeGopServer : IAccountApiService
             slice,
             new PaginationDto { Page = page, Limit = limit, Total = total, TotalPages = totalPages });
         return Task.FromResult(res);
+    }
+    // DELETE /user-sessions/user/{userId} — 해당 사용자 활성 세션 전체 종료(서버 user_sessions.py 미러). userId 캡처 + 종료 수 반환.
+    public Task<ApiResponse<object>> ForceLogoutAllUserSessionsAsync(int userId, CancellationToken ct = default)
+    {
+        ForceLogoutAllCallCount++;
+        LastForceLogoutAllUserId = userId;
+
+        // 해당 사용자의 활성 세션을 비활성화(서버 부수효과 모사) + 종료 수를 data로 반환.
+        int count = 0;
+        foreach (var sn in Sessions.Where(sn => sn.UserId == userId && sn.IsActive))
+        {
+            sn.IsActive = false;
+            count++;
+        }
+        var ok = new ApiResponse<object> { Success = true, Data = count, StatusCode = 200 };
+        return Task.FromResult(ok);
     }
     // 감사 로그: 날짜필터(created_at >=/<=) + id desc + page/limit 슬라이스 (서버 audit_logs.py 미러)
     public Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, string? startDate = null, string? endDate = null, CancellationToken ct = default)

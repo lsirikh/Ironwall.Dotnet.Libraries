@@ -37,12 +37,13 @@ internal sealed class FakeTokenStore : ITokenStorageService
     public void Clear() { }
 }
 
-/// <summary>protected OnActivateAsync 를 테스트에 노출(초기 로드 경로 검증).</summary>
+/// <summary>protected OnActivateAsync/OnDeactivateAsync 를 테스트에 노출(초기 로드·teardown 가드 경로 검증).</summary>
 internal sealed class TestUserSessionPanel : UserSessionPanelViewModel
 {
     public TestUserSessionPanel(IEventAggregator ea, ILogService log, IAccountApiService api, ITokenStorageService store)
         : base(ea, log, api, store) { }
     public Task ActivateForTestAsync() => OnActivateAsync(CancellationToken.None);
+    public Task DeactivateForTestAsync() => OnDeactivateAsync(true, CancellationToken.None);
 }
 
 public class UserSessionPanelTests
@@ -105,8 +106,8 @@ public class UserSessionPanelTests
         await vm.LoadNextPageAsync();
         Assert.Equal(200, vm.Items.Count);
 
-        // Act — 필터 토글(true→false) → setter가 첫 페이지부터 재조회
-        vm.IsActiveOnly = false;
+        // Act — 필터 토글(false→true, 기본 전체에서 활성만으로 변경) → setter가 첫 페이지부터 재조회
+        vm.IsActiveOnly = true;
 
         // Assert — 첫 페이지로 리셋(100), 아직 더 있음
         Assert.Equal(100, vm.Items.Count);
@@ -116,12 +117,14 @@ public class UserSessionPanelTests
     [Fact]
     public async Task should_send_is_active_when_active_only()
     {
-        // Arrange — 활성 3 + 비활성 2(활성만 필터 시 3건만)
+        // Arrange — 활성 3 + 비활성 2(활성만 필터 시 3건만). 기본은 전체(false)라 명시적으로 활성만 켠다(FR-3).
         var s = NewServerWithSessions(active: 3, inactive: 2);
-        var vm = NewVm(s);   // 기본 IsActiveOnly=true
-
-        // Act
+        var vm = NewVm(s);
         await vm.ActivateForTestAsync();
+
+        // Act — 활성만 필터 ON 후 재조회(awaited)
+        vm.IsActiveOnly = true;
+        await vm.OnClickReloadButton();
 
         // Assert — is_active=true 전송 + 활성 3건만 로드
         Assert.True(s.LastSessionIsActive);

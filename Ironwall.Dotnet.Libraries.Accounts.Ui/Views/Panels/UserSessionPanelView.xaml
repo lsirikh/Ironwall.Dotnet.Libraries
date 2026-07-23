@@ -8,10 +8,15 @@
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	d:DesignHeight="450"
 	d:DesignWidth="900"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+	<UserControl.Resources>
+		<!--  ISO(+09:00) string? → "yyyy-MM-dd HH:mm" 표시(파싱 실패 시 원문 폴백). 색 무관.  -->
+		<utils:IsoDateStringConverter x:Key="IsoDateStringConverter" />
+	</UserControl.Resources>
 	<!--  탭 콘텐츠 — 색은 100% DynamicResource 토큰. (세션 정책 영역은 EXT-10에서 상단 추가 예정)  -->
 	<Grid Margin="6">
 		<Grid.RowDefinitions>
@@ -68,22 +73,33 @@
 				<DataGridTextColumn Width="90" Binding="{Binding Role}" Header="역할" />
 				<DataGridTextColumn Width="130" Binding="{Binding IpAddress}" Header="IP" />
 				<DataGridCheckBoxColumn Width="60" Binding="{Binding IsActive}" Header="활성" />
-				<DataGridTextColumn Width="150" Binding="{Binding ExpiresAt}" Header="만료" />
-				<DataGridTextColumn Width="150" Binding="{Binding LoggedOutAt}" Header="로그아웃" />
+				<DataGridTextColumn Width="140" Binding="{Binding ExpiresAt, Converter={StaticResource IsoDateStringConverter}}" Header="만료" />
+				<DataGridTextColumn Width="140" Binding="{Binding LoggedOutAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그아웃" />
 				<DataGridTextColumn Width="130" Binding="{Binding LogoutReason}" Header="사유" />
-				<DataGridTextColumn Width="160" Binding="{Binding CreatedAt}" Header="로그인시각" />
-				<DataGridTemplateColumn Width="80" Header="관리">
+				<DataGridTextColumn Width="140" Binding="{Binding CreatedAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그인시각" />
+				<DataGridTemplateColumn Width="120" Header="관리">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>
-							<Button
-								HorizontalAlignment="Left"
-								VerticalAlignment="Center"
-								IsEnabled="{Binding IsActive}"
-								Style="{StaticResource ModernToolbarButton}"
-								ToolTip="강제 로그아웃">
-								<cal:Message.Attach>[Event Click] = [Action OnClickForceLogout($dataContext)]</cal:Message.Attach>
-								<md:PackIcon Width="20" Height="20" Kind="LogoutVariant" />
-							</Button>
+							<StackPanel HorizontalAlignment="Left" Orientation="Horizontal">
+								<!--  이 세션만 강제 로그아웃  -->
+								<Button
+									VerticalAlignment="Center"
+									IsEnabled="{Binding IsActive}"
+									Style="{StaticResource ModernToolbarButton}"
+									ToolTip="이 세션 강제 로그아웃">
+									<cal:Message.Attach>[Event Click] = [Action OnClickForceLogout($dataContext)]</cal:Message.Attach>
+									<md:PackIcon Width="20" Height="20" Kind="LogoutVariant" />
+								</Button>
+								<!--  이 사용자의 활성 세션 전체 종료(DELETE /user-sessions/user/{id})  -->
+								<Button
+									VerticalAlignment="Center"
+									IsEnabled="{Binding IsActive}"
+									Style="{StaticResource ModernToolbarButton}"
+									ToolTip="이 사용자 전체 세션 종료">
+									<cal:Message.Attach>[Event Click] = [Action OnClickForceLogoutAllUserSessions($dataContext)]</cal:Message.Attach>
+									<md:PackIcon Width="20" Height="20" Kind="AccountMultipleRemove" />
+								</Button>
+							</StackPanel>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>

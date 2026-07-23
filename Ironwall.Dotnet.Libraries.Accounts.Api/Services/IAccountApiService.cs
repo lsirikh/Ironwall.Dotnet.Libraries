@@ -93,6 +93,11 @@ public interface IAccountApiService
     /// 기본구현=미지원(테스트 스텁 무수정 목적) — 실제 구현은 AccountApiService.</summary>
     Task<ApiResponse<object>> ForceLogoutSessionAsync(int sessionId, CancellationToken ct = default)
         => throw new NotImplementedException();
+    /// <summary>DELETE /api/user-sessions/user/{user_id} — 해당 사용자의 활성 세션 전체 강제 로그아웃(ADMIN, users:control).
+    /// 응답 {success, data:&lt;종료 수&gt;}. 마지막 활성 ADMIN 전원잠금이면 409(가드 존중 → 오류 메시지 표시).
+    /// 기본구현=미지원(테스트 스텁 무수정 목적) — 실제 구현은 AccountApiService.</summary>
+    Task<ApiResponse<object>> ForceLogoutAllUserSessionsAsync(int userId, CancellationToken ct = default)
+        => throw new NotImplementedException();
 
     // ── Grant Scheduling (T4/FR-GS-06) — 서버 grants API. 기본구현=미지원(테스트 스텁 무수정) ──
     /// <summary>GET /api/users/{userId}/grants — 사용자 권한그룹 부여 목록(ADMIN). status=ACTIVE/PENDING/EXPIRED/REVOKED.</summary>
