@@ -29,6 +29,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History (탐지 신호 표면화 + 센서별 신호 이력 다이얼로그, FR 15) | Draft | 2026-07-23 |
 | [Admin_Photo_Upload-prd.md](prds/Admin_Photo_Upload-prd.md) | Admin_Photo_Upload (관리자 타계정 사진 업로드/삭제 클라 배선) | Draft | 2026-07-21 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-prd.md](prds/GMap_PidsCamera_FOV_Toggle_Persistence-prd.md) | GMap_PidsCamera_FOV_Toggle_Persistence | Approved | 2026-07-18 |
 | [GMap_Lock_Selection_ZOrder_Integrity-prd.md](prds/GMap_Lock_Selection_ZOrder_Integrity-prd.md) | GMap_Lock_Selection_ZOrder_Integrity | Approved | 2026-07-15 |
@@ -379,3 +380,15 @@
 | [REPORT_DeviceApi_IntegrationTest.md](reports/REPORT_DeviceApi_IntegrationTest.md) | [PRD](prds/REPORT_DeviceApi_IntegrationTest.md-prd.md) → [Plan](plans/REPORT_DeviceApi_IntegrationTest.md-prd-plan.md) | 2026-02-24 |
 
 <!-- auto-section-end -->
+
+## 조율/확인요청 (docs/coordination/)
+
+| 파일 | 대상 | 내용 | 날짜 |
+|------|------|------|------|
+| [REQ_Proxy_WINDY_RSP_ReplyTo.md](coordination/REQ_Proxy_WINDY_RSP_ReplyTo.md) | PidsProxy 담당 | WINDY(풍량모드) RSP 미수신 — reply-to 회신 경로 점검 요청 | 2026-07-23 |
+
+## 설계 (docs/design/)
+
+| 파일 | 내용 | 날짜 |
+|------|------|------|
+| [Detection_Signal_History_Storyboard.html](design/Detection_Signal_History_Storyboard.html) | 탐지 신호(detail.signal) 표면화 와이어프레임 & 스토리보드 v2 — 이력그리드 신호컬럼(+MessageType 제거)·카드 병기·우클릭 진입 2종(심볼/DevicePanel)·팝업 다이얼로그(차트+그리드)·다크/라이트 토글 | 2026-07-23 |

@@ -196,7 +196,7 @@
 								</cal:Message.Attach>
 								<md:PackIcon Kind="CommentOutline" />
 							</Button>
-							<Button
+							<!--<Button
 								Grid.Column="1"
 								Padding="4 0"
 								VerticalAlignment="Center"
@@ -211,7 +211,7 @@
 									Width="23"
 									Height="23"
 									Kind="VideoCheckOutline" />
-							</Button>
+							</Button>-->
 
 							<TextBlock
 								Grid.Column="3"

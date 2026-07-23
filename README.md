@@ -582,6 +582,11 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 ### [Unreleased] — v2.6.2 (2026-05-22 기준)
 
+**탐지 신호 이력** (Detection_Signal_History — PRD Draft, 2026-07-23)
+- 탐지 이벤트 신호 크기(`detail.signal`) 표면화: 이력 그리드 신호 컬럼 + 실시간 카드 병기 (Message Type 표시는 중복이라 제거)
+- 센서 우클릭(맵 심볼 / DevicePanel 그리드) → 탐지 신호 이력 팝업 다이얼로그(기간 프리셋·시간축 차트·필터/통계·조치보고 연계)
+- 설계: `docs/design/Detection_Signal_History_Storyboard.html` · PRD: `docs/prds/Detection_Signal_History-prd.md`
+
 **이벤트 파이프라인 전체 성능 최적화** (Event_Performance_Optimization)
 - `ApplyCompositeStatus` — `MarshalUpdate()` 코얼레싱으로 NATS 스레드→WPF STA 위반 해소
 - `DetectionNatsSyncService` / `MalfunctionNatsSyncService` — `PublishOnUIThreadAsync` 전환 (EA BackgroundThread ObservableCollection 접근 Blocker 제거)
