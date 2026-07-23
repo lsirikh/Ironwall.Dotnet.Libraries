@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-07-18 (advance-phase 자동)
-- **총 문서 수**: 346개
+- **마지막 갱신**: 2026-07-23 (advance-phase 자동)
+- **총 문서 수**: 392개
 
 ---
 
@@ -10,27 +10,61 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md](analyses/GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md) | GMap_OverlayWindow_Symbol_Visibility_Restore | 2026-07-20 |
+| [VSCode_Terminal_Tangling-analysis.md](analyses/VSCode_Terminal_Tangling-analysis.md) | VSCode_Terminal_Tangling | 2026-07-20 |
+| [Grant_Enforcement_Client_Analysis.md](analyses/Grant_Enforcement_Client_Analysis.md) | Grant_Enforcement_Client_Analysis.md | 2026-07-20 |
+| [Grant_Enforcement_Server_Analysis.md](analyses/Grant_Enforcement_Server_Analysis.md) | Grant_Enforcement_Server_Analysis.md | 2026-07-20 |
+| [GMap_Anchor_Boundary_Bounce_Flicker_Jerking-analysis.md](analyses/GMap_Anchor_Boundary_Bounce_Flicker_Jerking-analysis.md) | GMap_Anchor_Boundary_Bounce_Flicker_Jerking | 2026-07-20 |
+| [GMap_Pan_Overlay_Temporal_Desync-analysis.md](analyses/GMap_Pan_Overlay_Temporal_Desync-analysis.md) | GMap_Pan_Overlay_Temporal_Desync | 2026-07-19 |
+| [GMap_EditMode_ArrowKey_FocusSelectionBox-analysis.md](analyses/GMap_EditMode_ArrowKey_FocusSelectionBox-analysis.md) | GMap_EditMode_ArrowKey_FocusSelectionBox | 2026-07-19 |
+| [GMap_Rotation_FullSync_Design-analysis.md](analyses/GMap_Rotation_FullSync_Design-analysis.md) | GMap_Rotation_FullSync_Design | 2026-07-19 |
 | [GMap_Rotation_FullSync_Design_Adversarial_Review-analysis.md](analyses/GMap_Rotation_FullSync_Design_Adversarial_Review-analysis.md) | GMap_Rotation_FullSync_Design_Adversarial_Review | 2026-07-18 |
 | [GMap_Rotation_Overlay_Desync-analysis.md](analyses/GMap_Rotation_Overlay_Desync-analysis.md) | GMap_Rotation_Overlay_Desync | 2026-07-18 |
-| [GMap_Rotation_FullSync_Design-analysis.md](analyses/GMap_Rotation_FullSync_Design-analysis.md) | GMap_Rotation_FullSync_Design | 2026-07-18 |
 | [GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md](analyses/GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md) | GMap_UI_Edit_Undo_Redo_MultiSelection | 2026-07-15 |
 | [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz | 2026-07-15 |
 | [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
 | [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-13 |
 | [GMap_RDP_Overlay_Desync-analysis.md](analyses/GMap_RDP_Overlay_Desync-analysis.md) | GMap_RDP_Overlay_Desync | 2026-07-07 |
+| [GOP_Server_API_rbac_matrix_gate_NOTIFY.md](analyses/GOP_Server_API_rbac_matrix_gate_NOTIFY.md) | GOP_Server_API_rbac_matrix_gate_NOTIFY.md | 2026-07-07 |
 | [Map_Edit_Undo_Redo-analysis.md](analyses/Map_Edit_Undo_Redo-analysis.md) | Map_Edit_Undo_Redo | 2026-07-02 |
 | [GMap_Adorner_System-analysis.md](analyses/GMap_Adorner_System-analysis.md) | GMap_Adorner_System | 2026-07-02 |
 | [Tracking_Playback_DataSource_Toggle-analysis.md](analyses/Tracking_Playback_DataSource_Toggle-analysis.md) | Tracking_Playback_DataSource_Toggle | 2026-06-26 |
 | [Tracking_API_vs_LocalDB-analysis.md](analyses/Tracking_API_vs_LocalDB-analysis.md) | Tracking_API_vs_LocalDB | 2026-06-26 |
 | [Http_To_Https_Migration_Impact-analysis.md](analyses/Http_To_Https_Migration_Impact-analysis.md) | Http_To_Https_Migration_Impact | 2026-06-25 |
+| [GOP_Restful_Api_v4.9_Review-analysis.md](analyses/GOP_Restful_Api_v4.9_Review-analysis.md) | GOP_Restful_Api_v4.9_Review | 2026-06-24 |
 | [nats-tracking-message-flow-analysis.md](analyses/nats-tracking-message-flow-analysis.md) | nats-tracking-message-flow | 2026-06-23 |
+| [server_api_grounding.md](analyses/server_api_grounding.md) | server_api_grounding.md | 2026-06-22 |
+| [Client_API_Conformance_Audit-analysis.md](analyses/Client_API_Conformance_Audit-analysis.md) | Client_API_Conformance_Audit | 2026-06-19 |
+| [DeviceGroup_BatchRemove_API_Request.md](analyses/DeviceGroup_BatchRemove_API_Request.md) | DeviceGroup_BatchRemove_API_Request.md | 2026-06-19 |
+| [GOP_API_v4_Changes_ClientImpact-analysis.md](analyses/GOP_API_v4_Changes_ClientImpact-analysis.md) | GOP_API_v4_Changes_ClientImpact | 2026-06-19 |
+| [OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md](analyses/OverlayImage_Rotation_Zoom_AABB_RootCause-analysis.md) | OverlayImage_Rotation_Zoom_AABB_RootCause | 2026-06-12 |
+| [RapidEventBurst_Stutter_Analysis.md](analyses/RapidEventBurst_Stutter_Analysis.md) | RapidEventBurst_Stutter_Analysis.md | 2026-06-04 |
+| [Multisensor_Symbol_Bug_Analysis.md](analyses/Multisensor_Symbol_Bug_Analysis.md) | Multisensor_Symbol_Bug_Analysis.md | 2026-06-04 |
+| [EventStateSyncArchitecture_Analysis.md](analyses/EventStateSyncArchitecture_Analysis.md) | EventStateSyncArchitecture_Analysis.md | 2026-06-04 |
+| [BatchReport_SymbolLeak_Analysis.md](analyses/BatchReport_SymbolLeak_Analysis.md) | BatchReport_SymbolLeak_Analysis.md | 2026-06-04 |
+| [OverlayMap-Performance-Analysis.md](analyses/OverlayMap-Performance-Analysis.md) | OverlayMap-Performance-Analysis.md | 2026-05-27 |
+| [EVENT_PROCESS_VISUALIZATION.md](analyses/EVENT_PROCESS_VISUALIZATION.md) | EVENT_PROCESS_VISUALIZATION.md | 2026-05-22 |
+| [ANALYSIS_Skillset_Issues_And_Improvements.md](analyses/ANALYSIS_Skillset_Issues_And_Improvements.md) | ANALYSIS_Skillset_Issues_And_Improvements.md | 2026-05-19 |
+| [ANALYSIS_View_Architecture.md](analyses/ANALYSIS_View_Architecture.md) | ANALYSIS_View_Architecture.md | 2026-05-18 |
+| [ANALYSIS_Detection_Action_Process_Flow.md](analyses/ANALYSIS_Detection_Action_Process_Flow.md) | ANALYSIS_Detection_Action_Process_Flow.md | 2026-05-18 |
+| [NATS_Detection_Redis_Flow.md](analyses/NATS_Detection_Redis_Flow.md) | NATS_Detection_Redis_Flow.md | 2026-05-15 |
+| [ANALYSIS_GatewayEvent_Group_NtoN_Migration.md](analyses/ANALYSIS_GatewayEvent_Group_NtoN_Migration.md) | ANALYSIS_GatewayEvent_Group_NtoN_Migration.md | 2026-05-15 |
 
 ## 요구사항 정의서 (docs/prds/)
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History (탐지 신호 표면화 + 센서별 신호 이력 다이얼로그, FR 15) | Draft | 2026-07-23 |
-| [Admin_Photo_Upload-prd.md](prds/Admin_Photo_Upload-prd.md) | Admin_Photo_Upload (관리자 타계정 사진 업로드/삭제 클라 배선) | Draft | 2026-07-21 |
+| [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History | Approved | 2026-07-23 |
+| [GOP_AuditLog_DateFilter_Pagination-prd.md](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | GOP_AuditLog_DateFilter_Pagination | Draft | 2026-07-23 |
+| [GMap_Symbol_Visibility_Master-prd.md](prds/GMap_Symbol_Visibility_Master-prd.md) | GMap_Symbol_Visibility_Master | Draft | 2026-07-20 |
+| [MyPage_SelfPhoto_Delete_Fix-prd.md](prds/MyPage_SelfPhoto_Delete_Fix-prd.md) | MyPage_SelfPhoto_Delete_Fix | Draft | 2026-07-20 |
+| [GMap_Symbol_Visibility_Restore-prd.md](prds/GMap_Symbol_Visibility_Restore-prd.md) | GMap_Symbol_Visibility_Restore | Draft | 2026-07-20 |
+| [Admin_Photo_Upload-prd.md](prds/Admin_Photo_Upload-prd.md) | Admin_Photo_Upload | Draft | 2026-07-20 |
+| [Grant_LiveCutoff_NATS_Push-prd.md](prds/Grant_LiveCutoff_NATS_Push-prd.md) | Grant_LiveCutoff_NATS_Push | Draft | 2026-07-20 |
+| [Grant_LiveCutoff_Client-prd.md](prds/Grant_LiveCutoff_Client-prd.md) | Grant_LiveCutoff_Client | Draft | 2026-07-20 |
+| [GrantList_TopLevelTotal_Fix-prd.md](prds/GrantList_TopLevelTotal_Fix-prd.md) | GrantList_TopLevelTotal_Fix | Draft | 2026-07-20 |
+| [EventChart_Tooltip_ThemeSync-prd.md](prds/EventChart_Tooltip_ThemeSync-prd.md) | EventChart_Tooltip_ThemeSync | Approved | 2026-07-20 |
+| [GMap_Anchor_Viewport_Lock-prd.md](prds/GMap_Anchor_Viewport_Lock-prd.md) | GMap_Anchor_Viewport_Lock | Approved | 2026-07-19 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-prd.md](prds/GMap_PidsCamera_FOV_Toggle_Persistence-prd.md) | GMap_PidsCamera_FOV_Toggle_Persistence | Approved | 2026-07-18 |
 | [GMap_Lock_Selection_ZOrder_Integrity-prd.md](prds/GMap_Lock_Selection_ZOrder_Integrity-prd.md) | GMap_Lock_Selection_ZOrder_Integrity | Approved | 2026-07-15 |
 | [DeviceStatusSync_ActionReportPropagation-prd.md](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | DeviceStatusSync_ActionReportPropagation | Draft | 2026-07-15 |
@@ -162,6 +196,11 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [GOP_AuditLog_DateFilter_Pagination-prd-plan.md](plans/GOP_AuditLog_DateFilter_Pagination-prd-plan.md) | [PRD](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | 0/0 | 2026-07-23 |
+| [Admin_Photo_Upload-prd-plan.md](plans/Admin_Photo_Upload-prd-plan.md) | [PRD](prds/Admin_Photo_Upload-prd.md) | 5/26 | 2026-07-20 |
+| [EventChart_Tooltip_ThemeSync-prd-plan.md](plans/EventChart_Tooltip_ThemeSync-prd-plan.md) | [PRD](prds/EventChart_Tooltip_ThemeSync-prd.md) | 6/7 | 2026-07-20 |
+| [GMap_Anchor_Viewport_Lock-prd-plan.md](plans/GMap_Anchor_Viewport_Lock-prd-plan.md) | [PRD](prds/GMap_Anchor_Viewport_Lock-prd.md) | 6/7 | 2026-07-19 |
+| [GMap_PidsCamera_FOV_Toggle_Persistence-prd-plan.md](plans/GMap_PidsCamera_FOV_Toggle_Persistence-prd-plan.md) | [PRD](prds/GMap_PidsCamera_FOV_Toggle_Persistence-prd.md) | 7/8 | 2026-07-18 |
 | [DeviceStatusSync_ActionReportPropagation-prd-plan.md](plans/DeviceStatusSync_ActionReportPropagation-prd-plan.md) | [PRD](prds/DeviceStatusSync_ActionReportPropagation-prd.md) | 0/30 | 2026-07-15 |
 | [CameraPopup_RtspSource_Priority-prd-plan.md](plans/CameraPopup_RtspSource_Priority-prd-plan.md) | [PRD](prds/CameraPopup_RtspSource_Priority-prd.md) | 24/27 | 2026-07-15 |
 | [GMap_SystemResource_Indicator-prd-plan.md](plans/GMap_SystemResource_Indicator-prd-plan.md) | [PRD](prds/GMap_SystemResource_Indicator-prd.md) | 0/45 | 2026-07-13 |
@@ -247,7 +286,10 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
+| [GMap_Anchor_Viewport_Lock-test-result.md](tests/GMap_Anchor_Viewport_Lock-test-result.md) | -% | -% | 2026-07-19 |
+| [GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md](tests/GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md) | -% | -% | 2026-07-18 |
 | [GMap_Edit_Integration_Sim-test-result.md](tests/GMap_Edit_Integration_Sim-test-result.md) | -% | -% | 2026-07-05 |
+| [OverlayImage_Undo_TestScenarios.md](tests/OverlayImage_Undo_TestScenarios.md) | -% | -% | 2026-07-05 |
 | [TEST_SCENARIOS_GOP_Account_RBAC.md](tests/TEST_SCENARIOS_GOP_Account_RBAC.md) | -% | -% | 2026-07-04 |
 | [TEST_ImageOverlay_FileCopy_On_Register.md](tests/TEST_ImageOverlay_FileCopy_On_Register.md) | -% | -% | 2026-05-13 |
 
@@ -255,6 +297,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [grant-verification-report.md](reports/grant-verification-report.md) | [PRD](prds/grant-verification-prd.md) → [Plan](plans/grant-verification-prd-plan.md) | 2026-07-20 |
 | [ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md](reports/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md) | [PRD](prds/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd.md) → [Plan](plans/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd-plan.md) | 2026-07-15 |
 | [ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md](reports/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md) | [PRD](prds/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd.md) → [Plan](plans/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd-plan.md) | 2026-07-15 |
 | [ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md](reports/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd.md) → [Plan](plans/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd-plan.md) | 2026-07-15 |
@@ -280,6 +323,7 @@
 | [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) → [Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |
 | [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) → [Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
 | [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) → [Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd-plan.md) | 2026-05-20 |
+| [Skillset_Issues_And_Improvements_2026-05-19.md](reports/Skillset_Issues_And_Improvements_2026-05-19.md) | [PRD](prds/Skillset_Issues_And_Improvements_2026-05-19.md-prd.md) → [Plan](plans/Skillset_Issues_And_Improvements_2026-05-19.md-prd-plan.md) | 2026-05-19 |
 | [Detection_Sound_And_DualPath_Fix-report.md](reports/Detection_Sound_And_DualPath_Fix-report.md) | [PRD](prds/Detection_Sound_And_DualPath_Fix-prd.md) → [Plan](plans/Detection_Sound_And_DualPath_Fix-prd-plan.md) | 2026-05-18 |
 | [REPORT_GMapCustomControl_ImageDrag_BugFix.md](reports/REPORT_GMapCustomControl_ImageDrag_BugFix.md) | [PRD](prds/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd.md) → [Plan](plans/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd-plan.md) | 2026-05-15 |
 | [REPORT_ImageOverlay_FileCopy_On_Register.md](reports/REPORT_ImageOverlay_FileCopy_On_Register.md) | [PRD](prds/REPORT_ImageOverlay_FileCopy_On_Register.md-prd.md) → [Plan](plans/REPORT_ImageOverlay_FileCopy_On_Register.md-prd-plan.md) | 2026-05-13 |
