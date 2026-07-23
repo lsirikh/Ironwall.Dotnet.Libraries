@@ -290,11 +290,36 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DependencyProperty.Register("TitleMaxWidthPx", typeof(double), typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(200.0, OnTitleMaxWidthPxChanged));
 
-        /// <summary>라벨 색 프리셋(hex) — 편집 콤보 드롭다운(팔레트+자유입력 병행, OQ-2). 마지막 2개=종전 기본 글자/배경색, '#00000000'=투명.</summary>
-        public static string[] PresetLabelColorsHex { get; } =
+        /// <summary>라벨 글자색 팔레트 — 기존 채우기/테두리 콤보 구조 차용(스와치+이름, SelectedValue=Argb).
+        /// 첫 항목=종전 하드코딩 기본값(선택 표시 보장). 편집 hex 콤보는 렌더 결함으로 폐기(v2.3).</summary>
+        public static LabelColorOption[] LabelTextColorOptions { get; } =
         {
-            "#F0F0F4F8", "#CD1C1E22", "#FFFFFFFF", "#FF000000", "#FFFF5252", "#FFFFC107",
-            "#FF4CAF50", "#FF00AAFF", "#FFB388FF", "#FFFF8A65", "#00000000"
+            new("기본(밝음)", unchecked((int)0xF0F0F4F8)),
+            new("흰색", unchecked((int)0xFFFFFFFF)),
+            new("검정", unchecked((int)0xFF000000)),
+            new("빨강", unchecked((int)0xFFFF5252)),
+            new("주황", unchecked((int)0xFFFF8A65)),
+            new("노랑", unchecked((int)0xFFFFC107)),
+            new("초록", unchecked((int)0xFF4CAF50)),
+            new("하늘", unchecked((int)0xFF00AAFF)),
+            new("파랑", unchecked((int)0xFF2962FF)),
+            new("보라", unchecked((int)0xFFB388FF)),
+            new("회색", unchecked((int)0xFF9E9E9E)),
+        };
+
+        /// <summary>라벨 배경(칩)색 팔레트 — 투명·반투명 칩 중심 + 원색. 첫 항목=종전 기본 칩.</summary>
+        public static LabelColorOption[] LabelBackgroundColorOptions { get; } =
+        {
+            new("기본(칩)", unchecked((int)0xCD1C1E22)),
+            new("투명", 0),
+            new("검정 반투명", unchecked((int)0x99000000)),
+            new("흰색 반투명", unchecked((int)0xB3FFFFFF)),
+            new("검정", unchecked((int)0xFF000000)),
+            new("흰색", unchecked((int)0xFFFFFFFF)),
+            new("빨강", unchecked((int)0xFFB71C1C)),
+            new("파랑", unchecked((int)0xFF0D47A1)),
+            new("초록", unchecked((int)0xFF1B5E20)),
+            new("노랑", unchecked((int)0xFFF9A825)),
         };
 
         /// <summary>
@@ -1146,6 +1171,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private object? _applyLocOriginalContent;
         private bool _applyLocBusy;
         #endregion
+    }
+
+    /// <summary>라벨 색 팔레트 항목(이름 + packed ARGB) — 기존 채우기/테두리 색 콤보 구조를 라벨 색에 차용하기 위한
+    /// 아이템 모델(Overlay_Title FR-07 v2.3). SelectedValuePath=Argb로 int? DP와 직결.</summary>
+    public sealed class LabelColorOption
+    {
+        public string Name { get; }
+        public int Argb { get; }
+        public LabelColorOption(string name, int argb) { Name = name; Argb = argb; }
+        public override string ToString() => Name;
     }
 
 

@@ -10,8 +10,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 	<utils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
-	<!--  라벨 스타일(Overlay_Title FR-07): packed ARGB int ↔ hex 문자열 / 스와치 브러시  -->
-	<utils:ArgbHexConverter x:Key="ArgbHex" />
+	<!--  라벨 스타일(Overlay_Title FR-07 v2.3): packed ARGB int → 팔레트 스와치 브러시  -->
 	<utils:ArgbToBrushConverter x:Key="ArgbBrush" />
 	<!--  그룹(멀티셀렉트) Pending: NaN=값 서로 다름 → 텍스트 빈칸/—, 슬라이더 0 파킹. 단일 모드엔 영향 없음  -->
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlank" />
@@ -215,62 +214,82 @@
 											ToolTip="라벨 최대 폭(px, 40~800). 글자가 이 폭에서 말줄임 처리됩니다. 맵에서 라벨 가장자리를 드래그해도 조절됩니다." />
 									</Grid>
 
-									<!--  글자색 / 배경색 — 스와치 + 편집 콤보(프리셋 팔레트 + #AARRGGBB 자유입력, FR-07/OQ-2)  -->
+									<!--  글자색 / 배경색 — 채우기/테두리 색 콤보 구조 그대로 차용(스와치+이름, FR-07 v2.3).
+									      구 편집(hex) 콤보는 PropertyComboBox 템플릿에 편집 파트가 없어 값 표시가 깨지고
+									      LostFocus 커밋이라 선택 즉시 미반영되던 버그 → 표준 콤보로 교체.  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
-											<ColumnDefinition Width="18" />
 											<ColumnDefinition Width="*" />
 										</Grid.ColumnDefinitions>
 										<TextBlock
 											Grid.Column="0"
-											VerticalAlignment="Center"
 											Style="{StaticResource PropertyLabel}"
 											Text="글자색" />
-										<Border
-											Grid.Column="1"
-											Width="14"
-											Height="14"
-											VerticalAlignment="Center"
-											Background="{Binding TitleColorArgb, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource ArgbBrush}}"
-											BorderBrush="{DynamicResource BorderBrush}"
-											BorderThickness="1"
-											CornerRadius="2" />
 										<ComboBox
-											Grid.Column="2"
-											IsEditable="True"
-											ItemsSource="{x:Static properties:GMapPropertyBaseControl.PresetLabelColorsHex}"
-											Style="{StaticResource CompactComboBox}"
-											Text="{Binding TitleColorArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource ArgbHex}}"
-											ToolTip="라벨 글자색 — 프리셋 선택 또는 #AARRGGBB 직접 입력" />
+											Grid.Column="1"
+											ItemsSource="{x:Static properties:GMapPropertyBaseControl.LabelTextColorOptions}"
+											SelectedValue="{Binding TitleColorArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+											SelectedValuePath="Argb"
+											Style="{StaticResource CompactComboBox}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate>
+													<StackPanel Background="Transparent" Orientation="Horizontal">
+														<Rectangle
+															Width="40"
+															Height="12"
+															Fill="{Binding Argb, Converter={StaticResource ArgbBrush}}"
+															RadiusX="2"
+															RadiusY="2"
+															Stroke="{DynamicResource BorderBrush}"
+															StrokeThickness="0.5" />
+														<TextBlock
+															Margin="10,0"
+															Background="Transparent"
+															FontSize="10"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Text="{Binding Name}" />
+													</StackPanel>
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
 									</Grid>
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
-											<ColumnDefinition Width="18" />
 											<ColumnDefinition Width="*" />
 										</Grid.ColumnDefinitions>
 										<TextBlock
 											Grid.Column="0"
-											VerticalAlignment="Center"
 											Style="{StaticResource PropertyLabel}"
 											Text="배경색" />
-										<Border
-											Grid.Column="1"
-											Width="14"
-											Height="14"
-											VerticalAlignment="Center"
-											Background="{Binding TitleBackgroundArgb, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource ArgbBrush}}"
-											BorderBrush="{DynamicResource BorderBrush}"
-											BorderThickness="1"
-											CornerRadius="2" />
 										<ComboBox
-											Grid.Column="2"
-											IsEditable="True"
-											ItemsSource="{x:Static properties:GMapPropertyBaseControl.PresetLabelColorsHex}"
-											Style="{StaticResource CompactComboBox}"
-											Text="{Binding TitleBackgroundArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource ArgbHex}}"
-											ToolTip="라벨 배경색 — '#00000000'=투명" />
+											Grid.Column="1"
+											ItemsSource="{x:Static properties:GMapPropertyBaseControl.LabelBackgroundColorOptions}"
+											SelectedValue="{Binding TitleBackgroundArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+											SelectedValuePath="Argb"
+											Style="{StaticResource CompactComboBox}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate>
+													<StackPanel Background="Transparent" Orientation="Horizontal">
+														<Rectangle
+															Width="40"
+															Height="12"
+															Fill="{Binding Argb, Converter={StaticResource ArgbBrush}}"
+															RadiusX="2"
+															RadiusY="2"
+															Stroke="{DynamicResource BorderBrush}"
+															StrokeThickness="0.5" />
+														<TextBlock
+															Margin="10,0"
+															Background="Transparent"
+															FontSize="10"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Text="{Binding Name}" />
+													</StackPanel>
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
 									</Grid>
 
 									<!--  글꼴 + 굵게/이탤릭 — 시스템 설치 폰트 열거(자유입력 금지, FR-07/OQ-3)  -->
