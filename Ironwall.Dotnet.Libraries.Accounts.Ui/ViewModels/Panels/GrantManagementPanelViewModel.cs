@@ -1,5 +1,6 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
+using Ironwall.Dotnet.Libraries.Accounts.Ui.Common;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
@@ -7,6 +8,8 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
 /****************************************************************************
@@ -15,6 +18,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
    Company      : Sensorway Co., Ltd.
    Notes        : 사용자 선택 → 부여 목록 조회 + 부여(그룹·유효기간)/회수(Confirm). 서버 grants API 소비.
                   GET/POST /users/{id}/grants · DELETE /grants/{id}. IAccountApiService 직접 주입(GOP 모드).
+                  전체 부여 목록은 무한 스크롤(DataGridScrollEndBehavior) — AuditLog 패널과 동일 페이지네이션 패턴.
 ****************************************************************************/
 public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRevokeGrantMessageModel>
 {
@@ -25,6 +29,8 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     {
         _api = api;
         _validFrom = DateTime.Now;
+        // 람다가 _cancellationTokenSource '필드'를 캡처 — 매 발화 시 재평가되어 재활성 후 새 CTS 토큰을 읽는다(값 캡처 아님).
+        LoadMoreCommand = new AsyncRelayCommand(() => LoadNextGrantsPageAsync(_cancellationTokenSource?.Token ?? CancellationToken.None));
     }
 
     /// <summary>부여 대상 계정 목록(선택).</summary>
@@ -38,16 +44,16 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        await LoadAccountsAndGroupsAsync(cancellationToken);
-        await LoadAllGrantsAsync();   // 탭 열자마자 전체 부여 현황 표시(계정 미선택에도 목록이 비지 않도록)
+        await LoadAccountsAndGroupsAsync(_cancellationTokenSource?.Token ?? cancellationToken);
+        await LoadAllGrantsAsync(_cancellationTokenSource?.Token ?? cancellationToken);   // 탭 열자마자 전체 부여 현황 표시(계정 미선택에도 목록이 비지 않도록)
     }
     #endregion
 
     #region - Binding Methods -
     public async Task OnClickReloadButton()
     {
-        await LoadAccountsAndGroupsAsync(CancellationToken.None);   // item3: 계정/그룹 목록도 재조회 — 권한설정서 새 그룹 추가 시 부여 탭에 반영
-        await LoadAllGrantsAsync();
+        await LoadAccountsAndGroupsAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // item3: 계정/그룹 목록도 재조회 — 권한설정서 새 그룹 추가 시 부여 탭에 반영
+        await LoadAllGrantsAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);
     }
 
     /// <summary>부여 실행 — 클라 1차 경계검증(until>from) 후 POST. 서버 422가 최종.</summary>
@@ -139,28 +145,74 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 계정/그룹 로드 실패: {ex.Message}"); }
     }
 
-    /// <summary>전체 부여를 서버 GET /grants(단일 호출)로 조회 — 각 행 계정은 서버 비정규화(user_login_id/user_name) 사용.
-    ///   (구 인터림=계정 N-순회 집계 → REQ_Server_Grants_ListAll 서버 반영으로 단일콜 교체. B 씸 `2d90bfc` 소비.)</summary>
-    private async Task LoadAllGrantsAsync()
+    /// <summary>전체 부여를 서버 GET /grants(첫 페이지)로 조회 + swap-on-success. 페이지 상태를 리셋한다(무한 스크롤 진입점).
+    ///   각 행 계정은 서버 비정규화(user_login_id/user_name) 사용. (구 인터림=계정 N-순회 집계 → REQ_Server_Grants_ListAll 서버 반영으로 단일콜 교체. B 씸 `2d90bfc` 소비.)
+    ///   절단 경고 팝업은 무한 스크롤로 대체(제거).</summary>
+    private async Task LoadAllGrantsAsync(CancellationToken ct = default)
     {
-        Grants.Clear();
+        _currentPage = 0;
+        _totalPages = 1;
+        _totalCount = 0;
         try
         {
-            const int size = 100;
-            var res = await _api.GetAllGrantsAsync(page: 1, size: size);
+            var res = await _api.GetAllGrantsAsync(page: 1, size: PAGE_SIZE, ct: ct).ConfigureAwait(false);
+            if (ct.IsCancellationRequested) return;
+
             if (res.Success && res.Data is not null)
             {
-                foreach (var gr in res.Data) Grants.Add(gr);
-                var total = res.Pagination?.Total ?? res.Total ?? res.Data.Count;   // (F-1) 서버 top-level total 우선 → pagination → Count. GET /grants 는 total을 top-level로 반환.
-                if (total > res.Data.Count)   // 실제 더 있을 때만 무성 truncation 안내
-                    await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                    { Title = "권한 부여", Explain = $"부여 {total}건 중 {res.Data.Count}건만 표시됩니다(페이지네이션 필요)." });
+                // GET /grants 는 total을 top-level로 반환(F-1) — pagination.total_pages 미제공(0)이므로 total로 보정 계산(신뢰 소스).
+                _totalCount = res.Pagination?.Total ?? res.Total ?? res.Data.Count;
+                _currentPage = res.Pagination?.Page ?? 1;
+                _totalPages = _totalCount > 0 ? (int)Math.Ceiling(_totalCount / (double)PAGE_SIZE) : 1;
+
+                DispatcherService.Invoke(() =>
+                {
+                    Grants.Clear();
+                    foreach (var gr in res.Data) Grants.Add(gr);
+                    NotifyOfPropertyChange(() => LoadedCountText);
+                    NotifyOfPropertyChange(() => HasMorePages);
+                });
             }
             else if (!res.Success)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "권한 부여", Explain = $"부여 목록 불러오기 실패: {res.Error?.Message ?? res.Message}" });
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[GrantMgmt] 전체 부여 로드 실패: {ex.Message}"); }
+    }
+
+    /// <summary>다음 페이지 조회 후 기존 목록에 append (무한 스크롤). 중복 로드 가드.</summary>
+    public async Task LoadNextGrantsPageAsync(CancellationToken ct = default)
+    {
+        if (_isLoadingMore || !HasMorePages) return;
+        if (ct.IsCancellationRequested) return;
+
+        _isLoadingMore = true;   // 가드 필드 — 프로퍼티 세터와 함께 명시(세터 변경 시 가드 무음파손 방지)
+        IsLoadingMore = true;
+        try
+        {
+            var res = await _api.GetAllGrantsAsync(page: _currentPage + 1, size: PAGE_SIZE, ct: ct).ConfigureAwait(false);
+            if (ct.IsCancellationRequested) return;
+            if (!res.Success || res.Data is null) return;
+
+            _totalCount = res.Pagination?.Total ?? res.Total ?? _totalCount;
+            _currentPage = res.Pagination?.Page ?? (_currentPage + 1);
+            _totalPages = _totalCount > 0 ? (int)Math.Ceiling(_totalCount / (double)PAGE_SIZE) : _totalPages;
+
+            DispatcherService.Invoke(() =>
+            {
+                foreach (var gr in res.Data) Grants.Add(gr);
+                NotifyOfPropertyChange(() => LoadedCountText);
+                NotifyOfPropertyChange(() => HasMorePages);
+            });
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _log?.Error($"[GrantMgmt] 다음 부여 페이지 로드 실패: {ex.Message}"); }
+        finally
+        {
+            _isLoadingMore = false;
+            IsLoadingMore = false;
+        }
     }
     #endregion
 
@@ -190,6 +242,28 @@ public class GrantManagementPanelViewModel : BasePanelViewModel, IHandle<CallRev
 
     /// <summary>부여 버튼 활성 — 계정·그룹 선택 시.</summary>
     public bool CanCreateGrant => SelectedAccount is not null && SelectedGroup is not null;
+
+    private bool _isLoadingMore;
+    public bool IsLoadingMore
+    {
+        get => _isLoadingMore;
+        set { _isLoadingMore = value; NotifyOfPropertyChange(() => IsLoadingMore); }
+    }
+
+    /// <summary>로드된 건수 / 전체 건수 표시.</summary>
+    public string LoadedCountText => $"{Grants.Count} / {_totalCount}건";
+
+    /// <summary>다음 페이지 존재 여부 — 무한 스크롤 종료 판정.</summary>
+    public bool HasMorePages => _currentPage < _totalPages;
+
+    /// <summary>스크롤 하단 도달 시 발화(DataGridScrollEndBehavior 바인딩).</summary>
+    public ICommand LoadMoreCommand { get; }
+    #endregion
+    #region - Attributes -
+    private const int PAGE_SIZE = 100;   // 서버 grants size 최대치
+    private int _currentPage;
+    private int _totalPages = 1;
+    private int _totalCount;
     #endregion
 }
 

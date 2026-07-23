@@ -487,8 +487,10 @@ internal static class GrantScenarios
             }
         }
 
-        // ══════════════ J. 페이지네이션/절단 경고 ══════════════
-        log.Section("J. 페이지네이션 절단 경고(실서버 top-level total vs 보정 pagination)");
+        // ══════════════ J. 페이지네이션(무한 스크롤) — 절단 경고 팝업 제거 후 append 검증 ══════════════
+        //   변경: 100건 초과 시 절단 경고 팝업(구 J1a/J2a) 제거 → 무한 스크롤이 대체.
+        //   첫 페이지 100건 표시 + HasMorePages=true, 스크롤(LoadNextGrantsPageAsync)로 나머지 append.
+        log.Section("J. 페이지네이션(무한 스크롤): 첫 100건 + append, 절단경고 없음");
         {
             static void Seed150(FakeGopServer s)
             {
@@ -501,30 +503,37 @@ internal static class GrantScenarios
                     s.Seed(2, 10, GrantFixtures.T0.AddHours(-1), null, GrantFixtures.T0.AddSeconds(i));
             }
             {
-                var s = GrantFixtures.NewServer(); Seed150(s); s.EmitPaginationMeta = false;   // 실서버 재현
+                var s = GrantFixtures.NewServer(); Seed150(s); s.EmitPaginationMeta = false;   // 실서버 재현(total top-level)
                 var (vm, ea, _) = GrantFixtures.NewVm(s);
                 await vm.OnClickReloadButton();
-                log.Check("J1a", "실서버(total top-level) F-1 수정: 절단경고 정상 발생", HasInfo(ea, "150건 중 100건"));
-                log.Check("J1b", "표시 100건으로 절단", vm.Grants.Count == 100, $"count={vm.Grants.Count}");
+                log.Check("J1a", "절단 경고 팝업 제거(무한 스크롤 대체)", !HasInfo(ea, "페이지네이션 필요"));
+                log.Check("J1b", "첫 페이지 100건 표시", vm.Grants.Count == 100, $"count={vm.Grants.Count}");
+                log.Check("J1c", "더 있음(HasMorePages=true)", vm.HasMorePages);
+                await vm.LoadNextGrantsPageAsync();   // 스크롤 → 나머지 50건 append
+                log.Check("J1d", "append 후 150건 전체 표시", vm.Grants.Count == 150, $"count={vm.Grants.Count}");
+                log.Check("J1e", "마지막 페이지 후 더 없음", !vm.HasMorePages);
             }
             {
-                var s = GrantFixtures.NewServer(); Seed150(s); s.EmitPaginationMeta = true;    // 보정 서버/파싱
+                var s = GrantFixtures.NewServer(); Seed150(s); s.EmitPaginationMeta = true;    // pagination 객체 제공 경로
                 var (vm, ea, _) = GrantFixtures.NewVm(s);
                 await vm.OnClickReloadButton();
-                log.Check("J2a", "pagination.total 제공시 절단경고 발생", HasInfo(ea, "150건 중 100건"));
-                log.Check("J2b", "표시 100건", vm.Grants.Count == 100);
+                log.Check("J2a", "pagination 제공시에도 절단경고 없음", !HasInfo(ea, "페이지네이션 필요"));
+                log.Check("J2b", "첫 페이지 100건", vm.Grants.Count == 100);
+                log.Check("J2c", "더 있음(HasMorePages=true)", vm.HasMorePages);
+                await vm.LoadNextGrantsPageAsync();
+                log.Check("J2d", "append 후 150건", vm.Grants.Count == 150, $"count={vm.Grants.Count}");
             }
             {
                 var s = GrantFixtures.NewServer(); Seed100(s); s.EmitPaginationMeta = true;
                 var (vm, ea, _) = GrantFixtures.NewVm(s);
                 await vm.OnClickReloadButton();
-                log.Check("J3", "정확히 100건: 오탐 경고 없음", !HasInfo(ea, "건 중") && vm.Grants.Count == 100);
+                log.Check("J3", "정확히 100건: 경고 없음·더 없음", !HasInfo(ea, "건 중") && vm.Grants.Count == 100 && !vm.HasMorePages);
             }
             {
                 var s = GrantFixtures.NewServer(); Seed100(s); s.EmitPaginationMeta = false;
                 var (vm, ea, _) = GrantFixtures.NewVm(s);
                 await vm.OnClickReloadButton();
-                log.Check("J4", "정확히 100건(실서버): 경고 없음", !HasInfo(ea, "건 중") && vm.Grants.Count == 100);
+                log.Check("J4", "정확히 100건(실서버): 경고 없음·더 없음", !HasInfo(ea, "건 중") && vm.Grants.Count == 100 && !vm.HasMorePages);
             }
         }
 

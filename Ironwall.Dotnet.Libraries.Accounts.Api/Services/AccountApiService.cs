@@ -403,11 +403,13 @@ public class AccountApiService : IAccountApiService
         catch (Exception ex) { return ApiResponse<AuthUserDto>.CreateError("INTERNAL_ERROR", ex.Message); }
     }
 
-    public async Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default)
+    public async Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(int page = 1, int limit = 100, bool? isActive = null, CancellationToken ct = default)
     {
         try
         {
-            var res = await _api.GetRequestAsync("user-sessions").ConfigureAwait(false);
+            var q = $"user-sessions?page={page}&limit={limit}";
+            if (isActive.HasValue) q += $"&is_active={(isActive.Value ? "true" : "false")}";
+            var res = await _api.GetRequestAsync(q).ConfigureAwait(false);
             return await res.ToApiListResponseAsync<UserSessionDto>().ConfigureAwait(false);
         }
         catch (Exception ex) { return ApiListResponse<UserSessionDto>.CreateError("INTERNAL_ERROR", ex.Message); }

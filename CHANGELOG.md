@@ -15,6 +15,12 @@
 ## [Unreleased]
 
 ### Added
+- **세션 관리 + 권한부여 — 무한 스크롤 페이지네이션** ([PRD](docs/prds/GOP_SessionGrant_Pagination-prd.md) · [Plan](docs/plans/GOP_SessionGrant_Pagination-prd-plan.md) · 태그 `before-session-grant-pagination` · worktree `feature/session-grant-pagination` · Accounts.Api/Accounts.Ui · 라이브러리 한정) — 감사로그 무한스크롤 패턴을 자매 패널 2곳에 이식.
+  - **세션 관리**: `GetUserSessionsAsync`가 page/limit 파라미터 없어 서버 기본(≤100건)만 표시되던 갭 → `(page, limit, isActive?, ct)` 확장(스텁 5 CS0535) + 무한스크롤 + **활성/전체 토글**(is_active). **서버가 세션엔 날짜 필터 미지원**(라이브 모니터링 설계)이라 날짜피커 제외. 기본=활성만(토글로 전체).
+  - **권한부여**: 100건 초과 시 `"N건 중 100건만 표시(페이지네이션 필요)"` 경고 팝업만 뜨고 나머지 열람 불가하던 갭 → 무한스크롤로 대체. `/grants`는 top-level `total`만 주고 `TotalPages=0`(F-1)이라 VM이 `Ceiling(total/size)`로 파생.
+  - **공유**: 감사 때 만든 `Utils.Behaviors.DataGridScrollEndBehavior` + `AsyncRelayCommand` 재사용(신규 UI 컴포넌트 없음). 두 VM 공통 `res.Pagination`·`DispatcherService.Invoke`·`BasePanelViewModel` 관리토큰·이중 로딩가드.
+  - **검증**: code-review(opus) READY(P0/P1 0, F-1 실서버 JSON 바인딩 확인·기존 J섹션 테스트 충실 재작성 +9체크). 신규 테스트 9(세션 5·권한부여 4) + FakeGopServer 세션 실페이징. Accounts.Ui.Tests **36**·Accounts.Api **136** green·빌드0.
+  - **후속(범위 밖)**: 로그인 이력(UserLoginLog 성공+실패, 날짜필터) 패널 — 서버 데이터 有·클라 패널 無.
 - **감사 로그 뷰어 — 날짜 필터 + 무한 스크롤 페이지네이션** ([PRD](docs/prds/GOP_AuditLog_DateFilter_Pagination-prd.md) · [Plan](docs/plans/GOP_AuditLog_DateFilter_Pagination-prd-plan.md) · 태그 `before-auditlog-datefilter` · worktree `feature/auditlog-datefilter` · Accounts.Api/Accounts.Ui/Utils · 라이브러리 한정) — PRD-GOP-05 FR-SS-03 미완성분 완성.
   - **배경**: 감사 로그 패널이 최신 100건 1회 조회뿐(무한스크롤·날짜필터·페이지네이션 UI 없음) → 100건 초과 과거 로그 UI 접근 불가. 서버 `/api/audit-logs`는 `start_date`/`end_date`+페이지네이션을 이미 완전 지원(§9.6.2)이라 격차는 **100% 클라 측**(삼각검증: 스펙·실행서버·DB `created_at` 인덱스).
   - **API**: `IAccountApiService`/`AccountApiService.GetAuditLogsAsync`에 `startDate`/`endDate` 추가(ct 맨 뒤 유지) + `start_date`/`end_date` 쿼리 조립(`Uri.EscapeDataString`). 구현 스텁 5곳 시그니처 동기화(CS0535 — 인터페이스 파라미터 추가는 기본값과 무관하게 전 구현 매칭 필요).

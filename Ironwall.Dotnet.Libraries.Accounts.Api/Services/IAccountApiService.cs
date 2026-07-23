@@ -86,8 +86,9 @@ public interface IAccountApiService
     Task<ApiResponse<AuthUserDto>> AssignUserGroupAsync(int userId, int? groupId, CancellationToken ct = default)
         => throw new NotImplementedException();
 
-    /// <summary>GET /api/user-sessions — 세션 목록(ADMIN).</summary>
-    Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default);
+    /// <summary>GET /api/user-sessions — 세션 목록(ADMIN, page/limit(max 100) + is_active 필터, created_at DESC).
+    /// 날짜필터 없음. 응답 pagination:{page,limit,total,total_pages}.</summary>
+    Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(int page = 1, int limit = 100, bool? isActive = null, CancellationToken ct = default);
     /// <summary>DELETE /api/user-sessions/{session_id} — 세션 강제 로그아웃(ADMIN).
     /// 기본구현=미지원(테스트 스텁 무수정 목적) — 실제 구현은 AccountApiService.</summary>
     Task<ApiResponse<object>> ForceLogoutSessionAsync(int sessionId, CancellationToken ct = default)

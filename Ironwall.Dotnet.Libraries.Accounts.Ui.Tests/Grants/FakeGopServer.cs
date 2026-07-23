@@ -63,6 +63,13 @@ internal sealed class FakeGopServer : IAccountApiService
     public string? LastAuditEndDate { get; private set; }
     public int LastAuditPage { get; private set; }
 
+    // ── 세션 모사(is_active 필터+페이지네이션, 서버 user_sessions.py 계약: created_at DESC=id desc, 날짜필터 없음) ──
+    public List<UserSessionDto> Sessions { get; } = new();
+    public int SessionCallCount { get; private set; }
+    public bool? LastSessionIsActive { get; private set; }
+    public int LastSessionPage { get; private set; }
+    public int LastSessionLimit { get; private set; }
+
     /// <summary>서버 UserGroupGrant 행 모사.</summary>
     internal sealed class GrantRow
     {
@@ -302,7 +309,28 @@ internal sealed class FakeGopServer : IAccountApiService
     public Task<ApiResponse<AuthUserDto>> UpdateMyProfileAsync(UserSelfUpdateDto dto, CancellationToken ct = default) => throw NS();
     public Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default) => throw NS();
     public Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default) => throw NS();
-    public Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default) => throw NS();
+    // 세션: is_active 필터 + id desc(created_at desc) + page/limit 슬라이스 (서버 user_sessions.py 미러). 날짜필터 없음.
+    public Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(int page = 1, int limit = 100, bool? isActive = null, CancellationToken ct = default)
+    {
+        SessionCallCount++;
+        LastSessionIsActive = isActive;
+        LastSessionPage = page;
+        LastSessionLimit = limit;
+
+        IEnumerable<UserSessionDto> q = Sessions;
+        if (isActive.HasValue)
+            q = q.Where(sn => sn.IsActive == isActive.Value);
+
+        var filtered = q.OrderByDescending(sn => sn.Id).ToList();   // 서버 created_at desc ≈ id desc
+        var total = filtered.Count;
+        var totalPages = total > 0 ? (int)Math.Ceiling(total / (double)limit) : 1;
+        var slice = filtered.Skip((page - 1) * limit).Take(limit).ToList();
+
+        var res = ApiListResponse<UserSessionDto>.CreateSuccess(
+            slice,
+            new PaginationDto { Page = page, Limit = limit, Total = total, TotalPages = totalPages });
+        return Task.FromResult(res);
+    }
     // 감사 로그: 날짜필터(created_at >=/<=) + id desc + page/limit 슬라이스 (서버 audit_logs.py 미러)
     public Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, string? startDate = null, string? endDate = null, CancellationToken ct = default)
     {
