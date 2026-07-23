@@ -15,6 +15,13 @@
 ## [Unreleased]
 
 ### Added
+- **오버레이 심볼/이미지 Title — 줌 안정화 + 스타일 + 폭 WYSIWYG + 이미지 영속화** ([PRD](docs/prds/Overlay_Title_ZoomStyle-prd.md) · [Plan](docs/plans/Overlay_Title_ZoomStyle-prd-plan.md) · [분석](docs/analyses/Overlay_Title_ZoomStyle-analysis.md) — 시뮬 1차 108건+2차 69건 근거 · 태그 `before-overlay-title` · worktree `feature/overlay-title` · GMaps.Ui/GMaps.Db/Monitoring.Models · 4스테이지 독립 커밋)
+  - **줌 안정화(FR-01~04)**: `LabelAdorner`가 시각 footprint를 같은 프레임에 자체 투영(이미지=지오바운즈 Bearing 회전 AABB, 라인=RuntimePoints bbox, 점심볼=현행 유지) — 모델 W/H 역주입 의존 제거로 1프레임 stale 점프(최대 1,600px)·시작 시 오배치 해소. 이미지 오프셋은 **정규화 U/V**(하프익스텐트 비율, `Images.LabelOffsetU/V`)로 드래그된 라벨이 줌에서 상대위치 유지(시뮬 I 24/30 FAIL→0). 드래그 상한 `3·max(hw,hh)` 등방·줌 불변.
+  - **스타일(FR-05~09)**: TitleColor/TitleBackground(packed ARGB int, DDL 부호 리터럴)·TitleFontFamily·TitleBold/Italic — 계약/마커/모델/DB(Symbols+Images CREATE+컬럼별 멱등 ALTER)/속성패널(프리셋+hex 콤보·스와치·시스템 폰트 열거·그룹 pending)/undo 3중 스위치. 기본값=종전 하드코딩과 시각 동일(무변화 업그레이드). 심볼 영속=전용 부분 UPDATE(`UpdateSymbolLabelStyleAsync`, 판별자 오염 회피 선례).
+  - **폭 WYSIWYG(FR-13)**: `TitleMaxWidth`(px·기본 200=종전 값) — 편집모드 라벨 칩 좌/우 가장자리(`min(6px,25%)`) 드래그 **edge-pinned** 리사이즈(커서 추종+반대편 고정, 오프셋 Δ폭/2 보상, 40~800 클램프, 점선 최대폭 가이드) + (오프셋,폭) 원자 undo(`TitleWidthResizeCommand`) + 속성패널 숫자 입력.
+  - **이미지 영속화(FR-10~11)**: 이미지 TitleSize/ShowTitle/오프셋이 재시작마다 리셋되던 P0(무음 유실) 해소 — `Images` 4+6컬럼, `GMapImageMarker` 필드→모델 위임+INPC(undo 후 즉시 재렌더), DB 실패 시 오프셋/폭 롤백.
+  - **성능(FR-08/12)**: FormattedText/브러시/정적 Typeface 캐시 + PropertyName 필터(포함 20종 확정 — Bearing/ImageBounds 포함) + `LabelAdornerService` CollectionChanged 증분 O(1)+재진입 가드 + `GMapBaseMarker.Dispose` TOCTOU/무음 catch 정리.
+  - **검증**: 라벨 테스트 37(수식 12=시뮬 이식·스타일/폭 13·가시성 12) green, 전체 242 중 241 green(1 red=FOVColor CMD-02, v2.6 기존 red 상속·무관). 빌드 0오류. 신규 파일 UTF-8 BOM.
 - **세션 관리 패널 정리 — 표시 포맷 · 사용자 전체 세션 종료 · 기본 동작** ([Plan](docs/plans/GOP_SessionPanel_Cleanup-prd-plan.md) · 태그 `before-session-panel-cleanup` · worktree `feature/session-panel-cleanup` · Accounts.Api/Accounts.Ui/Utils · 라이브러리 한정) — **API 서버 무변경**(기존 서버 지원만 소비).
   - **표시**: 세션 날짜 컬럼(만료/로그아웃/로그인시각)이 `string?` ISO(+09:00)라 raw로 뜨던 것 → 신규 `IsoDateStringConverter`(Utils, `DateTime.TryParse`·파싱실패 시 원문 폴백)로 `yyyy-MM-dd HH:mm` 표시.
   - **기능**: **사용자 전체 세션 종료** 배선 — `IAccountApiService.ForceLogoutAllUserSessionsAsync`(**DIM `=> throw`라 테스트 스텁 5곳 무수정**) + `AccountApiService`(`DELETE /user-sessions/user/{userId}`) + VM 확인팝업·`HandleAsync`(성공→page1 재조회 / **409 ADMIN 전원잠금 가드 안내**) + 뷰 행별 버튼. 서버 기존 엔드포인트 소비(무변경).
