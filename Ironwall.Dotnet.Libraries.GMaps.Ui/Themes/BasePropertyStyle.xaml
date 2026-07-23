@@ -162,7 +162,8 @@
 										Foreground="{DynamicResource PrimaryBrush}"
 										Text="BASIC" />
 
-									<!--  제목  -->
+									<!--  제목 — LostFocus 커밋은 '입력 후 바로 맵 클릭/닫기' 시 무음 소실(로그에 Title 변경이
+									      아예 안 남던 결함, 제목 저장 전수감사). PropertyChanged+Delay로 입력 멈춤 후 자동 커밋.  -->
 									<Grid Margin="0,5">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
@@ -176,7 +177,7 @@
 										<TextBox
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
-											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+											Text="{Binding MarkerTitle, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=800}" />
 									</Grid>
 
 									<!--  제목크기  -->

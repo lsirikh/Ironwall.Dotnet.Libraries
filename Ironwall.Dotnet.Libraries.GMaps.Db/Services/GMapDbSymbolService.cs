@@ -3832,6 +3832,13 @@ internal sealed class GeometrySymbolSQL : SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // GeometrySymbol 전용 속성들 (간소화)
         ShapeType = EnumParseHelper.TryParseEnum(GeometryShapeType, EnumShapeType.Circle),
@@ -3896,6 +3903,13 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // PidsSymbol 전용 속성들
         LinkedDeviceId = LinkedDeviceId,
@@ -3976,6 +3990,13 @@ internal sealed class MilitarySymbolSQL : SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // MilitarySymbol 전용 속성들
         Affiliation = EnumParseHelper.TryParseEnum(Affiliation, EnumMilitaryAffiliation.Unknown),
@@ -4039,6 +4060,13 @@ internal sealed class LineSymbolSQL : SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // LineSymbol 전용 속성들
         LineOpacity = (double)LineOpacity,
@@ -4122,6 +4150,13 @@ internal sealed class InfraSymbolSQL : SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // InfraSymbol 전용 속성들
         BuildingType = EnumBuildingType.Factory,  // 하나뿐이므로 하드코딩
@@ -4188,6 +4223,13 @@ internal sealed class PidsGroupSymbolSQL : SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        // 라벨 스타일(FR-06 v2.5) — 파생 매퍼 누락 시 "저장은 되나 재시작 후 기본값 리셋"(제목 저장 전수감사 근본원인 2)
+        TitleColor = EnumParseHelper.TryParseEnum(TitleColor, EnumColorType.White),
+        TitleBackground = EnumParseHelper.TryParseEnum(TitleBackground, EnumColorType.Black),
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
 
         // PidsGroupSymbol 전용 속성들
         LinkedDeviceGroup = LinkedDeviceGroup,
