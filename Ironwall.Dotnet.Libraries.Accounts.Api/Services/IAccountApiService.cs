@@ -107,8 +107,8 @@ public interface IAccountApiService
     /// 계정별 N-순회 대체(단일 호출). v5.4 응답에 user_login_id/user_name 비정규화 포함.</summary>
     Task<ApiListResponse<GrantDto>> GetAllGrantsAsync(int page = 1, int size = 20, int? userId = null, int? groupId = null, string? status = null, bool activeOnly = false, CancellationToken ct = default)
         => throw new NotImplementedException();
-    /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit). action_type/resource_type=str(tolerant).</summary>
-    Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default);
+    /// <summary>GET /api/audit-logs — 감사 로그(ADMIN, page/limit + startDate/endDate 날짜범위 필터, ISO yyyy-MM-ddTHH:mm:ss). action_type/resource_type=str(tolerant).</summary>
+    Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, string? startDate = null, string? endDate = null, CancellationToken ct = default);
 
     // ── 세션 설정 (GOP_Session_Settings_Admin FR-SS-C1) ──
     /// <summary>GET /api/settings/session — 세션/인증 정책(ADMIN). 서버 API 미배포 시 404 → 클라 graceful.

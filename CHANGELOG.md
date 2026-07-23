@@ -15,6 +15,12 @@
 ## [Unreleased]
 
 ### Added
+- **감사 로그 뷰어 — 날짜 필터 + 무한 스크롤 페이지네이션** ([PRD](docs/prds/GOP_AuditLog_DateFilter_Pagination-prd.md) · [Plan](docs/plans/GOP_AuditLog_DateFilter_Pagination-prd-plan.md) · 태그 `before-auditlog-datefilter` · worktree `feature/auditlog-datefilter` · Accounts.Api/Accounts.Ui/Utils · 라이브러리 한정) — PRD-GOP-05 FR-SS-03 미완성분 완성.
+  - **배경**: 감사 로그 패널이 최신 100건 1회 조회뿐(무한스크롤·날짜필터·페이지네이션 UI 없음) → 100건 초과 과거 로그 UI 접근 불가. 서버 `/api/audit-logs`는 `start_date`/`end_date`+페이지네이션을 이미 완전 지원(§9.6.2)이라 격차는 **100% 클라 측**(삼각검증: 스펙·실행서버·DB `created_at` 인덱스).
+  - **API**: `IAccountApiService`/`AccountApiService.GetAuditLogsAsync`에 `startDate`/`endDate` 추가(ct 맨 뒤 유지) + `start_date`/`end_date` 쿼리 조립(`Uri.EscapeDataString`). 구현 스텁 5곳 시그니처 동기화(CS0535 — 인터페이스 파라미터 추가는 기본값과 무관하게 전 구현 매칭 필요).
+  - **UI**: `AuditLogPanelViewModel` 날짜범위(기본 최근 7일) + 무한스크롤(`LoadNextPageAsync`·`res.Pagination` 소비·`DispatcherService` 마셜·`BasePanelViewModel` 관리 토큰). 종료일 `T23:59:59` 상향(날짜-only DatePicker라 당일 포함). `AuditLogPanelView` `md:DatePicker`×2(시작/종료) + 검색 + 로드/전체 건수 + `DataGridScrollEndBehavior`(스크롤 하단→append).
+  - **공유 승격**: `DataGridScrollEndBehavior`를 Events.Ui→`Utils.Behaviors` 공유 정본으로 승격(타 패널 재사용). `AsyncRelayCommand`(재진입 가드 async ICommand) 신설.
+  - **검증**: architect(설계 seam) + code-reviewer(opus) 통과. FakeGopServer audit 실페이징(서버 계약 미러) + `AuditLogPanelTests` 7케이스. Accounts.Ui.Tests **27**·Accounts.Api **136** green·빌드0. **v2.6 FF 머지·런타임 육안(다크 `md:DatePicker`)=사용자 대기**.
 - **내정보 본인 프로필 사진 삭제 배선 (UI-only→서버 삭제)** ([PRD](docs/prds/MyPage_SelfPhoto_Delete_Fix-prd.md) · Accounts.Api/Accounts/Accounts.Ui/ViewModel · 라이브러리 한정)
   - **근본**: 내정보 '사진 제거하기'(`MyPagePanelViewModel.ClickClearPicture`)가 `ViewModel.Image=null`(UI만)이라 서버 미삭제 → 재조회 시 사진 부활. 본인 삭제 API/게이트웨이 미구현(업로드만 존재), PUT /users/me 도 photo_url 무시(C-5).
   - **수정(클라만, 서버 `DELETE /me/photo` 기존)**: `IAccountApiService.DeleteMyPhotoAsync`+`AccountApiService`(DELETE users/me/photo, idempotent) · `IProfileGateway.DeletePhotoAsync`(본인)+`ApiAccountGateway`/`DbAccountGateway`(false) · `CallDeletePhotoProcessMessageModel`+`MyPagePanelViewModel` 확인팝업→서버삭제(관리자 EditorDialog 패턴 미러).

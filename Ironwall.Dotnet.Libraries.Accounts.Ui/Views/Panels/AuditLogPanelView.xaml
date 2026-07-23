@@ -1,9 +1,11 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Accounts.Ui.Views.Panels.AuditLogPanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	d:DesignHeight="450"
@@ -17,12 +19,58 @@
 			<RowDefinition Height="*" />
 		</Grid.RowDefinitions>
 		<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
-			<TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelSectionLabel}" Text="감사 로그" />
+			<TextBlock
+				DockPanel.Dock="Left"
+				VerticalAlignment="Center"
+				Style="{StaticResource PanelSectionLabel}"
+				Text="감사 로그" />
+
+			<!--  갱신 (우측 끝)  -->
 			<Button DockPanel.Dock="Right" Style="{StaticResource ModernToolbarButton}" ToolTip="갱신">
 				<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
 				<md:PackIcon Width="20" Height="20" Kind="Refresh" />
 			</Button>
+
+			<!--  로드/전체 건수 (우측)  -->
+			<TextBlock
+				DockPanel.Dock="Right"
+				Margin="0,0,12,0"
+				VerticalAlignment="Center"
+				Foreground="{DynamicResource MaterialDesignBodyLight}"
+				Text="{Binding LoadedCountText}" />
+
+			<!--  날짜 범위 필터 + 검색 (라벨 뒤, 좌측)  -->
+			<StackPanel
+				DockPanel.Dock="Left"
+				Margin="16,0,0,0"
+				VerticalAlignment="Center"
+				Orientation="Horizontal">
+				<DatePicker
+					Width="130"
+					VerticalAlignment="Center"
+					md:HintAssist.Hint="시작일"
+					SelectedDate="{Binding StartDate, Mode=TwoWay}" />
+				<TextBlock
+					Margin="6,0,6,0"
+					VerticalAlignment="Center"
+					Foreground="{DynamicResource MaterialDesignBodyLight}"
+					Text="~" />
+				<DatePicker
+					Width="130"
+					VerticalAlignment="Center"
+					md:HintAssist.Hint="종료일"
+					DisplayDateStart="{Binding EndDateDisplay}"
+					SelectedDate="{Binding EndDate, Mode=TwoWay}" />
+				<Button
+					Margin="8,0,0,0"
+					Style="{StaticResource ModernToolbarButton}"
+					ToolTip="검색">
+					<cal:Message.Attach>[Event Click] = [Action OnClickSearch()]</cal:Message.Attach>
+					<md:PackIcon Width="20" Height="20" Kind="Magnify" />
+				</Button>
+			</StackPanel>
 		</DockPanel>
+
 		<DataGrid
 			Grid.Row="1"
 			RowHeight="38"
@@ -35,6 +83,9 @@
 			ItemsSource="{Binding Items}"
 			RowStyle="{StaticResource ModernDataGridRow}"
 			Style="{StaticResource ModernDataGrid}">
+			<i:Interaction.Behaviors>
+				<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
+			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
 				<DataGridTextColumn Width="150" Binding="{Binding CreatedAt}" Header="시각" />
 				<DataGridTextColumn Width="130" Binding="{Binding ActionType}" Header="동작" />

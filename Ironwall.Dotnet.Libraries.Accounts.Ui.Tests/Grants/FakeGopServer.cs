@@ -56,6 +56,13 @@ internal sealed class FakeGopServer : IAccountApiService
     public List<UserGroupDto> Groups { get; } = new();
     public List<GrantRow> GrantRows { get; } = new();
 
+    // ── 감사 로그 모사(날짜필터+페이지네이션, 서버 audit_logs.py 계약) ──
+    public List<AuditLogDto> AuditLogs { get; } = new();
+    public int AuditCallCount { get; private set; }
+    public string? LastAuditStartDate { get; private set; }
+    public string? LastAuditEndDate { get; private set; }
+    public int LastAuditPage { get; private set; }
+
     /// <summary>서버 UserGroupGrant 행 모사.</summary>
     internal sealed class GrantRow
     {
@@ -296,5 +303,28 @@ internal sealed class FakeGopServer : IAccountApiService
     public Task<ApiResponse<AuthUserDto>> UploadMyPhotoAsync(string filePath, CancellationToken ct = default) => throw NS();
     public Task<ApiResponse<object>> ChangeMyPasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default) => throw NS();
     public Task<ApiListResponse<UserSessionDto>> GetUserSessionsAsync(CancellationToken ct = default) => throw NS();
-    public Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, CancellationToken ct = default) => throw NS();
+    // 감사 로그: 날짜필터(created_at >=/<=) + id desc + page/limit 슬라이스 (서버 audit_logs.py 미러)
+    public Task<ApiListResponse<AuditLogDto>> GetAuditLogsAsync(int page = 1, int limit = 20, string? startDate = null, string? endDate = null, CancellationToken ct = default)
+    {
+        AuditCallCount++;
+        LastAuditStartDate = startDate;
+        LastAuditEndDate = endDate;
+        LastAuditPage = page;
+
+        IEnumerable<AuditLogDto> q = AuditLogs;
+        if (!string.IsNullOrEmpty(startDate) && DateTime.TryParse(startDate, out var sd))
+            q = q.Where(a => DateTime.TryParse(a.CreatedAt, out var c) && c >= sd);
+        if (!string.IsNullOrEmpty(endDate) && DateTime.TryParse(endDate, out var ed))
+            q = q.Where(a => DateTime.TryParse(a.CreatedAt, out var c) && c <= ed);
+
+        var filtered = q.OrderByDescending(a => a.Id).ToList();   // 서버 id desc
+        var total = filtered.Count;
+        var totalPages = total > 0 ? (int)Math.Ceiling(total / (double)limit) : 1;
+        var slice = filtered.Skip((page - 1) * limit).Take(limit).ToList();
+
+        var res = ApiListResponse<AuditLogDto>.CreateSuccess(
+            slice,
+            new PaginationDto { Page = page, Limit = limit, Total = total, TotalPages = totalPages });
+        return Task.FromResult(res);
+    }
 }
