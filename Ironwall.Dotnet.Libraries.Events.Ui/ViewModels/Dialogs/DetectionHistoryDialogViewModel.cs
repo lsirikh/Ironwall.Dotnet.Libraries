@@ -61,6 +61,9 @@ public class ResultChipViewModel : PropertyChangedBase
     public EnumDetectionType Result { get; }
     public string Name => Result.ToString();
 
+    /// <summary>칩 표시용 축약명 — "_SENSOR" 접미사 제거(PIR/THERMAL/…). 풀네임은 ToolTip으로 제공(툴바 잘림 방지).</summary>
+    public string ShortName => Name.EndsWith("_SENSOR", StringComparison.Ordinal) ? Name[..^"_SENSOR".Length] : Name;
+
     public bool IsOn
     {
         get => _isOn;

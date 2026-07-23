@@ -62,7 +62,7 @@
 			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 			<Setter Property="FontSize" Value="11.5" />
 			<Setter Property="Cursor" Value="Hand" />
-			<Setter Property="Margin" Value="4,0,0,0" />
+			<Setter Property="Margin" Value="0,0,4,4" /><!-- WrapPanel 줄바꿈 대응(우/하 간격) — 툴바 잘림 수정 -->
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="ToggleButton">
@@ -118,95 +118,105 @@
 			</StackPanel>
 		</Border>
 
-		<!--  ② 툴바 — 기간 세그먼트 · 필터 칩 · 미조치만 · 새로고침  -->
+		<!--  ② 툴바 — 2행 구조(잘림 수정): 1행=기간 세그먼트+새로고침 / 2행=필터 칩 WrapPanel(줄바꿈)+미조치만  -->
 		<Border
 			Grid.Row="1"
-			Padding="10,7"
+			Padding="10,7,10,3"
 			Background="{DynamicResource SurfaceAltBrush}"
 			BorderBrush="{DynamicResource DividerBrush}"
 			BorderThickness="0,0,0,1">
-			<DockPanel LastChildFill="False">
-				<Border
-					BorderBrush="{DynamicResource BorderBrush}"
-					BorderThickness="1"
-					CornerRadius="6"
-					DockPanel.Dock="Left">
-					<StackPanel Orientation="Horizontal">
-						<RadioButton
-							Content="1시간"
-							GroupName="Period"
-							Style="{StaticResource PeriodSegButton}">
-							<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('1h')]</cal:Message.Attach>
-						</RadioButton>
-						<RadioButton
-							Content="24시간"
-							GroupName="Period"
-							IsChecked="True"
-							Style="{StaticResource PeriodSegButton}">
-							<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('24h')]</cal:Message.Attach>
-						</RadioButton>
-						<RadioButton
-							Content="7일"
-							GroupName="Period"
-							Style="{StaticResource PeriodSegButton}">
-							<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('7d')]</cal:Message.Attach>
-						</RadioButton>
-						<RadioButton
-							Content="30일"
-							GroupName="Period"
-							Style="{StaticResource PeriodSegButton}">
-							<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('30d')]</cal:Message.Attach>
-						</RadioButton>
-						<RadioButton
-							Content="기간지정"
-							GroupName="Period"
-							Style="{StaticResource PeriodSegButton}">
-							<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('custom')]</cal:Message.Attach>
-						</RadioButton>
-					</StackPanel>
-				</Border>
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
 
-				<ItemsControl
-					Margin="8,0,0,0"
-					VerticalAlignment="Center"
-					DockPanel.Dock="Left"
-					ItemsSource="{Binding Chips}">
-					<ItemsControl.ItemsPanel>
-						<ItemsPanelTemplate>
-							<StackPanel Orientation="Horizontal" />
-						</ItemsPanelTemplate>
-					</ItemsControl.ItemsPanel>
-					<ItemsControl.ItemTemplate>
-						<DataTemplate>
-							<ToggleButton
-								Content="{Binding Name}"
-								IsChecked="{Binding IsOn, Mode=TwoWay}"
-								Style="{StaticResource FilterChip}" />
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
+				<!--  1행: 기간 프리셋 + 새로고침  -->
+				<DockPanel Grid.Row="0" LastChildFill="False">
+					<Border
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="6"
+						DockPanel.Dock="Left">
+						<StackPanel Orientation="Horizontal">
+							<RadioButton
+								Content="1시간"
+								GroupName="Period"
+								Style="{StaticResource PeriodSegButton}">
+								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('1h')]</cal:Message.Attach>
+							</RadioButton>
+							<RadioButton
+								Content="24시간"
+								GroupName="Period"
+								IsChecked="True"
+								Style="{StaticResource PeriodSegButton}">
+								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('24h')]</cal:Message.Attach>
+							</RadioButton>
+							<RadioButton
+								Content="7일"
+								GroupName="Period"
+								Style="{StaticResource PeriodSegButton}">
+								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('7d')]</cal:Message.Attach>
+							</RadioButton>
+							<RadioButton
+								Content="30일"
+								GroupName="Period"
+								Style="{StaticResource PeriodSegButton}">
+								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('30d')]</cal:Message.Attach>
+							</RadioButton>
+							<RadioButton
+								Content="기간지정"
+								GroupName="Period"
+								Style="{StaticResource PeriodSegButton}">
+								<cal:Message.Attach>[Event Checked] = [Action SelectPeriod('custom')]</cal:Message.Attach>
+							</RadioButton>
+						</StackPanel>
+					</Border>
 
-				<ToggleButton
-					Margin="8,0,0,0"
-					VerticalAlignment="Center"
-					Content="미조치만"
-					DockPanel.Dock="Left"
-					IsChecked="{Binding OnlyUnactioned, Mode=TwoWay}"
-					Style="{StaticResource FilterChip}" />
+					<Button
+						VerticalAlignment="Center"
+						Command="{Binding RefreshCommand}"
+						DockPanel.Dock="Right"
+						Style="{StaticResource MaterialDesignToolButton}"
+						ToolTip="새로고침">
+						<md:PackIcon
+							Width="20"
+							Height="20"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Kind="Refresh" />
+					</Button>
+				</DockPanel>
 
-				<Button
-					VerticalAlignment="Center"
-					Command="{Binding RefreshCommand}"
-					DockPanel.Dock="Right"
-					Style="{StaticResource MaterialDesignToolButton}"
-					ToolTip="새로고침">
-					<md:PackIcon
-						Width="20"
-						Height="20"
-						Foreground="{DynamicResource TextSecondaryBrush}"
-						Kind="Refresh" />
-				</Button>
-			</DockPanel>
+				<!--  2행: Result 필터 칩(WrapPanel — 폭 초과 시 줄바꿈, 절단 없음) + 미조치만  -->
+				<DockPanel
+					Grid.Row="1"
+					Margin="0,7,0,0"
+					LastChildFill="True">
+					<ToggleButton
+						Margin="8,0,0,4"
+						VerticalAlignment="Top"
+						Content="미조치만"
+						DockPanel.Dock="Right"
+						IsChecked="{Binding OnlyUnactioned, Mode=TwoWay}"
+						Style="{StaticResource FilterChip}" />
+					<ItemsControl ItemsSource="{Binding Chips}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<WrapPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<ToggleButton
+									Content="{Binding ShortName}"
+									IsChecked="{Binding IsOn, Mode=TwoWay}"
+									Style="{StaticResource FilterChip}"
+									ToolTip="{Binding Name}" />
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</DockPanel>
+			</Grid>
 		</Border>
 
 		<!--  ③ 기간지정 입력 행 (custom일 때만)  -->
