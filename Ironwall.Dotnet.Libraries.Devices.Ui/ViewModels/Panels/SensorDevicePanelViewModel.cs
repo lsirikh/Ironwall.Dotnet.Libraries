@@ -37,6 +37,34 @@ public class SensorDevicePanelViewModel : BaseDataGridMultiPanelViewModel<Sensor
         _deviceProvider = deviceProvider;
         _controllerProvider = controllerDeviceProvider;
         _deviceProviderService = deviceProviderService;
+        HistoryCommand = new Models.SimpleParamCommand(ShowDetectionHistoryAsync);
+    }
+    #endregion
+
+    #region - 탐지 이력 진입 (Detection_Signal_History FR-11) -
+    /// <summary>행 우클릭 '탐지 이력' — Draft(Id≤0)는 서버에 없는 장비라 차단. 오픈은 공용 메시지 발행(다이얼로그는 메인솔루션 Shell이 호스팅).</summary>
+    public System.Windows.Input.ICommand HistoryCommand { get; }
+
+    private async Task ShowDetectionHistoryAsync(object? param)
+    {
+        if (param is not SensorDeviceViewModel row) return;
+
+        if (row.Model.Id <= 0)
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "탐지 이력 조회 불가",
+                Explain = "미저장 장비입니다. 저장 후 조회할 수 있습니다."
+            });
+            return;
+        }
+
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenDetectionHistoryDialogMessageModel
+        {
+            DeviceId = row.Model.Id,
+            DeviceName = row.DeviceName,
+            DeviceNumber = row.DeviceNumber
+        });
     }
     #endregion
     #region - Implementation of Interface -

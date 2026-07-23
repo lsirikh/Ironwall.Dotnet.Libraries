@@ -129,6 +129,10 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         var perm = ResolvePermissionService();
         if (perm != null) perm.PermissionsChanged += OnPermissionsChanged;
 
+        // FR-04: 신호 미니바 상대 기준(MaxSignal) — 행 증감 시 재계산 (멱등 재구독)
+        ViewModelProvider.CollectionChanged -= OnRowsChangedForSignal;
+        ViewModelProvider.CollectionChanged += OnRowsChangedForSignal;
+
         await base.OnActivateAsync(cancellationToken);
         if (IsCacheValid())
         {
@@ -150,9 +154,18 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
         if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
 
         ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+        ViewModelProvider.CollectionChanged -= OnRowsChangedForSignal;   // FR-04 구독 해제
         _log.Info("OnDeactivateAsync in DetectionEventPanelViewModel");
         return base.OnDeactivateAsync(close, cancellationToken);
     }
+
+    #region - FR-04 신호 컬럼 상대 기준 -
+    /// <summary>현재 로드된 목록 내 최대 signal — 미니바 상대 폭·최대행 강조 기준. 없으면 0(바 미표시).</summary>
+    public int MaxSignal => ViewModelProvider?.Select(v => v.Signal ?? 0).DefaultIfEmpty(0).Max() ?? 0;
+
+    private void OnRowsChangedForSignal(object? sender, NotifyCollectionChangedEventArgs e)
+        => NotifyOfPropertyChange(nameof(MaxSignal));
+    #endregion
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
     {

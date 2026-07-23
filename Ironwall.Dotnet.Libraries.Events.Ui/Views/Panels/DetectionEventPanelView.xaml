@@ -5,6 +5,7 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -20,6 +21,10 @@
 	<UserControl.Resources>
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+		<!--  신호 컬럼 (FR-04) — 상대 미니바 폭/최대행 강조  -->
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<converters:SignalBarWidthConverter x:Key="SignalBarWidthConverter" />
+		<converters:SignalIsMaxConverter x:Key="SignalIsMaxConverter" />
 	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
@@ -266,52 +271,7 @@
 					</DataGridTextColumn.ElementStyle>
 				</DataGridTextColumn>
 
-				<!--  MessageType  -->
-				<DataGridTemplateColumn
-					CanUserSort="True"
-					IsReadOnly="True"
-					Header="Message Type"
-					SortMemberPath="MessageType">
-					<DataGridColumn.HeaderStyle>
-						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
-							<Setter Property="HorizontalAlignment" Value="Center" />
-							<Setter Property="VerticalAlignment" Value="Center" />
-						</Style>
-					</DataGridColumn.HeaderStyle>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding MessageType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								TextAlignment="Center" />
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-					<DataGridTemplateColumn.CellEditingTemplate>
-						<DataTemplate>
-							<ComboBox
-								VerticalAlignment="Center"
-								HorizontalContentAlignment="Center"
-								IsEditable="False"
-								ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
-								SelectedItem="{Binding MessageType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-								<ComboBox.ItemsPanel>
-									<ItemsPanelTemplate>
-										<VirtualizingStackPanel />
-									</ItemsPanelTemplate>
-								</ComboBox.ItemsPanel>
-								<ComboBox.ItemTemplate>
-									<DataTemplate>
-										<TextBlock Text="{Binding}" TextAlignment="Center" />
-									</DataTemplate>
-								</ComboBox.ItemTemplate>
-								<ComboBox.ItemContainerStyle>
-									<Style TargetType="{x:Type ComboBoxItem}" />
-								</ComboBox.ItemContainerStyle>
-							</ComboBox>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
-
+				<!--  Message Type 컬럼 제거 (FR-05) — 탐지 패널은 전 행 Intrusion 고정이라 중복 정보(사용자 결정)  -->
 
 				<!--  Device  -->
 				<DataGridTemplateColumn
@@ -425,6 +385,67 @@
 							</ComboBox>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
+				</DataGridTemplateColumn>
+
+				<!--  신호 (FR-04) — detail.signal, 센서 계측값 읽기 전용. 바=로드 목록 최대 기준 상대, 최대행 critical  -->
+				<DataGridTemplateColumn
+					CanUserSort="True"
+					Header="신호"
+					IsReadOnly="True"
+					SortMemberPath="Signal">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<StackPanel
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								Orientation="Horizontal">
+								<Border
+									Width="64"
+									Height="8"
+									Margin="0,0,8,0"
+									VerticalAlignment="Center"
+									Background="{DynamicResource SurfaceSunkenBrush}"
+									CornerRadius="4"
+									Visibility="{Binding HasSignal, Converter={StaticResource BoolToVis}}">
+									<Border
+										x:Name="PART_SignalBar"
+										HorizontalAlignment="Left"
+										Background="{DynamicResource PrimaryBrush}"
+										CornerRadius="4">
+										<Border.Width>
+											<MultiBinding Converter="{StaticResource SignalBarWidthConverter}" ConverterParameter="64">
+												<Binding Path="Signal" />
+												<Binding Path="Data.MaxSignal" Source="{StaticResource proxy}" />
+											</MultiBinding>
+										</Border.Width>
+									</Border>
+								</Border>
+								<TextBlock
+									MinWidth="44"
+									VerticalAlignment="Center"
+									FontFamily="Consolas"
+									Text="{Binding SignalText, Mode=OneWay}"
+									TextAlignment="Right" />
+							</StackPanel>
+							<DataTemplate.Triggers>
+								<DataTrigger Value="True">
+									<DataTrigger.Binding>
+										<MultiBinding Converter="{StaticResource SignalIsMaxConverter}">
+											<Binding Path="Signal" />
+											<Binding Path="Data.MaxSignal" Source="{StaticResource proxy}" />
+										</MultiBinding>
+									</DataTrigger.Binding>
+									<Setter TargetName="PART_SignalBar" Property="Background" Value="{DynamicResource StatusCriticalBrush}" />
+								</DataTrigger>
+							</DataTemplate.Triggers>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>
 
 				<!--  DateTime  -->

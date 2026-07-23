@@ -5281,6 +5281,29 @@ public partial class MapViewModel : BasePanelViewModel,
                 };
                 menu.Items.Add(editItem);
 
+                // 탐지 이력 (감지센서 전용, Detection_Signal_History FR-10)
+                // 웹서버/편집모드 게이트 미적용 — 운영 모드 상시 노출. 연동 장비 없으면 비활성.
+                if (pidsMarker.DeviceType == EnumDeviceType.SmartSensor)
+                {
+                    var linkedDevice = pidsMarker.LinkedDevice;
+                    var historyItem = new MenuItem
+                    {
+                        Header = "탐지 이력",
+                        IsEnabled = hasDevice,
+                        Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ChartLine, Width = 16, Height = 16 }
+                    };
+                    historyItem.Click += (s, e) =>
+                    {
+                        _ = _eventAggregator.PublishOnUIThreadAsync(new OpenDetectionHistoryDialogMessageModel
+                        {
+                            DeviceId = pidsMarker.LinkedDeviceId,
+                            DeviceName = linkedDevice?.DeviceName ?? pidsMarker.Title,
+                            DeviceNumber = linkedDevice?.DeviceNumber
+                        });
+                    };
+                    menu.Items.Add(historyItem);
+                }
+
                 // 제어기 홈페이지 (Controller 전용)
                 if (pidsMarker.DeviceType == EnumDeviceType.Controller)
                 {

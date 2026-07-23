@@ -31,6 +31,7 @@ public static class DtoToModelHelper
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
+            Signal = dto.Detail?.Signal,
             Device = ConvertDeviceFromDto(dto.Device, null)
         };
     }
@@ -104,7 +105,8 @@ public static class DtoToModelHelper
             Result = model.Result.ToString(),
             DeviceId = model.Device?.Id ?? 0,   // 서버 Create는 flat device_id(FK) 필수
             Device = ConvertDeviceToDto(model.Device),
-            DeviceDescription = model.Device?.DeviceName
+            DeviceDescription = model.Device?.DeviceName,
+            Detail = BuildDetectionDetail(model.Signal)
         };
     }
 
@@ -170,12 +172,18 @@ public static class DtoToModelHelper
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>IDetectionEventModel → DetectionEventReplaceDto (PUT 전용, type_event/result/detail만)</summary>
+    /// <remarks>서버 PUT은 detail "전체 교체" — 미전송 시 기존 detail(signal 포함)이 소실되므로 반드시 재구성해 보존한다.</remarks>
     public static DetectionEventReplaceDto ToDetectionEventReplaceDto(this IDetectionEventModel model)
         => new()
         {
             TypeEvent = model.MessageType.ToString(),
-            Result = model.Result.ToString()
+            Result = model.Result.ToString(),
+            Detail = BuildDetectionDetail(model.Signal)
         };
+
+    /// <summary>Signal 값이 있을 때만 detail 재구성(null이면 필드 자체 생략 — 기존 페이로드와 동일).</summary>
+    private static DetectionDetailDto? BuildDetectionDetail(int? signal)
+        => signal is int s ? new DetectionDetailDto { Signal = s } : null;
 
     /// <summary>IMalfunctionEventModel → MalfunctionEventReplaceDto (PUT 전용, type_event/reason/detail만)</summary>
     public static MalfunctionEventReplaceDto ToMalfunctionEventReplaceDto(this IMalfunctionEventModel model)
@@ -226,6 +234,7 @@ public static class DtoToModelHelper
             MessageType = Enum.Parse<EnumEventType>(dto.TypeEvent),
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
+            Signal = dto.Detail?.Signal,
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
     }

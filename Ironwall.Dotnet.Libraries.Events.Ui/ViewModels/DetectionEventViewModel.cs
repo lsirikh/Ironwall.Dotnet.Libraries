@@ -39,11 +39,20 @@ public class DetectionEventViewModel : ExEventViewModel, IDetectionEventViewMode
     public EnumDetectionType Result
     {
         get { return (_model as IDetectionEventModel)!.Result; }
-        set 
+        set
         {
             SetModelProperty(value, (_model as IDetectionEventModel)!.Result, v => (_model as IDetectionEventModel)!.Result = v);
         }
     }
+
+    /// <summary>탐지 신호 크기(detail.signal) — 센서 계측값이라 읽기 전용. null/0(AI)은 뷰에서 "—" 처리.</summary>
+    public int? Signal => (_model as IDetectionEventModel)!.Signal;
+
+    /// <summary>신호 표시 여부 — null 또는 0(AI_DETECT)이면 바/값 숨김.</summary>
+    public bool HasSignal => Signal is > 0;
+
+    /// <summary>그리드 표시 문자열 — 천 단위 구분, null/0(AI_DETECT)은 "—".</summary>
+    public string SignalText => Signal is > 0 ? Signal!.Value.ToString("N0") : "—";
 
     #endregion
     #region - Attributes -

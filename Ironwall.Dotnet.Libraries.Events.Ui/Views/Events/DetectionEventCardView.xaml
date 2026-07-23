@@ -20,6 +20,11 @@
 	
 	mc:Ignorable="d">
 
+	<UserControl.Resources>
+		<!--  신호 줄 가시성 (FR-06) — HasSignal 게이트  -->
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+	</UserControl.Resources>
+
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
 		Background="Transparent"
@@ -148,6 +153,7 @@
 						</Grid>
 
 						<!--  탐지 정보 Custom 구현 종료  -->
+						<!--  MessageType(Intrusion) 줄 제거 (FR-07) — 헤더 "탐지 이벤트"와 중복, 신호 줄 공간 확보  -->
 						<TextBlock
 							Grid.Row="1"
 							Grid.Column="0"
@@ -157,17 +163,39 @@
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="16"
 							Opacity="1"
-							Text="{Binding MessageType, FallbackValue=타입, Mode=OneWay}" />
-						<TextBlock
+							Text="{Binding Result, FallbackValue=장비, Mode=OneWay, StringFormat='({0})'}" />
+						<!--  신호 (FR-06) — detail.signal 병기, 바=세션 관측 최대 기준. null/0(AI)이면 줄 전체 숨김  -->
+						<StackPanel
 							Grid.Row="2"
 							Grid.Column="0"
 							Grid.ColumnSpan="2"
+							Margin="0,2,0,0"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Bottom"
-							FontFamily="{StaticResource NotoSansCJKkRMedium}"
-							FontSize="16"
-							Opacity="1"
-							Text="{Binding Result, FallbackValue=장비, Mode=OneWay, StringFormat='({0})'}" />
+							Orientation="Horizontal"
+							Visibility="{Binding HasSignal, Converter={StaticResource BoolToVis}}">
+							<Border
+								Width="80"
+								Height="8"
+								Margin="0,0,8,0"
+								VerticalAlignment="Center"
+								Background="{DynamicResource SurfaceSunkenBrush}"
+								CornerRadius="4">
+								<Border
+									Width="{Binding SignalBarWidth, Mode=OneWay}"
+									HorizontalAlignment="Left"
+									Background="{DynamicResource StatusCriticalBrush}"
+									CornerRadius="4" />
+							</Border>
+							<TextBlock
+								VerticalAlignment="Center"
+								FontFamily="Consolas"
+								FontSize="15"
+								FontWeight="Bold"
+								Foreground="{DynamicResource StatusCriticalBrush}"
+								Opacity="1"
+								Text="{Binding SignalText, Mode=OneWay}" />
+						</StackPanel>
 
 					</Grid>
 					<Separator
@@ -267,7 +295,9 @@
 						Grid.Row="1"
 						Margin="5"
 						VerticalAlignment="Top">
+						<!--  신호 행 추가로 5행 (FR-06) — 고정 200px 수용 위해 행 간격 축소(10→4)  -->
 						<Grid.RowDefinitions>
+							<RowDefinition />
 							<RowDefinition />
 							<RowDefinition />
 							<RowDefinition />
@@ -286,7 +316,7 @@
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="1"
-							Margin="10,10,0,0"
+							Margin="10,4,0,0"
 							md:HintAssist.Hint="제어기 번호"
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
@@ -301,7 +331,7 @@
 						<TextBox
 							Grid.Row="1"
 							Grid.Column="1"
-							Margin="10,10,0,0"
+							Margin="10,4,0,0"
 							md:HintAssist.Hint="센서 번호"
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
@@ -316,7 +346,7 @@
 						<TextBox
 							Grid.Row="2"
 							Grid.Column="1"
-							Margin="10,10,0,0"
+							Margin="10,4,0,0"
 							md:HintAssist.Hint="이벤트종류"
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
@@ -327,12 +357,27 @@
 							Grid.Column="0"
 							Margin="5,0,0,0"
 							VerticalAlignment="Center"
-							Text="시간"
-							TextWrapping="Wrap" />
+							Text="신호" />
 						<TextBox
 							Grid.Row="3"
 							Grid.Column="1"
-							Margin="10,10,0,0"
+							Margin="10,4,0,0"
+							md:HintAssist.Hint="신호 크기"
+							md:HintAssist.IsFloating="True"
+							IsReadOnly="True"
+							Opacity="1"
+							Text="{Binding SignalText, Mode=OneWay}" />
+						<TextBlock
+							Grid.Row="4"
+							Grid.Column="0"
+							Margin="5,0,0,0"
+							VerticalAlignment="Center"
+							Text="시간"
+							TextWrapping="Wrap" />
+						<TextBox
+							Grid.Row="4"
+							Grid.Column="1"
+							Margin="10,4,0,0"
 							md:HintAssist.Hint="이벤트 시간"
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"

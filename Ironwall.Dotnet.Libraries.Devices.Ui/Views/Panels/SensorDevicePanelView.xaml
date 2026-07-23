@@ -167,6 +167,17 @@
 			</i:Interaction.Behaviors>
 			<DataGrid.RowStyle>
 				<Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+					<!--  행 우클릭 → 탐지 이력 (Detection_Signal_History FR-11) — 탐지 패널 '조치보고' BindingProxy 패턴 미러  -->
+					<Setter Property="ContextMenu">
+						<Setter.Value>
+							<ContextMenu>
+								<MenuItem
+									Command="{Binding Data.HistoryCommand, Source={StaticResource proxy}}"
+									CommandParameter="{Binding}"
+									Header="탐지 이력" />
+							</ContextMenu>
+						</Setter.Value>
+					</Setter>
 					<Style.Triggers>
 						<DataTrigger Binding="{Binding IsDraft}" Value="True">
 							<Setter Property="Background" Value="#FFE0B2" />

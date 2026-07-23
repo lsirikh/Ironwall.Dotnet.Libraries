@@ -207,6 +207,9 @@ public class EventUiModule : Module
             builder.RegisterType<MalfunctionReportDialogViewModel>().AsSelf()// new DetectionReportDialogViewModel() 로도 해결 가능
                                                                    .As<EventReportDialogViewModel>()// 베이스로 요청해도 이 인스턴스를 반환
                                                                    .SingleInstance();              // or InstancePerDependency()
+
+            // 탐지 신호 이력 다이얼로그 (Detection_Signal_History FR-09) — 단일 인스턴스, Initialize()로 장비 컨텍스트 교체
+            builder.RegisterType<DetectionHistoryDialogViewModel>().AsSelf().SingleInstance();
     }
     #endregion
     #region - Overrides -

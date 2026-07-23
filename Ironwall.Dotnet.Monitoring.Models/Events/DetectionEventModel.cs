@@ -27,6 +27,7 @@ public class DetectionEventModel : ExEventModel, IDetectionEventModel
     public DetectionEventModel(IDetectionEventModel model) : base(model)
     {
         Result = model.Result;
+        Signal = model.Signal;
     }
     #endregion
     #region - Implementation of Interface -
@@ -42,6 +43,10 @@ public class DetectionEventModel : ExEventModel, IDetectionEventModel
     #region - Properties -
     [JsonProperty("result", Order = 6)]
     public EnumDetectionType Result { get; set; }
+
+    /// <summary>탐지 신호 크기(detail.signal). null=미제공, 0=AI_DETECT.</summary>
+    [JsonProperty("signal", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
+    public int? Signal { get; set; }
     #endregion
     #region - Attributes -
     #endregion

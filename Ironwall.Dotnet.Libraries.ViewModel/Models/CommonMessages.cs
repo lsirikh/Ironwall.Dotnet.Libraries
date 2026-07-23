@@ -51,6 +51,20 @@ public class OpenEventReportDialogMessageModel
 {
     public string? EventType { get; set; }
 }
+/// <summary>
+/// 탐지 신호 이력 다이얼로그 오픈 (Detection_Signal_History FR-08).
+/// GMaps.Ui(심볼 우클릭)·Devices.Ui(센서 그리드 우클릭) 양쪽에서 발행 — 공용 어셈블리 배치(순환 참조 회피).
+/// 메인솔루션 ConductorControl이 IHandle로 수신해 DialogShell에 다이얼로그를 띄운다.
+/// </summary>
+public class OpenDetectionHistoryDialogMessageModel
+{
+    /// <summary>대상 센서 장비 ID (GetDetectionEventsAsync sensor 필터 키).</summary>
+    public int DeviceId { get; set; }
+    /// <summary>헤더 표시용 장비명 (예: "[Multi] Sensor-A-1").</summary>
+    public string? DeviceName { get; set; }
+    /// <summary>헤더 표시용 장비 번호.</summary>
+    public int? DeviceNumber { get; set; }
+}
 public class OpenPreEventRemoveDialogMessageModel;
 public class OpenPreEventFaultDetailsDialogMessageModel;
 public class OpenPostEventDetailsDialogMessageModel;
