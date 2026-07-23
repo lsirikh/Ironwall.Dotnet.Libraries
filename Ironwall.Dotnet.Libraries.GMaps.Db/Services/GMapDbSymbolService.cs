@@ -466,6 +466,10 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `IsLocked`          BOOLEAN DEFAULT FALSE,                              -- 잠금 상태(맵 클릭 차단)
                 `HasGeoReference`   BOOLEAN DEFAULT FALSE,                              -- 지리 참조 여부
                 `CoordinateSystem`  VARCHAR(50),                                        -- 좌표계 (예: EPSG:4326)
+                `TitleSize`         DECIMAL(4,2) DEFAULT 11.0,                          -- 라벨 글자 크기 (Overlay_Title FR-10)
+                `ShowTitle`         BOOLEAN DEFAULT FALSE,                              -- 라벨 표시 여부 (FR-10)
+                `LabelOffsetU`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 U(하프익스텐트 비율, FR-02)
+                `LabelOffsetV`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 V(비율, FR-02)
                 `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX `IX_Images_Location` (`Latitude`, `Longitude`),
@@ -595,6 +599,16 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 _log?.Info("Symbols 테이블에 Visible 컬럼 추가 완료");
             }
             catch { /* 이미 존재하면 무시 (Duplicate column name) */ }
+
+            // ── Images 타이틀 부속 컬럼 마이그레이션 (레거시 DB 지원, 컬럼별 개별 try=부분 마이그레이션 안전 — Overlay_Title_ZoomStyle FR-10) ──
+            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `TitleSize` DECIMAL(4,2) DEFAULT 11.0;", token); _log?.Info("Images.TitleSize 컬럼 추가 완료"); }
+            catch { /* 이미 존재하면 무시 */ }
+            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `ShowTitle` BOOLEAN DEFAULT FALSE;", token); _log?.Info("Images.ShowTitle 컬럼 추가 완료"); }
+            catch { /* 이미 존재하면 무시 */ }
+            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `LabelOffsetU` DOUBLE DEFAULT 0;", token); _log?.Info("Images.LabelOffsetU 컬럼 추가 완료"); }
+            catch { /* 이미 존재하면 무시 */ }
+            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `LabelOffsetV` DOUBLE DEFAULT 0;", token); _log?.Info("Images.LabelOffsetV 컬럼 추가 완료"); }
+            catch { /* 이미 존재하면 무시 */ }
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
@@ -3206,6 +3220,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
                         Latitude, Longitude, Altitude, Zoom, Width, Height,
                         Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
+                        TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
                         CreatedAt, UpdatedAt
                 FROM    Images
                 ORDER BY CreatedAt DESC;";
@@ -3243,6 +3258,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 SELECT  Id, Title, FilePath, `Left`, Top, `Right`, Bottom,
                         Latitude, Longitude, Altitude, Zoom, Width, Height,
                         Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
+                        TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
                         CreatedAt, UpdatedAt
                 FROM    Images
                 WHERE   Id = @Id;";
@@ -3279,11 +3295,13 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 INSERT INTO Images
                     (Title, FilePath, `Left`, Top, `Right`, Bottom,
                      Latitude, Longitude, Altitude, Zoom, Width, Height,
-                     Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem)
+                     Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
+                     TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV)
                 VALUES
                     (@Title, @FilePath, @Left, @Top, @Right, @Bottom,
                      @Latitude, @Longitude, @Altitude, @Zoom, @Width, @Height,
-                     @Opacity, @Rotation, @Visibility, @IsLocked, @HasGeoReference, @CoordinateSystem);
+                     @Opacity, @Rotation, @Visibility, @IsLocked, @HasGeoReference, @CoordinateSystem,
+                     @TitleSize, @ShowTitle, @LabelOffsetU, @LabelOffsetV);
                 SELECT LAST_INSERT_ID();";
 
             var id = await conn.ExecuteScalarAsync<int>(sql, new
@@ -3305,7 +3323,11 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Visibility,
                 model.IsLocked,
                 model.HasGeoReference,
-                model.CoordinateSystem
+                model.CoordinateSystem,
+                model.TitleSize,
+                model.ShowTitle,
+                model.LabelOffsetU,
+                model.LabelOffsetV
             });
 
             model.Id = id;
@@ -3341,6 +3363,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     Zoom = @Zoom, Width = @Width, Height = @Height,
                     Opacity = @Opacity, Rotation = @Rotation, Visibility = @Visibility, IsLocked = @IsLocked,
                     HasGeoReference = @HasGeoReference, CoordinateSystem = @CoordinateSystem,
+                    TitleSize = @TitleSize, ShowTitle = @ShowTitle,
+                    LabelOffsetU = @LabelOffsetU, LabelOffsetV = @LabelOffsetV,
                     UpdatedAt = CURRENT_TIMESTAMP
                 WHERE Id = @Id;";
 
@@ -3364,7 +3388,11 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Visibility,
                 model.IsLocked,
                 model.HasGeoReference,
-                model.CoordinateSystem
+                model.CoordinateSystem,
+                model.TitleSize,
+                model.ShowTitle,
+                model.LabelOffsetU,
+                model.LabelOffsetV
             });
 
             if (affected == 0)
@@ -4059,6 +4087,18 @@ internal sealed class ImageSQL
     /// <summary>좌표계 (예: EPSG:4326)</summary>
     public string? CoordinateSystem { get; set; }
 
+    /// <summary>라벨 글자 크기 (FR-10)</summary>
+    public decimal TitleSize { get; set; } = 11.0m;
+
+    /// <summary>라벨 표시 여부 (FR-10)</summary>
+    public bool ShowTitle { get; set; }
+
+    /// <summary>라벨 오프셋 U — 하프익스텐트 비율 (FR-02)</summary>
+    public double LabelOffsetU { get; set; }
+
+    /// <summary>라벨 오프셋 V — 하프익스텐트 비율 (FR-02)</summary>
+    public double LabelOffsetV { get; set; }
+
     /// <summary>생성 일시</summary>
     public DateTime CreatedAt { get; set; }
 
@@ -4088,7 +4128,11 @@ internal sealed class ImageSQL
         Visibility = Visibility,
         IsLocked = IsLocked,
         HasGeoReference = HasGeoReference,
-        CoordinateSystem = CoordinateSystem
+        CoordinateSystem = CoordinateSystem,
+        TitleSize = (double)TitleSize,
+        ShowTitle = ShowTitle,
+        LabelOffsetU = LabelOffsetU,
+        LabelOffsetV = LabelOffsetV
     };
 }
 

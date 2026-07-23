@@ -555,12 +555,23 @@ public partial class MapViewModel : BasePanelViewModel,
     private void Markers_CollectionChangedForLabels(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         => _labelService?.Sync(MainMap?.Markers);
 
-    /// <summary>라벨 드래그 완료 → 심볼 모델 DB 영속(LabelOffsetX/Y 포함). RBAC 게이트(FR-LB-05).</summary>
+    /// <summary>라벨 드래그 완료 → 심볼 모델 DB 영속(심볼/라인=LabelOffsetX/Y px, 이미지=LabelOffsetU/V 비율). RBAC 게이트(FR-LB-05).
+    /// before 쌍의 도메인은 마커 타입 따름(이미지=U/V — LabelAdorner가 타입별로 전달, Overlay_Title FR-11).</summary>
     private async void OnLabelOffsetChanged(IEditableMarker marker, double beforeX, double beforeY)
     {
         if (marker == null || !CanEditMap()) return;
         try { await DbUpdateProcess(marker); _editRecorder?.RecordLabelOffset(marker, beforeX, beforeY); }   // before=드래그 시작 오프셋(선택 무관 정확)
-        catch (Exception ex) { _log?.Error($"라벨 오프셋 영속 실패: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"라벨 오프셋 영속 실패: {ex.Message}");
+            // DB 실패 시 드래그 이전 값으로 롤백 — 화면·DB 불일치 잔류 방지(FR-11/P1-03). undo 기록도 자연 생략됨.
+            try
+            {
+                if (marker is IImageEditableMarker img) { img.LabelOffsetU = beforeX; img.LabelOffsetV = beforeY; }
+                else { marker.LabelOffsetX = beforeX; marker.LabelOffsetY = beforeY; }
+            }
+            catch (Exception rex) { _log?.Error($"라벨 오프셋 롤백 실패: {rex.Message}"); }
+        }
     }
     #endregion
 

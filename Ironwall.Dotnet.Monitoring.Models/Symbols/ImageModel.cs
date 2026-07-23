@@ -43,6 +43,11 @@ public class ImageModel : BaseModel, IImageModel
         Visibility = true;
         Opacity = 0.8;
         Zoom = 0;  // 기본값: 0 = 모든 줌 레벨에서 표시
+
+        TitleSize = 11.0;      // 기존 GMapImageMarker 인메모리 기본값 승계 (FR-10)
+        ShowTitle = false;
+        LabelOffsetU = 0.0;
+        LabelOffsetV = 0.0;
     }
 
     /// <summary>
@@ -107,6 +112,11 @@ public class ImageModel : BaseModel, IImageModel
         Opacity = model.Opacity;
         Zoom = model.Zoom;
         ZOrder = model.ZOrder;
+
+        TitleSize = model.TitleSize;
+        ShowTitle = model.ShowTitle;
+        LabelOffsetU = model.LabelOffsetU;
+        LabelOffsetV = model.LabelOffsetV;
     }
 
     #endregion
@@ -165,6 +175,15 @@ public class ImageModel : BaseModel, IImageModel
     /// 런타임 Z-Order 홀더. MapLayers.ZOrder에서 주입받음 (DB 컬럼 없음).
     /// </summary>
     public int ZOrder { get; set; } = 0;
+
+    /// <summary>라벨 글자 크기(pt) — Images.TitleSize 영속 (FR-10).</summary>
+    public double TitleSize { get; set; }
+    /// <summary>라벨(제목) 표시 여부 — Images.ShowTitle 영속 (FR-10).</summary>
+    public bool ShowTitle { get; set; }
+    /// <summary>라벨 오프셋 U(하프익스텐트 비율, px 아님) — Images.LabelOffsetU 영속 (FR-02).</summary>
+    public double LabelOffsetU { get; set; }
+    /// <summary>라벨 오프셋 V(하프익스텐트 비율) — Images.LabelOffsetV 영속 (FR-02).</summary>
+    public double LabelOffsetV { get; set; }
     #endregion
     #endregion
     #region - Attributes -

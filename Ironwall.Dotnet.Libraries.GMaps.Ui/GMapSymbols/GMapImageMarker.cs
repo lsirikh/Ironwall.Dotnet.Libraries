@@ -247,19 +247,48 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
-    /// <summary>이미지 마커는 라벨 분리 대상 아님 — IEditableMarker 충족용(오프셋 미사용).</summary>
+    /// <summary>IEditableMarker 호환 px 오프셋 — 이미지 라벨은 정규화 U/V(아래)를 정본으로 사용(Overlay_Title FR-02).
+    /// LabelAdorner의 이미지 분기가 U/V만 읽으므로 이 px 쌍은 잔여 호환 스텁(미영속).</summary>
     public double LabelOffsetX { get; set; }
     public double LabelOffsetY { get; set; }
 
-    /// <summary>제목 글자 크기</summary>
-    public double TitleSize
+    /// <summary>라벨 오프셋 U — 시각 footprint 하프익스텐트(가로) 비율. 모델 영속(Images.LabelOffsetU, FR-02).</summary>
+    public double LabelOffsetU
     {
-        get => _titleSize;
+        get => _imageModel.LabelOffsetU;
         set
         {
-            if (Math.Abs(_titleSize - value) > 0.001)
+            if (Math.Abs(_imageModel.LabelOffsetU - value) > 0.000001)
             {
-                _titleSize = value;
+                _imageModel.LabelOffsetU = value;
+                OnPropertyChanged(nameof(LabelOffsetU));
+            }
+        }
+    }
+
+    /// <summary>라벨 오프셋 V — 하프익스텐트(세로) 비율. 모델 영속(Images.LabelOffsetV, FR-02).</summary>
+    public double LabelOffsetV
+    {
+        get => _imageModel.LabelOffsetV;
+        set
+        {
+            if (Math.Abs(_imageModel.LabelOffsetV - value) > 0.000001)
+            {
+                _imageModel.LabelOffsetV = value;
+                OnPropertyChanged(nameof(LabelOffsetV));
+            }
+        }
+    }
+
+    /// <summary>제목 글자 크기 — 모델 영속(Images.TitleSize, FR-10 — 이전 인메모리 필드 대체).</summary>
+    public double TitleSize
+    {
+        get => _imageModel.TitleSize;
+        set
+        {
+            if (Math.Abs(_imageModel.TitleSize - value) > 0.001)
+            {
+                _imageModel.TitleSize = value;
                 OnPropertyChanged(nameof(TitleSize));
             }
         }
@@ -435,15 +464,15 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
-    /// <summary>제목 표시 여부</summary>
+    /// <summary>제목 표시 여부 — 모델 영속(Images.ShowTitle, FR-10 — 이전 인메모리 필드 대체).</summary>
     public bool ShowTitle
     {
-        get => _showTitle;
+        get => _imageModel.ShowTitle;
         set
         {
-            if (_showTitle != value)
+            if (_imageModel.ShowTitle != value)
             {
-                _showTitle = value;
+                _imageModel.ShowTitle = value;
                 OnPropertyChanged(nameof(ShowTitle));
             }
         }
@@ -994,10 +1023,8 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
     private bool _isSelected;
     private bool _maintainAspectRatio = true;
 
-    // IEditableMarker 추가 속성용 필드
-    private double _titleSize = 11.0;
+    // IEditableMarker 추가 속성용 필드 — TitleSize/ShowTitle은 모델 위임으로 전환(FR-10), 필드 제거
     private bool _showShape = true;
-    private bool _showTitle;
     private EnumColorType _fillColor = EnumColorType.Transparent;
     private EnumColorType _strokeColor = EnumColorType.Blue;
     private double _strokeThickness = 2.0;

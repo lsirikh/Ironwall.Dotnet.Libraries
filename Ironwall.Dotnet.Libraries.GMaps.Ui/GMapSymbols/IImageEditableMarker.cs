@@ -67,6 +67,11 @@ public interface IImageEditableMarker : IEditableMarker
 
     /// <summary>ImageModel 참조</summary>
     IImageModel ImageModel { get; }
+
+    /// <summary>라벨 오프셋 U — 시각 footprint 하프익스텐트(가로) 비율(px 아님). 영속 정본(Overlay_Title FR-02).</summary>
+    double LabelOffsetU { get; set; }
+    /// <summary>라벨 오프셋 V — 하프익스텐트(세로) 비율 (FR-02).</summary>
+    double LabelOffsetV { get; set; }
     #endregion
 
     #region - Image 전용 메서드 -
