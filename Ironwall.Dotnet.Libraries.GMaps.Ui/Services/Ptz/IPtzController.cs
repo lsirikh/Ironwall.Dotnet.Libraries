@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.OnvifSolution.Base.Models;
 
@@ -16,6 +16,9 @@ public sealed record PtzPosition(double Pan, double Tilt, double Zoom, string? P
 
 /// <summary>카메라 영상 옵션 상태(옵션 탭). <c>IrCutFilter</c>="ON"(주간)/"OFF"(야간)/"AUTO". <c>AutoFocus</c>=오토포커스 여부.</summary>
 public sealed record CameraImagingState(string IrCutFilter, bool AutoFocus);
+
+/// <summary>카메라(ONVIF)에 저장된 프리셋 1건 — 팝업 프리셋 탭 표시/이동/삭제 단위. Name은 빈 값 가능(표시측 폴백). (FR-C1)</summary>
+public sealed record PtzPresetInfo(string Token, string Name);
 
 /// <summary>
 /// 팝업 PTZ 제어의 단일 소유 앱서비스. (PRD FR-PTZCTL-01~03 / FR-WRAP-01)
@@ -65,8 +68,29 @@ public interface IPtzController
     /// <summary>현재 PTZ 위치 읽기(프리셋 저장용 GetStatus). 실패 시 null. (FR-PRESET-03)</summary>
     Task<PtzPosition?> GetStatusAsync(int cameraId, CancellationToken ct = default);
 
-    /// <summary>이동 정지(StopPTZ panTilt+zoom).</summary>
+    /// <summary>이동 정지(StopPTZ panTilt+zoom). FR-L1: 뗌 Stop은 제스처 토큰을 전달 — 재누름(새 제스처)이
+    /// 취소하면 Gate 대기 중 Stop이 드롭되고 새 ContinuousMove가 자동 대체(ONVIF §5.3.2).</summary>
     Task StopAsync(int cameraId, CancellationToken ct = default);
+
+    /*──── ONVIF 프리셋(FR-C1) — 카메라가 진실원. 전부 ctx.Gate 직렬(I-05), 워밍 ctx(PtzClient+ProfileToken) 재사용 ────*/
+
+    /// <summary>카메라 프리셋 목록 조회(GetPresets). 실패/비PTZ=null, 프리셋 없음=빈 목록(FR-C3 구분용).</summary>
+    Task<System.Collections.Generic.IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(int cameraId, CancellationToken ct = default);
+
+    /// <summary>프리셋 토큰으로 이동(GotoPreset — 속도 미지정=카메라 기본). AbsoluteMove처럼 Busy 표시. (FR-C2)</summary>
+    Task<bool> GotoPresetAsync(int cameraId, string presetToken, CancellationToken ct = default);
+
+    /// <summary>현재 위치를 새 프리셋으로 저장(SetPreset — 토큰은 카메라 자동 할당). (FR-C2)</summary>
+    Task<bool> SetPresetAsync(int cameraId, string presetName, CancellationToken ct = default);
+
+    /// <summary>프리셋 삭제(RemovePreset). (FR-C2)</summary>
+    Task<bool> RemovePresetAsync(int cameraId, string presetToken, CancellationToken ct = default);
+
+    /// <summary>현재 위치를 Home으로 지정(SetHomePosition — ONVIF 전용 슬롯, per-preset 개념 아님). (FR-C2/OQ-6)</summary>
+    Task<bool> SetHomePresetAsync(int cameraId, CancellationToken ct = default);
+
+    /// <summary>Home 위치로 이동(GotoHomePosition — Home 미지정 카메라는 실패 반환). (FR-C2/OQ-6)</summary>
+    Task<bool> GotoHomePresetAsync(int cameraId, CancellationToken ct = default);
 
     /// <summary>영상 옵션(주야간/포커스) 사용 가능 여부 — IsImagingPossible + ImagingClient + VideoSourceToken. (FR-OPT-03)</summary>
     bool IsImagingCapable(int cameraId);

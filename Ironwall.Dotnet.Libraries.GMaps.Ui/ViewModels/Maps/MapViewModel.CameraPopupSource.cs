@@ -24,6 +24,11 @@ public partial class MapViewModel
     /// 팝업 닫힘/심볼 삭제 시 <see cref="CloseCameraPopupAsync"/>가 취소해 in-flight 조회를 끊는다(M-6, PRD §5-B).</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource> _onvifResolveCts = new();
 
+    /// <summary>진행 중 Onvif조회 태스크(cameraId당 1개) — FR-L2: <c>EnsurePtzReadyAsync</c>가 이 태스크 완료를
+    /// 기다린 뒤 IsPtzCapable=true를 세팅(패드 활성 순간 ctx.Gate 자유 보장 — capable 직후 첫 이동이 in-flight
+    /// GetStreamUri Gate 점유를 기다리던 Onvif모드 첫-누름 지연 제거). 완료 시 자기 항목만 제거(값-조건부).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Task> _onvifResolveTasks = new();
+
     /// <summary>
     /// Onvif조회 모드(FR-05/06/08): 팝업은 이미 열려 있음(IsResolvingSource=true) —
     /// ONVIF GetStreamUri로 프로파일별 URL 확보(<see cref="Services.Ptz.IPtzController.ResolveStreamUriAsync"/>)

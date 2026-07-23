@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Base.Models;
+﻿using Ironwall.Dotnet.Libraries.Base.Models;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
@@ -21,3 +21,10 @@ public class CallDeleteGroupSymbolsProcessMessageModel : IMessageModel { }
 /// 위험(Delete 키 오입력 시 데이터 손실)을 차단하기 위해 도입.
 /// </summary>
 public class CallDeleteSelectedProcessMessageModel : IMessageModel { }
+
+/// <summary>
+/// 카메라 영상 팝업 전체 닫기 확인 콜백(FR-B2). 맵 우하단 카운터 위젯의 ✕ → 표준 확인 팝업
+/// (<c>OpenConfirmPopupMessageModel</c>) → "확인" 시 팝업 인프라가 이 메시지를 재발행 →
+/// <c>MapViewModel.HandleAsync</c> 가 열린 모든 카메라 팝업을 순차 닫는다(Hub Lease/PTZ 정지 포함).
+/// </summary>
+public class CallCloseAllCameraPopupsProcessMessageModel : IMessageModel { }

@@ -844,6 +844,69 @@
 				ZoomInCommand="{Binding ZoomInCommand}"
 				ZoomOutCommand="{Binding ZoomOutCommand}" />
 
+			<!--  카메라 영상 팝업 카운터 위젯(FR-B1/B2) — 열린 팝업 수 뱃지 + ✕(전체 닫기 confirm). 0개면 숨김.
+			      배치: 우하단 줌 컨트롤 왼쪽(우측 도킹 여백 300 군집과 정렬). PropertyPanelCanvas(ZIndex 200) 위 ZIndex 210.  -->
+			<Border
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				Margin="5,5,358,5"
+				Padding="10,5"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Bottom"
+				Panel.ZIndex="210"
+				Background="#CC04161C"
+				BorderBrush="#FF38485A"
+				BorderThickness="1"
+				CornerRadius="4"
+				ToolTip="열린 카메라 영상 팝업">
+				<Border.Style>
+					<Style TargetType="Border">
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding CameraPopups.Count}" Value="0">
+								<Setter Property="Visibility" Value="Collapsed" />
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</Border.Style>
+				<StackPanel Orientation="Horizontal">
+					<md:PackIcon
+						Width="20"
+						Height="20"
+						VerticalAlignment="Center"
+						Foreground="#FF00C8FF"
+						Kind="Cctv" />
+					<Border
+						MinWidth="18"
+						Height="18"
+						Margin="6,0,0,0"
+						Padding="4,0"
+						VerticalAlignment="Center"
+						Background="#FF00C8FF"
+						CornerRadius="9">
+						<TextBlock
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							FontSize="11"
+							FontWeight="Bold"
+							Foreground="#FF04161C"
+							Text="{Binding CameraPopups.Count}" />
+					</Border>
+					<Button
+						Width="26"
+						Height="26"
+						Margin="10,0,0,0"
+						Padding="0"
+						Command="{Binding CloseAllCameraPopupsCommand}"
+						Style="{StaticResource MaterialDesignIconButton}"
+						ToolTip="모든 카메라 영상 닫기">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Foreground="#FFEF5350"
+							Kind="CloseCircleOutline" />
+					</Button>
+				</StackPanel>
+			</Border>
 
 			<Canvas
 				x:Name="PropertyPanelCanvas"

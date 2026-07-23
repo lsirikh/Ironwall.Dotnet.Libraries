@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
@@ -372,7 +372,8 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!--  프리셋 탭 (로컬 DB) — 비PTZ 카메라는 전체 버튼(가기/Home/삭제/저장/Home이동) 비활성  -->
+                                    <!--  프리셋 탭 (ONVIF — 카메라 저장 프리셋, FR-C2) — 비PTZ 카메라는 전체 버튼 비활성.
+                                          Home은 ONVIF 전용 슬롯(SetHome/GotoHome — per-preset 개념 아님, OQ-6).  -->
                                     <StackPanel IsEnabled="{Binding IsPtzCapable}">
                                         <StackPanel.Style>
                                             <Style TargetType="StackPanel">
@@ -391,24 +392,21 @@
                                                 <DataTemplate>
                                                     <Grid Margin="0,1">
                                                         <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
                                                             <ColumnDefinition Width="*" />
                                                             <ColumnDefinition Width="Auto" />
                                                             <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
-                                                        <md:PackIcon Grid.Column="0" Width="13" Height="13" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="#FFFFB300" Kind="Home" Visibility="{Binding IsHome, Converter={StaticResource BoolToVis}}" />
-                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Foreground="#FFE6EDF3" Text="{Binding PresetName}" TextTrimming="CharacterEllipsis" />
-                                                        <Button Grid.Column="2" Margin="2,0" Padding="6,2" Content="가기" FontSize="11" Command="{Binding DataContext.GotoPresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                                        <Button Grid.Column="3" Margin="2,0" Padding="6,2" Content="Home" FontSize="11" ToolTip="Home으로 지정" Command="{Binding DataContext.SetHomeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                                        <Button Grid.Column="4" Margin="2,0" Padding="6,2" Content="✕" FontSize="11" Foreground="#FFEF5350" Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <!--  행별 Home 아이콘/지정 버튼 제거(FR-C2/OQ-6) — ONVIF Home은 per-preset이 아닌 전용 슬롯  -->
+                                                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#FFE6EDF3" Text="{Binding PresetName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding PresetName}" />
+                                                        <Button Grid.Column="1" Margin="2,0" Padding="6,2" Content="가기" FontSize="11" ToolTip="이 프리셋으로 이동" Command="{Binding DataContext.GotoPresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <Button Grid.Column="2" Margin="2,0" Padding="6,2" Content="✕" FontSize="11" Foreground="#FFEF5350" ToolTip="카메라에서 프리셋 삭제" Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
 
-                                        <!--  빈 목록  -->
-                                        <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="등록된 프리셋이 없습니다">
+                                        <!--  빈 목록 상태(FR-C3): 조회 중/미지원/없음/조회 실패를 구분 표기  -->
+                                        <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="{Binding PresetStatusText}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -421,10 +419,11 @@
                                             </TextBlock.Style>
                                         </TextBlock>
 
-                                        <!--  버튼 행  -->
+                                        <!--  버튼 행 — Home 지정/이동 = ONVIF SetHomePosition/GotoHomePosition(FR-C2/OQ-6)  -->
                                         <StackPanel Margin="0,6,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
-                                            <Button Margin="2,0" Padding="8,3" Content="현재위치 저장" FontSize="11" Command="{Binding SavePresetCommand}" />
-                                            <Button Margin="2,0" Padding="8,3" Content="Home 이동" FontSize="11" Command="{Binding GotoHomeCommand}" IsEnabled="{Binding HasHomePreset}" />
+                                            <Button Margin="2,0" Padding="8,3" Content="현재위치 저장" FontSize="11" ToolTip="현재 위치를 카메라 프리셋으로 저장" Command="{Binding SavePresetCommand}" />
+                                            <Button Margin="2,0" Padding="8,3" Content="Home 지정" FontSize="11" ToolTip="현재 위치를 카메라 Home으로 지정" Command="{Binding SetHomeCommand}" />
+                                            <Button Margin="2,0" Padding="8,3" Content="Home 이동" FontSize="11" ToolTip="카메라 Home 위치로 이동(먼저 Home 지정 필요)" Command="{Binding GotoHomeCommand}" />
                                         </StackPanel>
 
                                         <!--  인라인 이름 입력  -->

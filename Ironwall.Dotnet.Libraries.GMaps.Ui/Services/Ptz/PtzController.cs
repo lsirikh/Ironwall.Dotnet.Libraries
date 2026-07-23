@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -268,14 +268,121 @@ public sealed class PtzController : IPtzController
         try
         {
             // C1: PtzClient(WCF 채널) 동일 인스턴스 병렬 호출 금지(I-05) — Move와 동일 Gate로 직렬화.
-            // (1회성 Relative/Absolute 이동이라 Stop이 직전 이동 뒤로 큐잉돼도 지연 짧음. 진행 중 이동
-            //  즉시 중단이 필요하면 별도 채널 필요 — 후속.)
+            // FR-L1(Stop LWW): 뗌 Stop은 호출측이 제스처 토큰(ct)을 전달 — 뗌→즉시 재누름 시 BeginPtzGesture가
+            // 이 토큰을 취소해 Gate 대기 중인 Stop을 드롭하고 새 ContinuousMove가 즉시 진행한다
+            // (ONVIF §5.3.2: 새 ContinuousMove가 이전 모션을 자동 대체 — Stop 생략 안전). 재누름이 없으면 정상 수행.
+            var __swGate = System.Diagnostics.Stopwatch.StartNew();   // [진단] FR-L3: Stop 게이트 대기(재누름 지연 정량화)
             await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
-            try { await _onvif.StopPTZ(ctx.Model.PtzClient, ctx.ProfileToken, true, true).ConfigureAwait(false); }
+            __swGate.Stop();
+            try
+            {
+                var __swStop = System.Diagnostics.Stopwatch.StartNew();   // [진단] FR-L3: WCF Stop 왕복(Digest 401 재왕복 시 커짐 — Phase 2 판단 근거)
+                await _onvif.StopPTZ(ctx.Model.PtzClient, ctx.ProfileToken, true, true).ConfigureAwait(false);
+                __swStop.Stop();
+                _log?.Info($"[PTZ] Stop cam={cameraId} gateWait={__swGate.ElapsedMilliseconds}ms WCF={__swStop.ElapsedMilliseconds}ms");
+            }
             finally { ctx.Gate.Release(); }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _log?.Error($"[PTZ] Stop 실패 cam={cameraId}: {Mask(ex.Message)}"); }
+    }
+
+    /*──────────────── ONVIF 프리셋(FR-C1) — 카메라가 진실원 ────────────────*/
+    // 전부 워밍 캐시(ctx.Model.PtzClient + ctx.ProfileToken) 재사용 + ctx.Gate 직렬(I-05: 동일 WCF 채널 병렬 금지).
+    // 구 로컬 DB 프리셋(PtzPresetStore)은 팝업에서 분리(OQ-4/5) — 코드/테이블은 롤백 대비 유지.
+
+    public async Task<System.Collections.Generic.IReadOnlyList<PtzPresetInfo>?> GetPresetsAsync(int cameraId, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return null;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var list = await _onvif.GetPTZPreset(ctx.Model.PtzClient, ctx.ProfileToken).ConfigureAwait(false);
+                if (list == null) return null;   // SOAP 실패(OnvifService가 로그 후 null) — "조회 실패"로 구분(FR-C3)
+                var result = new System.Collections.Generic.List<PtzPresetInfo>(list.Count);
+                foreach (var p in list)
+                {
+                    if (string.IsNullOrEmpty(p?.Token)) continue;   // 토큰 없는 항목은 이동/삭제 불가 — 제외
+                    result.Add(new PtzPresetInfo(p.Token, p.Name ?? string.Empty));
+                }
+                return result;
+            }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return null; }
+        catch (Exception ex) { _log?.Error($"[PTZ] GetPresets 실패 cam={cameraId}: {Mask(ex.Message)}"); return null; }
+    }
+
+    public async Task<bool> GotoPresetAsync(int cameraId, string presetToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(presetToken)) return false;
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            ctx.Busy = true;   // AbsoluteMove와 동일 — 프리셋 이동 중 표시
+            try { return await _onvif.GoPTZPreset(ctx.Model.PtzClient, null!, ctx.ProfileToken, presetToken).ConfigureAwait(false); }   // 속도 null=카메라 기본(ToWsdl null-안전)
+            finally { ctx.Busy = false; ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] GotoPreset 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> SetPresetAsync(int cameraId, string presetName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(presetName)) return false;
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try { return await _onvif.SetPTZPreset(ctx.Model.PtzClient, ctx.ProfileToken, presetName, null!).ConfigureAwait(false); }   // presetToken null=카메라가 자동 할당
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] SetPreset 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> RemovePresetAsync(int cameraId, string presetToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(presetToken)) return false;
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try { return await _onvif.DeletePTZPreset(ctx.Model.PtzClient, ctx.ProfileToken, presetToken).ConfigureAwait(false); }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] RemovePreset 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> SetHomePresetAsync(int cameraId, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            try { return await _onvif.SetHomePreset(ctx.Model.PtzClient, ctx.ProfileToken).ConfigureAwait(false); }
+            finally { ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] SetHome 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
+    }
+
+    public async Task<bool> GotoHomePresetAsync(int cameraId, CancellationToken ct = default)
+    {
+        if (!_ctx.TryGetValue(cameraId, out var ctx) || ctx.Model?.PtzClient == null) return false;
+        try
+        {
+            await ctx.Gate.WaitAsync(ct).ConfigureAwait(false);
+            ctx.Busy = true;
+            try { return await _onvif.GoHomePreset(ctx.Model.PtzClient, null!, ctx.ProfileToken).ConfigureAwait(false); }   // Home 미지정 카메라는 폴트 → false
+            finally { ctx.Busy = false; ctx.Gate.Release(); }
+        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _log?.Error($"[PTZ] GoHome 실패 cam={cameraId}: {Mask(ex.Message)}"); return false; }
     }
 
     /*──────────────── 영상 옵션(Imaging) ────────────────*/

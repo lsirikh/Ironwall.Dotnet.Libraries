@@ -1,6 +1,5 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Caliburn.Micro;
@@ -133,13 +132,18 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     public CameraViewModel StreamVm { get; }
 
     public double CanvasLeft { get => _canvasLeft; set { _canvasLeft = value; NotifyOfPropertyChange(nameof(CanvasLeft)); RecomputeLine(); } }
-    public double CanvasTop { get => _canvasTop; set { _canvasTop = value < MinCanvasTop ? MinCanvasTop : value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
+    // FR-A1: 세터 클램프 금지 — 맵 팬/줌 추종(RefreshCameraPopupPositions)이 이 세터를 경유하므로 여기서
+    // 하한을 물면 앵커가 화면 위로 나갈 때 팝업이 상단에 붙어 "딸려오는" 버그가 된다(CanvasLeft와 비대칭).
+    // 타이틀바 침범 방지는 드래그 경로(CameraStreamPopupControl.OnMouseMove)의 경계 클램프가 전담한다.
+    public double CanvasTop { get => _canvasTop; set { _canvasTop = value; NotifyOfPropertyChange(nameof(CanvasTop)); RecomputeLine(); } }
     public double PopupWidth { get => _popupWidth; set { _popupWidth = value; NotifyOfPropertyChange(nameof(PopupWidth)); RecomputeLine(); } }
     public double PopupHeight { get => _popupHeight; set { _popupHeight = value; NotifyOfPropertyChange(nameof(PopupHeight)); NotifyOfPropertyChange(nameof(ControlHeight)); RecomputeLine(); } }
 
     /// <summary>컨트롤 패널(아코디언) 높이 — 펼치면 팝업이 이만큼 아래로 커져 영상이 가려지지 않음. (PTZ 탭 줌·포커스 +/- 버튼 2행 추가로 188→230)</summary>
     public const double PanelHeight = 230;
-    /// <summary>팝업 상단 최소 Y(PropertyPanelCanvas 기준, 0=맵 영역 상단). 음수면 위로 넘쳐 상단 툴바/MahApps 윈도우 타이틀바(최대·최소·닫기)를 덮으므로 클램프. geo 추종은 AnchorGeo가 별도 보존하므로 표시 위치만 제한.</summary>
+    /// <summary>드래그 시 팝업 상단 하한(PropertyPanelCanvas 기준 0=맵 영역 상단) — 헤더 드래그가 상단 툴바/
+    /// MahApps 윈도우 타이틀바를 침범하지 않게 <see cref="GMapControls.CameraStreamPopupControl"/>의 드래그 경계
+    /// 클램프에서만 사용(FR-A2/OQ-1b). 맵 팬/줌 추종엔 적용하지 않는다(세터 클램프 시 상단 딸려옴 버그 — FR-A1).</summary>
     public const double MinCanvasTop = 0;
     /// <summary>컨트롤 실제 높이 = 영상 높이(PopupHeight) + 패널(펼침 시). MapView Height에 바인딩. (FR-UI-01)</summary>
     public double ControlHeight => _popupHeight + (_isPanelExpanded ? PanelHeight : 0);
@@ -270,27 +274,31 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
         if (dx != 0 || dy != 0) PtzNudgeRequested?.Invoke(this, new PtzNudgeEventArgs(dx, dy));
     }
 
-    // ── 프리셋 탭(로컬 DB) ────────────────────────────────────────────────────
+    // ── 프리셋 탭(ONVIF — 카메라 저장 프리셋, FR-C2) ─────────────────────────
     private readonly BindableCollection<IPtzPresetModel> _presets = new();
-    /// <summary>카메라 프리셋 목록(MapViewModel이 DB에서 로드해 주입). (FR-PRESET-01)</summary>
+    /// <summary>카메라 프리셋 목록(MapViewModel이 ONVIF GetPresets 결과를 어댑터로 주입). (FR-C2)</summary>
     public BindableCollection<IPtzPresetModel> Presets => _presets;
 
-    /// <summary>Home 프리셋 존재 여부([Home 이동] 활성 판단). (FR-PRESET-07)</summary>
-    public bool HasHomePreset => _presets.Any(p => p.IsHome);
+    private string _presetStatusText = "등록된 프리셋이 없습니다";
+    /// <summary>프리셋 탭 빈 목록 시 상태 문구(FR-C3) — "조회 중/미지원/없음/조회 실패"를 구분해 무음 빈 목록을 없앤다.</summary>
+    public string PresetStatusText { get => _presetStatusText; set { if (_presetStatusText == value) return; _presetStatusText = value; NotifyOfPropertyChange(nameof(PresetStatusText)); } }
 
-    /// <summary>MapViewModel이 DB 로드 결과를 주입(UI 스레드).</summary>
-    internal void SetPresets(IEnumerable<IPtzPresetModel> presets)
+    /// <summary>MapViewModel이 프리셋 로드 결과를 주입(UI 스레드). 빈 목록일 때 표시할 사유를 함께 주입(FR-C3).</summary>
+    internal void SetPresets(IEnumerable<IPtzPresetModel> presets, string? statusWhenEmpty = null)
     {
         _presets.Clear();
         _presets.AddRange(presets);
-        NotifyOfPropertyChange(nameof(HasHomePreset));
+        if (statusWhenEmpty != null) PresetStatusText = statusWhenEmpty;
     }
 
     public event EventHandler? PresetsReloadRequested;       // 탭 진입/변경 후 재조회 요청
     public event EventHandler<IPtzPresetModel>? PresetGotoRequested;
     public event EventHandler<string>? PresetSaveRequested;  // 인라인 이름 확정
     public event EventHandler<IPtzPresetModel>? PresetDeleteRequested;
-    public event EventHandler<IPtzPresetModel>? PresetHomeRequested;
+    /// <summary>[Home 지정] — 현재 위치를 카메라 Home으로(ONVIF SetHomePosition). per-preset Home 개념 폐기(OQ-6). (FR-C2)</summary>
+    public event EventHandler? PresetHomeSetRequested;
+    /// <summary>[Home 이동] — 카메라 Home 위치로(ONVIF GotoHomePosition). (FR-C2)</summary>
+    public event EventHandler? PresetHomeGotoRequested;
 
     internal void RaisePresetsReload() => PresetsReloadRequested?.Invoke(this, EventArgs.Empty);
 
@@ -306,8 +314,10 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
 
     public ICommand GotoPresetCommand => _gotoPresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetGotoRequested?.Invoke(this, m); });
     public ICommand DeletePresetCommand => _deletePresetCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetDeleteRequested?.Invoke(this, m); });
-    public ICommand SetHomeCommand => _setHomeCommand ??= new RelayCommand(p => { if (p is IPtzPresetModel m) PresetHomeRequested?.Invoke(this, m); });
-    public ICommand GotoHomeCommand => _gotoHomeCommand ??= new RelayCommand(() => { var h = _presets.FirstOrDefault(p => p.IsHome); if (h != null) PresetGotoRequested?.Invoke(this, h); });
+    /// <summary>[Home 지정] — 현재 위치를 카메라 Home으로. 행 파라미터 불필요(ONVIF Home=전용 슬롯). (FR-C2/OQ-6)</summary>
+    public ICommand SetHomeCommand => _setHomeCommand ??= new RelayCommand(() => PresetHomeSetRequested?.Invoke(this, EventArgs.Empty));
+    /// <summary>[Home 이동] — 카메라 Home 위치로(미지정 카메라는 무동작 — MapViewModel이 로그). (FR-C2/OQ-6)</summary>
+    public ICommand GotoHomeCommand => _gotoHomeCommand ??= new RelayCommand(() => PresetHomeGotoRequested?.Invoke(this, EventArgs.Empty));
 
     /// <summary>[현재위치 저장] → 인라인 이름 입력 시작.</summary>
     public ICommand SavePresetCommand => _savePresetCommand ??= new RelayCommand(() => { NewPresetName = $"Preset_{_presets.Count + 1}"; IsSavingPreset = true; });
@@ -397,4 +407,34 @@ public sealed class PtzNudgeEventArgs : EventArgs
     public PtzNudgeEventArgs(double dx, double dy) { Dx = dx; Dy = dy; }
     public double Dx { get; }
     public double Dy { get; }
+}
+
+/// <summary>
+/// ONVIF 프리셋 표시 어댑터(FR-C2) — 기존 프리셋 탭 XAML 바인딩(PresetName)과 이벤트 시그니처(IPtzPresetModel)를
+/// 유지한 채 소스만 로컬 DB→카메라(ONVIF)로 교체하기 위한 경량 아이템. 좌표(Pan/Tilt/Zoom)는 카메라 내부
+/// 상태라 미보유(0) — 이동/삭제는 <see cref="Token"/>(GotoPreset/RemovePreset)으로 수행한다.
+/// IsHome은 ONVIF에 per-preset 개념이 없어 항상 false(Home은 SetHome/GotoHome 전용 슬롯 — OQ-6).
+/// </summary>
+public sealed class OnvifPresetDisplayModel : IPtzPresetModel
+{
+    public OnvifPresetDisplayModel(int cameraId, string token, string? name)
+    {
+        CameraId = cameraId;
+        Token = token;
+        PresetName = string.IsNullOrWhiteSpace(name) ? $"프리셋 {token}" : name!;   // 빈 이름 폴백(FR-C2)
+    }
+
+    /// <summary>ONVIF 프리셋 토큰 — 이동(GotoPreset)/삭제(RemovePreset) 키.</summary>
+    public string Token { get; }
+
+    public int Id { get; set; }
+    public int CameraId { get; set; }
+    public string PresetName { get; set; }
+    public bool IsHome { get; set; }
+    public double Pan { get; set; }
+    public double Tilt { get; set; }
+    public double Zoom { get; set; }
+    public string? PanTiltSpace { get; set; }
+    public string? ZoomSpace { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }

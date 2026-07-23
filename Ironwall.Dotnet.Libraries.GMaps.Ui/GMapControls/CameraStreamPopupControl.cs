@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -151,11 +151,12 @@ public class CameraStreamPopupControl : Control
         var newLeft = left + dx;
         var newTop = top + dy;
 
-        // 경계 clamp — 팝업이 Canvas 밖으로 사라지지 않게
+        // 경계 clamp — 팝업이 Canvas 밖으로 사라지지 않게. 드래그 전용(FR-A2) — 맵 팬/줌 추종(VM 세터)은
+        // 클램프하지 않으므로(FR-A1) 타이틀바 침범 방지 하한은 여기 MinCanvasTop이 단일 진실원(OQ-1b).
         var maxLeft = canvas.ActualWidth - ActualWidth;
         var maxTop = canvas.ActualHeight - ActualHeight;
         if (maxLeft > 0) newLeft = Math.Min(Math.Max(0, newLeft), maxLeft);
-        if (maxTop > 0) newTop = Math.Min(Math.Max(0, newTop), maxTop);
+        if (maxTop > 0) newTop = Math.Min(Math.Max(CameraStreamPopupViewModel.MinCanvasTop, newTop), maxTop);
 
         vm.CanvasLeft = newLeft;
         vm.CanvasTop = newTop;

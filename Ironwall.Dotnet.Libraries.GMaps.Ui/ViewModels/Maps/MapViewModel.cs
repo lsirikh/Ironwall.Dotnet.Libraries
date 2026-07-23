@@ -72,6 +72,7 @@ public partial class MapViewModel : BasePanelViewModel,
                             IHandle<CallDeleteMapLayerProcessMessageModel>,
                             IHandle<CallDeleteGroupSymbolsProcessMessageModel>,
                             IHandle<CallDeleteSelectedProcessMessageModel>,
+                            IHandle<CallCloseAllCameraPopupsProcessMessageModel>,
                             IHandle<ZOrderChangeRequestedEvent>
                             //, IHandle<PropertyPanelCloseRequestedEvent>
                             //, IHandle<MarkerPropertyChangedEventArgs>
@@ -1772,8 +1773,15 @@ public partial class MapViewModel : BasePanelViewModel,
             };
             _log?.Info($"[CameraPopup] PTZ 준비 시도 cam={vm.CameraId} {cam.IpAddress}:{conn.PortOnvif}");
             var ok = await ptz.EnsureReadyAsync(vm.CameraId, conn).ConfigureAwait(false);
+            // FR-L2(capable 정렬): Onvif 소스모드는 in-flight GetStreamUri(같은 ctx.Gate)가 끝난 뒤에 패드를 활성 —
+            // "활성=즉시 이동 가능" 보장(활성 직후 첫 누름이 스트림 조회 SOAP 왕복을 Gate에서 기다리는 지연 제거).
+            // 조회 태스크는 자체 타임아웃(OnvifResolveTimeoutMs) 보유 — WhenAny 상한은 행 방지 안전망. Url 모드는 등록이 없어 즉시 통과.
+            if (_onvifResolveTasks.TryGetValue(vm.CameraId, out var resolveTask) && !resolveTask.IsCompleted)
+                await Task.WhenAny(resolveTask, Task.Delay(OnvifResolveTimeoutMs + 3000)).ConfigureAwait(false);
             await OnUiAsync(() => { vm.IsPtzCapable = ok && CanControlCamera(); vm.IsImagingCapable = ptz.IsImagingCapable(vm.CameraId); vm.IsPtzLoading = false; }).ConfigureAwait(false);
             _log?.Info($"[CameraPopup] PTZ 준비 결과 cam={vm.CameraId} capable={ok} (false면 비PTZ 카메라거나 ONVIF 포트/계정 확인)");
+            // P2-3(리뷰): 준비 중에 프리셋 탭에 진입해 "PTZ 준비 중…"에서 멈춘 사용자 구제 — 준비 완료 시 활성 탭이면 자동 재조회(FR-C3).
+            if (vm.ActiveTab == 1) _ = LoadPresetsAsync(vm);
         }
         catch (Exception ex)
         {
@@ -1803,6 +1811,29 @@ public partial class MapViewModel : BasePanelViewModel,
         return cts.Token;
     }
 
+    /// <summary>현재(마지막) 제스처의 취소 토큰(FR-L1) — 뗌 Stop에 전달해 "재누름 시 직전 Stop LWW 드롭"을 가능케 한다.
+    /// 제스처 이력이 없으면 None(명시 정지 항상 수행). 새 제스처가 방금 교체·Dispose한 경합이면 취소된 토큰
+    /// 반환(=Stop 스킵 — 새 ContinuousMove가 모션을 자동 대체하므로 안전, ONVIF §5.3.2).</summary>
+    private System.Threading.CancellationToken CurrentPtzGestureToken(int cameraId)
+    {
+        if (_ptzGestureCts.TryGetValue(cameraId, out var cts))
+        {
+            try { return cts.Token; }
+            catch (ObjectDisposedException) { return new System.Threading.CancellationToken(canceled: true); }
+        }
+        return System.Threading.CancellationToken.None;
+    }
+
+    /// <summary>ContinuousMove 발행 + 실패 보상 Stop(R-1). 직전 Stop이 LWW로 드롭된 상태에서 새 이동 SOAP까지
+    /// 실패하면 카메라가 이전 모션으로 계속 돌 수 있다 — 비취소 실패 시 best-effort Stop으로 정지를 보장한다.</summary>
+    private async Task ContinuousMoveWithStopFallbackAsync(Services.Ptz.IPtzController ptz, int cameraId,
+        double panVel, double tiltVel, double zoomVel, System.Threading.CancellationToken ct)
+    {
+        var ok = await ptz.ContinuousMoveAsync(cameraId, panVel, tiltVel, zoomVel, ct).ConfigureAwait(false);
+        if (!ok && !ct.IsCancellationRequested)
+            await ptz.StopAsync(cameraId).ConfigureAwait(false);
+    }
+
     private void OnCameraPopupPtzDragRequested(object? sender, PtzDragEventArgs e)
     {
         if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePtzDragAsync(vm, e);   // cam:control 게이팅 (FR-EN-06)
@@ -1826,7 +1857,11 @@ public partial class MapViewModel : BasePanelViewModel,
             var velFactor = vm.PanTiltSpeed * (0.3 + 0.7 * mag);
             var panVel = (e.Dx / len) * velFactor;
             var tiltVel = -(e.Dy / len) * velFactor;   // 화면 아래로 드래그 → 틸트 다운
-            if (!await ptz.ContinuousMoveAsync(vm.CameraId, panVel, tiltVel, 0, ct).ConfigureAwait(false)) return;
+            if (!await ptz.ContinuousMoveAsync(vm.CameraId, panVel, tiltVel, 0, ct).ConfigureAwait(false))
+            {
+                if (!ct.IsCancellationRequested) await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);   // R-1 보상(직전 Stop LWW 드롭 대비)
+                return;
+            }
             await Task.Delay(Math.Max(PtzDragMinDurationMs, (int)(mag * PtzDragMaxDurationMs)), ct).ConfigureAwait(false);
             await ptz.StopAsync(vm.CameraId, ct).ConfigureAwait(false);
             // FOV는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함(스케일 불일치).
@@ -1844,14 +1879,18 @@ public partial class MapViewModel : BasePanelViewModel,
         if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06)
         // FR-PTR-01: 취소토큰 전달 → 새 제스처가 직전 대기명령을 LWW 취소(Gate 큐 누적 제거). 드래그/휠과 동일.
         var ct = BeginPtzGesture(vm.CameraId);
-        _ = ptz.ContinuousMoveAsync(vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0, ct);
+        _ = ContinuousMoveWithStopFallbackAsync(ptz, vm.CameraId, e.Dx * vm.PanTiltSpeed, -e.Dy * vm.PanTiltSpeed, 0, ct);   // R-1 보상 포함
     }
 
     private void OnCameraPopupPtzStop(object? sender, EventArgs e)
     {
         if (sender is not CameraStreamPopupViewModel vm) return;
         var ptz = ResolvePtzController();
-        if (ptz != null) _ = ptz.StopAsync(vm.CameraId);   // FOV는 NATS가 갱신
+        if (ptz == null) return;
+        // FR-L1(Stop LWW): 뗌 Stop에 현재 제스처 토큰 전달 — 뗌→즉시 재누름 시 BeginPtzGesture가 이 토큰을
+        // 취소해 Gate 대기 중인 Stop을 드롭(ONVIF §5.3.2 새 ContinuousMove가 이전 모션 자동 대체 — 생략 안전)
+        // → 재누름이 직전 Stop의 SOAP 왕복(gateWait)을 통째로 기다리던 매-누름 지연 제거. 재누름 없으면 정상 정지.
+        _ = ptz.StopAsync(vm.CameraId, CurrentPtzGestureToken(vm.CameraId));   // FOV는 NATS가 갱신
     }
 
     private void OnCameraPopupPtzZoom(object? sender, int direction)
@@ -1867,7 +1906,11 @@ public partial class MapViewModel : BasePanelViewModel,
         var ct = BeginPtzGesture(vm.CameraId);   // 직전 제스처 취소
         try
         {
-            if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct).ConfigureAwait(false)) return;
+            if (!await ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct).ConfigureAwait(false))
+            {
+                if (!ct.IsCancellationRequested) await ptz.StopAsync(vm.CameraId).ConfigureAwait(false);   // R-1 보상(직전 Stop LWW 드롭 대비)
+                return;
+            }
             await Task.Delay(PtzZoomPulseMs, ct).ConfigureAwait(false);
             await ptz.StopAsync(vm.CameraId, ct).ConfigureAwait(false);
         }
@@ -1884,7 +1927,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (!CanControlCamera()) return;   // cam:control 게이팅 (FR-EN-06) — 다른 PTZ 핸들러와 동일
         // FR-PTR-01: 취소토큰 전달 → 직전 인플라이트 펄스/대기명령 LWW 취소(큐 누적 제거).
         var ct = BeginPtzGesture(vm.CameraId);
-        _ = ptz.ContinuousMoveAsync(vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct);   // 연속 — 뗄 때 StopAsync
+        _ = ContinuousMoveWithStopFallbackAsync(ptz, vm.CameraId, 0, 0, direction * vm.ZoomSpeed, ct);   // 연속 — 뗄 때 StopAsync. R-1 보상 포함
     }
 
     /// <summary>포커스 버튼 누름 → 연속 포커스 시작(near/far). 뗌/캡처분실/닫기는 OnCameraPopupFocusStop. direction +1=far/-1=near. (FR-PH-02)</summary>
@@ -1903,21 +1946,49 @@ public partial class MapViewModel : BasePanelViewModel,
         if (ptz != null) _ = ptz.StopFocusAsync(vm.CameraId);
     }
 
-    /*──────────────── 프리셋(로컬 DB) 핸들러 ────────────────*/
+    /*──────────────── 프리셋(ONVIF — 카메라가 진실원, FR-C2) 핸들러 ────────────────*/
+    // 구 로컬 DB 경로(PtzPresetStore)는 OQ-4/5 확정으로 팝업에서 분리 — 코드/테이블/스토어는 롤백 대비 유지.
 
     private void OnCameraPopupPresetsReload(object? sender, EventArgs e)
     {
         if (sender is CameraStreamPopupViewModel vm) _ = LoadPresetsAsync(vm);
     }
 
+    /// <summary>프리셋 탭 로드 = ONVIF GetPresets(워밍 ctx 재사용, Gate 직렬). 빈 목록 사유(조회 중/미지원/없음/실패)를
+    /// 상태 문구로 구분 — 기존 무음 빈 목록 제거. (FR-C2/FR-C3)</summary>
     private async Task LoadPresetsAsync(CameraStreamPopupViewModel vm)
     {
+        var ptz = ResolvePtzController();
+        if (ptz == null)
+        {
+            await OnUiAsync(() => vm.SetPresets(Array.Empty<IPtzPresetModel>(), "프리셋 조회 실패 (PTZ 서비스 없음)")).ConfigureAwait(false);
+            return;
+        }
+        if (vm.IsPtzLoading)
+        {
+            await OnUiAsync(() => vm.SetPresets(Array.Empty<IPtzPresetModel>(), "PTZ 준비 중…")).ConfigureAwait(false);
+            return;
+        }
+        if (!vm.IsPtzCapable)
+        {
+            await OnUiAsync(() => vm.SetPresets(Array.Empty<IPtzPresetModel>(), "이 카메라는 프리셋을 지원하지 않습니다")).ConfigureAwait(false);
+            return;
+        }
         try
         {
-            var list = await PtzPresetStore.GetPresetsAsync(vm.CameraId).ConfigureAwait(false);
-            await OnUiAsync(() => vm.SetPresets(list)).ConfigureAwait(false);
+            var list = await ptz.GetPresetsAsync(vm.CameraId).ConfigureAwait(false);
+            var items = list?.Select(p => (IPtzPresetModel)new OnvifPresetDisplayModel(vm.CameraId, p.Token, p.Name)).ToList();
+            await OnUiAsync(() =>
+            {
+                if (items == null) vm.SetPresets(Array.Empty<IPtzPresetModel>(), "프리셋 조회 실패 (카메라 응답 없음)");
+                else vm.SetPresets(items, "등록된 프리셋이 없습니다");
+            }).ConfigureAwait(false);
         }
-        catch (Exception ex) { _log?.Warning($"[CameraPopup] 프리셋 로드 실패 cam={vm.CameraId}: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Warning($"[CameraPopup] 프리셋 로드 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}");
+            await OnUiAsync(() => vm.SetPresets(Array.Empty<IPtzPresetModel>(), "프리셋 조회 실패")).ConfigureAwait(false);
+        }
     }
 
     private void OnCameraPopupPresetGoto(object? sender, IPtzPresetModel preset)
@@ -1925,15 +1996,16 @@ public partial class MapViewModel : BasePanelViewModel,
         if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetGotoAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
-    /// <summary>프리셋 이동 = AbsoluteMove(저장 좌표). FOV(부채꼴)는 NVR→NATS가 갱신. (FR-PRESET-02)</summary>
+    /// <summary>프리셋 이동 = ONVIF GotoPreset(카메라 내부 토큰 — AbsoluteMove(저장 좌표)보다 정밀·표준).
+    /// FOV(부채꼴)는 NVR→NATS가 갱신. (FR-C2)</summary>
     private async Task HandlePresetGotoAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
     {
         var ptz = ResolvePtzController();
-        if (ptz == null) return;
+        if (ptz == null || preset is not OnvifPresetDisplayModel onvifPreset) return;
         try
         {
-            await ptz.AbsoluteMoveAsync(vm.CameraId, preset.Pan, preset.Tilt, preset.Zoom).ConfigureAwait(false);
-            // FOV는 NVR→NATS(CameraPtzNatsSyncService) 경로가 갱신 — ONVIF 직접 갱신 안 함.
+            if (!await ptz.GotoPresetAsync(vm.CameraId, onvifPreset.Token).ConfigureAwait(false))
+                _log?.Warning($"[CameraPopup] 프리셋 이동 실패 cam={vm.CameraId} token={onvifPreset.Token}");
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
@@ -1943,28 +2015,17 @@ public partial class MapViewModel : BasePanelViewModel,
         if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetSaveAsync(vm, name);   // cam:control (FR-EN-06)
     }
 
-    /// <summary>프리셋 저장 = 현재 위치(GetStatus) 읽어 DB Upsert. 위치 못 읽으면 중단(쓰레기 좌표 금지). (FR-PRESET-03)</summary>
+    /// <summary>프리셋 저장 = ONVIF SetPreset(현재 위치, 토큰 자동 할당) 후 목록 재조회. (FR-C2)</summary>
     private async Task HandlePresetSaveAsync(CameraStreamPopupViewModel vm, string name)
     {
         var ptz = ResolvePtzController();
         if (ptz == null) return;
         try
         {
-            var pos = await ptz.GetStatusAsync(vm.CameraId).ConfigureAwait(false);
-            if (pos == null) { _log?.Warning($"[CameraPopup] 프리셋 저장 중단 — 현재 위치 읽기 실패 cam={vm.CameraId}"); return; }
-
-            var model = new PtzPresetModel
-            {
-                CameraId = vm.CameraId,
-                PresetName = name,
-                Pan = pos.Pan,
-                Tilt = pos.Tilt,
-                Zoom = pos.Zoom,
-                PanTiltSpace = pos.PanTiltSpace,
-                ZoomSpace = pos.ZoomSpace,
-            };
-            await PtzPresetStore.SaveAsync(model).ConfigureAwait(false);
-            await LoadPresetsAsync(vm).ConfigureAwait(false);
+            if (await ptz.SetPresetAsync(vm.CameraId, name).ConfigureAwait(false))
+                await LoadPresetsAsync(vm).ConfigureAwait(false);
+            else
+                _log?.Warning($"[CameraPopup] 프리셋 저장 실패 cam={vm.CameraId} name={name} (카메라 거부 — 프리셋 최대 수/이름 규칙 확인)");
         }
         catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 저장 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
@@ -1974,29 +2035,55 @@ public partial class MapViewModel : BasePanelViewModel,
         if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetDeleteAsync(vm, preset);   // cam:control (FR-EN-06)
     }
 
+    /// <summary>프리셋 삭제 = ONVIF RemovePreset(토큰) 후 목록 재조회. (FR-C2)</summary>
     private async Task HandlePresetDeleteAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
     {
+        var ptz = ResolvePtzController();
+        if (ptz == null || preset is not OnvifPresetDisplayModel onvifPreset) return;
         try
         {
-            await PtzPresetStore.DeleteAsync(preset.Id).ConfigureAwait(false);
-            await LoadPresetsAsync(vm).ConfigureAwait(false);
+            if (await ptz.RemovePresetAsync(vm.CameraId, onvifPreset.Token).ConfigureAwait(false))
+                await LoadPresetsAsync(vm).ConfigureAwait(false);
+            else
+                _log?.Warning($"[CameraPopup] 프리셋 삭제 실패 cam={vm.CameraId} token={onvifPreset.Token}");
         }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 삭제 실패 id={preset.Id}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] 프리셋 삭제 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
-    private void OnCameraPopupPresetHome(object? sender, IPtzPresetModel preset)
+    private void OnCameraPopupPresetHomeSet(object? sender, EventArgs e)
     {
-        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetHomeAsync(vm, preset);   // cam:control (FR-EN-06)
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetHomeSetAsync(vm);   // cam:control (FR-EN-06)
     }
 
-    private async Task HandlePresetHomeAsync(CameraStreamPopupViewModel vm, IPtzPresetModel preset)
+    /// <summary>[Home 지정] = 현재 위치를 카메라 Home으로(ONVIF SetHomePosition). (FR-C2/OQ-6)</summary>
+    private async Task HandlePresetHomeSetAsync(CameraStreamPopupViewModel vm)
     {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
         try
         {
-            await PtzPresetStore.SetHomeAsync(vm.CameraId, preset.Id).ConfigureAwait(false);
-            await LoadPresetsAsync(vm).ConfigureAwait(false);
+            if (!await ptz.SetHomePresetAsync(vm.CameraId).ConfigureAwait(false))
+                _log?.Warning($"[CameraPopup] Home 지정 실패 cam={vm.CameraId} (카메라가 SetHomePosition 미지원/거부)");
         }
-        catch (Exception ex) { _log?.Error($"[CameraPopup] Home 설정 실패 id={preset.Id}: {ex.Message}"); }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] Home 지정 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
+    }
+
+    private void OnCameraPopupPresetHomeGoto(object? sender, EventArgs e)
+    {
+        if (sender is CameraStreamPopupViewModel vm && CanControlCamera()) _ = HandlePresetHomeGotoAsync(vm);   // cam:control (FR-EN-06)
+    }
+
+    /// <summary>[Home 이동] = 카메라 Home 위치로(ONVIF GotoHomePosition). Home 미지정 카메라는 실패 로그만. (FR-C2/OQ-6)</summary>
+    private async Task HandlePresetHomeGotoAsync(CameraStreamPopupViewModel vm)
+    {
+        var ptz = ResolvePtzController();
+        if (ptz == null) return;
+        try
+        {
+            if (!await ptz.GotoHomePresetAsync(vm.CameraId).ConfigureAwait(false))
+                _log?.Warning($"[CameraPopup] Home 이동 실패 cam={vm.CameraId} (Home 미지정 또는 카메라 거부 — 먼저 [Home 지정] 수행)");
+        }
+        catch (Exception ex) { _log?.Error($"[CameraPopup] Home 이동 실패 cam={vm.CameraId}: {MaskRtspCredentials(ex.Message)}"); }
     }
 
     /*──────────────── 영상 옵션(주야간/포커스) 핸들러 ────────────────*/
@@ -2179,11 +2266,12 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.SelectRequested += OnCameraPopupSelectRequested;     // 좌클릭 → 선택+맨앞
             vm.PtzNudgeRequested += OnCameraPopupPtzNudge;          // PTZ 탭 방향 패드
             vm.PtzStopRequested += OnCameraPopupPtzStop;
-            vm.PresetsReloadRequested += OnCameraPopupPresetsReload; // 프리셋 탭 로드/이동/저장/삭제/Home
+            vm.PresetsReloadRequested += OnCameraPopupPresetsReload; // 프리셋 탭 로드/이동/저장/삭제/Home (ONVIF, FR-C2)
             vm.PresetGotoRequested += OnCameraPopupPresetGoto;
             vm.PresetSaveRequested += OnCameraPopupPresetSave;
             vm.PresetDeleteRequested += OnCameraPopupPresetDelete;
-            vm.PresetHomeRequested += OnCameraPopupPresetHome;
+            vm.PresetHomeSetRequested += OnCameraPopupPresetHomeSet;   // [Home 지정] = ONVIF SetHomePosition
+            vm.PresetHomeGotoRequested += OnCameraPopupPresetHomeGoto; // [Home 이동] = ONVIF GotoHomePosition
             vm.OptionsReloadRequested += OnCameraPopupOptionsReload;  // 옵션 탭 주야간/포커스
             vm.IrCutFilterRequested += OnCameraPopupIrCutFilter;
             vm.AutoFocusRequested += OnCameraPopupAutoFocus;
@@ -2199,7 +2287,12 @@ public partial class MapViewModel : BasePanelViewModel,
             if (resolveViaOnvif)
             {
                 vm.IsResolvingSource = true;
-                _ = ResolveOnvifSourceAndConnectAsync(vm, (marker as IPidsEditableMarker)?.LinkedDevice as ICameraDeviceModel, connInfo);
+                var resolveTask = ResolveOnvifSourceAndConnectAsync(vm, (marker as IPidsEditableMarker)?.LinkedDevice as ICameraDeviceModel, connInfo);
+                // FR-L2: capable 정렬용 등록(EnsurePtzReadyAsync가 대기) — 완료 시 내 항목만 제거(닫기→재오픈 경합 안전).
+                _onvifResolveTasks[vm.CameraId] = resolveTask;
+                _ = resolveTask.ContinueWith(
+                    t => _onvifResolveTasks.TryRemove(new System.Collections.Generic.KeyValuePair<int, Task>(vm.CameraId, t)),
+                    System.Threading.Tasks.TaskScheduler.Default);
             }
 
             // ONVIF PTZ 준비(비동기) → IsPtzCapable 설정(PTZ 카메라만 우버튼 활성)
@@ -2251,7 +2344,8 @@ public partial class MapViewModel : BasePanelViewModel,
             vm.PresetGotoRequested -= OnCameraPopupPresetGoto;
             vm.PresetSaveRequested -= OnCameraPopupPresetSave;
             vm.PresetDeleteRequested -= OnCameraPopupPresetDelete;
-            vm.PresetHomeRequested -= OnCameraPopupPresetHome;
+            vm.PresetHomeSetRequested -= OnCameraPopupPresetHomeSet;
+            vm.PresetHomeGotoRequested -= OnCameraPopupPresetHomeGoto;
             vm.OptionsReloadRequested -= OnCameraPopupOptionsReload;
             vm.IrCutFilterRequested -= OnCameraPopupIrCutFilter;
             vm.AutoFocusRequested -= OnCameraPopupAutoFocus;
@@ -2271,6 +2365,36 @@ public partial class MapViewModel : BasePanelViewModel,
             await vm.DisposeAsync();   // Hub Lease 해제(C-03)
         }
         catch (Exception ex) { _log?.Error($"카메라 팝업 닫기 실패: {ex.Message}"); }
+    }
+
+    /// <summary>카운터 위젯 ✕ → 전체 닫기 확인 팝업 발행(FR-B2). raw MessageBox 금지 — 표준 EventAggregator
+    /// 확인 패턴(단일/그룹 삭제 확인과 동일). "확인" 시 팝업 인프라가 콜백 메시지를 재발행 → HandleAsync가 수행.</summary>
+    private async Task RequestCloseAllCameraPopupsAsync()
+    {
+        var count = _cameraPopups?.Count ?? 0;
+        if (count == 0) return;   // 위젯은 0개면 숨김 — 방어적 가드
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "카메라 영상 전체 닫기",
+            Explain = $"열린 카메라 영상 {count}개를 모두 닫으시겠습니까?",
+            MessageModel = new CallCloseAllCameraPopupsProcessMessageModel()
+        });
+    }
+
+    /// <summary>전체 닫기 확인 콜백(FR-B2) — 열린 모든 카메라 팝업을 닫는다(Hub Lease 해제/PTZ 정지 포함).</summary>
+    public async Task HandleAsync(CallCloseAllCameraPopupsProcessMessageModel message, CancellationToken cancellationToken)
+    {
+        await CloseAllCameraPopupsAsync();
+    }
+
+    /// <summary>열린 카메라 팝업 전체 닫기(위젯 경로 전용 신규 진입점, FR-B2). 순차 await = ObservableCollection
+    /// 동시 Remove 회피(OnDeactivate 패턴). 기존 인라인 3곳(OnDeactivate/강제로그아웃/심볼 Reset)은 동작
+    /// 차이(순차/f&amp;f)가 의도적이라 미통합(OQ-B2).</summary>
+    private async Task CloseAllCameraPopupsAsync()
+    {
+        if (_cameraPopups == null) return;
+        foreach (var vm in _cameraPopups.ToList())   // 순회 중 Remove 재진입 방어
+            await CloseCameraPopupAsync(vm);
     }
 
     /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음).</summary>
@@ -2744,6 +2868,7 @@ public partial class MapViewModel : BasePanelViewModel,
         ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
         TogglePlaybackPanelCommand = new RelayCommand(_ => TogglePlaybackPanel());
         ToggleTrackingSettingsPanelCommand = new RelayCommand(_ => ToggleTrackingSettingsPanel());
+        CloseAllCameraPopupsCommand = new RelayCommand(_ => _ = RequestCloseAllCameraPopupsAsync());   // 위젯 ✕ → confirm(FR-B2)
     }
 
     #region - Tracking Playback(P5) -
@@ -7276,6 +7401,8 @@ public partial class MapViewModel : BasePanelViewModel,
     public RelayCommand? ShowMapRoiPanelCommand { get; private set; }
     public RelayCommand? ZoomInCommand { get; private set; }
     public RelayCommand? ZoomOutCommand { get; private set; }
+    /// <summary>카메라 팝업 카운터 위젯 ✕ — 전체 닫기 confirm 발행(FR-B2).</summary>
+    public RelayCommand? CloseAllCameraPopupsCommand { get; private set; }
 
     // 편집 관련 명령어
     public RelayCommand? ClearSelectionCommand { get; private set; }
