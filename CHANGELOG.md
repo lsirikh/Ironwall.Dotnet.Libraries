@@ -15,6 +15,8 @@
 ## [Unreleased]
 
 ### Added
+- **심볼 우클릭 메뉴 — 뷰 모드 표시 + 잠금 게이트 v2** ([PRD](docs/prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) · [Plan](docs/plans/Symbol_ContextMenu_ViewMode_Lock-prd-plan.md) · 태그 `before-symbol-contextmenu-v2` · worktree `feature/symbol-contextmenu-v2` · GMaps.Ui 1파일) — 편집모드에서만 심볼 우클릭 메뉴가 뜨던 문제 해소.
+  - 웹 의존 3종(장치페이지/상세/수정)=항상 표시+웹서버 OFF 시 비활성(disable 모델, 기존 편집모드 활성-데드링크도 해소) · 스피커 음원/TTS/Stop=웹서버 게이트 제거(NATS 기반인데 웹 조건 오결합) · **잠긴 심볼=메뉴 전체 미표시**(양 모드) · ZOrder=편집모드 전용 유지. 구 `ContextMenu_DisplayRules-prd.md`(6/10) Superseded.
 - **세션 관리 + 권한부여 — 무한 스크롤 페이지네이션** ([PRD](docs/prds/GOP_SessionGrant_Pagination-prd.md) · [Plan](docs/plans/GOP_SessionGrant_Pagination-prd-plan.md) · 태그 `before-session-grant-pagination` · worktree `feature/session-grant-pagination` · Accounts.Api/Accounts.Ui · 라이브러리 한정) — 감사로그 무한스크롤 패턴을 자매 패널 2곳에 이식.
   - **세션 관리**: `GetUserSessionsAsync`가 page/limit 파라미터 없어 서버 기본(≤100건)만 표시되던 갭 → `(page, limit, isActive?, ct)` 확장(스텁 5 CS0535) + 무한스크롤 + **활성/전체 토글**(is_active). **서버가 세션엔 날짜 필터 미지원**(라이브 모니터링 설계)이라 날짜피커 제외. 기본=활성만(토글로 전체).
   - **권한부여**: 100건 초과 시 `"N건 중 100건만 표시(페이지네이션 필요)"` 경고 팝업만 뜨고 나머지 열람 불가하던 갭 → 무한스크롤로 대체. `/grants`는 top-level `total`만 주고 `TotalPages=0`(F-1)이라 VM이 `Ceiling(total/size)`로 파생.
