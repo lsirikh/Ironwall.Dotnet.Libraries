@@ -106,8 +106,11 @@ public sealed class EditRecorder : IEditRecorder
         try
         {
             // before=드래그 시작 시점 오프셋(caller 명시 전달) — 마커 선택 여부와 무관하게 항상 정확(RecordPositionChange 동형).
+            // 도메인: 이미지=U/V(정규화, Overlay_Title FR-02) / 그 외=px. LabelAdorner.RaiseOffsetChanged와 동일 규약.
             var before = (beforeX, beforeY);
-            var after = (marker.LabelOffsetX, marker.LabelOffsetY);
+            var after = marker is IImageEditableMarker img
+                ? (img.LabelOffsetU, img.LabelOffsetV)
+                : (marker.LabelOffsetX, marker.LabelOffsetY);
             if (before.Equals(after)) return;
             _undo.Push(new LabelOffsetCommand(Context!, marker.Id, before, after, marker is GMapImageMarker));
             _labelBaseline[marker.Id] = after;   // 다음 드래그 before

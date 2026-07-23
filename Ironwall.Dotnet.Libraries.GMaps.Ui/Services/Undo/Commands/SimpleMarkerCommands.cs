@@ -8,7 +8,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.Commands;
    Created On   : 2026-07-03 · Sensorway Co., Ltd.
 ****************************************************************************/
 
-/// <summary>라벨 오프셋(X,Y) 드래그 취소/재실행.</summary>
+/// <summary>라벨 오프셋 드래그 취소/재실행 — 도메인은 마커 타입 따름: 이미지=U/V(정규화, Overlay_Title FR-02) / 그 외=px.</summary>
 public sealed class LabelOffsetCommand : UndoableCommandBase
 {
     private readonly int _id;
@@ -23,7 +23,8 @@ public sealed class LabelOffsetCommand : UndoableCommandBase
     private async Task Apply((double x, double y) s, CancellationToken ct)
     {
         var m = Ctx.FindMarkerById(_id, _isImage); if (m == null) return;
-        m.LabelOffsetX = s.x; m.LabelOffsetY = s.y;
+        if (m is GMapSymbols.IImageEditableMarker img) { img.LabelOffsetU = s.x; img.LabelOffsetV = s.y; }   // U/V INPC → 어도너 즉시 재렌더(P1-04)
+        else { m.LabelOffsetX = s.x; m.LabelOffsetY = s.y; }
         await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
     }
 }
