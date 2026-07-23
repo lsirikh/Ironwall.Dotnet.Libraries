@@ -285,6 +285,12 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     `ZOrder`            INT DEFAULT 10,                                 -- 레이어 순서 (높을수록 위)
                     `LabelOffsetX`      DOUBLE DEFAULT 0,                               -- 라벨 상대 오프셋 X (화면 픽셀)
                     `LabelOffsetY`      DOUBLE DEFAULT 0,                               -- 라벨 상대 오프셋 Y (화면 픽셀)
+                    `TitleColor`        INT DEFAULT -252645128,                         -- 라벨 글자색 ARGB(=0xF0F0F4F8, Overlay_Title FR-06)
+                    `TitleBackground`   INT DEFAULT -853729758,                         -- 라벨 배경색 ARGB(=0xCD1C1E22), 0=투명
+                    `TitleFontFamily`   VARCHAR(100) DEFAULT '',                        -- 라벨 폰트(빈값=Segoe UI)
+                    `TitleBold`         BOOLEAN DEFAULT FALSE,                          -- 라벨 굵게
+                    `TitleItalic`       BOOLEAN DEFAULT FALSE,                          -- 라벨 이탤릭
+                    `TitleMaxWidth`     DECIMAL(5,1) DEFAULT 200.0,                     -- 라벨 최대폭 px(말줄임 지점, FR-13)
                     `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     `CreatedBy`         VARCHAR(100),
@@ -470,6 +476,12 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `ShowTitle`         BOOLEAN DEFAULT FALSE,                              -- 라벨 표시 여부 (FR-10)
                 `LabelOffsetU`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 U(하프익스텐트 비율, FR-02)
                 `LabelOffsetV`      DOUBLE DEFAULT 0,                                   -- 라벨 오프셋 V(비율, FR-02)
+                `TitleColor`        INT DEFAULT -252645128,                             -- 라벨 글자색 ARGB(=0xF0F0F4F8, FR-06)
+                `TitleBackground`   INT DEFAULT -853729758,                             -- 라벨 배경색 ARGB(=0xCD1C1E22), 0=투명
+                `TitleFontFamily`   VARCHAR(100) DEFAULT '',                            -- 라벨 폰트(빈값=Segoe UI)
+                `TitleBold`         BOOLEAN DEFAULT FALSE,                              -- 라벨 굵게
+                `TitleItalic`       BOOLEAN DEFAULT FALSE,                              -- 라벨 이탤릭
+                `TitleMaxWidth`     DECIMAL(5,1) DEFAULT 200.0,                         -- 라벨 최대폭 px(FR-13)
                 `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX `IX_Images_Location` (`Latitude`, `Longitude`),
@@ -609,6 +621,24 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             catch { /* 이미 존재하면 무시 */ }
             try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `LabelOffsetV` DOUBLE DEFAULT 0;", token); _log?.Info("Images.LabelOffsetV 컬럼 추가 완료"); }
             catch { /* 이미 존재하면 무시 */ }
+
+            // ── 라벨 스타일 컬럼 마이그레이션 — Symbols+Images 동시, 컬럼별 개별 try(부분 마이그레이션 안전 — Overlay_Title_ZoomStyle FR-06).
+            //    ARGB 기본값은 부호 리터럴: -252645128=0xF0F0F4F8(글자), -853729758=0xCD1C1E22(배경) — V-07.
+            foreach (var tbl in new[] { "Symbols", "Images" })
+            {
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleColor` INT DEFAULT -252645128;", token); _log?.Info($"{tbl}.TitleColor 컬럼 추가 완료"); }
+                catch { /* 이미 존재하면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBackground` INT DEFAULT -853729758;", token); _log?.Info($"{tbl}.TitleBackground 컬럼 추가 완료"); }
+                catch { /* 이미 존재하면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleFontFamily` VARCHAR(100) DEFAULT '';", token); _log?.Info($"{tbl}.TitleFontFamily 컬럼 추가 완료"); }
+                catch { /* 이미 존재하면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBold` BOOLEAN DEFAULT FALSE;", token); _log?.Info($"{tbl}.TitleBold 컬럼 추가 완료"); }
+                catch { /* 이미 존재하면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleItalic` BOOLEAN DEFAULT FALSE;", token); _log?.Info($"{tbl}.TitleItalic 컬럼 추가 완료"); }
+                catch { /* 이미 존재하면 무시 */ }
+                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleMaxWidth` DECIMAL(5,1) DEFAULT 200.0;", token); _log?.Info($"{tbl}.TitleMaxWidth 컬럼 추가 완료"); }
+                catch { /* 이미 존재하면 무시 */ }
+            }
 
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
@@ -772,6 +802,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
                         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = 'BASIC_SHAPES'
@@ -804,6 +835,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom,
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
                         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Id = @Id;";
@@ -837,6 +869,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
                         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Pid = @Pid;";
@@ -867,6 +900,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 SELECT  Id, Pid, Title, TitleSize, OperationState, Latitude, Longitude, Altitude, Zoom, 
                         Bearing, Width, Height, Category, ShowShape, ShowTitle, Visible, IsLocked, 
                         FillColor, StrokeColor, StrokeThickness, ZOrder, LabelOffsetX, LabelOffsetY,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt, CreatedBy
                 FROM    Symbols
                 WHERE   Category = @Category
@@ -1115,7 +1149,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -1152,7 +1186,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -1370,7 +1404,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     g.ShapeType as GeometryShapeType, g.Opacity as GeometryOpacity
             FROM    Symbols s
@@ -1408,7 +1442,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1445,7 +1479,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1483,7 +1517,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1518,7 +1552,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1796,7 +1830,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
         FROM    Symbols s
@@ -1834,7 +1868,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
                     m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
@@ -1872,7 +1906,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
             SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                     s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                    s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                     s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                     m.Affiliation, m.BattleDimension, m.StandardIdentity, m.UnitType, m.UnitSize,
                     m.UnitDesignator, m.HigherFormation, m.CallSign, m.CountryCode
@@ -2114,7 +2148,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
         FROM    Symbols s
@@ -2176,7 +2210,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 l.LineOpacity, l.IsClosedPath, l.ShowArrowHead, l.LinePattern
         FROM    Symbols s
@@ -2470,7 +2504,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
         FROM    Symbols s
@@ -2507,7 +2541,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
         SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                 i.BuildingType, i.BuildingUsage, i.FloorCount, i.BasementFloorCount, i.BuildingArea
         FROM    Symbols s
@@ -2794,6 +2828,26 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         catch (Exception ex) { _log?.Error($"Symbol 마스터 가시성 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
     }
 
+    /// <summary>라벨 스타일 6종만 부분 UPDATE — 타입별 전체 UPDATE에 스타일 컬럼을 넣지 않는 전략(Overlay_Title FR-06).
+    /// 전체 행 재기록의 Category 판별자 오염 회피 선례(ShowShape/Visible)와 동일 사유. 심볼 영속 경로가 함께 호출.</summary>
+    public async Task<bool> UpdateSymbolLabelStyleAsync(int id, int titleColor, int titleBackground,
+        string titleFontFamily, bool titleBold, bool titleItalic, double titleMaxWidth, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            int ret = await conn.ExecuteAsync(
+                @"UPDATE Symbols SET TitleColor = @TitleColor, TitleBackground = @TitleBackground,
+                    TitleFontFamily = @TitleFontFamily, TitleBold = @TitleBold,
+                    TitleItalic = @TitleItalic, TitleMaxWidth = @TitleMaxWidth WHERE Id = @Id;",
+                new { Id = id, TitleColor = titleColor, TitleBackground = titleBackground,
+                      TitleFontFamily = titleFontFamily ?? string.Empty, TitleBold = titleBold,
+                      TitleItalic = titleItalic, TitleMaxWidth = titleMaxWidth });
+            return ret > 0;
+        }
+        catch (Exception ex) { _log?.Error($"Symbol 라벨 스타일 부분 UPDATE 실패(Id={id}): {ex.Message}"); throw; }
+    }
+
     #endregion
 
     #region - PidsGroupSymbol CRUD -
@@ -2826,7 +2880,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                         s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                         s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                         pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
                         pg.ShowArrowHead, pg.LinePattern
@@ -2889,7 +2943,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             const string sql = @"
                 SELECT  s.Id, s.Pid, s.Title, s.TitleSize, s.OperationState, s.Latitude, s.Longitude, s.Altitude, s.Zoom,
                         s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked, 
-                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY,
+                        s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                         s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                         pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
                         pg.ShowArrowHead, pg.LinePattern
@@ -3221,6 +3275,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                         Latitude, Longitude, Altitude, Zoom, Width, Height,
                         Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
                         TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt
                 FROM    Images
                 ORDER BY CreatedAt DESC;";
@@ -3259,6 +3314,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                         Latitude, Longitude, Altitude, Zoom, Width, Height,
                         Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
                         TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
+                        TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth,
                         CreatedAt, UpdatedAt
                 FROM    Images
                 WHERE   Id = @Id;";
@@ -3296,12 +3352,14 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     (Title, FilePath, `Left`, Top, `Right`, Bottom,
                      Latitude, Longitude, Altitude, Zoom, Width, Height,
                      Opacity, Rotation, Visibility, IsLocked, HasGeoReference, CoordinateSystem,
-                     TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV)
+                     TitleSize, ShowTitle, LabelOffsetU, LabelOffsetV,
+                     TitleColor, TitleBackground, TitleFontFamily, TitleBold, TitleItalic, TitleMaxWidth)
                 VALUES
                     (@Title, @FilePath, @Left, @Top, @Right, @Bottom,
                      @Latitude, @Longitude, @Altitude, @Zoom, @Width, @Height,
                      @Opacity, @Rotation, @Visibility, @IsLocked, @HasGeoReference, @CoordinateSystem,
-                     @TitleSize, @ShowTitle, @LabelOffsetU, @LabelOffsetV);
+                     @TitleSize, @ShowTitle, @LabelOffsetU, @LabelOffsetV,
+                     @TitleColor, @TitleBackground, @TitleFontFamily, @TitleBold, @TitleItalic, @TitleMaxWidth);
                 SELECT LAST_INSERT_ID();";
 
             var id = await conn.ExecuteScalarAsync<int>(sql, new
@@ -3327,7 +3385,13 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.TitleSize,
                 model.ShowTitle,
                 model.LabelOffsetU,
-                model.LabelOffsetV
+                model.LabelOffsetV,
+                model.TitleColor,
+                model.TitleBackground,
+                model.TitleFontFamily,
+                model.TitleBold,
+                model.TitleItalic,
+                model.TitleMaxWidth
             });
 
             model.Id = id;
@@ -3365,6 +3429,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     HasGeoReference = @HasGeoReference, CoordinateSystem = @CoordinateSystem,
                     TitleSize = @TitleSize, ShowTitle = @ShowTitle,
                     LabelOffsetU = @LabelOffsetU, LabelOffsetV = @LabelOffsetV,
+                    TitleColor = @TitleColor, TitleBackground = @TitleBackground,
+                    TitleFontFamily = @TitleFontFamily, TitleBold = @TitleBold,
+                    TitleItalic = @TitleItalic, TitleMaxWidth = @TitleMaxWidth,
                     UpdatedAt = CURRENT_TIMESTAMP
                 WHERE Id = @Id;";
 
@@ -3392,7 +3459,13 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.TitleSize,
                 model.ShowTitle,
                 model.LabelOffsetU,
-                model.LabelOffsetV
+                model.LabelOffsetV,
+                model.TitleColor,
+                model.TitleBackground,
+                model.TitleFontFamily,
+                model.TitleBold,
+                model.TitleItalic,
+                model.TitleMaxWidth
             });
 
             if (affected == 0)
@@ -3549,6 +3622,14 @@ internal class SymbolSQL
     public double LabelOffsetX { get; set; }
     public double LabelOffsetY { get; set; }
 
+    // 라벨 스타일 (Overlay_Title FR-06) — DEFAULT는 부호 리터럴(-252645128/-853729758)
+    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
+    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    public string TitleFontFamily { get; set; } = string.Empty;
+    public bool TitleBold { get; set; }
+    public bool TitleItalic { get; set; }
+    public decimal TitleMaxWidth { get; set; } = 200.0m;
+
     /// <summary>생성 일시</summary>
     public DateTime CreatedAt { get; set; }
 
@@ -3588,6 +3669,12 @@ internal class SymbolSQL
         ZOrder = ZOrder,
         LabelOffsetX = LabelOffsetX,
         LabelOffsetY = LabelOffsetY,
+        TitleColor = TitleColor,
+        TitleBackground = TitleBackground,
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth,
     };
 }
 
@@ -4087,6 +4174,14 @@ internal sealed class ImageSQL
     /// <summary>좌표계 (예: EPSG:4326)</summary>
     public string? CoordinateSystem { get; set; }
 
+    // 라벨 스타일 (FR-06)
+    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
+    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    public string TitleFontFamily { get; set; } = string.Empty;
+    public bool TitleBold { get; set; }
+    public bool TitleItalic { get; set; }
+    public decimal TitleMaxWidth { get; set; } = 200.0m;
+
     /// <summary>라벨 글자 크기 (FR-10)</summary>
     public decimal TitleSize { get; set; } = 11.0m;
 
@@ -4132,7 +4227,13 @@ internal sealed class ImageSQL
         TitleSize = (double)TitleSize,
         ShowTitle = ShowTitle,
         LabelOffsetU = LabelOffsetU,
-        LabelOffsetV = LabelOffsetV
+        LabelOffsetV = LabelOffsetV,
+        TitleColor = TitleColor,
+        TitleBackground = TitleBackground,
+        TitleFontFamily = TitleFontFamily,
+        TitleBold = TitleBold,
+        TitleItalic = TitleItalic,
+        TitleMaxWidth = (double)TitleMaxWidth
     };
 }
 

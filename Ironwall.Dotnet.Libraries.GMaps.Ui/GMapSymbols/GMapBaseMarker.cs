@@ -319,6 +319,38 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         }
     }
 
+    // ── 라벨 스타일 — 모델 위임 + INPC(어도너 즉시 재렌더·속성패널 TwoWay) (Overlay_Title FR-05·13) ──
+    public int TitleColor
+    {
+        get => _model.TitleColor;
+        set { if (_model.TitleColor != value) { _model.TitleColor = value; OnPropertyChanged(nameof(TitleColor)); } }
+    }
+    public int TitleBackground
+    {
+        get => _model.TitleBackground;
+        set { if (_model.TitleBackground != value) { _model.TitleBackground = value; OnPropertyChanged(nameof(TitleBackground)); } }
+    }
+    public string TitleFontFamily
+    {
+        get => _model.TitleFontFamily;
+        set { if (_model.TitleFontFamily != value) { _model.TitleFontFamily = value ?? string.Empty; OnPropertyChanged(nameof(TitleFontFamily)); } }
+    }
+    public bool TitleBold
+    {
+        get => _model.TitleBold;
+        set { if (_model.TitleBold != value) { _model.TitleBold = value; OnPropertyChanged(nameof(TitleBold)); } }
+    }
+    public bool TitleItalic
+    {
+        get => _model.TitleItalic;
+        set { if (_model.TitleItalic != value) { _model.TitleItalic = value; OnPropertyChanged(nameof(TitleItalic)); } }
+    }
+    public double TitleMaxWidth
+    {
+        get => _model.TitleMaxWidth;
+        set { if (System.Math.Abs(_model.TitleMaxWidth - value) > 0.001) { _model.TitleMaxWidth = value; OnPropertyChanged(nameof(TitleMaxWidth)); } }
+    }
+
     public EnumOperationState OperationState
     {
         get => _model.OperationState;

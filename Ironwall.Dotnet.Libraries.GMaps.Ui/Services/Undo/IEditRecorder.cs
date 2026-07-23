@@ -32,6 +32,10 @@ public interface IEditRecorder
     /// <summary>라벨 오프셋 드래그 완료 기록(before=드래그 시작 오프셋 명시 전달, after=현재). 선택 여부 무관.</summary>
     void RecordLabelOffset(IEditableMarker marker, double beforeX, double beforeY);
 
+    /// <summary>라벨 폭 WYSIWYG 조절 완료 기록 — edge-pinned가 (오프셋,폭)을 함께 바꾸므로 쌍 원자 기록(Overlay_Title FR-13).
+    /// before 오프셋 도메인은 마커 타입 따름(이미지=U/V).</summary>
+    void RecordTitleWidthResize(IEditableMarker marker, double beforeA, double beforeB, double beforeWidth);
+
     /// <summary>심볼 추가 기록(after=현재 모델, Id 포함).</summary>
     void RecordAdd(IEditableMarker marker);
 

@@ -458,6 +458,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 심볼 라벨 분리 오버레이 (Symbol_Label_Decouple) — AdornerManager 밖 전용 서비스
             _labelService = new LabelAdornerService(MainMap, _log);
             _labelService.LabelOffsetChanged += OnLabelOffsetChanged;   // 라벨 드래그 → 오프셋 DB 영속(FR-LB-05)
+            _labelService.LabelWidthChanged += OnLabelWidthChanged;     // 라벨 폭 조절 → (오프셋,폭) 영속+원자 undo(FR-13)
             MainMap.Markers.CollectionChanged += Markers_CollectionChangedForLabels;
             _labelService.Sync(MainMap.Markers);   // 이미 로드된 마커 부착
 
@@ -529,6 +530,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 심볼 라벨 분리 오버레이 정리
             MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForLabels;
             if (_labelService != null) _labelService.LabelOffsetChanged -= OnLabelOffsetChanged;
+            if (_labelService != null) _labelService.LabelWidthChanged -= OnLabelWidthChanged;
             _labelService?.Dispose();
             _labelService = null;
 
@@ -571,6 +573,25 @@ public partial class MapViewModel : BasePanelViewModel,
                 else { marker.LabelOffsetX = beforeX; marker.LabelOffsetY = beforeY; }
             }
             catch (Exception rex) { _log?.Error($"라벨 오프셋 롤백 실패: {rex.Message}"); }
+        }
+    }
+
+    /// <summary>라벨 폭 조절 완료 → (오프셋,폭) 쌍 DB 영속 + 원자 undo(FR-13). edge-pinned 리사이즈가 오프셋도 바꾸므로 쌍 처리.
+    /// before 오프셋 도메인은 마커 타입 따름(이미지=U/V).</summary>
+    private async void OnLabelWidthChanged(IEditableMarker marker, double beforeA, double beforeB, double beforeWidth)
+    {
+        if (marker == null || !CanEditMap()) return;
+        try { await DbUpdateProcess(marker); _editRecorder?.RecordTitleWidthResize(marker, beforeA, beforeB, beforeWidth); }
+        catch (Exception ex)
+        {
+            _log?.Error($"라벨 폭 영속 실패: {ex.Message}");
+            try
+            {
+                if (marker is IImageEditableMarker img) { img.LabelOffsetU = beforeA; img.LabelOffsetV = beforeB; }
+                else { marker.LabelOffsetX = beforeA; marker.LabelOffsetY = beforeB; }
+                marker.TitleMaxWidth = beforeWidth;
+            }
+            catch (Exception rex) { _log?.Error($"라벨 폭 롤백 실패: {rex.Message}"); }
         }
     }
     #endregion
@@ -6765,6 +6786,18 @@ public partial class MapViewModel : BasePanelViewModel,
             default:
                 // 공통 로직
                 break;
+        }
+
+        // 라벨 스타일은 전용 부분 UPDATE(Overlay_Title FR-06) — 타입별 전체 UPDATE에 스타일 컬럼을 넣지 않는 전략
+        // (Category 판별자 오염 회피 선례). 이미지는 UpdateImageAsync 전체 UPDATE가 스타일 포함이라 제외.
+        if (marker is not GMapImageMarker && marker.Id > 0)
+        {
+            try
+            {
+                await _gMapDbSymbolService.UpdateSymbolLabelStyleAsync(marker.Id, marker.TitleColor,
+                    marker.TitleBackground, marker.TitleFontFamily, marker.TitleBold, marker.TitleItalic, marker.TitleMaxWidth);
+            }
+            catch (Exception ex) { _log?.Error($"라벨 스타일 부분 영속 실패(Id={marker.Id}): {ex.Message}"); }
         }
     }
 

@@ -118,6 +118,24 @@ public sealed class EditRecorder : IEditRecorder
         catch (Exception ex) { _log?.Error($"RecordLabelOffset 실패: {ex.Message}"); }
     }
 
+    public void RecordTitleWidthResize(IEditableMarker marker, double beforeA, double beforeB, double beforeWidth)
+    {
+        if (!Ready || marker == null) return;
+        ResetCoalesce();
+        try
+        {
+            // edge-pinned 폭 조절은 (오프셋,폭)을 한 제스처로 바꿈 → 쌍을 단일 커맨드로 원자 기록(FR-13, 2차 검증 W그룹).
+            var before = (beforeA, beforeB, beforeWidth);
+            var after = marker is IImageEditableMarker img
+                ? (img.LabelOffsetU, img.LabelOffsetV, marker.TitleMaxWidth)
+                : (marker.LabelOffsetX, marker.LabelOffsetY, marker.TitleMaxWidth);
+            if (before.Equals(after)) return;
+            _undo.Push(new TitleWidthResizeCommand(Context!, marker.Id, before, after, marker is GMapImageMarker));
+            _labelBaseline[marker.Id] = (after.Item1, after.Item2);   // 오프셋 baseline 동기(다음 이동 드래그 before)
+        }
+        catch (Exception ex) { _log?.Error($"RecordTitleWidthResize 실패: {ex.Message}"); }
+    }
+
     public void RecordAdd(IEditableMarker marker)
     {
         if (!Ready || marker == null) return;

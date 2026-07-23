@@ -294,6 +294,38 @@ public class GMapImageMarker : GMapMarker, IImageEditableMarker, IMarkerControl
         }
     }
 
+    // ── 라벨 스타일 — 모델 영속(Images.*, FR-05·13). GMapBaseMarker 미상속이라 별도 구현(체크리스트 ⑤). ──
+    public int TitleColor
+    {
+        get => _imageModel.TitleColor;
+        set { if (_imageModel.TitleColor != value) { _imageModel.TitleColor = value; OnPropertyChanged(nameof(TitleColor)); } }
+    }
+    public int TitleBackground
+    {
+        get => _imageModel.TitleBackground;
+        set { if (_imageModel.TitleBackground != value) { _imageModel.TitleBackground = value; OnPropertyChanged(nameof(TitleBackground)); } }
+    }
+    public string TitleFontFamily
+    {
+        get => _imageModel.TitleFontFamily;
+        set { if (_imageModel.TitleFontFamily != value) { _imageModel.TitleFontFamily = value ?? string.Empty; OnPropertyChanged(nameof(TitleFontFamily)); } }
+    }
+    public bool TitleBold
+    {
+        get => _imageModel.TitleBold;
+        set { if (_imageModel.TitleBold != value) { _imageModel.TitleBold = value; OnPropertyChanged(nameof(TitleBold)); } }
+    }
+    public bool TitleItalic
+    {
+        get => _imageModel.TitleItalic;
+        set { if (_imageModel.TitleItalic != value) { _imageModel.TitleItalic = value; OnPropertyChanged(nameof(TitleItalic)); } }
+    }
+    public double TitleMaxWidth
+    {
+        get => _imageModel.TitleMaxWidth;
+        set { if (Math.Abs(_imageModel.TitleMaxWidth - value) > 0.001) { _imageModel.TitleMaxWidth = value; OnPropertyChanged(nameof(TitleMaxWidth)); } }
+    }
+
     /// <summary>표시 너비 (픽셀)</summary>
     /// <remarks>
     /// Phase 33.3: Width 설정 시 ImageBounds도 비율에 맞게 업데이트

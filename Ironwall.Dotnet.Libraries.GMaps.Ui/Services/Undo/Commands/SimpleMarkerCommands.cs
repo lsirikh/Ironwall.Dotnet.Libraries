@@ -29,6 +29,30 @@ public sealed class LabelOffsetCommand : UndoableCommandBase
     }
 }
 
+/// <summary>라벨 폭 WYSIWYG 조절 취소/재실행 — edge-pinned 리사이즈가 (오프셋,폭)을 함께 바꾸므로 쌍을 원자 복원(Overlay_Title FR-13).
+/// 오프셋 도메인은 마커 타입 따름(이미지=U/V, 그 외=px).</summary>
+public sealed class TitleWidthResizeCommand : UndoableCommandBase
+{
+    private readonly int _id;
+    private readonly bool _isImage;
+    private readonly (double a, double b, double w) _before, _after;
+    public TitleWidthResizeCommand(IUndoApplyContext ctx, int id, (double a, double b, double w) before,
+        (double a, double b, double w) after, bool isImage = false) : base(ctx)
+    { _id = id; _before = before; _after = after; _isImage = isImage; }
+
+    public override string Description => "라벨 폭 조절";
+    public override Task ExecuteAsync(CancellationToken ct = default) => Apply(_after, ct);
+    public override Task UndoAsync(CancellationToken ct = default) => Apply(_before, ct);
+    private async Task Apply((double a, double b, double w) s, CancellationToken ct)
+    {
+        var m = Ctx.FindMarkerById(_id, _isImage); if (m == null) return;
+        if (m is GMapSymbols.IImageEditableMarker img) { img.LabelOffsetU = s.a; img.LabelOffsetV = s.b; }
+        else { m.LabelOffsetX = s.a; m.LabelOffsetY = s.b; }
+        m.TitleMaxWidth = s.w;
+        await Ctx.ApplyMarkerUpdateAsync(m, ct).ConfigureAwait(false);
+    }
+}
+
 /// <summary>잠금/해제 취소·재실행.</summary>
 public sealed class LockCommand : UndoableCommandBase
 {

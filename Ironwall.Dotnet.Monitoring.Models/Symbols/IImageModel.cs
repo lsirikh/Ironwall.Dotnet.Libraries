@@ -38,6 +38,20 @@ public interface IImageModel : IBaseModel
     /// <summary>라벨 오프셋 V — 하프익스텐트(세로) 대비 비율 (FR-02).</summary>
     double LabelOffsetV { get; set; }
 
+    // ── 라벨 스타일 (FR-05·13) — ISymbolModel과 동일 규약, 기본값=종전 하드코딩 시각 동일(NFR-01). ──
+    /// <summary>라벨 글자색 — packed ARGB int.</summary>
+    int TitleColor { get; set; }
+    /// <summary>라벨 배경(칩)색 — packed ARGB int, 0=완전투명.</summary>
+    int TitleBackground { get; set; }
+    /// <summary>라벨 폰트 패밀리 — 빈값=Segoe UI.</summary>
+    string TitleFontFamily { get; set; }
+    /// <summary>라벨 굵게.</summary>
+    bool TitleBold { get; set; }
+    /// <summary>라벨 이탤릭.</summary>
+    bool TitleItalic { get; set; }
+    /// <summary>라벨 최대 폭(px·DIP, 말줄임 지점) — WYSIWYG 폭 조절(FR-13).</summary>
+    double TitleMaxWidth { get; set; }
+
     /// <summary>
     /// 런타임 Z-Order 홀더. MapLayers.ZOrder에서 주입받음 (DB 컬럼 없음).
     /// </summary>

@@ -28,9 +28,24 @@ public interface IEditableMarker : IDisposable
     /// <summary>레이어 마스터 가시성(조건2) — 레이어패널 심볼 Visibility 체크. false=심볼 전체(모양+Indicator+제목) 숨김.
     /// 속성창 ShowShape/ShowTitle(조건3)의 상위 게이트. 심볼=모델 Visible, 이미지=모델 Visibility 연동.</summary>
     bool Visible { get; set; }
-    /// <summary>라벨 상대 오프셋(화면 픽셀, 아이콘 하단 기본위치 기준). LabelAdorner 위치·DB 영속(Symbol_Label_Decouple).</summary>
+    /// <summary>라벨 상대 오프셋(화면 픽셀, 아이콘 하단 기본위치 기준). LabelAdorner 위치·DB 영속(Symbol_Label_Decouple).
+    /// 이미지 마커는 정규화 U/V(IImageEditableMarker)를 정본으로 사용 — 이 px 쌍은 호환 스텁(Overlay_Title FR-02).</summary>
     double LabelOffsetX { get; set; }
     double LabelOffsetY { get; set; }
+
+    // ── 라벨 스타일 (Overlay_Title_ZoomStyle FR-05·13). 기본값=종전 하드코딩 렌더와 시각 동일(NFR-01). ──
+    /// <summary>라벨 글자색 — packed ARGB int(기본 0xF0F0F4F8).</summary>
+    int TitleColor { get; set; }
+    /// <summary>라벨 배경(칩)색 — packed ARGB int, 0=완전투명(기본 0xCD1C1E22).</summary>
+    int TitleBackground { get; set; }
+    /// <summary>라벨 폰트 패밀리 — 빈값=Segoe UI. 미설치 폰트는 렌더 폴백.</summary>
+    string TitleFontFamily { get; set; }
+    /// <summary>라벨 굵게.</summary>
+    bool TitleBold { get; set; }
+    /// <summary>라벨 이탤릭.</summary>
+    bool TitleItalic { get; set; }
+    /// <summary>라벨 최대 폭(px·DIP, 말줄임 지점, 기본 200). WYSIWYG 폭 조절(FR-13).</summary>
+    double TitleMaxWidth { get; set; }
     EnumColorType FillColor { get; set; }
     EnumColorType StrokeColor { get; set; }
     double StrokeThickness { get; set; }

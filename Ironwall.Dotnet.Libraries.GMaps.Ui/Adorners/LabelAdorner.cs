@@ -44,11 +44,22 @@ public sealed class LabelAdorner : Adorner, IDisposable
     private double _origOffsetX, _origOffsetY;   // 심볼/라인 px before
     private double _origOffsetU, _origOffsetV;   // 이미지 U/V before (FR-02)
 
+    private bool _widthResizing;             // FR-13 폭 조절 드래그(edge-pinned)
+    private bool _resizeRightEdge;           // true=우측 가장자리 드래그
+    private double _origMaxWidth;            // 폭 조절 before (원자 undo용)
+
     private const double IMAGE_LABEL_RADIUS_MULT = 3.0;   // 이미지 드래그 상한 = 3·max(hw,hh) px — 줌 불변·등방(FR-03)
     private const double MIN_IMAGE_FOOTPRINT_PX = 10.0;   // GMapMarkerImageControl.OnRender MinSize와 동일 클램프
+    internal const double WIDTH_MIN = 40d, WIDTH_MAX = 800d;   // FR-13 폭 클램프
+    internal const double DEFAULT_MAX_WIDTH = 200d;            // 종전 하드코딩 MaxTextWidth(NFR-01 기본값)
 
-    /// <summary>라벨 드래그 완료 — 서비스/VM이 오프셋 DB 영속(FR-LB-05). (marker, beforeOffsetX, beforeOffsetY) — undo before 명시 전달.</summary>
+    /// <summary>라벨 드래그 완료 — 서비스/VM이 오프셋 DB 영속(FR-LB-05). (marker, beforeOffsetX, beforeOffsetY) — undo before 명시 전달.
+    /// before 도메인은 마커 타입 따름(이미지=U/V, 그 외=px).</summary>
     public event System.Action<IEditableMarker, double, double>? LabelOffsetChanged;
+
+    /// <summary>폭 조절 완료 — (marker, before오프셋A, before오프셋B, before최대폭). edge-pinned 리사이즈는 오프셋도 함께 바꾸므로
+    /// (오프셋,폭) 쌍을 원자 undo·영속(FR-13 — 2차 검증 W그룹). 오프셋 도메인은 마커 타입 따름(이미지=U/V).</summary>
+    public event System.Action<IEditableMarker, double, double, double>? LabelWidthChanged;
 
     public LabelAdorner(GMapCustomControl map, IEditableMarker marker, ILogService? log = null) : base(map)
     {
@@ -159,10 +170,14 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 return;
             var title = _marker.Title!;
 
+            // 스타일 반영(FR-05·13) — 기본값이면 종전 하드코딩과 시각 동일(NFR-01). 캐시는 스테이지4(FR-08).
             double dpi = VisualTreeHelper.GetDpi(_map).PixelsPerDip;
+            var typeface = ResolveTypeface(_marker.TitleFontFamily, _marker.TitleBold, _marker.TitleItalic);
+            var fg = BrushFromArgb(_marker.TitleColor, _fg);
+            double maxW = EffectiveMaxWidth(_marker.TitleMaxWidth);
             var ft = new FormattedText(title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                new Typeface("Segoe UI"), Math.Max(9d, _marker.TitleSize), _fg, dpi)
-            { MaxTextWidth = 200d, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                typeface, Math.Max(9d, _marker.TitleSize), fg, dpi)
+            { MaxTextWidth = maxW, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
 
             var c = LabelCenter();
             double w = ft.WidthIncludingTrailingWhitespace + PadX * 2d;
@@ -175,8 +190,16 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 dc.DrawLine(_leaderPen, IconCenter(), c);
 
             // 테두리 없이 배경 칩만 — MarkerEditAdorner 편집박스와 혼동(adorner 박스 2개처럼 보임) 방지. 가독성용 배경만 유지.
-            dc.DrawRoundedRectangle(_bg, null, box, 3d, 3d);
+            var bg = BrushFromArgb(_marker.TitleBackground, _bg);
+            dc.DrawRoundedRectangle(bg, null, box, 3d, 3d);
             dc.DrawText(ft, new Point(box.X + PadX, box.Y + PadY));
+
+            // 폭 조절 중: 최대폭 가이드(점선) — 텍스트가 짧아 박스가 안 자랄 때도 말줄임 한계선이 보이게(WYSIWYG, FR-13)
+            if (_widthResizing)
+            {
+                var guide = new Rect(c.X - (maxW + PadX * 2d) / 2d, box.Y, maxW + PadX * 2d, box.Height);
+                dc.DrawRectangle(null, _leaderPen, guide);
+            }
         }
         catch (Exception ex) { _log?.Error($"LabelAdorner 렌더 실패: {ex.Message}"); }
     }
@@ -186,15 +209,39 @@ public sealed class LabelAdorner : Adorner, IDisposable
         => _map.IsEditMode && !_labelRect.IsEmpty && _labelRect.Contains(hitTestParameters.HitPoint)   // 편집모드일 때만 히트(그 외 클릭스루=이동 불가, L2)
             ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null!;
 
+    /// <summary>폭 조절 스트립 폭 — min(6px, 박스폭 25%): 2글자 라벨(≈20px 박스)에서 이동 존 잠식 방지(2차 검증 W2-014).</summary>
+    private static double StripWidth(Rect box) => Math.Min(6d, box.Width * 0.25);
+
+    /// <summary>히트 존 판정 — 0=밖 / 1=내부(이동) / 2=좌 스트립(폭) / 3=우 스트립(폭). (FR-13/R-8 존 분리)</summary>
+    private int HitZone(Point p)
+    {
+        if (_labelRect.IsEmpty || !_labelRect.Contains(p)) return 0;
+        double s = StripWidth(_labelRect);
+        if (p.X <= _labelRect.Left + s) return 2;
+        if (p.X >= _labelRect.Right - s) return 3;
+        return 1;
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        if (_map.IsEditMode && !_labelRect.IsEmpty && _labelRect.Contains(e.GetPosition(this)))   // 라벨 이동은 맵 편집모드 ON일 때만(L2)
+        int zone = _map.IsEditMode ? HitZone(e.GetPosition(this)) : 0;   // 라벨 편집은 맵 편집모드 ON일 때만(L2)
+        if (zone > 0)
         {
-            _labelDragging = true;
             _grabScreen = e.GetPosition(_map);   // 델타는 맵컨트롤 공간(디지털줌 자동 역보정, 불변식#10)
             _origOffsetX = _marker.LabelOffsetX;
             _origOffsetY = _marker.LabelOffsetY;
             if (_marker is IImageEditableMarker imgB) { _origOffsetU = imgB.LabelOffsetU; _origOffsetV = imgB.LabelOffsetV; }   // 이미지 undo before=U/V(FR-02)
+            if (zone == 1)
+            {
+                _labelDragging = true;
+            }
+            else
+            {
+                // 폭 조절(FR-13) — edge-pinned: 드래그 가장자리=커서 추종, 반대편 고정(오프셋 보상은 OnMouseMove)
+                _widthResizing = true;
+                _resizeRightEdge = zone == 3;
+                _origMaxWidth = EffectiveMaxWidth(_marker.TitleMaxWidth);
+            }
             CaptureMouse();
             e.Handled = true;
             InvalidateVisual();
@@ -204,6 +251,36 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        // 호버 커서 — 스트립 위=SizeWE(폭), 내부=SizeAll(이동). HitTestCore가 라벨박스 밖을 투과하므로 박스 위에서만 도달.
+        if (!_labelDragging && !_widthResizing)
+            Cursor = HitZone(e.GetPosition(this)) is 2 or 3 ? Cursors.SizeWE : Cursors.SizeAll;
+
+        if (_widthResizing)
+        {
+            // FR-13 edge-pinned 폭 조절(2차 검증 W그룹: 유일 성립 모델) — 드래그 가장자리=커서 추종, 반대편 고정.
+            // 폭 Δ의 절반만큼 라벨 중심(오프셋)을 드래그 방향으로 보상. 릴리스 시 (오프셋,폭) 쌍 원자 undo.
+            var cur = e.GetPosition(_map);
+            double dxw = cur.X - _grabScreen.X;
+            double dw = _resizeRightEdge ? dxw : -dxw;
+            double newW = Math.Clamp(_origMaxWidth + dw, WIDTH_MIN, WIDTH_MAX);
+            double actualDw = newW - _origMaxWidth;
+            double centerShift = (_resizeRightEdge ? 1 : -1) * actualDw / 2d;
+            if (_marker is IImageEditableMarker imgW)
+            {
+                var (hw, _) = VisualHalfExtents();
+                imgW.LabelOffsetU = (_origOffsetU * Math.Max(1e-6, hw) + centerShift) / Math.Max(1e-6, hw);
+            }
+            else
+            {
+                _marker.LabelOffsetX = _origOffsetX + centerShift;
+            }
+            _marker.TitleMaxWidth = newW;
+            InvalidateVisual();
+            e.Handled = true;
+            base.OnMouseMove(e);
+            return;
+        }
+
         if (_labelDragging)
         {
             var cur = e.GetPosition(_map);
@@ -250,27 +327,46 @@ public sealed class LabelAdorner : Adorner, IDisposable
             LabelOffsetChanged?.Invoke(_marker, _origOffsetX, _origOffsetY);
     }
 
-    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    /// <summary>폭 조절 완료 통지 — (before오프셋A/B, before폭) 원자 전달(FR-13).</summary>
+    private void RaiseWidthChanged()
+    {
+        if (_marker is IImageEditableMarker)
+            LabelWidthChanged?.Invoke(_marker, _origOffsetU, _origOffsetV, _origMaxWidth);
+        else
+            LabelWidthChanged?.Invoke(_marker, _origOffsetX, _origOffsetY, _origMaxWidth);
+    }
+
+    /// <summary>드래그 종류별 종료 처리 공용 — Up/캡처손실 공유.</summary>
+    private void FinishDrag()
     {
         if (_labelDragging)
         {
             _labelDragging = false;
-            if (IsMouseCaptured) ReleaseMouseCapture();
-            e.Handled = true;
             InvalidateVisual();
             RaiseOffsetChanged();   // lock 밖 발화 — 오프셋 DB 영속 + undo(before=드래그시작 오프셋)
+        }
+        else if (_widthResizing)
+        {
+            _widthResizing = false;
+            InvalidateVisual();
+            RaiseWidthChanged();    // (오프셋,폭) 쌍 영속+원자 undo(FR-13)
+        }
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        if (_labelDragging || _widthResizing)
+        {
+            if (IsMouseCaptured) ReleaseMouseCapture();
+            e.Handled = true;
+            FinishDrag();
         }
         base.OnMouseLeftButtonUp(e);
     }
 
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
-        if (_labelDragging)
-        {
-            _labelDragging = false;
-            InvalidateVisual();
-            RaiseOffsetChanged();   // 캡처 손실 시에도 영속+undo(유실 방지)
-        }
+        FinishDrag();   // 캡처 손실 시에도 영속+undo(유실 방지)
         base.OnLostMouseCapture(e);
     }
 
@@ -279,11 +375,46 @@ public sealed class LabelAdorner : Adorner, IDisposable
         if (_disposed) return;
         _disposed = true;
         _labelDragging = false;     // ReleaseMouseCapture→OnLostMouseCapture 재진입 시 이벤트 발화 차단(P2-02)
+        _widthResizing = false;
         LabelOffsetChanged = null;  // 캡처 해제 전에 구독 제거 — Dispose 중 발화 방지
+        LabelWidthChanged = null;
         if (IsMouseCaptured) ReleaseMouseCapture();
         _map.OnMapZoomChanged -= OnMapChanged;
         _map.OnMapDrag -= OnMapChanged;
         if (_marker is INotifyPropertyChanged npc) npc.PropertyChanged -= OnMarkerPropertyChanged;
+    }
+
+    /// <summary>유효 최대폭 — 0 이하(레거시/미설정)는 기본 200, 그 외 40~800 클램프(FR-13). 테스트 공유.</summary>
+    internal static double EffectiveMaxWidth(double w)
+        => w > 0 ? Math.Clamp(w, WIDTH_MIN, WIDTH_MAX) : DEFAULT_MAX_WIDTH;
+
+    /// <summary>packed ARGB int → Frozen 브러시. 0=완전투명. 캐시는 스테이지4(FR-08).</summary>
+    internal static Brush BrushFromArgb(int argb, Brush fallbackIfDefault)
+    {
+        unchecked
+        {
+            if (argb == 0) return Brushes.Transparent;
+            var c = Color.FromArgb((byte)((argb >> 24) & 0xFF), (byte)((argb >> 16) & 0xFF),
+                                   (byte)((argb >> 8) & 0xFF), (byte)(argb & 0xFF));
+            var b = new SolidColorBrush(c);
+            b.Freeze();
+            return b;
+        }
+    }
+
+    /// <summary>폰트 패밀리+굵기+이탤릭 → Typeface. 빈값/비정상 폰트명은 Segoe UI 폴백(architect Q4 — 무음 폴백 UX 방지는 패널 콤보가 담당).</summary>
+    internal static Typeface ResolveTypeface(string? family, bool bold, bool italic)
+    {
+        try
+        {
+            var fam = string.IsNullOrWhiteSpace(family) ? new FontFamily("Segoe UI") : new FontFamily(family);
+            return new Typeface(fam, italic ? FontStyles.Italic : FontStyles.Normal,
+                bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal);
+        }
+        catch
+        {
+            return new Typeface("Segoe UI");
+        }
     }
 
     private static Brush Frozen(SolidColorBrush b) { b.Freeze(); return b; }

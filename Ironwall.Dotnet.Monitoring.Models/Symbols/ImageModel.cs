@@ -117,6 +117,13 @@ public class ImageModel : BaseModel, IImageModel
         ShowTitle = model.ShowTitle;
         LabelOffsetU = model.LabelOffsetU;
         LabelOffsetV = model.LabelOffsetV;
+
+        TitleColor = model.TitleColor;
+        TitleBackground = model.TitleBackground;
+        TitleFontFamily = model.TitleFontFamily;
+        TitleBold = model.TitleBold;
+        TitleItalic = model.TitleItalic;
+        TitleMaxWidth = model.TitleMaxWidth;
     }
 
     #endregion
@@ -184,6 +191,14 @@ public class ImageModel : BaseModel, IImageModel
     public double LabelOffsetU { get; set; }
     /// <summary>라벨 오프셋 V(하프익스텐트 비율) — Images.LabelOffsetV 영속 (FR-02).</summary>
     public double LabelOffsetV { get; set; }
+
+    // 라벨 스타일 (FR-05·13) — 기본값=종전 하드코딩 시각 동일(NFR-01). DB DEFAULT와 삼위일치.
+    public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
+    public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+    public string TitleFontFamily { get; set; } = string.Empty;   // 빈값=Segoe UI
+    public bool TitleBold { get; set; }
+    public bool TitleItalic { get; set; }
+    public double TitleMaxWidth { get; set; } = 200.0;
     #endregion
     #endregion
     #region - Attributes -

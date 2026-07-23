@@ -27,6 +27,10 @@ public sealed class LabelAdornerService : IDisposable
     public event System.Action<IEditableMarker, double, double>? LabelOffsetChanged;
     private void OnLabelMoved(IEditableMarker m, double bx, double by) => LabelOffsetChanged?.Invoke(m, bx, by);
 
+    /// <summary>라벨 폭 조절 완료 — (before오프셋A/B, before폭) 원자 전달, VM이 DB 영속+undo(FR-13).</summary>
+    public event System.Action<IEditableMarker, double, double, double>? LabelWidthChanged;
+    private void OnLabelWidthResized(IEditableMarker m, double ba, double bb, double bw) => LabelWidthChanged?.Invoke(m, ba, bb, bw);
+
     public LabelAdornerService(GMapCustomControl map, ILogService? log = null)
     {
         _map = map ?? throw new ArgumentNullException(nameof(map));
@@ -40,6 +44,7 @@ public sealed class LabelAdornerService : IDisposable
         if (_layer == null) { _log?.Error("LabelAdornerService: AdornerLayer 없음"); return; }
         var a = new LabelAdorner(_map, marker, _log);
         a.LabelOffsetChanged += OnLabelMoved;   // 오프셋 드래그 완료 → VM 영속 포워딩
+        a.LabelWidthChanged += OnLabelWidthResized;   // 폭 조절 완료 → VM 영속+원자 undo 포워딩(FR-13)
         _layer.Add(a);
         _labels[marker] = a;
     }
@@ -48,6 +53,7 @@ public sealed class LabelAdornerService : IDisposable
     {
         if (marker == null || !_labels.TryGetValue(marker, out var a)) return;
         a.LabelOffsetChanged -= OnLabelMoved;
+        a.LabelWidthChanged -= OnLabelWidthResized;
         try { (_layer ?? AdornerLayer.GetAdornerLayer(_map))?.Remove(a); } catch { /* 레이어 정리 중 */ }
         a.Dispose();
         _labels.Remove(marker);

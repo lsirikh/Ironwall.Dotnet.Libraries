@@ -36,6 +36,13 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "StrokeThickness": m.StrokeThickness = ToD(v); break;
             case "LabelOffsetX": m.LabelOffsetX = ToD(v); break;
             case "LabelOffsetY": m.LabelOffsetY = ToD(v); break;
+            // 라벨 스타일 (Overlay_Title FR-09) — 그룹 일괄편집·undo replay 공용
+            case "TitleColor": m.TitleColor = ToI(v); break;
+            case "TitleBackground": m.TitleBackground = ToI(v); break;
+            case "TitleFontFamily": m.TitleFontFamily = v as string ?? string.Empty; break;
+            case "TitleBold": m.TitleBold = ToB(v); break;
+            case "TitleItalic": m.TitleItalic = ToB(v); break;
+            case "TitleMaxWidth": m.TitleMaxWidth = ToD(v); break;
             case "ZOrder": m.ZOrder = ToI(v); break;
             case "Opacity": if (m is GMapImageMarker imOp) imOp.Opacity = ToD(v); break;   // 투명도 undo(D2) — 이미지 전용 UI속성
             case "ShowShape": m.ShowShape = ToB(v); break;
@@ -65,6 +72,12 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "StrokeThickness" => m.StrokeThickness,
         "LabelOffsetX" => m.LabelOffsetX,
         "LabelOffsetY" => m.LabelOffsetY,
+        "TitleColor" => m.TitleColor,
+        "TitleBackground" => m.TitleBackground,
+        "TitleFontFamily" => m.TitleFontFamily,
+        "TitleBold" => m.TitleBold,
+        "TitleItalic" => m.TitleItalic,
+        "TitleMaxWidth" => m.TitleMaxWidth,
         "ZOrder" => m.ZOrder,
         "Opacity" => m is GMapImageMarker imOp ? imOp.Opacity : null,
         "ShowShape" => m.ShowShape,
@@ -88,6 +101,7 @@ public abstract class UndoableCommandBase : IUndoableCommand
         or "StrokeThickness" or "LabelOffsetX" or "LabelOffsetY" or "ZOrder"
         or "Opacity" or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
         or "StrokeColor" or "OperationState"
+        or "TitleColor" or "TitleBackground" or "TitleFontFamily" or "TitleBold" or "TitleItalic" or "TitleMaxWidth"
         or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" => true,
         _ => false,
     };

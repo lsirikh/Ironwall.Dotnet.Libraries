@@ -10,6 +10,9 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 	<utils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
+	<!--  라벨 스타일(Overlay_Title FR-07): packed ARGB int ↔ hex 문자열 / 스와치 브러시  -->
+	<utils:ArgbHexConverter x:Key="ArgbHex" />
+	<utils:ArgbToBrushConverter x:Key="ArgbBrush" />
 	<!--  그룹(멀티셀렉트) Pending: NaN=값 서로 다름 → 텍스트 빈칸/—, 슬라이더 0 파킹. 단일 모드엔 영향 없음  -->
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlank" />
 	<utils:DoubleNaNToBlankConverter x:Key="NaNBlankF0" Format="F0" />
@@ -192,6 +195,131 @@
 											Grid.Column="1"
 											Style="{StaticResource CompactTextBox}"
 											Text="{Binding TitleSize, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlank}}" />
+									</Grid>
+
+									<!--  제목폭(px) — 말줄임 지점. 맵의 라벨 가장자리 드래그(WYSIWYG)와 동일 값 (FR-13)  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											VerticalAlignment="Center"
+											Style="{StaticResource PropertyLabel}"
+											Text="제목폭" />
+										<TextBox
+											Grid.Column="1"
+											Style="{StaticResource CompactTextBox}"
+											Text="{Binding TitleMaxWidthPx, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource NaNBlank}}"
+											ToolTip="라벨 최대 폭(px, 40~800). 글자가 이 폭에서 말줄임 처리됩니다. 맵에서 라벨 가장자리를 드래그해도 조절됩니다." />
+									</Grid>
+
+									<!--  글자색 / 배경색 — 스와치 + 편집 콤보(프리셋 팔레트 + #AARRGGBB 자유입력, FR-07/OQ-2)  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="18" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											VerticalAlignment="Center"
+											Style="{StaticResource PropertyLabel}"
+											Text="글자색" />
+										<Border
+											Grid.Column="1"
+											Width="14"
+											Height="14"
+											VerticalAlignment="Center"
+											Background="{Binding TitleColorArgb, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource ArgbBrush}}"
+											BorderBrush="{DynamicResource BorderBrush}"
+											BorderThickness="1"
+											CornerRadius="2" />
+										<ComboBox
+											Grid.Column="2"
+											IsEditable="True"
+											ItemsSource="{x:Static properties:GMapPropertyBaseControl.PresetLabelColorsHex}"
+											Style="{StaticResource CompactComboBox}"
+											Text="{Binding TitleColorArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource ArgbHex}}"
+											ToolTip="라벨 글자색 — 프리셋 선택 또는 #AARRGGBB 직접 입력" />
+									</Grid>
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="18" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											VerticalAlignment="Center"
+											Style="{StaticResource PropertyLabel}"
+											Text="배경색" />
+										<Border
+											Grid.Column="1"
+											Width="14"
+											Height="14"
+											VerticalAlignment="Center"
+											Background="{Binding TitleBackgroundArgb, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource ArgbBrush}}"
+											BorderBrush="{DynamicResource BorderBrush}"
+											BorderThickness="1"
+											CornerRadius="2" />
+										<ComboBox
+											Grid.Column="2"
+											IsEditable="True"
+											ItemsSource="{x:Static properties:GMapPropertyBaseControl.PresetLabelColorsHex}"
+											Style="{StaticResource CompactComboBox}"
+											Text="{Binding TitleBackgroundArgb, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource ArgbHex}}"
+											ToolTip="라벨 배경색 — '#00000000'=투명" />
+									</Grid>
+
+									<!--  글꼴 + 굵게/이탤릭 — 시스템 설치 폰트 열거(자유입력 금지, FR-07/OQ-3)  -->
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											VerticalAlignment="Center"
+											Style="{StaticResource PropertyLabel}"
+											Text="글꼴" />
+										<ComboBox
+											Grid.Column="1"
+											DisplayMemberPath="Source"
+											ItemsSource="{x:Static Fonts.SystemFontFamilies}"
+											SelectedValue="{Binding TitleFontFamilyName, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+											SelectedValuePath="Source"
+											Style="{StaticResource CompactComboBox}"
+											ToolTip="라벨 폰트 — 미선택(빈칸)=Segoe UI 기본" />
+									</Grid>
+									<Grid Margin="0,5">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="60" />
+											<ColumnDefinition Width="Auto" />
+											<ColumnDefinition Width="Auto" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											VerticalAlignment="Center"
+											Style="{StaticResource PropertyLabel}"
+											Text="글자체" />
+										<CheckBox
+											Grid.Column="1"
+											Margin="2,0,10,0"
+											VerticalAlignment="Center"
+											Content="굵게"
+											FontSize="11"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											IsChecked="{Binding TitleBoldFlag, RelativeSource={RelativeSource TemplatedParent}}" />
+										<CheckBox
+											Grid.Column="2"
+											VerticalAlignment="Center"
+											Content="이탤릭"
+											FontSize="11"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											IsChecked="{Binding TitleItalicFlag, RelativeSource={RelativeSource TemplatedParent}}" />
 									</Grid>
 
 									<!--  크기  -->

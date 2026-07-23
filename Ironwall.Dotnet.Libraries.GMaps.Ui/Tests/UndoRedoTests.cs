@@ -36,6 +36,12 @@ public class UndoRedoTests
         public bool ShowTitle { get; set; }
         public double LabelOffsetX { get; set; }
         public double LabelOffsetY { get; set; }
+        public int TitleColor { get; set; } = unchecked((int)0xF0F0F4F8);
+        public int TitleBackground { get; set; } = unchecked((int)0xCD1C1E22);
+        public string TitleFontFamily { get; set; } = string.Empty;
+        public bool TitleBold { get; set; }
+        public bool TitleItalic { get; set; }
+        public double TitleMaxWidth { get; set; } = 200.0;
         public EnumColorType FillColor { get; set; }
         public EnumColorType StrokeColor { get; set; }
         public double StrokeThickness { get; set; }

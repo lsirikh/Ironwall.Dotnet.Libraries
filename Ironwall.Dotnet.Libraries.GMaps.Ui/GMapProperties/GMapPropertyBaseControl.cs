@@ -228,6 +228,75 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 typeof(GMapPropertyBaseControl),
                 new PropertyMetadata(false, OnShowTitleChanged));
 
+        // ── 라벨 스타일 DP 6종 (Overlay_Title FR-07·13) — 기본값=마커/DB 기본값과 삼위일치(P2-06). ──
+
+        /// <summary>라벨 글자색(packed ARGB). null=그룹 Pending.</summary>
+        public int? TitleColorArgb
+        {
+            get { return (int?)GetValue(TitleColorArgbProperty); }
+            set { SetValue(TitleColorArgbProperty, value); }
+        }
+        public static readonly DependencyProperty TitleColorArgbProperty =
+            DependencyProperty.Register("TitleColorArgb", typeof(int?), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(unchecked((int)0xF0F0F4F8), OnTitleColorArgbChanged));
+
+        /// <summary>라벨 배경색(packed ARGB, 0=투명). null=그룹 Pending.</summary>
+        public int? TitleBackgroundArgb
+        {
+            get { return (int?)GetValue(TitleBackgroundArgbProperty); }
+            set { SetValue(TitleBackgroundArgbProperty, value); }
+        }
+        public static readonly DependencyProperty TitleBackgroundArgbProperty =
+            DependencyProperty.Register("TitleBackgroundArgb", typeof(int?), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(unchecked((int)0xCD1C1E22), OnTitleBackgroundArgbChanged));
+
+        /// <summary>라벨 폰트 패밀리명(빈값=Segoe UI). 그룹 다름=빈값.</summary>
+        public string TitleFontFamilyName
+        {
+            get { return (string)GetValue(TitleFontFamilyNameProperty); }
+            set { SetValue(TitleFontFamilyNameProperty, value); }
+        }
+        public static readonly DependencyProperty TitleFontFamilyNameProperty =
+            DependencyProperty.Register("TitleFontFamilyName", typeof(string), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(string.Empty, OnTitleFontFamilyNameChanged));
+
+        /// <summary>라벨 굵게. null=그룹 Pending.</summary>
+        public bool? TitleBoldFlag
+        {
+            get { return (bool?)GetValue(TitleBoldFlagProperty); }
+            set { SetValue(TitleBoldFlagProperty, value); }
+        }
+        public static readonly DependencyProperty TitleBoldFlagProperty =
+            DependencyProperty.Register("TitleBoldFlag", typeof(bool?), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(false, OnTitleBoldFlagChanged));
+
+        /// <summary>라벨 이탤릭. null=그룹 Pending.</summary>
+        public bool? TitleItalicFlag
+        {
+            get { return (bool?)GetValue(TitleItalicFlagProperty); }
+            set { SetValue(TitleItalicFlagProperty, value); }
+        }
+        public static readonly DependencyProperty TitleItalicFlagProperty =
+            DependencyProperty.Register("TitleItalicFlag", typeof(bool?), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(false, OnTitleItalicFlagChanged));
+
+        /// <summary>라벨 최대 폭 px(말줄임 지점, FR-13③ 숫자 정밀 입력 — 맵 WYSIWYG 핸들과 동일 값). NaN=그룹 Pending.</summary>
+        public double TitleMaxWidthPx
+        {
+            get { return (double)GetValue(TitleMaxWidthPxProperty); }
+            set { SetValue(TitleMaxWidthPxProperty, value); }
+        }
+        public static readonly DependencyProperty TitleMaxWidthPxProperty =
+            DependencyProperty.Register("TitleMaxWidthPx", typeof(double), typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(200.0, OnTitleMaxWidthPxChanged));
+
+        /// <summary>라벨 색 프리셋(hex) — 편집 콤보 드롭다운(팔레트+자유입력 병행, OQ-2). 마지막 2개=종전 기본 글자/배경색, '#00000000'=투명.</summary>
+        public static string[] PresetLabelColorsHex { get; } =
+        {
+            "#F0F0F4F8", "#CD1C1E22", "#FFFFFFFF", "#FF000000", "#FFFF5252", "#FFFFC107",
+            "#FF4CAF50", "#FF00AAFF", "#FFB388FF", "#FFFF8A65", "#00000000"
+        };
+
         /// <summary>
         /// 특정 컨텐츠
         /// </summary>
@@ -563,6 +632,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                     control.ShowShape = newMarker.ShowShape;
                     control.ShowTitle = newMarker.ShowTitle;
                     control.MarkerZoom = newMarker.Zoom;
+                    control.TitleColorArgb = newMarker.TitleColor;
+                    control.TitleBackgroundArgb = newMarker.TitleBackground;
+                    control.TitleFontFamilyName = newMarker.TitleFontFamily;
+                    control.TitleBoldFlag = newMarker.TitleBold;
+                    control.TitleItalicFlag = newMarker.TitleItalic;
+                    control.TitleMaxWidthPx = newMarker.TitleMaxWidth;
 
                     // *** 특화 속성 설정 추가 ***
                     //System.Diagnostics.Debug.WriteLine("SetupSpecificPropertiesFromMarker 호출");
@@ -688,6 +763,68 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             }
         }
 
+        // ── 라벨 스타일 콜백 6종 (FR-07) — 기존 패턴 답습: 3중 가드 + null(Pending) 미전파 + IsGroupMode 직접쓰기 억제. ──
+
+        private static void OnTitleColorArgbChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                if (e.NewValue is not int v) return;   // null=그룹 Pending — 마커 미전파
+                if (!control.IsGroupMode) control.SelectedMarker.TitleColor = v;
+                control.OnMarkerPropertyChanged("TitleColor", e.OldValue, v);
+            }
+        }
+
+        private static void OnTitleBackgroundArgbChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                if (e.NewValue is not int v) return;
+                if (!control.IsGroupMode) control.SelectedMarker.TitleBackground = v;
+                control.OnMarkerPropertyChanged("TitleBackground", e.OldValue, v);
+            }
+        }
+
+        private static void OnTitleFontFamilyNameChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                var v = e.NewValue as string ?? string.Empty;
+                if (!control.IsGroupMode) control.SelectedMarker.TitleFontFamily = v;
+                control.OnMarkerPropertyChanged("TitleFontFamily", e.OldValue, v);
+            }
+        }
+
+        private static void OnTitleBoldFlagChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                if (e.NewValue is not bool v) return;   // null=그룹 Pending
+                if (!control.IsGroupMode) control.SelectedMarker.TitleBold = v;
+                control.OnMarkerPropertyChanged("TitleBold", e.OldValue, v);
+            }
+        }
+
+        private static void OnTitleItalicFlagChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                if (e.NewValue is not bool v) return;
+                if (!control.IsGroupMode) control.SelectedMarker.TitleItalic = v;
+                control.OnMarkerPropertyChanged("TitleItalic", e.OldValue, v);
+            }
+        }
+
+        private static void OnTitleMaxWidthPxChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                if (e.NewValue is not double v || double.IsNaN(v)) return;   // NaN=그룹 Pending
+                if (!control.IsGroupMode) control.SelectedMarker.TitleMaxWidth = v;
+                control.OnMarkerPropertyChanged("TitleMaxWidth", e.OldValue, v);
+            }
+        }
+
         private static void OnMarkerZoomChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
@@ -736,6 +873,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             // 색상 속성은 EnumColorType이므로 직접 바인딩
             SetBinding(MarkerFillColorProperty, CreateTwoWayBinding(nameof(SelectedMarker.FillColor)));
             SetBinding(MarkerStrokeColorProperty, CreateTwoWayBinding(nameof(SelectedMarker.StrokeColor)));
+
+            // 라벨 스타일 (FR-07) — Setup/Clear 쌍 유지(체크리스트 ⑦)
+            SetBinding(TitleColorArgbProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleColor)));
+            SetBinding(TitleBackgroundArgbProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleBackground)));
+            SetBinding(TitleFontFamilyNameProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleFontFamily)));
+            SetBinding(TitleBoldFlagProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleBold)));
+            SetBinding(TitleItalicFlagProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleItalic)));
+            SetBinding(TitleMaxWidthPxProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleMaxWidth)));
 
             //System.Diagnostics.Debug.WriteLine("SetupCommonBiding 완료");
         }
@@ -792,6 +937,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, ShowShapeProperty);
             BindingOperations.ClearBinding(this, ShowTitleProperty);
             BindingOperations.ClearBinding(this, MarkerZoomProperty);
+            BindingOperations.ClearBinding(this, TitleColorArgbProperty);
+            BindingOperations.ClearBinding(this, TitleBackgroundArgbProperty);
+            BindingOperations.ClearBinding(this, TitleFontFamilyNameProperty);
+            BindingOperations.ClearBinding(this, TitleBoldFlagProperty);
+            BindingOperations.ClearBinding(this, TitleItalicFlagProperty);
+            BindingOperations.ClearBinding(this, TitleMaxWidthPxProperty);
         }
 
         #endregion
@@ -866,6 +1017,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             // bool(모양/제목 표시) 3상태: 다르면 null(indeterminate) — 클릭 시 true부터 순환(전원 적용)
             ShowShape = AllEqual("ShowShape", out var ss) && ss is bool sb ? sb : (bool?)null;
             ShowTitle = AllEqual("ShowTitle", out var stt) && stt is bool tb ? tb : (bool?)null;
+
+            // 라벨 스타일 (FR-07) — int?/bool?=null Pending, 폰트 다름=빈값, 폭 다름=NaN
+            TitleColorArgb = AllEqual("TitleColor", out var tcv) && tcv is int tci ? tci : (int?)null;
+            TitleBackgroundArgb = AllEqual("TitleBackground", out var tbv) && tbv is int tbi ? tbi : (int?)null;
+            TitleFontFamilyName = AllEqual("TitleFontFamily", out var tfv) ? (tfv as string ?? string.Empty) : string.Empty;
+            TitleBoldFlag = AllEqual("TitleBold", out var tbf) && tbf is bool tbb ? tbb : (bool?)null;
+            TitleItalicFlag = AllEqual("TitleItalic", out var tif) && tif is bool tib ? tib : (bool?)null;
+            TitleMaxWidthPx = AllEqual("TitleMaxWidth", out var tmw) ? ToD(tmw) : MIXED_DOUBLE;
 
             static double ToD(object? v) => v is double d ? d : MIXED_DOUBLE;
         }
