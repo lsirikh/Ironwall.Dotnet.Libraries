@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-07-23 (advance-phase 자동)
-- **총 문서 수**: 398개
+- **총 문서 수**: 402개
 
 ---
 
@@ -55,11 +55,11 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Superseded | 2026-07-23 |
-| [Symbol_ContextMenu_ViewMode_Lock-prd.md](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | Symbol_ContextMenu_ViewMode_Lock | Approved | 2026-07-23 |
 | [Overlay_Title_ZoomStyle-prd.md](prds/Overlay_Title_ZoomStyle-prd.md) | Overlay_Title_ZoomStyle | Approved | 2026-07-23 |
-| [GOP_SessionGrant_Pagination-prd.md](prds/GOP_SessionGrant_Pagination-prd.md) | GOP_SessionGrant_Pagination | Draft | 2026-07-23 |
 | [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History | Approved | 2026-07-23 |
+| [Symbol_ContextMenu_ViewMode_Lock-prd.md](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | Symbol_ContextMenu_ViewMode_Lock | Approved | 2026-07-23 |
+| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Superseded | 2026-07-23 |
+| [GOP_SessionGrant_Pagination-prd.md](prds/GOP_SessionGrant_Pagination-prd.md) | GOP_SessionGrant_Pagination | Draft | 2026-07-23 |
 | [GOP_AuditLog_DateFilter_Pagination-prd.md](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | GOP_AuditLog_DateFilter_Pagination | Draft | 2026-07-23 |
 | [GMap_Symbol_Visibility_Master-prd.md](prds/GMap_Symbol_Visibility_Master-prd.md) | GMap_Symbol_Visibility_Master | Draft | 2026-07-20 |
 | [MyPage_SelfPhoto_Delete_Fix-prd.md](prds/MyPage_SelfPhoto_Delete_Fix-prd.md) | MyPage_SelfPhoto_Delete_Fix | Draft | 2026-07-20 |
@@ -200,9 +200,10 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [Overlay_Title_ZoomStyle-prd-plan.md](plans/Overlay_Title_ZoomStyle-prd-plan.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) | 0/33 | 2026-07-23 |
+| [Overlay_Title_ZoomStyle-prd-plan.md](plans/Overlay_Title_ZoomStyle-prd-plan.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) | 0/38 | 2026-07-23 |
+| [Detection_Signal_History-prd-plan.md](plans/Detection_Signal_History-prd-plan.md) | [PRD](prds/Detection_Signal_History-prd.md) | 36/43 | 2026-07-23 |
+| [GOP_SessionPanel_Cleanup-prd-plan.md](plans/GOP_SessionPanel_Cleanup-prd-plan.md) | [PRD](prds/GOP_SessionPanel_Cleanup-prd.md) | 0/0 | 2026-07-23 |
 | [Symbol_ContextMenu_ViewMode_Lock-prd-plan.md](plans/Symbol_ContextMenu_ViewMode_Lock-prd-plan.md) | [PRD](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | 12/13 | 2026-07-23 |
-| [Detection_Signal_History-prd-plan.md](plans/Detection_Signal_History-prd-plan.md) | [PRD](prds/Detection_Signal_History-prd.md) | 35/43 | 2026-07-23 |
 | [GOP_SessionGrant_Pagination-prd-plan.md](plans/GOP_SessionGrant_Pagination-prd-plan.md) | [PRD](prds/GOP_SessionGrant_Pagination-prd.md) | 0/0 | 2026-07-23 |
 | [GOP_AuditLog_DateFilter_Pagination-prd-plan.md](plans/GOP_AuditLog_DateFilter_Pagination-prd-plan.md) | [PRD](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | 0/0 | 2026-07-23 |
 | [Admin_Photo_Upload-prd-plan.md](plans/Admin_Photo_Upload-prd-plan.md) | [PRD](prds/Admin_Photo_Upload-prd.md) | 5/26 | 2026-07-20 |
@@ -305,6 +306,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [Detection_Signal_History-report.md](reports/Detection_Signal_History-report.md) | [PRD](prds/Detection_Signal_History-prd.md) → [Plan](plans/Detection_Signal_History-prd-plan.md) | 2026-07-23 |
 | [grant-verification-report.md](reports/grant-verification-report.md) | [PRD](prds/grant-verification-prd.md) → [Plan](plans/grant-verification-prd-plan.md) | 2026-07-20 |
 | [ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md](reports/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md) | [PRD](prds/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd.md) → [Plan](plans/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd-plan.md) | 2026-07-15 |
 | [ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md](reports/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md) | [PRD](prds/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd.md) → [Plan](plans/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd-plan.md) | 2026-07-15 |
