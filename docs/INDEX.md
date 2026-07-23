@@ -55,8 +55,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [Overlay_Title_ZoomStyle-prd.md](prds/Overlay_Title_ZoomStyle-prd.md) | Overlay_Title_ZoomStyle | Approved | 2026-07-23 |
 | [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History | Approved | 2026-07-23 |
+| [Overlay_Title_ZoomStyle-prd.md](prds/Overlay_Title_ZoomStyle-prd.md) | Overlay_Title_ZoomStyle | Approved | 2026-07-23 |
 | [Symbol_ContextMenu_ViewMode_Lock-prd.md](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | Symbol_ContextMenu_ViewMode_Lock | Approved | 2026-07-23 |
 | [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Superseded | 2026-07-23 |
 | [GOP_SessionGrant_Pagination-prd.md](prds/GOP_SessionGrant_Pagination-prd.md) | GOP_SessionGrant_Pagination | Draft | 2026-07-23 |
@@ -200,8 +200,8 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [Detection_Signal_History-prd-plan.md](plans/Detection_Signal_History-prd-plan.md) | [PRD](prds/Detection_Signal_History-prd.md) | 37/44 | 2026-07-23 |
 | [Overlay_Title_ZoomStyle-prd-plan.md](plans/Overlay_Title_ZoomStyle-prd-plan.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) | 0/38 | 2026-07-23 |
-| [Detection_Signal_History-prd-plan.md](plans/Detection_Signal_History-prd-plan.md) | [PRD](prds/Detection_Signal_History-prd.md) | 36/43 | 2026-07-23 |
 | [GOP_SessionPanel_Cleanup-prd-plan.md](plans/GOP_SessionPanel_Cleanup-prd-plan.md) | [PRD](prds/GOP_SessionPanel_Cleanup-prd.md) | 0/0 | 2026-07-23 |
 | [Symbol_ContextMenu_ViewMode_Lock-prd-plan.md](plans/Symbol_ContextMenu_ViewMode_Lock-prd-plan.md) | [PRD](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | 12/13 | 2026-07-23 |
 | [GOP_SessionGrant_Pagination-prd-plan.md](plans/GOP_SessionGrant_Pagination-prd-plan.md) | [PRD](prds/GOP_SessionGrant_Pagination-prd.md) | 0/0 | 2026-07-23 |
