@@ -142,11 +142,11 @@ internal class NatsService : MessageService<INatsService>, INatsService
 
     public override async Task<string?> RequestAsync(string subject, string data, TimeSpan? timeout = null)
     {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
         try
         {
             if (Connection == null) return null;
 
-            var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
             using var cts = new CancellationTokenSource(effectiveTimeout);
 
             var reply = await Connection.RequestAsync<string, string>(
@@ -154,8 +154,15 @@ internal class NatsService : MessageService<INatsService>, INatsService
 
             return reply.Data;
         }
+        catch (NatsNoRespondersException)
+        {
+            // 구독자 자체가 없어 서버가 즉시 503 반환 — 타임아웃과 다른 실패 (수신측 미기동/미구독 진단용)
+            _log?.Warning($"[RequestAsync] no responders — '{subject}' 구독자 없음 (즉시 실패, 타임아웃 아님)");
+            return null;
+        }
         catch (OperationCanceledException)
         {
+            _log?.Warning($"[RequestAsync] timeout({effectiveTimeout.TotalSeconds:F0}s) — '{subject}' 응답 미도달");
             return null;
         }
         catch (Exception ex)
