@@ -213,10 +213,16 @@ public class SignalChartControl : FrameworkElement
     #endregion
 
     #region - Interaction (툴팁/클릭→행 동기화) -
+    // (code-review P1-2) 현재 hover 포인트 캐시 — 포인트가 바뀔 때만 ToolTip 갱신(매 MouseMove 재할당 시 팝업 깜빡임·GC 압박)
+    private SignalChartPoint? _hoverPoint;
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
         var hit = FindNearest(e.GetPosition(this));
+        if (ReferenceEquals(hit, _hoverPoint)) return;
+        _hoverPoint = hit;
+
         if (hit is { } p)
         {
             Cursor = Cursors.Hand;
@@ -229,16 +235,26 @@ public class SignalChartControl : FrameworkElement
         }
     }
 
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        _hoverPoint = null;
+        Cursor = Cursors.Arrow;
+        ToolTip = null;
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
         var hit = FindNearest(e.GetPosition(this));
         if (hit is not { } p) return;
 
-        SelectedPayload = p.Payload;
+        // (code-review P1-3) 선택 경로 단일화 — 커맨드가 있으면 VM(SelectedItem)→TwoWay 바인딩 역류로
+        // SelectedPayload가 갱신되고 AffectsRender가 재렌더한다. 커맨드 없을 때만 직접 세팅(폴백).
         if (PointClickedCommand?.CanExecute(p.Payload) == true)
             PointClickedCommand.Execute(p.Payload);
-        InvalidateVisual();
+        else
+            SelectedPayload = p.Payload;
         e.Handled = true;
     }
 

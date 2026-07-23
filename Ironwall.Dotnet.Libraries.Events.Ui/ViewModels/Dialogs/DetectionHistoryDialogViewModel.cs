@@ -111,7 +111,10 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(HeaderText));
 
         if (IsActive)
+        {
+            _loadedByInitialize = true;   // (code-review P1-1) 직후 재활성이 겹쳐도 OnActivate 중복 조회 방지
             _ = LoadAsync();
+        }
     }
     #endregion
 
@@ -119,6 +122,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        if (_loadedByInitialize) { _loadedByInitialize = false; return; }   // Initialize가 이미 조회를 걸었음 — 이중 서버 왕복 방지
         await LoadAsync();
     }
 
@@ -413,6 +417,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     private readonly DeviceProvider _deviceProvider;
     private CancellationTokenSource? _loadCts;
 
+    private bool _loadedByInitialize;   // (code-review P1-1) Initialize 즉시조회 ↔ OnActivate 조회 중복 가드
     private string _periodKey = "24h";
     private DateTime _customStart = DateTime.Now.AddDays(-1);
     private DateTime _customEnd = DateTime.Now;
