@@ -553,9 +553,9 @@ public partial class MapViewModel : BasePanelViewModel,
 
     // 심볼 라벨 분리 오버레이 서비스 (Symbol_Label_Decouple Phase 2) — AdornerManager 밖 소유.
     private Ironwall.Dotnet.Libraries.GMaps.Ui.Services.LabelAdornerService? _labelService;
-    /// <summary>마커 추가/제거 시 라벨 adorner 동기화(신규 부착·제거 detach).</summary>
+    /// <summary>마커 추가/제거 시 라벨 adorner 동기화 — Action 기반 증분(O(N²) 전체 재스캔 제거, FR-12/P1-06).</summary>
     private void Markers_CollectionChangedForLabels(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        => _labelService?.Sync(MainMap?.Markers);
+        => _labelService?.ApplyCollectionChange(e, MainMap?.Markers);
 
     /// <summary>라벨 드래그 완료 → 심볼 모델 DB 영속(심볼/라인=LabelOffsetX/Y px, 이미지=LabelOffsetU/V 비율). RBAC 게이트(FR-LB-05).
     /// before 쌍의 도메인은 마커 타입 따름(이미지=U/V — LabelAdorner가 타입별로 전달, Overlay_Title FR-11).</summary>

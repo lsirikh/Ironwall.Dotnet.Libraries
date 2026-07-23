@@ -59,18 +59,19 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         try
         {
             if (!_disposed && disposing)
-
             {
-                // 관리 리소스 정리
+                // 플래그를 먼저 세워 어도너의 IsDisposed 게이트가 _model=null 이전에 닫히게 함
+                // (TOCTOU NRE 방어 — Overlay_Title P2-04).
+                _disposed = true;
                 _model = default(T);
                 Clear();
             }
-
-            // Dispose flag set true
             _disposed = true;
         }
-        catch
+        catch (Exception ex)
         {
+            // 무음 삼킴 금지(P2-05) — Dispose 실패 원인 추적 가능하게 최소 로그.
+            System.Diagnostics.Debug.WriteLine($"GMapBaseMarker.Dispose 실패: {ex.Message}");
         }
     }
 

@@ -59,15 +59,51 @@ public sealed class LabelAdornerService : IDisposable
         _labels.Remove(marker);
     }
 
-    /// <summary>맵의 편집가능 마커와 라벨 동기화 — 신규는 Attach, 사라진 건 Detach. (Markers.CollectionChanged/로드 후 호출)</summary>
+    private bool _syncing;   // Detach/Attach의 레이어 조작이 CollectionChanged를 재발화해도 재진입 차단(P2-03)
+
+    /// <summary>맵의 편집가능 마커와 라벨 동기화 — 신규는 Attach, 사라진 건 Detach. (로드/Reset 후 호출)</summary>
     public void Sync(IEnumerable? markers)
     {
-        if (_disposed || markers == null) return;
-        var current = new HashSet<IEditableMarker>(markers.OfType<IEditableMarker>().Where(m => !m.IsDisposed));
-        foreach (var m in _labels.Keys.ToList())
-            if (!current.Contains(m)) Detach(m);
-        foreach (var m in current)
-            if (!_labels.ContainsKey(m)) Attach(m);
+        if (_disposed || markers == null || _syncing) return;
+        try
+        {
+            _syncing = true;
+            var current = new HashSet<IEditableMarker>(markers.OfType<IEditableMarker>().Where(m => !m.IsDisposed));
+            foreach (var m in _labels.Keys.ToList())
+                if (!current.Contains(m)) Detach(m);
+            foreach (var m in current)
+                if (!_labels.ContainsKey(m)) Attach(m);
+        }
+        finally { _syncing = false; }
+    }
+
+    /// <summary>CollectionChanged Action 기반 증분 처리 — Add/Remove는 해당 항목만 O(1), Reset/기타만 전체 Sync.
+    /// 초기 대량 로드의 O(N²) 전체 재스캔 제거(Overlay_Title FR-12/P1-06).</summary>
+    public void ApplyCollectionChange(System.Collections.Specialized.NotifyCollectionChangedEventArgs e, IEnumerable? allMarkers)
+    {
+        if (_disposed || e == null || _syncing) return;
+        switch (e.Action)
+        {
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Add:
+                if (e.NewItems != null)
+                    foreach (var m in e.NewItems.OfType<IEditableMarker>()) Attach(m);
+                break;
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Remove:
+                if (e.OldItems != null)
+                    foreach (var m in e.OldItems.OfType<IEditableMarker>()) Detach(m);
+                break;
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Replace:
+                if (e.OldItems != null)
+                    foreach (var m in e.OldItems.OfType<IEditableMarker>()) Detach(m);
+                if (e.NewItems != null)
+                    foreach (var m in e.NewItems.OfType<IEditableMarker>()) Attach(m);
+                break;
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Move:
+                break;   // 순서 변경은 라벨 무관
+            default:
+                Sync(allMarkers);   // Reset 등 — 전체 동기화
+                break;
+        }
     }
 
     public void Clear()

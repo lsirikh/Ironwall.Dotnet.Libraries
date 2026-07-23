@@ -48,6 +48,15 @@ public sealed class LabelAdorner : Adorner, IDisposable
     private bool _resizeRightEdge;           // true=우측 가장자리 드래그
     private double _origMaxWidth;            // 폭 조절 before (원자 undo용)
 
+    // ── 렌더 캐시(FR-08) — 마커 N개×줌/팬 연타 시 FormattedText/Typeface/Brush 재생성 제거(P1-01).
+    //    무효화: _textProps 속성 변경(OnMarkerPropertyChanged)·DPI 변경(OnRender 비교)·색 변경. Dispose서 해제. ──
+    private FormattedText? _cachedText;
+    private double _cachedDpi;
+    private Brush? _cachedFg, _cachedBg;
+    private int _cachedFgArgb, _cachedBgArgb;
+    private static readonly System.Collections.Generic.Dictionary<(string fam, bool b, bool i), Typeface> _typefaceCache = new();
+    private static readonly object _typefaceGate = new();   // 정적 공유 캐시 — Typeface는 불변 값 객체(architect Q5)
+
     private const double IMAGE_LABEL_RADIUS_MULT = 3.0;   // 이미지 드래그 상한 = 3·max(hw,hh) px — 줌 불변·등방(FR-03)
     private const double MIN_IMAGE_FOOTPRINT_PX = 10.0;   // GMapMarkerImageControl.OnRender MinSize와 동일 클램프
     internal const double WIDTH_MIN = 40d, WIDTH_MAX = 800d;   // FR-13 폭 클램프
@@ -77,8 +86,33 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
     private void OnMapChanged() => InvalidateVisual();
 
-    // 마커 속성(Title/TitleSize/ShowTitle/Position/크기/줌·레이어 가시성) 변경 시 라벨 재렌더 → 속성패널 즉시 반영.
-    private void OnMarkerPropertyChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
+    /// <summary>라벨 렌더에 영향을 주는 속성만 재렌더(FR-08 필터 — 2차 검증 N그룹 확정 목록).
+    /// Width/Height는 FR-01 이후 값은 안 읽지만 라인/이미지 '지오메트리 변경 신호'로 유지(V-08).
+    /// Bearing/ImageBounds는 이미지 회전·이동/리사이즈 시 footprint AABB가 변하므로 필수.</summary>
+    private static readonly System.Collections.Generic.HashSet<string> _renderProps = new(StringComparer.Ordinal)
+    {
+        "Title", "TitleSize", "ShowTitle",
+        "TitleColor", "TitleBackground", "TitleFontFamily", "TitleBold", "TitleItalic", "TitleMaxWidth",
+        "Position", "Bearing", "ImageBounds", "Width", "Height", "Zoom", "IsLayerEnabled", "Visible",
+        "LabelOffsetX", "LabelOffsetY", "LabelOffsetU", "LabelOffsetV",
+    };
+
+    /// <summary>텍스트 캐시를 무효화해야 하는 속성(글립/측정 변경) — FR-08 무효화 조건.</summary>
+    private static readonly System.Collections.Generic.HashSet<string> _textProps = new(StringComparer.Ordinal)
+    {
+        "Title", "TitleSize", "TitleColor", "TitleFontFamily", "TitleBold", "TitleItalic", "TitleMaxWidth",
+    };
+
+    // 마커 속성 변경 시 라벨 재렌더 — 무관 속성(IsSelected/Fill·StrokeColor 등)은 필터로 제외(P1-02 폭주 방지).
+    private void OnMarkerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        var name = e.PropertyName;
+        if (string.IsNullOrEmpty(name)) { _cachedText = null; InvalidateVisual(); return; }   // 전체 갱신 통지는 보수적으로
+        if (!_renderProps.Contains(name)) return;
+        if (_textProps.Contains(name)) _cachedText = null;
+        if (name is "TitleColor" or "TitleBackground") { _cachedFg = null; _cachedBg = null; }
+        InvalidateVisual();
+    }
 
     /// <summary>아이콘 스크린 중심.</summary>
     private Point IconCenter()
@@ -170,14 +204,22 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 return;
             var title = _marker.Title!;
 
-            // 스타일 반영(FR-05·13) — 기본값이면 종전 하드코딩과 시각 동일(NFR-01). 캐시는 스테이지4(FR-08).
+            // 스타일 반영(FR-05·13) + 렌더 캐시(FR-08) — 기본값이면 종전 하드코딩과 시각 동일(NFR-01).
             double dpi = VisualTreeHelper.GetDpi(_map).PixelsPerDip;
-            var typeface = ResolveTypeface(_marker.TitleFontFamily, _marker.TitleBold, _marker.TitleItalic);
-            var fg = BrushFromArgb(_marker.TitleColor, _fg);
             double maxW = EffectiveMaxWidth(_marker.TitleMaxWidth);
-            var ft = new FormattedText(title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                typeface, Math.Max(9d, _marker.TitleSize), fg, dpi)
-            { MaxTextWidth = maxW, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+            if (_cachedFg == null || _cachedFgArgb != _marker.TitleColor)
+            { _cachedFgArgb = _marker.TitleColor; _cachedFg = BrushFromArgb(_cachedFgArgb, _fg); _cachedText = null; }
+            if (_cachedBg == null || _cachedBgArgb != _marker.TitleBackground)
+            { _cachedBgArgb = _marker.TitleBackground; _cachedBg = BrushFromArgb(_cachedBgArgb, _bg); }
+            if (_cachedText == null || Math.Abs(_cachedDpi - dpi) > 0.001)
+            {
+                var typeface = GetTypeface(_marker.TitleFontFamily, _marker.TitleBold, _marker.TitleItalic);
+                _cachedText = new FormattedText(title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                    typeface, Math.Max(9d, _marker.TitleSize), _cachedFg, dpi)
+                { MaxTextWidth = maxW, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                _cachedDpi = dpi;
+            }
+            var ft = _cachedText;
 
             var c = LabelCenter();
             double w = ft.WidthIncludingTrailingWhitespace + PadX * 2d;
@@ -190,8 +232,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
                 dc.DrawLine(_leaderPen, IconCenter(), c);
 
             // 테두리 없이 배경 칩만 — MarkerEditAdorner 편집박스와 혼동(adorner 박스 2개처럼 보임) 방지. 가독성용 배경만 유지.
-            var bg = BrushFromArgb(_marker.TitleBackground, _bg);
-            dc.DrawRoundedRectangle(bg, null, box, 3d, 3d);
+            dc.DrawRoundedRectangle(_cachedBg, null, box, 3d, 3d);
             dc.DrawText(ft, new Point(box.X + PadX, box.Y + PadY));
 
             // 폭 조절 중: 최대폭 가이드(점선) — 텍스트가 짧아 박스가 안 자랄 때도 말줄임 한계선이 보이게(WYSIWYG, FR-13)
@@ -382,6 +423,22 @@ public sealed class LabelAdorner : Adorner, IDisposable
         _map.OnMapZoomChanged -= OnMapChanged;
         _map.OnMapDrag -= OnMapChanged;
         if (_marker is INotifyPropertyChanged npc) npc.PropertyChanged -= OnMarkerPropertyChanged;
+        _cachedText = null;   // 렌더 캐시 해제(FR-08 — 수명 규약)
+        _cachedFg = null;
+        _cachedBg = null;
+    }
+
+    /// <summary>Typeface 정적 공유 캐시 — 폰트/굵기/이탤릭 조합당 1회 생성(FR-08, 불변 값 객체라 공유 안전).</summary>
+    internal static Typeface GetTypeface(string? family, bool bold, bool italic)
+    {
+        var key = (family ?? string.Empty, bold, italic);
+        lock (_typefaceGate)
+        {
+            if (_typefaceCache.TryGetValue(key, out var tf)) return tf;
+            tf = ResolveTypeface(family, bold, italic);
+            _typefaceCache[key] = tf;
+            return tf;
+        }
     }
 
     /// <summary>유효 최대폭 — 0 이하(레거시/미설정)는 기본 200, 그 외 40~800 클램프(FR-13). 테스트 공유.</summary>
