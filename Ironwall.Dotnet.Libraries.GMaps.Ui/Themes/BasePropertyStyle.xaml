@@ -147,8 +147,9 @@
 								</Grid>
 							</Border>
 
-							<!--  스크롤 가능한 내용 영역  -->
+							<!--  스크롤 가능한 내용 영역 (PART_ContentScroll — 마커 전환 시 상단 복귀)  -->
 							<ScrollViewer
+								x:Name="PART_ContentScroll"
 								Grid.Row="1"
 								HorizontalScrollBarVisibility="Disabled"
 								VerticalScrollBarVisibility="Auto">

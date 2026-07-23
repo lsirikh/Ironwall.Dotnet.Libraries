@@ -696,6 +696,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 control._isInitializing = false; // 플래그 해제
                 control._isClearingBindings = false;
                 //System.Diagnostics.Debug.WriteLine("_isInitializing = false 설정");
+
+                // 마커 전환/패널 오픈 시 항상 BASIC(제목)부터 — LABEL 섹션 추가로 길어진 패널이
+                // 이전 스크롤 위치를 물려받아 중간부터 보이는 문제 방지(v2.4 후속).
+                control._contentScroll?.ScrollToTop();
             }
             //System.Diagnostics.Debug.WriteLine("=== OnSelectedMarkerChanged 완료 ===");
         }
@@ -1136,6 +1140,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
             // "현재위치 적용" 버튼 배선은 생성자 AddHandler(ButtonBase.ClickEvent) + OnAnyButtonClick에서 처리.
             // (SpecificContent는 ContentPresenter 별도 namescope라 GetTemplateChild로 못 찾음)
+
+            // 내용 스크롤 캐시 — 마커 선택 시 BASIC(제목)부터 보이게 상단 복귀(LABEL 섹션 추가로 패널이 길어져
+            // 이전 스크롤 위치가 남으면 열자마자 중간부터 보이는 문제, Overlay_Title v2.4 후속).
+            _contentScroll = GetTemplateChild("PART_ContentScroll") as ScrollViewer;
         }
 
         /// <summary>버블링된 모든 버튼 클릭에서 "현재위치 적용" 버튼만 식별해 처리 — SpecificContent 버튼 배선용.</summary>
@@ -1187,6 +1195,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         private Button? _applyLocBtn;
         private object? _applyLocOriginalContent;
         private bool _applyLocBusy;
+        // 내용 스크롤(마커 전환 시 상단 복귀용)
+        private ScrollViewer? _contentScroll;
         #endregion
     }
 
