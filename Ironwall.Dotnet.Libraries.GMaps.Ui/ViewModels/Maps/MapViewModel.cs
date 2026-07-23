@@ -7563,7 +7563,15 @@ public partial class MapViewModel : BasePanelViewModel,
                 return;
             }
 
-            await DbUpdateProcess(e.Marker);
+            try { await DbUpdateProcess(e.Marker); }
+            catch (Exception ex)
+            {
+                // async void 경유라 종전엔 예외가 무음 소멸/크래시로 이어져 "조용히 저장 안 됨"으로 보였음
+                // (예: 타입 테이블 행 부재 롤백 — 제목 저장 전수감사에서 자가치유 추가). 실패를 가시화하고
+                // undo 기록/트리 동기는 스킵(미저장 값을 undo 스택에 남기지 않음).
+                _log?.Error($"속성 영속 실패({e.PropertyName}, Id={e.Marker?.Id}): {ex.Message}");
+                return;
+            }
             _editRecorder?.RecordPropertyChange(e.Marker, e.PropertyName, e.OldValue, e.NewValue);   // Undo 기록(coalescing)
             // "Visibility"는 IsReplayableProperty 미포함이라 RecordPropertyChange가 드롭 → 전용 VisibilityCommand로
             //   라우팅해 속성창 가시성 변경도 Undo 가능하게(D2). (레이어 트리 체크박스와 동일 경로 재사용)
@@ -7598,6 +7606,12 @@ public partial class MapViewModel : BasePanelViewModel,
             {
                 MainMap?.RefreshMarkerVisibility(zoomMarker);
             }
+        }
+        else
+        {
+            // 편집모드 OFF/마커 편집 중엔 DB 미저장(설계) — 종전엔 완전 무음이라 "바꿨는데 조용히 원복"으로
+            // 오인됨(제목 저장 전수감사). 진단 가능하게 최소 로그.
+            _log?.Warning($"속성 변경 미영속(편집모드={IsEditModeEnabled}, 마커편집중={_isMarkerEditing}): {e.PropertyName}");
         }
     }
 

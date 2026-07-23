@@ -1358,8 +1358,18 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.Opacity
             }, transaction);
 
-            if (symbolAffected == 0 || geometryAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"GeometrySymbol not found. Id={model.Id}");
+            if (geometryAffected == 0)
+            {
+                // 타입 테이블 행 부재(구버전 INSERT/외부 시드로 base만 존재) — 종전엔 전체 롤백되어 Title 등
+                // base 변경까지 무음 소실(사용자 "반영 안 됨"). 자가치유 INSERT 후 진행(제목 저장 전수감사).
+                await conn.ExecuteAsync(@"
+                    INSERT INTO GeometrySymbols (SymbolId, ShapeType, Opacity)
+                    VALUES (@SymbolId, @ShapeType, @Opacity);",
+                    new { SymbolId = model.Id, ShapeType = model.ShapeType.ToString(), model.Opacity }, transaction);
+                _log?.Warning($"GeometrySymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
@@ -1748,8 +1758,27 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.BaseBearing
             }, transaction);
 
-            if (symbolAffected == 0 || pidsAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"PidsSymbol not found. Id={model.Id}");
+            if (pidsAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing)
+                    VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        model.LinkedDeviceId,
+                        DeviceType = model.DeviceType.ToString(),
+                        model.ShowFOV,
+                        FOVColor = model.FOVColor.ToString(),
+                        model.FOVOpacity,
+                        EventStatus = model.EventStatus.ToString(),
+                        model.BaseBearing
+                    }, transaction);
+                _log?.Warning($"PidsSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
@@ -2098,8 +2127,29 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.CountryCode
             }, transaction);
 
-            if (symbolAffected == 0 || militaryAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"MilitarySymbol not found. Id={model.Id}");
+            if (militaryAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO MilitarySymbols (SymbolId, Affiliation, BattleDimension, StandardIdentity, UnitType, UnitSize, UnitDesignator, HigherFormation, CallSign, CountryCode)
+                    VALUES (@SymbolId, @Affiliation, @BattleDimension, @StandardIdentity, @UnitType, @UnitSize, @UnitDesignator, @HigherFormation, @CallSign, @CountryCode);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        Affiliation = model.Affiliation.ToString(),
+                        BattleDimension = model.BattleDimension.ToString(),
+                        StandardIdentity = model.StandardIdentity.ToString(),
+                        UnitType = model.UnitType.ToString(),
+                        UnitSize = model.UnitSize.ToString(),
+                        model.UnitDesignator,
+                        model.HigherFormation,
+                        model.CallSign,
+                        model.CountryCode
+                    }, transaction);
+                _log?.Warning($"MilitarySymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
@@ -2450,8 +2500,24 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 await conn.ExecuteAsync(insertPointSql, pointParams, transaction);
             }
 
-            if (symbolAffected == 0 || lineAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"LineSymbol not found. Id={model.Id}");
+            if (lineAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO LineSymbols (SymbolId, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+                    VALUES (@SymbolId, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        model.LineOpacity,
+                        model.IsClosedPath,
+                        model.ShowArrowHead,
+                        LinePattern = model.LinePattern.ToString()
+                    }, transaction);
+                _log?.Warning($"LineSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
@@ -2735,8 +2801,25 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.BuildingArea
             }, transaction);
 
-            if (symbolAffected == 0 || infraAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"InfraSymbol not found. Id={model.Id}");
+            if (infraAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO InfraSymbols (SymbolId, BuildingType, BuildingUsage, FloorCount, BasementFloorCount, BuildingArea)
+                    VALUES (@SymbolId, @BuildingType, @BuildingUsage, @FloorCount, @BasementFloorCount, @BuildingArea);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        BuildingType = model.BuildingType.ToString(),
+                        BuildingUsage = model.BuildingUsage.ToString(),
+                        model.FloorCount,
+                        model.BasementFloorCount,
+                        model.BuildingArea
+                    }, transaction);
+                _log?.Warning($"InfraSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
@@ -3189,8 +3272,27 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 await conn.ExecuteAsync(insertPointSql, pointParams, transaction);
             }
 
-            if (symbolAffected == 0 || pidsGroupAffected == 0)
+            if (symbolAffected == 0)
                 throw new KeyNotFoundException($"PidsGroupSymbol not found. Id={model.Id}");
+            if (pidsGroupAffected == 0)
+            {
+                // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실
+                // (사용자 보고: PidsGroup 제목 변경 미반영). base는 이미 갱신됐으므로 타입행만 복구 후 커밋.
+                await conn.ExecuteAsync(@"
+                    INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
+                    VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);",
+                    new
+                    {
+                        SymbolId = model.Id,
+                        model.LinkedDeviceGroup,
+                        EventStatus = model.EventStatus.ToString(),
+                        model.LineOpacity,
+                        model.IsClosedPath,
+                        model.ShowArrowHead,
+                        LinePattern = model.LinePattern.ToString()
+                    }, transaction);
+                _log?.Warning($"PidsGroupSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
+            }
 
             await transaction.CommitAsync(token);
 
