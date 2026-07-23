@@ -322,6 +322,23 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             new("노랑", unchecked((int)0xFFF9A825)),
         };
 
+        /// <summary>라벨 폰트 큐레이션 — 한글 Windows 표준 탑재 폰트 위주. 한글 폰트는 한글명, 영문 폰트는 영문명(v2.4).</summary>
+        public static LabelFontOption[] LabelFontOptions { get; } =
+        {
+            new("기본 (Segoe UI)", string.Empty),
+            new("맑은 고딕", "Malgun Gothic"),
+            new("굴림", "Gulim"),
+            new("돋움", "Dotum"),
+            new("바탕", "Batang"),
+            new("궁서", "Gungsuh"),
+            new("Segoe UI", "Segoe UI"),
+            new("Arial", "Arial"),
+            new("Verdana", "Verdana"),
+            new("Tahoma", "Tahoma"),
+            new("Times New Roman", "Times New Roman"),
+            new("Consolas", "Consolas"),
+        };
+
         /// <summary>
         /// 특정 컨텐츠
         /// </summary>
@@ -1181,6 +1198,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public int Argb { get; }
         public LabelColorOption(string name, int argb) { Name = name; Argb = argb; }
         public override string ToString() => Name;
+    }
+
+    /// <summary>라벨 폰트 항목 — 큐레이션 리스트(한글 폰트=한글명, 영문 폰트=영문명, FR-07 v2.4).
+    /// 시스템 전체 열거({x:Static Fonts.SystemFontFamilies})는 설치 폰트 자원 상태에 따라 패널 로드/드롭다운에서
+    /// 예외로 앱이 죽는 크래시 벡터라 제거. 미탑재 폰트 선택 시 WPF 무음 폴백(크래시 없음).</summary>
+    public sealed class LabelFontOption
+    {
+        public string DisplayName { get; }
+        /// <summary>저장값(FontFamily invariant name). 빈값=Segoe UI 기본 규약.</summary>
+        public string Family { get; }
+        /// <summary>드롭다운 미리보기용(빈값이면 Segoe UI).</summary>
+        public string PreviewFamily => string.IsNullOrEmpty(Family) ? "Segoe UI" : Family;
+        public LabelFontOption(string displayName, string family) { DisplayName = displayName; Family = family; }
+        public override string ToString() => DisplayName;
     }
 
 
