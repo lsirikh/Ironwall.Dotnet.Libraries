@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-07-23 (advance-phase 자동)
-- **총 문서 수**: 392개
+- **총 문서 수**: 393개
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [Overlay_Title_ZoomStyle-analysis.md](analyses/Overlay_Title_ZoomStyle-analysis.md) | Overlay_Title_ZoomStyle (라벨 줌버그+스타일, 시뮬 108건) | 2026-07-23 |
 | [GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md](analyses/GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md) | GMap_OverlayWindow_Symbol_Visibility_Restore | 2026-07-20 |
 | [VSCode_Terminal_Tangling-analysis.md](analyses/VSCode_Terminal_Tangling-analysis.md) | VSCode_Terminal_Tangling | 2026-07-20 |
 | [Grant_Enforcement_Client_Analysis.md](analyses/Grant_Enforcement_Client_Analysis.md) | Grant_Enforcement_Client_Analysis.md | 2026-07-20 |
@@ -54,6 +55,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [Symbol_ContextMenu_ViewMode_Lock-prd.md](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | 심볼 우클릭 메뉴 뷰모드 표시+잠금 게이트 v2 (v1 supersede) | Draft | 2026-07-23 |
+| [Overlay_Title_ZoomStyle-prd.md](prds/Overlay_Title_ZoomStyle-prd.md) | Overlay_Title_ZoomStyle | Draft | 2026-07-23 |
 | [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History | Approved | 2026-07-23 |
 | [GOP_AuditLog_DateFilter_Pagination-prd.md](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | GOP_AuditLog_DateFilter_Pagination | Draft | 2026-07-23 |
 | [GMap_Symbol_Visibility_Master-prd.md](prds/GMap_Symbol_Visibility_Master-prd.md) | GMap_Symbol_Visibility_Master | Draft | 2026-07-20 |
@@ -150,7 +153,7 @@
 | [GMap_Zoom_Improvements-prd.md](prds/GMap_Zoom_Improvements-prd.md) | GMap_Zoom_Improvements | Approved | 2026-06-12 |
 | [MarkerHitTest_AABB_Fix-prd.md](prds/MarkerHitTest_AABB_Fix-prd.md) | MarkerHitTest_AABB_Fix | Completed | 2026-06-10 |
 | [OverlayImage_Rotation_Editing-prd.md](prds/OverlayImage_Rotation_Editing-prd.md) | OverlayImage_Rotation_Editing | Approved | 2026-06-10 |
-| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Approved | 2026-06-10 |
+| [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Superseded | 2026-06-10 |
 | [OverlayImage_ZOrder_Independence-prd.md](prds/OverlayImage_ZOrder_Independence-prd.md) | OverlayImage_ZOrder_Independence | Approved | 2026-06-10 |
 | [ZOrder_PropertyPanel_Integration-prd.md](prds/ZOrder_PropertyPanel_Integration-prd.md) | ZOrder_PropertyPanel_Integration | Draft | 2026-06-10 |
 | [LayerVisibility_Persistence_Fix-prd.md](prds/LayerVisibility_Persistence_Fix-prd.md) | LayerVisibility_Persistence_Fix | Approved | 2026-06-08 |
@@ -196,6 +199,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [Detection_Signal_History-prd-plan.md](plans/Detection_Signal_History-prd-plan.md) | [PRD](prds/Detection_Signal_History-prd.md) | 4/43 | 2026-07-23 |
 | [GOP_AuditLog_DateFilter_Pagination-prd-plan.md](plans/GOP_AuditLog_DateFilter_Pagination-prd-plan.md) | [PRD](prds/GOP_AuditLog_DateFilter_Pagination-prd.md) | 0/0 | 2026-07-23 |
 | [Admin_Photo_Upload-prd-plan.md](plans/Admin_Photo_Upload-prd-plan.md) | [PRD](prds/Admin_Photo_Upload-prd.md) | 5/26 | 2026-07-20 |
 | [EventChart_Tooltip_ThemeSync-prd-plan.md](plans/EventChart_Tooltip_ThemeSync-prd-plan.md) | [PRD](prds/EventChart_Tooltip_ThemeSync-prd.md) | 6/7 | 2026-07-20 |
