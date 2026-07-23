@@ -49,7 +49,8 @@
 					Width="130"
 					VerticalAlignment="Center"
 					md:HintAssist.Hint="시작일"
-					SelectedDate="{Binding StartDate, Mode=TwoWay}" />
+					SelectedDate="{Binding StartDate, Mode=TwoWay}"
+					Style="{StaticResource MaterialDesignDatePicker}" />
 				<TextBlock
 					Margin="6,0,6,0"
 					VerticalAlignment="Center"
@@ -60,7 +61,8 @@
 					VerticalAlignment="Center"
 					md:HintAssist.Hint="종료일"
 					DisplayDateStart="{Binding EndDateDisplay}"
-					SelectedDate="{Binding EndDate, Mode=TwoWay}" />
+					SelectedDate="{Binding EndDate, Mode=TwoWay}"
+					Style="{StaticResource MaterialDesignDatePicker}" />
 				<Button
 					Margin="8,0,0,0"
 					Style="{StaticResource ModernToolbarButton}"
