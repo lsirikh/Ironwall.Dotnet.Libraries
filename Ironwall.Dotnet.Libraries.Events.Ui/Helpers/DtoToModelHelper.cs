@@ -32,6 +32,10 @@ public static class DtoToModelHelper
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
             Signal = dto.Detail?.Signal,
+            AiModel = dto.Detail?.Model,
+            InferenceMs = dto.Detail?.InferenceMs,
+            Thumbnail = dto.Detail?.Thumbnail,
+            Objects = ConvertObjectsFromDto(dto.Detail?.Objects),
             Device = ConvertDeviceFromDto(dto.Device, null)
         };
     }
@@ -106,7 +110,7 @@ public static class DtoToModelHelper
             DeviceId = model.Device?.Id ?? 0,   // 서버 Create는 flat device_id(FK) 필수
             Device = ConvertDeviceToDto(model.Device),
             DeviceDescription = model.Device?.DeviceName,
-            Detail = BuildDetectionDetail(model.Signal)
+            Detail = BuildDetectionDetail(model)
         };
     }
 
@@ -178,12 +182,44 @@ public static class DtoToModelHelper
         {
             TypeEvent = model.MessageType.ToString(),
             Result = model.Result.ToString(),
-            Detail = BuildDetectionDetail(model.Signal)
+            Detail = BuildDetectionDetail(model)
         };
 
-    /// <summary>Signal 값이 있을 때만 detail 재구성(null이면 필드 자체 생략 — 기존 페이로드와 동일).</summary>
-    private static DetectionDetailDto? BuildDetectionDetail(int? signal)
-        => signal is int s ? new DetectionDetailDto { Signal = s } : null;
+    /// <summary>detail 필드가 하나라도 있으면 전체 재구성(없으면 필드 자체 생략 — 기존 페이로드와 동일).</summary>
+    private static DetectionDetailDto? BuildDetectionDetail(IDetectionEventModel model)
+    {
+        bool hasDetail = model.Signal is not null
+                         || !string.IsNullOrEmpty(model.AiModel)
+                         || model.InferenceMs is not null
+                         || !string.IsNullOrEmpty(model.Thumbnail)
+                         || model.Objects is { Count: > 0 };
+        if (!hasDetail) return null;
+
+        return new DetectionDetailDto
+        {
+            Signal = model.Signal,
+            Model = model.AiModel,
+            InferenceMs = model.InferenceMs,
+            Thumbnail = model.Thumbnail,
+            Objects = model.Objects?.Select(o => new DetectedObjectDto
+            {
+                Label = o.Label,
+                Confidence = o.Confidence,
+                Bbox = o.Bbox?.ToList(),
+                Thumbnail = o.Thumbnail
+            }).ToList()
+        };
+    }
+
+    /// <summary>detail.objects[] DTO → 모델 변환.</summary>
+    private static List<DetectionObjectModel>? ConvertObjectsFromDto(List<DetectedObjectDto>? objects)
+        => objects?.Select(o => new DetectionObjectModel
+        {
+            Label = o.Label,
+            Confidence = o.Confidence,
+            Bbox = o.Bbox?.ToList(),
+            Thumbnail = o.Thumbnail
+        }).ToList();
 
     /// <summary>IMalfunctionEventModel → MalfunctionEventReplaceDto (PUT 전용, type_event/reason/detail만)</summary>
     public static MalfunctionEventReplaceDto ToMalfunctionEventReplaceDto(this IMalfunctionEventModel model)
@@ -235,6 +271,10 @@ public static class DtoToModelHelper
             Status = dto.ActionReported == "True" ? EnumTrueFalse.True : EnumTrueFalse.False,
             Result = Enum.Parse<EnumDetectionType>(dto.Result),
             Signal = dto.Detail?.Signal,
+            AiModel = dto.Detail?.Model,
+            InferenceMs = dto.Detail?.InferenceMs,
+            Thumbnail = dto.Detail?.Thumbnail,
+            Objects = ConvertObjectsFromDto(dto.Detail?.Objects),
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };
     }

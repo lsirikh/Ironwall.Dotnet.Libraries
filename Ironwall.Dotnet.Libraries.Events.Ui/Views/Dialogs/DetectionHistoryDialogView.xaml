@@ -101,21 +101,52 @@
 			<RowDefinition Height="Auto" />
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  ① 시안 헤더 (ModernDialogHeader 표준)  -->
+		<!--  ① 시안 헤더 (ModernDialogHeader 표준) — 닫기=우상단 ✕ (디자인 패턴, 런타임 피드백)  -->
 		<Border Grid.Row="0" Style="{StaticResource ModernDialogHeader}">
-			<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-				<md:PackIcon
-					Width="20"
-					Height="20"
-					Margin="0,0,8,0"
+			<DockPanel LastChildFill="True">
+				<Button
+					x:Name="CloseDialog"
+					Width="26"
+					Height="26"
 					VerticalAlignment="Center"
-					Foreground="{DynamicResource OnPrimaryFixedBrush}"
-					Kind="ChartLine" />
-				<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="{Binding HeaderText, FallbackValue=탐지 신호 이력}" />
-			</StackPanel>
+					Cursor="Hand"
+					DockPanel.Dock="Right"
+					ToolTip="닫기">
+					<Button.Template>
+						<ControlTemplate TargetType="Button">
+							<Border
+								x:Name="Bd"
+								Background="Transparent"
+								CornerRadius="13">
+								<md:PackIcon
+									Width="15"
+									Height="15"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Foreground="{DynamicResource OnPrimaryFixedBrush}"
+									Kind="Close" />
+							</Border>
+							<ControlTemplate.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+								</Trigger>
+							</ControlTemplate.Triggers>
+						</ControlTemplate>
+					</Button.Template>
+				</Button>
+				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+					<md:PackIcon
+						Width="20"
+						Height="20"
+						Margin="0,0,8,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource OnPrimaryFixedBrush}"
+						Kind="ChartLine" />
+					<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="{Binding HeaderText, FallbackValue=탐지 신호 이력}" />
+				</StackPanel>
+			</DockPanel>
 		</Border>
 
 		<!--  ② 툴바 — 2행 구조(잘림 수정): 1행=기간 세그먼트+새로고침 / 2행=필터 칩 WrapPanel(줄바꿈)+미조치만  -->
@@ -347,6 +378,8 @@
 					LineBrush="{DynamicResource PrimaryBrush}"
 					PointBrush="{DynamicResource PrimaryBrush}"
 					PointClickedCommand="{Binding PointClickedCommand}"
+					RangeEnd="{Binding ChartRangeEnd}"
+					RangeStart="{Binding ChartRangeStart}"
 					SelectedPayload="{Binding SelectedItem, Mode=TwoWay}"
 					UnactionedBrush="{DynamicResource StatusCriticalBrush}" />
 				<DockPanel Margin="2,2,2,4" LastChildFill="False">
@@ -376,7 +409,7 @@
 						DockPanel.Dock="Right"
 						FontSize="11"
 						Foreground="{DynamicResource TextSecondaryBrush}"
-						Text="포인트 클릭 → 아래 그리드 해당 행 이동" />
+						Text="휠=줌 · 드래그=이동 · 더블클릭=전체 · 포인트 클릭=행 이동" />
 				</DockPanel>
 			</StackPanel>
 
@@ -535,29 +568,6 @@
 					Foreground="{DynamicResource TextSecondaryBrush}"
 					Text="{Binding LastUpdatedText}" />
 			</DockPanel>
-		</Border>
-
-		<!--  ⑧ 다이얼로그 버튼  -->
-		<Border
-			Grid.Row="7"
-			Padding="10,8"
-			BorderBrush="{DynamicResource DividerBrush}"
-			BorderThickness="0,1,0,0">
-			<Button
-				x:Name="CloseDialog"
-				Padding="20,4"
-				HorizontalAlignment="Right"
-				Style="{StaticResource MaterialDesignFlatDarkBgButton}">
-				<StackPanel Orientation="Horizontal">
-					<md:PackIcon
-						VerticalAlignment="Center"
-						Kind="Close" />
-					<TextBlock
-						Margin="6,0,0,0"
-						VerticalAlignment="Center"
-						Text="닫기" />
-				</StackPanel>
-			</Button>
 		</Border>
 	</Grid>
 </UserControl>

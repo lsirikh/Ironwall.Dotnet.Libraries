@@ -123,6 +123,59 @@ public class DetectionSignalTests
 
         Assert.Equal(820, copy.Signal);
     }
+
+    [Fact]
+    public void should_map_full_detail_when_present()
+    {
+        // detail 전체(objects/model/inference_ms/thumbnail) 표면화 — 런타임 피드백 v1.3
+        var dto = BuildDto(1, 1500);
+        dto.Detail!.Model = "yolov8n";
+        dto.Detail.InferenceMs = 45;
+        dto.Detail.Thumbnail = "http://192.168.1.50:8080/events/1001/thumb.jpg";
+        dto.Detail.Objects = new List<DetectedObjectDto>
+        {
+            new() { Label = "person", Confidence = 0.95, Bbox = new List<int> { 100, 200, 50, 100 } }
+        };
+
+        var model = dto.ToDetectionEventModel();
+
+        Assert.Equal(1500, model.Signal);
+        Assert.Equal("yolov8n", model.AiModel);
+        Assert.Equal(45, model.InferenceMs);
+        Assert.Equal("http://192.168.1.50:8080/events/1001/thumb.jpg", model.Thumbnail);
+        Assert.Single(model.Objects!);
+        Assert.Equal("person", model.Objects![0].Label);
+        Assert.Equal(0.95, model.Objects[0].Confidence);
+        Assert.Equal(new List<int> { 100, 200, 50, 100 }, model.Objects[0].Bbox);
+    }
+
+    [Fact]
+    public void should_rebuild_full_detail_when_ai_fields_present_on_replace()
+    {
+        // AI 이벤트(signal=0)도 detail 필드가 있으면 PUT에서 전체 보존돼야 한다(서버 전체 교체 계약)
+        var model = new DetectionEventModel
+        {
+            MessageType = EnumEventType.Intrusion,
+            Result = EnumDetectionType.AI_DETECT,
+            Signal = 0,
+            AiModel = "yolov8n",
+            InferenceMs = 45,
+            Thumbnail = "http://t/1.jpg",
+            Objects = new List<DetectionObjectModel>
+            {
+                new() { Label = "person", Confidence = 0.95, Bbox = new List<int> { 1, 2, 3, 4 } }
+            }
+        };
+
+        var dto = model.ToDetectionEventReplaceDto();
+
+        Assert.NotNull(dto.Detail);
+        Assert.Equal(0, dto.Detail!.Signal);
+        Assert.Equal("yolov8n", dto.Detail.Model);
+        Assert.Equal(45, dto.Detail.InferenceMs);
+        Assert.Single(dto.Detail.Objects!);
+        Assert.Equal("person", dto.Detail.Objects![0].Label);
+    }
     #endregion
 
     #region - TEST-02 Replace detail 보존 (FR-03) -

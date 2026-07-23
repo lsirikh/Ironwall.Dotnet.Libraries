@@ -206,6 +206,11 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         try
         {
             var (start, end) = ResolveRange();
+            // 차트 X축 전체 범위 = 조회 구간 (데이터가 일부 구간에만 있어도 축은 설정 기간 반영 — 런타임 피드백)
+            ChartRangeStart = start;
+            ChartRangeEnd = end;
+            NotifyOfPropertyChange(nameof(ChartRangeStart));
+            NotifyOfPropertyChange(nameof(ChartRangeEnd));
             var startText = start.ToString("yyyy-MM-ddTHH:mm:ss");
             var endText = end.ToString("yyyy-MM-ddTHH:mm:ss");
 
@@ -284,6 +289,10 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         get => _chartPoints;
         private set { _chartPoints = value; NotifyOfPropertyChange(); }
     }
+
+    /// <summary>차트 X축 전체 범위(조회 구간) — SignalChartControl.RangeStart/End 바인딩.</summary>
+    public DateTime? ChartRangeStart { get; private set; }
+    public DateTime? ChartRangeEnd { get; private set; }
 
     /// <summary>미조치만 보기 토글.</summary>
     public bool OnlyUnactioned

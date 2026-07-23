@@ -41,8 +41,9 @@
 
 			<!--  ─────────────────────────────  INPUT GRID  ─────────────────────────────  -->
 			<Grid Grid.Row="0">
-				<!--  2 행 × 6 쌍(label + editor) = 12 열  -->
+				<!--  3 행 — 1·2행: 편집 필드 / 3행: 탐지 상세(detail) 읽기 전용 (Detection_Signal_History)  -->
 				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
@@ -145,6 +146,62 @@
 					</ComboBox.ItemsPanel>
 				</ComboBox>
 
+				<!--  탐지 상세(detail.signal 등) — 계측값 읽기 전용 (Detection_Signal_History)  -->
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="4"
+					Style="{StaticResource TextBlockTitle}"
+					Text="신호" />
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="5"
+					VerticalAlignment="Center"
+					FontFamily="Consolas"
+					Text="{Binding SignalText, Mode=OneWay}" />
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="6"
+					Style="{StaticResource TextBlockTitle}"
+					Text="AI" />
+				<TextBlock
+					Grid.Row="1"
+					Grid.Column="7"
+					Grid.ColumnSpan="3"
+					VerticalAlignment="Center"
+					Text="{Binding AiSummaryText, Mode=OneWay}"
+					TextTrimming="CharacterEllipsis"
+					ToolTip="{Binding AiSummaryText}" />
+
+				<TextBlock
+					Grid.Row="2"
+					Grid.Column="0"
+					Margin="0,6,0,0"
+					Style="{StaticResource TextBlockTitle}"
+					Text="객체" />
+				<TextBlock
+					Grid.Row="2"
+					Grid.Column="1"
+					Grid.ColumnSpan="5"
+					Margin="0,6,0,0"
+					VerticalAlignment="Center"
+					Text="{Binding ObjectsText, Mode=OneWay}"
+					TextTrimming="CharacterEllipsis"
+					ToolTip="{Binding ObjectsText}" />
+				<TextBlock
+					Grid.Row="2"
+					Grid.Column="6"
+					Margin="0,6,0,0"
+					Style="{StaticResource TextBlockTitle}"
+					Text="썸네일" />
+				<TextBlock
+					Grid.Row="2"
+					Grid.Column="7"
+					Grid.ColumnSpan="3"
+					Margin="0,6,0,0"
+					VerticalAlignment="Center"
+					Text="{Binding ThumbnailText, Mode=OneWay}"
+					TextTrimming="CharacterEllipsis"
+					ToolTip="{Binding ThumbnailText}" />
 
 			</Grid>
 

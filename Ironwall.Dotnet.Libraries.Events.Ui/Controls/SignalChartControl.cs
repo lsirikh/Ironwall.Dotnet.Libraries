@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -12,6 +12,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Controls;
    Purpose      : 탐지 신호 시간축 차트 (Detection_Signal_History FR-13)
                   자체 OnRender 렌더러 — 외부 차트 패키지 없이 ≤500 포인트 렌더.
                   색상은 전부 Brush DP로 받는다(뷰에서 DynamicResource 토큰 바인딩 → 다크/라이트 대응).
+                  X축=조회 구간(RangeStart/End) 기준 + 휠 줌·드래그 팬·더블클릭 리셋 (런타임 피드백 v1.3).
    Created By   : GHLee
    Created On   : 2026-07-23
    Department   : SW Team
@@ -27,7 +28,17 @@ public class SignalChartControl : FrameworkElement
     #region - DependencyProperties -
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
         nameof(ItemsSource), typeof(IReadOnlyList<SignalChartPoint>), typeof(SignalChartControl),
-        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnViewResetNeeded));
+
+    /// <summary>조회 구간 시작 — X축 전체 범위 기준(데이터가 일부 구간에만 있어도 축은 조회 기간을 반영).</summary>
+    public static readonly DependencyProperty RangeStartProperty = DependencyProperty.Register(
+        nameof(RangeStart), typeof(DateTime?), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnViewResetNeeded));
+
+    /// <summary>조회 구간 끝.</summary>
+    public static readonly DependencyProperty RangeEndProperty = DependencyProperty.Register(
+        nameof(RangeEnd), typeof(DateTime?), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnViewResetNeeded));
 
     public static readonly DependencyProperty SelectedPayloadProperty = DependencyProperty.Register(
         nameof(SelectedPayload), typeof(object), typeof(SignalChartControl),
@@ -65,6 +76,16 @@ public class SignalChartControl : FrameworkElement
         get => (IReadOnlyList<SignalChartPoint>?)GetValue(ItemsSourceProperty);
         set => SetValue(ItemsSourceProperty, value);
     }
+    public DateTime? RangeStart
+    {
+        get => (DateTime?)GetValue(RangeStartProperty);
+        set => SetValue(RangeStartProperty, value);
+    }
+    public DateTime? RangeEnd
+    {
+        get => (DateTime?)GetValue(RangeEndProperty);
+        set => SetValue(RangeEndProperty, value);
+    }
     public object? SelectedPayload
     {
         get => GetValue(SelectedPayloadProperty);
@@ -81,13 +102,18 @@ public class SignalChartControl : FrameworkElement
     public Brush AxisBrush { get => (Brush)GetValue(AxisBrushProperty); set => SetValue(AxisBrushProperty, value); }
     public Brush GridBrush { get => (Brush)GetValue(GridBrushProperty); set => SetValue(GridBrushProperty, value); }
     public Brush LabelBrush { get => (Brush)GetValue(LabelBrushProperty); set => SetValue(LabelBrushProperty, value); }
+
+    // 데이터/조회 구간이 바뀌면 줌·팬 뷰를 전체로 리셋 (이전 뷰 잔존 방지)
+    private static void OnViewResetNeeded(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        => ((SignalChartControl)d).ResetView();
     #endregion
 
     #region - Ctors -
     public SignalChartControl()
     {
-        // 배경 히트테스트 확보(빈 영역 MouseMove/클릭 수신) — 렌더에서 투명 사각형을 깐다.
+        // 배경 히트테스트 확보(빈 영역 MouseMove/휠/드래그 수신) — 렌더에서 투명 사각형을 깐다.
         ClipToBounds = true;
+        Focusable = true;
         ToolTipService.SetInitialShowDelay(this, 150);
         ToolTipService.SetShowDuration(this, 8000);
     }
@@ -100,16 +126,37 @@ public class SignalChartControl : FrameworkElement
     private const double MARGIN_BOTTOM = 30;
     private const double POINT_RADIUS = 4.5;
     private const double HIT_RADIUS = 10;
+    private const double DRAG_THRESHOLD = 4;           // 이하 이동=클릭, 초과=팬
+    private const double MIN_VIEW_SPAN_SECONDS = 60;   // 최소 줌 구간(1분)
+    private const double ZOOM_STEP = 1.25;
     #endregion
 
+    #region - Attributes -
     // 렌더 시점 화면 좌표 캐시 — 히트테스트/툴팁용
     private readonly List<(Point Screen, SignalChartPoint Data)> _hitPoints = new();
+
+    // 줌/팬 뷰 윈도우 — null=전체(조회 구간). 렌더 시 실제 사용값/플롯 좌표를 캐시해 인터랙션 환산에 사용.
+    private DateTime? _viewStart, _viewEnd;
+    private DateTime _fullStart, _fullEnd;
+    private DateTime _renderStart, _renderEnd;
+    private double _plotL, _plotR;
+    private bool _hasData;
+
+    // 드래그 팬 상태
+    private bool _dragActive, _panMoved;
+    private Point _dragOrigin;
+    private DateTime _dragViewStart, _dragViewEnd;
+
+    // (code-review P1-2) 현재 hover 포인트 캐시 — 포인트가 바뀔 때만 ToolTip 갱신
+    private SignalChartPoint? _hoverPoint;
+    #endregion
 
     #region - Render -
     protected override void OnRender(DrawingContext dc)
     {
         base.OnRender(dc);
         _hitPoints.Clear();
+        _hasData = false;
 
         var w = ActualWidth;
         var h = ActualHeight;
@@ -120,6 +167,7 @@ public class SignalChartControl : FrameworkElement
 
         double plotL = MARGIN_LEFT, plotT = MARGIN_TOP;
         double plotR = w - MARGIN_RIGHT, plotB = h - MARGIN_BOTTOM;
+        _plotL = plotL; _plotR = plotR;
         var axisPen = new Pen(AxisBrush, 1);
         var gridPen = new Pen(GridBrush, 1) { DashStyle = new DashStyle(new double[] { 3, 4 }, 0) };
         axisPen.Freeze(); gridPen.Freeze();
@@ -128,21 +176,38 @@ public class SignalChartControl : FrameworkElement
         dc.DrawLine(axisPen, new Point(plotL, plotB), new Point(plotR, plotB));
         dc.DrawLine(axisPen, new Point(plotL, plotT), new Point(plotL, plotB));
 
-        var items = ItemsSource?.Where(p => p.Signal > 0).OrderBy(p => p.Time).ToList();
-        if (items is not { Count: > 0 })
+        var all = ItemsSource?.Where(p => p.Signal > 0).OrderBy(p => p.Time).ToList();
+        if (all is not { Count: > 0 })
         {
             DrawLabel(dc, "표시할 신호 데이터가 없습니다", new Point((plotL + plotR) / 2, (plotT + plotB) / 2), 12, TextAlignment.Center);
             return;
         }
+        _hasData = true;
 
-        // 스케일 — Y: 구간 최대값을 1-2-5 스텝으로 올림, X: 시간 범위(동일 시각 단건이면 ±30분 패딩)
-        var tMin = items[0].Time;
-        var tMax = items[^1].Time;
-        if (tMax <= tMin) { tMin = tMin.AddMinutes(-30); tMax = tMax.AddMinutes(30); }
+        // 전체 범위 — 조회 구간(RangeStart/End) 우선, 없으면 데이터 범위 (X축이 조회 기간을 반영)
+        var fullStart = RangeStart ?? all[0].Time;
+        var fullEnd = RangeEnd ?? all[^1].Time;
+        if (fullEnd <= fullStart) { fullStart = fullStart.AddMinutes(-30); fullEnd = fullEnd.AddMinutes(30); }
+        _fullStart = fullStart; _fullEnd = fullEnd;
+
+        // 현재 뷰(줌/팬 윈도우) — 없으면 전체. 전체 범위 밖으로 벗어나 있으면 리셋.
+        var tMin = _viewStart ?? fullStart;
+        var tMax = _viewEnd ?? fullEnd;
+        if (tMax <= tMin || tMin < fullStart.AddSeconds(-1) || tMax > fullEnd.AddSeconds(1))
+        {
+            tMin = fullStart; tMax = fullEnd;
+            _viewStart = _viewEnd = null;
+        }
+        _renderStart = tMin; _renderEnd = tMax;
         double span = (tMax - tMin).TotalSeconds;
-        int yMax = NiceCeiling(items.Max(p => p.Signal));
 
         double X(DateTime t) => plotL + (t - tMin).TotalSeconds / span * (plotR - plotL);
+
+        // 뷰 내 포인트 + 경계 이웃(라인이 화면 밖에서 이어져 들어오도록)
+        var items = FilterToView(all, tMin, tMax);
+
+        // Y 스케일 — 뷰 내 최대(줌 시 재스케일), 뷰가 비면 전체 최대
+        int yMax = NiceCeiling((items.Count > 0 ? items : all).Max(p => p.Signal));
         double Y(int s) => plotB - Math.Clamp((double)s / yMax, 0, 1) * (plotB - plotT);
 
         // Y 격자 + 라벨 (4분할)
@@ -155,16 +220,26 @@ public class SignalChartControl : FrameworkElement
         }
         DrawLabel(dc, "0", new Point(plotL - 6, plotB - 7), 10, TextAlignment.Right);
 
-        // X 격자 + 라벨 (4분할) — 범위에 따라 포맷 선택
-        string timeFormat = span <= 48 * 3600 ? "HH:mm" : "MM-dd";
+        // X 격자 + 라벨 (4분할) — 뷰 범위 기준 포맷(48h 초과 시 날짜 병기)
+        string timeFormat = span <= 48 * 3600 ? "HH:mm" : "MM-dd HH:mm";
         for (int i = 0; i <= 4; i++)
         {
             var t = tMin.AddSeconds(span * i / 4);
-            double x = X(t);
+            double x = plotL + (plotR - plotL) * i / 4;
             if (i > 0 && i < 4)
                 dc.DrawLine(gridPen, new Point(x, plotT), new Point(x, plotB));
             DrawLabel(dc, t.ToString(timeFormat), new Point(x, plotB + 6), 10, TextAlignment.Center);
         }
+
+        if (items.Count == 0)
+        {
+            DrawLabel(dc, "이 구간에 신호가 없습니다 (휠=줌 · 드래그=이동 · 더블클릭=전체)",
+                new Point((plotL + plotR) / 2, (plotT + plotB) / 2), 11, TextAlignment.Center);
+            return;
+        }
+
+        // 플롯 영역 클리핑 — 경계 이웃 포인트가 축 밖으로 그려지지 않도록
+        dc.PushClip(new RectangleGeometry(new Rect(plotL, plotT, plotR - plotL, plotB - plotT)));
 
         // 라인
         if (items.Count > 1)
@@ -186,11 +261,30 @@ public class SignalChartControl : FrameworkElement
         foreach (var p in items)
         {
             var center = new Point(X(p.Time), Y(p.Signal));
-            _hitPoints.Add((center, p));
+            if (center.X >= plotL - 1 && center.X <= plotR + 1)
+                _hitPoints.Add((center, p));
             var fill = p.IsActioned ? PointBrush : UnactionedBrush;
             bool selected = SelectedPayload != null && Equals(SelectedPayload, p.Payload);
             dc.DrawEllipse(fill, selected ? new Pen(LabelBrush, 2) : null, center, POINT_RADIUS, POINT_RADIUS);
         }
+
+        dc.Pop();
+    }
+
+    /// <summary>뷰 구간 내 포인트 + 양쪽 경계 이웃 1개씩(라인 연속성).</summary>
+    private static List<SignalChartPoint> FilterToView(List<SignalChartPoint> all, DateTime start, DateTime end)
+    {
+        var result = new List<SignalChartPoint>();
+        for (int i = 0; i < all.Count; i++)
+        {
+            var t = all[i].Time;
+            bool inside = t >= start && t <= end;
+            bool leftNeighbor = t < start && i + 1 < all.Count && all[i + 1].Time >= start;
+            bool rightNeighbor = t > end && i - 1 >= 0 && all[i - 1].Time <= end;
+            if (inside || leftNeighbor || rightNeighbor)
+                result.Add(all[i]);
+        }
+        return result;
     }
 
     /// <summary>1-2-5 스텝 올림 (예: 3150 → 4000) — Y축 눈금이 읽기 좋은 값이 되도록.</summary>
@@ -200,7 +294,7 @@ public class SignalChartControl : FrameworkElement
         double exp = Math.Pow(10, Math.Floor(Math.Log10(value)));
         double f = value / exp;
         double nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 4 ? 4 : f <= 5 ? 5 : 10;
-        return (int)(nice * exp);
+        return (int)Math.Min(nice * exp, int.MaxValue);
     }
 
     private void DrawLabel(DrawingContext dc, string text, Point anchor, double size, TextAlignment align)
@@ -212,14 +306,101 @@ public class SignalChartControl : FrameworkElement
     }
     #endregion
 
-    #region - Interaction (툴팁/클릭→행 동기화) -
-    // (code-review P1-2) 현재 hover 포인트 캐시 — 포인트가 바뀔 때만 ToolTip 갱신(매 MouseMove 재할당 시 팝업 깜빡임·GC 압박)
-    private SignalChartPoint? _hoverPoint;
+    #region - Interaction (줌/팬/툴팁/클릭→행 동기화) -
+    private void ResetView()
+    {
+        _viewStart = _viewEnd = null;
+        InvalidateVisual();
+    }
+
+    private void SetView(DateTime start, DateTime end)
+    {
+        // 전체 범위로 클램프 — 범위 밖 팬/줌 방지, 최소 구간 1분
+        double fullSpan = (_fullEnd - _fullStart).TotalSeconds;
+        double span = Math.Clamp((end - start).TotalSeconds, MIN_VIEW_SPAN_SECONDS, fullSpan);
+        if (start < _fullStart) start = _fullStart;
+        if (start.AddSeconds(span) > _fullEnd) start = _fullEnd.AddSeconds(-span);
+
+        if (span >= fullSpan - 0.5)
+        {
+            _viewStart = _viewEnd = null;   // 전체와 같으면 리셋 상태
+        }
+        else
+        {
+            _viewStart = start;
+            _viewEnd = start.AddSeconds(span);
+        }
+        InvalidateVisual();
+    }
+
+    private DateTime ScreenToTime(double x)
+    {
+        double ratio = Math.Clamp((x - _plotL) / Math.Max(1, _plotR - _plotL), 0, 1);
+        return _renderStart.AddSeconds((_renderEnd - _renderStart).TotalSeconds * ratio);
+    }
+
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        if (!_hasData) return;
+
+        // 커서 시각 고정 줌 — 커서가 가리키는 시간이 화면상 같은 위치에 남도록
+        var pos = e.GetPosition(this);
+        var cursorTime = ScreenToTime(pos.X);
+        double curSpan = (_renderEnd - _renderStart).TotalSeconds;
+        double newSpan = e.Delta > 0 ? curSpan / ZOOM_STEP : curSpan * ZOOM_STEP;
+        newSpan = Math.Clamp(newSpan, MIN_VIEW_SPAN_SECONDS, (_fullEnd - _fullStart).TotalSeconds);
+
+        double ratio = Math.Clamp((pos.X - _plotL) / Math.Max(1, _plotR - _plotL), 0, 1);
+        var newStart = cursorTime.AddSeconds(-newSpan * ratio);
+        SetView(newStart, newStart.AddSeconds(newSpan));
+        e.Handled = true;
+    }
+
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonDown(e);
+        if (!_hasData) return;
+
+        if (e.ClickCount == 2)   // 더블클릭=전체 보기
+        {
+            ResetView();
+            e.Handled = true;
+            return;
+        }
+
+        _dragActive = true;
+        _panMoved = false;
+        _dragOrigin = e.GetPosition(this);
+        _dragViewStart = _renderStart;
+        _dragViewEnd = _renderEnd;
+        CaptureMouse();
+        e.Handled = true;
+    }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        var hit = FindNearest(e.GetPosition(this));
+        var pos = e.GetPosition(this);
+
+        // 드래그 팬 — 임계(4px) 초과 이동 시 뷰 이동, 미만이면 클릭 후보 유지
+        if (_dragActive)
+        {
+            double dx = pos.X - _dragOrigin.X;
+            if (!_panMoved && Math.Abs(dx) < DRAG_THRESHOLD) return;
+            _panMoved = true;
+            Cursor = Cursors.ScrollWE;
+            ToolTip = null;
+            _hoverPoint = null;
+
+            double secondsPerPixel = (_dragViewEnd - _dragViewStart).TotalSeconds / Math.Max(1, _plotR - _plotL);
+            var shifted = _dragViewStart.AddSeconds(-dx * secondsPerPixel);
+            SetView(shifted, shifted.AddSeconds((_dragViewEnd - _dragViewStart).TotalSeconds));
+            return;
+        }
+
+        // (code-review P1-2) hover 포인트 변경 시에만 ToolTip 갱신
+        var hit = FindNearest(pos);
         if (ReferenceEquals(hit, _hoverPoint)) return;
         _hoverPoint = hit;
 
@@ -235,27 +416,36 @@ public class SignalChartControl : FrameworkElement
         }
     }
 
-    protected override void OnMouseLeave(MouseEventArgs e)
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
-        base.OnMouseLeave(e);
-        _hoverPoint = null;
+        base.OnMouseLeftButtonUp(e);
+        if (!_dragActive) return;
+        _dragActive = false;
+        ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
-        ToolTip = null;
-    }
 
-    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
-    {
-        base.OnMouseLeftButtonDown(e);
+        if (_panMoved)   // 팬 종료 — 클릭 아님
+        {
+            _panMoved = false;
+            return;
+        }
+
+        // 이동 없는 클릭 = 포인트 선택 (code-review P1-3: 커맨드→VM→TwoWay 역류로 단일화, 커맨드 없을 때만 직접 세팅)
         var hit = FindNearest(e.GetPosition(this));
         if (hit is not { } p) return;
-
-        // (code-review P1-3) 선택 경로 단일화 — 커맨드가 있으면 VM(SelectedItem)→TwoWay 바인딩 역류로
-        // SelectedPayload가 갱신되고 AffectsRender가 재렌더한다. 커맨드 없을 때만 직접 세팅(폴백).
         if (PointClickedCommand?.CanExecute(p.Payload) == true)
             PointClickedCommand.Execute(p.Payload);
         else
             SelectedPayload = p.Payload;
         e.Handled = true;
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        _hoverPoint = null;
+        if (!_dragActive) Cursor = Cursors.Arrow;
+        ToolTip = null;
     }
 
     private SignalChartPoint? FindNearest(Point pos)
