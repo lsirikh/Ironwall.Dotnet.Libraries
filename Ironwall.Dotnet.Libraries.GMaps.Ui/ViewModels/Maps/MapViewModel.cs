@@ -2384,7 +2384,17 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>전체 닫기 확인 콜백(FR-B2) — 열린 모든 카메라 팝업을 닫는다(Hub Lease 해제/PTZ 정지 포함).</summary>
     public async Task HandleAsync(CallCloseAllCameraPopupsProcessMessageModel message, CancellationToken cancellationToken)
     {
-        await CloseAllCameraPopupsAsync();
+        try
+        {
+            await CloseAllCameraPopupsAsync();
+        }
+        finally
+        {
+            // ★확인 팝업 닫기(ClickOk는 MessageModel만 발행하고 팝업을 닫지 않음 — 닫기 책임은 각 도메인 HandleAsync).
+            //  이게 누락돼 "모두 닫기 확인 → 확인 눌러도 확인창이 안 닫히는" 버그였음(2026-07-27 사용자 보고).
+            //  ROI/레이어 삭제 등 다른 확인 핸들러와 동일 패턴. finally로 CloseAll 예외 시에도 확인창은 반드시 닫음.
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel(), cancellationToken);
+        }
     }
 
     /// <summary>열린 카메라 팝업 전체 닫기(위젯 경로 전용 신규 진입점, FR-B2). 순차 await = ObservableCollection
