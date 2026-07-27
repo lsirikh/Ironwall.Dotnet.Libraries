@@ -7,6 +7,7 @@
 	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+	xmlns:sys="clr-namespace:System;assembly=mscorlib"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
@@ -445,6 +446,8 @@
 			HeadersVisibility="Column"
 			IsReadOnly="True"
 			ItemsSource="{Binding FilteredItems}"
+			MinRowHeight="34"
+			RowHeight="{x:Static sys:Double.NaN}"
 			SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
 			SelectionMode="Single"
 			Style="{StaticResource ModernDataGrid}">
