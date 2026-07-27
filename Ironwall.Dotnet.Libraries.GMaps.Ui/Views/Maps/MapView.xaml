@@ -996,11 +996,14 @@
 					Content="{Binding TrackingSettingsPanel}"
 					Visibility="{Binding IsTrackingSettingsPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-				<!--  카메라 팝업 연결선(Leader Line) — 카메라 심볼 중점 ↔ 팝업 경계, 팝업 아래 z레이어  -->
+				<!--  카메라 팝업 연결선(Leader Line) — 카메라 심볼 중점 ↔ 팝업 경계, 팝업 아래 z레이어.
+				      팝업과 동일하게 맵 영역으로 클립: 팝업이 맵 위로 스크롤되면 연결선도 맵 경계에서 잘려 상단 크롬을 덮지 않음.  -->
 				<ItemsControl
 					Canvas.Left="0"
 					Canvas.Top="0"
-					ClipToBounds="False"
+					Width="{Binding ActualWidth, ElementName=PropertyPanelCanvas}"
+					Height="{Binding ActualHeight, ElementName=PropertyPanelCanvas}"
+					ClipToBounds="True"
 					IsHitTestVisible="False"
 					Panel.ZIndex="5"
 					ItemsSource="{Binding CameraPopups}">
@@ -1024,11 +1027,16 @@
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
 
-				<!--  카메라 RTSP 스트리밍 팝업(멀티) — Geo 앵커 추종, 드래그 이동  -->
+				<!--  카메라 RTSP 스트리밍 팝업(멀티) — Geo 앵커 추종, 드래그 이동.
+				      ClipToBounds="True" + 캔버스 크기 고정: 팝업이 맵 영역(Grid.Row=2, PropertyPanelCanvas) 밖으로
+				      넘쳐 상단 툴바/MahApps 윈도우 타이틀바·컨트롤바(최소/최대/닫기)를 덮는 것을 구조적으로 차단(2026-07-27 스크린샷).
+				      PropertyPanelCanvas 자체는 다른 드래그 패널(음수 Top)을 위해 비클립 유지 — 이 레이어만 클립.  -->
 				<ItemsControl
 					Canvas.Left="0"
 					Canvas.Top="0"
-					ClipToBounds="False"
+					Width="{Binding ActualWidth, ElementName=PropertyPanelCanvas}"
+					Height="{Binding ActualHeight, ElementName=PropertyPanelCanvas}"
+					ClipToBounds="True"
 					Panel.ZIndex="10"
 					ItemsSource="{Binding CameraPopups}">
 					<ItemsControl.ItemsPanel>
