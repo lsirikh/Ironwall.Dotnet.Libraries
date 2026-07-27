@@ -77,6 +77,27 @@ public class LabelGeometryTests
         }
     }
 
+    [Theory(DisplayName = "라인/PidsGroup 드래그 라벨(비율 오프셋)은 줌해도 그룹 대비 위치 고정 (OQ-1 해소)")]
+    [InlineData(200, 40, 1.5, -1.2)]   // bbox 400x80, 우상단으로 드래그
+    [InlineData(700, 350, 0.8, 0.9)]   // 큰 펜스, 우하단
+    public void should_keep_line_label_relative_position_when_zoom_changes(double hw0, double hh0, double u, double v)
+    {
+        // 라인/PidsGroup은 v2.6부터 이미지와 동일 정규화(isNormalized: true) — 오프셋이 footprint 비율이라
+        // 줌으로 bbox가 스케일해도 라벨의 상대 위치(하프익스텐트 단위)가 불변이어야 한다.
+        double? baseNx = null, baseNy = null;
+        foreach (var scale in new[] { 0.125, 1.0, 8.0 })
+        {
+            double hw = hw0 * scale, hh = hh0 * scale;
+            var rel = LabelAdorner.ComputeLabelCenterRel(hw, hh, u, v, isNormalized: true);
+            Assert.Equal(u * hw, rel.X, 6);                 // 가로 = 비율×footprint (줌 비례)
+            Assert.Equal(hh + Gap + v * hh, rel.Y, 6);      // 세로 = 하단앵커 + 고정갭 + 비율×footprint
+            double nx = rel.X / hw, ny = (rel.Y - Gap) / hh;   // footprint 단위 상대좌표 = 줌 불변 상수여야
+            baseNx ??= nx; baseNy ??= ny;
+            Assert.Equal(baseNx.Value, nx, 6);
+            Assert.Equal(baseNy.Value, ny, 6);
+        }
+    }
+
     // ── E그룹: Bearing 회전 AABB (FR-04, 시뮬 E-091/092) ──
 
     [Fact(DisplayName = "bearing 0/360도: AABB == 원본 반치수")]

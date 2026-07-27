@@ -169,14 +169,29 @@ public sealed class LabelAdorner : Adorner, IDisposable
         return (_marker.Width / 2.0, _marker.Height / 2.0);
     }
 
-    /// <summary>footprint 하단 기본위치 + 오프셋(심볼·라인=px, 이미지=U/V 비율). 라벨박스 중심 좌표.</summary>
+    /// <summary>오프셋 정규화 대상 — footprint가 줌마다 스케일하는 마커(이미지 + 라인/폴리곤/PidsGroup).
+    /// 점 심볼만 고정 px(고정 크기 아이콘이라 px가 줌 불변). 정규화면 오프셋=하프익스텐트 비율이라
+    /// 드래그해 둔 위치가 줌해도 그룹 대비 고정된다(OQ-1 해소).</summary>
+    private bool IsNormalizedOffset => _marker is IImageEditableMarker || _marker is ILineEditableMarker;
+
+    /// <summary>저장된 오프셋 쌍 — 이미지=U/V, 그 외=X/Y(라인=비율, 점 심볼=px). 의미는 IsNormalizedOffset가 규정.</summary>
+    private (double a, double b) ReadOffset()
+        => _marker is IImageEditableMarker img ? (img.LabelOffsetU, img.LabelOffsetV) : (_marker.LabelOffsetX, _marker.LabelOffsetY);
+
+    /// <summary>오프셋 쌍 저장 — 이미지=U/V, 그 외=X/Y.</summary>
+    private void WriteOffset(double a, double b)
+    {
+        if (_marker is IImageEditableMarker img) { img.LabelOffsetU = a; img.LabelOffsetV = b; }
+        else { _marker.LabelOffsetX = a; _marker.LabelOffsetY = b; }
+    }
+
+    /// <summary>footprint 하단 기본위치 + 오프셋. 이미지·라인=비율(U/V, 줌 불변), 점 심볼=px. 라벨박스 중심 좌표.</summary>
     private Point LabelCenter()
     {
         var ic = IconCenter();
         var (hw, hh) = VisualHalfExtents();
-        var rel = _marker is IImageEditableMarker img
-            ? ComputeLabelCenterRel(hw, hh, img.LabelOffsetU, img.LabelOffsetV, isNormalized: true)
-            : ComputeLabelCenterRel(hw, hh, _marker.LabelOffsetX, _marker.LabelOffsetY, isNormalized: false);
+        var (ox, oy) = ReadOffset();
+        var rel = ComputeLabelCenterRel(hw, hh, ox, oy, isNormalized: IsNormalizedOffset);
         return new Point(ic.X + rel.X, ic.Y + rel.Y);
     }
 
@@ -308,14 +323,18 @@ public sealed class LabelAdorner : Adorner, IDisposable
             double newW = Math.Clamp(_origMaxWidth + dw, WIDTH_MIN, WIDTH_MAX);
             double actualDw = newW - _origMaxWidth;
             double centerShift = (_resizeRightEdge ? 1 : -1) * actualDw / 2d;
-            if (_marker is IImageEditableMarker imgW)
+            if (IsNormalizedOffset)
             {
+                // 이미지·라인: 폭 Δ/2 보상도 비율 도메인에서(가로만 이동, 세로 오프셋 불변). 이미지=U, 라인=X(비율).
                 var (hw, _) = VisualHalfExtents();
-                imgW.LabelOffsetU = (_origOffsetU * Math.Max(1e-6, hw) + centerShift) / Math.Max(1e-6, hw);
+                double baseA = _marker is IImageEditableMarker ? _origOffsetU : _origOffsetX;
+                double newA = (baseA * Math.Max(1e-6, hw) + centerShift) / Math.Max(1e-6, hw);
+                if (_marker is IImageEditableMarker imgW) imgW.LabelOffsetU = newA;
+                else _marker.LabelOffsetX = newA;
             }
             else
             {
-                _marker.LabelOffsetX = _origOffsetX + centerShift;
+                _marker.LabelOffsetX = _origOffsetX + centerShift;   // 점 심볼 px
             }
             _marker.TitleMaxWidth = newW;
             InvalidateVisual();
@@ -328,28 +347,26 @@ public sealed class LabelAdorner : Adorner, IDisposable
         {
             var cur = e.GetPosition(_map);
             double dx = cur.X - _grabScreen.X, dy = cur.Y - _grabScreen.Y;
-            if (_marker is IImageEditableMarker imgM)
+            if (IsNormalizedOffset)
             {
-                // 이미지(FR-02/03): px 델타를 U/V로 역산. 상한=3·max(hw,hh) px — 양변이 2^Δz로 함께 스케일해 줌 불변·등방.
+                // 이미지·라인/PidsGroup(FR-02/03·OQ-1): px 델타를 하프익스텐트 비율(U/V)로 역산 저장.
+                // 상한=3·max(hw,hh) px — 오프셋px와 상한이 2^Δz로 함께 스케일 → 비율은 줌 불변·등방.
+                // 저장위치: 이미지=U/V, 라인=X/Y(비율). before는 down에서 캡처(_origOffsetU/V vs _origOffsetX/Y).
                 var (hw, hh) = VisualHalfExtents();
-                double nx = _origOffsetU * hw + dx, ny = _origOffsetV * hh + dy;
+                double baseA = _marker is IImageEditableMarker ? _origOffsetU : _origOffsetX;
+                double baseB = _marker is IImageEditableMarker ? _origOffsetV : _origOffsetY;
+                double nx = baseA * hw + dx, ny = baseB * hh + dy;
                 double cap = Math.Max(hw, hh) * IMAGE_LABEL_RADIUS_MULT;
                 double len = Math.Sqrt(nx * nx + ny * ny);
                 if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
-                imgM.LabelOffsetU = nx / Math.Max(1e-6, hw);
-                imgM.LabelOffsetV = ny / Math.Max(1e-6, hh);
+                WriteOffset(nx / Math.Max(1e-6, hw), ny / Math.Max(1e-6, hh));
             }
             else
             {
-                double nx = _origOffsetX + dx;
-                double ny = _origOffsetY + dy;
-                // 상한: 오프셋 벡터 길이. 심볼=반지름(max(W,H)/2)의 배수 — 고정 px 아이콘이라 줌 불변(FR-LB-04).
-                // [LineArea_Symbol_Resize FR-07] line/폴리곤은 W/H가 파생·transient라 절대 픽셀 상한(§5-C D3b).
+                // 점 심볼: 고정 px 오프셋(고정 크기 아이콘이라 px가 줌 불변, FR-LB-04). 상한=반지름×4.
                 const double SYMBOL_LABEL_RADIUS_MULT = 4.0;
-                const double LINE_LABEL_CAP_PX = 500.0;
-                double cap = _marker is GMapSymbols.ILineEditableMarker
-                    ? LINE_LABEL_CAP_PX
-                    : Math.Max(_marker.Width, _marker.Height) / 2.0 * SYMBOL_LABEL_RADIUS_MULT;
+                double nx = _origOffsetX + dx, ny = _origOffsetY + dy;
+                double cap = Math.Max(_marker.Width, _marker.Height) / 2.0 * SYMBOL_LABEL_RADIUS_MULT;
                 double len = Math.Sqrt(nx * nx + ny * ny);
                 if (len > cap && len > 0d) { nx *= cap / len; ny *= cap / len; }
                 _marker.LabelOffsetX = nx;

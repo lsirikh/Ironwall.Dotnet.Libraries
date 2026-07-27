@@ -649,6 +649,20 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 catch { /* 이미 존재하면 무시 */ }
             }
 
+            // ── 라인/PidsGroup 라벨 오프셋 px→비율(U/V) 의미 전환 1회 정리 (Overlay_Title OQ-1) ──
+            // 라인 계열(AREA_BOUNDARY·PIDS_GROUP)의 LabelOffsetX/Y를 이제 '하프익스텐트 비율'로 해석한다(줌 불변 고정).
+            // 기존 px 드래그값(|v|>3 = 비율로는 불가능한 크기)은 드래그 시점 footprint를 알 수 없어 정확 변환 불가 →
+            // 기본위치(0)로 1회 초기화(이후 재드래그하면 줌해도 그룹 대비 고정). 비율 범위(≤3) 값은 그대로 둔다(무해).
+            // 점 심볼(px 오프셋)은 다른 Category라 미접촉.
+            try
+            {
+                var reset = await conn.ExecuteAsync(
+                    "UPDATE `Symbols` SET `LabelOffsetX`=0, `LabelOffsetY`=0 " +
+                    "WHERE `Category` IN ('AREA_BOUNDARY','PIDS_GROUP') AND (ABS(`LabelOffsetX`)>3 OR ABS(`LabelOffsetY`)>3);", token);
+                if (reset > 0) _log?.Info($"라인/PidsGroup 라벨 오프셋 px→비율 전환: 레거시 px {reset}행 기본위치 초기화(재드래그 시 줌 고정)");
+            }
+            catch { /* 컬럼 없거나 정리 실패 무시 */ }
+
             _log?.Info("Symbol 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)
