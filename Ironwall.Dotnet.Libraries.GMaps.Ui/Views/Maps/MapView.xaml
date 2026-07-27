@@ -1014,8 +1014,7 @@
 					HubX="{Binding HubPositionX, Mode=TwoWay}"
 					HubY="{Binding HubPositionY, Mode=TwoWay}"
 					OpenCount="{Binding CameraPopups.Count}"
-					PopupsSource="{Binding CameraPopups}"
-					SelectedPopup="{Binding SelectedCameraPopup}" />
+					PopupsSource="{Binding CameraPopups}" />
 			</Canvas>
 		</Grid>
 	</Grid>

@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
@@ -28,14 +29,18 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 public class CameraPopupControlHub : Control
 {
     private const double DragDeadZone = 8.0;     // 클릭/드래그 구분(RTSP 팝업 패턴 답습)
-    private const double EdgeMargin = 14.0;      // 기본 도킹 시 가장자리 여백
+    private const double EdgeMargin = 14.0;      // 기본 도킹 시 하단 여백
+    private const double DefaultRightInset = 360.0; // 기본 도킹 우측 인셋(줌 컨트롤/이벤트 패널 클러스터 회피 — 기존 카운터 위젯 358 계승, L4)
+    private const int FlyoutReopenGuardMs = 300; // pill 재클릭 시 StaysOpen 해제(MouseDown)와 토글(MouseUp) 경합 억제(H2)
 
     private FrameworkElement? _pill;
+    private Popup? _flyout;
     private Canvas? _parentCanvas;
     private bool _pressed;
     private bool _dragging;
     private Point _startOnCanvas;
     private double _startX, _startY;
+    private long _lastFlyoutCloseTick = -100000;   // 마지막 플라이아웃 닫힘 시각(ms, H2 재열림 가드). 초기값=과거(오버플로 없는 TickCount64)
 
     static CameraPopupControlHub()
     {
@@ -68,10 +73,8 @@ public class CameraPopupControlHub : Control
         DependencyProperty.RegisterReadOnly(nameof(BadgeText), typeof(string), typeof(CameraPopupControlHub), new PropertyMetadata(string.Empty));
     public static readonly DependencyProperty BadgeTextProperty = BadgeTextPropertyKey.DependencyProperty;
 
-    /// <summary>현재 선택 팝업(=SelectedCameraPopup). 리스트 행 강조.</summary>
-    public object? SelectedPopup { get => GetValue(SelectedPopupProperty); set => SetValue(SelectedPopupProperty, value); }
-    public static readonly DependencyProperty SelectedPopupProperty =
-        DependencyProperty.Register(nameof(SelectedPopup), typeof(object), typeof(CameraPopupControlHub), new PropertyMetadata(null));
+    // 행 선택 강조는 팝업 vm의 IsSelected(SelectedCameraPopup이 설정)를 DataTemplate에서 직접 사용 —
+    // 별도 SelectedPopup DP는 불필요(L1)라 제거함.
 
     /// <summary>플라이아웃 열림 상태(Popup.IsOpen TwoWay). 바깥 클릭 시 Popup이 false로 되돌림.</summary>
     public bool IsFlyoutOpen { get => (bool)GetValue(IsFlyoutOpenProperty); set => SetValue(IsFlyoutOpenProperty, value); }
@@ -126,6 +129,13 @@ public class CameraPopupControlHub : Control
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        // M2: 재-템플릿 시 이전 핸들러 해제(중복 구독 방지).
+        if (_pill != null)
+        {
+            _pill.MouseLeftButtonDown -= OnPillDown;
+            _pill.MouseMove -= OnPillMove;
+            _pill.MouseLeftButtonUp -= OnPillUp;
+        }
         _pill = GetTemplateChild("PART_Pill") as FrameworkElement;
         if (_pill != null)
         {
@@ -133,28 +143,41 @@ public class CameraPopupControlHub : Control
             _pill.MouseMove += OnPillMove;
             _pill.MouseLeftButtonUp += OnPillUp;
         }
+        if (_flyout != null) _flyout.Closed -= OnFlyoutClosed;
+        _flyout = GetTemplateChild("PART_Flyout") as Popup;
+        if (_flyout != null) _flyout.Closed += OnFlyoutClosed;
+
         BadgeText = CameraPopupHubMath.BadgeText(OpenCount);
     }
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         _parentCanvas = FindParentCanvas();
-        // 저장값 없음(NaN) → 기본 우하단 도킹. 있으면 현재 캔버스 경계로 clamp(리사이즈 대비, R-4).
-        EnsurePositioned();
+        // H1: 시작 시 OpenCount==0이면 허브가 Collapsed(0×0 측정)라 여기선 아직 자리잡지 못함 →
+        //     실제 크기가 생길 때(첫 팝업으로 Visible+측정) SizeChanged에서 재시도. 1회 Loaded로 끝내지 않음.
+        SizeChanged -= OnHubSizeChanged;
+        SizeChanged += OnHubSizeChanged;
+        TryPosition();
     }
 
-    private void EnsurePositioned()
+    private void OnHubSizeChanged(object? sender, SizeChangedEventArgs e) => TryPosition();
+
+    /// <summary>
+    /// 저장값 없음(NaN) → 기본 우하단 도킹, 있으면 캔버스 경계 clamp(리사이즈 대비 R-4).
+    /// ⚠ 캔버스/허브가 실제 크기를 가질 때만 확정(H1/M1) — 0×0(Collapsed·미측정)이면 no-op하고 다음 SizeChanged 재시도.
+    /// </summary>
+    private void TryPosition()
     {
+        _parentCanvas ??= FindParentCanvas();
         if (_parentCanvas == null) return;
         double cw = _parentCanvas.ActualWidth, ch = _parentCanvas.ActualHeight;
-        double w = ActualWidth > 0 ? ActualWidth : DesiredSize.Width;
-        double h = ActualHeight > 0 ? ActualHeight : DesiredSize.Height;
-        if (cw <= 0 || ch <= 0) return;
+        double w = ActualWidth, h = ActualHeight;
+        if (cw <= 0 || ch <= 0 || w <= 0 || h <= 0) return;   // 아직 미측정 → 커밋하지 않음(다음 SizeChanged 재시도)
 
         if (double.IsNaN(HubX) || double.IsNaN(HubY))
         {
-            // 기본 우하단(줌 컨트롤 왼쪽 여백 고려는 호스트 배치가 담당 — 여기선 캔버스 우하단 기준)
-            HubX = Math.Max(0, cw - w - EdgeMargin);
+            // 기본 우하단(줌 컨트롤/이벤트 패널 클러스터 왼쪽, L4)
+            HubX = Math.Max(0, cw - w - DefaultRightInset);
             HubY = Math.Max(0, ch - h - EdgeMargin);
         }
         else
@@ -163,6 +186,8 @@ public class CameraPopupControlHub : Control
             HubX = cx; HubY = cy;
         }
     }
+
+    private void OnFlyoutClosed(object? sender, EventArgs e) => _lastFlyoutCloseTick = Environment.TickCount64;
 
     private void OnPillDown(object sender, MouseButtonEventArgs e)
     {
@@ -174,6 +199,7 @@ public class CameraPopupControlHub : Control
         _startX = double.IsNaN(HubX) ? 0 : HubX;
         _startY = double.IsNaN(HubY) ? 0 : HubY;
         _pill?.CaptureMouse();
+        Focus();   // L2: 키보드 포커스 확보 → ESC로 플라이아웃 닫기(OnPreviewKeyDown) 동작
         e.Handled = true;
     }
 
@@ -208,7 +234,11 @@ public class CameraPopupControlHub : Control
         else
         {
             // 8px 미만 = 클릭 = 플라이아웃 토글.
-            IsFlyoutOpen = !IsFlyoutOpen;
+            // H2: 플라이아웃이 열려 있을 때 pill 클릭이면 StaysOpen=False가 MouseDown에서 이미 닫았을 수 있음
+            //     (IsFlyoutOpen=false). 이 경우 토글하면 도로 열려 "pill로 못 닫는" 버그 → 방금 닫혔으면 재열림 억제.
+            bool justDismissed = !IsFlyoutOpen && (Environment.TickCount64 - _lastFlyoutCloseTick) < FlyoutReopenGuardMs;
+            if (!justDismissed)
+                IsFlyoutOpen = !IsFlyoutOpen;
         }
         e.Handled = true;
     }
