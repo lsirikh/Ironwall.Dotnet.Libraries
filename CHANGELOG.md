@@ -15,6 +15,12 @@
 ## [Unreleased]
 
 ### Added
+- **지도 측정 툴 — 길이/넓이 재기 (Top 메뉴 아이콘 + 지오데식 계산)** ([PRD](docs/prds/Measure_Tools-prd.md) · [Plan](docs/plans/Measure_Tools-prd-plan.md) · [스토리보드](docs/design/Measure_Tools_Storyboard.html) · 태그 `before-measure-tools` · worktree `feature/measure-tools` · GMaps.Ui 한정 · 메인솔루션 변경 0)
+  - **기능**: 툴바 "측정" 그룹에 길이(Ruler)·넓이(VectorSquare) 토글. 지도 클릭으로 점 추가, 더블클릭/Enter 완료, ESC 취소, Backspace/Ctrl+Z 마지막 점 취소. 길이=폴리라인+구간 거리라벨, 넓이=닫힌 다각형 채움+면적 중심라벨. 임시 오버레이(DB 미저장·마커 미생성). aim/배치/라인드로잉과 상호배제(편집 모드 독립).
+  - **계산(FR-01/02)**: 위경도 도메인 — 거리=Haversine, 면적=지오데식 구면초과 shoelace(Google computeArea 방식), R=6378137(GMap.NET Axis). 화면 픽셀 shoelace 금지(MBTiles EPSG:3857 이중 왜곡 회피). 단위 자동전환 m/km·m²/ha/km².
+  - **디자인(테마 대응)**: 모든 색을 **Tactical Command 테마 토큰**(`TryFindResource`)으로 해석해 라이트/다크 자동 대응 — 채움=`TintAccentBrush`, 라벨칩=`SurfaceTranslucentBrush`, 선/정점=`PrimaryBrush`. 수치 리드아웃 HUD는 `MapFloatingPanelStyle`+`DynamicResource`(스케일바/줌/좌표 HUD와 동일 패턴·테마 자동스왑).
+  - **구현**: `Utils/MeasureMath`·`MeasureFormat`(순수)+`Adorners/MeasureAdorner`(맵 어도너, 완전 클릭스루 불변식#3)+`Services/MeasureController`(수명주기·리드아웃 통지)+`GMapCustomControl` 라우팅(IsMeasuring 분기·Start/Stop/Finish/Undo)+`MapViewModel.Measure`(토글 명령·HUD 바인딩·윈도우 키후킹)+`MapView.xaml`(측정 툴바 그룹+리드아웃 HUD).
+  - **검증**: GMaps.Ui 빌드 0오류 · `MeasureMathTests` 16/16 통과(known-value 거리·평면근사 면적 0.5%·와인딩 무관·임계 포맷). ⚠앱 재빌드 후 런타임 검증(클릭 점추가·줌/팬 앵커 고정·라이트/다크 색·완료/취소 키).
 - **카메라 RTSP 팝업 통합 제어 허브 — 드래그 이동 + 위치 기억 + 개별/전체 제어** ([PRD](docs/prds/CameraPopup_ControlHub-prd.md) · [Plan](docs/plans/CameraPopup_ControlHub-prd-plan.md) · [스토리보드](docs/design/CameraPopup_ControlHub_Storyboard.html) · 태그 `before-camerapopup-controlhub` · GMaps.Ui+GMaps.Db)
   - **기능**: 맵 우하단 카운터 위젯을 **드래그로 옮기고 위치가 기억되는** 플로팅 허브 CustomControl로 교체. 접힌 pill(그립+CCTV+개수 뱃지+chevron) 클릭 → 플라이아웃(열린 카메라 리스트): **행 클릭=이동/포커스**(맨앞+선택), **행 ✕=개별 닫기**, **하단=모두 닫기**(표준 확인팝업). 0개면 허브 숨김.
   - **드래그+위치 영속**: 본체 드래그(8px 데드존·경계 clamp) → 종료 시 화면 좌표를 GMapDb 저장, 재시작 복원(RTSP 팝업 위치 기억 방식 답습). 화면 고정 좌표(맵 팬/줌 불변). 전부 라이브러리 — 메인솔루션 변경 0.
