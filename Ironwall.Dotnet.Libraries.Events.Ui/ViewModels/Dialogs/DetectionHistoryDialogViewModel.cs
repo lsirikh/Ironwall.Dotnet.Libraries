@@ -132,6 +132,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     protected override Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)
     {
         _loadCts?.Cancel();
+        _loadCts?.Dispose();   // 닫힘~다음 오픈 사이 CTS 미해제 잔존 방지
+        _loadCts = null;
         return base.OnDeactivateAsync(close, cancellationToken);
     }
     #endregion

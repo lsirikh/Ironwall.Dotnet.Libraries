@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -35,6 +35,8 @@ public static class DtoToModelHelper
             AiModel = dto.Detail?.Model,
             InferenceMs = dto.Detail?.InferenceMs,
             Thumbnail = dto.Detail?.Thumbnail,
+            FrameWidth = dto.Detail?.FrameWidth,
+            FrameHeight = dto.Detail?.FrameHeight,
             Objects = ConvertObjectsFromDto(dto.Detail?.Objects),
             Device = ConvertDeviceFromDto(dto.Device, null)
         };
@@ -192,6 +194,8 @@ public static class DtoToModelHelper
                          || !string.IsNullOrEmpty(model.AiModel)
                          || model.InferenceMs is not null
                          || !string.IsNullOrEmpty(model.Thumbnail)
+                         || model.FrameWidth is not null
+                         || model.FrameHeight is not null
                          || model.Objects is { Count: > 0 };
         if (!hasDetail) return null;
 
@@ -201,6 +205,8 @@ public static class DtoToModelHelper
             Model = model.AiModel,
             InferenceMs = model.InferenceMs,
             Thumbnail = model.Thumbnail,
+            FrameWidth = model.FrameWidth,
+            FrameHeight = model.FrameHeight,
             Objects = model.Objects?.Select(o => new DetectedObjectDto
             {
                 Label = o.Label,
@@ -274,6 +280,8 @@ public static class DtoToModelHelper
             AiModel = dto.Detail?.Model,
             InferenceMs = dto.Detail?.InferenceMs,
             Thumbnail = dto.Detail?.Thumbnail,
+            FrameWidth = dto.Detail?.FrameWidth,
+            FrameHeight = dto.Detail?.FrameHeight,
             Objects = ConvertObjectsFromDto(dto.Detail?.Objects),
             Device = ConvertDeviceFromDto(dto.Device, deviceProvider)
         };

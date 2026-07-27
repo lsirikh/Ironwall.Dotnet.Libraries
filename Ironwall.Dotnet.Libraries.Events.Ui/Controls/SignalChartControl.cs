@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -188,6 +188,9 @@ public class SignalChartControl : FrameworkElement
         var fullStart = RangeStart ?? all[0].Time;
         var fullEnd = RangeEnd ?? all[^1].Time;
         if (fullEnd <= fullStart) { fullStart = fullStart.AddMinutes(-30); fullEnd = fullEnd.AddMinutes(30); }
+        // 전체 span이 최소 뷰 구간보다 짧으면 최소 1분으로 확장 — 줌/팬 Clamp(min>max) ArgumentException(크래시) 원천 차단.
+        if ((fullEnd - fullStart).TotalSeconds < MIN_VIEW_SPAN_SECONDS)
+            fullEnd = fullStart.AddSeconds(MIN_VIEW_SPAN_SECONDS);
         _fullStart = fullStart; _fullEnd = fullEnd;
 
         // 현재 뷰(줌/팬 윈도우) — 없으면 전체. 전체 범위 밖으로 벗어나 있으면 리셋.
@@ -317,6 +320,7 @@ public class SignalChartControl : FrameworkElement
     {
         // 전체 범위로 클램프 — 범위 밖 팬/줌 방지, 최소 구간 1분
         double fullSpan = (_fullEnd - _fullStart).TotalSeconds;
+        if (fullSpan < MIN_VIEW_SPAN_SECONDS) return;   // 방어: OnRender가 보장하나 stale 진입 시 Clamp(min>max) 크래시 회피
         double span = Math.Clamp((end - start).TotalSeconds, MIN_VIEW_SPAN_SECONDS, fullSpan);
         if (start < _fullStart) start = _fullStart;
         if (start.AddSeconds(span) > _fullEnd) start = _fullEnd.AddSeconds(-span);
@@ -343,6 +347,7 @@ public class SignalChartControl : FrameworkElement
     {
         base.OnMouseWheel(e);
         if (!_hasData) return;
+        if ((_fullEnd - _fullStart).TotalSeconds < MIN_VIEW_SPAN_SECONDS) return;   // 방어: fullSpan<최소구간이면 줌 무력화(Clamp 크래시 회피)
 
         // 커서 시각 고정 줌 — 커서가 가리키는 시간이 화면상 같은 위치에 남도록
         var pos = e.GetPosition(this);
@@ -445,6 +450,17 @@ public class SignalChartControl : FrameworkElement
         base.OnMouseLeave(e);
         _hoverPoint = null;
         if (!_dragActive) Cursor = Cursors.Arrow;
+        ToolTip = null;
+    }
+
+    // MouseUp 없이 캡처가 상실되는 경로(Alt-Tab·창 비활성화·타 요소 캡처 탈취·드래그 중 다이얼로그 교체)에서
+    // _dragActive 고착(버튼 안 눌러도 hover만으로 팬되는 오작동) 방지 — 팬 상태를 안전하게 종료.
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        _dragActive = false;
+        _panMoved = false;
+        Cursor = Cursors.Arrow;
         ToolTip = null;
     }
 

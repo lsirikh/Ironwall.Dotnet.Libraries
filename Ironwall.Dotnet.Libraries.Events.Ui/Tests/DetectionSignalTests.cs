@@ -176,6 +176,44 @@ public class DetectionSignalTests
         Assert.Single(dto.Detail.Objects!);
         Assert.Equal("person", dto.Detail.Objects![0].Label);
     }
+
+    [Fact]
+    public void should_preserve_frame_dims_on_replace_roundtrip()
+    {
+        // audit 후속: PUT Replace가 frame_width/frame_height를 소실하지 않아야 함(bbox 스케일 기준 보존)
+        var dto = BuildDto(1, 0, result: "AI_DETECT");
+        dto.Detail!.FrameWidth = 1920;
+        dto.Detail.FrameHeight = 1080;
+
+        var model = dto.ToDetectionEventModel();
+        Assert.Equal(1920, model.FrameWidth);
+        Assert.Equal(1080, model.FrameHeight);
+
+        var replace = model.ToDetectionEventReplaceDto();
+        Assert.NotNull(replace.Detail);
+        Assert.Equal(1920, replace.Detail!.FrameWidth);
+        Assert.Equal(1080, replace.Detail.FrameHeight);
+    }
+
+    [Fact]
+    public void should_deep_copy_objects_when_copy_constructor_used()
+    {
+        // audit 후속: 복사생성자가 Objects를 깊은 복사(리스트/Bbox 공유 방지)
+        var source = new DetectionEventModel
+        {
+            Result = EnumDetectionType.AI_DETECT,
+            Objects = new List<DetectionObjectModel>
+            {
+                new() { Label = "person", Confidence = 0.9, Bbox = new List<int> { 1, 2, 3, 4 } }
+            }
+        };
+
+        var copy = new DetectionEventModel(source);
+        copy.Objects![0].Bbox![0] = 999;
+
+        Assert.NotSame(source.Objects, copy.Objects);
+        Assert.Equal(1, source.Objects![0].Bbox![0]);   // 원본 불변
+    }
     #endregion
 
     #region - TEST-02 Replace detail 보존 (FR-03) -

@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Newtonsoft.Json;
 using System;
+using System.Linq;
 
 namespace Ironwall.Dotnet.Monitoring.Models.Events;
 /****************************************************************************
@@ -31,7 +32,16 @@ public class DetectionEventModel : ExEventModel, IDetectionEventModel
         AiModel = model.AiModel;
         InferenceMs = model.InferenceMs;
         Thumbnail = model.Thumbnail;
-        Objects = model.Objects;
+        FrameWidth = model.FrameWidth;
+        FrameHeight = model.FrameHeight;
+        // 헬퍼(ConvertObjectsFromDto/BuildDetectionDetail)와 대칭 — 깊은 복사(원소·Bbox 공유 방지)
+        Objects = model.Objects?.Select(o => new DetectionObjectModel
+        {
+            Label = o.Label,
+            Confidence = o.Confidence,
+            Bbox = o.Bbox?.ToList(),
+            Thumbnail = o.Thumbnail
+        }).ToList();
     }
     #endregion
     #region - Implementation of Interface -
@@ -64,8 +74,16 @@ public class DetectionEventModel : ExEventModel, IDetectionEventModel
     [JsonProperty("thumbnail", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
     public string? Thumbnail { get; set; }
 
+    /// <summary>AI 추론 프레임 폭(px, detail.frame_width) — bbox 스케일 기준.</summary>
+    [JsonProperty("frame_width", Order = 11, NullValueHandling = NullValueHandling.Ignore)]
+    public int? FrameWidth { get; set; }
+
+    /// <summary>AI 추론 프레임 높이(px, detail.frame_height).</summary>
+    [JsonProperty("frame_height", Order = 12, NullValueHandling = NullValueHandling.Ignore)]
+    public int? FrameHeight { get; set; }
+
     /// <summary>AI 탐지 객체 목록(detail.objects[]).</summary>
-    [JsonProperty("objects", Order = 11, NullValueHandling = NullValueHandling.Ignore)]
+    [JsonProperty("objects", Order = 13, NullValueHandling = NullValueHandling.Ignore)]
     public System.Collections.Generic.List<DetectionObjectModel>? Objects { get; set; }
     #endregion
     #region - Attributes -

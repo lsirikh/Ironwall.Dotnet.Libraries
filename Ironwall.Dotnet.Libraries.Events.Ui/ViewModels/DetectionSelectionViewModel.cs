@@ -142,17 +142,22 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     public DeviceProvider DeviceProvider { get; }
 
     // ── 탐지 상세(detail) 읽기 전용 표시 (Detection_Signal_History) ──
-    // 계측값이라 편집 대상 아님 — 선택 첫 항목 기준 요약(생성 시점 고정 바인딩, 다이얼로그마다 VM 새로 생성됨)
-    private IDetectionEventModel? FirstModel => _selection?.FirstOrDefault()?.Model as IDetectionEventModel;
+    // 계측값이라 편집 대상 아님. detail은 이벤트별 값이라 단일 선택일 때만 표시 —
+    // 멀티셀렉트에서 첫 항목 값을 대표값처럼 보여 오인시키지 않도록(편집필드 CommonOrNull 규칙과 일관).
+    private bool IsSingle => _selection is { Count: 1 };
+    private IDetectionEventModel? FirstModel => IsSingle ? _selection[0]?.Model as IDetectionEventModel : null;
 
-    /// <summary>신호 크기(detail.signal) — null/0(AI)은 "—".</summary>
-    public string SignalText => FirstModel?.Signal is int s and > 0 ? s.ToString("N0") : "—";
+    private const string MULTI = "(다중 선택)";
+
+    /// <summary>신호 크기(detail.signal) — null/0(AI)은 "—", 멀티셀렉트는 "(다중 선택)".</summary>
+    public string SignalText => !IsSingle ? MULTI : (FirstModel?.Signal is int s and > 0 ? s.ToString("N0") : "—");
 
     /// <summary>AI 추론 요약 — "yolov8n · 45ms".</summary>
     public string AiSummaryText
     {
         get
         {
+            if (!IsSingle) return MULTI;
             var m = FirstModel;
             if (m == null || (string.IsNullOrEmpty(m.AiModel) && m.InferenceMs is null)) return "—";
             var inference = m.InferenceMs is int ms ? $"{ms}ms" : "-";
@@ -162,13 +167,14 @@ public class DetectionSelectionViewModel : BasePanelViewModel
 
     /// <summary>AI 탐지 객체 요약 — "person 95% [100,200,50,100]".</summary>
     public string ObjectsText
-        => FirstModel?.Objects is { Count: > 0 } objs
-            ? string.Join(", ", objs.Select(o =>
-                $"{o.Label} {o.Confidence:P0}" + (o.Bbox is { Count: > 0 } b ? $" [{string.Join(",", b)}]" : string.Empty)))
-            : "—";
+        => !IsSingle ? MULTI
+            : FirstModel?.Objects is { Count: > 0 } objs
+                ? string.Join(", ", objs.Select(o =>
+                    $"{o.Label} {o.Confidence:P0}" + (o.Bbox is { Count: > 0 } b ? $" [{string.Join(",", b)}]" : string.Empty)))
+                : "—";
 
     /// <summary>썸네일 URL(detail.thumbnail).</summary>
-    public string ThumbnailText => string.IsNullOrEmpty(FirstModel?.Thumbnail) ? "—" : FirstModel!.Thumbnail!;
+    public string ThumbnailText => !IsSingle ? MULTI : (string.IsNullOrEmpty(FirstModel?.Thumbnail) ? "—" : FirstModel!.Thumbnail!);
     #endregion
     #region - Attributes -
     private IList<DetectionEventViewModel> _selection;

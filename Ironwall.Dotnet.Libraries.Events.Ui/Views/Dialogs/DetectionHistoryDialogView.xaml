@@ -10,7 +10,7 @@
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
-	d:DesignHeight="620"
+	d:DesignHeight="640"
 	d:DesignWidth="880"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
@@ -18,7 +18,7 @@
 
 	<!--
 		탐지 신호 이력 다이얼로그 콘텐츠 (Detection_Signal_History FR-09).
-		호스팅(md:DialogHost + md:Card 880×620)은 메인솔루션 래퍼(DetectionHistoryHostDialogView)가 담당 —
+		호스팅(md:DialogHost + md:Card 880×640)은 메인솔루션 래퍼(DetectionHistoryHostDialogView)가 담당 —
 		기존 DetectionEventDialogView 패턴 미러. 색상은 전부 DynamicResource 토큰(NFR-01 다크/라이트).
 	-->
 
