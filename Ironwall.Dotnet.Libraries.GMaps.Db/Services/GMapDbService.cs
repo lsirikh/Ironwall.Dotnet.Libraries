@@ -358,6 +358,17 @@ internal class GMapDbService : TaskService, IGMapDbService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "CameraPopupPositions 테이블 생성…" });
 
+            // 카메라 팝업 제어 허브 위치(화면 좌표, 단일 행 Id=1 고정) — CameraPopup_ControlHub. 드래그 이동 위치 기억.
+            const string createCameraPopupHubPositionSql = @"
+                CREATE TABLE IF NOT EXISTS `CameraPopupHubPosition` (
+                    `Id`        INT PRIMARY KEY,
+                    `X`         DOUBLE NOT NULL,
+                    `Y`         DOUBLE NOT NULL,
+                    `UpdatedAt` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                );";
+
+            await _conn.ExecuteAsync(createCameraPopupHubPositionSql);
+
             // 카메라 PTZ 프리셋(로컬 DB) — pan/tilt/zoom + space URI, (CameraId, PresetName) 유니크
             const string createCameraPtzPresetsSql = @"
                 CREATE TABLE IF NOT EXISTS `CameraPtzPresets` (
@@ -1570,6 +1581,42 @@ internal class GMapDbService : TaskService, IGMapDbService
         }
     }
 
+    /*────────────────────── CameraPopupHubPosition (제어 허브 위치, 단일 행 Id=1) ──────────*/
+
+    /// <summary>제어 허브 화면 좌표(X,Y)를 Upsert(단일 행 Id=1). 드래그 종료 시 호출. (CameraPopup_ControlHub FR-08)</summary>
+    public async Task UpsertCameraPopupHubPositionAsync(double x, double y, CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                INSERT INTO CameraPopupHubPosition (Id, X, Y) VALUES (1, @X, @Y)
+                ON DUPLICATE KEY UPDATE X = @X, Y = @Y;";
+            await conn.ExecuteAsync(sql, new { X = x, Y = y });
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"허브 위치 Upsert 실패: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>저장된 제어 허브 화면 좌표 조회. 없으면 null(→ 기본 우하단 도킹). (CameraPopup_ControlHub FR-08)</summary>
+    public async Task<CameraPopupHubPositionDto?> GetCameraPopupHubPositionAsync(CancellationToken token = default)
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = "SELECT X, Y FROM CameraPopupHubPosition WHERE Id = 1;";
+            return await conn.QueryFirstOrDefaultAsync<CameraPopupHubPositionDto>(sql);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"허브 위치 조회 실패: {ex.Message}");
+            throw;
+        }
+    }
+
     /*────────────────────── CameraTrackPoints (추적 좌표 영속, 로컬 DB) ──────────*/
 
     /// <summary>추적 좌표 일괄 저장(수신 batch). 반환=삽입 행수.</summary>
@@ -2104,6 +2151,13 @@ internal sealed class CameraPopupPositionSQL
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
     public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>CameraPopupHubPosition 조회 결과(제어 허브 화면 좌표). 인터페이스 반환용 public.</summary>
+public sealed class CameraPopupHubPositionDto
+{
+    public double X { get; set; }
+    public double Y { get; set; }
 }
 
 /// <summary>CameraPtzPresets 테이블 DTO</summary>

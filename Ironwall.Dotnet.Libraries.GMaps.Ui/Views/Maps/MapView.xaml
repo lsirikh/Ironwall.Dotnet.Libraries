@@ -844,69 +844,8 @@
 				ZoomInCommand="{Binding ZoomInCommand}"
 				ZoomOutCommand="{Binding ZoomOutCommand}" />
 
-			<!--  카메라 영상 팝업 카운터 위젯(FR-B1/B2) — 열린 팝업 수 뱃지 + ✕(전체 닫기 confirm). 0개면 숨김.
-			      배치: 우하단 줌 컨트롤 왼쪽(우측 도킹 여백 300 군집과 정렬). PropertyPanelCanvas(ZIndex 200) 위 ZIndex 210.  -->
-			<Border
-				Grid.Row="2"
-				Grid.ColumnSpan="2"
-				Margin="5,5,358,5"
-				Padding="10,5"
-				HorizontalAlignment="Right"
-				VerticalAlignment="Bottom"
-				Panel.ZIndex="210"
-				Background="#CC04161C"
-				BorderBrush="#FF38485A"
-				BorderThickness="1"
-				CornerRadius="4"
-				ToolTip="열린 카메라 영상 팝업">
-				<Border.Style>
-					<Style TargetType="Border">
-						<Style.Triggers>
-							<DataTrigger Binding="{Binding CameraPopups.Count}" Value="0">
-								<Setter Property="Visibility" Value="Collapsed" />
-							</DataTrigger>
-						</Style.Triggers>
-					</Style>
-				</Border.Style>
-				<StackPanel Orientation="Horizontal">
-					<md:PackIcon
-						Width="20"
-						Height="20"
-						VerticalAlignment="Center"
-						Foreground="#FF00C8FF"
-						Kind="Cctv" />
-					<Border
-						MinWidth="18"
-						Height="18"
-						Margin="6,0,0,0"
-						Padding="4,0"
-						VerticalAlignment="Center"
-						Background="#FF00C8FF"
-						CornerRadius="9">
-						<TextBlock
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center"
-							FontSize="11"
-							FontWeight="Bold"
-							Foreground="#FF04161C"
-							Text="{Binding CameraPopups.Count}" />
-					</Border>
-					<Button
-						Width="26"
-						Height="26"
-						Margin="10,0,0,0"
-						Padding="0"
-						Command="{Binding CloseAllCameraPopupsCommand}"
-						Style="{StaticResource MaterialDesignIconButton}"
-						ToolTip="모든 카메라 영상 닫기">
-						<md:PackIcon
-							Width="16"
-							Height="16"
-							Foreground="#FFEF5350"
-							Kind="CloseCircleOutline" />
-					</Button>
-				</StackPanel>
-			</Border>
+			<!--  카메라 영상 팝업 제어 허브(CameraPopup_ControlHub) — 기존 카운터 위젯 교체.
+			      드래그 이동 + 위치 기억 위해 PropertyPanelCanvas 안(Canvas.Left/Top)에 배치 → 아래 PropertyPanelCanvas 내부 참조.  -->
 
 			<Canvas
 				x:Name="PropertyPanelCanvas"
@@ -1060,6 +999,23 @@
 						</DataTemplate>
 					</ItemsControl.ItemTemplate>
 				</ItemsControl>
+
+				<!--  카메라 RTSP 팝업 제어 허브 — 드래그 이동(Canvas.Left/Top↔HubX/Y) + 위치 기억(SaveHubPositionCommand).
+				      0개면 컨트롤 자체가 Collapsed. ZIndex 210(팝업/패널 위). 플라이아웃은 컨트롤 내부 WPF Popup.  -->
+				<ctrl:CameraPopupControlHub
+					x:Name="CameraPopupHub"
+					Canvas.Left="{Binding HubX, RelativeSource={RelativeSource Self}}"
+					Canvas.Top="{Binding HubY, RelativeSource={RelativeSource Self}}"
+					Panel.ZIndex="210"
+					CloseAllCommand="{Binding CloseAllCameraPopupsCommand}"
+					CloseCommand="{Binding CloseCameraPopupCommand}"
+					DragCompletedCommand="{Binding SaveHubPositionCommand}"
+					FocusCommand="{Binding FocusCameraPopupCommand}"
+					HubX="{Binding HubPositionX, Mode=TwoWay}"
+					HubY="{Binding HubPositionY, Mode=TwoWay}"
+					OpenCount="{Binding CameraPopups.Count}"
+					PopupsSource="{Binding CameraPopups}"
+					SelectedPopup="{Binding SelectedCameraPopup}" />
 			</Canvas>
 		</Grid>
 	</Grid>

@@ -205,6 +205,9 @@ public partial class MapViewModel : BasePanelViewModel,
             // 툴바 우측 CPU/GPU/RAM 사용률 표시 시작(UI DispatcherTimer로 Sample 구동)
             StartResourceMonitor();
 
+            // 제어 허브(CameraPopup_ControlHub) 저장 위치 로드(없으면 컨트롤 기본 우하단 도킹). 실패해도 무해.
+            _ = LoadHubPositionAsync();
+
             // 1. 저장된 커스텀 맵들 로드
             await _customMapService.LoadCustomMapsAsync();
 
@@ -1505,6 +1508,39 @@ public partial class MapViewModel : BasePanelViewModel,
 
     private ICameraPopupPositionStore CameraPopupPositionStore
         => _cameraPopupPositionStore ??= new CameraPopupPositionStore(_gMapDbService, _log);
+
+    // ── 제어 허브(CameraPopup_ControlHub) — 드래그 위치 기억 + 개별/전체 제어 ──
+    private ICameraPopupHubPositionStore? _hubPositionStore;
+    private ICameraPopupHubPositionStore HubPositionStore
+        => _hubPositionStore ??= new CameraPopupHubPositionStore(_gMapDbService, _log);
+
+    private double _hubPositionX = double.NaN;
+    private double _hubPositionY = double.NaN;
+    /// <summary>제어 허브 화면 좌표 X(컨트롤 HubX TwoWay↔Canvas.Left). NaN=미저장 → 컨트롤이 기본 우하단 도킹. (FR-08)</summary>
+    public double HubPositionX { get => _hubPositionX; set { if (_hubPositionX.Equals(value)) return; _hubPositionX = value; NotifyOfPropertyChange(nameof(HubPositionX)); } }
+    public double HubPositionY { get => _hubPositionY; set { if (_hubPositionY.Equals(value)) return; _hubPositionY = value; NotifyOfPropertyChange(nameof(HubPositionY)); } }
+
+    /// <summary>허브 행 이동/포커스(param=팝업 vm) — 맨앞+선택(IsSelected 강조). (FR-04)</summary>
+    public RelayCommand? FocusCameraPopupCommand { get; private set; }
+    /// <summary>허브 행 개별 닫기(param=팝업 vm). 확인 없음(비파괴·재오픈). (FR-05)</summary>
+    public RelayCommand? CloseCameraPopupCommand { get; private set; }
+    /// <summary>허브 드래그 종료 → 현재 HubPositionX/Y 영속(GMapDb). (FR-08)</summary>
+    public RelayCommand? SaveHubPositionCommand { get; private set; }
+
+    private bool _hubPositionLoaded;
+    /// <summary>저장된 허브 위치를 1회 로드→HubPositionX/Y 반영(없으면 NaN 유지=컨트롤 기본 우하단 도킹). (FR-08)</summary>
+    private async Task LoadHubPositionAsync()
+    {
+        if (_hubPositionLoaded) return;
+        _hubPositionLoaded = true;
+        try
+        {
+            var pos = await HubPositionStore.TryGetAsync().ConfigureAwait(false);
+            if (pos != null)
+                await OnUiAsync(() => { HubPositionX = pos.Value.X; HubPositionY = pos.Value.Y; }).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log?.Warning($"[CameraPopupHub] 위치 로드 실패(기본 도킹): {ex.Message}"); }
+    }
 
     private IPtzPresetStore? _ptzPresetStore;
     private IPtzPresetStore PtzPresetStore => _ptzPresetStore ??= new PtzPresetStore(_gMapDbService, _log);
@@ -2878,7 +2914,11 @@ public partial class MapViewModel : BasePanelViewModel,
         ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
         TogglePlaybackPanelCommand = new RelayCommand(_ => TogglePlaybackPanel());
         ToggleTrackingSettingsPanelCommand = new RelayCommand(_ => ToggleTrackingSettingsPanel());
-        CloseAllCameraPopupsCommand = new RelayCommand(_ => _ = RequestCloseAllCameraPopupsAsync());   // 위젯 ✕ → confirm(FR-B2)
+        CloseAllCameraPopupsCommand = new RelayCommand(_ => _ = RequestCloseAllCameraPopupsAsync());   // 허브 하단 → confirm(FR-B2/FR-06)
+        // 제어 허브(CameraPopup_ControlHub) 행 커맨드 — 기존 메서드 재사용
+        FocusCameraPopupCommand = new RelayCommand(p => { if (p is CameraStreamPopupViewModel cvm) { BringCameraPopupToFront(cvm); SelectedCameraPopup = cvm; StartOrResetAutoCloseTimer(cvm); } });
+        CloseCameraPopupCommand = new RelayCommand(p => { if (p is CameraStreamPopupViewModel cvm) _ = CloseCameraPopupAsync(cvm); });
+        SaveHubPositionCommand = new RelayCommand(_ => { if (!double.IsNaN(HubPositionX) && !double.IsNaN(HubPositionY)) _ = HubPositionStore.SaveAsync(HubPositionX, HubPositionY); });
     }
 
     #region - Tracking Playback(P5) -

@@ -1,0 +1,307 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!--  카메라 RTSP 팝업 제어 허브 (CameraPopup_ControlHub) — 유리질 Tactical 카드.
+          템플릿 스코프라 색은 self-contained 하드코딩(기존 카운터 위젯 검증값) — 앱-MD StaticResource 참조 금지(크래시).  -->
+
+    <BooleanToVisibilityConverter x:Key="HubBoolToVis" />
+
+    <!--  행 액션 아이콘 버튼(투명 → 호버 강조)  -->
+    <Style x:Key="HubRowIconButton" TargetType="Button">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="#FF8299A8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#22EF5350" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#66EF5350" />
+                            <Setter Property="Foreground" Value="#FFEF5350" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--  행 전체(포커스 이동) 버튼 — 좌측 정보 영역. 선택 시 시안 좌측 바.  -->
+    <Style x:Key="HubRowFocusButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="9,7">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="BorderThickness" Value="3,0,0,0" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                                <Style.Triggers>
+                                    <!--  DataContext=팝업 vm — 선택 강조(SelectedCameraPopup이 IsSelected 설정)  -->
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Background" Value="#1C00C8FF" />
+                                        <Setter Property="BorderBrush" Value="#FF00C8FF" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#12FFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--  상태 태그 칩  -->
+    <Style x:Key="HubTag" TargetType="Border">
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="5,0" />
+        <Setter Property="Margin" Value="0,0,4,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="BorderBrush" Value="#552A3A48" />
+    </Style>
+
+    <Style TargetType="{x:Type ctrl:CameraPopupControlHub}">
+        <!--  0개면 허브 완전 숨김(표시 게이팅)  -->
+        <Style.Triggers>
+            <Trigger Property="OpenCount" Value="0">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </Trigger>
+        </Style.Triggers>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ctrl:CameraPopupControlHub}">
+                    <Grid>
+                        <!--  ===== 접힌 pill (드래그 핸들 = 본체 전체) =====  -->
+                        <Border x:Name="PART_Pill" Cursor="SizeAll" SnapsToDevicePixels="True">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Offset="0" Color="#F5102630" />
+                                    <GradientStop Offset="1" Color="#F508161D" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Border.BorderBrush>
+                                <SolidColorBrush Color="#7000C8FF" />
+                            </Border.BorderBrush>
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Setter Property="CornerRadius" Value="11" />
+                                    <Setter Property="Padding" Value="5,5,8,5" />
+                                    <Setter Property="Effect">
+                                        <Setter.Value>
+                                            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270" Opacity="0.55" Color="Black" />
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <!--  그립  -->
+                                <md:PackIcon Width="15" Height="19" VerticalAlignment="Center" Margin="0,0,3,0"
+                                             Foreground="#FF57697A" Kind="DragVertical" />
+                                <!--  카메라 아이콘 + 뱃지  -->
+                                <Grid Width="30" Height="30" VerticalAlignment="Center">
+                                    <Border Background="#1A00C8FF" CornerRadius="8" />
+                                    <md:PackIcon Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                 Foreground="#FF00C8FF" Kind="Cctv" />
+                                    <Border MinWidth="18" Height="18" Padding="4,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Margin="0,-6,-7,0" CornerRadius="9" BorderThickness="1.5" BorderBrush="#FF071822">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Offset="0" Color="#FF39D6FF" />
+                                                <GradientStop Offset="1" Color="#FF00C8FF" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" FontWeight="Bold"
+                                                   Foreground="#FF04161C"
+                                                   Text="{Binding BadgeText, RelativeSource={RelativeSource TemplatedParent}}" />
+                                    </Border>
+                                </Grid>
+                                <!--  chevron (열림=위/닫힘=아래)  -->
+                                <md:PackIcon x:Name="Chev" Width="15" Height="15" VerticalAlignment="Center" Margin="6,0,0,0"
+                                             Foreground="#FF8299A8" Kind="ChevronDown" />
+                            </StackPanel>
+                        </Border>
+
+                        <!--  ===== 플라이아웃 (WPF Popup: airspace 위 렌더 + 바깥클릭 닫힘) =====  -->
+                        <Popup x:Name="PART_Flyout" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                               Placement="Top" VerticalOffset="-8" HorizontalOffset="0"
+                               PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                               IsOpen="{Binding IsFlyoutOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <!--  DataContext=허브 컨트롤(PlacementTarget) → 내부 바인딩 단순화  -->
+                            <Border Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1" BorderBrush="#8038485A"
+                                    DataContext="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=Popup}}">
+                                <Border.Background>
+                                    <SolidColorBrush Color="#F00E2029" />
+                                </Border.Background>
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Opacity="0.6" Color="Black" />
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!--  헤더  -->
+                                    <Border Grid.Row="0" CornerRadius="13,13,0,0" Padding="12,10">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Offset="0" Color="#FF063847" />
+                                                <GradientStop Offset="0.6" Color="#FF0A6A83" />
+                                                <GradientStop Offset="1" Color="#FF0A7FA0" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <StackPanel Orientation="Horizontal">
+                                            <md:PackIcon Width="17" Height="17" VerticalAlignment="Center" Foreground="#FFD6FBFF" Kind="Cctv" />
+                                            <TextBlock Margin="9,0,0,0" VerticalAlignment="Center" FontSize="13" FontWeight="Bold"
+                                                       Foreground="#FFEAFFFF" Text="카메라 영상" />
+                                            <Border Margin="9,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#E6FFFFFF">
+                                                <TextBlock FontSize="11" FontWeight="Bold" Foreground="#FF053642"
+                                                           Text="{Binding OpenCount}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!--  카메라 리스트  -->
+                                    <ScrollViewer Grid.Row="1" Margin="0,0,0,0" Padding="6" VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding PopupsSource}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <!--  DataContext=팝업 vm (CameraStreamPopupViewModel)  -->
+                                                    <Grid Margin="0,0,0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!--  좌측: 행 클릭=이동/포커스  -->
+                                                        <Button Grid.Column="0" Style="{StaticResource HubRowFocusButton}"
+                                                                CommandParameter="{Binding}"
+                                                                Command="{Binding DataContext.FocusCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <!--  썸네일(상태점)  -->
+                                                                <Border Grid.Column="0" Width="44" Height="30" CornerRadius="6" BorderThickness="1"
+                                                                        BorderBrush="#552A3A48" ClipToBounds="True">
+                                                                    <Border.Background>
+                                                                        <RadialGradientBrush>
+                                                                            <GradientStop Offset="0" Color="#FF0E3A44" />
+                                                                            <GradientStop Offset="1" Color="#FF04222B" />
+                                                                        </RadialGradientBrush>
+                                                                    </Border.Background>
+                                                                    <Grid>
+                                                                        <md:PackIcon Width="15" Height="15" HorizontalAlignment="Center"
+                                                                                     VerticalAlignment="Center" Foreground="#FF356F7D" Kind="Play" />
+                                                                        <Ellipse Width="7" Height="7" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="3">
+                                                                            <Ellipse.Style>
+                                                                                <Style TargetType="Ellipse">
+                                                                                    <Setter Property="Fill" Value="#FF3DDC97" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding IsResolvingSource}" Value="True">
+                                                                                            <Setter Property="Fill" Value="#FFF5A623" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Ellipse.Style>
+                                                                        </Ellipse>
+                                                                    </Grid>
+                                                                </Border>
+                                                                <!--  이름 + 태그  -->
+                                                                <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center">
+                                                                    <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="#FFDCE7EE"
+                                                                               TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="#66F5A623"
+                                                                                Visibility="{Binding IsResolvingSource, Converter={StaticResource HubBoolToVis}}">
+                                                                            <TextBlock FontSize="9.5" Foreground="#FFFFDCA0" Text="조회중" />
+                                                                        </Border>
+                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="#663DDC97"
+                                                                                Visibility="{Binding IsPtzCapable, Converter={StaticResource HubBoolToVis}}">
+                                                                            <TextBlock FontSize="9.5" Foreground="#FFC6F5D8" Text="PTZ" />
+                                                                        </Border>
+                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="#6600C8FF"
+                                                                                Visibility="{Binding IsLarge, Converter={StaticResource HubBoolToVis}}">
+                                                                            <TextBlock FontSize="9.5" Foreground="#FF9FE6FF" Text="크게" />
+                                                                        </Border>
+                                                                    </StackPanel>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Button>
+
+                                                        <!--  우측: 개별 닫기  -->
+                                                        <Button Grid.Column="1" Margin="4,0,0,0" Style="{StaticResource HubRowIconButton}"
+                                                                ToolTip="이 카메라 영상 닫기" CommandParameter="{Binding}"
+                                                                Command="{Binding DataContext.CloseCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                                                            <md:PackIcon Width="16" Height="16" Kind="Close" />
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <!--  푸터: 모두 닫기  -->
+                                    <Border Grid.Row="2" Padding="10" BorderThickness="0,1,0,0" BorderBrush="#552A3A48" Background="#99061016"
+                                            CornerRadius="0,0,13,13">
+                                        <Button Command="{Binding CloseAllCommand}" Cursor="Hand" Height="36">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Fb" CornerRadius="8" BorderThickness="1" BorderBrush="#80EF5350" Background="#1FEF5350">
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <md:PackIcon Width="15" Height="15" VerticalAlignment="Center" Foreground="#FFFFD7D6" Kind="CloseCircleOutline" />
+                                                            <TextBlock Margin="7,0,0,0" FontSize="12.5" FontWeight="Bold" Foreground="#FFFFD7D6" Text="모두 닫기" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Fb" Property="Background" Value="#33EF5350" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!--  플라이아웃 열림 → chevron 위로  -->
+                        <Trigger Property="IsFlyoutOpen" Value="True">
+                            <Setter TargetName="Chev" Property="Kind" Value="ChevronUp" />
+                            <Setter TargetName="PART_Pill" Property="BorderBrush" Value="#FF00C8FF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

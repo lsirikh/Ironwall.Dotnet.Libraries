@@ -269,6 +269,13 @@ public interface IGMapDbService
     /// <summary>카메라 Id로 저장된 팝업 위치 삭제.</summary>
     Task<bool> DeleteCameraPopupPositionAsync(int cameraId, CancellationToken token = default);
 
+    /*────────────────────── CameraPopupHubPosition (제어 허브 위치, 단일 행) ──────────────*/
+
+    /// <summary>제어 허브 화면 좌표(X,Y) Upsert(단일 행 Id=1). (CameraPopup_ControlHub FR-08)</summary>
+    Task UpsertCameraPopupHubPositionAsync(double x, double y, CancellationToken token = default);
+    /// <summary>저장된 제어 허브 화면 좌표 조회(없으면 null).</summary>
+    Task<CameraPopupHubPositionDto?> GetCameraPopupHubPositionAsync(CancellationToken token = default);
+
     /*────────────────────── CameraPtzPresets (PTZ 프리셋, 로컬 DB) ──────────────*/
 
     /// <summary>카메라의 PTZ 프리셋 목록 조회(Home 우선, 이름 순).</summary>
