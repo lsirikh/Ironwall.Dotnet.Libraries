@@ -233,6 +233,12 @@ public partial class MapViewModel : BasePanelViewModel,
             await System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeAsync(
                 RestoreLayerVisibility,
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            // ③ 라벨 어도너 첫 페인트 회귀 해소 — 레이어 가시성 확정 뒤(같은 ApplicationIdle, 순서 보장) 1회 강제 재렌더.
+            //    라벨을 별도 AdornerLayer로 분리한 뒤 MainMap.InvalidateVisual이 어도너에 닿지 않아 첫 실행 시
+            //    심볼 타이틀이 안 뜨고 줌/팬 후에야 나타나던 회귀 차단(RestoreLayerVisibility 조기 return 경로도 커버).
+            await System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeAsync(
+                RefreshLabelsWhenReady,
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
             // 4.6. 오버레이 첫 렌더링 — 맵 로드 완료 후 실행
             if (_customMapOverlayService.ActiveOverlays.Any())
@@ -537,6 +543,7 @@ public partial class MapViewModel : BasePanelViewModel,
             }
 
             // 심볼 라벨 분리 오버레이 정리
+            MainMap.OnTileLoadComplete -= OnFirstTileLoadForLabels;   // 첫 타일 로드 one-shot 미발화 시 누수 방지
             MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForLabels;
             if (_labelService != null) _labelService.LabelOffsetChanged -= OnLabelOffsetChanged;
             if (_labelService != null) _labelService.LabelWidthChanged -= OnLabelWidthChanged;
@@ -8856,6 +8863,23 @@ public partial class MapViewModel : BasePanelViewModel,
         }
         MainMap?.InvalidateVisual();
         AggregateLeafCheckedFromMarkers();
+    }
+
+    /// <summary>라벨 어도너 강제 재렌더 준비 — 투영(ViewArea) 유효 시 즉시 RefreshAll, 아니면 첫 타일 로드 후 1회.
+    /// 라벨을 별도 AdornerLayer로 분리(Symbol_Label_Decouple)한 뒤 MainMap.InvalidateVisual이 어도너에 닿지 않아
+    /// 첫 페인트 stale이 고착되던 회귀(첫 실행 시 심볼 타이틀 누락, 줌/팬 후에야 표시) 해소. 시작 시 ApplicationIdle 1회 호출.</summary>
+    private void RefreshLabelsWhenReady()
+    {
+        if (MainMap == null || _labelService == null) return;
+        if (MainMap.ViewArea.WidthLng > 0) { _labelService.RefreshAll(); return; }
+        // 투영 미준비(비동기 타일 provider) — 오버레이 초기화와 동일 패턴으로 첫 타일 로드 후 1회 재렌더.
+        MainMap.OnTileLoadComplete += OnFirstTileLoadForLabels;
+    }
+
+    private void OnFirstTileLoadForLabels(long elapsedMilliseconds)
+    {
+        if (MainMap != null) MainMap.OnTileLoadComplete -= OnFirstTileLoadForLabels;   // one-shot
+        _labelService?.RefreshAll();
     }
 
     private async void OnLayerVisibilityChanged(object? sender, LayerChangedEventArgs e)

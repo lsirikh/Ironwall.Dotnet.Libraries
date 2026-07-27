@@ -106,6 +106,16 @@ public sealed class LabelAdornerService : IDisposable
         }
     }
 
+    /// <summary>부착된 모든 라벨을 1회 강제 재렌더(InvalidateVisual). 지도 초기화(홈줌/투영/레이어 가시성)가
+    /// 정착된 뒤, 라벨을 별도 AdornerLayer로 분리하면서 MainMap.InvalidateVisual이 어도너에 닿지 않아
+    /// 첫 페인트 stale이 고착되던 회귀(첫 실행 시 심볼 타이틀 누락) 해소용. VM이 초기 로드 후 1회 호출.
+    /// _renderProps 이름 불일치(Visible/IsVisible)를 우회해 직접 무효화하므로 가장 안전.</summary>
+    public void RefreshAll()
+    {
+        if (_disposed) return;
+        foreach (var a in _labels.Values) a.InvalidateVisual();
+    }
+
     public void Clear()
     {
         foreach (var m in _labels.Keys.ToList()) Detach(m);

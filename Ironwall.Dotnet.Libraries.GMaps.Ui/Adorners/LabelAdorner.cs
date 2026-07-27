@@ -81,11 +81,14 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
         _map.OnMapZoomChanged += OnMapChanged;   // geo-앵커 재렌더(줌/팬 추종)
         _map.OnMapDrag += OnMapChanged;
+        _map.OnPositionChanged += OnMapPositionChanged;   // 프로그램적/정착 뷰포트 이동(홈 이동·앵커 확정)도 추종 — 첫 페인트 회귀 갭 차단
         if (_marker is INotifyPropertyChanged npc)   // 제목/제목크기/제목표시·가시성 변경 즉시 반영(속성패널)
             npc.PropertyChanged += OnMarkerPropertyChanged;
     }
 
     private void OnMapChanged() => InvalidateVisual();
+    // OnPositionChanged는 PointLatLng 인자를 받으므로 별도 래퍼(줌/드래그와 달리 파라미터 있음).
+    private void OnMapPositionChanged(GMap.NET.PointLatLng _) => InvalidateVisual();
 
     /// <summary>라벨 렌더에 영향을 주는 속성만 재렌더(FR-08 필터 — 2차 검증 N그룹 확정 목록).
     /// Width/Height는 FR-01 이후 값은 안 읽지만 라인/이미지 '지오메트리 변경 신호'로 유지(V-08).
@@ -441,6 +444,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
         if (IsMouseCaptured) ReleaseMouseCapture();
         _map.OnMapZoomChanged -= OnMapChanged;
         _map.OnMapDrag -= OnMapChanged;
+        _map.OnPositionChanged -= OnMapPositionChanged;
         if (_marker is INotifyPropertyChanged npc) npc.PropertyChanged -= OnMarkerPropertyChanged;
         _cachedText = null;   // 렌더 캐시 해제(FR-08 — 수명 규약)
         _cachedFg = null;
