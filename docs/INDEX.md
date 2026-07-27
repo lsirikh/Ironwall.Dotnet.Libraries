@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-07-23 (advance-phase 자동)
-- **총 문서 수**: 402개
+- **총 문서 수**: 404개
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md](analyses/CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md) | CameraPopup_PanClamp_Badge_OnvifPtz | 2026-07-23 |
 | [Overlay_Title_ZoomStyle-analysis.md](analyses/Overlay_Title_ZoomStyle-analysis.md) | Overlay_Title_ZoomStyle | 2026-07-23 |
 | [GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md](analyses/GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md) | GMap_OverlayWindow_Symbol_Visibility_Restore | 2026-07-20 |
 | [VSCode_Terminal_Tangling-analysis.md](analyses/VSCode_Terminal_Tangling-analysis.md) | VSCode_Terminal_Tangling | 2026-07-20 |
@@ -55,8 +56,10 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History | Approved | 2026-07-23 |
+| [CameraPopup_ControlHub-prd.md](prds/CameraPopup_ControlHub-prd.md) | CameraPopup_ControlHub (RTSP 팝업 제어 허브: 드래그 이동+위치 기억) | Approved | 2026-07-27 |
+| [CameraPopup_PanClamp_Badge_OnvifPtz-prd.md](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) | CameraPopup_PanClamp_Badge_OnvifPtz | Approved(구현완료) | 2026-07-23 |
 | [Overlay_Title_ZoomStyle-prd.md](prds/Overlay_Title_ZoomStyle-prd.md) | Overlay_Title_ZoomStyle | Approved | 2026-07-23 |
+| [Detection_Signal_History-prd.md](prds/Detection_Signal_History-prd.md) | Detection_Signal_History | Approved | 2026-07-23 |
 | [Symbol_ContextMenu_ViewMode_Lock-prd.md](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | Symbol_ContextMenu_ViewMode_Lock | Approved | 2026-07-23 |
 | [ContextMenu_DisplayRules-prd.md](prds/ContextMenu_DisplayRules-prd.md) | ContextMenu_DisplayRules | Superseded | 2026-07-23 |
 | [GOP_SessionGrant_Pagination-prd.md](prds/GOP_SessionGrant_Pagination-prd.md) | GOP_SessionGrant_Pagination | Draft | 2026-07-23 |
@@ -200,8 +203,10 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [CameraPopup_ControlHub-prd-plan.md](plans/CameraPopup_ControlHub-prd-plan.md) | [PRD](prds/CameraPopup_ControlHub-prd.md) | 17/18 | 2026-07-27 |
+| [CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) | 23/23 | 2026-07-23 |
+| [Overlay_Title_ZoomStyle-prd-plan.md](plans/Overlay_Title_ZoomStyle-prd-plan.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) | 32/37 | 2026-07-23 |
 | [Detection_Signal_History-prd-plan.md](plans/Detection_Signal_History-prd-plan.md) | [PRD](prds/Detection_Signal_History-prd.md) | 37/44 | 2026-07-23 |
-| [Overlay_Title_ZoomStyle-prd-plan.md](plans/Overlay_Title_ZoomStyle-prd-plan.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) | 0/38 | 2026-07-23 |
 | [GOP_SessionPanel_Cleanup-prd-plan.md](plans/GOP_SessionPanel_Cleanup-prd-plan.md) | [PRD](prds/GOP_SessionPanel_Cleanup-prd.md) | 0/0 | 2026-07-23 |
 | [Symbol_ContextMenu_ViewMode_Lock-prd-plan.md](plans/Symbol_ContextMenu_ViewMode_Lock-prd-plan.md) | [PRD](prds/Symbol_ContextMenu_ViewMode_Lock-prd.md) | 12/13 | 2026-07-23 |
 | [GOP_SessionGrant_Pagination-prd-plan.md](plans/GOP_SessionGrant_Pagination-prd-plan.md) | [PRD](prds/GOP_SessionGrant_Pagination-prd.md) | 0/0 | 2026-07-23 |
@@ -306,6 +311,8 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [CameraPopup_PanClamp_Badge_OnvifPtz-report.md](reports/CameraPopup_PanClamp_Badge_OnvifPtz-report.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) → [Plan](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | 2026-07-23 |
+| [Overlay_Title_ZoomStyle-report.md](reports/Overlay_Title_ZoomStyle-report.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) → [Plan](plans/Overlay_Title_ZoomStyle-prd-plan.md) | 2026-07-23 |
 | [Detection_Signal_History-report.md](reports/Detection_Signal_History-report.md) | [PRD](prds/Detection_Signal_History-prd.md) → [Plan](plans/Detection_Signal_History-prd-plan.md) | 2026-07-23 |
 | [grant-verification-report.md](reports/grant-verification-report.md) | [PRD](prds/grant-verification-prd.md) → [Plan](plans/grant-verification-prd-plan.md) | 2026-07-20 |
 | [ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md](reports/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md) | [PRD](prds/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd.md) → [Plan](plans/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd-plan.md) | 2026-07-15 |
@@ -445,4 +452,5 @@
 
 | 파일 | 내용 | 날짜 |
 |------|------|------|
+| [Measure_Tools_Storyboard.html](design/Measure_Tools_Storyboard.html) | 측정 툴(길이·넓이) 스토리보드·와이어프레임 v0.1 — 탑메뉴 「측정」 그룹(Ruler/VectorPolygon)·클릭→실시간 리드아웃→완료 플로우·지오데식 거리/면적·다크/라이트 토큰·재사용맵(LineDrawingAdorner 포크)·미결질문 7 | 2026-07-24 |
 | [Detection_Signal_History_Storyboard.html](design/Detection_Signal_History_Storyboard.html) | 탐지 신호(detail.signal) 표면화 와이어프레임 & 스토리보드 v2 — 이력그리드 신호컬럼(+MessageType 제거)·카드 병기·우클릭 진입 2종(심볼/DevicePanel)·팝업 다이얼로그(차트+그리드)·다크/라이트 토글 | 2026-07-23 |

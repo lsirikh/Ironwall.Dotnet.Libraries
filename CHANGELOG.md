@@ -15,6 +15,11 @@
 ## [Unreleased]
 
 ### Added
+- **카메라 RTSP 팝업 통합 제어 허브 — 드래그 이동 + 위치 기억 + 개별/전체 제어** ([PRD](docs/prds/CameraPopup_ControlHub-prd.md) · [Plan](docs/plans/CameraPopup_ControlHub-prd-plan.md) · [스토리보드](docs/design/CameraPopup_ControlHub_Storyboard.html) · 태그 `before-camerapopup-controlhub` · GMaps.Ui+GMaps.Db)
+  - **기능**: 맵 우하단 카운터 위젯을 **드래그로 옮기고 위치가 기억되는** 플로팅 허브 CustomControl로 교체. 접힌 pill(그립+CCTV+개수 뱃지+chevron) 클릭 → 플라이아웃(열린 카메라 리스트): **행 클릭=이동/포커스**(맨앞+선택), **행 ✕=개별 닫기**, **하단=모두 닫기**(표준 확인팝업). 0개면 허브 숨김.
+  - **드래그+위치 영속**: 본체 드래그(8px 데드존·경계 clamp) → 종료 시 화면 좌표를 GMapDb 저장, 재시작 복원(RTSP 팝업 위치 기억 방식 답습). 화면 고정 좌표(맵 팬/줌 불변). 전부 라이브러리 — 메인솔루션 변경 0.
+  - **구현**: `CameraPopupControlHub`(CustomControl)+`CameraPopupControlHubStyle`(유리질 Tactical·self-contained 색·WPF Popup 플라이아웃=airspace 위)+`ICameraPopupHubPositionStore`/`Store`(Semaphore+인메모리 폴백)+`CameraPopupHubMath`(순수)+GMapDb `CameraPopupHubPosition` 1행 테이블·DAL+MapViewModel `Focus`/`Close`/`SaveHub` 커맨드. 리스트/개수/모두닫기/상태는 기존 `CameraPopups` 자산 재사용(위 3건 PRD의 카운터 위젯 계승·확장).
+  - **검증**: GMaps.Db+GMaps.Ui 빌드 0 · 테스트 **217/217**(`CameraPopupHubMathTests` 10 신규 소스링크). ⚠앱 재빌드 후 런타임 검증(드래그·기억·이동·개별닫기·모두닫기).
 - **카메라 영상 팝업 3건 — 상하 패닝 추종 버그 + 카운터 위젯(전체 닫기) + ONVIF 프리셋/PTZ 반응성** ([PRD](docs/prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) · [Plan](docs/plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) · [분석](docs/analyses/CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md) — Explore 3기→architect→code-reviewer 적대검증 체인 · 태그 `before-camerapopup-3fix` · worktree `feature/camerapopup-3fix` · GMaps.Ui 한정, ⚠`IPtzController` 확장=메인솔루션 재빌드 필요)
   - **패닝 추종(FR-A)**: `CanvasTop` 세터 하한0 클램프(58b3fd7)가 맵 팬/줌 추종 경로까지 적용돼 위로 패닝 시 팝업이 상단에 붙어 딸려오던 버그 — 세터 클램프 제거(1줄). 드래그 경계 보호는 컨트롤 레벨 유지+하한을 `MinCanvasTop` 상수 참조로 단일화(OQ-1b). 과거 클램프로 저장된 앵커는 유지(재드래그 시 자연 교정, OQ-2a).
   - **카운터 위젯(FR-B)**: 맵 우하단(줌 컨트롤 좌측) 카메라 아이콘+열린 팝업 수 뱃지, 0개면 숨김(DataTrigger — 컨버터 불필요로 계획 대비 단순화). ✕ → 표준 확인 팝업(`OpenConfirmPopupMessageModel`+`CallCloseAllCameraPopupsProcessMessageModel` 콜백, raw MessageBox 금지) → `CloseAllCameraPopupsAsync` 순차 닫기(Hub Lease/PTZ 정지 포함). 기존 인라인 전체닫기 3곳(OnDeactivate/강제로그아웃/심볼 Reset)은 동작 차이가 의도적이라 미통합(OQ-B2).
