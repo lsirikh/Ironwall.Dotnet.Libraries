@@ -113,6 +113,13 @@ public sealed class LabelAdornerService : IDisposable
     public void RefreshAll()
     {
         if (_disposed) return;
+        // GMap.NET OnTileLoadComplete는 백그라운드 타일-로드 스레드에서 발화 → UI 전용 InvalidateVisual을
+        // 그 스레드에서 호출하면 크로스-스레드 예외. 어도너를 소유한 컨트롤의 Dispatcher로 직렬화(자기-마샬링).
+        if (!_map.Dispatcher.CheckAccess())
+        {
+            _map.Dispatcher.InvokeAsync(RefreshAll);
+            return;
+        }
         foreach (var a in _labels.Values) a.InvalidateVisual();
     }
 
