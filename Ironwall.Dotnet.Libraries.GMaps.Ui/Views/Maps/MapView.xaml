@@ -415,7 +415,30 @@
 
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
-				<!--  ⑤ 심볼 추가 그룹  -->
+				<!--  ⑤ 측정 그룹 (길이/넓이 — Measure_Tools)  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="측정" />
+				<Border Style="{StaticResource ToolbarGroupStyle}">
+					<StackPanel Orientation="Horizontal">
+						<ToggleButton
+							Command="{Binding MeasureLengthCommand}"
+							IsChecked="{Binding IsMeasureLengthActive, Mode=OneWay}"
+							Style="{StaticResource ToolbarToggleButtonStyle}"
+							ToolTip="길이 측정 — 클릭으로 점 추가, 더블클릭/Enter 완료, ESC 취소">
+							<md:PackIcon Kind="Ruler" />
+						</ToggleButton>
+						<ToggleButton
+							Command="{Binding MeasureAreaCommand}"
+							IsChecked="{Binding IsMeasureAreaActive, Mode=OneWay}"
+							Style="{StaticResource ToolbarToggleButtonStyle}"
+							ToolTip="넓이 측정 — 최소 3점, 더블클릭/Enter 완료, ESC 취소">
+							<md:PackIcon Kind="VectorSquare" />
+						</ToggleButton>
+					</StackPanel>
+				</Border>
+
+				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
+
+				<!--  ⑥ 심볼 추가 그룹  -->
 				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="심볼" />
 				<ComboBox
 					Width="120"
@@ -826,6 +849,80 @@
 					FontWeight="SemiBold"
 					Foreground="White"
 					Text="{Binding AimStatusMessage}" />
+			</Border>
+
+			<!--  측정 리드아웃 HUD (MapFloatingPanelStyle + 토큰 — 라이트/다크 자동스왑)  -->
+			<Border
+				Grid.Row="2"
+				Grid.ColumnSpan="2"
+				MinWidth="160"
+				Margin="0,12,0,0"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Top"
+				Panel.ZIndex="300"
+				Style="{StaticResource MapFloatingPanelStyle}"
+				Visibility="{Binding IsMeasureReadoutVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<StackPanel>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Kind="Ruler" />
+						<TextBlock
+							Margin="6,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="11"
+							FontWeight="Bold"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Text="{Binding MeasurePrimaryLabel}" />
+						<TextBlock
+							Margin="8,0,0,0"
+							VerticalAlignment="Center"
+							FontFamily="Consolas"
+							FontSize="16"
+							FontWeight="Bold"
+							Foreground="{DynamicResource TextPrimaryBrush}"
+							Text="{Binding MeasurePrimaryValue}" />
+						<TextBlock
+							Margin="3,0,0,0"
+							VerticalAlignment="Bottom"
+							FontFamily="Consolas"
+							FontSize="11"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="{Binding MeasurePrimaryUnit}" />
+					</StackPanel>
+					<StackPanel
+						Margin="0,3,0,0"
+						Orientation="Horizontal"
+						Visibility="{Binding MeasureHasSecondary, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<TextBlock
+							VerticalAlignment="Center"
+							FontSize="10"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding MeasureSecondaryLabel}" />
+						<TextBlock
+							Margin="8,0,0,0"
+							VerticalAlignment="Center"
+							FontFamily="Consolas"
+							FontSize="12"
+							Foreground="{DynamicResource TextSecondaryBrush}"
+							Text="{Binding MeasureSecondaryValue}" />
+						<TextBlock
+							Margin="3,0,0,0"
+							VerticalAlignment="Bottom"
+							FontFamily="Consolas"
+							FontSize="9"
+							Foreground="{DynamicResource TextMutedBrush}"
+							Text="{Binding MeasureSecondaryUnit}" />
+					</StackPanel>
+					<TextBlock
+						Margin="0,4,0,0"
+						FontSize="9"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding MeasureHint}" />
+				</StackPanel>
 			</Border>
 
 			<!--  줌 컨트롤  -->

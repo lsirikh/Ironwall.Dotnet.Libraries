@@ -479,6 +479,9 @@ public partial class MapViewModel : BasePanelViewModel,
             // 다중 선택 모드 설정 (기본값: 단일 선택)
             MainMap.SetMultiSelectMode(false);
 
+            // 측정 툴(길이/넓이) 이벤트 배선
+            AttachMeasureEvents();
+
             _log?.Info("Adorner 시스템 통합 완료");
         }
         catch (Exception ex)
@@ -498,6 +501,8 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             // 타겟 조준 모드가 켜진 채 뷰가 비활성화되면 전역 커서(Cursors.Cross)·오버레이가 잔존 → 강제 종료(H1)
             ExitTargetAimMode();
+            // 측정 툴 정리(어도너 해제·키 후킹 해제)
+            DetachMeasureEvents();
 
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
@@ -699,9 +704,10 @@ public partial class MapViewModel : BasePanelViewModel,
     private void EnterSymbolPlacementMode(EnumMarkerCategory category, object type, string title)
     {
         if (MainMap == null || type == null) return;
-        // 충돌 모드 정리(타겟조준·라인드로잉). 배치는 편집모드와 공존(편집모드 종료 안 함).
+        // 충돌 모드 정리(타겟조준·라인드로잉·측정). 배치는 편집모드와 공존(편집모드 종료 안 함).
         if (MainMap.IsTargetAimMode) ExitTargetAimMode();
         if (MainMap.IsLineDrawing) _ = MainMap.LineDrawingService?.CancelDrawingAsync();
+        if (MainMap.IsMeasuring) MainMap.StopMeasure();
         _placeCategory = category; _placeType = type; _placeTitle = title;
         MainMap.IsSymbolPlacementMode = true;
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
@@ -755,6 +761,8 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             if (MainMap?.IsLineDrawing == true)
                 _ = MainMap.LineDrawingService?.CancelDrawingAsync();
+            if (MainMap?.IsMeasuring == true)   // 측정 모드도 aim과 상호배제
+                MainMap.StopMeasure();
             // 편집 모드 종료 — 세터가 SetEditMode(false)+ClearAllSelections 수행, 편집 단축키/어도너 상호배제(M5)
             if (IsEditModeEnabled)
                 IsEditModeEnabled = false;
@@ -2865,6 +2873,7 @@ public partial class MapViewModel : BasePanelViewModel,
         InitializeMarkerEditCommands();
         InitializeAdornerCommands();
         InitializeLineAdornerCommands();
+        InitializeMeasureCommands();
     }
 
    

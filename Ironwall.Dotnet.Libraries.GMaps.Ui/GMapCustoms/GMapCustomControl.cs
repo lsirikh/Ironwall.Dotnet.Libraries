@@ -52,6 +52,8 @@ public class GMapCustomControl : GMapControl
         InitializeAdornerManager();
         // 라인 드로잉 서비스 초기화
         InitializeLineDrawingService();
+        // 측정 툴(길이/넓이) 컨트롤러 초기화
+        InitializeMeasure();
 
         _mgrsOverlay = new MGRSGridOverlayService(_log);
         _log?.Info("GMapCustomControl 초기화 완료");
@@ -110,7 +112,49 @@ public class GMapCustomControl : GMapControl
 
 
     #endregion
-    
+
+    #region Measure Tools (길이/넓이 측정 — Measure_Tools)
+
+    private Services.MeasureController? _measureController;
+
+    /// <summary>측정 리드아웃 변경(HUD 바인딩용) — VM이 구독.</summary>
+    public event System.Action<Services.MeasureReadout>? MeasureReadoutChanged;
+    /// <summary>측정 모드 종료 통지 — VM이 토글 해제·배너 숨김.</summary>
+    public event System.Action? MeasureStopped;
+
+    /// <summary>측정 모드 활성 여부.</summary>
+    public bool IsMeasuring => _measureController?.IsActive ?? false;
+    /// <summary>현재 측정 종류.</summary>
+    public Adorners.MeasureKind ActiveMeasureKind => _measureController?.Mode ?? Adorners.MeasureKind.Length;
+
+    private void InitializeMeasure()
+    {
+        _measureController = new Services.MeasureController(this, _log);
+        _measureController.ReadoutChanged += r => MeasureReadoutChanged?.Invoke(r);
+    }
+
+    /// <summary>측정 시작(또는 종류 전환). 클릭 라우팅은 OnMouseLeftButtonDown의 IsMeasuring 분기.</summary>
+    public void StartMeasure(Adorners.MeasureKind kind)
+    {
+        _measureController?.Start(kind);
+        Focus();   // 키 수신 보조(윈도우 훅은 VM이 별도 설치)
+    }
+
+    /// <summary>측정 종료 — 어도너 해제 + MeasureStopped 통지.</summary>
+    public void StopMeasure()
+    {
+        _measureController?.Stop();
+        MeasureStopped?.Invoke();
+    }
+
+    /// <summary>측정 완료(더블클릭/Enter) — 결과 고정. 유효점 부족 시 false.</summary>
+    public bool FinishMeasure() => _measureController?.Finish() ?? false;
+
+    /// <summary>마지막 점 제거(Backspace/Ctrl+Z).</summary>
+    public void MeasureUndo() => _measureController?.Undo();
+
+    #endregion
+
     #region Line Drawing Fields
 
     private LineDrawingService _lineDrawingService;
@@ -300,6 +344,9 @@ public class GMapCustomControl : GMapControl
         {
             // 편집 모드 활성화
             //IsEditMode = true;
+
+            // 측정 모드와 상호배제 — 라인 드로잉 시작 시 측정 종료
+            if (IsMeasuring) StopMeasure();
 
             // 라인 드로잉 시작
             return await _lineDrawingService.StartLineDrawingAsync(parameters);
@@ -969,6 +1016,15 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [측정] 길이/넓이 측정 — base 전 가로채기(팬 미Armed). 더블클릭=완료, 단일=점 추가.
+        if (IsMeasuring)
+        {
+            if (e.ClickCount >= 2) _measureController!.Finish();
+            else _measureController!.AddPoint(geoPos);
+            e.Handled = true;
+            return;
+        }
+
         if (IsLineDrawing)
         {
             OnMapClicked?.Invoke(geoPos, mousePos);
@@ -1063,6 +1119,9 @@ public class GMapCustomControl : GMapControl
     protected override void OnMouseMove(MouseEventArgs e)
     {
         _lastMouseScreen = e.GetPosition(this);   // 커서 추적(붙여넣기 위치) — early-return 이전 무조건
+
+        // [측정] 미리보기 커서 갱신(라이브 리드아웃) — base 계속(좌표 표시 유지, 팬은 미Armed).
+        if (IsMeasuring) _measureController?.UpdateMouse(e.GetPosition(this));
 
         // [Rubber-band] 마퀴 갱신 (base 미호출 = 팬 방지, FR-MS-01)
         if (_isRubberBanding)
