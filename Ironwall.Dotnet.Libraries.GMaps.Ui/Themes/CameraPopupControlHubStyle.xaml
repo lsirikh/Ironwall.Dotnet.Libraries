@@ -4,12 +4,15 @@
     xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
     xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
 
-    <!--  카메라 RTSP 팝업 제어 허브 (CameraPopup_ControlHub) — 유리질 Tactical 카드.
-          템플릿 스코프라 색은 self-contained 하드코딩(기존 카운터 위젯 검증값) — 앱-MD StaticResource 참조 금지(크래시).  -->
+    <!--  카메라 RTSP 팝업 제어 허브 (CameraPopup_ControlHub) — Tactical 카드.
+          색은 앱 표준 테마 토큰을 {DynamicResource}로 참조 → Light/Dark 토글에 반응(App 레벨 Tokens.Light↔Dark 스왑).
+          템플릿 스코프이므로 앱-MD/MahApps StaticResource 참조 금지(크래시). 토큰은 전부 SolidColorBrush이므로
+          기존 그라디언트는 단색 토큰으로 평탄화(pill=SurfaceTranslucent, 헤더/뱃지=Primary+OnPrimaryFixed, 썸네일=SurfaceSunken).
+          시안 표면 위 전경은 반드시 OnPrimaryFixedBrush(Light=흰/Dark=암 반전)로 양테마 대비 보장. 그림자(Black)·구조값은 테마 불변.  -->
 
     <BooleanToVisibilityConverter x:Key="HubBoolToVis" />
 
-    <!--  행 액션 아이콘 버튼(투명 → 호버 강조)  -->
+    <!--  행 액션 아이콘 버튼(투명 → 호버 위험 강조)  -->
     <Style x:Key="HubRowIconButton" TargetType="Button">
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="28" />
@@ -17,7 +20,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Foreground" Value="#FF8299A8" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -27,9 +30,9 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#22EF5350" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="#66EF5350" />
-                            <Setter Property="Foreground" Value="#FFEF5350" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TintCriticalBrush}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DangerBorderBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -54,8 +57,8 @@
                                 <Style.Triggers>
                                     <!--  DataContext=팝업 vm — 선택 강조(SelectedCameraPopup이 IsSelected 설정)  -->
                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                        <Setter Property="Background" Value="#1C00C8FF" />
-                                        <Setter Property="BorderBrush" Value="#FF00C8FF" />
+                                        <Setter Property="Background" Value="{DynamicResource TintAccentBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource SelectionBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -64,7 +67,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#12FFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -79,7 +82,40 @@
         <Setter Property="Padding" Value="5,0" />
         <Setter Property="Margin" Value="0,0,4,0" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="BorderBrush" Value="#552A3A48" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    </Style>
+
+    <!--  '모두 닫기' 위험 버튼 — keyed 스타일(행 버튼과 동일 방식). Style 없으면 앱의 암시적 MD/MahApps Button
+          스타일을 상속해 폭/정렬이 깨짐 → BasedOn 없이 자체완결로 암시적 스타일 완전 우회.  -->
+    <Style x:Key="HubDangerButton" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Fb" CornerRadius="8" BorderThickness="1"
+                            BorderBrush="{DynamicResource DangerBorderBrush}" Background="{DynamicResource DangerSurfaceBrush}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <md:PackIcon Width="18" Height="18" VerticalAlignment="Center"
+                                         Foreground="{DynamicResource StatusCriticalBrush}" Kind="CloseCircleOutline" />
+                            <TextBlock Margin="8,0,0,0" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource StatusCriticalBrush}" Text="모두 닫기" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Fb" Property="Background" Value="{DynamicResource DangerHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style TargetType="{x:Type ctrl:CameraPopupControlHub}">
@@ -94,16 +130,9 @@
                 <ControlTemplate TargetType="{x:Type ctrl:CameraPopupControlHub}">
                     <Grid>
                         <!--  ===== 접힌 pill (드래그 핸들 = 본체 전체) =====  -->
-                        <Border x:Name="PART_Pill" Cursor="SizeAll" SnapsToDevicePixels="True">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Offset="0" Color="#F5102630" />
-                                    <GradientStop Offset="1" Color="#F508161D" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <Border.BorderBrush>
-                                <SolidColorBrush Color="#7000C8FF" />
-                            </Border.BorderBrush>
+                        <Border x:Name="PART_Pill" Cursor="SizeAll" SnapsToDevicePixels="True"
+                                Background="{DynamicResource SurfaceTranslucentBrush}"
+                                BorderBrush="{DynamicResource PrimaryBrush}">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="BorderThickness" Value="1" />
@@ -119,28 +148,23 @@
                             <StackPanel Orientation="Horizontal">
                                 <!--  그립  -->
                                 <md:PackIcon Width="15" Height="19" VerticalAlignment="Center" Margin="0,0,3,0"
-                                             Foreground="#FF57697A" Kind="DragVertical" />
+                                             Foreground="{DynamicResource TextMutedBrush}" Kind="DragVertical" />
                                 <!--  카메라 아이콘 + 뱃지  -->
                                 <Grid Width="30" Height="30" VerticalAlignment="Center">
-                                    <Border Background="#1A00C8FF" CornerRadius="8" />
+                                    <Border Background="{DynamicResource TintAccentBrush}" CornerRadius="8" />
                                     <md:PackIcon Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                 Foreground="#FF00C8FF" Kind="Cctv" />
+                                                 Foreground="{DynamicResource PrimaryBrush}" Kind="Cctv" />
                                     <Border MinWidth="18" Height="18" Padding="4,0" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                            Margin="0,-6,-7,0" CornerRadius="9" BorderThickness="1.5" BorderBrush="#FF071822">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                <GradientStop Offset="0" Color="#FF39D6FF" />
-                                                <GradientStop Offset="1" Color="#FF00C8FF" />
-                                            </LinearGradientBrush>
-                                        </Border.Background>
+                                            Margin="0,-6,-7,0" CornerRadius="9" BorderThickness="1.5"
+                                            BorderBrush="{DynamicResource SurfaceBrush}" Background="{DynamicResource PrimaryBrush}">
                                         <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" FontWeight="Bold"
-                                                   Foreground="#FF04161C"
+                                                   Foreground="{DynamicResource OnPrimaryFixedBrush}"
                                                    Text="{Binding BadgeText, RelativeSource={RelativeSource TemplatedParent}}" />
                                     </Border>
                                 </Grid>
                                 <!--  chevron (열림=위/닫힘=아래)  -->
                                 <md:PackIcon x:Name="Chev" Width="15" Height="15" VerticalAlignment="Center" Margin="6,0,0,0"
-                                             Foreground="#FF8299A8" Kind="ChevronDown" />
+                                             Foreground="{DynamicResource TextSecondaryBrush}" Kind="ChevronDown" />
                             </StackPanel>
                         </Border>
 
@@ -150,11 +174,9 @@
                                PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                IsOpen="{Binding IsFlyoutOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                             <!--  DataContext=허브 컨트롤(PlacementTarget) → 내부 바인딩 단순화  -->
-                            <Border Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1" BorderBrush="#8038485A"
+                            <Border Width="290" MaxHeight="360" CornerRadius="14" BorderThickness="1"
+                                    BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource SurfaceBrush}"
                                     DataContext="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=Popup}}">
-                                <Border.Background>
-                                    <SolidColorBrush Color="#F00E2029" />
-                                </Border.Background>
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Opacity="0.6" Color="Black" />
                                 </Border.Effect>
@@ -165,34 +187,29 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <!--  헤더  -->
-                                    <Border Grid.Row="0" CornerRadius="13,13,0,0" Padding="12,10">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                                <GradientStop Offset="0" Color="#FF063847" />
-                                                <GradientStop Offset="0.6" Color="#FF0A6A83" />
-                                                <GradientStop Offset="1" Color="#FF0A7FA0" />
-                                            </LinearGradientBrush>
-                                        </Border.Background>
+                                    <!--  헤더 (시안 표면=PrimaryBrush + 전경=OnPrimaryFixedBrush)  -->
+                                    <Border Grid.Row="0" CornerRadius="13,13,0,0" Padding="12,10" Background="{DynamicResource PrimaryBrush}">
                                         <StackPanel Orientation="Horizontal">
-                                            <md:PackIcon Width="17" Height="17" VerticalAlignment="Center" Foreground="#FFD6FBFF" Kind="Cctv" />
+                                            <md:PackIcon Width="17" Height="17" VerticalAlignment="Center"
+                                                         Foreground="{DynamicResource OnPrimaryFixedBrush}" Kind="Cctv" />
                                             <TextBlock Margin="9,0,0,0" VerticalAlignment="Center" FontSize="13" FontWeight="Bold"
-                                                       Foreground="#FFEAFFFF" Text="카메라 영상" />
-                                            <Border Margin="9,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#E6FFFFFF">
-                                                <TextBlock FontSize="11" FontWeight="Bold" Foreground="#FF053642"
+                                                       Foreground="{DynamicResource OnPrimaryFixedBrush}" Text="카메라 영상" />
+                                            <Border Margin="9,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9"
+                                                    Background="{DynamicResource OnPrimaryFixedBrush}">
+                                                <TextBlock FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryBrush}"
                                                            Text="{Binding OpenCount}" />
                                             </Border>
                                         </StackPanel>
                                     </Border>
 
-                                    <!--  카메라 리스트  -->
-                                    <ScrollViewer Grid.Row="1" Margin="0,0,0,0" Padding="6" VerticalScrollBarVisibility="Auto"
+                                    <!--  카메라 리스트 (좌우 10=헤더/푸터와 정렬)  -->
+                                    <ScrollViewer Grid.Row="1" Margin="0,0,0,0" Padding="10,6" VerticalScrollBarVisibility="Auto"
                                                   HorizontalScrollBarVisibility="Disabled">
                                         <ItemsControl ItemsSource="{Binding PopupsSource}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <!--  DataContext=팝업 vm (CameraStreamPopupViewModel)  -->
-                                                    <Grid Margin="0,0,0,3">
+                                                    <Grid Margin="5,0,5,3">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
                                                             <ColumnDefinition Width="Auto" />
@@ -209,23 +226,18 @@
                                                                 </Grid.ColumnDefinitions>
                                                                 <!--  썸네일(상태점)  -->
                                                                 <Border Grid.Column="0" Width="44" Height="30" CornerRadius="6" BorderThickness="1"
-                                                                        BorderBrush="#552A3A48" ClipToBounds="True">
-                                                                    <Border.Background>
-                                                                        <RadialGradientBrush>
-                                                                            <GradientStop Offset="0" Color="#FF0E3A44" />
-                                                                            <GradientStop Offset="1" Color="#FF04222B" />
-                                                                        </RadialGradientBrush>
-                                                                    </Border.Background>
+                                                                        BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource SurfaceSunkenBrush}"
+                                                                        ClipToBounds="True">
                                                                     <Grid>
                                                                         <md:PackIcon Width="15" Height="15" HorizontalAlignment="Center"
-                                                                                     VerticalAlignment="Center" Foreground="#FF356F7D" Kind="Play" />
+                                                                                     VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" Kind="Play" />
                                                                         <Ellipse Width="7" Height="7" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="3">
                                                                             <Ellipse.Style>
                                                                                 <Style TargetType="Ellipse">
-                                                                                    <Setter Property="Fill" Value="#FF3DDC97" />
+                                                                                    <Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
                                                                                     <Style.Triggers>
                                                                                         <DataTrigger Binding="{Binding IsResolvingSource}" Value="True">
-                                                                                            <Setter Property="Fill" Value="#FFF5A623" />
+                                                                                            <Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
                                                                                         </DataTrigger>
                                                                                     </Style.Triggers>
                                                                                 </Style>
@@ -235,20 +247,20 @@
                                                                 </Border>
                                                                 <!--  이름 + 태그  -->
                                                                 <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center">
-                                                                    <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="#FFDCE7EE"
+                                                                    <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                                                                TextTrimming="CharacterEllipsis" Text="{Binding Title}" />
                                                                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="#66F5A623"
+                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="{DynamicResource StatusWarningBrush}"
                                                                                 Visibility="{Binding IsResolvingSource, Converter={StaticResource HubBoolToVis}}">
-                                                                            <TextBlock FontSize="9.5" Foreground="#FFFFDCA0" Text="조회중" />
+                                                                            <TextBlock FontSize="9.5" Foreground="{DynamicResource StatusWarningBrush}" Text="조회중" />
                                                                         </Border>
-                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="#663DDC97"
+                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="{DynamicResource StatusNormalBrush}"
                                                                                 Visibility="{Binding IsPtzCapable, Converter={StaticResource HubBoolToVis}}">
-                                                                            <TextBlock FontSize="9.5" Foreground="#FFC6F5D8" Text="PTZ" />
+                                                                            <TextBlock FontSize="9.5" Foreground="{DynamicResource StatusNormalBrush}" Text="PTZ" />
                                                                         </Border>
-                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="#6600C8FF"
+                                                                        <Border Style="{StaticResource HubTag}" BorderBrush="{DynamicResource PrimaryBrush}"
                                                                                 Visibility="{Binding IsLarge, Converter={StaticResource HubBoolToVis}}">
-                                                                            <TextBlock FontSize="9.5" Foreground="#FF9FE6FF" Text="크게" />
+                                                                            <TextBlock FontSize="9.5" Foreground="{DynamicResource PrimaryBrush}" Text="크게" />
                                                                         </Border>
                                                                     </StackPanel>
                                                                 </StackPanel>
@@ -268,35 +280,19 @@
                                     </ScrollViewer>
 
                                     <!--  푸터: 모두 닫기  -->
-                                    <Border Grid.Row="2" Padding="10" BorderThickness="0,1,0,0" BorderBrush="#552A3A48" Background="#99061016"
-                                            CornerRadius="0,0,13,13">
-                                        <Button Command="{Binding CloseAllCommand}" Cursor="Hand" Height="36">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border x:Name="Fb" CornerRadius="8" BorderThickness="1" BorderBrush="#80EF5350" Background="#1FEF5350">
-                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                            <md:PackIcon Width="15" Height="15" VerticalAlignment="Center" Foreground="#FFFFD7D6" Kind="CloseCircleOutline" />
-                                                            <TextBlock Margin="7,0,0,0" FontSize="12.5" FontWeight="Bold" Foreground="#FFFFD7D6" Text="모두 닫기" />
-                                                        </StackPanel>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="Fb" Property="Background" Value="#33EF5350" />
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
+                                    <Border Grid.Row="2" Padding="12,10" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerBrush}"
+                                            Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="0,0,13,13">
+                                        <Button Command="{Binding CloseAllCommand}" Style="{StaticResource HubDangerButton}" />
                                     </Border>
                                 </Grid>
                             </Border>
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <!--  플라이아웃 열림 → chevron 위로  -->
+                        <!--  플라이아웃 열림 → chevron 위로 + pill 포커스 링  -->
                         <Trigger Property="IsFlyoutOpen" Value="True">
                             <Setter TargetName="Chev" Property="Kind" Value="ChevronUp" />
-                            <Setter TargetName="PART_Pill" Property="BorderBrush" Value="#FF00C8FF" />
+                            <Setter TargetName="PART_Pill" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

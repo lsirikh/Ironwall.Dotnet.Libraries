@@ -6567,9 +6567,13 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void OnFirstTileLoadForOverlay(long elapsedMilliseconds)
     {
-        MainMap.OnTileLoadComplete -= OnFirstTileLoadForOverlay;
+        var map = MainMap;
+        if (map == null) return;
+        map.OnTileLoadComplete -= OnFirstTileLoadForOverlay;
         _log?.Info($"[Overlay] OnTileLoadComplete 수신 — 초기 렌더링 실행");
-        _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+        // OnTileLoadComplete는 백그라운드 타일-로드 스레드에서 발화 → RefreshVisibleTiles(InvalidateVisual·
+        // Canvas.Visibility/Opacity 등 UI 전용)를 UI Dispatcher로 마샬링(크로스-스레드 예외 방지).
+        map.Dispatcher.InvokeAsync(() => _customMapOverlayService?.RefreshVisibleTiles(map));
     }
 
     private void MainMap_OnMapZoomChanged()
