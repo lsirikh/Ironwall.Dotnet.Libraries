@@ -8905,6 +8905,12 @@ public partial class MapViewModel : BasePanelViewModel,
             AggregateLeafCheckedFromMarkers();
             UpdateLayerItemCounts();
 
+            // 부모(Group/Category/Section) tri-state를 자식 실제 상태로 상향 재계산.
+            // 부모 팩토리가 IsChecked 미세팅(기본 true) + AggregateLeafCheckedFromMarkers가 개별 심볼 leaf
+            // (Model==null) 제외 → 재빌드마다 부모 체크가 true로 부활하던 desync 수정(세터 우회, 부작용 없음).
+            foreach (var root in _layerTreeNodes)
+                root.RecomputeCheckStateBottomUp();
+
             var leafCount = LayerTreeBuilder.Flatten(_layerTreeNodes).Count();
             //_log?.Info($"레이어 트리 빌드 완료 ({leafCount}개 Leaf 노드)");
         }

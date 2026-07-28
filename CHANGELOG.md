@@ -31,6 +31,10 @@
   - **원인**: MapEdit 모드 OFF 경로(`IsEditModeEnabled` 세터 / `GMapCustomControl.SetEditMode(false)`)가 선택·러버밴드·마커편집 드래그·배치 모드는 정리하지만 **`LineDrawingService`(드로잉)는 취소하지 않음** → 드로잉 HUD·맵 클릭 라우팅(`IsLineDrawing` 패스트패스)·Cross 커서·VM 상태가 orphan으로 잔존. aim/배치 전환은 `CancelDrawingAsync`로 취소하는데 편집-OFF 경로만 누락.
   - **수정**: `IsEditModeEnabled` 세터(모든 해제 경로의 단일 게이트) 해제 분기에서 `IsLineDrawing`이면 `CancelDrawingAsync()` 호출 + `IsLineDrawing=false`/`LineDrawingStatus=""` 리셋(이벤트 핸들러 `OnLineDrawingCancelled`는 VM 플래그 미리셋이라 명시).
   - **검증**: GMaps.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안(드로잉 중 편집 모드 OFF → HUD/커서/클릭 라우팅 즉시 정리).
+- **레이어 패널 부모(그룹/카테고리) 체크박스가 재오픈 시 자식과 어긋나 다시 체크되던 버그** (Track B · 태그 `before-layerpanel-parent-check-fix` · GMaps.Ui 한정 · 메인솔루션 변경 0 · 연관 [LayerVisibility_Persistence_Fix PRD](docs/prds/LayerVisibility_Persistence_Fix-prd.md) FR-4)
+  - **원인(회귀)**: `LayerTreeNode._isChecked` 기본값 true + 부모 팩토리(CreateGroup/CreateCategory/CreateSection)가 IsChecked 미세팅. 패널을 열 때마다 `LoadLayersFromDbAsync`가 트리를 재빌드하는데, 재빌드 후 유일한 집계 `AggregateLeafCheckedFromMarkers`는 필터 `Model.LayerType=="Symbol"`이라 **개별 심볼 leaf(Model==null)를 제외** → 부모 tri-state가 자식(영속된 `symbol.Visible`)으로부터 재계산되지 않고 기본 true로 부활. leaf는 정상 언체크라 desync. **영속 자체는 정상**(부모 체크는 파생 표시값, 비영속). LayerVisibility_Persistence_Fix(2026-06)가 세운 부모 집계를 **개별 심볼 트리노드 기능(`367e6f0`, 2026-06-30)이 회귀시켰고 미검출**(OVERLAY IMAGE만 별도 rollup 유지).
+  - **수정**: `LayerTreeNode.RecomputeCheckStateBottomUp()`(부작용 없는 자식→부모 상향 재계산, 세터 우회로 push-down/CheckChanged/Model.IsVisible/DB 영속 미유발) 추가 + `LoadLayersFromDbAsync` 재빌드 직후 1회 호출. PRD §8 "마커→leaf 역방향 금지"와 무관(node↔node 정방향).
+  - **검증**: GMaps.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안(PIDS 그룹 언체크→닫기→재오픈 시 그룹=언체크/indeterminate, leaf 숨김 유지).
 
 ### Added
 - **지도 측정 툴 — 길이/넓이 재기 (Top 메뉴 아이콘 + 지오데식 계산)** ([PRD](docs/prds/Measure_Tools-prd.md) · [Plan](docs/plans/Measure_Tools-prd-plan.md) · [스토리보드](docs/design/Measure_Tools_Storyboard.html) · 태그 `before-measure-tools` · worktree `feature/measure-tools` · GMaps.Ui 한정 · 메인솔루션 변경 0)

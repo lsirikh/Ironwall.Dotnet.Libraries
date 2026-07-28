@@ -229,6 +229,31 @@ public class LayerTreeNode : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 자식 실제 상태로부터 부모(Group/Category/Section) tri-state를 상향 재계산 (side-effect-free).
+    /// 트리 (재)빌드 직후 1회 호출 — 부모 팩토리(CreateGroup/CreateCategory/CreateSection)가 IsChecked를
+    /// 세팅하지 않아 기본 true로 남던 desync(패널 재오픈 시 부모 체크 부활 — 개별 심볼 트리노드 도입 367e6f0 이후 회귀) 수정.
+    /// 세터를 우회(_isChecked 직접 대입)해 자식 push-down·CheckChanged·Model.IsVisible 기록·DB 영속을 유발하지 않음.
+    /// Leaf(Children.Count==0)는 실제값(symbol.Visible 등) 보존 — 마커 스캔 없는 node↔node 정방향 집계.
+    /// </summary>
+    public void RecomputeCheckStateBottomUp()
+    {
+        foreach (var child in Children)
+            child.RecomputeCheckStateBottomUp();
+
+        if (Children.Count == 0) return;   // Leaf: 실제 가시성 값 보존
+
+        bool allChecked   = Children.All(c => c.IsChecked == true);
+        bool allUnchecked = Children.All(c => c.IsChecked == false);
+        bool? state = allChecked ? true : allUnchecked ? (bool?)false : null;
+
+        if (_isChecked != state)
+        {
+            _isChecked = state;
+            OnPropertyChanged(nameof(IsChecked));   // 세터 우회 — UI tri-state만 갱신, 부작용 없음
+        }
+    }
+
+    /// <summary>
     /// DB 모델 기반으로 Leaf 노드 생성
     /// </summary>
     public static LayerTreeNode FromModel(IMapLayerModel model, string displayName, string iconKind = "Circle")
