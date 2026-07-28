@@ -66,6 +66,56 @@
         </Setter>
     </Style>
 
+    <!--  프리셋 목록 행 '가기' — 컴팩트(최소 패딩)·라이트/다크 테마 토큰. Style 없으면 암시적 MD 버튼(둥근형·큰 패딩·MinWidth)
+          을 상속해 행 높이가 커짐 → 자체완결 템플릿으로 행을 슬림하게.  -->
+    <Style x:Key="PresetRowGoButtonStyle" TargetType="Button">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Padding="7,1" CornerRadius="3" Background="Transparent"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SecondaryHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--  프리셋 목록 행 삭제(✕) — 컴팩트 정사각·위험(StatusCritical) 토큰.  -->
+    <Style x:Key="PresetRowDeleteButtonStyle" TargetType="Button">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Width="20" Height="20" CornerRadius="3" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DangerHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!--  맵 위 이동식 RTSP 스트리밍 팝업 — 관심지역/레이어 창 답습  -->
     <Style TargetType="{x:Type ctrl:CameraStreamPopupControl}">
         <Setter Property="Template">
@@ -239,7 +289,7 @@
                             <!--  탭 패널 ([PTZ][프리셋][옵션]) — 우버튼 짧은클릭 토글. 영상 영역(*)이 줄고 패널이 아래에 펼쳐짐  -->
                             <Border
                                 Grid.Row="2"
-                                Height="200"
+                                Height="220"
                                 Background="#FF131922"
                                 BorderBrush="{StaticResource BorderGrayBrush}"
                                 BorderThickness="0,1,0,0"
@@ -386,45 +436,99 @@
                                             </Style>
                                         </StackPanel.Style>
 
-                                        <!--  프리셋 목록  -->
-                                        <ItemsControl MaxHeight="108" ItemsSource="{Binding Presets}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid Margin="0,1">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <!--  행별 Home 아이콘/지정 버튼 제거(FR-C2/OQ-6) — ONVIF Home은 per-preset이 아닌 전용 슬롯  -->
-                                                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#FFE6EDF3" Text="{Binding PresetName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding PresetName}" />
-                                                        <Button Grid.Column="1" Margin="2,0" Padding="6,2" Content="가기" FontSize="11" ToolTip="이 프리셋으로 이동" Command="{Binding DataContext.GotoPresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                                        <Button Grid.Column="2" Margin="2,0" Padding="6,2" Content="✕" FontSize="11" Foreground="#FFEF5350" ToolTip="카메라에서 프리셋 삭제" Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <!--  프리셋 목록 — 있을 때만 표시(빈 목록/조회 중엔 아래 스피너·상태문구). 많으면 내부 스크롤로 전부 접근(과거 MaxHeight 클리핑 → 스크롤 전환).  -->
+                                        <ScrollViewer MaxHeight="100" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                            <ScrollViewer.Style>
+                                                <Style TargetType="ScrollViewer">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <!--  없을 때: 리스트 영역 접어 높이 0(상태문구/스피너만 노출). 있을 때: Auto 높이(최대 150)+스크롤.  -->
+                                                        <DataTrigger Binding="{Binding Presets.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ScrollViewer.Style>
+                                            <ItemsControl ItemsSource="{Binding Presets}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,1">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <!--  행별 Home 아이콘/지정 버튼 제거(FR-C2/OQ-6) — ONVIF Home은 per-preset이 아닌 전용 슬롯  -->
+                                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Text="{Binding PresetName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding PresetName}" />
+                                                            <Button Grid.Column="1" Margin="2,0" Style="{StaticResource PresetRowGoButtonStyle}" Content="가기" ToolTip="이 프리셋으로 이동" Command="{Binding DataContext.GotoPresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                            <Button Grid.Column="2" Margin="2,0" Style="{StaticResource PresetRowDeleteButtonStyle}" Content="✕" ToolTip="카메라에서 프리셋 삭제" Command="{Binding DataContext.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
 
-                                        <!--  빈 목록 상태(FR-C3): 조회 중/미지원/없음/조회 실패를 구분 표기  -->
+                                        <!--  프리셋 조회 중 스피너(FR-C3) — ONVIF 왕복 동안 '없음' 오해 방지. 완료 시 목록/상태문구로 전환.  -->
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLoadingPresets}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <md:PackIcon Width="16" Height="16" VerticalAlignment="Center" Kind="Loading"
+                                                         Foreground="{DynamicResource PrimaryBrush}" RenderTransformOrigin="0.5,0.5">
+                                                <md:PackIcon.RenderTransform>
+                                                    <RotateTransform />
+                                                </md:PackIcon.RenderTransform>
+                                                <md:PackIcon.Triggers>
+                                                    <EventTrigger RoutedEvent="Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                                 From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </md:PackIcon.Triggers>
+                                            </md:PackIcon>
+                                            <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" FontSize="11" FontStyle="Italic"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" Text="프리셋 불러오는 중…" />
+                                        </StackPanel>
+
+                                        <!--  빈 목록 상태(FR-C3): 조회 중/미지원/없음/조회 실패를 구분 표기(조회 중엔 스피너만)  -->
                                         <TextBlock Margin="0,8" HorizontalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#FF6B7785" Text="{Binding PresetStatusText}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Presets.Count}" Value="0">
+                                                        <!--  조회 완료(로딩 아님) + 진짜 빈 목록일 때만 표시 — 조회 중 '없음' 깜빡임 방지  -->
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding Presets.Count}" Value="0" />
+                                                                <Condition Binding="{Binding IsLoadingPresets}" Value="False" />
+                                                            </MultiDataTrigger.Conditions>
                                                             <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
+                                                        </MultiDataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
 
-                                        <!--  버튼 행 — Home 지정/이동 = ONVIF SetHomePosition/GotoHomePosition(FR-C2/OQ-6)  -->
-                                        <StackPanel Margin="0,6,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
-                                            <Button Margin="2,0" Padding="8,3" Content="현재위치 저장" FontSize="11" ToolTip="현재 위치를 카메라 프리셋으로 저장" Command="{Binding SavePresetCommand}" />
-                                            <Button Margin="2,0" Padding="8,3" Content="Home 지정" FontSize="11" ToolTip="현재 위치를 카메라 Home으로 지정" Command="{Binding SetHomeCommand}" />
-                                            <Button Margin="2,0" Padding="8,3" Content="Home 이동" FontSize="11" ToolTip="카메라 Home 위치로 이동(먼저 Home 지정 필요)" Command="{Binding GotoHomeCommand}" />
-                                        </StackPanel>
+                                        <!--  버튼 — 토큰 스타일+2행 배치로 폭 종속 클리핑 제거(FR-C2/OQ-6). 스타일 없으면 암시적 MD Button 상속으로
+                                              라벨 잘림('현재위/Home/Home'). 1행 전폭 저장, 2행 Home 지정·이동(2열 균등).  -->
+                                        <Button Margin="0,6,0,0" HorizontalAlignment="Stretch" Style="{StaticResource PanelPrimaryButtonStyle}"
+                                                Content="현재위치 저장" ToolTip="현재 위치를 카메라 프리셋으로 저장" Command="{Binding SavePresetCommand}" />
+                                        <UniformGrid Margin="0,4,0,0" Columns="2">
+                                            <Button Margin="0,0,2,0" HorizontalAlignment="Stretch" Style="{StaticResource PanelSecondaryButtonStyle}"
+                                                    Content="Home 지정" ToolTip="현재 위치를 카메라 Home으로 지정" Command="{Binding SetHomeCommand}" />
+                                            <Button Margin="2,0,0,0" HorizontalAlignment="Stretch" Style="{StaticResource PanelSecondaryButtonStyle}"
+                                                    Content="Home 이동" ToolTip="카메라 Home 위치로 이동(먼저 Home 지정 필요)" Command="{Binding GotoHomeCommand}" />
+                                        </UniformGrid>
 
                                         <!--  인라인 이름 입력  -->
                                         <StackPanel Margin="0,6,0,0" Visibility="{Binding IsSavingPreset, Converter={StaticResource BoolToVis}}">

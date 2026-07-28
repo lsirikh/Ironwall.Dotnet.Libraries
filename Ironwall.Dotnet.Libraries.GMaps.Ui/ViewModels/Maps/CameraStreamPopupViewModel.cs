@@ -306,6 +306,10 @@ public class CameraStreamPopupViewModel : PropertyChangedBase, IAsyncDisposable
     /// <summary>프리셋 저장 인라인 이름 입력 표시 여부. (FR-PRESET-03)</summary>
     public bool IsSavingPreset { get => _isSavingPreset; set { if (_isSavingPreset == value) return; _isSavingPreset = value; NotifyOfPropertyChange(nameof(IsSavingPreset)); } }
 
+    private bool _isLoadingPresets;
+    /// <summary>프리셋 ONVIF 조회 진행 중 여부(FR-C3) — 조회 동안 스피너 표시·빈목록 문구 숨김(빈 목록 오해 방지). MapViewModel.LoadPresetsAsync가 토글.</summary>
+    public bool IsLoadingPresets { get => _isLoadingPresets; set { if (_isLoadingPresets == value) return; _isLoadingPresets = value; NotifyOfPropertyChange(nameof(IsLoadingPresets)); } }
+
     private string _newPresetName = string.Empty;
     public string NewPresetName { get => _newPresetName; set { _newPresetName = value; NotifyOfPropertyChange(nameof(NewPresetName)); } }
 

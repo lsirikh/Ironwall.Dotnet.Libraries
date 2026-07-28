@@ -28,3 +28,8 @@ public class CallDeleteSelectedProcessMessageModel : IMessageModel { }
 /// <c>MapViewModel.HandleAsync</c> 가 열린 모든 카메라 팝업을 순차 닫는다(Hub Lease/PTZ 정지 포함).
 /// </summary>
 public class CallCloseAllCameraPopupsProcessMessageModel : IMessageModel { }
+
+/// <summary>프리셋 삭제 확인 콜백(파괴적 동작 — 되돌릴 수 없음). <c>OpenConfirmPopupMessageModel</c> "확인" 시
+/// 팝업 인프라가 이 메시지를 재발행 → <c>MapViewModel.HandleAsync</c> 가 대기 대상(_pendingPresetDelete)을
+/// ONVIF RemovePreset 후 목록 재조회. raw MessageBox 금지 — 표준 EventAggregator 확인 패턴.</summary>
+public class CallDeletePresetProcessMessageModel : IMessageModel { }
