@@ -118,8 +118,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                     return false;
                 }
 
-                // LineDrawingAdorner 생성 및 추가
-                _currentAdorner = new LineDrawingAdorner(_mapControl, _mapControl, _log);
+                // LineDrawingAdorner 생성 및 추가 (심볼 종류별 헤더 타이틀 전달)
+                _currentAdorner = new LineDrawingAdorner(_mapControl, _mapControl, _log, ResolveHudTitle(_parameters.Model));
 
                 // 컨트롤 UI 이벤트 구독 (누락된 부분!)
                 _currentAdorner.CompleteRequested += OnAdornerCompleteRequested;
@@ -411,15 +411,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                 switch (e.Key)
                 {
                     case Key.Escape:
-                        // ESC: 완료 또는 취소
-                        if (_currentAdorner?.IsValid == true)
-                        {
-                            await CompleteDrawingAsync();
-                        }
-                        else
-                        {
-                            await CancelDrawingAsync();
-                        }
+                        // ESC: 취소(헤더 X 버튼과 동일). 완료는 Enter 전용.
+                        await CancelDrawingAsync();
                         e.Handled = true;
                         break;
 
@@ -597,6 +590,17 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
             var metersPerPixel = 156543.03392 * Math.Cos(latitude * Math.PI / 180) / Math.Pow(2, zoom);
             return metersPerPixel;
         }
+
+        /// <summary>
+        /// 심볼 종류에 따른 HUD 헤더 타이틀 결정 (라인/구역/PIDS 그룹).
+        /// 모델 종류가 완료 분기(CompleteDrawingAsync)와 일치 — 호출자 Title 문자열보다 신뢰.
+        /// </summary>
+        private static string ResolveHudTitle(ILineSymbolModel model) => model switch
+        {
+            PidsGroupSymbolModel => "PIDS 그룹 그리기",
+            LineSymbolModel { IsClosedPath: true } => "구역 그리기",
+            _ => "라인 그리기",
+        };
 
         /// <summary>
         /// DashStyle 가져오기

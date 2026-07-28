@@ -14,6 +14,24 @@
 
 ## [Unreleased]
 
+### Changed
+- **라인·구역·PIDS 그룹 드로잉 HUD 리디자인 + 위치 유지 버그 수정** ([PRD](docs/prds/line-drawing-hud-redesign-prd.md) · [Plan](docs/plans/line-drawing-hud-redesign-prd-plan.md) · [프리뷰](docs/design/line-drawing-hud-redesign-preview.html) · 태그 `before-line-drawing-hud-redesign` · GMaps.Ui 한정 · 메인솔루션 변경 0)
+  - **HUD 재디자인(FR-01~07)**: 그리는 중 뜨는 흰색 알약형 플로팅 컨트롤을 **표준 오버레이 패널 패턴**(시안 헤더 + **우상단 X 닫기** + 다크/라이트 카드)으로 교체. 코드-하드코딩 브러시 → 신규 templated `LineDrawingHudControl` + `LineDrawingHudStyle.xaml`이 `DesignTokens.xaml`의 `PanelCloseButtonStyle`/`PanelPrimaryButtonStyle`/`PanelSecondaryButtonStyle`·`DynamicResource` 토큰 재사용 → **런타임 테마 전환 자동 반영**. 헤더=아이콘(VectorLine)+심볼 종류 타이틀(라인/구역/PIDS 그룹)+X. 본문=점 칩+거리 / **완료**(Primary)+**되돌리기**(Secondary). 취소는 헤더 X(Esc). Line·Area·PIDS 그룹 3종 공유 어도너라 한 번에 적용.
+  - **위치 유지 수정(FR-08)**: 드래그로 옮긴 HUD가 다음 점 클릭·팬/줌마다 `firstPoint+(20,−50)`로 되돌아가던 버그(`UpdateControlUI`가 저장된 `_controlPosition`을 무시하고 하드코딩 재배치) → `_hasBeenDragged`+절대좌표 고정: 최초는 오프셋 배치, **한 번 드래그하면 그 화면 위치를 그리기 종료까지 유지**(팬/줌 무관), `Clear()`에서 초기화.
+  - **지도 표식 토큰화 + 정리(FR-06/09)**: 시작점=StatusNormal·끝점=Accent·꼭짓점=Primary·미리보기=Muted 점선(`TryFindResource` 1회 캐싱), `OnRender` 매 프레임 Pen 재할당 제거(캐싱), 죽은 named 핸들러/`_controlPosition` 제거, `HitTestCore`를 HUD 바운즈로 재타깃(지도 클릭 통과 불변식 보존), `OnMapChanged` Dispatcher 가드. **Esc = 취소로 정렬**(헤더 X와 일치, 완료는 Enter 전용).
+  - **완성 심볼 시작점 마커 제거(Track B)**: `LineMarkerStyle.xaml`의 `PART_EndpointMarkers`/`PART_StartPointMarker`(끝점 마커 제거 후 남은 위치 미지정 유령 초록점, IsClosedPath=Area마다 상시 표시)와 관련 트리거·잔여 주석 제거.
+  - **검증**: GMaps.Ui 빌드 0오류 · XAML(BAML) 컴파일 OK · 신규 .cs/.xaml UTF-8 BOM. ⚠앱 재빌드 후 런타임 육안(다크/라이트 토글 + Line/Area/PIDS 3종 그리기·완료·취소·되돌리기·드래그 유지).
+
+### Fixed
+- **PidsGroup(경계선 그룹) 추가 시 첫 맵 클릭이 무효화되던 버그** (Track B · 태그 `before-pidsgroup-firstclick-fix` · GMaps.Ui 한정 · 메인솔루션 변경 0)
+  - **원인**: Fence_Group(PidsGroup)이 단일-점 PIDS 장비와 함께 `EnumMarkerCategory.PIDS_EQUIPMENT` 배치 모드(placement mode) 경로로 분류(`MapViewModel.ExecuteAddSelectedSymbol`)돼, 다점 경계선인데도 **첫 맵 클릭이 "배치 클릭"으로 소비**되어 그리기 시작만 시키고(클릭 좌표 무시) 두 번째 클릭부터 꼭짓점으로 인식됨. Area/Line은 배치 모드 우회·직접 시작이라 무증상.
+  - **수정(Option A)**: PIDS_EQUIPMENT 분기에서 `deviceType == Fence_Group`이면 배치 모드 대신 `AddPidsGroupMarker`로 **곧바로 라인 드로잉 시작**(Area/Line과 동일) → 첫 클릭이 첫 꼭짓점. 나머지 단일-점 PIDS 장비는 배치 모드 유지.
+  - **검증**: GMaps.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안(PidsGroup 추가 → 첫 클릭부터 점 인식).
+- **편집 모드 해제 시 진행 중 라인/구역/PIDS그룹 드로잉이 정리되지 않던 버그** (Track B · 태그 `before-editmode-off-drawing-cancel` · GMaps.Ui 한정 · 메인솔루션 변경 0)
+  - **원인**: MapEdit 모드 OFF 경로(`IsEditModeEnabled` 세터 / `GMapCustomControl.SetEditMode(false)`)가 선택·러버밴드·마커편집 드래그·배치 모드는 정리하지만 **`LineDrawingService`(드로잉)는 취소하지 않음** → 드로잉 HUD·맵 클릭 라우팅(`IsLineDrawing` 패스트패스)·Cross 커서·VM 상태가 orphan으로 잔존. aim/배치 전환은 `CancelDrawingAsync`로 취소하는데 편집-OFF 경로만 누락.
+  - **수정**: `IsEditModeEnabled` 세터(모든 해제 경로의 단일 게이트) 해제 분기에서 `IsLineDrawing`이면 `CancelDrawingAsync()` 호출 + `IsLineDrawing=false`/`LineDrawingStatus=""` 리셋(이벤트 핸들러 `OnLineDrawingCancelled`는 VM 플래그 미리셋이라 명시).
+  - **검증**: GMaps.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안(드로잉 중 편집 모드 OFF → HUD/커서/클릭 라우팅 즉시 정리).
+
 ### Added
 - **지도 측정 툴 — 길이/넓이 재기 (Top 메뉴 아이콘 + 지오데식 계산)** ([PRD](docs/prds/Measure_Tools-prd.md) · [Plan](docs/plans/Measure_Tools-prd-plan.md) · [스토리보드](docs/design/Measure_Tools_Storyboard.html) · 태그 `before-measure-tools` · worktree `feature/measure-tools` · GMaps.Ui 한정 · 메인솔루션 변경 0)
   - **기능**: 툴바 "측정" 그룹에 길이(Ruler)·넓이(VectorSquare) 토글. 지도 클릭으로 점 추가, 더블클릭/Enter 완료, ESC 취소, Backspace/Ctrl+Z 마지막 점 취소. 길이=폴리라인+구간 거리라벨, 넓이=닫힌 다각형 채움+면적 중심라벨. 임시 오버레이(DB 미저장·마커 미생성). aim/배치/라인드로잉과 상호배제(편집 모드 독립).

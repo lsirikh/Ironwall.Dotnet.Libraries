@@ -91,27 +91,6 @@
 									</DataTemplate>
 								</ItemsControl.ItemTemplate>
 							</ItemsControl>
-
-							<!--  Start/End Markers  -->
-							<Grid Name="PART_EndpointMarkers" Visibility="Collapsed">
-								<!--  Start Point Marker  -->
-								<Ellipse
-									Name="PART_StartPointMarker"
-									Width="10"
-									Height="10"
-									Fill="LightGreen"
-									Stroke="Green"
-									StrokeThickness="2">
-									<Ellipse.Effect>
-										<DropShadowEffect
-											BlurRadius="4"
-											Opacity="0.6"
-											ShadowDepth="2"
-											Color="Black" />
-									</Ellipse.Effect>
-								</Ellipse>
-
-							</Grid>
 						</Canvas>
 
 						<!--  Invisible Hit Test Area (라인 클릭 감지용)  -->
@@ -193,11 +172,6 @@
 							<Setter TargetName="PART_ArrowHead" Property="Visibility" Value="Visible" />
 						</Trigger>
 
-						<!--  IsClosedPath=True일 때 끝점 마커 표시  -->
-						<Trigger Property="IsClosedPath" Value="True">
-							<Setter TargetName="PART_EndpointMarkers" Property="Visibility" Value="Visible" />
-						</Trigger>
-
 						<!--  ShowTitle=True일 때 라벨 표시  -->
 						<Trigger Property="ShowTitle" Value="True">
 							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
@@ -208,7 +182,6 @@
 							<Setter TargetName="PART_LabelContainer" Property="Visibility" Value="Collapsed" />
 							<Setter TargetName="PART_InfoText" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_LinePointsContainer" Property="Visibility" Value="Visible" />
-							<Setter TargetName="PART_EndpointMarkers" Property="Visibility" Value="Visible" />
 							<Setter TargetName="PART_MainPolyline" Property="StrokeThickness">
 								<Setter.Value>
 									<MultiBinding Converter="{StaticResource MultiAddValueConverter}">

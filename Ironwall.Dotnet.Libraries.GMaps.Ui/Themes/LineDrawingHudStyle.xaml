@@ -1,0 +1,141 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+	<!-- 표준 패널 스타일(PanelCloseButtonStyle 등) + 테마 토큰 재사용 -->
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- 드로잉 HUD (시안 헤더 + 우상단 X 닫기 + 다크/라이트 카드)  -->
+	<!-- 색은 전부 DynamicResource 토큰 → 런타임 테마 전환 자동 반영     -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<Style TargetType="{x:Type ctrl:LineDrawingHudControl}">
+		<Setter Property="Width" Value="240" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="UseLayoutRounding" Value="True" />
+		<Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ctrl:LineDrawingHudControl}">
+					<!-- 컨테이너 카드 (LayerPanel과 동일 패턴) -->
+					<Border
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						ClipToBounds="True"
+						CornerRadius="10">
+						<Border.Effect>
+							<DropShadowEffect
+								BlurRadius="12"
+								Opacity="0.4"
+								ShadowDepth="3"
+								Color="Black" />
+						</Border.Effect>
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="34" />
+								<RowDefinition Height="Auto" />
+							</Grid.RowDefinitions>
+
+							<!-- 헤더: 시안, 드래그(어도너가 처리), [아이콘][타이틀][X] -->
+							<Border
+								Grid.Row="0"
+								Background="{DynamicResource PrimaryBrush}"
+								CornerRadius="9,9,0,0"
+								Cursor="SizeAll">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="30" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="30" />
+									</Grid.ColumnDefinitions>
+									<md:PackIcon
+										Grid.Column="0"
+										Width="15"
+										Height="15"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Kind="VectorLine" />
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										FontSize="12.5"
+										FontWeight="Bold"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Text="{TemplateBinding HudTitle}"
+										TextTrimming="CharacterEllipsis" />
+									<Button
+										x:Name="PART_CloseButton"
+										Grid.Column="2"
+										Style="{StaticResource PanelCloseButtonStyle}"
+										ToolTip="닫기 / 취소 (Esc)" />
+								</Grid>
+							</Border>
+
+							<!-- 본문: 상태(점 칩 + 거리) + 액션(완료/되돌리기) -->
+							<StackPanel Grid.Row="1" Margin="12,10,12,12">
+								<Grid Margin="0,0,0,11">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<!-- 점 개수 칩 -->
+									<Border
+										Grid.Column="0"
+										VerticalAlignment="Center"
+										Background="{DynamicResource TintAccentBrush}"
+										CornerRadius="9"
+										Padding="9,2">
+										<TextBlock
+											FontSize="12"
+											FontWeight="Bold"
+											Foreground="{DynamicResource PrimaryBrush}"
+											Text="{TemplateBinding PointText}" />
+									</Border>
+									<!-- 총 거리 -->
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Right"
+										VerticalAlignment="Center"
+										FontFamily="Consolas"
+										FontSize="15"
+										FontWeight="Bold"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										Text="{TemplateBinding DistanceText}" />
+								</Grid>
+
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="7" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Button
+										x:Name="PART_CompleteButton"
+										Grid.Column="0"
+										Content="✓ 완료"
+										IsEnabled="{TemplateBinding CanComplete}"
+										Style="{StaticResource PanelPrimaryButtonStyle}"
+										ToolTip="완료 (Enter)" />
+									<Button
+										x:Name="PART_UndoButton"
+										Grid.Column="2"
+										Content="↶ 되돌리기"
+										Style="{StaticResource PanelSecondaryButtonStyle}"
+										ToolTip="마지막 점 취소 (Backspace)" />
+								</Grid>
+							</StackPanel>
+						</Grid>
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+</ResourceDictionary>
