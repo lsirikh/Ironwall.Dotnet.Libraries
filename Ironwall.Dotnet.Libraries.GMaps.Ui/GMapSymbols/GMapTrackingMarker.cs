@@ -110,12 +110,25 @@ public sealed class GMapTrackingMarker : GMapMarker
         Offset = new Point(-TipX, -TipY);   // 핀 끝이 좌표에 앵커
     }
 
+    // [Rotation FR-13/R-10] WorldHeading 정책 — 화살표 표시각 = 월드방위 − 맵 bearing.
+    // Update는 월드방위를 저장하고, 맵 회전은 ApplyMapBearing으로 별도 수신(둘 중 어느 쪽이 먼저 와도 정합).
+    private double _worldBearing;
+    private double _mapBearing;
+
+    /// <summary>canonical 맵 bearing 수신(매니저의 viewport snapshot 경유) — 화살표 재표시각.</summary>
+    public void ApplyMapBearing(double mapBearing)
+    {
+        _mapBearing = mapBearing;
+        _arrowRotate.Angle = _worldBearing - _mapBearing;
+    }
+
     /// <summary>위협색·타입·방향·속도를 갱신(위치는 매니저가 <see cref="GMapMarker.Position"/> 직접 설정).</summary>
     public void Update(EnumColorType threatColor, EnumTargetType type, double bearing, bool showArrow, double speedMps)
     {
         _pin.Foreground = BrushFor(threatColor);
         _typeIcon.Kind = IconFor(type);
-        _arrowRotate.Angle = bearing;
+        _worldBearing = bearing;
+        _arrowRotate.Angle = _worldBearing - _mapBearing;   // R-10: 지도 회전 하에서도 실제 진행방향 지시
         _arrow.Visibility = showArrow ? Visibility.Visible : Visibility.Collapsed;
         _speedLabel.Text = $"{speedMps:F1} m/s";
     }

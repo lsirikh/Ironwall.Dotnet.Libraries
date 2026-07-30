@@ -24,13 +24,24 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
    Company      : Sensorway Co., Ltd.                                       
    Email        : lsirikh@naver.com                                         
 ****************************************************************************/
+/// <summary>맵 회전 인지 Shape 계약(Rotation FR-11) — GMapCustomControl.UpdateOverlaysAfterRotation이
+/// 회전 변경 시 각 마커 Shape에 canonical 맵 bearing을 푸시한다(개별 구독 없이 중앙 배포 — 누수 0).</summary>
+public interface IMapRotationAwareShape
+{
+    /// <summary>이 Shape가 지형과 함께 도는가(point 심볼=true). 정점 재투영 계열(Line/PidsGroup)=false —
+    /// 재투영이 이미 회전을 반영하므로 RenderTransform −θ까지 걸면 2배 회전(R-36).</summary>
+    bool AppliesMapRotation { get; }
+    /// <summary>canonical [-180,180) 맵 bearing 수신 → 표시각 재계산.</summary>
+    void OnMapBearingChanged(double mapBearing);
+}
+
 /// <summary>
 /// Generic 기본 마커 컨트롤
 /// - GMapCustomMarker를 상속받는 모든 마커 타입 지원
 /// - 기존 코드 패턴 유지하면서 타입 안전성 확보
 /// </summary>
 /// <typeparam name="T">GMapCustomMarker를 상속받는 마커 타입</typeparam>
-public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T 
+public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRotationAwareShape where T
     : GMapMarker, IEditableMarker
 {
     #region Static Constructor
@@ -246,6 +257,13 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
     protected GMapMarkerBaseControl()
     {
         _log = IoC.Get<ILogService>();
+        // [Rotation FR-11 동적추가 replay] 이미 회전된 맵에 늦게 추가된 마커도 부착 시점의
+        // canonical bearing으로 표시각 초기화(F-10 — 회전 후 추가 객체 초기 상태 정합).
+        Loaded += (s, e) =>
+        {
+            var mc = FindParentMapControl();
+            if (mc != null) OnMapBearingChanged(Utils.RotationMath.NormalizeDeg(mc.Bearing));
+        };
     }
 
     /// <summary>
@@ -609,43 +627,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
         try
         {
-            TransformGroup transformGroup;
-            ScaleTransform scaleTransform;
-            RotateTransform existingRotate = null;
-
-            // 기존 Transform 구조 분석
-            if (RenderTransform is TransformGroup existingGroup)
-            {
-                // 기존 TransformGroup 사용
-                transformGroup = existingGroup;
-                existingRotate = transformGroup.Children.OfType<RotateTransform>().FirstOrDefault();
-                scaleTransform = transformGroup.Children.OfType<ScaleTransform>().FirstOrDefault();
-            }
-            else if (RenderTransform is RotateTransform rotateOnly)
-            {
-                // 기존 RotateTransform만 있는 경우
-                existingRotate = rotateOnly;
-                transformGroup = new TransformGroup();
-                transformGroup.Children.Add(existingRotate); // 기존 회전 보존
-                scaleTransform = null;
-            }
-            else
-            {
-                // Transform이 없는 경우
-                transformGroup = new TransformGroup();
-                scaleTransform = null;
-            }
-
-            // ScaleTransform 추가/수정
-            if (scaleTransform == null)
-            {
-                scaleTransform = new ScaleTransform(1.0, 1.0);
-                transformGroup.Children.Add(scaleTransform);
-            }
-
-            // TransformGroup 적용 (기존 회전 유지됨)
-            RenderTransform = transformGroup;
-            RenderTransformOrigin = new Point(0.5, 0.5);
+            // [Rotation FR-12/R-40] named persistent 트랜스폼 사용 — 종전의 구조 분석·재조립이
+            // 회전 변경(RenderTransform 교체)과 경합해 펄스/회전이 소실되던 충돌을 제거.
+            EnsurePersistentTransforms();
+            var scaleTransform = _pulseScale!;
 
             // 애니메이션 실행
             var animation = new System.Windows.Media.Animation.DoubleAnimation
@@ -784,16 +769,53 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl where T
 
     protected static void OnRotationAngleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        //System.Diagnostics.Debug.WriteLine($"OnRotationAngleChanged: {e.OldValue} -> {e.NewValue}");
-
+        // [Rotation FR-11/12] 종전: RenderTransform을 새 RotateTransform으로 '교체' —
+        // 클릭 펄스 TransformGroup 소실(R-40) + 표시각/모델각 미분리(R-35). 이제 named persistent
+        // 트랜스폼의 Angle만 갱신하며, 표시각은 DisplayAngle(모델각−θ) 파생값으로만 존재한다.
         if (d is GMapMarkerBaseControl<T> control)
-        {
-            control.RotationAngle = (double)e.NewValue;
-            //var angle = (double)e.NewValue; // 이미 CoerceValueCallback에서 반올림됨
-            var rotateTransform = new RotateTransform(control.RotationAngle);
-            control.RenderTransform = rotateTransform;
-            control.RenderTransformOrigin = new Point(0.5, 0.5);
-        }
+            control.UpdateDisplayRotation();
+    }
+
+    // ── [Rotation FR-11/12] named persistent transforms + 표시각↔모델각 분리 ──
+    // 구조 고정: TransformGroup[ _displayRotate(표시각), _pulseScale(클릭 펄스) ] · Origin=RotationPivot.
+    // 교체 금지 — 회전은 _displayRotate.Angle만, 펄스는 _pulseScale 애니만 갱신(R-40 충돌 제거).
+    private RotateTransform? _displayRotate;
+    private ScaleTransform? _pulseScale;
+    private double _appliedMapBearing;   // 마지막 수신 canonical 맵 bearing(−θ 합성용)
+
+    /// <summary>이 Shape가 지형과 함께 도는가 — point 심볼 기본 true.
+    /// 정점 재투영 계열(Line/PidsGroup)은 override false(R-36 이중회전 방지).</summary>
+    public virtual bool AppliesMapRotation => true;
+
+    /// <summary>회전 pivot(RenderTransformOrigin) — 기본 중심(0.5,0.5). 비대칭 앵커 심볼
+    /// (예: PIDS 카메라 FOV apex)은 override로 지리 앵커점에 고정(F-06/R-22 apex 드리프트 방지).</summary>
+    protected virtual Point RotationPivot => new Point(0.5, 0.5);
+
+    /// <summary>canonical 맵 bearing 수신(GMapCustomControl 중앙 배포) → 표시각 재계산(FR-11).</summary>
+    public void OnMapBearingChanged(double mapBearing)
+    {
+        _appliedMapBearing = mapBearing;
+        UpdateDisplayRotation();
+    }
+
+    private void EnsurePersistentTransforms()
+    {
+        if (_displayRotate != null) return;
+        _displayRotate = new RotateTransform(0);
+        _pulseScale = new ScaleTransform(1.0, 1.0);
+        var group = new TransformGroup();
+        group.Children.Add(_displayRotate);   // 순서 고정: Rotate → Scale(FR-12)
+        group.Children.Add(_pulseScale);
+        RenderTransform = group;
+        RenderTransformOrigin = RotationPivot;
+    }
+
+    /// <summary>표시각 = RotationMath.DisplayAngle(모델각, θ, AppliesMapRotation) — 파생값.
+    /// Marker.Bearing으로의 write-back 없음(R-35: TwoWay 바인딩은 편집 핸들→모델 방향만 사용).</summary>
+    private void UpdateDisplayRotation()
+    {
+        EnsurePersistentTransforms();
+        _displayRotate!.Angle = Utils.RotationMath.DisplayAngle(RotationAngle, _appliedMapBearing, AppliesMapRotation);
     }
 
     private static void OnShowTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

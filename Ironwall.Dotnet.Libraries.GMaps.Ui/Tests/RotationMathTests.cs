@@ -80,6 +80,31 @@ public class RotationMathTests
         Assert.Equal(new Rect(50, 60, 200, 160), r);
     }
 
+    // ── 표시각↔모델각 분리 (FR-11 / R-35) + FOV 정확-1회 (FR-13 / F-07) ──
+
+    [Theory(DisplayName = "표시각: point 심볼=Bearing−θ, 정점재투영 계열=Bearing 그대로(R-36)")]
+    [InlineData(45, 30, true, 15)]     // point 심볼 — 지형과 함께 회전
+    [InlineData(45, 30, false, 45)]    // Line/PidsGroup — 재투영이 회전 담당, −θ 미적용
+    [InlineData(0, 90, true, -90)]
+    [InlineData(0, 90, false, 0)]
+    public void should_derive_display_angle_when_map_rotated(
+        double bearing, double theta, bool applies, double expected)
+        => Assert.Equal(expected, RotationMath.DisplayAngle(bearing, theta, applies), 6);
+
+    [Theory(DisplayName = "FOV 정확-1회: 루트(Bearing−θ)+지오메트리(Detection−Bearing)=Detection−θ")]
+    [InlineData(120, 0, 0)]
+    [InlineData(120, 30, 45)]
+    [InlineData(275, -15, 90)]
+    [InlineData(0, 10, 180)]
+    public void should_compose_fov_world_angle_exactly_once_when_root_rotated(
+        double detection, double markerBearing, double theta)
+    {
+        double root = RotationMath.DisplayAngle(markerBearing, theta, appliesMapRotation: true);
+        double geometry = RotationMath.FovControlSpaceBearing(detection, markerBearing);
+        // 월드각 = 루트 + 지오메트리. θ가 정확히 1회만 합성돼야 한다(F-07 이중 −θ 부재 증명).
+        Assert.Equal(detection - theta, root + geometry, 6);
+    }
+
     // ── 휠줌 단일 역변환 불변식 (FR-10 / R-02) ──
 
     [Theory(DisplayName = "휠줌: raw 커서에 역행렬 1회 = core점 복원, 2회(종전 버그) = 어긋남")]

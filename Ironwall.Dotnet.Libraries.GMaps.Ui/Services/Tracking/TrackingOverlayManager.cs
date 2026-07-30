@@ -214,8 +214,13 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             entry.Trail?.Rebuild(_map);
     }
 
-    /// <summary>뷰포트(회전) snapshot 수신 — 트레일 재투영(회전 포함 FromLatLngToLocal, R-19).</summary>
-    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnZoomChanged();
+    /// <summary>뷰포트(회전) snapshot 수신 — 트레일 재투영(R-19) + 화살표 표시각 재적용(R-10).</summary>
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot snap)
+    {
+        OnZoomChanged();
+        foreach (var entry in _entries.Values)
+            entry.Marker?.ApplyMapBearing(snap.CanonicalBearing);
+    }
 
     private void RemoveEntry((int cameraId, string trackId) key)
     {

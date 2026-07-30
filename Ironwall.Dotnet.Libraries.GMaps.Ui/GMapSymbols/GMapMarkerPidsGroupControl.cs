@@ -129,6 +129,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         /// <summary>뷰포트(회전) snapshot 수신 — 정점 재투영(회전 포함, R-14). base −θ 추가 금지(R-36).</summary>
         private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapChanged();
 
+        /// <summary>[Rotation R-36] 정점 재투영 계열 — RenderTransform −θ 미적용(이중회전 방지).</summary>
+        public override bool AppliesMapRotation => false;
+
         private void OnMapPositionChanged(PointLatLng point)
         {
             UpdateLineGeometry();

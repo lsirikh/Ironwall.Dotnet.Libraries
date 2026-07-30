@@ -235,6 +235,9 @@ public class GMapMarkerLineControl : GMapMarkerBaseControl<GMapLineMarker>
     /// ※ base RenderTransform −θ 추가 금지(R-36) — 재투영이 이미 회전을 반영한다.</summary>
     private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapChanged();
 
+    /// <summary>[Rotation R-36] 정점 재투영 계열 — RenderTransform −θ 미적용(이중회전 방지).</summary>
+    public override bool AppliesMapRotation => false;
+
     private void OnMapPositionChanged(PointLatLng point)
     {
         UpdateLineGeometry();

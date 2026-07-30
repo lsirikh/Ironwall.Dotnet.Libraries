@@ -52,7 +52,14 @@ public sealed class PlaybackOverlayManager : IDisposable
     }
 
     private void OnMapViewChanged() => OnFrame();
-    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnFrame();
+
+    /// <summary>뷰포트(회전) snapshot 수신 — 재생 프레임 재렌더(R-21) + 화살표 표시각 재적용(R-10).</summary>
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot snap)
+    {
+        foreach (var (marker, _) in _markers.Values)
+            marker?.ApplyMapBearing(snap.CanonicalBearing);
+        OnFrame();
+    }
 
     /// <summary>표시할 트랙 필터(체크박스). null=전체. 즉시 반영.</summary>
     public void SetEnabledTracks(HashSet<string>? enabled)

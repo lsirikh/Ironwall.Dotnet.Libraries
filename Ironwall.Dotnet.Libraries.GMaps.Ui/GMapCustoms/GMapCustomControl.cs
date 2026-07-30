@@ -1363,13 +1363,17 @@ public class GMapCustomControl : GMapControl
                 var halfW = renderedW / 2.0;
                 var halfH = renderedH / 2.0;
 
-                // ★ 회전 보정 — 마커 Shape는 RenderTransform(Bearing, origin 0.5/0.5)으로 시각 중심 기준 회전한다.
-                //   클릭 좌표를 markerScreenPoint 중심으로 -Bearing 역회전한 뒤 비회전 AABB와 비교해야 정확.
-                //   (이미지 GetImageAtScreen의 InverseRotateMouse와 동일 원리, NFR-1)
+                // ★ 회전 보정 — [Rotation FR-11 render/hit parity] 렌더가 쓰는 표시각과 '동일한'
+                //   RotationMath.DisplayAngle(Bearing, θ, AppliesMapRotation)로 역회전한다(F-05:
+                //   종전 raw marker.Bearing만 쓰면 지도 회전 시 보이는 모양과 클릭 영역이 어긋남).
+                //   정점 재투영 계열(AppliesMapRotation=false)은 표시각에 θ가 없어 자동 제외(R-36).
                 var testPos = screenPosition;
-                if (marker.Bearing != 0)
+                bool shapeMapRotates = shape is GMapSymbols.IMapRotationAwareShape aware && aware.AppliesMapRotation;
+                double hitMapBearing = Utils.RotationMath.NormalizeDeg(Bearing);
+                double displayAngle = Utils.RotationMath.DisplayAngle(marker.Bearing, hitMapBearing, shapeMapRotates);
+                if (Math.Abs(displayAngle) > 0.01)
                 {
-                    var rad = -marker.Bearing * Math.PI / 180.0;
+                    var rad = -displayAngle * Math.PI / 180.0;
                     var ox = screenPosition.X - markerScreenPoint.X;
                     var oy = screenPosition.Y - markerScreenPoint.Y;
                     testPos = new Point(
@@ -2644,6 +2648,16 @@ public class GMapCustomControl : GMapControl
                 marker.ForceUpdateLocalPosition(this);
         }
         catch (Exception ex) { _log?.Error($"회전 후 마커 재배치 실패(격리): {ex.Message}"); }
+
+        // [FR-11] 심볼 표시각 중앙 배포 — 각 Shape에 canonical bearing 푸시(개별 구독 없음=누수 0).
+        // point 심볼=−θ 합성, 정점 재투영 계열(AppliesMapRotation=false)은 내부에서 스킵(R-36).
+        try
+        {
+            double canonicalBearing = Utils.RotationMath.NormalizeDeg(Bearing);
+            foreach (GMapMarker marker in Markers)
+                (marker.Shape as GMapSymbols.IMapRotationAwareShape)?.OnMapBearingChanged(canonicalBearing);
+        }
+        catch (Exception ex) { _log?.Error($"회전 후 심볼 표시각 배포 실패(격리): {ex.Message}"); }
 
         // 이미지 오버레이 회전 보정 (FR-7, NFR-6)
         // ★ Rotation(=UserRotation) 덮어쓰기 금지 — 사용자 편집 회전값 보존.

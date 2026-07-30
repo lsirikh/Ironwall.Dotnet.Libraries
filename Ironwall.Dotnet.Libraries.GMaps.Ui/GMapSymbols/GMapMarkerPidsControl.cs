@@ -245,6 +245,12 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// <summary>뷰포트(회전) snapshot 수신 — 줌 핸들러와 동일 경로로 FOV 재계산(R-13).</summary>
     private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapZoomChanged();
 
+    /// <summary>[Rotation FR-12/R-22] 회전 pivot을 FOV apex(카메라 하우징 중심, SVG y=43.6/200)에 고정 —
+    /// 중심(0.5,0.5) 회전 시 apex가 지리 앵커에서 이탈하던 드리프트 방지. IpCamera 외에는 중심 유지.
+    /// (우상단 EventStatus 배지는 원형이라 회전해도 시각 동일 — upright 보정 불요.)</summary>
+    protected override Point RotationPivot
+        => DeviceType == EnumDeviceType.IpCamera ? new Point(0.5, 43.6 / 200.0) : base.RotationPivot;
+
     private void OnMapZoomChanged()
     {
         if (ShowFOV && DeviceType == EnumDeviceType.IpCamera)
@@ -486,7 +492,10 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 double targetRadius = ConvertMetersToPixels(DetectionRange, Marker.Position, mapControl);
                 if (targetRadius < 1) targetRadius = 1;
 
-                double targetBearing = DetectionBearing;
+                // [Rotation FR-13 정확-1회] 루트가 DisplayAngle(=Bearing−θ)로 돌므로 FOV 지오메트리는
+                // θ를 읽지 않고 (Detection−Bearing)만 사용 → 월드각=(Bearing−θ)+(Detection−Bearing)=Detection−θ.
+                // 이 식에 θ가 없다는 것이 이중 −θ(F-07/R-36) 방지의 증명. 종전 R-22(Bearing≠0 시 FOV 오프셋)도 해소.
+                double targetBearing = Utils.RotationMath.FovControlSpaceBearing(DetectionBearing, RotationAngle);
                 double targetAngle = DetectionAngle;
 
                 // 3. 애니메이션 적용 여부 결정

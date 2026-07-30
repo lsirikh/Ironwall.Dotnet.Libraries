@@ -45,6 +45,20 @@ public static class RotationMath
         return n;
     }
 
+    /// <summary>심볼 화면 표시각(FR-11 단일 진실원) — 모델각(Marker.Bearing)과 분리된 파생값.
+    /// 렌더(RenderTransform)·히트테스트가 반드시 같은 이 함수를 사용한다(render/hit parity).
+    /// appliesMapRotation=false(라인/PidsGroup 등 정점 재투영 계열)는 −θ 미적용(R-36 이중회전 방지).
+    /// 표시각은 Marker.Bearing에 절대 write-back 금지(R-35 모델 오염).</summary>
+    public static double DisplayAngle(double markerBearing, double mapBearing, bool appliesMapRotation)
+        => markerBearing - (appliesMapRotation ? mapBearing : 0d);
+
+    /// <summary>FOV 부채꼴의 '컨트롤 로컬' 방위(FR-13 정확-1회 합성) — 루트가 이미
+    /// DisplayAngle(=Bearing−θ)로 돌므로, FOV 지오메트리는 θ를 전혀 읽지 않고
+    /// (Detection−Bearing)만 쓰면 월드각 = (Bearing−θ)+(Detection−Bearing) = Detection−θ.
+    /// θ가 이 식에 없다는 것 자체가 이중 −θ(F-07/R-36) 방지의 증명이다.</summary>
+    public static double FovControlSpaceBearing(double detectionBearing, double markerBearing)
+        => detectionBearing - markerBearing;
+
     /// <summary>4모서리 투영점 → 항상 양수 W/H의 AABB(min/max). 회전 시 2모서리 대각 차가
     /// 음수가 되어 Rect 예외(R-01 크래시)를 내던 경로의 안전 대체. Bearing=0에선 기존과 동일.</summary>
     public static Rect AabbOf(Point p1, Point p2, Point p3, Point p4)
