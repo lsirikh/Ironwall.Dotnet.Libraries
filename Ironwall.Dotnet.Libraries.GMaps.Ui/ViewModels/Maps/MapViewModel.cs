@@ -2531,11 +2531,48 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>뷰포트(회전) snapshot 수신(FR-05) — 팝업/leader 재투영(F-02: 회전 시 마커만
-    /// 이동하고 팝업·연결선이 잔류하던 누락 소비처) + 오버레이맵 타일 재배치(R-12).</summary>
+    /// 이동하고 팝업·연결선이 잔류하던 누락 소비처) + 오버레이맵 타일 재배치(R-12) +
+    /// 회전각 영속 debounce(사용자 요구 2026-07-28 — 재시작 시 복원).</summary>
     private void OnViewportSnapshotForVm(GMapCustoms.MapViewportSnapshot snap)
     {
         RefreshCameraPopupPositions();
         if (MainMap != null) _customMapOverlayService?.RefreshVisibleTiles(MainMap);
+        QueueRotationStateSave(snap.CanonicalBearing);
+    }
+
+    // ── [회전 영속] 각도 저장 debounce — 휠 연속 회전 중 매 스텝 파일쓰기 방지(1초 정지 후 1회) ──
+    private System.Windows.Threading.DispatcherTimer? _rotationSaveTimer;
+    private double _lastSavedRotationAngle;
+
+    private void QueueRotationStateSave(double canonicalBearing)
+    {
+        if (Math.Abs(canonicalBearing - _lastSavedRotationAngle) < 0.01) return;
+        if (_rotationSaveTimer == null)
+        {
+            _rotationSaveTimer = new System.Windows.Threading.DispatcherTimer
+            { Interval = TimeSpan.FromSeconds(1.0) };
+            _rotationSaveTimer.Tick += (_, __) => { _rotationSaveTimer!.Stop(); SaveMapRotationState(); };
+        }
+        _rotationSaveTimer.Stop();
+        _rotationSaveTimer.Start();   // 재시작 = debounce
+    }
+
+    /// <summary>회전 상태(나침반 ON/OFF + canonical 각도)를 AppSettings.MapRotation에 저장.</summary>
+    private void SaveMapRotationState()
+    {
+        try
+        {
+            var model = new Ironwall.Dotnet.Libraries.GMaps.Models.MapRotationModel
+            {
+                IsEnabled = Utils.RotationFeature.IsEnabled,
+                Angle = Utils.RotationMath.NormalizeDeg(MainMap?.Bearing ?? 0f),
+            };
+            _lastSavedRotationAngle = model.Angle;
+            if (_setupModel != null) _setupModel.MapRotation = model;
+            _ = MapSettingsHelper.SaveMapRotationAsync(model, _log);
+            _log?.Info($"[Rotation] 상태 저장: {model}");
+        }
+        catch (Exception ex) { _log?.Error($"[Rotation] 상태 저장 실패: {ex.Message}"); }
     }
 
     /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음).</summary>
@@ -3110,6 +3147,8 @@ public partial class MapViewModel : BasePanelViewModel,
                 // [사용자 요구 2026-07-28] 나침반 ON이면 앵커 '회전 허용'은 강제 체크(+잠금) —
                 // 패널이 열려 있어도 즉시 반영(수정 불가 상태로 전환).
                 if (enabled) AnchorAllowRotation = true;
+                // [회전 영속] 토글 즉시 저장(각도는 스냅샷 debounce가 담당)
+                SaveMapRotationState();
             });
     }
 
@@ -4692,6 +4731,18 @@ public partial class MapViewModel : BasePanelViewModel,
         MainMap_OnMapZoomChanged();
 
         ApplyMapAnchor();   // [MapAnchor] 사이트 고정: BoundsOfMap/MinZoom 적용 (증분2 · 앵커 비활성 시 해제)
+
+        // [회전 영속 복원 — 사용자 요구 2026-07-28] 앵커 적용 '이후' 복원: A모드(회전 비허용) 앵커면
+        // SSOT가 회전을 차단해 정책이 유지되고, B모드/무앵커면 저장각 그대로 복원된다.
+        var savedRotation = _setupModel?.MapRotation;
+        if (savedRotation?.IsEnabled == true)
+        {
+            Utils.RotationFeature.IsEnabled = true;
+            _lastSavedRotationAngle = savedRotation.Angle;
+            if (Math.Abs(savedRotation.Angle) > 0.01)
+                MainMap.SetMapRotation(savedRotation.Angle);
+            _log?.Info($"[Rotation] 상태 복원: {savedRotation}");
+        }
 
         SetInitialHomePosition();
     }

@@ -47,6 +47,15 @@ public static class MapSettingsHelper
     }
 
     /// <summary>
+    /// 지도 회전 상태(나침반 ON/OFF + 회전각)를 JSON에 저장 (AppSettings.MapRotation) —
+    /// 사용자 요구 2026-07-28 "재시작해도 설정 유지". 부팅 복원은 ConfigureCommonMapSettings.
+    /// </summary>
+    public static async Task SaveMapRotationAsync(MapRotationModel rotation, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapRotation", rotation, log);
+    }
+
+    /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>
     public static async Task SaveMapTypeAsync(string mapType, ILogService? log = default)
