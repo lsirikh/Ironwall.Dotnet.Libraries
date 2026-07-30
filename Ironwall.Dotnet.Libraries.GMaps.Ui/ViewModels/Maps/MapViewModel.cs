@@ -3102,8 +3102,15 @@ public partial class MapViewModel : BasePanelViewModel,
         ToggleRotationFeatureCommand = new RelayCommand(_ => MainMap?.ToggleRotationFeature());
         // 정적 플래그 변경 통지 구독 — 키보드(Ctrl+Shift+R)로 바뀌어도 버튼 IsChecked 동기화.
         // VM은 싱글턴(앱 수명)이라 정적 이벤트 구독 누수 없음.
-        Utils.RotationFeature.EnabledChanged += _ =>
-            OnUIThread(() => NotifyOfPropertyChange(nameof(IsRotationFeatureEnabled)));
+        Utils.RotationFeature.EnabledChanged += enabled =>
+            OnUIThread(() =>
+            {
+                NotifyOfPropertyChange(nameof(IsRotationFeatureEnabled));
+                NotifyOfPropertyChange(nameof(IsAnchorAllowRotationEditable));
+                // [사용자 요구 2026-07-28] 나침반 ON이면 앵커 '회전 허용'은 강제 체크(+잠금) —
+                // 패널이 열려 있어도 즉시 반영(수정 불가 상태로 전환).
+                if (enabled) AnchorAllowRotation = true;
+            });
     }
 
     /// <summary>회전 kill-switch 상태(툴바 토글 IsChecked 바인딩) — 기본 OFF(FR-03).</summary>
@@ -3112,6 +3119,10 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>회전 토글 버튼 활성 여부 — '회전 비허용(A모드)' 앵커 활성 중에만 비활성(V-06 옵션C).
     /// 회전 허용(B모드) 앵커면 버튼·회전 입력 모두 정상. ApplyMapAnchor의 SetAnchorSite 호출 뒤 통지.</summary>
     public bool IsRotationToggleEnabled => !(MainMap?.IsRotationLockedByAnchor ?? false);
+
+    /// <summary>[사용자 요구 2026-07-28] 앵커 '회전 허용' 체크박스 편집 가능 여부 — 나침반(회전 기능)
+    /// ON이면 강제 체크+잠금(수정 불가 — 해제 시 A모드 정북 강제 사고 방지). OFF면 자유 편집.</summary>
+    public bool IsAnchorAllowRotationEditable => !Utils.RotationFeature.IsEnabled;
 
     public RelayCommand? ToggleRotationFeatureCommand { get; private set; }
 

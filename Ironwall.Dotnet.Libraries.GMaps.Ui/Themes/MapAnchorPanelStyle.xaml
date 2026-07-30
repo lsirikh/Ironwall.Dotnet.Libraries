@@ -230,13 +230,15 @@
 										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding AnchorStrict}" />
 
-									<!--  [Rotation V-06 옵션C] 회전 허용 앵커(B모드) — OFF(기본)=고정 시 정북 강제+회전 잠금  -->
+									<!--  [Rotation V-06 옵션C] 회전 허용 앵커(B모드) — 나침반 ON 동안엔 강제 체크+잠금(수정 불가)  -->
 									<CheckBox
 										Margin="0,0,0,16"
 										Content="회전 허용 (고정 중에도 지도 회전 유지)"
 										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding AnchorAllowRotation}"
-										ToolTip="ON: 회전한 방향 그대로 사이트 고정(가두기는 회전 화면 외접 기준 — 같은 줌에서 보이는 범위가 다소 좁아짐)&#10;OFF(기본): 고정 시 정북으로 정렬되고 회전 잠금" />
+										IsEnabled="{Binding IsAnchorAllowRotationEditable}"
+										ToolTipService.ShowOnDisabled="True"
+										ToolTip="ON: 회전한 방향 그대로 사이트 고정(가두기는 회전 화면 외접 기준 — 같은 줌에서 보이는 범위가 다소 좁아짐)&#10;OFF(기본): 고정 시 정북으로 정렬되고 회전 잠금&#10;※ 나침반(회전 모드) ON 동안엔 자동 체크·잠금 — 해제하려면 회전 모드를 먼저 끄세요" />
 
 									<Button
 										MinWidth="110"

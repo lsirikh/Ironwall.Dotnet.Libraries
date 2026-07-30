@@ -150,13 +150,16 @@ public partial class MapViewModel
         AnchorMinZoom = a?.MinZoomFloor > 0 ? a.MinZoomFloor : (int)ZoomMin;
         AnchorStrict = a?.StrictContainment ?? false;
         AnchorAllowRotation = a?.AllowRotation ?? false;
-        // [사용자 요구 2026-07-28] 지도가 회전된 채 앵커 패널을 열면 "회전 허용" 자동 체크 —
-        // 기본 A모드가 의도치 않게 정북 강제하는 놀람 방지. 사용자가 명시적으로 해제는 가능.
-        if (!AnchorAllowRotation && Math.Abs(MainMap?.Bearing ?? 0f) > 0.01)
+        // [사용자 요구 2026-07-28] 나침반(회전 기능) ON 또는 지도가 실제 회전 중이면
+        // "회전 허용" 강제 체크 — 체크박스 자체도 잠금(IsAnchorAllowRotationEditable=false,
+        // 나침반 ON 동안 수정 불가)이라 정북 강제 사고 경로가 UI에서 차단된다.
+        if (!AnchorAllowRotation
+            && (Utils.RotationFeature.IsEnabled || Math.Abs(MainMap?.Bearing ?? 0f) > 0.01))
         {
             AnchorAllowRotation = true;
-            _log?.Info("[MapAnchor] 지도 회전 중 → '회전 허용' 자동 체크(정북 강제 놀람 방지)");
+            _log?.Info("[MapAnchor] 회전 활성 → '회전 허용' 강제 체크(+잠금)");
         }
+        NotifyOfPropertyChange(nameof(IsAnchorAllowRotationEditable));
         AnchorNwLat = a?.NorthWest?.Latitude ?? 0;
         AnchorNwLng = a?.NorthWest?.Longitude ?? 0;
         AnchorSeLat = a?.SouthEast?.Latitude ?? 0;
