@@ -14,6 +14,15 @@
 
 ## [Unreleased]
 
+### Added
+- **지도 회전 전면 싱크(GMap_Rotation_Full_Sync) — kill-switch 게이트 하 재활성 준비 완료** ([PRD v2.0](docs/prds/GMap_Rotation_Full_Sync-prd.md) · [Plan](docs/plans/GMap_Rotation_Full_Sync-prd-plan.md) · [버그 인벤토리 v2.0](docs/analyses/GMap_Rotation_Enable_BugInventory_v2-analysis.md) · [스파이크](docs/analyses/GMap_Rotation_P0_Spikes_V02_V08-analysis.md) · 롤백 5중: 태그 `before-rotation-fullsync`+백업브랜치+번들+worktree+kill-switch · GMaps.Ui+**GMap.NET 벤더**(V-01 승인))
+  - **P0 치명·상태**: 회전 SSOT(canonical [-180,180) 단일 적용경로·DP 교정으로 소비처 자동 정규화 R-09)·`RotationFeature` kill-switch(기본 OFF, 정북 복귀는 항상 허용)·앵커 원자 게이팅(정북 강제→verify→활성 V-06)·이미지 클릭 크래시 가드(R-01)·SelectedArea 음수 Rect 가드·휠줌 이중 역행렬 제거(R-02)·회전 투영 절삭→Round(R-38). **V-02 실측**: 회전 ViewArea `(int)NaN`=int.MinValue(쓰레기 rect 확정).
+  - **P1 동기 계약**: `MapViewportSnapshot`+`ViewportSnapshotPublisher`(per-consumer 예외격리·구독 즉시 replay·중복방지·revision·프레임당 1회 coalescing) + **12소비처 배선**(라벨·측정·조준·라인드로잉·그룹선택·FOV·Line/PidsGroup·트레일·재생·**카메라 팝업/leader(F-02 누락분)**·오버레이맵·맵전환 Resync) — R-12~R-21 stale 전면 해소.
+  - **P2 심볼·복합**: 표시각↔모델각 분리(`DisplayAngle` 파생, write-back 0 R-35)+render/hit parity(F-05)+named persistent transforms(클릭펄스 충돌 R-40)+PIDS FOV 정확-1회(θ-free 지오메트리, F-07/R-22)+apex pivot+트래킹 화살표 WorldHeading(R-10).
+  - **P3 기하·래스터**: **V-08 pixel-diff 스파이크**(7각도×4DPI)로 오버레이 접근법 확정 — 후보B(비절단 core좌표+회전 1회 Push)=전조건 0-diff, v1 설계안(절단좌표 역회전)은 seam 3~160px로 **실측 폐기**. 벤더 seam 2건(`FromLatLngToCoreLocal`·`RotationMatrixValue`)+ViewArea 4코너 원천교체(R-03)+이미지 "회전불변 중심 rect=ProjectedQuad 동치"(F-01·R-01/24/25/27, DB이미지 R-06/37 동시)+라벨 회전불변 익스텐트(R-23)+앵커그리기 정규화(R-28).
+  - **P4+P5**: 중복 O(N) 제거(F-12)·Bearing 이탈 시 크기 재통지(R-43)·Offset 벡터변환(R-42)·스냅 데드존(R-33) + **입력 재개방**(Shift+휠·Ctrl+←/→)을 kill-switch 게이트로 복원 — **OFF(기본)면 af0f29d와 동작 완전 동일(머지 무영향)**.
+  - **검증**: 전 단계 빌드 0오류 · 헤드리스 테스트 **77/77**(회전수학 31·발행기 6·측정 16·기타) · 단계별 태그 `rotation-p0-done`~`p5-done`. ⚠**런타임 E2E 및 flag ON 결정은 사용자 육안 검증 후**(PRD §9 매트릭스·NFR-02 정량 ≤1px/±0.1°).
+
 ### Changed
 - **라인·구역·PIDS 그룹 드로잉 HUD 리디자인 + 위치 유지 버그 수정** ([PRD](docs/prds/line-drawing-hud-redesign-prd.md) · [Plan](docs/plans/line-drawing-hud-redesign-prd-plan.md) · [프리뷰](docs/design/line-drawing-hud-redesign-preview.html) · 태그 `before-line-drawing-hud-redesign` · GMaps.Ui 한정 · 메인솔루션 변경 0)
   - **HUD 재디자인(FR-01~07)**: 그리는 중 뜨는 흰색 알약형 플로팅 컨트롤을 **표준 오버레이 패널 패턴**(시안 헤더 + **우상단 X 닫기** + 다크/라이트 카드)으로 교체. 코드-하드코딩 브러시 → 신규 templated `LineDrawingHudControl` + `LineDrawingHudStyle.xaml`이 `DesignTokens.xaml`의 `PanelCloseButtonStyle`/`PanelPrimaryButtonStyle`/`PanelSecondaryButtonStyle`·`DynamicResource` 토큰 재사용 → **런타임 테마 전환 자동 반영**. 헤더=아이콘(VectorLine)+심볼 종류 타이틀(라인/구역/PIDS 그룹)+X. 본문=점 칩+거리 / **완료**(Primary)+**되돌리기**(Secondary). 취소는 헤더 X(Esc). Line·Area·PIDS 그룹 3종 공유 어도너라 한 번에 적용.
