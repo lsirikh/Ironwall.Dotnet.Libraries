@@ -4777,6 +4777,19 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         SetInitialHomePosition();
+
+        // [사용자 제안 2026-07-30] 로딩 완료 후 1회 자동 리프레시 — CCMS 시점(부팅/맵전환 로딩 중)엔
+        // 레이아웃·오버레이 활성화가 미완이라 복원 회전각/최종 크기 기준 타일세트가 어긋나 백지가 남고,
+        // 수동 줌·패닝을 해야 복구되던 문제. ApplicationIdle(렌더·레이아웃 완료 후)에 수동 줌과 동일한
+        // 리프레시 + 회전 스냅샷 재발행을 1회 수행한다.
+        _ = MainMap?.Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+            new System.Action(() =>
+            {
+                if (MainMap == null) return;
+                MainMap.ResyncRotationDependents();   // 스냅샷 재발행 → 라벨/팝업/어도너 재투영
+                MainMap_OnMapZoomChanged();           // 줌 변경과 동일한 타일세트/스케일바 재계산
+            }));
     }
 
     /// <summary>
