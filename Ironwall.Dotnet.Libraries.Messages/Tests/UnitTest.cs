@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Brokers;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
@@ -2014,7 +2014,7 @@ public class NatsBodyDtoTests
     #endregion
 
     #region A2.16: Lamp 제어 (6종)
-    [Fact(DisplayName = "A2.16: Lamp Body DTOs 직렬화")]
+    [Fact(DisplayName = "A2.16: Lamp Body DTOs 직렬화 — GIS.md v1.5.2 와이어 값")]
     [Trait("Category", "DTO")]
     public void LampBodyDtos_Serialization_AllFields()
     {
@@ -2024,19 +2024,57 @@ public class NatsBodyDtoTests
         var off = new Dto.Brokers.LampOffBodyDto { LampIds = new List<int> { 1 } };
         Assert.Contains("\"lamp_ids\":[1]", JsonConvert.SerializeObject(off));
 
-        var colorSet = new Dto.Brokers.LampColorSetBodyDto { LampIds = new List<int> { 1 }, Color = "RED", Mode = "FLASH" };
+        // v1.5.2 §2.4: color=Red|Orange|Green|Blue|White, mode=steady|blinking (enum+EnumMember 강제)
+        var colorSet = new Dto.Brokers.LampColorSetBodyDto { LampIds = new List<int> { 1 }, Color = EnumLampColor.Red, Mode = EnumLightMode.Blinking };
         var csJson = JsonConvert.SerializeObject(colorSet);
-        Assert.Contains("\"color\":\"RED\"", csJson);
-        Assert.Contains("\"mode\":\"FLASH\"", csJson);
+        Assert.Contains("\"color\":\"Red\"", csJson);
+        Assert.Contains("\"mode\":\"blinking\"", csJson);
 
-        var buzzerSet = new Dto.Brokers.LampBuzzerSetBodyDto { LampIds = new List<int> { 1 }, Buzzer = "ALARM" };
-        Assert.Contains("\"buzzer\":\"ALARM\"", JsonConvert.SerializeObject(buzzerSet));
+        // v1.5.2 §2.5: buzzer 와이어 값에 공백/하이픈 포함 — EnumMember 매핑 검증
+        var buzzerSet = new Dto.Brokers.LampBuzzerSetBodyDto { LampIds = new List<int> { 1 }, Buzzer = EnumBuzzerSound.PiPiPi };
+        Assert.Contains("\"buzzer\":\"PI-PI-PI\"", JsonConvert.SerializeObject(buzzerSet));
 
         var colorTest = new Dto.Brokers.LampColorTestBodyDto { LampIds = new List<int> { 1 }, Color = "GREEN", Mode = "STEADY", DurationSec = 10 };
         Assert.Contains("\"duration_sec\":10", JsonConvert.SerializeObject(colorTest));
 
         var buzzerTest = new Dto.Brokers.LampBuzzerTestBodyDto { LampIds = new List<int> { 1 }, Buzzer = "BEEP", DurationSec = 5 };
         Assert.Contains("\"duration_sec\":5", JsonConvert.SerializeObject(buzzerTest));
+    }
+
+    [Fact(DisplayName = "A2.16-2: Lamp enum 와이어 값 왕복 + LAMP_CLEAR lamp_ids 생략")]
+    [Trait("Category", "DTO")]
+    public void should_roundtrip_lamp_enum_wire_values_and_omit_lamp_ids_when_clear_all()
+    {
+        // 부저 5종 전체 — 스펙 문자열(공백·하이픈·언더스코어) 정확 일치 + 역직렬화 왕복
+        var buzzerWire = new Dictionary<EnumBuzzerSound, string>
+        {
+            [EnumBuzzerSound.FireAWang] = "Fire A-WANG",
+            [EnumBuzzerSound.Emergency] = "Emergency",
+            [EnumBuzzerSound.Ambulance] = "Ambulance",
+            [EnumBuzzerSound.PiPiPi] = "PI-PI-PI",
+            [EnumBuzzerSound.PiContinue] = "PI_continue",
+        };
+        foreach (var (member, wire) in buzzerWire)
+        {
+            var json = JsonConvert.SerializeObject(new Dto.Brokers.LampBuzzerSetBodyDto { LampIds = new List<int> { 1 }, Buzzer = member });
+            Assert.Contains($"\"buzzer\":\"{wire}\"", json);
+            var back = JsonConvert.DeserializeObject<Dto.Brokers.LampBuzzerSetBodyDto>(json);
+            Assert.Equal(member, back!.Buzzer);
+        }
+
+        // 모드 2종 — 소문자 강제 + 왕복
+        var steadyJson = JsonConvert.SerializeObject(new Dto.Brokers.LampColorSetBodyDto { LampIds = new List<int> { 1 }, Color = EnumLampColor.White, Mode = EnumLightMode.Steady });
+        Assert.Contains("\"mode\":\"steady\"", steadyJson);
+        Assert.Contains("\"color\":\"White\"", steadyJson);
+        var steadyBack = JsonConvert.DeserializeObject<Dto.Brokers.LampColorSetBodyDto>(steadyJson);
+        Assert.Equal(EnumLightMode.Steady, steadyBack!.Mode);
+        Assert.Equal(EnumLampColor.White, steadyBack.Color);
+
+        // LAMP_CLEAR: lamp_ids=null → 필드 생략(=전체 해제, §2.2) / 지정 시 배열 출력
+        var clearAll = JsonConvert.SerializeObject(new Dto.Brokers.LampClearBodyDto());
+        Assert.DoesNotContain("lamp_ids", clearAll);
+        var clearSome = JsonConvert.SerializeObject(new Dto.Brokers.LampClearBodyDto { LampIds = new List<int> { 501, 502 } });
+        Assert.Contains("\"lamp_ids\":[501,502]", clearSome);
     }
     #endregion
 

@@ -5,8 +5,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Tracking;
 /****************************************************************************
    Purpose      : 카메라 회전요청 body 빌더 — 카메라 중심 + 타겟 좌표 →
                   CameraAimLocationBodyDto (거리·방위 계산). WPF/GMap 무의존.
-                  봉투 created/id는 ToBrokerPublish가 채우므로 body엔 시간 없음
-                  (IClock 불필요).
+                  봉투 created/id는 ToBrokerRequest(BrokerRequestClient 경유, REQ)가
+                  채우므로 body엔 시간 없음 (IClock 불필요).
    Created By   : GHLee
    Created On   : 2026-06-29
    Department   : SW Team

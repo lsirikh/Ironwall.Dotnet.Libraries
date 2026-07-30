@@ -1,9 +1,9 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace Ironwall.Dotnet.Libraries.Messages.Dto.Brokers;
 
 /****************************************************************************
-   Purpose      : 카메라 "특정 위치 확인" 회전 요청 body (GIS→nvr_manager PUB)
+   Purpose      : 카메라 "특정 위치 확인" 회전 요청 body (GIS→nvr_manager REQ — v1.5.2 PUB 예외 폐지)
                   지도에서 클릭한 타겟 좌표로 카메라를 향하게 하라는 요청.
                   클라는 좌표만 전달하고, 실제 PTZ 회전(geo bearing→pan/tilt)은
                   서버/NVRManager가 수행한다.

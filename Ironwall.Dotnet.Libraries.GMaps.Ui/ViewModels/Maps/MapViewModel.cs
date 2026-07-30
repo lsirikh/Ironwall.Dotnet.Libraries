@@ -831,17 +831,21 @@ public partial class MapViewModel : BasePanelViewModel,
         _ = HandleTargetAimPublishAsync(body, _aimGeneration);
     }
 
-    /// <summary>회전요청 발행(내부 예외 격리) — async void 함정 회피용 별도 async 메서드. gen=발행 시점 세대(stale 안내 방지).</summary>
+    /// <summary>회전요청 발행(내부 예외 격리) — async void 함정 회피용 별도 async 메서드. gen=발행 시점 세대(stale 안내 방지).
+    /// v1.5.2 §2.9: PTZ_AIM_LOCATION=REQ — RSP 결과 기반으로 완료/실패를 구분 안내한다.</summary>
     private async Task HandleTargetAimPublishAsync(CameraAimLocationBodyDto body, int gen)
     {
         try
         {
-            await _cameraAimControlService.PublishAimAsync(body, _cts?.Token ?? CancellationToken.None)
-                                          .ConfigureAwait(false);
+            var result = await _cameraAimControlService.PublishAimAsync(body, _cts?.Token ?? CancellationToken.None)
+                                                       .ConfigureAwait(false);
             await OnUiAsync(() =>
             {
-                if (gen == _aimGeneration)   // 그 사이 새 타겟 세션이 시작됐으면 새 안내 보존
-                    SetAimStatus($"카메라 {body.CameraId} → 회전요청 전송 ({body.DistanceM:F0}m, {body.BearingDeg:F0}°).", autoHide: true);
+                if (gen != _aimGeneration) return;   // 그 사이 새 타겟 세션이 시작됐으면 새 안내 보존
+                if (result.Success)
+                    SetAimStatus($"카메라 {body.CameraId} → 회전요청 완료 ({body.DistanceM:F0}m, {body.BearingDeg:F0}°).", autoHide: true);
+                else if (result.Reason != Services.Brokers.EnumBrokerFailure.Cancelled)   // ESC 취소는 별도 안내 없음
+                    SetAimStatus($"회전요청 실패 — {result.UserMessage}", autoHide: true);
             });
         }
         catch (Exception ex)
@@ -2201,6 +2205,13 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         try { _ = _eventAggregator?.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = title, Explain = explain }); }
         catch (Exception ex) { _log?.Warning($"[CameraPopup] 프리셋 안내 팝업 실패: {ex.Message}"); }
+    }
+
+    /// <summary>NATS REQ 제어(방송 등) 실패를 사용자에게 가시 통지(v1.5.2 §6.4 RSP 확인). raw MessageBox 금지 — EventAggregator 표준 팝업.</summary>
+    private void ShowBrokerControlInfo(string title, string explain)
+    {
+        try { _ = _eventAggregator?.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel { Title = title, Explain = explain }); }
+        catch (Exception ex) { _log?.Warning($"[BrokerReq] 제어 안내 팝업 실패: {ex.Message}"); }
     }
 
     /// <summary>[Home 이동] = 카메라 Home 위치로(ONVIF GotoHomePosition). Home 미지정 카메라는 실패 로그만. (FR-C2/OQ-6)</summary>
@@ -5859,8 +5870,22 @@ public partial class MapViewModel : BasePanelViewModel,
                     };
                     stopItem.Click += async (s, e) =>
                     {
-                        StopBroadcast(pidsMarker);
-                        await _broadcastControlService.PublishStopAsync(pidsMarker.LinkedDeviceId);
+                        // RSP 5초 대기 중 재클릭 시 동일 REQ 다중 전송 방지 (리뷰 P2)
+                        if (_isBroadcastRequestInFlight) { _log?.Info("방송 정지 무시 — 이전 방송 요청 응답 대기 중"); return; }
+                        _isBroadcastRequestInFlight = true;
+                        try
+                        {
+                            StopBroadcast(pidsMarker);
+                            // v1.5.2 §6.4: BROADCAST_STOP=REQ — RSP 확인, 실패 시 표준 팝업(무음 무동작 방지)
+                            var result = await _broadcastControlService.PublishStopAsync(pidsMarker.LinkedDeviceId);
+                            if (!result.Success)
+                            {
+                                _log?.Warning($"방송 정지 실패({result.Reason}): SpeakerId={pidsMarker.LinkedDeviceId} — {result.UserMessage}");
+                                ShowBrokerControlInfo("방송 정지 실패", result.UserMessage);
+                            }
+                        }
+                        catch (Exception ex) { _log?.Error($"방송 정지 처리 실패: {ex.Message}"); }
+                        finally { _isBroadcastRequestInFlight = false; }
                     };
                     menu.Items.Add(stopItem);
                 }
@@ -8674,19 +8699,35 @@ public partial class MapViewModel : BasePanelViewModel,
         IsBroadcastPlayPanelVisible = false;
     }
 
+    /// <summary>REQ(RSP 5초 대기) 진행 중 재진입 차단 플래그 — 방송 Play/Stop 공용. UI 스레드에서만 접근.</summary>
+    private bool _isBroadcastRequestInFlight;
+
     private async void OnBroadcastPlaySendRequested(object? sender, BroadcastSendEventArgs e)
     {
         if (!CanBroadcast()) { _log?.Warning("[FR-EN-07] 방송 발행 권한 없음 — 음원 실행 차단"); return; }
+        // RSP 5초 대기 중 전송 버튼 재클릭 시 동일 REQ 다중 전송 방지 (리뷰 P2)
+        if (_isBroadcastRequestInFlight) { _log?.Info("음원 실행 무시 — 이전 방송 요청 응답 대기 중"); return; }
+        _isBroadcastRequestInFlight = true;
         try
         {
-            await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat);
-            _log?.Info($"음원 실행: DeviceId={e.LinkedDeviceId}, FileGroup={e.FileGroupId}, Repeat={e.Repeat}");
-            HideBroadcastPlayPanel();
+            // v1.5.2 §6.4: BROADCAST_PLAY=REQ — 성공 시에만 패널 닫기, 실패 시 팝업+패널 유지(재시도 가능)
+            var result = await _broadcastControlService.PublishPlayAsync(e.LinkedDeviceId, e.FileGroupId, e.Repeat);
+            if (result.Success)
+            {
+                _log?.Info($"음원 실행: DeviceId={e.LinkedDeviceId}, FileGroup={e.FileGroupId}, Repeat={e.Repeat}");
+                HideBroadcastPlayPanel();
+            }
+            else
+            {
+                _log?.Warning($"음원 실행 실패({result.Reason}): DeviceId={e.LinkedDeviceId} — {result.UserMessage}");
+                ShowBrokerControlInfo("음원 실행 실패", result.UserMessage);
+            }
         }
         catch (Exception ex)
         {
             _log?.Error($"음원 실행 실패: {ex.Message}");
         }
+        finally { _isBroadcastRequestInFlight = false; }
     }
 
     public void ShowTtsBroadcastPanel(int linkedDeviceId)
