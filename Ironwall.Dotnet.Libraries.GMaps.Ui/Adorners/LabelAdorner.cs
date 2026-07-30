@@ -118,9 +118,25 @@ public sealed class LabelAdorner : Adorner, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>아이콘 스크린 중심.</summary>
+    /// <summary>아이콘 스크린 중심.
+    /// [Rotation 회전+팬 진동 수정] 회전 드래그 중 벤더는 매 프레임 ForceUpdateOverlays로 아이콘을
+    /// '레이아웃'(Canvas.SetLeft) 이동시키고(GMapControl OnMouseMove: IsRotated 분기), 라벨은
+    /// '렌더' 재투영으로 움직여 두 패스가 프레임마다 교번 어긋남 → 라벨 진동. point 심볼은
+    /// 아이콘 Shape의 실제 배치 중심을 직접 읽어(TranslatePoint) 같은 원천에 앵커 — 스큐 구조적 제거.
+    /// (마커 Offset=(−W/2,−H/2)라 Shape 중심=Position 투영과 동치. 라인/이미지 footprint 계열은
+    /// 기하가 별도 재투영이라 기존 투영 유지 — 혼합 원천 방지.)</summary>
     private Point IconCenter()
     {
+        if (_marker is not ILineEditableMarker
+            && _marker is GMap.NET.WindowsPresentation.GMapMarker gm && gm.Shape is FrameworkElement fe
+            && fe.IsLoaded && fe.ActualWidth > 0 && fe.ActualHeight > 0)
+        {
+            try
+            {
+                return fe.TranslatePoint(new Point(fe.ActualWidth / 2.0, fe.ActualHeight / 2.0), _map);
+            }
+            catch { /* 비주얼 트리 분리 과도기 — 투영 폴백 */ }
+        }
         var ip = _map.FromLatLngToLocal(_marker.Position);
         return new Point(ip.X, ip.Y);
     }
