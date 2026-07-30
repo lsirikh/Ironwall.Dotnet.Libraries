@@ -618,8 +618,13 @@ public class GMapCustomControl : GMapControl
             SetMapRotation(0);
             if (Math.Abs(Bearing) > (float)Utils.RotationMath.Epsilon)
             {
-                _log?.Error($"앵커 활성 실패: 정북 강제 후에도 Bearing={Bearing:F2} — 활성 중단(불일치 방지)");
-                return;
+                // [사용자 버그 2026-07-28 "앵커도 풀려버림"] 종전엔 여기서 활성을 '중단(return)'해
+                // 회전만 풀리고 앵커는 안 걸리는 어중간 상태가 됐다(DP가 이미 0인데 Bearing만 남은
+                // desync면 DP 콜백이 안 돌아 리셋 무시). → 중단 대신 벤더 Bearing 직접 정북 강제
+                // 폴백으로 항상 활성 완료(앵커가 어중간하게 풀리는 실패 모드 제거).
+                Bearing = 0f;
+                UpdateOverlaysAfterRotation();
+                _log?.Warning($"앵커 정북 강제 폴백: DP 미변경 desync 경로 — Bearing 직접 0 적용 후 활성 계속");
             }
         }
         _anchorAllowsRotation = allowRotation;
@@ -1679,6 +1684,14 @@ public class GMapCustomControl : GMapControl
         // ToggleRotationFeature(단일 진실원) 경유. flag 기본값은 여전히 OFF(부팅 시 회전 불가).
         if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.R)
         {
+            // [일관성] A모드 앵커 잠금 중엔 키보드도 버튼(비활성)과 동일하게 무시 — 버튼만 막고
+            // 키보드로 우회되면 상태가 어긋난다(사용자 "버튼 풀림→앵커 꼬임" 보고 방어).
+            if (IsRotationLockedByAnchor)
+            {
+                _log?.Info("[Rotation] 토글 무시 — 사이트 고정(A모드) 회전 잠금 중");
+                e.Handled = true;
+                return;
+            }
             ToggleRotationFeature();
             e.Handled = true;
             return;
