@@ -262,12 +262,19 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         try
         {
             // Phase 6.1: ImageBounds → FromLatLngToLocal 기반 줌 스케일링
+            // [Rotation FR-07 / R-06/R-37] 종전 대각 성분차는 회전 시 왜곡·부호반전(→MinSize 10px 붕괴) —
+            // 인접모서리 유클리드 거리(회전 불변)로 교체. 방향 −θ는 base의 DisplayAngle(Bearing−θ)
+            // RenderTransform이 담당(파일 오버레이 EffectiveRotation과 동형 거동, R-06).
             var bounds = Marker.ImageBounds;
             var topLeft = mapControl.FromLatLngToLocal(bounds.LocationTopLeft);
             var bottomRight = mapControl.FromLatLngToLocal(bounds.LocationRightBottom);
+            var topRight = mapControl.FromLatLngToLocal(new GMap.NET.PointLatLng(bounds.Lat, bounds.Lng + bounds.WidthLng));
+            var bottomLeft = mapControl.FromLatLngToLocal(new GMap.NET.PointLatLng(bounds.Lat - bounds.HeightLat, bounds.Lng));
 
-            double screenWidth = bottomRight.X - topLeft.X;
-            double screenHeight = bottomRight.Y - topLeft.Y;
+            double screenWidth = Math.Sqrt(
+                Math.Pow(topRight.X - topLeft.X, 2) + Math.Pow(topRight.Y - topLeft.Y, 2));
+            double screenHeight = Math.Sqrt(
+                Math.Pow(bottomLeft.X - topLeft.X, 2) + Math.Pow(bottomLeft.Y - topLeft.Y, 2));
 
             // 크기 제한 적용 (최소 10px)
             const double MinSize = 10.0;
@@ -369,12 +376,19 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         try
         {
             // Phase 6.1: ImageBounds → FromLatLngToLocal 기반 줌 스케일링
+            // [Rotation FR-07 / R-06/R-37] 종전 대각 성분차는 회전 시 왜곡·부호반전(→MinSize 10px 붕괴) —
+            // 인접모서리 유클리드 거리(회전 불변)로 교체. 방향 −θ는 base의 DisplayAngle(Bearing−θ)
+            // RenderTransform이 담당(파일 오버레이 EffectiveRotation과 동형 거동, R-06).
             var bounds = Marker.ImageBounds;
             var topLeft = mapControl.FromLatLngToLocal(bounds.LocationTopLeft);
             var bottomRight = mapControl.FromLatLngToLocal(bounds.LocationRightBottom);
+            var topRight = mapControl.FromLatLngToLocal(new GMap.NET.PointLatLng(bounds.Lat, bounds.Lng + bounds.WidthLng));
+            var bottomLeft = mapControl.FromLatLngToLocal(new GMap.NET.PointLatLng(bounds.Lat - bounds.HeightLat, bounds.Lng));
 
-            double screenWidth = bottomRight.X - topLeft.X;
-            double screenHeight = bottomRight.Y - topLeft.Y;
+            double screenWidth = Math.Sqrt(
+                Math.Pow(topRight.X - topLeft.X, 2) + Math.Pow(topRight.Y - topLeft.Y, 2));
+            double screenHeight = Math.Sqrt(
+                Math.Pow(bottomLeft.X - topLeft.X, 2) + Math.Pow(bottomLeft.Y - topLeft.Y, 2));
 
             // 크기 제한
             const double MinSize = 10.0;

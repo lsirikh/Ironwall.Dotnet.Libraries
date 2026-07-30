@@ -2015,11 +2015,12 @@ public class GMapCustomControl : GMapControl
     #region Handle Detection Methods
 
     /// <summary>
-    /// 이미지 화면 사각형(AABB) 계산 — 4모서리 min/max(항상 양수 W/H). (NFR-1 공통 헬퍼)
-    /// [FR-01 크래시 가드 / R-01] 종전 2모서리 대각 차 방식은 회전(Bearing≠0) 시 음수 폭/높이로
-    /// Rect가 ArgumentException을 던져 클릭마다 앱이 죽던 Critical 경로 — 4모서리 AABB로 대체.
-    /// Bearing=0에선 기존과 동일 결과(비회전 회귀 0, NFR-04). 방어: 예외 시 Rect.Empty(히트 false).
-    /// ※ 정확한 회전 렌더/히트는 P3 ProjectedQuad(FR-07)에서 — 본 가드는 크래시 차단이 목적.
+    /// 이미지 화면 사각형 — [FR-07 ProjectedQuad 동치] '회전 불변 중심 사각형'. (NFR-1 공통 헬퍼)
+    /// 투영은 등각(회전=거리 보존)이므로 [불변 rect(정확한 중심 + 인접모서리 유클리드 W/H)] +
+    /// [GetImageRotateTransform(EffectiveRotation=User−θ) 1회전] 합성이 곧 4모서리 투영 quad와
+    /// 수학적 동치다. 렌더·히트(InverseRotateMouse)·핸들·드래그가 이 rect+회전을 공유하므로
+    /// rect 산출만 교정하면 전 경로가 quad 정합(F-01 AABB 팽창·R-01 음수 crash 동시 해소).
+    /// Bearing=0·θ=0에선 종전 TL/BR rect와 동일(비회전 회귀 0, NFR-04). 예외 시 Rect.Empty.
     /// </summary>
     private Rect GetImageScreenRect(GMapCustomImage image)
     {
@@ -2030,15 +2031,25 @@ public class GMapCustomControl : GMapControl
             var br = FromLatLngToLocal(b.LocationRightBottom);
             var tr = FromLatLngToLocal(new PointLatLng(b.Lat, b.Lng + b.WidthLng));
             var bl = FromLatLngToLocal(new PointLatLng(b.Lat - b.HeightLat, b.Lng));
-            return Utils.RotationMath.AabbOf(
-                new Point(tl.X, tl.Y), new Point(tr.X, tr.Y),
-                new Point(br.X, br.Y), new Point(bl.X, bl.Y));
+            double w = ScreenDist(tl, tr);   // 회전 불변 폭(항상 ≥0)
+            double h = ScreenDist(tl, bl);   // 회전 불변 높이
+            double cx = (tl.X + br.X) / 2.0; // 등각 투영: 대각 중점 = 지오 중심의 투영
+            double cy = (tl.Y + br.Y) / 2.0;
+            if (w < 1 || h < 1) return Rect.Empty;
+            return new Rect(cx - w / 2.0, cy - h / 2.0, w, h);
         }
         catch (Exception ex)
         {
             _log?.Error($"GetImageScreenRect 실패(가드): {ex.Message}");
             return Rect.Empty;
         }
+    }
+
+    /// <summary>투영점 간 유클리드 거리 — 회전 불변 크기 산출 공용(FR-07).</summary>
+    private static double ScreenDist(GPoint a, GPoint b)
+    {
+        double dx = b.X - a.X, dy = b.Y - a.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     /// <summary>
@@ -3092,9 +3103,13 @@ public class GMapCustomControl : GMapControl
     {
         GPoint tlGP = FromLatLngToLocal(bounds.LocationTopLeft);
         GPoint brGP = FromLatLngToLocal(bounds.LocationRightBottom);
-
-        double curW = brGP.X - tlGP.X;
-        double curH = brGP.Y - tlGP.Y;
+        // [Rotation FR-07 / R-25] 종전 대각 성분차(brGP−tlGP)는 회전 시 부호 반전 → `<=2` 조기
+        // 반환으로 모서리 리사이즈가 무반응(no-op)이 되던 결함 — 크기는 회전 불변 유클리드 거리로
+        // 산출(brGP는 후속 스케일 기준점 계산에만 사용).
+        GPoint trGP = FromLatLngToLocal(new PointLatLng(bounds.Lat, bounds.Lng + bounds.WidthLng));
+        GPoint blGP = FromLatLngToLocal(new PointLatLng(bounds.Lat - bounds.HeightLat, bounds.Lng));
+        double curW = ScreenDist(tlGP, trGP);
+        double curH = ScreenDist(tlGP, blGP);
         if (curW <= 2 || curH <= 2) return bounds;
 
         double aspect = curW / curH;
