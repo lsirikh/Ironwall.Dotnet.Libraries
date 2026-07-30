@@ -272,6 +272,10 @@ public sealed class LabelAdorner : Adorner, IDisposable
             var ft = _cachedText;
 
             var c = LabelCenter();
+            // [Rotation 진동 하드닝] 라벨 박스 원점을 정수 픽셀에 스냅 — 회전 팬 중 앵커의
+            // 서브픽셀 변동이 매 프레임 ClearType 텍스트 재래스터(shimmer)로 보이던 떨림 제거.
+            // 1px 단위 이동은 아이콘 양자화와 동일 보폭이라 상대 정렬 유지.
+            c = new Point(Math.Round(c.X), Math.Round(c.Y));
             double w = ft.WidthIncludingTrailingWhitespace + PadX * 2d;
             double h = ft.Height + PadY * 2d;
             var box = new Rect(c.X - w / 2d, c.Y - h / 2d, w, h);
