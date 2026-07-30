@@ -75,7 +75,21 @@ public static class RotationMath
 /// OFF여도 정북 복귀(0)는 항상 허용되므로 ON→OFF 전환 시 ResetRotation으로 즉시 복구 가능.</summary>
 public static class RotationFeature
 {
-    /// <summary>회전 재활성 플래그. 기본 false — P5(FR-18) 전 시험 통과 전까지 켜지 않는다.
-    /// 테스트 하네스는 이 플래그를 세워 회전을 주입한다(사용자 입력 노출 0 유지).</summary>
-    public static bool IsEnabled { get; set; } = false;
+    private static bool _isEnabled;   // 기본 false — P5(FR-18) 전 시험 통과 전까지 켜지 않는다
+
+    /// <summary>플래그 변경 통지 — 툴바 토글 버튼(IsChecked)·키보드 토글이 상태를 공유(UI 동기화).
+    /// 정적 수명이므로 앱 수명 구독자(싱글턴 VM)만 구독한다.</summary>
+    public static event System.Action<bool>? EnabledChanged;
+
+    /// <summary>회전 재활성 플래그. 토글은 GMapCustomControl.ToggleRotationFeature(단일 진실원) 경유 권장.</summary>
+    public static bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (_isEnabled == value) return;
+            _isEnabled = value;
+            EnabledChanged?.Invoke(value);
+        }
+    }
 }

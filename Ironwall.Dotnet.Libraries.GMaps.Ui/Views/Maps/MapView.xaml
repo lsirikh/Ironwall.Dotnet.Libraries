@@ -438,7 +438,23 @@
 
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
-				<!--  ⑥ 심볼 추가 그룹  -->
+				<!--  ⑥ 회전 그룹 (GMap_Rotation_Full_Sync FR-18 — kill-switch 토글, Ctrl+Shift+R과 동일)  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="회전" />
+				<Border Style="{StaticResource ToolbarGroupStyle}">
+					<StackPanel Orientation="Horizontal">
+						<ToggleButton
+							Command="{Binding ToggleRotationFeatureCommand}"
+							IsChecked="{Binding IsRotationFeatureEnabled, Mode=OneWay}"
+							Style="{StaticResource ToolbarToggleButtonStyle}"
+							ToolTip="지도 회전 모드 (Ctrl+Shift+R) — ON: Shift+휠 / Ctrl+←→ 회전 · OFF: 즉시 정북 복귀">
+							<md:PackIcon Kind="CompassOutline" />
+						</ToggleButton>
+					</StackPanel>
+				</Border>
+
+				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
+
+				<!--  ⑦ 심볼 추가 그룹  -->
 				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="심볼" />
 				<ComboBox
 					Width="120"

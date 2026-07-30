@@ -3098,7 +3098,18 @@ public partial class MapViewModel : BasePanelViewModel,
         RotateCommand = new RelayCommand(ExecuteRotate, CanExecuteRotate);
         FineRotateCommand = new RelayCommand(ExecuteFineRotate, CanExecuteFineRotate);
         ResetRotationCommand = new RelayCommand(ExecuteResetRotation, CanExecuteResetRotation);
+        // [Rotation FR-18] 툴바 회전 토글 — 컨트롤 ToggleRotationFeature(키보드와 단일 진실원) 경유.
+        ToggleRotationFeatureCommand = new RelayCommand(_ => MainMap?.ToggleRotationFeature());
+        // 정적 플래그 변경 통지 구독 — 키보드(Ctrl+Shift+R)로 바뀌어도 버튼 IsChecked 동기화.
+        // VM은 싱글턴(앱 수명)이라 정적 이벤트 구독 누수 없음.
+        Utils.RotationFeature.EnabledChanged += _ =>
+            OnUIThread(() => NotifyOfPropertyChange(nameof(IsRotationFeatureEnabled)));
     }
+
+    /// <summary>회전 kill-switch 상태(툴바 토글 IsChecked 바인딩) — 기본 OFF(FR-03).</summary>
+    public bool IsRotationFeatureEnabled => Utils.RotationFeature.IsEnabled;
+
+    public RelayCommand? ToggleRotationFeatureCommand { get; private set; }
 
     /// <summary>
     /// 마커 편집 관련 명령어 초기화

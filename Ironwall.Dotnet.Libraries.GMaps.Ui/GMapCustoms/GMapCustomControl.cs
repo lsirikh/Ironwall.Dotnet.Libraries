@@ -1669,14 +1669,11 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
-        // [Rotation E2E 하네스] Ctrl+Shift+R = 회전 kill-switch 토글(개발/검증용).
-        // 의도적으로 비노출 조합 — 우발 활성화 시에도 OFF 토글이 즉시 정북 복귀(안전).
-        // flag 기본값은 여전히 OFF(부팅 시 회전 불가) — FR-18 게이트 유지.
+        // [Rotation FR-18] Ctrl+Shift+R = 회전 kill-switch 토글 — 툴바 버튼과 동일한
+        // ToggleRotationFeature(단일 진실원) 경유. flag 기본값은 여전히 OFF(부팅 시 회전 불가).
         if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.R)
         {
-            Utils.RotationFeature.IsEnabled = !Utils.RotationFeature.IsEnabled;
-            if (!Utils.RotationFeature.IsEnabled) ResetRotation();   // OFF 전환 = 즉시 정북(FR-03 검증 경로)
-            _log?.Info($"[Rotation] kill-switch 토글: {(Utils.RotationFeature.IsEnabled ? "ON — Shift+휠/Ctrl+←→ 회전 가능" : "OFF — 정북 복귀·입력 차단")}");
+            ToggleRotationFeature();
             e.Handled = true;
             return;
         }
@@ -2794,6 +2791,16 @@ public class GMapCustomControl : GMapControl
     /// <summary>맵 전환/재로드 후 회전 종속 상태 재적용(R-31) — 신규 오버레이의
     /// MapCorrectionRotation 재주입 + snapshot 재발행. MapViewModel.ChangeMapAsync가 호출.</summary>
     public void ResyncRotationDependents() => UpdateOverlaysAfterRotation();
+
+    /// <summary>회전 kill-switch 토글(FR-03/18 단일 진실원) — 키보드(Ctrl+Shift+R)와 툴바 버튼 공용.
+    /// OFF 전환 = 즉시 정북 복귀(0은 게이트 무관 항상 허용 — 안전 복구 경로). 반환=새 상태.</summary>
+    public bool ToggleRotationFeature()
+    {
+        Utils.RotationFeature.IsEnabled = !Utils.RotationFeature.IsEnabled;
+        if (!Utils.RotationFeature.IsEnabled) ResetRotation();
+        _log?.Info($"[Rotation] kill-switch 토글: {(Utils.RotationFeature.IsEnabled ? "ON — Shift+휠/Ctrl+←→ 회전 가능" : "OFF — 정북 복귀·입력 차단")}");
+        return Utils.RotationFeature.IsEnabled;
+    }
 
     #endregion
 
