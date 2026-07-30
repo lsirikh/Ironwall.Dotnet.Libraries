@@ -1533,10 +1533,15 @@ namespace GMap.NET.WindowsPresentation
             {
                 if (IsRotated)
                 {
-                    var p = new Point(x, y);
-                    p = _rotationMatrixInvert.Transform(p);
-                    x = (int)p.X;
-                    y = (int)p.Y;
+                    // [Rotation_Full_Sync R-42] 델타 '벡터'는 순수 회전 성분만 적용해야 한다 —
+                    // 종전 point 변환은 중심(C) 보유 어파인의 상수항 (C−R·C)까지 더해져
+                    // 회전 시 수백 px 스퓨리어스 오프셋(30°·FullHD 기준) 발생. M11~M22 벡터 변환으로 교체.
+                    var m = _rotationMatrix.Value;
+                    m.Invert();
+                    double vx = x * m.M11 + y * m.M21;
+                    double vy = x * m.M12 + y * m.M22;
+                    x = (int)Math.Round(vx);
+                    y = (int)Math.Round(vy);
 
                     _core.DragOffset(new GPoint(x, y));
 
@@ -1588,7 +1593,12 @@ namespace GMap.NET.WindowsPresentation
             {
                 if (_core.Bearing != value)
                 {
-                    bool resize = _core.Bearing == 0;
+                    // [Rotation_Full_Sync R-43] 종전: 진입(0→θ)만 resize — 이탈(θ→0) 시
+                    // _sizeOfMapArea가 √2 확대치로 잔존해 불필요한 타일 과다 페치.
+                    // 회전 상태 '전이'(진입 XOR 이탈) 양쪽에서 크기 재통지하도록 확장.
+                    bool wasZero = _core.Bearing == 0 || _core.Bearing % 360 == 0;
+                    bool isZero = value == 0 || value % 360 == 0;
+                    bool resize = wasZero != isZero;
                     _core.Bearing = value;
 
                     UpdateRotationMatrix();

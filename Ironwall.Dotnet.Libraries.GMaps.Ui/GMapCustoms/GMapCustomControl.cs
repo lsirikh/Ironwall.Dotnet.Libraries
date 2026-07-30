@@ -1673,11 +1673,15 @@ public class GMapCustomControl : GMapControl
         {
             switch (e.Key)
             {
-                // 지도 회전(Ctrl+←/→) 비활성 — Shift+휠과 동일 사유(회전 싱크 미지원 → 배치 깨짐).
-                //   회전 트리거만 차단하고 Ctrl+R 리셋은 유지. 기존: RotateMap(∓5)
+                // [Rotation FR-18 재개방] Ctrl+←/→ 회전 — kill-switch(기본 OFF) 게이트.
+                // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0). ON: RotateMap(∓5) → SSOT 경유.
                 case Key.Left:
+                    if (Utils.RotationFeature.IsEnabled) RotateMap(-5);
+                    e.Handled = true;
+                    break;
                 case Key.Right:
-                    e.Handled = true;   // 회전 차단(소비만)
+                    if (Utils.RotationFeature.IsEnabled) RotateMap(5);
+                    e.Handled = true;
                     break;
                 case Key.R:
                     ResetRotation();    // 기존 회전 상태 0으로 복구(유지)
@@ -1794,12 +1798,14 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
-        // 지도 회전(Shift+휠) 비활성 — 심볼/이미지/히트테스트/FOV/어도너가 맵 회전과 싱크되지 않아
-        //   회전 시 배치가 깨짐(격자스냅도 FR-12로 이미 회전 시 비활성). 전면 회전 싱크는 대규모 작업이라
-        //   사용자 요청으로 회전 트리거를 차단. Ctrl+R(ResetRotation)은 유지(복구용). 기존: RotateMap(e.Delta>0?5:-5)
+        // [Rotation FR-18 재개방] Shift+휠 회전 — RotationFeature.IsEnabled(kill-switch, 기본 OFF) 게이트.
+        // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0 — 머지 안전). ON: RotateMap(±5°) →
+        // SSOT(ApplyMapRotation) 경유라 정규화·앵커 게이트 자동 적용. Ctrl+R 리셋은 항상 유지.
         if (Keyboard.Modifiers == ModifierKeys.Shift)
         {
-            e.Handled = true;   // 휠 소비만 — 회전·줌 없음
+            if (Utils.RotationFeature.IsEnabled)
+                RotateMap(e.Delta > 0 ? 5 : -5);
+            e.Handled = true;   // 휠은 소비(줌으로 전파 금지)
             return;
         }
 
@@ -2626,6 +2632,14 @@ public class GMapCustomControl : GMapControl
     {
         double newRotation = MapRotation + deltaAngle;
         newRotation = ApplySnapAngle(newRotation);
+        // [Rotation R-33 데드존 탈출] 스냅각 ≥ 2×스텝이면 절대격자 반올림이 항상 같은 배수로
+        // 되돌아와 회전이 무반응이 되던 결함 — 스냅 결과가 제자리면 delta 방향 다음 배수로 전진.
+        if (RotationSnapAngle > 0
+            && Math.Abs(deltaAngle) > Utils.RotationMath.Epsilon
+            && Math.Abs(newRotation - MapRotation) < Utils.RotationMath.Epsilon)
+        {
+            newRotation = MapRotation + Math.Sign(deltaAngle) * RotationSnapAngle;
+        }
         MapRotation = newRotation;
     }
 
@@ -2697,12 +2711,9 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     private void UpdateOverlaysAfterRotation()
     {
-        try
-        {
-            foreach (GMapMarker marker in Markers)
-                marker.ForceUpdateLocalPosition(this);
-        }
-        catch (Exception ex) { _log?.Error($"회전 후 마커 재배치 실패(격리): {ex.Message}"); }
+        // [FR-16 / F-12] 마커 위치 재배치 루프 제거 — 벤더 Bearing setter가 이미
+        // ForceUpdateOverlays()로 전 마커를 갱신한다(GMapControl.cs Bearing setter). 여기서
+        // 또 돌면 회전 tick마다 중복 O(N). (맵 전환 Resync 경로의 위치는 Position/Zoom 이벤트가 담당.)
 
         // [FR-11] 심볼 표시각 중앙 배포 — 각 Shape에 canonical bearing 푸시(개별 구독 없음=누수 0).
         // point 심볼=−θ 합성, 정점 재투영 계열(AppliesMapRotation=false)은 내부에서 스킵(R-36).
@@ -3046,7 +3057,8 @@ public class GMapCustomControl : GMapControl
     private double ApplySnapAngle(double angle)
     {
         if (RotationSnapAngle <= 0) return angle;
-        return Math.Round(angle / RotationSnapAngle) * RotationSnapAngle;
+        // [Rotation R-33] ToEven(기본) 대신 AwayFromZero — .5 경계에서 전진 보장
+        return Math.Round(angle / RotationSnapAngle, MidpointRounding.AwayFromZero) * RotationSnapAngle;
     }
 
     #endregion
