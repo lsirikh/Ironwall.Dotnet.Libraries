@@ -2792,6 +2792,9 @@ public class GMapCustomControl : GMapControl
     /// MapCorrectionRotation 재주입 + snapshot 재발행. MapViewModel.ChangeMapAsync가 호출.</summary>
     public void ResyncRotationDependents() => UpdateOverlaysAfterRotation();
 
+    /// <summary>앵커(사이트 고정) 활성 여부 — 활성 중엔 회전 잠금(V-06/FR-02). 툴바 버튼 비활성 바인딩용.</summary>
+    public bool IsAnchorActive => _anchorSiteRect != null;
+
     /// <summary>회전 kill-switch 토글(FR-03/18 단일 진실원) — 키보드(Ctrl+Shift+R)와 툴바 버튼 공용.
     /// OFF 전환 = 즉시 정북 복귀(0은 게이트 무관 항상 허용 — 안전 복구 경로). 반환=새 상태.</summary>
     public bool ToggleRotationFeature()

@@ -213,6 +213,10 @@
 							<Setter TargetName="Bd" Property="Background" Value="{DynamicResource PrimaryBrush}" />
 							<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
 						</Trigger>
+						<!--  비활성 시각(회전 토글: 앵커 활성 중 잠금 표시 등) — Panel 버튼들과 동일 관례  -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter Property="Opacity" Value="0.35" />
+						</Trigger>
 					</ControlTemplate.Triggers>
 				</ControlTemplate>
 			</Setter.Value>

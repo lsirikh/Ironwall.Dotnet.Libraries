@@ -445,8 +445,10 @@
 						<ToggleButton
 							Command="{Binding ToggleRotationFeatureCommand}"
 							IsChecked="{Binding IsRotationFeatureEnabled, Mode=OneWay}"
+							IsEnabled="{Binding IsRotationToggleEnabled}"
 							Style="{StaticResource ToolbarToggleButtonStyle}"
-							ToolTip="지도 회전 모드 (Ctrl+Shift+R) — ON: Shift+휠 / Ctrl+←→ 회전 · OFF: 즉시 정북 복귀">
+							ToolTipService.ShowOnDisabled="True"
+							ToolTip="지도 회전 모드 (Ctrl+Shift+R) — ON: Shift+휠 / Ctrl+←→ 회전 · OFF: 즉시 정북 복귀 · 사이트 고정(앵커) 중에는 회전 잠금(자동 정북)">
 							<md:PackIcon Kind="CompassOutline" />
 						</ToggleButton>
 					</StackPanel>

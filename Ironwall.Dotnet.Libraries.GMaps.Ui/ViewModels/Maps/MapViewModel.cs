@@ -3109,6 +3109,10 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>회전 kill-switch 상태(툴바 토글 IsChecked 바인딩) — 기본 OFF(FR-03).</summary>
     public bool IsRotationFeatureEnabled => Utils.RotationFeature.IsEnabled;
 
+    /// <summary>회전 토글 버튼 활성 여부 — 앵커(사이트 고정) 활성 중엔 회전 잠금(V-06/FR-02)이라 비활성.
+    /// ApplyMapAnchor의 SetAnchorSite 호출 뒤 통지.</summary>
+    public bool IsRotationToggleEnabled => !(MainMap?.IsAnchorActive ?? false);
+
     public RelayCommand? ToggleRotationFeatureCommand { get; private set; }
 
     /// <summary>
