@@ -52,7 +52,7 @@ public partial class MapViewModel
 
         // FR-1: 원본 사이트 사각형을 컨트롤에 넘긴다. 컨트롤이 현재 뷰포트로 inset을 계산해 BoundsOfMap에 설정하고
         //   줌/디지털줌/크기 변경 시 라이브 재계산 → 벤더의 드래그 Contains 스킵이 뷰포트-가두기가 됨. 컨테인먼트 상시-ON(FR-6).
-        MainMap.SetAnchorSite(rect);
+        MainMap.SetAnchorSite(rect, anchor.AllowRotation);   // V-06 옵션C: B모드면 회전 유지 잠금
         NotifyOfPropertyChange(nameof(IsRotationToggleEnabled));   // 회전 토글 버튼 활성/비활성 동기(V-06)
 
         // FR-H1: 앵커 활성인데 홈이 미설정이면 홈=앵커 중심 자동 세팅(최초 적용).
@@ -110,6 +110,10 @@ public partial class MapViewModel
     private bool _anchorStrict;
     public bool AnchorStrict { get => _anchorStrict; set { _anchorStrict = value; NotifyOfPropertyChange(nameof(AnchorStrict)); } }
 
+    private bool _anchorAllowRotation;
+    /// <summary>[V-06 옵션C] 앵커 중 회전 허용(B모드) — false(기본)=정북 강제+회전 잠금(A모드).</summary>
+    public bool AnchorAllowRotation { get => _anchorAllowRotation; set { _anchorAllowRotation = value; NotifyOfPropertyChange(nameof(AnchorAllowRotation)); } }
+
     private double _anchorNwLat, _anchorNwLng, _anchorSeLat, _anchorSeLng;
     public double AnchorNwLat { get => _anchorNwLat; set { _anchorNwLat = value; NotifyOfPropertyChange(nameof(AnchorNwLat)); } }
     public double AnchorNwLng { get => _anchorNwLng; set { _anchorNwLng = value; NotifyOfPropertyChange(nameof(AnchorNwLng)); } }
@@ -145,6 +149,7 @@ public partial class MapViewModel
         AnchorEnabled = a?.IsEnabled ?? false;
         AnchorMinZoom = a?.MinZoomFloor > 0 ? a.MinZoomFloor : (int)ZoomMin;
         AnchorStrict = a?.StrictContainment ?? false;
+        AnchorAllowRotation = a?.AllowRotation ?? false;
         AnchorNwLat = a?.NorthWest?.Latitude ?? 0;
         AnchorNwLng = a?.NorthWest?.Longitude ?? 0;
         AnchorSeLat = a?.SouthEast?.Latitude ?? 0;
@@ -226,6 +231,7 @@ public partial class MapViewModel
             SouthEast = new CoordinateModel(AnchorSeLat, AnchorSeLng, 0.0),
             MinZoomFloor = AnchorMinZoom,
             StrictContainment = AnchorStrict,
+            AllowRotation = AnchorAllowRotation,
         };
         if (_setupModel != null) _setupModel.MapAnchor = anchor;
         await MapSettingsHelper.SaveMapAnchorAsync(anchor, _log);

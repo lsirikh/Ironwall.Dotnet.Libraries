@@ -601,15 +601,20 @@ public class GMapCustomControl : GMapControl
     // [MapAnchor] 앵커 원본 사이트 사각형(뷰포트 inset의 원천). null=앵커 비활성.
     private RectLatLng? _anchorSiteRect;
 
+    // [Rotation V-06 옵션C] 현재 앵커의 회전 허용 모드 — SetAnchorSite에서 세팅.
+    private bool _anchorAllowsRotation;
+
     /// <summary>앵커 사이트 사각형 설정(활성) 또는 해제(null). 즉시 현재 뷰포트로 inset을 계산해 BoundsOfMap에 반영.
     /// MapViewModel.ApplyMapAnchor에서 호출.
-    /// [FR-02 원자 전이] 활성 시: 정북 강제(reset, 0은 게이트 무관 항상 허용) → verify 0 → 앵커 활성.
-    /// 활성 이후엔 회전 SSOT(ApplyMapRotation)가 anchorActive 게이트로 0 아닌 회전을 차단(V-06).</summary>
-    public void SetAnchorSite(RectLatLng? site)
+    /// [FR-02 원자 전이 + V-06 옵션C] allowRotation=false(기본): 정북 강제 → verify 0 → 활성,
+    /// 이후 SSOT가 회전 차단(현행 A모드). allowRotation=true: 현재 회전 유지한 채 활성(B모드) —
+    /// 가두기 inset은 회전 화면의 외접 bbox(FR-08 4코너 ViewArea)로 계산되고, 회전 변경 시
+    /// UpdateOverlaysAfterRotation이 inset을 라이브 재계산해 보장 유지.</summary>
+    public void SetAnchorSite(RectLatLng? site, bool allowRotation = false)
     {
-        if (site != null && Math.Abs(Bearing) > (float)Utils.RotationMath.Epsilon)
+        if (site != null && !allowRotation && Math.Abs(Bearing) > (float)Utils.RotationMath.Epsilon)
         {
-            // 잠근 사이트 = 정립 표시 정책 — 앵커 걸기 전에 정북 강제(0은 항상 허용 경로)
+            // 잠근 사이트 = 정립 표시 정책(A모드) — 앵커 걸기 전에 정북 강제(0은 항상 허용 경로)
             SetMapRotation(0);
             if (Math.Abs(Bearing) > (float)Utils.RotationMath.Epsilon)
             {
@@ -617,6 +622,7 @@ public class GMapCustomControl : GMapControl
                 return;
             }
         }
+        _anchorAllowsRotation = allowRotation;
         _anchorSiteRect = site;
         RecomputeAnchorViewportBounds();
     }
@@ -2684,7 +2690,9 @@ public class GMapCustomControl : GMapControl
         if (_rotationCoercing) return;   // canonical 교정 중 중첩 콜백 무시
         try
         {
-            var applied = Utils.RotationMath.Decide(rotation, Utils.RotationFeature.IsEnabled, _anchorSiteRect != null);
+            // [V-06 옵션C] 앵커 잠금은 '회전 비허용 앵커'일 때만(B모드 앵커는 회전 통과)
+            var applied = Utils.RotationMath.Decide(rotation, Utils.RotationFeature.IsEnabled,
+                _anchorSiteRect != null && !_anchorAllowsRotation);
             if (applied == null)
             {
                 // 차단(kill-switch OFF 또는 앵커 활성) — DP를 직전 canonical로 복원(no-op)
@@ -2744,6 +2752,15 @@ public class GMapCustomControl : GMapControl
         }
         catch (Exception ex) { _log?.Error($"회전 후 이미지 보정 실패(격리): {ex.Message}"); }
 
+        // [V-06 옵션C/B모드] 회전 허용 앵커 활성 중 회전이 바뀌면 inset을 라이브 재계산 —
+        // ViewArea(FR-08 4코너)가 회전 화면의 외접 bbox를 주므로 가두기 보장이 각도 무관 유지.
+        try
+        {
+            if (_anchorSiteRect != null && _anchorAllowsRotation)
+                RecomputeAnchorViewportBounds();
+        }
+        catch (Exception ex) { _log?.Error($"회전 후 앵커 inset 재계산 실패(격리): {ex.Message}"); }
+
         // 소비처(라벨·측정·조준·라인드로잉·그룹선택·FOV·라인·트레일·재생·팝업·오버레이맵) 통지 — FR-05
         QueueViewportSnapshot();
 
@@ -2792,8 +2809,12 @@ public class GMapCustomControl : GMapControl
     /// MapCorrectionRotation 재주입 + snapshot 재발행. MapViewModel.ChangeMapAsync가 호출.</summary>
     public void ResyncRotationDependents() => UpdateOverlaysAfterRotation();
 
-    /// <summary>앵커(사이트 고정) 활성 여부 — 활성 중엔 회전 잠금(V-06/FR-02). 툴바 버튼 비활성 바인딩용.</summary>
+    /// <summary>앵커(사이트 고정) 활성 여부.</summary>
     public bool IsAnchorActive => _anchorSiteRect != null;
+
+    /// <summary>앵커에 의해 회전이 잠겼는가 — A모드(회전 비허용) 앵커 활성 시에만 true.
+    /// B모드(AllowRotation) 앵커는 회전 허용이므로 false. 툴바 버튼 비활성 바인딩용(V-06 옵션C).</summary>
+    public bool IsRotationLockedByAnchor => _anchorSiteRect != null && !_anchorAllowsRotation;
 
     /// <summary>회전 kill-switch 토글(FR-03/18 단일 진실원) — 키보드(Ctrl+Shift+R)와 툴바 버튼 공용.
     /// OFF 전환 = 즉시 정북 복귀(0은 게이트 무관 항상 허용 — 안전 복구 경로). 반환=새 상태.</summary>

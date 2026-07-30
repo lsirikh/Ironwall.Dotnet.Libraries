@@ -225,10 +225,18 @@
 									</Grid>
 
 									<CheckBox
-										Margin="0,0,0,16"
+										Margin="0,0,0,8"
 										Content="엄격 컨테인먼트 (화면밖 완전차단)"
 										Foreground="{DynamicResource TextPrimaryBrush}"
 										IsChecked="{Binding AnchorStrict}" />
+
+									<!--  [Rotation V-06 옵션C] 회전 허용 앵커(B모드) — OFF(기본)=고정 시 정북 강제+회전 잠금  -->
+									<CheckBox
+										Margin="0,0,0,16"
+										Content="회전 허용 (고정 중에도 지도 회전 유지)"
+										Foreground="{DynamicResource TextPrimaryBrush}"
+										IsChecked="{Binding AnchorAllowRotation}"
+										ToolTip="ON: 회전한 방향 그대로 사이트 고정(가두기는 회전 화면 외접 기준 — 같은 줌에서 보이는 범위가 다소 좁아짐)&#10;OFF(기본): 고정 시 정북으로 정렬되고 회전 잠금" />
 
 									<Button
 										MinWidth="110"

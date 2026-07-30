@@ -29,6 +29,7 @@ public class MapAnchorModel : IMapAnchorModel
         SouthEast = source.SouthEast;
         MinZoomFloor = source.MinZoomFloor;
         StrictContainment = source.StrictContainment;
+        AllowRotation = source.AllowRotation;
     }
     #endregion
     #region - Properties -
@@ -37,6 +38,8 @@ public class MapAnchorModel : IMapAnchorModel
     public CoordinateModel? SouthEast { get; set; }
     public int MinZoomFloor { get; set; }
     public bool StrictContainment { get; set; }
+    /// <summary>[Rotation V-06 옵션C] 앵커 중 회전 허용(기본 false=정북 강제·회전 잠금). JSON 영속 — 구설정 하위호환.</summary>
+    public bool AllowRotation { get; set; }
 
     /// <summary>구역이 유효한지(활성 + 양 코너 존재 + (0,0) 퇴화 아님). (0,0) 방어 = 구버전 잔재 무효화.</summary>
     [JsonIgnore]

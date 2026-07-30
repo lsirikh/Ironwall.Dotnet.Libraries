@@ -21,4 +21,7 @@ public interface IMapAnchorModel
     int MinZoomFloor { get; set; }
     /// <summary>엄격 컨테인먼트(뷰포트 inset로 화면밖 완전차단) 여부.</summary>
     bool StrictContainment { get; set; }
+    /// <summary>[Rotation V-06 옵션C] 앵커 활성 중 회전 허용 — false(기본)=현행(활성 시 정북 강제+회전 잠금),
+    /// true=회전 유지 잠금(가두기 inset은 회전 화면의 외접 bbox 기준 — FR-08 ViewArea가 공급).</summary>
+    bool AllowRotation { get; set; }
 }
