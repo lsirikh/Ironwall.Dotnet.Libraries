@@ -2779,6 +2779,21 @@ namespace GMap.NET.WindowsPresentation
             return _core.FromLocalToLatLng(x, y);
         }
 
+        // [Rotation_Full_Sync FR-15] 오버레이 별도-draw 정합용 최소 seam (V-08 스파이크 후보B):
+        // '비회전 core-local' 좌표와 회전 행렬을 노출한다. 오버레이 타일을 core 좌표로 배치하고
+        // 렌더 시 회전 행렬을 1회만 Push하면 베이스 타일(DrawMap: Rotate→[Scale]→Translate, 1657-1688)과
+        // 동일 변환 합성이 되어 픽셀-퍼펙트 정합(스파이크 실측: 전 각도·DPI 96~192% 0-diff).
+        // 절단된 회전 좌표를 역회전하는 방식(후보A)은 타일별 1px 계단(seam)으로 실측 탈락.
+        /// <summary>비회전 core-local 좌표(RenderOffset 포함, 회전·스케일 미적용).</summary>
+        public Point FromLatLngToCoreLocal(PointLatLng point)
+        {
+            var p = _core.FromLatLngToLocal(point);
+            return new Point(p.X, p.Y);
+        }
+
+        /// <summary>현재 회전 행렬 값(비회전 시 Identity) — 오버레이 렌더 Push용.</summary>
+        public Matrix RotationMatrixValue => IsRotated ? _rotationMatrix.Value : Matrix.Identity;
+
         public GPoint FromLatLngToLocal(PointLatLng point)
         {
             var ret = _core.FromLatLngToLocal(point);
@@ -2937,10 +2952,23 @@ namespace GMap.NET.WindowsPresentation
                 }
                 else if (_core.Provider.Projection != null)
                 {
-                    var p = FromLocalToLatLng(0, 0);
-                    var p2 = FromLocalToLatLng((int)Width, (int)Height);
+                    // [Rotation_Full_Sync FR-08 / R-03] 종전: 미설정 WPF Width/Height(NaN)를 (int) 캐스팅
+                    // (net8 실측 = int.MinValue → 무의미 좌표) + 대각 2코너만 사용(회전 사각형을 못 덮음,
+                    // 45°에서 폭 붕괴). → ActualWidth/ActualHeight 기반 '4코너' min/max 정규화 bbox로 교체:
+                    // 회전 뷰포트를 항상 완전히 덮고 폭/높이가 음수가 될 수 없다.
+                    // (antimeridian 경도 랩은 min/max로 과대 bbox가 될 수 있으나 운영권역 밖 — FR-08 한계 명시)
+                    int vw = (int)Math.Max(1, ActualWidth);
+                    int vh = (int)Math.Max(1, ActualHeight);
+                    var c1 = FromLocalToLatLng(0, 0);
+                    var c2 = FromLocalToLatLng(vw, 0);
+                    var c3 = FromLocalToLatLng(vw, vh);
+                    var c4 = FromLocalToLatLng(0, vh);
+                    double north = Math.Max(Math.Max(c1.Lat, c2.Lat), Math.Max(c3.Lat, c4.Lat));
+                    double south = Math.Min(Math.Min(c1.Lat, c2.Lat), Math.Min(c3.Lat, c4.Lat));
+                    double east = Math.Max(Math.Max(c1.Lng, c2.Lng), Math.Max(c3.Lng, c4.Lng));
+                    double west = Math.Min(Math.Min(c1.Lng, c2.Lng), Math.Min(c3.Lng, c4.Lng));
 
-                    return RectLatLng.FromLTRB(p.Lng, p.Lat, p2.Lng, p2.Lat);
+                    return RectLatLng.FromLTRB(west, north, east, south);
                 }
 
                 return RectLatLng.Empty;

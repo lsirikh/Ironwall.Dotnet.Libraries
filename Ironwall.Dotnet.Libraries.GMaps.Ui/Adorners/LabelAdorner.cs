@@ -147,29 +147,43 @@ public sealed class LabelAdorner : Adorner, IDisposable
     /// 점 심볼: 모델 W/H(고정 px, 현행 유지 — 시뮬 S그룹 0 FAIL 확증).</summary>
     private (double hw, double hh) VisualHalfExtents()
     {
+        // [Rotation FR-14 / R-23] 익스텐트는 '회전 불변'이어야 한다 — 종전 축차/bbox 방식은
+        // FromLatLngToLocal이 맵 회전을 포함해 θ에 따라 값이 변했고, 그 값으로 나눈 U/V 정규화가
+        // DB에 영속되어 회전 상태에서 잡은 라벨이 다른 θ에서 튀었다(45° 부근 U 폭주).
         if (_marker is IImageEditableMarker img)
         {
+            // 인접 모서리 유클리드 거리 = 회전 불변(회전은 등거리 변환). θ=0에선 종전 축차와 동일.
             var b = img.ImageBounds;
             var tl = _map.FromLatLngToLocal(b.LocationTopLeft);
-            var br = _map.FromLatLngToLocal(b.LocationRightBottom);
-            double w = Math.Max(Math.Abs(br.X - tl.X), MIN_IMAGE_FOOTPRINT_PX);
-            double h = Math.Max(Math.Abs(br.Y - tl.Y), MIN_IMAGE_FOOTPRINT_PX);
+            var tr = _map.FromLatLngToLocal(new GMap.NET.PointLatLng(b.Lat, b.Lng + b.WidthLng));
+            var bl = _map.FromLatLngToLocal(new GMap.NET.PointLatLng(b.Lat - b.HeightLat, b.Lng));
+            double w = Math.Max(Dist(tl, tr), MIN_IMAGE_FOOTPRINT_PX);
+            double h = Math.Max(Dist(tl, bl), MIN_IMAGE_FOOTPRINT_PX);
             return RotatedAabbHalf(w, h, _marker.Bearing);
         }
         if (_marker is ILineEditableMarker line && line.RuntimePoints is { Count: > 0 } pts)
         {
+            // 투영점을 맵 회전 역행렬로 되돌린 뒤 bbox — θ 무관 동일 footprint(비회전 시 Identity).
+            var inv = _map.RotationMatrixValue; inv.Invert();
             double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
             foreach (var p in pts)
             {
                 var lp = _map.FromLatLngToLocal(p);
-                if (lp.X < minX) minX = lp.X;
-                if (lp.X > maxX) maxX = lp.X;
-                if (lp.Y < minY) minY = lp.Y;
-                if (lp.Y > maxY) maxY = lp.Y;
+                var up = inv.Transform(new Point(lp.X, lp.Y));
+                if (up.X < minX) minX = up.X;
+                if (up.X > maxX) maxX = up.X;
+                if (up.Y < minY) minY = up.Y;
+                if (up.Y > maxY) maxY = up.Y;
             }
             return (Math.Max((maxX - minX) / 2.0, 1d), Math.Max((maxY - minY) / 2.0, 1d));
         }
         return (_marker.Width / 2.0, _marker.Height / 2.0);
+
+        static double Dist(GMap.NET.GPoint a, GMap.NET.GPoint b)
+        {
+            double dx = b.X - a.X, dy = b.Y - a.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
     }
 
     /// <summary>오프셋 정규화 대상 — footprint가 줌마다 스케일하는 마커(이미지 + 라인/폴리곤/PidsGroup).

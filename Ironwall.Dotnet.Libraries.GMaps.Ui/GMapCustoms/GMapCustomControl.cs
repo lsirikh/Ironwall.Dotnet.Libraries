@@ -1197,8 +1197,18 @@ public class GMapCustomControl : GMapControl
                     if (ar.Width >= 4 && ar.Height >= 4)   // 최소 드래그(오클릭 방지)
                     {
                         IsAnchorDrawMode = false;                                    // 유효 드래그 → 모드 종료
-                        var nw = FromLocalToLatLng((int)ar.Left, (int)ar.Top);       // 좌상 = 북서(north-west)
-                        var se = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);   // 우하 = 남동(south-east)
+                        // [Rotation R-28] 회전 시 화면 좌상≠지리 북서 — 4모서리를 전부 변환해 min/max로
+                        // 정규화(HeightLat 음수·뒤틀린 저장 방지). 비회전에선 종전 2코너와 동일 결과.
+                        var g1 = FromLocalToLatLng((int)ar.Left, (int)ar.Top);
+                        var g2 = FromLocalToLatLng((int)ar.Right, (int)ar.Top);
+                        var g3 = FromLocalToLatLng((int)ar.Right, (int)ar.Bottom);
+                        var g4 = FromLocalToLatLng((int)ar.Left, (int)ar.Bottom);
+                        double north = Math.Max(Math.Max(g1.Lat, g2.Lat), Math.Max(g3.Lat, g4.Lat));
+                        double south = Math.Min(Math.Min(g1.Lat, g2.Lat), Math.Min(g3.Lat, g4.Lat));
+                        double west = Math.Min(Math.Min(g1.Lng, g2.Lng), Math.Min(g3.Lng, g4.Lng));
+                        double east = Math.Max(Math.Max(g1.Lng, g2.Lng), Math.Max(g3.Lng, g4.Lng));
+                        var nw = new PointLatLng(north, west);                       // 정규화 북서
+                        var se = new PointLatLng(south, east);                       // 정규화 남동
                         AnchorAreaDrawn?.Invoke(nw, se);                             // VM이 채우고 ExitAnchorDrawMode(커서 복원)
                     }
                     // 너무 작은 드래그(오클릭)면 모드 유지 → 재시도 또는 ESC 취소
@@ -2143,33 +2153,67 @@ public class GMapCustomControl : GMapControl
     {
         if (OverlayMapCanvas == null) return;
 
-        // ZOrder 순으로 렌더링 (낮은 ZOrder = 먼저 그림 = 아래 레이어)
-        foreach (System.Windows.Controls.Canvas childCanvas in
-            OverlayMapCanvas.Children.OfType<System.Windows.Controls.Canvas>()
-                .OrderBy(c => System.Windows.Controls.Panel.GetZIndex(c)))
+        // [Rotation FR-15 후보B — V-08 pixel-diff 실측 채택] 회전 시: 타일을 '비절단 core-local'
+        // (벤더 seam FromLatLngToCoreLocal)에 배치하고 회전 행렬을 딱 1회 Push — 베이스 타일
+        // (DrawMap)과 동일 변환 합성이라 seam 0(전 각도·DPI 0-diff). 절단된 Canvas 좌표를
+        // 역회전하는 후보A는 타일별 1px 계단으로 실측 탈락(R-44 이중회전도 금지).
+        // ※ MapScaleTransform은 앱이 ScaleMode=Integer 고정이라 항상 null(internal이라 접근도 불가) —
+        //   fractional 도입 시 벤더 seam 확장 필요(주석 계약).
+        bool rotated = IsRotated;
+        var rot = RotationMatrixValue;
+        var rotInv = rot; if (rotated) rotInv.Invert();
+        if (rotated) drawingContext.PushTransform(new MatrixTransform(rot));
+        try
         {
-            if (childCanvas.Visibility != Visibility.Visible) continue;
-
-            var opacity = childCanvas.Opacity;
-
-            foreach (var img in childCanvas.Children.OfType<System.Windows.Controls.Image>())
+            // ZOrder 순으로 렌더링 (낮은 ZOrder = 먼저 그림 = 아래 레이어)
+            foreach (System.Windows.Controls.Canvas childCanvas in
+                OverlayMapCanvas.Children.OfType<System.Windows.Controls.Canvas>()
+                    .OrderBy(c => System.Windows.Controls.Panel.GetZIndex(c)))
             {
-                if (img.Source == null) continue;
+                if (childCanvas.Visibility != Visibility.Visible) continue;
 
-                var left = System.Windows.Controls.Canvas.GetLeft(img);
-                var top = System.Windows.Controls.Canvas.GetTop(img);
-                if (double.IsNaN(left) || double.IsNaN(top)) continue;
+                var opacity = childCanvas.Opacity;
 
-                var rect = new Rect(left, top, img.Width, img.Height);
+                foreach (var img in childCanvas.Children.OfType<System.Windows.Controls.Image>())
+                {
+                    if (img.Source == null) continue;
 
-                if (opacity < 1.0)
-                    drawingContext.PushOpacity(opacity);
+                    var left = System.Windows.Controls.Canvas.GetLeft(img);
+                    var top = System.Windows.Controls.Canvas.GetTop(img);
+                    if (double.IsNaN(left) || double.IsNaN(top)) continue;
 
-                drawingContext.DrawImage(img.Source, rect);
+                    double drawX = left, drawY = top;
+                    if (rotated)
+                    {
+                        if (img.Tag is PointLatLng tileGeo)
+                        {
+                            // 정석: 타일 geo → 비절단 core-local (베이스 타일과 동일 격자)
+                            var core = FromLatLngToCoreLocal(tileGeo);
+                            drawX = core.X; drawY = core.Y;
+                        }
+                        else
+                        {
+                            // 과도기 폴백(Tag 미보유 stale 타일): 절단 좌표 역회전 — 다음 Refresh서 정상화
+                            var back = rotInv.Transform(new Point(left, top));
+                            drawX = back.X; drawY = back.Y;
+                        }
+                    }
 
-                if (opacity < 1.0)
-                    drawingContext.Pop();
+                    var rect = new Rect(drawX, drawY, img.Width, img.Height);
+
+                    if (opacity < 1.0)
+                        drawingContext.PushOpacity(opacity);
+
+                    drawingContext.DrawImage(img.Source, rect);
+
+                    if (opacity < 1.0)
+                        drawingContext.Pop();
+                }
             }
+        }
+        finally
+        {
+            if (rotated) drawingContext.Pop();
         }
     }
 

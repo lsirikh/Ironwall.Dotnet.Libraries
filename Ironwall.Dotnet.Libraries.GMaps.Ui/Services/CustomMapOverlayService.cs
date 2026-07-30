@@ -275,9 +275,10 @@ public class CustomMapOverlayService : IDisposable
 
             if (state.VisibleTiles.TryGetValue(key, out var existingImg))
             {
-                // 기존 타일: 좌표만 갱신 (패닝 시 위치 동기화)
+                // 기존 타일: 좌표만 갱신 (패닝 시 위치 동기화) + geo Tag 보강(FR-15 과도기 타일)
                 Canvas.SetLeft(existingImg, pixelPoint.X);
                 Canvas.SetTop(existingImg, pixelPoint.Y);
+                existingImg.Tag ??= tileLatLng;
                 continue;
             }
 
@@ -291,6 +292,9 @@ public class CustomMapOverlayService : IDisposable
                 Width = 256,
                 Height = 256,
                 IsHitTestVisible = false,
+                // [Rotation FR-15] 타일 좌상단 geo 보존 — 회전 렌더가 비절단 core-local을
+                // 재산출할 원천(절단된 Canvas 좌표 재사용 금지 — V-08 후보A 탈락 근거).
+                Tag = tileLatLng,
             };
 
             Canvas.SetLeft(img, pixelPoint.X);
