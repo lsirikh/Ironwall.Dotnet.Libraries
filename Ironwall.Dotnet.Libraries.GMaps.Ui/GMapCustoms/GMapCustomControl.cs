@@ -602,9 +602,21 @@ public class GMapCustomControl : GMapControl
     private RectLatLng? _anchorSiteRect;
 
     /// <summary>앵커 사이트 사각형 설정(활성) 또는 해제(null). 즉시 현재 뷰포트로 inset을 계산해 BoundsOfMap에 반영.
-    /// MapViewModel.ApplyMapAnchor에서 호출.</summary>
+    /// MapViewModel.ApplyMapAnchor에서 호출.
+    /// [FR-02 원자 전이] 활성 시: 정북 강제(reset, 0은 게이트 무관 항상 허용) → verify 0 → 앵커 활성.
+    /// 활성 이후엔 회전 SSOT(ApplyMapRotation)가 anchorActive 게이트로 0 아닌 회전을 차단(V-06).</summary>
     public void SetAnchorSite(RectLatLng? site)
     {
+        if (site != null && Math.Abs(Bearing) > (float)Utils.RotationMath.Epsilon)
+        {
+            // 잠근 사이트 = 정립 표시 정책 — 앵커 걸기 전에 정북 강제(0은 항상 허용 경로)
+            SetMapRotation(0);
+            if (Math.Abs(Bearing) > (float)Utils.RotationMath.Epsilon)
+            {
+                _log?.Error($"앵커 활성 실패: 정북 강제 후에도 Bearing={Bearing:F2} — 활성 중단(불일치 방지)");
+                return;
+            }
+        }
         _anchorSiteRect = site;
         RecomputeAnchorViewportBounds();
     }
@@ -1989,15 +2001,30 @@ public class GMapCustomControl : GMapControl
     #region Handle Detection Methods
 
     /// <summary>
-    /// 이미지 화면 사각형(AABB) 계산. bounds → FromLatLngToLocal. (NFR-1 공통 헬퍼)
+    /// 이미지 화면 사각형(AABB) 계산 — 4모서리 min/max(항상 양수 W/H). (NFR-1 공통 헬퍼)
+    /// [FR-01 크래시 가드 / R-01] 종전 2모서리 대각 차 방식은 회전(Bearing≠0) 시 음수 폭/높이로
+    /// Rect가 ArgumentException을 던져 클릭마다 앱이 죽던 Critical 경로 — 4모서리 AABB로 대체.
+    /// Bearing=0에선 기존과 동일 결과(비회전 회귀 0, NFR-04). 방어: 예외 시 Rect.Empty(히트 false).
+    /// ※ 정확한 회전 렌더/히트는 P3 ProjectedQuad(FR-07)에서 — 본 가드는 크래시 차단이 목적.
     /// </summary>
     private Rect GetImageScreenRect(GMapCustomImage image)
     {
-        var bounds = image.ImageBounds;
-        var topLeft = FromLatLngToLocal(bounds.LocationTopLeft);
-        var bottomRight = FromLatLngToLocal(bounds.LocationRightBottom);
-        return new Rect(topLeft.X, topLeft.Y,
-            bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
+        try
+        {
+            var b = image.ImageBounds;
+            var tl = FromLatLngToLocal(b.LocationTopLeft);
+            var br = FromLatLngToLocal(b.LocationRightBottom);
+            var tr = FromLatLngToLocal(new PointLatLng(b.Lat, b.Lng + b.WidthLng));
+            var bl = FromLatLngToLocal(new PointLatLng(b.Lat - b.HeightLat, b.Lng));
+            return Utils.RotationMath.AabbOf(
+                new Point(tl.X, tl.Y), new Point(tr.X, tr.Y),
+                new Point(br.X, br.Y), new Point(bl.X, bl.Y));
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"GetImageScreenRect 실패(가드): {ex.Message}");
+            return Rect.Empty;
+        }
     }
 
     /// <summary>
@@ -2559,17 +2586,45 @@ public class GMapCustomControl : GMapControl
         SetMapRotation(0);
     }
 
+    // [FR-01 SSOT] DP 교정 재진입 가드 — ApplyMapRotation 안에서 MapRotation을 canonical로
+    // 되돌릴 때 중첩 콜백을 무시한다(무한루프 방지). 모든 회전 경로(RotateMap/SetMapRotation/
+    // ResetRotation/XAML 바인딩/직접 DP 세트)는 DP 콜백 → 이 메서드 하나로 수렴한다.
+    private bool _rotationCoercing;
+
     /// <summary>
-    /// 지도 회전 적용
+    /// 지도 회전 적용 — 회전 SSOT 단일 진입점(FR-01). 게이트(kill-switch FR-03 + 앵커 잠금 FR-02)
+    /// → canonical [-180,180) 정규화 → DP 교정(MapRotation≠Bearing 불일치 방지, R-09) → Bearing 적용.
+    /// 차단 시 DP를 직전 canonical(Bearing)로 되돌려 소비처(나침반·텍스트·스냅게이트·IsRotated)가
+    /// 항상 정규화 값을 읽게 한다.
     /// </summary>
     private void ApplyMapRotation(double rotation)
     {
+        if (_rotationCoercing) return;   // canonical 교정 중 중첩 콜백 무시
         try
         {
-            rotation = NormalizeAngle(rotation);
-            Bearing = (float)rotation;
+            var applied = Utils.RotationMath.Decide(rotation, Utils.RotationFeature.IsEnabled, _anchorSiteRect != null);
+            if (applied == null)
+            {
+                // 차단(kill-switch OFF 또는 앵커 활성) — DP를 직전 canonical로 복원(no-op)
+                _rotationCoercing = true;
+                try { MapRotation = Bearing; } finally { _rotationCoercing = false; }
+                _log?.Info($"지도 회전 차단(no-op): 요청 {rotation:F1}도 — feature={Utils.RotationFeature.IsEnabled}, anchor={_anchorSiteRect != null}");
+                return;
+            }
+
+            double canonical = applied.Value;
+            if (Math.Abs(canonical - rotation) > Utils.RotationMath.Epsilon)
+            {
+                // 요청값이 비정규(365도 등) — DP를 canonical로 교정(소비처 통일, R-09)
+                _rotationCoercing = true;
+                try { MapRotation = canonical; } finally { _rotationCoercing = false; }
+            }
+
+            if (Utils.RotationMath.AreClose(Bearing, canonical)) return;   // ε-가드: 중복 적용 스킵
+
+            Bearing = (float)canonical;
             UpdateOverlaysAfterRotation();
-            _log?.Info($"지도 회전 적용: {rotation:F1}도");
+            _log?.Info($"지도 회전 적용: {canonical:F1}도");
         }
         catch (Exception ex)
         {
@@ -3212,19 +3267,13 @@ public class GMapCustomControl : GMapControl
     #region Public Methods
 
     /// <summary>
-    /// 두 점을 연결하는 선에 맞춰 회전
+    /// 두 점을 연결하는 선에 맞춰 회전 — [FR-01 v1 비활성] 회전 SSOT 정비 전까지 다중 진입점
+    /// 축소(PRD GMap_Rotation_Full_Sync §3.4). 스크린 좌표 기반 각도 산출이 회전 상태에서
+    /// 자기참조(현재 회전 포함 투영)라 검증 전 사용 금지. 필요 시 후속 FR로 재설계.
     /// </summary>
     public void AlignToLine(PointLatLng point1, PointLatLng point2)
     {
-        var screenPoint1 = FromLatLngToLocal(point1);
-        var screenPoint2 = FromLatLngToLocal(point2);
-
-        double deltaX = screenPoint2.X - screenPoint1.X;
-        double deltaY = screenPoint2.Y - screenPoint1.Y;
-        double angle = Math.Atan2(deltaY, deltaX) * 180 / Math.PI - 90;
-
-        SetMapRotation(angle);
-        _log?.Info($"선분 정렬 회전: {angle:F1}도");
+        _log?.Warning($"AlignToLine 비활성(v1) — 회전 SSOT 정비 전 다중 진입점 차단(FR-01)");
     }
 
     /// <summary>

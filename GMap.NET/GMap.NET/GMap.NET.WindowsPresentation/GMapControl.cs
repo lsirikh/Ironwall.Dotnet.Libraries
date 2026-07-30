@@ -1723,10 +1723,13 @@ namespace GMap.NET.WindowsPresentation
                 var p1 = FromLatLngToLocal(SelectedArea.LocationTopLeft);
                 var p2 = FromLatLngToLocal(SelectedArea.LocationRightBottom);
 
-                long x1 = p1.X;
-                long y1 = p1.Y;
-                long x2 = p2.X;
-                long y2 = p2.Y;
+                // [Rotation_Full_Sync FR-09 / R-39] 회전 시 투영된 두 코너가 역전되어
+                // x2<x1 / y2<y1 이 되면 음수 크기 Rect/반지름이 ArgumentException을 던진다 —
+                // min/max 정규화로 크래시 가드(비회전 시 기존과 동일).
+                long x1 = Math.Min(p1.X, p2.X);
+                long y1 = Math.Min(p1.Y, p2.Y);
+                long x2 = Math.Max(p1.X, p2.X);
+                long y2 = Math.Max(p1.Y, p2.Y);
 
                 if (SelectionUseCircle)
                 {
@@ -1870,7 +1873,11 @@ namespace GMap.NET.WindowsPresentation
 
             if (MouseWheelZoomEnabled && (IsMouseDirectlyOver || IgnoreMarkerOnMouseWheel) && !_core.IsDragging)
             {
-                var p = e.GetPosition(this);
+                // [Rotation_Full_Sync FR-10 / R-02] raw 커서 좌표 보존 — FromLocalToLatLng는
+                // 내부에서 scale/rotation 역변환을 스스로 적용하므로(2754-2772), 여기서 미리
+                // 역변환한 p를 다시 넘기면 회전 시 역행렬이 2중 적용되어 줌 중심이 튄다.
+                var raw = e.GetPosition(this);
+                var p = raw;
 
                 if (MapScaleTransform != null)
                 {
@@ -1883,7 +1890,7 @@ namespace GMap.NET.WindowsPresentation
                 {
                     if (MouseWheelZoomType == MouseWheelZoomType.MousePositionAndCenter)
                     {
-                        Position = FromLocalToLatLng((int)p.X, (int)p.Y);
+                        Position = FromLocalToLatLng((int)raw.X, (int)raw.Y);   // raw — 역변환은 함수 내부 1회만
                     }
                     else if (MouseWheelZoomType == MouseWheelZoomType.ViewCenter)
                     {
@@ -1891,7 +1898,7 @@ namespace GMap.NET.WindowsPresentation
                     }
                     else if (MouseWheelZoomType == MouseWheelZoomType.MousePositionWithoutCenter)
                     {
-                        Position = FromLocalToLatLng((int)p.X, (int)p.Y);
+                        Position = FromLocalToLatLng((int)raw.X, (int)raw.Y);   // raw — 상동
                     }
 
                     _core.MouseLastZoom.X = (int)p.X;
@@ -2764,8 +2771,9 @@ namespace GMap.NET.WindowsPresentation
             {
                 var f = _rotationMatrixInvert.Transform(new Point(x, y));
 
-                x = (int)f.X;
-                y = (int)f.Y;
+                // [Rotation_Full_Sync FR-06 / R-38] 절삭((int))은 0쪽 편향+왕복 비가역 → 반올림
+                x = (int)Math.Round(f.X);
+                y = (int)Math.Round(f.Y);
             }
 
             return _core.FromLocalToLatLng(x, y);
@@ -2786,8 +2794,9 @@ namespace GMap.NET.WindowsPresentation
             {
                 var f = _rotationMatrix.Transform(new Point(ret.X, ret.Y));
 
-                ret.X = (int)f.X;
-                ret.Y = (int)f.Y;
+                // [Rotation_Full_Sync FR-06 / R-38] 절삭((int))은 0쪽 편향+왕복 비가역 → 반올림
+                ret.X = (int)Math.Round(f.X);
+                ret.Y = (int)Math.Round(f.Y);
             }
 
             return ret;
