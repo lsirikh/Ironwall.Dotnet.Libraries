@@ -4790,6 +4790,7 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         SetInitialHomePosition();
+        LoadMapCompassFromSettings();   // [Compass FR-08] 나침반 위치/설정 복원(파셜, 저장 억제 내장)
         ScheduleBootViewportResync();
     }
 

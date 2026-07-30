@@ -968,6 +968,23 @@
 				Grid.ColumnSpan="2"
 				Panel.ZIndex="200">
 
+				<!--  방위각 심볼(나침반) — GMap_Compass_Control PRD v1.0. 계기층 z6(D-03):
+				      리더선(5) 위 · 카메라 팝업(10)/OverlayWindow 패널(20~120)/제어 허브(210) 아래.
+				      RotationFeature OFF=Collapsed(컨트롤 자체 게이트) → 비회전 회귀 0(NFR-01).
+				      위치/설정 영속=VM(MapCompassX/Y 등 TwoWay + SaveMapCompassCommand).  -->
+				<!--  Canvas.Left/Top은 컨트롤이 직접 세팅(UpdateDisplayPosition) — 표시=클램프,
+				      CompassX/Y=영속 원본(desired) 분리로 작은 창 부팅 시 저장 좌표 훼손 방지(리뷰 #4).  -->
+				<ctrl:GMapCompassControl
+					x:Name="MapCompass"
+					Panel.ZIndex="6"
+					CompassX="{Binding MapCompassX, Mode=TwoWay}"
+					CompassY="{Binding MapCompassY, Mode=TwoWay}"
+					DialSize="{Binding CompassDialSize, Mode=TwoWay}"
+					DragCompletedCommand="{Binding SaveMapCompassCommand}"
+					IsReadoutVisible="{Binding CompassShowReadout, Mode=TwoWay}"
+					SettingsChangedCommand="{Binding SaveMapCompassCommand}"
+					TargetMap="{Binding ElementName=MainMap}"
+					Variant="{Binding CompassVariant, Mode=TwoWay}" />
 
 				<!--  심볼 속성 창  -->
 				<ContentPresenter

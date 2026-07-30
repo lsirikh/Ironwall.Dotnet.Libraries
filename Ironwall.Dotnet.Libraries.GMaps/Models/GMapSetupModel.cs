@@ -55,6 +55,7 @@ public class GMapSetupModel : IGMapSetupModel
         HomePosition = source.HomePosition;
         MapAnchor = source.MapAnchor;
         MapRotation = source.MapRotation;
+        MapCompass = source.MapCompass;
         MapType = source.MapType;
         MapMode = source.MapMode;
         MapName = source.MapName;
@@ -75,6 +76,7 @@ public class GMapSetupModel : IGMapSetupModel
     public HomePositionModel? HomePosition { get; set; }
     public MapAnchorModel? MapAnchor { get; set; }
     public MapRotationModel? MapRotation { get; set; }
+    public MapCompassModel? MapCompass { get; set; }
     public string? MapType { get; set; }
     public string? MapMode { get; set; }
     public string? MapName { get; set; }

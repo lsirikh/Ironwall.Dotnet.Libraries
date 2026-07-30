@@ -56,6 +56,15 @@ public static class MapSettingsHelper
     }
 
     /// <summary>
+    /// 방위각 심볼(나침반 컨트롤) 위치+설정을 JSON에 저장 (AppSettings.MapCompass) —
+    /// GMap_Compass_Control FR-08. 부팅 복원은 MapViewModel.
+    /// </summary>
+    public static async Task SaveMapCompassAsync(MapCompassModel compass, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapCompass", compass, log);
+    }
+
+    /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>
     public static async Task SaveMapTypeAsync(string mapType, ILogService? log = default)
