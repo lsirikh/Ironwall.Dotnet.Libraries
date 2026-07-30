@@ -3155,9 +3155,10 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>회전 kill-switch 상태(툴바 토글 IsChecked 바인딩) — 기본 OFF(FR-03).</summary>
     public bool IsRotationFeatureEnabled => Utils.RotationFeature.IsEnabled;
 
-    /// <summary>회전 토글 버튼 활성 여부 — '회전 비허용(A모드)' 앵커 활성 중에만 비활성(V-06 옵션C).
-    /// 회전 허용(B모드) 앵커면 버튼·회전 입력 모두 정상. ApplyMapAnchor의 SetAnchorSite 호출 뒤 통지.</summary>
-    public bool IsRotationToggleEnabled => !(MainMap?.IsRotationLockedByAnchor ?? false);
+    /// <summary>회전 토글 버튼 활성 여부 — [사용자 요구 2026-07-28] 앵커(사이트 고정) 활성 중엔
+    /// 모드 무관 토글 잠금: B모드=ON인 채 잠김(회전 '입력'은 계속 가능), A모드=OFF인 채 잠김.
+    /// 해제하려면 앵커부터 해제. ApplyMapAnchor의 SetAnchorSite 호출 뒤 통지.</summary>
+    public bool IsRotationToggleEnabled => !(MainMap?.IsAnchorActive ?? false);
 
     /// <summary>[사용자 요구 2026-07-28] 앵커 '회전 허용' 체크박스 편집 가능 여부 — 나침반(회전 기능)
     /// ON이면 강제 체크+잠금(수정 불가 — 해제 시 A모드 정북 강제 사고 방지). OFF면 자유 편집.</summary>

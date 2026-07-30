@@ -1684,14 +1684,7 @@ public class GMapCustomControl : GMapControl
         // ToggleRotationFeature(단일 진실원) 경유. flag 기본값은 여전히 OFF(부팅 시 회전 불가).
         if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.R)
         {
-            // [일관성] A모드 앵커 잠금 중엔 키보드도 버튼(비활성)과 동일하게 무시 — 버튼만 막고
-            // 키보드로 우회되면 상태가 어긋난다(사용자 "버튼 풀림→앵커 꼬임" 보고 방어).
-            if (IsRotationLockedByAnchor)
-            {
-                _log?.Info("[Rotation] 토글 무시 — 사이트 고정(A모드) 회전 잠금 중");
-                e.Handled = true;
-                return;
-            }
+            // 앵커 활성 잠금은 ToggleRotationFeature 내부 가드(단일 진실원)가 처리 — 키보드/버튼 동일.
             ToggleRotationFeature();
             e.Handled = true;
             return;
@@ -2830,9 +2823,16 @@ public class GMapCustomControl : GMapControl
     public bool IsRotationLockedByAnchor => _anchorSiteRect != null && !_anchorAllowsRotation;
 
     /// <summary>회전 kill-switch 토글(FR-03/18 단일 진실원) — 키보드(Ctrl+Shift+R)와 툴바 버튼 공용.
-    /// OFF 전환 = 즉시 정북 복귀(0은 게이트 무관 항상 허용 — 안전 복구 경로). 반환=새 상태.</summary>
+    /// OFF 전환 = 즉시 정북 복귀(0은 게이트 무관 항상 허용 — 안전 복구 경로). 반환=새(현) 상태.
+    /// [사용자 요구 2026-07-28] 앵커(사이트 고정) 활성 중엔 모드 무관 토글 잠금 — B모드에서
+    /// 나침반을 끄면 정북 리셋이 회전 유지 앵커와 꼬인다. 해제하려면 앵커부터 해제.</summary>
     public bool ToggleRotationFeature()
     {
+        if (IsAnchorActive)
+        {
+            _log?.Info("[Rotation] 토글 잠금 — 사이트 고정 중(앵커 해제 후 변경 가능)");
+            return Utils.RotationFeature.IsEnabled;
+        }
         Utils.RotationFeature.IsEnabled = !Utils.RotationFeature.IsEnabled;
         if (!Utils.RotationFeature.IsEnabled) ResetRotation();
         _log?.Info($"[Rotation] kill-switch 토글: {(Utils.RotationFeature.IsEnabled ? "ON — Shift+휠/Ctrl+←→ 회전 가능" : "OFF — 정북 복귀·입력 차단")}");
