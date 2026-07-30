@@ -25,7 +25,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 ///   PART_Rose를 −Bearing 회전. 구독 수명=Loaded/Unloaded 대칭(재열림 사망 함정 방지).
 /// - 표시 게이트: <see cref="RotationFeature.IsEnabled"/> OFF=Collapsed(FR-03, 비회전 회귀 0).
 /// - 본체(내부 원) 드래그=이동(허브 8px 데드존·클램프 패턴), 외곽 링(r≥80%) 드래그=지도 회전(FR-06,
-///   앵커 A모드 잠금 시 무시), 더블클릭=정북(FR-05), 우클릭=설정 메뉴(FR-07, e.Handled).
+///   앵커 A모드 잠금 시 무시), 더블클릭=정북(FR-05 — 앵커 중 비활성), 우클릭=설정 메뉴(FR-07, e.Handled,
+///   "정북 복귀" 항목도 앵커 중 비활성+안내 툴팁).
 /// - 위치/설정 영속은 호스트(MapViewModel) 몫 — <see cref="DragCompletedCommand"/>/<see cref="SettingsChangedCommand"/>.
 /// </para>
 /// </summary>
@@ -41,6 +42,7 @@ public class GMapCompassControl : Control
     private Canvas? _tickHost;
     private Canvas? _parentCanvas;
     private ContextMenu? _menu;
+    private MenuItem? _northMenuItem;    // "정북 복귀" — 앵커 중 비활성 갱신용(메뉴는 1회 생성·재사용)
 
     private bool _pressed;
     private bool _dragging;
@@ -430,7 +432,10 @@ public class GMapCompassControl : Control
         {
             // 더블클릭 정북은 '드래그로 승격되지 않은' Up에서만 실행 — 두 번째 다운 즉시 발동 시
             // 이동 드래그에 무음 회전 리셋이 편승하는 문제 차단(리뷰 #3).
-            TargetMap?.SetMapRotation(0);   // 0은 게이트 무관 항상 허용 = 안전 경로(FR-05)
+            // 사이트 고정(앵커) 중에는 정북 복귀 비활성(사용자 결정 2026-07-30) — 화면 각은 앵커가
+            // 소유하므로 수동 개입을 차단한다(SSOT 게이트의 0-항상허용은 앵커 강제 정립용이라 유지).
+            if (TargetMap?.IsAnchorActive != true)
+                TargetMap?.SetMapRotation(0);   // 0은 게이트 무관 항상 허용 = 안전 경로(FR-05)
         }
         e.Handled = true;
     }
@@ -458,6 +463,15 @@ public class GMapCompassControl : Control
     {
         _menu ??= BuildSettingsMenu();
         SyncMenuChecks();
+        // 사이트 고정(앵커) 중 "정북 복귀" 비활성(사용자 결정 2026-07-30) — 메뉴는 재사용되므로 열 때마다 갱신.
+        if (_northMenuItem != null)
+        {
+            bool anchored = TargetMap?.IsAnchorActive == true;
+            _northMenuItem.IsEnabled = !anchored;
+            _northMenuItem.ToolTip = anchored
+                ? "사이트 고정(앵커) 중에는 사용할 수 없습니다 — 앵커 해제 후 사용하세요"
+                : null;
+        }
         _menu.PlacementTarget = this;
         _menu.IsOpen = true;
     }
@@ -484,7 +498,10 @@ public class GMapCompassControl : Control
         menu.Items.Add(new Separator());
 
         var north = new MenuItem { Header = "정북 복귀" };
-        north.Click += (_, __) => TargetMap?.SetMapRotation(0);
+        // 앵커 중 클릭 방어(이중 안전) — IsEnabled 갱신은 ShowSettingsMenu가 담당
+        north.Click += (_, __) => { if (TargetMap?.IsAnchorActive != true) TargetMap?.SetMapRotation(0); };
+        ToolTipService.SetShowOnDisabled(north, true);
+        _northMenuItem = north;
         menu.Items.Add(north);
 
         return menu;

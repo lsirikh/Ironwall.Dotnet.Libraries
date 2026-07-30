@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-07-30 (advance-phase 자동)
-- **총 문서 수**: 416개
+- **총 문서 수**: 417개
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [GMap_Rotation_P0_Spikes_V02_V08-analysis.md](analyses/GMap_Rotation_P0_Spikes_V02_V08-analysis.md) | 회전 P0 스파이크 실측 — V-02 NaN=int.MinValue · V-08 후보B 픽셀퍼펙트 채택 | 2026-07-28 |
 | [GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md](analyses/GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md) | GMap_Rotation_Full_Sync_PRD_Adversarial_Review | 2026-07-28 |
 | [GMap_Rotation_Enable_BugInventory_v2-analysis.md](analyses/GMap_Rotation_Enable_BugInventory_v2-analysis.md) | GMap_Rotation_Enable_BugInventory_v2 | 2026-07-28 |
 | [CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md](analyses/CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md) | CameraPopup_PanClamp_Badge_OnvifPtz | 2026-07-23 |
@@ -27,7 +28,7 @@
 | [GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md](analyses/GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md) | GMap_UI_Edit_Undo_Redo_MultiSelection | 2026-07-15 |
 | [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz | 2026-07-15 |
 | [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
-| [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-13 |
+| [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap (v2 — v1.5.2 재검증) | 2026-07-30 |
 | [GMap_RDP_Overlay_Desync-analysis.md](analyses/GMap_RDP_Overlay_Desync-analysis.md) | GMap_RDP_Overlay_Desync | 2026-07-07 |
 | [GOP_Server_API_rbac_matrix_gate_NOTIFY.md](analyses/GOP_Server_API_rbac_matrix_gate_NOTIFY.md) | GOP_Server_API_rbac_matrix_gate_NOTIFY.md | 2026-07-07 |
 | [Map_Edit_Undo_Redo-analysis.md](analyses/Map_Edit_Undo_Redo-analysis.md) | Map_Edit_Undo_Redo | 2026-07-02 |
@@ -58,6 +59,9 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | WINDY 롤백 복구·프록시 서버 해석·조준 실패 팝업 승격 | Approved | 2026-07-30 |
+| [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS NATS v1.5.2 REQ 전환+LAMP 제어 서비스 | Approved | 2026-07-30 |
+| [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | 방위각 심볼(나침반) CustomControl — 회전 싱크·드래그·링 회전·우클릭 설정·영속 | Approved·구현완료 | 2026-07-30 |
 | [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | GMap_Rotation_Full_Sync | Approved | 2026-07-30 |
 | [line-drawing-hud-redesign-prd.md](prds/line-drawing-hud-redesign-prd.md) | line-drawing-hud-redesign | Draft | 2026-07-28 |
 | [Measure_Tools-prd.md](prds/Measure_Tools-prd.md) | Measure_Tools | Approved | 2026-07-27 |
@@ -208,6 +212,9 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [GIS_Nats_v152_Req_Transition-prd-plan.md](plans/GIS_Nats_v152_Req_Transition-prd-plan.md) | [PRD](prds/GIS_Nats_v152_Req_Transition-prd.md) | 24/28 | 2026-07-30 |
+| [GMap_Compass_Control-prd-plan.md](plans/GMap_Compass_Control-prd-plan.md) | [PRD](prds/GMap_Compass_Control-prd.md) | 12/12 | 2026-07-30 |
+| [GMap_Rotation_Full_Sync-prd-plan.md](plans/GMap_Rotation_Full_Sync-prd-plan.md) | [PRD](prds/GMap_Rotation_Full_Sync-prd.md) | 0/53 | 2026-07-30 |
 | [line-drawing-hud-redesign-prd-plan.md](plans/line-drawing-hud-redesign-prd-plan.md) | [PRD](prds/line-drawing-hud-redesign-prd.md) | 15/21 | 2026-07-28 |
 | [Measure_Tools-prd-plan.md](plans/Measure_Tools-prd-plan.md) | [PRD](prds/Measure_Tools-prd.md) | 0/21 | 2026-07-27 |
 | [CameraPopup_ControlHub-prd-plan.md](plans/CameraPopup_ControlHub-prd-plan.md) | [PRD](prds/CameraPopup_ControlHub-prd.md) | 19/19 | 2026-07-27 |
@@ -307,6 +314,7 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
+| [GMap_Rotation_E2E2-scenarios.md](tests/GMap_Rotation_E2E2-scenarios.md) | 육안 시나리오(사용자 실행 대기) | -% | 2026-07-30 |
 | [GMap_Anchor_Viewport_Lock-test-result.md](tests/GMap_Anchor_Viewport_Lock-test-result.md) | -% | -% | 2026-07-19 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md](tests/GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md) | -% | -% | 2026-07-18 |
 | [GMap_Edit_Integration_Sim-test-result.md](tests/GMap_Edit_Integration_Sim-test-result.md) | -% | -% | 2026-07-05 |
@@ -459,6 +467,7 @@
 
 | 파일 | 내용 | 날짜 |
 |------|------|------|
+| [GMap_Compass_Control-wireframe.html](design/GMap_Compass_Control-wireframe.html) | 방위각 심볼(나침반) CustomControl 와이어프레임 **v2.2** — 레이어링 확정안(PropertyPanelCanvas 자식 z6=계기층, OverlayWindow/팝업/허브 아래, 최상위 비권장 근거 3)· Theme 실토큰(Dark/Light 미러)+🌙/☀ 토글·토큰 매핑표·라이브 데모(θ·드래그 이동·링 회전·더블클릭 정북·**우클릭 설정 메뉴**=사용자 확정: 크기 S/M/L·스타일·각도표시·정북, AppSettings.MapCompass 영속 제안)·변형 A로즈/B링·해부도·설계·미결질문 5 | 2026-07-30 |
 | [line-drawing-hud-redesign-preview.html](design/line-drawing-hud-redesign-preview.html) | 라인·구역·PIDS 드로잉 HUD 리디자인 프리뷰 — 표준 패널 패턴(시안 헤더+우상단 X 닫기)·다크/라이트 Tactical 토큰·Before/After·위치 유지 버그 before/after·토큰 매핑 | 2026-07-28 |
 | [Measure_Tools_Storyboard.html](design/Measure_Tools_Storyboard.html) | 측정 툴(길이·넓이) 스토리보드·와이어프레임 v0.1 — 탑메뉴 「측정」 그룹(Ruler/VectorPolygon)·클릭→실시간 리드아웃→완료 플로우·지오데식 거리/면적·다크/라이트 토큰·재사용맵(LineDrawingAdorner 포크)·미결질문 7 | 2026-07-24 |
 | [Detection_Signal_History_Storyboard.html](design/Detection_Signal_History_Storyboard.html) | 탐지 신호(detail.signal) 표면화 와이어프레임 & 스토리보드 v2 — 이력그리드 신호컬럼(+MessageType 제거)·카드 병기·우클릭 진입 2종(심볼/DevicePanel)·팝업 다이얼로그(차트+그리드)·다크/라이트 토글 | 2026-07-23 |

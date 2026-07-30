@@ -14,7 +14,30 @@
 
 ## [Unreleased]
 
+### Changed
+- **사이트 고정(앵커) 중 "정북 복귀" 비활성화** (Track B · GMaps.Ui 한정 · 사용자 결정 2026-07-30)
+  - 앵커 활성(`IsAnchorActive`) 중에는 화면 각을 앵커가 소유하므로 수동 정북 개입을 차단: ①나침반 **더블클릭 정북** 무시 ②나침반 우클릭 메뉴 **"정북 복귀" 항목 비활성**(+"앵커 해제 후 사용" 안내 툴팁, 클릭 이중 방어) ③미바인딩 `ResetRotationCommand`의 CanExecute도 동일 게이트(향후 배선 대비).
+  - SSOT 게이트의 "0(정북)은 항상 허용"은 **유지** — 앵커 자신의 정북 강제·kill-switch OFF 복구가 쓰는 안전 경로라 UI 트리거만 차단.
+  - 검증: 빌드 0오류 · GMaps.Ui 370개 중 369 green(실패 1=EditRecorder 기존 기준선, 나침반 테스트 32종 포함 회귀 0). ⚠앱 재빌드 후 런타임 육안(앵커 ON→나침반 더블클릭 무반응·메뉴 항목 회색).
+
+### Fixed
+- **풍량모드(WINDY) 실패 시 라디오 미복원 + 프록시 서버 하드코딩 + 조준 실패 팝업 승격(GOP_Nats_Req_Failure_UX)** ([PRD](docs/prds/GOP_Nats_Req_Failure_UX-prd.md) · [Plan](docs/plans/GOP_Nats_Req_Failure_UX-prd-plan.md) · 태그 `before-windy-rollback-fix` · 라이브러리 2파일+메인솔루션 3파일)
+  - **원인(전부 실측)**: ① proxy-settings 조회가 `serverId=1` 하드코딩(스펙 §8.8 예시 복사) — 실제 servers 테이블에 id=1 없음 → 404 ② 재조회 실패 시 롤백 폴백 없음 + 클릭 즉시 이전 모드 소실 ③ 서버 v6 에러 봉투(`error.message`)를 안 읽어 실패 사유가 빈 문자열.
+  - **FR-1 프록시 서버 해석기**: 카테고리 목록에서 `type_server=PROXY`를 찾아 `ServerProvider`(로그인 후 전 서버 캐시)에서 해당 서버 id를 해석(사용자 지정 흐름). 캐시 + `SYNC_SERVER`/`SYNC_CATEGORY` 수신 시 무효화(`OnServerTopologyChanged` 훅 신설) + 404 자가치유. 미등록 시 "프록시 서버가 서버 관리에 등록되어 있지 않습니다" 사유 표면화.
+  - **FR-2 로컬 롤백 폴백**: `SendWindyModeMessage`에 PrevMode 추가(하위호환) — REQ 실패+REST 재조회까지 실패한 이중 장애 시 클릭 전 모드로 라디오 복원(팝업의 "되돌립니다" 약속 보장).
+  - **FR-3/FR-4**: 실패 사유에 `Error.Message` 사용(빈 사유 금지) · 부팅 무토큰 proxy-settings 조회를 로그인 후(`AllDevicesLoadedMessage`)로 게이팅 — 401+BearerAuthHandler 세션만료 오발화 제거.
+  - **FR-5 조준 실패 팝업 승격(사용자 확정)**: 특정위치확인(PTZ_AIM_LOCATION) 실패 시 2.5초 배너 대신 WINDY와 동일한 표준 팝업으로 통지, 성공은 배너 유지.
+  - **데이터 선행**: 테스트 서버에 PROXY 카테고리(id=11)+프록시 서버(id=17, PROXY-ab0101) 등록·lazy 생성 검증 완료. ⚠**현장 배포 시에도 type_server=PROXY 서버 등록 필요**(배포 체크리스트).
+  - **검증**: 빌드 0오류(양 레포) · 메인 테스트 53개 중 45 green(8 skip 기존)+신규 해석기 테스트 5종 · GMaps.Ui 337/338(기준선 1 제외 green, 회귀 0). ⚠런타임 육안(풍량 실패→사유 팝업+라디오 복원 / 조준 실패→팝업)은 앱 재빌드 후.
+
 ### Added
+- **방위각 심볼(나침반) CustomControl(GMap_Compass_Control)** ([PRD](docs/prds/GMap_Compass_Control-prd.md) · [Plan](docs/plans/GMap_Compass_Control-prd-plan.md) · [와이어프레임 v2.2](docs/design/GMap_Compass_Control-wireframe.html) · 태그 `before-compass-control` · v2.6 `731d8d4`+메인솔루션 `0cfe61e`)
+  - **GMapCompassControl**(templated, Generic.xaml): 고정 베젤/러버라인(Accent)+회전 로즈(−Bearing), 변형 A로즈/B링, S64/M96/L128, 눈금·기수문자 코드생성(SetResourceReference=라이브 테마), 리드아웃 canonical(`+035.0°`), 전 색상 DynamicResource 토큰.
+  - **싱크/게이트**: ViewportSnapshotPublisher 구독(Loaded/Unloaded 대칭) · RotationFeature OFF=Collapsed(비회전 회귀 0).
+  - **조작**: 본체 드래그 이동(8px 데드존+캔버스 클램프)·외곽 링 드래그=지도 회전(SSOT 게이트 경유, 앵커 잠금 시 무시)·더블클릭 정북(Up 시점 승격)·우클릭 설정 메뉴(크기/스타일/각도표시/정북).
+  - **영속**: `MapCompassModel {X,Y,Size,Variant,ShowReadout}` → AppSettings.MapCompass(복원 중 저장 억제 — 회전 영속 44bc6fc 교훈). 표시 클램프≠영속 좌표 분리(작은 창 부팅 시 저장 좌표 보존)+캔버스 리사이즈 재클램프.
+  - **레이어**: PropertyPanelCanvas 자식 z6 계기층(리더선 위·팝업/패널/허브 아래).
+  - **검증**: 적대 리뷰 워크플로(14에이전트) CONFIRMED 8건 전부 수정(캡처 유실 리셋·링 데드존·더블클릭 편승·좌표 소급훼손·투명 모서리 히트 등) · CompassMathTests 29케이스 · Compass/Rotation/Snapshot 72/72 · 양 레포 컴파일 0오류. ⚠런타임 육안=앱 재빌드 후(현재 앱 실행 중이라 출력 잠김).
 - **GIS NATS v1.5.2 REQ 전환 + 경광등 제어 서비스 신설(GIS_Nats_v152_Req_Transition)** ([PRD](docs/prds/GIS_Nats_v152_Req_Transition-prd.md) · [Plan](docs/plans/GIS_Nats_v152_Req_Transition-prd-plan.md) · [분석 v2](docs/analyses/GIS_Nats_Spec_Gap-analysis.md) · 태그 `before-gis-nats-req-transition` · Enums+Messages+GMaps.Ui+메인솔루션 1파일)
   - **공통 REQ 실행기(FR-01)**: 신규 `BrokerRequestClient`/`BrokerRequestResult` — m_type=REQ 봉투 발행→RSP 대기(기본 **5초**)→3분기(무응답/서버거부/성공), §6.9 서버 message 패턴→한글 안내문 매핑. Broadcast/Aim/Lamp 3개 서비스 공유.
   - **REQ 전환(FR-03~05)**: `BROADCAST_PLAY`/`BROADCAST_STOP`(스피커 심볼 메뉴)·`PTZ_AIM_LOCATION`(지도 클릭 조준)을 PUB fire-and-forget→**REQ+RSP 확인**으로 전환(v1.5.2 §6.4 통일 규칙). 실패 시 표준 팝업/조준 상태문구로 가시 통지 — 음원 실행은 성공 시에만 패널 닫힘, TTS는 비스펙 cmd라 PUB 유지(OQ-1, 서버 RSP 확인 대기).
