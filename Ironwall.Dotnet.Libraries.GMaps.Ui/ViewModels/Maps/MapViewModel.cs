@@ -286,6 +286,14 @@ public partial class MapViewModel : BasePanelViewModel,
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
             StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
 
+            // [회전 영속 2026-07-30] debounce 대기 중 종료 시 마지막 회전각 유실 방지 — 즉시 플러시.
+            // 종료 경로라 await(파일쓰기 도중 프로세스 종료로 인한 절단 방지 — appsettings 비원자적 쓰기 이력).
+            if (_rotationSaveTimer?.IsEnabled == true)
+            {
+                _rotationSaveTimer.Stop();
+                await SaveMapRotationState();
+            }
+
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
             // Adorner 시스템 정리
@@ -2543,6 +2551,11 @@ public partial class MapViewModel : BasePanelViewModel,
     // ── [회전 영속] 각도 저장 debounce — 휠 연속 회전 중 매 스텝 파일쓰기 방지(1초 정지 후 1회) ──
     private System.Windows.Threading.DispatcherTimer? _rotationSaveTimer;
     private double _lastSavedRotationAngle;
+    /// <summary>[회전 영속 버그 2026-07-30] 부팅 복원 중 저장 억제 — IsEnabled=true 세팅이
+    /// EnabledChanged 핸들러의 SaveMapRotationState()를 '각도 적용 전'(Bearing=0) 시점에 동기 발화시켜
+    /// Angle을 0.0으로 덮어쓰고, 직후 debounce는 _lastSavedRotationAngle 중복판정으로 스킵 →
+    /// 다음 재시작에서 회전 소실(정북 부팅 + 범위 밖 백지 노출). 복원 블록에서만 true.</summary>
+    private bool _suppressRotationSave;
 
     private void QueueRotationStateSave(double canonicalBearing)
     {
@@ -2551,14 +2564,15 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             _rotationSaveTimer = new System.Windows.Threading.DispatcherTimer
             { Interval = TimeSpan.FromSeconds(1.0) };
-            _rotationSaveTimer.Tick += (_, __) => { _rotationSaveTimer!.Stop(); SaveMapRotationState(); };
+            _rotationSaveTimer.Tick += (_, __) => { _rotationSaveTimer!.Stop(); _ = SaveMapRotationState(); };
         }
         _rotationSaveTimer.Stop();
         _rotationSaveTimer.Start();   // 재시작 = debounce
     }
 
-    /// <summary>회전 상태(나침반 ON/OFF + canonical 각도)를 AppSettings.MapRotation에 저장.</summary>
-    private void SaveMapRotationState()
+    /// <summary>회전 상태(나침반 ON/OFF + canonical 각도)를 AppSettings.MapRotation에 저장.
+    /// 반환 Task는 일반 경로에선 fire-and-forget, 종료 플러시에선 await(파일쓰기 절단 방지).</summary>
+    private Task SaveMapRotationState()
     {
         try
         {
@@ -2569,10 +2583,15 @@ public partial class MapViewModel : BasePanelViewModel,
             };
             _lastSavedRotationAngle = model.Angle;
             if (_setupModel != null) _setupModel.MapRotation = model;
-            _ = MapSettingsHelper.SaveMapRotationAsync(model, _log);
+            var task = MapSettingsHelper.SaveMapRotationAsync(model, _log);
             _log?.Info($"[Rotation] 상태 저장: {model}");
+            return task;
         }
-        catch (Exception ex) { _log?.Error($"[Rotation] 상태 저장 실패: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            _log?.Error($"[Rotation] 상태 저장 실패: {ex.Message}");
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음).</summary>
@@ -3147,8 +3166,9 @@ public partial class MapViewModel : BasePanelViewModel,
                 // [사용자 요구 2026-07-28] 나침반 ON이면 앵커 '회전 허용'은 강제 체크(+잠금) —
                 // 패널이 열려 있어도 즉시 반영(수정 불가 상태로 전환).
                 if (enabled) AnchorAllowRotation = true;
-                // [회전 영속] 토글 즉시 저장(각도는 스냅샷 debounce가 담당)
-                SaveMapRotationState();
+                // [회전 영속] 토글 즉시 저장(각도는 스냅샷 debounce가 담당).
+                // 단 부팅 복원 중엔 억제 — 각도 적용 전(Bearing=0) 저장이 Angle을 0으로 덮는 버그(2026-07-30).
+                if (!_suppressRotationSave) _ = SaveMapRotationState();
             });
     }
 
@@ -4741,10 +4761,18 @@ public partial class MapViewModel : BasePanelViewModel,
         var savedRotation = _setupModel?.MapRotation;
         if (savedRotation?.IsEnabled == true)
         {
-            Utils.RotationFeature.IsEnabled = true;
-            _lastSavedRotationAngle = savedRotation.Angle;
-            if (Math.Abs(savedRotation.Angle) > 0.01)
-                MainMap.SetMapRotation(savedRotation.Angle);
+            // [버그 수정 2026-07-30] IsEnabled=true가 EnabledChanged 핸들러의 즉시 저장을 동기 발화시키는데,
+            // 이 시점 Bearing은 아직 0이라 Angle=0.0으로 파일이 오염됨(다음 재시작 정북 부팅 + 백지 밴드).
+            // 복원 블록 전체를 저장 억제로 감싼다 — 이후 실사용 회전/토글 저장은 정상 동작.
+            _suppressRotationSave = true;
+            try
+            {
+                Utils.RotationFeature.IsEnabled = true;
+                _lastSavedRotationAngle = savedRotation.Angle;
+                if (Math.Abs(savedRotation.Angle) > 0.01)
+                    MainMap.SetMapRotation(savedRotation.Angle);
+            }
+            finally { _suppressRotationSave = false; }
             _log?.Info($"[Rotation] 상태 복원: {savedRotation}");
         }
 
