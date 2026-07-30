@@ -473,7 +473,10 @@ public class GMapCustomControl : GMapControl
             _mgrsOverlay.DrawMGRSGrid(drawingContext, ViewArea, (int)Zoom, this);
         }
 
-        if (IsSnapToGridEnabled)
+        // [R-41] 회전 중엔 격자 '표시'도 숨김 — 스냅 '계산' 게이트(GetSnappedPosition의
+        // |MapRotation|>0.1 비활성)와 일치. 축정렬 격자만 그려지고 흡착은 안 되는
+        // 표시/기능 불일치(사용자가 흡착된다고 오해) 제거.
+        if (IsSnapToGridEnabled && Math.Abs(MapRotation) <= 0.1)
         {
             _snapGridOverlay.DrawGrid(drawingContext, this, PixelsPerDip);
         }
