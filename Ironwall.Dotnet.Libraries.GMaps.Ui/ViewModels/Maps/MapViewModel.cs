@@ -286,6 +286,8 @@ public partial class MapViewModel : BasePanelViewModel,
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
             StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
 
+            _bootResyncTimer?.Stop();   // 부팅 재동기 재시도 타이머 정지(비활성 후 발화 방지)
+
             // [회전 영속 2026-07-30] debounce 대기 중 종료 시 마지막 회전각 유실 방지 — 즉시 플러시.
             // 종료 경로라 await(파일쓰기 도중 프로세스 종료로 인한 절단 방지 — appsettings 비원자적 쓰기 이력).
             if (_rotationSaveTimer?.IsEnabled == true)
@@ -4777,19 +4779,53 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         SetInitialHomePosition();
+        ScheduleBootViewportResync();
+    }
 
-        // [사용자 제안 2026-07-30] 로딩 완료 후 1회 자동 리프레시 — CCMS 시점(부팅/맵전환 로딩 중)엔
-        // 레이아웃·오버레이 활성화가 미완이라 복원 회전각/최종 크기 기준 타일세트가 어긋나 백지가 남고,
-        // 수동 줌·패닝을 해야 복구되던 문제. ApplicationIdle(렌더·레이아웃 완료 후)에 수동 줌과 동일한
-        // 리프레시 + 회전 스냅샷 재발행을 1회 수행한다.
-        _ = MainMap?.Dispatcher.BeginInvoke(
-            System.Windows.Threading.DispatcherPriority.ApplicationIdle,
-            new System.Action(() =>
+    // ── [사용자 제안 2026-07-30] 로딩 완료 후 1회 자동 리프레시(재시도형) ──
+    // ApplicationIdle 1회로는 부족했음(실측): 부팅 체인의 await 중에도 디스패처가 idle이 되어
+    // 코어 시작/레이아웃 완료 '전'에 발화 → 미시작 코어의 클램프 좌표로 ViewArea 위도폭 0
+    // (로그 view=(0.004088×0.000000)) → 리프레시가 무의미하게 소진되고 이후엔 아무도 재계산 안 함.
+    // ViewArea가 실제로 유효해질 때까지 250ms 간격 재시도(최대 10초) 후, 벤더 재동기 seam
+    // (RefreshRotationState: 코어 크기+RenderOffset+회전행렬) + 수동 줌과 동일 리프레시를 1회 수행.
+    private System.Windows.Threading.DispatcherTimer? _bootResyncTimer;
+    private int _bootResyncAttempts;
+
+    private void ScheduleBootViewportResync()
+    {
+        _bootResyncAttempts = 0;
+        if (_bootResyncTimer == null)
+        {
+            _bootResyncTimer = new System.Windows.Threading.DispatcherTimer
+            { Interval = TimeSpan.FromMilliseconds(250) };
+            _bootResyncTimer.Tick += (_, __) => TryBootViewportResync();
+        }
+        _bootResyncTimer.Stop();
+        _bootResyncTimer.Start();
+    }
+
+    private void TryBootViewportResync()
+    {
+        _bootResyncAttempts++;
+        var map = MainMap;
+        bool ready = map != null && map.IsLoaded && map.IsCoreStarted
+                     && map.ActualWidth > 0 && map.ActualHeight > 0;
+        if (!ready)
+        {
+            if (_bootResyncAttempts >= 40)
             {
-                if (MainMap == null) return;
-                MainMap.ResyncRotationDependents();   // 스냅샷 재발행 → 라벨/팝업/어도너 재투영
-                MainMap_OnMapZoomChanged();           // 줌 변경과 동일한 타일세트/스케일바 재계산
-            }));
+                _bootResyncTimer!.Stop();
+                _log?.Warning("[Rotation] 부팅 재동기 포기(10초) — 맵 코어/레이아웃 미준비");
+            }
+            return;
+        }
+
+        _bootResyncTimer!.Stop();
+        map!.RefreshRotationState();          // 코어 크기+RenderOffset+회전행렬 현재 레이아웃 기준 재정립
+        map.ResyncRotationDependents();       // 회전 스냅샷 재발행 → 라벨/팝업/어도너 재투영
+        MainMap_OnMapZoomChanged();           // 수동 줌과 동일: CTS 리셋+타일세트 재계산+스케일바
+        var view = map.ViewArea;
+        _log?.Info($"[Rotation] 부팅 재동기 완료(시도 {_bootResyncAttempts}): view=({view.WidthLng:F6}×{view.HeightLat:F6}) bearing={map.Bearing:F1}");
     }
 
     /// <summary>

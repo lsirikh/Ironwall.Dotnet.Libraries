@@ -2804,6 +2804,26 @@ namespace GMap.NET.WindowsPresentation
         /// <summary>현재 회전 행렬 값(비회전 시 Identity) — 오버레이 렌더 Push용.</summary>
         public Matrix RotationMatrixValue => IsRotated ? _rotationMatrix.Value : Matrix.Identity;
 
+        /// <summary>core 시작(OnMapOpen) 완료 여부 — 부팅 재동기 준비 판정용 seam.</summary>
+        public bool IsCoreStarted => _core.IsStarted;
+
+        // [Rotation_Full_Sync FR-19] 부팅 재동기 seam — 부팅 복원처럼 레이아웃/코어 시작 '이전'에
+        // Bearing이 설정되면 회전 행렬 중심(ActualWidth/2)과 코어 크기·RenderOffset이 stale로 남아
+        // ViewArea가 퇴화(위도폭 0)하고 오버레이 타일세트가 좁게 굳는다(수동 줌/패닝 시 자가치유).
+        // 시작 완료 후 이 메서드로 현재 레이아웃 기준 재정립: 코어 크기+bounds+RenderOffset(
+        // Core.OnMapSizeChanged → UpdateBounds+GoToCurrentPosition) + 회전 행렬 + 오버레이.
+        public void RefreshRotationState()
+        {
+            if (!_core.IsStarted || ActualWidth <= 0 || ActualHeight <= 0) return;
+            _core.OnMapSizeChanged((int)ActualWidth, (int)ActualHeight);
+            if (IsRotated)
+            {
+                UpdateRotationMatrix();
+            }
+            ForceUpdateOverlays();
+            InvalidateVisual();
+        }
+
         public GPoint FromLatLngToLocal(PointLatLng point)
         {
             var ret = _core.FromLatLngToLocal(point);
