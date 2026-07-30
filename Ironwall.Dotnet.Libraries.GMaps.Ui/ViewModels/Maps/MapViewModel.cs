@@ -4728,7 +4728,10 @@ public partial class MapViewModel : BasePanelViewModel,
         MainMap.OnMapZoomChanged += MainMap_OnMapZoomChanged;
         MainMap.SizeChanged += MainMap_SizeChanged;
 
-        MainMap.ShowCenter = true;
+        // [2026-07-28 사용자 문의] 벤더 빨간 중심 십자(ShowCenter/CenterCrossPen) 비활성 —
+        // 앱 자체의 토글형 파란 중앙 십자(IsCenterCrosshairVisible, 툴바)와 중복이고 스타일 이질.
+        // 회전 피벗 확인이 필요하면 툴바 십자 토글 사용. (복원: true 한 줄)
+        MainMap.ShowCenter = false;
         MainMap_OnMapZoomChanged();
 
         ApplyMapAnchor();   // [MapAnchor] 사이트 고정: BoundsOfMap/MinZoom 적용 (증분2 · 앵커 비활성 시 해제)
