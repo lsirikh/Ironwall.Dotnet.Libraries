@@ -118,28 +118,20 @@ public sealed class LabelAdorner : Adorner, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>아이콘 스크린 중심.
-    /// [Rotation 회전+팬 진동 수정] 회전 드래그 중 벤더는 매 프레임 ForceUpdateOverlays로 아이콘을
-    /// '레이아웃'(Canvas.SetLeft) 이동시키고(GMapControl OnMouseMove: IsRotated 분기), 라벨은
-    /// '렌더' 재투영으로 움직여 두 패스가 프레임마다 교번 어긋남 → 라벨 진동. point 심볼은
-    /// 아이콘 Shape의 실제 배치 중심을 직접 읽어(TranslatePoint) 같은 원천에 앵커 — 스큐 구조적 제거.
-    /// (마커 Offset=(−W/2,−H/2)라 Shape 중심=Position 투영과 동치. 라인/이미지 footprint 계열은
-    /// 기하가 별도 재투영이라 기존 투영 유지 — 혼합 원천 방지.)</summary>
-    private Point IconCenter()
+    /// <summary>지오점 → 화면 '연속(double)' 투영 — [Rotation 회전+팬 진동 최종 수정].
+    /// FromLatLngToLocal은 회전 결과를 정수 반올림(벤더 GPoint 계약)해 회전 팬 중 라벨이
+    /// 픽셀 격자에서 매 프레임 ±1px 덜컹거렸다(타일은 연속 변환으로 부드럽게 흘러 대비 극심).
+    /// 비절단 core-local(double, 벤더 seam) + 회전행렬을 double로 합성해 반올림 0 —
+    /// 라벨 궤적이 타일과 수학적으로 동일한 연속 경로(지형 고정). 비회전 시 Identity라 종전과 동일.</summary>
+    private Point ProjectSmooth(PointLatLng p)
     {
-        if (_marker is not ILineEditableMarker
-            && _marker is GMap.NET.WindowsPresentation.GMapMarker gm && gm.Shape is FrameworkElement fe
-            && fe.IsLoaded && fe.ActualWidth > 0 && fe.ActualHeight > 0)
-        {
-            try
-            {
-                return fe.TranslatePoint(new Point(fe.ActualWidth / 2.0, fe.ActualHeight / 2.0), _map);
-            }
-            catch { /* 비주얼 트리 분리 과도기 — 투영 폴백 */ }
-        }
-        var ip = _map.FromLatLngToLocal(_marker.Position);
-        return new Point(ip.X, ip.Y);
+        var core = _map.FromLatLngToCoreLocal(p);
+        var m = _map.RotationMatrixValue;
+        return m.IsIdentity ? core : m.Transform(core);
     }
+
+    /// <summary>아이콘 스크린 중심 — 연속 투영(지형 고정, 위 ProjectSmooth 주석 참조).</summary>
+    private Point IconCenter() => ProjectSmooth(_marker.Position);
 
     /// <summary>폭 w·높이 h 사각형을 bearing(도)만큼 회전한 축정렬(AABB) 반치수 — 순수 수식(FR-01/04, 테스트 공유).</summary>
     internal static (double hw, double hh) RotatedAabbHalf(double w, double h, double bearingDeg)
@@ -169,10 +161,11 @@ public sealed class LabelAdorner : Adorner, IDisposable
         if (_marker is IImageEditableMarker img)
         {
             // 인접 모서리 유클리드 거리 = 회전 불변(회전은 등거리 변환). θ=0에선 종전 축차와 동일.
+            // ProjectSmooth(연속 투영) — 반올림 지터가 익스텐트에 유입되지 않게(회전 팬 진동 수정).
             var b = img.ImageBounds;
-            var tl = _map.FromLatLngToLocal(b.LocationTopLeft);
-            var tr = _map.FromLatLngToLocal(new GMap.NET.PointLatLng(b.Lat, b.Lng + b.WidthLng));
-            var bl = _map.FromLatLngToLocal(new GMap.NET.PointLatLng(b.Lat - b.HeightLat, b.Lng));
+            var tl = ProjectSmooth(b.LocationTopLeft);
+            var tr = ProjectSmooth(new GMap.NET.PointLatLng(b.Lat, b.Lng + b.WidthLng));
+            var bl = ProjectSmooth(new GMap.NET.PointLatLng(b.Lat - b.HeightLat, b.Lng));
             double w = Math.Max(Dist(tl, tr), MIN_IMAGE_FOOTPRINT_PX);
             double h = Math.Max(Dist(tl, bl), MIN_IMAGE_FOOTPRINT_PX);
             return RotatedAabbHalf(w, h, _marker.Bearing);
@@ -180,12 +173,13 @@ public sealed class LabelAdorner : Adorner, IDisposable
         if (_marker is ILineEditableMarker line && line.RuntimePoints is { Count: > 0 } pts)
         {
             // 투영점을 맵 회전 역행렬로 되돌린 뒤 bbox — θ 무관 동일 footprint(비회전 시 Identity).
+            // ProjectSmooth 후 역회전 = core-local 그대로(연속) — 반올림 지터 0.
             var inv = _map.RotationMatrixValue; inv.Invert();
             double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
             foreach (var p in pts)
             {
-                var lp = _map.FromLatLngToLocal(p);
-                var up = inv.Transform(new Point(lp.X, lp.Y));
+                var lp = ProjectSmooth(p);
+                var up = inv.IsIdentity ? lp : inv.Transform(lp);
                 if (up.X < minX) minX = up.X;
                 if (up.X > maxX) maxX = up.X;
                 if (up.Y < minY) minY = up.Y;
@@ -195,7 +189,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
         }
         return (_marker.Width / 2.0, _marker.Height / 2.0);
 
-        static double Dist(GMap.NET.GPoint a, GMap.NET.GPoint b)
+        static double Dist(Point a, Point b)
         {
             double dx = b.X - a.X, dy = b.Y - a.Y;
             return Math.Sqrt(dx * dx + dy * dy);
@@ -272,10 +266,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
             var ft = _cachedText;
 
             var c = LabelCenter();
-            // [Rotation 진동 하드닝] 라벨 박스 원점을 정수 픽셀에 스냅 — 회전 팬 중 앵커의
-            // 서브픽셀 변동이 매 프레임 ClearType 텍스트 재래스터(shimmer)로 보이던 떨림 제거.
-            // 1px 단위 이동은 아이콘 양자화와 동일 보폭이라 상대 정렬 유지.
-            c = new Point(Math.Round(c.X), Math.Round(c.Y));
+            // (픽셀 스냅 제거 — 연속 투영(ProjectSmooth)과 상충: 스냅하면 지형 대비 ±1px 격자 댄스가
+            //  재발한다. 지형과 함께 흐르는 서브픽셀 이동이 시각적으로 안정적.)
             double w = ft.WidthIncludingTrailingWhitespace + PadX * 2d;
             double h = ft.Height + PadY * 2d;
             var box = new Rect(c.X - w / 2d, c.Y - h / 2d, w, h);
