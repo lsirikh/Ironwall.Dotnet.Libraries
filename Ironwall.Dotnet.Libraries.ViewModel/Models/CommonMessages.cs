@@ -114,8 +114,10 @@ public class CallDeleteReportTemplateProcessMessageModel : IMessageModel { }
 public sealed class ChangeModeWindyMessageModel : EventMessageModel<int>
 {
 }
-/// <summary>WindyMode NATS REQ 요청 트리거 — WindyPanelViewModel → NatsDomainService</summary>
-public record SendWindyModeMessage(EnumWindyMode Mode);
+/// <summary>WindyMode NATS REQ 요청 트리거 — WindyPanelViewModel → NatsDomainService.
+/// PrevMode=클릭 직전 모드(라디오 낙관 갱신 전 값) — REQ 실패+서버 재조회까지 실패한 이중 장애 시
+/// 로컬 롤백 폴백에 사용(GOP_Nats_Req_Failure_UX FR-2). null이면 폴백 생략(하위호환).</summary>
+public record SendWindyModeMessage(EnumWindyMode Mode, EnumWindyMode? PrevMode = null);
 
 /// <summary>디바이스 초기 로딩 완료 알림 — SymbolEventManager 일괄 동기화 트리거</summary>
 public record AllDevicesLoadedMessage();

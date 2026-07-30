@@ -841,11 +841,18 @@ public partial class MapViewModel : BasePanelViewModel,
                                                        .ConfigureAwait(false);
             await OnUiAsync(() =>
             {
-                if (gen != _aimGeneration) return;   // 그 사이 새 타겟 세션이 시작됐으면 새 안내 보존
                 if (result.Success)
-                    SetAimStatus($"카메라 {body.CameraId} → 회전요청 완료 ({body.DistanceM:F0}m, {body.BearingDeg:F0}°).", autoHide: true);
-                else if (result.Reason != Services.Brokers.EnumBrokerFailure.Cancelled)   // ESC 취소는 별도 안내 없음
-                    SetAimStatus($"회전요청 실패 — {result.UserMessage}", autoHide: true);
+                {
+                    if (gen == _aimGeneration)   // 그 사이 새 타겟 세션이 시작됐으면 새 안내 보존
+                        SetAimStatus($"카메라 {body.CameraId} → 회전요청 완료 ({body.DistanceM:F0}m, {body.BearingDeg:F0}°).", autoHide: true);
+                }
+                else if (result.Reason != Services.Brokers.EnumBrokerFailure.Cancelled)   // ESC 취소는 통지 없음
+                {
+                    // FR-5(GOP_Nats_Req_Failure_UX, 사용자 확정): 실패는 표준 팝업으로 승격 —
+                    // autoHide 2.5초 배너는 놓치기 쉬움. 성공은 배너 유지. 실패 사실 통지라 세대(gen) 무관.
+                    ShowBrokerControlInfo("특정 위치 확인 실패",
+                        $"카메라 {body.CameraId} 회전요청을 적용하지 못했습니다.\n{result.UserMessage}");
+                }
             });
         }
         catch (Exception ex)
@@ -4130,9 +4137,10 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// 회전 초기화 명령어 실행 가능 여부
+    /// 회전 초기화 명령어 실행 가능 여부 — 사이트 고정(앵커) 중에는 정북 복귀 비활성(사용자 결정 2026-07-30,
+    /// 나침반 더블클릭/메뉴와 동일 정책. 현재 XAML 바인딩은 없으나 향후 배선 대비 게이트 유지).
     /// </summary>
-    private bool CanExecuteResetRotation(object arg) => true;
+    private bool CanExecuteResetRotation(object arg) => !(MainMap?.IsAnchorActive ?? false);
 
     /// <summary>
     /// 회전 초기화 실행
