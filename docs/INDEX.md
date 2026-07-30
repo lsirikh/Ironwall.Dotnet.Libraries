@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-07-27 (advance-phase 자동)
-- **총 문서 수**: 411개
+- **마지막 갱신**: 2026-07-30 (advance-phase 자동)
+- **총 문서 수**: 416개
 
 ---
 
@@ -10,7 +10,8 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [GMap_Rotation_Enable_BugInventory_v2-analysis.md](analyses/GMap_Rotation_Enable_BugInventory_v2-analysis.md) | GMap_Rotation 재활성 버그 인벤토리 v2.0 (44결함·해소·단계계획) | 2026-07-27 |
+| [GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md](analyses/GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md) | GMap_Rotation_Full_Sync_PRD_Adversarial_Review | 2026-07-28 |
+| [GMap_Rotation_Enable_BugInventory_v2-analysis.md](analyses/GMap_Rotation_Enable_BugInventory_v2-analysis.md) | GMap_Rotation_Enable_BugInventory_v2 | 2026-07-28 |
 | [CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md](analyses/CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md) | CameraPopup_PanClamp_Badge_OnvifPtz | 2026-07-23 |
 | [Overlay_Title_ZoomStyle-analysis.md](analyses/Overlay_Title_ZoomStyle-analysis.md) | Overlay_Title_ZoomStyle | 2026-07-23 |
 | [GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md](analyses/GMap_OverlayWindow_Symbol_Visibility_Restore-analysis.md) | GMap_OverlayWindow_Symbol_Visibility_Restore | 2026-07-20 |
@@ -57,7 +58,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | 지도 회전 재활성 전면 싱크 (v2.0 — 적대검증 반영, RotationPolicy·Snapshot·ProjectedQuad, 18 FR, Track C) | Draft | 2026-07-28 |
+| [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | GMap_Rotation_Full_Sync | Approved | 2026-07-30 |
 | [line-drawing-hud-redesign-prd.md](prds/line-drawing-hud-redesign-prd.md) | line-drawing-hud-redesign | Draft | 2026-07-28 |
 | [Measure_Tools-prd.md](prds/Measure_Tools-prd.md) | Measure_Tools | Approved | 2026-07-27 |
 | [CameraPopup_ControlHub-prd.md](prds/CameraPopup_ControlHub-prd.md) | CameraPopup_ControlHub | Approved | 2026-07-27 |
@@ -207,7 +208,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [line-drawing-hud-redesign-prd-plan.md](plans/line-drawing-hud-redesign-prd-plan.md) | [PRD](prds/line-drawing-hud-redesign-prd.md) | 13/15 | 2026-07-28 |
+| [line-drawing-hud-redesign-prd-plan.md](plans/line-drawing-hud-redesign-prd-plan.md) | [PRD](prds/line-drawing-hud-redesign-prd.md) | 15/21 | 2026-07-28 |
 | [Measure_Tools-prd-plan.md](plans/Measure_Tools-prd-plan.md) | [PRD](prds/Measure_Tools-prd.md) | 0/21 | 2026-07-27 |
 | [CameraPopup_ControlHub-prd-plan.md](plans/CameraPopup_ControlHub-prd-plan.md) | [PRD](prds/CameraPopup_ControlHub-prd.md) | 19/19 | 2026-07-27 |
 | [CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) | 23/23 | 2026-07-23 |
