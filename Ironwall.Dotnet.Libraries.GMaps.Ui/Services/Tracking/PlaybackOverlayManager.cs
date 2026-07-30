@@ -38,14 +38,21 @@ public sealed class PlaybackOverlayManager : IDisposable
         _log = log;
     }
 
-    /// <summary>지도 연결 + 엔진 Frame 구독. 멱등.</summary>
+    /// <summary>지도 연결 + 엔진 Frame 구독. 멱등.
+    /// [R-21] 줌·회전 구독 추가 — 일시정지/재생완료 상태의 트레일이 이전 줌/방향으로 굳지 않게
+    /// 뷰포트 변경 시 OnFrame 1회 재렌더.</summary>
     public void Attach(GMapControl map)
     {
         _map = map ?? throw new ArgumentNullException(nameof(map));
         if (_attached) return;
         _engine.Frame += OnFrame;
+        _map.OnMapZoomChanged += OnMapViewChanged;
+        (_map as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);
         _attached = true;
     }
+
+    private void OnMapViewChanged() => OnFrame();
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnFrame();
 
     /// <summary>표시할 트랙 필터(체크박스). null=전체. 즉시 반영.</summary>
     public void SetEnabledTracks(HashSet<string>? enabled)
@@ -133,7 +140,16 @@ public sealed class PlaybackOverlayManager : IDisposable
 
     public void Dispose()
     {
-        if (_attached) { _engine.Frame -= OnFrame; _attached = false; }
+        if (_attached)
+        {
+            _engine.Frame -= OnFrame;
+            if (_map is not null)
+            {
+                _map.OnMapZoomChanged -= OnMapViewChanged;
+                (_map as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
+            }
+            _attached = false;
+        }
         ClearAll();
     }
 }

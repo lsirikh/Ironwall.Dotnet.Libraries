@@ -220,6 +220,8 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         if (_mapControl != null)
         {
             _mapControl.OnMapZoomChanged += OnMapZoomChanged;
+            // 회전 통지(R-13) — 회전만 변경 시에도 FOV 재계산 트리거. Unloaded서 해제
+            (_mapControl as GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);
         }
 
         // 초기추가 보강: 생성자 단계(UpdateFromSpecificMarker/OnApplyTemplate)의 UpdateFOVPath는
@@ -235,9 +237,13 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         if (_mapControl != null)
         {
             _mapControl.OnMapZoomChanged -= OnMapZoomChanged;
+            (_mapControl as GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
             _mapControl = null;
         }
     }
+
+    /// <summary>뷰포트(회전) snapshot 수신 — 줌 핸들러와 동일 경로로 FOV 재계산(R-13).</summary>
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapZoomChanged();
 
     private void OnMapZoomChanged()
     {

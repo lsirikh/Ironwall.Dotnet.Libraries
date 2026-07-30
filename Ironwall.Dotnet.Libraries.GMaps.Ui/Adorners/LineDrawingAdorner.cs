@@ -93,6 +93,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             // 지도 이동/줌 이벤트 구독
             _mapControl.OnMapZoomChanged += OnMapChanged;
             _mapControl.OnMapDrag += OnMapChanged;
+            (_mapControl as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);   // 회전 통지(R-18)
 
             _log?.Info("LineDrawingAdorner 생성 완료");
         }
@@ -487,6 +488,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
         /// <summary>
         /// 지도 변경 이벤트 핸들러 (이동/줌) — UI 스레드 직렬화(백그라운드 발화 대비).
         /// </summary>
+        /// <summary>뷰포트(회전) snapshot 수신 — 확정 라인·미리보기·HUD 재배치(R-18).</summary>
+        private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapChanged();
+
         private void OnMapChanged()
         {
             if (!Dispatcher.CheckAccess())
@@ -550,6 +554,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             {
                 _mapControl.OnMapZoomChanged -= OnMapChanged;
                 _mapControl.OnMapDrag -= OnMapChanged;
+                (_mapControl as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
             }
 
             // Visual 제거

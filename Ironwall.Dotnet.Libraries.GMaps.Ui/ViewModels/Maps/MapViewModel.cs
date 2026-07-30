@@ -489,6 +489,10 @@ public partial class MapViewModel : BasePanelViewModel,
             // 측정 툴(길이/넓이) 이벤트 배선
             AttachMeasureEvents();
 
+            // [Rotation FR-05] 뷰포트(회전) snapshot 구독 — 카메라 팝업/leader 재투영(F-02) +
+            // 오버레이맵 타일 재배치(R-12). per-consumer 격리는 발행기가 보장.
+            MainMap.SubscribeViewport(OnViewportSnapshotForVm);
+
             _log?.Info("Adorner 시스템 통합 완료");
         }
         catch (Exception ex)
@@ -510,6 +514,9 @@ public partial class MapViewModel : BasePanelViewModel,
             ExitTargetAimMode();
             // 측정 툴 정리(어도너 해제·키 후킹 해제)
             DetachMeasureEvents();
+
+            // [Rotation FR-05] 뷰포트 snapshot 구독 해제(NFR-04 누수 방지)
+            MainMap.UnsubscribeViewport(OnViewportSnapshotForVm);
 
             // 이벤트 구독 해제
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
@@ -2521,6 +2528,14 @@ public partial class MapViewModel : BasePanelViewModel,
         if (_cameraPopups == null) return;
         foreach (var vm in _cameraPopups.ToList())   // 순회 중 Remove 재진입 방어
             await CloseCameraPopupAsync(vm);
+    }
+
+    /// <summary>뷰포트(회전) snapshot 수신(FR-05) — 팝업/leader 재투영(F-02: 회전 시 마커만
+    /// 이동하고 팝업·연결선이 잔류하던 누락 소비처) + 오버레이맵 타일 재배치(R-12).</summary>
+    private void OnViewportSnapshotForVm(GMapCustoms.MapViewportSnapshot snap)
+    {
+        RefreshCameraPopupPositions();
+        if (MainMap != null) _customMapOverlayService?.RefreshVisibleTiles(MainMap);
     }
 
     /// <summary>팬/줌 시 모든 팝업을 AnchorGeo 기준으로 재배치(Geo 추종 — 자동숨김/클램프 없음).</summary>
@@ -7948,6 +7963,10 @@ public partial class MapViewModel : BasePanelViewModel,
 
             // 설정 저장
             await SaveCurrentMapSettingsAsync();
+
+            // [Rotation R-31] 맵 전환 후 회전 종속 상태 재적용 — 신규 오버레이 MapCorrectionRotation
+            // 재주입 + snapshot 재발행(전환 전 회전 유지 시 desync 방지)
+            MainMap?.ResyncRotationDependents();
 
             _log?.Info($"지도 변경 완료: {targetMap.Name}");
         }

@@ -58,6 +58,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
 
         _map.OnMapZoomChanged += OnMapChanged;   // geo-앵커 재렌더(줌 생존)
         _map.OnMapDrag += OnMapChanged;
+        _map.SubscribeViewport(OnViewportSnapshot);   // 회전 통지(R-20) — Dispose서 해제
 
         ContextMenu = BuildContextMenu();   // 선택 심볼 우클릭 → 그룹 공통 메뉴 (FR-MS-09)
     }
@@ -85,6 +86,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
     }
 
     private void OnMapChanged() => InvalidateVisual();
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => InvalidateVisual();
 
     public void SetMarkers(IReadOnlyList<IEditableMarker> markers)
     {
@@ -226,6 +228,7 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
         if (IsMouseCaptured) ReleaseMouseCapture();
         _map.OnMapZoomChanged -= OnMapChanged;
         _map.OnMapDrag -= OnMapChanged;
+        _map.UnsubscribeViewport(OnViewportSnapshot);
         GroupMoveCompleted = null;
         GroupDeleteRequested = null;
         GroupLockRequested = null;

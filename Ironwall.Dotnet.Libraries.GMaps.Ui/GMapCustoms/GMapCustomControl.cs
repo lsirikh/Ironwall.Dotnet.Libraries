@@ -2633,37 +2633,77 @@ public class GMapCustomControl : GMapControl
     }
 
     /// <summary>
-    /// 회전 후 오버레이 업데이트
+    /// 회전 후 오버레이 업데이트 — [FR-04/F-10] 파트별 예외 격리(종전 단일 try/catch 해체:
+    /// 한 파트 실패가 뒤 파트를 중단시키지 않는다) + 뷰포트 snapshot 발행(FR-05 소비처 통지).
     /// </summary>
     private void UpdateOverlaysAfterRotation()
     {
         try
         {
-            // 마커 위치 업데이트
-            //foreach (GMapMarker marker in CustomMarkers)
-            //{
-            //    marker.ForceUpdateLocalPosition(this);
-            //}
             foreach (GMapMarker marker in Markers)
-            {
                 marker.ForceUpdateLocalPosition(this);
-            }
-
-            // 이미지 오버레이 회전 보정 (FR-7, NFR-6)
-            // ★ Rotation(=UserRotation) 덮어쓰기 금지 — 사용자 편집 회전값 보존.
-            //   맵 보정값만 MapCorrectionRotation에 반영하고, 렌더는 EffectiveRotation(합산)을 사용한다.
-            foreach (var customImage in CustomImages)
-            {
-                customImage.MapCorrectionRotation = -MapRotation;
-            }
-
-            InvalidateVisual();
         }
-        catch (Exception ex)
+        catch (Exception ex) { _log?.Error($"회전 후 마커 재배치 실패(격리): {ex.Message}"); }
+
+        // 이미지 오버레이 회전 보정 (FR-7, NFR-6)
+        // ★ Rotation(=UserRotation) 덮어쓰기 금지 — 사용자 편집 회전값 보존.
+        //   맵 보정값만 MapCorrectionRotation에 반영하고, 렌더는 EffectiveRotation(합산)을 사용한다.
+        try
         {
-            _log?.Error($"회전 후 오버레이 업데이트 실패: {ex.Message}");
+            foreach (var customImage in CustomImages)
+                customImage.MapCorrectionRotation = -MapRotation;
         }
+        catch (Exception ex) { _log?.Error($"회전 후 이미지 보정 실패(격리): {ex.Message}"); }
+
+        // 소비처(라벨·측정·조준·라인드로잉·그룹선택·FOV·라인·트레일·재생·팝업·오버레이맵) 통지 — FR-05
+        QueueViewportSnapshot();
+
+        try { InvalidateVisual(); }
+        catch (Exception ex) { _log?.Error($"회전 후 무효화 실패(격리): {ex.Message}"); }
     }
+
+    #region Viewport Snapshot (FR-04 — 회전 동기 계약)
+
+    private ViewportSnapshotPublisher? _viewportPublisher;
+    private bool _snapshotPublishQueued;
+
+    private ViewportSnapshotPublisher ViewportPublisher => _viewportPublisher ??= new ViewportSnapshotPublisher(_log);
+
+    /// <summary>현재 뷰포트 snapshot(발행 전이면 즉석 생성). 소비자는 구독 시 자동 replay되므로
+    /// 통상 직접 조회 불요 — 초기화 순서가 특수한 소비자용.</summary>
+    public MapViewportSnapshot CurrentViewportSnapshot
+        => ViewportPublisher.Current ?? BuildViewportSnapshot();
+
+    /// <summary>뷰포트 snapshot 구독 — 구독 즉시 현재 snapshot replay(동적 추가 소비자 정합).
+    /// 소비자는 반드시 Dispose/Unloaded에서 UnsubscribeViewport(NFR-04 누수 방지).</summary>
+    public void SubscribeViewport(System.Action<MapViewportSnapshot> handler) => ViewportPublisher.Subscribe(handler);
+
+    public void UnsubscribeViewport(System.Action<MapViewportSnapshot> handler) => ViewportPublisher.Unsubscribe(handler);
+
+    private MapViewportSnapshot BuildViewportSnapshot() => new(
+        Position, Utils.RotationMath.NormalizeDeg(Bearing), Zoom,
+        ActualWidth, ActualHeight, DigitalZoomScale, ViewportPublisher.CurrentRevision);
+
+    /// <summary>snapshot 발행 예약 — WPF 프레임당 최종 1회 coalescing(FR-16: 연속 회전 입력이
+    /// 프레임 내 여러 번 와도 발행은 마지막 상태로 1회). revision은 매 변경마다 증가.</summary>
+    private void QueueViewportSnapshot()
+    {
+        ViewportPublisher.NextRevision();
+        if (_snapshotPublishQueued) return;
+        _snapshotPublishQueued = true;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Render, new System.Action(() =>
+        {
+            _snapshotPublishQueued = false;
+            try { ViewportPublisher.Publish(BuildViewportSnapshot()); }
+            catch (Exception ex) { _log?.Error($"Viewport snapshot 발행 실패: {ex.Message}"); }
+        }));
+    }
+
+    /// <summary>맵 전환/재로드 후 회전 종속 상태 재적용(R-31) — 신규 오버레이의
+    /// MapCorrectionRotation 재주입 + snapshot 재발행. MapViewModel.ChangeMapAsync가 호출.</summary>
+    public void ResyncRotationDependents() => UpdateOverlaysAfterRotation();
+
+    #endregion
 
     #endregion
     #region Image Management Methods
@@ -2677,6 +2717,9 @@ public class GMapCustomControl : GMapControl
 
         try
         {
+            // [R-26 / FR-05 동적추가 replay] 회전된 맵에 늦게 추가된 오버레이도 즉시 −θ 보정 —
+            // 종전에는 UpdateOverlaysAfterRotation에서만 세팅돼 다음 회전 변경까지 desync였다.
+            customImage.MapCorrectionRotation = -MapRotation;
             CustomImages.Add(customImage);
             InvalidateVisual();
             _log?.Info($"이미지 오버레이 추가: {customImage.Title}");

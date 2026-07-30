@@ -35,7 +35,11 @@ public sealed class LabelAdornerService : IDisposable
     {
         _map = map ?? throw new ArgumentNullException(nameof(map));
         _log = log;
+        _map.SubscribeViewport(OnViewportSnapshot);   // 회전 통지(R-15) — Dispose서 해제
     }
+
+    /// <summary>뷰포트(회전) snapshot 수신 — 전 라벨 재렌더(R-15 stale 해소).</summary>
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => RefreshAll();
 
     public void Attach(IEditableMarker marker)
     {
@@ -132,6 +136,7 @@ public sealed class LabelAdornerService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _map.UnsubscribeViewport(OnViewportSnapshot);   // NFR-04 누수 방지
         Clear();
     }
 }

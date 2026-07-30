@@ -69,6 +69,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 _mapControl.OnPositionChanged += OnMapPositionChanged;
                 // [FR-C4] 창 리사이즈/모니터 이동 시 폴리라인 픽셀캐시 stale → 재계산(줌/팬 없이도). 2026-07-15 멀티모니터 소실.
                 _mapControl.SizeChanged += OnMapSizeChanged;
+                // 회전 통지(R-14) — 회전만 변경 시에도 정점 재투영. Unloaded서 해제
+                (_mapControl as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);
 
                 // 초기 라인 그리기
                 UpdateLineGeometry();
@@ -91,6 +93,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 _mapControl.OnMapDrag -= OnMapChanged;
                 _mapControl.OnPositionChanged -= OnMapPositionChanged;
                 _mapControl.SizeChanged -= OnMapSizeChanged;
+                (_mapControl as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
             }
 
             if (Marker != null)
@@ -122,6 +125,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             //System.Diagnostics.Debug.WriteLine("지도 변경 감지 - 라인 업데이트");
             UpdateLineGeometry();
         }
+
+        /// <summary>뷰포트(회전) snapshot 수신 — 정점 재투영(회전 포함, R-14). base −θ 추가 금지(R-36).</summary>
+        private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapChanged();
 
         private void OnMapPositionChanged(PointLatLng point)
         {

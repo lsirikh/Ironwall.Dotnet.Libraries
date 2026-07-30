@@ -58,9 +58,11 @@ public sealed class AimOverlayAdorner : Adorner, IDisposable
 
         _map.OnMapZoomChanged += OnMapChanged;   // geo-앵커 재렌더(팬/줌 추종, LineDrawingAdorner 패턴)
         _map.OnMapDrag += OnMapChanged;
+        _map.SubscribeViewport(OnViewportSnapshot);   // 회전 통지(R-17) — Dispose서 해제
     }
 
     private void OnMapChanged() => InvalidateVisual();
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => InvalidateVisual();
 
     /// <summary>반경 등장 애니 시작(r=0→목표, CubicEaseOut ~420ms).</summary>
     public void StartGrowIn()
@@ -179,6 +181,7 @@ public sealed class AimOverlayAdorner : Adorner, IDisposable
         UnhookRendering();
         _map.OnMapZoomChanged -= OnMapChanged;   // 이벤트 루팅 누수 방지(§2)
         _map.OnMapDrag -= OnMapChanged;
+        _map.UnsubscribeViewport(OnViewportSnapshot);
         RippleCompleted = null;
     }
 }

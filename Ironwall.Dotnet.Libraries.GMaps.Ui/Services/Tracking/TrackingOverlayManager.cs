@@ -66,6 +66,8 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             _sweepTimer.Start();
             // 줌 변경 시에만 트레일 재투영(팬은 상대좌표 불변 — FR-P2-08 드래그 storm 회피)
             _map.OnMapZoomChanged += OnZoomChanged;
+            // 회전 통지(R-19) — 회전만 변경 시 트레일 기하 stale 방지. Dispose서 해제
+            (_map as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);
         });
         _log?.Info($"{nameof(TrackingOverlayManager)} attached — TTL 스윕 500ms + 줌 트레일 재투영 기동");
     }
@@ -212,6 +214,9 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
             entry.Trail?.Rebuild(_map);
     }
 
+    /// <summary>뷰포트(회전) snapshot 수신 — 트레일 재투영(회전 포함 FromLatLngToLocal, R-19).</summary>
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnZoomChanged();
+
     private void RemoveEntry((int cameraId, string trackId) key)
     {
         if (_entries.TryGetValue(key, out var entry))
@@ -249,7 +254,10 @@ public sealed class TrackingOverlayManager : ITrackingOverlayManager
                 _sweepTimer = null;
             }
             if (_map is not null)
+            {
                 _map.OnMapZoomChanged -= OnZoomChanged;
+                (_map as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
+            }
             foreach (var key in _entries.Keys.ToList())
                 RemoveEntry(key);
         });

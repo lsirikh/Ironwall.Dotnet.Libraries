@@ -45,9 +45,11 @@ public sealed class MeasureAdorner : Adorner, IDisposable
         IsHitTestVisible = false;   // 완전 클릭스루 — 클릭이 맵으로 통과(불변식#3)
         _map.OnMapZoomChanged += OnMapChanged;
         _map.OnMapDrag += OnMapChanged;
+        (_map as GMapCustoms.GMapCustomControl)?.SubscribeViewport(OnViewportSnapshot);   // 회전 통지(R-16)
     }
 
     private void OnMapChanged() => InvalidateVisual();
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => InvalidateVisual();
 
     #region - 공개 API (컨트롤러가 구동) -
     public int PointCount => _geoPoints.Count;
@@ -205,6 +207,7 @@ public sealed class MeasureAdorner : Adorner, IDisposable
         _disposed = true;
         _map.OnMapZoomChanged -= OnMapChanged;
         _map.OnMapDrag -= OnMapChanged;
+        (_map as GMapCustoms.GMapCustomControl)?.UnsubscribeViewport(OnViewportSnapshot);
         _geoPoints.Clear();
     }
 }
