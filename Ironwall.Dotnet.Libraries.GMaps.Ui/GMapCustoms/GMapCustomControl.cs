@@ -1669,6 +1669,18 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [Rotation E2E 하네스] Ctrl+Shift+R = 회전 kill-switch 토글(개발/검증용).
+        // 의도적으로 비노출 조합 — 우발 활성화 시에도 OFF 토글이 즉시 정북 복귀(안전).
+        // flag 기본값은 여전히 OFF(부팅 시 회전 불가) — FR-18 게이트 유지.
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.R)
+        {
+            Utils.RotationFeature.IsEnabled = !Utils.RotationFeature.IsEnabled;
+            if (!Utils.RotationFeature.IsEnabled) ResetRotation();   // OFF 전환 = 즉시 정북(FR-03 검증 경로)
+            _log?.Info($"[Rotation] kill-switch 토글: {(Utils.RotationFeature.IsEnabled ? "ON — Shift+휠/Ctrl+←→ 회전 가능" : "OFF — 정북 복귀·입력 차단")}");
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             switch (e.Key)
