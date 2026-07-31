@@ -24,6 +24,9 @@ public class EventSetupModel : IEventSetupModel
         TimeDiscardSec     = model.TimeDiscardSec;
         LengthMaxEventPrev = model.LengthMaxEventPrev;
         LengthMinEventPrev = model.LengthMinEventPrev;
+        // 장애 전용 자동조치보고 설정 — 탐지와 독립. 신규 필드는 반드시 복사(누락 시 복사본이 false/0으로 유실).
+        IsMalfunctionAutoEventDiscard = model.IsMalfunctionAutoEventDiscard;
+        MalfunctionTimeDiscardSec     = model.MalfunctionTimeDiscardSec;
     }
     #endregion
     #region - Implementation of Interface -
@@ -43,6 +46,8 @@ public class EventSetupModel : IEventSetupModel
     public int TimeDiscardSec { get; set; }
     public int LengthMaxEventPrev { get; set; }
     public int LengthMinEventPrev { get; set; }
+    public bool IsMalfunctionAutoEventDiscard { get; set; }
+    public int MalfunctionTimeDiscardSec { get; set; }
     #endregion
     #region - Attributes -
     #endregion

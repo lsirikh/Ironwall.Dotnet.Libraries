@@ -127,8 +127,10 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
                 EventType = EnumEventType.Fault,
                 IsControllerBlackout = isControllerBlackout,
                 EventId = eventId,
-                TimeoutSeconds = _eventSetupModel.TimeDiscardSec,
-                IsAutoReportEnabled = _eventSetupModel.IsAutoEventDiscard
+                // 장애 전용 설정(= "장애 이벤트 해제" 항목) — 탐지와 독립.
+                // IsMalfunctionAutoEventDiscard=false면 IsAutoReportEnabled=false → EQM tick에서 skip → 장애 자동조치보고 미발송.
+                TimeoutSeconds = _eventSetupModel.MalfunctionTimeDiscardSec,
+                IsAutoReportEnabled = _eventSetupModel.IsMalfunctionAutoEventDiscard
             }, natsMessageId);
 
             _log?.Info($"MALFUNCTION Enqueue 완료: entryId={entryId}, eventId={eventId}");
