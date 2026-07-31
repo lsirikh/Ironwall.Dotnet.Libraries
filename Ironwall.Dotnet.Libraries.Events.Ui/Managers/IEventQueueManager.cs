@@ -53,6 +53,17 @@ public interface IEventQueueManager
     /// SYNC_DETECTION 썸네일 갱신 게이트 — resource_id가 현재 EQM에 등록(활성)된 **탐지**인 경우에만 재조회.</summary>
     EventEntry? FindEntryByEventId(int eventId, EnumEventType eventType);
 
+    /// <summary>그룹의 현재 복합상태를 실제 활성 엔트리 기준으로 재계산해 반환(순수 읽기, 상태변경 없음).
+    /// 심볼 재계산 복원(FR-03)용 — 조치보고/복구 시 잔여 활성 이벤트를 반영. 엔트리 없으면 Normal.</summary>
+    EnumCompositeEventStatus GetGroupState(int groupId);
+
+    /// <summary>개별 디바이스의 현재 복합상태를 실제 활성 엔트리 기준으로 재계산해 반환(순수 읽기, 상태변경 없음).</summary>
+    EnumCompositeEventStatus GetDeviceState(int deviceId, EnumDeviceType deviceType);
+
+    /// <summary>지정 제어기의 블랙아웃 Fault 엔트리를 자동복구(Dequeue + OnAutoRecovery 발화). 제어기 통신 복구
+    /// (SYNC_DEVICE ACTIVATED) 트리거용 — Controller_Fault_AutoRecovery_Extension FR-04. 대상 없으면 false(멱등).</summary>
+    bool TryAutoRecoverController(int controllerId);
+
     /// <summary>Timer 틱당 최대 Dequeue 건수 (기본 5)</summary>
     int MaxDequeuePerTick { get; set; }
 

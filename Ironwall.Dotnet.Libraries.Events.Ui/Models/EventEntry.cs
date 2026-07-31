@@ -32,6 +32,11 @@ public class EventEntry
     /// GMap_Controller_Blackout.</summary>
     public bool IsControllerBlackout { get; set; }
 
+    /// <summary>탐지(Intrusion) 엔트리가 소속된 제어기 Id — 제어기 고장 자동복구 매칭용
+    /// (Controller_Fault_AutoRecovery_Extension). 센서 탐지 도착 시 이 제어기의 블랙아웃 Fault를 자동복구.
+    /// null 또는 0이면 소속 제어기 없음(자동복구 트리거 스킵).</summary>
+    public int? OwningControllerId { get; set; }
+
     /// <summary>큐 등록 시간</summary>
     public DateTime EnqueuedAt { get; set; }
 

@@ -93,7 +93,8 @@ public class EventUiModule : Module
                 c.Resolve<Caliburn.Micro.IEventAggregator>(),
                 // 로그인 게이팅(Login_Gated_GIS_Init): 수동 팩토리 new라 옵셔널 파라미터가 자동 주입되지 않음 —
                 // 명시 전달 필수(누락 시 게이트 무력 → 로그아웃 상태 알람 수신 + EQM 자동조치보고 유출).
-                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()   // 소속 제어기 해석(Controller_Fault_AutoRecovery_Extension) — 수동 팩토리라 명시 전달 필수(누락 시 자동복구 태깅 죽음)
             )).As<IDetectionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 1)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();
@@ -108,6 +109,14 @@ public class EventUiModule : Module
                 c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()   // 제어기무통신 그룹확장(GMap_Controller_Blackout) — 수동 팩토리라 명시 전달 필수(누락 시 기능 죽음)
             )).As<IMalfunctionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 2)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
+              .SingleInstance();
+            // G-2 활성 억제 배너 데이터 소스 — /active 30s 폴링 모니터(로그인 게이팅, 수동 팩토리라 tokenStorage 명시 전달).
+            builder.Register(c => new SuppressionActiveMonitor(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventSuppressionApiService>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()
+            )).As<ISuppressionActiveMonitor>()
+              .As<IService>().WithMetadata("Order", _count + 4)   // 자동 시작(ExecuteAsync 폴링) + OnExit StopAsync
               .SingleInstance();
             builder.Register(c => new DetectionSyncNatsService(
                 c.ResolveOptional<ILogService>(),

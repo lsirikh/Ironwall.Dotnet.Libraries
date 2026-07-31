@@ -69,6 +69,28 @@ public class EventQueueManager : IEventQueueManager, IDisposable
                 }
             }
 
+            // 1-b. 제어기-소유 자동복구: 탐지 센서가 소속된 제어기의 블랙아웃 Fault 수집
+            //      (Controller_Fault_AutoRecovery_Extension FR-03). same-deviceKey와 키가 달라
+            //      제거는 제어기 자신 deviceKey로 별도 처리(아래 3-b).
+            _scratchControllerFaultIds.Clear();
+            if (entry.EventType == EnumEventType.Intrusion
+                && entry.OwningControllerId is int ownCtrl && ownCtrl > 0
+                && _deviceIndex.TryGetValue((ownCtrl, EnumDeviceType.Controller), out var ctrlDevIds))
+            {
+                foreach (var id in ctrlDevIds)
+                {
+                    if (_entries.TryGetValue(id, out var ce)
+                        && ce.EventType == EnumEventType.Fault
+                        && ce.IsControllerBlackout)
+                    {
+                        _scratchControllerFaultIds.Add(id);
+                        if (ce.GroupIds != null)
+                            foreach (var gid in ce.GroupIds)
+                                _scratchAffectedGroupIds.Add(gid);
+                    }
+                }
+            }
+
             // 2. prev 상태 스냅샷 (모든 조작 전, scratch 재사용)
             _scratchPrevGroupStates.Clear();
             foreach (var gid in _scratchAffectedGroupIds)
@@ -99,6 +121,35 @@ public class EventQueueManager : IEventQueueManager, IDisposable
                     devIds.Remove(faultId);
                     if (devIds.Count == 0)
                         _deviceIndex.Remove(deviceKey);
+                }
+                autoRecoveryIds.Add(faultId);
+            }
+
+            // 3-b. 제어기 블랙아웃 Fault 원자 제거 — 자신 deviceKey로 정리(위 3의 incoming 키와 다름)
+            foreach (var faultId in _scratchControllerFaultIds)
+            {
+                if (_entries.TryGetValue(faultId, out var ctrlFault))
+                {
+                    if (ctrlFault.GroupIds != null)
+                    {
+                        foreach (var gid in ctrlFault.GroupIds)
+                        {
+                            if (_groupIndex.TryGetValue(gid, out var gCtrlIds))
+                            {
+                                gCtrlIds.Remove(faultId);
+                                if (gCtrlIds.Count == 0)
+                                    _groupIndex.Remove(gid);
+                            }
+                        }
+                    }
+                    var ctrlKey = (ctrlFault.DeviceId, ctrlFault.DeviceType);
+                    if (_deviceIndex.TryGetValue(ctrlKey, out var ctrlDevSet))
+                    {
+                        ctrlDevSet.Remove(faultId);
+                        if (ctrlDevSet.Count == 0)
+                            _deviceIndex.Remove(ctrlKey);
+                    }
+                    _entries.Remove(faultId);
                 }
                 autoRecoveryIds.Add(faultId);
             }
@@ -404,6 +455,51 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             return null;
         }
     }
+
+    /// <summary>그룹의 현재 복합상태를 EQM 실제 활성 엔트리 기준으로 재계산해 반환(SSOT 읽기). 상태변경·이벤트 발화 없음.
+    /// FR-03 심볼 재계산 복원용 — 조치보고/복구 시 잔여 활성 이벤트를 반영(맹목 Normal 금지). 엔트리 없으면 Normal.</summary>
+    public EnumCompositeEventStatus GetGroupState(int groupId)
+    {
+        lock (_gate) return ComputeGroupState(groupId);
+    }
+
+    /// <summary>개별 디바이스의 현재 복합상태를 EQM 실제 활성 엔트리 기준으로 재계산해 반환(SSOT 읽기). 상태변경·이벤트 발화 없음.</summary>
+    public EnumCompositeEventStatus GetDeviceState(int deviceId, EnumDeviceType deviceType)
+    {
+        lock (_gate) return ComputeDeviceState((deviceId, deviceType));
+    }
+
+    /// <summary>지정 제어기의 블랙아웃 Fault 엔트리를 자동복구(Dequeue + OnAutoRecovery 발화)한다.
+    /// 제어기 통신 복구(SYNC_DEVICE ACTIVATED) 트리거용 — Controller_Fault_AutoRecovery_Extension FR-04.
+    /// 대상 엔트리가 없으면 no-op하고 false(멱등). Dequeue가 그룹 재계산으로 검정을 해제하고,
+    /// OnAutoRecovery가 조치보고 경로(HandleAutoRecoveryAsync)를 실행한다. NATS 콜백 스레드에서 호출 가능.</summary>
+    public bool TryAutoRecoverController(int controllerId)
+    {
+        string? faultId = null;
+        lock (_gate)
+        {
+            if (_deviceIndex.TryGetValue((controllerId, EnumDeviceType.Controller), out var ids))
+            {
+                foreach (var id in ids)
+                {
+                    if (_entries.TryGetValue(id, out var e)
+                        && e.EventType == EnumEventType.Fault
+                        && e.IsControllerBlackout)
+                    {
+                        faultId = id;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (faultId == null) return false;
+
+        Dequeue(faultId);                    // 엔트리 제거 + 그룹/디바이스 재계산(검정 해제)
+        OnAutoRecovery?.Invoke(faultId);     // 조치보고 경로 발화(lock 밖)
+        _log?.Info($"[자동복구] 제어기 복구 → 블랙아웃 조치보고: controller={controllerId}, entry={faultId}");
+        return true;
+    }
     #endregion
 
     #region - SharedTimer -
@@ -601,6 +697,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
     private readonly List<EventEntry> _expiredScratch = new();
     private readonly HashSet<int> _scratchAffectedGroupIds = new();
     private readonly List<string> _scratchFaultIds = new();
+    private readonly List<string> _scratchControllerFaultIds = new();
     private readonly Dictionary<int, EnumCompositeEventStatus> _scratchPrevGroupStates = new();
     #endregion
 }

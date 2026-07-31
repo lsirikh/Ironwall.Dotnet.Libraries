@@ -32,7 +32,8 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
         IEventQueueManager eventQueueManager,
         IEventSetupModel eventSetupModel,
         IEventAggregator? eventAggregator = null,
-        ITokenStorageService? tokenStorage = null)
+        ITokenStorageService? tokenStorage = null,
+        Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? deviceProvider = null)
     {
         _log = log;
         _natsService = natsService;
@@ -41,6 +42,7 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
         _eventSetupModel = eventSetupModel;
         _eventAggregator = eventAggregator;
         _tokenStorage = tokenStorage;
+        _deviceProvider = deviceProvider;   // 소속 제어기 해석용(Controller_Fault_AutoRecovery_Extension). 미주입 시 자동복구 태깅 생략.
     }
     #endregion
 
@@ -114,6 +116,14 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
 
             _log?.Info($"DETECTION 수신: deviceId={deviceId}, deviceType={deviceType}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
 
+            // 탐지 센서의 소속 제어기 Id 해석 — 제어기 고장 자동복구 매칭용(Controller_Fault_AutoRecovery_Extension FR-02).
+            //   provider 미주입/센서 미발견/Controller.Id<=0이면 null → 자동복구 트리거 스킵(안전실패).
+            int? owningControllerId = null;
+            var sensor = _deviceProvider?
+                .OfType<Ironwall.Dotnet.Monitoring.Models.Devices.SensorDeviceModel>()
+                .FirstOrDefault(s => s.Id == deviceId);
+            if (sensor?.Controller?.Id is int ctrlId && ctrlId > 0) owningControllerId = ctrlId;
+
             // EventQueue에 이벤트 등록
             // 심볼 Detecting은 EventQueueManager 전이 이벤트로 일원화:
             //   - 개별 심볼: OnDeviceFirstEvent → SetDeviceDetecting()
@@ -125,6 +135,7 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
                 GroupIds = deviceGroups,
                 EventType = eventType,
                 EventId = eventId,
+                OwningControllerId = owningControllerId,   // 제어기 고장 자동복구 매칭(FR-02)
                 TimeoutSeconds = _eventSetupModel.TimeDiscardSec,
                 IsAutoReportEnabled = _eventSetupModel.IsAutoEventDiscard
             }, natsMessageId); // NATS UUID를 entryId로 사용
@@ -155,5 +166,6 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
     private readonly IEventSetupModel _eventSetupModel;
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
+    private readonly Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? _deviceProvider;   // 소속 제어기 해석용(Controller_Fault_AutoRecovery_Extension)
     #endregion
 }
