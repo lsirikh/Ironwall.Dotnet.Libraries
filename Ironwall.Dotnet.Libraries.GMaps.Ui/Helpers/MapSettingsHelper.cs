@@ -64,6 +64,24 @@ public static class MapSettingsHelper
         await SaveSettingAsync("MapCompass", compass, log);
     }
 
+    /// <summary>강풍모드 인디케이터 위치+설정 저장 (AppSettings.MapWindyIndicator) — GMap_Map_Instruments FR-12.</summary>
+    public static async Task SaveMapWindyIndicatorAsync(MapWindyIndicatorModel windy, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapWindyIndicator", windy, log);
+    }
+
+    /// <summary>탐지·장애 인디케이터 위치+설정 저장 (AppSettings.MapDetectionFault) — GMap_Map_Instruments FR-12.</summary>
+    public static async Task SaveMapDetectionFaultAsync(MapDetectionFaultModel detFault, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapDetectionFault", detFault, log);
+    }
+
+    /// <summary>계기 보기(View) 가시성 저장 (AppSettings.MapInstrumentVisibility) — GMap_Map_Instruments FR-16.</summary>
+    public static async Task SaveMapInstrumentVisibilityAsync(MapInstrumentVisibilityModel vis, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapInstrumentVisibility", vis, log);
+    }
+
     /// <summary>
     /// 지도 타입을 JSON에 저장
     /// </summary>

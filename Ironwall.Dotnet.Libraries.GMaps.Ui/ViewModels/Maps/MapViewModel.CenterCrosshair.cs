@@ -17,7 +17,8 @@ public partial class MapViewModel
     public bool IsCenterCrosshairVisible
     {
         get => _isCenterCrosshairVisible;
-        set { _isCenterCrosshairVisible = value; NotifyOfPropertyChange(nameof(IsCenterCrosshairVisible)); }
+        // [GMap_Map_Instruments D-12] 보기(View) 메뉴 가시성 영속에 포함 — 복원 중(_suppressInstrumentSave)엔 저장 억제.
+        set { _isCenterCrosshairVisible = value; NotifyOfPropertyChange(nameof(IsCenterCrosshairVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); }
     }
 
     private RelayCommand? _toggleCenterCrosshairCommand;

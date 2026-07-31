@@ -169,6 +169,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             onDeviceFirst?.Invoke(entry.DeviceId, entry.DeviceType, entry.EventType);
 
         onAnyEnqueue?.Invoke(entry.EventType);
+        RaiseActiveCountChanged();   // 인디케이터 라이브 갱신(GMap_Map_Instruments)
 
         return entry.EntryId;
     }
@@ -254,6 +255,8 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
         if (isDeviceEmpty)
             onDeviceEmpty?.Invoke(deviceKey.DeviceId, deviceKey.DeviceType);
+
+        RaiseActiveCountChanged();   // 동일-상태 dequeue도 카운트 반영(GMap_Map_Instruments)
     }
 
     /// <summary>
@@ -318,12 +321,38 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
         foreach (var (id, type) in deviceKeys)
             onDeviceEmpty?.Invoke(id, type);
+
+        RaiseActiveCountChanged();   // 전체 비움 → (0,0) 통지(GMap_Map_Instruments)
     }
 
     public EventEntry? GetEntry(string entryId)
     {
         lock (_gate)
             return _entries.TryGetValue(entryId, out var entry) ? entry : null;
+    }
+
+    /// <summary>활성 탐지/장애 건수 재집계 (D-01/03). _gate 보호 하 _entries를 EventType별 카운트.</summary>
+    public (int Detection, int Fault) GetActiveCounts()
+    {
+        lock (_gate)
+        {
+            int det = 0, flt = 0;
+            foreach (var e in _entries.Values)
+            {
+                if (e.EventType == EnumEventType.Intrusion) det++;
+                else if (e.EventType == EnumEventType.Fault) flt++;
+            }
+            return (det, flt);
+        }
+    }
+
+    /// <summary>활성 카운트 변경 통지 — 각 mutator 끝(lock 밖)에서 호출. 핸들러 없으면 재집계도 생략.</summary>
+    private void RaiseActiveCountChanged()
+    {
+        var handler = OnActiveCountChanged;
+        if (handler == null) return;
+        var (det, flt) = GetActiveCounts();
+        handler.Invoke(det, flt);
     }
 
     public int GetTotalQueueCount()
@@ -445,6 +474,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         OnDeviceEmpty = null;
         OnAutoReport = null;
         OnAnyEnqueue = null;
+        OnActiveCountChanged = null;
         OnDeviceStateChanged = null;
         OnAutoRecovery = null;
     }
@@ -535,6 +565,9 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
     /// <summary>Fault 자동복구 완료 시 발화 (faultEntryId). 이미 Dequeue 처리 완료.</summary>
     public event Action<string>? OnAutoRecovery;
+
+    /// <summary>활성 탐지/장애 건수 변경 (detection, fault) — GMap_Map_Instruments 인디케이터 소스.</summary>
+    public event Action<int, int>? OnActiveCountChanged;
     #endregion
 
     #region - Properties -

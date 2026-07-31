@@ -30,6 +30,14 @@ public interface IEventQueueManager
     /// <summary>큐 전체 이벤트 수</summary>
     int GetTotalQueueCount();
 
+    /// <summary>활성(미조치) 탐지(Intrusion)·장애(Fault) 건수 — 지도 계기 인디케이터 소스
+    /// (GMap_Map_Instruments D-01/03). _entries를 EventType별 재집계.</summary>
+    (int Detection, int Fault) GetActiveCounts();
+
+    /// <summary>활성 탐지/장애 건수 변경 시 발화 (detection, fault) — Enqueue/Dequeue/DequeueAll
+    /// 모든 경로에서 발화(동일 상태 dequeue 포함). 인디케이터가 폴링 없이 라이브 갱신.</summary>
+    event Action<int, int>? OnActiveCountChanged;
+
     /// <summary>특정 그룹에 이벤트가 있는지 여부</summary>
     bool HasEventsForGroup(int groupId);
 

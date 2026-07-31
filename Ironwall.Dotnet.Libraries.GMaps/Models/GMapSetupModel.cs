@@ -56,6 +56,9 @@ public class GMapSetupModel : IGMapSetupModel
         MapAnchor = source.MapAnchor;
         MapRotation = source.MapRotation;
         MapCompass = source.MapCompass;
+        MapWindyIndicator = source.MapWindyIndicator;
+        MapDetectionFault = source.MapDetectionFault;
+        MapInstrumentVisibility = source.MapInstrumentVisibility;
         MapType = source.MapType;
         MapMode = source.MapMode;
         MapName = source.MapName;
@@ -77,6 +80,9 @@ public class GMapSetupModel : IGMapSetupModel
     public MapAnchorModel? MapAnchor { get; set; }
     public MapRotationModel? MapRotation { get; set; }
     public MapCompassModel? MapCompass { get; set; }
+    public MapWindyIndicatorModel? MapWindyIndicator { get; set; }
+    public MapDetectionFaultModel? MapDetectionFault { get; set; }
+    public MapInstrumentVisibilityModel? MapInstrumentVisibility { get; set; }
     public string? MapType { get; set; }
     public string? MapMode { get; set; }
     public string? MapName { get; set; }

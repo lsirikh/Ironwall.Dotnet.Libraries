@@ -23,7 +23,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls;
 /// <para>
 /// - 회전 싱크: <see cref="TargetMap"/>의 ViewportSnapshot 구독(FR-02, replay+코얼레싱 계약) →
 ///   PART_Rose를 −Bearing 회전. 구독 수명=Loaded/Unloaded 대칭(재열림 사망 함정 방지).
-/// - 표시 게이트: <see cref="RotationFeature.IsEnabled"/> OFF=Collapsed(FR-03, 비회전 회귀 0).
+/// - 표시 게이트: 보기(View) 메뉴 마스터(MapView가 Visibility=IsCompassVisible 바인딩, GMap_Map_Instruments FR-17).
+///   회전 기능(<see cref="RotationFeature.IsEnabled"/>)은 회전 '입력'(링 드래그 등)만 게이트 — 가시성과 분리.
 /// - 본체(내부 원) 드래그=이동(허브 8px 데드존·클램프 패턴), 외곽 링(r≥80%) 드래그=지도 회전(FR-06,
 ///   앵커 A모드 잠금 시 무시), 더블클릭=정북(FR-05 — 앵커 중 비활성), 우클릭=설정 메뉴(FR-07, e.Handled,
 ///   "정북 복귀" 항목도 앵커 중 비활성+안내 툴팁).
@@ -182,8 +183,8 @@ public class GMapCompassControl : Control
     {
         _parentCanvas = FindParentCanvas();
         TargetMap?.SubscribeViewport(OnViewportSnapshot);          // replay로 현재각 즉시 수신
-        RotationFeature.EnabledChanged += OnRotationFeatureChanged;
-        ApplyFeatureVisibility(RotationFeature.IsEnabled);
+        // [GMap_Map_Instruments FR-17] 가시성은 보기(View) 메뉴가 마스터(MapView가 Visibility 바인딩) —
+        // 종전 RotationFeature→Collapsed 커플링 제거. 회전 기능은 회전 '입력'만 게이트(가시성과 분리).
         SizeChanged -= OnControlSizeChanged;
         SizeChanged += OnControlSizeChanged;
         TryPosition();
@@ -192,7 +193,6 @@ public class GMapCompassControl : Control
     private void OnUnloaded(object? sender, RoutedEventArgs e)
     {
         TargetMap?.UnsubscribeViewport(OnViewportSnapshot);
-        RotationFeature.EnabledChanged -= OnRotationFeatureChanged;
         SizeChanged -= OnControlSizeChanged;
         if (_hookedCanvas != null) { _hookedCanvas.SizeChanged -= OnCanvasSizeChanged; _hookedCanvas = null; }
         ResetInteraction();
@@ -209,16 +209,6 @@ public class GMapCompassControl : Control
     }
 
     private void OnViewportSnapshot(MapViewportSnapshot snap) => Bearing = snap.CanonicalBearing;
-
-    private void OnRotationFeatureChanged(bool enabled)
-    {
-        // 정적 이벤트는 임의 스레드 가능성 방어 — UI 스레드로 정렬(현재는 UI에서만 발화).
-        if (Dispatcher.CheckAccess()) ApplyFeatureVisibility(enabled);
-        else Dispatcher.InvokeAsync(() => ApplyFeatureVisibility(enabled));
-    }
-
-    private void ApplyFeatureVisibility(bool enabled)
-        => Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
 
     private void OnControlSizeChanged(object? sender, SizeChangedEventArgs e) => TryPosition();
 

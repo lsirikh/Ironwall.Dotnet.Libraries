@@ -208,6 +208,32 @@
 					</MenuItem.InputBindings>
 				</MenuItem>
 			</MenuItem>
+
+			<!--  보기(View) 메뉴 — 지도 계기 표시/숨김(GMap_Map_Instruments FR-14~16).
+			      _Maps 좌표계 토글과 동일 IsCheckable+IsChecked TwoWay 패턴. 체크상태 영속(VM 세터→저장).  -->
+			<MenuItem Header="보기(_V)">
+				<MenuItem
+					Header="방위각(나침반)"
+					Icon="{md:PackIcon Kind=CompassOutline}"
+					IsCheckable="True"
+					IsChecked="{Binding IsCompassVisible, Mode=TwoWay}" />
+				<MenuItem
+					Header="강풍모드 인디케이터"
+					Icon="{md:PackIcon Kind=WeatherWindy}"
+					IsCheckable="True"
+					IsChecked="{Binding IsWindyIndicatorVisible, Mode=TwoWay}" />
+				<MenuItem
+					Header="탐지·장애 상태"
+					Icon="{md:PackIcon Kind=ShieldAlertOutline}"
+					IsCheckable="True"
+					IsChecked="{Binding IsDetFaultVisible, Mode=TwoWay}" />
+				<Separator />
+				<MenuItem
+					Header="중앙 십자선"
+					Icon="{md:PackIcon Kind=Crosshairs}"
+					IsCheckable="True"
+					IsChecked="{Binding IsCenterCrosshairVisible, Mode=TwoWay}" />
+			</MenuItem>
 		</Menu>
 
 			<!--  시스템 리소스 표시(우측 정렬) — CPU/GPU/RAM 아이콘+% · SystemResources 라이브러리  -->
@@ -984,7 +1010,37 @@
 					IsReadoutVisible="{Binding CompassShowReadout, Mode=TwoWay}"
 					SettingsChangedCommand="{Binding SaveMapCompassCommand}"
 					TargetMap="{Binding ElementName=MainMap}"
-					Variant="{Binding CompassVariant, Mode=TwoWay}" />
+					Variant="{Binding CompassVariant, Mode=TwoWay}"
+					Visibility="{Binding IsCompassVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+				<!--  강풍모드(WINDY) 인디케이터 — 계기층 z6, 보기 메뉴 가시성(FR-17), 클릭→WINDY 패널(D-10).  -->
+				<ctrl:GMapWindyIndicatorControl
+					x:Name="MapWindyIndicator"
+					Panel.ZIndex="6"
+					ClickCommand="{Binding OpenWindyPanelCommand}"
+					DisplayStyle="{Binding WindyDisplayStyle, Mode=TwoWay}"
+					DragCompletedCommand="{Binding SaveMapWindyCommand}"
+					HideOnNormal="{Binding WindyHideOnNormal, Mode=TwoWay}"
+					IsInstrumentVisible="{Binding IsWindyIndicatorVisible}"
+					Mode="{Binding WindyMode}"
+					SettingsChangedCommand="{Binding SaveMapWindyCommand}"
+					WindyX="{Binding WindyIndicatorX, Mode=TwoWay}"
+					WindyY="{Binding WindyIndicatorY, Mode=TwoWay}" />
+
+				<!--  탐지·장애 상태 인디케이터 — z6, EQM 소스(D-01), 클릭→이벤트 패널(D-10).  -->
+				<ctrl:GMapDetectionFaultControl
+					x:Name="MapDetectionFault"
+					Panel.ZIndex="6"
+					ClickCommand="{Binding OpenEventPanelCommand}"
+					DetFaultX="{Binding DetFaultX, Mode=TwoWay}"
+					DetFaultY="{Binding DetFaultY, Mode=TwoWay}"
+					DetectionCount="{Binding DetectionCount}"
+					DragCompletedCommand="{Binding SaveMapDetectionFaultCommand}"
+					FaultCount="{Binding FaultCount}"
+					HideOnZero="{Binding DetFaultHideOnZero, Mode=TwoWay}"
+					IsInstrumentVisible="{Binding IsDetFaultVisible}"
+					Orientation="{Binding DetFaultOrientation, Mode=TwoWay}"
+					SettingsChangedCommand="{Binding SaveMapDetectionFaultCommand}" />
 
 				<!--  심볼 속성 창  -->
 				<ContentPresenter

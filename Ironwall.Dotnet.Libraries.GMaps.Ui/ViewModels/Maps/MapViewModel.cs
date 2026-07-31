@@ -114,6 +114,7 @@ public partial class MapViewModel : BasePanelViewModel,
                         , Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IEditRecorder editRecorder
                         , Ironwall.Dotnet.Libraries.GMaps.Ui.Services.Undo.IUndoService undoService
                         , Ironwall.Dotnet.Libraries.SystemResources.Services.ISystemResourceMonitor resourceMonitor
+                        , Ironwall.Dotnet.Libraries.Events.Ui.Managers.IEventQueueManager eventQueueManager
                         , TrackingOverlayManager? trackingOverlay = null
                         , PlaybackViewModel? playbackVm = null
                         , TrackingSetupViewModel? trackingSetupVm = null
@@ -139,6 +140,7 @@ public partial class MapViewModel : BasePanelViewModel,
         _editRecorder = editRecorder;
         _undoService = undoService;
         _resourceMonitor = resourceMonitor;
+        _eventQueueManager = eventQueueManager;
         _trackingOverlay = trackingOverlay;
         _playbackVm = playbackVm;
         _trackingSetupVm = trackingSetupVm;
@@ -4799,6 +4801,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
         SetInitialHomePosition();
         LoadMapCompassFromSettings();   // [Compass FR-08] 나침반 위치/설정 복원(파셜, 저장 억제 내장)
+        InitializeInstruments();        // [Map_Instruments] 강풍/탐지장애 EQM 구독+가시성 복원(파셜)
         ScheduleBootViewportResync();
     }
 
@@ -8390,6 +8393,7 @@ public partial class MapViewModel : BasePanelViewModel,
     //private GMapPropertyCustomControl? _customPropertyPanel;
     private bool _isPropertyPanelVisible;
     private SymbolEventManager _symbolEventManager;
+    private readonly Ironwall.Dotnet.Libraries.Events.Ui.Managers.IEventQueueManager _eventQueueManager;   // GMap_Map_Instruments 탐지·장애 소스(D-01)
     private IDeviceDetailUrlService _deviceDetailUrlService;
     private IBroadcastControlService _broadcastControlService;
     private readonly Dictionary<int, CancellationTokenSource> _broadcastTimers = new();
