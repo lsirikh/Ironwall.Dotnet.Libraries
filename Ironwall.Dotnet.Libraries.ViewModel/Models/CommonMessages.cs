@@ -23,6 +23,8 @@ public class OpenSetupPanelMessageModel;
 public class OpenMyPagePanelMessageModel;
 public class OpenDevicePanelMessageModel;
 public class OpenEventPanelMessageModel;
+/// <summary>이벤트 억제(정비 창) 스케줄 관리 패널 오픈 — 좌측 메뉴/배너 클릭 시 발행. ConductorControl이 events:view 백스톱 후 PanelShell에 띄운다.</summary>
+public class OpenEventSuppressionPanelMessageModel;
 public class OpenReportPanelMessageModel;
 public class OpenAccountManagerPanelMessageModel;
 public class OpenVcaPanelMessageModel;

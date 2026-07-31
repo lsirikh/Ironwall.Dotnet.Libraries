@@ -68,6 +68,17 @@ public class EventApiModule : Module
                 .SingleInstance()
                 .WithMetadata("Order", _count);
 
+            // 4. EventSuppressionApiService 등록 — 동일 Named IApiService/ApiSetupModel 재사용(Bearer/401 인프라 상속).
+            //    _apiService.Initialize() 는 EventApiService 의 ExecuteAsync(IService)에서 이미 수행되므로 As<IService> 불필요.
+            builder.Register(ctx => new EventSuppressionApiService(
+                    _log,
+                    ctx.ResolveNamed<IApiService>($"{_name}"),
+                    ctx.ResolveNamed<ApiSetupModel>(_name)
+                ))
+                .As<IEventSuppressionApiService>()
+                .SingleInstance()
+                .WithMetadata("Order", _count + 1);
+
             _log?.Info($"[{nameof(EventApiModule)}] Module loaded successfully with name: {_name}");
         }
         catch (Exception ex)

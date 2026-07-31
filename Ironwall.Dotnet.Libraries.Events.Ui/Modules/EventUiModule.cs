@@ -69,6 +69,8 @@ public class EventUiModule : Module
             builder.RegisterType<CameraEventInfoViewModel>().SingleInstance();
             builder.RegisterType<DataChartPanelViewModel>().SingleInstance();
             builder.RegisterType<EventCardListPanelViewModel>().SingleInstance();
+            // 이벤트 억제(정비 창) 스케줄 관리 패널 — IEventSuppressionApiService(EventApiModule)+DeviceProvider/DeviceGroupProvider 자동 주입.
+            builder.RegisterType<EventSuppressionSchedulePanelViewModel>().SingleInstance();
             builder.RegisterType<SymbolEventManager>()
                    .AsSelf()
                    .As<ISymbolEventManager>()
