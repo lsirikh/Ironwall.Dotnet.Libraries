@@ -217,6 +217,8 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [detection-sync-thumbnail-prd-plan.md](plans/detection-sync-thumbnail-prd-plan.md) | [PRD](prds/detection-sync-thumbnail-prd.md) | 14/14 (구현·테스트) | 2026-07-31 |
+| [malfunction-card-controller-sensor-prd-plan.md](plans/malfunction-card-controller-sensor-prd-plan.md) | — (버그수정) | 완료 | 2026-07-31 |
 | [malfunction-autoreport-setting-prd-plan.md](plans/malfunction-autoreport-setting-prd-plan.md) | [PRD](prds/malfunction-autoreport-setting-prd.md) | 0/27 | 2026-07-31 |
 | [GMap_Map_Instruments-prd-plan.md](plans/GMap_Map_Instruments-prd-plan.md) | [PRD](prds/GMap_Map_Instruments-prd.md) | 16/16 | 2026-07-31 |
 | [GMap_Compass_Control-prd-plan.md](plans/GMap_Compass_Control-prd-plan.md) | [PRD](prds/GMap_Compass_Control-prd.md) | 12/12 | 2026-07-30 |

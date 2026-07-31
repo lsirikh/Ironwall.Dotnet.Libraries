@@ -26,6 +26,15 @@
   - `DetectionEventViewModel`에 `ThumbnailUri`/`HasThumbnail` 추가(신호 컬럼과 동일 패턴). 속성 편집기(SelectionView)는 이미 썸네일 연결됨 → URI 로직만 공통화.
   - **검증**: Events.Ui 빌드 0오류 · 한글 BOM. ⚠앱 재빌드 후 런타임 육안.
 
+### Fixed
+- **장애 카드 flip 뒷장 제어기/센서 번호 공란 견고화** (Track C · Events.Ui + Devices.Ui · 태그 `before-malfunction-card-controller-sensor-fix` · [Plan](docs/plans/malfunction-card-controller-sensor-prd-plan.md) · 사용자 지시 2026-07-31)
+  - **근본원인**: 장애 전문(`BaseDeviceDto`)은 컨트롤러 표시번호를 싣지 않고 `controller_id`(FK)만 준다 — 제어기 필드는 `Controller.DeviceNumber`(중첩 nav)에 바인딩되므로 Provider 로컬 해석이 유일 소스인데, 클라 변환이 받은 `controller_id`조차 버려 Provider 참조가 온전치 않은 순간(폴백/미하이드레이션) 복구 불가·공란. 로그 실측상 Provider 재연결(`72865ab`)은 정상(`Controller(1351, DeviceNumber=1)`)이나 그 외 경로에 안전망 부재(검증 워크플로 H4 CONFIRMED).
+  - **D1(중심)**: `EventCardViewModel.ControllerDeviceNumber` — 중첩 `Controller.DeviceNumber`가 0이면 `Controller.Id`로 `DeviceProvider`에서 컨트롤러 번호 재해석(생성 경로 무관 복구).
+  - **D1/D3**: `Events.Ui/DtoToModelHelper.ConvertDeviceFromDto` 폴백(장비 Provider 미스)에서 `controller_id`로 Provider 컨트롤러 연결(없으면 FK id 보존) + `Devices.Ui/DtoToModelHelper.ToSensorDeviceModel`이 중첩 controller 부재 시 `ControllerId` seed(NavigationMapping 재링크).
+  - **D2(정본 교정, 커밋 `0548d81`)**: 실측 전문에서 **FAULT_CABLE_CUTTING이 제어기가 아니라 Fence 센서에 실려 옴**(device.type_device="Fence", controller_id=제어기FK) 확인 → 카드 `ControllerDisplay/SensorDisplay`가 **사유(reason)로 장비타입을 단정**하던 오배정을 **장비타입 기준(`Device is ISensorDeviceModel`)**으로 교정: 센서장비=제어기(ControllerDeviceNumber)+센서(자기번호), 제어기장비=제어기(자기번호)+센서(null). 사유 무관. (직전 화이트→블랙리스트 시도는 이걸로 대체 — reason은 장비타입을 나타내지 못함.) **왜 탐지만 정상**: 탐지 카드는 reason 게이트 없이 `ControllerDeviceNumber`/`Device.DeviceNumber` raw 바인딩이라 항상 정상.
+  - **detail null**: `detail`이 null이면 first/second 4값은 `ToMalfunctionEventModel`이 이미 `?? 0`로 0,0,0,0 처리(추가 수정 불요, 회귀 테스트로 고정).
+  - **테스트**: `MalfunctionCardDisplayTests` 장비타입 기준 재작성(FAULT_CABLE_CUTTING-on-sensor 포함) + Provider 폴백·DTO 변환 링크. Events.Ui 46 통과/0실패 · Devices.Ui 27 통과/0실패 · 빌드 0오류 · 한글 BOM. 커밋 `196fd59`(견고화)+`0548d81`(장비타입 교정). 메인솔루션 무변경 — **앱 반영엔 메인솔루션 재빌드·재배포 필요**.
+
 ### Changed
 - **조치보고 다이얼로그 "탐지 속성(detail)" 레이아웃 정리 + 썸네일 이미지화** (Track B · Events.Ui · 태그 `before-detection-detail-layout-thumbnail` · 사용자 지시 2026-07-31)
   - **레이아웃**: 10열 불규칙 그리드(값 시작 위치가 행마다 어긋남)를 **좌(속성 라벨:값 세로 정렬) + 우(썸네일 박스)** 2단으로 재작성. Type/Device/Status/Result(편집) + 신호/AI/객체(읽기전용) 정돈.
