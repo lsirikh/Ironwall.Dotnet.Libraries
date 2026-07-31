@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-07-31 (수동 — malfunction-autoreport-setting PRD 추가)
-- **총 문서 수**: 418개
+- **마지막 갱신**: 2026-07-31 (advance-phase 자동)
+- **총 문서 수**: 430개
 
 ---
 
@@ -10,7 +10,9 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [GMap_Rotation_P0_Spikes_V02_V08-analysis.md](analyses/GMap_Rotation_P0_Spikes_V02_V08-analysis.md) | 회전 P0 스파이크 실측 — V-02 NaN=int.MinValue · V-08 후보B 픽셀퍼펙트 채택 | 2026-07-28 |
+| [Controller_Blackout_Propagation-analysis.md](analyses/Controller_Blackout_Propagation-analysis.md) | 제어기 무통신→연결센서 그룹 검은색 전파 — 색상 시스템 매핑+3갭+설계+시뮬레이션 101×2 결과 | 2026-07-31 |
+| [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-30 |
+| [GMap_Rotation_P0_Spikes_V02_V08-analysis.md](analyses/GMap_Rotation_P0_Spikes_V02_V08-analysis.md) | GMap_Rotation_P0_Spikes_V02_V08 | 2026-07-30 |
 | [GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md](analyses/GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md) | GMap_Rotation_Full_Sync_PRD_Adversarial_Review | 2026-07-28 |
 | [GMap_Rotation_Enable_BugInventory_v2-analysis.md](analyses/GMap_Rotation_Enable_BugInventory_v2-analysis.md) | GMap_Rotation_Enable_BugInventory_v2 | 2026-07-28 |
 | [CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md](analyses/CameraPopup_PanClamp_Badge_OnvifPtz-analysis.md) | CameraPopup_PanClamp_Badge_OnvifPtz | 2026-07-23 |
@@ -28,7 +30,6 @@
 | [GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md](analyses/GMap_UI_Edit_Undo_Redo_MultiSelection-analysis.md) | GMap_UI_Edit_Undo_Redo_MultiSelection | 2026-07-15 |
 | [Rtsp_Popup_Streaming_Ptz-analysis.md](analyses/Rtsp_Popup_Streaming_Ptz-analysis.md) | Rtsp_Popup_Streaming_Ptz | 2026-07-15 |
 | [GIS_Nats_Simulation_Verification.md](analyses/GIS_Nats_Simulation_Verification.md) | GIS_Nats_Simulation_Verification.md | 2026-07-13 |
-| [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap (v2 — v1.5.2 재검증) | 2026-07-30 |
 | [GMap_RDP_Overlay_Desync-analysis.md](analyses/GMap_RDP_Overlay_Desync-analysis.md) | GMap_RDP_Overlay_Desync | 2026-07-07 |
 | [GOP_Server_API_rbac_matrix_gate_NOTIFY.md](analyses/GOP_Server_API_rbac_matrix_gate_NOTIFY.md) | GOP_Server_API_rbac_matrix_gate_NOTIFY.md | 2026-07-07 |
 | [Map_Edit_Undo_Redo-analysis.md](analyses/Map_Edit_Undo_Redo-analysis.md) | Map_Edit_Undo_Redo | 2026-07-02 |
@@ -59,13 +60,15 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [malfunction-autoreport-setting-prd.md](prds/malfunction-autoreport-setting-prd.md) | 장애 이벤트 자동조치보고 독립 설정 — `장애 이벤트 해제` 항목 신설(탐지와 분리), 장애 전용 토글·타임아웃, 업그레이드 기본값 true/20 | Draft | 2026-07-31 |
-| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | 지도 계기 인디케이터(강풍모드·탐지장애)+보기(View)메뉴 — EQM 소스·타입칩 v2분리·z6·드래그영속 | Completed | 2026-07-31 |
-| [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | API/NATS 호출·수신 로깅 P0(진단 사각 제거) | Draft | 2026-07-31 |
-| [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | WINDY 롤백 복구·프록시 서버 해석·조준 실패 팝업 승격 | Approved | 2026-07-30 |
-| [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS NATS v1.5.2 REQ 전환+LAMP 제어 서비스 | Approved | 2026-07-30 |
-| [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | 방위각 심볼(나침반) CustomControl — 회전 싱크·드래그·링 회전·우클릭 설정·영속 | Approved·구현완료 | 2026-07-30 |
+| [malfunction-autoreport-setting-prd.md](prds/malfunction-autoreport-setting-prd.md) | malfunction-autoreport-setting | Approved | 2026-07-31 |
+| [GMap_Controller_Blackout-prd.md](prds/GMap_Controller_Blackout-prd.md) | 제어기 무통신→연결센서 그룹 검은색 전파(시뮬 101×2 반영) | Completed | 2026-07-31 |
+| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | GMap_Map_Instruments | Draft | 2026-07-31 |
+| [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | GOP_Logging_Observability_P0 | Draft | 2026-07-31 |
+| [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | GOP_Nats_Req_Failure_UX | Approved | 2026-07-30 |
+| [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | GMap_Compass_Control | Draft | 2026-07-30 |
+| [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS_Nats_v152_Req_Transition | Approved | 2026-07-30 |
 | [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | GMap_Rotation_Full_Sync | Approved | 2026-07-30 |
+| [GIS.md](prds/GIS.md) | GIS.md | Draft | 2026-07-30 |
 | [line-drawing-hud-redesign-prd.md](prds/line-drawing-hud-redesign-prd.md) | line-drawing-hud-redesign | Draft | 2026-07-28 |
 | [Measure_Tools-prd.md](prds/Measure_Tools-prd.md) | Measure_Tools | Approved | 2026-07-27 |
 | [CameraPopup_ControlHub-prd.md](prds/CameraPopup_ControlHub-prd.md) | CameraPopup_ControlHub | Approved | 2026-07-27 |
@@ -94,7 +97,6 @@
 | [GOP_Server_API_GIS_v6.3_전달통지.md](prds/GOP_Server_API_GIS_v6.3_전달통지.md) | GOP_Server_API_GIS_v6.3_전달통지.md | Draft | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
 | [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
-| [GIS.md](prds/GIS.md) | GIS.md | Draft | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
 | [LeftMenu_IntegratedWeb_Button-prd.md](prds/LeftMenu_IntegratedWeb_Button-prd.md) | LeftMenu_IntegratedWeb_Button | Approved | 2026-07-13 |
 | [GMap_Zoom_Anchor_Home-prd.md](prds/GMap_Zoom_Anchor_Home-prd.md) | GMap_Zoom_Anchor_Home | Draft | 2026-07-13 |
@@ -215,10 +217,12 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [GIS_Nats_v152_Req_Transition-prd-plan.md](plans/GIS_Nats_v152_Req_Transition-prd-plan.md) | [PRD](prds/GIS_Nats_v152_Req_Transition-prd.md) | 24/28 | 2026-07-30 |
+| [malfunction-autoreport-setting-prd-plan.md](plans/malfunction-autoreport-setting-prd-plan.md) | [PRD](prds/malfunction-autoreport-setting-prd.md) | 0/27 | 2026-07-31 |
 | [GMap_Map_Instruments-prd-plan.md](plans/GMap_Map_Instruments-prd-plan.md) | [PRD](prds/GMap_Map_Instruments-prd.md) | 16/16 | 2026-07-31 |
 | [GMap_Compass_Control-prd-plan.md](plans/GMap_Compass_Control-prd-plan.md) | [PRD](prds/GMap_Compass_Control-prd.md) | 12/12 | 2026-07-30 |
-| [GMap_Rotation_Full_Sync-prd-plan.md](plans/GMap_Rotation_Full_Sync-prd-plan.md) | [PRD](prds/GMap_Rotation_Full_Sync-prd.md) | 0/53 | 2026-07-30 |
+| [GOP_Nats_Req_Failure_UX-prd-plan.md](plans/GOP_Nats_Req_Failure_UX-prd-plan.md) | [PRD](prds/GOP_Nats_Req_Failure_UX-prd.md) | 14/16 | 2026-07-30 |
+| [GMap_Rotation_Full_Sync-prd-plan.md](plans/GMap_Rotation_Full_Sync-prd-plan.md) | [PRD](prds/GMap_Rotation_Full_Sync-prd.md) | 53/56 | 2026-07-30 |
+| [GIS_Nats_v152_Req_Transition-prd-plan.md](plans/GIS_Nats_v152_Req_Transition-prd-plan.md) | [PRD](prds/GIS_Nats_v152_Req_Transition-prd.md) | 24/33 | 2026-07-30 |
 | [line-drawing-hud-redesign-prd-plan.md](plans/line-drawing-hud-redesign-prd-plan.md) | [PRD](prds/line-drawing-hud-redesign-prd.md) | 15/21 | 2026-07-28 |
 | [Measure_Tools-prd-plan.md](plans/Measure_Tools-prd-plan.md) | [PRD](prds/Measure_Tools-prd.md) | 0/21 | 2026-07-27 |
 | [CameraPopup_ControlHub-prd-plan.md](plans/CameraPopup_ControlHub-prd-plan.md) | [PRD](prds/CameraPopup_ControlHub-prd.md) | 19/19 | 2026-07-27 |
@@ -318,7 +322,7 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
-| [GMap_Rotation_E2E2-scenarios.md](tests/GMap_Rotation_E2E2-scenarios.md) | 육안 시나리오(사용자 실행 대기) | -% | 2026-07-30 |
+| [GMap_Rotation_E2E2-scenarios.md](tests/GMap_Rotation_E2E2-scenarios.md) | -% | -% | 2026-07-30 |
 | [GMap_Anchor_Viewport_Lock-test-result.md](tests/GMap_Anchor_Viewport_Lock-test-result.md) | -% | -% | 2026-07-19 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md](tests/GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md) | -% | -% | 2026-07-18 |
 | [GMap_Edit_Integration_Sim-test-result.md](tests/GMap_Edit_Integration_Sim-test-result.md) | -% | -% | 2026-07-05 |

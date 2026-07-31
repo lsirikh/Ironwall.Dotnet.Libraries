@@ -15,6 +15,11 @@
 ## [Unreleased]
 
 ### Added
+- **장애 이벤트 자동조치보고 독립 설정** (Track C · Events + Events.Ui · [PRD](docs/prds/malfunction-autoreport-setting-prd.md) · [Plan](docs/plans/malfunction-autoreport-setting-prd-plan.md) · 태그 `before-malfunction-autoreport-setting` · 사용자 지시 2026-07-31)
+  - **문제**: `이벤트설정`의 탐지 항목 1개(`탐지 이벤트 해제` 토글+초)가 탐지·장애 **양쪽** 자동조치보고 타이머·활성을 동시 결정.
+  - **라이브러리(이 repo)**: `IEventSetupModel`·`EventSetupModel`에 장애 전용 필드 `IsMalfunctionAutoEventDiscard`/`MalfunctionTimeDiscardSec` 추가(복사 생성자 포함). `MalfunctionNatsSyncService`가 장애 Enqueue 시 신규 필드를 읽도록 변경(탐지 경로 `DetectionNatsSyncService`는 무변경). 장애 토글 OFF → 엔트리 `IsAutoReportEnabled=false` → `EventQueueManager` tick skip → 장애 자동조치보고 미발송.
+  - **테스트**: `MalfunctionNatsSyncServiceTests`(필드 매핑·off 게이팅·탐지 독립성 4종) + `EventSetupModelTests`(복사 생성자 1종) 신설. TDD Red→Green. Events.Ui 340 통과/7 실패(전부 기존 기준선=DeviceSymbolLookupModel·DetectionNatsSyncService, 회귀 0) · 한글 BOM.
+  - **⚠ 메인 솔루션 잔여([외부 솔루션] EXT)**: `SetupModel`(C# 기본값 true/20)·`appsettings.json`·`EventSetupViewModel`·`EventSetupView.xaml`(`장애 이벤트 해제` 항목 신설) — 사용자 통지 후 진행 예정.
 - **탐지 이벤트 DataGrid 썸네일 컬럼** (Track C · Events.Ui · 사용자 지시 2026-07-31)
   - `DetectionEventPanelView` DataGrid에 "썸네일" 컬럼 추가(Device 다음). **Row 높이 이내로 축소**(Grid 36 / Image MaxHeight 34), **마우스 호버 시 원본 크기 툴팁**(MaxWidth 360, InitialShowDelay 300ms). 썸네일 **부재/로드 실패 시 기본 이미지**(`ImageOffOutline`) — Image를 기본 아이콘 위에 겹쳐 로드 실패 시 뒤 레이어 노출(코드비하인드 불요).
   - **공통 헬퍼** `Helpers/ThumbnailUriResolver` 신설 — 썸네일 원본 경로→절대 URI(절대 그대로 / 상대는 API base host 결합, `IApiSetupModel` IoC 조달). `DetectionEventViewModel`(행)·`DetectionSelectionViewModel`(속성 편집기)가 공유(기존 중복 로직 제거).
@@ -44,6 +49,16 @@
   - **검증**: Events.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안.
 
 ### Fixed
+- **서버 datetime 규약(aware ISO 8601) 정합 — GIS→서버 요청 시각 offset 통일** (Track C · Messages/Api/Events.Ui/Accounts.Ui/Devices.Api · 서버팀 통지 `GOP_Server_API_datetime_unification` · 사용자 지시 2026-07-31)
+  - **배경**: 서버가 datetime Option B(저장 UTC / 출력 offset / **입력 aware 권장**)로 통일. 클라가 naive/거짓-Z를 보내면 서버가 ±9h 오해석. 전수 감사(6영역 병렬)로 gap 도출.
+  - **P0(데이터 오염)**: `DtoToModelHelper`의 이벤트 생성 `created_at`이 KST 벽시계에 **리터럴 'Z'**를 붙여 거짓 UTC를 만들던 결함(서버 UTC 해석 시 +9h) → 공통 헬퍼 aware(+09:00)로 교정(탐지/장애/연결/조치 4곳). `BaseDto`의 올바른 aware 기본값을 덮어쓰던 문제도 해소.
+  - **공통 헬퍼 신설** `KoreaTimeHelper.ToServerIso8601(DateTime / DateTimeOffset / DateTime?)` — Kind별(Utc→+00:00, Local→로컬, Unspecified→KST +09:00) aware ISO 8601 생성.
+  - **쿼리 aware**: `EventProviderService`(조회·페이지·통계 11지점 start_date/end_date), `DetectionHistoryDialogViewModel`, `AuditLogPanelViewModel` — naive `ToString("yyyy-MM-ddTHH:mm:ss")` → 헬퍼 aware.
+  - **공통 body 직렬화**: `ApiService`가 설정 없이 `SerializeObject`하던 것에 `DateTimeZoneHandling.Local` 부여 → 모든 body DateTime 필드(Grant valid_from/valid_until 등)가 offset 부착.
+  - **응답 파서**: `DtoToModelHelper.ParseDateTime`가 `DateTimeOffset.TryParse`(RoundtripKind)로 offset 보존 후 KST 정규화(기존 offset 소실 수정).
+  - **URL 인코딩**: `ServerApiService`/`DeviceApiService`의 `before_date` raw 결합 → `Uri.EscapeDataString`(aware '+' → %2B, 손상 방지).
+  - **보류(서버 계약/후속 확인 필요)**: Report generate date-only(`yyyy-MM-dd`, 서버가 aware ISO 수용 여부 확인 후), ServerMetric `collected_at` 호출자(GIS 박스 직접 푸시 경로), `GrantDto` **응답** offset 보존(DTO를 DateTimeOffset/string으로 — 다운스트림 영향), `BrokerMessageHelper` 헬퍼 일원화(현재도 UtcNow+Z로 aware).
+  - **검증**: 솔루션 빌드 0오류. ⚠앱 재빌드 후 런타임 육안.
 - **조치보고 다이얼로그 탐지/장애 속성 "스크롤 불가 + 높이 짤림" 버그** (Track B · Events.Ui · 사용자 스크린샷 제보 2026-07-31)
   - **원인 1(스크롤 불가)**: 다이얼로그가 `<ContentControl x:Name="SelectedItemEditor" IsEnabled="false">`로 읽기전용을 걸었는데, WPF의 IsEnabled는 자식으로 **강제 상속**되어 내부 `ScrollViewer`까지 비활성화 → 스크롤바 드래그·휠 모두 죽음.
   - **원인 2(높이 짤림)**: `ScrollViewer MaxHeight="150"`이 과소해 6행(Type/Device/Status/Result/신호/객체) 중 3행만 보이고 나머지가 숨음.
@@ -77,6 +92,11 @@
   - **검증**: 빌드 0오류(양 레포) · 메인 테스트 53개 중 45 green(8 skip 기존)+신규 해석기 테스트 5종 · GMaps.Ui 337/338(기준선 1 제외 green, 회귀 0). ⚠런타임 육안(풍량 실패→사유 팝업+라디오 복원 / 조준 실패→팝업)은 앱 재빌드 후.
 
 ### Added
+- **제어기 무통신 그룹 검은색 전파(GMap_Controller_Blackout)** ([PRD](docs/prds/GMap_Controller_Blackout-prd.md) · [분석·시뮬](docs/analyses/Controller_Blackout_Propagation-analysis.md) · v2.6 `bff9b13`)
+  - 제어기 장애(MALFUNCTION `reason=FAULT_CONTROLLER`) → 연결 센서가 먹통 → 그 센서 그룹의 PidsGroupSymbol을 **검은색(Blackout, 최상위 우선)**. 해소 시 남은 센서 장애 그룹은 **주황 복귀**.
+  - `EnumCompositeEventStatus.Blackout` + 순수 `ControllerBlackoutModel`(우선순위 `Blackout>FaultedDetecting>Faulted>Detecting>Normal` + 제어기→센서 그룹 확장). `EventEntry.IsControllerBlackout`, EQM 상태계산 단일 우선순위 지점.
+  - `MalfunctionNatsSyncService`: `DeviceProvider` 주입, `reason` 파싱, 연결센서 그룹 합집합 확장. SEM/모델/PidsGroup·Pids 마커 검은색 트리거.
+  - **시뮬레이션(사용자 요구): 101 시나리오 ×2회**(시뮬 vs 독립 오라클 매 스텝 대조), 330 스텝·734 색상대조 실패 0·결정성. 적대 리뷰 wf(13에이전트) CONFIRMED 2건 수정(①DeviceProvider 수동팩토리 미전달=기능 죽음 ②제어기 자기 마커 주황→초록 회귀). 빌드 0오류·Events.Ui 59통과. ⚠런타임 육안=사용자.
 - **지도 계기 인디케이터 2종(강풍·탐지장애) + 보기(View) 메뉴(GMap_Map_Instruments)** ([PRD](docs/prds/GMap_Map_Instruments-prd.md) · [Plan](docs/plans/GMap_Map_Instruments-prd-plan.md) · [강풍 WF](docs/design/GMap_Windy_Indicator-wireframe.html) · [탐지장애 WF](docs/design/GMap_Detection_Fault_Indicator-wireframe.html) · 태그 `before-map-instruments` · v2.6 `f1ee163`+메인솔루션 `ad17c73`)
   - **GMapWindyIndicatorControl**: WINDY 4모드(wind0 보통/wind1 약풍/wind2 강풍/wind3 태풍) 아이콘·색 전환(중립→Info→Warning→Critical, 태풍 회전+펄스)·아이콘+라벨/아이콘만·평상시숨김. 소스=`ChangeModeWindyMessageModel` 구독. 클릭→WINDY 패널(`OpenWindyPanelMessageModel`).
   - **GMapDetectionFaultControl**: 활성(미조치) 탐지/장애 집계 pill 2개(Critical/Warning)·탐지 펄스·세로/가로·0건숨김. **소스=`EventQueueManager`(활성 SSOT, 카드목록 아님 — 500캡 desync 회피)**. 클릭→이벤트 패널(`OpenEventPanelMessageModel`).
