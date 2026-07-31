@@ -66,6 +66,17 @@ public class SessionLifecycle : ISessionLifecycle
         if (exp is null) return;                       // 무만료/DB모드 → 타이머 불요
         var due = exp.Value - DateTime.UtcNow;
         if (due <= TimeSpan.Zero) { OnExpiry(); return; }   // 이미 만료 → 즉시
+
+        // System.Threading.Timer 의 dueTime 상한 = 4294967294ms(≈49.7일). 초과 시(장수명 토큰,
+        // 예: exp가 수년 후) 그대로 넘기면 ArgumentOutOfRangeException 으로 무장 실패 → 능동 만료 감지가
+        // 아예 안 걸리던 버그(로그: dueTime '315...' must be ≤ '4294967294'). 상한을 넘으면 능동 타이머를
+        // 생략한다 — 그렇게 먼 만료는 실사용 세션 내 도달 불가하고, 실제 만료는 요청 시 401→refresh 로 반응 처리됨.
+        const double MaxTimerMs = 4_294_967_294d;
+        if (due.TotalMilliseconds > MaxTimerMs)
+        {
+            _log?.Info($"[SessionLifecycle] 만료가 매우 김(exp={exp.Value:o}, {due.TotalDays:F0}일 후) — 능동 만료 타이머 생략(Timer 한계 초과, 401 반응 처리 위임)");
+            return;
+        }
         try
         {
             _expiryTimer = new Timer(_ => OnExpiry(), null, due, Timeout.InfiniteTimeSpan);

@@ -51,7 +51,8 @@ public class BearerAuthHandler : DelegatingHandler
         var refreshed = await TryRefreshSingleFlightAsync(staleToken, cancellationToken).ConfigureAwait(false);
         if (!refreshed)
         {
-            _log?.Warning("[BearerAuthHandler] refresh 실패 — 세션 만료 신호 발화");
+            // 진단: 어느 요청의 401이 트리거였는지(로그인 직후 특정 엔드포인트 401 원인 추적용).
+            _log?.Warning($"[BearerAuthHandler] refresh 실패 — 세션 만료 신호 발화 (401 trigger={request.RequestUri?.AbsolutePath})");
             SessionExpired?.Invoke();
             return response;
         }
@@ -107,6 +108,8 @@ public class BearerAuthHandler : DelegatingHandler
                 return false;
             }
 
+            // 진단: 서버가 refresh 를 왜 거부했는지(전송실패 vs 401/만료 등) 남긴다 — 로그인 직후 로그아웃 원인 추적.
+            _log?.Warning($"[BearerAuthHandler] auth/refresh 거부: success={result.Success}, code={result.Error?.Code}, msg='{(string.IsNullOrEmpty(result.Message) ? result.Error?.Message : result.Message)}'");
             _store.Clear();
             return false;
         }
