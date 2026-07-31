@@ -1,4 +1,5 @@
-﻿using Ironwall.Dotnet.Libraries.Devices.Providers;
+﻿using Caliburn.Micro;
+using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using System;
 using System.Linq;
@@ -15,13 +16,15 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 ****************************************************************************/
 
 /// <summary>억제 스케줄 DataGrid 행. 서버 DTO + Device/Group Provider로 표시명 해석.</summary>
-public class EventSuppressionScheduleItemViewModel
+public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
 {
     public EventSuppressionScheduleItemViewModel(
         EventSuppressionScheduleDto dto,
         DeviceProvider? deviceProvider,
-        DeviceGroupProvider? groupProvider)
+        DeviceGroupProvider? groupProvider,
+        System.Action? onSelectionChanged = null)
     {
+        _onSelectionChanged = onSelectionChanged;
         Id = dto.Id;
         Name = dto.Name;
         Status = dto.Status ?? "pending";
@@ -32,7 +35,11 @@ public class EventSuppressionScheduleItemViewModel
         // 취소(soft-cancel) 가능 = 아직 취소 안 됐고 종료되지 않음(예정/진행중).
         IsCancellable = string.IsNullOrEmpty(dto.RevokedAt)
                         && Status is not ("expired" or "cancelled");
+        // 하드삭제 대상 = 취소됨/종료됨(terminal) — 목록 정리용 선택 체크박스 노출 조건.
+        IsDeletable = Status is "cancelled" or "expired";
     }
+
+    private readonly System.Action? _onSelectionChanged;
 
     /// <summary>스케줄 DB Id.</summary>
     public int Id { get; }
@@ -59,6 +66,24 @@ public class EventSuppressionScheduleItemViewModel
     public string WindowEndText { get; }
     /// <summary>취소 버튼 활성 여부.</summary>
     public bool IsCancellable { get; }
+
+    /// <summary>하드삭제 대상 여부(취소/종료 = terminal). 삭제 체크박스 노출 조건.</summary>
+    public bool IsDeletable { get; }
+
+    /// <summary>삭제 선택(체크박스, TwoWay). IsDeletable 행에서만 유효 — 변경 시 패널에 통지(선택수/버튼 갱신).</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            var v = value && IsDeletable;   // 비대상(진행중/예정) 행은 선택 불가(방어)
+            if (_isSelected == v) return;
+            _isSelected = v;
+            NotifyOfPropertyChange(nameof(IsSelected));
+            _onSelectionChanged?.Invoke();
+        }
+    }
+    private bool _isSelected;
 
     #region - Helpers -
     private static string MapScope(string scope) => scope switch

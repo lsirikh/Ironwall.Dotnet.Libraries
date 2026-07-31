@@ -111,3 +111,26 @@ public class EventSuppressionScheduleRequestDto
     [JsonProperty("recurrence_rule", Order = 10, NullValueHandling = NullValueHandling.Ignore)]
     public string? RecurrenceRule { get; set; }
 }
+
+/// <summary>
+/// 취소/종료(terminal) 억제 스케줄 <b>일괄 하드삭제</b> 요청(POST /bulk-delete).
+/// <para>soft-cancel(DELETE)과 달리 목록에서 물리 제거(복구 불가). 서버는 활성/예정은 skip.</para>
+/// </summary>
+public class EventSuppressionBulkDeleteRequestDto
+{
+    [JsonProperty("ids")]
+    public List<int> Ids { get; set; } = new();
+}
+
+/// <summary>일괄 하드삭제 결과 — 삭제/스킵(활성·예정)/미존재 분리.</summary>
+public class EventSuppressionBulkDeleteResultDto
+{
+    [JsonProperty("deleted_ids")]
+    public List<int> DeletedIds { get; set; } = new();
+
+    [JsonProperty("skipped_ids")]
+    public List<int> SkippedIds { get; set; } = new();
+
+    [JsonProperty("not_found_ids")]
+    public List<int> NotFoundIds { get; set; } = new();
+}

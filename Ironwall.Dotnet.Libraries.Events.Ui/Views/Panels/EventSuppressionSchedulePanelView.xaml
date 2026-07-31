@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.EventSuppressionSchedulePanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -68,6 +68,35 @@
 
 				<!--  툴바 + 필터  -->
 				<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+					<!--  선택 삭제(취소/종료 행 일괄 하드삭제) — 취소항목 정리  -->
+					<Button
+						DockPanel.Dock="Left"
+						Margin="0,0,8,0"
+						IsEnabled="{Binding CanDeleteSelected}"
+						Style="{StaticResource MaterialDesignFlatButton}"
+						ToolTip="체크한 취소/종료 항목을 목록에서 완전 삭제(복구 불가)">
+						<cal:Message.Attach>[Event Click] = [Action OnClickDeleteSelected()]</cal:Message.Attach>
+						<StackPanel Orientation="Horizontal">
+							<md:PackIcon
+								Width="18"
+								Height="18"
+								VerticalAlignment="Center"
+								Kind="DeleteSweep" />
+							<TextBlock
+								Margin="5,0,0,0"
+								VerticalAlignment="Center"
+								Text="{Binding DeleteSelectedText}" />
+						</StackPanel>
+					</Button>
+					<CheckBox
+						DockPanel.Dock="Left"
+						Margin="0,0,14,0"
+						VerticalAlignment="Center"
+						Content="취소항목 전체선택"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						IsChecked="{Binding SelectAllDeletable, Mode=TwoWay}"
+						Visibility="{Binding HasDeletableRows, Converter={StaticResource BoolToVis}}" />
+
 					<Button
 						DockPanel.Dock="Right"
 						Style="{StaticResource ModernToolbarButton}"
@@ -364,6 +393,20 @@
 						<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 					</i:Interaction.Behaviors>
 					<DataGrid.Columns>
+						<!--  삭제 선택 체크박스 — 취소/종료(terminal) 행에만 노출  -->
+						<DataGridTemplateColumn Width="60">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<CheckBox
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+										ToolTip="삭제 선택(취소/종료 항목만)"
+										Visibility="{Binding IsDeletable, Converter={StaticResource BoolToVis}}" />
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
 						<DataGridTemplateColumn Width="90" Header="상태">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>

@@ -27,7 +27,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
    Company      : Sensorway Co., Ltd.
    Email        : lsirikh@naver.com
 ****************************************************************************/
-public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandle<CallCancelSuppressionMessageModel>
+public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
+    IHandle<CallCancelSuppressionMessageModel>,
+    IHandle<CallBulkDeleteSuppressionMessageModel>
 {
     #region - Ctors -
     public EventSuppressionSchedulePanelViewModel(
@@ -122,6 +124,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
         {
             NotifyOfPropertyChange(nameof(CanCreate));
             NotifyOfPropertyChange(nameof(CanDelete));
+            NotifySelectionState();   // events:delete 회수 시 '선택 삭제' 버튼/전체선택 즉시 비활성 반영
         });
     }
     #endregion
@@ -226,6 +229,70 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
         }
     }
+
+    /// <summary>선택 삭제(체크된 취소/종료 행 일괄 하드삭제) → Confirm 후 CallBulkDeleteSuppressionMessageModel 발행.</summary>
+    public async Task OnClickDeleteSelected()
+    {
+        if (!CanDelEvents())
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "권한 없음", Explain = "이벤트 삭제 권한(events:delete)이 없습니다." });
+            return;
+        }
+        var ids = Schedules.Where(s => s.IsSelected && s.IsDeletable).Select(s => s.Id).ToList();
+        if (ids.Count == 0)
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "억제 스케줄 삭제", Explain = "삭제할 취소/종료 항목을 체크하세요." });
+            return;
+        }
+        await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
+        {
+            Title = "억제 스케줄 삭제",
+            Explain = $"선택한 {ids.Count}건을 목록에서 완전 삭제합니다.\n삭제 후에는 복구할 수 없습니다. 계속하시겠습니까?",
+            MessageModel = new CallBulkDeleteSuppressionMessageModel { Ids = ids }
+        });
+    }
+
+    /// <summary>Confirm→Yes 후 실제 일괄 하드삭제(POST /bulk-delete) + 목록 갱신. 활성/예정 skip 시 안내.</summary>
+    public async Task HandleAsync(CallBulkDeleteSuppressionMessageModel message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var res = await _api.BulkDeleteSuppressionSchedulesAsync(message.Ids);
+            if (res.Success)
+            {
+                var skipped = res.Data?.SkippedIds?.Count ?? 0;
+                await LoadAllAsync();
+                if (skipped > 0)
+                    await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                    {
+                        Title = "억제 스케줄 삭제",
+                        Explain = $"{res.Data?.DeletedIds?.Count ?? 0}건 삭제. {skipped}건은 활성/예정이라 제외(먼저 취소 필요)."
+                    });
+            }
+            else
+                await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+                { Title = "억제 스케줄 삭제", Explain = $"삭제 실패: {res.Error?.Message ?? res.Message}" });
+        }
+        catch (Exception ex) { _log?.Error($"[Suppression] 일괄 삭제 실패: {ex.Message}"); }
+        finally
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+        }
+    }
+
+    /// <summary>행 체크박스 변경 콜백 — 선택수/버튼/전체선택 상태 갱신.</summary>
+    private void OnItemSelectionChanged() => NotifySelectionState();
+
+    private void NotifySelectionState()
+    {
+        NotifyOfPropertyChange(nameof(SelectedDeleteCount));
+        NotifyOfPropertyChange(nameof(CanDeleteSelected));
+        NotifyOfPropertyChange(nameof(DeleteSelectedText));
+        NotifyOfPropertyChange(nameof(HasDeletableRows));
+        NotifyOfPropertyChange(nameof(SelectAllDeletable));
+    }
     #endregion
 
     #region - Processes -
@@ -259,9 +326,10 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
                 Execute.OnUIThread(() =>
                 {
                     Schedules.Clear();
-                    foreach (var d in res.Data) Schedules.Add(new EventSuppressionScheduleItemViewModel(d, DeviceProvider, DeviceGroupProvider));
+                    foreach (var d in res.Data) Schedules.Add(new EventSuppressionScheduleItemViewModel(d, DeviceProvider, DeviceGroupProvider, OnItemSelectionChanged));
                     NotifyOfPropertyChange(nameof(LoadedCountText));
                     NotifyOfPropertyChange(nameof(HasMorePages));
+                    NotifySelectionState();
                 });
             }
             else if (!res.Success)
@@ -286,9 +354,10 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
             _totalPages = _totalCount > 0 ? (int)Math.Ceiling(_totalCount / (double)PAGE_SIZE) : _totalPages;
             Execute.OnUIThread(() =>
             {
-                foreach (var d in res.Data) Schedules.Add(new EventSuppressionScheduleItemViewModel(d, DeviceProvider, DeviceGroupProvider));
+                foreach (var d in res.Data) Schedules.Add(new EventSuppressionScheduleItemViewModel(d, DeviceProvider, DeviceGroupProvider, OnItemSelectionChanged));
                 NotifyOfPropertyChange(nameof(LoadedCountText));
                 NotifyOfPropertyChange(nameof(HasMorePages));
+                NotifySelectionState();
             });
         }
         catch (OperationCanceledException) { }
@@ -369,6 +438,22 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
     public string LoadedCountText => $"{Schedules.Count} / {_totalCount}건";
     public bool HasMorePages => _currentPage < _totalPages;
     public ICommand LoadMoreCommand { get; }
+
+    // ── 선택 삭제(취소/종료 행 일괄 하드삭제) ──
+    /// <summary>체크된 삭제 대상(취소/종료) 개수.</summary>
+    public int SelectedDeleteCount => Schedules.Count(s => s.IsSelected && s.IsDeletable);
+    /// <summary>삭제 대상(취소/종료) 행이 하나라도 있는가 — 전체선택 체크박스 노출 조건.</summary>
+    public bool HasDeletableRows => Schedules.Any(s => s.IsDeletable);
+    /// <summary>선택 삭제 버튼 활성 — events:delete + 1건 이상 선택.</summary>
+    public bool CanDeleteSelected => CanDelEvents() && SelectedDeleteCount > 0;
+    /// <summary>선택 삭제 버튼 라벨.</summary>
+    public string DeleteSelectedText => $"선택 삭제 ({SelectedDeleteCount})";
+    /// <summary>취소/종료 행 전체선택 토글(헤더 체크박스 바인딩).</summary>
+    public bool SelectAllDeletable
+    {
+        get { var d = Schedules.Where(s => s.IsDeletable).ToList(); return d.Count > 0 && d.All(s => s.IsSelected); }
+        set { foreach (var s in Schedules.Where(x => x.IsDeletable)) s.IsSelected = value; NotifySelectionState(); }
+    }
     #endregion
 
     #region - Attributes -
@@ -384,4 +469,10 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
 public class CallCancelSuppressionMessageModel : IMessageModel
 {
     public int ScheduleId { get; set; }
+}
+
+/// <summary>선택 삭제 확인 트리거 — Confirm '확인' 시 발행 → HandleAsync가 일괄 하드삭제(POST /bulk-delete).</summary>
+public class CallBulkDeleteSuppressionMessageModel : IMessageModel
+{
+    public System.Collections.Generic.List<int> Ids { get; set; } = new();
 }

@@ -134,4 +134,52 @@ public class EventSuppressionScheduleTests
         Assert.Equal("active", dto.Status);
         Assert.True(dto.IsActive);
     }
+
+    // ── 하드삭제 대상(취소/종료 = terminal) ──
+    [Theory]
+    [InlineData("cancelled", true)]
+    [InlineData("expired", true)]
+    [InlineData("active", false)]
+    [InlineData("pending", false)]
+    public void should_be_deletable_when_status_terminal(string status, bool expected)
+    {
+        var vm = new EventSuppressionScheduleItemViewModel(Dto("device", devIds: new() { 1 }, status: status), null, null);
+        Assert.Equal(expected, vm.IsDeletable);
+    }
+
+    [Fact]
+    public void should_reject_selection_when_not_deletable()
+    {
+        var vm = new EventSuppressionScheduleItemViewModel(Dto("device", devIds: new() { 1 }, status: "active"), null, null);
+        vm.IsSelected = true;   // 진행중 행은 선택 불가(방어)
+        Assert.False(vm.IsSelected);
+    }
+
+    [Fact]
+    public void should_allow_selection_when_deletable()
+    {
+        var vm = new EventSuppressionScheduleItemViewModel(Dto("device", devIds: new() { 1 }, status: "cancelled"), null, null);
+        vm.IsSelected = true;
+        Assert.True(vm.IsSelected);
+    }
+
+    // ── 일괄 삭제 요청/결과 DTO 계약 ──
+    [Fact]
+    public void should_serialize_ids_when_bulk_delete_request()
+    {
+        var req = new EventSuppressionBulkDeleteRequestDto { Ids = new() { 3, 5, 8 } };
+        var json = JsonConvert.SerializeObject(req);
+        Assert.Contains("\"ids\":[3,5,8]", json);
+    }
+
+    [Fact]
+    public void should_deserialize_bulk_delete_result()
+    {
+        var json = "{\"deleted_ids\":[1,2],\"skipped_ids\":[3],\"not_found_ids\":[]}";
+        var res = JsonConvert.DeserializeObject<EventSuppressionBulkDeleteResultDto>(json);
+        Assert.NotNull(res);
+        Assert.Equal(2, res!.DeletedIds.Count);
+        Assert.Single(res.SkippedIds);
+        Assert.Empty(res.NotFoundIds);
+    }
 }

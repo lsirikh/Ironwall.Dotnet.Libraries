@@ -53,4 +53,9 @@ public interface IEventSuppressionApiService : IService
     Task<ApiResponse<EventSuppressionScheduleDto>> CancelSuppressionScheduleAsync(
         int id,
         CancellationToken token = default);
+
+    /// <summary>취소/종료 억제 스케줄 <b>일괄 하드삭제</b>(POST /bulk-delete, 목록 정리). 활성/예정은 서버가 skip.</summary>
+    Task<ApiResponse<EventSuppressionBulkDeleteResultDto>> BulkDeleteSuppressionSchedulesAsync(
+        IEnumerable<int> ids,
+        CancellationToken token = default);
 }

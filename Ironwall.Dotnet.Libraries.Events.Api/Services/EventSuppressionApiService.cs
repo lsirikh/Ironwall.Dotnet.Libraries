@@ -152,6 +152,21 @@ public class EventSuppressionApiService : IEventSuppressionApiService
             return ApiResponse<EventSuppressionScheduleDto>.CreateError("INTERNAL_ERROR", $"Failed to cancel suppression schedule {id}", ex.Message);
         }
     }
+
+    public async Task<ApiResponse<EventSuppressionBulkDeleteResultDto>> BulkDeleteSuppressionSchedulesAsync(IEnumerable<int> ids, CancellationToken token = default)
+    {
+        try
+        {
+            var body = new EventSuppressionBulkDeleteRequestDto { Ids = ids?.Distinct().ToList() ?? new() };
+            var response = await _apiService.PostRequestAsync($"{BaseUrl}/bulk-delete", body);
+            return await response.ToApiResponseAsync<EventSuppressionBulkDeleteResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(BulkDeleteSuppressionSchedulesAsync)}] Error: {ex.Message}");
+            return ApiResponse<EventSuppressionBulkDeleteResultDto>.CreateError("INTERNAL_ERROR", "Failed to bulk-delete suppression schedules", ex.Message);
+        }
+    }
     #endregion
 
     #region - Attributes -
