@@ -365,7 +365,7 @@
 									<Image
 										MaxHeight="34"
 										RenderOptions.BitmapScalingMode="HighQuality"
-										Source="{Binding ThumbnailUri, Mode=OneWay}"
+										Source="{Binding Thumbnail, Mode=OneWay}"
 										Stretch="Uniform"
 										ToolTipService.InitialShowDelay="300"
 										ToolTipService.ShowDuration="30000">
@@ -379,7 +379,7 @@
 													MaxWidth="360"
 													MaxHeight="270"
 													RenderOptions.BitmapScalingMode="HighQuality"
-													Source="{Binding ThumbnailUri, Mode=OneWay}"
+													Source="{Binding Thumbnail, Mode=OneWay}"
 													Stretch="Uniform" />
 											</ToolTip>
 										</Image.ToolTip>

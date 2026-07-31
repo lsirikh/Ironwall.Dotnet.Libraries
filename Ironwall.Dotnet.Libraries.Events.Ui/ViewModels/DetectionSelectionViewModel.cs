@@ -8,6 +8,7 @@ using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 /****************************************************************************
@@ -218,6 +219,17 @@ public class DetectionSelectionViewModel : BasePanelViewModel
 
     /// <summary>썸네일 이미지 후보가 있는지(단일 선택 + URL 존재). false면 View가 default 이미지를 표시.</summary>
     public bool HasThumbnail => ThumbnailUri != null;
+
+    /// <summary>썸네일 이미지(단일 선택) — 원격 URL 1회 다운로드→OnLoad 캐시(<see cref="ThumbnailImageLoader"/>).
+    /// 재열기/탭 전환에도 유지. 로드 전/부재/실패면 null → View의 겹침 default.</summary>
+    public ImageSource? Thumbnail
+    {
+        get
+        {
+            var uri = ThumbnailUri;
+            return uri is null ? null : ThumbnailImageLoader.GetOrLoad(uri, () => NotifyOfPropertyChange(nameof(Thumbnail)));
+        }
+    }
     #endregion
     #region - Attributes -
     private IList<DetectionEventViewModel> _selection;

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
+using System.Windows.Media;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 /****************************************************************************
@@ -61,6 +62,18 @@ public class DetectionEventViewModel : ExEventViewModel, IDetectionEventViewMode
 
     /// <summary>썸네일 후보 존재 여부(URI 유효). false면 뷰가 기본 이미지를 표시.</summary>
     public bool HasThumbnail => ThumbnailUri != null;
+
+    /// <summary>썸네일 이미지 — 원격 URL을 1회 다운로드→OnLoad 디코드→Freeze 캐시(<see cref="Helpers.ThumbnailImageLoader"/>).
+    /// 탭 전환/DataGrid 컨테이너 재활용에도 유지 = Uri 직접 바인딩이 재렌더에 실패해 Default만 남던 문제 해소.
+    /// 로드 전/부재/실패면 null → 뷰의 겹침 default.</summary>
+    public ImageSource? Thumbnail
+    {
+        get
+        {
+            var uri = ThumbnailUri;
+            return uri is null ? null : ThumbnailImageLoader.GetOrLoad(uri, () => NotifyOfPropertyChange(nameof(Thumbnail)));
+        }
+    }
 
     #endregion
     #region - Attributes -

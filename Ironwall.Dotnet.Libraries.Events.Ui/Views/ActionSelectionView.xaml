@@ -16,6 +16,7 @@
 	<!--  View-model proxy (전역 DataContext 바인딩용)  -->
 	<UserControl.Resources>
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 	</UserControl.Resources>
 
 	<GroupBox
@@ -38,103 +39,243 @@
 				<!--  Apply Button  -->
 			</Grid.RowDefinitions>
 
-			<!--  ─────────────────────────────  INPUT GRID  ─────────────────────────────  -->
+			<!--  ── 좌(원본 필수정보 + 편집 필드) + 우(썸네일). 높이는 ScrollViewer MaxHeight로 상한, 넘치면 스크롤 ──  -->
 			<Grid Grid.Row="0">
-				<!--  2 행 × 6 쌍(label + editor) = 12 열  -->
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="80" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="80" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="100" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="80" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="80" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="12" />
+					<ColumnDefinition Width="Auto" />
 				</Grid.ColumnDefinitions>
 
-				<TextBlock
-					Grid.Row="0"
+				<ScrollViewer
 					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Type" />
-				<ComboBox
-					Grid.Row="0"
-					Grid.Column="1"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
-					SelectedItem="{Binding MessageType, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-				</ComboBox>
+					MaxHeight="210"
+					HorizontalScrollBarVisibility="Disabled"
+					VerticalScrollBarVisibility="Auto">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="64" />
+							<ColumnDefinition Width="*" MinWidth="80" />
+						</Grid.ColumnDefinitions>
+						<Grid.Resources>
+							<Style BasedOn="{StaticResource TextBlockTitle}" TargetType="TextBlock">
+								<Setter Property="VerticalAlignment" Value="Center" />
+								<Setter Property="Margin" Value="0,3" />
+							</Style>
+							<!--  원본 필수정보 = 읽기 전용 값(편집 불가). 테두리 없는 TextBox로 복사는 허용, 편집 차단  -->
+							<Style x:Key="ReadOnlyValue" TargetType="TextBox">
+								<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+								<Setter Property="FontSize" Value="14" />
+								<Setter Property="Opacity" Value="0.8" />
+								<Setter Property="IsReadOnly" Value="True" />
+								<Setter Property="Background" Value="Transparent" />
+								<Setter Property="BorderThickness" Value="0" />
+								<Setter Property="Padding" Value="2,0" />
+								<Setter Property="Margin" Value="0,2" />
+								<Setter Property="VerticalAlignment" Value="Center" />
+								<Setter Property="Cursor" Value="Arrow" />
+								<Setter Property="IsTabStop" Value="False" />
+							</Style>
+						</Grid.Resources>
 
-				<TextBlock
-					Grid.Row="0"
+						<!--  ── 원본(Origin) 이벤트 필수정보 — 읽기 전용 ──  -->
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="원본" />
+						<TextBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginKindText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="구역" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginZoneText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="장비" />
+						<TextBox
+							Grid.Row="2"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginDeviceText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="3" Grid.Column="0" Text="번호" />
+						<TextBox
+							Grid.Row="3"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginNumberText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="4" Grid.Column="0" Text="발생" />
+						<TextBox
+							Grid.Row="4"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginDateTimeText, Mode=OneWay}" />
+
+						<!--  탐지 origin 전용: 결과·신호 (장애면 접힘)  -->
+						<TextBlock
+							Grid.Row="5"
+							Grid.Column="0"
+							Text="결과"
+							Visibility="{Binding IsDetectionOrigin, Converter={StaticResource BoolToVis}}" />
+						<TextBox
+							Grid.Row="5"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginResultText, Mode=OneWay}"
+							Visibility="{Binding IsDetectionOrigin, Converter={StaticResource BoolToVis}}" />
+
+						<TextBlock
+							Grid.Row="6"
+							Grid.Column="0"
+							Text="신호"
+							Visibility="{Binding IsDetectionOrigin, Converter={StaticResource BoolToVis}}" />
+						<TextBox
+							Grid.Row="6"
+							Grid.Column="1"
+							FontFamily="Consolas"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginSignalText, Mode=OneWay}"
+							Visibility="{Binding IsDetectionOrigin, Converter={StaticResource BoolToVis}}" />
+
+						<!--  장애 origin 전용: 사유 (탐지면 접힘)  -->
+						<TextBlock
+							Grid.Row="7"
+							Grid.Column="0"
+							Text="사유"
+							Visibility="{Binding IsMalfunctionOrigin, Converter={StaticResource BoolToVis}}" />
+						<TextBox
+							Grid.Row="7"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding OriginReasonText, Mode=OneWay}"
+							Visibility="{Binding IsMalfunctionOrigin, Converter={StaticResource BoolToVis}}" />
+
+						<Border
+							Grid.Row="8"
+							Grid.Column="0"
+							Grid.ColumnSpan="2"
+							Height="1"
+							Margin="0,6"
+							Background="{DynamicResource DividerBrush}" />
+
+						<!--  ── 조치 편집 필드 ──  -->
+						<TextBlock Grid.Row="9" Grid.Column="0" Text="Type" />
+						<ComboBox
+							Grid.Row="9"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
+							SelectedItem="{Binding MessageType, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemsPanel>
+								<ItemsPanelTemplate>
+									<VirtualizingStackPanel />
+								</ItemsPanelTemplate>
+							</ComboBox.ItemsPanel>
+						</ComboBox>
+
+						<TextBlock Grid.Row="10" Grid.Column="0" Text="원본지정" />
+						<ComboBox
+							Grid.Row="10"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Data.EventProvider, Source={StaticResource proxy}}"
+							SelectedItem="{Binding OriginEvent, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemsPanel>
+								<ItemsPanelTemplate>
+									<VirtualizingStackPanel />
+								</ItemsPanelTemplate>
+							</ComboBox.ItemsPanel>
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Width="52" Text="{Binding Id}" />
+										<TextBlock Width="76" Text="{Binding MessageType}" />
+										<TextBlock Width="120" Text="{Binding Device.DeviceName}" />
+										<TextBlock Width="130" Text="{Binding DateTime, StringFormat={}{0:yy-MM-dd HH:mm:ss}}" />
+									</StackPanel>
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+
+						<TextBlock Grid.Row="11" Grid.Column="0" Text="User" />
+						<TextBox
+							Grid.Row="11"
+							Grid.Column="1"
+							Margin="0,2"
+							md:HintAssist.Hint="admin"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding User, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+						<TextBlock Grid.Row="12" Grid.Column="0" Text="Content" />
+						<TextBox
+							Grid.Row="12"
+							Grid.Column="1"
+							Margin="0,2"
+							md:HintAssist.Hint="Action report contents"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding Content, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+							TextWrapping="Wrap" />
+					</Grid>
+				</ScrollViewer>
+
+				<!--  우: 썸네일 — 탐지 origin=이미지 / 장애·부재·로드실패=Default("미리보기 없음")  -->
+				<Border
 					Grid.Column="2"
-					Style="{StaticResource TextBlockTitle}"
-					Text="User" />
-				<TextBox
-					Grid.Row="0"
-					Grid.Column="3"
-					md:HintAssist.Hint="admin"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding User, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					Width="150"
+					Height="150"
+					VerticalAlignment="Top"
+					Background="{DynamicResource MaterialDesignChipBackground}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="1"
+					CornerRadius="4">
+					<Grid>
+						<!--  default (뒤): 썸네일 없음/장애/로드 실패 시 노출  -->
+						<StackPanel
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Orientation="Vertical">
+							<md:PackIcon
+								Width="32"
+								Height="32"
+								HorizontalAlignment="Center"
+								Opacity="0.5"
+								Kind="ImageOffOutline" />
+							<TextBlock
+								Margin="0,4,0,0"
+								HorizontalAlignment="Center"
+								FontSize="11"
+								Opacity="0.55"
+								Text="미리보기 없음" />
+						</StackPanel>
 
-				<TextBlock
-					Grid.Row="0"
-					Grid.Column="4"
-					Style="{StaticResource TextBlockTitle}"
-					Text="OriginEvent" />
-				<ComboBox
-					Grid.Row="0"
-					Grid.Column="5"
-					Grid.ColumnSpan="4"
-					ItemsSource="{Binding Data.EventProvider, Source={StaticResource proxy}}"
-					SelectedItem="{Binding OriginEvent, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<!--  패널 지정 → 반드시 ItemsPanelTemplate 로 래핑  -->
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-
-					<!--  실제 아이템 모양  -->
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Width="60" Text="{Binding Id}" />
-								<TextBlock Width="80" Text="{Binding MessageType}" />
-								<TextBlock Width="120" Text="{Binding Device.DeviceName}" />
-								<TextBlock Width="140" Text="{Binding DateTime, StringFormat={}{0:yy-MM-dd HH:mm:ss}}" />
-							</StackPanel>
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
-
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Content" />
-				<TextBox
-					Grid.Row="1"
-					Grid.Column="1"
-					Grid.ColumnSpan="8"
-					md:HintAssist.Hint="Action report contents"
-					Style="{StaticResource TextBoxInput}"
-					Text="{Binding Content, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-					TextWrapping="Wrap" />
-
-
+						<!--  썸네일 이미지(앞): 탐지 origin 후보 있을 때만. 로드 전/실패면 빈 렌더 → 뒤 default 노출  -->
+						<Image
+							RenderOptions.BitmapScalingMode="HighQuality"
+							Source="{Binding OriginThumbnail, Mode=OneWay}"
+							Stretch="Uniform"
+							Visibility="{Binding HasOriginThumbnail, Converter={StaticResource BoolToVis}}" />
+					</Grid>
+				</Border>
 			</Grid>
 
 			<!--  ───────────────────────────  APPLY BUTTON  ───────────────────────────  -->

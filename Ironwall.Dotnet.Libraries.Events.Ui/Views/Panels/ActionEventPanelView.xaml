@@ -348,6 +348,72 @@
 				</DataGridTemplateColumn>
 
 	
+				<!--  썸네일 (원본 탐지 detail.thumbnail) — 탐지 origin=이미지, 장애/부재=Default. 호버 시 원본 툴팁  -->
+				<DataGridTemplateColumn
+					CanUserSort="False"
+					Header="썸네일"
+					IsReadOnly="True">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<Grid
+								Width="52"
+								Height="36"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center">
+								<!--  기본 이미지(뒤): 썸네일 없음/장애 origin/로드 실패 시 노출  -->
+								<md:PackIcon
+									Width="18"
+									Height="18"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Opacity="0.4"
+									Kind="ImageOffOutline" />
+								<!--  썸네일(앞): 탐지 origin + 후보 존재 시만. 로드 전/실패면 빈 렌더 → 뒤 Default 노출  -->
+								<Border ClipToBounds="True" CornerRadius="3">
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="Visibility" Value="Visible" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HasOriginThumbnail}" Value="False">
+													<Setter Property="Visibility" Value="Collapsed" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+									<Image
+										MaxHeight="34"
+										RenderOptions.BitmapScalingMode="HighQuality"
+										Source="{Binding OriginThumbnail, Mode=OneWay}"
+										Stretch="Uniform"
+										ToolTipService.InitialShowDelay="300"
+										ToolTipService.ShowDuration="30000">
+										<Image.ToolTip>
+											<ToolTip
+												Background="{DynamicResource SurfaceAltBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												Padding="4">
+												<Image
+													MaxWidth="360"
+													MaxHeight="270"
+													RenderOptions.BitmapScalingMode="HighQuality"
+													Source="{Binding OriginThumbnail, Mode=OneWay}"
+													Stretch="Uniform" />
+											</ToolTip>
+										</Image.ToolTip>
+									</Image>
+								</Border>
+							</Grid>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+
 				<!--  User  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
