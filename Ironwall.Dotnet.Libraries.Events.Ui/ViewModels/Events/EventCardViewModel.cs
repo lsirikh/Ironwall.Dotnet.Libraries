@@ -66,8 +66,23 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         {
             get
             {
-                var num = (Device as ISensorDeviceModel)?.Controller?.DeviceNumber;
-                return num is null or 0 ? null : num;
+                var controller = (Device as ISensorDeviceModel)?.Controller;
+                var num = controller?.DeviceNumber;
+                if (num is > 0) return num;
+
+                // 폴백: 장애 전문(BaseDeviceDto)은 컨트롤러 표시번호를 싣지 않고 controller_id(FK)만 준다.
+                //   중첩 Controller nav가 미하이드레이션(번호=0)이면 controller_id로 DeviceProvider에서 재해석 —
+                //   생성 경로(Provider 히트/폴백 스텁/미하이드레이션)와 무관하게 제어기 번호를 복구한다.
+                var controllerId = controller?.Id ?? 0;
+                if (controllerId <= 0) return null;
+                try
+                {
+                    var ctrl = IoC.Get<DeviceProvider>()
+                        .OfType<ControllerDeviceModel>()
+                        .FirstOrDefault(c => c.Id == controllerId);
+                    return ctrl?.DeviceNumber is > 0 ? ctrl.DeviceNumber : null;
+                }
+                catch { return null; }
             }
         }
         public string? DeviceTypeName => Device?.DeviceType switch

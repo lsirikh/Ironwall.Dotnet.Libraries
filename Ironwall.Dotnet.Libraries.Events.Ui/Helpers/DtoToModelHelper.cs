@@ -395,12 +395,34 @@ public static class DtoToModelHelper
             model.Id = deviceDto.Id;
             model.DeviceType = deviceType;
             PopulateDeviceFromDto(model, deviceDto);
+            LinkControllerFromDto(model, deviceDto, deviceProvider);
             return model;
         }
 
         var fallback = new SensorDeviceModel { Id = deviceDto.Id };
         PopulateDeviceFromDto(fallback, deviceDto);
+        LinkControllerFromDto(fallback, deviceDto, deviceProvider);
         return fallback;
+    }
+
+    /// <summary>
+    /// 폴백 센서 모델에 controller_id(FK)로 컨트롤러를 연결한다.
+    /// 장애/연결 이벤트 전문(BaseDeviceDto)은 컨트롤러 표시번호를 싣지 않고 controller_id만 준다 —
+    /// Provider에 정식 컨트롤러가 있으면 그 인스턴스로 연결(DeviceNumber 포함), 없으면 최소 FK id만 보존해
+    /// 뷰모델(ControllerDeviceNumber)이 나중에 Provider에서 번호를 재해석할 수 있게 한다.
+    /// </summary>
+    private static void LinkControllerFromDto(BaseDeviceModel model, BaseDeviceDto dto, DeviceProvider? provider)
+    {
+        if (model is not ISensorDeviceModel sensor) return;
+        if (dto.ControllerId is not int cid || cid <= 0) return;
+
+        var ctrl = provider?.OfType<ControllerDeviceModel>().FirstOrDefault(c => c.Id == cid);
+        if (ctrl != null) { sensor.Controller = ctrl; return; }
+
+        if (sensor.Controller == null)
+            sensor.Controller = new ControllerDeviceModel { Id = cid };
+        else
+            sensor.Controller.Id = cid;
     }
 
     /// <summary>

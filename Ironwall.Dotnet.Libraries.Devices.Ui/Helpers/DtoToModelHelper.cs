@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Servers;
@@ -212,10 +212,16 @@ public static class DtoToModelHelper
 
         MapGeolocationToModel(dto, model);
 
-        // Controller 정보가 포함된 경우 변환
+        // Controller 정보가 포함된 경우 변환.
+        // 중첩 controller 객체가 없고 controller_id(FK)만 온 경우엔 Id만 seed →
+        // NavigationMappingHelper.SetupBidirectionalReferences가 실제 FK로 재링크(orphan/제어기번호 유실 방지).
         if (dto.Controller != null)
         {
             model.Controller = dto.Controller.ToControllerDeviceModel();
+        }
+        else if (dto.ControllerId > 0)
+        {
+            model.Controller = new ControllerDeviceModel { Id = dto.ControllerId };
         }
 
         return model;

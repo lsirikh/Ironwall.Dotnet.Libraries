@@ -112,13 +112,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             : ControllerDeviceNumber;
 
         /// <summary>
-        /// 장애 타입에 따라 센서 필드에 표시할 번호
-        /// 센서 장애(FAULT_FENCE, FAULT_MULTI 등): 장치 자신의 DeviceNumber
-        /// 제어기 장애: null (센서 없음)
+        /// 장애 타입에 따라 센서 필드에 표시할 번호.
+        /// 순수 제어기 장애(FAULT_CONTROLLER, FAULT_CABLE_CUTTING): null (센서 없음).
+        /// 그 외 센서 계열 장애(FAULT_FENCE, FAULT_MULTI, FAULT_ETC 등): 장치 자신의 DeviceNumber.
+        /// (블랙리스트 방식 — 화이트리스트면 FAULT_ETC 등 기타/신규 사유에서 센서번호가 무조건 공란)
         /// </summary>
-        public int? SensorDisplay => Reason is EnumFaultType.FAULT_FENCE or EnumFaultType.FAULT_MULTI
-            ? (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber)
-            : null;
+        public int? SensorDisplay => Reason is EnumFaultType.FAULT_CONTROLLER or EnumFaultType.FAULT_CABLE_CUTTING
+            ? null
+            : (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber);
         #endregion
         #region - Attributes -
         #endregion
