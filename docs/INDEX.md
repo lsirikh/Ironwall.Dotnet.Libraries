@@ -59,6 +59,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | API/NATS 호출·수신 로깅 P0(진단 사각 제거) | Draft | 2026-07-31 |
 | [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | WINDY 롤백 복구·프록시 서버 해석·조준 실패 팝업 승격 | Approved | 2026-07-30 |
 | [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS NATS v1.5.2 REQ 전환+LAMP 제어 서비스 | Approved | 2026-07-30 |
 | [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | 방위각 심볼(나침반) CustomControl — 회전 싱크·드래그·링 회전·우클릭 설정·영속 | Approved·구현완료 | 2026-07-30 |

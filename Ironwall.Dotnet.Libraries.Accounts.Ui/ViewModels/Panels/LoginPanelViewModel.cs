@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Providers;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -86,7 +86,7 @@ public class LoginPanelViewModel : BasePanelViewModel
             // 게이트웨이가 인증 + 토큰 발급 (Db: 로컬 TokenGenerator, Api(GOP-00): 서버 JWT)
             var outcome = await _gateway.AuthenticateAsync(Username!, Password!, ct);
             if (!outcome.Success || outcome.Result is null)
-                throw new Exception(FailMessage(outcome));   // G1: 서버 사유별 메시지
+                throw new LoginFailureException(FailMessage(outcome));   // G1: 서버 사유별 메시지(의도된 실패 경로)
             var auth = outcome.Result;
 
             ViewModel.Insert(auth.Account);
@@ -103,14 +103,31 @@ public class LoginPanelViewModel : BasePanelViewModel
             await Task.Delay(TimeSpan.FromSeconds(1));
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePanelMessageModel());
         }
-        catch (Exception ex)
+        catch (LoginFailureException ex)
         {
+            // 의도된 실패(FailMessage 산출 문구) — 그대로 표시 (자격오류는 일반 문구로 SEC-5 준수)
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
-            SetLoginFailed(ex.Message);   // G1: 사유별 메시지 표시(자격오류는 일반 문구로 SEC-5 준수)
+            SetLoginFailed(ex.Message);
             _log?.Info(ex.Message);
             await Task.Delay(TimeSpan.FromSeconds(2));
             ClearLoginStatus();
         }
+        catch (Exception ex)
+        {
+            // 예기치 못한 예외 — raw 예외 문구를 UI에 노출하지 않는다(2026-07-31 "Cannot access child value
+            // on JValue" 노출 사고). 사용자는 일반 문구, 진단은 스택 포함 ERROR 로그로.
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
+            SetLoginFailed("로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.");
+            _log?.Error($"[Login] 예기치 못한 오류: {ex}");
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            ClearLoginStatus();
+        }
+    }
+
+    /// <summary>의도된 로그인 실패(사유 문구 확정) — 일반 예외와 구분해 raw 예외 문구의 UI 노출을 차단한다.</summary>
+    private sealed class LoginFailureException : Exception
+    {
+        public LoginFailureException(string message) : base(message) { }
     }
     #endregion
     #region - Processes -

@@ -14,6 +14,14 @@
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-07-31
+
+### Fixed
+- **로그인 실패 시 raw 예외 문구("Cannot access child value on Newtonsoft.Json.Linq.JValue") 노출 버그** (Track B · 태그 `before-login-details-jvalue-fix` · Accounts.Api+Accounts.Ui · 사용자 제보 2026-07-31)
+  - **원인**: `ApiAccountGateway`가 v6.3 잠금정책 안내를 위해 `error.details`(JToken)에서 `d?["failed_count"]` 등을 인덱싱하는데, `?.`는 C# null만 걸러 **`JValue`(details:null=`JValue(Null)` / 연결실패 로컬에러=`JValue(string)`)** 에는 `JValue["key"]`가 예외를 던짐. 원격 서버(123.141.236.253:8136) 연결 실패 시 이 경로가 크래시하며 `LoginPanelViewModel`의 catch가 `ex.Message`를 그대로 라벨에 노출 → 준비돼 있던 "서버에 연결할 수 없습니다" 문구를 가로챔.
+  - **수정**: ① `DetailsToken as JObject` — 객체일 때만 잠금정책 파싱, 문자열/null details는 무시(generic 실패로 정상 전개) ② `LoginPanelViewModel`에 `LoginFailureException` 도입 — 의도된 실패(FailMessage 문구)와 예기치 못한 예외를 분리, 후자는 raw 문구 대신 일반 안내 + 스택 포함 ERROR 로그(SEC-5 준수).
+  - **검증**: 빌드 0오류 · Accounts.Api 139/139 green(details 문자열JValue/JSON null/객체 회귀 3종 추가). ⚠앱 재빌드 후 육안(서버 연결 끊고 로그인→"서버에 연결할 수 없습니다").
+
 ### Changed
 - **사이트 고정(앵커) 중 "정북 복귀" 비활성화** (Track B · GMaps.Ui 한정 · 사용자 결정 2026-07-30)
   - 앵커 활성(`IsAnchorActive`) 중에는 화면 각을 앵커가 소유하므로 수동 정북 개입을 차단: ①나침반 **더블클릭 정북** 무시 ②나침반 우클릭 메뉴 **"정북 복귀" 항목 비활성**(+"앵커 해제 후 사용" 안내 툴팁, 클릭 이중 방어) ③미바인딩 `ResetRotationCommand`의 CanExecute도 동일 게이트(향후 배선 대비).

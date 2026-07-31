@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Helpers;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
 using Ironwall.Dotnet.Libraries.Base.Services;
@@ -44,7 +44,10 @@ public class ApiAccountGateway : IAuthGateway, IUserDirectoryGateway, IProfileGa
         {
             _log?.Warning($"[ApiAccountGateway] 로그인 실패: {res.Error?.Code ?? "UNKNOWN"}");
             // v6.3 잠금정책: error.details {failed_count,threshold,remaining,locked} 파싱(있으면). 미존재 계정/잠금비활성이면 null(generic).
-            var d = res.Error?.DetailsToken;
+            // ★ as JObject 필수 — DetailsToken은 JValue일 수 있다: 서버 details:null → JValue(Null),
+            //   연결실패 로컬 에러(Details 세터) → JValue(string). ?.는 C# null만 거르므로 JValue["key"]가
+            //   "Cannot access child value on JValue"로 크래시해 FailMessage의 정상 문구를 가로챘다(2026-07-31 실측).
+            var d = res.Error?.DetailsToken as JObject;
             return AuthOutcome.Fail(
                 res.Error?.Code ?? "UNAUTHORIZED",
                 res.Error?.Message,

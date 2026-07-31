@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
+﻿using Ironwall.Dotnet.Libraries.Accounts.Api.Gateways;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
@@ -50,15 +50,76 @@ public class ApiAccountGatewayTests
         Assert.False(store.IsAuthenticated);
     }
 
+    // ── v6.3 details 파싱 하드닝 회귀 (2026-07-31 "Cannot access child value on JValue" 로그인 크래시) ──
+    // DetailsToken이 JObject가 아닌 경우(서버 details:null=JValue(Null), 연결실패 로컬 에러=JValue(string))
+    // 잠금정책 파싱이 크래시하지 않고 generic 실패로 떨어져야 한다.
+
+    [Fact]
+    public async Task should_not_crash_and_skip_lockout_fields_when_details_is_string_jvalue()
+    {
+        var gw = new ApiAccountGateway(
+            new StubAuthApi(loginOk: false, failDetails: JValue.CreateString("Connection refused")),
+            new TokenStorageService(), new PermissionService());
+
+        var outcome = await gw.AuthenticateAsync("admin", "pw");
+
+        Assert.False(outcome.Success);
+        Assert.Equal("UNAUTHORIZED", outcome.ErrorCode);
+        Assert.Null(outcome.FailedCount);
+        Assert.Null(outcome.Remaining);
+        Assert.Null(outcome.Locked);
+    }
+
+    [Fact]
+    public async Task should_not_crash_and_skip_lockout_fields_when_details_is_json_null()
+    {
+        // 서버가 "details": null 을 보내면 역직렬화 결과는 C# null이 아니라 JValue(Type=Null)
+        var gw = new ApiAccountGateway(
+            new StubAuthApi(loginOk: false, failDetails: JValue.CreateNull()),
+            new TokenStorageService(), new PermissionService());
+
+        var outcome = await gw.AuthenticateAsync("ghost", "pw");
+
+        Assert.False(outcome.Success);
+        Assert.Null(outcome.FailedCount);
+        Assert.Null(outcome.Remaining);
+    }
+
+    [Fact]
+    public async Task should_parse_lockout_fields_when_details_is_object()
+    {
+        var details = JObject.Parse(@"{""failed_count"":2,""threshold"":5,""remaining"":3,""locked"":false}");
+        var gw = new ApiAccountGateway(
+            new StubAuthApi(loginOk: false, failDetails: details),
+            new TokenStorageService(), new PermissionService());
+
+        var outcome = await gw.AuthenticateAsync("admin", "wrong");
+
+        Assert.False(outcome.Success);
+        Assert.Equal(2, outcome.FailedCount);
+        Assert.Equal(5, outcome.Threshold);
+        Assert.Equal(3, outcome.Remaining);
+        Assert.False(outcome.Locked);
+    }
+
     private sealed class StubAuthApi : IAccountApiService
     {
         private readonly bool _ok;
-        public StubAuthApi(bool loginOk) => _ok = loginOk;
+        private readonly JToken? _failDetails;
+        public StubAuthApi(bool loginOk, JToken? failDetails = null)
+        {
+            _ok = loginOk;
+            _failDetails = failDetails;
+        }
 
         public Task<ApiResponse<LoginResponseDataDto>> LoginAsync(string loginId, string password, CancellationToken ct = default)
         {
             if (!_ok)
-                return Task.FromResult(ApiResponse<LoginResponseDataDto>.CreateError("UNAUTHORIZED", "bad credentials"));
+            {
+                var err = ApiResponse<LoginResponseDataDto>.CreateError("UNAUTHORIZED", "bad credentials");
+                if (_failDetails is not null) err.Error!.DetailsToken = _failDetails;
+                return Task.FromResult(err);
+            }
 
             var data = new LoginResponseDataDto
             {
