@@ -49,7 +49,7 @@
 
 				<ScrollViewer
 					Grid.Column="0"
-					MaxHeight="210"
+					MaxHeight="140"
 					HorizontalScrollBarVisibility="Disabled"
 					VerticalScrollBarVisibility="Auto">
 					<Grid>
@@ -176,59 +176,22 @@
 							Margin="0,6"
 							Background="{DynamicResource DividerBrush}" />
 
-						<!--  ── 조치 편집 필드 ──  -->
-						<TextBlock Grid.Row="9" Grid.Column="0" Text="Type" />
-						<ComboBox
-							Grid.Row="9"
-							Grid.Column="1"
-							Margin="0,2"
-							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
-							SelectedItem="{Binding MessageType, Mode=TwoWay}"
-							Style="{StaticResource ComboBoxContent}">
-							<ComboBox.ItemsPanel>
-								<ItemsPanelTemplate>
-									<VirtualizingStackPanel />
-								</ItemsPanelTemplate>
-							</ComboBox.ItemsPanel>
-						</ComboBox>
-
-						<TextBlock Grid.Row="10" Grid.Column="0" Text="원본지정" />
-						<ComboBox
-							Grid.Row="10"
-							Grid.Column="1"
-							Margin="0,2"
-							ItemsSource="{Binding Data.EventProvider, Source={StaticResource proxy}}"
-							SelectedItem="{Binding OriginEvent, Mode=TwoWay}"
-							Style="{StaticResource ComboBoxContent}">
-							<ComboBox.ItemsPanel>
-								<ItemsPanelTemplate>
-									<VirtualizingStackPanel />
-								</ItemsPanelTemplate>
-							</ComboBox.ItemsPanel>
-							<ComboBox.ItemTemplate>
-								<DataTemplate>
-									<StackPanel Orientation="Horizontal">
-										<TextBlock Width="52" Text="{Binding Id}" />
-										<TextBlock Width="76" Text="{Binding MessageType}" />
-										<TextBlock Width="120" Text="{Binding Device.DeviceName}" />
-										<TextBlock Width="130" Text="{Binding DateTime, StringFormat={}{0:yy-MM-dd HH:mm:ss}}" />
-									</StackPanel>
-								</DataTemplate>
-							</ComboBox.ItemTemplate>
-						</ComboBox>
-
-						<TextBlock Grid.Row="11" Grid.Column="0" Text="User" />
+						<!--  ── 조치 편집 필드 ──
+						      Type·원본지정 콤보 제거: 기존 리포트는 IsDraft 가드(BaseEventViewModel.MessageType / ActionEventViewModel.OriginEvent)로
+						      변경 차단 + PUT(ToActionEventReplaceDto)이 type_event/content/user만 보내고 from_event 제외 → 편집 무의미.
+						      Type는 항상 Action, 신규 Draft 원본지정은 그리드 OriginEvent 셀(IsEnabled=IsDraft)이 담당. ──  -->
+						<TextBlock Grid.Row="9" Grid.Column="0" Text="User" />
 						<TextBox
-							Grid.Row="11"
+							Grid.Row="9"
 							Grid.Column="1"
 							Margin="0,2"
 							md:HintAssist.Hint="admin"
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding User, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-						<TextBlock Grid.Row="12" Grid.Column="0" Text="Content" />
+						<TextBlock Grid.Row="10" Grid.Column="0" Text="Content" />
 						<TextBox
-							Grid.Row="12"
+							Grid.Row="10"
 							Grid.Column="1"
 							Margin="0,2"
 							md:HintAssist.Hint="Action report contents"
@@ -241,8 +204,8 @@
 				<!--  우: 썸네일 — 탐지 origin=이미지 / 장애·부재·로드실패=Default("미리보기 없음")  -->
 				<Border
 					Grid.Column="2"
-					Width="150"
-					Height="150"
+					Width="140"
+					Height="140"
 					VerticalAlignment="Top"
 					Background="{DynamicResource MaterialDesignChipBackground}"
 					BorderBrush="{DynamicResource DividerBrush}"
