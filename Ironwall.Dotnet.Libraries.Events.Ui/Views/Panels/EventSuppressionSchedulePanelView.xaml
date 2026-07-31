@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
 	x:Class="Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels.EventSuppressionSchedulePanelView"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -9,399 +9,427 @@
 	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	d:DesignHeight="560"
-	d:DesignWidth="1040"
+	d:DesignHeight="720"
+	d:DesignWidth="1180"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 	</UserControl.Resources>
 
-	<Grid Margin="6">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto" />
-			<RowDefinition Height="Auto" />
-			<RowDefinition Height="*" />
-		</Grid.RowDefinitions>
+	<!--  중앙 정렬 바운드 박스 (최상위 패널 표준, ReportConsole 패턴 — 전체화면 stretch 방지 + 불투명 배경)  -->
+	<Border
+		Width="1180"
+		Height="720"
+		HorizontalAlignment="Center"
+		VerticalAlignment="Center"
+		Background="{DynamicResource SurfaceBrush}"
+		BorderBrush="{DynamicResource BorderBrush}"
+		BorderThickness="1"
+		CornerRadius="10">
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="*" />
+			</Grid.RowDefinitions>
 
-		<!--  ── 헤더 + 필터 ──  -->
-		<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
-			<TextBlock
-				DockPanel.Dock="Left"
-				VerticalAlignment="Center"
-				Style="{StaticResource PanelSectionLabel}"
-				Text="이벤트 억제 스케줄 관리 (정비 창)" />
-
-			<Button
-				DockPanel.Dock="Right"
-				Style="{StaticResource ModernToolbarButton}"
-				ToolTip="갱신">
-				<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
-				<md:PackIcon Width="20" Height="20" Kind="Refresh" />
-			</Button>
-			<TextBlock
-				DockPanel.Dock="Right"
-				Margin="0,0,12,0"
-				VerticalAlignment="Center"
-				Foreground="{DynamicResource TextMutedBrush}"
-				Text="{Binding LoadedCountText}" />
-
-			<!--  필터  -->
-			<TextBlock
-				Margin="16,0,4,0"
-				VerticalAlignment="Center"
-				Foreground="{DynamicResource TextSecondaryBrush}"
-				Text="상태" />
-			<ComboBox
-				Width="110"
-				VerticalAlignment="Center"
-				SelectedValue="{Binding FilterStatus, Mode=TwoWay}"
-				SelectedValuePath="Tag">
-				<ComboBoxItem Content="전체" Tag="" />
-				<ComboBoxItem Content="예정" Tag="pending" />
-				<ComboBoxItem Content="진행중" Tag="active" />
-				<ComboBoxItem Content="종료" Tag="expired" />
-				<ComboBoxItem Content="취소" Tag="cancelled" />
-			</ComboBox>
-			<TextBlock
-				Margin="12,0,4,0"
-				VerticalAlignment="Center"
-				Foreground="{DynamicResource TextSecondaryBrush}"
-				Text="대상" />
-			<ComboBox
-				Width="110"
-				VerticalAlignment="Center"
-				SelectedValue="{Binding FilterTargetType, Mode=TwoWay}"
-				SelectedValuePath="Tag">
-				<ComboBoxItem Content="전체" Tag="" />
-				<ComboBoxItem Content="장비" Tag="device" />
-				<ComboBoxItem Content="그룹" Tag="group" />
-				<ComboBoxItem Content="전체대상" Tag="all" />
-			</ComboBox>
-		</DockPanel>
-
-		<!--  ── 생성 폼 (인라인, StandardPanelCard) ──  -->
-		<Border
-			Grid.Row="1"
-			Margin="0,0,0,8"
-			Padding="12,10"
-			Style="{StaticResource StandardPanelCard}">
-			<StackPanel Orientation="Vertical">
-				<TextBlock
-					Margin="0,0,0,8"
-					Foreground="{DynamicResource PrimaryBrush}"
-					FontWeight="Bold"
-					Text="＋ 억제 창 추가" />
-
-				<WrapPanel Orientation="Horizontal">
-					<!--  작업명  -->
-					<StackPanel Margin="0,0,16,8" Orientation="Vertical">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="작업명 *" />
-						<TextBox
-							Width="220"
-							md:HintAssist.Hint="예: GOP 3구역 펜스 보수"
-							Style="{StaticResource MaterialDesignTextBox}"
-							Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-					</StackPanel>
-
-					<!--  대상 유형(배타)  -->
-					<StackPanel Margin="0,0,16,8" Orientation="Vertical">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="대상 유형 *" />
-						<StackPanel Orientation="Horizontal">
-							<RadioButton
-								Margin="0,0,10,0"
-								Content="장비"
-								GroupName="tt"
-								IsChecked="{Binding IsDeviceMode, Mode=TwoWay}" />
-							<RadioButton
-								Margin="0,0,10,0"
-								Content="그룹"
-								GroupName="tt"
-								IsChecked="{Binding IsGroupMode, Mode=TwoWay}" />
-							<RadioButton
-								Content="전체"
-								GroupName="tt"
-								IsChecked="{Binding IsAllMode, Mode=TwoWay}" />
-						</StackPanel>
-					</StackPanel>
-
-					<!--  장비 멀티셀렉트(복수)  -->
-					<StackPanel
-						Margin="0,0,16,8"
-						Orientation="Vertical"
-						Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVis}}">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="장비 선택 * (복수)" />
-						<StackPanel Orientation="Vertical">
-							<ItemsControl ItemsSource="{Binding SelectedDevices}" MinHeight="22">
-								<ItemsControl.ItemsPanel>
-									<ItemsPanelTemplate>
-										<WrapPanel />
-									</ItemsPanelTemplate>
-								</ItemsControl.ItemsPanel>
-								<ItemsControl.ItemTemplate>
-									<DataTemplate>
-										<Border
-											Margin="0,0,4,4"
-											Padding="8,1,4,1"
-											Background="{DynamicResource TintAccentBrush}"
-											BorderBrush="{DynamicResource PrimaryBrush}"
-											BorderThickness="1"
-											CornerRadius="10">
-											<StackPanel Orientation="Horizontal">
-												<TextBlock
-													VerticalAlignment="Center"
-													FontSize="11"
-													Foreground="{DynamicResource PrimaryBrush}"
-													Text="{Binding DeviceName}" />
-												<Button
-													Margin="4,0,0,0"
-													Padding="0"
-													Background="Transparent"
-													BorderThickness="0"
-													Cursor="Hand"
-													ToolTip="제거">
-													<cal:Message.Attach>[Event Click] = [Action RemoveDevice($dataContext)]</cal:Message.Attach>
-													<md:PackIcon
-														Width="12"
-														Height="12"
-														Foreground="{DynamicResource PrimaryBrush}"
-														Kind="Close" />
-												</Button>
-											</StackPanel>
-										</Border>
-									</DataTemplate>
-								</ItemsControl.ItemTemplate>
-							</ItemsControl>
-							<ComboBox
-								Width="220"
-								Margin="0,3,0,0"
-								DisplayMemberPath="DeviceName"
-								ItemsSource="{Binding DeviceProvider.CollectionEntity}"
-								md:HintAssist.Hint="＋ 장비 추가…"
-								SelectedItem="{Binding DeviceToAdd, Mode=TwoWay}" />
-						</StackPanel>
-					</StackPanel>
-
-					<!--  그룹 멀티셀렉트(복수)  -->
-					<StackPanel
-						Margin="0,0,16,8"
-						Orientation="Vertical"
-						Visibility="{Binding IsGroupMode, Converter={StaticResource BoolToVis}}">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="그룹 선택 * (복수)" />
-						<StackPanel Orientation="Vertical">
-							<ItemsControl ItemsSource="{Binding SelectedGroups}" MinHeight="22">
-								<ItemsControl.ItemsPanel>
-									<ItemsPanelTemplate>
-										<WrapPanel />
-									</ItemsPanelTemplate>
-								</ItemsControl.ItemsPanel>
-								<ItemsControl.ItemTemplate>
-									<DataTemplate>
-										<Border
-											Margin="0,0,4,4"
-											Padding="8,1,4,1"
-											Background="{DynamicResource TintAccentBrush}"
-											BorderBrush="{DynamicResource PrimaryBrush}"
-											BorderThickness="1"
-											CornerRadius="10">
-											<StackPanel Orientation="Horizontal">
-												<TextBlock
-													VerticalAlignment="Center"
-													FontSize="11"
-													Foreground="{DynamicResource PrimaryBrush}"
-													Text="{Binding Name}" />
-												<Button
-													Margin="4,0,0,0"
-													Padding="0"
-													Background="Transparent"
-													BorderThickness="0"
-													Cursor="Hand"
-													ToolTip="제거">
-													<cal:Message.Attach>[Event Click] = [Action RemoveGroup($dataContext)]</cal:Message.Attach>
-													<md:PackIcon
-														Width="12"
-														Height="12"
-														Foreground="{DynamicResource PrimaryBrush}"
-														Kind="Close" />
-												</Button>
-											</StackPanel>
-										</Border>
-									</DataTemplate>
-								</ItemsControl.ItemTemplate>
-							</ItemsControl>
-							<ComboBox
-								Width="220"
-								Margin="0,3,0,0"
-								DisplayMemberPath="Name"
-								ItemsSource="{Binding DeviceGroupProvider.CollectionEntity}"
-								md:HintAssist.Hint="＋ 그룹 추가…"
-								SelectedItem="{Binding GroupToAdd, Mode=TwoWay}" />
-						</StackPanel>
-					</StackPanel>
-
-					<!--  대상 측(group/all)  -->
-					<StackPanel
-						Margin="0,0,16,8"
-						Orientation="Vertical"
-						Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="대상 측(side)" />
-						<ComboBox
-							Width="150"
-							SelectedValue="{Binding TargetSide, Mode=TwoWay}"
-							SelectedValuePath="Tag">
-							<ComboBoxItem Content="전체(감지+감시)" Tag="both" />
-							<ComboBoxItem Content="감지(detection)" Tag="detection" />
-							<ComboBoxItem Content="감시(surveillance)" Tag="surveillance" />
-						</ComboBox>
-					</StackPanel>
-
-					<!--  범위  -->
-					<StackPanel Margin="0,0,16,8" Orientation="Vertical">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="억제 범위 *" />
-						<ComboBox
-							Width="130"
-							SelectedValue="{Binding EventScope, Mode=TwoWay}"
-							SelectedValuePath="Tag">
-							<ComboBoxItem Content="전체" Tag="all" />
-							<ComboBoxItem Content="연결" Tag="connection" />
-							<ComboBoxItem Content="탐지" Tag="detection" />
-							<ComboBoxItem Content="장애" Tag="malfunction" />
-						</ComboBox>
-					</StackPanel>
-
-					<!--  억제 시간창(시작 ~ 종료, 한 줄)  -->
-					<StackPanel Margin="0,0,16,8" Orientation="Vertical">
-						<TextBlock
-							Margin="0,0,0,2"
-							Foreground="{DynamicResource TextSecondaryBrush}"
-							Text="억제 시간창 (KST) *  시작 ~ 종료" />
-						<StackPanel Orientation="Horizontal">
-							<mah:DateTimePicker Width="180" SelectedDateTime="{Binding WindowStart, Mode=TwoWay}" />
-							<TextBlock
-								Margin="6,0,6,0"
-								VerticalAlignment="Center"
-								Foreground="{DynamicResource TextMutedBrush}"
-								Text="~" />
-							<mah:DateTimePicker Width="180" SelectedDateTime="{Binding WindowEnd, Mode=TwoWay}" />
-						</StackPanel>
-					</StackPanel>
-
-					<!--  생성 버튼  -->
+			<!--  ── 시안 헤더 바 (표준) ──  -->
+			<Border
+				Grid.Row="0"
+				CornerRadius="10,10,0,0"
+				Style="{StaticResource ModernDialogHeader}">
+				<DockPanel VerticalAlignment="Center">
 					<Button
-						Margin="0,0,0,8"
-						VerticalAlignment="Bottom"
-						Content="＋ 억제 창 생성"
-						IsEnabled="{Binding CanCreate}"
-						Style="{StaticResource MaterialDesignFlatButton}">
-						<cal:Message.Attach>[Event Click] = [Action ClickCreate()]</cal:Message.Attach>
+						x:Name="Close"
+						DockPanel.Dock="Right"
+						Style="{StaticResource ModernPanelCloseButton}" />
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="18"
+							Height="18"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Kind="CalendarClock" />
+						<TextBlock
+							Margin="8,0,0,0"
+							Style="{StaticResource ModernDialogHeaderText}"
+							Text="이벤트 억제 스케줄 관리 (정비 창)" />
+					</StackPanel>
+				</DockPanel>
+			</Border>
+
+			<!--  ── 본문 ──  -->
+			<Grid Grid.Row="1" Margin="12">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="*" />
+				</Grid.RowDefinitions>
+
+				<!--  툴바 + 필터  -->
+				<DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+					<Button
+						DockPanel.Dock="Right"
+						Style="{StaticResource ModernToolbarButton}"
+						ToolTip="갱신">
+						<cal:Message.Attach>[Event Click] = [Action OnClickReloadButton()]</cal:Message.Attach>
+						<md:PackIcon Width="20" Height="20" Kind="Refresh" />
 					</Button>
-				</WrapPanel>
-			</StackPanel>
-		</Border>
+					<TextBlock
+						DockPanel.Dock="Right"
+						Margin="0,0,12,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource TextMutedBrush}"
+						Text="{Binding LoadedCountText}" />
 
-		<!--  ── 목록 ──  -->
-		<DataGrid
-			Grid.Row="2"
-			AutoGenerateColumns="False"
-			Background="Transparent"
-			CanUserAddRows="False"
-			CellStyle="{StaticResource ModernDataGridCell}"
-			ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
-			HeadersVisibility="Column"
-			IsReadOnly="True"
-			ItemsSource="{Binding Schedules}"
-			RowHeaderWidth="0"
-			RowHeight="38"
-			RowStyle="{StaticResource ModernDataGridRow}"
-			Style="{StaticResource ModernDataGrid}">
-			<i:Interaction.Behaviors>
-				<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
-			</i:Interaction.Behaviors>
-			<DataGrid.Columns>
-				<!--  상태 배지 pill (DataTrigger, 토큰)  -->
-				<DataGridTemplateColumn Width="90" Header="상태">
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<Border
-								HorizontalAlignment="Left"
-								VerticalAlignment="Center"
-								Padding="8,1"
-								BorderThickness="1"
-								CornerRadius="9">
-								<Border.Style>
-									<Style TargetType="Border">
-										<Setter Property="BorderBrush" Value="{DynamicResource StatusInfoBrush}" />
-										<Setter Property="Background" Value="{DynamicResource TintInfoBrush}" />
-										<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusInfoBrush}" />
-										<Style.Triggers>
-											<DataTrigger Binding="{Binding Status}" Value="active">
-												<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
-												<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
-												<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusNormalBrush}" />
-											</DataTrigger>
-											<DataTrigger Binding="{Binding Status}" Value="expired">
-												<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
-												<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
-												<Setter Property="TextElement.Foreground" Value="{DynamicResource TextMutedBrush}" />
-											</DataTrigger>
-											<DataTrigger Binding="{Binding Status}" Value="cancelled">
-												<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
-												<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
-												<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusWarningBrush}" />
-											</DataTrigger>
-										</Style.Triggers>
-									</Style>
-								</Border.Style>
+					<TextBlock
+						Margin="0,0,4,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="상태" />
+					<ComboBox
+						Width="110"
+						VerticalAlignment="Center"
+						SelectedValue="{Binding FilterStatus, Mode=TwoWay}"
+						SelectedValuePath="Tag">
+						<ComboBoxItem Content="전체" Tag="" />
+						<ComboBoxItem Content="예정" Tag="pending" />
+						<ComboBoxItem Content="진행중" Tag="active" />
+						<ComboBoxItem Content="종료" Tag="expired" />
+						<ComboBoxItem Content="취소" Tag="cancelled" />
+					</ComboBox>
+					<TextBlock
+						Margin="12,0,4,0"
+						VerticalAlignment="Center"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="대상" />
+					<ComboBox
+						Width="110"
+						VerticalAlignment="Center"
+						SelectedValue="{Binding FilterTargetType, Mode=TwoWay}"
+						SelectedValuePath="Tag">
+						<ComboBoxItem Content="전체" Tag="" />
+						<ComboBoxItem Content="장비" Tag="device" />
+						<ComboBoxItem Content="그룹" Tag="group" />
+						<ComboBoxItem Content="전체대상" Tag="all" />
+					</ComboBox>
+				</DockPanel>
+
+				<!--  생성 폼 (인라인, StandardPanelCard)  -->
+				<Border
+					Grid.Row="1"
+					Margin="0,0,0,8"
+					Padding="12,10"
+					Style="{StaticResource StandardPanelCard}">
+					<StackPanel Orientation="Vertical">
+						<TextBlock
+							Margin="0,0,0,8"
+							FontWeight="Bold"
+							Foreground="{DynamicResource PrimaryBrush}"
+							Text="＋ 억제 창 추가" />
+
+						<WrapPanel Orientation="Horizontal">
+							<StackPanel Margin="0,0,16,8" Orientation="Vertical">
 								<TextBlock
-									FontSize="11"
-									FontWeight="Bold"
-									Text="{Binding StatusText}" />
-							</Border>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-				</DataGridTemplateColumn>
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="작업명 *" />
+								<TextBox
+									Width="220"
+									md:HintAssist.Hint="예: GOP 3구역 펜스 보수"
+									Style="{StaticResource MaterialDesignTextBox}"
+									Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+							</StackPanel>
 
-				<DataGridTextColumn Width="*" Binding="{Binding Name}" Header="작업명" />
-				<DataGridTextColumn Width="200" Binding="{Binding TargetSummary}" Header="대상" />
-				<DataGridTextColumn Width="70" Binding="{Binding ScopeText}" Header="범위" />
-				<DataGridTextColumn Width="130" Binding="{Binding WindowStartText}" Header="시작(KST)" />
-				<DataGridTextColumn Width="130" Binding="{Binding WindowEndText}" Header="종료(KST)" />
+							<StackPanel Margin="0,0,16,8" Orientation="Vertical">
+								<TextBlock
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="대상 유형 *" />
+								<StackPanel Orientation="Horizontal">
+									<RadioButton
+										Margin="0,0,10,0"
+										Content="장비"
+										GroupName="tt"
+										IsChecked="{Binding IsDeviceMode, Mode=TwoWay}" />
+									<RadioButton
+										Margin="0,0,10,0"
+										Content="그룹"
+										GroupName="tt"
+										IsChecked="{Binding IsGroupMode, Mode=TwoWay}" />
+									<RadioButton
+										Content="전체"
+										GroupName="tt"
+										IsChecked="{Binding IsAllMode, Mode=TwoWay}" />
+								</StackPanel>
+							</StackPanel>
 
-				<!--  취소(soft-cancel)  -->
-				<DataGridTemplateColumn Width="70" Header="취소">
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
+							<!--  장비 멀티셀렉트  -->
+							<StackPanel
+								Margin="0,0,16,8"
+								Orientation="Vertical"
+								Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVis}}">
+								<TextBlock
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="장비 선택 * (복수)" />
+								<ItemsControl MinHeight="22" ItemsSource="{Binding SelectedDevices}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<WrapPanel />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border
+												Margin="0,0,4,4"
+												Padding="8,1,4,1"
+												Background="{DynamicResource TintAccentBrush}"
+												BorderBrush="{DynamicResource PrimaryBrush}"
+												BorderThickness="1"
+												CornerRadius="10">
+												<StackPanel Orientation="Horizontal">
+													<TextBlock
+														VerticalAlignment="Center"
+														FontSize="11"
+														Foreground="{DynamicResource PrimaryBrush}"
+														Text="{Binding DeviceName}" />
+													<Button
+														Margin="4,0,0,0"
+														Padding="0"
+														Background="Transparent"
+														BorderThickness="0"
+														Cursor="Hand"
+														ToolTip="제거">
+														<cal:Message.Attach>[Event Click] = [Action RemoveDevice($dataContext)]</cal:Message.Attach>
+														<md:PackIcon
+															Width="12"
+															Height="12"
+															Foreground="{DynamicResource PrimaryBrush}"
+															Kind="Close" />
+													</Button>
+												</StackPanel>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+								<ComboBox
+									Width="220"
+									Margin="0,3,0,0"
+									md:HintAssist.Hint="＋ 장비 추가…"
+									DisplayMemberPath="DeviceName"
+									ItemsSource="{Binding DeviceProvider.CollectionEntity}"
+									SelectedItem="{Binding DeviceToAdd, Mode=TwoWay}" />
+							</StackPanel>
+
+							<!--  그룹 멀티셀렉트  -->
+							<StackPanel
+								Margin="0,0,16,8"
+								Orientation="Vertical"
+								Visibility="{Binding IsGroupMode, Converter={StaticResource BoolToVis}}">
+								<TextBlock
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="그룹 선택 * (복수)" />
+								<ItemsControl MinHeight="22" ItemsSource="{Binding SelectedGroups}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<WrapPanel />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border
+												Margin="0,0,4,4"
+												Padding="8,1,4,1"
+												Background="{DynamicResource TintAccentBrush}"
+												BorderBrush="{DynamicResource PrimaryBrush}"
+												BorderThickness="1"
+												CornerRadius="10">
+												<StackPanel Orientation="Horizontal">
+													<TextBlock
+														VerticalAlignment="Center"
+														FontSize="11"
+														Foreground="{DynamicResource PrimaryBrush}"
+														Text="{Binding Name}" />
+													<Button
+														Margin="4,0,0,0"
+														Padding="0"
+														Background="Transparent"
+														BorderThickness="0"
+														Cursor="Hand"
+														ToolTip="제거">
+														<cal:Message.Attach>[Event Click] = [Action RemoveGroup($dataContext)]</cal:Message.Attach>
+														<md:PackIcon
+															Width="12"
+															Height="12"
+															Foreground="{DynamicResource PrimaryBrush}"
+															Kind="Close" />
+													</Button>
+												</StackPanel>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+								<ComboBox
+									Width="220"
+									Margin="0,3,0,0"
+									md:HintAssist.Hint="＋ 그룹 추가…"
+									DisplayMemberPath="Name"
+									ItemsSource="{Binding DeviceGroupProvider.CollectionEntity}"
+									SelectedItem="{Binding GroupToAdd, Mode=TwoWay}" />
+							</StackPanel>
+
+							<!--  대상 측(group/all)  -->
+							<StackPanel
+								Margin="0,0,16,8"
+								Orientation="Vertical"
+								Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+								<TextBlock
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="대상 측(side)" />
+								<ComboBox
+									Width="150"
+									SelectedValue="{Binding TargetSide, Mode=TwoWay}"
+									SelectedValuePath="Tag">
+									<ComboBoxItem Content="전체(감지+감시)" Tag="both" />
+									<ComboBoxItem Content="감지(detection)" Tag="detection" />
+									<ComboBoxItem Content="감시(surveillance)" Tag="surveillance" />
+								</ComboBox>
+							</StackPanel>
+
+							<!--  범위  -->
+							<StackPanel Margin="0,0,16,8" Orientation="Vertical">
+								<TextBlock
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="억제 범위 *" />
+								<ComboBox
+									Width="130"
+									SelectedValue="{Binding EventScope, Mode=TwoWay}"
+									SelectedValuePath="Tag">
+									<ComboBoxItem Content="전체" Tag="all" />
+									<ComboBoxItem Content="연결" Tag="connection" />
+									<ComboBoxItem Content="탐지" Tag="detection" />
+									<ComboBoxItem Content="장애" Tag="malfunction" />
+								</ComboBox>
+							</StackPanel>
+
+							<!--  억제 시간창(시작 ~ 종료, 한 줄)  -->
+							<StackPanel Margin="0,0,16,8" Orientation="Vertical">
+								<TextBlock
+									Margin="0,0,0,2"
+									Foreground="{DynamicResource TextSecondaryBrush}"
+									Text="억제 시간창 (KST) *  시작 ~ 종료" />
+								<StackPanel Orientation="Horizontal">
+									<mah:DateTimePicker Width="180" SelectedDateTime="{Binding WindowStart, Mode=TwoWay}" />
+									<TextBlock
+										Margin="6,0,6,0"
+										VerticalAlignment="Center"
+										Foreground="{DynamicResource TextMutedBrush}"
+										Text="~" />
+									<mah:DateTimePicker Width="180" SelectedDateTime="{Binding WindowEnd, Mode=TwoWay}" />
+								</StackPanel>
+							</StackPanel>
+
 							<Button
-								HorizontalAlignment="Left"
-								VerticalAlignment="Center"
-								IsEnabled="{Binding IsCancellable}"
-								Style="{StaticResource ModernToolbarButton}"
-								ToolTip="억제 창 취소(soft-cancel)">
-								<cal:Message.Attach>[Event Click] = [Action OnClickCancel($dataContext)]</cal:Message.Attach>
-								<md:PackIcon Width="18" Height="18" Kind="CalendarRemoveOutline" />
+								Margin="0,0,0,8"
+								VerticalAlignment="Bottom"
+								Content="＋ 억제 창 생성"
+								IsEnabled="{Binding CanCreate}"
+								Style="{StaticResource MaterialDesignFlatButton}">
+								<cal:Message.Attach>[Event Click] = [Action ClickCreate()]</cal:Message.Attach>
 							</Button>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-				</DataGridTemplateColumn>
-			</DataGrid.Columns>
-		</DataGrid>
-	</Grid>
+						</WrapPanel>
+					</StackPanel>
+				</Border>
+
+				<!--  목록  -->
+				<DataGrid
+					Grid.Row="2"
+					AutoGenerateColumns="False"
+					Background="Transparent"
+					CanUserAddRows="False"
+					CellStyle="{StaticResource ModernDataGridCell}"
+					ColumnHeaderStyle="{StaticResource ModernDataGridColumnHeader}"
+					HeadersVisibility="Column"
+					IsReadOnly="True"
+					ItemsSource="{Binding Schedules}"
+					RowHeaderWidth="0"
+					RowHeight="38"
+					RowStyle="{StaticResource ModernDataGridRow}"
+					Style="{StaticResource ModernDataGrid}">
+					<i:Interaction.Behaviors>
+						<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
+					</i:Interaction.Behaviors>
+					<DataGrid.Columns>
+						<DataGridTemplateColumn Width="90" Header="상태">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Border
+										Padding="8,1"
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										BorderThickness="1"
+										CornerRadius="9">
+										<Border.Style>
+											<Style TargetType="Border">
+												<Setter Property="BorderBrush" Value="{DynamicResource StatusInfoBrush}" />
+												<Setter Property="Background" Value="{DynamicResource TintInfoBrush}" />
+												<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusInfoBrush}" />
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding Status}" Value="active">
+														<Setter Property="BorderBrush" Value="{DynamicResource StatusNormalBrush}" />
+														<Setter Property="Background" Value="{DynamicResource TintSuccessBrush}" />
+														<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusNormalBrush}" />
+													</DataTrigger>
+													<DataTrigger Binding="{Binding Status}" Value="expired">
+														<Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+														<Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+														<Setter Property="TextElement.Foreground" Value="{DynamicResource TextMutedBrush}" />
+													</DataTrigger>
+													<DataTrigger Binding="{Binding Status}" Value="cancelled">
+														<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+														<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+														<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusWarningBrush}" />
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Border.Style>
+										<TextBlock
+											FontSize="11"
+											FontWeight="Bold"
+											Text="{Binding StatusText}" />
+									</Border>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+
+						<DataGridTextColumn Width="*" Binding="{Binding Name}" Header="작업명" />
+						<DataGridTextColumn Width="200" Binding="{Binding TargetSummary}" Header="대상" />
+						<DataGridTextColumn Width="70" Binding="{Binding ScopeText}" Header="범위" />
+						<DataGridTextColumn Width="130" Binding="{Binding WindowStartText}" Header="시작(KST)" />
+						<DataGridTextColumn Width="130" Binding="{Binding WindowEndText}" Header="종료(KST)" />
+
+						<DataGridTemplateColumn Width="70" Header="취소">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<Button
+										HorizontalAlignment="Left"
+										VerticalAlignment="Center"
+										IsEnabled="{Binding IsCancellable}"
+										Style="{StaticResource ModernToolbarButton}"
+										ToolTip="억제 창 취소(soft-cancel)">
+										<cal:Message.Attach>[Event Click] = [Action OnClickCancel($dataContext)]</cal:Message.Attach>
+										<md:PackIcon Width="18" Height="18" Kind="CalendarRemoveOutline" />
+									</Button>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+					</DataGrid.Columns>
+				</DataGrid>
+			</Grid>
+		</Grid>
+	</Border>
 </UserControl>

@@ -127,6 +127,9 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel, IHandl
     #endregion
 
     #region - Binding Methods -
+    /// <summary>헤더 X 버튼(ModernPanelCloseButton, x:Name="Close") — 패널 닫기(ReportConsole 패턴).</summary>
+    public Task Close() => TryCloseAsync();
+
     public async Task OnClickReloadButton()
         => await LoadAllAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);
 
