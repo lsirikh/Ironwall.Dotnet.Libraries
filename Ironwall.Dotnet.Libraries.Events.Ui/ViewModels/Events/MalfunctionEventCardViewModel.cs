@@ -103,23 +103,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
         public int SecondStart => _model.SecondStart;
 
         /// <summary>
-        /// 장애 타입에 따라 제어기 필드에 표시할 번호
-        /// 제어기 장애(FAULT_CONTROLLER, FAULT_CABLE_CUTTING): 장치 자신의 DeviceNumber
-        /// 센서 장애(FAULT_FENCE, FAULT_MULTI 등): 연결된 제어기의 DeviceNumber
+        /// 제어기 필드에 표시할 번호 — <b>장비 타입 기준(사유 무관)</b>.
+        /// 센서 장비(ISensorDeviceModel): 연결된 제어기의 DeviceNumber(controller_id→DeviceProvider 해석).
+        /// 제어기 장비(그 외): 장비 자신의 DeviceNumber.
+        /// <para>사유(reason)로 분기하지 않는다 — reason은 장비 타입을 신뢰성 있게 나타내지 못한다.
+        /// 실측: FAULT_CABLE_CUTTING이 제어기가 아니라 Fence 센서(device.type_device="Fence", controller_id=제어기FK)에 실려 옴 →
+        /// reason 기준이면 센서 번호를 제어기 칸에 표시하고 센서 칸은 공란이 되는 오배정 발생.</para>
         /// </summary>
-        public int? ControllerDisplay => Reason is EnumFaultType.FAULT_CONTROLLER or EnumFaultType.FAULT_CABLE_CUTTING
-            ? (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber)
-            : ControllerDeviceNumber;
+        public int? ControllerDisplay => Device is ISensorDeviceModel
+            ? ControllerDeviceNumber
+            : (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber);
 
         /// <summary>
-        /// 장애 타입에 따라 센서 필드에 표시할 번호.
-        /// 순수 제어기 장애(FAULT_CONTROLLER, FAULT_CABLE_CUTTING): null (센서 없음).
-        /// 그 외 센서 계열 장애(FAULT_FENCE, FAULT_MULTI, FAULT_ETC 등): 장치 자신의 DeviceNumber.
-        /// (블랙리스트 방식 — 화이트리스트면 FAULT_ETC 등 기타/신규 사유에서 센서번호가 무조건 공란)
+        /// 센서 필드에 표시할 번호 — <b>장비 타입 기준(사유 무관)</b>.
+        /// 센서 장비(ISensorDeviceModel): 장비 자신의 DeviceNumber. 제어기 장비(그 외): null(센서 없음).
         /// </summary>
-        public int? SensorDisplay => Reason is EnumFaultType.FAULT_CONTROLLER or EnumFaultType.FAULT_CABLE_CUTTING
-            ? null
-            : (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber);
+        public int? SensorDisplay => Device is ISensorDeviceModel
+            ? (Device?.DeviceNumber is null or 0 ? null : Device?.DeviceNumber)
+            : null;
         #endregion
         #region - Attributes -
         #endregion
