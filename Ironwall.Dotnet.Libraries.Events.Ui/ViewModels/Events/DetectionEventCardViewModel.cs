@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Models;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
@@ -126,6 +127,49 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             if (Signal is not int s || s <= 0) { SignalBarWidth = 0d; return; }
             if (s > _sessionMaxSignal) _sessionMaxSignal = s;
             SignalBarWidth = (double)s / _sessionMaxSignal * SIGNAL_BAR_TOTAL_WIDTH;
+        }
+        #endregion
+        #region - 썸네일 (SYNC_DETECTION 갱신) -
+        // 캐시버스트 버전 — 같은 URL·새 바이트(PTZ 회전 후 재촬영)에도 WPF/WinINet URL 캐시를 무효화하고 재로딩.
+        // 최초 로드(0)는 미부착(정적 경로와 동일). ApplyThumbnailUpdate 시마다 증가.
+        private int _thumbVersion;
+
+        /// <summary>탐지 썸네일(detail.thumbnail) 절대 URI. _thumbVersion&gt;0이면 ?v= 부착(재로딩 보장). null=미표시.</summary>
+        public Uri? ThumbnailUri
+        {
+            get
+            {
+                var uri = ThumbnailUriResolver.Resolve(_model.Thumbnail);
+                if (uri == null || _thumbVersion <= 0) return uri;
+                var separator = string.IsNullOrEmpty(uri.Query) ? "?" : "&";
+                return Uri.TryCreate($"{uri.AbsoluteUri}{separator}v={_thumbVersion}", UriKind.Absolute, out var busted)
+                    ? busted : uri;
+            }
+        }
+
+        /// <summary>썸네일 표시 여부 — 앞면 히어로 이미지 게이트(없으면 Collapsed, 기존 카드 무영향).
+        /// 카드 크기는 장애 카드와 동일 고정(220×200 / 뒷면 250×200) — 썸네일은 그 안에 들어가는 상단 밴드.</summary>
+        public bool HasThumbnail => ThumbnailUri != null;
+
+        /// <summary>
+        /// SYNC_DETECTION{UPDATED} 재조회 결과를 카드 모델에 in-place 반영하고 뷰를 재렌더한다.
+        /// 반드시 UI 스레드에서 호출(EventCardListPanelViewModel 핸들러가 UI 스레드에서 호출).
+        /// </summary>
+        public void ApplyThumbnailUpdate(string? thumbnail, int? frameWidth, int? frameHeight)
+        {
+            // frame_width/height는 값이 있을 때만 갱신(부분 detail 방어).
+            if (frameWidth.HasValue) _model.FrameWidth = frameWidth;
+            if (frameHeight.HasValue) _model.FrameHeight = frameHeight;
+
+            // 부분 detail 방어: 빈 썸네일(썸네일과 무관한 UPDATE·부분 응답)로 기존 유효 썸네일을 지우지 않는다.
+            // 서버는 탐지 행의 어떤 컬럼 변경에도 SYNC_DETECTION{UPDATED}를 발행 → detail/thumbnail 없는 재조회가 정상 존재.
+            // 비어있으면 재바인딩/재로딩(캐시버스트)도 생략. 같은 URL·새 바이트는 값이 있을 때 _thumbVersion++로 재로딩.
+            if (string.IsNullOrEmpty(thumbnail)) return;
+
+            _model.Thumbnail = thumbnail;
+            _thumbVersion++;   // 같은 URL이어도 캐시버스트로 재로딩
+            NotifyOfPropertyChange(nameof(ThumbnailUri));
+            NotifyOfPropertyChange(nameof(HasThumbnail));
         }
         #endregion
         #region - Attributes -

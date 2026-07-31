@@ -107,6 +107,16 @@ public class EventUiModule : Module
             )).As<IMalfunctionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 2)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();
+            builder.Register(c => new DetectionSyncNatsService(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                c.Resolve<IEventQueueManager>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Events.Api.Services.IEventApiService>(),   // GET /events/detections/{id}
+                c.Resolve<Caliburn.Micro.IEventAggregator>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+            )).As<IDetectionSyncNatsService>()
+              .As<IService>().WithMetadata("Order", _count + 4)   // (EB1) OnExit StopAsync → NATS 구독 해제. Order 고유값(기존 +1/+2/+3 사용 중).
+              .SingleInstance();
             builder.Register(c => new EventQueueManager(
                        c.ResolveOptional<ILogService>(),
                        c.ResolveOptional<IEventSetupModel>()))
@@ -200,6 +210,10 @@ public class EventUiModule : Module
                 // MalfunctionNatsSyncService 시작 — NATS MALFUNCTION 구독 등록
                 var mns = scope.Resolve<IMalfunctionNatsSyncService>();
                 mns.StartService();
+
+                // DetectionSyncNatsService 시작 — NATS SYNC_DETECTION 구독 등록(PTZ 회전 후 썸네일 갱신)
+                var dsns = scope.Resolve<IDetectionSyncNatsService>();
+                dsns.StartService();
 
                 // TrackingStatusNatsSyncService 시작 — NATS TRACKING_STATUS 구독 등록(로그-only stub)
                 var tns = scope.Resolve<ITrackingStatusNatsSyncService>();

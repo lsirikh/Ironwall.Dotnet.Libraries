@@ -40,6 +40,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<MalfunctionReportedMessageModel>
                                             , IHandle<CallAllEventReportMessageModel>
                                             , IHandle<EventEntryEnqueuedMessage>
+                                            , IHandle<DetectionThumbnailSyncedMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -811,6 +812,25 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                 // 카드가 아직 추가되지 않음 → 보류 큐에 저장
                 _pendingEntries[message.EventId] = message.EntryId;
             }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// SYNC_DETECTION{UPDATED} 재조회 결과 수신 → EventId로 활성 탐지 카드를 찾아 썸네일 in-place 갱신.
+        /// (PTZ 회전 후 썸네일) 카드가 없으면(이미 조치/미표시) 멱등 no-op. DetectionSyncNatsService가 UI 스레드에서 발행.
+        /// </summary>
+        public Task HandleAsync(DetectionThumbnailSyncedMessage message, CancellationToken cancellationToken)
+        {
+            // 타입 우선 필터(OfType) 필수 — ViewModelProvider는 탐지·장애 카드 혼재 컬렉션이고
+            // 탐지/장애는 독립 id 시퀀스라 숫자 Id 충돌 시 FirstOrDefault가 장애 카드를 먼저 잡아
+            // as 캐스트 null → 실제 탐지 카드가 뒤에 있어도 조용히 유실됨(Undo id충돌 선례와 동일).
+            var card = ViewModelProvider.OfType<DetectionEventCardViewModel>()
+                                        .FirstOrDefault(c => c.Model?.Id == message.EventId);
+            if (card == null)
+                return Task.CompletedTask;   // 멱등: 이미 종결됐거나 본 패널에 없는 탐지
+
+            card.ApplyThumbnailUpdate(message.Thumbnail, message.FrameWidth, message.FrameHeight);
+            _log?.Info($"[SYNC_DETECTION] 탐지 카드 썸네일 갱신: Event({message.EventId}), frame={message.FrameWidth}x{message.FrameHeight}");
             return Task.CompletedTask;
         }
         #endregion

@@ -63,6 +63,9 @@ public enum EnumGopCommand
     LAMP_BUZZER_SET = 27,
     // 추적 상태 보고 수신 (AiAnalysis→GIS, gis.tracking-status — 처리=라이브러리 TrackingStatusNatsSyncService, 여기 정의는 메인 라우터 Unknown 경고 회피용)
     TRACKING_STATUS = 28,
+    // 탐지 이벤트 동기화 알림 (DBApi가 탐지 UPDATE/DELETE 시 all.sync.detection 로 발행 — PTZ 회전 후 썸네일 갱신).
+    // 처리=라이브러리 DetectionSyncNatsService(cmd 문자열 이름매칭). 정수는 유일성만(SYNC_* 라우팅은 이름 기반). 메인 라우터 Unknown 경고 회피용.
+    SYNC_DETECTION = 29,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

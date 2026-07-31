@@ -35,9 +35,13 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
+                <!--  장애 카드와 동일 고정 크기(220×200) — 썸네일은 이 안에 들어가는 상단 밴드로 표시(카드 확장 없음)  -->
                 <Grid Width="220" Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
+						<!--  앞면 히어로 썸네일 행 (SYNC_DETECTION) — HasThumbnail=false면 Collapsed으로 0px  -->
+						<RowDefinition Height="Auto" />
+						<!--  정보 영역: 4*(별) — 고정 200 내에서 잔여공간 흡수(원본 레이아웃 유지, 푸터 하단 고정)  -->
 						<RowDefinition Height="4*" />
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
@@ -72,7 +76,23 @@
 								Text="탐지 이벤트" />
 						</StackPanel>
 					</md:ColorZone>
-					<Grid Grid.Row="1" Margin="5">
+					<!--  앞면 히어로 썸네일 (SYNC_DETECTION 갱신) — 회전 후 실물을 flip 없이 즉시 확인.
+					      HasThumbnail=false면 Collapsed → 행 0px → 기존(썸네일 없는) 카드 레이아웃 무영향.  -->
+					<Border
+						Grid.Row="1"
+						Height="62"
+						Margin="5,5,5,0"
+						Background="{DynamicResource SurfaceSunkenBrush}"
+						BorderBrush="{DynamicResource DividerBrush}"
+						BorderThickness="1"
+						ClipToBounds="True"
+						CornerRadius="4"
+						Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVis}}">
+						<Image
+							Source="{Binding ThumbnailUri, Mode=OneWay}"
+							Stretch="UniformToFill" />
+					</Border>
+					<Grid Grid.Row="2" Margin="5">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="2*" />
 							<ColumnDefinition Width="8*" />
@@ -199,10 +219,10 @@
 
 					</Grid>
 					<Separator
-						Grid.Row="2"
+						Grid.Row="3"
 						Margin="0"
 						Style="{StaticResource MaterialDesignLightSeparator}" />
-					<StackPanel Grid.Row="3" Margin="10">
+					<StackPanel Grid.Row="4" Margin="10">
 						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="Auto" />
@@ -260,7 +280,8 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-				<Grid Height="200">
+				<!--  뒷면(상세)도 장애 카드와 동일 크기(250×200)  -->
+				<Grid Width="250" Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="3*" />

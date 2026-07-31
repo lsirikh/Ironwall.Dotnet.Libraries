@@ -47,6 +47,12 @@ public interface IEventQueueManager
     /// <summary>특정 device의 가장 오래된 entry 조회 (제거하지 않음)</summary>
     EventEntry? FindEntryByDevice(int deviceId, EnumDeviceType deviceType);
 
+    /// <summary>서버 이벤트 ID(EventEntry.EventId) + EventType로 활성 entry 조회 (제거하지 않음). 없으면 null.
+    /// 탐지(Intrusion)/장애(Fault)는 서버측 **독립 id 시퀀스**라 숫자 EventId만으로는 충돌 가능 →
+    /// EventType 판별 필수(FindEntryByDevice가 deviceType을 요구하는 것과 동일 원칙).
+    /// SYNC_DETECTION 썸네일 갱신 게이트 — resource_id가 현재 EQM에 등록(활성)된 **탐지**인 경우에만 재조회.</summary>
+    EventEntry? FindEntryByEventId(int eventId, EnumEventType eventType);
+
     /// <summary>Timer 틱당 최대 Dequeue 건수 (기본 5)</summary>
     int MaxDequeuePerTick { get; set; }
 

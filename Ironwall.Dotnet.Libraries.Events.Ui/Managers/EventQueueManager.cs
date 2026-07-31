@@ -389,6 +389,21 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             return oldest;
         }
     }
+
+    /// <summary>서버 이벤트 ID(EventEntry.EventId) + EventType로 활성 entry 조회 (제거하지 않음). 없으면 null.
+    /// EventId 전용 역인덱스는 없으므로 _gate 하 _entries 순회(활성 이벤트 수만큼, 소규모) — 순수 조회, 상태전이/이벤트 발화 없음.
+    /// 탐지/장애는 독립 id 시퀀스 → <paramref name="eventType"/> 필수 판별(숫자 EventId 충돌 방어). eventId ≤ 0(미설정)은 항상 null.</summary>
+    public EventEntry? FindEntryByEventId(int eventId, EnumEventType eventType)
+    {
+        if (eventId <= 0) return null;
+        lock (_gate)
+        {
+            foreach (var e in _entries.Values)
+                if (e.EventId == eventId && e.EventType == eventType)
+                    return e;
+            return null;
+        }
+    }
     #endregion
 
     #region - SharedTimer -
