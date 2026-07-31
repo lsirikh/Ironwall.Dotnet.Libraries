@@ -110,9 +110,11 @@ public class ActionSelectionViewModel : BasePanelViewModel
 
         if (ret == null)
             return null;
-        else
-            return events
-                .Where(entity => entity.Id == ret.Id).FirstOrDefault();
+
+        // Id만으로 재조회하면 탐지↔장애 Id 시퀀스 독립이라 (a)같은 Id의 탐지로 오타입 매칭 →
+        // IsMalfunctionOrigin=false로 장애 사유/필드가 안 뜨거나, (b)장애 origin이 provider에 없어 null.
+        // 타입까지 일치하는 provider 인스턴스 우선, 없으면 실제 origin(ret) 폴백 → 정타입·비-null 보장.
+        return events.FirstOrDefault(entity => entity.Id == ret.Id && entity.GetType() == ret.GetType()) ?? ret;
     }
 
     public void RefreshAll()
