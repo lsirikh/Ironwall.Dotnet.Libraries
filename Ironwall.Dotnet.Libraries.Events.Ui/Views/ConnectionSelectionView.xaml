@@ -24,7 +24,7 @@
 		UseLayoutRounding="True">
 		<GroupBox.Header>
 			<StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal">
-				<md:PackIcon Kind="LanConnect" />
+				<md:PackIcon Kind="Settings" />
 				<TextBlock
 					Margin="5,0"
 					VerticalAlignment="Center"
@@ -32,10 +32,10 @@
 			</StackPanel>
 		</GroupBox.Header>
 
-		<!--  연결 이벤트는 서버 관측값(장비 연결/통신 기록) — device_id·status 불변, PUT=type_event만.
-		      편집 콤보(Type/Device/Status)·Apply 제거 → 읽기전용 정보 패널로 재구성.  -->
+		<!--  연결 이벤트는 서버 관측값(장비 연결/통신 기록) — 편집 불가(device_id 불변, PUT=type_event만).
+		      탐지/장애 SelectionView와 동일 포맷의 장비 필수정보(구역/종류/장비/번호)만 읽기전용으로 표시.  -->
 		<ScrollViewer
-			MaxHeight="180"
+			MaxHeight="140"
 			HorizontalScrollBarVisibility="Disabled"
 			VerticalScrollBarVisibility="Auto">
 			<Grid>
@@ -44,11 +44,9 @@
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="64" />
+					<ColumnDefinition Width="56" />
 					<ColumnDefinition Width="*" MinWidth="80" />
 				</Grid.ColumnDefinitions>
 				<Grid.Resources>
@@ -56,11 +54,11 @@
 						<Setter Property="VerticalAlignment" Value="Center" />
 						<Setter Property="Margin" Value="0,3" />
 					</Style>
-					<!--  읽기 전용 값 — 테두리 없는 TextBox(값 복사 허용, 편집 차단)  -->
+					<!--  장비 필수정보 = 읽기 전용 값(편집 불가). 테두리 없는 TextBox로 값 복사는 허용하되 편집은 차단  -->
 					<Style x:Key="ReadOnlyValue" TargetType="TextBox">
 						<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
-						<Setter Property="FontSize" Value="14" />
-						<Setter Property="Opacity" Value="0.8" />
+						<Setter Property="FontSize" Value="15" />
+						<Setter Property="Opacity" Value="0.75" />
 						<Setter Property="IsReadOnly" Value="True" />
 						<Setter Property="Background" Value="Transparent" />
 						<Setter Property="BorderThickness" Value="0" />
@@ -72,48 +70,34 @@
 					</Style>
 				</Grid.Resources>
 
-				<TextBlock Grid.Row="0" Grid.Column="0" Text="종류" />
+				<!--  장비(Device) 필수 정보 — 읽기 전용 (탐지/장애와 동일)  -->
+				<TextBlock Grid.Row="0" Grid.Column="0" Text="구역" />
 				<TextBox
 					Grid.Row="0"
 					Grid.Column="1"
 					Style="{StaticResource ReadOnlyValue}"
-					Text="{Binding MessageTypeText, Mode=OneWay}" />
+					Text="{Binding DeviceZoneText, Mode=OneWay}" />
 
-				<TextBlock Grid.Row="1" Grid.Column="0" Text="구역" />
+				<TextBlock Grid.Row="1" Grid.Column="0" Text="종류" />
 				<TextBox
 					Grid.Row="1"
 					Grid.Column="1"
 					Style="{StaticResource ReadOnlyValue}"
-					Text="{Binding DeviceZoneText, Mode=OneWay}" />
+					Text="{Binding DeviceTypeText, Mode=OneWay}" />
 
-				<TextBlock Grid.Row="2" Grid.Column="0" Text="장비종류" />
+				<TextBlock Grid.Row="2" Grid.Column="0" Text="장비" />
 				<TextBox
 					Grid.Row="2"
 					Grid.Column="1"
 					Style="{StaticResource ReadOnlyValue}"
-					Text="{Binding DeviceTypeText, Mode=OneWay}" />
+					Text="{Binding DeviceNameText, Mode=OneWay}" />
 
-				<TextBlock Grid.Row="3" Grid.Column="0" Text="장비" />
+				<TextBlock Grid.Row="3" Grid.Column="0" Text="번호" />
 				<TextBox
 					Grid.Row="3"
 					Grid.Column="1"
 					Style="{StaticResource ReadOnlyValue}"
-					Text="{Binding DeviceNameText, Mode=OneWay}" />
-
-				<TextBlock Grid.Row="4" Grid.Column="0" Text="번호" />
-				<TextBox
-					Grid.Row="4"
-					Grid.Column="1"
-					Style="{StaticResource ReadOnlyValue}"
 					Text="{Binding DeviceNumberText, Mode=OneWay}" />
-
-				<TextBlock Grid.Row="5" Grid.Column="0" Text="발생" />
-				<TextBox
-					Grid.Row="5"
-					Grid.Column="1"
-					FontFamily="Consolas"
-					Style="{StaticResource ReadOnlyValue}"
-					Text="{Binding DateTimeText, Mode=OneWay}" />
 			</Grid>
 		</ScrollViewer>
 	</GroupBox>
