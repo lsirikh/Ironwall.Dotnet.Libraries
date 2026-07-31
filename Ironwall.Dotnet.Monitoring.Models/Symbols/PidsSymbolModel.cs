@@ -74,6 +74,7 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
                 EnumCompositeEventStatus.Faulted          => EnumEventStatus.Fault,
                 EnumCompositeEventStatus.FaultedDetecting => EnumEventStatus.Fault,
                 EnumCompositeEventStatus.Connection       => EnumEventStatus.Connection,
+                EnumCompositeEventStatus.Blackout         => EnumEventStatus.Blackout,   // 제어기 무통신(검은색) — 회귀방지: 그룹모델과 대칭(리뷰 확정)
                 _                                         => EnumEventStatus.Normal,
             };
         }

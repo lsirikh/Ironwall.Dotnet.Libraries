@@ -27,6 +27,11 @@ public class EventEntry
     /// <summary>이벤트 타입 (Intrusion / Fault)</summary>
     public EnumEventType EventType { get; set; }
 
+    /// <summary>제어기 무통신(먹통) 장애 여부 — FAULT_CONTROLLER. true면 GroupIds는 그 제어기에
+    /// 연결된 센서 그룹으로 확장됨(MalfunctionNatsSyncService). 그룹/장비 상태에서 최상위 우선(검은색).
+    /// GMap_Controller_Blackout.</summary>
+    public bool IsControllerBlackout { get; set; }
+
     /// <summary>큐 등록 시간</summary>
     public DateTime EnqueuedAt { get; set; }
 

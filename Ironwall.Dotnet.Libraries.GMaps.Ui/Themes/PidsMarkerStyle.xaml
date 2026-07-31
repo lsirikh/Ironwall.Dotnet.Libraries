@@ -1042,6 +1042,10 @@
 						<Trigger Property="EventStatus" Value="Connection">
 							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
 						</Trigger>
+							<!--  Blackout: 제어기 무통신(검은색) — 제어기 자기 마커도 장애 은폐 방지(GMap_Controller_Blackout, 리뷰 회귀수정)  -->
+							<Trigger Property="EventStatus" Value="Blackout">
+								<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+							</Trigger>
 
 						<!--  스피커 방송 동작중 — 부드러운 Opacity 펄스 (Fault blink보다 느리고 부드럽게)  -->
 						<Trigger Property="IsBroadcasting" Value="True">

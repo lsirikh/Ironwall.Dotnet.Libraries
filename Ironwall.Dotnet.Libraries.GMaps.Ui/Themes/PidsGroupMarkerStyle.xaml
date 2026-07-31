@@ -251,6 +251,18 @@
 							</Trigger.ExitActions>
 						</Trigger>
 
+						<!--  Blackout: 제어기 무통신(먹통) → 검은색 정적(GMap_Controller_Blackout).
+						      우선순위 최상위 — 센서 Faulted/Detecting을 덮음. 깜빡임 없음(dead steady).
+						      제어기 장애 해소 시 상태 재계산으로 다른 Trigger로 전환.  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Blackout}">
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="Black" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="Black" />
+							<Setter TargetName="PART_EventPolyline" Property="Opacity" Value="1" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+
 						<!--  Mouse Over Effect  -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="PART_MainPolyline" Property="StrokeThickness" Value="4" />

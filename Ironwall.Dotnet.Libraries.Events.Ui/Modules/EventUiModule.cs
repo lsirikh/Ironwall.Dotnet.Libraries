@@ -102,7 +102,8 @@ public class EventUiModule : Module
                 c.Resolve<IEventQueueManager>(),
                 _eventSetup,
                 c.Resolve<Caliburn.Micro.IEventAggregator>(),
-                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>(),   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()   // 제어기무통신 그룹확장(GMap_Controller_Blackout) — 수동 팩토리라 명시 전달 필수(누락 시 기능 죽음)
             )).As<IMalfunctionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 2)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
               .SingleInstance();

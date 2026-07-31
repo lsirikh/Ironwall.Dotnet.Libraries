@@ -304,6 +304,7 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
             case EnumCompositeEventStatus.Detecting:
             case EnumCompositeEventStatus.Faulted:
             case EnumCompositeEventStatus.FaultedDetecting:
+            case EnumCompositeEventStatus.Blackout:   // 제어기 무통신 → 검은색(GMap_Controller_Blackout)
                 SetGroupCompositeStatus(groupId, next);
                 break;
             case EnumCompositeEventStatus.Connection:

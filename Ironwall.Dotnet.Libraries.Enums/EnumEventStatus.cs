@@ -15,4 +15,6 @@ public enum EnumEventStatus
     Connection,
     Detecting,
     Fault,
+    /// <summary>제어기 무통신(먹통) — 검은색. GMap_Controller_Blackout.</summary>
+    Blackout,
 }

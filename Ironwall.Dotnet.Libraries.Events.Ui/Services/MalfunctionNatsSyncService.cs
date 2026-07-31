@@ -32,7 +32,8 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
         IEventQueueManager eventQueueManager,
         IEventSetupModel eventSetupModel,
         IEventAggregator? eventAggregator = null,
-        ITokenStorageService? tokenStorage = null)
+        ITokenStorageService? tokenStorage = null,
+        Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? deviceProvider = null)
     {
         _log = log;
         _natsService = natsService;
@@ -41,6 +42,7 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
         _eventSetupModel = eventSetupModel;
         _eventAggregator = eventAggregator;
         _tokenStorage = tokenStorage;
+        _deviceProvider = deviceProvider;   // 제어기 무통신 그룹 확장용(GMap_Controller_Blackout). 미주입 시 확장 생략(자기 그룹만).
     }
     #endregion
 
@@ -101,7 +103,21 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
                 .Select(g => g.Id)
                 .ToList();
 
-            _log?.Info($"MALFUNCTION 수신: deviceId={deviceId}, deviceType={deviceType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
+            // [GMap_Controller_Blackout] 제어기 무통신(FAULT_CONTROLLER) → 연결 센서 그룹으로 확장 + blackout 표식.
+            // 연결 센서가 모두 먹통이므로 그 센서 그룹의 PidsGroupSymbol을 검은색(Blackout, 최상위 우선)으로.
+            bool isControllerBlackout = string.Equals(body.Reason, nameof(EnumFaultType.FAULT_CONTROLLER),
+                                                       StringComparison.OrdinalIgnoreCase);
+            if (isControllerBlackout && _deviceProvider != null)
+            {
+                var sensors = _deviceProvider
+                    .OfType<Ironwall.Dotnet.Monitoring.Models.Devices.SensorDeviceModel>()
+                    .Select(s => ((int?)s.Controller?.Id, (IEnumerable<int>?)s.DeviceGroups));
+                var expanded = ControllerBlackoutModel.ExpandBlackoutGroups(deviceId, sensors, deviceGroups);
+                if (expanded.Count > 0) deviceGroups = expanded.ToList();
+                _log?.Info($"MALFUNCTION 제어기무통신: ctrl={deviceId} → blackout 그룹=[{string.Join(",", deviceGroups ?? [])}]");
+            }
+
+            _log?.Info($"MALFUNCTION 수신: deviceId={deviceId}, deviceType={deviceType}, reason={body.Reason}, blackout={isControllerBlackout}, groups=[{string.Join(",", deviceGroups ?? [])}]");
 
             var entryId = _eventQueueManager.Enqueue(new EventEntry
             {
@@ -109,6 +125,7 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
                 DeviceType = deviceType,
                 GroupIds = deviceGroups,
                 EventType = EnumEventType.Fault,
+                IsControllerBlackout = isControllerBlackout,
                 EventId = eventId,
                 TimeoutSeconds = _eventSetupModel.TimeDiscardSec,
                 IsAutoReportEnabled = _eventSetupModel.IsAutoEventDiscard
@@ -138,5 +155,6 @@ public class MalfunctionNatsSyncService : IMalfunctionNatsSyncService, IService
     private readonly IEventSetupModel _eventSetupModel;
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스
+    private readonly Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? _deviceProvider;   // 제어기→센서→그룹 토폴로지(GMap_Controller_Blackout)
     #endregion
 }

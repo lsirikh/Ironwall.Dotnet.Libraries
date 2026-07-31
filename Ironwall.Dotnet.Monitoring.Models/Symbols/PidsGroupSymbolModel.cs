@@ -59,6 +59,7 @@ public class PidsGroupSymbolModel : LineSymbolModel, IPidsGroupSymbolModel
                 EnumCompositeEventStatus.Faulted          => EnumEventStatus.Fault,
                 EnumCompositeEventStatus.FaultedDetecting => EnumEventStatus.Fault,
                 EnumCompositeEventStatus.Connection       => EnumEventStatus.Connection,
+                EnumCompositeEventStatus.Blackout         => EnumEventStatus.Blackout,   // 제어기 무통신(검은색)
                 _                                         => EnumEventStatus.Normal,
             };
         }

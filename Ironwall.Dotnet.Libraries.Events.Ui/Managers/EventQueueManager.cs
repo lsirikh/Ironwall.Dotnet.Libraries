@@ -489,6 +489,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         if (!_groupIndex.TryGetValue(groupId, out var entryIds) || entryIds.Count == 0)
             return EnumCompositeEventStatus.Normal;
 
+        bool hasBlackout = false;
         bool hasFault = false;
         bool hasDetection = false;
 
@@ -496,6 +497,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         {
             if (_entries.TryGetValue(id, out var entry))
             {
+                if (entry.IsControllerBlackout) hasBlackout = true;
                 if (entry.EventType == EnumEventType.Fault)
                     hasFault = true;
                 else if (entry.EventType == EnumEventType.Intrusion)
@@ -503,10 +505,8 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             }
         }
 
-        if (hasFault && hasDetection) return EnumCompositeEventStatus.FaultedDetecting;
-        if (hasFault) return EnumCompositeEventStatus.Faulted;
-        if (hasDetection) return EnumCompositeEventStatus.Detecting;
-        return EnumCompositeEventStatus.Normal;
+        // 단일 우선순위 지점(GMap_Controller_Blackout): Blackout > FaultedDetecting > Faulted > Detecting > Normal.
+        return ControllerBlackoutModel.Resolve(hasBlackout, hasFault, hasDetection);
     }
 
     /// <summary>_entries + _deviceIndex 기반으로 디바이스 복합 상태 계산 (SSOT: _entries)</summary>
@@ -517,6 +517,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         if (!_deviceIndex.TryGetValue(deviceKey, out var entryIds) || entryIds.Count == 0)
             return EnumCompositeEventStatus.Normal;
 
+        bool hasBlackout = false;
         bool hasFault = false;
         bool hasDetection = false;
 
@@ -524,6 +525,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         {
             if (_entries.TryGetValue(id, out var entry))
             {
+                if (entry.IsControllerBlackout) hasBlackout = true;
                 if (entry.EventType == EnumEventType.Fault)
                     hasFault = true;
                 else if (entry.EventType == EnumEventType.Intrusion)
@@ -531,10 +533,8 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             }
         }
 
-        if (hasFault && hasDetection) return EnumCompositeEventStatus.FaultedDetecting;
-        if (hasFault) return EnumCompositeEventStatus.Faulted;
-        if (hasDetection) return EnumCompositeEventStatus.Detecting;
-        return EnumCompositeEventStatus.Normal;
+        // 단일 우선순위 지점(GMap_Controller_Blackout): Blackout > FaultedDetecting > Faulted > Detecting > Normal.
+        return ControllerBlackoutModel.Resolve(hasBlackout, hasFault, hasDetection);
     }
     #endregion
 
