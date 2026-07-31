@@ -20,6 +20,25 @@
 	d:DesignWidth="1200"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
+	<!--  전역 단축키 — 상단 메뉴 명령을 맵 포커스 상태에서 동작(메뉴 스코프가 아닌 루트 스코프).
+	      기존 코드 단축키(Ctrl+Shift+R 회전토글·Ctrl+R 회전리셋·Ctrl+←/→ 미세회전·Ctrl+A 전체선택)와 비충돌.  -->
+	<UserControl.InputBindings>
+		<!--  파일  -->
+		<KeyBinding Key="L" Modifiers="Ctrl" Command="{Binding LoadMapImageCommand}" />
+		<KeyBinding Key="I" Modifiers="Ctrl" Command="{Binding LoadImageOverlayCommand}" />
+		<KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding CreateCustomMapCommand}" />
+		<KeyBinding Key="D" Modifiers="Ctrl" Command="{Binding SetMapTileFolderCommand}" />
+		<KeyBinding Key="E" Modifiers="Ctrl" Command="{Binding ExitApplicationCommand}" />
+		<!--  지도(좌표계)  -->
+		<KeyBinding Key="D1" Modifiers="Ctrl" Command="{Binding ToggleWGS84Command}" />
+		<KeyBinding Key="D2" Modifiers="Ctrl" Command="{Binding ToggleMGRSCommand}" />
+		<KeyBinding Key="D3" Modifiers="Ctrl" Command="{Binding ToggleUTMCommand}" />
+		<!--  보기(계기 토글) — Ctrl+Shift 조합, 회전토글 R과 비충돌  -->
+		<KeyBinding Key="C" Modifiers="Ctrl+Shift" Command="{Binding ToggleCompassVisibleCommand}" />
+		<KeyBinding Key="W" Modifiers="Ctrl+Shift" Command="{Binding ToggleWindyIndicatorVisibleCommand}" />
+		<KeyBinding Key="F" Modifiers="Ctrl+Shift" Command="{Binding ToggleDetFaultVisibleCommand}" />
+		<KeyBinding Key="X" Modifiers="Ctrl+Shift" Command="{Binding ToggleCenterCrosshairCommand}" />
+	</UserControl.InputBindings>
 	<UserControl.Resources>
 		<ResourceDictionary>
 			<ResourceDictionary.MergedDictionaries>
@@ -110,103 +129,54 @@
 				IsMainMenu="True"
 				Style="{StaticResource MaterialDesignMenu}">
 
-			<!--  File 메뉴  -->
-			<MenuItem Header="_File">
+			<!--  파일 메뉴 — 단축키는 루트 UserControl.InputBindings에서 전역 처리(여기선 InputGestureText 표시만).  -->
+			<MenuItem Header="파일(_F)">
 				<MenuItem
 					Command="{Binding LoadMapImageCommand}"
 					Header="맵 불러오기"
 					Icon="{md:PackIcon Kind=Map}"
-					InputGestureText="Ctrl+L">
-					<MenuItem.InputBindings>
-						<KeyBinding
-							Key="L"
-							Command="{Binding LoadMapImageCommand}"
-							Modifiers="Ctrl" />
-					</MenuItem.InputBindings>
-				</MenuItem>
-
+					InputGestureText="Ctrl+L" />
 				<MenuItem
 					Command="{Binding LoadImageOverlayCommand}"
 					Header="이미지 불러오기"
 					Icon="{md:PackIcon Kind=Image}"
-					InputGestureText="Ctrl+I">
-					<MenuItem.InputBindings>
-						<KeyBinding
-							Key="I"
-							Command="{Binding LoadImageOverlayCommand}"
-							Modifiers="Ctrl" />
-					</MenuItem.InputBindings>
-				</MenuItem>
-
+					InputGestureText="Ctrl+I" />
 				<MenuItem
 					Command="{Binding CreateCustomMapCommand}"
 					Header="새 커스텀 맵 생성"
 					Icon="{md:PackIcon Kind=MapPlus}"
-					InputGestureText="Ctrl+N">
-					<MenuItem.InputBindings>
-						<KeyBinding
-							Key="N"
-							Command="{Binding CreateCustomMapCommand}"
-							Modifiers="Ctrl" />
-					</MenuItem.InputBindings>
-				</MenuItem>
-
+					InputGestureText="Ctrl+N" />
 				<MenuItem
 					Command="{Binding SetMapTileFolderCommand}"
 					Header="맵 타일 폴더 설정"
 					Icon="{md:PackIcon Kind=Mapbox}"
-					InputGestureText="Ctrl+D">
-					<MenuItem.InputBindings>
-						<KeyBinding
-							Key="D"
-							Command="{Binding SetMapTileFolderCommand}"
-							Modifiers="Ctrl" />
-					</MenuItem.InputBindings>
-				</MenuItem>
-
+					InputGestureText="Ctrl+D" />
 				<Separator />
-
 				<MenuItem
 					Command="{Binding ExitApplicationCommand}"
-					Header="Exit"
+					Header="종료"
 					Icon="{md:PackIcon Kind=ExitToApp}"
-					InputGestureText="Ctrl+E">
-					<MenuItem.InputBindings>
-						<KeyBinding
-							Key="E"
-							Command="{Binding ExitApplicationCommand}"
-							Modifiers="Ctrl" />
-					</MenuItem.InputBindings>
-				</MenuItem>
+					InputGestureText="Ctrl+E" />
 			</MenuItem>
-			<MenuItem Header="_Maps">
+
+			<!--  지도(좌표계) 메뉴 — 마우스=IsChecked TwoWay 단일 토글(Command 제거로 이중토글 방지),
+			      키보드=루트 InputBindings(Ctrl+1/2/3→Toggle*Command 플립).  -->
+			<MenuItem Header="지도(_M)">
 				<MenuItem
-					Command="{Binding ToggleWGS84Command}"
 					Header="WGS-84 좌표계"
+					InputGestureText="Ctrl+1"
 					IsCheckable="True"
-					IsChecked="{Binding IsShowWSG84, UpdateSourceTrigger=PropertyChanged}">
-					<MenuItem.InputBindings>
-						<KeyBinding Command="{Binding ToggleWGS84Command}" />
-					</MenuItem.InputBindings>
-				</MenuItem>
+					IsChecked="{Binding IsShowWSG84, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 				<MenuItem
-					Command="{Binding ToggleMGRSCommand}"
 					Header="MGRS 좌표계"
+					InputGestureText="Ctrl+2"
 					IsCheckable="True"
-					IsChecked="{Binding IsShowMGRS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-					<MenuItem.InputBindings>
-						<KeyBinding Command="{Binding ToggleMGRSCommand}" />
-					</MenuItem.InputBindings>
-				</MenuItem>
+					IsChecked="{Binding IsShowMGRS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 				<MenuItem
-					Command="{Binding ToggleUTMCommand}"
 					Header="UTM 좌표계"
+					InputGestureText="Ctrl+3"
 					IsCheckable="True"
-					IsChecked="{Binding IsShowUTM, UpdateSourceTrigger=PropertyChanged}">
-					<MenuItem.InputBindings>
-						<KeyBinding Command="{Binding ToggleUTMCommand}" />
-					</MenuItem.InputBindings>
-				</MenuItem>
+					IsChecked="{Binding IsShowUTM, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 			</MenuItem>
 
 			<!--  보기(View) 메뉴 — 지도 계기 표시/숨김(GMap_Map_Instruments FR-14~16).
@@ -215,22 +185,26 @@
 				<MenuItem
 					Header="방위각(나침반)"
 					Icon="{md:PackIcon Kind=CompassOutline}"
+					InputGestureText="Ctrl+Shift+C"
 					IsCheckable="True"
 					IsChecked="{Binding IsCompassVisible, Mode=TwoWay}" />
 				<MenuItem
 					Header="강풍모드 인디케이터"
 					Icon="{md:PackIcon Kind=WeatherWindy}"
+					InputGestureText="Ctrl+Shift+W"
 					IsCheckable="True"
 					IsChecked="{Binding IsWindyIndicatorVisible, Mode=TwoWay}" />
 				<MenuItem
 					Header="탐지·장애 상태"
 					Icon="{md:PackIcon Kind=ShieldAlertOutline}"
+					InputGestureText="Ctrl+Shift+F"
 					IsCheckable="True"
 					IsChecked="{Binding IsDetFaultVisible, Mode=TwoWay}" />
 				<Separator />
 				<MenuItem
 					Header="중앙 십자선"
 					Icon="{md:PackIcon Kind=Crosshairs}"
+					InputGestureText="Ctrl+Shift+X"
 					IsCheckable="True"
 					IsChecked="{Binding IsCenterCrosshairVisible, Mode=TwoWay}" />
 			</MenuItem>

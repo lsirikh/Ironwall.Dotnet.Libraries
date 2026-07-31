@@ -3824,7 +3824,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void ExecuteToggleMGRSCommand(object obj)
     {
-        IsShowMGRSGrid = IsShowMGRS;
+        IsShowMGRS = !IsShowMGRS;   // 플립(격자는 세터가 동기). 키보드 단축키·메뉴 공용 단일 토글.
     }
 
     /// <summary>
@@ -3837,6 +3837,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     private void ExecuteToggleUTMCommand(object obj)
     {
+        IsShowUTM = !IsShowUTM;   // 플립. 키보드 단축키·메뉴 공용 단일 토글.
     }
     #endregion
 
@@ -7446,7 +7447,9 @@ public partial class MapViewModel : BasePanelViewModel,
     public bool IsShowMGRS
     {
         get { return _isShowMGRS; }
+        // MGRS 격자 표시를 세터에 통합 — 마우스(IsChecked TwoWay)·키보드(토글 커맨드) 어느 경로든 격자 동기.
         set { _isShowMGRS = value;
+            IsShowMGRSGrid = value;
             NotifyOfPropertyChange(nameof(IsShowMGRS)); }
     }
 

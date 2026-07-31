@@ -92,6 +92,17 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
     public bool IsWindyIndicatorVisible { get => _isWindyIndicatorVisible; set { _isWindyIndicatorVisible = value; NotifyOfPropertyChange(nameof(IsWindyIndicatorVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
     private bool _isDetFaultVisible = true;
     public bool IsDetFaultVisible { get => _isDetFaultVisible; set { _isDetFaultVisible = value; NotifyOfPropertyChange(nameof(IsDetFaultVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
+
+    // 키보드 단축키용 토글 커맨드(메뉴는 IsChecked로 마우스 토글). 세터가 저장까지 처리.
+    private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _toggleCompassVisibleCommand;
+    public Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand ToggleCompassVisibleCommand
+        => _toggleCompassVisibleCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(_ => IsCompassVisible = !IsCompassVisible);
+    private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _toggleWindyIndicatorVisibleCommand;
+    public Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand ToggleWindyIndicatorVisibleCommand
+        => _toggleWindyIndicatorVisibleCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(_ => IsWindyIndicatorVisible = !IsWindyIndicatorVisible);
+    private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _toggleDetFaultVisibleCommand;
+    public Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand ToggleDetFaultVisibleCommand
+        => _toggleDetFaultVisibleCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(_ => IsDetFaultVisible = !IsDetFaultVisible);
     #endregion
 
     /// <summary>초기 배선 — CCMS(부팅)에서 1회 호출. EQM 구독 + 초기 카운트 + 설정 복원(억제).</summary>
