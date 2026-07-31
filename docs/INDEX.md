@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-07-30 (advance-phase 자동)
-- **총 문서 수**: 417개
+- **마지막 갱신**: 2026-07-31 (수동 — malfunction-autoreport-setting PRD 추가)
+- **총 문서 수**: 418개
 
 ---
 
@@ -59,6 +59,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [malfunction-autoreport-setting-prd.md](prds/malfunction-autoreport-setting-prd.md) | 장애 이벤트 자동조치보고 독립 설정 — `장애 이벤트 해제` 항목 신설(탐지와 분리), 장애 전용 토글·타임아웃, 업그레이드 기본값 true/20 | Draft | 2026-07-31 |
 | [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | 지도 계기 인디케이터(강풍모드·탐지장애)+보기(View)메뉴 — EQM 소스·타입칩 v2분리·z6·드래그영속 | Completed | 2026-07-31 |
 | [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | API/NATS 호출·수신 로깅 P0(진단 사각 제거) | Draft | 2026-07-31 |
 | [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | WINDY 롤백 복구·프록시 서버 해석·조준 실패 팝업 승격 | Approved | 2026-07-30 |

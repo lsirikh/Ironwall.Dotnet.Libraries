@@ -1,6 +1,7 @@
 ﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 
@@ -53,6 +54,13 @@ public class DetectionEventViewModel : ExEventViewModel, IDetectionEventViewMode
 
     /// <summary>그리드 표시 문자열 — 천 단위 구분, null/0(AI_DETECT)은 "—".</summary>
     public string SignalText => Signal is > 0 ? Signal!.Value.ToString("N0") : "—";
+
+    /// <summary>썸네일 절대 URI(detail.thumbnail) — 상대경로는 API base 결합(공용 ThumbnailUriResolver).
+    /// 없거나 조합 실패면 null → 뷰의 기본 이미지. 실제 로드 실패(자체서명 인증서 등)는 뷰 겹침 default가 폴백.</summary>
+    public Uri? ThumbnailUri => ThumbnailUriResolver.Resolve((_model as IDetectionEventModel)!.Thumbnail);
+
+    /// <summary>썸네일 후보 존재 여부(URI 유효). false면 뷰가 기본 이미지를 표시.</summary>
+    public bool HasThumbnail => ThumbnailUri != null;
 
     #endregion
     #region - Attributes -

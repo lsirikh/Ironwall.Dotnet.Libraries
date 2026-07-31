@@ -14,6 +14,13 @@
 
 ## [Unreleased]
 
+### Added
+- **탐지 이벤트 DataGrid 썸네일 컬럼** (Track C · Events.Ui · 사용자 지시 2026-07-31)
+  - `DetectionEventPanelView` DataGrid에 "썸네일" 컬럼 추가(Device 다음). **Row 높이 이내로 축소**(Grid 36 / Image MaxHeight 34), **마우스 호버 시 원본 크기 툴팁**(MaxWidth 360, InitialShowDelay 300ms). 썸네일 **부재/로드 실패 시 기본 이미지**(`ImageOffOutline`) — Image를 기본 아이콘 위에 겹쳐 로드 실패 시 뒤 레이어 노출(코드비하인드 불요).
+  - **공통 헬퍼** `Helpers/ThumbnailUriResolver` 신설 — 썸네일 원본 경로→절대 URI(절대 그대로 / 상대는 API base host 결합, `IApiSetupModel` IoC 조달). `DetectionEventViewModel`(행)·`DetectionSelectionViewModel`(속성 편집기)가 공유(기존 중복 로직 제거).
+  - `DetectionEventViewModel`에 `ThumbnailUri`/`HasThumbnail` 추가(신호 컬럼과 동일 패턴). 속성 편집기(SelectionView)는 이미 썸네일 연결됨 → URI 로직만 공통화.
+  - **검증**: Events.Ui 빌드 0오류 · 한글 BOM. ⚠앱 재빌드 후 런타임 육안.
+
 ### Changed
 - **조치보고 다이얼로그 "탐지 속성(detail)" 레이아웃 정리 + 썸네일 이미지화** (Track B · Events.Ui · 태그 `before-detection-detail-layout-thumbnail` · 사용자 지시 2026-07-31)
   - **레이아웃**: 10열 불규칙 그리드(값 시작 위치가 행마다 어긋남)를 **좌(속성 라벨:값 세로 정렬) + 우(썸네일 박스)** 2단으로 재작성. Type/Device/Status/Result(편집) + 신호/AI/객체(읽기전용) 정돈.
@@ -33,6 +40,7 @@
   - **VM**: `Detection/MalfunctionSelectionViewModel`에 표시용 파생 프로퍼티 추가 — `DeviceNameText`(DeviceName)·`DeviceTypeText`(DeviceType)·`DeviceNumberText`(DeviceNumber)·`DeviceZoneText`(DeviceGroups Id→`DeviceGroupProvider` 이름 변환, BaseDeviceViewModel 패턴). `RefreshAll`에서 NotifyOfPropertyChange, `ApplyButton`의 `item.Device = …` 적용 제거.
   - **대시보드 편집기 영향**: 동일 뷰를 쓰는 `EventDashboardView`에서도 Device는 읽기전용(IsReadOnly)이나 Type/Status/Result/Reason 등은 편집 유지.
   - 와이어프레임 갱신: `docs/design/action-report-dialogs-wireframe.html`(Device=읽기전용 필드).
+  - **폰트 일치**: `ReadOnlyValue`(Device 값) 스타일에 표준 폰트 지정(NotoSansCJKkRMedium / FontSize 15 / Opacity 0.75) — 미지정 시 MaterialDesign 기본(Roboto→한글 시스템 fallback)으로 떨어져 라벨·ComboBox 값과 어긋나던 문제 수정.
   - **검증**: Events.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안.
 
 ### Fixed

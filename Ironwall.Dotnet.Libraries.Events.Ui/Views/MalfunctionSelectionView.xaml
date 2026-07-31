@@ -51,7 +51,7 @@
 				      읽기 전용(조치보고)에서도 스크롤이 살아야 하므로 IsEnabled는 ScrollViewer가 아니라 내부 Grid(편집 컨트롤)에만 건다.  -->
 				<ScrollViewer
 					Grid.Column="0"
-					MaxHeight="220"
+					MaxHeight="120"
 					HorizontalScrollBarVisibility="Disabled"
 					VerticalScrollBarVisibility="Auto">
 					<Grid IsEnabled="{Binding IsEditable}">
@@ -75,6 +75,9 @@
 							</Style>
 							<!--  장비 필수정보 = 읽기 전용 값(편집 불가). 테두리 없는 TextBox로 값 복사는 허용하되 편집은 차단  -->
 							<Style x:Key="ReadOnlyValue" TargetType="TextBox">
+								<Setter Property="FontFamily" Value="{StaticResource NotoSansCJKkRMedium}" />
+								<Setter Property="FontSize" Value="15" />
+								<Setter Property="Opacity" Value="0.75" />
 								<Setter Property="IsReadOnly" Value="True" />
 								<Setter Property="Background" Value="Transparent" />
 								<Setter Property="BorderThickness" Value="0" />

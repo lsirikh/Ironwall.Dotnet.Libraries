@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -211,38 +212,12 @@ public class DetectionSelectionViewModel : BasePanelViewModel
 
     /// <summary>썸네일 절대 URI — 상대경로(/api/thumbnails/…)면 API base host를 결합. 없거나 조합 실패면 null(→ default 이미지).
     /// 단일 선택일 때만. 실제 이미지 로드 실패(자체서명 인증서 등)는 View의 ImageFailed가 default로 폴백.</summary>
-    public Uri? ThumbnailUri
-    {
-        get
-        {
-            if (!IsSingle) return null;
-            var raw = FirstModel?.Thumbnail;
-            if (string.IsNullOrWhiteSpace(raw)) return null;
-
-            // 절대 URL이면 그대로
-            if (Uri.TryCreate(raw, UriKind.Absolute, out var abs)) return abs;
-
-            // 상대경로면 API base host와 결합 (base 미조달 시 null → default)
-            var baseUrl = ResolveApiBaseUrl();
-            if (string.IsNullOrWhiteSpace(baseUrl)) return null;
-            return Uri.TryCreate(new Uri(baseUrl!), raw, out var combined) ? combined : null;
-        }
-    }
+    /// <summary>썸네일 절대 URI(detail.thumbnail) — 단일 선택일 때만. 상대경로는 API base 결합(공용 ThumbnailUriResolver).
+    /// 없거나 조합 실패면 null → default. 실제 이미지 로드 실패(자체서명 인증서 등)는 View의 겹침 default가 폴백.</summary>
+    public Uri? ThumbnailUri => IsSingle ? ThumbnailUriResolver.Resolve(FirstModel?.Thumbnail) : null;
 
     /// <summary>썸네일 이미지 후보가 있는지(단일 선택 + URL 존재). false면 View가 default 이미지를 표시.</summary>
     public bool HasThumbnail => ThumbnailUri != null;
-
-    /// <summary>API base host 추출 — appsettings Url(예: https://host:8136/api)에서 scheme+host+port. IoC 미등록 시 null.</summary>
-    private static string? ResolveApiBaseUrl()
-    {
-        try
-        {
-            var setup = IoC.Get<Ironwall.Dotnet.Libraries.Api.Models.IApiSetupModel>();
-            if (setup?.Url is not string url || string.IsNullOrWhiteSpace(url)) return null;
-            return Uri.TryCreate(url, UriKind.Absolute, out var u) ? $"{u.Scheme}://{u.Authority}" : null;
-        }
-        catch { return null; }   // IoC 미등록/해석 실패 — 상대 썸네일은 default로 폴백
-    }
     #endregion
     #region - Attributes -
     private IList<DetectionEventViewModel> _selection;

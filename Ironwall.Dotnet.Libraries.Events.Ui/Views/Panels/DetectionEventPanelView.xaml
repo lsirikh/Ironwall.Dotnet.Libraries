@@ -322,6 +322,74 @@
 				</DataGridTemplateColumn>
 
 	
+				<!--  썸네일 (detail.thumbnail) — Row 높이 이내로 축소, 마우스 호버 시 원본 크기 툴팁, 없으면 기본 이미지  -->
+				<DataGridTemplateColumn
+					CanUserSort="False"
+					Header="썸네일"
+					IsReadOnly="True">
+					<DataGridColumn.HeaderStyle>
+						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
+							<Setter Property="HorizontalAlignment" Value="Center" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+						</Style>
+					</DataGridColumn.HeaderStyle>
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<Grid
+								Width="52"
+								Height="36"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center">
+								<!--  기본 이미지(뒤 레이어): 썸네일 없음/로드 실패 시 노출  -->
+								<md:PackIcon
+									Width="18"
+									Height="18"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center"
+									Opacity="0.4"
+									Kind="ImageOffOutline" />
+								<!--  썸네일(앞 레이어): 후보 있을 때만 표시. 로드 실패면 빈 렌더 → 뒤 기본 이미지 노출  -->
+								<Border
+									ClipToBounds="True"
+									CornerRadius="3">
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="Visibility" Value="Visible" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HasThumbnail}" Value="False">
+													<Setter Property="Visibility" Value="Collapsed" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+									<Image
+										MaxHeight="34"
+										RenderOptions.BitmapScalingMode="HighQuality"
+										Source="{Binding ThumbnailUri, Mode=OneWay}"
+										Stretch="Uniform"
+										ToolTipService.InitialShowDelay="300"
+										ToolTipService.ShowDuration="30000">
+										<Image.ToolTip>
+											<ToolTip
+												Background="{DynamicResource SurfaceAltBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												Padding="4">
+												<Image
+													MaxWidth="360"
+													MaxHeight="270"
+													RenderOptions.BitmapScalingMode="HighQuality"
+													Source="{Binding ThumbnailUri, Mode=OneWay}"
+													Stretch="Uniform" />
+											</ToolTip>
+										</Image.ToolTip>
+									</Image>
+								</Border>
+							</Grid>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+
 				<!--  조치보고  -->
 				<DataGridCheckBoxColumn
 					Binding="{Binding IsActionReported, Mode=OneWay}"
