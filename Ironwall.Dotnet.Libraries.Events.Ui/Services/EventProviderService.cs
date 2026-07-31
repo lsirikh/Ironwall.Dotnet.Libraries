@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 
@@ -53,8 +54,8 @@ public class EventProviderService
             while (true)
             {
                 var response = await _apiService.GetDetectionEventsAsync(
-                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                    endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -115,8 +116,8 @@ public class EventProviderService
             while (true)
             {
                 var response = await _apiService.GetMalfunctionEventsAsync(
-                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                    endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -175,8 +176,8 @@ public class EventProviderService
             while (true)
             {
                 var response = await _apiService.GetConnectionEventsAsync(
-                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                    endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -235,8 +236,8 @@ public class EventProviderService
             while (true)
             {
                 var response = await _apiService.GetActionEventsAsync(
-                    startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                    endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                     page: currentPage,
                     limit: pageSize,
                     token: token);
@@ -285,8 +286,8 @@ public class EventProviderService
         try
         {
             var response = await _apiService.GetDetectionEventsAsync(
-                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                 page: page, limit: limit, token: token);
 
             if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -331,8 +332,8 @@ public class EventProviderService
         try
         {
             var response = await _apiService.GetMalfunctionEventsAsync(
-                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                 page: page, limit: limit, token: token);
 
             if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -376,8 +377,8 @@ public class EventProviderService
         try
         {
             var response = await _apiService.GetConnectionEventsAsync(
-                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                 page: page, limit: limit, token: token);
 
             if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -421,8 +422,8 @@ public class EventProviderService
         try
         {
             var response = await _apiService.GetActionEventsAsync(
-                startDate: startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate: endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                startDate: KoreaTimeHelper.ToServerIso8601(startDate),
+                endDate: KoreaTimeHelper.ToServerIso8601(endDate),
                 page: page, limit: limit, token: token);
 
             if (!response.Success || response.Data == null || response.Data.Count == 0)
@@ -853,8 +854,8 @@ public class EventProviderService
         {
             _log?.Info($"FetchEventDashboardAsync() started: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}, interval={interval}");
             var response = await _apiService.GetEventStatisticsDashboardAsync(
-                startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                KoreaTimeHelper.ToServerIso8601(startDate),
+                KoreaTimeHelper.ToServerIso8601(endDate),
                 interval, token);
 
             if (!response.Success || response.Data == null)
@@ -879,8 +880,8 @@ public class EventProviderService
         try
         {
             var response = await _apiService.GetEventStatisticsSummaryAsync(
-                startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                KoreaTimeHelper.ToServerIso8601(startDate),
+                KoreaTimeHelper.ToServerIso8601(endDate),
                 token);
 
             if (!response.Success || response.Data == null)
@@ -904,8 +905,8 @@ public class EventProviderService
         try
         {
             var response = await _apiService.GetEventStatisticsByDeviceAsync(
-                startDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                endDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+                KoreaTimeHelper.ToServerIso8601(startDate),
+                KoreaTimeHelper.ToServerIso8601(endDate),
                 token);
 
             if (!response.Success || response.Data == null)

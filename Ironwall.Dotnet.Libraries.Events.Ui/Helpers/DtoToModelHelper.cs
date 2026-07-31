@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 
@@ -105,7 +106,7 @@ public static class DtoToModelHelper
         return new DetectionEventDto
         {
             Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = KoreaTimeHelper.ToServerIso8601(model.DateTime),   // aware(+09:00) — 리터럴 'Z'(거짓 UTC) 금지
             TypeEvent = model.MessageType.ToString(),
             ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
             Result = model.Result.ToString(),
@@ -124,7 +125,7 @@ public static class DtoToModelHelper
         return new MalfunctionEventDto
         {
             Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = KoreaTimeHelper.ToServerIso8601(model.DateTime),   // aware(+09:00) — 리터럴 'Z'(거짓 UTC) 금지
             TypeEvent = model.MessageType.ToString(),
             ActionReported = model.Status == EnumTrueFalse.True ? "True" : "False",
             Reason = model.Reason.ToString(),
@@ -149,7 +150,7 @@ public static class DtoToModelHelper
         return new ConnectionEventDto
         {
             Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = KoreaTimeHelper.ToServerIso8601(model.DateTime),   // aware(+09:00) — 리터럴 'Z'(거짓 UTC) 금지
             TypeEvent = model.MessageType.ToString(),
             DeviceId = model.Device?.Id ?? 0,   // 서버 Create는 flat device_id(FK) 필수
             Device = ConvertDeviceToDto(model.Device),
@@ -165,7 +166,7 @@ public static class DtoToModelHelper
         return new ActionEventDto
         {
             Id = model.Id,
-            CreatedAt = model.DateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            CreatedAt = KoreaTimeHelper.ToServerIso8601(model.DateTime),   // aware(+09:00) — 리터럴 'Z'(거짓 UTC) 금지
             TypeEvent = model.MessageType.ToString(),
             Content = model.Content ?? string.Empty,
             User = model.User ?? string.Empty,
@@ -588,6 +589,11 @@ public static class DtoToModelHelper
     {
         if (string.IsNullOrEmpty(dateTimeString))
             return DateTime.Now;
+
+        // 서버 aware ISO(+09:00/Z)는 offset을 보존해 KST 벽시계로 정규화 — offset 소실/호스트 TZ 시프트 방지
+        if (DateTimeOffset.TryParse(dateTimeString, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var dto))
+            return dto.ToOffset(KoreaTimeHelper.KoreaUtcOffset).DateTime;
 
         if (DateTime.TryParse(dateTimeString, out var dateTime))
             return dateTime;

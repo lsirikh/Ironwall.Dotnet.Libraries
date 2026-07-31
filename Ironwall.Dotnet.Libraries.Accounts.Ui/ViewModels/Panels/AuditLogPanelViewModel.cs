@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Ui.Common;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Accounts;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System;
@@ -125,8 +126,8 @@ public class AuditLogPanelViewModel : BasePanelViewModel
     /// <summary>날짜범위 → ISO(yyyy-MM-ddTHH:mm:ss). 종료일은 당일 끝(23:59:59)까지 포함.</summary>
     private (string startDate, string endDate) BuildDateRange()
     {
-        var sd = _startDate.Date.ToString("yyyy-MM-ddTHH:mm:ss");
-        var ed = _endDate.Date.AddDays(1).AddSeconds(-1).ToString("yyyy-MM-ddTHH:mm:ss");
+        var sd = KoreaTimeHelper.ToServerIso8601(_startDate.Date);
+        var ed = KoreaTimeHelper.ToServerIso8601(_endDate.Date.AddDays(1).AddSeconds(-1));
         return (sd, ed);
     }
 

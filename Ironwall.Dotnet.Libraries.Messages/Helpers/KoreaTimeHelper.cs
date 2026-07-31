@@ -67,6 +67,31 @@ public static class KoreaTimeHelper
     }
 
     /// <summary>
+    /// 서버 전송용 aware ISO 8601 문자열 생성 — 앱 내 KST 벽시계 <see cref="DateTime"/>을 offset이 붙은 규약 문자열로.
+    /// <para>서버 datetime 규약(Option B): 입력은 aware(offset 포함) 권장. offset 없는 naive를 보내면 서버가 DISPLAY_TZ로 간주해 오해석될 수 있다.</para>
+    /// <para>Kind 처리: Utc → offset 0(+00:00), Local → 머신 로컬 offset, Unspecified(DatePicker 등) → KST(+09:00)로 간주.</para>
+    /// </summary>
+    /// <returns>"2026-01-06T00:00:00.000+09:00" 형태(offset 포함).</returns>
+    public static string ToServerIso8601(DateTime dt)
+    {
+        DateTimeOffset dto = dt.Kind switch
+        {
+            DateTimeKind.Utc => new DateTimeOffset(dt),                  // offset 0(+00:00)
+            DateTimeKind.Local => new DateTimeOffset(dt),                // 머신 로컬 offset
+            _ => new DateTimeOffset(dt, KoreaUtcOffset),                 // Unspecified → KST 간주
+        };
+        return dto.ToString(Iso8601WithOffsetFormat, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>서버 전송용 aware ISO 8601 — <see cref="DateTimeOffset"/>은 offset을 그대로 보존.</summary>
+    public static string ToServerIso8601(DateTimeOffset dto)
+        => dto.ToString(Iso8601WithOffsetFormat, System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>서버 전송용 aware ISO 8601(nullable) — null이면 null 반환(쿼리 파라미터 생략용).</summary>
+    public static string? ToServerIso8601(DateTime? dt)
+        => dt.HasValue ? ToServerIso8601(dt.Value) : null;
+
+    /// <summary>
     /// UTC DateTime을 한국 시간 ISO 8601 문자열로 변환
     /// </summary>
     public static string ToKoreaTimeIso8601(DateTime utcDateTime)

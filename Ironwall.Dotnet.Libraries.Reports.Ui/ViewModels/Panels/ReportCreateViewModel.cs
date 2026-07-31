@@ -1,6 +1,7 @@
 using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using System.Collections.ObjectModel;
@@ -76,8 +77,9 @@ public class ReportCreateViewModel : BasePanelViewModel
                 Title = title,
                 PeriodType = IsCustomRange ? "custom" : SelectedPeriod.Value,
                 TemplateId = IsTemplateBased ? SelectedTemplate!.Id : null,
-                StartDate = IsCustomRange ? StartDate?.ToString("yyyy-MM-dd") : null,
-                EndDate = IsCustomRange ? EndDate?.ToString("yyyy-MM-dd") : null,
+                // aware(+09:00) 자정 경계 — 서버가 end 자정을 23:59:59로 확장해 끝일 포함([start,end] 닫힌구간, 서버팀 확인 2026-07-31)
+                StartDate = IsCustomRange ? KoreaTimeHelper.ToServerIso8601(StartDate?.Date) : null,
+                EndDate = IsCustomRange ? KoreaTimeHelper.ToServerIso8601(EndDate?.Date) : null,
             };
             var genRes = await _api.GenerateAsync(req);
             if (!genRes.Success || genRes.Data is null) { StatusText = $"생성 요청 실패: {genRes.Message}"; IsGenerating = false; return; }

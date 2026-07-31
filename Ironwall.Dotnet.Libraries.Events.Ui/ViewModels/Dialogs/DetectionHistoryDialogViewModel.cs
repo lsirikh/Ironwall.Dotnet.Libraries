@@ -11,6 +11,7 @@ using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
+using Ironwall.Dotnet.Libraries.Messages.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.ObjectModel;
@@ -213,8 +214,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             ChartRangeEnd = end;
             NotifyOfPropertyChange(nameof(ChartRangeStart));
             NotifyOfPropertyChange(nameof(ChartRangeEnd));
-            var startText = start.ToString("yyyy-MM-ddTHH:mm:ss");
-            var endText = end.ToString("yyyy-MM-ddTHH:mm:ss");
+            var startText = KoreaTimeHelper.ToServerIso8601(start);
+            var endText = KoreaTimeHelper.ToServerIso8601(end);
 
             var models = new List<IDetectionEventModel>();
             int page = 1;

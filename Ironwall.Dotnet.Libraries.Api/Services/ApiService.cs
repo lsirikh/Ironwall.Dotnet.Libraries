@@ -18,6 +18,14 @@ namespace Ironwall.Dotnet.Libraries.Api.Services;
 ****************************************************************************/
 public class ApiService : IApiService
 {
+    // 요청 body 직렬화 공통 설정 — DateTime 필드를 aware ISO8601로 내보낸다(Unspecified/Local → 로컬 KST offset 부착).
+    // 서버 datetime 규약(입력 aware 권장) 준수. 설정 없는 SerializeObject는 Unspecified를 offset 없이 naive로 내보내던 결함을 차단.
+    private static readonly JsonSerializerSettings _jsonSettings = new()
+    {
+        DateFormatHandling = DateFormatHandling.IsoDateFormat,
+        DateTimeZoneHandling = DateTimeZoneHandling.Local,
+    };
+
     #region - Ctors -
     public ApiService(ILogService? log
                     , ApiSetupModel setupModel
@@ -122,7 +130,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonConvert.SerializeObject(body);
+            var json = JsonConvert.SerializeObject(body, _jsonSettings);
             //var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -197,7 +205,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonConvert.SerializeObject(body);
+            var json = JsonConvert.SerializeObject(body, _jsonSettings);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var request = new HttpRequestMessage(HttpMethod.Delete, endpoint)
             {
@@ -229,7 +237,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonConvert.SerializeObject(body);
+            var json = JsonConvert.SerializeObject(body, _jsonSettings);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var request = new HttpRequestMessage(HttpMethod.Patch, endpoint)
             {
@@ -261,7 +269,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("엔드포인트 URL이 올바르지 않습니다.", nameof(endpoint));
 
-            var json = JsonConvert.SerializeObject(body);
+            var json = JsonConvert.SerializeObject(body, _jsonSettings);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             return await _client.PutAsync(endpoint, content);
         }

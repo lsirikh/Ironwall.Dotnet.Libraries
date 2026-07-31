@@ -1211,7 +1211,7 @@ public class DeviceApiService : IDeviceApiService
         {
             var endpoint = $"{_setupModel.Url}/devices/enclosures/{enclosureId}/metrics";
             if (!string.IsNullOrEmpty(beforeDate))
-                endpoint += $"?before_date={beforeDate}";
+                endpoint += $"?before_date={Uri.EscapeDataString(beforeDate)}";   // aware ISO(+09:00)의 '+' 손상 방지(%2B 인코딩)
 
             var response = await _apiService.DeleteRequestAsync(endpoint);
             return await response.ToApiResponseAsync<MetricDeleteResultDto>();
