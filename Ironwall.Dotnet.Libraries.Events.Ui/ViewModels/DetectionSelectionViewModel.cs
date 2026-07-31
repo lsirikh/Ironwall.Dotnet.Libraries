@@ -2,6 +2,7 @@
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
+using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
@@ -156,7 +157,7 @@ public class DetectionSelectionViewModel : BasePanelViewModel
 
     // ── 장비(Device) 필수 정보 — 읽기 전용. 이벤트가 가리키는 장비는 변경 불가(무결성) → ComboBox 대신 텍스트로만 노출 ──
     public string DeviceNameText   => Device?.DeviceName is string n && n.Length > 0 ? n : "—";
-    public string DeviceTypeText   => Device != null ? Device.DeviceType.ToString() : "—";
+    public string DeviceTypeText   => Device != null ? EnumKoreanMap.To(Device.DeviceType) : "—";
     public string DeviceNumberText => Device != null ? Device.DeviceNumber.ToString() : "—";
 
     /// <summary>장비 소속 구역(그룹) 이름 — DeviceGroups(Id 목록)를 DeviceGroupProvider로 이름 변환(BaseDeviceViewModel 패턴).</summary>

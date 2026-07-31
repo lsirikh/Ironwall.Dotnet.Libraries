@@ -6,6 +6,7 @@
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels"
@@ -23,6 +24,8 @@
 	<UserControl.Resources>
 		<!--  신호 줄 가시성 (FR-06) — HasSignal 게이트  -->
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<!--  enum→한글 표시 전용(라이브러리 Resources.xaml는 앱에 미머지 → 뷰 로컬 등록)  -->
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 
 	<md:Flipper
@@ -183,7 +186,7 @@
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="16"
 							Opacity="1"
-							Text="{Binding Result, FallbackValue=장비, Mode=OneWay, StringFormat='({0})'}" />
+							Text="{Binding Result, Converter={StaticResource EnumToKoreanConverter}, FallbackValue=장비, Mode=OneWay, StringFormat='({0})'}" />
 						<!--  신호 (FR-06) — detail.signal 병기, 바=세션 관측 최대 기준. null/0(AI)이면 줄 전체 숨김  -->
 						<StackPanel
 							Grid.Row="2"
@@ -372,7 +375,7 @@
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
 							Opacity="1"
-							Text="{Binding Result, Mode=OneWay}" />
+							Text="{Binding Result, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}" />
 						<TextBlock
 							Grid.Row="3"
 							Grid.Column="0"

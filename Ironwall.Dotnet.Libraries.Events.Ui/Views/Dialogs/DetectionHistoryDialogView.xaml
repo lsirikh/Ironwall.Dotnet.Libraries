@@ -28,6 +28,7 @@
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 		<converters:SignalBarWidthConverter x:Key="SignalBarWidthConverter" />
 		<converters:SignalIsMaxConverter x:Key="SignalIsMaxConverter" />
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 
 		<!--  기간 세그먼트 버튼 — 선택 시 primary 채움 (템플릿 스코프=DynamicResource 토큰만)  -->
 		<Style x:Key="PeriodSegButton" TargetType="RadioButton">
@@ -470,7 +471,7 @@
 					Binding="{Binding TimeText}"
 					FontFamily="Consolas"
 					Header="시간" />
-				<DataGridTextColumn Binding="{Binding Result}" Header="Result" />
+				<DataGridTextColumn Binding="{Binding Result, Converter={StaticResource EnumToKoreanConverter}}" Header="Result" />
 				<DataGridTemplateColumn Header="신호" SortMemberPath="Signal">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>

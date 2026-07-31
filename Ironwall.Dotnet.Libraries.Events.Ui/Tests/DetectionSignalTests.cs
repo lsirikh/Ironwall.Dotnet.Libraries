@@ -370,7 +370,8 @@ public class DetectionSignalTests
         Assert.Equal(3000, vm.MaxSignal);
         Assert.Equal(1607, (int)Math.Round(double.Parse(vm.AvgSignalText.Replace(",", ""))));
         Assert.Equal(1, vm.UnactionedCount);
-        Assert.StartsWith("PIR_SENSOR", vm.TopResultText);
+        // 표시 한글화(FR-07): TopResultText는 EnumKoreanMap 라벨("PIR 감지") — 원본 enum/데이터는 불변
+        Assert.StartsWith("PIR 감지", vm.TopResultText);
     }
     #endregion
 }

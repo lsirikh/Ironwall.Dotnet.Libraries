@@ -25,6 +25,7 @@
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 		<converters:SignalBarWidthConverter x:Key="SignalBarWidthConverter" />
 		<converters:SignalIsMaxConverter x:Key="SignalIsMaxConverter" />
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
@@ -425,7 +426,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding Result, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding Result, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -444,7 +445,7 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding}" TextAlignment="Center" />
+										<TextBlock Text="{Binding Converter={StaticResource EnumToKoreanConverter}}" TextAlignment="Center" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>

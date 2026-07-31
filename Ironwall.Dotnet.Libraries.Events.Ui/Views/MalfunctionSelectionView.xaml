@@ -4,6 +4,7 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views"
@@ -16,6 +17,7 @@
 	<!--  View-model proxy (전역 DataContext 바인딩용)  -->
 	<UserControl.Resources>
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 
 	<GroupBox
@@ -98,6 +100,11 @@
 							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
 							SelectedItem="{Binding MessageType, Mode=TwoWay}"
 							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<TextBlock Text="{Binding Converter={StaticResource EnumToKoreanConverter}}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
 							<ComboBox.ItemsPanel>
 								<ItemsPanelTemplate>
 									<VirtualizingStackPanel />
@@ -143,6 +150,11 @@
 							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
 							SelectedItem="{Binding Status, Mode=TwoWay}"
 							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<TextBlock Text="{Binding Converter={StaticResource EnumToKoreanConverter}}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
 							<ComboBox.ItemsPanel>
 								<ItemsPanelTemplate>
 									<VirtualizingStackPanel />
@@ -158,6 +170,11 @@
 							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumFaultType}}}"
 							SelectedItem="{Binding Reason, Mode=TwoWay}"
 							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemTemplate>
+								<DataTemplate>
+									<TextBlock Text="{Binding Converter={StaticResource EnumToKoreanConverter}}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
 							<ComboBox.ItemsPanel>
 								<ItemsPanelTemplate>
 									<VirtualizingStackPanel />

@@ -6,6 +6,7 @@
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels"
@@ -20,6 +21,7 @@
 	<UserControl.Resources>
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
@@ -280,7 +282,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding MessageType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding MessageType, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -299,7 +301,7 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding}" TextAlignment="Center" />
+										<TextBlock Text="{Binding Converter={StaticResource EnumToKoreanConverter}}" TextAlignment="Center" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>
@@ -375,7 +377,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding Reason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding Reason, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -394,7 +396,7 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding}" TextAlignment="Center" />
+										<TextBlock Text="{Binding Converter={StaticResource EnumToKoreanConverter}}" TextAlignment="Center" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>

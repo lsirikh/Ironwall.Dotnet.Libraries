@@ -6,6 +6,7 @@
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:local="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Views.Panels"
@@ -19,6 +20,11 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	TextElement.Foreground="{DynamicResource MaterialDesignBody}"
 	mc:Ignorable="d">
+
+	<UserControl.Resources>
+		<!--  enum→한글 표시 전용(라이브러리 Resources.xaml는 앱에 미머지 → 뷰 로컬 등록)  -->
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
+	</UserControl.Resources>
 
 	<md:Flipper
 		md:ElevationAssist.Elevation="Dp0"
@@ -156,7 +162,7 @@
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
 							FontSize="16"
 							Opacity="1"
-							Text="{Binding MessageType, FallbackValue=타입, Mode=OneWay}" />
+							Text="{Binding MessageType, Converter={StaticResource EnumToKoreanConverter}, FallbackValue=타입, Mode=OneWay}" />
 
 					</Grid>
 					<Separator
@@ -296,7 +302,7 @@
 							md:HintAssist.IsFloating="True"
 							IsReadOnly="True"
 							Opacity="1"
-							Text="{Binding Reason, Mode=OneWay}" />
+							Text="{Binding Reason, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}" />
 						<TextBlock
 							Grid.Row="3"
 							Grid.Column="0"

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
+using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.Controls;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
@@ -60,7 +61,7 @@ public class ResultChipViewModel : PropertyChangedBase
     }
 
     public EnumDetectionType Result { get; }
-    public string Name => Result.ToString();
+    public string Name => EnumKoreanMap.To(Result);
 
     /// <summary>칩 표시용 축약명 — "_SENSOR" 접미사 제거(PIR/THERMAL/…). 풀네임은 ToolTip으로 제공(툴바 잘림 방지).</summary>
     public string ShortName => Name.EndsWith("_SENSOR", StringComparison.Ordinal) ? Name[..^"_SENSOR".Length] : Name;
@@ -342,7 +343,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         ChartPoints = filtered
             .Where(i => i.HasSignal)
             .OrderBy(i => i.DateTime)
-            .Select(i => new SignalChartPoint(i.DateTime, i.Signal!.Value, i.IsActioned, i.Result.ToString(), i))
+            .Select(i => new SignalChartPoint(i.DateTime, i.Signal!.Value, i.IsActioned, EnumKoreanMap.To(i.Result), i))
             .ToList();
 
         // 통계
@@ -351,7 +352,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         MaxSignal = signals.Count > 0 ? signals.Max() : 0;
         AvgSignalText = signals.Count > 0 ? signals.Average().ToString("N0") : "—";
         var top = filtered.GroupBy(i => i.Result).OrderByDescending(g => g.Count()).FirstOrDefault();
-        TopResultText = top != null ? $"{top.Key} ({top.Count()}건)" : "—";
+        TopResultText = top != null ? $"{EnumKoreanMap.To(top.Key)} ({top.Count()}건)" : "—";
         UnactionedCount = filtered.Count(i => !i.IsActioned);
         NotifyOfPropertyChange(nameof(MaxSignalText));
     }
