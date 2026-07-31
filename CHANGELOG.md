@@ -69,6 +69,14 @@
   - **검증**: 빌드 0오류(양 레포) · 메인 테스트 53개 중 45 green(8 skip 기존)+신규 해석기 테스트 5종 · GMaps.Ui 337/338(기준선 1 제외 green, 회귀 0). ⚠런타임 육안(풍량 실패→사유 팝업+라디오 복원 / 조준 실패→팝업)은 앱 재빌드 후.
 
 ### Added
+- **지도 계기 인디케이터 2종(강풍·탐지장애) + 보기(View) 메뉴(GMap_Map_Instruments)** ([PRD](docs/prds/GMap_Map_Instruments-prd.md) · [Plan](docs/plans/GMap_Map_Instruments-prd-plan.md) · [강풍 WF](docs/design/GMap_Windy_Indicator-wireframe.html) · [탐지장애 WF](docs/design/GMap_Detection_Fault_Indicator-wireframe.html) · 태그 `before-map-instruments` · v2.6 `f1ee163`+메인솔루션 `ad17c73`)
+  - **GMapWindyIndicatorControl**: WINDY 4모드(wind0 보통/wind1 약풍/wind2 강풍/wind3 태풍) 아이콘·색 전환(중립→Info→Warning→Critical, 태풍 회전+펄스)·아이콘+라벨/아이콘만·평상시숨김. 소스=`ChangeModeWindyMessageModel` 구독. 클릭→WINDY 패널(`OpenWindyPanelMessageModel`).
+  - **GMapDetectionFaultControl**: 활성(미조치) 탐지/장애 집계 pill 2개(Critical/Warning)·탐지 펄스·세로/가로·0건숨김. **소스=`EventQueueManager`(활성 SSOT, 카드목록 아님 — 500캡 desync 회피)**. 클릭→이벤트 패널(`OpenEventPanelMessageModel`).
+  - **EQM 확장**: `GetActiveCounts()`+`OnActiveCountChanged` 이벤트(Enqueue/Dequeue/DequeueAll 전 경로 발화, 동일상태 dequeue 포함, lock 밖 발화, Dispose 정리) — 전이 재집계.
+  - **보기(View) 메뉴**: `_Maps` 좌표계 토글과 동일 `IsCheckable`+`IsChecked` 패턴으로 나침반·강풍·탐지장애·중앙십자선 토글, 체크상태 영속.
+  - **나침반 FR-17**: 가시성 마스터를 보기 메뉴로 이관(회전 기능→가시성 커플링 제거, 회전 OFF여도 정북 계기 표시). 회전 기능은 회전 '입력'만 게이트.
+  - **영속**: `MapWindyIndicator/MapDetectionFault/MapInstrumentVisibility` 모델, 복원 중 저장 억제. 표시클램프≠영속좌표 분리+마진≥16 도킹(HUD 회피).
+  - **검증**: 적대 리뷰 워크플로(12에이전트) CONFIRMED 1건(나침반 doc 주석 stale) 수정, 나머지 반박기각(EQM 락경계·NATS→UI 정렬 클린 확정) · InstrumentMath 헤드리스+회전/나침반 93/93 · 양 레포 컴파일 0오류. ⚠런타임 육안=앱 재빌드 후.
 - **방위각 심볼(나침반) CustomControl(GMap_Compass_Control)** ([PRD](docs/prds/GMap_Compass_Control-prd.md) · [Plan](docs/plans/GMap_Compass_Control-prd-plan.md) · [와이어프레임 v2.2](docs/design/GMap_Compass_Control-wireframe.html) · 태그 `before-compass-control` · v2.6 `731d8d4`+메인솔루션 `0cfe61e`)
   - **GMapCompassControl**(templated, Generic.xaml): 고정 베젤/러버라인(Accent)+회전 로즈(−Bearing), 변형 A로즈/B링, S64/M96/L128, 눈금·기수문자 코드생성(SetResourceReference=라이브 테마), 리드아웃 canonical(`+035.0°`), 전 색상 DynamicResource 토큰.
   - **싱크/게이트**: ViewportSnapshotPublisher 구독(Loaded/Unloaded 대칭) · RotationFeature OFF=Collapsed(비회전 회귀 0).

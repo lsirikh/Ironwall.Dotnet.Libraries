@@ -59,7 +59,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | 지도 계기 인디케이터(강풍모드·탐지장애)+보기(View)메뉴 — EQM 소스·타입칩 v2분리·z6·드래그영속 | Draft | 2026-07-31 |
+| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | 지도 계기 인디케이터(강풍모드·탐지장애)+보기(View)메뉴 — EQM 소스·타입칩 v2분리·z6·드래그영속 | Completed | 2026-07-31 |
 | [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | API/NATS 호출·수신 로깅 P0(진단 사각 제거) | Draft | 2026-07-31 |
 | [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | WINDY 롤백 복구·프록시 서버 해석·조준 실패 팝업 승격 | Approved | 2026-07-30 |
 | [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS NATS v1.5.2 REQ 전환+LAMP 제어 서비스 | Approved | 2026-07-30 |
@@ -215,6 +215,7 @@
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
 | [GIS_Nats_v152_Req_Transition-prd-plan.md](plans/GIS_Nats_v152_Req_Transition-prd-plan.md) | [PRD](prds/GIS_Nats_v152_Req_Transition-prd.md) | 24/28 | 2026-07-30 |
+| [GMap_Map_Instruments-prd-plan.md](plans/GMap_Map_Instruments-prd-plan.md) | [PRD](prds/GMap_Map_Instruments-prd.md) | 16/16 | 2026-07-31 |
 | [GMap_Compass_Control-prd-plan.md](plans/GMap_Compass_Control-prd-plan.md) | [PRD](prds/GMap_Compass_Control-prd.md) | 12/12 | 2026-07-30 |
 | [GMap_Rotation_Full_Sync-prd-plan.md](plans/GMap_Rotation_Full_Sync-prd-plan.md) | [PRD](prds/GMap_Rotation_Full_Sync-prd.md) | 0/53 | 2026-07-30 |
 | [line-drawing-hud-redesign-prd-plan.md](plans/line-drawing-hud-redesign-prd-plan.md) | [PRD](prds/line-drawing-hud-redesign-prd.md) | 15/21 | 2026-07-28 |
