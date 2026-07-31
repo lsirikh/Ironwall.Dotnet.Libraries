@@ -90,7 +90,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             var model = (eventModel as MalfunctionEventCardViewModel)!.Model as IMalfunctionEventModel;
             var viewModel = new MalfunctionEventViewModel(model!);
             var list = new List<MalfunctionEventViewModel>() { viewModel };
-            SelectedItemEditor = new MalfunctionSelectionViewModel(list);
+            SelectedItemEditor = new MalfunctionSelectionViewModel(list) { IsEditable = false }; // 조치보고=읽기 전용(스크롤은 유지)
             (SelectedItemEditor as MalfunctionSelectionViewModel)!.RefreshAll();
         }
         #endregion

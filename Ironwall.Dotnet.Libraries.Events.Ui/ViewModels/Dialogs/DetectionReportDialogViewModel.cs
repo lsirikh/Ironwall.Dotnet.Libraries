@@ -91,7 +91,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs{
             var model = (eventModel as DetectionEventCardViewModel)!.Model as IDetectionEventModel;
             var viewModel = new DetectionEventViewModel(model!);
             var list = new List<DetectionEventViewModel>() { viewModel };
-            SelectedItemEditor = new DetectionSelectionViewModel(list);
+            SelectedItemEditor = new DetectionSelectionViewModel(list) { IsEditable = false }; // 조치보고=읽기 전용(스크롤은 유지)
             (SelectedItemEditor as DetectionSelectionViewModel)!.RefreshAll();
         }
         #endregion

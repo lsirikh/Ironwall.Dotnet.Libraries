@@ -39,170 +39,195 @@
 				<!--  Apply Button  -->
 			</Grid.RowDefinitions>
 
-			<!--  ─────────────────────────────  INPUT GRID  ─────────────────────────────  -->
+			<!--  ── 좌(속성 필드) + 우(썸네일). 높이는 ScrollViewer MaxHeight로 상한, 평소엔 다 보이고 넘치면 스크롤 (사용자 지시) ──  -->
 			<Grid Grid.Row="0">
-				<!--  3 행 — 1·2행: 편집 필드 / 3행: 탐지 상세(detail) 읽기 전용 (Detection_Signal_History)  -->
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="60" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="60" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="60" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="60" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
-					<ColumnDefinition Width="60" />
-					<ColumnDefinition Width="2*" MinWidth="60" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="12" />
+					<ColumnDefinition Width="Auto" />
 				</Grid.ColumnDefinitions>
 
-				<TextBlock
-					Grid.Row="0"
+				<!--  좌측: 속성 필드 — 라벨(고정) : 값(유연) 세로 나열.
+				      읽기 전용(조치보고)에서도 스크롤이 살아야 하므로 IsEnabled는 ScrollViewer가 아니라 내부 Grid(편집 컨트롤)에만 건다.  -->
+				<ScrollViewer
 					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Type" />
-				<ComboBox
-					Grid.Row="0"
-					Grid.Column="1"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
-					SelectedItem="{Binding MessageType, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-				</ComboBox>
+					MaxHeight="280"
+					HorizontalScrollBarVisibility="Disabled"
+					VerticalScrollBarVisibility="Auto">
+					<Grid IsEnabled="{Binding IsEditable}">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="56" />
+							<ColumnDefinition Width="*" MinWidth="80" />
+						</Grid.ColumnDefinitions>
+						<Grid.Resources>
+							<Style BasedOn="{StaticResource TextBlockTitle}" TargetType="TextBlock">
+								<Setter Property="VerticalAlignment" Value="Center" />
+								<Setter Property="Margin" Value="0,3" />
+							</Style>
+							<!--  장비 필수정보 = 읽기 전용 값(편집 불가). 테두리 없는 TextBox로 값 복사는 허용하되 편집은 차단  -->
+							<Style x:Key="ReadOnlyValue" TargetType="TextBox">
+								<Setter Property="IsReadOnly" Value="True" />
+								<Setter Property="Background" Value="Transparent" />
+								<Setter Property="BorderThickness" Value="0" />
+								<Setter Property="Padding" Value="2,0" />
+								<Setter Property="Margin" Value="0,2" />
+								<Setter Property="VerticalAlignment" Value="Center" />
+								<Setter Property="Cursor" Value="Arrow" />
+								<Setter Property="IsTabStop" Value="False" />
+							</Style>
+						</Grid.Resources>
 
-				<TextBlock
-					Grid.Row="0"
+						<!--  이벤트 속성 (편집 가능 — 대시보드 편집기에서만, 조치보고에선 IsEditable=false)  -->
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="Type" />
+						<ComboBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
+							SelectedItem="{Binding MessageType, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}" />
+
+						<!--  장비(Device) 필수 정보 — 읽기 전용. 이벤트가 가리키는 장비는 변경 불가  -->
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="구역" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceZoneText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="종류" />
+						<TextBox
+							Grid.Row="2"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceTypeText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="3" Grid.Column="0" Text="장비" />
+						<TextBox
+							Grid.Row="3"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceNameText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="4" Grid.Column="0" Text="번호" />
+						<TextBox
+							Grid.Row="4"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceNumberText, Mode=OneWay}" />
+
+						<!--  이벤트 속성 (편집 가능)  -->
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="Status" />
+						<ComboBox
+							Grid.Row="5"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
+							SelectedItem="{Binding Status, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}" />
+
+						<TextBlock Grid.Row="6" Grid.Column="0" Text="Result" />
+						<ComboBox
+							Grid.Row="6"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDetectionType}}}"
+							SelectedItem="{Binding Result, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}" />
+
+						<!--  탐지 상세(detail) — 읽기전용 계측값 (Detection_Signal_History). 신호/AI 한 행 공유  -->
+						<TextBlock Grid.Row="7" Grid.Column="0" Text="신호" />
+						<StackPanel
+							Grid.Row="7"
+							Grid.Column="1"
+							Orientation="Horizontal">
+							<TextBlock
+								MinWidth="70"
+								VerticalAlignment="Center"
+								FontFamily="Consolas"
+								Text="{Binding SignalText, Mode=OneWay}" />
+							<TextBlock
+								Margin="12,0,6,0"
+								VerticalAlignment="Center"
+								Opacity="0.75"
+								Text="AI" />
+							<TextBlock
+								VerticalAlignment="Center"
+								Text="{Binding AiSummaryText, Mode=OneWay}"
+								TextTrimming="CharacterEllipsis"
+								ToolTip="{Binding AiSummaryText}" />
+						</StackPanel>
+
+						<TextBlock Grid.Row="8" Grid.Column="0" Text="객체" />
+						<TextBlock
+							Grid.Row="8"
+							Grid.Column="1"
+							VerticalAlignment="Center"
+							Text="{Binding ObjectsText, Mode=OneWay}"
+							TextTrimming="CharacterEllipsis"
+							ToolTip="{Binding ObjectsText}" />
+					</Grid>
+				</ScrollViewer>
+
+				<!--  우측: 썸네일 — 로드 성공=이미지 / 실패(자체서명 인증서 등)·부재=default. Image 로드 실패 시 뒤의 default가 노출됨  -->
+				<Border
 					Grid.Column="2"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Device" />
-				<ComboBox
-					Grid.Row="0"
-					Grid.Column="3"
-					Grid.ColumnSpan="5"
-					ItemsSource="{Binding Data.DeviceProvider, Source={StaticResource proxy}}"
-					SelectedItem="{Binding Device, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-					<!--  실제 아이템 모양  -->
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<StackPanel Orientation="Horizontal">
-								<TextBlock Width="35" Text="{Binding DeviceGroupsText}" />
-								<TextBlock Width="60" Text="{Binding DeviceType}" />
-								<TextBlock Width="140" Text="{Binding DeviceName}" />
-							</StackPanel>
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
+					Width="150"
+					Height="110"
+					VerticalAlignment="Top"
+					Background="{DynamicResource MaterialDesignChipBackground}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="1"
+					CornerRadius="4">
+					<Grid>
+						<!--  default (뒤 레이어): 썸네일 없음/로드 실패 시 노출  -->
+						<StackPanel
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Orientation="Vertical">
+							<md:PackIcon
+								Width="32"
+								Height="32"
+								HorizontalAlignment="Center"
+								Opacity="0.5"
+								Kind="ImageOffOutline" />
+							<TextBlock
+								Margin="0,4,0,0"
+								HorizontalAlignment="Center"
+								FontSize="11"
+								Opacity="0.55"
+								Text="미리보기 없음" />
+						</StackPanel>
 
-
-
-				<TextBlock
-					Grid.Row="0"
-					Grid.Column="8"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Status" />
-				<ComboBox
-					Grid.Row="0"
-					Grid.Column="9"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
-					SelectedItem="{Binding Status, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-				</ComboBox>
-
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="Result" />
-				<ComboBox
-					Grid.Row="1"
-					Grid.Column="1"
-					Grid.ColumnSpan="3"
-					ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumDetectionType}}}"
-					SelectedItem="{Binding Result, Mode=TwoWay}"
-					Style="{StaticResource ComboBoxContent}">
-					<ComboBox.ItemsPanel>
-						<ItemsPanelTemplate>
-							<VirtualizingStackPanel />
-						</ItemsPanelTemplate>
-					</ComboBox.ItemsPanel>
-				</ComboBox>
-
-				<!--  탐지 상세(detail.signal 등) — 계측값 읽기 전용 (Detection_Signal_History)  -->
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="4"
-					Style="{StaticResource TextBlockTitle}"
-					Text="신호" />
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="5"
-					VerticalAlignment="Center"
-					FontFamily="Consolas"
-					Text="{Binding SignalText, Mode=OneWay}" />
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="6"
-					Style="{StaticResource TextBlockTitle}"
-					Text="AI" />
-				<TextBlock
-					Grid.Row="1"
-					Grid.Column="7"
-					Grid.ColumnSpan="3"
-					VerticalAlignment="Center"
-					Text="{Binding AiSummaryText, Mode=OneWay}"
-					TextTrimming="CharacterEllipsis"
-					ToolTip="{Binding AiSummaryText}" />
-
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="0"
-					Margin="0,6,0,0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="객체" />
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="1"
-					Grid.ColumnSpan="5"
-					Margin="0,6,0,0"
-					VerticalAlignment="Center"
-					Text="{Binding ObjectsText, Mode=OneWay}"
-					TextTrimming="CharacterEllipsis"
-					ToolTip="{Binding ObjectsText}" />
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="6"
-					Margin="0,6,0,0"
-					Style="{StaticResource TextBlockTitle}"
-					Text="썸네일" />
-				<TextBlock
-					Grid.Row="2"
-					Grid.Column="7"
-					Grid.ColumnSpan="3"
-					Margin="0,6,0,0"
-					VerticalAlignment="Center"
-					Text="{Binding ThumbnailText, Mode=OneWay}"
-					TextTrimming="CharacterEllipsis"
-					ToolTip="{Binding ThumbnailText}" />
-
+						<!--  썸네일 이미지 (앞 레이어): 후보 있을 때만 표시. 로드 실패면 빈 렌더 → 뒤 default 노출  -->
+						<Image
+							Source="{Binding ThumbnailUri, Mode=OneWay}"
+							RenderOptions.BitmapScalingMode="HighQuality"
+							Stretch="Uniform">
+							<Image.Style>
+								<Style TargetType="Image">
+									<Setter Property="Visibility" Value="Visible" />
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding HasThumbnail}" Value="False">
+											<Setter Property="Visibility" Value="Collapsed" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Image.Style>
+						</Image>
+					</Grid>
+				</Border>
 			</Grid>
 
 			<!--  ───────────────────────────  APPLY BUTTON  ───────────────────────────  -->
@@ -212,6 +237,7 @@
 				Margin="0,10,0,0"
 				HorizontalAlignment="Right"
 				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+				IsEnabled="{Binding IsEditable}"
 				Style="{StaticResource MaterialDesignFlatButton}">
 				<Button.Content>
 					<StackPanel Orientation="Horizontal">

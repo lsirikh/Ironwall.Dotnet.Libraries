@@ -18,10 +18,8 @@
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
 	</UserControl.Resources>
 
-
-
 	<GroupBox
-		Margin="5"
+		Margin="10, 0, 10, 0"
 		Style="{StaticResource MaterialDesignGroupBox}"
 		UseLayoutRounding="True">
 		<GroupBox.Header>
@@ -34,166 +32,244 @@
 			</StackPanel>
 		</GroupBox.Header>
 
-
-		<!--  ─────────────────────────────  INPUT GRID  ─────────────────────────────  -->
-		<Grid Margin="5">
-			<!--  2 행 × 6 쌍(label + editor) = 12 열  -->
+		<Grid>
 			<Grid.RowDefinitions>
+				<RowDefinition Height="*" />
 				<RowDefinition Height="Auto" />
-				<RowDefinition Height="Auto" />
-				<RowDefinition Height="Auto" />
+				<!--  Apply Button  -->
 			</Grid.RowDefinitions>
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="80" />
-				<ColumnDefinition Width="2*" MinWidth="60" />
-				<ColumnDefinition Width="80" />
-				<ColumnDefinition Width="2*" MinWidth="60" />
-				<ColumnDefinition Width="100" />
-				<ColumnDefinition Width="2*" MinWidth="60" />
-				<ColumnDefinition Width="100" />
-				<ColumnDefinition Width="2*" MinWidth="60" />
-				<ColumnDefinition Width="80" />
-				<ColumnDefinition Width="2*" MinWidth="60" />
-			</Grid.ColumnDefinitions>
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Type" />
-			<ComboBox
-				Grid.Row="0"
-				Grid.Column="1"
-				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
-				SelectedItem="{Binding MessageType, Mode=TwoWay}"
-				Style="{StaticResource ComboBoxContent}">
-				<ComboBox.ItemsPanel>
-					<ItemsPanelTemplate>
-						<VirtualizingStackPanel />
-					</ItemsPanelTemplate>
-				</ComboBox.ItemsPanel>
-			</ComboBox>
+			<!--  ── 좌(속성 필드) + 우(고장 구간값 카드). 탐지 속성과 동일 구조 — 높이는 ScrollViewer MaxHeight로 상한, 평소엔 다 보이고 넘치면 스크롤 ──  -->
+			<Grid Grid.Row="0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="12" />
+					<ColumnDefinition Width="Auto" />
+				</Grid.ColumnDefinitions>
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="2"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Device" />
-			<ComboBox
-				Grid.Row="0"
-				Grid.Column="3"
-				Grid.ColumnSpan="5"
-				ItemsSource="{Binding Data.DeviceProvider, Source={StaticResource proxy}}"
-				SelectedItem="{Binding Device, Mode=TwoWay}"
-				Style="{StaticResource ComboBoxContent}"
-				ToolTip="{Binding Device, Mode=TwoWay}">
-				<ComboBox.ItemsPanel>
-					<ItemsPanelTemplate>
-						<VirtualizingStackPanel />
-					</ItemsPanelTemplate>
-				</ComboBox.ItemsPanel>
-				<!--  실제 아이템 모양  -->
-				<ComboBox.ItemTemplate>
-					<DataTemplate>
-						<StackPanel Orientation="Horizontal">
-							<TextBlock Width="35" Text="{Binding DeviceGroupsText}" />
-							<TextBlock Width="60" Text="{Binding DeviceType}" />
-							<TextBlock Width="140" Text="{Binding DeviceName}" />
+				<!--  좌측: 속성 필드 — 라벨(고정) : 값(유연) 세로 나열.
+				      읽기 전용(조치보고)에서도 스크롤이 살아야 하므로 IsEnabled는 ScrollViewer가 아니라 내부 Grid(편집 컨트롤)에만 건다.  -->
+				<ScrollViewer
+					Grid.Column="0"
+					MaxHeight="220"
+					HorizontalScrollBarVisibility="Disabled"
+					VerticalScrollBarVisibility="Auto">
+					<Grid IsEnabled="{Binding IsEditable}">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="56" />
+							<ColumnDefinition Width="*" MinWidth="80" />
+						</Grid.ColumnDefinitions>
+						<Grid.Resources>
+							<Style BasedOn="{StaticResource TextBlockTitle}" TargetType="TextBlock">
+								<Setter Property="VerticalAlignment" Value="Center" />
+								<Setter Property="Margin" Value="0,3" />
+							</Style>
+							<!--  장비 필수정보 = 읽기 전용 값(편집 불가). 테두리 없는 TextBox로 값 복사는 허용하되 편집은 차단  -->
+							<Style x:Key="ReadOnlyValue" TargetType="TextBox">
+								<Setter Property="IsReadOnly" Value="True" />
+								<Setter Property="Background" Value="Transparent" />
+								<Setter Property="BorderThickness" Value="0" />
+								<Setter Property="Padding" Value="2,0" />
+								<Setter Property="Margin" Value="0,2" />
+								<Setter Property="VerticalAlignment" Value="Center" />
+								<Setter Property="Cursor" Value="Arrow" />
+								<Setter Property="IsTabStop" Value="False" />
+							</Style>
+						</Grid.Resources>
+
+						<!--  이벤트 속성 (편집 가능 — 대시보드 편집기에서만, 조치보고에선 IsEditable=false)  -->
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="Type" />
+						<ComboBox
+							Grid.Row="0"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumEventType}}}"
+							SelectedItem="{Binding MessageType, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemsPanel>
+								<ItemsPanelTemplate>
+									<VirtualizingStackPanel />
+								</ItemsPanelTemplate>
+							</ComboBox.ItemsPanel>
+						</ComboBox>
+
+						<!--  장비(Device) 필수 정보 — 읽기 전용. 이벤트가 가리키는 장비는 변경 불가  -->
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="구역" />
+						<TextBox
+							Grid.Row="1"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceZoneText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="종류" />
+						<TextBox
+							Grid.Row="2"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceTypeText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="3" Grid.Column="0" Text="장비" />
+						<TextBox
+							Grid.Row="3"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceNameText, Mode=OneWay}" />
+
+						<TextBlock Grid.Row="4" Grid.Column="0" Text="번호" />
+						<TextBox
+							Grid.Row="4"
+							Grid.Column="1"
+							Style="{StaticResource ReadOnlyValue}"
+							Text="{Binding DeviceNumberText, Mode=OneWay}" />
+
+						<!--  이벤트 속성 (편집 가능)  -->
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="Status" />
+						<ComboBox
+							Grid.Row="5"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
+							SelectedItem="{Binding Status, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemsPanel>
+								<ItemsPanelTemplate>
+									<VirtualizingStackPanel />
+								</ItemsPanelTemplate>
+							</ComboBox.ItemsPanel>
+						</ComboBox>
+
+						<TextBlock Grid.Row="6" Grid.Column="0" Text="Reason" />
+						<ComboBox
+							Grid.Row="6"
+							Grid.Column="1"
+							Margin="0,2"
+							ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumFaultType}}}"
+							SelectedItem="{Binding Reason, Mode=TwoWay}"
+							Style="{StaticResource ComboBoxContent}">
+							<ComboBox.ItemsPanel>
+								<ItemsPanelTemplate>
+									<VirtualizingStackPanel />
+								</ItemsPanelTemplate>
+							</ComboBox.ItemsPanel>
+						</ComboBox>
+					</Grid>
+				</ScrollViewer>
+
+				<!--  우측: 고장 구간값 카드 (detail) — 탐지 썸네일 자리 대체. 장애엔 썸네일이 없어 First/Second 구간값을 시각화.
+				      편집 컨트롤이므로 읽기 모드에선 IsEnabled=false(스크롤과 무관)  -->
+				<Border
+					Grid.Column="2"
+					Width="176"
+					VerticalAlignment="Top"
+					Padding="10"
+					Background="{DynamicResource MaterialDesignChipBackground}"
+					BorderBrush="{DynamicResource DividerBrush}"
+					BorderThickness="1"
+					CornerRadius="4"
+					IsEnabled="{Binding IsEditable}">
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="8" />
+							<ColumnDefinition Width="*" />
+						</Grid.ColumnDefinitions>
+
+						<TextBlock
+							Grid.Row="0"
+							Grid.Column="0"
+							Grid.ColumnSpan="3"
+							Margin="0,0,0,6"
+							FontSize="11"
+							Opacity="0.7"
+							Text="고장 구간" />
+
+						<!--  FirstStart  -->
+						<StackPanel
+							Grid.Row="1"
+							Grid.Column="0"
+							Margin="0,0,0,6"
+							Orientation="Vertical">
+							<TextBlock
+								Margin="0,0,0,2"
+								FontSize="10"
+								Opacity="0.7"
+								Text="FirstStart" />
+							<TextBox
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding FirstStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 						</StackPanel>
-					</DataTemplate>
-				</ComboBox.ItemTemplate>
-			</ComboBox>
 
+						<!--  FirstEnd  -->
+						<StackPanel
+							Grid.Row="1"
+							Grid.Column="2"
+							Margin="0,0,0,6"
+							Orientation="Vertical">
+							<TextBlock
+								Margin="0,0,0,2"
+								FontSize="10"
+								Opacity="0.7"
+								Text="FirstEnd" />
+							<TextBox
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding FirstEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						</StackPanel>
 
+						<!--  SecondStart  -->
+						<StackPanel
+							Grid.Row="2"
+							Grid.Column="0"
+							Orientation="Vertical">
+							<TextBlock
+								Margin="0,0,0,2"
+								FontSize="10"
+								Opacity="0.7"
+								Text="SecondStart" />
+							<TextBox
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding SecondStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						</StackPanel>
 
-			<TextBlock
-				Grid.Row="0"
-				Grid.Column="8"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Status" />
-			<ComboBox
-				Grid.Row="0"
-				Grid.Column="9"
-				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumTrueFalse}}}"
-				SelectedItem="{Binding Status, Mode=TwoWay}"
-				Style="{StaticResource ComboBoxContent}">
-				<ComboBox.ItemsPanel>
-					<ItemsPanelTemplate>
-						<VirtualizingStackPanel />
-					</ItemsPanelTemplate>
-				</ComboBox.ItemsPanel>
-			</ComboBox>
-
-			<TextBlock
-				Grid.Row="1"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="Reason" />
-			<ComboBox
-				Grid.Row="1"
-				Grid.Column="1"
-				Grid.ColumnSpan="2"
-				ItemsSource="{Binding Source={utils:EnumBindingSource {x:Type enums:EnumFaultType}}}"
-				SelectedItem="{Binding Reason, Mode=TwoWay}"
-				Style="{StaticResource ComboBoxContent}">
-				<ComboBox.ItemsPanel>
-					<ItemsPanelTemplate>
-						<VirtualizingStackPanel />
-					</ItemsPanelTemplate>
-				</ComboBox.ItemsPanel>
-			</ComboBox>
-
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="0"
-				Style="{StaticResource TextBlockTitle}"
-				Text="FirstStart" />
-			<TextBox
-				Grid.Row="2"
-				Grid.Column="1"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding FirstStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="2"
-				Style="{StaticResource TextBlockTitle}"
-				Text="FirstEnd" />
-			<TextBox
-				Grid.Row="2"
-				Grid.Column="3"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding FirstEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="4"
-				Style="{StaticResource TextBlockTitle}"
-				Text="SecondStart" />
-			<TextBox
-				Grid.Row="2"
-				Grid.Column="5"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding SecondStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-			<TextBlock
-				Grid.Row="2"
-				Grid.Column="6"
-				Style="{StaticResource TextBlockTitle}"
-				Text="SecondEnd" />
-			<TextBox
-				Grid.Row="2"
-				Grid.Column="7"
-				Style="{StaticResource TextBoxInput}"
-				Text="{Binding SecondEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						<!--  SecondEnd  -->
+						<StackPanel
+							Grid.Row="2"
+							Grid.Column="2"
+							Orientation="Vertical">
+							<TextBlock
+								Margin="0,0,0,2"
+								FontSize="10"
+								Opacity="0.7"
+								Text="SecondEnd" />
+							<TextBox
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding SecondEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+						</StackPanel>
+					</Grid>
+				</Border>
+			</Grid>
 
 			<!--  ───────────────────────────  APPLY BUTTON  ───────────────────────────  -->
 			<Button
 				x:Name="ApplyButton"
-				Grid.Row="2"
-				Grid.Column="8"
-				Grid.ColumnSpan="2"
+				Grid.Row="1"
+				Margin="0,10,0,0"
+				HorizontalAlignment="Right"
 				BorderBrush="{DynamicResource PrimaryHueDarkBrush}"
+				IsEnabled="{Binding IsEditable}"
 				Style="{StaticResource MaterialDesignFlatButton}">
 				<Button.Content>
 					<StackPanel Orientation="Horizontal">
@@ -204,5 +280,4 @@
 			</Button>
 		</Grid>
 	</GroupBox>
-
 </UserControl>

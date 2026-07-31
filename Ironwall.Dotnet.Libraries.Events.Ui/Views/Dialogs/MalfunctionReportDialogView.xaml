@@ -35,7 +35,7 @@
 			</StackPanel>
 		</Border>
 
-		<ContentControl x:Name="SelectedItemEditor" IsEnabled="false" />
+		<ContentControl x:Name="SelectedItemEditor" />
 
 		<Grid>
 			<Grid.RowDefinitions>

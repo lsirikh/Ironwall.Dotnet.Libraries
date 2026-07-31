@@ -14,6 +14,36 @@
 
 ## [Unreleased]
 
+### Changed
+- **조치보고 다이얼로그 "탐지 속성(detail)" 레이아웃 정리 + 썸네일 이미지화** (Track B · Events.Ui · 태그 `before-detection-detail-layout-thumbnail` · 사용자 지시 2026-07-31)
+  - **레이아웃**: 10열 불규칙 그리드(값 시작 위치가 행마다 어긋남)를 **좌(속성 라벨:값 세로 정렬) + 우(썸네일 박스)** 2단으로 재작성. Type/Device/Status/Result(편집) + 신호/AI/객체(읽기전용) 정돈.
+  - **높이 고정 + 스크롤(사용자 지시)**: 좌측 속성 영역을 `ScrollViewer`(MaxHeight 150)로 감싸 창 Height를 키우지 않고 넘치면 세로 스크롤.
+  - **썸네일 이미지화**: URL 텍스트 표시 → 실제 이미지. `DetectionSelectionViewModel.ThumbnailUri`(절대 URL 그대로 / 상대 `/api/thumbnails/…`는 API base host 결합, base는 `IApiSetupModel` IoC 조달) + `HasThumbnail`. 로드 성공=이미지, 부재/실패=default("미리보기 없음" 아이콘) — Image를 default 위에 겹쳐 로드 실패 시 뒤 default 노출(코드비하인드 불요). ⚠서버가 자체서명(mkcert, SAN 없음) https면 이미지 로드 실패로 default가 표시될 수 있음(인증서 정책 별개).
+  - EventUiModule에 `IApiSetupModel` 인스턴스 등록(썸네일 base seam).
+  - **검증**: Events.Ui 빌드 0오류 · 335 통과/7 실패(전부 기존 기준선=DeviceSymbolLookupModel·DetectionNatsSyncService, stash 대조로 회귀 0 확증) · 한글 BOM. ⚠앱 재빌드 후 런타임 육안.
+- **조치보고 다이얼로그 "장애보고 속성(detail)" 레이아웃 정리 — 탐지와 일관화** (Track B · Events.Ui · 와이어프레임 승인 후 적용 · 사용자 지시 2026-07-31)
+  - **레이아웃**: 10열 불규칙 그리드(Type/Device/Status 한 줄 + Reason + First/Second 구간 4칸 한 줄)를 탐지 속성과 동일하게 **좌(속성 라벨:값 세로 정렬 Type/Device/Status/Reason) + 우(고장 구간값 카드)** 2단으로 재작성.
+  - **높이 고정 + 스크롤**: 좌측 속성 영역을 `ScrollViewer`(MaxHeight 150)로 감싸 창 Height 고정.
+  - **구간값 카드**: 탐지의 썸네일 자리를 `FirstStart/FirstEnd/SecondStart/SecondEnd` 2×2 카드로 대체(장애엔 썸네일이 없어 detail 구간값을 시각화). Border=`MaterialDesignChipBackground`+`DividerBrush`, 탐지 썸네일 박스와 동일 톤.
+  - 바인딩·VM(`MalfunctionSelectionViewModel`) 무변경(IsEditable 제외) — 뷰 재배치만. 와이어프레임 정본: `docs/design/action-report-dialogs-wireframe.html`.
+  - **검증**: Events.Ui 빌드 0오류(경고는 전부 기존 nullable/분석기) · 한글 BOM. ⚠앱 재빌드 후 런타임 육안.
+- **조치보고 다이얼로그 Device 필드 읽기전용화 — 인스턴스 매칭 ComboBox 제거** (Track B · Events.Ui · 사용자 지시 2026-07-31)
+  - **이유**: 이벤트가 가리키는 장비를 다른 장비로 교체하는 건 데이터 무결성상 부적절 → Device는 편집 불가로.
+  - **변경**: `DeviceProvider` 기반 ComboBox(인스턴스 매칭) → 장비 **필수 정보 읽기전용 텍스트**(구역/종류/장비/번호). 값은 테두리 없는 `IsReadOnly` TextBox(복사 허용·편집 차단, `IsTabStop=False`).
+  - **VM**: `Detection/MalfunctionSelectionViewModel`에 표시용 파생 프로퍼티 추가 — `DeviceNameText`(DeviceName)·`DeviceTypeText`(DeviceType)·`DeviceNumberText`(DeviceNumber)·`DeviceZoneText`(DeviceGroups Id→`DeviceGroupProvider` 이름 변환, BaseDeviceViewModel 패턴). `RefreshAll`에서 NotifyOfPropertyChange, `ApplyButton`의 `item.Device = …` 적용 제거.
+  - **대시보드 편집기 영향**: 동일 뷰를 쓰는 `EventDashboardView`에서도 Device는 읽기전용(IsReadOnly)이나 Type/Status/Result/Reason 등은 편집 유지.
+  - 와이어프레임 갱신: `docs/design/action-report-dialogs-wireframe.html`(Device=읽기전용 필드).
+  - **검증**: Events.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안.
+
+### Fixed
+- **조치보고 다이얼로그 탐지/장애 속성 "스크롤 불가 + 높이 짤림" 버그** (Track B · Events.Ui · 사용자 스크린샷 제보 2026-07-31)
+  - **원인 1(스크롤 불가)**: 다이얼로그가 `<ContentControl x:Name="SelectedItemEditor" IsEnabled="false">`로 읽기전용을 걸었는데, WPF의 IsEnabled는 자식으로 **강제 상속**되어 내부 `ScrollViewer`까지 비활성화 → 스크롤바 드래그·휠 모두 죽음.
+  - **원인 2(높이 짤림)**: `ScrollViewer MaxHeight="150"`이 과소해 6행(Type/Device/Status/Result/신호/객체) 중 3행만 보이고 나머지가 숨음.
+  - **해결**: 읽기전용을 `DetectionSelectionViewModel`/`MalfunctionSelectionViewModel`의 `IsEditable` 플래그로 이관 — 편집 컨트롤(좌측 필드 Grid·장애 구간값 카드·적용 버튼)만 `IsEnabled="{Binding IsEditable}"`로 묶고 **ScrollViewer는 항상 활성**(읽기 모드에서도 스크롤 가능). 다이얼로그 `ContentControl`의 `IsEnabled="false"` 제거 후 VM 생성 시 `{ IsEditable = false }` 주입. MaxHeight 상향(탐지 280 / 장애 220)으로 평소엔 스크롤 없이 전 행 표시, 넘칠 때만 스크롤.
+  - **재사용 보존**: 동일 SelectionView를 쓰는 `EventDashboardView` 편집기는 `IsEditable` 기본 true라 편집 유지(회귀 없음).
+  - 변경: `Detection/MalfunctionSelectionView.xaml`, `Detection/MalfunctionSelectionViewModel.cs`, `Detection/MalfunctionReportDialogView(Model).cs`.
+  - **검증**: Events.Ui 빌드 0오류. ⚠앱 재빌드 후 런타임 육안(스크린샷은 수정 전 빌드).
+
 ## [2.9.0] - 2026-07-31
 
 ### Fixed

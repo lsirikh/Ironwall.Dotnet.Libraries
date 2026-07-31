@@ -59,6 +59,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | 지도 계기 인디케이터(강풍모드·탐지장애)+보기(View)메뉴 — EQM 소스·타입칩 v2분리·z6·드래그영속 | Draft | 2026-07-31 |
 | [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | API/NATS 호출·수신 로깅 P0(진단 사각 제거) | Draft | 2026-07-31 |
 | [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | WINDY 롤백 복구·프록시 서버 해석·조준 실패 팝업 승격 | Approved | 2026-07-30 |
 | [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS NATS v1.5.2 REQ 전환+LAMP 제어 서비스 | Approved | 2026-07-30 |
@@ -468,6 +469,9 @@
 
 | 파일 | 내용 | 날짜 |
 |------|------|------|
+| [action-report-dialogs-wireframe.html](design/action-report-dialogs-wireframe.html) | 탐지·장애 조치보고 다이얼로그 와이어프레임 — 두 창을 Tactical Command 실토큰(Dark/Light 미러+토글)으로 렌더·탐지=좌 속성 스크롤(MaxHeight 156)+우 썸네일(성공 이미지/실패·부재 기본화면) **적용됨**·장애=동일 원칙 정리 제안(좌 속성+우 FirstStart/End·SecondStart/End 구간값 카드)·공유 조치보고 항목(라디오 5+기타 메모)·확인/취소·구조 주석 5×2 | 2026-07-31 |
+| [GMap_Windy_Indicator-wireframe.html](design/GMap_Windy_Indicator-wireframe.html) | 강풍모드(WINDY) 인디케이터 CustomControl 와이어프레임 v1.0 — 4모드(wind0~3) 아이콘/색 전환·아이콘+라벨/아이콘만·평상시숨김·드래그 영속·z6 계기층·보기(View)메뉴 토글·실토큰 Dark/Light | 2026-07-31 |
+| [GMap_Detection_Fault_Indicator-wireframe.html](design/GMap_Detection_Fault_Indicator-wireframe.html) | 탐지·장애 상태 인디케이터 CustomControl 와이어프레임 v1.0 — 탐지(EnumDetectionType)/장애(EnumFaultType) 집계 pill+타입칩·활성 강조·0건숨김·세로/가로·드래그 영속·z6·보기메뉴·실토큰 Dark/Light | 2026-07-31 |
 | [GMap_Compass_Control-wireframe.html](design/GMap_Compass_Control-wireframe.html) | 방위각 심볼(나침반) CustomControl 와이어프레임 **v2.2** — 레이어링 확정안(PropertyPanelCanvas 자식 z6=계기층, OverlayWindow/팝업/허브 아래, 최상위 비권장 근거 3)· Theme 실토큰(Dark/Light 미러)+🌙/☀ 토글·토큰 매핑표·라이브 데모(θ·드래그 이동·링 회전·더블클릭 정북·**우클릭 설정 메뉴**=사용자 확정: 크기 S/M/L·스타일·각도표시·정북, AppSettings.MapCompass 영속 제안)·변형 A로즈/B링·해부도·설계·미결질문 5 | 2026-07-30 |
 | [line-drawing-hud-redesign-preview.html](design/line-drawing-hud-redesign-preview.html) | 라인·구역·PIDS 드로잉 HUD 리디자인 프리뷰 — 표준 패널 패턴(시안 헤더+우상단 X 닫기)·다크/라이트 Tactical 토큰·Before/After·위치 유지 버그 before/after·토큰 매핑 | 2026-07-28 |
 | [Measure_Tools_Storyboard.html](design/Measure_Tools_Storyboard.html) | 측정 툴(길이·넓이) 스토리보드·와이어프레임 v0.1 — 탑메뉴 「측정」 그룹(Ruler/VectorPolygon)·클릭→실시간 리드아웃→완료 플로우·지오데식 거리/면적·다크/라이트 토큰·재사용맵(LineDrawingAdorner 포크)·미결질문 7 | 2026-07-24 |

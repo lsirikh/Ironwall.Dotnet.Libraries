@@ -44,6 +44,10 @@ public class EventUiModule : Module
             //builder.RegisterModule(new EventDbModule(_dbSetup, _log, _count++)); // 2
             builder.RegisterModule(new EventApiModule(_log, new ApiSetupModel(_apiSetup), count: _count++));
 
+            // 썸네일 절대 URL 조합용 base URL seam — DetectionSelectionViewModel이 IoC로 조달
+            // (탐지 detail 썸네일이 상대경로 "/api/thumbnails/…" 로 와서 host 결합 필요). 실패해도 default 이미지로 폴백.
+            builder.RegisterInstance(new ApiSetupModel(_apiSetup)).As<IApiSetupModel>().SingleInstance();
+
             // EventProviderService: DeviceProvider 및 EventProvider 의존성 추가
             builder.Register(c => new EventProviderService(
                 c.Resolve<ILogService>(),

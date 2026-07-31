@@ -39,7 +39,7 @@
 		<StackPanel Orientation="Vertical"
 					Margin="10">
 			
-			<ContentControl x:Name="SelectedItemEditor" IsEnabled="false" />
+			<ContentControl x:Name="SelectedItemEditor" />
 
 
 			<Grid>
