@@ -123,6 +123,14 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
         Device = CommonOrNullReference(_selection, DeviceProvider, _log);
         Status = CommonOrNullValue(_selection, m => m.Status);
         DateTime = CommonOrNullValue(_selection, m => m.DateTime);
+
+        // 읽기 전용 표시 갱신
+        NotifyOfPropertyChange(nameof(MessageTypeText));
+        NotifyOfPropertyChange(nameof(DeviceZoneText));
+        NotifyOfPropertyChange(nameof(DeviceTypeText));
+        NotifyOfPropertyChange(nameof(DeviceNameText));
+        NotifyOfPropertyChange(nameof(DeviceNumberText));
+        NotifyOfPropertyChange(nameof(DateTimeText));
     }
     #endregion
     #region - IHanldes -
@@ -134,6 +142,31 @@ public class ConnectionSelectionViewModel : BasePanelViewModel
     public DateTime? DateTime { get; set; }
     public ConnectionEventPanelViewModel PanelViewModel { get; }
     public DeviceProvider DeviceProvider { get; }
+
+    // ── 읽기 전용 표시 — 연결 이벤트는 서버 관측값. device_id/status 불변(ExEventViewModel IsDraft 가드),
+    //    PUT(ConnectionEventReplaceDto)은 type_event만 전송 → 편집 불가라 콤보 대신 읽기전용 텍스트로 노출. ──
+    public string MessageTypeText  => MessageType?.ToString() ?? "—";
+    public string DeviceNameText   => Device?.DeviceName is string n && n.Length > 0 ? n : "—";
+    public string DeviceTypeText   => Device != null ? Device.DeviceType.ToString() : "—";
+    public string DeviceNumberText => Device is { } d ? d.DeviceNumber.ToString() : "—";
+    public string DateTimeText     => DateTime is { } t ? t.ToString("yyyy-MM-dd HH:mm:ss") : "—";
+
+    /// <summary>장비 소속 구역(그룹) 이름 — DeviceGroups(Id)→DeviceGroupProvider 변환(DetectionSelection 패턴 미러).</summary>
+    public string DeviceZoneText
+    {
+        get
+        {
+            var groups = Device?.DeviceGroups;
+            if (groups == null || groups.Count == 0) return "—";
+            try
+            {
+                var provider = IoC.Get<DeviceGroupProvider>();
+                return string.Join(", ", groups.Select(id =>
+                    provider.OfType<DeviceGroupModel>().FirstOrDefault(g => g.Id == id)?.Name ?? id.ToString()));
+            }
+            catch { return string.Join(", ", groups); }
+        }
+    }
     #endregion
     #region - Attributes -
     private readonly IList<ConnectionEventViewModel> _selection;
