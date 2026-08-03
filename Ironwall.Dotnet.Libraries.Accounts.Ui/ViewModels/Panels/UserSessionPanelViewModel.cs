@@ -19,7 +19,7 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Ui.ViewModels.Panels;
    Notes        : IAccountApiService 직접 주입(GOP 모드 전용). 강제 로그아웃(쓰기)은 Confirm→DELETE→page1 재조회.
                   AuditLog 패널과 동일 페이지네이션 패턴(무한 스크롤, DataGridScrollEndBehavior). 날짜필터 없음.
                   swap-on-success + DispatcherService 마셜 + BasePanelViewModel 관리 토큰.
-                  is_active 필터: 기본 전체(IsActiveOnly=false, 정리=전체 조망) — 변경 시 첫 페이지부터 재조회.
+                  is_active 필터: 기본 활성만(IsActiveOnly=true, 서버 회신 2026-08-03) — evict_all 비활성 DUPLICATE 착시 제거. 변경 시 첫 페이지부터 재조회.
                   자동 갱신: 활성 중 ~20s 주기 재조회(page 1 · 로드 중 아닐 때만 — 무한스크롤 비방해).
                     타이머는 OnActivate에서 시작, OnDeactivate에서 정지·폐기(리크·teardown 후 tick 방지).
 ****************************************************************************/
@@ -96,8 +96,9 @@ public class UserSessionPanelViewModel : BasePanelViewModel
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Title = "세션 관리",
+            // 전체 종료는 '계정 단위' — 그 행이 정확히 내 현재세션이 아니어도 내 계정이면 본인도 로그아웃되므로 경고(IsMyAccount).
             Explain = $"'{session.LoginId}' 사용자의 활성 세션을 모두 강제 로그아웃하시겠습니까?"
-                      + (session.IsCurrentSession ? "\n⚠ 본인 계정 — 진행 시 본인도 즉시 로그아웃됩니다." : ""),
+                      + (IsMyAccount(session) ? "\n⚠ 본인 계정 — 진행 시 본인도 즉시 로그아웃됩니다." : ""),
             MessageModel = new CallForceLogoutAllUserSessionsMessageModel { Session = session }
         });
     }
@@ -142,7 +143,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 {
                     if (_isTearingDown) return;   // teardown 이 레이스 승리 — 늦은 타이머 tick의 stale swap 폐기(TOCTOU)
                     Items.Clear();
-                    foreach (var d in res.Data) { d.IsCurrentSession = IsMine(d); Items.Add(d); }
+                    foreach (var d in res.Data) { d.IsCurrentSession = IsCurrent(d); Items.Add(d); }
                     NotifyOfPropertyChange(() => LoadedCountText);
                     NotifyOfPropertyChange(() => HasMorePages);
                 });
@@ -177,7 +178,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
 
             DispatcherService.Invoke(() =>
             {
-                foreach (var d in res.Data) { d.IsCurrentSession = IsMine(d); Items.Add(d); }
+                foreach (var d in res.Data) { d.IsCurrentSession = IsCurrent(d); Items.Add(d); }
                 NotifyOfPropertyChange(() => LoadedCountText);
                 NotifyOfPropertyChange(() => HasMorePages);
             });
@@ -216,9 +217,21 @@ public class UserSessionPanelViewModel : BasePanelViewModel
         _autoRefreshTimer = null;
     }
 
-    /// <summary>현재(내) 세션 근사 판별 — 내 로그인 계정의 활성 세션. sub=login_id 또는 user_id 클레임 둘 다 대조(force-logout-04).
-    /// 정확한 단일-세션 식별은 서버 is_current/session_id 필요(미제공) → 자기-로그아웃 보호에 충분한 근사.</summary>
-    private bool IsMine(UserSessionDto d)
+    /// <summary>현재(내) 세션 '정확' 판별 — 서버 sid 클레임(session_id) ↔ 행 id 대조(서버 회신 2026-08-03).
+    /// 로그인·refresh JWT의 sid 클레임을 TokenStorageService가 포착(SessionId)하며, 서버가 그 값을 세션 행 id로 발급한다.
+    /// sid 미보유(구서버)면 login_id+active 근사로 폴백 — 자기-로그아웃 보호는 유지하되 동일 계정 다중세션은 구분 못함.</summary>
+    private bool IsCurrent(UserSessionDto d)
+    {
+        if (d is null || !d.IsActive) return false;
+        var sid = _tokenStore.SessionId;
+        if (!string.IsNullOrEmpty(sid))
+            return string.Equals(d.Id.ToString(), sid, StringComparison.Ordinal);   // 정확 대조(단일 행)
+        return IsMyAccount(d);   // 폴백: sid 미제공 구서버 → 계정 근사(과다표시 가능)
+    }
+
+    /// <summary>내 '계정'의 세션 여부 — sub=login_id 또는 user_id 클레임 둘 다 대조(force-logout-04).
+    /// 전체 세션 종료(사용자 단위) 경고에 사용: 그 행이 정확히 내 세션이 아니어도 내 계정이면 본인도 로그아웃되므로 경고.</summary>
+    private bool IsMyAccount(UserSessionDto d)
     {
         if (d is null || !d.IsActive) return false;
         var me = _tokenStore.UserId;
@@ -228,7 +241,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     }
 
     #region - Properties -
-    /// <summary>활성 세션만 조회 여부(기본 false=전체). 변경 시 첫 페이지부터 재조회.</summary>
+    /// <summary>활성 세션만 조회 여부(기본 true=활성만, 서버 회신 반영 — 비활성 DUPLICATE 착시 제거). 변경 시 첫 페이지부터 재조회.</summary>
     public bool IsActiveOnly
     {
         get => _isActiveOnly;
@@ -263,7 +276,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     private int _totalPages = 1;
     private int _totalCount;
     private bool _isLoadingMore;
-    private bool _isActiveOnly;   // 기본 전체(false) — 정리=전체 조망(FR-3). is_active 미전송 → 서버 전체 반환.
+    private bool _isActiveOnly = true;   // 기본 활성만(true, 서버 회신 2026-08-03) — evict_all 비활성 DUPLICATE 착시 제거. is_active=true 전송.
     private Timer? _autoRefreshTimer;   // 주기 자동 갱신(활성 중만). OnActivate 시작 / OnDeactivate 폐기.
     #endregion
 }

@@ -23,7 +23,7 @@ public class UserSessionDto
     /// <summary>커넥션 주체 식별(서버 v6.3 user_sessions.client_id). 구버전 서버는 null → UI "-".</summary>
     [JsonProperty("client_id")] public string? ClientId { get; set; }
 
-    /// <summary>현재(내) 세션 근사 표시 — 내 로그인 계정의 활성 세션. 클라 계산(비직렬화).
-    /// 정확한 단일-세션 식별은 서버 is_current/session_id가 필요(미제공)하므로 login_id+active 근사(자기-로그아웃 보호용).</summary>
+    /// <summary>현재(내) 세션 표시 — 서버 sid 클레임(session_id) ↔ 행 id 정확 대조(서버 회신 2026-08-03). 클라 계산(비직렬화).
+    /// sid 미제공 구서버에서만 login_id+active 근사로 폴백(동일 계정 다중세션 구분 불가).</summary>
     [JsonIgnore] public bool IsCurrentSession { get; set; }
 }

@@ -28,8 +28,8 @@ internal sealed class FakeTokenStore : ITokenStorageService
     public DateTime? RefreshExpiresAtUtc => null;
     public bool IsAuthenticated => true;
     public string? Jti => null;
-    public string? UserId => null;
-    public string? SessionId => null;
+    public string? UserId { get; set; }
+    public string? SessionId { get; set; }   // 서버 sid 클레임 시뮬레이션(현재세션 정확 대조 테스트용)
     public int Generation => 0;
     public void SetTokens(string accessToken, string? refreshToken = null, string? sessionId = null) { }
     public bool SetTokensIfGeneration(int expectedGeneration, string accessToken, string? refreshToken = null, string? sessionId = null) => true;
@@ -107,8 +107,8 @@ public class UserSessionPanelTests
         await vm.LoadNextPageAsync();
         Assert.Equal(200, vm.Items.Count);
 
-        // Act — 필터 토글(false→true, 기본 전체에서 활성만으로 변경) → setter가 첫 페이지부터 재조회
-        vm.IsActiveOnly = true;
+        // Act — 필터 토글(기본 활성만 true → false 전체) → setter가 첫 페이지부터 재조회
+        vm.IsActiveOnly = false;
 
         // Assert — 첫 페이지로 리셋(100), 아직 더 있음
         Assert.Equal(100, vm.Items.Count);
@@ -118,13 +118,11 @@ public class UserSessionPanelTests
     [Fact]
     public async Task should_send_is_active_when_active_only()
     {
-        // Arrange — 활성 3 + 비활성 2(활성만 필터 시 3건만). 기본은 전체(false)라 명시적으로 활성만 켠다(FR-3).
+        // Arrange — 활성 3 + 비활성 2(활성만 필터 시 3건만). 기본이 활성만(true)이라 재조회만 해도 활성 3건(서버 회신).
         var s = NewServerWithSessions(active: 3, inactive: 2);
         var vm = NewVm(s);
-        await vm.ActivateForTestAsync();
 
-        // Act — 활성만 필터 ON 후 재조회(awaited)
-        vm.IsActiveOnly = true;
+        // Act — 기본(활성만) 상태에서 조회
         await vm.OnClickReloadButton();
 
         // Assert — is_active=true 전송 + 활성 3건만 로드
@@ -147,5 +145,37 @@ public class UserSessionPanelTests
         // Assert — is_active 미전송(null) + 5건 전체 로드
         Assert.Null(s.LastSessionIsActive);
         Assert.Equal(5, vm.Items.Count);
+    }
+
+    [Fact]
+    public async Task should_mark_only_matching_session_as_current_when_sid_provided()
+    {
+        // Arrange — 활성 세션 3개(id 1,2,3). 내 sid=2 (서버 sid 클레임 ↔ 행 id 정확 대조, 서버 회신 2026-08-03)
+        var s = NewServerWithSessions(active: 3, inactive: 0);
+        var store = new FakeTokenStore { SessionId = "2" };
+        var vm = new TestUserSessionPanel(new RecordingEventAggregator(), new RecordingLog(), s, store);
+
+        // Act
+        await vm.ActivateForTestAsync();
+
+        // Assert — 정확히 1개(id=2)만 현재세션(login_id 근사로 인한 과다표시 없음)
+        Assert.Equal(1, vm.Items.Count(x => x.IsCurrentSession));
+        Assert.True(vm.Items.Single(x => x.Id == 2).IsCurrentSession);
+    }
+
+    [Fact]
+    public async Task should_fallback_to_account_approx_when_sid_absent()
+    {
+        // Arrange — sid 미제공(구서버). 내 계정=user2 → 그 계정 활성 세션만 근사 현재표시
+        var s = NewServerWithSessions(active: 3, inactive: 0);   // login_id: user1,user2,user3
+        var store = new FakeTokenStore { UserId = "user2" };     // SessionId=null → 폴백 경로
+        var vm = new TestUserSessionPanel(new RecordingEventAggregator(), new RecordingLog(), s, store);
+
+        // Act
+        await vm.ActivateForTestAsync();
+
+        // Assert — 폴백: 내 계정(user2) 세션만 현재표시
+        Assert.True(vm.Items.Single(x => x.LoginId == "user2").IsCurrentSession);
+        Assert.False(vm.Items.Single(x => x.LoginId == "user1").IsCurrentSession);
     }
 }

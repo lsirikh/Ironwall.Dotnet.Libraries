@@ -12,7 +12,7 @@ using Xunit;
 namespace Ironwall.Dotnet.Libraries.Accounts.Ui.Tests.Sessions;
 
 /****************************************************************************
-   Purpose   : 세션 패널 정리(GOP_SessionPanel_Cleanup) 검증 — FR-1 표시 컨버터 · FR-2 사용자 전체 세션 종료 · FR-3 기본 전체+자동갱신.
+   Purpose   : 세션 패널 정리(GOP_SessionPanel_Cleanup) 검증 — FR-1 표시 컨버터 · FR-2 사용자 전체 세션 종료 · FR-3 기본 활성만+자동갱신.
    대상      : UserSessionPanelViewModel(TryAutoRefresh / OnClickForceLogoutAllUserSessions / HandleAsync) · IsoDateStringConverter.
    서버계약  : FakeGopServer.ForceLogoutAllUserSessionsAsync(userId 캡처+활성 비활성화) · GetUserSessionsAsync(is_active null=전체).
    비고      : 헤드리스(Application.Current=null → DispatcherService.Invoke 인라인) 결정론. UserSessionPanelTests 하네스 미러(sleep 없음).
@@ -70,7 +70,7 @@ public class UserSessionPanelCleanupTests
     [Fact]
     public async Task should_reload_after_force_logout_all()
     {
-        // Arrange — 전체 보기(false). userId=7 활성 2 + userId=8 활성 1 = 3건 로드
+        // Arrange — 기본 활성만(true). userId=7 활성 2 + userId=8 활성 1 = 활성 3건 로드
         var s = NewServerWithSessions(active: 2, inactive: 0, userId: 7);
         s.Sessions.Add(new UserSessionDto { Id = 99, UserId = 8, LoginId = "other", Role = "OPERATOR", IsActive = true });
         var (vm, ea) = NewVm(s);
@@ -83,30 +83,31 @@ public class UserSessionPanelCleanupTests
         await vm.OnClickForceLogoutAllUserSessions(target);
         await vm.HandleAsync(ExtractAllTrigger(ea), CancellationToken.None);
 
-        // Assert — 재조회 발생(GetUserSessions 재호출). 전체(false) 조회라 3건 유지되나
-        //          userId=7 은 비활성, 활성으로 남은 건 userId=8 1건뿐(서버 부수효과 반영).
+        // Assert — 재조회 발생(GetUserSessions 재호출). 활성만 조회(기본)라 userId=7 비활성 제외 →
+        //          활성으로 남은 userId=8 1건만(서버 부수효과 반영).
         Assert.True(s.SessionCallCount > callsBefore);
-        Assert.Equal(3, vm.Items.Count);
+        Assert.Equal(1, vm.Items.Count);
         var stillActive = Assert.Single(vm.Items, x => x.IsActive);
         Assert.Equal(8, stillActive.UserId);
     }
 
-    // ─────────────────────────── FR-3: 기본 전체 표시 ───────────────────────────
+    // ─────────────────────────── FR-3: 기본 활성만 표시(서버 회신 2026-08-03) ───────────────────────────
 
     [Fact]
-    public async Task should_default_to_all_sessions_when_activated()
+    public async Task should_default_to_active_only_when_activated()
     {
-        // Arrange — 활성 3 + 비활성 2. 기본 IsActiveOnly=false 여야 전체(5) + is_active 미전송
+        // Arrange — 활성 3 + 비활성 2. 기본 IsActiveOnly=true 여야 활성 3건 + is_active=true 전송
+        //           (서버 회신: evict_all 비활성 DUPLICATE 착시 제거 위해 기본 활성만 조회)
         var s = NewServerWithSessions(active: 3, inactive: 2);
         var (vm, _) = NewVm(s);
 
         // Act
         await vm.ActivateForTestAsync();
 
-        // Assert — 기본 전체 조망(is_active null → 5건 전체)
-        Assert.False(vm.IsActiveOnly);
-        Assert.Null(s.LastSessionIsActive);
-        Assert.Equal(5, vm.Items.Count);
+        // Assert — 기본 활성만(is_active=true → 활성 3건)
+        Assert.True(vm.IsActiveOnly);
+        Assert.True(s.LastSessionIsActive);
+        Assert.Equal(3, vm.Items.Count);
     }
 
     // ─────────────────────────── FR-3: 자동 갱신 가드 ───────────────────────────
