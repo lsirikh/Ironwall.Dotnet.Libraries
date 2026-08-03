@@ -51,7 +51,7 @@
 					Grid.Row="0"
 					Grid.Column="0"
 					Style="{StaticResource TextBlockTitle}"
-					Text="From" />
+					Text="시작" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="1"
@@ -63,7 +63,7 @@
 					Grid.Row="0"
 					Grid.Column="2"
 					Style="{StaticResource TextBlockTitle}"
-					Text="To" />
+					Text="종료" />
 				<mah:DateTimePicker
 					Grid.Row="0"
 					Grid.Column="3"

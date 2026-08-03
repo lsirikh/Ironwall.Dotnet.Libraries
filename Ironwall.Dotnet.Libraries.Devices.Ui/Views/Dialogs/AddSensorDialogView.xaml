@@ -104,7 +104,7 @@
 					VerticalAlignment="Center"
 					FontSize="15"
 					Foreground="{DynamicResource OnPrimaryFixedBrush}"
-					Text="Sensor Property" />
+					Text="센서 속성" />
 				<ScrollViewer Margin="5" VerticalScrollBarVisibility="Auto">
 
 					<Grid Margin="20,10,10,10" VerticalAlignment="Stretch">
@@ -134,7 +134,7 @@
 							Margin="0,5,0,0"
 							VerticalAlignment="Center"
 							FontSize="15"
-							Text="Group" />
+							Text="그룹" />
 						<ComboBox
 							Grid.Row="0"
 							Grid.Column="1"
@@ -174,7 +174,7 @@
 							Margin="0,5,0,0"
 							VerticalAlignment="Center"
 							FontSize="15"
-							Text="From Sensor" />
+							Text="시작 센서" />
 						<ComboBox
 							Grid.Row="2"
 							Grid.Column="1"
@@ -212,7 +212,7 @@
 							Margin="0,5,0,0"
 							VerticalAlignment="Center"
 							FontSize="15"
-							Text="To Sensor" />
+							Text="종료 센서" />
 
 						<TextBox
 							Grid.Row="3"

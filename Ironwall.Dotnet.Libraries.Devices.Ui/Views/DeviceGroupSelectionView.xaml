@@ -51,7 +51,7 @@
 				<TextBlock
 					Grid.Column="0"
 					Style="{StaticResource TextBlockTitle}"
-					Text="Name" />
+					Text="이름" />
 				<TextBox
 					Grid.Column="1"
 					md:HintAssist.Hint="1구역"
@@ -61,7 +61,7 @@
 				<TextBlock
 					Grid.Column="2"
 					Style="{StaticResource TextBlockTitle}"
-					Text="Description" />
+					Text="설명" />
 				<TextBox
 					Grid.Column="3"
 					md:HintAssist.Hint="설명"

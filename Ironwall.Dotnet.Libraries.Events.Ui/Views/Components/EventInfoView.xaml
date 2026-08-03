@@ -53,7 +53,7 @@
 						Orientation="Vertical">
 						<CheckBox
 							Margin="0,3"
-							Content="DET"
+							Content="탐지"
 							FontSize="15"
 							FontWeight="Bold"
 							Foreground="{DynamicResource TextPrimaryBrush}"
@@ -61,7 +61,7 @@
 							Visibility="{Binding IsDetectionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						<CheckBox
 							Margin="0,3"
-							Content="MAL"
+							Content="장애"
 							FontSize="15"
 							FontWeight="Bold"
 							Foreground="{DynamicResource TextPrimaryBrush}"
@@ -69,7 +69,7 @@
 							Visibility="{Binding IsMalfunctionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						<CheckBox
 							Margin="0,3"
-							Content="CON"
+							Content="연결"
 							FontSize="15"
 							FontWeight="Bold"
 							Foreground="{DynamicResource TextPrimaryBrush}"
@@ -77,7 +77,7 @@
 							Visibility="{Binding IsConnectionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 						<CheckBox
 							Margin="0,3"
-							Content="ACT"
+							Content="조치"
 							FontSize="15"
 							FontWeight="Bold"
 							Foreground="{DynamicResource TextPrimaryBrush}"

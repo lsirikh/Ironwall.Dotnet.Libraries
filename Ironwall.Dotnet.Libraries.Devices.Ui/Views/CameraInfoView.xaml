@@ -118,7 +118,7 @@
 			Grid.Row="6"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Device ID" />
+			Text="장비 ID" />
 		<TextBox
 			Grid.Row="6"
 			Grid.Column="1"
@@ -146,7 +146,7 @@
 			Grid.Row="8"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="ONVIF Version" />
+			Text="ONVIF 버전" />
 		<TextBox
 			Grid.Row="8"
 			Grid.Column="1"

@@ -60,7 +60,7 @@
 			Grid.Row="0"
 			Grid.Column="2"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Group" />
+			Text="그룹" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="3"
@@ -77,7 +77,7 @@
 			Grid.Row="0"
 			Grid.Column="4"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Name" />
+			Text="이름" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="5"
@@ -90,7 +90,7 @@
 			Grid.Row="0"
 			Grid.Column="6"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Controller" />
+			Text="제어기" />
 		<!--  ViewModelProxy 는 기존 DataGrid 예시에서 사용하던 StaticResource  -->
 		<ComboBox
 			Grid.Row="0"
@@ -110,7 +110,7 @@
 			Grid.Row="0"
 			Grid.Column="8"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Type" />
+			Text="유형" />
 		<ComboBox
 			Grid.Row="0"
 			Grid.Column="9"
@@ -137,7 +137,7 @@
 			Grid.Row="1"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Version" />
+			Text="버전" />
 		<TextBox
 			Grid.Row="1"
 			Grid.Column="1"
@@ -150,7 +150,7 @@
 			Grid.Row="1"
 			Grid.Column="2"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Status" />
+			Text="상태" />
 
 		<ComboBox
 			Grid.Row="1"

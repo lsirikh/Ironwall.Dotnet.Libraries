@@ -40,7 +40,7 @@
 			Grid.Row="0"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Device No" />
+			Text="장비번호" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="1"
@@ -53,7 +53,7 @@
 			Grid.Row="0"
 			Grid.Column="2"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Group" />
+			Text="그룹" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="3"
@@ -66,7 +66,7 @@
 			Grid.Row="0"
 			Grid.Column="4"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Name" />
+			Text="이름" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="5"
@@ -92,7 +92,7 @@
 			Grid.Row="0"
 			Grid.Column="8"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Port" />
+			Text="포트" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="9"
@@ -112,7 +112,7 @@
 			Grid.Row="1"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Type" />
+			Text="유형" />
 		<ComboBox
 			Grid.Row="1"
 			Grid.Column="1"
@@ -137,7 +137,7 @@
 			Grid.Row="1"
 			Grid.Column="2"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Ver." />
+			Text="버전" />
 		<TextBox
 			Grid.Row="1"
 			Grid.Column="3"
@@ -150,7 +150,7 @@
 			Grid.Row="1"
 			Grid.Column="4"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Status" />
+			Text="상태" />
 		<ComboBox
 			Grid.Row="1"
 			Grid.Column="5"

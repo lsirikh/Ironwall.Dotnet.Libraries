@@ -88,7 +88,7 @@
 							Grid.Row="0"
 							Grid.Column="0"
 							Style="{StaticResource FieldLabel}"
-							Text="Device No" />
+							Text="장비번호" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="1"
@@ -100,7 +100,7 @@
 							Grid.Row="0"
 							Grid.Column="2"
 							Style="{StaticResource FieldLabel}"
-							Text="Name" />
+							Text="이름" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="3"
@@ -112,7 +112,7 @@
 							Grid.Row="0"
 							Grid.Column="4"
 							Style="{StaticResource FieldLabel}"
-							Text="Ver." />
+							Text="버전" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="5"
@@ -138,7 +138,7 @@
 							Grid.Row="1"
 							Grid.Column="2"
 							Style="{StaticResource FieldLabel}"
-							Text="Status" />
+							Text="상태" />
 						<ComboBox
 							Grid.Row="1"
 							Grid.Column="3"
@@ -161,7 +161,7 @@
 							Grid.Row="1"
 							Grid.Column="4"
 							Style="{StaticResource FieldLabel}"
-							Text="Type" />
+							Text="유형" />
 						<TextBox
 							Grid.Row="1"
 							Grid.Column="5"
@@ -186,7 +186,7 @@
 						<TextBlock
 							Grid.Column="0"
 							Style="{StaticResource FieldLabel}"
-							Text="Type" />
+							Text="유형" />
 						<TextBox
 							Grid.Column="1"
 							md:HintAssist.Hint="IP"
@@ -196,7 +196,7 @@
 						<TextBlock
 							Grid.Column="2"
 							Style="{StaticResource FieldLabel}"
-							Text="Desc" />
+							Text="설명" />
 						<TextBox
 							Grid.Column="3"
 							md:HintAssist.Hint="설명"
@@ -250,7 +250,7 @@
 							Grid.Row="0"
 							Grid.Column="0"
 							Style="{StaticResource FieldLabel}"
-							Text="Location" />
+							Text="위치" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="1"
@@ -262,7 +262,7 @@
 							Grid.Row="0"
 							Grid.Column="2"
 							Style="{StaticResource FieldLabel}"
-							Text="Lat" />
+							Text="위도" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="3"
@@ -274,7 +274,7 @@
 							Grid.Row="0"
 							Grid.Column="4"
 							Style="{StaticResource FieldLabel}"
-							Text="Lng" />
+							Text="경도" />
 						<TextBox
 							Grid.Row="0"
 							Grid.Column="5"
@@ -286,7 +286,7 @@
 							Grid.Row="1"
 							Grid.Column="0"
 							Style="{StaticResource FieldLabel}"
-							Text="Alt" />
+							Text="고도" />
 						<TextBox
 							Grid.Row="1"
 							Grid.Column="1"
@@ -298,7 +298,7 @@
 							Grid.Row="1"
 							Grid.Column="2"
 							Style="{StaticResource FieldLabel}"
-							Text="Bearing" />
+							Text="방위각" />
 						<TextBox
 							Grid.Row="1"
 							Grid.Column="3"

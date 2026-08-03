@@ -76,7 +76,7 @@
 							VerticalAlignment="Center"
 							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Kind="AccountKey" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="Login" />
+						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="로그인" />
 					</StackPanel>
 				</Border>
 
@@ -260,7 +260,7 @@
 						<Button.Content>
 							<StackPanel Orientation="Horizontal">
 								<md:PackIcon Kind="Register" Style="{StaticResource ButtonIcon}" />
-								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="Register" />
+								<TextBlock Style="{StaticResource ButtonTextBlock}" Text="가입하기" />
 							</StackPanel>
 						</Button.Content>
 					</Button>

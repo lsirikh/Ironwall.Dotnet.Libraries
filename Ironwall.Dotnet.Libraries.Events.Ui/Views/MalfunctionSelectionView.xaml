@@ -92,7 +92,7 @@
 						</Grid.Resources>
 
 						<!--  이벤트 속성 (편집 가능 — 대시보드 편집기에서만, 조치보고에선 IsEditable=false)  -->
-						<TextBlock Grid.Row="0" Grid.Column="0" Text="Type" />
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="유형" />
 						<ComboBox
 							Grid.Row="0"
 							Grid.Column="1"
@@ -142,7 +142,7 @@
 							Text="{Binding DeviceNumberText, Mode=OneWay}" />
 
 						<!--  이벤트 속성 (편집 가능)  -->
-						<TextBlock Grid.Row="5" Grid.Column="0" Text="Status" />
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="상태" />
 						<ComboBox
 							Grid.Row="5"
 							Grid.Column="1"
@@ -162,7 +162,7 @@
 							</ComboBox.ItemsPanel>
 						</ComboBox>
 
-						<TextBlock Grid.Row="6" Grid.Column="0" Text="Reason" />
+						<TextBlock Grid.Row="6" Grid.Column="0" Text="사유" />
 						<ComboBox
 							Grid.Row="6"
 							Grid.Column="1"
@@ -227,7 +227,7 @@
 								Margin="0,0,0,2"
 								FontSize="10"
 								Opacity="0.7"
-								Text="FirstStart" />
+								Text="1차 시작" />
 							<TextBox
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding FirstStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -243,7 +243,7 @@
 								Margin="0,0,0,2"
 								FontSize="10"
 								Opacity="0.7"
-								Text="FirstEnd" />
+								Text="1차 종료" />
 							<TextBox
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding FirstEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -258,7 +258,7 @@
 								Margin="0,0,0,2"
 								FontSize="10"
 								Opacity="0.7"
-								Text="SecondStart" />
+								Text="2차 시작" />
 							<TextBox
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding SecondStart, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -273,7 +273,7 @@
 								Margin="0,0,0,2"
 								FontSize="10"
 								Opacity="0.7"
-								Text="SecondEnd" />
+								Text="2차 종료" />
 							<TextBox
 								Style="{StaticResource TextBoxInput}"
 								Text="{Binding SecondEnd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

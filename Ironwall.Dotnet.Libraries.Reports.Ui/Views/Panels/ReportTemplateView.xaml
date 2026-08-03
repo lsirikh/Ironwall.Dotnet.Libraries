@@ -35,7 +35,7 @@
                       RowStyle="{StaticResource ModernDataGridRow}"
                       BorderThickness="0" Background="Transparent">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="52" />
+                    <DataGridTextColumn Header="아이디" Binding="{Binding Id}" Width="52" />
                     <DataGridTextColumn Header="이름" Binding="{Binding Name}" Width="200" />
                     <DataGridTextColumn Header="설명" Binding="{Binding Description}" Width="*" MinWidth="200" />
                     <DataGridTextColumn Header="유형" Binding="{Binding ReportType}" Width="90" />

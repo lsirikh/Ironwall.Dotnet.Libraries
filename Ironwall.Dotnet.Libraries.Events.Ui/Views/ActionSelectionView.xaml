@@ -180,7 +180,7 @@
 						      Type·원본지정 콤보 제거: 기존 리포트는 IsDraft 가드(BaseEventViewModel.MessageType / ActionEventViewModel.OriginEvent)로
 						      변경 차단 + PUT(ToActionEventReplaceDto)이 type_event/content/user만 보내고 from_event 제외 → 편집 무의미.
 						      Type는 항상 Action, 신규 Draft 원본지정은 그리드 OriginEvent 셀(IsEnabled=IsDraft)이 담당. ──  -->
-						<TextBlock Grid.Row="9" Grid.Column="0" Text="User" />
+						<TextBlock Grid.Row="9" Grid.Column="0" Text="사용자" />
 						<TextBox
 							Grid.Row="9"
 							Grid.Column="1"
@@ -189,7 +189,7 @@
 							Style="{StaticResource TextBoxInput}"
 							Text="{Binding User, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-						<TextBlock Grid.Row="10" Grid.Column="0" Text="Content" />
+						<TextBlock Grid.Row="10" Grid.Column="0" Text="내용" />
 						<TextBox
 							Grid.Row="10"
 							Grid.Column="1"

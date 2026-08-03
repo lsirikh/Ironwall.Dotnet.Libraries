@@ -30,7 +30,7 @@
 			Grid.Row="0"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Weather Mode" />
+			Text="날씨 모드" />
 		<ComboBox
 			Grid.Row="0"
 			Grid.Column="1"
@@ -42,7 +42,7 @@
 			Grid.Row="1"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Camera Mode" />
+			Text="카메라 모드" />
 		<ComboBox
 			Grid.Row="1"
 			Grid.Column="1"
@@ -54,7 +54,7 @@
 			Grid.Row="2"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Heater" />
+			Text="히터" />
 		<ComboBox
 			Grid.Row="2"
 			Grid.Column="1"
@@ -66,7 +66,7 @@
 			Grid.Row="3"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Fan" />
+			Text="팬" />
 		<ComboBox
 			Grid.Row="3"
 			Grid.Column="1"
@@ -78,7 +78,7 @@
 			Grid.Row="4"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Headlight" />
+			Text="전조등" />
 		<ComboBox
 			Grid.Row="4"
 			Grid.Column="1"
@@ -90,7 +90,7 @@
 			Grid.Row="5"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Day/Night Mode" />
+			Text="주야간 모드" />
 		<ComboBox
 			Grid.Row="5"
 			Grid.Column="1"
@@ -102,7 +102,7 @@
 			Grid.Row="6"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Focus Mode" />
+			Text="포커스 모드" />
 		<ComboBox
 			Grid.Row="6"
 			Grid.Column="1"
@@ -114,7 +114,7 @@
 			Grid.Row="7"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Iris Mode" />
+			Text="조리개 모드" />
 		<ComboBox
 			Grid.Row="7"
 			Grid.Column="1"
@@ -126,7 +126,7 @@
 			Grid.Row="8"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Tracking" />
+			Text="추적" />
 		<ComboBox
 			Grid.Row="8"
 			Grid.Column="1"
@@ -138,7 +138,7 @@
 			Grid.Row="9"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Palette" />
+			Text="팔레트" />
 		<ComboBox
 			Grid.Row="9"
 			Grid.Column="1"

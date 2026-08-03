@@ -105,7 +105,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="Controller" />
+							Text="제어기" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -149,7 +149,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="Multi-Sensor" />
+							Text="복합센서" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -173,7 +173,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="Fense Sensor" />
+							Text="펜스센서" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -217,7 +217,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="Underground Sensor" />
+							Text="지중센서" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -282,7 +282,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="Contact Sensor" />
+							Text="접점센서" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -327,7 +327,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="PIR Sensor" />
+							Text="PIR 센서" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -371,7 +371,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="IO Controller" />
+							Text="IO 제어기" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -415,7 +415,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="Laser Sensor" />
+							Text="레이저센서" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"
@@ -459,7 +459,7 @@
 						<TextBlock
 							Grid.Row="0"
 							Style="{StaticResource NameText}"
-							Text="IP Camera" />
+							Text="IP 카메라" />
 						<GridSplitter
 							Grid.Row="1"
 							Height="1"

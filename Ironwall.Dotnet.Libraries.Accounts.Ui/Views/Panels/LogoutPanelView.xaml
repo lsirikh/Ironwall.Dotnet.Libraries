@@ -45,7 +45,7 @@
 							VerticalAlignment="Center"
 							Foreground="{DynamicResource OnPrimaryFixedBrush}"
 							Kind="LogoutVariant" />
-						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="Logout" />
+						<TextBlock Style="{StaticResource ModernDialogHeaderText}" Text="로그아웃" />
 					</StackPanel>
 				</Border>
 

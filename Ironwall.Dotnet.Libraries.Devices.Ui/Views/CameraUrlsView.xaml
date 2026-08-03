@@ -28,7 +28,7 @@
 			Grid.Row="0"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Homepage" />
+			Text="홈페이지" />
 		<TextBox
 			Grid.Row="0"
 			Grid.Column="1"
@@ -41,7 +41,7 @@
 			Grid.Row="1"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="ONVIF Service" />
+			Text="ONVIF 서비스" />
 		<TextBox
 			Grid.Row="1"
 			Grid.Column="1"
@@ -54,7 +54,7 @@
 			Grid.Row="2"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="RTSP Main" />
+			Text="RTSP 메인" />
 		<TextBox
 			Grid.Row="2"
 			Grid.Column="1"
@@ -67,7 +67,7 @@
 			Grid.Row="3"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="RTSP Sub" />
+			Text="RTSP 서브" />
 		<TextBox
 			Grid.Row="3"
 			Grid.Column="1"
@@ -80,7 +80,7 @@
 			Grid.Row="4"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="WebRTC Main" />
+			Text="WebRTC 메인" />
 		<TextBox
 			Grid.Row="4"
 			Grid.Column="1"
@@ -93,7 +93,7 @@
 			Grid.Row="5"
 			Grid.Column="0"
 			Style="{StaticResource TextBlockTitle}"
-			Text="Snapshot Ch1" />
+			Text="스냅샷 Ch1" />
 		<TextBox
 			Grid.Row="5"
 			Grid.Column="1"

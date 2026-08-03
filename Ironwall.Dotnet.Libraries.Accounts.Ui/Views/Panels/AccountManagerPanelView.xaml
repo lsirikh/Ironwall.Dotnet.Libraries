@@ -268,7 +268,7 @@
 						<!--  No  -->
 						<DataGridTextColumn
 							Binding="{Binding (ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType=DataGridRow}}"
-							Header="No"
+							Header="번호"
 							IsReadOnly="True">
 							<DataGridTextColumn.HeaderStyle>
 								<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">

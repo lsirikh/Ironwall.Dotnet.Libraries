@@ -94,7 +94,7 @@
 						</Grid.Resources>
 
 						<!--  이벤트 속성 (편집 가능 — 대시보드 편집기에서만, 조치보고에선 IsEditable=false)  -->
-						<TextBlock Grid.Row="0" Grid.Column="0" Text="Type" />
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="유형" />
 						<ComboBox
 							Grid.Row="0"
 							Grid.Column="1"
@@ -139,7 +139,7 @@
 							Text="{Binding DeviceNumberText, Mode=OneWay}" />
 
 						<!--  이벤트 속성 (편집 가능)  -->
-						<TextBlock Grid.Row="5" Grid.Column="0" Text="Status" />
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="상태" />
 						<ComboBox
 							Grid.Row="5"
 							Grid.Column="1"
@@ -154,7 +154,7 @@
 							</ComboBox.ItemTemplate>
 						</ComboBox>
 
-						<TextBlock Grid.Row="6" Grid.Column="0" Text="Result" />
+						<TextBlock Grid.Row="6" Grid.Column="0" Text="결과" />
 						<ComboBox
 							Grid.Row="6"
 							Grid.Column="1"
