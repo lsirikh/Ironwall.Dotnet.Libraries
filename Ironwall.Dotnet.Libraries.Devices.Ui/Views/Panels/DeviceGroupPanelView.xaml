@@ -175,7 +175,7 @@
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -194,7 +194,7 @@
 				<!--  Name  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Name"
+					Header="이름"
 					MinWidth="200"
 					SortMemberPath="Name">
 					<DataGridColumn.HeaderStyle>
@@ -224,7 +224,7 @@
 					<!--  Description  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Description"
+					Header="설명"
 					MinWidth="200"
 					SortMemberPath="Description">
 					<DataGridColumn.HeaderStyle>
@@ -255,7 +255,7 @@
 				<!--  DeviceCount (read-only)  -->
 				<DataGridTextColumn
 					Binding="{Binding DeviceCount}"
-					Header="Device Count"
+					Header="장비수"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">

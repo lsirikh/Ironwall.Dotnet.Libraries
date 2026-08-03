@@ -471,7 +471,7 @@
 					Binding="{Binding TimeText}"
 					FontFamily="Consolas"
 					Header="시간" />
-				<DataGridTextColumn Binding="{Binding Result, Converter={StaticResource EnumToKoreanConverter}}" Header="Result" />
+				<DataGridTextColumn Binding="{Binding Result, Converter={StaticResource EnumToKoreanConverter}}" Header="결과" />
 				<DataGridTemplateColumn Header="신호" SortMemberPath="Signal">
 					<DataGridTemplateColumn.CellTemplate>
 						<DataTemplate>

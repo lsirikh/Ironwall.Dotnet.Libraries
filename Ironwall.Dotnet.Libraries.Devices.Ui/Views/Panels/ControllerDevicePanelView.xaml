@@ -5,6 +5,7 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Devices.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Converters;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -18,6 +19,8 @@
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
+		<!--  enum 한글 표시(단방향, 저장/전송 값 불변)  -->
+		<conv:UiEnumToKoreanConverter x:Key="UiEnumToKorean" />
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
 	</UserControl.Resources>
@@ -184,7 +187,7 @@
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -203,7 +206,7 @@
 				<!--  DeviceNumber  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Device Number"
+					Header="장비번호"
 					SortMemberPath="DeviceNumber">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -232,7 +235,7 @@
 				<!--  DeviceName  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Device Name"
+					Header="장비명"
 					SortMemberPath="DeviceNumber">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -273,7 +276,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding DeviceType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding DeviceType, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -307,7 +310,7 @@
 				<!--  IpAddress  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="IpAddress"
+					Header="IP 주소"
 					SortMemberPath="IpAddress">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -337,7 +340,7 @@
 				<!--  Port  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Port"
+					Header="포트"
 					SortMemberPath="Port">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -366,7 +369,7 @@
 				<!--  Location  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Location"
+					Header="위치"
 					SortMemberPath="Location">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -395,7 +398,7 @@
 				<!--  Status  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Status"
+					Header="상태"
 					SortMemberPath="Status">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -407,7 +410,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding Status, Mode=OneWay, Converter={StaticResource UiEnumToKorean}}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
