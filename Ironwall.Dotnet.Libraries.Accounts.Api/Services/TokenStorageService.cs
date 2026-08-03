@@ -29,9 +29,13 @@ public class TokenStorageService : ITokenStorageService
     public int Generation                { get { lock (_gate) return _generation; } }
     public bool IsAuthenticated          { get { lock (_gate) return !string.IsNullOrEmpty(_access); } }
 
+    /// <summary>토큰 갱신 시 발화(lock 밖) — SessionLifecycle 만료 타이머 재무장(token-refresh-08).</summary>
+    public event System.Action? TokensRenewed;
+
     public void SetTokens(string accessToken, string? refreshToken = null, string? sessionId = null)
     {
         lock (_gate) { ApplyTokens(accessToken, refreshToken, sessionId); }
+        TokensRenewed?.Invoke();   // lock 밖 — 재진입/구독자 예외 격리
     }
 
     public bool SetTokensIfGeneration(int expectedGeneration, string accessToken, string? refreshToken = null, string? sessionId = null)
@@ -40,8 +44,9 @@ public class TokenStorageService : ITokenStorageService
         {
             if (_generation != expectedGeneration) return false;   // Clear()가 끼어듦(강제 로그아웃) → refresh 부활 차단(FR-FL-05)
             ApplyTokens(accessToken, refreshToken, sessionId);
-            return true;
         }
+        TokensRenewed?.Invoke();   // 갱신 성공 시에만(lock 밖) — 만료 타이머 재무장
+        return true;
     }
 
     /// <summary>lock 보유 상태에서 호출. access 의 exp/jti/user_id/sid 디코드 + sessionId 보관.</summary>

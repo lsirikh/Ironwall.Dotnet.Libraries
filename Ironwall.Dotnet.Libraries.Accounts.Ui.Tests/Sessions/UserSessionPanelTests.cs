@@ -35,6 +35,7 @@ internal sealed class FakeTokenStore : ITokenStorageService
     public bool SetTokensIfGeneration(int expectedGeneration, string accessToken, string? refreshToken = null, string? sessionId = null) => true;
     public bool IsAccessTokenExpiring(TimeSpan threshold) => false;
     public void Clear() { }
+    public event System.Action? TokensRenewed;
 }
 
 /// <summary>protected OnActivateAsync/OnDeactivateAsync 를 테스트에 노출(초기 로드·teardown 가드 경로 검증).</summary>

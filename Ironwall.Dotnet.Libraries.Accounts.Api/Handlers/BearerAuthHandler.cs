@@ -16,6 +16,9 @@ namespace Ironwall.Dotnet.Libraries.Accounts.Api.Handlers;
 public class BearerAuthHandler : DelegatingHandler
 {
     private static readonly SemaphoreSlim _refreshLock = new(1, 1);
+
+    /// <summary>refresh 결과 — Renewed(갱신 성공) / Terminal(종단 실패=세션 만료) / Transient(일시 실패=재시도 위임, 세션 유지).</summary>
+    private enum RefreshOutcome { Renewed, Terminal, Transient }
     private readonly ITokenStorageService _store;
     private readonly Func<IAccountApiService> _accountApiFactory;
     private readonly ILogService? _log;
@@ -48,20 +51,33 @@ public class BearerAuthHandler : DelegatingHandler
         if (isAuth)
             return response;
 
-        var refreshed = await TryRefreshSingleFlightAsync(staleToken, cancellationToken).ConfigureAwait(false);
-        if (!refreshed)
+        var outcome = await TryRefreshSingleFlightAsync(staleToken, cancellationToken).ConfigureAwait(false);
+        if (outcome == RefreshOutcome.Transient)
+        {
+            // 일시 오류(네트워크/5xx/429) — 세션 강제종료 대신 원 401 반환(토큰 보존, 다음 요청·사용자 재시도에 위임). token-refresh-10
+            _log?.Warning($"[BearerAuthHandler] refresh 일시 실패 — 세션 유지·재시도 위임 (401 trigger={request.RequestUri?.AbsolutePath})");
+            return response;
+        }
+        if (outcome == RefreshOutcome.Terminal)
         {
             // 진단: 어느 요청의 401이 트리거였는지(로그인 직후 특정 엔드포인트 401 원인 추적용).
-            _log?.Warning($"[BearerAuthHandler] refresh 실패 — 세션 만료 신호 발화 (401 trigger={request.RequestUri?.AbsolutePath})");
+            _log?.Warning($"[BearerAuthHandler] refresh 종단 실패 — 세션 만료 신호 발화 (401 trigger={request.RequestUri?.AbsolutePath})");
             SessionExpired?.Invoke();
             return response;
         }
 
-        // 새 토큰으로 1회 재시도 (HttpRequestMessage 는 1회성이라 clone 필요)
+        // Renewed → 새 토큰으로 1회 재시도 (HttpRequestMessage 는 1회성이라 clone 필요)
         response.Dispose();
         var retry = await CloneAsync(request).ConfigureAwait(false);
         ApplyBearer(retry, _store.AccessToken);
-        return await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
+        var retryResponse = await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
+        // 재시도도 401이면 종단 세션 만료로 escalate(token-refresh-15 — 재-refresh 재귀 금지, 좀비 세션 방지)
+        if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _log?.Warning("[BearerAuthHandler] refresh 후 재시도도 401 — 세션 만료 escalate");
+            SessionExpired?.Invoke();
+        }
+        return retryResponse;
     }
 
     /// <summary>auth 액션 엔드포인트(로그인/갱신/로그아웃) 여부 — 401 refresh·세션만료 로직 제외 대상.</summary>
@@ -81,37 +97,41 @@ public class BearerAuthHandler : DelegatingHandler
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    private async Task<bool> TryRefreshSingleFlightAsync(string? staleToken, CancellationToken ct)
+    private async Task<RefreshOutcome> TryRefreshSingleFlightAsync(string? staleToken, CancellationToken ct)
     {
         await _refreshLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // 다른 요청이 이미 토큰을 갱신했으면 재요청만으로 충분 → 성공 처리
             if (_store.AccessToken != staleToken && !string.IsNullOrEmpty(_store.AccessToken))
-                return true;
+                return RefreshOutcome.Renewed;
 
             var refreshToken = _store.RefreshToken;
             if (string.IsNullOrEmpty(refreshToken))
             {
                 _store.Clear();
-                return false;
+                return RefreshOutcome.Terminal;
             }
 
             var gen = _store.Generation;   // FR-FL-05: refresh 시작 시점 세대 캡처
             var result = await _accountApiFactory().RefreshAsync(refreshToken, ct).ConfigureAwait(false);
             if (result.Success && !string.IsNullOrEmpty(result.Data?.AccessToken))
             {
-                // 강제 로그아웃(Clear)이 refresh 진행 중 끼어들었으면(세대 변경) 폐기 세션 부활 차단 → 실패 처리
+                // 강제 로그아웃(Clear)이 refresh 진행 중 끼어들었으면(세대 변경) 폐기 세션 부활 차단 → 종단 처리
                 if (_store.SetTokensIfGeneration(gen, result.Data.AccessToken, result.Data.RefreshToken))
-                    return true;
+                    return RefreshOutcome.Renewed;
                 _log?.Warning("[BearerAuthHandler] refresh 성공했으나 세션 폐기됨(generation 변경) — 부활 차단");
-                return false;
+                return RefreshOutcome.Terminal;
             }
 
-            // 진단: 서버가 refresh 를 왜 거부했는지(전송실패 vs 401/만료 등) 남긴다 — 로그인 직후 로그아웃 원인 추적.
-            _log?.Warning($"[BearerAuthHandler] auth/refresh 거부: success={result.Success}, code={result.Error?.Code}, msg='{(string.IsNullOrEmpty(result.Message) ? result.Error?.Message : result.Message)}'");
+            // 실패 분류(token-refresh-10): 일시(네트워크/5xx/429)면 토큰 보존·재시도 위임(Transient), 종단(401/자격 만료/SESSION_REVOKED)이면 Clear+세션 만료(Terminal).
+            var code = result.Error?.Code;
+            var sc = result.StatusCode;
+            var transient = code == "INTERNAL_ERROR" || sc == 0 || sc == 429 || sc == 502 || sc == 503 || sc == 504;
+            _log?.Warning($"[BearerAuthHandler] auth/refresh 거부: success={result.Success}, code={code}, status={sc}, transient={transient}, msg='{(string.IsNullOrEmpty(result.Message) ? result.Error?.Message : result.Message)}'");
+            if (transient) return RefreshOutcome.Transient;   // Clear 안 함 — 토큰 보존
             _store.Clear();
-            return false;
+            return RefreshOutcome.Terminal;
         }
         finally
         {

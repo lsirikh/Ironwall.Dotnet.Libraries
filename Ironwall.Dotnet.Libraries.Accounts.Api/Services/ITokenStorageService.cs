@@ -35,4 +35,7 @@ public interface ITokenStorageService
 
     /// <summary>로그아웃/만료 시 전체 제로화 + Generation 증가.</summary>
     void Clear();
+
+    /// <summary>토큰 갱신(SetTokens/refresh 성공) 시 발화 — SessionLifecycle 만료 타이머 재무장 훅(token-refresh-08).</summary>
+    event System.Action? TokensRenewed;
 }

@@ -19,6 +19,16 @@ public class SessionLifecycle : ISessionLifecycle
         _tokenStore = tokenStore;
         _permission = permission;
         _log = log;
+        _tokenStore.TokensRenewed += OnTokensRenewed;   // refresh/재발급 시 만료 타이머 재무장(token-refresh-08)
+    }
+
+    /// <summary>토큰 갱신 시 새 exp 로 만료 타이머 재무장(token-refresh-08 — 갱신 후에도 옛 exp 로 강제 로그아웃되던 실버그 차단).
+    /// 강제 로그아웃 진행 중이면 무시(폐기 세션 부활 방지).</summary>
+    private void OnTokensRenewed()
+    {
+        if (_loggingOut != 0) return;
+        try { ArmExpiryTimer(); }
+        catch (Exception ex) { _log?.Warning($"[SessionLifecycle] TokensRenewed 재무장 실패: {ex.Message}"); }
     }
 
     public event Action<EnumRevokeReason>? ForceLogoutRequested;
