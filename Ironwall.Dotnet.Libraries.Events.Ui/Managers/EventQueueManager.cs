@@ -39,6 +39,9 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         var groupFirstEvents = new List<(int GroupId, EnumEventType EventType)>();
         var groupTransitions = new List<(int GroupId, EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
         var autoRecoveryIds = new List<string>();
+        // 제어기-소유 자동복구로 상태가 바뀐 '제어기 자신' 심볼 전이(수신 엔트리 키와 별개).
+        var controllerTransitions = new List<(int DeviceId, EnumDeviceType DeviceType,
+                                              EnumCompositeEventStatus Prev, EnumCompositeEventStatus Next)>();
         var devicePrev = EnumCompositeEventStatus.Normal;
         var deviceNext = EnumCompositeEventStatus.Normal;
         bool deviceStateChanged = false;
@@ -96,6 +99,19 @@ public class EventQueueManager : IEventQueueManager, IDisposable
             foreach (var gid in _scratchAffectedGroupIds)
                 _scratchPrevGroupStates[gid] = ComputeGroupState(gid);
             devicePrev = ComputeDeviceState(deviceKey);
+
+            // 2-b. 제어기 '자신' 키의 prev 스냅샷 — 3-b가 제어기 블랙아웃 Fault를 제어기 자기
+            //      deviceKey로 제거하는데, 종전엔 그 키의 전이를 발화하지 않아 그룹만 풀리고
+            //      제어기 심볼은 Blackout으로 남았다(자기 심볼 미복원). 제거 전에 스냅샷 필수.
+            //      수신 엔트리와 같은 키면 아래 device 전이가 이미 담당하므로 제외(중복 발화 방지).
+            _scratchPrevControllerStates.Clear();
+            foreach (var faultId in _scratchControllerFaultIds)
+            {
+                if (!_entries.TryGetValue(faultId, out var ce)) continue;
+                var ck = (ce.DeviceId, ce.DeviceType);
+                if (ck == deviceKey || _scratchPrevControllerStates.ContainsKey(ck)) continue;
+                _scratchPrevControllerStates[ck] = ComputeDeviceState(ck);
+            }
 
             // 3. Fault 엔트리 원자 제거 (자동복구)
             foreach (var faultId in _scratchFaultIds)
@@ -194,6 +210,14 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
             deviceNext = ComputeDeviceState(deviceKey);
             deviceStateChanged = devicePrev != deviceNext;
+
+            // 7-b. 제어기 자신 키의 next 계산 → 변화분만 전이 목록에 적재(발화는 lock 밖).
+            foreach (var kv in _scratchPrevControllerStates)
+            {
+                var ctrlNext = ComputeDeviceState(kv.Key);
+                if (kv.Value != ctrlNext)
+                    controllerTransitions.Add((kv.Key.Item1, kv.Key.Item2, kv.Value, ctrlNext));
+            }
         }
 
         // 이벤트 발화는 lock 밖에서 (데드락 방지)
@@ -215,6 +239,10 @@ public class EventQueueManager : IEventQueueManager, IDisposable
 
         if (deviceStateChanged)
             onDeviceStateChanged?.Invoke(entry.DeviceId, entry.DeviceType, devicePrev, deviceNext);
+
+        // 제어기 자신 심볼 복원 — 그룹(구역)만 풀리고 제어기 아이콘은 검은색으로 남던 갭 해소.
+        foreach (var (ctrlId, ctrlType, prev, next) in controllerTransitions)
+            onDeviceStateChanged?.Invoke(ctrlId, ctrlType, prev, next);
 
         if (isFirstDeviceEvent)
             onDeviceFirst?.Invoke(entry.DeviceId, entry.DeviceType, entry.EventType);
@@ -699,5 +727,7 @@ public class EventQueueManager : IEventQueueManager, IDisposable
     private readonly List<string> _scratchFaultIds = new();
     private readonly List<string> _scratchControllerFaultIds = new();
     private readonly Dictionary<int, EnumCompositeEventStatus> _scratchPrevGroupStates = new();
+    /// <summary>제어기-소유 자동복구로 정리될 '제어기 자신' 키의 prev 상태(전이 발화용, scratch 재사용).</summary>
+    private readonly Dictionary<(int, EnumDeviceType), EnumCompositeEventStatus> _scratchPrevControllerStates = new();
     #endregion
 }
