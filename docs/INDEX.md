@@ -60,6 +60,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [Event_Edit_Save_Pipeline-prd.md](prds/Event_Edit_Save_Pipeline-prd.md) | 이벤트 편집→적용→저장 파이프라인 정합성 — 탐지 detail 편집이 dirty를 못 켜 저장 무음 실패(DEF-01). 7에이전트 워크플로로 58시나리오 시뮬레이션 → 결함 20건·FR 15·테스트 22종. **배치1 적용 `7f810aa`** + 편집상태 정규화 `DetectionEditModel` `01d0cdd` + PUT 실패 시 되읽기 검증 `2d9bf9b`(서버 500이나 DB 반영됨을 실측). 배치 2=타 세션 XAML 대기, 배치 3=서버 detail 생략 계약(U-1) 선행 | 배치1 적용 | 2026-08-04 |
 | [malfunction-autoreport-setting-prd.md](prds/malfunction-autoreport-setting-prd.md) | malfunction-autoreport-setting | Approved | 2026-07-31 |
 | [GMap_Controller_Blackout-prd.md](prds/GMap_Controller_Blackout-prd.md) | 제어기 무통신→연결센서 그룹 검은색 전파(시뮬 101×2 반영) | Completed | 2026-07-31 |
 | [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | GMap_Map_Instruments | Draft | 2026-07-31 |
