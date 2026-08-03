@@ -5,6 +5,7 @@
 	xmlns:behavior="clr-namespace:Ironwall.Dotnet.Libraries.Utils.Behaviors;assembly=Ironwall.Dotnet.Libraries.Utils"
 	xmlns:behavior_inner="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:cal="http://caliburnmicro.com"
+	xmlns:converters="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Converters"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
@@ -20,6 +21,8 @@
 	<UserControl.Resources>
 		<!--  뷰 전체 DataContext(ViewModel)를 상속받아서 Data 에 할당  -->
 		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
+		<!--  탐지/장애 패널과 동일 — enum 표시 한글화(표시 전용, ConvertBack 미지원). 저장/전송 값은 raw enum 유지.  -->
+		<converters:EnumToKoreanConverter x:Key="EnumToKoreanConverter" />
 	</UserControl.Resources>
 	<Grid>
 		<Grid.RowDefinitions>
@@ -253,7 +256,7 @@
 				</DataGridTextColumn>
 
 				<!--  MessageType  -->
-				<DataGridTemplateColumn
+				<!--<DataGridTemplateColumn
 					CanUserSort="True"
 					IsReadOnly="True"
 					Header="이벤트 종류"
@@ -296,7 +299,7 @@
 							</ComboBox>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
+				</DataGridTemplateColumn>-->
 
 
 				<!--  OriginEvent  -->
@@ -314,7 +317,7 @@
 						<DataTemplate>
 							<TextBlock
 								VerticalAlignment="Center"
-								Text="{Binding OriginEvent.MessageType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Text="{Binding OriginEvent.MessageType, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}"
 								TextAlignment="Center" />
 						</DataTemplate>
 					</DataGridTemplateColumn.CellTemplate>
@@ -336,7 +339,7 @@
 								</ComboBox.ItemsPanel>
 								<ComboBox.ItemTemplate>
 									<DataTemplate>
-										<TextBlock Text="{Binding MessageType}" TextAlignment="Center" />
+										<TextBlock Text="{Binding MessageType, Converter={StaticResource EnumToKoreanConverter}, Mode=OneWay}" TextAlignment="Center" />
 									</DataTemplate>
 								</ComboBox.ItemTemplate>
 								<ComboBox.ItemContainerStyle>
