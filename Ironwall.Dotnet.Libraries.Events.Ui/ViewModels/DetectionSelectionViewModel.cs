@@ -48,6 +48,30 @@ public class DetectionSelectionViewModel : BasePanelViewModel
             item.Status = Status ?? item.Status;
             item.DateTime = DateTime ?? item.DateTime;
         }
+
+        ApplyDetailEdits();
+    }
+
+    /// <summary>
+    /// 탐지 상세(detail) 편집분을 모델에 반영 — <b>사용자가 건드린 값만</b> 바뀌고 나머지는 그대로 남는다.
+    /// <para>썸네일·objects 등 미편집 키는 모델에 그대로 있으므로,
+    /// 저장(PUT) 시 <c>DtoToModelHelper.ToDetectionEventReplaceDto</c> 가 detail 전체를 재구성해
+    /// 함께 실어보낸다(서버 PUT은 detail 통째 교체라 이 재구성이 유실 방지의 핵심).</para>
+    /// <para>다중 선택에서는 상세가 이벤트마다 달라 편집 대상이 모호하므로 단일 선택에서만 적용한다.</para>
+    /// </summary>
+    private void ApplyDetailEdits()
+    {
+        var m = FirstModel;
+        if (m == null) return;   // 다중 선택/모델 없음 → 상세 편집 미적용
+
+        if (SignalEdit is int sig) m.Signal = sig;
+        if (!string.IsNullOrWhiteSpace(AiModelEdit)) m.AiModel = AiModelEdit!.Trim();
+        if (InferenceMsEdit is int inf) m.InferenceMs = inf;
+        if (FrameWidthEdit is int fw) m.FrameWidth = fw;
+        if (FrameHeightEdit is int fh) m.FrameHeight = fh;
+        // ⚠ Thumbnail / Objects 는 편집 대상 아님 — 모델 값 그대로 유지되어 저장 시 보존된다.
+
+        NotifyDetailTexts();
     }
 
     /* 공통값 계산 헬퍼 */
@@ -129,6 +153,27 @@ public class DetectionSelectionViewModel : BasePanelViewModel
         NotifyOfPropertyChange(nameof(DeviceTypeText));
         NotifyOfPropertyChange(nameof(DeviceNumberText));
         NotifyOfPropertyChange(nameof(DeviceZoneText));
+
+        // 상세(detail) 편집 필드를 현재 값으로 초기화(단일 선택일 때만 의미 있음)
+        var m = FirstModel;
+        _signalEdit = m?.Signal;
+        _aiModelEdit = m?.AiModel;
+        _inferenceMsEdit = m?.InferenceMs;
+        _frameWidthEdit = m?.FrameWidth;
+        _frameHeightEdit = m?.FrameHeight;
+        NotifyOfPropertyChange(nameof(SignalEdit));
+        NotifyOfPropertyChange(nameof(AiModelEdit));
+        NotifyOfPropertyChange(nameof(InferenceMsEdit));
+        NotifyOfPropertyChange(nameof(FrameWidthEdit));
+        NotifyOfPropertyChange(nameof(FrameHeightEdit));
+        NotifyOfPropertyChange(nameof(IsDetailEditable));
+    }
+
+    /// <summary>편집 반영 후 읽기전용 표시 텍스트 재계산.</summary>
+    private void NotifyDetailTexts()
+    {
+        NotifyOfPropertyChange(nameof(SignalText));
+        NotifyOfPropertyChange(nameof(AiSummaryText));
     }
 
 
@@ -184,6 +229,33 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     private IDetectionEventModel? FirstModel => IsSingle ? _selection[0]?.Model as IDetectionEventModel : null;
 
     private const string MULTI = "(다중 선택)";
+
+    // ── 탐지 상세(detail) 편집 필드 ──────────────────────────────────────
+    // 단일 선택에서만 편집. 값을 비우면(null) 해당 키는 **변경하지 않는다**(기존 값 유지).
+    // 썸네일·objects 는 편집 대상이 아니며 모델 값이 그대로 남아 저장 시 함께 보존된다.
+
+    /// <summary>상세 편집 가능 여부 — 단일 선택에서만(멀티셀렉트는 대상 모호).</summary>
+    public bool IsDetailEditable => IsSingle;
+
+    private int? _signalEdit;
+    /// <summary>신호 크기(detail.signal) 편집값.</summary>
+    public int? SignalEdit { get => _signalEdit; set { _signalEdit = value; NotifyOfPropertyChange(nameof(SignalEdit)); } }
+
+    private string? _aiModelEdit;
+    /// <summary>AI 모델명(detail.model) 편집값.</summary>
+    public string? AiModelEdit { get => _aiModelEdit; set { _aiModelEdit = value; NotifyOfPropertyChange(nameof(AiModelEdit)); } }
+
+    private int? _inferenceMsEdit;
+    /// <summary>추론 시간 ms(detail.inference_ms) 편집값.</summary>
+    public int? InferenceMsEdit { get => _inferenceMsEdit; set { _inferenceMsEdit = value; NotifyOfPropertyChange(nameof(InferenceMsEdit)); } }
+
+    private int? _frameWidthEdit;
+    /// <summary>프레임 가로 px(detail.frame_width) 편집값 — objects[].bbox 좌표 해석 기준.</summary>
+    public int? FrameWidthEdit { get => _frameWidthEdit; set { _frameWidthEdit = value; NotifyOfPropertyChange(nameof(FrameWidthEdit)); } }
+
+    private int? _frameHeightEdit;
+    /// <summary>프레임 세로 px(detail.frame_height) 편집값.</summary>
+    public int? FrameHeightEdit { get => _frameHeightEdit; set { _frameHeightEdit = value; NotifyOfPropertyChange(nameof(FrameHeightEdit)); } }
 
     /// <summary>신호 크기(detail.signal) — null/0(AI)은 "—", 멀티셀렉트는 "(다중 선택)".</summary>
     public string SignalText => !IsSingle ? MULTI : (FirstModel?.Signal is int s and > 0 ? s.ToString("N0") : "—");
