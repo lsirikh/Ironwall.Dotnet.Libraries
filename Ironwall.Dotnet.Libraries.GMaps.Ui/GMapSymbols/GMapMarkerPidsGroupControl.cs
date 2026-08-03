@@ -438,20 +438,35 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 Width = Math.Max(minSize, actualWidth + padding * 2);
                 Height = Math.Max(minSize, actualHeight + padding * 2);
 
-                // 4. 중심점 기준으로 상대 좌표 계산 (수정된 부분)
+                // 4. 컨트롤 원점(좌상단)을 폴리라인 bbox에 고정 — Adorner 박스 정합 (Adorner_Box_Mismatch_Fix)
+                //
+                //    종전: 점을 'Position(중심) 기준'으로 배치하고 Offset은 GMapBaseMarker.UpdateOffset()이
+                //          _model.Width/Height(생성 시점 스냅샷, 여백 ±50·최소 100)로 계산했다.
+                //          컨트롤 실제 크기는 여기서 매 줌마다 '화면 bbox + 여백 ±5·최소 40'으로 다시 잡히므로
+                //          둘이 서로 다른 소스라 어긋났고, 정점 편집으로 Position이 bbox 중심을 벗어나면
+                //          폴리라인이 컨트롤 안에서 치우쳐 사각형 밖으로 삐져나왔다.
+                //          MarkerEditAdorner(파란 점선)·GroupSelectionAdorner(하늘색 점선)·GetMarkerAtScreen(AABB)이
+                //          전부 이 컨트롤 사각형을 쓰기 때문에 박스와 히트영역이 같이 틀어졌다.
+                //
+                //    수정: 원점을 bbox에서 직접 구하고 Offset을 (원점 − Position화면좌표)로 세팅한다.
+                //          → 컨트롤 사각형이 항상 선을 padding 여백으로 정확히 감싸고, 폴리라인은 제 지리위치에 그려진다.
+                //          Position이 bbox 중심이 아니어도 성립한다(정점 편집 후 중심 재계산 불필요).
+                //          최소크기(40) 보정으로 남는 여백은 상하/좌우 균등 분배.
+                //          (GMapMarkerImageControl 이 Marker.Offset 을 화면 크기로 세팅하는 것과 동일 패턴)
+                double originX = minX - (Width - actualWidth) / 2.0;
+                double originY = minY - (Height - actualHeight) / 2.0;
+
                 var centerGPoint = _mapControl.FromLatLngToLocal(Marker.Position);
-                var centerScreenPos = new Point(centerGPoint.X, centerGPoint.Y);
+                var newOffset = new Point(originX - centerGPoint.X, originY - centerGPoint.Y);
+                if (Marker.Offset != newOffset)
+                    Marker.Offset = newOffset;   // 팬 중에는 origin·center가 같이 이동해 값이 유지됨(불필요 재배치 없음)
 
                 var pointCollection = new PointCollection();
 
                 foreach (var screenPoint in screenPoints)
                 {
-                    // 컨트롤의 중심(Width/2, Height/2)을 기준으로 배치
-                    var relativePoint = new Point(
-                        (screenPoint.X - centerScreenPos.X) + Width / 2,
-                        (screenPoint.Y - centerScreenPos.Y) + Height / 2
-                    );
-                    pointCollection.Add(relativePoint);
+                    // 컨트롤 좌상단(원점) 기준 로컬 좌표 — 화면상 실제 위치와 1:1
+                    pointCollection.Add(new Point(screenPoint.X - originX, screenPoint.Y - originY));
                 }
 
                 // 닫힌 경로 처리

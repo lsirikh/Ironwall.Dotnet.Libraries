@@ -108,29 +108,16 @@
 								TextTrimming="CharacterEllipsis" />
 						</Border>
 
-						<!--  Selection Highlight  -->
-						<Rectangle
-							Name="PART_SelectionHighlight"
-							Width="{TemplateBinding Width}"
-							Height="{TemplateBinding Height}"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center"
-							Fill="Transparent"
-							Opacity="0"
-							Stroke="DodgerBlue"
-							StrokeDashArray="3 3"
-							StrokeThickness="2" />
+						<!--  (Adorner_Box_Mismatch_Fix) 템플릿 자체 Selection Highlight(DodgerBlue 점선) 제거.
+						      선택 표시는 어도너 전담: 단일=MarkerEditAdorner(파랑, ActualLineBounds+PADDING) /
+						      다중=GroupSelectionAdorner(하늘색, 동일 공식). 이 사각형은 컨트롤 전체 크기
+						      (bbox+여백, 가로선이면 높이 최소 40) 기준이라 선 기하와 안 맞아 "제3의 하늘색 박스"로 겹쳐 보였다.  -->
 					</Grid>
 
 					<ControlTemplate.Triggers>
 						<!--  Title 표시 트리거 — 라벨은 맵레벨 LabelAdorner가 전담. 옛 템플릿 라벨 비표시 유지(Phase 3 누락분 보강).  -->
 						<Trigger Property="ShowTitle" Value="True">
 							<Setter TargetName="PART_TitleContainer" Property="Visibility" Value="Collapsed" />
-						</Trigger>
-
-						<!--  선택 상태 트리거  -->
-						<Trigger Property="IsSelected" Value="True">
-							<Setter TargetName="PART_SelectionHighlight" Property="Opacity" Value="0.5" />
 						</Trigger>
 
 						<!--  Line Pattern Triggers  -->

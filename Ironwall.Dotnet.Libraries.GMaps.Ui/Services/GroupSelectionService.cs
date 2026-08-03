@@ -56,6 +56,11 @@ public sealed class GroupSelectionService : IDisposable
         // IsSelected는 설정하지 않음 — 심볼별 선택표시는 GroupSelectionAdorner 정밀 박스가 균일 담당
         // (템플릿 PART_SelectionHighlight 불일치·부정확 회피). 그룹 이동/삭제/잠금은 _selection 기준.
 
+        // ★ 그룹(하늘색) 어도너는 2개 이상에서만 — 1개는 그룹이 아니다(단일 선택은 MarkerEditAdorner 소관).
+        //   1-항목 선택이 여기 오는 경우는 러버밴드 시작 시 단일→그룹 승격(병합용, 드래그 중 일시 상태)뿐이며
+        //   릴리스 후 VM funnel(ApplyGroupSelectionByIds)이 1개를 단일 선택으로 강등한다. (Adorner_Box_Mismatch_Fix)
+        if (_selection.Count < 2) { _log?.Info($"그룹 선택 {_selection.Count}개 — 어도너 미부착(2개 미만)"); return; }
+
         _layer = AdornerLayer.GetAdornerLayer(_map);
         if (_layer == null) { _log?.Error("GroupSelectionService: AdornerLayer 없음"); return; }
 
@@ -84,7 +89,7 @@ public sealed class GroupSelectionService : IDisposable
             var set = new HashSet<IEditableMarker>(removed);
             _selection = _selection.Where(m => !set.Contains(m)).ToList();
         }
-        if (_selection.Count == 0) { Clear(); return; }
+        if (_selection.Count < 2) { Clear(); return; }   // 1개 잔존 = 그룹 아님 — 어도너 제거(단일 선택은 사용자가 재클릭)
         _adorner?.SetMarkers(_selection);
     }
 

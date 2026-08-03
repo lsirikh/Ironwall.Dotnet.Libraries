@@ -134,13 +134,52 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
             foreach (var m in _markers)
             {
                 if (m == null || m.IsDisposed || m.IsLocked) continue;   // FR-MS-08: 잠금 멤버는 선택 점선박스 미표시
-                var r = MarkerRect(m);
-                if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) continue;
-                r.Inflate(1.5d, 1.5d);   // 심볼 가장자리 살짝 밖(가시성)
-                dc.DrawRectangle(null, _boxPen, r);
+                RenderMarkerBox(dc, m);
             }
         }
         catch (Exception ex) { _log?.Error($"GroupSelectionAdorner 렌더 실패: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// 심볼 1개의 선택 박스 — 단일 편집 어도너(<see cref="MarkerEditAdorner"/>)와 **동일 공식**으로 그린다
+    /// (Adorner_Box_Mismatch_Fix: 종전 TransformBounds AABB+1.5 인플레이트는 단일 박스와 크기·회전이 안 맞았다).
+    /// · 라인/구역 컨트롤 = ActualLineBounds + PADDING (RenderEditArea의 CalculateLineEditBounds와 동일)
+    /// · 그 외          = RenderSize(0,0,W,H) + PADDING (CalculateEditBounds와 동일)
+    /// 요소→맵 변환을 PushTransform으로 적용해 회전 심볼도 단일 어도너처럼 심볼을 따라 도는 박스가 된다.
+    /// 변환을 얻지 못하면 기존 AABB 폴백.
+    /// </summary>
+    private void RenderMarkerBox(DrawingContext dc, IEditableMarker m)
+    {
+        var shape = (m as GMap.NET.WindowsPresentation.GMapMarker)?.Shape as FrameworkElement;
+        if (shape != null && shape.ActualWidth > 0 && shape.ActualHeight > 0)
+        {
+            // 단일 어도너와 같은 소스: 라인 계열은 폴리라인 점 bbox, 그 외는 컨트롤 렌더 크기
+            Rect local = shape switch
+            {
+                GMapMarkerLineControl lc       => lc.ActualLineBounds,
+                GMapMarkerPidsGroupControl gc  => gc.ActualLineBounds,
+                _                              => new Rect(shape.RenderSize),
+            };
+            local.Inflate(MarkerEditAdorner.PADDING, MarkerEditAdorner.PADDING);
+
+            try
+            {
+                if (!local.IsEmpty && local.Width > 0 && local.Height > 0
+                    && shape.TransformToVisual(_map) is Transform t)
+                {
+                    dc.PushTransform(t);
+                    dc.DrawRectangle(null, _boxPen, local);
+                    dc.Pop();
+                    return;
+                }
+            }
+            catch { /* 비주얼트리 분리 등 → 아래 AABB 폴백 */ }
+        }
+
+        var r = MarkerRect(m);
+        if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) return;
+        r.Inflate(MarkerEditAdorner.PADDING, MarkerEditAdorner.PADDING);
+        dc.DrawRectangle(null, _boxPen, r);
     }
 
     protected override HitTestResult HitTestCore(PointHitTestParameters hitTestParameters)

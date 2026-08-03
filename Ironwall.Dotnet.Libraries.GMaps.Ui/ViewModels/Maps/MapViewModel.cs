@@ -967,9 +967,17 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>Shift+드래그 시작 — 단일 선택 중이었으면 그룹에 흡수(추가선택 유지) 후 단일 해제.</summary>
     private void OnRubberBandStarted()
     {
-        if (SelectedMarker != null && !SelectedMarker.IsDisposed && !(_groupSelection?.HasSelection ?? false))
-            _groupSelection?.SetSelection(new System.Collections.Generic.List<IEditableMarker> { SelectedMarker });
+        // 단일 선택을 그룹으로 승격한다. 단, 단일 편집 adorner(파란 점선)를 **먼저 제거**해야 한다 —
+        // 종전엔 SelectedMarker만 null로 두고 DeselectAllMarkers()를 부르지 않아, 파란 점선이 남은 채
+        // 그룹 adorner(하늘색 점선)가 겹쳐 그려졌다(멀티셀렉션인데 둘 다 보이는 버그).
+        // ApplyGroupSelectionByIds(Ctrl+클릭·러버밴드 결과 경로)는 이미 DeselectAllMarkers를 호출하고 있어
+        // 이쪽만 누락된 비대칭이었다. 호출 순서도 그쪽과 동일하게 맞춘다(Deselect → SetSelection).
+        var single = SelectedMarker;
+        var promote = single != null && !single.IsDisposed && !(_groupSelection?.HasSelection ?? false);
+        MainMap?.DeselectAllMarkers();
         SelectedMarker = null;
+        if (promote)
+            _groupSelection?.SetSelection(new System.Collections.Generic.List<IEditableMarker> { single! });
     }
 
     /// <summary>Shift+드래그 릴리스 — 사각형 내 마커를 기존 선택에 추가/토글 병합(겹치는 것만 토글, 나머지 유지). 빈 드래그면 유지.</summary>
@@ -1022,6 +1030,18 @@ public partial class MapViewModel : BasePanelViewModel,
             live = MainMap.Markers.OfType<IEditableMarker>()
                 .Where(m => m != null && !m.IsDisposed && idset.Contains((m is GMapSymbols.GMapImageMarker, m.Id))).ToList();   // 타입인지 — 같은 Id 반대타입 미포함
         }
+        // ★ 1개 = 그룹이 아니라 '단일 선택' — 멀티(하늘색) 어도너는 2개 이상에서만.
+        //   Ctrl+클릭 첫 선택·러버밴드로 1개만 잡힘·토글로 1개 남음 전부 여기로 수렴 →
+        //   일반 클릭과 동일한 단일 경로(파란 편집 어도너 + 속성창)로 강등한다. (Adorner_Box_Mismatch_Fix)
+        if (live != null && live.Count == 1)
+        {
+            _groupSelection?.SetSelection(null);
+            SelectMarkerForEditing(live[0]);
+            NotifyOfPropertyChange(nameof(SelectedMarkers));
+            NotifyOfPropertyChange(nameof(HasSelectedItem));
+            return;
+        }
+
         _groupSelection?.SetSelection(live != null && live.Count > 0 ? live : null);
         NotifyOfPropertyChange(nameof(SelectedMarkers));
         NotifyOfPropertyChange(nameof(HasSelectedItem));   // 그룹선택 변경 → 쓰레기통·선택취소 버튼 활성 갱신
