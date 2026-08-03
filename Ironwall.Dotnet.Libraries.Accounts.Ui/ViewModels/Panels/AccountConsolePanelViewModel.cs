@@ -42,13 +42,13 @@ public class AccountConsolePanelViewModel : BasePanelViewModel
     protected override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
-        // 각 탭 콘텐츠 VM 활성화 → OnActivate에서 서버 조회 로드
-        await ScreenExtensions.TryActivateAsync(AccountManagerPanelViewModel, cancellationToken);
-        await ScreenExtensions.TryActivateAsync(PermissionMatrixPanelViewModel, cancellationToken);
-        await ScreenExtensions.TryActivateAsync(UserSessionPanelViewModel, cancellationToken);
-        await ScreenExtensions.TryActivateAsync(AuditLogPanelViewModel, cancellationToken);
-        await ScreenExtensions.TryActivateAsync(AccountSetupPanelViewModel, cancellationToken);
-        await ScreenExtensions.TryActivateAsync(GrantManagementPanelViewModel, cancellationToken);
+        // 자식 탭 활성화는 권한 게이팅 — 비-ADMIN이 숨은 패널의 서버 GET(403 유발)을 쏘지 않도록 CanSee*일 때만 활성(rbac-audit-03)
+        if (CanSeeAccounts) await ScreenExtensions.TryActivateAsync(AccountManagerPanelViewModel, cancellationToken);
+        if (CanSeePermission) await ScreenExtensions.TryActivateAsync(PermissionMatrixPanelViewModel, cancellationToken);
+        if (CanSeeSession) await ScreenExtensions.TryActivateAsync(UserSessionPanelViewModel, cancellationToken);
+        if (CanSeeAudit) await ScreenExtensions.TryActivateAsync(AuditLogPanelViewModel, cancellationToken);
+        if (CanSeeSessionConfig) await ScreenExtensions.TryActivateAsync(AccountSetupPanelViewModel, cancellationToken);
+        if (CanSeeGrants) await ScreenExtensions.TryActivateAsync(GrantManagementPanelViewModel, cancellationToken);
     }
 
     protected override async Task OnDeactivateAsync(bool close, CancellationToken cancellationToken)

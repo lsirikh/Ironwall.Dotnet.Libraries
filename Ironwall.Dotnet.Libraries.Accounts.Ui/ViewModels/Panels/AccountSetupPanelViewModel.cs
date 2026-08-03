@@ -91,8 +91,12 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             }
             else
             {
+                // 403(비-ADMIN)은 전용 안내로 표면화(rbac-audit-15)
+                var explain = res.Error?.Code == "FORBIDDEN" || res.StatusCode == 403
+                    ? "권한이 없습니다 — 세션 설정 저장은 ADMIN 전용입니다."
+                    : $"저장 실패: {res.Error?.Message ?? res.Error?.Code ?? "서버 거부"}";
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "세션 정책", Explain = $"저장 실패: {res.Error?.Message ?? res.Error?.Code ?? "서버 거부"}" });
+                { Title = "세션 정책", Explain = explain });
             }
         }
         catch (Exception ex)
@@ -133,7 +137,15 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             }
             else
             {
-                ApplyUnavailable("서버 세션설정 API 미배포 — 편집 비활성(기본값 표시). 서버 배포 후 활성화됩니다.");
+                // 실패 원인 분기 — 401/403을 "미배포"로 오분류 금지(rbac-audit-04)
+                var msg = res.StatusCode switch
+                {
+                    403 => "권한이 없습니다 — 세션 설정은 ADMIN 전용입니다.",
+                    401 => "인증이 만료되었습니다 — 다시 로그인해 주세요.",
+                    404 => "서버 세션설정 API 미배포 — 편집 비활성(기본값 표시). 서버 배포 후 활성화됩니다.",
+                    _ => "서버 세션설정을 불러오지 못했습니다 — 편집 비활성(기본값 표시).",
+                };
+                ApplyUnavailable(msg);
             }
         }
         catch (Exception ex)

@@ -64,7 +64,8 @@ public class UserSessionPanelViewModel : BasePanelViewModel
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Title = "세션 관리",
-            Explain = $"'{session.LoginId}' ({session.IpAddress}) 세션을 강제 로그아웃하시겠습니까?",
+            Explain = $"'{session.LoginId}' ({session.IpAddress}) 세션을 강제 로그아웃하시겠습니까?"
+                      + (session.IsCurrentSession ? "\n⚠ 본인 계정의 세션입니다 — 진행 시 즉시 로그아웃될 수 있습니다." : ""),
             MessageModel = new CallForceLogoutSessionMessageModel { Session = session }
         });
     }
@@ -79,9 +80,9 @@ public class UserSessionPanelViewModel : BasePanelViewModel
             var res = await _api.ForceLogoutSessionAsync(session.Id);
             // 확인팝업 종료 — ConfirmPopupDialog.ClickOk은 MessageModel만 발행하고 안 닫음(grant/group과 동형).
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
-            if (res.Success)
+            if (res.Success || res.StatusCode == 404)   // 404=이미 종료된 세션 → 멱등 처리(조용히 재조회)
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 강제로그아웃 후 첫 페이지부터 재조회
-            else
+            else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중(401→teardown)이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "세션 관리", Explain = $"강제 로그아웃 실패: {res.Error?.Message ?? res.Message}" });
         }
@@ -95,7 +96,8 @@ public class UserSessionPanelViewModel : BasePanelViewModel
         await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenConfirmPopupMessageModel
         {
             Title = "세션 관리",
-            Explain = $"'{session.LoginId}' 사용자의 활성 세션을 모두 강제 로그아웃하시겠습니까?",
+            Explain = $"'{session.LoginId}' 사용자의 활성 세션을 모두 강제 로그아웃하시겠습니까?"
+                      + (session.IsCurrentSession ? "\n⚠ 본인 계정 — 진행 시 본인도 즉시 로그아웃됩니다." : ""),
             MessageModel = new CallForceLogoutAllUserSessionsMessageModel { Session = session }
         });
     }
@@ -110,9 +112,9 @@ public class UserSessionPanelViewModel : BasePanelViewModel
             var res = await _api.ForceLogoutAllUserSessionsAsync(session.UserId);
             // 확인팝업 종료 — ConfirmPopupDialog.ClickOk은 MessageModel만 발행하고 안 닫음(단일 케이스와 동형).
             await _eventAggregator!.PublishOnCurrentThreadAsync(new ClosePopupMessageModel());
-            if (res.Success)
+            if (res.Success || res.StatusCode == 404)   // 404=이미 종료됨 → 멱등
                 await ReloadAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);   // 전체종료 후 첫 페이지부터 재조회
-            else
+            else if (_tokenStore.IsAuthenticated)   // 자기 로그아웃 전환 중이면 스퓨리어스 실패팝업 억제(force-logout-07)
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "세션 관리", Explain = $"전체 세션 종료 실패: {res.Error?.Message ?? res.Message}" });   // (R-2) 409 ADMIN 락아웃 메시지 표면화
         }
