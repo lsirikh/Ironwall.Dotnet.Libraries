@@ -252,11 +252,13 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             _pCancellationTokenSource = new CancellationTokenSource();
 
             var token = _pCancellationTokenSource.Token;
-            var currentList = _eventProvider;
 
-            var insertList = currentList
-                            .Where(m => m.Id <= 0)
-                            .OfType<IDetectionEventModel>()
+            // 신규(Draft) 수집 소스는 ViewModelProvider 단일 기준 — 나머지 3패널(장애/연결/조치)과 동일.
+            // _eventProvider는 CollectionChanged 구독으로 VP를 미러링할 뿐이라, 첫 조회 실패 등으로
+            // 구독이 부착되지 않은 경로에서는 Draft가 EP에 들어오지 않아 POST가 조용히 누락됐다.
+            var insertList = ViewModelProvider
+                            .Where(vm => vm.Model.Id <= 0)
+                            .Select(vm => (IDetectionEventModel)vm.Model)
                             .ToList();
             var updateRows = ViewModelProvider
                             .Where(vm => vm.IsEdited && vm.Model.Id > 0)
@@ -265,11 +267,12 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             // (EA7) 부분 실패 수집 — 한 건 실패로 전체 중단/무응답 방지. 실패/보류 시 재로드 생략해 편집 보존.
             var saveFailures = new List<string>();
             int held = 0;
+            int succeeded = 0;
 
             foreach (var vm in updateRows)
             {
                 var model = (IDetectionEventModel)vm.Model;
-                try { await _providerService.UpdateDetectionEventAsync(model, token); vm.IsEdited = false; }   // 성공 행은 dirty 해제(재-PUT 누적 방지)
+                try { await _providerService.UpdateDetectionEventAsync(model, token); vm.IsEdited = false; succeeded++; }   // 성공 행은 dirty 해제(재-PUT 누적 방지)
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
@@ -281,13 +284,25 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
             foreach (var model in insertList)
             {
                 if (model.Device == null || model.Device.Id <= 0) { held++; continue; }   // 장비 미선택 Draft 보류(서버 device_id FK 필수)
-                try { var created = await _providerService.InsertDetectionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; }
+                try { var created = await _providerService.InsertDetectionEventAsync(model, token); if (created != null && created.Id > 0) model.Id = created.Id; succeeded++; }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     saveFailures.Add($"추가: {ex.Message}");
                     _log?.Error($"InsertDetectionEventAsync 실패: {ex.Message}");
                 }
+            }
+
+            // 저장 대상이 0건이면 그 사실을 알린다 — 종전에는 "저장 성공"과 구별이 안 돼,
+            // 편집이 dirty로 잡히지 않은 경우(예: 상세 편집 누락)를 사용자가 감지할 수 없었다.
+            if (saveFailures.Count == 0 && held == 0 && succeeded == 0)
+            {
+                await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                {
+                    Title = "이벤트 저장",
+                    Explain = "변경된 내용이 없습니다."
+                });
+                return;   // 바뀐 게 없으므로 목록 재조회도 생략(선택/스크롤 유지)
             }
 
             if (saveFailures.Count > 0 || held > 0)
@@ -305,6 +320,12 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
                 });
                 return;
             }
+
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "이벤트 저장",
+                Explain = $"{succeeded}건을 저장했습니다."
+            });
 
             await DataInitialize().ConfigureAwait(false);
             await Task.Delay(2000, token);

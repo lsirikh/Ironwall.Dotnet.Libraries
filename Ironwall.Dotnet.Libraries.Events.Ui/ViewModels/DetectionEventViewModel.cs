@@ -47,14 +47,64 @@ public class DetectionEventViewModel : ExEventViewModel, IDetectionEventViewMode
         }
     }
 
-    /// <summary>탐지 신호 크기(detail.signal) — 센서 계측값이라 읽기 전용. null/0(AI)은 뷰에서 "—" 처리.</summary>
-    public int? Signal => (_model as IDetectionEventModel)!.Signal;
+    // ── 탐지 상세(detail) 편집 속성 ────────────────────────────────────────
+    // 반드시 SetModelProperty 경유 = 이 세터가 dirty(IsEdited)를 켜는 유일한 경로다.
+    // 모델에 직접 대입하면 IsEdited가 false로 남아 저장 루프
+    // (DetectionEventPanelViewModel: Where(vm => vm.IsEdited && Id>0))에서 행 자체가 탈락한다.
+    // ⚠ 서버발 갱신(NATS SYNC·썸네일 후속 수신)은 사용자의 편집이 아니므로
+    //    여기 세터가 아니라 모델 직접 갱신을 유지해야 한다(거짓 dirty → 불필요 PUT 방지).
+
+    /// <summary>탐지 신호 크기(detail.signal). null/0(AI)은 뷰에서 "—" 처리.</summary>
+    public int? Signal
+    {
+        get { return (_model as IDetectionEventModel)!.Signal; }
+        set
+        {
+            if (SetModelProperty(value, (_model as IDetectionEventModel)!.Signal, v => (_model as IDetectionEventModel)!.Signal = v))
+                NotifySignalTexts();
+        }
+    }
+
+    /// <summary>AI 모델명(detail.model).</summary>
+    public string? AiModel
+    {
+        get { return (_model as IDetectionEventModel)!.AiModel; }
+        set { SetModelProperty(value, (_model as IDetectionEventModel)!.AiModel, v => (_model as IDetectionEventModel)!.AiModel = v); }
+    }
+
+    /// <summary>추론 소요 시간 ms(detail.inference_ms).</summary>
+    public int? InferenceMs
+    {
+        get { return (_model as IDetectionEventModel)!.InferenceMs; }
+        set { SetModelProperty(value, (_model as IDetectionEventModel)!.InferenceMs, v => (_model as IDetectionEventModel)!.InferenceMs = v); }
+    }
+
+    /// <summary>프레임 가로 px(detail.frame_width) — objects[].bbox 좌표 해석 기준.</summary>
+    public int? FrameWidth
+    {
+        get { return (_model as IDetectionEventModel)!.FrameWidth; }
+        set { SetModelProperty(value, (_model as IDetectionEventModel)!.FrameWidth, v => (_model as IDetectionEventModel)!.FrameWidth = v); }
+    }
+
+    /// <summary>프레임 세로 px(detail.frame_height).</summary>
+    public int? FrameHeight
+    {
+        get { return (_model as IDetectionEventModel)!.FrameHeight; }
+        set { SetModelProperty(value, (_model as IDetectionEventModel)!.FrameHeight, v => (_model as IDetectionEventModel)!.FrameHeight = v); }
+    }
 
     /// <summary>신호 표시 여부 — null 또는 0(AI_DETECT)이면 바/값 숨김.</summary>
     public bool HasSignal => Signal is > 0;
 
     /// <summary>그리드 표시 문자열 — 천 단위 구분, null/0(AI_DETECT)은 "—".</summary>
     public string SignalText => Signal is > 0 ? Signal!.Value.ToString("N0") : "—";
+
+    /// <summary>Signal 파생 표시값 갱신 — 세터가 모델을 바꿨을 때만 호출(그리드 신호 컬럼·미니바 즉시 반영).</summary>
+    private void NotifySignalTexts()
+    {
+        NotifyOfPropertyChange(nameof(HasSignal));
+        NotifyOfPropertyChange(nameof(SignalText));
+    }
 
     /// <summary>썸네일 절대 URI(detail.thumbnail) — 상대경로는 API base 결합(공용 ThumbnailUriResolver).
     /// 없거나 조합 실패면 null → 뷰의 기본 이미지. 실제 로드 실패(자체서명 인증서 등)는 뷰 겹침 default가 폴백.</summary>

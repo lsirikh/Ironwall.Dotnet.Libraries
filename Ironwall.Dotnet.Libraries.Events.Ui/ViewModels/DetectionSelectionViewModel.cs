@@ -58,17 +58,22 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     /// 저장(PUT) 시 <c>DtoToModelHelper.ToDetectionEventReplaceDto</c> 가 detail 전체를 재구성해
     /// 함께 실어보낸다(서버 PUT은 detail 통째 교체라 이 재구성이 유실 방지의 핵심).</para>
     /// <para>다중 선택에서는 상세가 이벤트마다 달라 편집 대상이 모호하므로 단일 선택에서만 적용한다.</para>
+    /// <para><b>반드시 행 ViewModel 세터를 경유한다</b> — 모델(<c>FirstModel</c>)에 직접 대입하면
+    /// <c>IsEdited</c>(dirty)가 켜지지 않아 저장 루프의 <c>Where(vm =&gt; vm.IsEdited &amp;&amp; Id&gt;0)</c> 필터에서
+    /// 행 자체가 탈락, <b>오류도 성공도 없이 PUT이 0건</b>이 된다(PRD Event_Edit_Save_Pipeline FR-01/02).</para>
     /// </summary>
     private void ApplyDetailEdits()
     {
-        var m = FirstModel;
-        if (m == null) return;   // 다중 선택/모델 없음 → 상세 편집 미적용
+        var vm = IsSingle ? _selection[0] : null;
+        if (vm?.Model is not IDetectionEventModel) return;   // 다중 선택/모델 없음 → 상세 편집 미적용
 
-        if (SignalEdit is int sig) m.Signal = sig;
-        if (!string.IsNullOrWhiteSpace(AiModelEdit)) m.AiModel = AiModelEdit!.Trim();
-        if (InferenceMsEdit is int inf) m.InferenceMs = inf;
-        if (FrameWidthEdit is int fw) m.FrameWidth = fw;
-        if (FrameHeightEdit is int fh) m.FrameHeight = fh;
+        // 값이 없는(null/공백) 편집 필드는 "변경 없음" — 기존 값 유지.
+        // 값이 실제로 같으면 SetModelProperty가 false를 반환해 dirty도 켜지지 않는다(거짓 PUT 방지, FR-03).
+        if (SignalEdit is int sig) vm.Signal = sig;
+        if (!string.IsNullOrWhiteSpace(AiModelEdit)) vm.AiModel = AiModelEdit!.Trim();
+        if (InferenceMsEdit is int inf) vm.InferenceMs = inf;
+        if (FrameWidthEdit is int fw) vm.FrameWidth = fw;
+        if (FrameHeightEdit is int fh) vm.FrameHeight = fh;
         // ⚠ Thumbnail / Objects 는 편집 대상 아님 — 모델 값 그대로 유지되어 저장 시 보존된다.
 
         NotifyDetailTexts();

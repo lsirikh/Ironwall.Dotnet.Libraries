@@ -22,6 +22,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
    Company      : Sensorway Co., Ltd.
    Email        : lsirikh@naver.com
 ****************************************************************************/
+[Collection("IoC-Dependent")]   // IoC.GetInstance는 전역 정적 — 다른 IoC 스텁 테스트와 병렬 실행 시 서로의 스텁을 덮어써 간헐 실패한다
 public class BatchActionReportTests
 {
     private readonly Mock<IEventAggregator> _mockEa = new();

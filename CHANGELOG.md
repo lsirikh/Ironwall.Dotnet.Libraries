@@ -15,6 +15,15 @@
 ## [Unreleased]
 
 ### Added
+- **이벤트 편집→적용→저장 파이프라인 정합성 (탐지 detail 무음 실패 수정)** (Track C · Events.Ui · [PRD](docs/prds/Event_Edit_Save_Pipeline-prd.md) · 롤백태그 `before-event-edit-dirty-fix` · 사용자 지시 2026-08-03)
+  - **문제**: 속성창에서 탐지 상세(신호·AI 모델·추론ms·프레임 W·H)만 고치고 [적용]→[저장] 하면 **오류도 성공도 없이 저장되지 않음**. 결과 콤보를 함께 바꾼 날만 저장돼 "됐다 안 됐다" 하는 간헐 버그로 보였으나 실제로는 100% 결정적.
+  - **근본원인**: `ApplyDetailEdits()`가 행 ViewModel 세터를 우회해 모델에 직접 대입 → `IsEdited`(dirty) 미설정 → 저장 루프 `Where(vm => vm.IsEdited && Id>0)`에서 **행 자체가 탈락**(PUT 0건). Events.Ui 전체에 `SetProperty(` 호출이 0건이라 dirty 경로는 `SetModelProperty` **하나뿐**임을 Grep으로 확정.
+  - **분석**: 7에이전트 워크플로(4축 분석 → 58시나리오 시뮬레이션 → 종합)로 **결함 20건(DEF-01~20)** 도출, FR 15개·회귀위험 12건·테스트 22종 산출. 이번 적용은 **배치 1(FR-01~06)** — 나머지는 타 세션 편집 중 파일(배치 2)·서버 계약 확인 선행(배치 3)으로 분리.
+  - **수정 4건**: ① `DetectionEventViewModel`에 detail 세터 5종(`Signal`/`AiModel`/`InferenceMs`/`FrameWidth`/`FrameHeight`) 신설 — 전부 `SetModelProperty` 경유(장애 도메인 `MalfunctionEventViewModel`과 동일 패턴으로 수렴), `Signal` 세터는 `SignalText`/`HasSignal`까지 알림 → 그리드 신호 컬럼·미니바 즉시 갱신(DEF-16 동시 해소). ② `ApplyDetailEdits()`가 `FirstModel`(모델)이 아니라 `_selection[0]`(행 VM)에 대입. ③ Draft 수집 소스를 `_eventProvider`→`ViewModelProvider`로 일원화(나머지 3패널과 동일 — 첫 조회 실패 시 구독 미부착으로 POST가 무음 누락되던 DEF-03). ④ 저장 결과 **항상 통지** — "변경된 내용이 없습니다." / "n건을 저장했습니다."(0건 저장과 성공이 화면상 동일해 무음 실패를 감지할 수 없던 DEF-08).
+  - **불변 유지**: 서버발 갱신(NATS SYNC·썸네일 후속 수신)은 **모델 직접 갱신 유지** = dirty 미설정(거짓 PUT·감사로그 오염 방지). 그리드 detail 컬럼 OneWay 유지. "빈칸=변경 없음" 계약 유지. 썸네일/objects는 `BuildDetectionDetail` 전량 재구성으로 보존.
+  - **테스트**: `EventEditSavePipelineTests` **17종 신설**(dirty 경로 11 · 속성창 적용 4 · 저장 파이프라인 2) 전건 통과. **판별력 입증**: 수정을 일시 되돌리자 `should_mark_row_as_edited_when_apply_called_with_detail_edit` · `should_collect_draft_from_viewmodel_provider_when_provider_not_mirrored` **정확히 2건만 실패** → 복원 후 통과. 부수 수정: `BatchActionReportTests`가 IoC 스텁 클래스 중 유일하게 `[Collection("IoC-Dependent")]` 누락 → 전역 정적 `IoC.GetInstance` 경쟁으로 간헐 실패 유발, 직렬화 컬렉션에 편입.
+  - **회귀 0**: 베이스라인(내 변경만 stash 격리) 415통과/15실패 → 적용 후 **432통과/15실패**(실패 목록 동일, 3회 반복 일치 — 기존 실패는 DeviceSymbolLookup 줌 산술 6 · DtoToModelHelper datetime 4 · XAML 바인딩 4 · NATS 1로 본 변경과 무관). 빌드 0오류 · 한글 UTF-8 BOM · mojibake 0.
+  - 🔲 서버 `PUT /events/detections|connections` 500(lazy-load, 커밋 `4f0e875` 미배포) 해소 후 실사용 E2E. 배치 2(불변 필드 UI 게이팅·연결 편집 경로 확정·캐시 복귀 시 dirty 보존)는 타 세션 XAML 커밋 후 착수.
 - **장애 이벤트 자동조치보고 독립 설정** (Track C · Events + Events.Ui · [PRD](docs/prds/malfunction-autoreport-setting-prd.md) · [Plan](docs/plans/malfunction-autoreport-setting-prd-plan.md) · 태그 `before-malfunction-autoreport-setting` · 사용자 지시 2026-07-31)
   - **문제**: `이벤트설정`의 탐지 항목 1개(`탐지 이벤트 해제` 토글+초)가 탐지·장애 **양쪽** 자동조치보고 타이머·활성을 동시 결정.
   - **라이브러리(이 repo)**: `IEventSetupModel`·`EventSetupModel`에 장애 전용 필드 `IsMalfunctionAutoEventDiscard`/`MalfunctionTimeDiscardSec` 추가(복사 생성자 포함). `MalfunctionNatsSyncService`가 장애 Enqueue 시 신규 필드를 읽도록 변경(탐지 경로 `DetectionNatsSyncService`는 무변경). 장애 토글 OFF → 엔트리 `IsAutoReportEnabled=false` → `EventQueueManager` tick skip → 장애 자동조치보고 미발송.
