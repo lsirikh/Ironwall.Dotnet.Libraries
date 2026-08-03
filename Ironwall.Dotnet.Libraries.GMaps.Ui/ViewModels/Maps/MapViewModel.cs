@@ -455,6 +455,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.OnMarkerClicked += OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked += OnMapMarkerRightClicked;
             MainMap.OnMarkerDoubleClicked += OnMapMarkerDoubleClicked;   // RTSP 카메라 팝업
+            MainMap.OnGroupActionReportRequested += OnGroupActionReportRequested;   // 구역 라인 더블클릭 → 조치보고
             MainMap.Markers.CollectionChanged += Markers_CollectionChangedForCameraPopups;  // FR-13 심볼 제거 시 팝업 닫기
             MainMap.OnImageClicked += OnMapImageClicked;
             MainMap.OnImageRightClicked += OnMapImageRightClicked;       // FR-9 이미지 우클릭 메뉴
@@ -534,6 +535,7 @@ public partial class MapViewModel : BasePanelViewModel,
             MainMap.OnMarkerClicked -= OnMapMarkerClicked;
             MainMap.OnMarkerRightClicked -= OnMapMarkerRightClicked;
             MainMap.OnMarkerDoubleClicked -= OnMapMarkerDoubleClicked;
+            MainMap.OnGroupActionReportRequested -= OnGroupActionReportRequested;
             MainMap.Markers.CollectionChanged -= Markers_CollectionChangedForCameraPopups;
             MainMap.OnImageClicked -= OnMapImageClicked;
             MainMap.OnImageRightClicked -= OnMapImageRightClicked;
@@ -1500,6 +1502,27 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex)
         {
             _log?.Error($"카메라 더블클릭 처리 실패: {ex.Message}");
+        }
+    }
+
+    // ── 구역(PidsGroup) 라인 더블클릭 → 그룹 조치보고 (GMap_PidsGroup_DoubleClick_ActionReport FR-01) ──
+    private Services.IGroupActionReportLauncher? _groupActionReportLauncher;
+
+    /// <summary>
+    /// 이벤트가 살아있는 구역 라인을 더블클릭했을 때 그 구역의 '가장 먼저 발생한' 이벤트 조치보고 창을 연다.
+    /// <para>카메라 더블클릭(<see cref="OnMapMarkerDoubleClicked"/>)과 <b>경로가 분리</b>되어 있다 —
+    /// 이쪽은 라인 컨트롤이 WPF 폴리라인 히트로 직접 감지해 통지하므로 부모 AABB 스캔을 타지 않는다.</para>
+    /// </summary>
+    private void OnGroupActionReportRequested(IPidsGroupEditableMarker marker)
+    {
+        try
+        {
+            _groupActionReportLauncher ??= new Services.GroupActionReportLauncher(_log);
+            _groupActionReportLauncher.TryOpenForGroup(marker);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"구역 조치보고 처리 실패: {ex.Message}");
         }
     }
 

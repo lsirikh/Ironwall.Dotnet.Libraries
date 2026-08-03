@@ -60,6 +60,10 @@ public interface IEventQueueManager
     /// <summary>개별 디바이스의 현재 복합상태를 실제 활성 엔트리 기준으로 재계산해 반환(순수 읽기, 상태변경 없음).</summary>
     EnumCompositeEventStatus GetDeviceState(int deviceId, EnumDeviceType deviceType);
 
+    /// <summary>그룹에 등록된 활성 엔트리 스냅샷(순수 읽기, 상태변경 없음). 그룹 심볼 더블클릭 조치보고가
+    /// '가장 먼저 발생한 이벤트'를 고를 때 사용. 그룹에 활성 이벤트가 없으면 빈 리스트.</summary>
+    IReadOnlyList<EventEntry> GetEntriesByGroup(int groupId);
+
     /// <summary>지정 제어기의 블랙아웃 Fault 엔트리를 자동복구(Dequeue + OnAutoRecovery 발화). 제어기 통신 복구
     /// (SYNC_DEVICE ACTIVATED) 트리거용 — Controller_Fault_AutoRecovery_Extension FR-04. 대상 없으면 false(멱등).</summary>
     bool TryAutoRecoverController(int controllerId);

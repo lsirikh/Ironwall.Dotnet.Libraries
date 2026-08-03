@@ -240,6 +240,14 @@ public class GMapCustomControl : GMapControl
     public event Action<IEditableMarker>? OnMarkerDoubleClicked;
 
     /// <summary>
+    /// 구역(PidsGroup) 라인 더블클릭 → 그룹 조치보고 요청 (GMap_PidsGroup_DoubleClick_ActionReport FR-01/FR-09).
+    /// <para>일반 마커 더블클릭(<see cref="OnMarkerDoubleClicked"/>)과 **경로가 다르다** — 이쪽은 부모의
+    /// AABB 스캔(<c>GetMarkerAtScreen</c>)을 타지 않고 라인 컨트롤이 WPF 폴리라인 히트로 직접 감지해 통지한다.
+    /// 구역은 AABB가 bbox 전체라 빈 지도까지 잡히고 잠금 심볼은 아예 제외되기 때문(PRD v1.2).</para>
+    /// </summary>
+    public event Action<IPidsGroupEditableMarker>? OnGroupActionReportRequested;
+
+    /// <summary>
     /// 이미지 클릭 이벤트 - ViewModel에 클릭된 이미지 전달
     /// </summary>
     public event Action<GMapCustomImage> OnImageClicked;
@@ -894,6 +902,21 @@ public class GMapCustomControl : GMapControl
         catch (Exception ex)
         {
             _log?.Error($"TriggerMarkerDoubleClicked 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>구역 라인 더블클릭 → 그룹 조치보고 요청을 ViewModel로 전달.
+    /// 라인 컨트롤(<c>GMapMarkerPidsGroupControl</c>)이 폴리라인 위에서 직접 감지해 호출한다.</summary>
+    public void TriggerGroupActionReport(GMapMarker marker)
+    {
+        try
+        {
+            if (marker is IPidsGroupEditableMarker groupMarker)
+                OnGroupActionReportRequested?.Invoke(groupMarker);
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"TriggerGroupActionReport 실패: {ex.Message}");
         }
     }
 

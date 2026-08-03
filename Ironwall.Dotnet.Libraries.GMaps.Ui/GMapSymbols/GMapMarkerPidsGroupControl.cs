@@ -83,6 +83,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
             // IsVisible 변경 감지: Visibility=false 후 true로 복원 시 기하 재계산
             if (Marker != null)
                 Marker.PropertyChanged += OnMarkerPropertyChanged;
+
+            UpdateActionReportCursor();   // 로드 시점에 이미 이벤트 중인 구역이면 손가락 커서 (FR-06)
         }
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
@@ -110,6 +112,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 || e.PropertyName == nameof(GMapPidsGroupMarker.LinePoints))
             {
                 Dispatcher.InvokeAsync(UpdateLineGeometry, System.Windows.Threading.DispatcherPriority.Render);
+                return;
+            }
+
+            // 이벤트 상태 전이(탐지/장애 발생·해제) → 손가락 커서 On/Off (FR-06)
+            if (e.PropertyName == nameof(GMapPidsGroupMarker.CompositeStatus))
+            {
+                Dispatcher.InvokeAsync(UpdateActionReportCursor);
                 return;
             }
 
@@ -302,10 +311,53 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         /// <summary>
         /// 클릭으로 선택과 비선택에 따른 이벤트 콜백
         /// </summary>
-        /// <param name="isSelected"></param>
         protected override void OnSelectionChanged(bool isSelected)
         {
             base.OnSelectionChanged(isSelected);
+        }
+        #endregion
+
+        #region - 그룹 조치보고 더블클릭 (GMap_PidsGroup_DoubleClick_ActionReport) -
+        /// <summary>
+        /// 이벤트가 살아있는 구역인지 — 탐지 깜빡임 / 장애 색상 / 장애+탐지 공존 / 제어기 무통신(검정). (FR-02)
+        /// 정상·연결 상태는 조치할 이벤트가 없으므로 더블클릭을 받지 않는다.
+        /// </summary>
+        private bool IsEventActive()
+            => Marker?.CompositeStatus is EnumCompositeEventStatus.Detecting
+                                       or EnumCompositeEventStatus.Faulted
+                                       or EnumCompositeEventStatus.FaultedDetecting
+                                       or EnumCompositeEventStatus.Blackout;
+
+        /// <summary>
+        /// 라인 위 좌클릭. 이벤트가 살아있는 구역을 더블클릭하면 그룹 조치보고를 요청한다. (FR-01/FR-09)
+        /// <para><b>왜 여기서 받나</b>: 템플릿 루트 <c>PART_LineCanvas</c>에 Background가 없어 WPF는
+        /// <b>폴리라인이 실제로 그려진 곳에서만</b> 히트한다 → 별도 거리 계산 없이 기하학적으로 정확하다.
+        /// 부모의 AABB 스캔(<c>GMapCustomControl.GetMarkerAtScreen</c>)은 구역의 화면 bbox 전체를 클릭
+        /// 영역으로 잡고(<c>Width=Max(40, bbox+10)</c>) 잠금 심볼을 아예 제외하므로 이 기능엔 쓰지 않는다.</para>
+        /// <para>편집 모드에서는 진입하지 않는다 — 편집 중 더블클릭은 기존 편집 동작이 우선.</para>
+        /// </summary>
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2
+                && Marker != null
+                && _mapControl != null
+                && !_mapControl.IsEditMode
+                && IsEventActive())
+            {
+                _mapControl.TriggerGroupActionReport(Marker);
+                e.Handled = true;   // base 미호출 = 팬 Armed·선택 토글 억제
+                return;
+            }
+
+            base.OnMouseLeftButtonDown(e);
+        }
+
+        /// <summary>이벤트 활성 구역이면 라인 위에서 손가락 커서. (FR-06)
+        /// Canvas에 배경이 없으므로 커서도 폴리라인 위에서만 바뀐다. 편집 모드는 기존 드래그 커서 유지.</summary>
+        private void UpdateActionReportCursor()
+        {
+            var active = IsEventActive() && _mapControl is { IsEditMode: false };
+            Cursor = active ? Cursors.Hand : null;   // null = 상위 커서 상속(원복)
         }
 
         #endregion

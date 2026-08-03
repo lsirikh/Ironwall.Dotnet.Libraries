@@ -497,6 +497,25 @@ public class EventQueueManager : IEventQueueManager, IDisposable
         lock (_gate) return ComputeDeviceState((deviceId, deviceType));
     }
 
+    /// <summary>그룹에 등록된 활성 엔트리 **스냅샷**을 반환(순수 읽기, 상태변경·이벤트 발화 없음).
+    /// 그룹 심볼 더블클릭 조치보고(GMap_PidsGroup_DoubleClick_ActionReport FR-03)가 '최선착 이벤트'를
+    /// 고르기 위해 사용한다. 호출측이 목록을 순회하는 동안 EQM이 변해도 안전하도록 lock 안에서 복사한다
+    /// (엔트리 인스턴스 자체는 공유 — 읽기 전용으로만 다룰 것). 그룹 없으면 빈 리스트.</summary>
+    public IReadOnlyList<EventEntry> GetEntriesByGroup(int groupId)
+    {
+        lock (_gate)
+        {
+            if (!_groupIndex.TryGetValue(groupId, out var entryIds) || entryIds.Count == 0)
+                return Array.Empty<EventEntry>();
+
+            var result = new List<EventEntry>(entryIds.Count);
+            foreach (var id in entryIds)
+                if (_entries.TryGetValue(id, out var entry))
+                    result.Add(entry);
+            return result;
+        }
+    }
+
     /// <summary>지정 제어기의 블랙아웃 Fault 엔트리를 자동복구(Dequeue + OnAutoRecovery 발화)한다.
     /// 제어기 통신 복구(SYNC_DEVICE ACTIVATED) 트리거용 — Controller_Fault_AutoRecovery_Extension FR-04.
     /// 대상 엔트리가 없으면 no-op하고 false(멱등). Dequeue가 그룹 재계산으로 검정을 해제하고,
