@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Ui.Converters;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -38,93 +39,30 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     #region - Binding Methods -
     #endregion
     #region - Processes -
+    /// <summary>
+    /// 편집 버퍼(<see cref="Edit"/>)를 선택된 행 ViewModel에 적용한다 = DataGrid 항목이 곧바로 갱신되고,
+    /// 값이 실제로 바뀐 행만 <c>IsEdited</c>(dirty)가 켜져 저장(PUT) 대상에 포함된다.
+    /// <para>적용 경로는 <see cref="DetectionEditModel.ApplyTo"/> <b>하나</b>다 —
+    /// 종전처럼 모델에 직접 대입하면 dirty가 켜지지 않아
+    /// 저장 루프 <c>Where(vm =&gt; vm.IsEdited &amp;&amp; Id&gt;0)</c> 에서 행이 조용히 탈락한다
+    /// (PRD Event_Edit_Save_Pipeline FR-01/02).</para>
+    /// <para>상세(detail)는 이벤트마다 다른 계측값이라 <b>단일 선택에서만</b> 적용한다.
+    /// 썸네일·objects 등 미편집 키는 모델에 그대로 남아, 저장 시
+    /// <c>DtoToModelHelper.BuildDetectionDetail</c> 이 detail 전체를 재구성해 함께 보존한다
+    /// (서버 PUT은 detail 통째 교체).</para>
+    /// </summary>
     public void ApplyButton()
     {
-        foreach (var item in _selection)
-        {
-            item.MessageType = MessageType ?? item.MessageType;
-            // Device는 읽기 전용(이벤트가 가리키는 장비는 변경 불가) — 적용에서 제외
-            item.Result = Result ?? item.Result;
-            item.Status = Status ?? item.Status;
-            item.DateTime = DateTime ?? item.DateTime;
-        }
-
-        ApplyDetailEdits();
-    }
-
-    /// <summary>
-    /// 탐지 상세(detail) 편집분을 모델에 반영 — <b>사용자가 건드린 값만</b> 바뀌고 나머지는 그대로 남는다.
-    /// <para>썸네일·objects 등 미편집 키는 모델에 그대로 있으므로,
-    /// 저장(PUT) 시 <c>DtoToModelHelper.ToDetectionEventReplaceDto</c> 가 detail 전체를 재구성해
-    /// 함께 실어보낸다(서버 PUT은 detail 통째 교체라 이 재구성이 유실 방지의 핵심).</para>
-    /// <para>다중 선택에서는 상세가 이벤트마다 달라 편집 대상이 모호하므로 단일 선택에서만 적용한다.</para>
-    /// <para><b>반드시 행 ViewModel 세터를 경유한다</b> — 모델(<c>FirstModel</c>)에 직접 대입하면
-    /// <c>IsEdited</c>(dirty)가 켜지지 않아 저장 루프의 <c>Where(vm =&gt; vm.IsEdited &amp;&amp; Id&gt;0)</c> 필터에서
-    /// 행 자체가 탈락, <b>오류도 성공도 없이 PUT이 0건</b>이 된다(PRD Event_Edit_Save_Pipeline FR-01/02).</para>
-    /// </summary>
-    private void ApplyDetailEdits()
-    {
-        var vm = IsSingle ? _selection[0] : null;
-        if (vm?.Model is not IDetectionEventModel) return;   // 다중 선택/모델 없음 → 상세 편집 미적용
-
-        // 값이 없는(null/공백) 편집 필드는 "변경 없음" — 기존 값 유지.
-        // 값이 실제로 같으면 SetModelProperty가 false를 반환해 dirty도 켜지지 않는다(거짓 PUT 방지, FR-03).
-        if (SignalEdit is int sig) vm.Signal = sig;
-        if (!string.IsNullOrWhiteSpace(AiModelEdit)) vm.AiModel = AiModelEdit!.Trim();
-        if (InferenceMsEdit is int inf) vm.InferenceMs = inf;
-        if (FrameWidthEdit is int fw) vm.FrameWidth = fw;
-        if (FrameHeightEdit is int fh) vm.FrameHeight = fh;
-        // ⚠ Thumbnail / Objects 는 편집 대상 아님 — 모델 값 그대로 유지되어 저장 시 보존된다.
+        // Device는 읽기 전용(이벤트가 가리키는 장비는 변경 불가) — 편집 모델에 포함하지 않는다.
+        foreach (var row in _selection)
+            Edit.ApplyTo(row, includeDetail: IsSingle);
 
         NotifyDetailTexts();
+        PanelViewModel?.RefreshSignalScale();   // 신호 편집이 목록 최대값을 바꿨을 수 있음(미니바 기준)
     }
 
-    /* 공통값 계산 헬퍼 */
-    //int 형 및 Enum 타입의 형식 비교
-    private static T? CommonOrNullValue<T>(IEnumerable<DetectionEventViewModel> list, Func<IDetectionEventModel, T> selector) where T : struct
-    {
-        try
-        {
-            if (list == null || !list.Any()) return null;
-
-            var firstModel = list.FirstOrDefault()?.Model as IDetectionEventModel;
-            if (firstModel == null) return null;
-
-            T firstValue = selector(firstModel);
-
-            bool allSame = list
-                .Select(vm => vm.Model as IDetectionEventModel)
-                .Where(m => m != null)
-                .All(m => EqualityComparer<T>.Default.Equals(selector(m), firstValue));
-
-            return allSame ? firstValue : (T?)null;
-        }
-        catch (Exception)
-        {
-
-            throw;
-        }
-    }
-
-    private static T? CommonOrNullString<T>(IEnumerable<DetectionEventViewModel> list, Func<IDetectionEventModel, T> selector) where T : class?
-    {
-        try
-        {
-            if (!list.Any()) return null;
-
-            var models = list.Select(x => x.Model as IDetectionEventModel).ToList();
-            var firstModel = list.FirstOrDefault()?.Model as IDetectionEventModel;
-            if (firstModel == null) return null;
-            T firstValue = selector(firstModel);
-
-            return models.All(m => EqualityComparer<T>.Default.Equals(selector(m), firstValue)) ? firstValue : null;
-        }
-        catch (Exception)
-        {
-            throw;
-        }
-    }
-
+    /* 공통값 계산 헬퍼 — 편집 필드는 DetectionEditModel.LoadFrom 이 담당하고,
+       여기 남은 것은 편집 대상이 아닌 Device(참조 비교) 전용이다. */
     private static IBaseDeviceModel? CommonOrNullReference(IEnumerable<DetectionEventViewModel> list, DeviceProvider devices, ILogService? log)
     {
         if (!list.Any()) return null;
@@ -145,33 +83,34 @@ public class DetectionSelectionViewModel : BasePanelViewModel
                 .Where(entity => entity.DeviceName == ret.DeviceName).FirstOrDefault();
     }
 
+    /// <summary>편집 버퍼를 현재 선택의 공통값으로 다시 시딩하고, 뷰 바인딩을 전부 갱신한다.</summary>
     public void RefreshAll()
     {
-        MessageType = CommonOrNullValue(_selection, m => m.MessageType);
+        Edit.LoadFrom(_selection as IReadOnlyList<DetectionEventViewModel> ?? _selection?.ToList());
         Device = CommonOrNullReference(_selection, DeviceProvider, _log);
-        Result = CommonOrNullValue(_selection, m => m.Result);
-        Status = CommonOrNullValue(_selection, m => m.Status);
-        DateTime = CommonOrNullValue(_selection, m => m.DateTime);
+
+        NotifyEditFields();
 
         // Device 읽기전용 표시값 갱신
         NotifyOfPropertyChange(nameof(DeviceNameText));
         NotifyOfPropertyChange(nameof(DeviceTypeText));
         NotifyOfPropertyChange(nameof(DeviceNumberText));
         NotifyOfPropertyChange(nameof(DeviceZoneText));
+        NotifyOfPropertyChange(nameof(IsDetailEditable));
+    }
 
-        // 상세(detail) 편집 필드를 현재 값으로 초기화(단일 선택일 때만 의미 있음)
-        var m = FirstModel;
-        _signalEdit = m?.Signal;
-        _aiModelEdit = m?.AiModel;
-        _inferenceMsEdit = m?.InferenceMs;
-        _frameWidthEdit = m?.FrameWidth;
-        _frameHeightEdit = m?.FrameHeight;
+    /// <summary>편집 모델을 감싸는 뷰 바인딩 속성 전체 갱신(뷰는 이 래퍼 이름으로 바인딩되어 있다).</summary>
+    private void NotifyEditFields()
+    {
+        NotifyOfPropertyChange(nameof(MessageType));
+        NotifyOfPropertyChange(nameof(Status));
+        NotifyOfPropertyChange(nameof(Result));
+        NotifyOfPropertyChange(nameof(DateTime));
         NotifyOfPropertyChange(nameof(SignalEdit));
         NotifyOfPropertyChange(nameof(AiModelEdit));
         NotifyOfPropertyChange(nameof(InferenceMsEdit));
         NotifyOfPropertyChange(nameof(FrameWidthEdit));
         NotifyOfPropertyChange(nameof(FrameHeightEdit));
-        NotifyOfPropertyChange(nameof(IsDetailEditable));
     }
 
     /// <summary>편집 반영 후 읽기전용 표시 텍스트 재계산.</summary>
@@ -192,11 +131,38 @@ public class DetectionSelectionViewModel : BasePanelViewModel
     #region - IHanldes -
     #endregion
     #region - Properties -
-    public EnumEventType? MessageType { get; set; }
+    /// <summary>
+    /// 이 속성창의 <b>편집 상태 정본</b>. 모든 입력 필드는 이 모델 하나에 모이며,
+    /// 규칙도 하나다 — <c>null</c> = "변경 없음", 값 있음 = "이 값으로 변경".
+    /// <para>아래 <c>MessageType</c>/<c>Result</c>/<c>SignalEdit</c>… 은 기존 뷰 바인딩 이름을 유지하기 위한
+    /// <b>얇은 위임 래퍼</b>일 뿐이며, 상태는 전부 여기에 있다.</para>
+    /// </summary>
+    public DetectionEditModel Edit { get; } = new();
+
+    // ── 편집 필드(뷰 바인딩 유지용 위임 래퍼) ─────────────────────────────
+    public EnumEventType? MessageType
+    {
+        get => Edit.MessageType;
+        set { Edit.MessageType = value; NotifyOfPropertyChange(); }
+    }
+    public EnumTrueFalse? Status
+    {
+        get => Edit.Status;
+        set { Edit.Status = value; NotifyOfPropertyChange(); }
+    }
+    public EnumDetectionType? Result
+    {
+        get => Edit.Result;
+        set { Edit.Result = value; NotifyOfPropertyChange(); }
+    }
+    public DateTime? DateTime
+    {
+        get => Edit.DateTime;
+        set { Edit.DateTime = value; NotifyOfPropertyChange(); }
+    }
+
+    /// <summary>이벤트가 가리키는 장비 — 읽기 전용(무결성상 변경 불가)이라 편집 모델에 넣지 않는다.</summary>
     public IBaseDeviceModel? Device { get; set; }
-    public EnumTrueFalse? Status { get; set; }
-    public EnumDetectionType? Result { get; set; }
-    public DateTime? DateTime { get; set; }
     public DetectionEventPanelViewModel PanelViewModel { get; }
     public DeviceProvider DeviceProvider { get; }
 
@@ -235,32 +201,27 @@ public class DetectionSelectionViewModel : BasePanelViewModel
 
     private const string MULTI = "(다중 선택)";
 
-    // ── 탐지 상세(detail) 편집 필드 ──────────────────────────────────────
+    // ── 탐지 상세(detail) 편집 필드(뷰 바인딩 유지용 위임 래퍼) ───────────
     // 단일 선택에서만 편집. 값을 비우면(null) 해당 키는 **변경하지 않는다**(기존 값 유지).
     // 썸네일·objects 는 편집 대상이 아니며 모델 값이 그대로 남아 저장 시 함께 보존된다.
 
     /// <summary>상세 편집 가능 여부 — 단일 선택에서만(멀티셀렉트는 대상 모호).</summary>
     public bool IsDetailEditable => IsSingle;
 
-    private int? _signalEdit;
     /// <summary>신호 크기(detail.signal) 편집값.</summary>
-    public int? SignalEdit { get => _signalEdit; set { _signalEdit = value; NotifyOfPropertyChange(nameof(SignalEdit)); } }
+    public int? SignalEdit { get => Edit.Signal; set { Edit.Signal = value; NotifyOfPropertyChange(); } }
 
-    private string? _aiModelEdit;
-    /// <summary>AI 모델명(detail.model) 편집값.</summary>
-    public string? AiModelEdit { get => _aiModelEdit; set { _aiModelEdit = value; NotifyOfPropertyChange(nameof(AiModelEdit)); } }
+    /// <summary>AI 모델명(detail.model) 편집값 — 공백만 입력하면 "변경 없음"으로 정규화된다.</summary>
+    public string? AiModelEdit { get => Edit.AiModel; set { Edit.AiModel = value; NotifyOfPropertyChange(); } }
 
-    private int? _inferenceMsEdit;
     /// <summary>추론 시간 ms(detail.inference_ms) 편집값.</summary>
-    public int? InferenceMsEdit { get => _inferenceMsEdit; set { _inferenceMsEdit = value; NotifyOfPropertyChange(nameof(InferenceMsEdit)); } }
+    public int? InferenceMsEdit { get => Edit.InferenceMs; set { Edit.InferenceMs = value; NotifyOfPropertyChange(); } }
 
-    private int? _frameWidthEdit;
     /// <summary>프레임 가로 px(detail.frame_width) 편집값 — objects[].bbox 좌표 해석 기준.</summary>
-    public int? FrameWidthEdit { get => _frameWidthEdit; set { _frameWidthEdit = value; NotifyOfPropertyChange(nameof(FrameWidthEdit)); } }
+    public int? FrameWidthEdit { get => Edit.FrameWidth; set { Edit.FrameWidth = value; NotifyOfPropertyChange(); } }
 
-    private int? _frameHeightEdit;
     /// <summary>프레임 세로 px(detail.frame_height) 편집값.</summary>
-    public int? FrameHeightEdit { get => _frameHeightEdit; set { _frameHeightEdit = value; NotifyOfPropertyChange(nameof(FrameHeightEdit)); } }
+    public int? FrameHeightEdit { get => Edit.FrameHeight; set { Edit.FrameHeight = value; NotifyOfPropertyChange(); } }
 
     /// <summary>신호 크기(detail.signal) — null/0(AI)은 "—", 멀티셀렉트는 "(다중 선택)".</summary>
     public string SignalText => !IsSingle ? MULTI : (FirstModel?.Signal is int s and > 0 ? s.ToString("N0") : "—");

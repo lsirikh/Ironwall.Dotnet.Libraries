@@ -15,6 +15,15 @@
 ## [Unreleased]
 
 ### Added
+- **탐지 속성창 편집 상태 정규화 — `DetectionEditModel` 도입** (Track C · Events.Ui · PRD `docs/prds/Event_Edit_Save_Pipeline-prd.md` FR-01/02 후속 · 사용자 지시 2026-08-03)
+  - **문제**: `DetectionSelectionViewModel`의 편집 상태가 **세 가지 형식으로 흩어져** 있었다 — ① 공통값 필드(`MessageType`/`Result`/`Status`/`DateTime`)는 **무-알림 auto-property**, ② 상세 필드는 `*Edit` 별도 명명 + 별도 알림, ③ 적용 경로도 둘(`item.X = X ?? item.X` 루프 vs `ApplyDetailEdits`)로 갈라져 한쪽이 모델 직접 대입이었다.
+  - **정규화**: 편집 상태를 **모델 하나(`Models/DetectionEditModel.cs`)**로 모으고 규칙을 통일 — ① 모든 필드 `null` = "변경 없음", 값 있음 = "이 값으로 변경" ② 모든 필드 PropertyChanged 발생(무-알림 auto-property 제거 = DEF-18 잠복 결함 해소) ③ 적용 경로는 `ApplyTo(row, includeDetail)` **하나**뿐이며 **행 ViewModel 세터만** 사용.
+  - **데이터 흐름 일원화**: 속성창 입력 → `DetectionEditModel` → `ApplyTo` → **DataGrid 항목(행 VM)** → `IsEdited` → 저장 루프 → `ToDetectionEventReplaceDto` → PUT. 중간에 모델 직접 대입 지점이 남아 있지 않다.
+  - **뷰 무변경**: `DetectionSelectionView.xaml`이 타 세션 편집 중이라 기존 바인딩 이름(`MessageType`/`Result`/`SignalEdit`…)을 **얇은 위임 래퍼**로 유지 — XAML 0줄 수정.
+  - **부수**: `AiModel` 공백 입력을 세터에서 `null`(변경 없음)로 정규화 + Trim. `DetectionEventPanelViewModel.RefreshSignalScale()` 신설 — 신호 편집이 목록 최대값을 바꿔도 미니바 기준이 갱신되도록(행 증감이 없으면 `MaxSignal`이 재계산되지 않던 문제). 죽은 헬퍼(`CommonOrNullValue`/`CommonOrNullString`) 제거.
+  - **서버 계약 명문화**: 기존 행(Id&gt;0)에서 실제 변경 가능한 것은 `result` 와 `detail` 뿐 — `type_event`/`created_at`/`action_reported` 는 행 VM의 `IsDraft` 가드가 차단(Draft 에서만 반영). 테스트로 고정.
+  - **테스트**: 정규화 계약 7종 추가(시딩·다중선택 상세 미시딩·공백 정규화·Trim·불변필드 차단·result 반영·공통필드 다중적용) → 신규 파일 **24종 전건 통과**. 전체 **439통과/15실패**(실패는 기존 베이스라인과 동일 목록, 2회 반복 일치) = **회귀 0**. 빌드 0오류 · UTF-8 BOM · mojibake 0.
+  - **실서버 실측(2026-08-03 24:35)**: `PUT /events/detections/{id}` 는 **여전히 500** 이나 **DB에는 값이 반영됨**(signal 982→983 확인 후 원복). 같은 시각 `PUT /events/malfunctions/{id}` 는 **200** → 서버 lazy-load 수정 커밋 `4f0e875` 가 아직 미배포임이 재확인. 클라이언트는 500을 정상적으로 실패로 표시하므로 **화면상 "저장 실패"는 서버 배포 전까지 계속** 뜬다(값은 저장됨).
 - **이벤트 편집→적용→저장 파이프라인 정합성 (탐지 detail 무음 실패 수정)** (Track C · Events.Ui · [PRD](docs/prds/Event_Edit_Save_Pipeline-prd.md) · 롤백태그 `before-event-edit-dirty-fix` · 사용자 지시 2026-08-03)
   - **문제**: 속성창에서 탐지 상세(신호·AI 모델·추론ms·프레임 W·H)만 고치고 [적용]→[저장] 하면 **오류도 성공도 없이 저장되지 않음**. 결과 콤보를 함께 바꾼 날만 저장돼 "됐다 안 됐다" 하는 간헐 버그로 보였으나 실제로는 100% 결정적.
   - **근본원인**: `ApplyDetailEdits()`가 행 ViewModel 세터를 우회해 모델에 직접 대입 → `IsEdited`(dirty) 미설정 → 저장 루프 `Where(vm => vm.IsEdited && Id>0)`에서 **행 자체가 탈락**(PUT 0건). Events.Ui 전체에 `SetProperty(` 호출이 0건이라 dirty 경로는 `SetModelProperty` **하나뿐**임을 Grep으로 확정.

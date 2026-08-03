@@ -325,6 +325,123 @@ public class DetectionSelectionApplyTests : IoCStubbedTestBase
     }
 
     [Fact]
+    public void should_seed_edit_model_from_selection_when_constructed()
+    {
+        // Arrange & Act — 편집 버퍼는 선택의 공통값으로 시딩된다
+        var row = BuildRow(100, 1200, aiModel: "yolov8n");
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel> { row });
+
+        // Assert — 래퍼와 편집 모델이 같은 상태를 가리킨다(정본 1곳)
+        Assert.Equal(1200, sut.Edit.Signal);
+        Assert.Equal("yolov8n", sut.Edit.AiModel);
+        Assert.Equal(EnumDetectionType.PIR_SENSOR, sut.Edit.Result);
+        Assert.Equal(sut.Edit.Signal, sut.SignalEdit);
+        Assert.Equal(sut.Edit.Result, sut.Result);
+    }
+
+    [Fact]
+    public void should_not_seed_detail_when_multiple_rows_selected()
+    {
+        // Arrange — 상세는 이벤트별 계측값이라 다중 선택에서 대표값처럼 보이면 안 된다
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel>
+        {
+            BuildRow(100, 1200), BuildRow(101, 800)
+        });
+
+        // Assert
+        Assert.Null(sut.Edit.Signal);
+        Assert.Null(sut.Edit.AiModel);
+        // 공통값이 같은 필드는 다중 선택에서도 시딩된다
+        Assert.Equal(EnumDetectionType.PIR_SENSOR, sut.Edit.Result);
+    }
+
+    [Fact]
+    public void should_normalize_blank_ai_model_to_no_change()
+    {
+        // Arrange — 공백만 입력 = "변경 없음"으로 정규화(빈 문자열이 모델에 들어가지 않는다)
+        var row = BuildRow(100, 1200, aiModel: "yolov8n");
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel> { row });
+
+        // Act
+        sut.AiModelEdit = "   ";
+        sut.ApplyButton();
+
+        // Assert
+        Assert.Null(sut.Edit.AiModel);
+        Assert.Equal("yolov8n", ((IDetectionEventModel)row.Model).AiModel);
+        Assert.False(row.IsEdited);
+    }
+
+    [Fact]
+    public void should_trim_ai_model_when_applied()
+    {
+        var row = BuildRow(100, 1200, aiModel: "yolov8n");
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel> { row });
+
+        sut.AiModelEdit = "  yolov8s  ";
+        sut.ApplyButton();
+
+        Assert.Equal("yolov8s", ((IDetectionEventModel)row.Model).AiModel);
+        Assert.True(row.IsEdited);
+    }
+
+    [Fact]
+    public void should_not_change_immutable_fields_when_row_is_not_draft()
+    {
+        // Arrange — 기존 행(Id>0)에서 서버 불변 필드는 편집 모델에 값이 있어도 반영되지 않는다.
+        //           (type_event/created_at/action_reported는 행 VM 세터의 IsDraft 가드가 차단)
+        var row = BuildRow(100, 1200);
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel> { row });
+
+        // Act
+        sut.MessageType = EnumEventType.Fault;
+        sut.Status = EnumTrueFalse.True;
+        sut.DateTime = new DateTime(2020, 1, 1);
+        sut.ApplyButton();
+
+        // Assert — 값 불변 + 거짓 dirty도 없음
+        var m = row.Model;
+        Assert.Equal(EnumEventType.Intrusion, m.MessageType);
+        Assert.Equal(new DateTime(2026, 8, 3, 12, 0, 0), m.DateTime);
+        Assert.False(row.IsEdited);
+    }
+
+    [Fact]
+    public void should_apply_result_to_grid_row_when_changed()
+    {
+        // Arrange — 기존 행에서 실제로 바뀌는 공통 필드는 result 뿐이다(서버 Replace 계약)
+        var row = BuildRow(100, 1200);
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel> { row });
+
+        // Act
+        sut.Result = EnumDetectionType.AI_DETECT;
+        sut.ApplyButton();
+
+        // Assert — DataGrid 항목(행 VM)에 반영 + 저장 대상 편입
+        Assert.Equal(EnumDetectionType.AI_DETECT, row.Result);
+        Assert.True(row.IsEdited);
+    }
+
+    [Fact]
+    public void should_apply_common_fields_to_all_rows_when_multiple_selected()
+    {
+        // Arrange — 공통 필드는 다중 선택 전체에 적용된다(상세와 달리 대상이 모호하지 않다)
+        var first = BuildRow(100, 1200);
+        var second = BuildRow(101, 800);
+        var sut = new DetectionSelectionViewModel(new List<DetectionEventViewModel> { first, second });
+
+        // Act
+        sut.Result = EnumDetectionType.AI_DETECT;
+        sut.ApplyButton();
+
+        // Assert
+        Assert.Equal(EnumDetectionType.AI_DETECT, first.Result);
+        Assert.Equal(EnumDetectionType.AI_DETECT, second.Result);
+        Assert.True(first.IsEdited);
+        Assert.True(second.IsEdited);
+    }
+
+    [Fact]
     public void should_not_apply_detail_when_multiple_rows_selected()
     {
         // Arrange — detail은 이벤트별 값이라 다중 선택에서는 대상이 모호 → 적용하지 않는다(현행 계약 고정)

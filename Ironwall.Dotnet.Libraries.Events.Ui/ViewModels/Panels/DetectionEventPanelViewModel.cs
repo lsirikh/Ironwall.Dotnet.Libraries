@@ -165,6 +165,9 @@ public class DetectionEventPanelViewModel : BaseDataGridMultiPanelViewModel<Dete
 
     private void OnRowsChangedForSignal(object? sender, NotifyCollectionChangedEventArgs e)
         => NotifyOfPropertyChange(nameof(MaxSignal));
+
+    /// <summary>속성창에서 신호를 편집한 뒤 호출 — 행 증감이 없어도 최대값이 바뀌므로 미니바 기준을 다시 계산한다.</summary>
+    public void RefreshSignalScale() => NotifyOfPropertyChange(nameof(MaxSignal));
     #endregion
 
     public override async void OnClickDeleteButton(object sender, RoutedEventArgs e)
