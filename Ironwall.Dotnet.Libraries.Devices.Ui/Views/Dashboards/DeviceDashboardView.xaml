@@ -79,7 +79,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="AudioVideo" />
 							<TextBlock
 								Margin="5,0"
@@ -123,7 +123,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="ProximitySensor" />
 							<TextBlock
 								Margin="5,0"
@@ -191,7 +191,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="Vibrate" />
 							<TextBlock
 								Margin="5,0"
@@ -235,7 +235,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="Brain" />
 							<TextBlock
 								Margin="5,0"
@@ -256,7 +256,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="DownloadNetwork" />
 							<TextBlock
 								Margin="5,0"
@@ -301,7 +301,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="Connection" />
 							<TextBlock
 								Margin="5,0"
@@ -345,7 +345,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="DownloadNetwork" />
 							<TextBlock
 								Margin="5,0"
@@ -389,7 +389,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="AudioInputRca" />
 							<TextBlock
 								Margin="5,0"
@@ -433,7 +433,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="LaserPointer" />
 							<TextBlock
 								Margin="5,0"
@@ -477,7 +477,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="Cctv" />
 							<TextBlock
 								Margin="5,0"
@@ -522,7 +522,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="Speaker" />
 							<TextBlock
 								Margin="5,0"
@@ -543,7 +543,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="Locker" />
 							<TextBlock
 								Margin="5,0"
@@ -564,7 +564,7 @@
 					Style="{StaticResource MaterialDesignGroupBox}"
 					UseLayoutRounding="True">
 					<GroupBox.Header>
-						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+						<StackPanel HorizontalAlignment="Center" Orientation="Horizontal" TextElement.Foreground="{DynamicResource OnPrimaryFixedBrush}">
 							<md:PackIcon Kind="LightbulbOn" />
 							<TextBlock
 								Margin="5,0"
