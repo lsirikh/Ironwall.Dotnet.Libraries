@@ -1,9 +1,10 @@
-<UserControl
+﻿<UserControl
     x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportListView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:cal="http://caliburnmicro.com"
-    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+    AutomationProperties.AutomationId="Reports.List.Root">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
@@ -19,19 +20,24 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="상태" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource PanelFieldLabel}" />
                 <ComboBox Width="150" ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}"
-                          Style="{StaticResource ModernComboBox}" />
+                          Style="{StaticResource ModernComboBox}" AutomationProperties.AutomationId="Reports.List.StatusFilterComboBox" />
                 <Button x:Name="LoadAsync" Content="검색" MinWidth="76" Margin="10,0,0,0"
+                        AutomationProperties.AutomationId="Reports.List.SearchButton"
                         Style="{StaticResource ModernSecondaryButton}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button x:Name="Preview" Content="미리보기" MinWidth="92"
+                        AutomationProperties.AutomationId="Reports.List.PreviewButton"
                         Style="{StaticResource ModernSecondaryButton}" IsEnabled="{Binding CanDownload}" />
                 <Button x:Name="Download" Content="다운로드" MinWidth="92" Margin="8,0,0,0"
+                        AutomationProperties.AutomationId="Reports.List.DownloadButton"
                         Style="{StaticResource ModernPrimaryButton}" IsEnabled="{Binding CanDownload}"
                         ToolTip="PDF로 다운로드" />
                 <Button x:Name="Delete" Content="삭제" MinWidth="64" Margin="8,0,0,0"
+                        AutomationProperties.AutomationId="Reports.List.DeleteButton"
                         Style="{StaticResource ModernDangerButton}" IsEnabled="{Binding CanDelete}" />
                 <Button x:Name="Reload" Content="갱신" MinWidth="64" Margin="8,0,0,0"
+                        AutomationProperties.AutomationId="Reports.List.ReloadButton"
                         Style="{StaticResource ModernSecondaryButton}" ToolTip="목록 새로고침" />
             </StackPanel>
         </Grid>
@@ -39,6 +45,7 @@
         <!-- 목록 -->
         <Border Grid.Row="1" Style="{StaticResource StandardPanelCard}">
             <DataGrid x:Name="Items" AutoGenerateColumns="False" IsReadOnly="True"
+                      AutomationProperties.AutomationId="Reports.List.ReportGrid"
                       SelectedItem="{Binding SelectedItem}" CanUserAddRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                       RowHeight="38" FontSize="13"
@@ -59,6 +66,7 @@
                                     <Border x:Name="Chip" CornerRadius="9" Padding="10,2" Background="#555F6B"
                                             VerticalAlignment="Center">
                                         <TextBlock x:Name="ChipText" Text="{Binding Status}" Foreground="White"
+                                                   AutomationProperties.AutomationId="{Binding Id, StringFormat=Reports.List.RowStatusText.{0}}"
                                                    FontSize="11" FontWeight="Medium" />
                                     </Border>
                                     <!-- 진행중(대기/생성중): 원형 프로그레스 — 앱 표준 MaterialDesignCircularProgressBar -->
@@ -112,7 +120,7 @@
         <TextBlock Grid.Row="1" Text="{Binding EmptyStateText}" HorizontalAlignment="Center" VerticalAlignment="Center"
                    TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
                    Foreground="{DynamicResource TextMutedBrush}"
-                   Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                   Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" AutomationProperties.AutomationId="Reports.List.EmptyStateText" />
 
         <!-- 로딩 스피너 — 검색/갱신/최초 로드 중(IsBusy) DataGrid 위 중앙. 앱 표준 MaterialDesignCircularProgressBar -->
         <ProgressBar Grid.Row="1" Style="{DynamicResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
@@ -121,6 +129,6 @@
                      Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
         <TextBlock Grid.Row="2" Margin="2,8,0,0" Foreground="{DynamicResource TextMutedBrush}"
-                   Text="{Binding Items.Count, StringFormat=로드 {0}건}" />
+                   Text="{Binding Items.Count, StringFormat=로드 {0}건}" AutomationProperties.AutomationId="Reports.List.CountText" />
     </Grid>
 </UserControl>

@@ -15,6 +15,10 @@
 ## [Unreleased]
 
 ### Added
+- **UI 자동화 하네스 1단계 — AutomationId 계측(라이브러리 82건)** (Track C · Accounts.Ui + Events.Ui + Reports.Ui + GMaps.Ui · [PRD](docs/prds/UI_Automation_FlaUI_Smoke-prd.md) v1.0 Approved · [Plan](docs/plans/UI_Automation_FlaUI_Smoke-prd-plan.md) · 태그 `before-ui-automation` · 브랜치 `v2.9.23` · 사용자 승인 2026-08-03)
+  - FlaUI(UIA3) 스모크 테스트를 위한 `AutomationProperties.AutomationId` 부여. 명명 규칙 `도메인.패널.요소`. **기존 `x:Name` 불변**(Caliburn.Micro 컨벤션 바인딩 지시자 — AutomationId 가 UIA 노출을 이기고 x:Name 은 보존됨, 실측). 렌더링·바인딩 무영향(첨부 속성).
+  - 대상: `LoginPanelView`(10) · `EventSuppressionSchedulePanelView`(25, 행 체크박스는 `{Binding Id, StringFormat=…}` 바인딩식) · Reports 5개 뷰(43+WebView2 `Reports.Preview.Browser` 1 — `HwndHostAutomationPeer` 실측 확인) · `MapView`(3).
+  - 대응 테스트 하네스는 메인 솔루션 `Dotnet.Monitoring.Solution.UiTests` (Solution CHANGELOG 참조).
 - **장애 이벤트 자동조치보고 독립 설정** (Track C · Events + Events.Ui · [PRD](docs/prds/malfunction-autoreport-setting-prd.md) · [Plan](docs/plans/malfunction-autoreport-setting-prd-plan.md) · 태그 `before-malfunction-autoreport-setting` · 사용자 지시 2026-07-31)
   - **문제**: `이벤트설정`의 탐지 항목 1개(`탐지 이벤트 해제` 토글+초)가 탐지·장애 **양쪽** 자동조치보고 타이머·활성을 동시 결정.
   - **라이브러리(이 repo)**: `IEventSetupModel`·`EventSetupModel`에 장애 전용 필드 `IsMalfunctionAutoEventDiscard`/`MalfunctionTimeDiscardSec` 추가(복사 생성자 포함). `MalfunctionNatsSyncService`가 장애 Enqueue 시 신규 필드를 읽도록 변경(탐지 경로 `DetectionNatsSyncService`는 무변경). 장애 토글 OFF → 엔트리 `IsAutoReportEnabled=false` → `EventQueueManager` tick skip → 장애 자동조치보고 미발송.

@@ -19,7 +19,8 @@
 	d:DesignHeight="450"
 	d:DesignWidth="1200"
 	FontFamily="{DynamicResource MaterialDesignFont}"
-	mc:Ignorable="d">
+	mc:Ignorable="d"
+	AutomationProperties.AutomationId="GMaps.Map.Root">
 	<!--  전역 단축키 — 상단 메뉴 명령을 맵 포커스 상태에서 동작(메뉴 스코프가 아닌 루트 스코프).
 	      기존 코드 단축키(Ctrl+Shift+R 회전토글·Ctrl+R 회전리셋·Ctrl+←/→ 미세회전·Ctrl+A 전체선택)와 비충돌.  -->
 	<UserControl.InputBindings>
@@ -130,7 +131,7 @@
 				Style="{StaticResource MaterialDesignMenu}">
 
 			<!--  파일 메뉴 — 단축키는 루트 UserControl.InputBindings에서 전역 처리(여기선 InputGestureText 표시만).  -->
-			<MenuItem Header="파일(_F)">
+			<MenuItem Header="파일(_F)" AutomationProperties.AutomationId="GMaps.Map.FileMenu">
 				<MenuItem
 					Command="{Binding LoadMapImageCommand}"
 					Header="맵 불러오기"
@@ -161,7 +162,7 @@
 
 			<!--  지도(좌표계) 메뉴 — 마우스=IsChecked TwoWay 단일 토글(Command 제거로 이중토글 방지),
 			      키보드=루트 InputBindings(Ctrl+1/2/3→Toggle*Command 플립).  -->
-			<MenuItem Header="지도(_M)">
+			<MenuItem Header="지도(_M)" AutomationProperties.AutomationId="GMaps.Map.MapMenu">
 				<MenuItem
 					Header="WGS-84 좌표계"
 					InputGestureText="Ctrl+1"

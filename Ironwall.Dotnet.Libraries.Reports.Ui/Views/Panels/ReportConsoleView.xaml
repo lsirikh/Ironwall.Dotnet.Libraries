@@ -1,9 +1,10 @@
-<UserControl
+﻿<UserControl
     x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportConsoleView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:cal="http://caliburnmicro.com"
-    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+    AutomationProperties.AutomationId="Reports.Console.Root">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
@@ -22,25 +23,25 @@
             <!-- 헤더 (시안 바 표준) -->
             <Border Grid.Row="0" Style="{StaticResource ModernDialogHeader}" CornerRadius="10,10,0,0">
                 <DockPanel VerticalAlignment="Center">
-                    <Button DockPanel.Dock="Right" x:Name="Close" Style="{StaticResource ModernPanelCloseButton}" />
+                    <Button DockPanel.Dock="Right" x:Name="Close" AutomationProperties.AutomationId="Reports.Console.CloseButton" Style="{StaticResource ModernPanelCloseButton}" />
                     <StackPanel Orientation="Horizontal">
                         <md:PackIcon Kind="FileChartOutline" Width="18" Height="18" VerticalAlignment="Center"
                                      Foreground="{DynamicResource OnPrimaryFixedBrush}" />
-                        <TextBlock Text="보고서 관리" Margin="8,0,0,0" Style="{StaticResource ModernDialogHeaderText}" />
+                        <TextBlock Text="보고서 관리" Margin="8,0,0,0" Style="{StaticResource ModernDialogHeaderText}" AutomationProperties.AutomationId="Reports.Console.TitleText" />
                     </StackPanel>
                 </DockPanel>
             </Border>
 
             <!-- 본문: 탭 + 미리보기/수정 오버레이 -->
             <Grid Grid.Row="1">
-                <TabControl Background="Transparent" BorderThickness="0" Margin="12,8">
-                    <TabItem Header="목록">
+                <TabControl Background="Transparent" BorderThickness="0" Margin="12,8" AutomationProperties.AutomationId="Reports.Console.Tabs">
+                    <TabItem Header="목록" AutomationProperties.AutomationId="Reports.Console.ListTab">
                         <ContentControl x:Name="ListViewModel" Margin="5,8,5,0" />
                     </TabItem>
-                    <TabItem Header="생성">
+                    <TabItem Header="생성" AutomationProperties.AutomationId="Reports.Console.CreateTab">
                         <ContentControl x:Name="CreateViewModel" Margin="5,8,5,0" />
                     </TabItem>
-                    <TabItem Header="템플릿">
+                    <TabItem Header="템플릿" AutomationProperties.AutomationId="Reports.Console.TemplateTab">
                         <ContentControl x:Name="TemplateViewModel" Margin="5,8,5,0" />
                     </TabItem>
                 </TabControl>
@@ -56,8 +57,8 @@
                             </Grid.RowDefinitions>
                             <Border Grid.Row="0" Style="{StaticResource ModernDialogHeader}">
                                 <DockPanel>
-                                    <Button DockPanel.Dock="Right" x:Name="ClosePreview" Style="{StaticResource ModernPanelCloseButton}" />
-                                    <TextBlock Text="미리보기" Style="{StaticResource ModernDialogHeaderText}" />
+                                    <Button DockPanel.Dock="Right" x:Name="ClosePreview" AutomationProperties.AutomationId="Reports.Preview.CloseButton" Style="{StaticResource ModernPanelCloseButton}" />
+                                    <TextBlock Text="미리보기" Style="{StaticResource ModernDialogHeaderText}" AutomationProperties.AutomationId="Reports.Preview.HeaderText" />
                                 </DockPanel>
                             </Border>
                             <ContentControl Grid.Row="1" x:Name="PreviewViewModel" />
