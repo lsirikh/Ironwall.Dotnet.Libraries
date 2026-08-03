@@ -1,4 +1,5 @@
 using Autofac;
+using Autofac.Features.Metadata;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Modules;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Gateways;
@@ -60,5 +61,17 @@ public class AccountApiModuleResolutionTests
 
         var services = c.Resolve<IEnumerable<IService>>();
         Assert.Contains(services, s => s is ApiService);
+    }
+
+    [Fact]
+    public void should_register_logout_on_exit_service_with_order_metadata()
+    {
+        // 종료 시 강제 로그아웃(LogoutOnExitService)이 IService 로 등록돼 OnExit 이 StopAsync 를 호출하고,
+        // 모든 IService 가 'Order' 키를 보유해 OnExit 의 OrderBy(Metadata["Order"])가 KeyNotFoundException 을 던지지 않아야 한다.
+        using var c = Build();
+
+        var metas = c.Resolve<IEnumerable<Meta<IService>>>();
+        Assert.Contains(metas, m => m.Value is LogoutOnExitService);
+        Assert.All(metas, m => Assert.True(m.Metadata.ContainsKey("Order")));   // OnExit OrderBy 안전
     }
 }

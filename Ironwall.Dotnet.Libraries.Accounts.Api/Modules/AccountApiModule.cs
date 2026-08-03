@@ -73,6 +73,16 @@ public class AccountApiModule : Module
             .As<IService>()
             .SingleInstance().WithMetadata("Order", _count + 1);
 
+        // 종료 시 강제 로그아웃(종료 전용 IService) — OnExit 이 StopAsync 호출. best-effort/무이벤트.
+        //   seam=IAccountApiService.LogoutAsync(+TokenStorage.Clear) — IAuthGateway 는 ForceLogoutRequested 발화(종료 중 UI 데드락)라 미사용.
+        //   API 모드에만 등록(DB 모드는 서버 세션 없음). Order=_count+2 (ApiService=_count, PermissionRefresh=_count+1 다음 슬롯).
+        builder.Register(ctx => new LogoutOnExitService(
+                ctx.Resolve<IAccountApiService>(),
+                ctx.Resolve<ITokenStorageService>(),
+                _log))
+            .As<IService>()
+            .SingleInstance().WithMetadata("Order", _count + 2);
+
         // 게이트웨이 — 3 인터페이스 동시 등록(VM 무편집 스왑 지점)
         builder.Register(ctx => new ApiAccountGateway(
                 ctx.Resolve<IAccountApiService>(),
