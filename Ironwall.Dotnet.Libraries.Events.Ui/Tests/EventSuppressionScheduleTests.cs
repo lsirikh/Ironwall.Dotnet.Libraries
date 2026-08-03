@@ -1,6 +1,7 @@
 ﻿using Xunit;
 using Newtonsoft.Json;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Tests;
@@ -181,5 +182,78 @@ public class EventSuppressionScheduleTests
         Assert.Equal(2, res!.DeletedIds.Count);
         Assert.Single(res.SkippedIds);
         Assert.Empty(res.NotFoundIds);
+    }
+
+    // ══════ 서버 명세 v2.0 회피 규칙 (§5-B 겹친 창 / §5-D 기간 상한) ══════
+
+    // ── §5-D 창 길이 상한 ──
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(30, true)]      // 경계: 정확히 30일 허용
+    [InlineData(31, false)]
+    [InlineData(365, false)]    // 오타로 1년 억제 방지
+    public void should_validate_window_length_when_within_max_days(int days, bool expected)
+    {
+        var start = new DateTime(2026, 8, 3, 9, 0, 0);
+        Assert.Equal(expected, SuppressionRules.IsWindowLengthValid(start, start.AddDays(days)));
+    }
+
+    // ── §5-B 같은 대상 활성 창 중복 판정 ──
+    private static EventSuppressionScheduleDto Active(
+        string targetType, System.Collections.Generic.List<int>? dev = null, System.Collections.Generic.List<int>? grp = null)
+        => new()
+        {
+            Id = 99,
+            Name = "active window",
+            TargetType = targetType,
+            TargetDeviceIds = dev ?? new(),
+            TargetGroupIds = grp ?? new(),
+            Status = "active",
+        };
+
+    [Fact]
+    public void should_detect_overlap_when_device_already_covered()
+    {
+        var active = new[] { Active("device", dev: new() { 1801, 1802 }) };
+        var n = SuppressionRules.CountOverlappingActive(active, "device", new[] { 1802 }, null);
+        Assert.Equal(1, n);
+    }
+
+    [Fact]
+    public void should_not_detect_overlap_when_device_not_covered()
+    {
+        var active = new[] { Active("device", dev: new() { 1801 }) };
+        var n = SuppressionRules.CountOverlappingActive(active, "device", new[] { 1802 }, null);
+        Assert.Equal(0, n);
+    }
+
+    [Fact]
+    public void should_detect_overlap_when_group_intersects()
+    {
+        var active = new[] { Active("group", grp: new() { 5, 6 }) };
+        var n = SuppressionRules.CountOverlappingActive(active, "group", null, new[] { 6, 7 });
+        Assert.Equal(1, n);
+    }
+
+    [Fact]
+    public void should_count_all_windows_when_target_type_all()
+    {
+        var active = new[] { Active("all"), Active("all"), Active("device", dev: new() { 1 }) };
+        var n = SuppressionRules.CountOverlappingActive(active, "all", null, null);
+        Assert.Equal(2, n);
+    }
+
+    [Fact]
+    public void should_return_zero_when_no_active_windows()
+    {
+        Assert.Equal(0, SuppressionRules.CountOverlappingActive(null, "device", new[] { 1 }, null));
+        Assert.Equal(0, SuppressionRules.CountOverlappingActive(System.Array.Empty<EventSuppressionScheduleDto>(), "device", new[] { 1 }, null));
+    }
+
+    [Fact]
+    public void should_return_zero_when_nothing_selected()
+    {
+        var active = new[] { Active("device", dev: new() { 1801 }) };
+        Assert.Equal(0, SuppressionRules.CountOverlappingActive(active, "device", System.Array.Empty<int>(), null));
     }
 }
