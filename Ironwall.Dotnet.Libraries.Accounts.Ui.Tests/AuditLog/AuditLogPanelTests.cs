@@ -59,9 +59,9 @@ public class AuditLogPanelTests
         // Act
         await vm.OnClickSearch();
 
-        // Assert — ISO 8601, 시작=당일 00:00
-        Assert.Equal("2026-07-13T00:00:00", s.LastAuditStartDate);
-        Assert.Equal("2026-07-20T23:59:59", s.LastAuditEndDate);
+        // Assert — aware ISO 8601(+09:00), 시작=당일 00:00 (서버 datetime 규약, KoreaTimeHelper.ToServerIso8601)
+        Assert.Equal("2026-07-13T00:00:00.000+09:00", s.LastAuditStartDate);
+        Assert.Equal("2026-07-20T23:59:59.000+09:00", s.LastAuditEndDate);
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public class AuditLogPanelTests
         await vm.OnClickSearch();
 
         // Assert
-        Assert.StartsWith("2026-07-20", s.LastAuditEndDate);
-        Assert.EndsWith("T23:59:59", s.LastAuditEndDate);
+        Assert.StartsWith("2026-07-20T23:59:59", s.LastAuditEndDate);
+        Assert.EndsWith("+09:00", s.LastAuditEndDate);   // aware ISO(+09:00)
     }
 
     [Fact]

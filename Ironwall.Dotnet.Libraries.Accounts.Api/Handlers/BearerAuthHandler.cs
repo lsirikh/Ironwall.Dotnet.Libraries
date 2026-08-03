@@ -149,7 +149,8 @@ public class BearerAuthHandler : DelegatingHandler
             // 실패 분류(token-refresh-10): 일시(네트워크/5xx/429)면 토큰 보존·재시도 위임(Transient), 종단(401/자격 만료/SESSION_REVOKED)이면 Clear+세션 만료(Terminal).
             var code = result.Error?.Code;
             var sc = result.StatusCode;
-            var transient = code == "INTERNAL_ERROR" || sc == 0 || sc == 429 || sc == 502 || sc == 503 || sc == 504;
+            // 네트워크 예외는 code=INTERNAL_ERROR(AccountApiService catch), 서버 과부하는 429/5xx. StatusCode 미상(0)은 종단으로 간주(자격오류 등 안전측).
+            var transient = code == "INTERNAL_ERROR" || sc == 429 || sc == 502 || sc == 503 || sc == 504;
             _log?.Warning($"[BearerAuthHandler] auth/refresh 거부: success={result.Success}, code={code}, status={sc}, transient={transient}, msg='{(string.IsNullOrEmpty(result.Message) ? result.Error?.Message : result.Message)}'");
             if (transient) return RefreshOutcome.Transient;   // Clear 안 함 — 토큰 보존
             _store.Clear();
