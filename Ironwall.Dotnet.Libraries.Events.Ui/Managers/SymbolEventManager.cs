@@ -35,14 +35,18 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     private readonly IEventAggregator _ea;
     private readonly ILogService _log;
     private readonly EventSetupModel _eventSetupModel;
+    // FR-03 재계산 복원용 SSOT(선택 주입) — 미주입(테스트/DB모드)이면 Refresh* 는 no-op. EQM→SEM 참조 없음이라 순환 없음.
+    private readonly IEventQueueManager? _eventQueueManager;
 
     public SymbolEventManager(IEventAggregator eventAggregator,
                              ILogService log,
-                             EventSetupModel eventSetupModel)
+                             EventSetupModel eventSetupModel,
+                             IEventQueueManager? eventQueueManager = null)
     {
         _ea = eventAggregator;
         _log = log;
         _eventSetupModel = eventSetupModel;
+        _eventQueueManager = eventQueueManager;
 
         _deviceSymbolLookup = new ConcurrentDictionary<(int, EnumDeviceType), DeviceSymbolLookupModel>();
         _groupSymbolLookup = new ConcurrentDictionary<int, DeviceSymbolLookupModel>();
@@ -67,6 +71,14 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
 
         // FR-08c: 등록 즉시 Device.Status → Symbol.OperationState 동기화
         lookup.SyncFromDevice(deviceModel.Status);
+
+        // (stale 상태 자가치유) 심볼 EventStatus는 PidsSymbols.EventStatus 컬럼에 영속된다.
+        //   과거 장애로 Blackout/Fault가 저장된 뒤 복구가 OperationState만 갱신하면 그 값이 영구히 남아
+        //   앱을 재시작해도 심볼이 검은색/장애색으로 표시된다(실측: 제어기2(1352)).
+        //   장비가 정상(ACTIVATED)으로 로드되는데 저장된 이벤트상태가 남아 있으면 EQM 기준으로 재계산한다.
+        //   부팅 시 EQM은 비어 있으므로 Normal로 정리되고, 서버가 여전히 장애면 Status=ERROR라 여기 걸리지 않는다.
+        if (deviceModel.Status == EnumDeviceStatus.ACTIVATED)
+            RefreshDeviceSymbol(deviceModel.Id, deviceModel.DeviceType);
 
         // FR-13 ④: 장비정보(API geolocation.heading) → 심볼 BaseBearing 메모리 반영(로컬 DB 미저장).
         // SaveMarker 호출하지 않음 — SoT=서버, 설치방향 변경은 서버 장비 API로. heading=null이면 미변경.
@@ -204,6 +216,16 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         {
             lookup.SyncFromDevice(status);
             _log?.Info($"Device 상태 동기화: Device({deviceId}, {deviceType}) → {status}");
+
+            // (stale 상태 고착 방지) SyncFromDevice는 OperationState만 갱신한다.
+            //   장비가 정상 복귀(ACTIVATED)했는데 EventStatus(Blackout/Fault)가 남으면
+            //   그 값이 심볼 DB(PidsSymbols.EventStatus)에 영속되어 재시작 후에도 검은색이 유지된다.
+            //   (실측: 제어기2(1352) — ACTION_REPORT가 '카드종결 no-op(부재)'로 dequeue되지 않은 뒤
+            //    SYNC_DEVICE ACTIVATED가 와도 EventStatus=Blackout 잔존 → DB 저장 → 재기동 시 재현)
+            //   → EQM 실제 상태로 재계산해 반영한다. 큐에 살아있는 이벤트가 있으면 그 상태가 유지되고,
+            //     없으면 Normal로 복귀한다(권위=EventQueueManager).
+            if (status == EnumDeviceStatus.ACTIVATED)
+                RefreshDeviceSymbol(deviceId, deviceType);
         }
         else
         {
@@ -266,6 +288,10 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
             groupLookup.ProcessEvent(eventType, EnumSeverityLevel.WARNING);
             _log?.Info($"그룹 Detecting 설정: DeviceGroup({groupId}) -> {eventType}");
         }
+        else
+        {
+            _log?.Warning($"그룹 심볼 미등록: DeviceGroup({groupId}) → Detecting 반영 no-op(LinkedDeviceGroup 미연결/미배치 가능성)");
+        }
     }
 
     /// <summary>
@@ -278,6 +304,34 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
             groupLookup.ProcessEventReport();
             _log?.Info($"그룹 심볼 복원: DeviceGroup({groupId}) → Normal");
         }
+        else
+        {
+            // FR-02 관측성: 미등록 그룹은 조용히 무산되던 것을 경고로 표면화(LinkedDeviceGroup=0/미배치 진단).
+            _log?.Warning($"그룹 심볼 미등록: DeviceGroup({groupId}) — 복원 no-op(LinkedDeviceGroup 미연결/미배치 가능성)");
+        }
+    }
+
+    /// <summary>
+    /// 그룹 심볼을 EQM 실제 상태로 **재계산 복원**(FR-03). 조치보고/제어기 복구 시 사용.
+    /// RestoreGroupSymbol(ProcessEventReport 휴리스틱)과 달리 **잔여 활성 이벤트를 반영**(맹목 Normal 금지 — 공존 센서 장애 색 보존).
+    /// EQM 미주입(테스트/DB모드) 시 no-op.
+    /// </summary>
+    public void RefreshGroupSymbol(int groupId)
+    {
+        if (_eventQueueManager == null) return;
+        var state = _eventQueueManager.GetGroupState(groupId);
+        SetGroupCompositeStatus(groupId, state);   // 직접 세팅 — 재계산값 그대로(미등록이면 SetGroupCompositeStatus가 경고)
+        _log?.Info($"그룹 심볼 재계산 복원: DeviceGroup({groupId}) → {state}");
+    }
+
+    /// <summary>개별 디바이스 심볼을 EQM 실제 상태로 재계산 반영(FR-03). EQM 미주입 시 no-op.</summary>
+    public void RefreshDeviceSymbol(int deviceId, EnumDeviceType deviceType)
+    {
+        if (_eventQueueManager == null) return;
+        if (!TryResolveDevice(deviceId, deviceType, out var lookup)) return;
+        var state = _eventQueueManager.GetDeviceState(deviceId, deviceType);
+        lookup.ApplyCompositeStatus(state);
+        _log?.Info($"개별 심볼 재계산: Device({deviceId},{deviceType}) → {state}");
     }
 
     /// <summary>
@@ -359,6 +413,11 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         {
             groupLookup.ApplyCompositeStatus(status);
             _log?.Info($"그룹 복합 상태 설정: DeviceGroup({groupId}) → {status}");
+        }
+        else
+        {
+            // FR-02 관측성: 미등록 그룹은 제어기 Blackout 등 상태가 조용히 유실되던 지점(근본원인 A) — 경고로 표면화.
+            _log?.Warning($"그룹 심볼 미등록: DeviceGroup({groupId}) → {status} 반영 no-op(LinkedDeviceGroup 미연결/미배치 가능성)");
         }
     }
 

@@ -1,4 +1,4 @@
-namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
+﻿namespace Ironwall.Dotnet.Libraries.Events.Ui.Managers;
 /****************************************************************************
    Purpose      : SymbolEventManager 인터페이스 (테스트 및 DI 주입 지원)
    Created By   : GHLee
@@ -48,6 +48,16 @@ public interface ISymbolEventManager
     /// 그룹 심볼 Normal 복원 (EventQueueManager N→0 전이 시 호출)
     /// </summary>
     void RestoreGroupSymbol(int groupId);
+
+    /// <summary>
+    /// 그룹 심볼을 EQM 실제 상태로 재계산 복원 (FR-03 조치보고/제어기 복구). 잔여 활성 이벤트 반영(맹목 Normal 금지).
+    /// </summary>
+    void RefreshGroupSymbol(int groupId);
+
+    /// <summary>
+    /// 개별 디바이스 심볼을 EQM 실제 상태로 재계산 반영 (FR-03).
+    /// </summary>
+    void RefreshDeviceSymbol(int deviceId, Enums.EnumDeviceType deviceType);
 
     /// <summary>
     /// 그룹 복합 상태 전이 처리 (EventQueueManager OnGroupStateChanged 구독용)
