@@ -236,6 +236,7 @@ public static class ApiMessageHelper
             HttpStatusCode.InternalServerError => "INTERNAL_SERVER_ERROR",
             HttpStatusCode.ServiceUnavailable => "SERVICE_UNAVAILABLE",
             HttpStatusCode.GatewayTimeout => "GATEWAY_TIMEOUT",
+            HttpStatusCode.TooManyRequests => "TOO_MANY_REQUESTS",
             _ => "UNKNOWN_ERROR"
         };
     }

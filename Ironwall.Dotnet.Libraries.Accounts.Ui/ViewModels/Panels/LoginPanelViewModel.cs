@@ -161,6 +161,7 @@ public class LoginPanelViewModel : BasePanelViewModel
             "FORBIDDEN"           => "계정이 잠겼거나 비활성 상태입니다. (로그인 시도 초과 등) 관리자에게 문의하세요.",   // W6: 잠금 사유 명확화
             "SERVICE_UNAVAILABLE" => "서버에 연결할 수 없습니다.",
             "GATEWAY_TIMEOUT"     => "요청 시간이 초과되었습니다.",
+            "TOO_MANY_REQUESTS"   => "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",   // 429(login-clientid-13)
             _                     => "아이디 또는 비밀번호가 일치하지 않습니다.",
         };
     }

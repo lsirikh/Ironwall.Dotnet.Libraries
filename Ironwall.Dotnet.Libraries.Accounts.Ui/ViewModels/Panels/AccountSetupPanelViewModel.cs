@@ -91,10 +91,14 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             }
             else
             {
-                // 403(비-ADMIN)은 전용 안내로 표면화(rbac-audit-15)
-                var explain = res.Error?.Code == "FORBIDDEN" || res.StatusCode == 403
-                    ? "권한이 없습니다 — 세션 설정 저장은 ADMIN 전용입니다."
-                    : $"저장 실패: {res.Error?.Message ?? res.Error?.Code ?? "서버 거부"}";
+                // 403(비-ADMIN)/422(제약위반)을 전용 안내로 표면화(rbac-audit-15 / settings-put-13)
+                string explain;
+                if (res.Error?.Code == "FORBIDDEN" || res.StatusCode == 403)
+                    explain = "권한이 없습니다 — 세션 설정 저장은 ADMIN 전용입니다.";
+                else if (res.StatusCode == 422)
+                    explain = $"입력값 제약 위반: {res.Error?.Details ?? res.Error?.Message ?? "값 범위를 확인하세요."}";
+                else
+                    explain = $"저장 실패: {res.Error?.Message ?? res.Error?.Code ?? "서버 거부"}";
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                 { Title = "세션 정책", Explain = explain });
             }

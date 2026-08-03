@@ -51,6 +51,14 @@ public class BearerAuthHandler : DelegatingHandler
         if (isAuth)
             return response;
 
+        // 폐기 세션(SESSION_REVOKED: 중복로그인 축출/강제/비번변경 등)이면 refresh 왕복이 무의미 — 즉시 세션 만료 처리(session-revoked-08).
+        if (await IsSessionRevokedAsync(response).ConfigureAwait(false))
+        {
+            _log?.Warning($"[BearerAuthHandler] SESSION_REVOKED 감지 — refresh 생략·세션 만료 발화 (401 trigger={request.RequestUri?.AbsolutePath})");
+            SessionExpired?.Invoke();
+            return response;
+        }
+
         var outcome = await TryRefreshSingleFlightAsync(staleToken, cancellationToken).ConfigureAwait(false);
         if (outcome == RefreshOutcome.Transient)
         {
@@ -90,6 +98,20 @@ public class BearerAuthHandler : DelegatingHandler
 
     private static bool MatchesPath(Uri? uri, string suffix)
         => uri is not null && uri.AbsolutePath.TrimEnd('/').EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>401 본문의 <c>error.code == SESSION_REVOKED</c> 판별 — 폐기 세션이면 refresh 생략(불필요 왕복 제거).
+    /// 본문은 기본 ResponseContentRead 로 버퍼되어 상위(ApiMessageHelper)가 재읽어도 안전. 파싱 실패/비JSON은 false.</summary>
+    private static async Task<bool> IsSessionRevokedAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(body)) return false;
+            var code = Newtonsoft.Json.Linq.JObject.Parse(body)["error"]?["code"]?.ToString();
+            return string.Equals(code, "SESSION_REVOKED", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
 
     private static void ApplyBearer(HttpRequestMessage request, string? token)
     {
