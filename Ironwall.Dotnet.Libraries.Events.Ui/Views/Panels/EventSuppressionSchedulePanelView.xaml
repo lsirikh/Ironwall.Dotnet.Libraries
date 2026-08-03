@@ -9,12 +9,15 @@
 	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	d:DesignHeight="720"
 	d:DesignWidth="1180"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	mc:Ignorable="d">
 	<UserControl.Resources>
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
+		<!--  DataGrid 컬럼 헤더는 DataContext를 상속하지 않음 → 패널 VM 접근용 프록시  -->
+		<utils:BindingProxy x:Key="proxy" Data="{Binding}" />
 	</UserControl.Resources>
 
 	<!--  중앙 정렬 바운드 박스 (최상위 패널 표준, ReportConsole 패턴 — 전체화면 stretch 방지 + 불투명 배경)  -->
@@ -88,14 +91,7 @@
 								Text="{Binding DeleteSelectedText}" />
 						</StackPanel>
 					</Button>
-					<CheckBox
-						DockPanel.Dock="Left"
-						Margin="0,0,14,0"
-						VerticalAlignment="Center"
-						Content="취소항목 전체선택"
-						Foreground="{DynamicResource TextSecondaryBrush}"
-						IsChecked="{Binding SelectAllDeletable, Mode=TwoWay}"
-						Visibility="{Binding HasDeletableRows, Converter={StaticResource BoolToVis}}" />
+					<!--  전체선택 체크박스는 DataGrid 체크박스 컬럼 헤더로 이동(중복 제거)  -->
 
 					<Button
 						DockPanel.Dock="Right"
@@ -395,6 +391,17 @@
 					<DataGrid.Columns>
 						<!--  삭제 선택 체크박스 — 취소/종료(terminal) 행에만 노출  -->
 						<DataGridTemplateColumn Width="60">
+							<!--  헤더 전체선택 — 취소/종료(삭제 가능) 행 일괄 체크. 대상 행 없으면 비활성  -->
+							<DataGridTemplateColumn.HeaderTemplate>
+								<DataTemplate>
+									<CheckBox
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										IsChecked="{Binding Data.SelectAllDeletable, Source={StaticResource proxy}, Mode=TwoWay}"
+										IsEnabled="{Binding Data.HasDeletableRows, Source={StaticResource proxy}}"
+										ToolTip="취소/종료 항목 전체 선택" />
+								</DataTemplate>
+							</DataGridTemplateColumn.HeaderTemplate>
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
 									<CheckBox

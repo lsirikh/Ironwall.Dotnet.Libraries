@@ -272,8 +272,14 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                     });
             }
             else
+            {
+                // 404/405 = 서버에 /bulk-delete 미배포(구버전 서버) — 원인을 바로 알 수 있게 안내.
+                var hint = res.StatusCode is 404 or 405
+                    ? "\n\n※ 서버에 일괄삭제 기능이 아직 배포되지 않았습니다(서버 업데이트 필요)."
+                    : string.Empty;
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                { Title = "억제 스케줄 삭제", Explain = $"삭제 실패: {res.Error?.Message ?? res.Message}" });
+                { Title = "억제 스케줄 삭제", Explain = $"삭제 실패: {res.Error?.Message ?? res.Message}{hint}" });
+            }
         }
         catch (Exception ex) { _log?.Error($"[Suppression] 일괄 삭제 실패: {ex.Message}"); }
         finally
