@@ -84,6 +84,17 @@ public class ApiService : IApiService
             BaseAddress = new Uri(baseUrl),
             Timeout = TimeSpan.FromSeconds(timeoutSec)
         };
+
+        // FR-2: 세션 식별용 X-Client-Id(주체별 고유). 로그인 포함 전 요청에 일관 부착.
+        // 빈값이면 미부착(하위호환 안전), 패턴(^[A-Za-z0-9._:-]{1,64}$) 위반이면 미부착+경고(서버는 위반값을 무시).
+        var clientId = _setupModel.ClientId;
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(clientId, "^[A-Za-z0-9._:-]{1,64}$"))
+                _client.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Id", clientId);
+            else
+                _log?.Warning($"[ApiService] X-Client-Id 패턴 위반으로 미부착: '{clientId}'");
+        }
     }
 
     /// <summary>
