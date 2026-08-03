@@ -250,7 +250,7 @@
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -270,7 +270,7 @@
 				<DataGridTemplateColumn
 					CanUserSort="True"
 					IsReadOnly="True"
-					Header="Message Type"
+					Header="이벤트 종류"
 					SortMemberPath="MessageType">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -316,7 +316,7 @@
 				<!--  Device  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Device"
+					Header="장비"
 					SortMemberPath="Device">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -365,7 +365,7 @@
 				<!--  Reason  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Reason"
+					Header="사유"
 					SortMemberPath="Reason">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -410,7 +410,7 @@
 				<!--  FirstStart  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="FirstStart"
+					Header="1차 시작"
 					SortMemberPath="FirstStart">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -439,7 +439,7 @@
 				<!--  FirstEnd  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="FirstEnd"
+					Header="1차 종료"
 					SortMemberPath="FirstEnd">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -468,7 +468,7 @@
 				<!--  SecondStart  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="SecondStart"
+					Header="2차 시작"
 					SortMemberPath="SecondStart">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -497,7 +497,7 @@
 				<!--  SecondEnd  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="SecondEnd"
+					Header="2차 종료"
 					SortMemberPath="SecondEnd">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -548,7 +548,7 @@
 				<!--  DateTime  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="DateTime"
+					Header="발생시각"
 					SortMemberPath="DateTime">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">

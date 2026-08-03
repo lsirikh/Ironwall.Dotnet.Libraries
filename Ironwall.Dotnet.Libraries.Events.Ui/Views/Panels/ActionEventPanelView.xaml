@@ -236,7 +236,7 @@
 				<!--  No  -->
 				<DataGridTextColumn
 					Binding="{Binding Index}"
-					Header="No"
+					Header="번호"
 					IsReadOnly="True">
 					<DataGridTextColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -256,7 +256,7 @@
 				<DataGridTemplateColumn
 					CanUserSort="True"
 					IsReadOnly="True"
-					Header="Message Type"
+					Header="이벤트 종류"
 					SortMemberPath="MessageType">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -302,7 +302,7 @@
 				<!--  OriginEvent  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="OriginEvent"
+					Header="원본 이벤트"
 					SortMemberPath="OriginEvent">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -417,7 +417,7 @@
 				<!--  User  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="User"
+					Header="사용자"
 					SortMemberPath="User">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -446,7 +446,7 @@
 				<!--  Content  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="Content"
+					Header="내용"
 					SortMemberPath="Content">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
@@ -475,7 +475,7 @@
 				<!--  DateTime  -->
 				<DataGridTemplateColumn
 					CanUserSort="True"
-					Header="DateTime"
+					Header="발생시각"
 					SortMemberPath="DateTime">
 					<DataGridColumn.HeaderStyle>
 						<Style BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}" TargetType="{x:Type DataGridColumnHeader}">
