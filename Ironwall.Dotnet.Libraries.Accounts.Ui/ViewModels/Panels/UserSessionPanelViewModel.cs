@@ -140,7 +140,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
                 {
                     if (_isTearingDown) return;   // teardown 이 레이스 승리 — 늦은 타이머 tick의 stale swap 폐기(TOCTOU)
                     Items.Clear();
-                    foreach (var d in res.Data) Items.Add(d);
+                    foreach (var d in res.Data) { d.IsCurrentSession = IsMine(d); Items.Add(d); }
                     NotifyOfPropertyChange(() => LoadedCountText);
                     NotifyOfPropertyChange(() => HasMorePages);
                 });
@@ -175,7 +175,7 @@ public class UserSessionPanelViewModel : BasePanelViewModel
 
             DispatcherService.Invoke(() =>
             {
-                foreach (var d in res.Data) Items.Add(d);
+                foreach (var d in res.Data) { d.IsCurrentSession = IsMine(d); Items.Add(d); }
                 NotifyOfPropertyChange(() => LoadedCountText);
                 NotifyOfPropertyChange(() => HasMorePages);
             });
@@ -212,6 +212,17 @@ public class UserSessionPanelViewModel : BasePanelViewModel
     {
         _autoRefreshTimer?.Dispose();
         _autoRefreshTimer = null;
+    }
+
+    /// <summary>현재(내) 세션 근사 판별 — 내 로그인 계정의 활성 세션. sub=login_id 또는 user_id 클레임 둘 다 대조(force-logout-04).
+    /// 정확한 단일-세션 식별은 서버 is_current/session_id 필요(미제공) → 자기-로그아웃 보호에 충분한 근사.</summary>
+    private bool IsMine(UserSessionDto d)
+    {
+        if (d is null || !d.IsActive) return false;
+        var me = _tokenStore.UserId;
+        if (string.IsNullOrEmpty(me)) return false;
+        return string.Equals(d.LoginId, me, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(d.UserId.ToString(), me, StringComparison.Ordinal);
     }
 
     #region - Properties -

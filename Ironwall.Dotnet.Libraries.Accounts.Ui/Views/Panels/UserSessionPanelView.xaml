@@ -8,6 +8,7 @@
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:conv="clr-namespace:Ironwall.Dotnet.Libraries.Accounts.Ui.Converters"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	d:DesignHeight="450"
 	d:DesignWidth="900"
@@ -16,6 +17,8 @@
 	<UserControl.Resources>
 		<!--  ISO(+09:00) string? → "yyyy-MM-dd HH:mm" 표시(파싱 실패 시 원문 폴백). 색 무관.  -->
 		<utils:IsoDateStringConverter x:Key="IsoDateStringConverter" />
+		<!--  세션 종료 사유 코드→한글(표시 전용)  -->
+		<conv:LogoutReasonConverter x:Key="LogoutReasonConverter" />
 	</UserControl.Resources>
 	<!--  탭 콘텐츠 — 색은 100% DynamicResource 토큰. (세션 정책 영역은 EXT-10에서 상단 추가 예정)  -->
 	<Grid Margin="6">
@@ -69,13 +72,41 @@
 				<behavior:DataGridScrollEndBehavior Command="{Binding LoadMoreCommand}" Threshold="50" />
 			</i:Interaction.Behaviors>
 			<DataGrid.Columns>
-				<DataGridTextColumn Width="130" Binding="{Binding LoginId}" Header="사용자" />
-				<DataGridTextColumn Width="90" Binding="{Binding Role}" Header="역할" />
-				<DataGridTextColumn Width="130" Binding="{Binding IpAddress}" Header="IP" />
+				<DataGridTemplateColumn Width="64" Header="현재">
+						<DataGridTemplateColumn.CellTemplate>
+							<DataTemplate>
+								<Border Padding="8,2" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource PrimaryHueLightBrush}" CornerRadius="9">
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="Visibility" Value="Collapsed" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsCurrentSession}" Value="True">
+													<Setter Property="Visibility" Value="Visible" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+									<TextBlock FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryHueLightForegroundBrush}" Text="현재" />
+								</Border>
+							</DataTemplate>
+						</DataGridTemplateColumn.CellTemplate>
+					</DataGridTemplateColumn>
+					<DataGridTextColumn Width="120" Binding="{Binding LoginId}" Header="사용자" />
+				<DataGridTextColumn Width="80" Binding="{Binding Role}" Header="역할" />
+					<DataGridTextColumn Width="110" Binding="{Binding ClientId, TargetNullValue=-}" Header="클라이언트" />
+				<DataGridTextColumn Width="120" Binding="{Binding IpAddress}" Header="IP" />
+					<DataGridTextColumn Width="90" Binding="{Binding UserAgent}" Header="단말">
+						<DataGridTextColumn.ElementStyle>
+							<Style TargetType="TextBlock">
+								<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+								<Setter Property="ToolTip" Value="{Binding UserAgent}" />
+							</Style>
+						</DataGridTextColumn.ElementStyle>
+					</DataGridTextColumn>
 				<DataGridCheckBoxColumn Width="60" Binding="{Binding IsActive}" Header="활성" />
 				<DataGridTextColumn Width="140" Binding="{Binding ExpiresAt, Converter={StaticResource IsoDateStringConverter}}" Header="만료" />
 				<DataGridTextColumn Width="140" Binding="{Binding LoggedOutAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그아웃" />
-				<DataGridTextColumn Width="130" Binding="{Binding LogoutReason}" Header="사유" />
+				<DataGridTextColumn Width="120" Binding="{Binding LogoutReason, Converter={StaticResource LogoutReasonConverter}}" Header="사유" />
 				<DataGridTextColumn Width="140" Binding="{Binding CreatedAt, Converter={StaticResource IsoDateStringConverter}}" Header="로그인시각" />
 				<DataGridTemplateColumn Width="120" Header="관리">
 					<DataGridTemplateColumn.CellTemplate>
