@@ -67,6 +67,9 @@
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
+							<!--  detail 편집 행(AI 모델/추론, 프레임)  -->
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
 						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="56" />
@@ -169,32 +172,85 @@
 							</ComboBox.ItemTemplate>
 						</ComboBox>
 
-						<!--  탐지 상세(detail) — 읽기전용 계측값 (Detection_Signal_History). 신호/AI 한 행 공유  -->
+						<!--  탐지 상세(detail) 편집 — 값을 비우면 그 항목은 변경되지 않는다(기존 값 유지).
+						      썸네일·객체는 편집 대상이 아니며 저장 시 원본 그대로 보존된다.
+						      단일 선택에서만 편집 가능(IsDetailEditable) — 다중 선택은 대상이 모호.  -->
 						<TextBlock Grid.Row="7" Grid.Column="0" Text="신호" />
-						<StackPanel
+						<TextBox
 							Grid.Row="7"
 							Grid.Column="1"
-							Orientation="Horizontal">
+							Margin="0,2"
+							FontFamily="Consolas"
+							IsEnabled="{Binding IsDetailEditable}"
+							Style="{StaticResource TextBoxInput}"
+							Text="{Binding SignalEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+							ToolTip="탐지 신호 크기(detail.signal)" />
+
+						<TextBlock Grid.Row="8" Grid.Column="0" Text="AI" />
+						<Grid Grid.Row="8" Grid.Column="1">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*" />
+								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="70" />
+							</Grid.ColumnDefinitions>
+							<TextBox
+								Grid.Column="0"
+								Margin="0,2"
+								IsEnabled="{Binding IsDetailEditable}"
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding AiModelEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+								ToolTip="AI 모델명(detail.model)" />
 							<TextBlock
-								MinWidth="70"
-								VerticalAlignment="Center"
-								FontFamily="Consolas"
-								Text="{Binding SignalText, Mode=OneWay}" />
-							<TextBlock
-								Margin="12,0,6,0"
+								Grid.Column="1"
+								Margin="8,0,4,0"
 								VerticalAlignment="Center"
 								Opacity="0.75"
-								Text="AI" />
-							<TextBlock
-								VerticalAlignment="Center"
-								Text="{Binding AiSummaryText, Mode=OneWay}"
-								TextTrimming="CharacterEllipsis"
-								ToolTip="{Binding AiSummaryText}" />
-						</StackPanel>
+								Text="추론(ms)" />
+							<TextBox
+								Grid.Column="2"
+								Margin="0,2"
+								FontFamily="Consolas"
+								IsEnabled="{Binding IsDetailEditable}"
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding InferenceMsEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+								ToolTip="추론 시간 ms(detail.inference_ms)" />
+						</Grid>
 
-						<TextBlock Grid.Row="8" Grid.Column="0" Text="객체" />
+						<TextBlock Grid.Row="9" Grid.Column="0" Text="프레임" />
+						<Grid Grid.Row="9" Grid.Column="1">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*" />
+								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="*" />
+							</Grid.ColumnDefinitions>
+							<TextBox
+								Grid.Column="0"
+								Margin="0,2"
+								FontFamily="Consolas"
+								IsEnabled="{Binding IsDetailEditable}"
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding FrameWidthEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+								ToolTip="프레임 가로 px(detail.frame_width) — 객체 bbox 좌표 해석 기준" />
+							<TextBlock
+								Grid.Column="1"
+								Margin="6,0"
+								VerticalAlignment="Center"
+								Opacity="0.75"
+								Text="×" />
+							<TextBox
+								Grid.Column="2"
+								Margin="0,2"
+								FontFamily="Consolas"
+								IsEnabled="{Binding IsDetailEditable}"
+								Style="{StaticResource TextBoxInput}"
+								Text="{Binding FrameHeightEdit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+								ToolTip="프레임 세로 px(detail.frame_height)" />
+						</Grid>
+
+						<!--  객체(objects[])는 배열이라 편집 대상 아님 — 읽기 전용 표시  -->
+						<TextBlock Grid.Row="10" Grid.Column="0" Text="객체" />
 						<TextBlock
-							Grid.Row="8"
+							Grid.Row="10"
 							Grid.Column="1"
 							VerticalAlignment="Center"
 							Text="{Binding ObjectsText, Mode=OneWay}"
