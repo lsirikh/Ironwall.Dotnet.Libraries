@@ -15,6 +15,15 @@
 ## [Unreleased]
 
 ### Added
+- **탐지 수정 저장 — PUT 실패 후 실제 저장 여부 되읽기 검증** (Track B · Events.Ui · 사용자 지시 2026-08-04)
+  - **문제(사용자 실측)**: 신호를 고쳐 [적용]→[저장] 하면 `1건 저장에 실패했습니다 … Internal server error` 팝업. **그런데 값은 DB에 저장돼 있다.** 사용자는 실패로 알고 재시도/포기 → 화면과 데이터가 어긋난다.
+  - **근거 3중**: ① 사용자 로그 시간순 — `UpdateDetectionEventAsync started(33,534)` → 서버 `SYNC_DETECTION resource_id=52412(33,569)` → `Internal server error(33,581)`. 서버는 **UPDATE 커밋 후에만** SYNC를 발행하므로 쓰기는 끝난 뒤 응답 조립에서 터진 것. ② 서버 재조회 시 `signal`이 편집값과 동일. ③ 서버의 `detail`이 7키 전체 형태 = 클라 `BuildDetectionDetail` 산출물(NATS 유래 이벤트는 2키) → 클라 페이로드가 그대로 DB에 반영됨.
+  - **수정** `EventProviderService.UpdateDetectionEventAsync` — PUT 실패 시 `GetDetectionEventByIdAsync` 로 **실제 서버 상태를 되읽어** 보낸 페이로드(type_event·result·detail 7키)와 **전 필드 대조**. 일치할 때만 성공으로 간주해 모델을 반환하고 `WARN 서버 응답 오류였으나 저장은 확인됨` 기록. 불일치·조회 실패·`OperationCanceledException` 은 **원래 실패를 그대로 전파**. Draft(Id≤0)는 검증 대상 아님.
+  - **거짓 성공이 아니다**: 실패를 숨기는 게 아니라 실제 상태를 확인하는 것이라 진짜 실패는 여전히 실패로 뜬다. 서버가 고쳐지면 PUT이 성공하므로 이 경로는 **아예 타지 않는다**(정상 경로 되읽기 0회를 테스트로 고정).
+  - **패널 무변경**: 예외 대신 모델이 반환되므로 기존 성공 집계·dirty 해제·목록 재조회 로직이 그대로 동작(파급 최소).
+  - **실서버 검증(2026-08-04 01:2x)**: 폴백과 동일 순서를 실 API로 재현 — `PUT → 500` → 되읽기 `signal 2563` = 보낸 값 **일치 → 성공 처리**. 검증 후 원값 2556 원복. 동시각 `PUT /events/malfunctions/{id}` 는 200(탐지만 결함).
+  - **테스트**: `DetectionSaveVerificationTests` 5종(저장됨→성공 / 값 다름→실패 / 조회 실패→실패 / result 불일치→실패 / 정상 경로 되읽기 0회). 전체 **444통과/15실패**(실패는 기존 베이스라인과 동일 목록, 2회 반복 일치) = **회귀 0**. 빌드 0오류 · BOM · mojibake 0.
+  - 범위: 연결(Connection) PUT 도 같은 서버 결함이나 편집 UI 자체가 없어(PRD DEF-04) 사용자 영향 없음 → 미적용. 근본 해결은 서버 `4f0e875` 재배포.
 - **탐지 속성창 편집 상태 정규화 — `DetectionEditModel` 도입** (Track C · Events.Ui · PRD `docs/prds/Event_Edit_Save_Pipeline-prd.md` FR-01/02 후속 · 사용자 지시 2026-08-03)
   - **문제**: `DetectionSelectionViewModel`의 편집 상태가 **세 가지 형식으로 흩어져** 있었다 — ① 공통값 필드(`MessageType`/`Result`/`Status`/`DateTime`)는 **무-알림 auto-property**, ② 상세 필드는 `*Edit` 별도 명명 + 별도 알림, ③ 적용 경로도 둘(`item.X = X ?? item.X` 루프 vs `ApplyDetailEdits`)로 갈라져 한쪽이 모델 직접 대입이었다.
   - **정규화**: 편집 상태를 **모델 하나(`Models/DetectionEditModel.cs`)**로 모으고 규칙을 통일 — ① 모든 필드 `null` = "변경 없음", 값 있음 = "이 값으로 변경" ② 모든 필드 PropertyChanged 발생(무-알림 auto-property 제거 = DEF-18 잠복 결함 해소) ③ 적용 경로는 `ApplyTo(row, includeDetail)` **하나**뿐이며 **행 ViewModel 세터만** 사용.

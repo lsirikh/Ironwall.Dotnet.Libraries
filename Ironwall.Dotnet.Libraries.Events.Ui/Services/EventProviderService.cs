@@ -521,12 +521,70 @@ public class EventProviderService
             _log?.Info($"UpdateDetectionEventAsync() completed for ID {model.Id}");
             return updatedModel;
         }
+        catch (OperationCanceledException) { throw; }   // 사용자 취소는 검증 대상 아님
         catch (Exception ex)
         {
+            // 서버가 UPDATE를 커밋한 뒤 응답 조립에서 실패하는 사례가 있다
+            // (PUT /events/detections/{id} 의 event.device lazy-load → MissingGreenlet → 500).
+            // 이때 DB에는 값이 반영돼 있는데 클라는 "저장 실패"로 표시해 사용자가 재시도/포기하게 된다.
+            // → 실패를 성공으로 둔갑시키는 게 아니라, **실제 서버 상태를 되읽어 확인**한다.
+            //   보낸 페이로드와 일치할 때만 성공으로 간주하고, 아니면 원래대로 실패를 전파한다.
+            var verified = await TryVerifyDetectionSavedAsync(model, token).ConfigureAwait(false);
+            if (verified != null)
+            {
+                _log?.Warning($"UpdateDetectionEventAsync(): 서버 응답 오류였으나 저장은 확인됨 (ID {model.Id}) — {ex.Message}");
+                return verified;
+            }
+
             _log?.Error($"UpdateDetectionEventAsync() failed: {ex.Message}");
             throw;
         }
     }
+
+    /// <summary>
+    /// PUT 실패 후 <b>실제 저장 여부를 되읽어 확인</b>한다.
+    /// 서버 상태가 우리가 보낸 페이로드(type_event·result·detail)와 일치하면 그 모델을, 아니면 null을 돌려준다.
+    /// </summary>
+    /// <remarks>
+    /// 조회 자체가 실패하면(네트워크 단절·404 등) null → 호출부가 원래 예외를 그대로 전파한다.
+    /// 서버 응답 결함이 해소되면 이 경로는 아예 타지 않는다.
+    /// </remarks>
+    private async Task<IDetectionEventModel?> TryVerifyDetectionSavedAsync(
+        IDetectionEventModel sent,
+        CancellationToken token)
+    {
+        if (sent.Id <= 0) return null;   // 신규(Draft)는 확인할 대상이 없다
+
+        try
+        {
+            var res = await _apiService.GetDetectionEventByIdAsync(sent.Id, token).ConfigureAwait(false);
+            if (!res.Success || res.Data == null) return null;
+
+            var actual = res.Data.ToDetectionEventModel(_deviceProvider);
+            return MatchesSentPayload(actual, sent) ? actual : null;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _log?.Warning($"TryVerifyDetectionSavedAsync(ID {sent.Id}) 조회 실패: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 서버 상태가 PUT으로 보낸 값과 같은지 비교한다.
+    /// <b>실제로 전송한 필드만</b> 본다 — Replace 계약이 허용하는 type_event·result·detail 뿐이며,
+    /// created_at·action_reported 등 서버가 관리하는 필드는 비교 대상이 아니다.
+    /// </summary>
+    private static bool MatchesSentPayload(IDetectionEventModel actual, IDetectionEventModel sent)
+        => actual.MessageType == sent.MessageType
+        && actual.Result      == sent.Result
+        && actual.Signal      == sent.Signal
+        && actual.InferenceMs == sent.InferenceMs
+        && actual.FrameWidth  == sent.FrameWidth
+        && actual.FrameHeight == sent.FrameHeight
+        && string.Equals(actual.AiModel   ?? string.Empty, sent.AiModel   ?? string.Empty, StringComparison.Ordinal)
+        && string.Equals(actual.Thumbnail ?? string.Empty, sent.Thumbnail ?? string.Empty, StringComparison.Ordinal);
 
     /// <summary>
     /// GOP API를 통해 Detection Event를 삭제합니다.

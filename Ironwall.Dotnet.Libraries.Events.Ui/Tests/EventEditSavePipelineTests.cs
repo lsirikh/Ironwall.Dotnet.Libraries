@@ -8,6 +8,8 @@ using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
 using Ironwall.Dotnet.Libraries.Events.Ui.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels;
+using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using Moq;
@@ -459,6 +461,113 @@ public class DetectionSelectionApplyTests : IoCStubbedTestBase
         Assert.Equal(800, ((IDetectionEventModel)second.Model).Signal);
         Assert.False(first.IsEdited);
         Assert.False(second.IsEdited);
+    }
+}
+#endregion
+
+#region - PUT 실패 후 저장 검증 폴백 (서버가 커밋 후 응답 조립에서 500) -
+/// <summary>
+/// 서버 `PUT /events/detections/{id}` 는 UPDATE를 커밋한 뒤 응답 조립(event.device lazy-load)에서
+/// 터져 500을 돌려준다 — DB에는 값이 반영됐는데 클라는 "저장 실패"로 표시한다(실측 2026-08-04).
+/// 실패를 성공으로 둔갑시키지 않고 <b>실제 서버 상태를 되읽어</b> 보낸 값과 일치할 때만 성공 처리한다.
+/// </summary>
+public class DetectionSaveVerificationTests
+{
+    private static DetectionEventDto BuildDto(int id, int? signal, string result = "PIR_SENSOR", string type = "Intrusion")
+        => new()
+        {
+            Id = id,
+            CreatedAt = "2026-08-03T12:00:00",
+            TypeEvent = type,
+            ActionReported = "False",
+            Result = result,
+            Detail = new DetectionDetailDto { Signal = signal }
+        };
+
+    private static IDetectionEventModel BuildSent(int id, int? signal)
+        => new DetectionEventModel
+        {
+            Id = id,
+            MessageType = EnumEventType.Intrusion,
+            Result = EnumDetectionType.PIR_SENSOR,
+            DateTime = new DateTime(2026, 8, 3, 12, 0, 0),
+            Signal = signal
+        };
+
+    private static (EventProviderService svc, Mock<IEventApiService> api) CreateSut(
+        ApiResponse<DetectionEventDto> putResult,
+        ApiResponse<DetectionEventDto> getResult)
+    {
+        var api = new Mock<IEventApiService>();
+        api.Setup(a => a.UpdateDetectionEventAsync(It.IsAny<int>(), It.IsAny<DetectionEventReplaceDto>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(putResult);
+        api.Setup(a => a.GetDetectionEventByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(getResult);
+        return (new EventProviderService(new Mock<ILogService>().Object, api.Object), api);
+    }
+
+    private static ApiResponse<DetectionEventDto> Fail()
+        => new() { Success = false, Data = null };
+
+    private static ApiResponse<DetectionEventDto> Ok(DetectionEventDto dto)
+        => new() { Success = true, Data = dto };
+
+    [Fact]
+    public async Task should_return_verified_model_when_put_fails_but_value_persisted()
+    {
+        // Arrange — PUT은 실패(500)하지만 서버에는 우리가 보낸 값이 들어가 있다
+        var (svc, api) = CreateSut(Fail(), Ok(BuildDto(100, signal: 3400)));
+
+        // Act
+        var result = await svc.UpdateDetectionEventAsync(BuildSent(100, 3400));
+
+        // Assert — 예외 없이 확인된 모델 반환 + 되읽기 1회
+        Assert.NotNull(result);
+        Assert.Equal(3400, result.Signal);
+        api.Verify(a => a.GetDetectionEventByIdAsync(100, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task should_throw_when_put_fails_and_server_value_differs()
+    {
+        // Arrange — 서버 값이 보낸 값과 다르다 = 진짜 실패
+        var (svc, _) = CreateSut(Fail(), Ok(BuildDto(100, signal: 1200)));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.UpdateDetectionEventAsync(BuildSent(100, 3400)));
+    }
+
+    [Fact]
+    public async Task should_throw_when_put_fails_and_verification_fetch_fails()
+    {
+        // Arrange — 확인 조회 자체가 실패(네트워크 단절·404) → 원래 실패를 그대로 전파
+        var (svc, _) = CreateSut(Fail(), Fail());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.UpdateDetectionEventAsync(BuildSent(100, 3400)));
+    }
+
+    [Fact]
+    public async Task should_throw_when_put_fails_and_result_differs()
+    {
+        // Arrange — detail은 같지만 result가 반영되지 않았다 = 부분 실패도 실패로 본다
+        var (svc, _) = CreateSut(Fail(), Ok(BuildDto(100, signal: 3400, result: "AI_DETECT")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.UpdateDetectionEventAsync(BuildSent(100, 3400)));
+    }
+
+    [Fact]
+    public async Task should_not_fetch_verification_when_put_succeeds()
+    {
+        // Arrange — 정상 경로에서는 되읽기를 하지 않는다(서버 수정 후 이 폴백은 아예 타지 않음)
+        var (svc, api) = CreateSut(Ok(BuildDto(100, signal: 3400)), Ok(BuildDto(100, signal: 3400)));
+
+        var result = await svc.UpdateDetectionEventAsync(BuildSent(100, 3400));
+
+        Assert.NotNull(result);
+        api.Verify(a => a.GetDetectionEventByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
 #endregion
