@@ -50,6 +50,19 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
             { Title = "세션 정책", Explain = "값 범위를 확인하세요. 세션 만료 1~168h, refresh 1~90일, 잠금 임계 0~20, 자동해제 0~1440분." });
             return;
         }
+        // v6.3 동시성 5키 클라 검증(서버 422 선제 차단)
+        if (ConcurrencyPolicy is not ("evict_all" or "allow"))
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "세션 정책", Explain = "동시 세션 정책은 '단일(evict_all)' 또는 '다중(allow)'만 가능합니다." });
+            return;
+        }
+        if (MaxConcurrentSessions is < 0 or > 100 || SessionHistoryRetentionDays is < 0 or > 3650)
+        {
+            await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            { Title = "세션 정책", Explain = "값 범위를 확인하세요. 최대 동시 세션 0~100(0=무제한), 세션 이력 보존 0~3650일(0=정리 안 함)." });
+            return;
+        }
 
         var api = ResolveApi();
         if (api == null) return;
@@ -62,6 +75,12 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 LockoutThreshold = LockoutThreshold,
                 LockoutDurationMinutes = LockoutDurationMinutes,
                 SessionEnabled = SessionPolicyEnabled,
+                // v6.3 동시성 5키(읽기전용 auth_mode/jwt_algorithm은 미포함 = null 전송 안 함, 부분 PUT)
+                SessionConcurrencyPolicy = ConcurrencyPolicy,
+                MaxConcurrentSessions = MaxConcurrentSessions,
+                SessionSelfReplaceEnabled = SessionSelfReplaceEnabled,
+                SessionHistoryRetentionDays = SessionHistoryRetentionDays,
+                LoginAnomalyEventEnabled = LoginAnomalyEventEnabled,
             };
             var res = await api.UpdateSessionSettingsAsync(dto);
             if (res.Success)
@@ -103,6 +122,12 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
                 SessionPolicyEnabled = d.SessionEnabled ?? true;
                 AuthMode = d.AuthMode ?? "-";
                 JwtAlgorithm = d.JwtAlgorithm ?? "-";
+                // v6.3 동시성 5키 — 구버전 서버(키 없음)는 기본값 폴백
+                ConcurrencyPolicy = d.SessionConcurrencyPolicy ?? "evict_all";
+                MaxConcurrentSessions = d.MaxConcurrentSessions ?? 0;
+                SessionSelfReplaceEnabled = d.SessionSelfReplaceEnabled ?? false;
+                SessionHistoryRetentionDays = d.SessionHistoryRetentionDays ?? 0;
+                LoginAnomalyEventEnabled = d.LoginAnomalyEventEnabled ?? false;
                 ServerSettingsAvailable = true;
                 ServerStatus = string.Empty;
             }
@@ -123,6 +148,8 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     {
         TimeoutHours = 24; RefreshDays = 7; LockoutThreshold = 5; LockoutDurationMinutes = 30; SessionPolicyEnabled = true;
         AuthMode = "(서버 조회 필요)"; JwtAlgorithm = "-";
+        ConcurrencyPolicy = "evict_all"; MaxConcurrentSessions = 0; SessionSelfReplaceEnabled = false;
+        SessionHistoryRetentionDays = 0; LoginAnomalyEventEnabled = false;
         ServerSettingsAvailable = false;
         ServerStatus = status;
     }
@@ -153,6 +180,25 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     private bool _sessionPolicyEnabled = true;
     public bool SessionPolicyEnabled { get => _sessionPolicyEnabled; set { _sessionPolicyEnabled = value; NotifyOfPropertyChange(() => SessionPolicyEnabled); } }
 
+    // ── v6.3 동시성 5키 ──
+    private string _concurrencyPolicy = "evict_all";
+    public string ConcurrencyPolicy { get => _concurrencyPolicy; set { _concurrencyPolicy = value; NotifyOfPropertyChange(() => ConcurrencyPolicy); NotifyOfPropertyChange(() => IsAllowPolicy); } }
+
+    private int _maxConcurrentSessions;
+    public int MaxConcurrentSessions { get => _maxConcurrentSessions; set { _maxConcurrentSessions = value; NotifyOfPropertyChange(() => MaxConcurrentSessions); } }
+
+    private bool _sessionSelfReplaceEnabled;
+    public bool SessionSelfReplaceEnabled { get => _sessionSelfReplaceEnabled; set { _sessionSelfReplaceEnabled = value; NotifyOfPropertyChange(() => SessionSelfReplaceEnabled); } }
+
+    private int _sessionHistoryRetentionDays;
+    public int SessionHistoryRetentionDays { get => _sessionHistoryRetentionDays; set { _sessionHistoryRetentionDays = value; NotifyOfPropertyChange(() => SessionHistoryRetentionDays); } }
+
+    private bool _loginAnomalyEventEnabled;
+    public bool LoginAnomalyEventEnabled { get => _loginAnomalyEventEnabled; set { _loginAnomalyEventEnabled = value; NotifyOfPropertyChange(() => LoginAnomalyEventEnabled); } }
+
+    /// <summary>정책=allow &amp; 서버가용일 때만 최대세션·자기교체 컨트롤 활성(GUIDE §3 의존 UX).</summary>
+    public bool IsAllowPolicy => ServerSettingsAvailable && ConcurrencyPolicy == "allow";
+
     private string _authMode = "-";
     public string AuthMode { get => _authMode; set { _authMode = value; NotifyOfPropertyChange(() => AuthMode); } }
 
@@ -163,7 +209,7 @@ public class AccountSetupPanelViewModel : BasePanelViewModel
     public bool ServerSettingsAvailable
     {
         get => _serverSettingsAvailable;
-        set { _serverSettingsAvailable = value; NotifyOfPropertyChange(() => ServerSettingsAvailable); NotifyOfPropertyChange(() => CanClickSave); }
+        set { _serverSettingsAvailable = value; NotifyOfPropertyChange(() => ServerSettingsAvailable); NotifyOfPropertyChange(() => CanClickSave); NotifyOfPropertyChange(() => IsAllowPolicy); }
     }
 
     private string _serverStatus = string.Empty;

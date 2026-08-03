@@ -30,4 +30,20 @@ public class SessionSettingsDto
 
     /// <summary>JWT 서명 알고리즘. 읽기 전용.</summary>
     [JsonProperty("jwt_algorithm")] public string? JwtAlgorithm { get; set; }
+
+    // ── v6.3 동시성 5키 (nullable — 구버전 서버 폴백). GUIDE §2 ──
+    /// <summary>동시 세션 정책: evict_all(단일) | allow(다중 공존). 편집 가능.</summary>
+    [JsonProperty("session_concurrency_policy")] public string? SessionConcurrencyPolicy { get; set; }
+
+    /// <summary>allow일 때 계정당 최대 동시 세션 수(0=무제한, 0~100). 편집 가능.</summary>
+    [JsonProperty("max_concurrent_sessions")] public int? MaxConcurrentSessions { get; set; }
+
+    /// <summary>같은 client_id 재로그인 시 그 클라의 옛 세션만 교체(고유 client_id 선행 필요). 편집 가능.</summary>
+    [JsonProperty("session_self_replace_enabled")] public bool? SessionSelfReplaceEnabled { get; set; }
+
+    /// <summary>오래된 비활성 세션 이력 보존일(0=정리 안 함, 0~3650). 편집 가능.</summary>
+    [JsonProperty("session_history_retention_days")] public int? SessionHistoryRetentionDays { get; set; }
+
+    /// <summary>(예약) 로그인 이상탐지 이벤트 발행. 서버 배선 후속. 편집 가능.</summary>
+    [JsonProperty("login_anomaly_event_enabled")] public bool? LoginAnomalyEventEnabled { get; set; }
 }
