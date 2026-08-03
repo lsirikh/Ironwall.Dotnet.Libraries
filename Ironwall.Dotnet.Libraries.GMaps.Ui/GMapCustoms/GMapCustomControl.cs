@@ -1693,18 +1693,29 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [스텝 세분화] Ctrl+Shift+←/→ = 미세 회전(1°). Ctrl+←/→(5°)와 동일 경로(SSOT RotateMap),
+        // 배율만 다르다. Ctrl+Shift+R(토글)은 위에서 이미 처리·반환되므로 여기 도달하지 않는다.
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+            && (e.Key == Key.Left || e.Key == Key.Right))
+        {
+            if (Utils.RotationFeature.IsEnabled)
+                RotateMap(e.Key == Key.Left ? -ROTATION_STEP_FINE : ROTATION_STEP_FINE);
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             switch (e.Key)
             {
                 // [Rotation FR-18 재개방] Ctrl+←/→ 회전 — kill-switch(기본 OFF) 게이트.
-                // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0). ON: RotateMap(∓5) → SSOT 경유.
+                // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0). ON: RotateMap(∓5°) → SSOT 경유.
                 case Key.Left:
-                    if (Utils.RotationFeature.IsEnabled) RotateMap(-5);
+                    if (Utils.RotationFeature.IsEnabled) RotateMap(-ROTATION_STEP_COARSE);
                     e.Handled = true;
                     break;
                 case Key.Right:
-                    if (Utils.RotationFeature.IsEnabled) RotateMap(5);
+                    if (Utils.RotationFeature.IsEnabled) RotateMap(ROTATION_STEP_COARSE);
                     e.Handled = true;
                     break;
                 case Key.R:
@@ -1823,12 +1834,18 @@ public class GMapCustomControl : GMapControl
         }
 
         // [Rotation FR-18 재개방] Shift+휠 회전 — RotationFeature.IsEnabled(kill-switch, 기본 OFF) 게이트.
-        // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0 — 머지 안전). ON: RotateMap(±5°) →
+        // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0 — 머지 안전). ON: RotateMap(±step) →
         // SSOT(ApplyMapRotation) 경유라 정규화·앵커 게이트 자동 적용. Ctrl+R 리셋은 항상 유지.
-        if (Keyboard.Modifiers == ModifierKeys.Shift)
+        // [스텝 세분화] Shift=5°(거친 조정) / Ctrl+Shift=1°(미세 조정) — 키보드 화살표와 동일 규칙.
+        bool isCoarseRotate = Keyboard.Modifiers == ModifierKeys.Shift;
+        bool isFineRotate = Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
+        if (isCoarseRotate || isFineRotate)
         {
             if (Utils.RotationFeature.IsEnabled)
-                RotateMap(e.Delta > 0 ? 5 : -5);
+            {
+                var step = isFineRotate ? ROTATION_STEP_FINE : ROTATION_STEP_COARSE;
+                RotateMap(e.Delta > 0 ? step : -step);
+            }
             e.Handled = true;   // 휠은 소비(줌으로 전파 금지)
             return;
         }
@@ -2825,10 +2842,19 @@ public class GMapCustomControl : GMapControl
     /// B모드(AllowRotation) 앵커는 회전 허용이므로 false. 툴바 버튼 비활성 바인딩용(V-06 옵션C).</summary>
     public bool IsRotationLockedByAnchor => _anchorSiteRect != null && !_anchorAllowsRotation;
 
+    /// <summary>회전 입력 스텝(도) — 거친 조정(Shift+휠 / Ctrl+←→).</summary>
+    private const double ROTATION_STEP_COARSE = 5;
+    /// <summary>회전 입력 스텝(도) — 미세 조정(Ctrl+Shift+휠 / Ctrl+Shift+←→).</summary>
+    private const double ROTATION_STEP_FINE = 1;
+
     /// <summary>회전 kill-switch 토글(FR-03/18 단일 진실원) — 키보드(Ctrl+Shift+R)와 툴바 버튼 공용.
-    /// OFF 전환 = 즉시 정북 복귀(0은 게이트 무관 항상 허용 — 안전 복구 경로). 반환=새(현) 상태.
-    /// [사용자 요구 2026-07-28] 앵커(사이트 고정) 활성 중엔 모드 무관 토글 잠금 — B모드에서
-    /// 나침반을 끄면 정북 리셋이 회전 유지 앵커와 꼬인다. 해제하려면 앵커부터 해제.</summary>
+    /// 반환=새(현) 상태.
+    /// [사용자 요구 2026-08-03] OFF 전환은 <b>회전 입력만 차단</b>하고 <b>현재 각도는 그대로 유지</b>한다
+    /// (= 현재 회전 잠금). 종전에는 OFF 시 즉시 정북 복귀(PRD FR-03)였으나, 운영 중 맞춰둔 방위가
+    /// 토글 한 번에 초기화돼 쓰기 어렵다는 사용자 판단으로 분리했다.
+    /// 정북 복귀는 전용 경로 유지 — 나침반 'N' 버튼 / Ctrl+R(<see cref="ResetRotation"/>).
+    /// 렌더링은 플래그 게이트 대상이 아니고, 입력만 Decide 게이트로 차단되므로 각도 유지가 안전하다.
+    /// [사용자 요구 2026-07-28] 앵커(사이트 고정) 활성 중엔 모드 무관 토글 잠금 — 해제하려면 앵커부터 해제.</summary>
     public bool ToggleRotationFeature()
     {
         if (IsAnchorActive)
@@ -2837,8 +2863,7 @@ public class GMapCustomControl : GMapControl
             return Utils.RotationFeature.IsEnabled;
         }
         Utils.RotationFeature.IsEnabled = !Utils.RotationFeature.IsEnabled;
-        if (!Utils.RotationFeature.IsEnabled) ResetRotation();
-        _log?.Info($"[Rotation] kill-switch 토글: {(Utils.RotationFeature.IsEnabled ? "ON — Shift+휠/Ctrl+←→ 회전 가능" : "OFF — 정북 복귀·입력 차단")}");
+        _log?.Info($"[Rotation] kill-switch 토글: {(Utils.RotationFeature.IsEnabled ? $"ON — Shift+휠/Ctrl+←→ {ROTATION_STEP_COARSE}°, Ctrl+Shift {ROTATION_STEP_FINE}°" : $"OFF — 입력 차단(현재 각도 {MapRotation:F1}° 유지, 정북은 나침반 N/Ctrl+R)")}");
         return Utils.RotationFeature.IsEnabled;
     }
 
