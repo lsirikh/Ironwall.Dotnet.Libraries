@@ -106,49 +106,8 @@ public static class MapSettingsHelper
         await SaveSettingAsync("MapName", mapName, log);
     }
 
-    /// <summary>
-    /// 타일 디렉토리를 JSON에 저장
-    /// </summary>
-    public static async Task SaveTileDirectoryAsync(string tileDirectory, ILogService? log = default)
-    {
-        if (Directory.Exists(tileDirectory))
-        {
-
-            // 쓰기 권한 확인
-            if (HasWritePermission(tileDirectory))
-            {
-                await SaveSettingAsync("TileDirectory", tileDirectory);
-                log?.Info($"타일 디렉토리 변경 및 저장 완료: {tileDirectory}");
-            }
-            else
-            {
-                log?.Warning($"선택한 폴더에 쓰기 권한이 없습니다: {tileDirectory}");
-            }
-            
-        }
-        else
-        {
-            log?.Error($"유효하지 않은 폴더입니다: {tileDirectory}");
-
-            Directory.CreateDirectory(tileDirectory);
-            System.Diagnostics.Process.Start("explorer.exe", tileDirectory);
-            
-            log?.Info($"타일 폴더 생성 및 열기: {tileDirectory}");
-
-            // 쓰기 권한 확인
-            if (HasWritePermission(tileDirectory))
-            {
-                await SaveSettingAsync("TileDirectory", tileDirectory, log);
-                log?.Info($"타일 디렉토리 변경 및 저장 완료: {tileDirectory}");
-            }
-            else
-            {
-                log?.Warning($"선택한 폴더에 쓰기 권한이 없습니다: {tileDirectory}");
-            }
-        }
-
-        
-    }
+    // (appsettings 정리 2026-08-04) SaveTileDirectoryAsync 제거 — 호출자 0곳인 고아 헬퍼,
+    // TileDirectory 키 자체가 읽기 0건으로 사장(감사 확인). 기본맵 폴더는 MapDataDirectory가 정식 후속.
 
     /// <summary>
     /// 전체 지도 설정을 한번에 저장

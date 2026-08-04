@@ -1,8 +1,8 @@
 <!-- auto-section-start -->
 # 프로젝트 문서 인덱스
 
-- **마지막 갱신**: 2026-07-31 (advance-phase 자동)
-- **총 문서 수**: 430개
+- **마지막 갱신**: 2026-08-04 (advance-phase 자동)
+- **총 문서 수**: 463개
 
 ---
 
@@ -10,11 +10,13 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [map-25d-rotation-sync-analysis.md](analyses/map-25d-rotation-sync-analysis.md) | 톱다운 2.5D(철책·아이콘·건물 입체) + 지도 회전 동기 설계 — 5축 분해 바인딩, 들어올림=화면상수라 θ항 소거, 회전 무효화 111ms 스로틀이 진짜 위험, 건물 폴리곤 타입 부재 | 2026-08-03 |
-| [map-3d-visualization-analysis.md](analyses/map-3d-visualization-analysis.md) | 지도 2D(MBTiles/GMap.NET)→2.5D/3D 전환 8경로 검토 — 실비용은 렌더러가 아닌 심볼·어도너 약 4만 줄, DEM이 전 경로 공통 blocker, 계산형 3D(음영기복+viewshed) 우선 권고 | 2026-08-03 |
-| [ui-automation-scenario-spec-analysis.md](analyses/ui-automation-scenario-spec-analysis.md) | FlaUI 스모크 시나리오 3종 계측 명세 — AutomationId 96건 표·단계 시퀀스·안전경고·미해결 8건 | 2026-08-03 |
-| [playwright-self-verification-analysis.md](analyses/playwright-self-verification-analysis.md) | Playwright 자체 검증 가능성 — WPF 본체 불가/웹 표면 3종 가능, WebView2 CDP attach 코드 0줄 실증, 도입 6단계 | 2026-08-03 |
-| [Controller_Blackout_Propagation-analysis.md](analyses/Controller_Blackout_Propagation-analysis.md) | 제어기 무통신→연결센서 그룹 검은색 전파 — 색상 시스템 매핑+3갭+설계+시뮬레이션 101×2 결과 | 2026-07-31 |
+| [map-25d-rotation-sync-analysis.md](analyses/map-25d-rotation-sync-analysis.md) | map-25d-rotation-sync | 2026-08-03 |
+| [logout-on-exit-analysis.md](analyses/logout-on-exit-analysis.md) | logout-on-exit | 2026-08-03 |
+| [map-3d-visualization-analysis.md](analyses/map-3d-visualization-analysis.md) | map-3d-visualization | 2026-08-03 |
+| [ui-automation-scenario-spec-analysis.md](analyses/ui-automation-scenario-spec-analysis.md) | ui-automation-scenario-spec | 2026-08-03 |
+| [playwright-self-verification-analysis.md](analyses/playwright-self-verification-analysis.md) | playwright-self-verification | 2026-08-03 |
+| [session-scenario-simulation-analysis.md](analyses/session-scenario-simulation-analysis.md) | session-scenario-simulation | 2026-08-03 |
+| [Controller_Blackout_Propagation-analysis.md](analyses/Controller_Blackout_Propagation-analysis.md) | Controller_Blackout_Propagation | 2026-07-31 |
 | [GIS_Nats_Spec_Gap-analysis.md](analyses/GIS_Nats_Spec_Gap-analysis.md) | GIS_Nats_Spec_Gap | 2026-07-30 |
 | [GMap_Rotation_P0_Spikes_V02_V08-analysis.md](analyses/GMap_Rotation_P0_Spikes_V02_V08-analysis.md) | GMap_Rotation_P0_Spikes_V02_V08 | 2026-07-30 |
 | [GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md](analyses/GMap_Rotation_Full_Sync_PRD_Adversarial_Review-analysis.md) | GMap_Rotation_Full_Sync_PRD_Adversarial_Review | 2026-07-28 |
@@ -64,23 +66,28 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [installer-prd.md](prds/installer-prd.md) | IRONWALL 관제 SW Inno Setup 인스톨러 — FR 13(골격·clean publish 파이프라인·업그레이드 무인제거·현장 구성 위저드 6화면 완곡명칭·appsettings 플레이스홀더 기록·자동시작 예약작업 D-7·보존정책·에셋 버전미표기)·NFR 7·V 8·리스크 7. 정본 설계=docs/design/installer-wizard-plan.html v1.2, Q1~Q5 기본안 채택 | Draft | 2026-08-04 |
-| [Event_Edit_Save_Pipeline-prd.md](prds/Event_Edit_Save_Pipeline-prd.md) | 이벤트 편집→적용→저장 파이프라인 정합성 — 탐지 detail 편집이 dirty를 못 켜 저장 무음 실패(DEF-01). 7에이전트 워크플로로 58시나리오 시뮬레이션 → 결함 20건·FR 15·테스트 22종. **배치1 적용 `7f810aa`** + 편집상태 정규화 `DetectionEditModel` `01d0cdd` + PUT 실패 시 되읽기 검증 `2d9bf9b`(서버 500이나 DB 반영됨을 실측). 배치 2=타 세션 XAML 대기, 배치 3=서버 detail 생략 계약(U-1) 선행 | 배치1 적용 | 2026-08-04 |
-| [UI_Functional_Testing_Layer-prd.md](prds/UI_Functional_Testing_Layer-prd.md) | UI 기능 테스트 계층(2단계) — 상호작용 밀도(Interact/Dialogs/Grid/페이지 오브젝트)+CRUD 왕복+파이프라인 테스트 스텝. 운영 쓰기 0(스왑 게이트+호스트 allowlist) | Approved | 2026-08-04 |
-| [UI_Automation_FlaUI_Smoke-prd.md](prds/UI_Automation_FlaUI_Smoke-prd.md) | WPF 자동 UI 검증 하네스 1단계 — AutomationId 계측 97건 + FlaUI 스모크 3종(로그인·억제스케줄 읽기전용·보고서 FlaUI→Playwright CDP 하이브리드). Debug 대상, S2 삭제/심볼 peer는 Out of Scope | Draft | 2026-08-03 |
-| [GMap_PidsGroup_DoubleClick_ActionReport-prd.md](prds/GMap_PidsGroup_DoubleClick_ActionReport-prd.md) | PidsGroup 심볼 더블클릭 → 그룹 최선착 이벤트 조치보고 패널(탐지 깜빡임·장애 색상·블랙아웃 트리거, 손가락 커서, 라인 히트 정밀도, 시나리오 44종) | Draft | 2026-08-03 |
-| [Controller_Fault_AutoRecovery_Extension-prd.md](prds/Controller_Fault_AutoRecovery_Extension-prd.md) | 제어기 고장 자동복구 확장 — (a)소속 센서 탐지 (b)SYNC_DEVICE ACTIVATED 복구 → 자동 조치보고+검정 해제. same-sensor 자동복구를 controller-ownership 정밀 매칭으로 확장(V-05 제외 정책 뒤집기), 메인솔루션 NatsDomainService 배선 포함 | Draft | 2026-08-01 |
-| [GMap_Controller_Blackout_Runtime_Fix-prd.md](prds/GMap_Controller_Blackout_Runtime_Fix-prd.md) | 제어기 고장 블랙아웃 런타임 3결함 수정(그룹심볼 LinkedDeviceGroup 미등록·조치보고 검정 미복원·상태반영 무경고 no-op) | Draft | 2026-08-01 |
-| [event-suppression-schedule-prd.md](prds/event-suppression-schedule-prd.md) | 이벤트 억제(정비 창) 스케줄 관리 — G-1 CRUD 패널(GrantMgmt 선례·PanelShell+Conductor 라우팅·BaseDataGridMultiPanel Temp-state·인라인폼 DateTimePicker KST)·G-2 활성배너·G-3 딤(P2)·신규 IEventSuppressionApiService·events RBAC | Draft | 2026-07-31 |
-| [detection-sync-thumbnail-prd.md](prds/detection-sync-thumbnail-prd.md) | SYNC_DETECTION{UPDATED} → 실시간 탐지 카드 썸네일 갱신(라이브러리 Path A) | Draft | 2026-07-31 |
+| [installer-prd.md](prds/installer-prd.md) | IRONWALL 관제 SW Inno Setup 인스톨러 — FR 13(골격·clean publish·업그레이드 무인제거·구성 위저드 6화면 완곡명칭·appsettings 플레이스홀더 기록·자동시작 예약작업 D-7·보존정책)·NFR 7·V 8·리스크 7. 정본 설계=design/installer-wizard-plan.html v1.2, Q1~Q5 기본안 | Approved | 2026-08-04 |
+| [GMap_Schema_Migration_Idempotency-prd.md](prds/GMap_Schema_Migration_Idempotency-prd.md) | GMap_Schema_Migration_Idempotency | Draft | 2026-08-04 |
+| [UI_Functional_Testing_Layer-prd.md](prds/UI_Functional_Testing_Layer-prd.md) | UI_Functional_Testing_Layer | Approved | 2026-08-04 |
+| [Event_Edit_Save_Pipeline-prd.md](prds/Event_Edit_Save_Pipeline-prd.md) | Event_Edit_Save_Pipeline | Draft | 2026-08-03 |
+| [UI_Automation_FlaUI_Smoke-prd.md](prds/UI_Automation_FlaUI_Smoke-prd.md) | UI_Automation_FlaUI_Smoke | Approved | 2026-08-03 |
+| [GMap_PidsGroup_DoubleClick_ActionReport-prd.md](prds/GMap_PidsGroup_DoubleClick_ActionReport-prd.md) | GMap_PidsGroup_DoubleClick_ActionReport | Approved | 2026-08-03 |
+| [logout-on-exit-prd.md](prds/logout-on-exit-prd.md) | logout-on-exit | Draft | 2026-08-03 |
+| [Event_Enum_Korean_Display-prd.md](prds/Event_Enum_Korean_Display-prd.md) | Event_Enum_Korean_Display | Approved | 2026-08-03 |
+| [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | GMap_Rotation_Full_Sync | Approved | 2026-08-03 |
+| [event-suppression-schedule-prd.md](prds/event-suppression-schedule-prd.md) | event-suppression-schedule | Draft | 2026-08-03 |
+| [session-management-overhaul-prd.md](prds/session-management-overhaul-prd.md) | session-management-overhaul | Approved | 2026-08-03 |
+| [Controller_Fault_AutoRecovery_Extension-prd.md](prds/Controller_Fault_AutoRecovery_Extension-prd.md) | Controller_Fault_AutoRecovery_Extension | Draft | 2026-07-31 |
+| [GMap_Controller_Blackout_Runtime_Fix-prd.md](prds/GMap_Controller_Blackout_Runtime_Fix-prd.md) | GMap_Controller_Blackout_Runtime_Fix | Draft | 2026-07-31 |
+| [action-report-origin-thumbnail-prd.md](prds/action-report-origin-thumbnail-prd.md) | action-report-origin-thumbnail | Draft | 2026-07-31 |
+| [detection-sync-thumbnail-prd.md](prds/detection-sync-thumbnail-prd.md) | detection-sync-thumbnail | Approved | 2026-07-31 |
+| [GMap_Controller_Blackout-prd.md](prds/GMap_Controller_Blackout-prd.md) | GMap_Controller_Blackout | Draft | 2026-07-31 |
 | [malfunction-autoreport-setting-prd.md](prds/malfunction-autoreport-setting-prd.md) | malfunction-autoreport-setting | Approved | 2026-07-31 |
-| [GMap_Controller_Blackout-prd.md](prds/GMap_Controller_Blackout-prd.md) | 제어기 무통신→연결센서 그룹 검은색 전파(시뮬 101×2 반영) | Completed | 2026-07-31 |
 | [GMap_Map_Instruments-prd.md](prds/GMap_Map_Instruments-prd.md) | GMap_Map_Instruments | Draft | 2026-07-31 |
 | [GOP_Logging_Observability_P0-prd.md](prds/GOP_Logging_Observability_P0-prd.md) | GOP_Logging_Observability_P0 | Draft | 2026-07-31 |
 | [GOP_Nats_Req_Failure_UX-prd.md](prds/GOP_Nats_Req_Failure_UX-prd.md) | GOP_Nats_Req_Failure_UX | Approved | 2026-07-30 |
 | [GMap_Compass_Control-prd.md](prds/GMap_Compass_Control-prd.md) | GMap_Compass_Control | Draft | 2026-07-30 |
 | [GIS_Nats_v152_Req_Transition-prd.md](prds/GIS_Nats_v152_Req_Transition-prd.md) | GIS_Nats_v152_Req_Transition | Approved | 2026-07-30 |
-| [GMap_Rotation_Full_Sync-prd.md](prds/GMap_Rotation_Full_Sync-prd.md) | GMap_Rotation_Full_Sync | Approved | 2026-07-30 |
 | [GIS.md](prds/GIS.md) | GIS.md | Draft | 2026-07-30 |
 | [line-drawing-hud-redesign-prd.md](prds/line-drawing-hud-redesign-prd.md) | line-drawing-hud-redesign | Draft | 2026-07-28 |
 | [Measure_Tools-prd.md](prds/Measure_Tools-prd.md) | Measure_Tools | Approved | 2026-07-27 |
@@ -230,14 +237,18 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [UI_Functional_Testing_Layer-prd-plan.md](plans/UI_Functional_Testing_Layer-prd-plan.md) | [PRD](prds/UI_Functional_Testing_Layer-prd.md) | 16/16 **완료·머지**(Sol `577d226`, 리뷰 25건 반영, CRUD 라이브 그린) | 2026-08-04 |
-| [UI_Automation_FlaUI_Smoke-prd-plan.md](plans/UI_Automation_FlaUI_Smoke-prd-plan.md) | [PRD](prds/UI_Automation_FlaUI_Smoke-prd.md) | 37/38 **머지 완료**(Lib `6b4590a`·Sol `c53bebf`, 메인 exe 재검증 통과, 결과=docs/tests/ui-automation-smoke-20260804) | 2026-08-04 |
-| [GMap_PidsGroup_DoubleClick_ActionReport-prd-plan.md](plans/GMap_PidsGroup_DoubleClick_ActionReport-prd-plan.md) | [PRD](prds/GMap_PidsGroup_DoubleClick_ActionReport-prd.md) | 0/36 (Phase 0 선결검증 대기) | 2026-08-03 |
-| [Controller_Fault_AutoRecovery_Extension-prd-plan.md](plans/Controller_Fault_AutoRecovery_Extension-prd-plan.md) | [PRD](prds/Controller_Fault_AutoRecovery_Extension-prd.md) | T1~T8 완료(라이브러리+메인솔루션 빌드0·EQM 65/65·격리회귀0 입증), T9 문서마감 | 2026-08-01 |
-| [GMap_Controller_Blackout_Runtime_Fix-prd-plan.md](plans/GMap_Controller_Blackout_Runtime_Fix-prd-plan.md) | [PRD](prds/GMap_Controller_Blackout_Runtime_Fix-prd.md) | 핵심 완료(FR-01/02/03·빌드0·회귀0), IMPL-05/FR-04 보류 | 2026-08-01 |
-| [detection-sync-thumbnail-prd-plan.md](plans/detection-sync-thumbnail-prd-plan.md) | [PRD](prds/detection-sync-thumbnail-prd.md) | 14/14 (구현·테스트) | 2026-07-31 |
-| [malfunction-card-controller-sensor-prd-plan.md](plans/malfunction-card-controller-sensor-prd-plan.md) | — (버그수정) | 완료 | 2026-07-31 |
-| [malfunction-autoreport-setting-prd-plan.md](plans/malfunction-autoreport-setting-prd-plan.md) | [PRD](prds/malfunction-autoreport-setting-prd.md) | 0/27 | 2026-07-31 |
+| [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 0/34 | 2026-08-04 |
+| [UI_Functional_Testing_Layer-prd-plan.md](plans/UI_Functional_Testing_Layer-prd-plan.md) | [PRD](prds/UI_Functional_Testing_Layer-prd.md) | 16/16 | 2026-08-04 |
+| [UI_Automation_FlaUI_Smoke-prd-plan.md](plans/UI_Automation_FlaUI_Smoke-prd-plan.md) | [PRD](prds/UI_Automation_FlaUI_Smoke-prd.md) | 38/49 | 2026-08-04 |
+| [GMap_PidsGroup_DoubleClick_ActionReport-prd-plan.md](plans/GMap_PidsGroup_DoubleClick_ActionReport-prd-plan.md) | [PRD](prds/GMap_PidsGroup_DoubleClick_ActionReport-prd.md) | 23/44 | 2026-08-03 |
+| [session-management-overhaul-prd-plan.md](plans/session-management-overhaul-prd-plan.md) | [PRD](prds/session-management-overhaul-prd.md) | 3/40 | 2026-08-03 |
+| [Controller_Fault_AutoRecovery_Extension-prd-plan.md](plans/Controller_Fault_AutoRecovery_Extension-prd-plan.md) | [PRD](prds/Controller_Fault_AutoRecovery_Extension-prd.md) | 0/9 | 2026-07-31 |
+| [GMap_Controller_Blackout_Runtime_Fix-prd-plan.md](plans/GMap_Controller_Blackout_Runtime_Fix-prd-plan.md) | [PRD](prds/GMap_Controller_Blackout_Runtime_Fix-prd.md) | 0/26 | 2026-07-31 |
+| [Event_Enum_Korean_Display-prd-plan.md](plans/Event_Enum_Korean_Display-prd-plan.md) | [PRD](prds/Event_Enum_Korean_Display-prd.md) | 3/24 | 2026-07-31 |
+| [action-report-origin-thumbnail-prd-plan.md](plans/action-report-origin-thumbnail-prd-plan.md) | [PRD](prds/action-report-origin-thumbnail-prd.md) | 7/8 | 2026-07-31 |
+| [detection-sync-thumbnail-prd-plan.md](plans/detection-sync-thumbnail-prd-plan.md) | [PRD](prds/detection-sync-thumbnail-prd.md) | 14/14 | 2026-07-31 |
+| [malfunction-card-controller-sensor-prd-plan.md](plans/malfunction-card-controller-sensor-prd-plan.md) | [PRD](prds/malfunction-card-controller-sensor-prd.md) | 0/0 | 2026-07-31 |
+| [malfunction-autoreport-setting-prd-plan.md](plans/malfunction-autoreport-setting-prd-plan.md) | [PRD](prds/malfunction-autoreport-setting-prd.md) | 18/27 | 2026-07-31 |
 | [GMap_Map_Instruments-prd-plan.md](plans/GMap_Map_Instruments-prd-plan.md) | [PRD](prds/GMap_Map_Instruments-prd.md) | 16/16 | 2026-07-31 |
 | [GMap_Compass_Control-prd-plan.md](plans/GMap_Compass_Control-prd-plan.md) | [PRD](prds/GMap_Compass_Control-prd.md) | 12/12 | 2026-07-30 |
 | [GOP_Nats_Req_Failure_UX-prd-plan.md](plans/GOP_Nats_Req_Failure_UX-prd-plan.md) | [PRD](prds/GOP_Nats_Req_Failure_UX-prd.md) | 14/16 | 2026-07-30 |
@@ -354,6 +365,7 @@
 
 | 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
+| [session-management-overhaul-report.md](reports/session-management-overhaul-report.md) | [PRD](prds/session-management-overhaul-prd.md) → [Plan](plans/session-management-overhaul-prd-plan.md) | 2026-08-03 |
 | [Detection_Signal_History-report.md](reports/Detection_Signal_History-report.md) | [PRD](prds/Detection_Signal_History-prd.md) → [Plan](plans/Detection_Signal_History-prd-plan.md) | 2026-07-27 |
 | [CameraPopup_PanClamp_Badge_OnvifPtz-report.md](reports/CameraPopup_PanClamp_Badge_OnvifPtz-report.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) → [Plan](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | 2026-07-23 |
 | [Overlay_Title_ZoomStyle-report.md](reports/Overlay_Title_ZoomStyle-report.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) → [Plan](plans/Overlay_Title_ZoomStyle-prd-plan.md) | 2026-07-23 |
