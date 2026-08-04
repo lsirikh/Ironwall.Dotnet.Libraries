@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-08-04 (advance-phase 자동)
-- **총 문서 수**: 463개
+- **총 문서 수**: 464개
 
 ---
 
@@ -66,8 +66,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [installer-prd.md](prds/installer-prd.md) | IRONWALL 관제 SW Inno Setup 인스톨러 — FR 13(골격·clean publish·업그레이드 무인제거·구성 위저드 6화면 완곡명칭·appsettings 플레이스홀더 기록·자동시작 예약작업 D-7·보존정책)·NFR 7·V 8·리스크 7. 정본 설계=design/installer-wizard-plan.html v1.2, Q1~Q5 기본안 | Approved | 2026-08-04 |
-| [GMap_Schema_Migration_Idempotency-prd.md](prds/GMap_Schema_Migration_Idempotency-prd.md) | GMap_Schema_Migration_Idempotency | Draft | 2026-08-04 |
+| [GMap_Schema_Migration_Idempotency-prd.md](prds/GMap_Schema_Migration_Idempotency-prd.md) | GMap_Schema_Migration_Idempotency | Approved | 2026-08-04 |
+| [installer-prd.md](prds/installer-prd.md) | installer | Approved | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd.md](prds/UI_Functional_Testing_Layer-prd.md) | UI_Functional_Testing_Layer | Approved | 2026-08-04 |
 | [Event_Edit_Save_Pipeline-prd.md](prds/Event_Edit_Save_Pipeline-prd.md) | 이벤트 편집→적용→저장 파이프라인 정합성 — 탐지 detail 편집이 dirty를 못 켜 저장 무음 실패(DEF-01). 7에이전트 워크플로로 58시나리오 시뮬레이션 → 결함 20건·FR 15·테스트 22종. 배치1 적용 `7f810aa` + 편집상태 정규화 `DetectionEditModel` `01d0cdd` + PUT 실패 되읽기 검증 `2d9bf9b`. **서버 `4f0e875` 재배포 확인(2026-08-04 14:39) — 탐지·연결 PUT 200, 저장 정상**(폴백은 휴면·방어용 존치). 배치 2=타 세션 XAML 대기, 배치 3=서버 detail 생략 계약(U-1) 선행 | 배치1 완료 | 2026-08-04 |
 | [UI_Automation_FlaUI_Smoke-prd.md](prds/UI_Automation_FlaUI_Smoke-prd.md) | UI_Automation_FlaUI_Smoke | Approved | 2026-08-03 |
@@ -237,7 +237,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 0/34 | 2026-08-04 |
+| [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 5/41 | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd-plan.md](plans/UI_Functional_Testing_Layer-prd-plan.md) | [PRD](prds/UI_Functional_Testing_Layer-prd.md) | 16/16 | 2026-08-04 |
 | [UI_Automation_FlaUI_Smoke-prd-plan.md](plans/UI_Automation_FlaUI_Smoke-prd-plan.md) | [PRD](prds/UI_Automation_FlaUI_Smoke-prd.md) | 38/49 | 2026-08-04 |
 | [GMap_PidsGroup_DoubleClick_ActionReport-prd-plan.md](plans/GMap_PidsGroup_DoubleClick_ActionReport-prd-plan.md) | [PRD](prds/GMap_PidsGroup_DoubleClick_ActionReport-prd.md) | 23/44 | 2026-08-03 |
