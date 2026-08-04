@@ -1,9 +1,10 @@
-<UserControl
+﻿<UserControl
     x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportCreateView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:cal="http://caliburnmicro.com"
-    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+    xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+    AutomationProperties.AutomationId="Reports.Create.Root">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </UserControl.Resources>
@@ -20,9 +21,9 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
             <TextBlock Text="보고서 종류" Style="{StaticResource PanelFieldLabel}" VerticalAlignment="Center" Margin="0,0,14,0" />
             <RadioButton Content="표준 전체" GroupName="ReportKind" IsChecked="{Binding IsStandard, Mode=TwoWay}"
-                         Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                         Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" AutomationProperties.AutomationId="Reports.Create.StandardRadio" />
             <RadioButton Content="템플릿 기반" GroupName="ReportKind" IsChecked="{Binding IsTemplateBased, Mode=TwoWay}"
-                         Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="18,0,0,0" />
+                         Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="18,0,0,0" AutomationProperties.AutomationId="Reports.Create.TemplateRadio" />
             <TextBlock Text="  (표준 = 전 섹션 · 템플릿 = 선택 구성)" VerticalAlignment="Center" Margin="12,0,0,0"
                        Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
         </StackPanel>
@@ -32,7 +33,7 @@
                     Visibility="{Binding IsTemplateBased, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="템플릿 *" Style="{StaticResource PanelFieldLabel}" Margin="0,0,0,2" />
             <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" DisplayMemberPath="Name"
-                      Style="{StaticResource ModernComboBox}" Width="320" HorizontalAlignment="Left" />
+                      Style="{StaticResource ModernComboBox}" Width="320" HorizontalAlignment="Left" AutomationProperties.AutomationId="Reports.Create.TemplateComboBox" />
             <TextBlock Text="※ 템플릿은 '템플릿' 탭에서 추가/수정합니다." Foreground="{DynamicResource TextMutedBrush}"
                        FontSize="11" Margin="0,4,0,0" />
         </StackPanel>
@@ -41,24 +42,24 @@
         <StackPanel Grid.Row="2">
             <TextBlock Text="제목 *" Style="{StaticResource PanelFieldLabel}" Margin="0,0,0,2" />
             <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource ModernTextBox}"
-                     md:HintAssist.Hint="보고서 제목" Margin="0,0,0,10" />
+                     md:HintAssist.Hint="보고서 제목" Margin="0,0,0,10" AutomationProperties.AutomationId="Reports.Create.TitleTextBox" />
             <TextBlock Text="기간 *" Style="{StaticResource PanelFieldLabel}" Margin="0,0,0,2" />
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                 <RadioButton Content="프리셋" GroupName="RangeKind" IsChecked="{Binding IsPreset, Mode=TwoWay}"
-                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" AutomationProperties.AutomationId="Reports.Create.PresetRadio" />
                 <RadioButton Content="직접 지정(달력)" GroupName="RangeKind" IsChecked="{Binding IsCustomRange, Mode=TwoWay}"
-                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="18,0,0,0" />
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="18,0,0,0" AutomationProperties.AutomationId="Reports.Create.CustomRangeRadio" />
             </StackPanel>
             <!-- 프리셋(7d/30d/…) -->
             <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding SelectedPeriod}" DisplayMemberPath="Display"
                       Style="{StaticResource ModernComboBox}" Width="200" HorizontalAlignment="Left"
-                      Visibility="{Binding IsPreset, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                      Visibility="{Binding IsPreset, Converter={StaticResource BooleanToVisibilityConverter}}" AutomationProperties.AutomationId="Reports.Create.PeriodComboBox" />
             <!-- 직접 지정: 시작 ~ 끝 (달력). ※ 서버 커스텀 날짜 반영 후 정식 동작 -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"
                         Visibility="{Binding IsCustomRange, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <DatePicker SelectedDate="{Binding StartDate}" Width="150" />
+                <DatePicker SelectedDate="{Binding StartDate}" Width="150" AutomationProperties.AutomationId="Reports.Create.StartDatePicker" />
                 <TextBlock Text="~" VerticalAlignment="Center" Margin="8,0" Foreground="{DynamicResource TextMutedBrush}" />
-                <DatePicker SelectedDate="{Binding EndDate}" Width="150" />
+                <DatePicker SelectedDate="{Binding EndDate}" Width="150" AutomationProperties.AutomationId="Reports.Create.EndDatePicker" />
                 <TextBlock Text="(끝일 포함)" VerticalAlignment="Center" Margin="10,0,0,0"
                            FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
             </StackPanel>
@@ -68,13 +69,14 @@
         <StackPanel Grid.Row="4" Margin="0,12,0,0">
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="Generate" Content="생성" MinWidth="96" Style="{StaticResource ModernPrimaryButton}"
+                        AutomationProperties.AutomationId="Reports.Create.GenerateButton"
                         IsEnabled="{Binding CanGenerate}" />
                 <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
                              Width="22" Height="22" Margin="12,0,0,0" VerticalAlignment="Center"
                              Foreground="{DynamicResource PrimaryBrush}"
                              Visibility="{Binding IsGenerating, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="10,0,0,0"
-                           Style="{StaticResource PanelFieldLabel}" />
+                           Style="{StaticResource PanelFieldLabel}" AutomationProperties.AutomationId="Reports.Create.StatusText" />
             </StackPanel>
             <!-- 진행률 결정형 바 (서버 progress_pct, 생성 중만) -->
             <ProgressBar Minimum="0" Maximum="100" Value="{Binding GenProgress}" Height="6" Margin="0,10,0,0"
