@@ -540,113 +540,181 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 await _eventAggregator.PublishOnUIThreadAsync(new SplashScreenMessage
                 { Title = nameof(BuildSchemeAsync), Message = "Images 테이블 생성…" });
 
-            // ── 기존 테이블 마이그레이션: ZIndex 컬럼 추가 (레거시 DB 지원) ──
-            try
+            // ── (제거됨) 레거시 ZIndex 컬럼 추가 + ZIndex → ZOrder 데이터 이관 ──
+            //  [GMap_Schema_Migration_Idempotency FR-03 · FR-04]
+            //
+            //  제거한 문장:
+            //      ALTER TABLE `Symbols` ADD COLUMN `ZIndex` INT DEFAULT 10;   ← FR-04
+            //      UPDATE Symbols SET ZOrder = ZIndex;                          ← FR-03 (위험)
+            //
+            //  이 UPDATE 는 배포 이후 단 한 번도 실행된 적이 없다. 같은 try 안에서 바로 앞의
+            //  ADD COLUMN `ZOrder` 가 기존 DB 에서 항상 1060(Duplicate column name)을 던져
+            //  catch 로 빠져나가기 때문이다. 즉 '동작하는 이관'이 아니라 '예외에 가려진 사문'이었다.
+            //
+            //  ZIndex 는 심볼 INSERT 컬럼 목록에 없어 모든 행이 DDL 기본값 10 에 고정돼 있고,
+            //  실제 레이어 순서는 ZOrder 만 담는다.
+            //  (실측 2026-08-04: Symbols 102행 전부 ZIndex=10, ZOrder=1000~1106, 불일치 102/102)
+            //  따라서 이 UPDATE 가 살아나면 WHERE 절 없이 전 행의 ZOrder 를 10 으로 평탄화하고,
+            //  아래 band shift 가 그 전부를 1010 으로 밀어 상대 순서가 소실된다. 그 상태로 지도를
+            //  로드하면 EnsureUniqueZOrder 가 중복을 감지해 마커 열거 순서대로 재번호한 뒤
+            //  BatchUpdateZOrderAsync 로 DB 에 확정 기록한다 → 코드 롤백으로 복구 불가.
+            //
+            //  ⚠ 예외 기반 가드를 information_schema 가드로 바꾸기 전에 반드시 제거해야 한다.
+            //     (예외가 사라지는 순간 이 UPDATE 가 처음으로 실행된다)
+
+            // ══════════════════════════════════════════════════════════════════════════════
+            //  스키마 마이그레이션 — information_schema 멱등 가드
+            //  [GMap_Schema_Migration_Idempotency FR-01·FR-02·FR-05~FR-09]
+            //
+            //  이전 방식: 매 부팅 ALTER TABLE ADD COLUMN 을 22회 실행하고 1060(Duplicate column
+            //  name)을 bare catch 로 삼켰다. 부팅마다 예외 22건이 발생했고, 무엇이 실제로 적용됐고
+            //  무엇이 실패했는지 로그에 전혀 남지 않았다.
+            //
+            //  현재 방식: 테이블당 1회 컬럼 메타를 조회해 부재 컬럼에만 ALTER 를 실행한다.
+            //  같은 솔루션의 GMapDbService.MigrateCustomMapsTableAsync 가 쓰는 검증된 패턴이다.
+            //  MariaDB 전용 `ADD COLUMN IF NOT EXISTS` 는 쓰지 않는다 — MySQL 서버에서 1064 로
+            //  전 마이그레이션이 죽고, 적용/스킵 여부를 앱이 알 수 없어 요약 로그를 만들 수 없다.
+            //
+            //  ⚠ 취소 비대상 구간(FR-09): 아래 DDL/DML 은 CancellationToken 을 전달하지 않는다.
+            //     DDL 은 암묵 커밋이라 중도 취소 시 원자적으로 되돌릴 수 없고, 스키마가 절반만
+            //     적용된 채 로드로 진행하면 심볼 0건 부팅이 된다. 시그니처의 token 은 위쪽
+            //     OpenConnectionAsync(token) 에만 쓴다. (토큰을 깜빡한 것이 아니라 의도된 설계다)
+            //     참고: MySql.Data 9.3.0 은 명령 실행 경로에서 CancellationToken 을 관측하지 않는다
+            //     — 취소 가능 지점은 MySqlConnection.OpenAsync 뿐이다.
+            // ══════════════════════════════════════════════════════════════════════════════
+
+            var applied = 0;
+            var skipped = 0;
+            var failed = 0;
+            var modified = 0;
+
+            // FR-02: 스냅샷은 반드시 CREATE TABLE 이후에 찍는다.
+            //        연결 직후에 찍으면 신규 DB 에서 전 컬럼을 '부재'로 오판한다.
+            var columnMeta = new Dictionary<string, Dictionary<string, ColumnMeta>?>(StringComparer.OrdinalIgnoreCase)
             {
-                await conn.ExecuteAsync(
-                    "ALTER TABLE `Symbols` ADD COLUMN `ZIndex` INT DEFAULT 10;", token);
-                _log?.Info("Symbols 테이블에 ZIndex 컬럼 추가 완료 (레거시)");
-            }
-            catch
+                ["Symbols"] = await LoadColumnMetaAsync(conn, "Symbols"),
+                ["Images"]  = await LoadColumnMetaAsync(conn, "Images"),
+            };
+
+            // ── FR-01 · FR-10: 사양표 순회 — 부재 컬럼만 ADD ──
+            foreach (var spec in COLUMN_SPECS)
             {
-                // 이미 컬럼이 존재하면 무시 (Duplicate column name)
+                var meta = columnMeta[spec.Table];
+                if (meta is null)
+                {
+                    // 판정 불능(조회 실패/0행) — 추측으로 ALTER 하지 않는다
+                    skipped++;
+                    continue;
+                }
+                if (meta.ContainsKey(spec.Column))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                try
+                {
+                    await conn.ExecuteAsync($"ALTER TABLE `{spec.Table}` ADD COLUMN `{spec.Column}` {spec.Ddl};");
+                    applied++;
+                    _log?.Info($"{spec.Table}.{spec.Column} 컬럼 추가 완료");
+                }
+                catch (OperationCanceledException) { throw; }               // FR-06: 취소를 '스킵'으로 위장하지 않는다
+                catch (MySqlException mex) when (mex.Number is ERR_DUP_COLUMN or ERR_CANT_DROP)
+                {
+                    // 동시 부팅 경합 등으로 그 사이에 생긴 경우 — 정상 수렴
+                    skipped++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{spec.Table}.{spec.Column} 컬럼 추가 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
             }
 
-            // ── ZIndex → ZOrder 컬럼 이관 마이그레이션 ──
-            try
+            // ── FR-05: 색 컬럼 타입 교정(MODIFY) — ADD 가드와 분리 판정 ──
+            //    ADD 가드는 '컬럼 존재'만 본다. MODIFY 를 거기에 접으면 v2.2 INT 스키마로 생성된 DB 의
+            //    타입 교정 경로가 영구 정지한다(이 문장들은 오늘 유일하게 매 부팅 성공 실행되던 경로다).
+            //    따라서 COLUMN_TYPE / IS_NULLABLE 로 별도 판정하고, 실행하면 반드시 로그를 남긴다.
+            foreach (var (tbl, col, want) in new[]
+                     {
+                         ("Symbols", "TitleColor",      "'White'"),
+                         ("Symbols", "TitleBackground", "'Black'"),
+                         ("Images",  "TitleColor",      "'White'"),
+                         ("Images",  "TitleBackground", "'Black'"),
+                     })
             {
-                await conn.ExecuteAsync(
-                    "ALTER TABLE `Symbols` ADD COLUMN `ZOrder` INT DEFAULT 10;", token);
-                _log?.Info("Symbols 테이블에 ZOrder 컬럼 추가 완료");
-                await conn.ExecuteAsync("UPDATE Symbols SET ZOrder = ZIndex;", token);
-                _log?.Info("Symbols ZIndex → ZOrder 데이터 이관 완료");
-            }
-            catch
-            {
-                // ZOrder 컬럼 이미 존재하거나 ZIndex 컬럼 없으면 무시
+                var meta = columnMeta[tbl];
+                if (meta is null || !meta.TryGetValue(col, out var cm)) continue;
+                if (string.Equals(cm.ColumnType, "varchar(20)", StringComparison.OrdinalIgnoreCase) && !cm.IsNullable)
+                    continue;   // 이미 목표 타입 — 실행 불필요
+
+                try
+                {
+                    await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `{col}` VARCHAR(20) NOT NULL DEFAULT {want};");
+                    modified++;
+                    _log?.Info($"{tbl}.{col} 타입 교정 완료 ({cm.ColumnType} → varchar(20) NOT NULL)");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{tbl}.{col} 타입 교정 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
             }
 
-            // ── 심볼 ZOrder Band 시프트 마이그레이션 ──
-            // 이미지 band(0~999)와 충돌 방지: 기존 심볼 ZOrder를 1000+ 대역으로 이동
-            try
+            // ── FR-08: 레거시 숫자 색상값 정리 ──
+            //    이 4문은 배포 이후 한 번도 실행된 적이 없었다. `conn.ExecuteAsync(sql, token)` 형태로
+            //    CancellationToken 이 Dapper 의 param 슬롯에 들어갔는데, 정규식 '^-?[0-9]+$' 안의
+            //    홀로 선 '?' 가 Dapper 의 OleDb 판정에 걸려 파라미터 필터링이 꺼지고,
+            //    CancellationToken 을 파라미터로 바인딩하려다 NotSupportedException 으로 죽었다
+            //    (SQL 이 서버에 도달조차 못 했다). param 인자를 제거해 정상화한다.
+            //    WHERE 절이 자기제한적이라 반복 실행해도 멱등 — 2회차부터 0행이다.
+            foreach (var (tbl, col, fallback) in new[]
+                     {
+                         ("Symbols", "TitleColor",      "White"),
+                         ("Symbols", "TitleBackground", "Black"),
+                         ("Images",  "TitleColor",      "White"),
+                         ("Images",  "TitleBackground", "Black"),
+                     })
             {
-                await conn.ExecuteAsync(
-                    "UPDATE `Symbols` SET `ZOrder` = `ZOrder` + 1000 WHERE `ZOrder` < 1000;", token);
-                _log?.Info("Symbols ZOrder band 시프트 완료 (1000+ 대역)");
-            }
-            catch
-            {
-                // ZOrder 컬럼 없거나 이미 시프트된 경우 무시
+                var meta = columnMeta[tbl];
+                if (meta is null || !meta.ContainsKey(col)) continue;
+
+                try
+                {
+                    var rows = await conn.ExecuteAsync(
+                        $"UPDATE `{tbl}` SET `{col}` = '{fallback}' WHERE `{col}` REGEXP '^-?[0-9]+$';");
+                    if (rows > 0) _log?.Info($"{tbl}.{col} 레거시 숫자 색상값 {rows}행 정리 완료");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{tbl}.{col} 숫자 색상값 정리 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
             }
 
-            // ── IsLocked 컬럼 추가 마이그레이션 (레거시 DB 지원, 멱등) ──
-            try
+            // ── 심볼 ZOrder Band 시프트 (FR-07: 영향 행수를 반드시 기록) ──
+            //    이미지 band(0~999)와 충돌 방지: 심볼 ZOrder 를 1000+ 대역으로 승격.
+            //    `WHERE ZOrder < 1000` 이 자기제한적이라 별도 멱등 마커가 필요 없다.
+            //    다만 이전 코드는 반환 행수를 버려 '0행'인지 '전 행'인지 구분할 수 없었다 —
+            //    band 이탈 행이 새로 유입되면 그것이 신호이므로 반드시 수치로 남긴다.
+            var bandShifted = 0;
+            if (columnMeta["Symbols"]?.ContainsKey("ZOrder") == true)
             {
-                await conn.ExecuteAsync(
-                    "ALTER TABLE `Symbols` ADD COLUMN `IsLocked` BOOLEAN DEFAULT FALSE;", token);
-                _log?.Info("Symbols 테이블에 IsLocked 컬럼 추가 완료");
-            }
-            catch { /* 이미 존재하면 무시 (Duplicate column name) */ }
-            try
-            {
-                await conn.ExecuteAsync(
-                    "ALTER TABLE `Images` ADD COLUMN `IsLocked` BOOLEAN DEFAULT FALSE;", token);
-                _log?.Info("Images 테이블에 IsLocked 컬럼 추가 완료");
-            }
-            catch { /* 이미 존재하면 무시 */ }
-
-            // ── LabelOffsetX/Y 컬럼 추가 마이그레이션 (레거시 DB 지원, 멱등 — Symbol_Label_Decouple) ──
-            try
-            {
-                await conn.ExecuteAsync("ALTER TABLE `Symbols` ADD COLUMN `LabelOffsetX` DOUBLE DEFAULT 0;", token);
-                await conn.ExecuteAsync("ALTER TABLE `Symbols` ADD COLUMN `LabelOffsetY` DOUBLE DEFAULT 0;", token);
-                _log?.Info("Symbols 테이블에 LabelOffsetX/Y 컬럼 추가 완료");
-            }
-            catch { /* 이미 존재하면 무시 (Duplicate column name) */ }
-
-            // ── Visible 컬럼 추가 마이그레이션 (레거시 DB 지원, 멱등 — 레이어 마스터 가시성 GMap_Symbol_Visibility_Master) ──
-            try
-            {
-                await conn.ExecuteAsync("ALTER TABLE `Symbols` ADD COLUMN `Visible` BOOLEAN DEFAULT TRUE;", token);
-                _log?.Info("Symbols 테이블에 Visible 컬럼 추가 완료");
-            }
-            catch { /* 이미 존재하면 무시 (Duplicate column name) */ }
-
-            // ── Images 타이틀 부속 컬럼 마이그레이션 (레거시 DB 지원, 컬럼별 개별 try=부분 마이그레이션 안전 — Overlay_Title_ZoomStyle FR-10) ──
-            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `TitleSize` DECIMAL(4,2) DEFAULT 11.0;", token); _log?.Info("Images.TitleSize 컬럼 추가 완료"); }
-            catch { /* 이미 존재하면 무시 */ }
-            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `ShowTitle` BOOLEAN DEFAULT FALSE;", token); _log?.Info("Images.ShowTitle 컬럼 추가 완료"); }
-            catch { /* 이미 존재하면 무시 */ }
-            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `LabelOffsetU` DOUBLE DEFAULT 0;", token); _log?.Info("Images.LabelOffsetU 컬럼 추가 완료"); }
-            catch { /* 이미 존재하면 무시 */ }
-            try { await conn.ExecuteAsync("ALTER TABLE `Images` ADD COLUMN `LabelOffsetV` DOUBLE DEFAULT 0;", token); _log?.Info("Images.LabelOffsetV 컬럼 추가 완료"); }
-            catch { /* 이미 존재하면 무시 */ }
-
-            // ── 라벨 스타일 컬럼 마이그레이션 — Symbols+Images 동시, 컬럼별 개별 try(부분 마이그레이션 안전 — Overlay_Title_ZoomStyle FR-06).
-            //    v2.5: 색은 EnumColorType 문자열(FillColor 동형 — 심볼 기본 색상 콤보 재사용). 초기 v2.2 INT 스키마로
-            //    생성된 DB는 MODIFY로 교정(숫자 잔존값은 UPDATE로 기본값 정리, 로드는 EnumParseHelper 폴백이 이중 방어).
-            foreach (var tbl in new[] { "Symbols", "Images" })
-            {
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleColor` VARCHAR(20) NOT NULL DEFAULT 'White';", token); _log?.Info($"{tbl}.TitleColor 컬럼 추가 완료"); }
-                catch { /* 이미 존재하면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBackground` VARCHAR(20) NOT NULL DEFAULT 'Black';", token); _log?.Info($"{tbl}.TitleBackground 컬럼 추가 완료"); }
-                catch { /* 이미 존재하면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `TitleColor` VARCHAR(20) NOT NULL DEFAULT 'White';", token); }
-                catch { /* 컬럼 없으면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `TitleBackground` VARCHAR(20) NOT NULL DEFAULT 'Black';", token); }
-                catch { /* 컬럼 없으면 무시 */ }
-                try { await conn.ExecuteAsync($"UPDATE `{tbl}` SET `TitleColor` = 'White' WHERE `TitleColor` REGEXP '^-?[0-9]+$';", token); }
-                catch { /* 정리 실패 무시(로드 폴백이 방어) */ }
-                try { await conn.ExecuteAsync($"UPDATE `{tbl}` SET `TitleBackground` = 'Black' WHERE `TitleBackground` REGEXP '^-?[0-9]+$';", token); }
-                catch { /* 정리 실패 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleFontFamily` VARCHAR(100) DEFAULT '';", token); _log?.Info($"{tbl}.TitleFontFamily 컬럼 추가 완료"); }
-                catch { /* 이미 존재하면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleBold` BOOLEAN DEFAULT FALSE;", token); _log?.Info($"{tbl}.TitleBold 컬럼 추가 완료"); }
-                catch { /* 이미 존재하면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleItalic` BOOLEAN DEFAULT FALSE;", token); _log?.Info($"{tbl}.TitleItalic 컬럼 추가 완료"); }
-                catch { /* 이미 존재하면 무시 */ }
-                try { await conn.ExecuteAsync($"ALTER TABLE `{tbl}` ADD COLUMN `TitleMaxWidth` DECIMAL(5,1) DEFAULT 200.0;", token); _log?.Info($"{tbl}.TitleMaxWidth 컬럼 추가 완료"); }
-                catch { /* 이미 존재하면 무시 */ }
+                try
+                {
+                    bandShifted = await conn.ExecuteAsync(
+                        "UPDATE `Symbols` SET `ZOrder` = `ZOrder` + 1000 WHERE `ZOrder` < 1000;");
+                    if (bandShifted > 0)
+                        _log?.Info($"Symbols ZOrder band 시프트 {bandShifted}행 (1000+ 대역)");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"Symbols ZOrder band 시프트 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
             }
 
             // ── (제거됨) 구 '라인/PidsGroup 라벨 오프셋 px→비율 1회 정리' UPDATE (Overlay_Title OQ-1) ──
@@ -656,7 +724,17 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 레거시 px 정리는 이 전환 코드 배포 직후 이미 완료(이후 부팅에서 걸리는 >3 값은 사실상 정상 드래그값).
             // → 제거하여 모든 크기의 유효 드래그 비율값을 보존(라벨 위치 재시작 유지). 재드래그 없이도 향후 손실 차단.
 
-            _log?.Info("Symbol 관련 테이블 생성/확인 완료");
+            // ── FR-07: 요약 로그 ──
+            //    이전에는 "생성/확인 완료" 한 줄뿐이라 성공과 무음 실패가 구분되지 않았다.
+            //    적용/스킵/실패 건수를 남겨 '이 DB 가 몇 세대 스키마인가'와 '무엇이 실패했나'를
+            //    부팅 로그만으로 판별할 수 있게 한다.
+            var unresolved = columnMeta.Where(kv => kv.Value is null).Select(kv => kv.Key).ToList();
+            var summary = $"Symbol 스키마 마이그레이션 완료 — 적용 {applied} / 스킵 {skipped} / 실패 {failed} / 타입교정 {modified} / band시프트 {bandShifted}행";
+            if (unresolved.Count > 0)
+                summary += $" / 판정불능 테이블: {string.Join(", ", unresolved)}";
+
+            if (failed > 0 || unresolved.Count > 0) _log?.Warning(summary);
+            else                                    _log?.Info(summary);
         }
         catch (Exception ex)
         {
@@ -664,6 +742,106 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             throw;
         }
     }
+
+    /// <summary>
+    /// 마이그레이션 대상 컬럼 사양표 (GMap_Schema_Migration_Idempotency FR-11).
+    /// </summary>
+    /// <remarks>
+    /// 선언적 사양표 — 가드 루프는 이 배열만 순회한다. 컬럼을 추가할 때는
+    /// (1) 해당 테이블의 CREATE TABLE 정의 (2) 이 배열 (3) 읽기 SQL의 명시 컬럼 목록
+    /// 세 곳을 함께 갱신한다. 셋의 정합성은 단위 테스트가 검증한다.
+    ///
+    /// ⚠ 1회성 데이터 이관 DML 은 이 표에도, BuildSchemeAsync 본문에도 두지 않는다.
+    ///   불가피하면 마이그레이션 이력 테이블을 먼저 도입하고 그 게이트 뒤에서만 실행한다.
+    ///   (BuildSchemeAsync 는 부팅당 무조건 1회 실행되므로 '1회성'을 보장할 수단이 없다)
+    /// </remarks>
+    private static readonly (string Table, string Column, string Ddl)[] COLUMN_SPECS =
+    {
+        // ── Symbols ──
+        ("Symbols", "ZOrder",          "INT DEFAULT 10"),
+        ("Symbols", "Visible",         "BOOLEAN DEFAULT TRUE"),
+        ("Symbols", "IsLocked",        "BOOLEAN DEFAULT FALSE"),
+        ("Symbols", "LabelOffsetX",    "DOUBLE DEFAULT 0"),
+        ("Symbols", "LabelOffsetY",    "DOUBLE DEFAULT 0"),   // FR-10: X와 독립 판정(이전엔 try 공유로 X가 던지면 Y가 영구 누락)
+        ("Symbols", "TitleColor",      "VARCHAR(20) NOT NULL DEFAULT 'White'"),
+        ("Symbols", "TitleBackground", "VARCHAR(20) NOT NULL DEFAULT 'Black'"),
+        ("Symbols", "TitleFontFamily", "VARCHAR(100) DEFAULT ''"),
+        ("Symbols", "TitleBold",       "BOOLEAN DEFAULT FALSE"),
+        ("Symbols", "TitleItalic",     "BOOLEAN DEFAULT FALSE"),
+        ("Symbols", "TitleMaxWidth",   "DECIMAL(5,1) DEFAULT 200.0"),
+
+        // ── Images ──
+        ("Images",  "IsLocked",        "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "TitleSize",       "DECIMAL(4,2) DEFAULT 11.0"),
+        ("Images",  "ShowTitle",       "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "LabelOffsetU",    "DOUBLE DEFAULT 0"),
+        ("Images",  "LabelOffsetV",    "DOUBLE DEFAULT 0"),
+        ("Images",  "TitleColor",      "VARCHAR(20) NOT NULL DEFAULT 'White'"),
+        ("Images",  "TitleBackground", "VARCHAR(20) NOT NULL DEFAULT 'Black'"),
+        ("Images",  "TitleFontFamily", "VARCHAR(100) DEFAULT ''"),
+        ("Images",  "TitleBold",       "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "TitleItalic",     "BOOLEAN DEFAULT FALSE"),
+        ("Images",  "TitleMaxWidth",   "DECIMAL(5,1) DEFAULT 200.0"),
+    };
+
+    /// <summary>MySQL 에러 번호 — 컬럼 중복.</summary>
+    private const int ERR_DUP_COLUMN = 1060;
+    /// <summary>MySQL 에러 번호 — 존재하지 않는 대상 DROP/변경.</summary>
+    private const int ERR_CANT_DROP = 1091;
+
+    /// <summary>information_schema 에서 읽은 컬럼 메타.</summary>
+    private sealed record ColumnMeta(string Name, string ColumnType, bool IsNullable);
+
+    /// <summary>
+    /// 지정 테이블의 컬럼 메타를 1회 조회한다 (GMap_Schema_Migration_Idempotency FR-01).
+    /// </summary>
+    /// <returns>
+    /// 컬럼명 → 메타 딕셔너리(대소문자 무시). 조회 실패 또는 0행이면 <c>null</c> —
+    /// 이는 "컬럼이 전부 없다"가 아니라 **판정 불능**을 뜻하며, 호출부는 추측으로 ALTER 하지 않고 스킵한다.
+    /// </returns>
+    /// <remarks>
+    /// ⚠ <c>AND TABLE_SCHEMA = DATABASE()</c> 는 필수다. 빠뜨리면 같은 인스턴스에 공존하는
+    ///   monitor_test_db 의 동명 테이블과 합집합이 되어, 운영 DB 에 실제로 없는 컬럼을
+    ///   '존재'로 오판 → ALTER 스킵 → 읽기 SQL 이 Unknown column(1054) → 심볼 0건 부팅이 된다.
+    ///   비교자도 반드시 OrdinalIgnoreCase 여야 한다(플랫폼별 식별자 케이싱 차이).
+    ///   취소 토큰은 전달하지 않는다 — 스키마 구간은 취소 비대상이다(FR-09).
+    /// </remarks>
+    private async Task<Dictionary<string, ColumnMeta>?> LoadColumnMetaAsync(MySqlConnection conn, string table)
+    {
+        const string sql = @"
+            SELECT COLUMN_NAME AS Name, COLUMN_TYPE AS ColumnType, IS_NULLABLE AS IsNullable
+              FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME   = @Table;";
+
+        try
+        {
+            var rows = await conn.QueryAsync<(string Name, string ColumnType, string IsNullable)>(
+                new CommandDefinition(sql, new { Table = table }, commandTimeout: COLUMN_META_TIMEOUT_SEC));
+
+            var map = new Dictionary<string, ColumnMeta>(StringComparer.OrdinalIgnoreCase);
+            foreach (var r in rows)
+                map[r.Name] = new ColumnMeta(r.Name, r.ColumnType,
+                    string.Equals(r.IsNullable, "YES", StringComparison.OrdinalIgnoreCase));
+
+            if (map.Count == 0)
+            {
+                _log?.Warning($"{table} 컬럼 메타 0행 — 마이그레이션 판정 불능으로 스킵합니다.");
+                return null;
+            }
+            return map;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // 부팅을 막지 않는다 — 판정 불능으로 열화시키고 해당 테이블 마이그레이션만 건너뛴다.
+            _log?.Warning($"{table} 컬럼 메타 조회 실패 — {ex.GetType().Name}: {ex.Message}. 마이그레이션을 스킵합니다.");
+            return null;
+        }
+    }
+
+    /// <summary>컬럼 메타 조회 타임아웃(초). 대형 인스턴스에서 information_schema 가 느릴 수 있다.</summary>
+    private const int COLUMN_META_TIMEOUT_SEC = 10;
 
     /// <summary>
     /// 데이터베이스에서 모든 Symbol 인스턴스를 로드하여 SymbolProvider에 저장
