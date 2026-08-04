@@ -1,0 +1,1285 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]: Installer Planning · Wireframe & Storyboard
+    - heading "IRONWALL 관제 SW 설치 프로그램 기획서" [level=1] [ref=e5]
+    - paragraph [ref=e6]:
+      - text: Inno Setup 기반 설치 마법사의 화면 구성·입력 단계·그래픽 시안을 정의한다. 설치 시
+      - code [ref=e7]: appsettings.json
+      - text: 의 현장 필수 설정을 단계별로 입력받아 자동 기록하는 것이 핵심 목표다.
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - text: 대상
+        - generic [ref=e10]: Dotnet.Monitoring.Solution
+        - text: (Pids Monitoring System)
+      - generic [ref=e11]:
+        - text: 참조
+        - generic [ref=e12]: Multiplatform.Downloader\Installer
+      - generic [ref=e13]:
+        - text: 도구
+        - generic [ref=e14]: Inno Setup 6.3+
+        - text: · Korean.isl
+      - generic [ref=e15]:
+        - text: 상태
+        - generic [ref=e16]: Draft v1.0
+        - text: · 2026-08-04
+  - navigation [ref=e17]:
+    - link "1개요" [ref=e18] [cursor=pointer]:
+      - /url: "#s1"
+    - link "2조사 근거" [ref=e19] [cursor=pointer]:
+      - /url: "#s2"
+    - link "3표기 원칙" [ref=e20] [cursor=pointer]:
+      - /url: "#s3"
+    - link "4스토리보드" [ref=e21] [cursor=pointer]:
+      - /url: "#s4"
+    - link "5와이어프레임" [ref=e22] [cursor=pointer]:
+      - /url: "#s5"
+    - link "6그래픽 시안" [ref=e23] [cursor=pointer]:
+      - /url: "#s6"
+    - link "7설정 기록·보존" [ref=e24] [cursor=pointer]:
+      - /url: "#s7"
+    - link "8기술 설계" [ref=e25] [cursor=pointer]:
+      - /url: "#s8"
+    - link "9미결 사항" [ref=e26] [cursor=pointer]:
+      - /url: "#s9"
+  - generic [ref=e27]:
+    - generic [ref=e28]:
+      - generic [ref=e29]: "01"
+      - heading "개요" [level=2] [ref=e30]
+      - generic [ref=e31]: 목표 · 범위 · 접근
+    - paragraph [ref=e32]:
+      - text: 현재 관제 SW는
+      - code [ref=e33]: bin\Release
+      - text: 출력 폴더를 통째로 복사한 zip(
+      - code [ref=e34]: PidsMonitoringSystem.zip
+      - text: )으로 수동 배포된다. 현장 설치 시 엔지니어가
+      - code [ref=e35]: appsettings.json
+      - text: 을 직접 열어 서버 주소들을 손으로 고치는데, 이 과정이 설치 품질의 최대 변수다.
+    - paragraph [ref=e36]:
+      - text: 이 기획은 검증된 사내 인스톨러(샤샤룽 다운로더)의 뼈대를 계승하되,
+      - generic [ref=e37]:
+        - text: 설치 마법사가 현장 필수 설정을 단계별 화면으로 입력받아
+        - code [ref=e38]: appsettings.json
+        - text: 을 자동 생성
+      - text: 하도록 확장한다.
+    - generic [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]: Goal 1
+        - heading "설정 입력의 마법사화" [level=4] [ref=e42]
+        - paragraph [ref=e43]: 브로커·관제 서버·데이터 저장소·지도 데이터 등 현장 필수 항목을 화면 단위로 세분화해 입력받고 검증한다.
+      - generic [ref=e44]:
+        - generic [ref=e45]: Goal 2
+        - heading "업그레이드 안전성" [level=4] [ref=e46]
+        - paragraph [ref=e47]: 기존 설치 감지 시 설정 파일을 절대 덮어쓰지 않고 구성 단계를 건너뛴다. 사용자 데이터 폴더는 전량 보존한다.
+      - generic [ref=e48]:
+        - generic [ref=e49]: Goal 3
+        - heading "제품 브랜딩" [level=4] [ref=e50]
+        - paragraph [ref=e51]: 매뉴얼 기반 제품 특징을 그래픽 보드 2장으로 요약해 설치 중 노출한다. 이미지에 버전 정보는 넣지 않는다.
+      - generic [ref=e52]:
+        - generic [ref=e53]: Non-Goal
+        - heading "서버 구성요소 설치" [level=4] [ref=e54]
+        - paragraph [ref=e55]: 브로커 서버·데이터베이스·관제 API 서버 자체의 설치는 범위 밖이다. 클라이언트는 접속 정보만 입력받는다.
+  - generic [ref=e56]:
+    - generic [ref=e57]:
+      - generic [ref=e58]: "02"
+      - heading "조사 근거 요약" [level=2] [ref=e59]
+      - generic [ref=e60]: 설계를 결정한 사실들
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e63]: Runtime
+        - heading ".NET 8 WPF · framework-dependent" [level=4] [ref=e64]
+        - paragraph [ref=e65]:
+          - code [ref=e66]: net8.0-windows
+          - text: ", Desktop Runtime 8 필요. 설치 페이로드 약 415MB(지도 데이터 제외). 발행 프로필 없음 — 현행 배포는 bin 복사."
+      - generic [ref=e67]:
+        - generic [ref=e68]: Config
+        - heading "appsettings.json = 사용자 데이터" [level=4] [ref=e69]
+        - paragraph [ref=e70]:
+          - text: 앱이 런타임에 테마·셋업 패널 값을 원자적 쓰기(
+          - code [ref=e71]: File.Replace
+          - text: +
+          - code [ref=e72]: .bak
+          - text: )로 계속 갱신한다. 업그레이드 시 덮어쓰기 금지가 절대 원칙.
+      - generic [ref=e73]:
+        - generic [ref=e74]: Write path
+        - heading "설치 폴더에 상시 쓰기" [level=4] [ref=e75]
+        - paragraph [ref=e76]: 설정·로그·스냅샷·오버레이 이미지·프로필·WebView2 데이터를 전부 자기 폴더에 기록. 매니페스트 없음(asInvoker) → 설치 경로 전략이 필수 설계 포인트.
+      - generic [ref=e77]:
+        - generic [ref=e78]: Map data
+        - heading "기본맵은 수백 GB" [level=4] [ref=e79]
+        - paragraph [ref=e80]:
+          - code [ref=e81]: Datas\*.mbtiles
+          - text: (기본맵 52GB + 위성 117GB)는 설치본에 포함 불가.
+          - code [ref=e82]: MapDataDirectory
+          - text: 로 외부 폴더를 지정하는 구조 → 마법사 입력 항목으로 채택.
+    - table [ref=e84]:
+      - rowgroup [ref=e85]:
+        - row [ref=e86]:
+          - columnheader "참조 소스" [ref=e87]
+          - columnheader "가져오는 것" [ref=e88]
+        - row [ref=e89]:
+          - cell [ref=e90]:
+            - code [ref=e91]: Multiplatform.Downloader\Installer
+          - cell [ref=e92]:
+            - text: Inno 스크립트 뼈대 — 이전 버전 무인 제거, 실행 중 앱 강제 종료, PNG 위저드 이미지, 특징 소개 커스텀 페이지(BMP),
+            - code [ref=e93]: build.bat
+            - text: 원클릭 파이프라인, 버전 자동 추출.
+        - row [ref=e94]:
+          - cell [ref=e95]:
+            - code [ref=e96]: appsettings.json
+            - text: (메인 솔루션)
+          - cell "설치 시 입력받을 현장 설정 키 목록과 기본값 — §5 각 화면 스펙과 §7 매핑표의 근거." [ref=e97]
+        - row [ref=e98]:
+          - cell [ref=e99]:
+            - code [ref=e100]: docs/manual
+            - text: (10장 · 139 스크린샷)
+          - cell "제품 특징 8그룹 — §6 그래픽 보드 2장의 콘텐츠 소스." [ref=e101]
+  - generic [ref=e102]:
+    - generic [ref=e103]:
+      - generic [ref=e104]: "03"
+      - heading "화면 표기 원칙 — 기술명 비노출" [level=2] [ref=e105]
+      - generic [ref=e106]: 완곡 명칭 매핑
+    - paragraph [ref=e107]: 설치 화면에는 특정 기술·제품명을 직접 드러내지 않고 역할 중심의 완곡한 명칭을 쓴다. 제품의 설정 UI가 이미 "브로커 서버"라는 용어를 쓰고 있어(세팅 패널 스크린샷 55·59번) 설치 화면과 실행 후 화면의 용어가 자연스럽게 이어진다.
+    - table [ref=e109]:
+      - rowgroup [ref=e110]:
+        - row [ref=e111]:
+          - columnheader "실제 기술" [ref=e112]
+          - columnheader "설치 화면 표기" [ref=e113]
+          - columnheader "관련 설정 키" [ref=e114]
+        - row [ref=e115]:
+          - cell "NATS" [ref=e116]
+          - cell "통합 브로커 서버" [ref=e117]
+          - cell [ref=e118]:
+            - code [ref=e119]: IpAddressNats
+            - code [ref=e120]: PortNats
+            - code [ref=e121]: UsernameNats
+            - code [ref=e122]: PasswordNats
+            - code [ref=e123]: ConnectionTimeoutNats
+        - row [ref=e124]:
+          - cell "NATS 토픽 체계" [ref=e125]
+          - cell "시스템 식별 정보 (도메인 / 운영 그룹 / 서브시스템)" [ref=e126]
+          - cell [ref=e127]:
+            - code [ref=e128]: DomainNats
+            - code [ref=e129]: GroupNats
+            - code [ref=e130]: SubsystemNats
+            - code [ref=e131]: DefaultSubjectNats
+            - text: (자동 파생)
+        - row [ref=e132]:
+          - cell "Redis" [ref=e133]
+          - cell "서드파티 브로커 서버" [ref=e134]
+          - cell [ref=e135]:
+            - code [ref=e136]: IpAddressRedis
+            - code [ref=e137]: PortRedis
+            - code [ref=e138]: PasswordRedis
+            - code [ref=e139]: NameChannel
+        - row [ref=e140]:
+          - cell "REST API 서버" [ref=e141]
+          - cell "통합 관제 서버" [ref=e142]
+          - cell [ref=e143]:
+            - code [ref=e144]: Url
+        - row [ref=e145]:
+          - cell "통제 웹 (내장 웹 뷰어)" [ref=e146]
+          - cell "통합 관제 웹(통제웹)" [ref=e147]
+          - cell [ref=e148]:
+            - code [ref=e149]: IpAddrerssWebServer
+            - code [ref=e150]: PortWebServer
+            - code [ref=e151]: IsWebServerEnabled
+        - row [ref=e152]:
+          - cell "MariaDB / MySQL" [ref=e153]
+          - cell "데이터 저장소" [ref=e154]
+          - cell [ref=e155]:
+            - code [ref=e156]: IpDbServer
+            - code [ref=e157]: PortDbServer
+            - code [ref=e158]: DbDatabase
+            - code [ref=e159]: UidDbServer
+            - code [ref=e160]: PasswordDbServer
+        - row [ref=e161]:
+          - cell "클라이언트 UUID" [ref=e162]
+          - cell "클라이언트 ID" [ref=e163]
+          - cell [ref=e164]:
+            - code [ref=e165]: SystemUuid
+        - row [ref=e166]:
+          - cell "MBTiles 기본맵" [ref=e167]
+          - cell "지도 데이터 폴더" [ref=e168]
+          - cell [ref=e169]:
+            - code [ref=e170]: MapDataDirectory
+            - code [ref=e171]: TileDirectory
+    - generic [ref=e172]:
+      - generic [ref=e173]: i
+      - paragraph [ref=e174]: 포트 번호·기본값(4222, 6379 등)은 입력 필드의 기본값으로만 노출된다. 화면 문구·도움말·이미지 어디에도 NATS·Redis·MariaDB 같은 기술명을 쓰지 않는다.
+  - generic [ref=e175]:
+    - generic [ref=e176]:
+      - generic [ref=e177]: "04"
+      - heading "설치 플로우 스토리보드" [level=2] [ref=e178]
+      - generic [ref=e179]: 16개 화면 · 2개 분기 · 3개 예외
+    - paragraph [ref=e180]: 전체 흐름은 브랜딩 → 위치·옵션 → 현장 구성(신규 설치만) → 요약 → 설치 → 완료의 6막이다. 기존 설치가 감지되면(업그레이드) 구성 7개 화면을 통째로 건너뛴다.
+    - generic [ref=e182]:
+      - generic [ref=e183]:
+        - generic [ref=e184]: "01"
+        - generic [ref=e191]:
+          - generic [ref=e192]: 환영
+          - generic [ref=e193]: 좌측 브랜드 배너 + 설치 안내
+      - generic [ref=e194]: →
+      - generic [ref=e195]:
+        - generic [ref=e196]: "02"
+        - generic [ref=e200]:
+          - generic [ref=e201]: 제품 소개 ①
+          - generic [ref=e202]: 실시간 관제 특징 보드
+      - generic [ref=e203]: →
+      - generic [ref=e204]:
+        - generic [ref=e205]: "03"
+        - generic [ref=e209]:
+          - generic [ref=e210]: 제품 소개 ②
+          - generic [ref=e211]: 운영·관리 특징 보드
+      - generic [ref=e212]: →
+      - generic [ref=e213]:
+        - generic [ref=e214]: "04"
+        - generic [ref=e220]:
+          - generic [ref=e221]: 설치 위치
+          - generic [ref=e222]: 폴더 선택 + 공간 확인
+      - generic [ref=e223]: →
+      - generic [ref=e224]:
+        - generic [ref=e225]: "05"
+        - generic [ref=e231]:
+          - generic [ref=e232]: 추가 작업
+          - generic [ref=e233]: 바탕화면 아이콘 · 자동 실행
+      - generic [ref=e234]: →
+      - generic [ref=e235]:
+        - generic [ref=e236]: "06"
+        - generic [ref=e241]:
+          - generic [ref=e242]: 설치 유형
+          - generic [ref=e243]: 신규 구성 / 기존 설정 유지
+      - generic [ref=e244]: →
+      - generic [ref=e245]:
+        - generic [ref=e246]: 현장 구성 단계 — 신규 설치만
+        - generic [ref=e247]:
+          - generic [ref=e248]: "07"
+          - generic [ref=e254]:
+            - generic [ref=e255]: 시스템 식별
+            - generic [ref=e256]: 클라이언트 ID · 도메인 · 그룹
+        - generic [ref=e257]: →
+        - generic [ref=e258]:
+          - generic [ref=e259]: "08"
+          - generic [ref=e264]:
+            - generic [ref=e265]: 통합 브로커 서버
+            - generic [ref=e266]: 주소 · 포트 · 인증(선택)
+        - generic [ref=e267]: →
+        - generic [ref=e268]:
+          - generic [ref=e269]: "09"
+          - generic [ref=e274]:
+            - generic [ref=e275]: 서드파티 브로커 서버
+            - generic [ref=e276]: 주소 · 포트 · 채널
+        - generic [ref=e277]: →
+        - generic [ref=e278]:
+          - generic [ref=e279]: "10"
+          - generic [ref=e285]:
+            - generic [ref=e286]: 통합 관제 서버
+            - generic [ref=e287]: 관제 API · 통제웹 주소
+        - generic [ref=e288]: →
+        - generic [ref=e289]:
+          - generic [ref=e290]: "11"
+          - generic [ref=e296]:
+            - generic [ref=e297]: 데이터 저장소
+            - generic [ref=e298]: 주소 · 데이터베이스 · 계정
+        - generic [ref=e299]: →
+        - generic [ref=e300]:
+          - generic [ref=e301]: "12"
+          - generic [ref=e306]:
+            - generic [ref=e307]: 지도 데이터
+            - generic [ref=e308]: 기본맵 폴더 지정
+        - generic [ref=e309]: →
+        - generic [ref=e310]:
+          - generic [ref=e311]: "13"
+          - generic [ref=e318]:
+            - generic [ref=e319]: 구성 요약
+            - generic [ref=e320]: 입력값 최종 확인
+      - generic [ref=e321]: →
+      - generic [ref=e322]:
+        - generic [ref=e323]: "14"
+        - generic [ref=e329]:
+          - generic [ref=e330]: 설치 준비 완료
+          - generic [ref=e331]: 최종 확인 → [설치]
+      - generic [ref=e332]: →
+      - generic [ref=e333]:
+        - generic [ref=e334]: "15"
+        - generic [ref=e340]:
+          - generic [ref=e341]: 설치 진행
+          - generic [ref=e342]: 파일 복사 + 설정 기록
+      - generic [ref=e343]: →
+      - generic [ref=e344]:
+        - generic [ref=e345]: "16"
+        - generic [ref=e350]:
+          - generic [ref=e351]: 완료
+          - generic [ref=e352]: 실행 체크 + 지도 데이터 안내
+    - generic [ref=e353]:
+      - text: "업그레이드(기존 설정 유지) 선택 시: 06 →"
+      - generic [ref=e355]: "14"
+      - text: 로 직행 — 07~13 화면을 건너뛴다.
+    - heading "예외 흐름 (화면 밖 동작)" [level=3] [ref=e356]
+    - generic [ref=e357]:
+      - generic [ref=e358]:
+        - generic [ref=e359]: E1 · 설치 시작 전
+        - heading "이전 버전 자동 제거" [level=4] [ref=e360]
+        - paragraph [ref=e361]: 레지스트리에서 동일 AppId 설치 흔적을 찾으면 조용히 제거 후 진행(진행창은 표시). 사용자 데이터·설정은 보존된다.
+      - generic [ref=e362]:
+        - generic [ref=e363]: E2 · 설치 시작 전
+        - heading "실행 중 프로그램 종료" [level=4] [ref=e364]
+        - paragraph [ref=e365]: 관제 프로그램과 감시 프로세스(와치독)를 함께 강제 종료해 파일 잠금으로 인한 설치 실패를 방지한다.
+      - generic [ref=e366]:
+        - generic [ref=e367]: E3 · 사전 요구사항
+        - heading "실행 환경 확인" [level=4] [ref=e368]
+        - paragraph [ref=e369]: .NET Desktop Runtime 8 미설치 시 안내 후 동봉본 설치(또는 다운로드 안내). WebView2 런타임도 함께 확인한다.
+  - generic [ref=e370]:
+    - generic [ref=e371]:
+      - generic [ref=e372]: "05"
+      - heading "화면별 와이어프레임" [level=2] [ref=e373]
+      - generic [ref=e374]: 16개 화면 상세
+    - heading "화면 01 — 환영" [level=3] [ref=e375]
+    - generic [ref=e376]:
+      - generic [ref=e377]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e379]: ✕
+      - generic [ref=e380]:
+        - generic [ref=e381]:
+          - heading "IRONWALL 통합 관제" [level=5] [ref=e386]: IRONWALL통합 관제
+          - generic [ref=e387]: PIDS MONITORING SYSTEM
+          - generic [ref=e389]: 지능형 외곽 침입 탐지 관제
+          - generic [ref=e391]: GIS 위성지도 기반 현장 시각화
+          - generic [ref=e393]: 카메라 영상·PTZ 즉시 연동
+          - generic [ref=e395]: 계정·권한·감사 통제
+          - generic [ref=e397]: SENSORWAY
+        - generic [ref=e398]:
+          - heading "IRONWALL 관제 프로그램 설치를 시작합니다" [level=6] [ref=e399]
+          - paragraph [ref=e400]: 이 마법사는 프로그램 설치와 함께 현장 운영에 필요한 서버 연결 정보를 단계별로 구성합니다.계속하기 전에 다른 프로그램을 모두 닫는 것이 좋습니다. 설치를 계속하려면 [다음]을, 마법사를 끝내려면 [취소]를 누르십시오.
+      - generic [ref=e401]:
+        - button "다음(N) >" [ref=e402]
+        - button "취소" [ref=e403]
+    - paragraph [ref=e404]: 좌측 배너는 §6의 위저드 배너 시안을 사용한다. 배너에 버전 표기 없음 — 버전은 창 제목·언인스톨 항목에만 노출.
+    - heading "화면 02 · 03 — 제품 소개 (특징 보드)" [level=3] [ref=e405]
+    - generic [ref=e406]:
+      - generic [ref=e407]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e409]: ✕
+      - generic [ref=e410]:
+        - generic [ref=e412]:
+          - generic [ref=e413]: IRONWALL 통합 관제 소개
+          - text: 현장의 모든 신호를 한 화면에서 관제합니다.
+        - generic [ref=e417]: 특징 보드 ① (§6 시안 · 1040×660 BMP)
+      - generic [ref=e419]:
+        - button "< 뒤로(B)" [ref=e420]
+        - button "다음(N) >" [ref=e421]
+        - button "취소" [ref=e422]
+    - paragraph [ref=e423]: 참조 인스톨러의 특징 페이지 패턴 그대로 — 이미지를 페이지 폭에 맞춰 비율 유지 중앙 배치. 화면 02는 보드 ①(실시간 관제), 화면 03은 보드 ②(운영·관리)를 표시한다.
+    - heading "화면 04 — 설치 위치" [level=3] [ref=e424]
+    - generic [ref=e425]:
+      - generic [ref=e426]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e428]: ✕
+      - generic [ref=e429]:
+        - generic [ref=e431]:
+          - generic [ref=e432]: 설치 위치 선택
+          - text: IRONWALL 관제 프로그램을 설치할 폴더를 선택하십시오.
+        - generic [ref=e436]:
+          - paragraph [ref=e437]: 프로그램은 운영 중 설정·로그·스냅샷을 설치 폴더에 기록합니다. 쓰기 가능한 경로를 권장합니다.
+          - generic [ref=e439]:
+            - text: C:\PidsMonitoringSystem
+            - generic [ref=e440]: 찾아보기(R)...
+          - generic [ref=e441]: "필요한 디스크 공간: 약 420 MB · 사용 가능한 공간: 182.4 GB"
+      - generic [ref=e443]:
+        - button "< 뒤로(B)" [ref=e444]
+        - button "다음(N) >" [ref=e445]
+        - button "취소" [ref=e446]
+    - paragraph [ref=e447]:
+      - text: 기본 경로는
+      - code [ref=e448]: C:\PidsMonitoringSystem
+      - text: (현행 배포 폴더명 계승).
+      - code [ref=e449]: Program Files
+      - text: 를 선택하면 설치기가 폴더에 사용자 쓰기 권한(ACL)을 부여한다 — §8 경로 전략 참고.
+    - heading "화면 05 — 추가 작업" [level=3] [ref=e450]
+    - generic [ref=e451]:
+      - generic [ref=e452]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e454]: ✕
+      - generic [ref=e455]:
+        - generic [ref=e457]:
+          - generic [ref=e458]: 추가 작업 선택
+          - text: 수행할 추가 작업을 선택하십시오.
+        - generic [ref=e462]:
+          - paragraph [ref=e463]: "바로가기:"
+          - generic [ref=e464]: 바탕 화면에 바로가기 만들기(D)
+          - paragraph [ref=e466]: "운영 옵션:"
+          - generic [ref=e467]: Windows 시작 시 관제 프로그램 자동 실행
+          - generic [ref=e469]: 관제 PC 재부팅 후 자동으로 관제를 재개합니다. (상주 관제 PC 권장)
+      - generic [ref=e470]:
+        - button "< 뒤로(B)" [ref=e471]
+        - button "다음(N) >" [ref=e472]
+        - button "취소" [ref=e473]
+    - heading "화면 06 — 설치 유형 (분기점)" [level=3] [ref=e474]
+    - generic [ref=e475]:
+      - generic [ref=e476]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e478]: ✕
+      - generic [ref=e479]:
+        - generic [ref=e481]:
+          - generic [ref=e482]: 설치 유형
+          - text: 현장 구성 방법을 선택하십시오.
+        - generic [ref=e486]:
+          - generic [ref=e487]:
+            - generic [ref=e488]: "!"
+            - paragraph [ref=e489]:
+              - text: 기존 설치가 감지되었습니다 —
+              - code [ref=e490]: C:\PidsMonitoringSystem\appsettings.json
+              - text: (기존 설정 유지가 기본값으로 선택됩니다)
+          - generic [ref=e491]: 새로 구성 (신규 설치) 다음 단계에서 서버 연결 정보를 입력받아 설정 파일을 새로 만듭니다.
+          - generic [ref=e494]: 기존 설정 유지 (업그레이드) 현재 설정·데이터를 그대로 두고 프로그램 파일만 교체합니다. 구성 단계를 건너뜁니다.
+      - generic [ref=e497]:
+        - button "< 뒤로(B)" [ref=e498]
+        - button "다음(N) >" [ref=e499]
+        - button "취소" [ref=e500]
+    - paragraph [ref=e501]:
+      - text: 신규 PC(설정 파일 없음)에서는 안내 배너가 숨겨지고 "새로 구성"이 기본 선택된다. 업그레이드에서 "새로 구성"을 고르면 기존 파일을
+      - code [ref=e502]: appsettings.json.pre-upgrade.bak
+      - text: 으로 백업 후 재작성한다.
+    - heading "화면 07 — 현장 구성 ① 시스템 식별" [level=3] [ref=e503]
+    - generic [ref=e504]:
+      - generic [ref=e505]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e507]: ✕
+      - generic [ref=e508]:
+        - generic [ref=e510]:
+          - generic [ref=e511]: 현장 구성 (1/6) — 시스템 식별
+          - text: 이 관제 클라이언트를 식별하는 정보를 입력하십시오.
+        - generic [ref=e515]:
+          - generic [ref=e516]:
+            - generic [ref=e517]: 클라이언트 ID *
+            - generic [ref=e518]: gis-monitoring
+          - generic [ref=e519]: 이 프로그램 인스턴스의 고유 이름 — 영문·숫자·하이픈(-)만 사용.
+          - generic [ref=e521]:
+            - generic [ref=e522]: 시스템 도메인 *
+            - generic [ref=e523]: sensorway
+          - generic [ref=e524]:
+            - generic [ref=e525]: 운영 그룹 *
+            - generic [ref=e526]: unit001
+          - generic [ref=e527]: 사이트(현장) 단위 식별자 — 같은 현장의 장비·서버와 일치해야 합니다.
+          - generic [ref=e528]:
+            - generic [ref=e529]: 서브시스템 *
+            - generic [ref=e530]: gis
+          - generic [ref=e532]:
+            - text: "자동 구성 — 기본 수신 주제:"
+            - code [ref=e533]: sensorway.unit001.gis.>
+      - generic [ref=e534]:
+        - button "< 뒤로(B)" [ref=e535]
+        - button "다음(N) >" [ref=e536]
+        - button "취소" [ref=e537]
+    - table [ref=e539]:
+      - rowgroup [ref=e540]:
+        - row [ref=e541]:
+          - columnheader "필드" [ref=e542]
+          - columnheader "설정 키" [ref=e543]
+          - columnheader "기본값" [ref=e544]
+          - columnheader "검증" [ref=e545]
+        - row [ref=e546]:
+          - cell "클라이언트 ID" [ref=e547]
+          - cell [ref=e548]:
+            - code [ref=e549]: SystemUuid
+          - cell [ref=e550]:
+            - code [ref=e551]: gis-monitoring
+          - cell [ref=e552]:
+            - text: 필수 ·
+            - code [ref=e553]: "[a-zA-Z0-9-]+"
+        - row [ref=e554]:
+          - cell "시스템 도메인" [ref=e555]
+          - cell [ref=e556]:
+            - code [ref=e557]: DomainNats
+          - cell [ref=e558]:
+            - code [ref=e559]: sensorway
+          - cell "필수 · 소문자 영숫자" [ref=e560]
+        - row [ref=e561]:
+          - cell "운영 그룹" [ref=e562]
+          - cell [ref=e563]:
+            - code [ref=e564]: GroupNats
+          - cell [ref=e565]:
+            - code [ref=e566]: unit001
+          - cell "필수 · 소문자 영숫자" [ref=e567]
+        - row [ref=e568]:
+          - cell "서브시스템" [ref=e569]
+          - cell [ref=e570]:
+            - code [ref=e571]: SubsystemNats
+          - cell [ref=e572]:
+            - code [ref=e573]: gis
+          - cell "필수 · 소문자 영숫자" [ref=e574]
+        - row [ref=e575]:
+          - cell "기본 수신 주제 (읽기 전용)" [ref=e576]
+          - cell [ref=e577]:
+            - code [ref=e578]: DefaultSubjectNats
+          - cell [ref=e579]:
+            - text: 자동 파생 —
+            - code [ref=e580]: "{도메인}.{그룹}.{서브시스템}.>"
+            - text: 실시간 미리보기
+    - heading "화면 08 — 현장 구성 ② 통합 브로커 서버" [level=3] [ref=e581]
+    - generic [ref=e582]:
+      - generic [ref=e583]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e585]: ✕
+      - generic [ref=e586]:
+        - generic [ref=e588]:
+          - generic [ref=e589]: 현장 구성 (2/6) — 통합 브로커 서버
+          - text: 실시간 이벤트를 중계하는 통합 브로커 서버 접속 정보입니다.
+        - generic [ref=e593]:
+          - generic [ref=e594]:
+            - generic [ref=e595]: 서버 주소 *
+            - generic [ref=e596]: "예: 192.168.0.10 또는 호스트명"
+          - generic [ref=e597]:
+            - generic [ref=e598]: 포트 *
+            - generic [ref=e599]:
+              - generic [ref=e600]: "4222"
+              - generic [ref=e601]: 연결 확인
+          - generic [ref=e603]:
+            - generic [ref=e604]: 접속 계정
+            - generic [ref=e605]: (선택) 서버에 인증이 설정된 경우
+          - generic [ref=e606]:
+            - generic [ref=e607]: 접속 암호
+            - generic [ref=e608]: (선택) ●●●●●●
+          - generic [ref=e609]:
+            - generic [ref=e610]: 연결 제한시간
+            - generic [ref=e611]:
+              - generic [ref=e612]: "5000"
+              - generic [ref=e613]: 밀리초 (고급)
+      - generic [ref=e614]:
+        - button "< 뒤로(B)" [ref=e615]
+        - button "다음(N) >" [ref=e616]
+        - button "취소" [ref=e617]
+    - table [ref=e619]:
+      - rowgroup [ref=e620]:
+        - row [ref=e621]:
+          - columnheader "필드" [ref=e622]
+          - columnheader "설정 키" [ref=e623]
+          - columnheader "기본값" [ref=e624]
+          - columnheader "검증" [ref=e625]
+        - row [ref=e626]:
+          - cell "서버 주소" [ref=e627]
+          - cell [ref=e628]:
+            - code [ref=e629]: IpAddressNats
+          - cell "(빈값 — 현장 입력 강제)" [ref=e630]
+          - cell "필수 · IPv4/호스트명 형식" [ref=e631]
+        - row [ref=e632]:
+          - cell "포트" [ref=e633]
+          - cell [ref=e634]:
+            - code [ref=e635]: PortNats
+          - cell [ref=e636]:
+            - code [ref=e637]: "4222"
+          - cell "필수 · 1–65535" [ref=e638]
+        - row [ref=e639]:
+          - cell "접속 계정 / 암호" [ref=e640]
+          - cell [ref=e641]:
+            - code [ref=e642]: UsernameNats
+            - text: /
+            - code [ref=e643]: PasswordNats
+          - cell "빈값" [ref=e644]
+          - cell "선택 · 암호 마스킹" [ref=e645]
+        - row [ref=e646]:
+          - cell "연결 제한시간" [ref=e647]
+          - cell [ref=e648]:
+            - code [ref=e649]: ConnectionTimeoutNats
+          - cell [ref=e650]:
+            - code [ref=e651]: "5000"
+          - cell "선택 · 숫자" [ref=e652]
+    - paragraph [ref=e653]: "[연결 확인]은 TCP 접속 검사(성공/실패 표시)만 수행하는 선택 구현 — 실패해도 다음 진행은 막지 않는다(현장 서버가 아직 미가동일 수 있음)."
+    - heading "화면 09 — 현장 구성 ③ 서드파티 브로커 서버" [level=3] [ref=e654]
+    - generic [ref=e655]:
+      - generic [ref=e656]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e658]: ✕
+      - generic [ref=e659]:
+        - generic [ref=e661]:
+          - generic [ref=e662]: 현장 구성 (3/6) — 서드파티 브로커 서버
+          - text: 외부 연계 데이터(영상 스트리밍 등)를 주고받는 채널 서버입니다.
+        - generic [ref=e666]:
+          - generic [ref=e667]:
+            - generic [ref=e669]: 기본값 사용
+            - generic [ref=e670]: — 별도 서버가 없으면 그대로 두십시오.
+          - generic [ref=e671]:
+            - generic [ref=e672]: 서버 주소
+            - generic [ref=e673]: localhost
+          - generic [ref=e674]:
+            - generic [ref=e675]: 포트
+            - generic [ref=e676]: "6379"
+          - generic [ref=e677]:
+            - generic [ref=e678]: 접속 암호
+            - generic [ref=e679]: ●●●
+          - generic [ref=e680]:
+            - generic [ref=e681]: 채널 이름
+            - generic [ref=e682]: StreamingChannel
+      - generic [ref=e683]:
+        - button "< 뒤로(B)" [ref=e684]
+        - button "다음(N) >" [ref=e685]
+        - button "취소" [ref=e686]
+    - table [ref=e688]:
+      - rowgroup [ref=e689]:
+        - row [ref=e690]:
+          - columnheader "필드" [ref=e691]
+          - columnheader "설정 키" [ref=e692]
+          - columnheader "기본값" [ref=e693]
+          - columnheader "검증" [ref=e694]
+        - row [ref=e695]:
+          - cell "서버 주소" [ref=e696]
+          - cell [ref=e697]:
+            - code [ref=e698]: IpAddressRedis
+          - cell [ref=e699]:
+            - code [ref=e700]: localhost
+          - cell "\"기본값 사용\" 해제 시 필수" [ref=e701]
+        - row [ref=e702]:
+          - cell "포트" [ref=e703]
+          - cell [ref=e704]:
+            - code [ref=e705]: PortRedis
+          - cell [ref=e706]:
+            - code [ref=e707]: "6379"
+          - cell "1–65535" [ref=e708]
+        - row [ref=e709]:
+          - cell "접속 암호" [ref=e710]
+          - cell [ref=e711]:
+            - code [ref=e712]: PasswordRedis
+          - cell "기존 기본값 유지" [ref=e713]
+          - cell "선택 · 마스킹" [ref=e714]
+        - row [ref=e715]:
+          - cell "채널 이름" [ref=e716]
+          - cell [ref=e717]:
+            - code [ref=e718]: NameChannel
+          - cell [ref=e719]:
+            - code [ref=e720]: StreamingChannel
+          - cell "선택" [ref=e721]
+    - heading "화면 10 — 현장 구성 ④ 통합 관제 서버" [level=3] [ref=e722]
+    - generic [ref=e723]:
+      - generic [ref=e724]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e726]: ✕
+      - generic [ref=e727]:
+        - generic [ref=e729]:
+          - generic [ref=e730]: 현장 구성 (4/6) — 통합 관제 서버
+          - text: 장비·이벤트 데이터를 제공하는 관제 서버와 통제웹 주소입니다.
+        - generic [ref=e734]:
+          - generic [ref=e735]:
+            - generic [ref=e736]: 관제 서버 주소 *
+            - generic [ref=e737]: "예: https://192.168.0.10:8136/api"
+          - generic [ref=e738]:
+            - text: 전체 주소를 입력하십시오 (
+            - code [ref=e739]: https://주소:포트/api
+            - text: ). 보안 연결(https) 사용을 권장합니다.
+          - generic [ref=e741]: 통합 관제 웹(통제웹) 사용
+          - generic [ref=e744]:
+            - generic [ref=e745]: 통제웹 주소
+            - generic [ref=e746]: 192.168.0.10
+          - generic [ref=e747]:
+            - generic [ref=e748]: 통제웹 포트
+            - generic [ref=e749]: "6173"
+          - generic [ref=e750]: 체크 시 활성화 — 프로그램의 [통합 웹 열기] 버튼이 이 주소로 연결됩니다.
+      - generic [ref=e751]:
+        - button "< 뒤로(B)" [ref=e752]
+        - button "다음(N) >" [ref=e753]
+        - button "취소" [ref=e754]
+    - table [ref=e756]:
+      - rowgroup [ref=e757]:
+        - row [ref=e758]:
+          - columnheader "필드" [ref=e759]
+          - columnheader "설정 키" [ref=e760]
+          - columnheader "기본값" [ref=e761]
+          - columnheader "검증" [ref=e762]
+        - row [ref=e763]:
+          - cell "관제 서버 주소" [ref=e764]
+          - cell [ref=e765]:
+            - code [ref=e766]: Url
+          - cell "(빈값 — 현장 입력 강제)" [ref=e767]
+          - cell [ref=e768]:
+            - text: 필수 ·
+            - code [ref=e769]: http(s)://
+            - text: 시작 +
+            - code [ref=e770]: /api
+            - text: 미포함 시 자동 보정 안내
+        - row [ref=e771]:
+          - cell "통제웹 사용" [ref=e772]
+          - cell [ref=e773]:
+            - code [ref=e774]: IsWebServerEnabled
+          - cell [ref=e775]:
+            - code [ref=e776]: "false"
+          - cell "체크박스" [ref=e777]
+        - row [ref=e778]:
+          - cell "통제웹 주소 / 포트" [ref=e779]
+          - cell [ref=e780]:
+            - code [ref=e781]: IpAddrerssWebServer
+            - text: /
+            - code [ref=e782]: PortWebServer
+          - cell [ref=e783]:
+            - text: 빈값 /
+            - code [ref=e784]: "6173"
+          - cell "사용 체크 시 필수" [ref=e785]
+    - paragraph [ref=e786]:
+      - text: 운영자 계정(
+      - code [ref=e787]: Username
+      - text: ·
+      - code [ref=e788]: Password
+      - text: )은 설치 시 수집하지 않는다 — 프로그램 로그인 화면에서 처리(계정은 관리자가 발급).
+    - heading "화면 11 — 현장 구성 ⑤ 데이터 저장소" [level=3] [ref=e789]
+    - generic [ref=e790]:
+      - generic [ref=e791]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e793]: ✕
+      - generic [ref=e794]:
+        - generic [ref=e796]:
+          - generic [ref=e797]: 현장 구성 (5/6) — 데이터 저장소
+          - text: 지도 심볼·이벤트 이력을 저장하는 데이터 저장소 접속 정보입니다.
+        - generic [ref=e801]:
+          - generic [ref=e802]:
+            - generic [ref=e803]: 서버 주소 *
+            - generic [ref=e804]: 127.0.0.1
+          - generic [ref=e805]:
+            - generic [ref=e806]: 포트 *
+            - generic [ref=e807]:
+              - generic [ref=e808]: "3306"
+              - generic [ref=e809]: 연결 확인
+          - generic [ref=e810]:
+            - generic [ref=e811]: 데이터베이스 이름 *
+            - generic [ref=e812]: monitor_DB
+          - generic [ref=e814]:
+            - generic [ref=e815]: 접속 계정 *
+            - generic [ref=e816]: "예: monitor_user"
+          - generic [ref=e817]:
+            - generic [ref=e818]: 접속 암호 *
+            - generic [ref=e819]: ●●●●●●●●
+          - generic [ref=e820]: 보안을 위해 기본 관리자 계정(root) 대신 전용 계정 사용을 권장합니다.
+      - generic [ref=e821]:
+        - button "< 뒤로(B)" [ref=e822]
+        - button "다음(N) >" [ref=e823]
+        - button "취소" [ref=e824]
+    - table [ref=e826]:
+      - rowgroup [ref=e827]:
+        - row [ref=e828]:
+          - columnheader "필드" [ref=e829]
+          - columnheader "설정 키" [ref=e830]
+          - columnheader "기본값" [ref=e831]
+          - columnheader "검증" [ref=e832]
+        - row [ref=e833]:
+          - cell "서버 주소" [ref=e834]
+          - cell [ref=e835]:
+            - code [ref=e836]: IpDbServer
+          - cell [ref=e837]:
+            - code [ref=e838]: 127.0.0.1
+          - cell "필수 · IPv4/호스트명" [ref=e839]
+        - row [ref=e840]:
+          - cell "포트" [ref=e841]
+          - cell [ref=e842]:
+            - code [ref=e843]: PortDbServer
+          - cell [ref=e844]:
+            - code [ref=e845]: "3306"
+          - cell "필수 · 1–65535" [ref=e846]
+        - row [ref=e847]:
+          - cell "데이터베이스 이름" [ref=e848]
+          - cell [ref=e849]:
+            - code [ref=e850]: DbDatabase
+          - cell [ref=e851]:
+            - code [ref=e852]: monitor_DB
+          - cell "필수" [ref=e853]
+        - row [ref=e854]:
+          - cell "접속 계정 / 암호" [ref=e855]
+          - cell [ref=e856]:
+            - code [ref=e857]: UidDbServer
+            - text: /
+            - code [ref=e858]: PasswordDbServer
+          - cell "(빈값 — 현장 입력 강제)" [ref=e859]
+          - cell "필수 · 암호 마스킹" [ref=e860]
+    - heading "화면 12 — 현장 구성 ⑥ 지도 데이터" [level=3] [ref=e861]
+    - generic [ref=e862]:
+      - generic [ref=e863]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e865]: ✕
+      - generic [ref=e866]:
+        - generic [ref=e868]:
+          - generic [ref=e869]: 현장 구성 (6/6) — 지도 데이터
+          - text: 오프라인 기본 지도 데이터의 위치를 지정하십시오.
+        - generic [ref=e873]:
+          - generic [ref=e874]:
+            - generic [ref=e875]: i
+            - paragraph [ref=e876]: 기본 지도 데이터(수백 GB)는 용량 관계로 설치본에 포함되지 않습니다. 별도 제공된 지도 데이터 드라이브/폴더를 지정하십시오. 설치 후 [설정 > 지도]에서도 변경할 수 있습니다.
+          - generic [ref=e877]:
+            - generic [ref=e878]: 기본 지도 데이터 폴더
+            - generic [ref=e879]:
+              - text: "예: D:\\MapData"
+              - generic [ref=e880]: 찾아보기...
+          - generic [ref=e881]:
+            - text: 비워 두면 설치 폴더의
+            - code [ref=e882]: Datas
+            - text: 를 사용합니다 (지도 데이터를 직접 복사해야 함).
+          - generic [ref=e883]:
+            - generic [ref=e884]: 지도 캐시 폴더
+            - generic [ref=e885]:
+              - text: D:\Tiles
+              - generic [ref=e886]: 찾아보기...
+          - generic [ref=e887]: 온라인 지도 사용 시 타일이 저장되는 캐시 위치 (선택).
+      - generic [ref=e888]:
+        - button "< 뒤로(B)" [ref=e889]
+        - button "다음(N) >" [ref=e890]
+        - button "취소" [ref=e891]
+    - table [ref=e893]:
+      - rowgroup [ref=e894]:
+        - row [ref=e895]:
+          - columnheader "필드" [ref=e896]
+          - columnheader "설정 키" [ref=e897]
+          - columnheader "기본값" [ref=e898]
+          - columnheader "검증" [ref=e899]
+        - row [ref=e900]:
+          - cell "기본 지도 데이터 폴더" [ref=e901]
+          - cell [ref=e902]:
+            - code [ref=e903]: MapDataDirectory
+          - cell "빈값 (설치폴더\\Datas 폴백)" [ref=e904]
+          - cell "선택 · 폴더 존재 검사, 미존재 시 경고(진행 가능)" [ref=e905]
+        - row [ref=e906]:
+          - cell "지도 캐시 폴더" [ref=e907]
+          - cell [ref=e908]:
+            - code [ref=e909]: TileDirectory
+          - cell [ref=e910]:
+            - code [ref=e911]: D:/Tiles/
+          - cell "선택" [ref=e912]
+    - heading "화면 13 — 구성 요약" [level=3] [ref=e913]
+    - generic [ref=e914]:
+      - generic [ref=e915]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e917]: ✕
+      - generic [ref=e918]:
+        - generic [ref=e920]:
+          - generic [ref=e921]: 현장 구성 요약
+          - text: 입력한 구성을 확인하십시오. 설치 시 설정 파일에 기록됩니다.
+        - generic [ref=e926]:
+          - generic [ref=e927]: 시스템 식별
+          - generic [ref=e930]:
+            - generic [ref=e931]: 클라이언트 ID
+            - generic [ref=e932]: gis-monitoring
+          - generic [ref=e933]:
+            - generic [ref=e934]: 도메인 · 그룹 · 서브시스템
+            - generic [ref=e935]: sensorway · unit001 · gis
+          - generic [ref=e936]: 통합 브로커 서버
+          - generic [ref=e939]:
+            - generic [ref=e940]: 주소
+            - generic [ref=e941]: "192.168.0.10 : 4222 (인증 없음)"
+          - generic [ref=e942]: 서드파티 브로커 서버
+          - generic [ref=e945]:
+            - generic [ref=e946]: 주소
+            - generic [ref=e947]: "localhost : 6379 · 채널 StreamingChannel (기본값)"
+          - generic [ref=e948]: 통합 관제 서버
+          - generic [ref=e951]:
+            - generic [ref=e952]: 관제 서버
+            - generic [ref=e953]: https://192.168.0.10:8136/api
+          - generic [ref=e954]:
+            - generic [ref=e955]: 통제웹
+            - generic [ref=e956]: 사용 안 함
+          - generic [ref=e957]: 데이터 저장소 · 지도
+          - generic [ref=e960]:
+            - generic [ref=e961]: 데이터 저장소
+            - generic [ref=e962]: "127.0.0.1 : 3306 · monitor_DB · monitor_user"
+          - generic [ref=e963]:
+            - generic [ref=e964]: 지도 데이터 폴더
+            - generic [ref=e965]: D:\MapData
+      - generic [ref=e966]:
+        - button "< 뒤로(B)" [ref=e967]
+        - button "다음(N) >" [ref=e968]
+        - button "취소" [ref=e969]
+    - paragraph [ref=e970]: 암호류는 요약에서 마스킹(●●●) 표시. [뒤로]로 각 단계 수정 가능.
+    - heading "화면 14 · 15 · 16 — 설치 준비 · 진행 · 완료" [level=3] [ref=e971]
+    - generic [ref=e972]:
+      - generic [ref=e973]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e975]: ✕
+      - generic [ref=e976]:
+        - generic [ref=e978]:
+          - generic [ref=e979]: 설치 준비 완료
+          - text: 설치를 시작할 준비가 되었습니다.
+        - generic [ref=e983]:
+          - paragraph [ref=e984]: "설치 위치: C:\\PidsMonitoringSystem추가 작업: 바탕 화면 바로가기현장 구성: 새로 구성 (요약 확인됨)"
+          - paragraph [ref=e986]: "[설치]를 누르면 파일 복사 후 현장 구성이 설정 파일에 기록됩니다."
+      - generic [ref=e987]:
+        - button "< 뒤로(B)" [ref=e988]
+        - button "설치(I)" [ref=e989]
+        - button "취소" [ref=e990]
+    - generic [ref=e991]:
+      - generic [ref=e992]:
+        - text: IRONWALL 관제 프로그램 설치
+        - generic [ref=e994]: ✕
+      - generic [ref=e995]:
+        - generic [ref=e996]:
+          - heading "IRONWALL 통합 관제" [level=5] [ref=e1001]: IRONWALL통합 관제
+          - generic [ref=e1002]: PIDS MONITORING SYSTEM
+          - generic [ref=e1004]: SENSORWAY
+        - generic [ref=e1005]:
+          - heading "설치를 완료했습니다" [level=6] [ref=e1006]
+          - paragraph [ref=e1007]: IRONWALL 관제 프로그램 설치가 끝났습니다.
+          - generic [ref=e1008]: IRONWALL 관제 프로그램 실행(R)
+          - generic [ref=e1010]:
+            - generic [ref=e1011]: i
+            - paragraph [ref=e1012]:
+              - text: 지도 데이터 폴더를 지정하지 않았다면, 첫 실행 전에 제공된 지도 데이터를
+              - code [ref=e1013]: Datas
+              - text: 폴더에 복사하거나 [설정 > 지도]에서 폴더를 지정하십시오.
+      - button "완료(F)" [ref=e1015]
+    - paragraph [ref=e1016]: 화면 15(설치 진행)는 표준 진행바 화면 — 파일 복사 완료 후 설정 기록 단계에서 상태 문구 "현장 구성을 기록하는 중..."을 표시한다.
+  - generic [ref=e1017]:
+    - generic [ref=e1018]:
+      - generic [ref=e1019]: "06"
+      - heading "제품 특징 그래픽 시안" [level=2] [ref=e1020]
+      - generic [ref=e1021]: 특징 보드 2장 · 위저드 배너 · 로고
+    - paragraph [ref=e1022]: 매뉴얼(10장 · 스크린샷 139장)에서 추린 제품 특성을 보드 2장 × 4그룹으로 요약한다. 제품의 Tactical Command 다크 톤(다크 네이비 + 시안)을 그대로 계승해 실행 후 화면과 인상이 이어지게 한다.
+    - generic [ref=e1023]:
+      - generic [ref=e1024]: "!"
+      - paragraph [ref=e1025]: 버전 표기 금지 — 참조 인스톨러 배너에는 버전(v2.8.5)이 박혀 있으나 이 관행은 계승하지 않는다. 아래 모든 이미지(배너·보드·로고)에 버전 문자열을 넣지 않는다. 버전은 설치기 파일명·창 제목·프로그램 추가/제거 항목에서만 노출한다.
+    - heading "특징 보드 ① — 실시간 통합 관제 (화면 02에 표시)" [level=3] [ref=e1026]
+    - generic [ref=e1028]:
+      - generic [ref=e1029]:
+        - generic [ref=e1030]:
+          - generic [ref=e1031]: IRONWALL · PIDS MONITORING
+          - heading "현장의 모든 신호를 한 화면에서" [level=4] [ref=e1032]: 현장의 모든 신호를한 화면에서
+        - generic [ref=e1033]: GIS 위성지도 기반 외곽 침입탐지 통합 관제 —탐지·장애·영상·이동 경로까지 실시간으로.
+      - generic [ref=e1034]:
+        - generic [ref=e1035]:
+          - heading "GIS 지도 관제" [level=5] [ref=e1040]
+          - paragraph [ref=e1041]: 위성지도 위 장비 심볼·레이어·관심지역. 맵 편집으로 현장 배치를 그대로 재현.
+        - generic [ref=e1042]:
+          - heading "실시간 탐지·장애 경보" [level=5] [ref=e1046]
+          - paragraph [ref=e1047]: 침입·장애 발생 즉시 심볼 애니메이션과 이벤트 카드로 알림, 조치 보고로 종결.
+        - generic [ref=e1048]:
+          - heading "카메라 영상 연동" [level=5] [ref=e1053]
+          - paragraph [ref=e1054]: 탐지 지점 영상 자동 팝업, 팝업에서 바로 방향·배율 조작과 프리셋 이동.
+        - generic [ref=e1055]:
+          - heading "추적 재생" [level=5] [ref=e1061]
+          - paragraph [ref=e1062]: 과거 시간대 감지 대상의 이동 경로를 지도 위에서 되짚어 재생.
+    - paragraph [ref=e1063]: 제작 스펙 — 1040×660px · 24bpp BMP(커스텀 페이지 로더가 BMP만 지원) · HTML 시안 → 브라우저 렌더 → BMP 변환 파이프라인(참조 인스톨러와 동일). 각 카드에는 아이콘 대신 실제 제품 스크린샷 썸네일을 넣는 B안도 가능 — §9 미결 사항.
+    - paragraph [ref=e1064]:
+      - text: "스크린샷 소스(B안용):"
+      - code [ref=e1065]: 05.로그인후화면(안양발전소기준)
+      - text: ·
+      - code [ref=e1066]: 122.심볼센서_탐지이벤트_애니메이션
+      - text: ·
+      - code [ref=e1067]: 124.탐지이벤트카드
+      - text: ·
+      - code [ref=e1068]: 113.카메라영상팝업_PTZ제어
+      - text: ·
+      - code [ref=e1069]: 21.추적재생패널_플레이시_타겟의이동루트_확인가능
+    - heading "특징 보드 ② — 운영·관리 (화면 03에 표시)" [level=3] [ref=e1070]
+    - generic [ref=e1072]:
+      - generic [ref=e1073]:
+        - generic [ref=e1074]:
+          - generic [ref=e1075]: IRONWALL · OPERATIONS
+          - heading "운영과 관리까지 빈틈없이" [level=4] [ref=e1076]: 운영과 관리까지빈틈없이
+        - generic [ref=e1077]: 장비 등록부터 이력·보고서·계정 통제까지 —관제 운영의 전 과정을 프로그램 안에서.
+      - generic [ref=e1078]:
+        - generic [ref=e1079]:
+          - heading "장비 관리" [level=5] [ref=e1086]
+          - paragraph [ref=e1087]: 제어기·센서·카메라·스피커·함체를 구역 단위로 등록하고 속성·임계값 관리.
+        - generic [ref=e1088]:
+          - heading "이벤트 이력·보고서" [level=5] [ref=e1092]
+          - paragraph [ref=e1093]: 탐지·장애·조치 이력을 기간별로 조회하고 템플릿 기반 운영 보고서 생성.
+        - generic [ref=e1094]:
+          - heading "계정·권한·감사" [level=5] [ref=e1099]
+          - paragraph [ref=e1100]: 권한 그룹·한시적 스케쥴 권한, 세션 통제와 감사 로그로 사용자 이력 추적.
+        - generic [ref=e1101]:
+          - heading "유연한 환경 설정" [level=5] [ref=e1106]
+          - paragraph [ref=e1107]: 브로커·지도·소리·자동조치 등 운영 환경을 설정 패널에서 즉시 조정.
+    - paragraph [ref=e1108]:
+      - text: "스크린샷 소스(B안용):"
+      - code [ref=e1109]: 68-1.장비패널
+      - text: ·
+      - code [ref=e1110]: 66.리포트패널_보고서생성
+      - text: ·
+      - code [ref=e1111]: 97.계정권한관리패널_권한그룹설정
+      - text: ·
+      - code [ref=e1112]: 43.세팅패널_셋업패널
+    - heading "위저드 배너 (좌측 세로 이미지) · 헤더 로고" [level=3] [ref=e1113]
+    - generic [ref=e1114]:
+      - generic [ref=e1115]:
+        - generic [ref=e1116]: wizard-large.png
+        - heading "세로 배너 — 410×785px PNG" [level=4] [ref=e1117]
+        - paragraph [ref=e1118]: "다크 네이비(#0B1220) 그라디언트 + 시안 포인트. 위→아래: 방패 마크 → \"IRONWALL 통합 관제\" 타이틀 → 영문 서브타이틀 → 구분선 → 특징 체크 4행 → 하단 SENSORWAY. 화면 01 목업의 좌측 배너가 실제 시안. 164:314 비율 정확 준수(참조본의 410×797은 비율 오차 — 785로 교정). 버전 표기 없음."
+      - generic [ref=e1119]:
+        - generic [ref=e1120]: wizard-small.png
+        - heading "헤더 로고 — 160×160px PNG (정사각)" [level=4] [ref=e1121]
+        - paragraph [ref=e1122]: 흰 배경 중앙에 다크 네이비 라운드 사각 + 시안 방패 마크. 표시 영역이 항상 정사각이므로 정사각 제작(참조본 164×175는 세로 눌림 결함 — 교정). 버전 표기 없음.
+      - generic [ref=e1123]:
+        - generic [ref=e1124]: app icon
+        - heading "Ironwall_AppIcon.ico 재사용" [level=4] [ref=e1125]
+        - paragraph [ref=e1126]: 메인 프로젝트의 다해상도 아이콘(16–256px)을 SetupIconFile·바로가기·언인스톨 아이콘에 그대로 사용.
+      - generic [ref=e1127]:
+        - generic [ref=e1128]: 제작 파이프라인
+        - heading "HTML → 렌더 → 에셋" [level=4] [ref=e1129]
+        - paragraph [ref=e1130]:
+          - text: 이 기획서의 보드·배너 시안을 정본 HTML로 유지하고, 브라우저 렌더 캡처로 PNG/BMP를 생성(참조 인스톨러의
+          - code [ref=e1131]: docs/marketing
+          - text: 패턴). 디자인 수정 = HTML 수정 → 재렌더.
+  - generic [ref=e1132]:
+    - generic [ref=e1133]:
+      - generic [ref=e1134]: "07"
+      - heading "설정 기록 · 보존 설계" [level=2] [ref=e1135]
+      - generic [ref=e1136]: appsettings.json 생성 메커니즘
+    - heading "7.1 입력 항목 분류 총괄" [level=3] [ref=e1137]
+    - table [ref=e1139]:
+      - rowgroup [ref=e1140]:
+        - row [ref=e1141]:
+          - columnheader "분류" [ref=e1142]
+          - columnheader "항목" [ref=e1143]
+          - columnheader "처리" [ref=e1144]
+        - row [ref=e1145]:
+          - cell "설치 시 입력" [ref=e1146]
+          - cell "클라이언트 ID · 도메인/그룹/서브시스템 · 통합 브로커 주소/포트 · 관제 서버 주소 · 데이터 저장소 5종" [ref=e1148]
+          - cell "마법사 필수 입력 → 설정 파일 기록" [ref=e1149]
+        - row [ref=e1150]:
+          - cell "설치 시 선택" [ref=e1151]
+          - cell "브로커 인증 · 서드파티 브로커 4종 · 통제웹 3종 · 지도 폴더 2종 · 연결 제한시간" [ref=e1153]
+          - cell "기본값 제공, 변경 시에만 기록" [ref=e1154]
+        - row [ref=e1155]:
+          - cell "자동 파생" [ref=e1156]
+          - cell [ref=e1158]:
+            - text: 기본 수신 주제(
+            - code [ref=e1159]: DefaultSubjectNats
+            - text: )
+          - cell [ref=e1160]:
+            - code [ref=e1161]: "{도메인}.{그룹}.{서브시스템}.>"
+            - text: 로 조합 — 직접 입력 금지(오타 방지)
+        - row [ref=e1162]:
+          - cell "기본값 유지" [ref=e1163]
+          - cell "테마 · 사운드 · 이벤트 자동조치 · 카메라 팝업 · 홈 위치 · 세션 · 회사 정보 등 나머지 전부" [ref=e1165]
+          - cell "설치기는 건드리지 않음 — 실행 후 [설정] 패널에서 조정 (매뉴얼 5장)" [ref=e1166]
+    - heading "7.2 기록 메커니즘 — 플레이스홀더 템플릿 방식" [level=3] [ref=e1167]
+    - list [ref=e1168]:
+      - listitem [ref=e1169]:
+        - text: 설치본에 설치 전용 템플릿
+        - code [ref=e1170]: appsettings.template.json
+        - text: 을 포함한다 — 운영 기본값 + 마법사 대상 키에만
+        - code [ref=e1171]: __PLACEHOLDER__
+        - text: 토큰.
+      - listitem [ref=e1172]:
+        - text: 설치 단계(
+        - code [ref=e1173]: ssPostInstall
+        - text: )에서 템플릿을 읽어 토큰을 마법사 입력값으로 치환한다 — JSON 파서 없이 문자열 치환만 하므로 단순·안전.
+      - listitem [ref=e1174]:
+        - text: 치환 결과를
+        - code [ref=e1175]: "{app}\\appsettings.json"
+        - text: 으로 저장하고 템플릿 파일은 삭제(또는 애초에
+        - code [ref=e1176]: dontcopy
+        - text: 로 임시 추출만).
+      - listitem [ref=e1177]:
+        - text: "업그레이드(기존 설정 유지): 기존"
+        - code [ref=e1178]: appsettings.json
+        - text: 이 있으면 이 단계를 통째로 건너뛴다 — 파일에 손대지 않음.
+      - listitem [ref=e1179]:
+        - text: 업그레이드에서 "새로 구성"을 선택한 경우에만 기존 파일을
+        - code [ref=e1180]: appsettings.json.pre-upgrade.bak
+        - text: 으로 백업 후 재생성.
+    - generic [ref=e1181]:
+      - generic [ref=e1182]: "!"
+      - paragraph [ref=e1183]:
+        - text: 인코딩 주의 — 원본
+        - code [ref=e1184]: appsettings.json
+        - text: 에는 한글 주석·한글 값(회사 정보)이 있다. Inno의 문자열 파일 함수는 ANSI 기준이므로, 템플릿은
+        - generic [ref=e1185]:
+          - text: UTF-8로 저장하고 Inno 6의 UTF-8 저장 API(
+          - code [ref=e1186]: SaveStringToFile
+          - text: + BOM 유지)로 처리
+        - text: 하거나, 한글 값은 치환 대상에서 제외해 그대로 통과시키는 방식으로 검증한다. 구현 단계에서 한글 값 왜곡(mojibake) 테스트 필수.
+    - heading "7.3 업그레이드 · 제거 시 보존 목록" [level=3] [ref=e1187]
+    - table [ref=e1189]:
+      - rowgroup [ref=e1190]:
+        - row [ref=e1191]:
+          - columnheader "대상" [ref=e1192]
+          - columnheader "내용" [ref=e1193]
+          - columnheader "정책" [ref=e1194]
+        - row [ref=e1195]:
+          - cell [ref=e1196]:
+            - code [ref=e1197]: appsettings.json
+            - text: (+
+            - code [ref=e1198]: .bak
+            - text: )
+          - cell "현장 설정 — 앱이 런타임에 계속 갱신" [ref=e1199]
+          - cell "업그레이드 시 불가침 · 제거 시 보존(선택적 완전 제거 옵션)" [ref=e1200]
+        - row [ref=e1201]:
+          - cell [ref=e1202]:
+            - code [ref=e1203]: Images\Overlays\
+          - cell "사용자 오버레이 이미지 — 삭제 시 영구 데이터 손실" [ref=e1204]
+          - cell "절대 보존" [ref=e1205]
+        - row [ref=e1206]:
+          - cell [ref=e1207]:
+            - code [ref=e1208]: Logs\
+            - text: ·
+            - code [ref=e1209]: snapshots\
+            - text: ·
+            - code [ref=e1210]: Profile\
+          - cell "운영 로그 · 카메라 스냅샷 · 프로필 사진" [ref=e1211]
+          - cell "보존" [ref=e1212]
+        - row [ref=e1213]:
+          - cell [ref=e1214]:
+            - code [ref=e1215]: Datas\
+            - text: ·
+            - code [ref=e1216]: CustomMapTiles\
+            - text: ·
+            - code [ref=e1217]: maps\
+          - cell "지도 데이터·캐시 (사용자 반입)" [ref=e1218]
+          - cell "보존 — 설치기는 빈 폴더만 생성" [ref=e1219]
+        - row [ref=e1220]:
+          - cell [ref=e1221]:
+            - code [ref=e1222]: login-prefs.json
+            - text: · WebView2 폴더
+          - cell "로그인 기억 · 내장 브라우저 데이터" [ref=e1223]
+          - cell "보존" [ref=e1224]
+        - row [ref=e1225]:
+          - cell [ref=e1226]:
+            - text: 프로그램 파일 (exe·dll·
+            - code [ref=e1227]: libvlc
+            - text: ·
+            - code [ref=e1228]: runtimes
+            - text: )
+          - cell "설치기가 배포한 파일" [ref=e1229]
+          - cell "업그레이드 시 교체 · 제거 시 삭제" [ref=e1230]
+  - generic [ref=e1231]:
+    - generic [ref=e1232]:
+      - generic [ref=e1233]: "08"
+      - heading "기술 설계 노트" [level=2] [ref=e1234]
+      - generic [ref=e1235]: 계승 패턴 · 빌드 · 파일 수집
+    - heading "8.1 참조 인스톨러에서 계승하는 패턴" [level=3] [ref=e1236]
+    - list [ref=e1237]:
+      - listitem [ref=e1238]:
+        - text: 버전 단일 소스 — csproj
+        - code [ref=e1239]: <Version>
+        - text: (현재 2.6.0) → publish된 exe에서
+        - code [ref=e1240]: GetVersionNumbersString
+        - text: 자동 추출,
+        - code [ref=e1241]: build.bat 2.7.0
+        - text: 식 오버라이드 지원.
+      - listitem [ref=e1242]:
+        - text: 이전 버전 무인 제거 — 동일 AppId의
+        - code [ref=e1243]: UninstallString
+        - text: 조회 →
+        - code [ref=e1244]: /SILENT /SUPPRESSMSGBOXES /NORESTART
+        - text: 실행 → 레지스트리 소멸 폴링(최대 15초).
+      - listitem [ref=e1245]:
+        - text: 실행 중 앱 강제 종료 —
+        - code [ref=e1246]: CloseApplications=yes
+        - text: +
+        - code [ref=e1247]: taskkill /F
+        - text: 이중 방어. 이 제품은 본체 exe와 와치독 exe 두 프로세스를 모두 종료해야 한다.
+      - listitem [ref=e1248]:
+        - text: 위저드 이미지 — PNG 1장 전략(최대 DPI 크기로 제작, Inno가 축소) +
+        - code [ref=e1249]: WizardSizePercent=140,120
+        - text: . 구성 입력 폼이 많으므로 확대 창 유지.
+      - listitem [ref=e1250]:
+        - text: 특징 페이지 — BMP
+        - code [ref=e1251]: dontcopy
+        - text: +
+        - code [ref=e1252]: ExtractTemporaryFile
+        - text: + 비율 유지 중앙 배치(1040×660).
+      - listitem [ref=e1253]:
+        - text: 깨끗한 산출물 —
+        - code [ref=e1254]: dotnet publish -p:DebugType=None
+        - text: +
+        - code [ref=e1255]: "Excludes: *.pdb"
+        - text: .
+    - heading "8.2 이 제품 고유의 설계 결정" [level=3] [ref=e1256]
+    - generic [ref=e1257]:
+      - generic [ref=e1258]:
+        - generic [ref=e1259]: D-1 · 설치 경로
+        - heading "쓰기 가능 경로 기본" [level=4] [ref=e1260]
+        - paragraph [ref=e1261]:
+          - text: 앱이 설치 폴더에 상시 쓰기하므로 기본 경로는
+          - code [ref=e1262]: C:\PidsMonitoringSystem
+          - text: . Program Files 선택 시
+          - code [ref=e1263]: "[Dirs] Permissions: users-modify"
+          - text: 로 ACL 부여. 두 경우 모두 동작 보장.
+      - generic [ref=e1264]:
+        - generic [ref=e1265]: D-2 · 런타임
+        - heading ".NET 8 Desktop Runtime 처리" [level=4] [ref=e1266]
+        - paragraph [ref=e1267]:
+          - text: 현행 framework-dependent 유지. 설치 시 런타임 감지(
+          - code [ref=e1268]: dotnet --list-runtimes
+          - text: 또는 레지스트리) → 미설치 시 동봉 설치본 실행(A안) 또는 다운로드 안내(B안). WebView2는 감지+안내만.
+      - generic [ref=e1269]:
+        - generic [ref=e1270]: D-3 · 파일 수집
+        - heading "publish 출력만 패키징" [level=4] [ref=e1271]
+        - paragraph [ref=e1272]:
+          - text: 개발
+          - code [ref=e1273]: bin\Release
+          - text: 는 테스트 어셈블리 오염 확인 — 반드시
+          - code [ref=e1274]: dotnet publish
+          - text: 전용 출력에서 수집.
+          - code [ref=e1275]: Datas\*.mbtiles
+          - text: (수백 GB) 복사 차단을 publish 옵션/제외 규칙으로 이중 방어.
+      - generic [ref=e1276]:
+        - generic [ref=e1277]: D-4 · 바로가기
+        - heading "WorkingDirectory 필수 지정" [level=4] [ref=e1278]
+        - paragraph [ref=e1279]:
+          - text: 앱이 현재 폴더 기준으로 설정 파일을 읽으므로 모든 바로가기에
+          - code [ref=e1280]: "WorkingDir: {app}"
+          - text: 지정 — 누락 시 설정 미로드로 기본값 부팅되는 함정.
+      - generic [ref=e1281]:
+        - generic [ref=e1282]: D-5 · 동봉 실행물
+        - heading "와치독 포함" [level=4] [ref=e1283]
+        - paragraph [ref=e1284]:
+          - text: 감시 프로세스 exe(
+          - code [ref=e1285]: Ironwall.Dotnet.Libraries.Watchdog.exe
+          - text: )를 함께 설치 — 와치독 옵션 활성 시 앱이 자기 폴더에서 기동한다.
+      - generic [ref=e1286]:
+        - generic [ref=e1287]: D-6 · 언어
+        - heading "한국어 단일" [level=4] [ref=e1288]
+        - paragraph [ref=e1289]:
+          - code [ref=e1290]: Korean.isl
+          - text: 단일 언어. 커스텀 페이지 문구는 모두 한국어, 기술명 비노출 원칙(§3) 적용.
+    - heading "8.3 빌드 파이프라인 (Installer\\build.bat)" [level=3] [ref=e1291]
+    - list [ref=e1292]:
+      - listitem [ref=e1293]:
+        - code [ref=e1294]: dotnet publish
+        - text: — Release · win-x64 · framework-dependent →
+        - code [ref=e1295]: Installer\publish\
+        - text: (매회 삭제 후 재생성, mbtiles 제외 확인).
+      - listitem [ref=e1296]:
+        - text: 와치독 publish — 기존
+        - code [ref=e1297]: deploy-watchdog.ps1
+        - text: 방식(단일 파일) 산출물을
+        - code [ref=e1298]: publish\
+        - text: 에 합류.
+      - listitem [ref=e1299]:
+        - code [ref=e1300]: ISCC IronwallMonitoring.iss
+        - text: — 버전 자동 추출, 산출물
+        - code [ref=e1301]: "Output\\IronwallMonitoring_Setup_v{버전}.exe"
+        - text: .
+    - paragraph [ref=e1302]:
+      - text: "디렉터리 구성은 참조 인스톨러와 동일:"
+      - code [ref=e1303]: "C:\\workspace_app\\Dotnet.Monitoring.Solution\\Installer\\{IronwallMonitoring.iss, build.bat, Assets\\, publish\\, Output\\}"
+      - text: .
+  - generic [ref=e1304]:
+    - generic [ref=e1305]:
+      - generic [ref=e1306]: "09"
+      - heading "미결 사항 · 다음 단계" [level=2] [ref=e1307]
+      - generic [ref=e1308]: 확인 필요 5건
+    - generic [ref=e1309]:
+      - generic [ref=e1310]: Q1. 설치 표기 제품명
+      - text: "\"IRONWALL 관제 프로그램\"(본 기획서 가정) vs \"Sensorway PIDS Monitoring SW\"(appsettings 타이틀) — 설치기·바로가기·프로그램 추가/제거에 쓸 공식 표기 확정 필요."
+    - generic [ref=e1311]:
+      - generic [ref=e1312]: Q2. .NET 런타임 동봉 여부
+      - text: Desktop Runtime 8 동봉(A안, 설치기 +55MB, 오프라인 현장 안전) vs 다운로드 안내(B안, 경량). 현장 인터넷 가용성 기준으로 결정.
+    - generic [ref=e1313]:
+      - generic [ref=e1314]: Q3. 특징 보드 스타일
+      - text: 아이콘형(본 시안 A안, 깔끔·유지보수 쉬움) vs 실제 스크린샷 콜라주형(B안, 실물감·§6 소스 목록 준비됨). 혼합(카드 배경에 흐린 스크린샷)도 가능.
+    - generic [ref=e1315]:
+      - generic [ref=e1316]: Q4. [연결 확인] 버튼 범위
+      - text: TCP 접속 검사 구현 여부(통합 브로커·데이터 저장소 2곳). 미구현 시 화면에서 버튼 제거 — 흐름에는 영향 없음.
+    - generic [ref=e1317]:
+      - generic [ref=e1318]: Q5. 서드파티 브로커 화면 노출 여부
+      - text: 대부분 현장이 기본값(localhost)이라면 화면 09를 "고급" 접힘 항목으로 화면 08에 통합해 단계를 1개 줄일 수 있음.
+    - heading "다음 단계" [level=3] [ref=e1319]
+    - list [ref=e1320]:
+      - listitem [ref=e1321]: 이 기획서 검토·승인 (Q1~Q5 결정 포함).
+      - listitem [ref=e1322]:
+        - text: PRD 작성 (
+        - code [ref=e1323]: docs/prds/installer-prd.md
+        - text: ) → 승인 → 구현 계획.
+      - listitem [ref=e1324]: 그래픽 에셋 제작 — 배너·보드 HTML 시안 확정 → 렌더 → PNG/BMP.
+      - listitem [ref=e1325]:
+        - code [ref=e1326]: Installer\IronwallMonitoring.iss
+        - text: +
+        - code [ref=e1327]: build.bat
+        - text: 구현 → 신규/업그레이드 설치 시나리오 검증(설정 보존·한글 무결성 포함).
+  - contentinfo [ref=e1328]:
+    - text: "정본:"
+    - code [ref=e1329]: docs/design/installer-wizard-plan.html
+    - text: "(Ironwall.Dotnet.Libraries) · 근거 조사: 메인 솔루션 배포 구조 / appsettings.json / 참조 인스톨러 / 사용자 매뉴얼 · 2026-08-04"

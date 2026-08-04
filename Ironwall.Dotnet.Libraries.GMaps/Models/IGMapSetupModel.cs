@@ -17,4 +17,9 @@ public interface IGMapSetupModel
     string? MapMode { get; set; }
     string? MapName { get; set; }
     string? MapType { get; set; }
+    /// <summary>기본맵(.mbtiles) 폴더 — MBTiles 사전정의 지도 스캔·로딩 위치 (MapData_Directory_Option).
+    /// 기본맵은 수백 GB라 설치본에 포함할 수 없어 외부 폴더 지정이 필요하다.
+    /// 비어있거나 폴더가 없으면 실행폴더\Datas 폴백(기존 동작 무회귀).
+    /// 오버레이맵·오버레이 이미지는 이 설정과 무관(현행 유지).</summary>
+    string? MapDataDirectory { get; set; }
 }

@@ -73,7 +73,7 @@
 		</Border>
 		<Border
 			Grid.Row="0"
-			Height="200"
+			Height="265"
 			Margin="5,0,10,0"
 			md:ThemeAssist.Theme="Inherit"
 			BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"

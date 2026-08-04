@@ -1,0 +1,344 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - heading "측정 툴 스토리보드 — 길이 재기 · 넓이 재기" [level=1] [ref=e5]
+      - paragraph [ref=e6]: GIS 지도 상단 툴바에 추가할 길이/넓이 측정 도구의 디자인·상호작용 안내 · v0.1 (승인용 초안)
+      - generic [ref=e7]:
+        - generic [ref=e8]: 코드 근거 확정
+        - generic [ref=e9]: 라이브러리 한정 (GMaps.Ui)
+        - generic [ref=e10]: 임시 오버레이 · DB 미영속
+        - generic [ref=e11]: 편집모드 무관
+    - button "🌓 다크/라이트 전환" [ref=e12] [cursor=pointer]
+  - generic [ref=e13]:
+    - heading "0. 개요무엇을·어떻게" [level=2] [ref=e14]
+    - paragraph [ref=e15]: 지도 상단 툴바 편집 그룹 오른쪽에 「측정」 그룹을 새로 만들어 길이 재기(눈금자 아이콘)와 넓이 재기(다각형 아이콘) 두 버튼을 넣습니다. 두 도구 모두 지도에 임시로 그려지는 오버레이이고 DB에 저장되지 않으며(선 그리기 도구를 포크하되 저장 단계만 제거), 도구를 끄면 사라집니다. 클릭으로 점을 찍는 동안 실시간으로 거리/면적이 표시되고 더블클릭·Enter·우클릭으로 완료합니다.
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: 이 도구가 하는 일
+        - list [ref=e19]:
+          - listitem [ref=e20]: "길이: 여러 점을 이어 총 거리(구간별 + 합계)"
+          - listitem [ref=e21]: "넓이: 3점 이상으로 닫힌 다각형의 면적 + 둘레"
+          - listitem [ref=e22]: 지도 팬/줌 시 라벨이 따라다님(지오 앵커)
+      - generic [ref=e23]:
+        - generic [ref=e24]: 재사용 (신규 코드 최소화)
+        - list [ref=e25]:
+          - listitem [ref=e26]:
+            - code [ref=e27]: LineDrawingAdorner
+            - text: → 포크(선+미리보기+정점)
+          - listitem [ref=e28]:
+            - code [ref=e29]: LineDrawingService
+            - text: → 포크(클릭/키/정리)
+          - listitem [ref=e30]:
+            - text: 상태배너 =
+            - code [ref=e31]: AimStatusMessage
+            - text: 패턴
+          - listitem [ref=e32]:
+            - text: 디자인 =
+            - code [ref=e33]: DesignTokens.xaml
+            - text: 그대로
+      - generic [ref=e34]:
+        - generic [ref=e35]: 새로 필요한 것
+        - list [ref=e36]:
+          - listitem [ref=e37]: 지오데식 면적 공식(신규)
+          - listitem [ref=e38]: 다각형 닫힌 채우기 렌더
+          - listitem [ref=e39]:
+            - code [ref=e40]: MapViewModel.Measure.cs
+            - text: 파샬
+          - listitem [ref=e41]: 툴바 「측정」 그룹 2버튼
+  - generic [ref=e42]:
+    - 'heading "1. 탑메뉴 배치MapView.xaml ToolBar : 편집 그룹 다음" [level=2] [ref=e43]'
+    - paragraph [ref=e44]: 기존 툴바 그룹 구조(라벨 → 구분선 → 버튼 묶음)를 그대로 따라 「측정」 그룹을 편집·심볼 사이에 삽입합니다. 활성 상태는 옆의 십자/앵커/레이어 토글과 동일한 시안(Primary) 하이라이트 패턴을 씁니다.
+    - generic [ref=e45]:
+      - img "상단 툴바 와이어프레임" [ref=e46]:
+        - generic [ref=e48]:
+          - generic [ref=e49]: 지도
+          - generic [ref=e52]: 위성지도 ▾
+          - generic [ref=e53]: 이동
+          - generic [ref=e55]: ⌂
+          - generic [ref=e64]: 편집
+          - generic [ref=e73]: 측정 ★신규
+          - generic [ref=e75]: 길이
+          - generic [ref=e83]: 넓이
+          - generic [ref=e90]: 심볼
+          - generic [ref=e93]: 카테고리 ▾
+          - generic [ref=e95]: 타입 ▾
+          - generic [ref=e97]: ＋추가
+      - generic [ref=e100]:
+        - generic [ref=e101]: "1"
+        - text: 탑메뉴 idle — 편집과 심볼 사이에 「측정」 그룹 신설. 길이=Ruler, 넓이=VectorPolygon 아이콘(둘 다 MaterialDesign 유효 Kind). 아이콘 색은 유휴 시 TextSecondary.
+    - generic [ref=e102]:
+      - generic [ref=e103]:
+        - img "길이 버튼 활성" [ref=e104]:
+          - generic [ref=e110]: 길이 ON
+          - generic [ref=e113]: 넓이
+        - generic [ref=e114]:
+          - generic [ref=e115]: "2"
+          - text: 활성 상태 — 켜진 버튼은 시안 채움(
+          - code [ref=e116]: OnPrimary
+          - text: 아이콘). 길이·넓이는 상호 배타(하나 켜면 다른 하나 꺼짐).
+      - generic [ref=e117]:
+        - img "토글 대안" [ref=e118]:
+          - generic [ref=e123]: 대안 A · 시안 아이콘 틴트
+          - generic [ref=e125]: 대안 B · 시안 채움(권장)
+        - generic [ref=e127]:
+          - generic [ref=e128]: 2b
+          - text: 활성 표현 2안 — (A) 아이콘만 시안 틴트(옆 토글들과 동일, 은은) / (B) 버튼 전체 시안 채움(‘도구 armed’ 강조,
+          - code [ref=e129]: ToolbarToggleButtonStyle
+          - text: ). → OQ에서 택1.
+  - generic [ref=e130]:
+    - heading "2. 길이 재기 흐름클릭 → 실시간 거리 → 완료" [level=2] [ref=e131]
+    - paragraph [ref=e132]: 활성화하면 커서가 십자(Cross)로 바뀌고 상단 중앙에 힌트 배너가 뜹니다. 클릭할 때마다 점이 추가되고, 다음 클릭 전까지 커서까지 점선 미리보기와 실시간 합계가 갱신됩니다.
+    - generic [ref=e133]:
+      - generic [ref=e134]:
+        - img "길이 첫 클릭" [ref=e135]:
+          - generic [ref=e139]: 클릭하여 측정 시작 · Enter/더블클릭 종료 · ESC 취소
+        - generic [ref=e142]:
+          - generic [ref=e143]: "3"
+          - text: 첫 클릭 — 정점 1개, 십자 커서, 힌트 배너(클릭스루·값은 안 넣음).
+      - generic [ref=e144]:
+        - img "길이 진행 중 실시간" [ref=e145]:
+          - generic [ref=e154]:
+            - generic [ref=e156]: 312 m
+            - generic [ref=e158]: 208 m
+          - generic [ref=e162]: 거리
+          - generic [ref=e163]: 742 m
+        - generic [ref=e164]:
+          - generic [ref=e165]: "4"
+          - text: 진행 중(실시간) — 확정 폴리라인 + 커서까지 점선 미리보기, 구간별 라벨(중점), 우하단 리드아웃 칩에 실시간 합계.
+      - generic [ref=e166]:
+        - img "길이 완료" [ref=e167]:
+          - generic [ref=e175]:
+            - generic [ref=e177]: 312 m
+            - generic [ref=e179]: 208 m
+            - generic [ref=e181]: 190 m
+          - generic [ref=e183]: 거리
+          - generic [ref=e184]: 1.23 km
+        - generic [ref=e189]:
+          - generic [ref=e190]: "5"
+          - text: 완료 — 더블클릭/Enter/우클릭 시 확정. 합계가 km로 자동 전환, 칩에 ✕ Clear 버튼.
+  - generic [ref=e191]:
+    - heading "3. 넓이 재기 흐름3점부터 닫힌 다각형 + 면적" [level=2] [ref=e192]
+    - paragraph [ref=e193]: 넓이는 3번째 점부터 닫힌 고리로 그려지며 반투명 채움이 표시되고, 리드아웃에 면적 + 둘레가 함께 갱신됩니다.
+    - generic [ref=e194]:
+      - generic [ref=e195]:
+        - img "넓이 진행 중" [ref=e196]:
+          - generic [ref=e199]: 클릭하여 영역 측정 · Enter/더블클릭 닫기 · ESC 취소
+          - generic [ref=e210]: 면적
+          - generic [ref=e211]: 2.9 ha
+          - generic [ref=e212]: 둘레
+          - generic [ref=e213]: 648 m
+        - generic [ref=e214]:
+          - generic [ref=e215]: "6"
+          - text: 진행 중 — 3점부터 반투명 채움 + 닫는 변 점선. 리드아웃에 면적·둘레 동시 표시.
+      - generic [ref=e216]:
+        - img "넓이 완료" [ref=e217]:
+          - generic [ref=e227]: 3.45 ha
+          - generic [ref=e229]: 면적
+          - generic [ref=e230]: 3.45 ha
+          - generic [ref=e231]: 둘레
+          - generic [ref=e232]: 742 m
+        - generic [ref=e233]:
+          - generic [ref=e234]: "7"
+          - text: 완료 — 닫힌 채움 다각형 + 중심 면적 라벨, 리드아웃에 최종 면적/둘레.
+  - generic [ref=e235]:
+    - heading "4. 리드아웃 컴포넌트 & 단위MapFloatingPanelStyle 칩" [level=2] [ref=e236]
+    - generic [ref=e237]:
+      - generic [ref=e238]:
+        - img "리드아웃 클로즈업" [ref=e239]:
+          - generic [ref=e242]: 거리
+          - generic [ref=e243]: 1.23 km
+          - generic [ref=e245]: 면적
+          - generic [ref=e246]: 3.45 ha
+          - generic [ref=e247]: 둘레
+          - generic [ref=e248]: 742 m
+          - generic [ref=e249]: Consolas 숫자(폭 흔들림 방지) · 반투명 변형은 지도 위 겹침용
+        - generic [ref=e250]:
+          - generic [ref=e251]: "8"
+          - text: 리드아웃 칩 —
+          - code [ref=e252]: MapFloatingPanelStyle
+          - text: (Surface 채움·1px 테두리·라운드 8·그림자). 라벨=Primary, 값=TextPrimary, 단위=TextMuted.
+      - generic [ref=e253]:
+        - generic [ref=e254]: 단위 규칙 (기존 ScaleHelper·통계 관례 준수)
+        - table [ref=e255]:
+          - rowgroup [ref=e256]:
+            - row [ref=e257]:
+              - columnheader "구분" [ref=e258]
+              - columnheader "임계" [ref=e259]
+              - columnheader "표기" [ref=e260]
+            - row [ref=e261]:
+              - cell "거리" [ref=e262]
+              - cell "< 1,000 m" [ref=e263]
+              - cell "742 m (F1)" [ref=e264]
+            - row [ref=e265]:
+              - cell [ref=e266]
+              - cell "≥ 1,000 m" [ref=e267]
+              - cell "1.23 km (F2)" [ref=e268]
+            - row [ref=e269]:
+              - cell "면적" [ref=e270]
+              - cell "< 10,000 m²" [ref=e271]
+              - cell "850 m² (F1)" [ref=e272]
+            - row [ref=e273]:
+              - cell [ref=e274]
+              - cell "1만~100만 m²" [ref=e275]
+              - cell "3.45 ha (F2)" [ref=e276]
+            - row [ref=e277]:
+              - cell [ref=e278]
+              - cell "≥ 1,000,000 m²" [ref=e279]
+              - cell "2.10 km² (F2)" [ref=e280]
+        - generic [ref=e281]: 스케일바가 ‘Km’ 대문자를 쓰므로 측정 리드아웃 표기(‘km’ vs ‘Km’, ‘m²’ vs ‘㎡’)는 OQ에서 통일합니다.
+  - generic [ref=e282]:
+    - heading "5. 상호작용 · 키맵완료/취소/상호배타" [level=2] [ref=e283]
+    - generic [ref=e284]:
+      - generic [ref=e285]:
+        - generic [ref=e286]:
+          - generic [ref=e287]: 클릭
+          - text: 점 추가
+        - generic [ref=e288]:
+          - generic [ref=e289]: 더블클릭
+          - text: /
+          - generic [ref=e290]: Enter
+          - text: /
+          - generic [ref=e291]: 우클릭
+          - text: 완료
+          - generic [ref=e292]: OQ
+        - generic [ref=e293]:
+          - generic [ref=e294]: Backspace
+          - text: /
+          - generic [ref=e295]: Ctrl+Z
+          - text: 직전 점 취소
+        - generic [ref=e296]:
+          - generic [ref=e297]: ESC
+          - text: 유효하면 완료, 아니면 취소
+      - list [ref=e299]:
+        - listitem [ref=e300]: 상호 배타 — 길이 ↔ 넓이 ↔ 선 그리기 ↔ 조준 모드는 한 번에 하나만. 하나 켜면 나머지 자동 종료.
+        - listitem [ref=e301]: 편집모드 무관 — 선 그리기처럼 편집모드 없이도 동작(별도 최상위 모드).
+        - listitem [ref=e302]: 임시 오버레이 — DB 저장 안 함. 도구 끄기/ESC/뷰 비활성 시 사라짐.
+        - listitem [ref=e303]:
+          - text: 지오 앵커 — 팬/줌 시 점·라벨이 지도에 붙어 따라감(
+          - code [ref=e304]: FromLatLngToLocal
+          - text: 재렌더).
+  - generic [ref=e305]:
+    - heading "6. 디자인 토큰DesignTokens.xaml 실 hex (다크/라이트)" [level=2] [ref=e306]
+    - generic [ref=e307]:
+      - generic [ref=e308]:
+        - generic [ref=e309]:
+          - text: Primary
+          - generic [ref=e311]: "#22B8D9 / #0C6B89"
+        - generic [ref=e312]:
+          - text: OnPrimary
+          - generic [ref=e314]: "#04161C / #FFFFFF"
+        - generic [ref=e315]:
+          - text: Accent
+          - generic [ref=e317]: "#F0A33C / #B25A06"
+        - generic [ref=e318]:
+          - text: Critical
+          - generic [ref=e320]: "#FF5A52 / #C62121"
+      - generic [ref=e321]:
+        - generic [ref=e322]:
+          - text: Bg
+          - generic [ref=e324]: "#0C1117 / #DDE3EB"
+        - generic [ref=e325]:
+          - text: Surface
+          - generic [ref=e327]: "#161D26 / #F2F5F9"
+        - generic [ref=e328]:
+          - text: SurfaceAlt
+          - generic [ref=e330]: "#1E2832 / #FFFFFF"
+        - generic [ref=e331]:
+          - text: Sunken
+          - generic [ref=e333]: "#0F151C / #E2E8F0"
+      - generic [ref=e334]:
+        - generic [ref=e335]:
+          - text: TextPrimary
+          - generic [ref=e337]: "#E6EDF3 / #13202C"
+        - generic [ref=e338]:
+          - text: TextSecondary
+          - generic [ref=e340]: "#A6B4C2 / #3D4D5C"
+        - generic [ref=e341]:
+          - text: TextMuted
+          - generic [ref=e343]: "#8493A2 / #5E6B79"
+        - generic [ref=e344]:
+          - text: Border
+          - generic [ref=e346]: "#2C3A48 / #8FA0B3"
+    - generic [ref=e347]:
+      - text: 위 다크/라이트 토글 버튼으로 두 테마가 실제 앱 토큰값으로 전환됩니다. 신규 스타일 0개 — 전부 기존
+      - code [ref=e348]: DesignTokens.xaml
+      - text: 브러시 재사용.
+  - generic [ref=e349]:
+    - heading "7. 계산 정확성지오데식 거리·면적 (픽셀 shoelace 금지)" [level=2] [ref=e350]
+    - generic [ref=e351]:
+      - generic [ref=e352]:
+        - generic [ref=e353]: 길이 (구현 존재)
+        - paragraph [ref=e354]:
+          - text: 구간별 Haversine 측지거리 합(m). 줌 무관.
+          - code [ref=e355]: LineDrawingAdorner.TotalDistance
+          - text: 에 이미 라이브.
+        - paragraph [ref=e356]: a=sin²(Δφ/2)+cosφ₁cosφ₂sin²(Δλ/2)d=2R·atan2(√a,√(1−a)) · R=6378137
+      - generic [ref=e357]:
+        - generic [ref=e358]: 면적 (신규)
+        - paragraph [ref=e359]: 구면 초과(spherical-excess) shoelace를 위경도에 직접 적용(Google computeArea 방식). 어느 위도·범위·줌에서도 정확.
+        - paragraph [ref=e360]: A=|Σᵢ(λᵢ₊₁−λᵢ)(2+sinφᵢ+sinφᵢ₊₁)|·R²/2
+    - generic [ref=e361]: ⚠ 화면 픽셀 shoelace 금지 — 오프라인 MBTiles는 Web Mercator(EPSG:3857)라 픽셀 좌표가 (1)줌 스케일 (2)위도별 ~1/cos²(위도) 면적 왜곡 → 이중으로 틀림. 반드시 위경도 기반으로 계산.
+  - generic [ref=e362]:
+    - heading "8. 재사용 / 신규 파일 맵구현 착수 근거 (file:line)" [level=2] [ref=e363]
+    - table [ref=e364]:
+      - rowgroup [ref=e365]:
+        - row [ref=e366]:
+          - columnheader "영역" [ref=e367]
+          - columnheader "방식" [ref=e368]
+          - columnheader "근거" [ref=e369]
+        - row [ref=e370]:
+          - cell "툴바 「측정」 그룹" [ref=e371]
+          - cell "편집 그룹 뒤 삽입, 기존 그룹 스타일 그대로" [ref=e372]
+          - cell "MapView.xaml:414 (편집 그룹 뒤)" [ref=e373]
+        - row [ref=e374]:
+          - cell "활성 토글" [ref=e375]
+          - cell "plain Button + DataTrigger 시안 틴트 / 또는 ToolbarToggleButtonStyle 채움" [ref=e376]
+          - cell "MapView.xaml:305 · DesignTokens:192" [ref=e377]
+        - row [ref=e378]:
+          - cell "드로잉 오버레이" [ref=e379]
+          - cell [ref=e380]:
+            - code [ref=e381]: LineDrawingAdorner
+            - text: 포크 → MeasureAdorner (저장 단계 제거, 면적 채움 추가)
+          - cell "Adorners/LineDrawingAdorner.cs" [ref=e382]
+        - row [ref=e383]:
+          - cell "클릭/키/정리" [ref=e384]
+          - cell [ref=e385]:
+            - code [ref=e386]: LineDrawingService
+            - text: 포크 → MeasureService
+          - cell "Services/LineDrawingService.cs:157-215,405-447,635-658" [ref=e387]
+        - row [ref=e388]:
+          - cell "마우스 라우팅" [ref=e389]
+          - cell [ref=e390]:
+            - code [ref=e391]: GMapCustomControl
+            - text: 에 IsMeasuring 분기(선그리기 옆)
+          - cell "GMapCustomControl.cs:972,1067,1110" [ref=e392]
+        - row [ref=e393]:
+          - cell "VM 배선" [ref=e394]
+          - cell [ref=e395]:
+            - text: 신규 파샬
+            - code [ref=e396]: MapViewModel.Measure.cs
+            - text: (CenterCrosshair 패턴)
+          - cell "MapViewModel.CenterCrosshair.cs(27줄) 미러" [ref=e397]
+        - row [ref=e398]:
+          - cell "상태 배너" [ref=e399]
+          - cell [ref=e400]:
+            - code [ref=e401]: AimStatusMessage
+            - text: 클론(MeasureStatusMessage)
+          - cell "MapView.xaml:800-829 · MapViewModel.cs:604-616" [ref=e402]
+        - row [ref=e403]:
+          - cell "면적 함수" [ref=e404]
+          - cell [ref=e405]:
+            - code [ref=e406]: GeoPointConverter.CalculateArea
+            - text: 신규(거리 함수 형제)
+          - cell "Utils/GeoPointConverter.cs" [ref=e407]
+  - generic [ref=e408]:
+    - heading "9. 승인 전 확인 (미결 질문)답 주시면 PRD로 확정" [level=2] [ref=e409]
+    - list [ref=e411]:
+      - listitem [ref=e412]: "완료 제스처 — 더블클릭 / Enter / 우클릭 중 무엇으로 완료할지? (현재 선 그리기 도구는 우클릭=컨텍스트 메뉴라, 우클릭 완료를 쓰려면 별도 가로채기 필요) 권장: Enter + 더블클릭(우클릭은 취소 메뉴 유지)"
+      - listitem [ref=e413]: "활성 표현 — 아이콘 시안 틴트(대안 A, 은은) vs 버튼 시안 채움(대안 B, 강조) 권장: B"
+      - listitem [ref=e414]: "동시 측정 개수 — 새 측정 시작하면 이전 측정 지움(단일) vs 여러 개 지도에 누적? 권장: 단일(선/조준 도구와 동일)"
+      - listitem [ref=e415]: "영속 여부 — 임시 오버레이(끄면 사라짐)로 확정? 권장: 임시(DB 저장 안 함)"
+      - listitem [ref=e416]: 단위·표기 — 자동전환 임계(m→km 1000, m²→ha 1만, →km² 100만)·소수 자리(F1/F2)·표기(‘km’/‘Km’, ‘m²’/‘㎡’) 확정
+      - listitem [ref=e417]: 지구 반경 상수 통일 — 앱에 6371000·6378137 혼재 → 길이·면적 일관성 위해 하나로(권장 6378137, GMap.NET 일치)
+      - listitem [ref=e418]: 넓이 채움 시점 — 3번째 점부터 그리는 중 채움(권장) vs 완료 시에만 채움?
+    - generic [ref=e419]: 이 스토리보드는 실제 코드(툴바 위치·재사용 클래스·토큰·수학)를 근거로 작성했습니다. 디자인·미결 질문을 확정해 주시면 PRD → plan → 구현으로 진행합니다. 코드는 아직 손대지 않았습니다.

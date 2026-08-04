@@ -383,7 +383,13 @@ public partial class MapViewModel : BasePanelViewModel,
                         if (groupSymbol != null)
                         {
                             _symbolEventManager.RegisterGroupSymbol(groupId, device, groupSymbol.Model);
-                            //_log?.Info($"그룹-심볼 매핑: DeviceGroup({groupId}) <-> {groupSymbol.Title}");
+                            _log?.Info($"그룹-심볼 매핑: DeviceGroup({groupId}) <-> {groupSymbol.Title}");
+                        }
+                        else
+                        {
+                            // FR-02 관측성(근본원인 A): 소속 장비는 있으나 그 그룹을 나타내는 구역 심볼이 없음
+                            //   (구역을 안 그렸거나 LinkedDeviceGroup 미연결=0) → 이 그룹은 제어기 고장 시 검게 안 됨.
+                            _log?.Warning($"[구역 미연결] DeviceGroup({groupId})에 연결된 구역 심볼 없음 — 제어기 Blackout/그룹 이벤트 미표시. 속성창 '연결된 장치 그룹' 설정 필요 (Device={device.Id}).");
                         }
                     }
                 }
@@ -4523,27 +4529,63 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>
-    /// Datas/ 폴더의 .mbtiles 파일을 스캔하여 DB에 DefinedMap으로 자동 등록.
+    /// 기본맵(.mbtiles) 폴더 해석 — MapData_Directory_Option.
+    /// 설정(appsettings AppSettings.MapDataDirectory)이 있고 폴더가 실재하면 그 경로,
+    /// 아니면 실행폴더\Datas 폴백(기존 동작 무회귀). 스캔(Seed)·초기 로드·맵 전환이 전부 이 한 곳을 쓴다.
+    /// 기본맵은 수백 GB라 설치본에 포함 불가 → 외부 폴더 지정이 배포 전제조건.
+    /// 오버레이맵/오버레이 이미지는 별도 경로(DB per-map)라 이 설정과 무관.
+    /// </summary>
+    private string ResolveMapDataDirectory()
+    {
+        var configured = _setupModel?.MapDataDirectory;
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            if (System.IO.Directory.Exists(configured))
+                return configured;
+            // 설정은 있는데 폴더가 없음 — 조용한 폴백은 "지도만 안 뜸" 미스터리를 만들므로 반드시 표면화.
+            _log?.Warning($"[MapData] 설정된 기본맵 폴더가 존재하지 않음: {configured} — 실행폴더 Datas 폴백");
+        }
+        return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Datas");
+    }
+
+    /// <summary>기본맵 부재 안내 — 기본맵(.mbtiles)은 필수라 조용히 넘어가면 "지도가 안 뜨는" 미스터리가 된다.
+    /// 설정 > 지도의 기본맵 폴더 지정으로 유도. EA 미주입(테스트) 시 로그만.</summary>
+    private async Task NotifyMissingBaseMapAsync(string path)
+    {
+        if (_eventAggregator == null) return;
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+        {
+            Title = "기본맵 없음",
+            Explain = $"기본맵(.mbtiles) 폴더에 지도 파일이 없습니다.\n{path}\n\n설정 > 지도에서 기본맵 폴더를 지정하세요. (변경 후 재시작 적용)"
+        });
+    }
+
+    /// <summary>
+    /// 기본맵 폴더의 .mbtiles 파일을 스캔하여 DB에 DefinedMap으로 자동 등록.
     /// MBTiles 메타데이터(bounds, zoom)를 읽어 정확한 값으로 Insert.
+    /// 폴더 위치는 <see cref="ResolveMapDataDirectory"/> (설정 우선, 실행폴더\Datas 폴백).
     /// </summary>
     private async Task SeedMBTilesMapsAsync()
     {
         try
         {
-            // Datas/ 폴더 스캔
-            var datasPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Datas");
+            // 기본맵 폴더 스캔 (MapData_Directory_Option)
+            var datasPath = ResolveMapDataDirectory();
             if (!System.IO.Directory.Exists(datasPath))
             {
-                _log?.Info($"Datas 폴더 없음: {datasPath}");
+                _log?.Warning($"[MapData] 기본맵 폴더 없음: {datasPath}");
+                await NotifyMissingBaseMapAsync(datasPath);   // 기본맵은 필수 — 안내 팝업
                 return;
             }
 
             var mbtilesFiles = System.IO.Directory.GetFiles(datasPath, "*.mbtiles");
             if (mbtilesFiles.Length == 0)
             {
-                _log?.Info("Datas 폴더에 .mbtiles 파일 없음");
+                _log?.Warning($"[MapData] 기본맵 폴더에 .mbtiles 파일 없음: {datasPath}");
+                await NotifyMissingBaseMapAsync(datasPath);   // 기본맵은 필수 — 안내 팝업
                 return;
             }
+            _log?.Info($"[MapData] 기본맵 폴더: {datasPath} (.mbtiles {mbtilesFiles.Length}건)");
 
             // DB에서 기존 MBTiles 맵 목록 조회
             var existing = await _gMapDbService.FetchDefinedMapsAsync();
@@ -4687,7 +4729,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (MainMap == null || string.IsNullOrEmpty(definedMap.ServiceUrl)) return;
 
         var mbtilesPath = System.IO.Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "Datas", definedMap.ServiceUrl);
+            ResolveMapDataDirectory(), definedMap.ServiceUrl);   // 기본맵 폴더 설정 우선 (MapData_Directory_Option)
 
         if (!System.IO.File.Exists(mbtilesPath))
         {
@@ -4730,7 +4772,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (MainMap == null || string.IsNullOrEmpty(definedMap.ServiceUrl)) return;
 
         var mbtilesPath = System.IO.Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "Datas", definedMap.ServiceUrl);
+            ResolveMapDataDirectory(), definedMap.ServiceUrl);   // 기본맵 폴더 설정 우선 (MapData_Directory_Option)
 
         if (!System.IO.File.Exists(mbtilesPath))
         {
@@ -7998,6 +8040,21 @@ public partial class MapViewModel : BasePanelViewModel,
                 && pidsMarker.LinkedDevice != null)
             {
                 _symbolEventManager.RegisterDeviceSymbol(pidsMarker.LinkedDevice, pidsMarker.Model);
+            }
+
+            // LinkedDeviceGroup 변경 → _groupSymbolLookup 즉시 재등록 (FR-01, 근본원인 A)
+            // 신규/재지정 구역이 제어기 고장 Blackout·그룹 이벤트 대상에 즉시 포함되도록 — 맵 리로드/AllDevicesLoadedMessage 대기 불필요.
+            // (그룹 상태는 SymbolModel만 사용하므로 device 인자는 non-null 만족용 대표 장비. 소속 장비 없으면 블랙아웃 대상도 없어 스킵 안전.)
+            if (e.PropertyName == "LinkedDeviceGroup"
+                && e.Marker is GMapPidsGroupMarker groupMarker
+                && groupMarker.LinkedDeviceGroup > 0)
+            {
+                var repDevice = DeviceProvider.FirstOrDefault(
+                    d => d.DeviceGroups != null && d.DeviceGroups.Contains(groupMarker.LinkedDeviceGroup));
+                if (repDevice != null)
+                    _symbolEventManager.RegisterGroupSymbol(groupMarker.LinkedDeviceGroup, repDevice, groupMarker.Model);
+                else
+                    _log?.Warning($"[구역 재등록] Group({groupMarker.LinkedDeviceGroup}) 소속 장비 없음 — 블랙아웃 대상 미존재, 등록 스킵");
             }
 
             // OverlayImage Title/Opacity/Visibility 변경 → MapLayers 동기화

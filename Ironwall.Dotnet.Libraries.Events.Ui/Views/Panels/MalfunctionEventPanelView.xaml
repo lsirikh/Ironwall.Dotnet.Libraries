@@ -267,7 +267,7 @@
 				</DataGridTextColumn>
 
 				<!--  MessageType  -->
-				<DataGridTemplateColumn
+				<!--<DataGridTemplateColumn
 					CanUserSort="True"
 					IsReadOnly="True"
 					Header="이벤트 종류"
@@ -310,7 +310,7 @@
 							</ComboBox>
 						</DataTemplate>
 					</DataGridTemplateColumn.CellEditingTemplate>
-				</DataGridTemplateColumn>
+				</DataGridTemplateColumn>-->
 
 
 				<!--  Device  -->

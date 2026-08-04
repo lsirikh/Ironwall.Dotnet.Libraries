@@ -53,7 +53,7 @@
 				      읽기 전용(조치보고)에서도 스크롤이 살아야 하므로 IsEnabled는 ScrollViewer가 아니라 내부 Grid(편집 컨트롤)에만 건다.  -->
 				<ScrollViewer
 					Grid.Column="0"
-					MaxHeight="120"
+					MaxHeight="140"
 					HorizontalScrollBarVisibility="Disabled"
 					VerticalScrollBarVisibility="Auto">
 					<Grid IsEnabled="{Binding IsEditable}">
@@ -188,7 +188,8 @@
 				      편집 컨트롤이므로 읽기 모드에선 IsEnabled=false(스크롤과 무관)  -->
 				<Border
 					Grid.Column="2"
-					Width="176"
+					Width="165"
+					Height="165"
 					VerticalAlignment="Top"
 					Padding="10"
 					Background="{DynamicResource MaterialDesignChipBackground}"

@@ -18,7 +18,6 @@
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.Utils;assembly=Ironwall.Dotnet.Libraries.Utils"
 	FontFamily="{DynamicResource MaterialDesignFont}"
 	TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-	
 	mc:Ignorable="d">
 
 	<UserControl.Resources>
@@ -38,23 +37,22 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-                <!--  장애 카드와 동일 고정 크기(220×200) — 썸네일은 이 안에 들어가는 상단 밴드로 표시(카드 확장 없음)  -->
-                <Grid Width="220" Height="200">
+				<!--  220×200 고정. 썸네일은 본문 ②행의 "고정 슬롯(56×56)" — 지연 로드(SYNC_DETECTION) 시
+				      슬롯 크기 불변, 이미지 소스만 교체 → 레이아웃 붕괴 없음.  -->
+				<Grid Width="220" Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
-						<!--  앞면 히어로 썸네일 행 (SYNC_DETECTION) — HasThumbnail=false면 Collapsed으로 0px  -->
-						<RowDefinition Height="Auto" />
-						<!--  정보 영역: 4*(별) — 고정 200 내에서 잔여공간 흡수(원본 레이아웃 유지, 푸터 하단 고정)  -->
-						<RowDefinition Height="4*" />
+						<!--  본문: ①구역·장비(전체폭) + ②사진(고정 슬롯)+결과·신호  -->
+						<RowDefinition Height="*" />
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="Auto" />
 					</Grid.RowDefinitions>
+
 					<md:ColorZone
 						Grid.Row="0"
 						Padding="5"
 						Mode="PrimaryMid">
-						<StackPanel Orientation="Horizontal"
-									Width="260">
+						<StackPanel Orientation="Horizontal">
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
@@ -79,161 +77,111 @@
 								Text="탐지 이벤트" />
 						</StackPanel>
 					</md:ColorZone>
-					<!--  앞면 히어로 썸네일 (SYNC_DETECTION 갱신) — 회전 후 실물을 flip 없이 즉시 확인.
-					      HasThumbnail=false면 Collapsed → 행 0px → 기존(썸네일 없는) 카드 레이아웃 무영향.  -->
-					<Border
-						Grid.Row="1"
-						Height="62"
-						Margin="5,5,5,0"
-						Background="{DynamicResource SurfaceSunkenBrush}"
-						BorderBrush="{DynamicResource DividerBrush}"
-						BorderThickness="1"
-						ClipToBounds="True"
-						CornerRadius="4"
-						Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVis}}">
-						<Image
-							Source="{Binding ThumbnailUri, Mode=OneWay}"
-							Stretch="UniformToFill" />
-					</Border>
-					<Grid Grid.Row="2" Margin="5">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="2*" />
-							<ColumnDefinition Width="8*" />
-						</Grid.ColumnDefinitions>
+
+					<!--  ── 본문 ──  -->
+					<Grid Grid.Row="1" Margin="10,6,10,4">
 						<Grid.RowDefinitions>
 							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
-							<RowDefinition Height="Auto" />
+							<RowDefinition Height="*" />
 						</Grid.RowDefinitions>
-						<!--  탐지 정보 Custom 구현 시작  -->
-						<!--<TextBlock
-                               Grid.Column="0"
-                               FontFamily="{StaticResource NotoSansCJKkRMedium}"
-                               FontSize="20"
-                               Foreground="{DynamicResource OnPrimaryFixedBrush}"
-                               Opacity="1">
 
-							<TextBlock.Text>
-								<MultiBinding  StringFormat="Area {0} - Sensor No.{1}"
-                                           FallbackValue="Area 1 - Sensor No.1">
-									<Binding Path="NameArea" />
-									<Binding Path="NameDevice" />
-								</MultiBinding>
-							</TextBlock.Text>
-						</TextBlock>-->
-						<Grid
-							Grid.Row="0"
-							Grid.Column="0"
-							Grid.ColumnSpan="2"
-							Margin="10,0,0,0"
-							VerticalAlignment="Center">
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
-							</Grid.ColumnDefinitions>
-							<!--<TextBlock
-								Grid.Column="0"
-								FontFamily="{StaticResource NotoSansCJKkRMedium}"
-								FontSize="20"
-								Opacity="1"
-								Text="구역"
-								TextAlignment="Center" />-->
-							<TextBlock
-								Grid.Column="0"
-								Margin="5,0"
-								FontFamily="{StaticResource NotoSansCJKkRMedium}"
-								FontSize="20"
-								Opacity="1"
-								Text="{Binding DeviceGroupsText}"
-								TextAlignment="Center" />
-							<TextBlock
-								Grid.Column="1"
-								Margin="5,0"
-								FontFamily="{StaticResource NotoSansCJKkRMedium}"
-								FontSize="20"
-								Opacity="1"
-								Text="-"
-								TextAlignment="Center" />
-							<TextBlock
-								Grid.Column="2"
-								Margin="5,0"
-								FontFamily="{StaticResource NotoSansCJKkRMedium}"
-								FontSize="20"
-								Opacity="1"
-								Text="{Binding DeviceTypeName, FallbackValue=센서}"
-								TextAlignment="Center" />
-							<TextBlock
-								Grid.Column="3"
-								Margin="5,0"
-								FontFamily="{StaticResource NotoSansCJKkRMedium}"
-								FontSize="20"
-								Opacity="1"
-								Text="{Binding Device.DeviceNumber}"
-								TextAlignment="Center" />
-						</Grid>
-
-						<!--  탐지 정보 Custom 구현 종료  -->
-						<!--  MessageType(Intrusion) 줄 제거 (FR-07) — 헤더 "탐지 이벤트"와 중복, 신호 줄 공간 확보  -->
+						<!--  ① 구역·장비 — 전체폭 단일 라인(말줄임). 이전 다중 TextBlock 분할 → 잘림 해결  -->
 						<TextBlock
-							Grid.Row="1"
-							Grid.Column="0"
-							Grid.ColumnSpan="2"
-							HorizontalAlignment="Right"
-							VerticalAlignment="Bottom"
+							Grid.Row="0"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
-							FontSize="16"
+							FontSize="19"
 							Opacity="1"
-							Text="{Binding Result, Converter={StaticResource EnumToKoreanConverter}, FallbackValue=장비, Mode=OneWay, StringFormat='({0})'}" />
-						<!--  신호 (FR-06) — detail.signal 병기, 바=세션 관측 최대 기준. null/0(AI)이면 줄 전체 숨김  -->
-						<StackPanel
-							Grid.Row="2"
-							Grid.Column="0"
-							Grid.ColumnSpan="2"
-							Margin="0,2,0,0"
-							HorizontalAlignment="Right"
-							VerticalAlignment="Bottom"
-							Orientation="Horizontal"
-							Visibility="{Binding HasSignal, Converter={StaticResource BoolToVis}}">
-							<Border
-								Width="80"
-								Height="8"
-								Margin="0,0,8,0"
-								VerticalAlignment="Center"
-								Background="{DynamicResource SurfaceSunkenBrush}"
-								CornerRadius="4">
-								<Border
-									Width="{Binding SignalBarWidth, Mode=OneWay}"
-									HorizontalAlignment="Left"
-									Background="{DynamicResource StatusCriticalBrush}"
-									CornerRadius="4" />
-							</Border>
-							<TextBlock
-								VerticalAlignment="Center"
-								FontFamily="Consolas"
-								FontSize="15"
-								FontWeight="Bold"
-								Foreground="{DynamicResource StatusCriticalBrush}"
-								Opacity="1"
-								Text="{Binding SignalText, Mode=OneWay}" />
-						</StackPanel>
+							Text="{Binding ZoneDeviceText, FallbackValue=구역 - 센서 01}"
+							TextTrimming="CharacterEllipsis"
+							TextWrapping="NoWrap" />
 
-					</Grid>
-					<Separator
-						Grid.Row="3"
-						Margin="0"
-						Style="{StaticResource MaterialDesignLightSeparator}" />
-					<StackPanel Grid.Row="4" Margin="10">
-						<Grid>
+						<!--  ② 좌: 56×56 고정 썸네일 슬롯 / 우: 결과·신호  -->
+						<Grid Grid.Row="1" Margin="0,6,0,0">
 							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="12" />
+								<ColumnDefinition Width="56" />
+								<ColumnDefinition Width="10" />
 								<ColumnDefinition Width="*" />
 							</Grid.ColumnDefinitions>
 
+							<!--  고정 슬롯 — 뒤: 기본 이미지(항상) / 앞: 썸네일(있으면).
+							      부모 Border(56×56)가 항상 렌더되어 행 높이 불변 → 지연 로드에도 리플로우 0.  -->
+							<Border
+								Grid.Column="0"
+								Width="56"
+								Height="56"
+								VerticalAlignment="Top"
+								Background="{DynamicResource SurfaceSunkenBrush}"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="1"
+								ClipToBounds="True"
+								CornerRadius="4">
+								<Grid>
+									<md:PackIcon
+										Width="24"
+										Height="24"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										Opacity="0.5"
+										Kind="ImageOffOutline" />
+									<Image
+										RenderOptions.BitmapScalingMode="HighQuality"
+										Source="{Binding ThumbnailUri, Mode=OneWay}"
+										Stretch="UniformToFill"
+										Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVis}}" />
+								</Grid>
+							</Border>
+
+							<!--  결과(한글) + 신호  -->
+							<StackPanel Grid.Column="2" VerticalAlignment="Center">
+								<TextBlock
+									FontFamily="{StaticResource NotoSansCJKkRMedium}"
+									FontSize="16"
+									Opacity="1"
+									Text="{Binding Result, Converter={StaticResource EnumToKoreanConverter}, FallbackValue=결과, Mode=OneWay, StringFormat='({0})'}"
+									TextTrimming="CharacterEllipsis"
+									TextWrapping="NoWrap" />
+								<StackPanel
+									Margin="0,4,0,0"
+									Orientation="Horizontal"
+									Visibility="{Binding HasSignal, Converter={StaticResource BoolToVis}}">
+									<Border
+										Width="70"
+										Height="8"
+										Margin="0,0,8,0"
+										VerticalAlignment="Center"
+										Background="{DynamicResource SurfaceSunkenBrush}"
+										CornerRadius="4">
+										<Border
+											Width="{Binding SignalBarWidth, Mode=OneWay}"
+											HorizontalAlignment="Left"
+											Background="{DynamicResource StatusCriticalBrush}"
+											CornerRadius="4" />
+									</Border>
+									<TextBlock
+										VerticalAlignment="Center"
+										FontFamily="Consolas"
+										FontSize="15"
+										FontWeight="Bold"
+										Foreground="{DynamicResource StatusCriticalBrush}"
+										Opacity="1"
+										Text="{Binding SignalText, Mode=OneWay}" />
+								</StackPanel>
+							</StackPanel>
+						</Grid>
+					</Grid>
+
+					<Separator
+						Grid.Row="2"
+						Margin="0"
+						Style="{StaticResource MaterialDesignLightSeparator}" />
+
+					<!--  ── 푸터 ──  -->
+					<StackPanel Grid.Row="3" Margin="10,4,10,6">
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="*" />
+							</Grid.ColumnDefinitions>
 							<Button
 								Grid.Column="0"
 								Padding="4 0"
@@ -247,25 +195,8 @@
 								</cal:Message.Attach>
 								<md:PackIcon Kind="CommentOutline" />
 							</Button>
-							<!--<Button
-								Grid.Column="1"
-								Padding="4 0"
-								VerticalAlignment="Center"
-								VerticalContentAlignment="Center"
-								md:RippleAssist.IsCentered="True"
-								Style="{StaticResource MaterialDesignFlatButton}"
-								ToolTip="{DynamicResource CameraPopup}">
-								<cal:Message.Attach>
-									[Event Click] = [Action OnButtonCameraPopup($source, $eventArgs)];
-								</cal:Message.Attach>
-								<md:PackIcon
-									Width="23"
-									Height="23"
-									Kind="VideoCheckOutline" />
-							</Button>-->
-
 							<TextBlock
-								Grid.Column="3"
+								Grid.Column="1"
 								HorizontalAlignment="Right"
 								VerticalAlignment="Center"
 								FontSize="12"
@@ -283,8 +214,8 @@
 				BorderBrush="{DynamicResource DividerBrush}"
 				BorderThickness="2"
 				CornerRadius="5">
-				<!--  뒷면(상세)도 장애 카드와 동일 크기(250×200)  -->
-				<Grid Width="250" Height="200">
+				<!--  뒷면(상세)도 앞면과 동일 크기(220×200) — 플립 시 폭 점프 제거  -->
+				<Grid Width="220" Height="200">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="3*" />
@@ -294,8 +225,7 @@
 						Padding="5"
 						CornerRadius="5,5,0,0"
 						Mode="PrimaryMid">
-						<StackPanel Orientation="Horizontal"
-									Width="260">
+						<StackPanel Orientation="Horizontal">
 							<Button
 								HorizontalAlignment="Left"
 								Command="{x:Static md:Flipper.FlipCommand}"
@@ -413,4 +343,3 @@
 		</md:Flipper.BackContent>
 	</md:Flipper>
 </UserControl>
-

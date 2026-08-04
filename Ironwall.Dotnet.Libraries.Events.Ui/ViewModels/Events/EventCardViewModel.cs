@@ -116,6 +116,24 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
                 catch { return string.Join(", ", ids); }
             }
         }
+
+        /// <summary>
+        /// 카드 1행 표시용 — "그룹 - 장비타입 번호" 단일 문자열(전체폭 라벨, 말줄임 대응).
+        /// 기존 다중 TextBlock 분할이 좁은 카드에서 구역·장비명을 잘라먹던 문제(사용자 보고) 해결.
+        /// 표시 전용 파생값 — 원본 Device/그룹 데이터는 변경하지 않는다.
+        /// </summary>
+        public string ZoneDeviceText
+        {
+            get
+            {
+                var group = DeviceGroupsText;
+                var type = DeviceTypeName ?? string.Empty;
+                var num = Device?.DeviceNumber is int n and > 0 ? n.ToString() : string.Empty;
+                var right = string.Join(" ", new[] { type, num }.Where(s => !string.IsNullOrEmpty(s)));
+                if (string.IsNullOrEmpty(group)) return right;
+                return string.IsNullOrEmpty(right) ? group : $"{group} - {right}";
+            }
+        }
         #endregion
         #region - Attributes -
         protected readonly T _model;

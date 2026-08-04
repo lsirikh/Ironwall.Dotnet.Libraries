@@ -62,6 +62,7 @@ public class GMapSetupModel : IGMapSetupModel
         MapType = source.MapType;
         MapMode = source.MapMode;
         MapName = source.MapName;
+        MapDataDirectory = source.MapDataDirectory;
     }
 
     #endregion
@@ -86,6 +87,8 @@ public class GMapSetupModel : IGMapSetupModel
     public string? MapType { get; set; }
     public string? MapMode { get; set; }
     public string? MapName { get; set; }
+    /// <summary>기본맵(.mbtiles) 폴더 — 비면 실행폴더\Datas 폴백. <see cref="IGMapSetupModel.MapDataDirectory"/> 참조.</summary>
+    public string? MapDataDirectory { get; set; }
     #endregion
     #region - Attributes -
     #endregion

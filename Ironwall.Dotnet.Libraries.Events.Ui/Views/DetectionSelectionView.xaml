@@ -53,7 +53,7 @@
 				      읽기 전용(조치보고)에서도 스크롤이 살아야 하므로 IsEnabled는 ScrollViewer가 아니라 내부 Grid(편집 컨트롤)에만 건다.  -->
 				<ScrollViewer
 					Grid.Column="0"
-					MaxHeight="120"
+					MaxHeight="140"
 					HorizontalScrollBarVisibility="Disabled"
 					VerticalScrollBarVisibility="Auto">
 					<Grid IsEnabled="{Binding IsEditable}">
@@ -263,7 +263,7 @@
 				<Border
 					Grid.Column="2"
 					Width="150"
-					Height="100"
+					Height="150"
 					VerticalAlignment="Top"
 					Background="{DynamicResource MaterialDesignChipBackground}"
 					BorderBrush="{DynamicResource DividerBrush}"
@@ -291,7 +291,7 @@
 
 						<!--  썸네일 이미지 (앞 레이어): 후보 있을 때만 표시. 로드 실패면 빈 렌더 → 뒤 default 노출  -->
 						<Image
-							Source="{Binding ThumbnailUri, Mode=OneWay}"
+							Source="{Binding Thumbnail, Mode=OneWay}"
 							RenderOptions.BitmapScalingMode="HighQuality"
 							Stretch="Uniform">
 							<Image.Style>

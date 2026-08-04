@@ -701,6 +701,55 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             return true;
         }
 
+        /// <summary>
+        /// 조치보고 시 심볼/EQM 상태 정리 (FR-03). EntryId 폴백 체인: _pendingEntries → EQM 실엔트리(EventId+Type / Device).
+        /// 엔트리를 찾으면 Dequeue(N→0 전이 → 그룹/개별 심볼 복원), 아예 없으면(그리드 일시 카드 / 부팅 전 장애)
+        /// 심볼을 EQM 실제 상태로 **재계산 복원**(검정/장애색 소거, 잔여 활성 이벤트 보존). vm.EntryId를 확정 세팅.
+        /// </summary>
+        private void ResolveReportedFaultState(EventCardBaseViewModel vm)
+        {
+            var model = vm.Model;
+            if (vm.EntryId == null && model?.Id != null)
+            {
+                if (_pendingEntries.TryRemove(model.Id, out var pendingId))
+                {
+                    vm.EntryId = pendingId;
+                    _log?.Info($"EntryId 개별 폴백 매칭: Event({model.Id}) → Entry({pendingId})");
+                }
+                else
+                {
+                    // 그리드 조치보고=일시 카드 인스턴스라 EntryId 미할당 — 실제 EQM 엔트리 직접 조회(장애/탐지 독립 id → Type 판별).
+                    var entry = _eventQueueManager.FindEntryByEventId(model.Id, model.MessageType)
+                                ?? (model.Device != null
+                                        ? _eventQueueManager.FindEntryByDevice(model.Device.Id, model.Device.DeviceType)
+                                        : null);
+                    if (entry?.EntryId != null)
+                    {
+                        vm.EntryId = entry.EntryId;
+                        _log?.Info($"조치보고 EQM 엔트리 직접 매칭(EntryId null 폴백): Event({model.Id}) → Entry({entry.EntryId})");
+                    }
+                }
+            }
+
+            if (vm.EntryId != null)
+            {
+                _eventQueueManager.Dequeue(vm.EntryId);   // N→0 전이 시 그룹/개별 심볼 복원
+            }
+            else if (model?.Device != null)
+            {
+                // EQM 엔트리 자체가 없음(부팅 전 장애 등) — Dequeue 대상 부재. 심볼을 EQM 실제 상태로 재계산 복원.
+                _symbolEventManager.RefreshDeviceSymbol(model.Device.Id, model.Device.DeviceType);
+                if (model.Device.DeviceGroups != null)
+                    foreach (var g in model.Device.DeviceGroups)
+                        _symbolEventManager.RefreshGroupSymbol(g);
+                _log?.Warning($"EQM 엔트리 부재 — 심볼 재계산 복원(EntryId null): Event({model.Id}), Device({model.Device.Id})");
+            }
+            else
+            {
+                _log?.Warning($"EntryId·EQM 엔트리·Device 모두 부재 — 심볼 복원 스킵: Event({model?.Id})");
+            }
+        }
+
         public async Task HandleAsync(DetectionReportedMessageModel message, CancellationToken cancellationToken)
         {
             try
@@ -711,19 +760,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var model = vm.Model;
                     if (model == null) throw new NullReferenceException("DetectionEventModel을 찾을 수 없습니다.");
 
-                    // 심볼 복원: _pendingEntries 폴백 후 Dequeue (FR-02)
-                    if (vm.EntryId == null && vm.Model?.Id != null)
-                    {
-                        if (_pendingEntries.TryRemove(vm.Model.Id, out var fallbackEntryId))
-                        {
-                            vm.EntryId = fallbackEntryId;
-                            _log?.Info($"EntryId 개별 탐지 폴백 매칭: Event({vm.Model.Id}) → Entry({fallbackEntryId})");
-                        }
-                    }
-                    if (vm.EntryId != null)
-                        _eventQueueManager.Dequeue(vm.EntryId);
-                    else
-                        _log?.Warning($"EntryId null — Dequeue 스킵: Event({vm.Model?.Id}), Device({vm.Model?.Device?.Id})");
+                    // 심볼/EQM 상태 정리 — EntryId 폴백 체인(직접 EQM 조회) + 엔트리 부재 시 재계산 복원 (FR-03)
+                    ResolveReportedFaultState(vm);
 
                     await DispatcherService.BeginInvoke(() =>
                     {
@@ -749,19 +787,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                     var model = vm.Model;
                     if (model == null) throw new NullReferenceException("MalfunctionEventModel을 찾을 수 없습니다.");
 
-                    // 심볼 복원: _pendingEntries 폴백 후 Dequeue (FR-02)
-                    if (vm.EntryId == null && vm.Model?.Id != null)
-                    {
-                        if (_pendingEntries.TryRemove(vm.Model.Id, out var fallbackEntryId))
-                        {
-                            vm.EntryId = fallbackEntryId;
-                            _log?.Info($"EntryId 개별 장애 폴백 매칭: Event({vm.Model.Id}) → Entry({fallbackEntryId})");
-                        }
-                    }
-                    if (vm.EntryId != null)
-                        _eventQueueManager.Dequeue(vm.EntryId);
-                    else
-                        _log?.Warning($"EntryId null — Dequeue 스킵: Event({vm.Model?.Id}), Device({vm.Model?.Device?.Id})");
+                    // 심볼/EQM 상태 정리 — EntryId 폴백 체인(직접 EQM 조회) + 엔트리 부재 시 재계산 복원 (FR-03)
+                    ResolveReportedFaultState(vm);
 
                     await DispatcherService.BeginInvoke(() =>
                     {
