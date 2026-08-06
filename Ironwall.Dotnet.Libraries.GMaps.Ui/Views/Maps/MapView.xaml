@@ -25,11 +25,11 @@
 	<!--  전역 단축키 — 상단 메뉴 명령을 맵 포커스 상태에서 동작(메뉴 스코프가 아닌 루트 스코프).
 	      기존 코드 단축키(Ctrl+Shift+R 회전토글·Ctrl+R 회전리셋·Ctrl+←/→ 미세회전·Ctrl+A 전체선택)와 비충돌.  -->
 	<UserControl.InputBindings>
-		<!--  파일  -->
+		<!--  등록(편집 스트립) — 파일 메뉴 폐지(FR-C3) 후에도 단축키 유지. 타일폴더(Ctrl+D)는 기능 자체가
+		      설정정보>지도설정 카드로 일원화되어 바인딩 제거(§3 매핑 '삭제(중복)').  -->
 		<KeyBinding Key="L" Modifiers="Ctrl" Command="{Binding LoadMapImageCommand}" />
 		<KeyBinding Key="I" Modifiers="Ctrl" Command="{Binding LoadImageOverlayCommand}" />
 		<KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding CreateCustomMapCommand}" />
-		<KeyBinding Key="D" Modifiers="Ctrl" Command="{Binding SetMapTileFolderCommand}" />
 		<KeyBinding Key="E" Modifiers="Ctrl" Command="{Binding ExitApplicationCommand}" />
 		<!--  지도(좌표계)  -->
 		<KeyBinding Key="D1" Modifiers="Ctrl" Command="{Binding ToggleWGS84Command}" />
@@ -46,6 +46,7 @@
 			<ResourceDictionary.MergedDictionaries>
 				<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 			</ResourceDictionary.MergedDictionaries>
+			<symbolUtils:AreEqualMultiConverter x:Key="AreEqualMultiConverter" />
 			<symbolUtils:ColorTypeToBrushConverter x:Key="ColorTypeToBrushConverter" />
 		<symbolUtils:MarkerCategoryToDisplayNameConverter x:Key="MarkerCategoryToDisplayNameConverter" />
 		<symbolUtils:MarkerCategoryToIconConverter x:Key="MarkerCategoryToIconConverter" />
@@ -196,54 +197,60 @@
 				IsMainMenu="True"
 				Style="{StaticResource MaterialDesignMenu}">
 
-			<!--  파일 메뉴 — 단축키는 루트 UserControl.InputBindings에서 전역 처리(여기선 InputGestureText 표시만).  -->
-			<MenuItem Header="파일(_F)" AutomationProperties.AutomationId="GMaps.Map.FileMenu">
+			<!--  지도(M) 메뉴 (FR-C3) — 파일 메뉴 폐지: 등록 3종(맵/이미지/커스텀맵)→편집 스트립 '등록',
+			      타일폴더 설정은 설정정보>지도설정 카드로 일원화(중복 삭제), 종료는 이 메뉴 최하단.
+			      좌표계 토글: 마우스=IsChecked TwoWay 단일 토글, 키보드=루트 InputBindings(Ctrl+1/2/3).  -->
+			<MenuItem Header="지도(_M)" AutomationProperties.AutomationId="GMaps.Map.MapMenu">
+				<!--  지도 전환 라디오 — 콤보와 동일 기능의 키보드 접근 경로. 체크=현재 지도(참조 비교).  -->
 				<MenuItem
-					Command="{Binding LoadMapImageCommand}"
-					Header="맵 불러오기"
-					Icon="{md:PackIcon Kind=Map}"
-					InputGestureText="Ctrl+L" />
+					Header="지도 전환"
+					Icon="{md:PackIcon Kind=SwapHorizontal}"
+					ItemsSource="{Binding AvailableMaps}">
+					<MenuItem.ItemContainerStyle>
+						<Style BasedOn="{StaticResource MaterialDesignMenuItem}" TargetType="MenuItem">
+							<Setter Property="Header" Value="{Binding Name}" />
+							<Setter Property="Command" Value="{Binding DataContext.SelectMapCommand, RelativeSource={RelativeSource AncestorType=Menu}}" />
+							<Setter Property="CommandParameter" Value="{Binding}" />
+							<Setter Property="IsCheckable" Value="False" />
+							<Setter Property="IsChecked">
+								<Setter.Value>
+									<MultiBinding Converter="{StaticResource AreEqualMultiConverter}" Mode="OneWay">
+										<Binding />
+										<Binding Path="DataContext.SelectedMapItem" RelativeSource="{RelativeSource AncestorType=Menu}" />
+									</MultiBinding>
+								</Setter.Value>
+							</Setter>
+						</Style>
+					</MenuItem.ItemContainerStyle>
+				</MenuItem>
+				<MenuItem Header="좌표계" Icon="{md:PackIcon Kind=Earth}">
+					<MenuItem
+						Header="WGS-84 좌표계"
+						InputGestureText="Ctrl+1"
+						IsCheckable="True"
+						IsChecked="{Binding IsShowWSG84, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					<MenuItem
+						Header="MGRS 좌표계"
+						InputGestureText="Ctrl+2"
+						IsCheckable="True"
+						IsChecked="{Binding IsShowMGRS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					<MenuItem
+						Header="UTM 좌표계"
+						InputGestureText="Ctrl+3"
+						IsCheckable="True"
+						IsChecked="{Binding IsShowUTM, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+				</MenuItem>
+				<!--  설정정보>지도설정 바로가기 — 지도별 min/max 줌 편집 카드(zoom-float FR-20)  -->
 				<MenuItem
-					Command="{Binding LoadImageOverlayCommand}"
-					Header="이미지 불러오기"
-					Icon="{md:PackIcon Kind=Image}"
-					InputGestureText="Ctrl+I" />
-				<MenuItem
-					Command="{Binding CreateCustomMapCommand}"
-					Header="새 커스텀 맵 생성"
-					Icon="{md:PackIcon Kind=MapPlus}"
-					InputGestureText="Ctrl+N" />
-				<MenuItem
-					Command="{Binding SetMapTileFolderCommand}"
-					Header="맵 타일 폴더 설정"
-					Icon="{md:PackIcon Kind=Mapbox}"
-					InputGestureText="Ctrl+D" />
+					Command="{Binding OpenMapSetupCommand}"
+					Header="지도 줌 범위 설정…"
+					Icon="{md:PackIcon Kind=MagnifyPlusOutline}" />
 				<Separator />
 				<MenuItem
 					Command="{Binding ExitApplicationCommand}"
 					Header="종료"
 					Icon="{md:PackIcon Kind=ExitToApp}"
 					InputGestureText="Ctrl+E" />
-			</MenuItem>
-
-			<!--  지도(좌표계) 메뉴 — 마우스=IsChecked TwoWay 단일 토글(Command 제거로 이중토글 방지),
-			      키보드=루트 InputBindings(Ctrl+1/2/3→Toggle*Command 플립).  -->
-			<MenuItem Header="지도(_M)" AutomationProperties.AutomationId="GMaps.Map.MapMenu">
-				<MenuItem
-					Header="WGS-84 좌표계"
-					InputGestureText="Ctrl+1"
-					IsCheckable="True"
-					IsChecked="{Binding IsShowWSG84, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-				<MenuItem
-					Header="MGRS 좌표계"
-					InputGestureText="Ctrl+2"
-					IsCheckable="True"
-					IsChecked="{Binding IsShowMGRS, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-				<MenuItem
-					Header="UTM 좌표계"
-					InputGestureText="Ctrl+3"
-					IsCheckable="True"
-					IsChecked="{Binding IsShowUTM, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 			</MenuItem>
 
 			<!--  보기(View) 메뉴 — 지도 계기 표시/숨김(GMap_Map_Instruments FR-14~16).

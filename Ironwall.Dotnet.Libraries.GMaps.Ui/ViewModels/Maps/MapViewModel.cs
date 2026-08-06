@@ -8626,6 +8626,16 @@ public partial class MapViewModel : BasePanelViewModel,
             }
         }
     }
+
+    private RelayCommand? _selectMapCommand;
+    /// <summary>지도(M)&gt;지도 전환 라디오 서브메뉴(map-topbar-trafficlight FR-C3) — 콤보와 동일 기능의 키보드 접근 경로.</summary>
+    public RelayCommand SelectMapCommand
+        => _selectMapCommand ??= new RelayCommand(p => { if (p is IMapModel m) SelectedMapItem = m; });
+
+    private RelayCommand? _openMapSetupCommand;
+    /// <summary>지도(M)&gt;지도 줌 범위 설정 바로가기(FR-C3) — 설정정보 패널 오픈(지도설정 카드의 줌 범위 편집, FR-20).</summary>
+    public RelayCommand OpenMapSetupCommand
+        => _openMapSetupCommand ??= new RelayCommand(_ => _ = _eventAggregator?.PublishOnCurrentThreadAsync(new OpenSetupPanelMessageModel()));
     #endregion
     #region - 필드 (Private Fields) -
     // 맵 전환 동시 실행 방지
