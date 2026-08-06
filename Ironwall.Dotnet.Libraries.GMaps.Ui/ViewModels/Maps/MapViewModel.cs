@@ -3159,7 +3159,12 @@ public partial class MapViewModel : BasePanelViewModel,
 
         if (PlaybackPanel == null)
         {
-            PlaybackPanel = new GMapControls.PlaybackConsoleControl { DataContext = _playbackVm };
+            // 추적 설정 ⚙은 재생 패널 헤더 소속(map-topbar-trafficlight FR-C5) — 상단 툴바에서 이동
+            PlaybackPanel = new GMapControls.PlaybackConsoleControl
+            {
+                DataContext = _playbackVm,
+                SettingsCommand = ToggleTrackingSettingsPanelCommand,
+            };
             _playbackVm.CloseRequested += () => IsPlaybackPanelVisible = false;
             _playbackVm.FocusRequested += (lat, lng) => { if (MainMap != null) MainMap.Position = new PointLatLng(lat, lng); };
             if (MainMap != null) _playbackVm.AttachMap(MainMap);

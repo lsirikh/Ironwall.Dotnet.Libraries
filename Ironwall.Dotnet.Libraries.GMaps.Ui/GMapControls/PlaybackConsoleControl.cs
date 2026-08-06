@@ -27,6 +27,12 @@ public class PlaybackConsoleControl : Control
 
     public PlaybackConsoleControl() => InitializeDragSupport();
 
+    /// <summary>헤더 ⚙ 추적 설정 커맨드(map-topbar-trafficlight FR-C5) — 상단 툴바에서 이동.
+    /// DataContext(PlaybackViewModel)가 아닌 MapViewModel 소유 커맨드라 DP로 주입(생성 지점 TogglePlaybackPanel).</summary>
+    public ICommand? SettingsCommand { get => (ICommand?)GetValue(SettingsCommandProperty); set => SetValue(SettingsCommandProperty, value); }
+    public static readonly DependencyProperty SettingsCommandProperty =
+        DependencyProperty.Register(nameof(SettingsCommand), typeof(ICommand), typeof(PlaybackConsoleControl), new PropertyMetadata(null));
+
     #region - Drag (헤더 Y≤38만 드래그 → 부모 ContentPresenter를 Canvas 이동) -
     private bool _isDragging;
     private Point _lastMousePosition;

@@ -251,6 +251,7 @@
 										<ColumnDefinition Width="34" />
 										<ColumnDefinition Width="*" />
 										<ColumnDefinition Width="34" />
+										<ColumnDefinition Width="34" />
 									</Grid.ColumnDefinitions>
 									<md:PackIcon
 										Grid.Column="0"
@@ -264,9 +265,35 @@
 										FontSize="13" FontWeight="Bold"
 										Foreground="{DynamicResource OnPrimaryFixedBrush}"
 										Text="추적 재생 (Playback)" />
+									<!-- 추적 설정 ⚙ — 상단 툴바에서 이동(map-topbar-trafficlight FR-C5). MapViewModel 커맨드 DP 주입. -->
+									<Button
+										x:Name="PART_SettingsButton"
+										Grid.Column="2"
+										Width="26" Height="26"
+										AutomationProperties.AutomationId="GMaps.Playback.SettingsButton"
+										Command="{TemplateBinding SettingsCommand}"
+										Cursor="Hand"
+										ToolTip="추적 설정">
+										<Button.Template>
+											<ControlTemplate TargetType="Button">
+												<Border x:Name="Bd" Background="Transparent" CornerRadius="13">
+													<md:PackIcon
+														Width="14" Height="14"
+														HorizontalAlignment="Center" VerticalAlignment="Center"
+														Foreground="{DynamicResource OnPrimaryFixedBrush}"
+														Kind="CogOutline" />
+												</Border>
+												<ControlTemplate.Triggers>
+													<Trigger Property="IsMouseOver" Value="True">
+														<Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+													</Trigger>
+												</ControlTemplate.Triggers>
+											</ControlTemplate>
+										</Button.Template>
+									</Button>
 									<Button
 										x:Name="PART_CloseButton"
-										Grid.Column="2"
+										Grid.Column="3"
 										Command="{Binding CloseCommand}"
 										Style="{StaticResource PanelCloseButtonStyle}" />
 								</Grid>
