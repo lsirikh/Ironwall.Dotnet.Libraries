@@ -133,22 +133,32 @@
 				</DataTrigger>
 			</Style.Triggers>
 		</Style>
-		<Style
-			x:Key="SysResDonut"
-			BasedOn="{StaticResource MaterialDesignCircularProgressBar}"
-			TargetType="ProgressBar">
+		<!--  링 드로잉 직접 소유(사용자 피드백 반영) — ① 회색 트랙 원이 항상 원형 실루엣을 유지하고
+		      ② 호는 트랙과 정확히 동심·동두께(D=26,T=3, 12시 시작 시계방향). MD 원형 ProgressBar
+		      템플릿 의존 제거(트랙과의 기하 일치를 보장할 수 없음).  -->
+		<symbolUtils:PercentToDonutArcConverter
+			x:Key="SysResDonutArcConverter"
+			Diameter="26"
+			Thickness="3" />
+		<Style x:Key="SysResDonutTrack" TargetType="Ellipse">
 			<Setter Property="Width" Value="26" />
 			<Setter Property="Height" Value="26" />
-			<Setter Property="Minimum" Value="0" />
-			<Setter Property="Maximum" Value="100" />
-			<Setter Property="IsIndeterminate" Value="False" />
-			<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+			<Setter Property="Stroke" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="StrokeThickness" Value="3" />
+		</Style>
+		<Style x:Key="SysResDonutArc" TargetType="Path">
+			<Setter Property="Width" Value="26" />
+			<Setter Property="Height" Value="26" />
+			<Setter Property="StrokeThickness" Value="3" />
+			<Setter Property="StrokeStartLineCap" Value="Round" />
+			<Setter Property="StrokeEndLineCap" Value="Round" />
+			<Setter Property="Stroke" Value="{DynamicResource PrimaryBrush}" />
 			<Style.Triggers>
 				<DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="{x:Static sysres:ResourceLevel.Warning}">
-					<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+					<Setter Property="Stroke" Value="{DynamicResource StatusWarningBrush}" />
 				</DataTrigger>
 				<DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="{x:Static sysres:ResourceLevel.Critical}">
-					<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+					<Setter Property="Stroke" Value="{DynamicResource StatusCriticalBrush}" />
 				</DataTrigger>
 			</Style.Triggers>
 		</Style>
@@ -161,8 +171,11 @@
 			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
 			<Setter Property="IsHitTestVisible" Value="False" />
 		</Style>
-		<!--  % 병기(고정폭 Consolas — 폭 지터 방지, 레벨색은 호스트 TextElement 상속)  -->
+		<!--  % 병기(레벨색은 호스트 TextElement 상속) — Width=34 로 "100%"(4자) 폭을 선점(사용자 피드백):
+		      자릿수가 5%↔55%↔100%로 바뀌어도 레이아웃이 좌우로 흔들리지 않는다. 우측 정렬=% 기호 고정.  -->
 		<Style x:Key="SysResDonutText" TargetType="TextBlock">
+			<Setter Property="Width" Value="34" />
+			<Setter Property="TextAlignment" Value="Right" />
 			<Setter Property="Margin" Value="5,0,0,0" />
 			<Setter Property="VerticalAlignment" Value="Center" />
 			<Setter Property="FontFamily" Value="Consolas" />
@@ -297,10 +310,11 @@
 					Tag="{Binding CpuLevel}"
 					ToolTip="{Binding CpuTooltip}">
 					<Grid>
-						<ProgressBar
-							Style="{StaticResource SysResDonut}"
-							Tag="{Binding CpuLevel}"
-							Value="{Binding CpuPercent, Mode=OneWay}" />
+						<Ellipse Style="{StaticResource SysResDonutTrack}" />
+						<Path
+							Data="{Binding CpuPercent, Converter={StaticResource SysResDonutArcConverter}}"
+							Style="{StaticResource SysResDonutArc}"
+							Tag="{Binding CpuLevel}" />
 						<TextBlock Style="{StaticResource SysResDonutAbbr}" Text="C" />
 					</Grid>
 					<TextBlock Style="{StaticResource SysResDonutText}" Text="{Binding CpuText}" />
@@ -311,10 +325,11 @@
 					Tag="{Binding GpuLevel}"
 					ToolTip="{Binding GpuTooltip}">
 					<Grid>
-						<ProgressBar
-							Style="{StaticResource SysResDonut}"
-							Tag="{Binding GpuLevel}"
-							Value="{Binding GpuPercent, Mode=OneWay}" />
+						<Ellipse Style="{StaticResource SysResDonutTrack}" />
+						<Path
+							Data="{Binding GpuPercent, Converter={StaticResource SysResDonutArcConverter}}"
+							Style="{StaticResource SysResDonutArc}"
+							Tag="{Binding GpuLevel}" />
 						<TextBlock Style="{StaticResource SysResDonutAbbr}" Text="G" />
 					</Grid>
 					<TextBlock Style="{StaticResource SysResDonutText}" Text="{Binding GpuText}" />
@@ -325,10 +340,11 @@
 					Tag="{Binding RamLevel}"
 					ToolTip="{Binding RamTooltip}">
 					<Grid>
-						<ProgressBar
-							Style="{StaticResource SysResDonut}"
-							Tag="{Binding RamLevel}"
-							Value="{Binding RamPercent, Mode=OneWay}" />
+						<Ellipse Style="{StaticResource SysResDonutTrack}" />
+						<Path
+							Data="{Binding RamPercent, Converter={StaticResource SysResDonutArcConverter}}"
+							Style="{StaticResource SysResDonutArc}"
+							Tag="{Binding RamLevel}" />
 						<TextBlock Style="{StaticResource SysResDonutAbbr}" Text="R" />
 					</Grid>
 					<TextBlock Style="{StaticResource SysResDonutText}" Text="{Binding RamText}" />
