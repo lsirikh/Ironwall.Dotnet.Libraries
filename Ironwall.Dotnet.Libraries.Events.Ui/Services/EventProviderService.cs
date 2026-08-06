@@ -433,6 +433,12 @@ public class EventProviderService
 
                 return new PagedResult<IActionEventModel>
                 {
+                    // [VF-10] 이 한 줄이 빠져 있었다. PagedResult.Success 는 기본값이 true 라,
+                    //   API 실패(504/401 등)에도 Success 가 true 로 남아
+                    //   ActionEventPanelViewModel 의 `if (!firstPage.Success)` 통지 분기를 그대로 통과했다
+                    //   → 팝업 없음 + 기존 조치 이벤트 전건 제거 + 0건 추가 = "로딩 끝난 빈 화면"(무음 실패).
+                    //   탐지(:298)·장애(:346)·연결(:391) 3종은 이미 같은 줄을 갖고 있다(EA2 대칭).
+                    Success = response.Success,
                     Page = page,
                     TotalPages = response.Pagination?.TotalPages ?? 1,
                     Total = response.Pagination?.Total ?? 0

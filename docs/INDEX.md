@@ -10,9 +10,15 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [zoom-float-halfstep-scenario-analysis.md](analyses/zoom-float-halfstep-scenario-analysis.md) | **줌 Float(0.5스텝) 전환 시나리오 기반 분석 v1.1** — Explore 6기+시뮬 1,472케이스(v2)+적대 검증 3기. 현행 휠 래더≡0.5 래더 동형 증명(SIM-D009, 전이 무수정), 이슈 Z-01~Z-24(file:line+SIM 실증), Gap G-1~G-8. 서버 무영향(Api.Messages 한정) 확정 | 2026-08-06 |
+| [gmap-label-offset-domain-mismatch-analysis.md](analyses/gmap-label-offset-domain-mismatch-analysis.md) | **지도 라벨 미표시 근본원인(확정)** — 현장 DB px 오프셋 × 신버전 비율 해석 = 구역/라인 라벨 화면 밖 렌더. 스키마 22컬럼 추가는 중립 | 2026-08-06 |
+| [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | **검증 발견 백로그(정본)** — 증거는 확보했으나 미조치인 사항 추적. VF-01 SYNC_EVENT_SUPPRESSION 미정의 등 | 2026-08-04 |
+| [harness-customization-manifest.md](analyses/harness-customization-manifest.md) | **하네스 커스터마이징 매니페스트** — `.claude/rules·skills·domain-skills`는 업그레이드 시 삭제 후 재설치 → 복구 목록 H-01~H-06 | 2026-08-04 |
+| [event-panel-silent-load-failure-analysis.md](analyses/event-panel-silent-load-failure-analysis.md) | **이벤트 패널 간헐 무음 실패** 4축 적대검증 — 조치탭 `Success` 누락 · `Error()`가 Warn 방출 · 대시보드 null 무음(로그 실증) | 2026-08-05 |
 | [map-25d-rotation-sync-analysis.md](analyses/map-25d-rotation-sync-analysis.md) | map-25d-rotation-sync | 2026-08-03 |
 | [logout-on-exit-analysis.md](analyses/logout-on-exit-analysis.md) | logout-on-exit | 2026-08-03 |
 | [map-3d-visualization-analysis.md](analyses/map-3d-visualization-analysis.md) | map-3d-visualization | 2026-08-03 |
+| [theme-contrast-audit-analysis.md](analyses/theme-contrast-audit-analysis.md) | 테마 대비·구별성 감사 46건(High 16) — 상태색 충돌·하드코딩 색상·지도 오버레이 대비·disabled/포커스 부재 | 2026-08-04 |
 | [ui-automation-scenario-spec-analysis.md](analyses/ui-automation-scenario-spec-analysis.md) | ui-automation-scenario-spec | 2026-08-03 |
 | [playwright-self-verification-analysis.md](analyses/playwright-self-verification-analysis.md) | playwright-self-verification | 2026-08-03 |
 | [session-scenario-simulation-analysis.md](analyses/session-scenario-simulation-analysis.md) | session-scenario-simulation | 2026-08-03 |
@@ -66,6 +72,10 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | PidsGroup 우클릭 — 맵 심볼 메뉴(ShowMarkerContextMenu:5809 분기)·등록 센서 정보 오버레이(DeviceProvider 역필터, 서버 0)·그룹 탐지 이력 확장판(센서 팬아웃+멀티 시리즈)·그룹 탭 행 우클릭·메인솔루션 EXT. FR-01~15(Phase 1·2), V-01~05, 결정 대기 G-1/G-2/G-3 | **Draft** | 2026-08-06 |
+| [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | 줌 Float(0.5스텝) 전환 **v1.1(적대검증 반영)** — 실효줌 SSOT·라벨 `x.5`(최상단 `+`/`++` 유지)·SetEffectiveZoom 원자 복원+**저장 경로(FR-09b)**·게이트 10곳 단일 헬퍼(FR-10)·생성 기록 8곳 캡(FR-13)·dzl 통지 계약(FR-19)·ROI 5개소 마이그레이션. FR-01~19(SIM ID 추적), 결정 대기 G-1/G-2/G-5/G-6 | **Draft** | 2026-08-06 |
+| [Event_Silent_Failure_Elimination-prd.md](prds/Event_Silent_Failure_Elimination-prd.md) | 이벤트 파이프라인 무음 실패 제거 — 조회 실패가 "정상적으로 빈 화면"으로 위장되는 경로 차단(`PanelLoadState` 도입·stale 표식·제한 재시도·통지 등급표). **v1.1 개정**: `NatsBrokerService.cs`가 **⚠메인 솔루션** 소속임을 명시(FR-08 배선 3단 + 사전 통지 게이트). FR-01의 "bool→get-only 파생" 폐기 → **setter 유지 + 단방향 투영표**(실측: `IsVisible` 4개 베이스 정의·외부 대입 56곳). 탐지 패널은 `!Success` 경로에 **이미 팝업 존재**(`:490-498`) → FR-02를 취소·일반예외 한정으로 축소하고 **기존 팝업 배너 강등을 §0 명시 승인 항목**으로 승격. 인용 stale 전수 정정(`925-929`·`LogService:137`·로그 `4736-4738`). **V-04 해소**(`SYNC_EVENT_SUPPRESSION` 9건 실증) · S6를 해당 2줄로 한정(`SYSTEM_EVENT` 24건 Out of Scope). 롤백태그·worktree·`commit -a` 금지 게이트 + DoD 무조건/조건부 분리. 탭 헤더 계측은 Phase2 FR-04 단독 소유 | **Draft** | 2026-08-05 |
+| [UI_Automation_Instrumentation_Phase2-prd.md](prds/UI_Automation_Instrumentation_Phase2-prd.md) | UI 자동화 계측 2단계 — 제어기→센서 등록 자동화 해금(계측 126건/19파일). **v1.1 개정**: 장비 삭제 앱 4중 가드 실측(7패널 전수) → FR-01 행 id 근거를 '안전'→'정확한 지목·안정성'으로 강등, 안전은 **FR-02 선택 기반 가드**(선택→셀텍스트 신원확인→확인팝업 문구 대조→취소)로 재설계. FR-07 `PART_TreeView` 계측이 하네스 4개 호출부 파괴 실증 → Option A(제외) 기본 + 폴백 id 전수 대조표 10종(FR-11 신설). `CanDeleteSelection` 실제 계약='부분집합' 정정, `DeviceGroupViewModel` 미적합 → FR-01-C 분리. 탭 헤더 계측 단독 소유 확정 | **Draft** | 2026-08-05 |
 | [installer-prd.md](prds/installer-prd.md) | installer | Approved | 2026-08-04 |
 | [GMap_Schema_Migration_Idempotency-prd.md](prds/GMap_Schema_Migration_Idempotency-prd.md) | GMap_Schema_Migration_Idempotency | Approved | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd.md](prds/UI_Functional_Testing_Layer-prd.md) | UI_Functional_Testing_Layer | Approved | 2026-08-04 |
@@ -354,6 +364,10 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
+| [zoom-float-halfstep-scenarios.md](tests/zoom-float-halfstep-scenarios.md) | 시뮬 완료(v2) | SIM 1,472건(T720/S263/R363/B21/D9/L4/P50/O38/C4)+실기 4계열 | 2026-08-06 |
+| [zoom-float-halfstep-simulation-log.md](tests/zoom-float-halfstep-simulation-log.md) | PASS 1,448 / ISSUE 24(22종) | 전량 로그 v2(시뮬 ID 정본) | 2026-08-06 |
+| [gmap-scenario-spec.md](tests/gmap-scenario-spec.md) | 미실행 | GM-* 56건(🟢27/🟡14/🔴8/⚫7) | 2026-08-04 |
+| [ui-scenario-board.html](tests/ui-scenario-board.html) | E2E 4통과 | 진행 보드(정본) | 2026-08-04 |
 | [GMap_Rotation_E2E2-scenarios.md](tests/GMap_Rotation_E2E2-scenarios.md) | -% | -% | 2026-07-30 |
 | [GMap_Anchor_Viewport_Lock-test-result.md](tests/GMap_Anchor_Viewport_Lock-test-result.md) | -% | -% | 2026-07-19 |
 | [GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md](tests/GMap_PidsCamera_FOV_Toggle_Persistence-test-result.md) | -% | -% | 2026-07-18 |
@@ -508,6 +522,7 @@
 
 | 파일 | 내용 | 날짜 |
 |------|------|------|
+| [pidsgroup-rightclick-storyboard.html](design/pidsgroup-rightclick-storyboard.html) | PidsGroup 우클릭 와이어프레임+스토리보드 v1.0 — 진입점 3곳(맵 구역 심볼 우클릭 메뉴·오버레이 행 우클릭·장비정보 그룹 탭 행 우클릭)·등록 센서 정보 오버레이(LayerPanel 표준 크롬, DeviceProvider 역필터 서버변경 0)·그룹 탐지 이력 확장판(센서 팬아웃+멀티 시리즈 차트, 팔레트 CVD 검증)·S1~S6 필름스트립·리스크/데이터 계약/Phase 1·2 분할·실토큰 Dark/Light 토글 | 2026-08-06 |
 | [installer-wizard-plan.html](design/installer-wizard-plan.html) | IRONWALL 관제 SW Inno Setup 인스톨러 기획서 v1.0 — 16화면 위저드 와이어프레임+스토리보드(신규/업그레이드 분기·예외 3종)·appsettings.json 현장설정 단계별 입력(완곡 명칭: 통합/서드파티 브로커 서버·통합 관제 서버·데이터 저장소)·특징 보드 2장+배너 시안(버전 표기 금지)·설정 기록(플레이스홀더 템플릿)/보존 정책·기술 설계 노트·미결 Q5 | 2026-08-04 |
 | [event-suppression-schedule-wireframe.html](design/event-suppression-schedule-wireframe.html) | 이벤트 억제(정비 창) 스케줄 관리 와이어프레임 v1.0 — G-1 CRUD 패널(도구모음+인라인폼 DateTimePicker+DataGrid 상태배지 pill+무한스크롤)·G-2 활성 배너(SurfaceTranslucent+StatusWarning)·G-3 딤·권한 disable 시뮬·Conductor PanelShell·Tactical Dark/Light 토글 | 2026-07-31 |
 | [event-suppression-schedule-storyboard.html](design/event-suppression-schedule-storyboard.html) | 이벤트 억제 스케줄 스토리보드 v1.0 — 9장면 사용자 흐름(진입→생성→검증→목록/필터→수정→취소 Confirm→활성배너→라이브딤(P2)→권한) 각 장면 REST/NATS/UI 메시지 표기·Dark/Light | 2026-07-31 |

@@ -127,8 +127,14 @@ public class LogService : ILogService
         // 호출자 정보 포함한 메시지 생성
         var detailedMsg = $"{msg} (at {fileName}:{lineNumber} in {memberName})";
 
-        // Log 호출
-        Log(detailedMsg, typeof(LogService), Level.Warn);
+        // [VF-11] Level.Warn → Level.Error.
+        //   이전에는 Error() 가 Warning() 과 동일하게 Warn 으로 방출돼 두 가지가 동시에 깨져 있었다:
+        //   ① 코드 어디서도 Level.Error 를 내보내지 않으므로 위 BufferingForwardingAppender 의
+        //      Evaluator = new LevelEvaluator(Level.Error)(= "ERROR 즉시 flush") 조건이 영원히 성립하지 않았다
+        //      → 실패 라인이 버퍼 50줄이 찰 때까지 디스크에 안 남고, 크래시하면 통째로 유실됐다.
+        //   ② 로그에서 ERROR 로 검색하면 0건이라 "에러가 없다"고 오판하게 만들었다
+        //      (실증: 이벤트 대시보드 504 실패 3줄이 전부 WARN 으로 기록됨 — log-2026-08-05.txt).
+        Log(detailedMsg, typeof(LogService), Level.Error);
     }
 
     private void Log(string msg, Type? type = default, Level? level = null, bool debug = false)
