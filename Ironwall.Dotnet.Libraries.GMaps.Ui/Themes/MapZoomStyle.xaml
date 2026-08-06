@@ -54,6 +54,7 @@
 							<!--  줌 레벨 표시 — 0.5 래더 소수 표기("17"/"17.5"), 최상단 소프트 밴드는 "19.5+"/"19.5++"(주황)  -->
 							<TextBlock
 								x:Name="ZoomLabelText"
+								AutomationProperties.AutomationId="GMaps.MapZoom.Label"
 								Grid.Column="0"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Center"
@@ -65,6 +66,7 @@
 
 							<!--  줌 아웃  -->
 							<Button
+								AutomationProperties.AutomationId="GMaps.MapZoom.ZoomOutButton"
 								Grid.Column="1"
 								Command="{TemplateBinding ZoomOutCommand}"
 								Foreground="{DynamicResource PrimaryBrush}"
@@ -79,6 +81,7 @@
 							      Value=SliderValue(=min(Zoom,Max)+0.5×dzl) 라우팅. 틱은 정수만 표시(과밀 방지),
 							      스냅은 0.5 단위(zoom-float-halfstep FR-03).  -->
 							<Slider
+								AutomationProperties.AutomationId="GMaps.MapZoom.Slider"
 								Grid.Column="2"
 								Margin="4,0"
 								VerticalAlignment="Center"
@@ -94,6 +97,7 @@
 
 							<!--  줌 인  -->
 							<Button
+								AutomationProperties.AutomationId="GMaps.MapZoom.ZoomInButton"
 								Grid.Column="3"
 								Command="{TemplateBinding ZoomInCommand}"
 								Foreground="{DynamicResource PrimaryBrush}"
