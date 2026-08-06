@@ -6947,9 +6947,12 @@ public partial class MapViewModel : BasePanelViewModel,
 
     private void MainMap_OnMapZoomChanged()
     {
-        // ★ FR-10: 실제 타일 줌이 바뀌면(맵 전환/홈 이동/줌아웃 등) 디지털 줌 초기화.
+        // ★ FR-10(구 디지털줌): 실제 타일 줌이 바뀌면(맵 전환/홈 이동/줌아웃 등) 디지털 줌 초기화.
         //   디지털 줌은 _core.Zoom을 바꾸지 않으므로 디지털 인/아웃 자체로는 이 핸들러가 호출되지 않는다.
-        MainMap?.ResetDigitalZoom();
+        // ★ zoom-float-halfstep FR-08: SetEffectiveZoom 원자 적용 중에는 리셋 억제 —
+        //   복원된 하프스텝(dzl)이 이 핸들러에 의해 소거되는 것을 차단(SIM-P008). 사용자 조작 경로는 현행 유지.
+        if (MainMap?.IsApplyingEffectiveZoom != true)
+            MainMap?.ResetDigitalZoom();
 
         CreateScaleBar();
         ClearAllSelections();
@@ -7040,12 +7043,15 @@ public partial class MapViewModel : BasePanelViewModel,
         NotifyOfPropertyChange(() => ScalePoints);
     }
 
-    /// <summary>디지털 줌 레벨 변경 → 축척바 재계산 + 카메라 팝업 outer 재배치.
+    /// <summary>디지털 줌 레벨 변경 → 축척바 재계산 + 카메라 팝업 outer 재배치 + 가시성 재평가.
     /// (디지털줌은 _core.Zoom 불변이라 OnMapZoomChanged가 미발화 → 여기서 직접 Refresh, RC-2)</summary>
     private void OnMapDigitalZoomLevelChanged(int level)
     {
         CreateScaleBar();
         RefreshCameraPopupPositions();   // 디지털 인/아웃 시 팝업·연결선 outer 좌표 재계산
+        // ★ zoom-float-halfstep FR-19: 하프스텝(dzl)도 실효줌을 바꾸므로 객체 최소줌 게이트 재평가 —
+        //   이것이 없으면 objZoom=17.5 심볼이 17→17.5 하프 진입 시 즉시 나타나지 않는다(Z-24).
+        ReapplyLayerVisibilityForZoom();
     }
 
     /// <summary>
@@ -7432,10 +7438,12 @@ public partial class MapViewModel : BasePanelViewModel,
     /// </summary>
     public double Zoom
     {
-        get { return MainMap.Zoom; }
+        get { return MainMap.Zoom; }   // 타일줌(정수) — 축척바 등 정수 계약 소비자용(NFR-02). 실효줌은 MainMap.EffectiveZoom.
         set
         {
-            MainMap.Zoom = value;
+            // ★ zoom-float-halfstep NFR-04: 벤더 Zoom DP 직대입 우회로 봉쇄 — 소수 입력도 안전하게
+            //   (타일, dzl)로 분해된다. 정수 입력은 종전과 동일하게 동작.
+            MainMap.SetEffectiveZoom(value);
             NotifyOfPropertyChange(nameof(Zoom));
         }
     }
@@ -7449,7 +7457,10 @@ public partial class MapViewModel : BasePanelViewModel,
         set
         {
             MainMap.MaxZoom = value;
-            MainMap?.ResetDigitalZoom();   // ★ FR-10: MaxZoom 변동(provider/맵 전환) 시 디지털 줌 초기화
+            // ★ FR-10(구 디지털줌): MaxZoom 변동(provider/맵 전환) 시 디지털 줌 초기화
+            // ★ zoom-float-halfstep FR-08: 실효줌 원자 적용 중에는 억제(복원 순서 재배치 없이 하프 보존)
+            if (MainMap?.IsApplyingEffectiveZoom != true)
+                MainMap?.ResetDigitalZoom();
             NotifyOfPropertyChange(nameof(ZoomMax));
         }
     }

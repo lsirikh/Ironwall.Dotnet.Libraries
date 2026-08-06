@@ -1791,6 +1791,10 @@ public class GMapCustomControl : GMapControl
         // [MapAnchor] 디지털 줌 변경 시 보이는 영역이 달라지므로 inset 라이브 재계산(FR-4/5).
         c.RecomputeAnchorViewportBounds();
         c.DigitalZoomLevelChanged?.Invoke((int)e.NewValue);
+        // ★ zoom-float-halfstep FR-19: dzl 변경 = 실효 배율 변경 — 뷰포트 스냅샷 버스에도 발행(Z-24).
+        //   종전에는 회전 경로에서만 발행되어 12개 소비처(어도너/FOV/라인/트레일/팝업/오버레이맵)가
+        //   DigitalZoomScale 변동을 통지받지 못했다.
+        c.QueueViewportSnapshot();
     }
 
     /// <summary>현재 디지털 줌 배율(1.0/1.5/2.0).</summary>
@@ -1801,6 +1805,73 @@ public class GMapCustomControl : GMapControl
 
     /// <summary>맵 전환·Provider 변경·홈 이동·MaxZoom 변동 시 디지털 줌 초기화(FR-10).</summary>
     public void ResetDigitalZoom() => DigitalZoomLevel = 0;
+
+    // ─────────── EffectiveZoom SSOT (zoom-float-halfstep PRD v1.1 FR-05/07) ───────────
+    // 실효줌 = min(타일줌, MaxZoom) + 0.5×dzl. 슬라이더 합성·영속(읽기/쓰기)·객체 게이트·
+    // 객체 생성 기록이 전부 이 단일 값을 쓴다. 벤더 Zoom DP에는 정수만 대입(NFR-04 —
+    // ScaleMode=Integer라 소수 대입은 GMapControl.cs:341에서 무성 절단됨).
+
+    /// <summary>실효줌(사용자 노출 float, 0.5 그리드). 예: (17,dzl1) → 17.5.</summary>
+    public double EffectiveZoom => Math.Min(Zoom, MaxZoom) + 0.5 * DigitalZoomLevel;
+
+    /// <summary>SetEffectiveZoom 적용 중 플래그 — MainMap_OnMapZoomChanged의 ResetDigitalZoom 억제 게이트(FR-08).</summary>
+    public bool IsApplyingEffectiveZoom { get; private set; }
+
+    /// <summary>
+    /// 실효줌 원자 세터(FR-07): 0.5 그리드 스냅(AwayFromZero — 은행가 반올림 금지, SIM-D002) →
+    /// (타일줌, dzl) 분해 → 한 동기 블록 적용(NFR-03: 중간 정수 프레임 노출 금지).
+    /// 복원·홈·맵전환·ROI 등 모든 프로그램적 줌 설정은 이 API로만 수렴한다.
+    /// </summary>
+    public void SetEffectiveZoom(double effectiveZoom)
+    {
+        if (double.IsNaN(effectiveZoom) || double.IsInfinity(effectiveZoom)) return;
+        double snapped = Math.Round(effectiveZoom * 2.0, MidpointRounding.AwayFromZero) / 2.0;
+        snapped = Math.Clamp(snapped, MinZoom, MaxZoom + 0.5 * DIGITAL_ZOOM_MAX);
+        int tile, dzl;
+        if (snapped >= MaxZoom)
+        {
+            tile = MaxZoom;
+            dzl = Math.Clamp((int)Math.Round((snapped - MaxZoom) / 0.5, MidpointRounding.AwayFromZero), 0, DIGITAL_ZOOM_MAX);
+        }
+        else
+        {
+            tile = (int)Math.Floor(snapped + 1e-9);
+            dzl = (snapped - tile) >= 0.25 ? 1 : 0;
+        }
+        IsApplyingEffectiveZoom = true;
+        try
+        {
+            Zoom = tile;                 // 정수만 대입 — 동기 발화하는 Reset은 FR-08 게이트가 억제
+            DigitalZoomLevel = dzl;
+        }
+        finally { IsApplyingEffectiveZoom = false; }
+        _log?.Info($"[EffectiveZoom] set={snapped.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} → (tile={tile}, dzl={dzl})");
+    }
+
+    /// <summary>
+    /// 커맨드용 래더 스텝(FR-05): 휠 래더(OnMouseWheel — 본 파일 하단)와 동일 의미론, 화면 중심 기준.
+    /// 휠 경로는 커서 기준 위치 보정(base.OnMouseWheel)이 필요해 별도 유지 — 전이 규칙은 동일(SIM-D009 동형).
+    /// </summary>
+    public void StepEffectiveZoom(int direction)
+    {
+        if (direction > 0)
+        {
+            if (Zoom < MaxZoom)
+            {
+                if (DigitalZoomLevel == 0) { StepDigitalZoom(+1); return; }   // 정수 → 하프(x.5)
+                ResetDigitalZoom();
+                Zoom = Math.Floor(Zoom) + 1;                                  // 하프 → 다음 정수(중심 기준)
+            }
+            else if (DigitalZoomLevel < DIGITAL_ZOOM_MAX) StepDigitalZoom(+1); // 최상단 소프트 스텝
+        }
+        else if (direction < 0)
+        {
+            if (DigitalZoomLevel > 0) { StepDigitalZoom(-1); return; }
+            if (Zoom <= MinZoom) return;
+            Zoom = Math.Floor(Zoom) - 1;                                      // 정수 줌아웃(핸들러 Reset 후)
+            if (Zoom < MaxZoom) StepDigitalZoom(+1);                          // 아래 정수의 하프 부여(휠다운 1920-1922와 동형)
+        }
+    }
 
     /// <summary>디지털 배율을 컨트롤 RenderTransform(화면 중심 기준 ScaleTransform)으로 적용.</summary>
     private void ApplyDigitalZoomTransform()
