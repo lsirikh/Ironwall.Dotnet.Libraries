@@ -63,6 +63,39 @@
 		</Setter>
 	</Style>
 
+	<!-- 패널 헤더 보조 아이콘 버튼(⚙ 추적 설정 등) — PanelCloseButtonStyle 동계열: 무그림자·호버 하이라이트만.
+	     ★ 명시 스타일 필수 — 인라인 Template만 주면 암시적 MD Button 스타일의 Elevation(그림자) Setter가
+	     누수된다(재생 패널 ⚙ 실측, 제어허브 '모두 닫기' 폭 훼손과 동일 계열). -->
+	<Style x:Key="PanelHeaderGearButtonStyle" TargetType="Button">
+		<Setter Property="Width" Value="26" />
+		<Setter Property="Height" Value="26" />
+		<Setter Property="Cursor" Value="Hand" />
+		<Setter Property="Effect" Value="{x:Null}" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border
+						x:Name="Bd"
+						Background="Transparent"
+						CornerRadius="13">
+						<md:PackIcon
+							Width="14"
+							Height="14"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							Foreground="{DynamicResource OnPrimaryFixedBrush}"
+							Kind="CogOutline" />
+					</Border>
+					<ControlTemplate.Triggers>
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
 	<!-- ═══════════════════ 패널 버튼 (Primary) ═══════════════════ -->
 	<Style x:Key="PanelPrimaryButtonStyle" TargetType="Button">
 		<Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />

@@ -298,12 +298,19 @@
 			</MenuItem>
 		</Menu>
 
-			<!--  시스템 리소스 R1 도넛 게이지(우측 정렬) — 링=사용률 호, 중앙 약어, 레벨색(시안→노랑→빨강), % 병기 (FR-B1)  -->
-			<StackPanel
+			<!--  시스템 리소스 R1 도넛 게이지(우측 정렬) — 링=사용률 호, 중앙 약어, 레벨색(시안→노랑→빨강), % 병기 (FR-B1)
+			      그룹 Border(사용자 피드백): 신호등 pill 과 동계열(SurfaceSunken+Border 토큰)로 도넛 3개를 하나의 캡슐로 묶는다.  -->
+			<Border
 				DockPanel.Dock="Right"
 				Margin="0,0,10,0"
+				Padding="0,2,10,2"
 				VerticalAlignment="Center"
-				Orientation="Horizontal">
+				AutomationProperties.AutomationId="GMaps.SysRes.Panel"
+				Background="{DynamicResource SurfaceSunkenBrush}"
+				BorderBrush="{DynamicResource BorderBrush}"
+				BorderThickness="1"
+				CornerRadius="16">
+			<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 				<StackPanel
 					AutomationProperties.AutomationId="GMaps.SysRes.Cpu"
 					Style="{StaticResource SysResDonutHost}"
@@ -350,6 +357,7 @@
 					<TextBlock Style="{StaticResource SysResDonutText}" Text="{Binding RamText}" />
 				</StackPanel>
 			</StackPanel>
+			</Border>
 
 			<ToolBarTray
 				VerticalAlignment="Center"
