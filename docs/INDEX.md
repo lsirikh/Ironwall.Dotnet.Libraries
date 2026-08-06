@@ -248,6 +248,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 0/38 | 2026-08-06 |
 | [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 0/30 | 2026-08-06 |
 | [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 29/42 | 2026-08-04 |
 | [GMap_Schema_Migration_Idempotency-prd-plan.md](plans/GMap_Schema_Migration_Idempotency-prd-plan.md) | [PRD](prds/GMap_Schema_Migration_Idempotency-prd.md) | 19/47 | 2026-08-04 |
