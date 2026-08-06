@@ -74,14 +74,17 @@ public partial class MapViewModel
     {
         CpuText = s.CpuAvailable ? $"{s.CpuPercent:F0}%" : "--";
         CpuLevel = s.CpuLevel;
+        CpuPercent = s.CpuAvailable ? s.CpuPercent : 0d;   // R1 도넛 호(FR-B1) — 불가 시 빈 링
         CpuTooltip = s.CpuAvailable ? $"CPU 사용률 {s.CpuPercent:F0}%" : "CPU 측정 대기/불가";
 
         GpuText = s.GpuAvailable ? $"{s.GpuPercent:F0}%" : "--";
         GpuLevel = s.GpuLevel;
+        GpuPercent = s.GpuAvailable ? s.GpuPercent : 0d;
         GpuTooltip = s.GpuAvailable ? $"GPU 사용률 {s.GpuPercent:F0}%" : "GPU 미가용";
 
         RamText = s.RamAvailable ? $"{s.RamPercent:F0}%" : "--";
         RamLevel = s.RamLevel;
+        RamPercent = s.RamAvailable ? s.RamPercent : 0d;
         RamTooltip = s.RamAvailable
             ? $"메모리 사용률 {s.RamPercent:F0}% ({BytesToGb(s.RamUsedBytes):F1}/{BytesToGb(s.RamTotalBytes):F1} GB)"
             : "메모리 측정 불가";
@@ -104,6 +107,14 @@ public partial class MapViewModel
 
     private string _cpuTooltip = "CPU 사용률";
     public string CpuTooltip { get => _cpuTooltip; set { if (_cpuTooltip != value) { _cpuTooltip = value; NotifyOfPropertyChange(); } } }
+
+    // R1 도넛 게이지 호(0~100, FR-B1) — 텍스트 파싱 없이 스냅샷 원값 직결(V-05)
+    private double _cpuPercent;
+    public double CpuPercent { get => _cpuPercent; set { if (Math.Abs(_cpuPercent - value) > 0.05) { _cpuPercent = value; NotifyOfPropertyChange(); } } }
+    private double _gpuPercent;
+    public double GpuPercent { get => _gpuPercent; set { if (Math.Abs(_gpuPercent - value) > 0.05) { _gpuPercent = value; NotifyOfPropertyChange(); } } }
+    private double _ramPercent;
+    public double RamPercent { get => _ramPercent; set { if (Math.Abs(_ramPercent - value) > 0.05) { _ramPercent = value; NotifyOfPropertyChange(); } } }
 
     private string _gpuText = "--";
     public string GpuText { get => _gpuText; set { if (_gpuText != value) { _gpuText = value; NotifyOfPropertyChange(); } } }
