@@ -179,7 +179,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     /// <summary>오픈 메시지 컨텍스트 주입 — 이미 활성 상태면(다른 장비로 전환) 즉시 재조회.</summary>
     public void Initialize(OpenDetectionHistoryDialogMessageModel message)
     {
-        var modeChanged = IsGroupMode;   // 그룹→센서 전환이면 상호 컨텍스트 완전 리셋(PRD 5-B)
+        // 그룹→센서 전환뿐 아니라 단일→다른 단일도 완전 리셋 — Result 칩 이월·이전 센서 잔상 차단(검증 F1/E9, 그룹 경로와 정책 일치)
+        var contextChanged = IsGroupMode || DeviceId != message.DeviceId;
         IsGroupMode = false;
         GroupId = 0;
         GroupName = string.Empty;
@@ -188,7 +189,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         DeviceId = message.DeviceId;
         DeviceName = string.IsNullOrWhiteSpace(message.DeviceName) ? $"장비 {message.DeviceId}" : message.DeviceName!;
         DeviceNumber = message.DeviceNumber;
-        if (modeChanged) ResetModeContext();
+        if (contextChanged) ResetModeContext();
         NotifyOfPropertyChange(nameof(HeaderText));
         NotifyOfPropertyChange(nameof(IsGroupMode));
         NotifyOfPropertyChange(nameof(SensorColumnVisibility));
@@ -335,12 +336,20 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
     private async Task LoadAsync()
     {
+        // 조회 시점 멤버십 재해석(AD-5 계약 — 검증 NEW-2): 다이얼로그를 열어둔 채 그룹 편성이 바뀌어도
+        // 새로고침/기간 변경 재조회가 최신 멤버로 팬아웃하고 헤더 "(센서 N)"도 동기화된다.
+        if (IsGroupMode)
+        {
+            ResolveGroupSensors();
+            NotifyOfPropertyChange(nameof(HeaderText));
+        }
         if (IsGroupMode ? _groupSensors.Count == 0 : DeviceId <= 0) return;   // 빈 그룹은 진입 게이트가 1차, 여기는 2차 방어(FR-10)
 
         _loadCts?.Cancel();
         _loadCts?.Dispose();
-        _loadCts = new CancellationTokenSource();
-        var ct = _loadCts.Token;
+        var cts = new CancellationTokenSource();   // 로컬 참조 — finally의 IsBusy 세대 가드용(검증 C1/Q5)
+        _loadCts = cts;
+        var ct = cts.Token;
 
         IsBusy = true;
         HasLoadError = false;
@@ -361,8 +370,9 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
             if (!IsGroupMode)
             {
-                var (models, sensorTruncated) = await FetchSensorPagedAsync(startText, endText, DeviceId, ct);
+                var (models, sensorTruncated, partialPages) = await FetchSensorPagedAsync(startText, endText, DeviceId, ct);
                 truncated = sensorTruncated;
+                if (partialPages) _failedSensorNames.Add($"{DeviceName}(일부 페이지)");   // 부분 데이터 표식(Q2/E1)
                 // 서버 정렬(created_at desc, id desc 타이브레이크)=최신 우선 — 상한 초과분은 과거 데이터라 절단
                 if (models.Count > MAX_LOAD)
                     models = models.Take(MAX_LOAD).ToList();
@@ -378,14 +388,14 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
                 {
                     try
                     {
-                        var (models, sensorTruncated) = await FetchSensorPagedAsync(startText, endText, sensor.Id, ct);
-                        return (Sensor: sensor, Index: index, Models: models, Truncated: sensorTruncated, Failed: false);
+                        var (models, sensorTruncated, partialPages) = await FetchSensorPagedAsync(startText, endText, sensor.Id, ct);
+                        return (Sensor: sensor, Index: index, Models: models, Truncated: sensorTruncated, Failed: false, Partial: partialPages);
                     }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception ex)
                     {
                         _log?.Warning($"[SIGNAL_HISTORY] 그룹 팬아웃 센서 조회 실패 (sensorId={sensor.Id}): {ex.Message}");
-                        return (Sensor: sensor, Index: index, Models: new List<IDetectionEventModel>(), Truncated: false, Failed: true);
+                        return (Sensor: sensor, Index: index, Models: new List<IDetectionEventModel>(), Truncated: false, Failed: true, Partial: false);
                     }
                 }).ToList();
 
@@ -395,6 +405,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
                 if (results.All(r => r.Failed))
                     throw new InvalidOperationException("그룹 멤버 센서 전체 조회 실패");
                 _failedSensorNames.AddRange(results.Where(r => r.Failed).Select(r => r.Sensor.Name));
+                _failedSensorNames.AddRange(results.Where(r => r.Partial).Select(r => $"{r.Sensor.Name}(일부 페이지)"));   // 부분 데이터 표식(Q2/E1)
 
                 // 병합 순서(버그헌트 확정 규약): 센서별 후필터(Fetch 내부) → 병합 → EventId dedup → 최신순 → 총합 500 절단(G-1=(a)).
                 // dedup은 서버 필터 회귀 시 N중복 방어 + offset 페이지 경계 중복 방어(정상 서버에서는 no-op).
@@ -443,7 +454,9 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         }
         finally
         {
-            IsBusy = false;
+            // 세대 가드(검증 C1/Q5) — 취소된 구 로드의 지연 finally가 신 로드의 스피너를 조기 소등하지 않도록
+            if (ReferenceEquals(_loadCts, cts))
+                IsBusy = false;
         }
     }
 
@@ -453,12 +466,13 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     /// <summary>단일 센서 페이지 순회 조회 — 그룹 팬아웃이 센서별로 재사용(FR-10).
     /// 응답을 요청 센서로 후필터(DTO의 device_id/device.id 검증) — 서버 device_id 필터와 의미 동일(정상 서버=no-op 멱등),
     /// 서버가 필터를 무시하던 실버그(B2/B3)의 재발 방어 + 오귀속 차단.</summary>
-    private async Task<(List<IDetectionEventModel> Models, bool Truncated)> FetchSensorPagedAsync(
+    private async Task<(List<IDetectionEventModel> Models, bool Truncated, bool Partial)> FetchSensorPagedAsync(
         string startText, string endText, int sensorId, CancellationToken ct)
     {
         var models = new List<IDetectionEventModel>();
         int page = 1;
         bool truncated = false;
+        bool partial = false;
         while (true)
         {
             var response = await _apiService.GetDetectionEventsAsync(
@@ -468,7 +482,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             {
                 if (page == 1)
                     throw new InvalidOperationException(response?.Message ?? "서버 응답이 없습니다.");
-                break;   // 후속 페이지 실패 — 확보한 만큼만 표시
+                partial = true;   // 후속 페이지 실패 — 확보분만 표시하되 부분 데이터임을 표식(검증 Q2/E1: 침묵 금지)
+                break;
             }
 
             models.AddRange(response.Data
@@ -480,7 +495,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             if (page >= MAX_PAGES) { truncated = true; break; }   // 원시 페이지 캡 — 후필터 시대에도 왕복 수 불변 보장
             page++;
         }
-        return (models, truncated);
+        return (models, truncated, partial);
     }
     #endregion
 

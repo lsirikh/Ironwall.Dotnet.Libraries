@@ -40,8 +40,9 @@ public class DetectionSignalTests
             TypeEvent = "Intrusion",
             ActionReported = actioned ? "True" : "False",
             Result = result,
-            // 클라 후필터 계약(요청 센서=dto.DeviceId 검증, 2026-08-06 B2/B3 방어) — 본 파일의 조회 테스트는 전부 DeviceId=5로 조회
-            DeviceId = 5,
+            // 클라 후필터 계약(2026-08-06 B2/B3 방어) — 실서버 형태(중첩 device, 최상위 device_id 미전송)로 스탬프.
+            // 본 파일의 조회 테스트는 전부 DeviceId=5로 조회한다(검증 NEW-1).
+            Device = new Ironwall.Dotnet.Libraries.Messages.Dto.Devices.BaseDeviceDto { Id = 5 },
             Detail = signal is int s ? new DetectionDetailDto { Signal = s } : null
         };
 
