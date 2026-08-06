@@ -96,7 +96,7 @@
 						      장애 램프는 점등 중 상시 펄스(감시 공백 최우선 시인성, 스토리보드 S3)  -->
 						<Border
 							AutomationProperties.AutomationId="Events.Status.TrafficLight"
-							Margin="0,0,24,0"
+							Margin="0,0,8,0"
 							Padding="8,3"
 							VerticalAlignment="Center"
 							Background="{DynamicResource SurfaceSunkenBrush}"
@@ -305,21 +305,25 @@
 							</StackPanel>
 						</Border>
 
+						<!--  총 카드 수(컴팩트, 잘림 해소 1안): 패널 폭 250px 고정에서 '이벤트 수' 라벨(15px+마진 32)이
+						      신호등을 밀어내 잘림 — 총수는 셸 벨 배지·신호등 건수와 3중 중복이라 "총 N"으로 축약.
+						      MinWidth=32 로 4자리("1000") 폭 선점 — 자릿수 변동에도 신호등 위치 불변.  -->
 						<TextBlock
-							Margin="0,0,32,0"
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
-							FontSize="15"
+							FontSize="12"
 							Foreground="{DynamicResource TextSecondaryBrush}"
 							Opacity="0.80"
-							Text="이벤트 수" />
+							Text="총" />
 						<TextBlock
-							HorizontalAlignment="Stretch"
+							MinWidth="32"
+							Margin="4,0,0,0"
 							VerticalAlignment="Center"
 							FontFamily="{StaticResource NotoSansCJKkRMedium}"
-							FontSize="15"
+							FontSize="13"
 							Foreground="{DynamicResource AccentBrush}"
-							Opacity="0.80"
+							Opacity="0.85"
+							TextAlignment="Left"
 							Text="{Binding ViewModelProvider.Count, FallbackValue=1000}" />
 					</StackPanel>
 				</Grid>
