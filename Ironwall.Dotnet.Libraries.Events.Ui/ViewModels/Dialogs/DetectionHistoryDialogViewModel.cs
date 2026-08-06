@@ -128,6 +128,14 @@ public class SensorChipViewModel : PropertyChangedBase
             _onToggled();
         }
     }
+
+    /// <summary>[전체] 마스터 토글 일괄 적용용 — 콜백(ApplyFilters) 없이 상태만 갱신(N회 재적용 폭주 방지).</summary>
+    internal void SetSilently(bool isOn)
+    {
+        if (_isOn == isOn) return;
+        _isOn = isOn;
+        NotifyOfPropertyChange(nameof(IsOn));
+    }
 }
 
 public class DetectionHistoryDialogViewModel : BasePanelViewModel
@@ -466,6 +474,30 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     public ObservableCollection<ResultChipViewModel> Chips { get; } = new();
     /// <summary>그룹 모드 센서 필터 칩(FR-12) — 멤버 전원, 시리즈 인덱스 고정.</summary>
     public ObservableCollection<SensorChipViewModel> SensorChips { get; } = new();
+
+    /// <summary>[전체] 마스터 토글 — set: 전 칩 일괄 on/off(1회 재적용) / get: 전부 on일 때만 true(개별 토글 시 자동 동기).</summary>
+    public bool AllSensorsOn
+    {
+        get => _allSensorsOn;
+        set
+        {
+            if (_allSensorsOn == value) return;
+            _allSensorsOn = value;
+            NotifyOfPropertyChange(nameof(AllSensorsOn));
+            foreach (var chip in SensorChips)
+                chip.SetSilently(value);
+            ApplyFilters();
+        }
+    }
+
+    /// <summary>개별 칩 토글/재구성 후 [전체] 표시 상태 재계산 — setter 경유 금지(일괄 적용 루프 방지).</summary>
+    private void SyncAllSensorsOn()
+    {
+        var allOn = SensorChips.Count > 0 && SensorChips.All(c => c.IsOn);
+        if (_allSensorsOn == allOn) return;
+        _allSensorsOn = allOn;
+        NotifyOfPropertyChange(nameof(AllSensorsOn));
+    }
     public ObservableCollection<SignalHistoryItemViewModel> FilteredItems { get; } = new();
     public IReadOnlyList<SignalChartPoint> ChartPoints
     {
@@ -524,6 +556,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
     private void ApplyFilters()
     {
+        SyncAllSensorsOn();   // 개별 칩 토글 경로 포함 — [전체] 표시 상태 동기
         var enabled = Chips.Where(c => c.IsOn).Select(c => c.Result).ToHashSet();
         var enabledSensors = SensorChips.Where(c => c.IsOn).Select(c => c.DeviceId).ToHashSet();
 
@@ -670,5 +703,6 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     private string _avgSignalText = "—";
     private string _topResultText = "—";
     private int _unactionedCount;
+    private bool _allSensorsOn = true;   // [전체] 마스터 토글 백킹 — 칩 재구성/개별 토글 시 SyncAllSensorsOn으로 동기
     #endregion
 }

@@ -95,6 +95,19 @@ public class SensorInfoPanelViewModelTests
     }
 
     [Fact]
+    public void should_clear_selection_when_context_reloaded()
+    {
+        var vm = new SensorInfoPanelViewModel();
+        vm.Load(1, "1구역", new[] { Row(1, EnumCompositeEventStatus.Normal) });
+        vm.SelectedRow = vm.Rows[0];
+
+        vm.Load(2, "2구역", new[] { Row(2, EnumCompositeEventStatus.Normal) });
+
+        // 재우클릭(컨텍스트 교체) 시 이전 그룹의 선택 잔존 금지
+        Assert.Null(vm.SelectedRow);
+    }
+
+    [Fact]
     public void should_raise_close_requested_when_close_command_executed()
     {
         var vm = new SensorInfoPanelViewModel();
