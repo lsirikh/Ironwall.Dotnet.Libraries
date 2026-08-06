@@ -1,0 +1,359 @@
+﻿<ResourceDictionary
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:ctrl="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapControls"
+	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+	<ResourceDictionary.MergedDictionaries>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
+	</ResourceDictionary.MergedDictionaries>
+
+	<!--  등록 센서 정보 오버레이 (pidsgroup-rightclick FR-03/05)
+	      표준 오버레이 크롬: 외곽 r10 + 1px 헤어라인 + 시안 헤더 38(드래그) + 26px 원형 닫기.
+	      색 전부 DynamicResource 토큰(NFR-04) — 하드코딩 hex 금지.  -->
+
+	<!-- 상태 집계 배지 (count=0이면 접힘) -->
+	<Style x:Key="SiBadgeText" TargetType="TextBlock">
+		<Setter Property="FontSize" Value="10" />
+		<Setter Property="FontWeight" Value="Bold" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+	<Style x:Key="SiBadgeBorder" TargetType="Border">
+		<Setter Property="CornerRadius" Value="8" />
+		<Setter Property="Padding" Value="7,1" />
+		<Setter Property="Margin" Value="4,0,0,0" />
+		<Setter Property="BorderThickness" Value="1" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+
+	<!-- 테이블 헤더 라벨 -->
+	<Style x:Key="SiColHeader" TargetType="TextBlock">
+		<Setter Property="FontSize" Value="10" />
+		<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+		<Setter Property="VerticalAlignment" Value="Center" />
+	</Style>
+
+	<Style TargetType="{x:Type ctrl:SensorInfoPanelControl}">
+		<Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+		<Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+		<Setter Property="UseLayoutRounding" Value="True" />
+		<Setter Property="SnapsToDevicePixels" Value="True" />
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type ctrl:SensorInfoPanelControl}">
+					<Border
+						Width="400"
+						MaxHeight="460"
+						Background="{DynamicResource SurfaceBrush}"
+						BorderBrush="{DynamicResource BorderBrush}"
+						BorderThickness="1"
+						CornerRadius="10">
+						<Border.Effect>
+							<DropShadowEffect BlurRadius="10" Opacity="0.15" ShadowDepth="3" Color="Black" />
+						</Border.Effect>
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="38" />
+								<RowDefinition Height="Auto" />
+								<RowDefinition Height="*" />
+								<RowDefinition Height="Auto" />
+							</Grid.RowDefinitions>
+
+							<!-- 헤더 (드래그) -->
+							<Border
+								Grid.Row="0"
+								Background="{DynamicResource PrimaryBrush}"
+								CornerRadius="9,9,0,0"
+								Cursor="SizeAll">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="34" />
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="34" />
+									</Grid.ColumnDefinitions>
+									<md:PackIcon
+										Grid.Column="0"
+										Width="16" Height="16"
+										HorizontalAlignment="Center" VerticalAlignment="Center"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Kind="ClipboardTextOutline" />
+									<TextBlock
+										Grid.Column="1"
+										HorizontalAlignment="Center" VerticalAlignment="Center"
+										FontSize="13" FontWeight="Bold"
+										Foreground="{DynamicResource OnPrimaryFixedBrush}"
+										Text="{Binding GroupName, Mode=OneWay, StringFormat=등록 센서 정보 — {0}}"
+										TextTrimming="CharacterEllipsis" />
+									<Button
+										x:Name="PART_CloseButton"
+										Grid.Column="2"
+										Command="{Binding CloseCommand}"
+										Style="{StaticResource PanelCloseButtonStyle}" />
+								</Grid>
+							</Border>
+
+							<!-- 요약 스트립 (FR-05) -->
+							<Border
+								Grid.Row="1"
+								Padding="10,7"
+								Background="{DynamicResource SurfaceAltBrush}"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="0,0,0,1">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<StackPanel Grid.Column="0" VerticalAlignment="Center" Orientation="Horizontal">
+										<TextBlock FontSize="11" Foreground="{DynamicResource TextMutedBrush}">
+											<Run Text="그룹 " /><Run FontFamily="Consolas" Text="{Binding GroupId, Mode=OneWay}" />
+										</TextBlock>
+										<TextBlock
+											Margin="10,0,0,0"
+											FontSize="11" FontWeight="SemiBold"
+											Foreground="{DynamicResource TextPrimaryBrush}"
+											Text="{Binding SensorCount, Mode=OneWay, StringFormat=센서 {0}}" />
+									</StackPanel>
+									<WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+										<Border BorderBrush="{DynamicResource StatusNormalBrush}" Background="{DynamicResource TintSuccessBrush}">
+											<Border.Style>
+												<Style BasedOn="{StaticResource SiBadgeBorder}" TargetType="Border">
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding NormalCount}" Value="0">
+															<Setter Property="Visibility" Value="Collapsed" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</Border.Style>
+											<TextBlock Foreground="{DynamicResource StatusNormalBrush}" Style="{StaticResource SiBadgeText}" Text="{Binding NormalCount, Mode=OneWay, StringFormat=정상 {0}}" />
+										</Border>
+										<Border BorderBrush="{DynamicResource StatusCriticalBrush}" Background="{DynamicResource TintCriticalBrush}">
+											<Border.Style>
+												<Style BasedOn="{StaticResource SiBadgeBorder}" TargetType="Border">
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding DetectCount}" Value="0">
+															<Setter Property="Visibility" Value="Collapsed" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</Border.Style>
+											<TextBlock Foreground="{DynamicResource StatusCriticalBrush}" Style="{StaticResource SiBadgeText}" Text="{Binding DetectCount, Mode=OneWay, StringFormat=탐지 {0}}" />
+										</Border>
+										<Border BorderBrush="{DynamicResource StatusWarningBrush}" Background="{DynamicResource TintWarningBrush}">
+											<Border.Style>
+												<Style BasedOn="{StaticResource SiBadgeBorder}" TargetType="Border">
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding FaultCount}" Value="0">
+															<Setter Property="Visibility" Value="Collapsed" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</Border.Style>
+											<TextBlock Foreground="{DynamicResource StatusWarningBrush}" Style="{StaticResource SiBadgeText}" Text="{Binding FaultCount, Mode=OneWay, StringFormat=장애 {0}}" />
+										</Border>
+										<Border BorderBrush="{DynamicResource TextMutedBrush}" Background="{DynamicResource SurfaceSunkenBrush}">
+											<Border.Style>
+												<Style BasedOn="{StaticResource SiBadgeBorder}" TargetType="Border">
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding BlackoutCount}" Value="0">
+															<Setter Property="Visibility" Value="Collapsed" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</Border.Style>
+											<TextBlock Foreground="{DynamicResource TextMutedBrush}" Style="{StaticResource SiBadgeText}" Text="{Binding BlackoutCount, Mode=OneWay, StringFormat=통신두절 {0}}" />
+										</Border>
+									</WrapPanel>
+								</Grid>
+							</Border>
+
+							<!-- 센서 테이블 -->
+							<Grid Grid.Row="2" MinHeight="60">
+								<Grid.RowDefinitions>
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="*" />
+								</Grid.RowDefinitions>
+
+								<!-- 컬럼 헤더 -->
+								<Border
+									Grid.Row="0"
+									Padding="10,4"
+									BorderBrush="{DynamicResource DividerBrush}"
+									BorderThickness="0,0,0,1">
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="26" />
+											<ColumnDefinition Width="40" />
+											<ColumnDefinition Width="*" />
+											<ColumnDefinition Width="84" />
+											<ColumnDefinition Width="92" />
+										</Grid.ColumnDefinitions>
+										<TextBlock Grid.Column="0" Style="{StaticResource SiColHeader}" Text="상태" />
+										<TextBlock Grid.Column="1" Style="{StaticResource SiColHeader}" Text="No" />
+										<TextBlock Grid.Column="2" Style="{StaticResource SiColHeader}" Text="센서명" />
+										<TextBlock Grid.Column="3" Style="{StaticResource SiColHeader}" Text="제어기" />
+										<TextBlock Grid.Column="4" Style="{StaticResource SiColHeader}" Text="위치" />
+									</Grid>
+								</Border>
+
+								<ScrollViewer Grid.Row="1" Padding="0,0,2,0" VerticalScrollBarVisibility="Auto">
+									<ItemsControl Margin="0,2,0,4" ItemsSource="{Binding Rows}">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate>
+												<Border
+													Padding="10,5"
+													Background="Transparent"
+													BorderBrush="{DynamicResource DividerBrush}"
+													BorderThickness="0,0,0,1"
+													Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType={x:Type ctrl:SensorInfoPanelControl}}}">
+													<Border.Style>
+														<Style TargetType="Border">
+															<Style.Triggers>
+																<Trigger Property="IsMouseOver" Value="True">
+																	<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+																</Trigger>
+															</Style.Triggers>
+														</Style>
+													</Border.Style>
+													<Border.ContextMenu>
+														<ContextMenu>
+															<!-- FR-06: 기존 단일 센서 탐지 이력 다이얼로그 재사용(메시지 발행만) -->
+															<MenuItem
+																Command="{Binding PlacementTarget.Tag.SensorHistoryCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+																CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+																Header="센서 탐지 이력">
+																<MenuItem.Icon>
+																	<md:PackIcon Width="16" Height="16" Kind="ChartLine" />
+																</MenuItem.Icon>
+															</MenuItem>
+															<!-- FR-07(G-3 채택): 해당 센서 좌표로 맵 센터링 -->
+															<MenuItem
+																Command="{Binding PlacementTarget.Tag.LocateCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+																CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+																Header="지도에서 위치 확인">
+																<MenuItem.Icon>
+																	<md:PackIcon Width="16" Height="16" Kind="CrosshairsGps" />
+																</MenuItem.Icon>
+															</MenuItem>
+														</ContextMenu>
+													</Border.ContextMenu>
+													<Grid>
+														<Grid.ColumnDefinitions>
+															<ColumnDefinition Width="26" />
+															<ColumnDefinition Width="40" />
+															<ColumnDefinition Width="*" />
+															<ColumnDefinition Width="84" />
+															<ColumnDefinition Width="92" />
+														</Grid.ColumnDefinitions>
+														<Ellipse
+															Grid.Column="0"
+															Width="8" Height="8"
+															HorizontalAlignment="Left" VerticalAlignment="Center"
+															ToolTip="{Binding StateText}">
+															<Ellipse.Style>
+																<Style TargetType="Ellipse">
+																	<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+																	<Style.Triggers>
+																		<DataTrigger Binding="{Binding State}" Value="Detecting">
+																			<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+																		</DataTrigger>
+																		<DataTrigger Binding="{Binding State}" Value="FaultedDetecting">
+																			<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+																		</DataTrigger>
+																		<DataTrigger Binding="{Binding State}" Value="Faulted">
+																			<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+																		</DataTrigger>
+																		<DataTrigger Binding="{Binding State}" Value="Connection">
+																			<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+																		</DataTrigger>
+																		<DataTrigger Binding="{Binding State}" Value="Blackout">
+																			<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+																		</DataTrigger>
+																	</Style.Triggers>
+																</Style>
+															</Ellipse.Style>
+														</Ellipse>
+														<TextBlock
+															Grid.Column="1"
+															VerticalAlignment="Center"
+															FontFamily="Consolas" FontSize="11.5"
+															Foreground="{DynamicResource TextSecondaryBrush}"
+															Text="{Binding DeviceNumber}" />
+														<TextBlock
+															Grid.Column="2"
+															VerticalAlignment="Center"
+															FontSize="11.5"
+															Foreground="{DynamicResource TextPrimaryBrush}"
+															Text="{Binding DeviceName}"
+															TextTrimming="CharacterEllipsis" />
+														<TextBlock
+															Grid.Column="3"
+															VerticalAlignment="Center"
+															FontSize="11"
+															Foreground="{DynamicResource TextSecondaryBrush}"
+															Text="{Binding ControllerName}"
+															TextTrimming="CharacterEllipsis" />
+														<TextBlock
+															Grid.Column="4"
+															VerticalAlignment="Center"
+															FontSize="11"
+															Foreground="{DynamicResource TextMutedBrush}"
+															Text="{Binding Location}"
+															TextTrimming="CharacterEllipsis" />
+													</Grid>
+												</Border>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</ScrollViewer>
+
+								<!-- 빈 상태 (FR-05) -->
+								<TextBlock
+									Grid.Row="1"
+									HorizontalAlignment="Center" VerticalAlignment="Center"
+									FontSize="10" FontStyle="Italic"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="등록된 센서가 없습니다">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock">
+											<Setter Property="Visibility" Value="Collapsed" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding HasSensors}" Value="False">
+													<Setter Property="Visibility" Value="Visible" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+							</Grid>
+
+							<!-- 푸터 — [닫기] + [그룹 탐지 이력](FR-08, 빈 그룹=비활성) -->
+							<Border
+								Grid.Row="3"
+								Padding="10,8"
+								BorderBrush="{DynamicResource DividerBrush}"
+								BorderThickness="0,1,0,0">
+								<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+									<Button
+										Margin="0,0,8,0"
+										Command="{Binding CloseCommand}"
+										Content="닫기"
+										Style="{StaticResource PanelSecondaryButtonStyle}" />
+									<Button
+										Command="{Binding GroupHistoryCommand}"
+										Content="📈 그룹 탐지 이력"
+										IsEnabled="{Binding HasSensors}"
+										Style="{StaticResource PanelPrimaryButtonStyle}"
+										ToolTipService.ShowOnDisabled="True"
+										ToolTip="등록된 센서가 있어야 조회할 수 있습니다" />
+								</StackPanel>
+							</Border>
+						</Grid>
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+</ResourceDictionary>

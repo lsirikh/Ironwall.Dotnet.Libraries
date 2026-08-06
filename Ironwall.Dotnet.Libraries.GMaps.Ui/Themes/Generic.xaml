@@ -46,6 +46,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/CompassControlStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/WindyIndicatorStyle.xaml" />
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DetectionFaultStyle.xaml" />
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/SensorInfoPanelStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
 

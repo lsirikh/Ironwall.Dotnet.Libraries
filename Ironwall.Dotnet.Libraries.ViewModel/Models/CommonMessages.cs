@@ -67,6 +67,19 @@ public class OpenDetectionHistoryDialogMessageModel
     /// <summary>헤더 표시용 장비 번호.</summary>
     public int? DeviceNumber { get; set; }
 }
+/// <summary>
+/// 그룹 탐지 이력 다이얼로그 오픈 (pidsgroup-rightclick FR-08).
+/// GMaps.Ui(구역 심볼 우클릭·등록 센서 정보 오버레이 푸터)·Devices.Ui(그룹 설정 탭 행 우클릭)에서 발행 —
+/// 서버에 그룹 필터가 없어 다이얼로그가 멤버 센서 팬아웃(sensor 필터 N회)으로 조회한다(그룹 총합 500 절단, G-1=(a)).
+/// 메인솔루션 ConductorControl이 IHandle로 수신해 기존 DetectionHistoryHostDialog에 그룹 모드로 띄운다.
+/// </summary>
+public class OpenGroupDetectionHistoryDialogMessageModel
+{
+    /// <summary>대상 장비그룹 ID (PidsGroup 심볼 LinkedDeviceGroup).</summary>
+    public int GroupId { get; set; }
+    /// <summary>헤더 표시용 그룹명.</summary>
+    public string? GroupName { get; set; }
+}
 public class OpenPreEventRemoveDialogMessageModel;
 public class OpenPreEventFaultDetailsDialogMessageModel;
 public class OpenPostEventDetailsDialogMessageModel;
