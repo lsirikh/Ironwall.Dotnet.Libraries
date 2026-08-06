@@ -359,6 +359,180 @@
 			</StackPanel>
 			</Border>
 
+			<!--  탐지·장애 신호등(T1) — 시스템 도넛 캡슐 좌측·동일 높이 32(사용자 확정: 이벤트 헤더 배치 철회).
+			      숫자 = EQM 활성(미조치) 건수, 점등 시에만 램프 옆 표시 · 미초기화 "—".
+			      깜빡임 정책(사용자 확정): 탐지(노랑)=깜빡 · 장애(빨강)=상시 점등.
+			      클릭 = 이벤트 패널 오픈(D-10 승계) · 보기>탐지·장애 신호등(Ctrl+Shift+F)이 가시성 직접 제어.  -->
+			<Border
+				DockPanel.Dock="Right"
+				Height="32"
+				Margin="0,0,8,0"
+				Padding="10,0"
+				VerticalAlignment="Center"
+				AutomationProperties.AutomationId="GMaps.Status.TrafficLight"
+				Background="{DynamicResource SurfaceSunkenBrush}"
+				BorderBrush="{DynamicResource BorderBrush}"
+				BorderThickness="1"
+				CornerRadius="16"
+				Cursor="Hand"
+				ToolTip="{Binding TrafficTooltip}"
+				Visibility="{Binding IsDetFaultVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<Border.InputBindings>
+					<MouseBinding Command="{Binding OpenEventPanelCommand}" MouseAction="LeftClick" />
+				</Border.InputBindings>
+				<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+					<StackPanel.Resources>
+						<!--  램프 공통: 소등=테두리만, 점등=DataTrigger가 채움+글로 부여  -->
+						<Style x:Key="LampBase" TargetType="Ellipse">
+							<Setter Property="Width" Value="12" />
+							<Setter Property="Height" Value="12" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+							<Setter Property="Fill" Value="{DynamicResource SurfaceAltBrush}" />
+							<Setter Property="Stroke" Value="{DynamicResource BorderBrush}" />
+							<Setter Property="StrokeThickness" Value="1" />
+						</Style>
+						<Style x:Key="LampCount" TargetType="TextBlock">
+							<Setter Property="Margin" Value="4,0,0,0" />
+							<Setter Property="VerticalAlignment" Value="Center" />
+							<Setter Property="FontFamily" Value="Consolas" />
+							<Setter Property="FontSize" Value="12" />
+							<Setter Property="FontWeight" Value="Bold" />
+						</Style>
+					</StackPanel.Resources>
+
+					<!--  🔴 장애 — 상시 점등(깜빡임 없음, 사용자 확정)  -->
+					<Ellipse AutomationProperties.AutomationId="GMaps.Status.TrafficLight.FaultLamp">
+						<Ellipse.Style>
+							<Style BasedOn="{StaticResource LampBase}" TargetType="Ellipse">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsTrafficFaultOn}" Value="True">
+										<Setter Property="Fill" Value="{DynamicResource StatusCriticalBrush}" />
+										<Setter Property="Stroke" Value="{DynamicResource StatusCriticalBrush}" />
+										<Setter Property="Effect">
+											<Setter.Value>
+												<DropShadowEffect
+													BlurRadius="8"
+													Opacity="0.9"
+													ShadowDepth="0"
+													Color="#FF5A52" />
+											</Setter.Value>
+										</Setter>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Ellipse.Style>
+					</Ellipse>
+					<TextBlock AutomationProperties.AutomationId="GMaps.Status.TrafficLight.FaultCount">
+						<TextBlock.Style>
+							<Style BasedOn="{StaticResource LampCount}" TargetType="TextBlock">
+								<Setter Property="Foreground" Value="{DynamicResource StatusCriticalBrush}" />
+								<Setter Property="Text" Value="{Binding TrafficFaultCount}" />
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsTrafficFaultOn}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
+
+					<!--  🟡 탐지 — 점등 시 깜빡임(사용자 확정)  -->
+					<Ellipse Margin="7,0,0,0" AutomationProperties.AutomationId="GMaps.Status.TrafficLight.DetectionLamp">
+						<Ellipse.Style>
+							<Style BasedOn="{StaticResource LampBase}" TargetType="Ellipse">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsTrafficDetectionOn}" Value="True">
+										<Setter Property="Fill" Value="{DynamicResource StatusWarningBrush}" />
+										<Setter Property="Stroke" Value="{DynamicResource StatusWarningBrush}" />
+										<Setter Property="Effect">
+											<Setter.Value>
+												<DropShadowEffect
+													BlurRadius="8"
+													Opacity="0.85"
+													ShadowDepth="0"
+													Color="#FFB02E" />
+											</Setter.Value>
+										</Setter>
+										<DataTrigger.EnterActions>
+											<BeginStoryboard x:Name="TrafficDetectionBlink">
+												<Storyboard AutoReverse="True" RepeatBehavior="Forever">
+													<DoubleAnimation
+														Storyboard.TargetProperty="Opacity"
+														From="1.0"
+														To="0.35"
+														Duration="0:0:0.5" />
+												</Storyboard>
+											</BeginStoryboard>
+										</DataTrigger.EnterActions>
+										<DataTrigger.ExitActions>
+											<StopStoryboard BeginStoryboardName="TrafficDetectionBlink" />
+										</DataTrigger.ExitActions>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Ellipse.Style>
+					</Ellipse>
+					<TextBlock AutomationProperties.AutomationId="GMaps.Status.TrafficLight.DetectionCount">
+						<TextBlock.Style>
+							<Style BasedOn="{StaticResource LampCount}" TargetType="TextBlock">
+								<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+								<Setter Property="Text" Value="{Binding TrafficDetectionCount}" />
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsTrafficDetectionOn}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
+
+					<!--  🟢 정상 (green = ready && 둘 다 0 — TrafficLampLogic 불변식)  -->
+					<Ellipse Margin="7,0,0,0" AutomationProperties.AutomationId="GMaps.Status.TrafficLight.NormalLamp">
+						<Ellipse.Style>
+							<Style BasedOn="{StaticResource LampBase}" TargetType="Ellipse">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsTrafficGreenOn}" Value="True">
+										<Setter Property="Fill" Value="{DynamicResource StatusNormalBrush}" />
+										<Setter Property="Stroke" Value="{DynamicResource StatusNormalBrush}" />
+										<Setter Property="Effect">
+											<Setter.Value>
+												<DropShadowEffect
+													BlurRadius="6"
+													Opacity="0.8"
+													ShadowDepth="0"
+													Color="#46D17A" />
+											</Setter.Value>
+										</Setter>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Ellipse.Style>
+					</Ellipse>
+
+					<!--  미초기화 표기 "—" (데이터 없음 ≠ 정상)  -->
+					<TextBlock
+						Margin="6,0,0,0"
+						VerticalAlignment="Center"
+						FontFamily="Consolas"
+						FontSize="12"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="—">
+						<TextBlock.Style>
+							<Style TargetType="TextBlock">
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsTrafficCountsReady}" Value="False">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
+				</StackPanel>
+			</Border>
+
 			<ToolBarTray
 				VerticalAlignment="Center"
 				Background="{DynamicResource SurfaceBrush}"

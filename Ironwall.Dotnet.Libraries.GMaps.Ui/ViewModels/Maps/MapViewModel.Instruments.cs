@@ -10,17 +10,16 @@ using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
-   Purpose      : 지도 계기 인디케이터(강풍) + 보기(View) 가시성 배선
-                  (GMap_Map_Instruments FR-03/12/14~17). MapViewModel partial 분리.
-                  탐지·장애 pill 계기는 map-topbar-trafficlight D2로 제거 —
-                  집계 표시는 이벤트 카드 리스트 헤더 신호등(Events.Ui, EQM 직구독)이 승계,
-                  여기는 보기 토글(IsDetFaultVisible)의 EA 브리지(FR-A5)만 남는다.
+   Purpose      : 지도 계기 인디케이터(강풍) + 탐지·장애 신호등(상단바 T1) + 보기(View) 가시성 배선
+                  (GMap_Map_Instruments FR-03/12/14~17 · map-topbar-trafficlight FR-A).
+                  신호등 최종 배치 = 상단바 시스템 도넛 캡슐 좌측(사용자 확정, 이벤트 카드 리스트
+                  헤더 배치는 철회·원복) — 같은 뷰라 보기 토글이 직접 가시성 제어(EA 브리지 불요).
+                  구 pill 드래그 계기(GMapDetectionFaultControl)는 D2 제거 유지.
    Note         : 복원 중 저장 억제(_suppressInstrumentSave) — 회전 영속 자가오염(44bc6fc) 교훈.
                   강풍 초기 모드는 IGMapSetupModel에 없어 wind0 기본, 첫 ChangeModeWindyMessage로 갱신.
    Created On   : 2026-07-31 · Sensorway Co., Ltd.
  ****************************************************************************/
-public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>,
-                                    IHandle<TrafficLightVisibilityRequestMessage>
+public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
 {
     private bool _suppressInstrumentSave;
 
@@ -58,14 +57,49 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>,
     }
     #endregion
 
-    #region - 탐지·장애 신호등 연동 (map-topbar-trafficlight FR-A5/A6) -
-    // pill 계기(GMapDetectionFaultControl)·EQM 구독·건수 프로퍼티는 D2로 제거(ee51761 승계 커밋) —
-    // 위치/방향/HideOnZero 영속(MapDetectionFaultModel)은 소비처가 없어져 읽지 않는다(파일 잔존 무해).
+    #region - 탐지·장애 신호등 (map-topbar-trafficlight FR-A — 상단바 T1, 도넛 캡슐 좌측) -
+    // EQM 활성(미조치) 집계 → 램프 3(빨=장애 펄스·노=탐지·초=정상) + 건수 병기(점등 시만).
+    // 점등 규칙 SSOT = TrafficLampLogic(green 불변식·미초기화 게이트). 클릭=이벤트 패널 오픈(D-10 승계).
+    // 구 pill 위치/방향/HideOnZero 영속(MapDetectionFaultModel)은 소비처 없음(파일 잔존 무해).
 
-    /// <summary>신호등 측(Events.Ui) 초기 상태 질의 수신 → 현재 토글 값 재발행(양측 활성화 순서 역전 대비).</summary>
-    public Task HandleAsync(TrafficLightVisibilityRequestMessage message, CancellationToken cancellationToken)
-        => _eventAggregator?.PublishOnCurrentThreadAsync(
-               new TrafficLightVisibilityChangedMessage(IsDetFaultVisible), cancellationToken) ?? Task.CompletedTask;
+    private int _trafficDetectionCount;
+    /// <summary>미조치 탐지 건수(EQM). 램프 점등 시에만 숫자 표시.</summary>
+    public int TrafficDetectionCount { get => _trafficDetectionCount; private set { _trafficDetectionCount = value; NotifyOfPropertyChange(nameof(TrafficDetectionCount)); } }
+
+    private int _trafficFaultCount;
+    /// <summary>미조치 장애 건수(EQM).</summary>
+    public int TrafficFaultCount { get => _trafficFaultCount; private set { _trafficFaultCount = value; NotifyOfPropertyChange(nameof(TrafficFaultCount)); } }
+
+    private bool _isTrafficCountsReady;
+    /// <summary>EQM 첫 집계 수신 여부 — false면 '데이터 없음'(전체 소등+"—"), 초록 점등 금지.</summary>
+    public bool IsTrafficCountsReady { get => _isTrafficCountsReady; private set { _isTrafficCountsReady = value; NotifyOfPropertyChange(nameof(IsTrafficCountsReady)); } }
+
+    public bool IsTrafficFaultOn => TrafficLampLogic.FaultOn(_isTrafficCountsReady, _trafficFaultCount);
+    public bool IsTrafficDetectionOn => TrafficLampLogic.DetectionOn(_isTrafficCountsReady, _trafficDetectionCount);
+    public bool IsTrafficGreenOn => TrafficLampLogic.GreenOn(_isTrafficCountsReady, _trafficDetectionCount, _trafficFaultCount);
+
+    public string TrafficTooltip => _isTrafficCountsReady
+        ? $"미조치 장애 {_trafficFaultCount}건 · 탐지 {_trafficDetectionCount}건 — 클릭: 이벤트 패널 열기"
+        : "집계 대기 중 — 로그인/초기화 전";
+
+    /// <summary>EQM 콜백은 NATS 스레드일 수 있어 UI 스레드로 정렬(FR-07 승계).</summary>
+    private void OnTrafficActiveCountChanged(int detection, int fault)
+        => OnUIThread(() =>
+        {
+            TrafficDetectionCount = detection;
+            TrafficFaultCount = fault;
+            IsTrafficCountsReady = true;
+            NotifyOfPropertyChange(nameof(IsTrafficFaultOn));
+            NotifyOfPropertyChange(nameof(IsTrafficDetectionOn));
+            NotifyOfPropertyChange(nameof(IsTrafficGreenOn));
+            NotifyOfPropertyChange(nameof(TrafficTooltip));
+        });
+
+    private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _openEventPanelCommand;
+    /// <summary>신호등 pill 클릭 → 이벤트 패널 오픈(D-10 승계).</summary>
+    public Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand OpenEventPanelCommand
+        => _openEventPanelCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(
+            _ => _ = _eventAggregator?.PublishOnCurrentThreadAsync(new OpenEventPanelMessageModel()));
     #endregion
 
     #region - 보기(View) 가시성 (D-12/FR-14~17) -
@@ -74,9 +108,8 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>,
     private bool _isWindyIndicatorVisible = true;
     public bool IsWindyIndicatorVisible { get => _isWindyIndicatorVisible; set { _isWindyIndicatorVisible = value; NotifyOfPropertyChange(nameof(IsWindyIndicatorVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
     private bool _isDetFaultVisible = true;
-    /// <summary>보기&gt;탐지·장애 신호등(Ctrl+Shift+F). 세터가 EA 발행(FR-A5) — 부팅 복원(_suppressInstrumentSave) 중에도
-    /// 발행해 Events.Ui 신호등에 초기 상태를 전파한다(저장만 억제).</summary>
-    public bool IsDetFaultVisible { get => _isDetFaultVisible; set { _isDetFaultVisible = value; NotifyOfPropertyChange(nameof(IsDetFaultVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); _ = _eventAggregator?.PublishOnCurrentThreadAsync(new TrafficLightVisibilityChangedMessage(value)); } }
+    /// <summary>보기&gt;탐지·장애 신호등(Ctrl+Shift+F) — 상단바 신호등 pill 가시성 직결(같은 뷰, EA 브리지 불요).</summary>
+    public bool IsDetFaultVisible { get => _isDetFaultVisible; set { _isDetFaultVisible = value; NotifyOfPropertyChange(nameof(IsDetFaultVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
 
     // 키보드 단축키용 토글 커맨드(메뉴는 IsChecked로 마우스 토글). 세터가 저장까지 처리.
     private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _toggleCompassVisibleCommand;
@@ -90,10 +123,15 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>,
         => _toggleDetFaultVisibleCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(_ => IsDetFaultVisible = !IsDetFaultVisible);
     #endregion
 
-    /// <summary>초기 배선 — CCMS(부팅)에서 1회 호출. 설정 복원(억제).
-    /// EQM 구독은 신호등 이관(FR-A6)으로 제거 — EventCardListPanelViewModel이 직구독한다(이중 집계 방지).</summary>
+    /// <summary>초기 배선 — CCMS(부팅)에서 1회 호출. EQM 구독(신호등) + 초기 카운트 + 설정 복원(억제).</summary>
     private void InitializeInstruments()
     {
+        // EQM 구독(FR-A) — VM은 싱글턴(앱 수명)이라 누수 없음. 중복 방지 위해 먼저 해제.
+        _eventQueueManager.OnActiveCountChanged -= OnTrafficActiveCountChanged;
+        _eventQueueManager.OnActiveCountChanged += OnTrafficActiveCountChanged;
+        var (det, flt) = _eventQueueManager.GetActiveCounts();
+        OnTrafficActiveCountChanged(det, flt);
+
         LoadMapInstrumentsFromSettings();
     }
 

@@ -146,16 +146,6 @@ public record DeviceStatusChangedMessage(int DeviceId, EnumDeviceType DeviceType
 /// <summary>웹서버 설정(IsWebServerEnabled) 변경 알림 — SETUP 웹설정 토글 시 발행. LeftMenu 통합웹 버튼 가시성 라이브 갱신용(FR-05).</summary>
 public record WebServerEnabledChangedMessage(bool IsEnabled);
 
-/// <summary>탐지·장애 신호등 표시 토글 알림(map-topbar-trafficlight FR-A5) — GMaps 보기&gt;탐지·장애 신호등
-/// (Ctrl+Shift+F, IsDetFaultVisible) 변경 시 MapViewModel이 발행. EventCardListPanelViewModel이 IHandle로 수신해
-/// 카드 리스트 헤더 신호등 Visibility를 갱신한다. 지도 pill 계기 제거(D2) 후 토글의 새 대상 —
-/// Events.Ui가 GMaps 미참조라 공용 어셈블리(순환 참조 회피) 배치.</summary>
-public record TrafficLightVisibilityChangedMessage(bool IsVisible);
-
-/// <summary>신호등 현재 표시 상태 질의(FR-A5) — 카드 리스트 VM 활성화 시 발행, MapViewModel이 수신해
-/// TrafficLightVisibilityChangedMessage로 현재 값을 재발행한다(양측 활성화 순서 역전 대비).</summary>
-public record TrafficLightVisibilityRequestMessage();
-
 public class StatusMessageModel
 {
     public StatusMessageModel()

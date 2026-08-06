@@ -19,7 +19,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Windows;
-using System.Windows.Data;
 using System.Windows.Threading;
 using Action = System.Action;
 
@@ -42,7 +41,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<CallAllEventReportMessageModel>
                                             , IHandle<EventEntryEnqueuedMessage>
                                             , IHandle<DetectionThumbnailSyncedMessage>
-                                            , IHandle<TrafficLightVisibilityChangedMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -104,18 +102,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
             ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
             _batchTimer = new Timer(FlushPendingCards, null, BATCH_INTERVAL_MS, BATCH_INTERVAL_MS);
-
-            // 신호등(map-topbar-trafficlight FR-A3): EQM 활성(미조치) 집계 구독 —
-            // 중복 방지 위해 해제 후 구독(MapViewModel.Instruments 검증 패턴). 초기값 즉시 반영.
-            _eventQueueManager.OnActiveCountChanged -= OnTrafficActiveCountChanged;
-            _eventQueueManager.OnActiveCountChanged += OnTrafficActiveCountChanged;
-            var (tlDetection, tlFault) = _eventQueueManager.GetActiveCounts();
-            OnTrafficActiveCountChanged(tlDetection, tlFault);
-
-            // FR-A5: 보기 토글 현재 상태 질의 — MapViewModel(GMaps.Ui)이 TrafficLightVisibilityChangedMessage로
-            // 응답한다(양측 활성화 순서 역전 대비, 토글 변경분은 IHandle로 라이브 수신).
-            _ = _eventAggregator.PublishOnUIThreadAsync(new TrafficLightVisibilityRequestMessage());
-
             return base.OnActivateAsync(cancellationToken);
         }
 
@@ -126,8 +112,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
 
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
-            _eventQueueManager.OnActiveCountChanged -= OnTrafficActiveCountChanged;   // 신호등 구독 해제(FR-A3)
-            ApplyTrafficFilter(null);                                                  // 종류 필터 해제(FR-A4, 비영속)
 
             // 타이머 안전 정지: Infinite로 먼저 중지 후 Dispose (진행 중 콜백 race 방지)
             _batchTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -148,92 +132,6 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
             return base.OnDeactivateAsync(close, cancellationToken);
         }
-        #endregion
-        #region - 신호등 (map-topbar-trafficlight FR-A1~A3) -
-        // EQM 활성(미조치) 집계 → 카드 리스트 헤더 신호등(T1). 지도 pill 계기(D2 제거)의 후신.
-        // green 불변식: green = (ready && fault==0 && detection==0) — 동시 점등 시 green은 구조적으로 꺼짐.
-        // 미초기화(ready=false) = 전체 소등 + "—" (데이터 없음 ≠ 정상, 스토리보드 S8).
-        private int _trafficDetectionCount;
-        private int _trafficFaultCount;
-        private bool _isTrafficCountsReady;
-        private bool _isTrafficLightVisible = true;
-
-        /// <summary>미조치 탐지 건수(EQM).</summary>
-        public int TrafficDetectionCount { get => _trafficDetectionCount; private set { _trafficDetectionCount = value; NotifyOfPropertyChange(); } }
-
-        /// <summary>미조치 장애 건수(EQM).</summary>
-        public int TrafficFaultCount { get => _trafficFaultCount; private set { _trafficFaultCount = value; NotifyOfPropertyChange(); } }
-
-        /// <summary>EQM 첫 집계 수신 여부 — false면 '데이터 없음'(전체 소등+"—"), 초록 점등 금지.</summary>
-        public bool IsTrafficCountsReady { get => _isTrafficCountsReady; private set { _isTrafficCountsReady = value; NotifyOfPropertyChange(); } }
-
-        public bool IsTrafficFaultOn => _isTrafficCountsReady && _trafficFaultCount > 0;
-        public bool IsTrafficDetectionOn => _isTrafficCountsReady && _trafficDetectionCount > 0;
-        public bool IsTrafficGreenOn => _isTrafficCountsReady && _trafficFaultCount == 0 && _trafficDetectionCount == 0;
-
-        /// <summary>보기&gt;탐지·장애 신호등 토글(FR-A5) — TrafficLightVisibilityChangedMessage 수신으로 갱신,
-        /// 영속은 GMaps 측 MapInstrumentVisibility.DetectionFault 키 승계(여기서는 저장하지 않는다).</summary>
-        public bool IsTrafficLightVisible { get => _isTrafficLightVisible; set { _isTrafficLightVisible = value; NotifyOfPropertyChange(); } }
-
-        /// <summary>보기 토글 수신(FR-A5) — MapViewModel(GMaps.Ui)이 세터/질의 응답으로 발행.</summary>
-        public Task HandleAsync(TrafficLightVisibilityChangedMessage message, CancellationToken cancellationToken)
-        {
-            IsTrafficLightVisible = message.IsVisible;
-            return Task.CompletedTask;
-        }
-
-        // ---- 램프 클릭 종류 필터 (FR-A4) ----
-        // ListBox가 ViewModelProvider에 직결 → 기본 CollectionView Filter로 화면만 거른다(컬렉션/건수 무영향,
-        // 배치 flush로 추가되는 카드에도 자동 적용). Connection 카드(EQM 미집계 타입)는 두 필터 모두에서
-        // 제외되고 해제 시 전체 복귀. 필터 상태는 비영속 — 패널 비활성화 시 해제.
-        private const string TRAFFIC_FILTER_FAULT = "FAULT";
-        private const string TRAFFIC_FILTER_DETECTION = "DETECTION";
-        private string? _trafficFilter;
-
-        /// <summary>장애 필터 활성 여부 — 램프 그룹 외곽선 트리거.</summary>
-        public bool IsTrafficFilterFault => _trafficFilter == TRAFFIC_FILTER_FAULT;
-        /// <summary>탐지 필터 활성 여부 — 램프 그룹 외곽선 트리거.</summary>
-        public bool IsTrafficFilterDetection => _trafficFilter == TRAFFIC_FILTER_DETECTION;
-
-        /// <summary>빨간 램프 클릭(cal:Message.Attach) — 장애 카드만 표시, 재클릭 해제.</summary>
-        public void ToggleTrafficFaultFilter()
-            => ApplyTrafficFilter(IsTrafficFilterFault ? null : TRAFFIC_FILTER_FAULT);
-
-        /// <summary>노란 램프 클릭(cal:Message.Attach) — 탐지 카드만 표시, 재클릭 해제.</summary>
-        public void ToggleTrafficDetectionFilter()
-            => ApplyTrafficFilter(IsTrafficFilterDetection ? null : TRAFFIC_FILTER_DETECTION);
-
-        private void ApplyTrafficFilter(string? filter)
-        {
-            _trafficFilter = filter;
-            var view = CollectionViewSource.GetDefaultView(ViewModelProvider);
-            if (view != null)
-                view.Filter = filter switch
-                {
-                    TRAFFIC_FILTER_FAULT => new Predicate<object>(o => o is MalfunctionEventCardViewModel),
-                    TRAFFIC_FILTER_DETECTION => new Predicate<object>(o => o is DetectionEventCardViewModel),
-                    _ => null,
-                };
-            NotifyOfPropertyChange(nameof(IsTrafficFilterFault));
-            NotifyOfPropertyChange(nameof(IsTrafficFilterDetection));
-        }
-
-        public string TrafficTooltip => _isTrafficCountsReady
-            ? $"미조치 장애 {_trafficFaultCount}건 · 탐지 {_trafficDetectionCount}건 — 램프 클릭: 해당 종류만 필터(재클릭 해제)"
-            : "집계 대기 중 — 로그인/초기화 전";
-
-        /// <summary>EQM 콜백은 NATS 스레드일 수 있음 → UI 스레드 정렬(MapViewModel.Instruments 패턴).</summary>
-        private void OnTrafficActiveCountChanged(int detection, int fault)
-            => Execute.OnUIThread(() =>
-            {
-                TrafficDetectionCount = detection;
-                TrafficFaultCount = fault;
-                IsTrafficCountsReady = true;
-                NotifyOfPropertyChange(nameof(IsTrafficFaultOn));
-                NotifyOfPropertyChange(nameof(IsTrafficDetectionOn));
-                NotifyOfPropertyChange(nameof(IsTrafficGreenOn));
-                NotifyOfPropertyChange(nameof(TrafficTooltip));
-            });
         #endregion
         #region - Binding Methods -
         #endregion
