@@ -334,8 +334,10 @@
 				md:ThemeAssist.Theme="Inherit">
 			<ToolBar ClipToBounds="True" Background="{DynamicResource SurfaceBrush}" Style="{StaticResource MaterialDesignToolBar}">
 
-				<!--  ① 지도 선택 그룹  -->
-				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="지도" />
+				<!--  운영 모드 기본 노출(FR-C1) — 그룹 라벨 제거(툴팁이 이름 담당), 구분선만 유지.
+				      수정 계열(등록·심볼·선택·기준)은 편집 스트립(Grid.Row=1, FR-C2)으로 이관.  -->
+
+				<!--  ① 지도 선택  -->
 				<ComboBox
 					Width="150"
 					Margin="5,0"
@@ -363,39 +365,12 @@
 
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
-				<!--  ② 네비게이션 그룹  -->
-				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="이동" />
+				<!--  ② 이동/조회 — 홈설정·앵커는 편집 스트립 '기준'으로, 십자는 보기 메뉴로 일원화(삭제),
+				      추적 설정은 재생 패널 헤더로 이동(FR-C5)  -->
 				<Border Style="{StaticResource ToolbarGroupStyle}">
 					<StackPanel Orientation="Horizontal">
 						<Button Command="{Binding MoveHomeLocationCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="홈 위치 이동">
 							<md:PackIcon Kind="Home" />
-						</Button>
-						<Button Command="{Binding SetHomeLocationCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="홈 위치 설정">
-							<md:PackIcon Kind="HomeEdit" />
-						</Button>
-						<Button Command="{Binding ShowMapAnchorPanelCommand}" ToolTip="사이트 고정(맵 앵커)">
-							<Button.Style>
-								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding IsMapAnchorPanelVisible}" Value="True">
-											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</Button.Style>
-							<md:PackIcon Kind="CropFree" />
-						</Button>
-						<Button Command="{Binding ToggleCenterCrosshairCommand}" ToolTip="화면 중앙 십자">
-							<Button.Style>
-								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding IsCenterCrosshairVisible}" Value="True">
-											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</Button.Style>
-							<md:PackIcon Kind="Crosshairs" />
 						</Button>
 						<Button Command="{Binding ShowMapRoiPanelCommand}" ToolTip="관심지역 관리">
 							<Button.Style>
@@ -433,73 +408,12 @@
 							</Button.Style>
 							<md:PackIcon Kind="PlayCircleOutline" />
 						</Button>
-						<Button Command="{Binding ToggleTrackingSettingsPanelCommand}" ToolTip="추적 설정">
-							<Button.Style>
-								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
-									<Style.Triggers>
-										<DataTrigger Binding="{Binding IsTrackingSettingsPanelVisible}" Value="True">
-											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
-										</DataTrigger>
-									</Style.Triggers>
-								</Style>
-							</Button.Style>
-							<md:PackIcon Kind="CogOutline" />
-						</Button>
 					</StackPanel>
 				</Border>
 
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
-				<!--  ④ 편집 그룹  -->
-				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="편집" />
-				<Border Style="{StaticResource ToolbarGroupStyle}">
-					<StackPanel Orientation="Horizontal">
-						<ToggleButton
-							x:Name="EditModeToggle"
-							Command="{Binding ToggleEditModeCommand}"
-							IsChecked="{Binding IsEditModeEnabled, Mode=OneWay}"
-							IsEnabled="{Binding CanMapEdit}"
-							Style="{StaticResource MaterialDesignSwitchToggleButton}"
-							ToolTip="편집 모드 전환">
-							<md:PackIcon Kind="Draw" />
-						</ToggleButton>
-						<Button
-							Command="{Binding ClearSelectionCommand}"
-							IsEnabled="{Binding HasSelectedItem}"
-							Style="{StaticResource ToolbarButtonStyle}"
-							ToolTip="선택 해제">
-							<md:PackIcon Kind="SelectionOff" />
-						</Button>
-						<Button
-							Command="{Binding DeleteSelectedCommand}"
-							IsEnabled="{Binding HasSelectedItem}"
-							Style="{StaticResource ToolbarButtonStyle}"
-							ToolTip="선택 항목 삭제">
-							<md:PackIcon Kind="Delete" />
-						</Button>
-						<Button
-							Command="{Binding UndoCommand}"
-							IsEnabled="{Binding CanUndo}"
-							Style="{StaticResource ToolbarButtonStyle}"
-							ToolTipService.ShowOnDisabled="True"
-							ToolTip="{Binding NextUndoDescription, StringFormat='실행 취소 (Ctrl+Z): {0}', TargetNullValue='실행 취소 (Ctrl+Z)'}">
-							<md:PackIcon Kind="Undo" />
-						</Button>
-						<Button
-							Command="{Binding RedoCommand}"
-							IsEnabled="{Binding CanRedo}"
-							Style="{StaticResource ToolbarButtonStyle}"
-							ToolTipService.ShowOnDisabled="True"
-							ToolTip="{Binding NextRedoDescription, StringFormat='다시 실행 (Ctrl+Y / Ctrl+Shift+Z): {0}', TargetNullValue='다시 실행 (Ctrl+Y / Ctrl+Shift+Z)'}">
-							<md:PackIcon Kind="Redo" />
-						</Button>
-					</StackPanel>
-				</Border>
-
-				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
-
-				<!--  ⑤ 측정 그룹 (길이/넓이 — Measure_Tools)  -->
-				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="측정" />
+				<!--  ③ 측정 도구 (길이/넓이 — Measure_Tools, 운영 유지 Q3)  -->
 				<Border Style="{StaticResource ToolbarGroupStyle}">
 					<StackPanel Orientation="Horizontal">
 						<ToggleButton
@@ -521,8 +435,7 @@
 
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
-				<!--  ⑥ 회전 그룹 (GMap_Rotation_Full_Sync FR-18 — kill-switch 토글, Ctrl+Shift+R과 동일)  -->
-				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="회전" />
+				<!--  ④ 회전 (GMap_Rotation_Full_Sync FR-18 — kill-switch 토글, Ctrl+Shift+R과 동일)  -->
 				<Border Style="{StaticResource ToolbarGroupStyle}">
 					<StackPanel Orientation="Horizontal">
 						<ToggleButton
@@ -539,76 +452,36 @@
 
 				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
 
-				<!--  ⑦ 심볼 추가 그룹  -->
-				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="심볼" />
-				<ComboBox
-					Width="120"
-					ItemsSource="{Binding AvailableMarkerCategories}"
-					SelectedItem="{Binding SelectedMarkerCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-					Style="{StaticResource CompactComboBox}"
-					ToolTip="마커 카테고리 선택">
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon
-									Width="14"
-									Height="14"
-									Margin="0,0,5,0"
-									Kind="{Binding Converter={StaticResource MarkerCategoryToIconConverter}}" />
-								<TextBlock
-									VerticalAlignment="Center"
-									FontSize="11"
-									Text="{Binding Converter={StaticResource MarkerCategoryToDisplayNameConverter}}" />
-							</StackPanel>
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
-
-				<!--  심볼 타입 선택  -->
-				<ComboBox
-					Width="100"
-					ItemsSource="{Binding AvailableSymbolTypes}"
-					SelectedItem="{Binding SelectedSymbolType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-					Style="{StaticResource CompactComboBox}"
-					ToolTip="심볼 타입 선택">
-					<ComboBox.ItemTemplate>
-						<DataTemplate>
-							<StackPanel Orientation="Horizontal">
-								<md:PackIcon
-									Width="14"
-									Height="14"
-									Margin="0,0,5,0"
-									Kind="{Binding Converter={StaticResource SymbolTypeToIconConverter}}" />
-								<TextBlock
-									VerticalAlignment="Center"
-									FontSize="11"
-									Text="{Binding Converter={StaticResource SymbolTypeToDisplayNameConverter}}" />
-							</StackPanel>
-						</DataTemplate>
-					</ComboBox.ItemTemplate>
-				</ComboBox>
-
-				<!--  심볼 추가 버튼  -->
-				<Button
-					Command="{Binding AddSelectedSymbolCommand}"
-					IsEnabled="{Binding CanAddSymbol}"
-					Style="{StaticResource MaterialDesignToolButton}"
-					ToolTip="선택된 심볼 추가 (Ctrl+Shift+A)">
-					<Button.InputBindings>
-						<KeyBinding Key="A" Modifiers="Ctrl+Shift" />
-					</Button.InputBindings>
-					<StackPanel Orientation="Horizontal">
-						<md:PackIcon
-							Width="16"
-							Height="16"
-							Kind="Plus" />
-						<TextBlock
-							Margin="3,0,0,0"
-							VerticalAlignment="Center"
-							FontSize="10"
-							Text="추가" />
-					</StackPanel>
-				</Button>
+				<!--  ⑤ 편집 스위치 (FR-C4) — CanMapEdit 권한자에게만 렌더(비노출, Q4). ON 시 편집 스트립 확장.  -->
+				<StackPanel
+					AutomationProperties.AutomationId="GMaps.EditSwitch.Host"
+					Orientation="Horizontal"
+					Visibility="{Binding CanMapEdit, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<ToggleButton
+						x:Name="EditModeToggle"
+						Command="{Binding ToggleEditModeCommand}"
+						IsChecked="{Binding IsEditModeEnabled, Mode=OneWay}"
+						IsEnabled="{Binding CanMapEdit}"
+						Style="{StaticResource MaterialDesignSwitchToggleButton}"
+						ToolTip="편집 모드 전환 — ON 시 아래 편집 스트립(등록·심볼·선택·기준) 확장">
+						<md:PackIcon Kind="Draw" />
+					</ToggleButton>
+					<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11">
+						<TextBlock.Style>
+							<Style TargetType="TextBlock">
+								<Setter Property="Text" Value="편집" />
+								<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsEditModeEnabled}" Value="True">
+										<Setter Property="Text" Value="편집 중" />
+										<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}" />
+										<Setter Property="FontWeight" Value="Bold" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</TextBlock.Style>
+					</TextBlock>
+				</StackPanel>
 
 				<!--  라인 드로잉 전용 버튼 추가 (AREA_BOUNDARY 카테고리일 때만 표시)  -->
 				<!--<Button
@@ -634,44 +507,6 @@
 					</StackPanel>
 				</Button>-->
 
-
-				<!--  마커 복제 버튼  -->
-				<Button Command="{Binding DuplicateMarkerCommand}" ToolTip="선택된 마커 복제 (Ctrl+D)">
-					<Button.InputBindings>
-						<KeyBinding Key="D" Modifiers="Ctrl+Shift" />
-					</Button.InputBindings>
-					<md:PackIcon Kind="ContentDuplicate" />
-				</Button>
-
-				<!--  격자 스냅 토글  -->
-				<Grid>
-					<ToggleButton
-						x:Name="SnapGridToggle"
-						Command="{Binding ToggleSnapToGridCommand}"
-						IsChecked="{Binding IsSnapToGridEnabled, Mode=OneWay}"
-						IsEnabled="{Binding IsEditModeEnabled}"
-						ToolTip="격자 스냅 ON/OFF (편집 모드 필요)">
-						<ToggleButton.Style>
-							<Style BasedOn="{StaticResource MaterialDesignSwitchToggleButton}" TargetType="ToggleButton">
-								<Style.Triggers>
-									<DataTrigger Binding="{Binding IsSnapToGridEnabled}" Value="True">
-										<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
-									</DataTrigger>
-								</Style.Triggers>
-							</Style>
-						</ToggleButton.Style>
-						<md:PackIcon Kind="GridLarge" />
-					</ToggleButton>
-					<Popup
-						AllowsTransparency="True"
-						IsOpen="{Binding IsSnapToGridEnabled, Mode=OneWay}"
-						Placement="Bottom"
-						PlacementTarget="{x:Reference SnapGridToggle}"
-						StaysOpen="True"
-						VerticalOffset="4">
-						<local:GridSnapSettingsControl />
-					</Popup>
-				</Grid>
 
 				<!--<StackPanel Orientation="Horizontal" Visibility="{Binding CanEditMarker, Converter={StaticResource BooleanToVisibilityConverter}}">
 					<md:PackIcon
@@ -833,6 +668,260 @@
 			</ToolBar>
 		</ToolBarTray>
 		</DockPanel>
+
+		<!--  편집 스트립 (FR-C2) — 편집 모드 동안만 확장(200ms 슬라이드), 주황 하단 테두리=수정 모드 상시 암시.
+		      등록·심볼·선택·기준 4그룹(§3 매핑) — 운영 툴바·파일 메뉴에서 이관. CanMapEdit 없인 편집 모드 진입
+		      자체가 불가하므로 스트립은 IsEditModeEnabled 단일 게이트.  -->
+		<Border
+			Grid.Row="1"
+			Grid.ColumnSpan="2"
+			Margin="50,0,0,0"
+			Panel.ZIndex="9"
+			AutomationProperties.AutomationId="GMaps.EditStrip.Panel"
+			Background="{DynamicResource SurfaceBrush}"
+			BorderBrush="{DynamicResource StatusWarningBrush}"
+			BorderThickness="0,0,0,2"
+			ClipToBounds="True">
+			<Border.Style>
+				<Style TargetType="Border">
+					<Setter Property="MaxHeight" Value="0" />
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsEditModeEnabled}" Value="True">
+							<DataTrigger.EnterActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation
+											Storyboard.TargetProperty="MaxHeight"
+											To="64"
+											Duration="0:0:0.2" />
+									</Storyboard>
+								</BeginStoryboard>
+							</DataTrigger.EnterActions>
+							<DataTrigger.ExitActions>
+								<BeginStoryboard>
+									<Storyboard>
+										<DoubleAnimation
+											Storyboard.TargetProperty="MaxHeight"
+											To="0"
+											Duration="0:0:0.2" />
+									</Storyboard>
+								</BeginStoryboard>
+							</DataTrigger.ExitActions>
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Style>
+			<StackPanel Margin="8,3" Orientation="Horizontal">
+
+				<!--  등록 — 파일 메뉴에서 이관(FR-C3), 단축키 유지  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="등록" />
+				<Border Style="{StaticResource ToolbarGroupStyle}">
+					<StackPanel Orientation="Horizontal">
+						<Button
+							AutomationProperties.AutomationId="GMaps.EditStrip.LoadMap"
+							Command="{Binding LoadMapImageCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="맵 불러오기 (Ctrl+L)">
+							<md:PackIcon Kind="Map" />
+						</Button>
+						<Button
+							AutomationProperties.AutomationId="GMaps.EditStrip.LoadImage"
+							Command="{Binding LoadImageOverlayCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="이미지 불러오기 (Ctrl+I)">
+							<md:PackIcon Kind="Image" />
+						</Button>
+						<Button
+							AutomationProperties.AutomationId="GMaps.EditStrip.CreateCustomMap"
+							Command="{Binding CreateCustomMapCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="새 커스텀 맵 생성 (Ctrl+N)">
+							<md:PackIcon Kind="MapPlus" />
+						</Button>
+					</StackPanel>
+				</Border>
+
+				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
+
+				<!--  심볼 — 툴바 ⑦에서 이관  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="심볼" />
+				<ComboBox
+					Width="120"
+					AutomationProperties.AutomationId="GMaps.EditStrip.CategoryCombo"
+					ItemsSource="{Binding AvailableMarkerCategories}"
+					SelectedItem="{Binding SelectedMarkerCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					Style="{StaticResource CompactComboBox}"
+					ToolTip="마커 카테고리 선택">
+					<ComboBox.ItemTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="14"
+									Height="14"
+									Margin="0,0,5,0"
+									Kind="{Binding Converter={StaticResource MarkerCategoryToIconConverter}}" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="11"
+									Text="{Binding Converter={StaticResource MarkerCategoryToDisplayNameConverter}}" />
+							</StackPanel>
+						</DataTemplate>
+					</ComboBox.ItemTemplate>
+				</ComboBox>
+				<ComboBox
+					Width="100"
+					AutomationProperties.AutomationId="GMaps.EditStrip.TypeCombo"
+					ItemsSource="{Binding AvailableSymbolTypes}"
+					SelectedItem="{Binding SelectedSymbolType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					Style="{StaticResource CompactComboBox}"
+					ToolTip="심볼 타입 선택">
+					<ComboBox.ItemTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal">
+								<md:PackIcon
+									Width="14"
+									Height="14"
+									Margin="0,0,5,0"
+									Kind="{Binding Converter={StaticResource SymbolTypeToIconConverter}}" />
+								<TextBlock
+									VerticalAlignment="Center"
+									FontSize="11"
+									Text="{Binding Converter={StaticResource SymbolTypeToDisplayNameConverter}}" />
+							</StackPanel>
+						</DataTemplate>
+					</ComboBox.ItemTemplate>
+				</ComboBox>
+				<Button
+					AutomationProperties.AutomationId="GMaps.EditStrip.AddSymbol"
+					Command="{Binding AddSelectedSymbolCommand}"
+					IsEnabled="{Binding CanAddSymbol}"
+					Style="{StaticResource MaterialDesignToolButton}"
+					ToolTip="선택된 심볼 추가 (Ctrl+Shift+A)">
+					<Button.InputBindings>
+						<KeyBinding Key="A" Modifiers="Ctrl+Shift" />
+					</Button.InputBindings>
+					<StackPanel Orientation="Horizontal">
+						<md:PackIcon
+							Width="16"
+							Height="16"
+							Kind="Plus" />
+						<TextBlock
+							Margin="3,0,0,0"
+							VerticalAlignment="Center"
+							FontSize="10"
+							Text="추가" />
+					</StackPanel>
+				</Button>
+				<Button
+					AutomationProperties.AutomationId="GMaps.EditStrip.Duplicate"
+					Command="{Binding DuplicateMarkerCommand}"
+					Style="{StaticResource ToolbarButtonStyle}"
+					ToolTip="선택된 마커 복제 (Ctrl+Shift+D)">
+					<Button.InputBindings>
+						<KeyBinding Key="D" Modifiers="Ctrl+Shift" />
+					</Button.InputBindings>
+					<md:PackIcon Kind="ContentDuplicate" />
+				</Button>
+				<Grid>
+					<ToggleButton
+						x:Name="SnapGridToggle"
+						Command="{Binding ToggleSnapToGridCommand}"
+						IsChecked="{Binding IsSnapToGridEnabled, Mode=OneWay}"
+						IsEnabled="{Binding IsEditModeEnabled}"
+						ToolTip="격자 스냅 ON/OFF (편집 모드 필요)">
+						<ToggleButton.Style>
+							<Style BasedOn="{StaticResource MaterialDesignSwitchToggleButton}" TargetType="ToggleButton">
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsSnapToGridEnabled}" Value="True">
+										<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</ToggleButton.Style>
+						<md:PackIcon Kind="GridLarge" />
+					</ToggleButton>
+					<Popup
+						AllowsTransparency="True"
+						IsOpen="{Binding IsSnapToGridEnabled, Mode=OneWay}"
+						Placement="Bottom"
+						PlacementTarget="{x:Reference SnapGridToggle}"
+						StaysOpen="True"
+						VerticalOffset="4">
+						<local:GridSnapSettingsControl />
+					</Popup>
+				</Grid>
+
+				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
+
+				<!--  선택 — 툴바 ④에서 이관  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="선택" />
+				<Border Style="{StaticResource ToolbarGroupStyle}">
+					<StackPanel Orientation="Horizontal">
+						<Button
+							Command="{Binding ClearSelectionCommand}"
+							IsEnabled="{Binding HasSelectedItem}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="선택 해제">
+							<md:PackIcon Kind="SelectionOff" />
+						</Button>
+						<Button
+							Command="{Binding DeleteSelectedCommand}"
+							IsEnabled="{Binding HasSelectedItem}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="선택 항목 삭제">
+							<md:PackIcon Kind="Delete" />
+						</Button>
+						<Button
+							Command="{Binding UndoCommand}"
+							IsEnabled="{Binding CanUndo}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTipService.ShowOnDisabled="True"
+							ToolTip="{Binding NextUndoDescription, StringFormat='실행 취소 (Ctrl+Z): {0}', TargetNullValue='실행 취소 (Ctrl+Z)'}">
+							<md:PackIcon Kind="Undo" />
+						</Button>
+						<Button
+							Command="{Binding RedoCommand}"
+							IsEnabled="{Binding CanRedo}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTipService.ShowOnDisabled="True"
+							ToolTip="{Binding NextRedoDescription, StringFormat='다시 실행 (Ctrl+Y / Ctrl+Shift+Z): {0}', TargetNullValue='다시 실행 (Ctrl+Y / Ctrl+Shift+Z)'}">
+							<md:PackIcon Kind="Redo" />
+						</Button>
+					</StackPanel>
+				</Border>
+
+				<Border Style="{StaticResource ToolbarSeparatorStyle}" />
+
+				<!--  기준 — 툴바 ②에서 이관(홈 설정·사이트 고정 = 뷰 기준 '설정' 행위)  -->
+				<TextBlock Style="{StaticResource ToolbarGroupLabel}" Text="기준" />
+				<Border Style="{StaticResource ToolbarGroupStyle}">
+					<StackPanel Orientation="Horizontal">
+						<Button
+							AutomationProperties.AutomationId="GMaps.EditStrip.SetHome"
+							Command="{Binding SetHomeLocationCommand}"
+							Style="{StaticResource ToolbarButtonStyle}"
+							ToolTip="홈 위치 설정">
+							<md:PackIcon Kind="HomeEdit" />
+						</Button>
+						<Button
+							AutomationProperties.AutomationId="GMaps.EditStrip.Anchor"
+							Command="{Binding ShowMapAnchorPanelCommand}"
+							ToolTip="사이트 고정(맵 앵커)">
+							<Button.Style>
+								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
+									<Style.Triggers>
+										<DataTrigger Binding="{Binding IsMapAnchorPanelVisible}" Value="True">
+											<Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+										</DataTrigger>
+									</Style.Triggers>
+								</Style>
+							</Button.Style>
+							<md:PackIcon Kind="CropFree" />
+						</Button>
+					</StackPanel>
+				</Border>
+			</StackPanel>
+		</Border>
 
 		<!--<gmap:GMapCustomControl
 			x:Name="MainMap"
