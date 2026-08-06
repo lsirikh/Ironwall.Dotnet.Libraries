@@ -582,6 +582,12 @@ dotnet pack Ironwall.Dotnet.Libraries.Base.csproj --configuration Release --outp
 
 ### [Unreleased] — v2.6.2 (2026-05-22 기준)
 
+**PidsGroup 우클릭 — 등록 센서 정보 오버레이 + 그룹 탐지 이력** (pidsgroup-rightclick — 구현 완료 · v2.6 머지 `6624d4d` + 메인솔루션 배선 `d0a19c1`, 2026-08-06 · 런타임 육안 미검증)
+- 맵 구역(PidsGroup) 심볼 우클릭 메뉴 신설: [등록 센서 정보] / [그룹 탐지 이력] (미연결·빈 그룹=disable+ToolTip)
+- 등록 센서 정보 오버레이 윈도우(드래그·상태 배지 4종·센서 테이블·행 우클릭→센서 탐지 이력/지도 위치 확인) — 서버 변경 0(DeviceProvider 역필터)
+- 그룹 탐지 이력 = 기존 탐지 이력 다이얼로그의 그룹 모드: 멤버 센서 팬아웃(총합 500 절단)·센서별 멀티 시리즈 차트(신규 토큰 ChartSeries1~3Brush)·센서 필터 칩·센서 컬럼·최다 발생 센서 통계 + 장비정보 그룹 설정 탭 행 우클릭 진입
+- 설계: `docs/design/pidsgroup-rightclick-storyboard.html` · PRD: `docs/prds/pidsgroup-rightclick-prd.md`
+
 **탐지 신호 이력** (Detection_Signal_History — 구현 완료 · v2.6 머지 `736207e` + 메인솔루션 배선, 2026-07-23)
 - 탐지 이벤트 신호 크기(`detail.signal`) 표면화: 이력 그리드 신호 컬럼 + 실시간 카드 병기 (Message Type 표시는 중복이라 제거)
 - 센서 우클릭(맵 심볼 / DevicePanel 그리드) → 탐지 신호 이력 팝업 다이얼로그(기간 프리셋·시간축 차트·필터/통계·조치보고 연계)
