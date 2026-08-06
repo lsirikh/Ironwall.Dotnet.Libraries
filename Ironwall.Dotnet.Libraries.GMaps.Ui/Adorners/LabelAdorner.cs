@@ -80,6 +80,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
         Cursor = Cursors.SizeAll;     // adorner는 HitTestCore로 라벨박스 위에서만 이벤트 수신 → 이동커서도 거기서만
 
         _map.OnMapZoomChanged += OnMapChanged;   // geo-앵커 재렌더(줌/팬 추종)
+        _map.DigitalZoomLevelChanged += OnDigitalZoomChanged;   // FR-19: 하프스텝(dzl) 변경도 게이트 재평가(실효줌 게이트)
         _map.OnMapDrag += OnMapChanged;
         _map.OnPositionChanged += OnMapPositionChanged;   // 프로그램적/정착 뷰포트 이동(홈 이동·앵커 확정)도 추종 — 첫 페인트 회귀 갭 차단
         if (_marker is INotifyPropertyChanged npc)   // 제목/제목크기/제목표시·가시성 변경 즉시 반영(속성패널)
@@ -87,6 +88,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
     }
 
     private void OnMapChanged() => InvalidateVisual();
+    // DigitalZoomLevelChanged는 Action<int> 시그니처 — 래퍼로 수신(FR-19).
+    private void OnDigitalZoomChanged(int _) => InvalidateVisual();
     // OnPositionChanged는 PointLatLng 인자를 받으므로 별도 래퍼(줌/드래그와 달리 파라미터 있음).
     private void OnMapPositionChanged(GMap.NET.PointLatLng _) => InvalidateVisual();
 
@@ -232,7 +235,8 @@ public sealed class LabelAdorner : Adorner, IDisposable
         if (isDisposed) return false;
         if (string.IsNullOrWhiteSpace(title)) return false;
         if (!showTitle) return false;                              // 제목 표시 여부(속성창 조건3)
-        if (mapZoom < markerZoom || !isLayerEnabled) return false; // 줌 && 마스터(IsLayerEnabled=카테고리&&Visible)
+        // 실효줌 게이트(FR-10) — mapZoom 인자에는 실효줌(EffectiveZoom)을 전달한다(하프스텝 0.5 인지).
+        if (!Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(mapZoom, markerZoom) || !isLayerEnabled) return false;
         return true;
     }
 
@@ -243,7 +247,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
             _labelRect = Rect.Empty;
             // 라벨 렌더 가시성 — 단일 술어(ShouldRenderLabel)로 통일. 마스터 OFF는 IsLayerEnabled 경유로 숨김.
             if (!ShouldRenderLabel(_marker.IsDisposed, _marker.Title, _marker.ShowTitle,
-                    _marker.Zoom, _marker.IsLayerEnabled, _map.Zoom))
+                    _marker.Zoom, _marker.IsLayerEnabled, _map.EffectiveZoom))   // FR-10: 실효줌 전달
                 return;
             var title = _marker.Title!;
 
@@ -469,6 +473,7 @@ public sealed class LabelAdorner : Adorner, IDisposable
         LabelWidthChanged = null;
         if (IsMouseCaptured) ReleaseMouseCapture();
         _map.OnMapZoomChanged -= OnMapChanged;
+        _map.DigitalZoomLevelChanged -= OnDigitalZoomChanged;   // FR-19 구독 해제(누수 방지)
         _map.OnMapDrag -= OnMapChanged;
         _map.OnPositionChanged -= OnMapPositionChanged;
         if (_marker is INotifyPropertyChanged npc) npc.PropertyChanged -= OnMarkerPropertyChanged;

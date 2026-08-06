@@ -255,9 +255,9 @@ public class GMapMarkerImageControl : GMapMarkerBaseControl<GMapImageMarker>
         var mapControl = FindParentMapControl();
         if (mapControl == null) return;
 
-        // 최소 줌 게이트 — 현재 줌 < 이미지 최소줌(Marker.Zoom, 속성창 Zoom)이면 숨김(심볼과 동형). Zoom=0=모든 줌 표시.
-        //   OnMapZoomChanged→InvalidateVisual로 줌 변경 시 재평가됨.
-        if (Marker.Zoom > 0 && mapControl.Zoom < Marker.Zoom) return;
+        // 최소 줌 게이트 — 실효줌(하프스텝 포함) < 이미지 최소줌(Marker.Zoom)이면 숨김(심볼과 동형). Zoom=0=모든 줌 표시.
+        //   OnMapZoomChanged→InvalidateVisual + dzl 변경 시 VM 재평가(FR-19)로 갱신됨. (FR-10)
+        if (!Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(mapControl.EffectiveZoom, Marker.Zoom)) return;
 
         try
         {

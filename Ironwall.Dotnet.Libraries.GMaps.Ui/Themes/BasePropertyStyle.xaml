@@ -18,6 +18,11 @@
 		x:Key="NaNDashF0"
 		BlankText="—"
 		Format="F0" />
+	<!--  zoom-float-halfstep FR-11: 최소 줌 표시 — 17.5를 "18"로 반올림하던 F0 대체(정수는 "17", 하프는 "17.5")  -->
+	<utils:DoubleNaNToBlankConverter
+		x:Key="NaNDashHalf"
+		BlankText="—"
+		Format="0.#" />
 
 	<Style x:Key="CompactTextBox" TargetType="TextBox">
 		<Setter Property="Margin" Value="2" />
@@ -589,21 +594,23 @@
 											Grid.Column="0"
 											Style="{StaticResource PropertyLabel}"
 											Text="최소 줌" />
+										<!--  zoom-float-halfstep FR-11: 0.5 눈금(하프스텝 입력 가능) + 상한 MaxObjectZoom(=정책 상한 Max+0.5).
+										      종전 Tick=1은 x.5 입력 불가 + 기존 하프값을 터치 즉시 정수로 파괴했다(SIM-O033).  -->
 										<Slider
 											Grid.Column="1"
 											Margin="5,0"
 											VerticalAlignment="Center"
 											IsSnapToTickEnabled="True"
-											Maximum="20"
+											Maximum="{Binding MaxObjectZoom, RelativeSource={RelativeSource TemplatedParent}}"
 											Minimum="0"
-											TickFrequency="1"
+											TickFrequency="0.5"
 											Value="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NaNBlank}}" />
 										<TextBlock
 											Grid.Column="2"
 											VerticalAlignment="Center"
 											FontSize="11"
 											Foreground="{DynamicResource TextSecondaryBrush}"
-											Text="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NaNDashF0}}" />
+											Text="{Binding MarkerZoom, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NaNDashHalf}}" />
 									</Grid>
 
 									<!--  구분선  -->

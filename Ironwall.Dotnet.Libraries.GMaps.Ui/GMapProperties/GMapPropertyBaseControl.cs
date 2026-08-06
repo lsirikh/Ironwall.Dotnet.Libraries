@@ -395,6 +395,19 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DependencyProperty.Register(nameof(MarkerZoom), typeof(double),
                 typeof(GMapPropertyBaseControl), new PropertyMetadata(0.0, OnMarkerZoomChanged));
 
+        /// <summary>최소 줌 슬라이더 상한 — 정책 상한(MaxZoom+0.5, zoom-float-halfstep FR-11/FR-13 캡과 동일).
+        /// 기본 20.5(정책 최대 provider Max=20 기준). 상한이 저장값보다 낮으면 슬라이더 클램프가
+        /// TwoWay 되쓰기로 값을 파괴하므로, 낮추는 방향의 변경은 금지.</summary>
+        public double MaxObjectZoom
+        {
+            get => (double)GetValue(MaxObjectZoomProperty);
+            set => SetValue(MaxObjectZoomProperty, value);
+        }
+
+        public static readonly DependencyProperty MaxObjectZoomProperty =
+            DependencyProperty.Register(nameof(MaxObjectZoom), typeof(double),
+                typeof(GMapPropertyBaseControl), new PropertyMetadata(20.5));
+
         #endregion
 
         #region Abstract Methods

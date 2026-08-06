@@ -187,7 +187,10 @@ public partial class MapViewModel
         AnchorNwLng = centerLng - halfLng;                 // west(좌)
         AnchorSeLat = centerLat - halfLat;                 // south(아래)
         AnchorSeLng = centerLng + halfLng;                 // east(우)
-        AnchorMinZoom = (int)Math.Round(Zoom);             // ★ 최소 줌 = 현재 줌 반영 — 이 줌 이하로 축소 차단
+        // ★ 최소 줌 = 현재 '실효줌'의 내림(zoom-float-halfstep FR-16, G-4=A) — 종전 (int)Math.Round(타일줌)는
+        //   ToEven 비대칭(16.5→16/17.5→18)으로 실효줌 입력 시 현재 화면보다 강한 하한이 걸렸다(SIM-P009/010).
+        //   floor 채택 = 보수적 하한(현재 화면으로 항상 복귀 가능). 모델은 int 유지(정수 전용).
+        AnchorMinZoom = (int)Math.Floor(MainMap?.EffectiveZoom ?? Zoom);
         _log?.Info($"[MapAnchor] 현재 화면(보이는 영역, digScale={s:F2})을 구역으로: 중심({centerLat:F6},{centerLng:F6}) NW({AnchorNwLat:F6},{AnchorNwLng:F6}) SE({AnchorSeLat:F6},{AnchorSeLng:F6}) minZoom={AnchorMinZoom}");
     }
 
@@ -227,7 +230,7 @@ public partial class MapViewModel
         AnchorNwLng = nw.Lng;
         AnchorSeLat = se.Lat;
         AnchorSeLng = se.Lng;
-        AnchorMinZoom = (int)Math.Round(Zoom);
+        AnchorMinZoom = (int)Math.Floor(MainMap?.EffectiveZoom ?? Zoom);   // FR-16: 실효줌 floor(보수적 하한)
         _log?.Info($"[MapAnchor] 지도 드래그로 구역 지정: NW({nw.Lat:F6},{nw.Lng:F6}) SE({se.Lat:F6},{se.Lng:F6}) minZoom={AnchorMinZoom}");
     }
 

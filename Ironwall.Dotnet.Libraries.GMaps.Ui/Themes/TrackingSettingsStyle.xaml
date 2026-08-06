@@ -121,8 +121,9 @@
 											<TextBlock Style="{StaticResource SetLabel}" Text="최소 줌" />
 											<TextBlock Style="{StaticResource SetHint}" Text="이하 숨김 (0=항상)" />
 										</StackPanel>
-										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="0" Maximum="20" AutoToolTipPlacement="None" Value="{Binding MinVisibleZoom, Mode=TwoWay}" />
-										<TextBlock Grid.Column="2" Style="{StaticResource SetVal}" Text="{Binding MinVisibleZoom, StringFormat={}{0:0}}" />
+										<!--  zoom-float-halfstep FR-11(Z-21): 0.5 스냅 + 소수 표시 — 종전엔 스냅 없는 임의 소수 입력에 {0:0} 정수 표시로 표시-실값 괴리  -->
+										<Slider Grid.Column="1" VerticalAlignment="Center" Minimum="0" Maximum="20.5" IsSnapToTickEnabled="True" TickFrequency="0.5" AutoToolTipPlacement="None" Value="{Binding MinVisibleZoom, Mode=TwoWay}" />
+										<TextBlock Grid.Column="2" Style="{StaticResource SetVal}" Text="{Binding MinVisibleZoom, StringFormat={}{0:0.#}}" />
 									</Grid>
 								</StackPanel>
 

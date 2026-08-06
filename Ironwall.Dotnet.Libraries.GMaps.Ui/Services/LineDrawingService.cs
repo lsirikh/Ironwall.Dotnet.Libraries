@@ -455,7 +455,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                     Longitude = centerPoint.Lng,
                     Width = width,
                     Height = height,
-                    Zoom = _mapControl.Zoom,
+                    Zoom = Helpers.ZoomLadder.CreationZoom(_mapControl.EffectiveZoom, _mapControl.MaxZoom),   // FR-13(Z-22): 실효줌 기록
                     Bearing = 0,
                     Category = _parameters.Model.Category,
                     ShowShape = true,
@@ -502,7 +502,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
                     Longitude = centerPoint.Lng,
                     Width = width,
                     Height = height,
-                    Zoom = _mapControl.Zoom,
+                    Zoom = Helpers.ZoomLadder.CreationZoom(_mapControl.EffectiveZoom, _mapControl.MaxZoom),   // FR-13(Z-22): 실효줌 기록
                     Bearing = 0,
                     Category = EnumMarkerCategory.AREA_BOUNDARY,
                     ShowShape = true,

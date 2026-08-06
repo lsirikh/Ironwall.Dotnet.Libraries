@@ -318,7 +318,7 @@ public partial class MapViewModel : IUndoApplyContext
             if (m == null) return Task.CompletedTask;
             m.IsLayerEnabled = show;
             m.Visible = show;   // 레이어 마스터 가시성(구 ShowShape 대체) — undo/redo 런타임 복원
-            m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 마스터 AND 줌
+            m.IsVisible = show && MainMap != null && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap.EffectiveZoom, m.Zoom);   // 유효 가시성 = 마스터 AND 실효줌(FR-10)
             MainMap?.InvalidateVisual();
             SyncMarkerNode(id, isImage);   // 트리 체크박스 반영
             return Task.CompletedTask;

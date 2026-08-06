@@ -1348,7 +1348,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 var beforeShow = m.Visible;
                 m.IsLayerEnabled = show;
                 m.Visible = show;   // 레이어 마스터 가시성(구 ShowShape 대체) — 트리 체크가 Visible을 읽음
-                m.IsVisible = show && MainMap != null && MainMap.Zoom >= m.Zoom;   // 유효 가시성 = 마스터 AND 줌
+                m.IsVisible = show && MainMap != null && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap.EffectiveZoom, m.Zoom);   // 유효 가시성 = 마스터 AND 실효줌(FR-10)
                 _editRecorder?.RecordVisibility(m, beforeShow, show);
                 n++;
             }
@@ -5243,7 +5243,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
-                Zoom = Zoom,
+                Zoom = CreationZoom,   // FR-13(Z-22): 실효줌 기록(0.5 스냅 + Max+0.5 캡)
                 Width = 50,
                 Height = 75,
                 Bearing = 0,
@@ -5282,7 +5282,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
-                Zoom = Zoom,
+                Zoom = CreationZoom,   // FR-13(Z-22): 실효줌 기록(0.5 스냅 + Max+0.5 캡)
                 Width = 50,
                 Height = 50,
                 Bearing = 0,
@@ -5367,7 +5367,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
-                Zoom = Zoom,
+                Zoom = CreationZoom,   // FR-13(Z-22): 실효줌 기록(0.5 스냅 + Max+0.5 캡)
                 Width = 50,
                 Height = 50,
                 Bearing = 0,
@@ -5529,7 +5529,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 TitleSize = 12,
                 Latitude = position.Lat,
                 Longitude = position.Lng,
-                Zoom = Zoom,
+                Zoom = CreationZoom,   // FR-13(Z-22): 실효줌 기록(0.5 스냅 + Max+0.5 캡)
                 Width = 40,
                 Height = 50,
                 Bearing = 0,
@@ -6515,7 +6515,7 @@ public partial class MapViewModel : BasePanelViewModel,
             // 위치 설정
             militaryModel.Latitude = position.Lat;
             militaryModel.Longitude = position.Lng;
-            militaryModel.Zoom = Zoom;
+            militaryModel.Zoom = CreationZoom;   // FR-13(Z-22)
 
             _log?.Info($"군사 심볼 등록: {militaryModel.Title}");
             _log?.Info($"소속: {militaryModel.Affiliation}, 공중성: {militaryModel.BattleDimension}");
@@ -7433,6 +7433,11 @@ public partial class MapViewModel : BasePanelViewModel,
             NotifyOfPropertyChange(nameof(Zoom));
         }
     }
+
+    /// <summary>객체 생성 시 기록할 줌(FR-13, Z-22) — 실효줌 0.5 스냅 + Max+0.5 캡.
+    /// 타일줌(VM.Zoom)을 기록하면 실효 17.5 생성 객체가 17로 영구 저장된다(SIM-O036).</summary>
+    private double CreationZoom
+        => MainMap == null ? DEFAULT_ZOOM : Helpers.ZoomLadder.CreationZoom(MainMap.EffectiveZoom, MainMap.MaxZoom);
 
     /// <summary>
     /// 최대 줌 레벨
@@ -9073,7 +9078,7 @@ public partial class MapViewModel : BasePanelViewModel,
             var beforeVisible = marker.Visible;   // Undo용 이전 마스터 가시성
             marker.Visible = e.IsVisible;
             marker.IsLayerEnabled = e.IsVisible;   // 유효 IsLayerEnabled = 카테고리ON && Visible(개별 토글 → Visible 반영)
-            marker.IsVisible = e.IsVisible && MainMap!.Zoom >= marker.Zoom;   // 렌더 게이트 = 마스터 AND 줌
+            marker.IsVisible = e.IsVisible && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap!.EffectiveZoom, marker.Zoom);   // 렌더 게이트 = 마스터 AND 실효줌(FR-10 — 휠/토글 경로 판정 통일, SIM-O037)
             MainMap?.InvalidateVisual();
             _editRecorder?.RecordVisibility(marker, beforeVisible, e.IsVisible);   // Undo 기록(마스터 가시성)
 
@@ -9599,7 +9604,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 // 유효 가시성 = 카테고리 레이어 && 개별 마스터(Visible) && 줌. 카테고리 토글이 개별 Visible을 덮지 않음(보존).
                 bool layerOn = layer.IsVisible && em.Visible;
                 em.IsLayerEnabled = layerOn;
-                em.IsVisible = layerOn && MainMap!.Zoom >= em.Zoom;
+                em.IsVisible = layerOn && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(MainMap!.EffectiveZoom, em.Zoom);   // FR-10
             }
             MainMap?.InvalidateVisual();
         }

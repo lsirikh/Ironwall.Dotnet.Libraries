@@ -210,7 +210,11 @@ public class ImageOverlayService
                 Opacity = 0.7,
                 HasGeoReference = false,
                 Rotation = 0.0,
-                Zoom = gMap?.Zoom ?? 0  // 현재 지도 줌 레벨 저장 (0 = 모든 줌 레벨에서 표시)
+                // zoom-float-halfstep FR-13(Z-22): 실효줌(하프스텝 포함) 기록 + Max+0.5 캡 — 타일줌 기록 시
+                // 실효 17.5에서 생성한 이미지가 17로 영구 저장되어 반 스텝 이르게 표시됐다(SIM-O036).
+                Zoom = gMap is GMapCustoms.GMapCustomControl gcc
+                    ? Helpers.ZoomLadder.CreationZoom(gcc.EffectiveZoom, gcc.MaxZoom)
+                    : (gMap?.Zoom ?? 0)  // (0 = 모든 줌 레벨에서 표시)
             };
 
             // 3. 경계 계산 (일반 이미지는 지리참조 없음)

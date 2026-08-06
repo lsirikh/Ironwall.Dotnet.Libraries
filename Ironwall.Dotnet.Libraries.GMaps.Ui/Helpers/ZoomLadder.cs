@@ -69,6 +69,13 @@ public static class ZoomLadder
         => zoom >= maxZoom && dzl >= 2;
 
     /// <summary>
+    /// 객체 생성 시 기록할 줌(FR-13): 실효줌 0.5 스냅 + 상한 MaxZoom+0.5 캡 —
+    /// 소프트 밴드(dzl≥2)에서 생성해도 속성 슬라이더 상한(Max+0.5)을 넘는 값이 영구 기록되지 않게 한다.
+    /// </summary>
+    public static double CreationZoom(double effectiveZoom, int maxZoom)
+        => Math.Min(Snap(effectiveZoom), maxZoom + 0.5);
+
+    /// <summary>
     /// 객체(심볼/이미지/라벨) 최소 표시 줌 게이트(FR-10, G-3 확정):
     /// 실효줌 ≥ 객체줌(0.5 스냅 정규화) + ε 비교. objectZoom ≤ 0 은 항상 표시(이미지 규약 —
     /// GMapCustomControl 이미지 게이트 `Zoom&lt;=0 ||` 과 동치, 마커에도 무해).

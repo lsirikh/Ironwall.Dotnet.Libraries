@@ -762,7 +762,7 @@ public class GMapCustomControl : GMapControl
     }
 
     private bool SetMarkerVisibility(IEditableMarker marker)
-        => Zoom >= marker.Zoom && marker.IsLayerEnabled;
+        => Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(EffectiveZoom, marker.Zoom) && marker.IsLayerEnabled;   // FR-10: 실효줌 게이트(하프스텝 인지)
 
     /// <summary>
     /// 단일 마커의 유효 가시성을 현재 줌/레이어 기준으로 즉시 재계산 + 리렌더.
@@ -1476,7 +1476,7 @@ public class GMapCustomControl : GMapControl
     private GMapCustomImage GetImageAt(PointLatLng position)
     {
         return CustomImages.FirstOrDefault(img =>
-            img.Visibility && (img.Zoom <= 0 || Zoom >= img.Zoom) && img.Contains(position));
+            img.Visibility && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(EffectiveZoom, img.Zoom) && img.Contains(position));   // FR-10
     }
 
     /// <summary>
@@ -1487,7 +1487,7 @@ public class GMapCustomControl : GMapControl
     {
         return CustomImages.FirstOrDefault(img =>
         {
-            if (!img.Visibility || (img.Zoom > 0 && Zoom < img.Zoom)) return false;
+            if (!img.Visibility || !Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(EffectiveZoom, img.Zoom)) return false;   // FR-10
             if (img.Opacity <= 0) return false;             // ★ FR-10 (AABB PRD R-2 흡수) — 투명 이미지 클릭 차단
             return HitTestImageScreen(img, screenPos);      // ★ NFR-1 (AABB PRD R-3 흡수) — 회전 보정 AABB
         });
@@ -2376,7 +2376,7 @@ public class GMapCustomControl : GMapControl
     {
         try
         {
-            foreach (var customImage in CustomImages.Where(img => img.Visibility && (img.Zoom <= 0 || Zoom >= img.Zoom)))
+            foreach (var customImage in CustomImages.Where(img => img.Visibility && Helpers.ZoomLadder.IsVisibleAtEffectiveZoom(EffectiveZoom, img.Zoom)))   // FR-10
             {
                 RenderSingleImageOverlay(drawingContext, customImage);
             }
