@@ -544,7 +544,10 @@ public class UndoRedoTests
         var m = new FakeEditableMarker { Id = 3 };
         ctx.Markers[3] = m;
         var rec = new EditRecorder(svc) { Context = ctx };
-        rec.RecordPropertyChange(m, "FOVColor", "Purple", "Red");   // ApplyProperty 미지원 → 죽은 엔트리 방지
+        // ※ 표본 교체: 종전 표본 "FOVColor"는 ae253f6(2026-07-15, PIDS FOV)에서 복원 가능 속성으로 승격되어
+        //   테스트 전제가 무효화됨(그 후 상시 실패 — zoom-float-halfstep 세션에서 발견·수리, 기능 변경 아님).
+        //   "Visibility"는 IsReplayableProperty 미포함(전용 VisibilityCommand 라우팅)이라 의도에 부합하는 표본.
+        rec.RecordPropertyChange(m, "Visibility", true, false);   // ApplyProperty 미지원 → 죽은 엔트리 방지
         Assert.False(svc.CanUndo);
     }
 
