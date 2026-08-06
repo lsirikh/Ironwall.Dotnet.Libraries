@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-08-06 (advance-phase 자동)
-- **총 문서 수**: 483개
+- **총 문서 수**: 484개
 
 ---
 
@@ -250,6 +250,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
+| [map-topbar-trafficlight-prd-plan.md](plans/map-topbar-trafficlight-prd-plan.md) | [PRD](prds/map-topbar-trafficlight-prd.md) | 0/21 | 2026-08-06 |
 | [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 28/32 | 2026-08-06 |
 | [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 36/50 | 2026-08-06 |
 | [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 29/42 | 2026-08-04 |
