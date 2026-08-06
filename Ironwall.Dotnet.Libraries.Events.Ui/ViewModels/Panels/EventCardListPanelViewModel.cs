@@ -102,6 +102,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
             ViewModelProvider.CollectionChanged += CollectionEntity_CollectionChanged;
             _batchTimer = new Timer(FlushPendingCards, null, BATCH_INTERVAL_MS, BATCH_INTERVAL_MS);
+
+            // 신호등(map-topbar-trafficlight FR-A3): EQM 활성(미조치) 집계 구독 —
+            // 중복 방지 위해 해제 후 구독(MapViewModel.Instruments 검증 패턴). 초기값 즉시 반영.
+            _eventQueueManager.OnActiveCountChanged -= OnTrafficActiveCountChanged;
+            _eventQueueManager.OnActiveCountChanged += OnTrafficActiveCountChanged;
+            var (tlDetection, tlFault) = _eventQueueManager.GetActiveCounts();
+            OnTrafficActiveCountChanged(tlDetection, tlFault);
+
             return base.OnActivateAsync(cancellationToken);
         }
 
@@ -112,6 +120,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
 
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
+            _eventQueueManager.OnActiveCountChanged -= OnTrafficActiveCountChanged;   // 신호등 구독 해제(FR-A3)
 
             // 타이머 안전 정지: Infinite로 먼저 중지 후 Dispose (진행 중 콜백 race 방지)
             _batchTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -132,6 +141,48 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
             return base.OnDeactivateAsync(close, cancellationToken);
         }
+        #endregion
+        #region - 신호등 (map-topbar-trafficlight FR-A1~A3) -
+        // EQM 활성(미조치) 집계 → 카드 리스트 헤더 신호등(T1). 지도 pill 계기(D2 제거)의 후신.
+        // green 불변식: green = (ready && fault==0 && detection==0) — 동시 점등 시 green은 구조적으로 꺼짐.
+        // 미초기화(ready=false) = 전체 소등 + "—" (데이터 없음 ≠ 정상, 스토리보드 S8).
+        private int _trafficDetectionCount;
+        private int _trafficFaultCount;
+        private bool _isTrafficCountsReady;
+        private bool _isTrafficLightVisible = true;
+
+        /// <summary>미조치 탐지 건수(EQM).</summary>
+        public int TrafficDetectionCount { get => _trafficDetectionCount; private set { _trafficDetectionCount = value; NotifyOfPropertyChange(); } }
+
+        /// <summary>미조치 장애 건수(EQM).</summary>
+        public int TrafficFaultCount { get => _trafficFaultCount; private set { _trafficFaultCount = value; NotifyOfPropertyChange(); } }
+
+        /// <summary>EQM 첫 집계 수신 여부 — false면 '데이터 없음'(전체 소등+"—"), 초록 점등 금지.</summary>
+        public bool IsTrafficCountsReady { get => _isTrafficCountsReady; private set { _isTrafficCountsReady = value; NotifyOfPropertyChange(); } }
+
+        public bool IsTrafficFaultOn => _isTrafficCountsReady && _trafficFaultCount > 0;
+        public bool IsTrafficDetectionOn => _isTrafficCountsReady && _trafficDetectionCount > 0;
+        public bool IsTrafficGreenOn => _isTrafficCountsReady && _trafficFaultCount == 0 && _trafficDetectionCount == 0;
+
+        /// <summary>보기&gt;탐지·장애 신호등 토글(FR-A5 — EA 재연결은 IMPL-04에서 배선, 기본 표시).</summary>
+        public bool IsTrafficLightVisible { get => _isTrafficLightVisible; set { _isTrafficLightVisible = value; NotifyOfPropertyChange(); } }
+
+        public string TrafficTooltip => _isTrafficCountsReady
+            ? $"미조치 장애 {_trafficFaultCount}건 · 탐지 {_trafficDetectionCount}건 — 클릭: 해당 종류 카드로 이동"
+            : "집계 대기 중 — 로그인/초기화 전";
+
+        /// <summary>EQM 콜백은 NATS 스레드일 수 있음 → UI 스레드 정렬(MapViewModel.Instruments 패턴).</summary>
+        private void OnTrafficActiveCountChanged(int detection, int fault)
+            => Execute.OnUIThread(() =>
+            {
+                TrafficDetectionCount = detection;
+                TrafficFaultCount = fault;
+                IsTrafficCountsReady = true;
+                NotifyOfPropertyChange(nameof(IsTrafficFaultOn));
+                NotifyOfPropertyChange(nameof(IsTrafficDetectionOn));
+                NotifyOfPropertyChange(nameof(IsTrafficGreenOn));
+                NotifyOfPropertyChange(nameof(TrafficTooltip));
+            });
         #endregion
         #region - Binding Methods -
         #endregion
