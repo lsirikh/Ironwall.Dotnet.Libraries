@@ -259,8 +259,8 @@ public class EventApiService : IEventApiService
             var parameters = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
             if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
-            if (controller.HasValue) parameters.Add("controller", controller.Value.ToString());
-            if (sensor.HasValue) parameters.Add("sensor", sensor.Value.ToString());
+            // PRD v2.1 서버 계약: 장치 필터 = device_id 단일(malfunctions.py:208) — detections 동일 계열 잠복 함정 정리(버그헌트 E4)
+            if (sensor.HasValue) parameters.Add("device_id", sensor.Value.ToString());
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 
@@ -411,8 +411,8 @@ public class EventApiService : IEventApiService
             var parameters = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
             if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
-            if (controller.HasValue) parameters.Add("controller", controller.Value.ToString());
-            if (sensor.HasValue) parameters.Add("sensor", sensor.Value.ToString());
+            // PRD v2.1 서버 계약: 장치 필터 = device_id 단일 — detections 동일 계열 잠복 함정 정리(버그헌트 E4)
+            if (sensor.HasValue) parameters.Add("device_id", sensor.Value.ToString());
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
 using Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
@@ -78,9 +79,10 @@ public class GroupDetectionHistoryTests
 
     private static void SetupSensor(Mock<IEventApiService> apiMock, int sensorId, params DetectionEventDto[] dtos)
     {
-        // 클라 후필터(요청 센서=dto.DeviceId 검증) 계약 반영 — 목 데이터에 소속 장비를 스탬프
+        // 클라 후필터 계약 반영 — 실서버 응답 형태로 스탬프: 최상위 device_id 스칼라는 서버가 보내지 않으므로(PRD v1.3 제거)
+        // 중첩 device.id만 채운다(검증 NEW-1 — 후필터 2절(실경로) 검증, 1절(DeviceId)은 사문)
         foreach (var dto in dtos)
-            if (dto.DeviceId == 0) dto.DeviceId = sensorId;
+            dto.Device ??= new BaseDeviceDto { Id = sensorId };
         apiMock.Setup(x => x.GetDetectionEventsAsync(
                 It.IsAny<string?>(), It.IsAny<string?>(), null, sensorId, null,
                 It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -146,7 +148,7 @@ public class GroupDetectionHistoryTests
                             {
                                 var dto = BuildDto(sensorId * 10000 + n, 100 + n,
                                     baseTime.AddMinutes(n).AddSeconds(offsetSec).ToString("yyyy-MM-ddTHH:mm:ss"));
-                                dto.DeviceId = sensorId;   // 후필터 계약 — 소속 장비 스탬프
+                                dto.Device = new BaseDeviceDto { Id = sensorId };   // 후필터 계약 — 실서버 형태(중첩 device)
                                 return dto;
                             })
                             .ToArray())
@@ -312,9 +314,9 @@ public class GroupDetectionHistoryTests
     {
         // 실서버 버그(B2/B3) 재현: 어떤 sensor 값으로 호출해도 "전체 데이터"가 그대로 반환되는 서버.
         // 클라 방어(요청 센서 후필터 + EventId dedup)로 센서별 데이터가 분리되고 N중복이 사라져야 한다.
-        var e1 = BuildDto(1, 1000, "2026-08-06T10:00:00"); e1.DeviceId = 11;
-        var e2 = BuildDto(2, 2000, "2026-08-06T11:00:00"); e2.DeviceId = 12;
-        var e3 = BuildDto(3, 1500, "2026-08-06T12:00:00"); e3.DeviceId = 11;
+        var e1 = BuildDto(1, 1000, "2026-08-06T10:00:00"); e1.Device = new BaseDeviceDto { Id = 11 };
+        var e2 = BuildDto(2, 2000, "2026-08-06T11:00:00"); e2.Device = new BaseDeviceDto { Id = 12 };
+        var e3 = BuildDto(3, 1500, "2026-08-06T12:00:00"); e3.Device = new BaseDeviceDto { Id = 11 };
         var apiMock = new Mock<IEventApiService>();
         apiMock.Setup(x => x.GetDetectionEventsAsync(
                 It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
@@ -340,7 +342,7 @@ public class GroupDetectionHistoryTests
     {
         // offset 페이지네이션 레이스: 페이지 사이 신규 이벤트 삽입으로 같은 이벤트가 두 페이지에 걸쳐 중복 수신 → 1건으로 dedup
         var baseTime = new DateTime(2026, 8, 6, 0, 0, 0);
-        DetectionEventDto Row(int id) { var d = BuildDto(id, 100 + id, baseTime.AddMinutes(id).ToString("yyyy-MM-ddTHH:mm:ss")); d.DeviceId = 99; return d; }
+        DetectionEventDto Row(int id) { var d = BuildDto(id, 100 + id, baseTime.AddMinutes(id).ToString("yyyy-MM-ddTHH:mm:ss")); d.Device = new BaseDeviceDto { Id = 99 }; return d; }
         var apiMock = new Mock<IEventApiService>();
         apiMock.Setup(x => x.GetDetectionEventsAsync(
                 It.IsAny<string?>(), It.IsAny<string?>(), null, 99, null,
