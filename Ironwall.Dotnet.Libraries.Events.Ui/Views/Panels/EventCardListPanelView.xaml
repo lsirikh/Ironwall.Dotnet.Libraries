@@ -125,7 +125,28 @@
 									</Style>
 								</StackPanel.Resources>
 
-								<!--  🔴 장애 — 점등 시 상시 펄스  -->
+								<!--  🔴 장애 그룹 — 클릭=장애 카드만 필터(재클릭 해제, FR-A4) · 점등 시 상시 펄스  -->
+								<Border
+									AutomationProperties.AutomationId="Events.Status.TrafficLight.FaultGroup"
+									Padding="2,1"
+									Background="Transparent"
+									BorderThickness="1"
+									CornerRadius="9"
+									Cursor="Hand">
+									<cal:Message.Attach>
+										[Event MouseLeftButtonUp] = [Action ToggleTrafficFaultFilter()]
+									</cal:Message.Attach>
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="BorderBrush" Value="Transparent" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsTrafficFilterFault}" Value="True">
+													<Setter Property="BorderBrush" Value="{DynamicResource StatusCriticalBrush}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+									<StackPanel Orientation="Horizontal">
 								<Ellipse AutomationProperties.AutomationId="Events.Status.TrafficLight.FaultLamp">
 									<Ellipse.Style>
 										<Style BasedOn="{StaticResource LampBase}" TargetType="Ellipse">
@@ -175,9 +196,33 @@
 										</Style>
 									</TextBlock.Style>
 								</TextBlock>
+									</StackPanel>
+								</Border>
 
-								<!--  🟡 탐지  -->
-								<Ellipse Margin="7,0,0,0" AutomationProperties.AutomationId="Events.Status.TrafficLight.DetectionLamp">
+								<!--  🟡 탐지 그룹 — 클릭=탐지 카드만 필터(재클릭 해제, FR-A4)  -->
+								<Border
+									Margin="5,0,0,0"
+									AutomationProperties.AutomationId="Events.Status.TrafficLight.DetectionGroup"
+									Padding="2,1"
+									Background="Transparent"
+									BorderThickness="1"
+									CornerRadius="9"
+									Cursor="Hand">
+									<cal:Message.Attach>
+										[Event MouseLeftButtonUp] = [Action ToggleTrafficDetectionFilter()]
+									</cal:Message.Attach>
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="BorderBrush" Value="Transparent" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsTrafficFilterDetection}" Value="True">
+													<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+									<StackPanel Orientation="Horizontal">
+								<Ellipse AutomationProperties.AutomationId="Events.Status.TrafficLight.DetectionLamp">
 									<Ellipse.Style>
 										<Style BasedOn="{StaticResource LampBase}" TargetType="Ellipse">
 											<Style.Triggers>
@@ -212,9 +257,11 @@
 										</Style>
 									</TextBlock.Style>
 								</TextBlock>
+									</StackPanel>
+								</Border>
 
-								<!--  🟢 정상 (green = ready && 둘 다 0 — VM 불변식)  -->
-								<Ellipse Margin="7,0,0,0" AutomationProperties.AutomationId="Events.Status.TrafficLight.NormalLamp">
+								<!--  🟢 정상 (green = ready && 둘 다 0 — VM 불변식) · 클릭 없음  -->
+								<Ellipse Margin="5,0,0,0" AutomationProperties.AutomationId="Events.Status.TrafficLight.NormalLamp">
 									<Ellipse.Style>
 										<Style BasedOn="{StaticResource LampBase}" TargetType="Ellipse">
 											<Style.Triggers>

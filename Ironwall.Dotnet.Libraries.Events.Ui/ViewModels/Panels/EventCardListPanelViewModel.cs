@@ -19,6 +19,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Threading;
 using Action = System.Action;
 
@@ -126,6 +127,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
             ViewModelProvider.CollectionChanged -= CollectionEntity_CollectionChanged;
             _eventQueueManager.OnActiveCountChanged -= OnTrafficActiveCountChanged;   // 신호등 구독 해제(FR-A3)
+            ApplyTrafficFilter(null);                                                  // 종류 필터 해제(FR-A4, 비영속)
 
             // 타이머 안전 정지: Infinite로 먼저 중지 후 Dispose (진행 중 콜백 race 방지)
             _batchTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -180,8 +182,44 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             return Task.CompletedTask;
         }
 
+        // ---- 램프 클릭 종류 필터 (FR-A4) ----
+        // ListBox가 ViewModelProvider에 직결 → 기본 CollectionView Filter로 화면만 거른다(컬렉션/건수 무영향,
+        // 배치 flush로 추가되는 카드에도 자동 적용). Connection 카드(EQM 미집계 타입)는 두 필터 모두에서
+        // 제외되고 해제 시 전체 복귀. 필터 상태는 비영속 — 패널 비활성화 시 해제.
+        private const string TRAFFIC_FILTER_FAULT = "FAULT";
+        private const string TRAFFIC_FILTER_DETECTION = "DETECTION";
+        private string? _trafficFilter;
+
+        /// <summary>장애 필터 활성 여부 — 램프 그룹 외곽선 트리거.</summary>
+        public bool IsTrafficFilterFault => _trafficFilter == TRAFFIC_FILTER_FAULT;
+        /// <summary>탐지 필터 활성 여부 — 램프 그룹 외곽선 트리거.</summary>
+        public bool IsTrafficFilterDetection => _trafficFilter == TRAFFIC_FILTER_DETECTION;
+
+        /// <summary>빨간 램프 클릭(cal:Message.Attach) — 장애 카드만 표시, 재클릭 해제.</summary>
+        public void ToggleTrafficFaultFilter()
+            => ApplyTrafficFilter(IsTrafficFilterFault ? null : TRAFFIC_FILTER_FAULT);
+
+        /// <summary>노란 램프 클릭(cal:Message.Attach) — 탐지 카드만 표시, 재클릭 해제.</summary>
+        public void ToggleTrafficDetectionFilter()
+            => ApplyTrafficFilter(IsTrafficFilterDetection ? null : TRAFFIC_FILTER_DETECTION);
+
+        private void ApplyTrafficFilter(string? filter)
+        {
+            _trafficFilter = filter;
+            var view = CollectionViewSource.GetDefaultView(ViewModelProvider);
+            if (view != null)
+                view.Filter = filter switch
+                {
+                    TRAFFIC_FILTER_FAULT => new Predicate<object>(o => o is MalfunctionEventCardViewModel),
+                    TRAFFIC_FILTER_DETECTION => new Predicate<object>(o => o is DetectionEventCardViewModel),
+                    _ => null,
+                };
+            NotifyOfPropertyChange(nameof(IsTrafficFilterFault));
+            NotifyOfPropertyChange(nameof(IsTrafficFilterDetection));
+        }
+
         public string TrafficTooltip => _isTrafficCountsReady
-            ? $"미조치 장애 {_trafficFaultCount}건 · 탐지 {_trafficDetectionCount}건 — 클릭: 해당 종류 카드로 이동"
+            ? $"미조치 장애 {_trafficFaultCount}건 · 탐지 {_trafficDetectionCount}건 — 램프 클릭: 해당 종류만 필터(재클릭 해제)"
             : "집계 대기 중 — 로그인/초기화 전";
 
         /// <summary>EQM 콜백은 NATS 스레드일 수 있음 → UI 스레드 정렬(MapViewModel.Instruments 패턴).</summary>
