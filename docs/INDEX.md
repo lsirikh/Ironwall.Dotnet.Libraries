@@ -1,15 +1,17 @@
 ﻿<!-- auto-section-start -->
-# ?꾨줈?앺듃 臾몄꽌 ?몃뜳??
-- **留덉?留?媛깆떊**: 2026-08-06 (advance-phase ?먮룞)
-- **珥?臾몄꽌 ??*: 481媛?
+# 프로젝트 문서 인덱스
+
+- **마지막 갱신**: 2026-08-06 (advance-phase 자동)
+- **총 문서 수**: 481개
+
 ---
 
-## 遺꾩꽍 (docs/analyses/)
+## 분석 (docs/analyses/)
 
-| ?뚯씪 | 遺꾩꽍 ???| ?좎쭨 |
+| 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [gmap-label-offset-domain-mismatch-analysis.md](analyses/gmap-label-offset-domain-mismatch-analysis.md) | gmap-label-offset-domain-mismatch | 2026-08-06 |
 | [zoom-float-halfstep-scenario-analysis.md](analyses/zoom-float-halfstep-scenario-analysis.md) | zoom-float-halfstep-scenario | 2026-08-06 |
-| [gmap-label-offset-domain-mismatch-analysis.md](analyses/gmap-label-offset-domain-mismatch-analysis.md) | **吏???쇰꺼 誘명몴??洹쇰낯?먯씤(?고????뺤쬆)** ??px ?ㅽ봽??횞 鍮꾩쑉 ?댁꽍 = 援ъ뿭/?쇱씤 ?쇰꺼 ?붾㈃ 諛? ?ㅽ봽??0 由ъ뀑?쇰줈 蹂듦뎄 ?ㅼ쬆. 寃고븿 2遺꾨━(D-1 ?곗씠??/ D-2 ?댄솕異?肄붾뱶) | 2026-08-06 |
 | [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | verified-findings-backlog.md | 2026-08-05 |
 | [event-panel-silent-load-failure-analysis.md](analyses/event-panel-silent-load-failure-analysis.md) | event-panel-silent-load-failure | 2026-08-04 |
 | [harness-customization-manifest.md](analyses/harness-customization-manifest.md) | harness-customization-manifest.md | 2026-08-04 |
@@ -66,9 +68,9 @@
 | [NATS_Detection_Redis_Flow.md](analyses/NATS_Detection_Redis_Flow.md) | NATS_Detection_Redis_Flow.md | 2026-05-15 |
 | [ANALYSIS_GatewayEvent_Group_NtoN_Migration.md](analyses/ANALYSIS_GatewayEvent_Group_NtoN_Migration.md) | ANALYSIS_GatewayEvent_Group_NtoN_Migration.md | 2026-05-15 |
 
-## ?붽뎄?ы빆 ?뺤쓽??(docs/prds/)
+## 요구사항 정의서 (docs/prds/)
 
-| ?뚯씪 | ?댁슜 | ?곹깭 | ?좎쭨 |
+| 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
 | [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
 | [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | zoom-float-halfstep | Approved | 2026-08-06 |
@@ -123,7 +125,7 @@
 | [CameraPopup_RtspSource_Priority-prd.md](prds/CameraPopup_RtspSource_Priority-prd.md) | CameraPopup_RtspSource_Priority | Approved | 2026-07-15 |
 | [GIS_Nats_Full_Integration-prd.md](prds/GIS_Nats_Full_Integration-prd.md) | GIS_Nats_Full_Integration | Draft | 2026-07-13 |
 | [GMap_SystemResource_Indicator-prd.md](prds/GMap_SystemResource_Indicator-prd.md) | GMap_SystemResource_Indicator | Approved | 2026-07-13 |
-| [GOP_Server_API_GIS_v6.3_?꾨떖?듭?.md](prds/GOP_Server_API_GIS_v6.3_?꾨떖?듭?.md) | GOP_Server_API_GIS_v6.3_?꾨떖?듭?.md | Draft | 2026-07-13 |
+| [GOP_Server_API_GIS_v6.3_전달통지.md](prds/GOP_Server_API_GIS_v6.3_전달통지.md) | GOP_Server_API_GIS_v6.3_전달통지.md | Draft | 2026-07-13 |
 | [LineArea_Symbol_Resize-prd.md](prds/LineArea_Symbol_Resize-prd.md) | LineArea_Symbol_Resize | Approved | 2026-07-13 |
 | [FullScreen_F11_Toggle-prd.md](prds/FullScreen_F11_Toggle-prd.md) | FullScreen_F11_Toggle | Approved | 2026-07-13 |
 | [MapSymbol_Shortcut_CopyPasteDelete-prd.md](prds/MapSymbol_Shortcut_CopyPasteDelete-prd.md) | MapSymbol_Shortcut_CopyPasteDelete | Approved | 2026-07-13 |
@@ -193,7 +195,7 @@
 | [GOP_MyPage_UI-prd.md](prds/GOP_MyPage_UI-prd.md) | GOP_MyPage_UI | Draft | 2026-06-20 |
 | [GOP_AccountManager_UI-prd.md](prds/GOP_AccountManager_UI-prd.md) | GOP_AccountManager_UI | Draft | 2026-06-20 |
 | [Client_API_v46_Conformance-prd.md](prds/Client_API_v46_Conformance-prd.md) | Client_API_v46_Conformance | Approved | 2026-06-19 |
-| [NATS-Tracking-Geolocation-硫붿떆吏?뺣━.md](prds/NATS-Tracking-Geolocation-硫붿떆吏?뺣━.md) | NATS-Tracking-Geolocation-硫붿떆吏?뺣━.md | Draft | 2026-06-19 |
+| [NATS-Tracking-Geolocation-메시지정리.md](prds/NATS-Tracking-Geolocation-메시지정리.md) | NATS-Tracking-Geolocation-메시지정리.md | Draft | 2026-06-19 |
 | [DevicePanel_CRUD_API_Sync-prd.md](prds/DevicePanel_CRUD_API_Sync-prd.md) | DevicePanel_CRUD_API_Sync | Draft | 2026-06-17 |
 | [EventProcess_ContaminationFix-prd.md](prds/EventProcess_ContaminationFix-prd.md) | EventProcess_ContaminationFix | Draft | 2026-06-15 |
 | [GridSnap_System-prd.md](prds/GridSnap_System-prd.md) | GridSnap_System | Approved | 2026-06-15 |
@@ -242,12 +244,12 @@
 | [LayerPanel_ContextMenu_Enhancement-prd.md](prds/LayerPanel_ContextMenu_Enhancement-prd.md) | LayerPanel_ContextMenu_Enhancement | Completed | 2026-05-14 |
 | [PRD_ImageOverlay_FileCopy_On_Register.md](prds/PRD_ImageOverlay_FileCopy_On_Register.md) | PRD_ImageOverlay_FileCopy_On_Register.md | Completed | 2026-05-13 |
 
-## 援ы쁽 ?뚮옖 (docs/plans/)
+## 구현 플랜 (docs/plans/)
 
-| ?뚯씪 | ?곌? PRD | 吏꾪뻾瑜?| ?좎쭨 |
+| 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
 | [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 33/47 | 2026-08-06 |
-| [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 0/30 | 2026-08-06 |
+| [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 27/31 | 2026-08-06 |
 | [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 29/42 | 2026-08-04 |
 | [GMap_Schema_Migration_Idempotency-prd-plan.md](plans/GMap_Schema_Migration_Idempotency-prd-plan.md) | [PRD](prds/GMap_Schema_Migration_Idempotency-prd.md) | 19/47 | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd-plan.md](plans/UI_Functional_Testing_Layer-prd-plan.md) | [PRD](prds/UI_Functional_Testing_Layer-prd.md) | 16/16 | 2026-08-04 |
@@ -361,9 +363,9 @@
 | [LayerPanel_ContextMenu_Enhancement-prd-plan.md](plans/LayerPanel_ContextMenu_Enhancement-prd-plan.md) | [PRD](prds/LayerPanel_ContextMenu_Enhancement-prd.md) | 31/31 | 2026-05-14 |
 | [PRD_ImageOverlay_FileCopy_On_Register-prd-plan.md](plans/PRD_ImageOverlay_FileCopy_On_Register-prd-plan.md) | [PRD](prds/PRD_ImageOverlay_FileCopy_On_Register-prd.md) | 9/9 | 2026-05-13 |
 
-## ?뚯뒪??寃곌낵 (docs/tests/)
+## 테스트 결과 (docs/tests/)
 
-| ?뚯씪 | ?듦낵??| 而ㅻ쾭由ъ? | ?좎쭨 |
+| 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
 | [zoom-float-halfstep-scenarios.md](tests/zoom-float-halfstep-scenarios.md) | -% | -% | 2026-08-06 |
 | [zoom-float-halfstep-simulation-log.md](tests/zoom-float-halfstep-simulation-log.md) | -% | -% | 2026-08-06 |
@@ -376,139 +378,139 @@
 | [TEST_SCENARIOS_GOP_Account_RBAC.md](tests/TEST_SCENARIOS_GOP_Account_RBAC.md) | -% | -% | 2026-07-04 |
 | [TEST_ImageOverlay_FileCopy_On_Register.md](tests/TEST_ImageOverlay_FileCopy_On_Register.md) | -% | -% | 2026-05-13 |
 
-## ?꾨즺 由ы룷??(docs/reports/)
+## 완료 리포트 (docs/reports/)
 
-| ?뚯씪 | 臾몄꽌 ?곌껐 泥댁씤 | ?좎쭨 |
+| 파일 | 문서 연결 체인 | 날짜 |
 |------|------------|------|
-| [session-management-overhaul-report.md](reports/session-management-overhaul-report.md) | [PRD](prds/session-management-overhaul-prd.md) ??[Plan](plans/session-management-overhaul-prd-plan.md) | 2026-08-03 |
-| [Detection_Signal_History-report.md](reports/Detection_Signal_History-report.md) | [PRD](prds/Detection_Signal_History-prd.md) ??[Plan](plans/Detection_Signal_History-prd-plan.md) | 2026-07-27 |
-| [CameraPopup_PanClamp_Badge_OnvifPtz-report.md](reports/CameraPopup_PanClamp_Badge_OnvifPtz-report.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) ??[Plan](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | 2026-07-23 |
-| [Overlay_Title_ZoomStyle-report.md](reports/Overlay_Title_ZoomStyle-report.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) ??[Plan](plans/Overlay_Title_ZoomStyle-prd-plan.md) | 2026-07-23 |
-| [grant-verification-report.md](reports/grant-verification-report.md) | [PRD](prds/grant-verification-prd.md) ??[Plan](plans/grant-verification-prd-plan.md) | 2026-07-20 |
-| [ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md](reports/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md) | [PRD](prds/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd.md) ??[Plan](plans/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd-plan.md) | 2026-07-15 |
-| [ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md](reports/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md) | [PRD](prds/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd.md) ??[Plan](plans/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd-plan.md) | 2026-07-15 |
-| [ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md](reports/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd.md) ??[Plan](plans/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd-plan.md) | 2026-07-15 |
-| [ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md](reports/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md-prd.md) ??[Plan](plans/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md-prd-plan.md) | 2026-07-15 |
-| [Event_CRUD_Standard_Simulation-report.md](reports/Event_CRUD_Standard_Simulation-report.md) | [PRD](prds/Event_CRUD_Standard_Simulation-prd.md) ??[Plan](plans/Event_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
-| [Device_CRUD_Standard_Simulation-report.md](reports/Device_CRUD_Standard_Simulation-report.md) | [PRD](prds/Device_CRUD_Standard_Simulation-prd.md) ??[Plan](plans/Device_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
-| [TEST_VERIFICATION_CHECKLIST_2026-07-04.md](reports/TEST_VERIFICATION_CHECKLIST_2026-07-04.md) | [PRD](prds/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd.md) ??[Plan](plans/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd-plan.md) | 2026-07-04 |
-| [Permission_Simulation_Round2-report.md](reports/Permission_Simulation_Round2-report.md) | [PRD](prds/Permission_Simulation_Round2-prd.md) ??[Plan](plans/Permission_Simulation_Round2-prd-plan.md) | 2026-07-02 |
-| [Permission_Simulation_Round1-report.md](reports/Permission_Simulation_Round1-report.md) | [PRD](prds/Permission_Simulation_Round1-prd.md) ??[Plan](plans/Permission_Simulation_Round1-prd-plan.md) | 2026-07-02 |
-| [GOP_Force_Logout_Client_Phase1-report.md](reports/GOP_Force_Logout_Client_Phase1-report.md) | [PRD](prds/GOP_Force_Logout_Client_Phase1-prd.md) ??[Plan](plans/GOP_Force_Logout_Client_Phase1-prd-plan.md) | 2026-06-29 |
-| [2026-06-23_Event_Domain_Session_Report.md](reports/2026-06-23_Event_Domain_Session_Report.md) | [PRD](prds/2026-06-23_Event_Domain_Session_Report.md-prd.md) ??[Plan](plans/2026-06-23_Event_Domain_Session_Report.md-prd-plan.md) | 2026-06-22 |
-| [API_Group_DeviceCount_Cascade-report.md](reports/API_Group_DeviceCount_Cascade-report.md) | [PRD](prds/API_Group_DeviceCount_Cascade-prd.md) ??[Plan](plans/API_Group_DeviceCount_Cascade-prd-plan.md) | 2026-06-21 |
-| [API_Delete_Response_Inconsistency-report.md](reports/API_Delete_Response_Inconsistency-report.md) | [PRD](prds/API_Delete_Response_Inconsistency-prd.md) ??[Plan](plans/API_Delete_Response_Inconsistency-prd-plan.md) | 2026-06-21 |
-| [DevicePanel_TempState_QA-checklist.md](reports/DevicePanel_TempState_QA-checklist.md) | [PRD](prds/DevicePanel_TempState_QA-checklist.md-prd.md) ??[Plan](plans/DevicePanel_TempState_QA-checklist.md-prd-plan.md) | 2026-06-21 |
-| [DevicePanel_TempState_Unification-report.md](reports/DevicePanel_TempState_Unification-report.md) | [PRD](prds/DevicePanel_TempState_Unification-prd.md) ??[Plan](plans/DevicePanel_TempState_Unification-prd-plan.md) | 2026-06-21 |
-| [Controller_422_Fix-report.md](reports/Controller_422_Fix-report.md) | [PRD](prds/Controller_422_Fix-prd.md) ??[Plan](plans/Controller_422_Fix-prd-plan.md) | 2026-06-20 |
-| [DataGridPanel_CRUD_Phase2_3-report.md](reports/DataGridPanel_CRUD_Phase2_3-report.md) | [PRD](prds/DataGridPanel_CRUD_Phase2_3-prd.md) ??[Plan](plans/DataGridPanel_CRUD_Phase2_3-prd-plan.md) | 2026-06-20 |
-| [DataGridPanel_CRUD_Phase1-report.md](reports/DataGridPanel_CRUD_Phase1-report.md) | [PRD](prds/DataGridPanel_CRUD_Phase1-prd.md) ??[Plan](plans/DataGridPanel_CRUD_Phase1-prd-plan.md) | 2026-06-19 |
-| [Client_API_v46_Conformance_Batch2-report.md](reports/Client_API_v46_Conformance_Batch2-report.md) | [PRD](prds/Client_API_v46_Conformance_Batch2-prd.md) ??[Plan](plans/Client_API_v46_Conformance_Batch2-prd-plan.md) | 2026-06-19 |
-| [Client_API_v46_Conformance_Phase0-report.md](reports/Client_API_v46_Conformance_Phase0-report.md) | [PRD](prds/Client_API_v46_Conformance_Phase0-prd.md) ??[Plan](plans/Client_API_v46_Conformance_Phase0-prd-plan.md) | 2026-06-19 |
-| [DigitalZoom_RenderTransform-report.md](reports/DigitalZoom_RenderTransform-report.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) ??[Plan](plans/DigitalZoom_RenderTransform-prd-plan.md) | 2026-06-15 |
-| [WebServer_Enable_Feature-report.md](reports/WebServer_Enable_Feature-report.md) | [PRD](prds/WebServer_Enable_Feature-prd.md) ??[Plan](plans/WebServer_Enable_Feature-prd-plan.md) | 2026-06-05 |
-| [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) ??[Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |
-| [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) ??[Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
-| [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) ??[Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd-plan.md) | 2026-05-20 |
-| [Skillset_Issues_And_Improvements_2026-05-19.md](reports/Skillset_Issues_And_Improvements_2026-05-19.md) | [PRD](prds/Skillset_Issues_And_Improvements_2026-05-19.md-prd.md) ??[Plan](plans/Skillset_Issues_And_Improvements_2026-05-19.md-prd-plan.md) | 2026-05-19 |
-| [Detection_Sound_And_DualPath_Fix-report.md](reports/Detection_Sound_And_DualPath_Fix-report.md) | [PRD](prds/Detection_Sound_And_DualPath_Fix-prd.md) ??[Plan](plans/Detection_Sound_And_DualPath_Fix-prd-plan.md) | 2026-05-18 |
-| [REPORT_GMapCustomControl_ImageDrag_BugFix.md](reports/REPORT_GMapCustomControl_ImageDrag_BugFix.md) | [PRD](prds/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd.md) ??[Plan](plans/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd-plan.md) | 2026-05-15 |
-| [REPORT_ImageOverlay_FileCopy_On_Register.md](reports/REPORT_ImageOverlay_FileCopy_On_Register.md) | [PRD](prds/REPORT_ImageOverlay_FileCopy_On_Register.md-prd.md) ??[Plan](plans/REPORT_ImageOverlay_FileCopy_On_Register.md-prd-plan.md) | 2026-05-13 |
-| [REPORT_DetectionEvent_Symbol_Visual_Restore.md](reports/REPORT_DetectionEvent_Symbol_Visual_Restore.md) | [PRD](prds/REPORT_DetectionEvent_Symbol_Visual_Restore.md-prd.md) ??[Plan](plans/REPORT_DetectionEvent_Symbol_Visual_Restore.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_Broadcast_Panel_Embedded.md](reports/REPORT_Broadcast_Panel_Embedded.md) | [PRD](prds/REPORT_Broadcast_Panel_Embedded.md-prd.md) ??[Plan](plans/REPORT_Broadcast_Panel_Embedded.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_Pids_Symbol_Background.md](reports/REPORT_Pids_Symbol_Background.md) | [PRD](prds/REPORT_Pids_Symbol_Background.md-prd.md) ??[Plan](plans/REPORT_Pids_Symbol_Background.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_OverlayMap_Visibility_Activate.md](reports/REPORT_OverlayMap_Visibility_Activate.md) | [PRD](prds/REPORT_OverlayMap_Visibility_Activate.md-prd.md) ??[Plan](plans/REPORT_OverlayMap_Visibility_Activate.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_EventCard_EntryId_Connection.md](reports/REPORT_EventCard_EntryId_Connection.md) | [PRD](prds/REPORT_EventCard_EntryId_Connection.md-prd.md) ??[Plan](plans/REPORT_EventCard_EntryId_Connection.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_MBTiles_DefinedMap_Integration.md](reports/REPORT_MBTiles_DefinedMap_Integration.md) | [PRD](prds/REPORT_MBTiles_DefinedMap_Integration.md-prd.md) ??[Plan](plans/REPORT_MBTiles_DefinedMap_Integration.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_DeviceGroupSelection_ProgressCircle.md](reports/REPORT_DeviceGroupSelection_ProgressCircle.md) | [PRD](prds/REPORT_DeviceGroupSelection_ProgressCircle.md-prd.md) ??[Plan](plans/REPORT_DeviceGroupSelection_ProgressCircle.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_Gateway_DeviceGroup_Migration.md](reports/REPORT_Gateway_DeviceGroup_Migration.md) | [PRD](prds/REPORT_Gateway_DeviceGroup_Migration.md-prd.md) ??[Plan](plans/REPORT_Gateway_DeviceGroup_Migration.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_Layer_Panel_Tree_Redesign.md](reports/REPORT_Layer_Panel_Tree_Redesign.md) | [PRD](prds/REPORT_Layer_Panel_Tree_Redesign.md-prd.md) ??[Plan](plans/REPORT_Layer_Panel_Tree_Redesign.md-prd-plan.md) | 2026-05-12 |
-| [REPORT_DeviceView_ViewModel_Alignment.md](reports/REPORT_DeviceView_ViewModel_Alignment.md) | [PRD](prds/REPORT_DeviceView_ViewModel_Alignment.md-prd.md) ??[Plan](plans/REPORT_DeviceView_ViewModel_Alignment.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_Geolocation_AllDevices.md](reports/REPORT_Geolocation_AllDevices.md) | [PRD](prds/REPORT_Geolocation_AllDevices.md-prd.md) ??[Plan](plans/REPORT_Geolocation_AllDevices.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_DeviceGroup_Assignment_Ui.md](reports/REPORT_DeviceGroup_Assignment_Ui.md) | [PRD](prds/REPORT_DeviceGroup_Assignment_Ui.md-prd.md) ??[Plan](plans/REPORT_DeviceGroup_Assignment_Ui.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_SelectionView_Layout_Compact.md](reports/REPORT_SelectionView_Layout_Compact.md) | [PRD](prds/REPORT_SelectionView_Layout_Compact.md-prd.md) ??[Plan](plans/REPORT_SelectionView_Layout_Compact.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_EventPanel_Cache_Reuse.md](reports/REPORT_EventPanel_Cache_Reuse.md) | [PRD](prds/REPORT_EventPanel_Cache_Reuse.md-prd.md) ??[Plan](plans/REPORT_EventPanel_Cache_Reuse.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_PanelView_Missing_Columns.md](reports/REPORT_PanelView_Missing_Columns.md) | [PRD](prds/REPORT_PanelView_Missing_Columns.md-prd.md) ??[Plan](plans/REPORT_PanelView_Missing_Columns.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_EventPanel_Cancel_Token.md](reports/REPORT_EventPanel_Cancel_Token.md) | [PRD](prds/REPORT_EventPanel_Cancel_Token.md-prd.md) ??[Plan](plans/REPORT_EventPanel_Cancel_Token.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_DeviceTab_Header_Truncation.md](reports/REPORT_DeviceTab_Header_Truncation.md) | [PRD](prds/REPORT_DeviceTab_Header_Truncation.md-prd.md) ??[Plan](plans/REPORT_DeviceTab_Header_Truncation.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_SelectionView_CheckBox_To_ComboBox.md](reports/REPORT_SelectionView_CheckBox_To_ComboBox.md) | [PRD](prds/REPORT_SelectionView_CheckBox_To_ComboBox.md-prd.md) ??[Plan](plans/REPORT_SelectionView_CheckBox_To_ComboBox.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_Nats_Detection_Routing_Fix.md](reports/REPORT_Nats_Detection_Routing_Fix.md) | [PRD](prds/REPORT_Nats_Detection_Routing_Fix.md-prd.md) ??[Plan](plans/REPORT_Nats_Detection_Routing_Fix.md-prd-plan.md) | 2026-05-06 |
-| [REPORT_GetMarkerAtScreen_Priority_Fix.md](reports/REPORT_GetMarkerAtScreen_Priority_Fix.md) | [PRD](prds/REPORT_GetMarkerAtScreen_Priority_Fix.md-prd.md) ??[Plan](plans/REPORT_GetMarkerAtScreen_Priority_Fix.md-prd-plan.md) | 2026-03-30 |
-| [REPORT_Symbol_ZOrder_HitTest_Bug.md](reports/REPORT_Symbol_ZOrder_HitTest_Bug.md) | [PRD](prds/REPORT_Symbol_ZOrder_HitTest_Bug.md-prd.md) ??[Plan](plans/REPORT_Symbol_ZOrder_HitTest_Bug.md-prd-plan.md) | 2026-03-30 |
-| [REPORT_Symbol_ZOrder_Control.md](reports/REPORT_Symbol_ZOrder_Control.md) | [PRD](prds/REPORT_Symbol_ZOrder_Control.md-prd.md) ??[Plan](plans/REPORT_Symbol_ZOrder_Control.md-prd-plan.md) | 2026-03-30 |
-| [REPORT_Map_DragButton_LeftMouse.md](reports/REPORT_Map_DragButton_LeftMouse.md) | [PRD](prds/REPORT_Map_DragButton_LeftMouse.md-prd.md) ??[Plan](plans/REPORT_Map_DragButton_LeftMouse.md-prd-plan.md) | 2026-03-30 |
-| [REPORT_EditMode_HitTest_Passthrough.md](reports/REPORT_EditMode_HitTest_Passthrough.md) | [PRD](prds/REPORT_EditMode_HitTest_Passthrough.md-prd.md) ??[Plan](plans/REPORT_EditMode_HitTest_Passthrough.md-prd-plan.md) | 2026-03-30 |
-| [REPORT_OverlayImage_ZOrder_EditMode.md](reports/REPORT_OverlayImage_ZOrder_EditMode.md) | [PRD](prds/REPORT_OverlayImage_ZOrder_EditMode.md-prd.md) ??[Plan](plans/REPORT_OverlayImage_ZOrder_EditMode.md-prd-plan.md) | 2026-03-27 |
-| [REPORT_OverlayMap_ZOrder_Rendering.md](reports/REPORT_OverlayMap_ZOrder_Rendering.md) | [PRD](prds/REPORT_OverlayMap_ZOrder_Rendering.md-prd.md) ??[Plan](plans/REPORT_OverlayMap_ZOrder_Rendering.md-prd-plan.md) | 2026-03-26 |
-| [REPORT_Layer_Ordering_Investigation.md](reports/REPORT_Layer_Ordering_Investigation.md) | [PRD](prds/REPORT_Layer_Ordering_Investigation.md-prd.md) ??[Plan](plans/REPORT_Layer_Ordering_Investigation.md-prd-plan.md) | 2026-03-26 |
-| [REPORT_OverlayImage_Status_Analysis.md](reports/REPORT_OverlayImage_Status_Analysis.md) | [PRD](prds/REPORT_OverlayImage_Status_Analysis.md-prd.md) ??[Plan](plans/REPORT_OverlayImage_Status_Analysis.md-prd-plan.md) | 2026-03-25 |
-| [REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md](reports/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md) | [PRD](prds/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md-prd.md) ??[Plan](plans/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md-prd-plan.md) | 2026-03-24 |
-| [REPORT_MapViewModel_Provider_Cleanup.md](reports/REPORT_MapViewModel_Provider_Cleanup.md) | [PRD](prds/REPORT_MapViewModel_Provider_Cleanup.md-prd.md) ??[Plan](plans/REPORT_MapViewModel_Provider_Cleanup.md-prd-plan.md) | 2026-03-24 |
-| [REPORT_EntryId_Nats_Uuid_DirectMatch.md](reports/REPORT_EntryId_Nats_Uuid_DirectMatch.md) | [PRD](prds/REPORT_EntryId_Nats_Uuid_DirectMatch.md-prd.md) ??[Plan](plans/REPORT_EntryId_Nats_Uuid_DirectMatch.md-prd-plan.md) | 2026-03-13 |
-| [REPORT_CollectionChanged_BatchReset.md](reports/REPORT_CollectionChanged_BatchReset.md) | [PRD](prds/REPORT_CollectionChanged_BatchReset.md-prd.md) ??[Plan](plans/REPORT_CollectionChanged_BatchReset.md-prd-plan.md) | 2026-03-13 |
-| [REPORT_SharedTimer_Chunk_Dequeue.md](reports/REPORT_SharedTimer_Chunk_Dequeue.md) | [PRD](prds/REPORT_SharedTimer_Chunk_Dequeue.md-prd.md) ??[Plan](plans/REPORT_SharedTimer_Chunk_Dequeue.md-prd-plan.md) | 2026-03-13 |
-| [REPORT_EventQueue_Logic_Analysis.md](reports/REPORT_EventQueue_Logic_Analysis.md) | [PRD](prds/REPORT_EventQueue_Logic_Analysis.md-prd.md) ??[Plan](plans/REPORT_EventQueue_Logic_Analysis.md-prd-plan.md) | 2026-03-13 |
-| [REPORT_EventQueue_Symbol_Unification.md](reports/REPORT_EventQueue_Symbol_Unification.md) | [PRD](prds/REPORT_EventQueue_Symbol_Unification.md-prd.md) ??[Plan](plans/REPORT_EventQueue_Symbol_Unification.md-prd-plan.md) | 2026-03-13 |
-| [REPORT_Batch_Action_Report.md](reports/REPORT_Batch_Action_Report.md) | [PRD](prds/REPORT_Batch_Action_Report.md-prd.md) ??[Plan](plans/REPORT_Batch_Action_Report.md-prd-plan.md) | 2026-03-13 |
-| [REPORT_DevicePanel_ProgressCircle_Fix.md](reports/REPORT_DevicePanel_ProgressCircle_Fix.md) | [PRD](prds/REPORT_DevicePanel_ProgressCircle_Fix.md-prd.md) ??[Plan](plans/REPORT_DevicePanel_ProgressCircle_Fix.md-prd-plan.md) | 2026-03-12 |
-| [ANALYSIS_DevicePanel_ProgressCircle_Visibility.md](reports/ANALYSIS_DevicePanel_ProgressCircle_Visibility.md) | [PRD](prds/ANALYSIS_DevicePanel_ProgressCircle_Visibility.md-prd.md) ??[Plan](plans/ANALYSIS_DevicePanel_ProgressCircle_Visibility.md-prd-plan.md) | 2026-03-12 |
-| [ANALYSIS_Redis_RTSP_Popup_Communication.md](reports/ANALYSIS_Redis_RTSP_Popup_Communication.md) | [PRD](prds/ANALYSIS_Redis_RTSP_Popup_Communication.md-prd.md) ??[Plan](plans/ANALYSIS_Redis_RTSP_Popup_Communication.md-prd-plan.md) | 2026-03-12 |
-| [REPORT_EventPanel_CentralizedDatePicker.md](reports/REPORT_EventPanel_CentralizedDatePicker.md) | [PRD](prds/REPORT_EventPanel_CentralizedDatePicker.md-prd.md) ??[Plan](plans/REPORT_EventPanel_CentralizedDatePicker.md-prd-plan.md) | 2026-03-12 |
-| [ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md](reports/ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md) | [PRD](prds/ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md-prd.md) ??[Plan](plans/ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md-prd-plan.md) | 2026-03-12 |
-| [REPORT_Event_BatchUI_Performance.md](reports/REPORT_Event_BatchUI_Performance.md) | [PRD](prds/REPORT_Event_BatchUI_Performance.md-prd.md) ??[Plan](plans/REPORT_Event_BatchUI_Performance.md-prd-plan.md) | 2026-03-08 |
-| [REPORT_Event_Pipeline_Redesign.md](reports/REPORT_Event_Pipeline_Redesign.md) | [PRD](prds/REPORT_Event_Pipeline_Redesign.md-prd.md) ??[Plan](plans/REPORT_Event_Pipeline_Redesign.md-prd-plan.md) | 2026-03-08 |
-| [ANALYSIS_Performance_Event_Processing_v2.md](reports/ANALYSIS_Performance_Event_Processing_v2.md) | [PRD](prds/ANALYSIS_Performance_Event_Processing_v2.md-prd.md) ??[Plan](plans/ANALYSIS_Performance_Event_Processing_v2.md-prd-plan.md) | 2026-03-07 |
-| [REPORT_DeviceGroup_AssignDialog_Wrapper.md](reports/REPORT_DeviceGroup_AssignDialog_Wrapper.md) | [PRD](prds/REPORT_DeviceGroup_AssignDialog_Wrapper.md-prd.md) ??[Plan](plans/REPORT_DeviceGroup_AssignDialog_Wrapper.md-prd-plan.md) | 2026-03-07 |
-| [REPORT_WindyMode_Nats_Integration.md](reports/REPORT_WindyMode_Nats_Integration.md) | [PRD](prds/REPORT_WindyMode_Nats_Integration.md-prd.md) ??[Plan](plans/REPORT_WindyMode_Nats_Integration.md-prd-plan.md) | 2026-03-06 |
-| [ANALYSIS_Performance_Event_Processing.md](reports/ANALYSIS_Performance_Event_Processing.md) | [PRD](prds/ANALYSIS_Performance_Event_Processing.md-prd.md) ??[Plan](plans/ANALYSIS_Performance_Event_Processing.md-prd-plan.md) | 2026-03-06 |
-| [REPORT_SymbolVisual_SyncDevice_Unification.md](reports/REPORT_SymbolVisual_SyncDevice_Unification.md) | [PRD](prds/REPORT_SymbolVisual_SyncDevice_Unification.md-prd.md) ??[Plan](plans/REPORT_SymbolVisual_SyncDevice_Unification.md-prd-plan.md) | 2026-03-06 |
-| [REPORT_PidsSymbol_Status_Visual_Fix.md](reports/REPORT_PidsSymbol_Status_Visual_Fix.md) | [PRD](prds/REPORT_PidsSymbol_Status_Visual_Fix.md-prd.md) ??[Plan](plans/REPORT_PidsSymbol_Status_Visual_Fix.md-prd-plan.md) | 2026-03-06 |
-| [REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md](reports/REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md) | [PRD](prds/REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md-prd.md) ??[Plan](plans/REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md-prd-plan.md) | 2026-03-06 |
-| [REPORT_NatsSync_PidsIndicator_Realtime_Fix.md](reports/REPORT_NatsSync_PidsIndicator_Realtime_Fix.md) | [PRD](prds/REPORT_NatsSync_PidsIndicator_Realtime_Fix.md-prd.md) ??[Plan](plans/REPORT_NatsSync_PidsIndicator_Realtime_Fix.md-prd-plan.md) | 2026-03-06 |
-| [REPORT_DeviceDetailUrl_SswSvms_Format.md](reports/REPORT_DeviceDetailUrl_SswSvms_Format.md) | [PRD](prds/REPORT_DeviceDetailUrl_SswSvms_Format.md-prd.md) ??[Plan](plans/REPORT_DeviceDetailUrl_SswSvms_Format.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_Nats_SyncDevice_Handling.md](reports/REPORT_Nats_SyncDevice_Handling.md) | [PRD](prds/REPORT_Nats_SyncDevice_Handling.md-prd.md) ??[Plan](plans/REPORT_Nats_SyncDevice_Handling.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_Speaker_Broadcast_ContextMenu.md](reports/REPORT_Speaker_Broadcast_ContextMenu.md) | [PRD](prds/REPORT_Speaker_Broadcast_ContextMenu.md-prd.md) ??[Plan](plans/REPORT_Speaker_Broadcast_ContextMenu.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_PidsMarker_ContextMenu_DeviceDetail.md](reports/REPORT_PidsMarker_ContextMenu_DeviceDetail.md) | [PRD](prds/REPORT_PidsMarker_ContextMenu_DeviceDetail.md-prd.md) ??[Plan](plans/REPORT_PidsMarker_ContextMenu_DeviceDetail.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_PidsMarker_FaultBlink_Animation.md](reports/REPORT_PidsMarker_FaultBlink_Animation.md) | [PRD](prds/REPORT_PidsMarker_FaultBlink_Animation.md-prd.md) ??[Plan](plans/REPORT_PidsMarker_FaultBlink_Animation.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_Camera_PtzStatus_Nats_Service.md](reports/REPORT_Camera_PtzStatus_Nats_Service.md) | [PRD](prds/REPORT_Camera_PtzStatus_Nats_Service.md-prd.md) ??[Plan](plans/REPORT_Camera_PtzStatus_Nats_Service.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_GMaps_Pids_SmartSensor_Symbol.md](reports/REPORT_GMaps_Pids_SmartSensor_Symbol.md) | [PRD](prds/REPORT_GMaps_Pids_SmartSensor_Symbol.md-prd.md) ??[Plan](plans/REPORT_GMaps_Pids_SmartSensor_Symbol.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_FaultFence_GroupSymbol_Color_Fix.md](reports/REPORT_FaultFence_GroupSymbol_Color_Fix.md) | [PRD](prds/REPORT_FaultFence_GroupSymbol_Color_Fix.md-prd.md) ??[Plan](plans/REPORT_FaultFence_GroupSymbol_Color_Fix.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_ActionReport_Flow_Analysis.md](reports/REPORT_ActionReport_Flow_Analysis.md) | [PRD](prds/REPORT_ActionReport_Flow_Analysis.md-prd.md) ??[Plan](plans/REPORT_ActionReport_Flow_Analysis.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_GMaps_Pids_Speaker_Symbol.md](reports/REPORT_GMaps_Pids_Speaker_Symbol.md) | [PRD](prds/REPORT_GMaps_Pids_Speaker_Symbol.md-prd.md) ??[Plan](plans/REPORT_GMaps_Pids_Speaker_Symbol.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_Nats_MessageService_Wiring_Fix.md](reports/REPORT_Nats_MessageService_Wiring_Fix.md) | [PRD](prds/REPORT_Nats_MessageService_Wiring_Fix.md-prd.md) ??[Plan](plans/REPORT_Nats_MessageService_Wiring_Fix.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_Pids_NatsSync_OperationState_Realtime.md](reports/REPORT_Pids_NatsSync_OperationState_Realtime.md) | [PRD](prds/REPORT_Pids_NatsSync_OperationState_Realtime.md-prd.md) ??[Plan](plans/REPORT_Pids_NatsSync_OperationState_Realtime.md-prd-plan.md) | 2026-03-05 |
-| [REPORT_NATS_Event_Integration.md](reports/REPORT_NATS_Event_Integration.md) | [PRD](prds/REPORT_NATS_Event_Integration.md-prd.md) ??[Plan](plans/REPORT_NATS_Event_Integration.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_Nats_Setup_Refactoring.md](reports/REPORT_Nats_Setup_Refactoring.md) | [PRD](prds/REPORT_Nats_Setup_Refactoring.md-prd.md) ??[Plan](plans/REPORT_Nats_Setup_Refactoring.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_GMap_Pids_Indicator_OperationState_Policy.md](reports/REPORT_GMap_Pids_Indicator_OperationState_Policy.md) | [PRD](prds/REPORT_GMap_Pids_Indicator_OperationState_Policy.md-prd.md) ??[Plan](plans/REPORT_GMap_Pids_Indicator_OperationState_Policy.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_EventPanel_Remove_Zone_Add_ActionReported.md](reports/REPORT_EventPanel_Remove_Zone_Add_ActionReported.md) | [PRD](prds/REPORT_EventPanel_Remove_Zone_Add_ActionReported.md-prd.md) ??[Plan](plans/REPORT_EventPanel_Remove_Zone_Add_ActionReported.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_GMap_PidsGroup_DeviceGroup_Integration.md](reports/REPORT_GMap_PidsGroup_DeviceGroup_Integration.md) | [PRD](prds/REPORT_GMap_PidsGroup_DeviceGroup_Integration.md-prd.md) ??[Plan](plans/REPORT_GMap_PidsGroup_DeviceGroup_Integration.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md](reports/REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md) | [PRD](prds/REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md-prd.md) ??[Plan](plans/REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_DevicePanel_CRUD_And_GroupAssignment.md](reports/REPORT_DevicePanel_CRUD_And_GroupAssignment.md) | [PRD](prds/REPORT_DevicePanel_CRUD_And_GroupAssignment.md-prd.md) ??[Plan](plans/REPORT_DevicePanel_CRUD_And_GroupAssignment.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_GMaps_Db_Safe_Enum_Parse.md](reports/REPORT_GMaps_Db_Safe_Enum_Parse.md) | [PRD](prds/REPORT_GMaps_Db_Safe_Enum_Parse.md-prd.md) ??[Plan](plans/REPORT_GMaps_Db_Safe_Enum_Parse.md-prd-plan.md) | 2026-03-04 |
-| [REPORT_Dashboard_Loading_Progress.md](reports/REPORT_Dashboard_Loading_Progress.md) | [PRD](prds/REPORT_Dashboard_Loading_Progress.md-prd.md) ??[Plan](plans/REPORT_Dashboard_Loading_Progress.md-prd-plan.md) | 2026-03-03 |
-| [REPORT_EventDashboard_Statistics_Integration.md](reports/REPORT_EventDashboard_Statistics_Integration.md) | [PRD](prds/REPORT_EventDashboard_Statistics_Integration.md-prd.md) ??[Plan](plans/REPORT_EventDashboard_Statistics_Integration.md-prd-plan.md) | 2026-03-03 |
-| [REPORT_DevicePanel_InfiniteScroll_Pagination.md](reports/REPORT_DevicePanel_InfiniteScroll_Pagination.md) | [PRD](prds/REPORT_DevicePanel_InfiniteScroll_Pagination.md-prd.md) ??[Plan](plans/REPORT_DevicePanel_InfiniteScroll_Pagination.md-prd-plan.md) | 2026-03-03 |
-| [REPORT_Tab_Switch_Info_Refresh.md](reports/REPORT_Tab_Switch_Info_Refresh.md) | [PRD](prds/REPORT_Tab_Switch_Info_Refresh.md-prd.md) ??[Plan](plans/REPORT_Tab_Switch_Info_Refresh.md-prd-plan.md) | 2026-03-03 |
-| [REPORT_Chart_Empty_Data_Display.md](reports/REPORT_Chart_Empty_Data_Display.md) | [PRD](prds/REPORT_Chart_Empty_Data_Display.md-prd.md) ??[Plan](plans/REPORT_Chart_Empty_Data_Display.md-prd-plan.md) | 2026-03-03 |
-| [REPORT_ActionEvent_Loading_Fix.md](reports/REPORT_ActionEvent_Loading_Fix.md) | [PRD](prds/REPORT_ActionEvent_Loading_Fix.md-prd.md) ??[Plan](plans/REPORT_ActionEvent_Loading_Fix.md-prd-plan.md) | 2026-02-27 |
-| [REPORT_Event_UnitTest_Coverage.md](reports/REPORT_Event_UnitTest_Coverage.md) | [PRD](prds/REPORT_Event_UnitTest_Coverage.md-prd.md) ??[Plan](plans/REPORT_Event_UnitTest_Coverage.md-prd-plan.md) | 2026-02-27 |
-| [REPORT_EventPanel_Loading_State_Fix.md](reports/REPORT_EventPanel_Loading_State_Fix.md) | [PRD](prds/REPORT_EventPanel_Loading_State_Fix.md-prd.md) ??[Plan](plans/REPORT_EventPanel_Loading_State_Fix.md-prd-plan.md) | 2026-02-27 |
-| [REPORT_Event_InfiniteScroll_Pagination.md](reports/REPORT_Event_InfiniteScroll_Pagination.md) | [PRD](prds/REPORT_Event_InfiniteScroll_Pagination.md-prd.md) ??[Plan](plans/REPORT_Event_InfiniteScroll_Pagination.md-prd-plan.md) | 2026-02-27 |
-| [REPORT_Event_DtoModel_Matching.md](reports/REPORT_Event_DtoModel_Matching.md) | [PRD](prds/REPORT_Event_DtoModel_Matching.md-prd.md) ??[Plan](plans/REPORT_Event_DtoModel_Matching.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_Dashboard_NewDevice_Fetch_Fix.md](reports/REPORT_Dashboard_NewDevice_Fetch_Fix.md) | [PRD](prds/REPORT_Dashboard_NewDevice_Fetch_Fix.md-prd.md) ??[Plan](plans/REPORT_Dashboard_NewDevice_Fetch_Fix.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_AllDevices_Geo_Sync_Fix.md](reports/REPORT_AllDevices_Geo_Sync_Fix.md) | [PRD](prds/REPORT_AllDevices_Geo_Sync_Fix.md-prd.md) ??[Plan](plans/REPORT_AllDevices_Geo_Sync_Fix.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_Sensor_UpdateProperties_Geo_Fix.md](reports/REPORT_Sensor_UpdateProperties_Geo_Fix.md) | [PRD](prds/REPORT_Sensor_UpdateProperties_Geo_Fix.md-prd.md) ??[Plan](plans/REPORT_Sensor_UpdateProperties_Geo_Fix.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_Sensor_DeviceEquals_Fix.md](reports/REPORT_Sensor_DeviceEquals_Fix.md) | [PRD](prds/REPORT_Sensor_DeviceEquals_Fix.md-prd.md) ??[Plan](plans/REPORT_Sensor_DeviceEquals_Fix.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_Camera_Dto_Mapping_Fix.md](reports/REPORT_Camera_Dto_Mapping_Fix.md) | [PRD](prds/REPORT_Camera_Dto_Mapping_Fix.md-prd.md) ??[Plan](plans/REPORT_Camera_Dto_Mapping_Fix.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_Camera_IsRecord_Editable.md](reports/REPORT_Camera_IsRecord_Editable.md) | [PRD](prds/REPORT_Camera_IsRecord_Editable.md-prd.md) ??[Plan](plans/REPORT_Camera_IsRecord_Editable.md-prd-plan.md) | 2026-02-26 |
-| [REPORT_Camera_Model_Cleanup_And_DetailView.md](reports/REPORT_Camera_Model_Cleanup_And_DetailView.md) | [PRD](prds/REPORT_Camera_Model_Cleanup_And_DetailView.md-prd.md) ??[Plan](plans/REPORT_Camera_Model_Cleanup_And_DetailView.md-prd-plan.md) | 2026-02-25 |
-| [REPORT_DevicePanel_CRUD_Completion.md](reports/REPORT_DevicePanel_CRUD_Completion.md) | [PRD](prds/REPORT_DevicePanel_CRUD_Completion.md-prd.md) ??[Plan](plans/REPORT_DevicePanel_CRUD_Completion.md-prd-plan.md) | 2026-02-25 |
-| [REPORT_DeviceGroup_Ui.md](reports/REPORT_DeviceGroup_Ui.md) | [PRD](prds/REPORT_DeviceGroup_Ui.md-prd.md) ??[Plan](plans/REPORT_DeviceGroup_Ui.md-prd-plan.md) | 2026-02-25 |
-| [REPORT_EventUi_DeviceProperty_Binding.md](reports/REPORT_EventUi_DeviceProperty_Binding.md) | [PRD](prds/REPORT_EventUi_DeviceProperty_Binding.md-prd.md) ??[Plan](plans/REPORT_EventUi_DeviceProperty_Binding.md-prd-plan.md) | 2026-02-25 |
-| [REPORT_EventApi_IntegrationTest.md](reports/REPORT_EventApi_IntegrationTest.md) | [PRD](prds/REPORT_EventApi_IntegrationTest.md-prd.md) ??[Plan](plans/REPORT_EventApi_IntegrationTest.md-prd-plan.md) | 2026-02-25 |
-| [REPORT_CameraPreset_ROI_Point_Api.md](reports/REPORT_CameraPreset_ROI_Point_Api.md) | [PRD](prds/REPORT_CameraPreset_ROI_Point_Api.md-prd.md) ??[Plan](plans/REPORT_CameraPreset_ROI_Point_Api.md-prd-plan.md) | 2026-02-24 |
-| [REPORT_ServerApi_IntegrationTest.md](reports/REPORT_ServerApi_IntegrationTest.md) | [PRD](prds/REPORT_ServerApi_IntegrationTest.md-prd.md) ??[Plan](plans/REPORT_ServerApi_IntegrationTest.md-prd-plan.md) | 2026-02-24 |
-| [REPORT_DeviceApi_IntegrationTest.md](reports/REPORT_DeviceApi_IntegrationTest.md) | [PRD](prds/REPORT_DeviceApi_IntegrationTest.md-prd.md) ??[Plan](plans/REPORT_DeviceApi_IntegrationTest.md-prd-plan.md) | 2026-02-24 |
+| [session-management-overhaul-report.md](reports/session-management-overhaul-report.md) | [PRD](prds/session-management-overhaul-prd.md) → [Plan](plans/session-management-overhaul-prd-plan.md) | 2026-08-03 |
+| [Detection_Signal_History-report.md](reports/Detection_Signal_History-report.md) | [PRD](prds/Detection_Signal_History-prd.md) → [Plan](plans/Detection_Signal_History-prd-plan.md) | 2026-07-27 |
+| [CameraPopup_PanClamp_Badge_OnvifPtz-report.md](reports/CameraPopup_PanClamp_Badge_OnvifPtz-report.md) | [PRD](prds/CameraPopup_PanClamp_Badge_OnvifPtz-prd.md) → [Plan](plans/CameraPopup_PanClamp_Badge_OnvifPtz-prd-plan.md) | 2026-07-23 |
+| [Overlay_Title_ZoomStyle-report.md](reports/Overlay_Title_ZoomStyle-report.md) | [PRD](prds/Overlay_Title_ZoomStyle-prd.md) → [Plan](plans/Overlay_Title_ZoomStyle-prd-plan.md) | 2026-07-23 |
+| [grant-verification-report.md](reports/grant-verification-report.md) | [PRD](prds/grant-verification-prd.md) → [Plan](plans/grant-verification-prd-plan.md) | 2026-07-20 |
+| [ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md](reports/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md) | [PRD](prds/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd.md) → [Plan](plans/ANALYSIS_DevicePanel_Intermittent_Empty_API_Load.md-prd-plan.md) | 2026-07-15 |
+| [ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md](reports/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md) | [PRD](prds/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd.md) → [Plan](plans/ANALYSIS_GMap_IpCamera_FOV_Add_Bug.md-prd-plan.md) | 2026-07-15 |
+| [ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md](reports/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd.md) → [Plan](plans/ANALYSIS_GMap_PidsGroup_Blink_StrokeThickness_FieldBuild.md-prd-plan.md) | 2026-07-15 |
+| [ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md](reports/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md) | [PRD](prds/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md-prd.md) → [Plan](plans/ANALYSIS_GMap_PidsGroup_Lock_MultiMonitor_Disappearance.md-prd-plan.md) | 2026-07-15 |
+| [Event_CRUD_Standard_Simulation-report.md](reports/Event_CRUD_Standard_Simulation-report.md) | [PRD](prds/Event_CRUD_Standard_Simulation-prd.md) → [Plan](plans/Event_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
+| [Device_CRUD_Standard_Simulation-report.md](reports/Device_CRUD_Standard_Simulation-report.md) | [PRD](prds/Device_CRUD_Standard_Simulation-prd.md) → [Plan](plans/Device_CRUD_Standard_Simulation-prd-plan.md) | 2026-07-05 |
+| [TEST_VERIFICATION_CHECKLIST_2026-07-04.md](reports/TEST_VERIFICATION_CHECKLIST_2026-07-04.md) | [PRD](prds/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd.md) → [Plan](plans/TEST_VERIFICATION_CHECKLIST_2026-07-04.md-prd-plan.md) | 2026-07-04 |
+| [Permission_Simulation_Round2-report.md](reports/Permission_Simulation_Round2-report.md) | [PRD](prds/Permission_Simulation_Round2-prd.md) → [Plan](plans/Permission_Simulation_Round2-prd-plan.md) | 2026-07-02 |
+| [Permission_Simulation_Round1-report.md](reports/Permission_Simulation_Round1-report.md) | [PRD](prds/Permission_Simulation_Round1-prd.md) → [Plan](plans/Permission_Simulation_Round1-prd-plan.md) | 2026-07-02 |
+| [GOP_Force_Logout_Client_Phase1-report.md](reports/GOP_Force_Logout_Client_Phase1-report.md) | [PRD](prds/GOP_Force_Logout_Client_Phase1-prd.md) → [Plan](plans/GOP_Force_Logout_Client_Phase1-prd-plan.md) | 2026-06-29 |
+| [2026-06-23_Event_Domain_Session_Report.md](reports/2026-06-23_Event_Domain_Session_Report.md) | [PRD](prds/2026-06-23_Event_Domain_Session_Report.md-prd.md) → [Plan](plans/2026-06-23_Event_Domain_Session_Report.md-prd-plan.md) | 2026-06-22 |
+| [API_Group_DeviceCount_Cascade-report.md](reports/API_Group_DeviceCount_Cascade-report.md) | [PRD](prds/API_Group_DeviceCount_Cascade-prd.md) → [Plan](plans/API_Group_DeviceCount_Cascade-prd-plan.md) | 2026-06-21 |
+| [API_Delete_Response_Inconsistency-report.md](reports/API_Delete_Response_Inconsistency-report.md) | [PRD](prds/API_Delete_Response_Inconsistency-prd.md) → [Plan](plans/API_Delete_Response_Inconsistency-prd-plan.md) | 2026-06-21 |
+| [DevicePanel_TempState_QA-checklist.md](reports/DevicePanel_TempState_QA-checklist.md) | [PRD](prds/DevicePanel_TempState_QA-checklist.md-prd.md) → [Plan](plans/DevicePanel_TempState_QA-checklist.md-prd-plan.md) | 2026-06-21 |
+| [DevicePanel_TempState_Unification-report.md](reports/DevicePanel_TempState_Unification-report.md) | [PRD](prds/DevicePanel_TempState_Unification-prd.md) → [Plan](plans/DevicePanel_TempState_Unification-prd-plan.md) | 2026-06-21 |
+| [Controller_422_Fix-report.md](reports/Controller_422_Fix-report.md) | [PRD](prds/Controller_422_Fix-prd.md) → [Plan](plans/Controller_422_Fix-prd-plan.md) | 2026-06-20 |
+| [DataGridPanel_CRUD_Phase2_3-report.md](reports/DataGridPanel_CRUD_Phase2_3-report.md) | [PRD](prds/DataGridPanel_CRUD_Phase2_3-prd.md) → [Plan](plans/DataGridPanel_CRUD_Phase2_3-prd-plan.md) | 2026-06-20 |
+| [DataGridPanel_CRUD_Phase1-report.md](reports/DataGridPanel_CRUD_Phase1-report.md) | [PRD](prds/DataGridPanel_CRUD_Phase1-prd.md) → [Plan](plans/DataGridPanel_CRUD_Phase1-prd-plan.md) | 2026-06-19 |
+| [Client_API_v46_Conformance_Batch2-report.md](reports/Client_API_v46_Conformance_Batch2-report.md) | [PRD](prds/Client_API_v46_Conformance_Batch2-prd.md) → [Plan](plans/Client_API_v46_Conformance_Batch2-prd-plan.md) | 2026-06-19 |
+| [Client_API_v46_Conformance_Phase0-report.md](reports/Client_API_v46_Conformance_Phase0-report.md) | [PRD](prds/Client_API_v46_Conformance_Phase0-prd.md) → [Plan](plans/Client_API_v46_Conformance_Phase0-prd-plan.md) | 2026-06-19 |
+| [DigitalZoom_RenderTransform-report.md](reports/DigitalZoom_RenderTransform-report.md) | [PRD](prds/DigitalZoom_RenderTransform-prd.md) → [Plan](plans/DigitalZoom_RenderTransform-prd-plan.md) | 2026-06-15 |
+| [WebServer_Enable_Feature-report.md](reports/WebServer_Enable_Feature-report.md) | [PRD](prds/WebServer_Enable_Feature-prd.md) → [Plan](plans/WebServer_Enable_Feature-prd-plan.md) | 2026-06-05 |
+| [SymbolUpdate_DispatcherFreeze_Fix-report.md](reports/SymbolUpdate_DispatcherFreeze_Fix-report.md) | [PRD](prds/SymbolUpdate_DispatcherFreeze_Fix-prd.md) → [Plan](plans/SymbolUpdate_DispatcherFreeze_Fix-prd-plan.md) | 2026-06-04 |
+| [OverlayMap_MBTiles_Provider-report.md](reports/OverlayMap_MBTiles_Provider-report.md) | [PRD](prds/OverlayMap_MBTiles_Provider-prd.md) → [Plan](plans/OverlayMap_MBTiles_Provider-prd-plan.md) | 2026-06-02 |
+| [Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md](reports/Device_CompositeState_SSOT_And_FaultAutoRecovery-report.md) | [PRD](prds/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd.md) → [Plan](plans/Device_CompositeState_SSOT_And_FaultAutoRecovery-prd-plan.md) | 2026-05-20 |
+| [Skillset_Issues_And_Improvements_2026-05-19.md](reports/Skillset_Issues_And_Improvements_2026-05-19.md) | [PRD](prds/Skillset_Issues_And_Improvements_2026-05-19.md-prd.md) → [Plan](plans/Skillset_Issues_And_Improvements_2026-05-19.md-prd-plan.md) | 2026-05-19 |
+| [Detection_Sound_And_DualPath_Fix-report.md](reports/Detection_Sound_And_DualPath_Fix-report.md) | [PRD](prds/Detection_Sound_And_DualPath_Fix-prd.md) → [Plan](plans/Detection_Sound_And_DualPath_Fix-prd-plan.md) | 2026-05-18 |
+| [REPORT_GMapCustomControl_ImageDrag_BugFix.md](reports/REPORT_GMapCustomControl_ImageDrag_BugFix.md) | [PRD](prds/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd.md) → [Plan](plans/REPORT_GMapCustomControl_ImageDrag_BugFix.md-prd-plan.md) | 2026-05-15 |
+| [REPORT_ImageOverlay_FileCopy_On_Register.md](reports/REPORT_ImageOverlay_FileCopy_On_Register.md) | [PRD](prds/REPORT_ImageOverlay_FileCopy_On_Register.md-prd.md) → [Plan](plans/REPORT_ImageOverlay_FileCopy_On_Register.md-prd-plan.md) | 2026-05-13 |
+| [REPORT_DetectionEvent_Symbol_Visual_Restore.md](reports/REPORT_DetectionEvent_Symbol_Visual_Restore.md) | [PRD](prds/REPORT_DetectionEvent_Symbol_Visual_Restore.md-prd.md) → [Plan](plans/REPORT_DetectionEvent_Symbol_Visual_Restore.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_Broadcast_Panel_Embedded.md](reports/REPORT_Broadcast_Panel_Embedded.md) | [PRD](prds/REPORT_Broadcast_Panel_Embedded.md-prd.md) → [Plan](plans/REPORT_Broadcast_Panel_Embedded.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_Pids_Symbol_Background.md](reports/REPORT_Pids_Symbol_Background.md) | [PRD](prds/REPORT_Pids_Symbol_Background.md-prd.md) → [Plan](plans/REPORT_Pids_Symbol_Background.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_OverlayMap_Visibility_Activate.md](reports/REPORT_OverlayMap_Visibility_Activate.md) | [PRD](prds/REPORT_OverlayMap_Visibility_Activate.md-prd.md) → [Plan](plans/REPORT_OverlayMap_Visibility_Activate.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_EventCard_EntryId_Connection.md](reports/REPORT_EventCard_EntryId_Connection.md) | [PRD](prds/REPORT_EventCard_EntryId_Connection.md-prd.md) → [Plan](plans/REPORT_EventCard_EntryId_Connection.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_MBTiles_DefinedMap_Integration.md](reports/REPORT_MBTiles_DefinedMap_Integration.md) | [PRD](prds/REPORT_MBTiles_DefinedMap_Integration.md-prd.md) → [Plan](plans/REPORT_MBTiles_DefinedMap_Integration.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_DeviceGroupSelection_ProgressCircle.md](reports/REPORT_DeviceGroupSelection_ProgressCircle.md) | [PRD](prds/REPORT_DeviceGroupSelection_ProgressCircle.md-prd.md) → [Plan](plans/REPORT_DeviceGroupSelection_ProgressCircle.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_Gateway_DeviceGroup_Migration.md](reports/REPORT_Gateway_DeviceGroup_Migration.md) | [PRD](prds/REPORT_Gateway_DeviceGroup_Migration.md-prd.md) → [Plan](plans/REPORT_Gateway_DeviceGroup_Migration.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_Layer_Panel_Tree_Redesign.md](reports/REPORT_Layer_Panel_Tree_Redesign.md) | [PRD](prds/REPORT_Layer_Panel_Tree_Redesign.md-prd.md) → [Plan](plans/REPORT_Layer_Panel_Tree_Redesign.md-prd-plan.md) | 2026-05-12 |
+| [REPORT_DeviceView_ViewModel_Alignment.md](reports/REPORT_DeviceView_ViewModel_Alignment.md) | [PRD](prds/REPORT_DeviceView_ViewModel_Alignment.md-prd.md) → [Plan](plans/REPORT_DeviceView_ViewModel_Alignment.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_Geolocation_AllDevices.md](reports/REPORT_Geolocation_AllDevices.md) | [PRD](prds/REPORT_Geolocation_AllDevices.md-prd.md) → [Plan](plans/REPORT_Geolocation_AllDevices.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_DeviceGroup_Assignment_Ui.md](reports/REPORT_DeviceGroup_Assignment_Ui.md) | [PRD](prds/REPORT_DeviceGroup_Assignment_Ui.md-prd.md) → [Plan](plans/REPORT_DeviceGroup_Assignment_Ui.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_SelectionView_Layout_Compact.md](reports/REPORT_SelectionView_Layout_Compact.md) | [PRD](prds/REPORT_SelectionView_Layout_Compact.md-prd.md) → [Plan](plans/REPORT_SelectionView_Layout_Compact.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_EventPanel_Cache_Reuse.md](reports/REPORT_EventPanel_Cache_Reuse.md) | [PRD](prds/REPORT_EventPanel_Cache_Reuse.md-prd.md) → [Plan](plans/REPORT_EventPanel_Cache_Reuse.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_PanelView_Missing_Columns.md](reports/REPORT_PanelView_Missing_Columns.md) | [PRD](prds/REPORT_PanelView_Missing_Columns.md-prd.md) → [Plan](plans/REPORT_PanelView_Missing_Columns.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_EventPanel_Cancel_Token.md](reports/REPORT_EventPanel_Cancel_Token.md) | [PRD](prds/REPORT_EventPanel_Cancel_Token.md-prd.md) → [Plan](plans/REPORT_EventPanel_Cancel_Token.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_DeviceTab_Header_Truncation.md](reports/REPORT_DeviceTab_Header_Truncation.md) | [PRD](prds/REPORT_DeviceTab_Header_Truncation.md-prd.md) → [Plan](plans/REPORT_DeviceTab_Header_Truncation.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_SelectionView_CheckBox_To_ComboBox.md](reports/REPORT_SelectionView_CheckBox_To_ComboBox.md) | [PRD](prds/REPORT_SelectionView_CheckBox_To_ComboBox.md-prd.md) → [Plan](plans/REPORT_SelectionView_CheckBox_To_ComboBox.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_Nats_Detection_Routing_Fix.md](reports/REPORT_Nats_Detection_Routing_Fix.md) | [PRD](prds/REPORT_Nats_Detection_Routing_Fix.md-prd.md) → [Plan](plans/REPORT_Nats_Detection_Routing_Fix.md-prd-plan.md) | 2026-05-06 |
+| [REPORT_GetMarkerAtScreen_Priority_Fix.md](reports/REPORT_GetMarkerAtScreen_Priority_Fix.md) | [PRD](prds/REPORT_GetMarkerAtScreen_Priority_Fix.md-prd.md) → [Plan](plans/REPORT_GetMarkerAtScreen_Priority_Fix.md-prd-plan.md) | 2026-03-30 |
+| [REPORT_Symbol_ZOrder_HitTest_Bug.md](reports/REPORT_Symbol_ZOrder_HitTest_Bug.md) | [PRD](prds/REPORT_Symbol_ZOrder_HitTest_Bug.md-prd.md) → [Plan](plans/REPORT_Symbol_ZOrder_HitTest_Bug.md-prd-plan.md) | 2026-03-30 |
+| [REPORT_Symbol_ZOrder_Control.md](reports/REPORT_Symbol_ZOrder_Control.md) | [PRD](prds/REPORT_Symbol_ZOrder_Control.md-prd.md) → [Plan](plans/REPORT_Symbol_ZOrder_Control.md-prd-plan.md) | 2026-03-30 |
+| [REPORT_Map_DragButton_LeftMouse.md](reports/REPORT_Map_DragButton_LeftMouse.md) | [PRD](prds/REPORT_Map_DragButton_LeftMouse.md-prd.md) → [Plan](plans/REPORT_Map_DragButton_LeftMouse.md-prd-plan.md) | 2026-03-30 |
+| [REPORT_EditMode_HitTest_Passthrough.md](reports/REPORT_EditMode_HitTest_Passthrough.md) | [PRD](prds/REPORT_EditMode_HitTest_Passthrough.md-prd.md) → [Plan](plans/REPORT_EditMode_HitTest_Passthrough.md-prd-plan.md) | 2026-03-30 |
+| [REPORT_OverlayImage_ZOrder_EditMode.md](reports/REPORT_OverlayImage_ZOrder_EditMode.md) | [PRD](prds/REPORT_OverlayImage_ZOrder_EditMode.md-prd.md) → [Plan](plans/REPORT_OverlayImage_ZOrder_EditMode.md-prd-plan.md) | 2026-03-27 |
+| [REPORT_OverlayMap_ZOrder_Rendering.md](reports/REPORT_OverlayMap_ZOrder_Rendering.md) | [PRD](prds/REPORT_OverlayMap_ZOrder_Rendering.md-prd.md) → [Plan](plans/REPORT_OverlayMap_ZOrder_Rendering.md-prd-plan.md) | 2026-03-26 |
+| [REPORT_Layer_Ordering_Investigation.md](reports/REPORT_Layer_Ordering_Investigation.md) | [PRD](prds/REPORT_Layer_Ordering_Investigation.md-prd.md) → [Plan](plans/REPORT_Layer_Ordering_Investigation.md-prd-plan.md) | 2026-03-26 |
+| [REPORT_OverlayImage_Status_Analysis.md](reports/REPORT_OverlayImage_Status_Analysis.md) | [PRD](prds/REPORT_OverlayImage_Status_Analysis.md-prd.md) → [Plan](plans/REPORT_OverlayImage_Status_Analysis.md-prd-plan.md) | 2026-03-25 |
+| [REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md](reports/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md) | [PRD](prds/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md-prd.md) → [Plan](plans/REPORT_MBTiles_ZoomLevel_Shadowing_Fix.md-prd-plan.md) | 2026-03-24 |
+| [REPORT_MapViewModel_Provider_Cleanup.md](reports/REPORT_MapViewModel_Provider_Cleanup.md) | [PRD](prds/REPORT_MapViewModel_Provider_Cleanup.md-prd.md) → [Plan](plans/REPORT_MapViewModel_Provider_Cleanup.md-prd-plan.md) | 2026-03-24 |
+| [REPORT_EntryId_Nats_Uuid_DirectMatch.md](reports/REPORT_EntryId_Nats_Uuid_DirectMatch.md) | [PRD](prds/REPORT_EntryId_Nats_Uuid_DirectMatch.md-prd.md) → [Plan](plans/REPORT_EntryId_Nats_Uuid_DirectMatch.md-prd-plan.md) | 2026-03-13 |
+| [REPORT_CollectionChanged_BatchReset.md](reports/REPORT_CollectionChanged_BatchReset.md) | [PRD](prds/REPORT_CollectionChanged_BatchReset.md-prd.md) → [Plan](plans/REPORT_CollectionChanged_BatchReset.md-prd-plan.md) | 2026-03-13 |
+| [REPORT_SharedTimer_Chunk_Dequeue.md](reports/REPORT_SharedTimer_Chunk_Dequeue.md) | [PRD](prds/REPORT_SharedTimer_Chunk_Dequeue.md-prd.md) → [Plan](plans/REPORT_SharedTimer_Chunk_Dequeue.md-prd-plan.md) | 2026-03-13 |
+| [REPORT_EventQueue_Logic_Analysis.md](reports/REPORT_EventQueue_Logic_Analysis.md) | [PRD](prds/REPORT_EventQueue_Logic_Analysis.md-prd.md) → [Plan](plans/REPORT_EventQueue_Logic_Analysis.md-prd-plan.md) | 2026-03-13 |
+| [REPORT_EventQueue_Symbol_Unification.md](reports/REPORT_EventQueue_Symbol_Unification.md) | [PRD](prds/REPORT_EventQueue_Symbol_Unification.md-prd.md) → [Plan](plans/REPORT_EventQueue_Symbol_Unification.md-prd-plan.md) | 2026-03-13 |
+| [REPORT_Batch_Action_Report.md](reports/REPORT_Batch_Action_Report.md) | [PRD](prds/REPORT_Batch_Action_Report.md-prd.md) → [Plan](plans/REPORT_Batch_Action_Report.md-prd-plan.md) | 2026-03-13 |
+| [REPORT_DevicePanel_ProgressCircle_Fix.md](reports/REPORT_DevicePanel_ProgressCircle_Fix.md) | [PRD](prds/REPORT_DevicePanel_ProgressCircle_Fix.md-prd.md) → [Plan](plans/REPORT_DevicePanel_ProgressCircle_Fix.md-prd-plan.md) | 2026-03-12 |
+| [ANALYSIS_DevicePanel_ProgressCircle_Visibility.md](reports/ANALYSIS_DevicePanel_ProgressCircle_Visibility.md) | [PRD](prds/ANALYSIS_DevicePanel_ProgressCircle_Visibility.md-prd.md) → [Plan](plans/ANALYSIS_DevicePanel_ProgressCircle_Visibility.md-prd-plan.md) | 2026-03-12 |
+| [ANALYSIS_Redis_RTSP_Popup_Communication.md](reports/ANALYSIS_Redis_RTSP_Popup_Communication.md) | [PRD](prds/ANALYSIS_Redis_RTSP_Popup_Communication.md-prd.md) → [Plan](plans/ANALYSIS_Redis_RTSP_Popup_Communication.md-prd-plan.md) | 2026-03-12 |
+| [REPORT_EventPanel_CentralizedDatePicker.md](reports/REPORT_EventPanel_CentralizedDatePicker.md) | [PRD](prds/REPORT_EventPanel_CentralizedDatePicker.md-prd.md) → [Plan](plans/REPORT_EventPanel_CentralizedDatePicker.md-prd-plan.md) | 2026-03-12 |
+| [ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md](reports/ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md) | [PRD](prds/ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md-prd.md) → [Plan](plans/ANALYSIS_EventPanel_Chart_DataGrid_Mismatch.md-prd-plan.md) | 2026-03-12 |
+| [REPORT_Event_BatchUI_Performance.md](reports/REPORT_Event_BatchUI_Performance.md) | [PRD](prds/REPORT_Event_BatchUI_Performance.md-prd.md) → [Plan](plans/REPORT_Event_BatchUI_Performance.md-prd-plan.md) | 2026-03-08 |
+| [REPORT_Event_Pipeline_Redesign.md](reports/REPORT_Event_Pipeline_Redesign.md) | [PRD](prds/REPORT_Event_Pipeline_Redesign.md-prd.md) → [Plan](plans/REPORT_Event_Pipeline_Redesign.md-prd-plan.md) | 2026-03-08 |
+| [ANALYSIS_Performance_Event_Processing_v2.md](reports/ANALYSIS_Performance_Event_Processing_v2.md) | [PRD](prds/ANALYSIS_Performance_Event_Processing_v2.md-prd.md) → [Plan](plans/ANALYSIS_Performance_Event_Processing_v2.md-prd-plan.md) | 2026-03-07 |
+| [REPORT_DeviceGroup_AssignDialog_Wrapper.md](reports/REPORT_DeviceGroup_AssignDialog_Wrapper.md) | [PRD](prds/REPORT_DeviceGroup_AssignDialog_Wrapper.md-prd.md) → [Plan](plans/REPORT_DeviceGroup_AssignDialog_Wrapper.md-prd-plan.md) | 2026-03-07 |
+| [REPORT_WindyMode_Nats_Integration.md](reports/REPORT_WindyMode_Nats_Integration.md) | [PRD](prds/REPORT_WindyMode_Nats_Integration.md-prd.md) → [Plan](plans/REPORT_WindyMode_Nats_Integration.md-prd-plan.md) | 2026-03-06 |
+| [ANALYSIS_Performance_Event_Processing.md](reports/ANALYSIS_Performance_Event_Processing.md) | [PRD](prds/ANALYSIS_Performance_Event_Processing.md-prd.md) → [Plan](plans/ANALYSIS_Performance_Event_Processing.md-prd-plan.md) | 2026-03-06 |
+| [REPORT_SymbolVisual_SyncDevice_Unification.md](reports/REPORT_SymbolVisual_SyncDevice_Unification.md) | [PRD](prds/REPORT_SymbolVisual_SyncDevice_Unification.md-prd.md) → [Plan](plans/REPORT_SymbolVisual_SyncDevice_Unification.md-prd-plan.md) | 2026-03-06 |
+| [REPORT_PidsSymbol_Status_Visual_Fix.md](reports/REPORT_PidsSymbol_Status_Visual_Fix.md) | [PRD](prds/REPORT_PidsSymbol_Status_Visual_Fix.md-prd.md) → [Plan](plans/REPORT_PidsSymbol_Status_Visual_Fix.md-prd-plan.md) | 2026-03-06 |
+| [REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md](reports/REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md) | [PRD](prds/REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md-prd.md) → [Plan](plans/REPORT_SyncDevice_SensorAllTypes_And_DeviceGroup.md-prd-plan.md) | 2026-03-06 |
+| [REPORT_NatsSync_PidsIndicator_Realtime_Fix.md](reports/REPORT_NatsSync_PidsIndicator_Realtime_Fix.md) | [PRD](prds/REPORT_NatsSync_PidsIndicator_Realtime_Fix.md-prd.md) → [Plan](plans/REPORT_NatsSync_PidsIndicator_Realtime_Fix.md-prd-plan.md) | 2026-03-06 |
+| [REPORT_DeviceDetailUrl_SswSvms_Format.md](reports/REPORT_DeviceDetailUrl_SswSvms_Format.md) | [PRD](prds/REPORT_DeviceDetailUrl_SswSvms_Format.md-prd.md) → [Plan](plans/REPORT_DeviceDetailUrl_SswSvms_Format.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_Nats_SyncDevice_Handling.md](reports/REPORT_Nats_SyncDevice_Handling.md) | [PRD](prds/REPORT_Nats_SyncDevice_Handling.md-prd.md) → [Plan](plans/REPORT_Nats_SyncDevice_Handling.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_Speaker_Broadcast_ContextMenu.md](reports/REPORT_Speaker_Broadcast_ContextMenu.md) | [PRD](prds/REPORT_Speaker_Broadcast_ContextMenu.md-prd.md) → [Plan](plans/REPORT_Speaker_Broadcast_ContextMenu.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_PidsMarker_ContextMenu_DeviceDetail.md](reports/REPORT_PidsMarker_ContextMenu_DeviceDetail.md) | [PRD](prds/REPORT_PidsMarker_ContextMenu_DeviceDetail.md-prd.md) → [Plan](plans/REPORT_PidsMarker_ContextMenu_DeviceDetail.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_PidsMarker_FaultBlink_Animation.md](reports/REPORT_PidsMarker_FaultBlink_Animation.md) | [PRD](prds/REPORT_PidsMarker_FaultBlink_Animation.md-prd.md) → [Plan](plans/REPORT_PidsMarker_FaultBlink_Animation.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_Camera_PtzStatus_Nats_Service.md](reports/REPORT_Camera_PtzStatus_Nats_Service.md) | [PRD](prds/REPORT_Camera_PtzStatus_Nats_Service.md-prd.md) → [Plan](plans/REPORT_Camera_PtzStatus_Nats_Service.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_GMaps_Pids_SmartSensor_Symbol.md](reports/REPORT_GMaps_Pids_SmartSensor_Symbol.md) | [PRD](prds/REPORT_GMaps_Pids_SmartSensor_Symbol.md-prd.md) → [Plan](plans/REPORT_GMaps_Pids_SmartSensor_Symbol.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_FaultFence_GroupSymbol_Color_Fix.md](reports/REPORT_FaultFence_GroupSymbol_Color_Fix.md) | [PRD](prds/REPORT_FaultFence_GroupSymbol_Color_Fix.md-prd.md) → [Plan](plans/REPORT_FaultFence_GroupSymbol_Color_Fix.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_ActionReport_Flow_Analysis.md](reports/REPORT_ActionReport_Flow_Analysis.md) | [PRD](prds/REPORT_ActionReport_Flow_Analysis.md-prd.md) → [Plan](plans/REPORT_ActionReport_Flow_Analysis.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_GMaps_Pids_Speaker_Symbol.md](reports/REPORT_GMaps_Pids_Speaker_Symbol.md) | [PRD](prds/REPORT_GMaps_Pids_Speaker_Symbol.md-prd.md) → [Plan](plans/REPORT_GMaps_Pids_Speaker_Symbol.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_Nats_MessageService_Wiring_Fix.md](reports/REPORT_Nats_MessageService_Wiring_Fix.md) | [PRD](prds/REPORT_Nats_MessageService_Wiring_Fix.md-prd.md) → [Plan](plans/REPORT_Nats_MessageService_Wiring_Fix.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_Pids_NatsSync_OperationState_Realtime.md](reports/REPORT_Pids_NatsSync_OperationState_Realtime.md) | [PRD](prds/REPORT_Pids_NatsSync_OperationState_Realtime.md-prd.md) → [Plan](plans/REPORT_Pids_NatsSync_OperationState_Realtime.md-prd-plan.md) | 2026-03-05 |
+| [REPORT_NATS_Event_Integration.md](reports/REPORT_NATS_Event_Integration.md) | [PRD](prds/REPORT_NATS_Event_Integration.md-prd.md) → [Plan](plans/REPORT_NATS_Event_Integration.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_Nats_Setup_Refactoring.md](reports/REPORT_Nats_Setup_Refactoring.md) | [PRD](prds/REPORT_Nats_Setup_Refactoring.md-prd.md) → [Plan](plans/REPORT_Nats_Setup_Refactoring.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_GMap_Pids_Indicator_OperationState_Policy.md](reports/REPORT_GMap_Pids_Indicator_OperationState_Policy.md) | [PRD](prds/REPORT_GMap_Pids_Indicator_OperationState_Policy.md-prd.md) → [Plan](plans/REPORT_GMap_Pids_Indicator_OperationState_Policy.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_EventPanel_Remove_Zone_Add_ActionReported.md](reports/REPORT_EventPanel_Remove_Zone_Add_ActionReported.md) | [PRD](prds/REPORT_EventPanel_Remove_Zone_Add_ActionReported.md-prd.md) → [Plan](plans/REPORT_EventPanel_Remove_Zone_Add_ActionReported.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_GMap_PidsGroup_DeviceGroup_Integration.md](reports/REPORT_GMap_PidsGroup_DeviceGroup_Integration.md) | [PRD](prds/REPORT_GMap_PidsGroup_DeviceGroup_Integration.md-prd.md) → [Plan](plans/REPORT_GMap_PidsGroup_DeviceGroup_Integration.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md](reports/REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md) | [PRD](prds/REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md-prd.md) → [Plan](plans/REPORT_DeviceAssignDialog_MultiSelect_And_RemoveConfirm.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_DevicePanel_CRUD_And_GroupAssignment.md](reports/REPORT_DevicePanel_CRUD_And_GroupAssignment.md) | [PRD](prds/REPORT_DevicePanel_CRUD_And_GroupAssignment.md-prd.md) → [Plan](plans/REPORT_DevicePanel_CRUD_And_GroupAssignment.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_GMaps_Db_Safe_Enum_Parse.md](reports/REPORT_GMaps_Db_Safe_Enum_Parse.md) | [PRD](prds/REPORT_GMaps_Db_Safe_Enum_Parse.md-prd.md) → [Plan](plans/REPORT_GMaps_Db_Safe_Enum_Parse.md-prd-plan.md) | 2026-03-04 |
+| [REPORT_Dashboard_Loading_Progress.md](reports/REPORT_Dashboard_Loading_Progress.md) | [PRD](prds/REPORT_Dashboard_Loading_Progress.md-prd.md) → [Plan](plans/REPORT_Dashboard_Loading_Progress.md-prd-plan.md) | 2026-03-03 |
+| [REPORT_EventDashboard_Statistics_Integration.md](reports/REPORT_EventDashboard_Statistics_Integration.md) | [PRD](prds/REPORT_EventDashboard_Statistics_Integration.md-prd.md) → [Plan](plans/REPORT_EventDashboard_Statistics_Integration.md-prd-plan.md) | 2026-03-03 |
+| [REPORT_DevicePanel_InfiniteScroll_Pagination.md](reports/REPORT_DevicePanel_InfiniteScroll_Pagination.md) | [PRD](prds/REPORT_DevicePanel_InfiniteScroll_Pagination.md-prd.md) → [Plan](plans/REPORT_DevicePanel_InfiniteScroll_Pagination.md-prd-plan.md) | 2026-03-03 |
+| [REPORT_Tab_Switch_Info_Refresh.md](reports/REPORT_Tab_Switch_Info_Refresh.md) | [PRD](prds/REPORT_Tab_Switch_Info_Refresh.md-prd.md) → [Plan](plans/REPORT_Tab_Switch_Info_Refresh.md-prd-plan.md) | 2026-03-03 |
+| [REPORT_Chart_Empty_Data_Display.md](reports/REPORT_Chart_Empty_Data_Display.md) | [PRD](prds/REPORT_Chart_Empty_Data_Display.md-prd.md) → [Plan](plans/REPORT_Chart_Empty_Data_Display.md-prd-plan.md) | 2026-03-03 |
+| [REPORT_ActionEvent_Loading_Fix.md](reports/REPORT_ActionEvent_Loading_Fix.md) | [PRD](prds/REPORT_ActionEvent_Loading_Fix.md-prd.md) → [Plan](plans/REPORT_ActionEvent_Loading_Fix.md-prd-plan.md) | 2026-02-27 |
+| [REPORT_Event_UnitTest_Coverage.md](reports/REPORT_Event_UnitTest_Coverage.md) | [PRD](prds/REPORT_Event_UnitTest_Coverage.md-prd.md) → [Plan](plans/REPORT_Event_UnitTest_Coverage.md-prd-plan.md) | 2026-02-27 |
+| [REPORT_EventPanel_Loading_State_Fix.md](reports/REPORT_EventPanel_Loading_State_Fix.md) | [PRD](prds/REPORT_EventPanel_Loading_State_Fix.md-prd.md) → [Plan](plans/REPORT_EventPanel_Loading_State_Fix.md-prd-plan.md) | 2026-02-27 |
+| [REPORT_Event_InfiniteScroll_Pagination.md](reports/REPORT_Event_InfiniteScroll_Pagination.md) | [PRD](prds/REPORT_Event_InfiniteScroll_Pagination.md-prd.md) → [Plan](plans/REPORT_Event_InfiniteScroll_Pagination.md-prd-plan.md) | 2026-02-27 |
+| [REPORT_Event_DtoModel_Matching.md](reports/REPORT_Event_DtoModel_Matching.md) | [PRD](prds/REPORT_Event_DtoModel_Matching.md-prd.md) → [Plan](plans/REPORT_Event_DtoModel_Matching.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_Dashboard_NewDevice_Fetch_Fix.md](reports/REPORT_Dashboard_NewDevice_Fetch_Fix.md) | [PRD](prds/REPORT_Dashboard_NewDevice_Fetch_Fix.md-prd.md) → [Plan](plans/REPORT_Dashboard_NewDevice_Fetch_Fix.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_AllDevices_Geo_Sync_Fix.md](reports/REPORT_AllDevices_Geo_Sync_Fix.md) | [PRD](prds/REPORT_AllDevices_Geo_Sync_Fix.md-prd.md) → [Plan](plans/REPORT_AllDevices_Geo_Sync_Fix.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_Sensor_UpdateProperties_Geo_Fix.md](reports/REPORT_Sensor_UpdateProperties_Geo_Fix.md) | [PRD](prds/REPORT_Sensor_UpdateProperties_Geo_Fix.md-prd.md) → [Plan](plans/REPORT_Sensor_UpdateProperties_Geo_Fix.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_Sensor_DeviceEquals_Fix.md](reports/REPORT_Sensor_DeviceEquals_Fix.md) | [PRD](prds/REPORT_Sensor_DeviceEquals_Fix.md-prd.md) → [Plan](plans/REPORT_Sensor_DeviceEquals_Fix.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_Camera_Dto_Mapping_Fix.md](reports/REPORT_Camera_Dto_Mapping_Fix.md) | [PRD](prds/REPORT_Camera_Dto_Mapping_Fix.md-prd.md) → [Plan](plans/REPORT_Camera_Dto_Mapping_Fix.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_Camera_IsRecord_Editable.md](reports/REPORT_Camera_IsRecord_Editable.md) | [PRD](prds/REPORT_Camera_IsRecord_Editable.md-prd.md) → [Plan](plans/REPORT_Camera_IsRecord_Editable.md-prd-plan.md) | 2026-02-26 |
+| [REPORT_Camera_Model_Cleanup_And_DetailView.md](reports/REPORT_Camera_Model_Cleanup_And_DetailView.md) | [PRD](prds/REPORT_Camera_Model_Cleanup_And_DetailView.md-prd.md) → [Plan](plans/REPORT_Camera_Model_Cleanup_And_DetailView.md-prd-plan.md) | 2026-02-25 |
+| [REPORT_DevicePanel_CRUD_Completion.md](reports/REPORT_DevicePanel_CRUD_Completion.md) | [PRD](prds/REPORT_DevicePanel_CRUD_Completion.md-prd.md) → [Plan](plans/REPORT_DevicePanel_CRUD_Completion.md-prd-plan.md) | 2026-02-25 |
+| [REPORT_DeviceGroup_Ui.md](reports/REPORT_DeviceGroup_Ui.md) | [PRD](prds/REPORT_DeviceGroup_Ui.md-prd.md) → [Plan](plans/REPORT_DeviceGroup_Ui.md-prd-plan.md) | 2026-02-25 |
+| [REPORT_EventUi_DeviceProperty_Binding.md](reports/REPORT_EventUi_DeviceProperty_Binding.md) | [PRD](prds/REPORT_EventUi_DeviceProperty_Binding.md-prd.md) → [Plan](plans/REPORT_EventUi_DeviceProperty_Binding.md-prd-plan.md) | 2026-02-25 |
+| [REPORT_EventApi_IntegrationTest.md](reports/REPORT_EventApi_IntegrationTest.md) | [PRD](prds/REPORT_EventApi_IntegrationTest.md-prd.md) → [Plan](plans/REPORT_EventApi_IntegrationTest.md-prd-plan.md) | 2026-02-25 |
+| [REPORT_CameraPreset_ROI_Point_Api.md](reports/REPORT_CameraPreset_ROI_Point_Api.md) | [PRD](prds/REPORT_CameraPreset_ROI_Point_Api.md-prd.md) → [Plan](plans/REPORT_CameraPreset_ROI_Point_Api.md-prd-plan.md) | 2026-02-24 |
+| [REPORT_ServerApi_IntegrationTest.md](reports/REPORT_ServerApi_IntegrationTest.md) | [PRD](prds/REPORT_ServerApi_IntegrationTest.md-prd.md) → [Plan](plans/REPORT_ServerApi_IntegrationTest.md-prd-plan.md) | 2026-02-24 |
+| [REPORT_DeviceApi_IntegrationTest.md](reports/REPORT_DeviceApi_IntegrationTest.md) | [PRD](prds/REPORT_DeviceApi_IntegrationTest.md-prd.md) → [Plan](plans/REPORT_DeviceApi_IntegrationTest.md-prd-plan.md) | 2026-02-24 |
 
 <!-- auto-section-end -->
 
