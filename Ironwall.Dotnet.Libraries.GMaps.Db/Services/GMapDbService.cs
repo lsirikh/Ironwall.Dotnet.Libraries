@@ -1207,6 +1207,35 @@ internal class GMapDbService : TaskService, IGMapDbService
             throw;
         }
     }
+
+    public async Task<bool> UpdateMapZoomRangeAsync(int mapId, int minZoom, int maxZoom, CancellationToken token = default)
+    {
+        // zoom-float-halfstep FR-20: 설정정보>지도설정 편집 전용 — 줌 범위 2컬럼만 갱신(bounds 불변).
+        if (minZoom < 0 || maxZoom <= minZoom)
+        {
+            _log?.Warning($"UpdateMapZoomRangeAsync 거부 — 유효하지 않은 범위 Min={minZoom}, Max={maxZoom} (MapId={mapId})");
+            return false;
+        }
+
+        try
+        {
+            await using var conn = await OpenConnectionAsync(token);
+            const string sql = @"
+                UPDATE Maps SET
+                    MinZoomLevel = @MinZoom, MaxZoomLevel = @MaxZoom,
+                    UpdatedAt = NOW()
+                WHERE Id = @MapId;";
+
+            var rows = await conn.ExecuteAsync(sql, new { MapId = mapId, MinZoom = minZoom, MaxZoom = maxZoom });
+            _log?.Info($"UpdateMapZoomRangeAsync 완료 - MapId={mapId}, Zoom={minZoom}~{maxZoom} (rows={rows})");
+            return rows > 0;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"지도 줌 범위 업데이트 실패: {ex.Message}");
+            throw;
+        }
+    }
     #endregion
 
     #region - GeoControlPoint CRUD -

@@ -175,6 +175,15 @@ public interface IGMapDbService
         int minZoom, int maxZoom,
         CancellationToken token = default);
 
+    /// <summary>
+    /// 지도 줌 범위(Min/MaxZoomLevel)만 갱신한다 — 설정정보>지도설정 편집용 (zoom-float-halfstep FR-20).
+    /// bounds 등 다른 컬럼은 건드리지 않는다. UpdatedAt=NOW() 갱신으로 MBTiles 시드의
+    /// "파일이 더 새로우면 메타데이터 원복" 경로(LastWriteTime 비교)로부터 사용자 편집을 보호한다.
+    /// </summary>
+    /// <returns>갱신된 행 존재 여부</returns>
+    Task<bool> UpdateMapZoomRangeAsync(
+        int mapId, int minZoom, int maxZoom, CancellationToken token = default);
+
     /*───────────────────── GeoControlPoint ────────────────*/
 
     /// <summary>
