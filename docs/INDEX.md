@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-08-06 (advance-phase 자동)
-- **총 문서 수**: 481개
+- **총 문서 수**: 482개
 
 ---
 
@@ -10,9 +10,10 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
+| [detection-history-bughunt-scenario-analysis.md](analyses/detection-history-bughunt-scenario-analysis.md) | detection-history-bughunt-scenario | 2026-08-06 |
+| [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | verified-findings-backlog.md | 2026-08-06 |
 | [gmap-label-offset-domain-mismatch-analysis.md](analyses/gmap-label-offset-domain-mismatch-analysis.md) | gmap-label-offset-domain-mismatch | 2026-08-06 |
 | [zoom-float-halfstep-scenario-analysis.md](analyses/zoom-float-halfstep-scenario-analysis.md) | zoom-float-halfstep-scenario | 2026-08-06 |
-| [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | verified-findings-backlog.md | 2026-08-05 |
 | [event-panel-silent-load-failure-analysis.md](analyses/event-panel-silent-load-failure-analysis.md) | event-panel-silent-load-failure | 2026-08-04 |
 | [harness-customization-manifest.md](analyses/harness-customization-manifest.md) | harness-customization-manifest.md | 2026-08-04 |
 | [theme-contrast-audit-analysis.md](analyses/theme-contrast-audit-analysis.md) | theme-contrast-audit | 2026-08-04 |
@@ -72,8 +73,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
-| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
 | [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | zoom-float-halfstep | Approved | 2026-08-06 |
+| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
 | [UI_Automation_Instrumentation_Phase2-prd.md](prds/UI_Automation_Instrumentation_Phase2-prd.md) | UI_Automation_Instrumentation_Phase2 | Draft | 2026-08-05 |
 | [Overlay_Image_Canonical_Join-prd.md](prds/Overlay_Image_Canonical_Join-prd.md) | Overlay_Image_Canonical_Join | Draft | 2026-08-05 |
 | [Event_Silent_Failure_Elimination-prd.md](prds/Event_Silent_Failure_Elimination-prd.md) | Event_Silent_Failure_Elimination | Draft | 2026-08-05 |
@@ -248,8 +249,8 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 33/47 | 2026-08-06 |
-| [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 27/31 | 2026-08-06 |
+| [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 28/32 | 2026-08-06 |
+| [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 36/50 | 2026-08-06 |
 | [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 29/42 | 2026-08-04 |
 | [GMap_Schema_Migration_Idempotency-prd-plan.md](plans/GMap_Schema_Migration_Idempotency-prd-plan.md) | [PRD](prds/GMap_Schema_Migration_Idempotency-prd.md) | 19/47 | 2026-08-04 |
 | [UI_Functional_Testing_Layer-prd-plan.md](plans/UI_Functional_Testing_Layer-prd-plan.md) | [PRD](prds/UI_Functional_Testing_Layer-prd.md) | 16/16 | 2026-08-04 |
@@ -524,6 +525,9 @@
 
 | ?뚯씪 | ?댁슜 | ?좎쭨 |
 |------|------|------|
+| [detection-fault-trafficlight-wireframe.html](design/detection-fault-trafficlight-wireframe.html) | 탐지·장애 신호등 와이어프레임 v1.2 — **★확정: 신호등=이벤트 카드 창 헤더(B′)+T1 · 시스템=지도 상단바 R1 도넛(분리) · 기존 pill 계기 제거(D2)+보기>탐지·장애(Ctrl+Shift+F) 토글을 신호등 표시로 재연결**. 대안 기록·상태 매트릭스·클릭=같은 창 필터·Dark/Light | 2026-08-06 |
+| [map-topbar-simplification-wireframe.html](design/map-topbar-simplification-wireframe.html) | 지도 상단 메뉴·툴바 간소화 v1.0 — **운영/편집 이원화**: 운영 기본=콤보1+아이콘7+편집스위치(현행 20컨트롤→9, -55%), 편집 ON 시 2번째 줄 편집 스트립(등록: 맵/이미지/커스텀맵 · 심볼 · 선택 · 기준) 확장. 전 항목 이동 매핑표(누락 0)·중복 2건 삭제(툴바 십자선, 파일>타일폴더)·메뉴 파일 폐지→지도/보기 2종·편집 스위치 권한자만 렌더·Q1~Q4 결정 대기 | 2026-08-06 |
+| [detection-fault-trafficlight-storyboard.html](design/detection-fault-trafficlight-storyboard.html) | 탐지·장애 신호등 스토리보드 v1.1(확정 B′ 기준) — 9장면(정상→탐지 펄스→장애 상시펄스→동시 점등→클릭=같은 창 필터·포커스→툴팁/우클릭 설정→분리 배치 구도(상단바 도넛+헤더 신호등)→미초기화 '—' 게이트→테마·3중 부호화) EQM/NATS 소스·불변식 표기 | 2026-08-06 |
 | [pidsgroup-rightclick-storyboard.html](design/pidsgroup-rightclick-storyboard.html) | PidsGroup ?고겢由???댁뼱?꾨젅???ㅽ넗由щ낫??v1.0 ??吏꾩엯??3怨?留?援ъ뿭 ?щ낵 ?고겢由?硫붾돱쨌?ㅻ쾭?덉씠 ???고겢由?룹옣鍮꾩젙蹂?洹몃９ ?????고겢由?쨌?깅줉 ?쇱꽌 ?뺣낫 ?ㅻ쾭?덉씠(LayerPanel ?쒖? ?щ＼, DeviceProvider ??븘???쒕쾭蹂寃?0)쨌洹몃９ ?먯? ?대젰 ?뺤옣???쇱꽌 ?ъ븘??硫???쒕━利?李⑦듃, ?붾젅??CVD 寃利?쨌S1~S6 ?꾨쫫?ㅽ듃由승룸━?ㅽ겕/?곗씠??怨꾩빟/Phase 1쨌2 遺꾪븷쨌?ㅽ넗??Dark/Light ?좉? | 2026-08-06 |
 | [installer-wizard-plan.html](design/installer-wizard-plan.html) | IRONWALL 愿??SW Inno Setup ?몄뒪?⑤윭 湲고쉷??v1.0 ??16?붾㈃ ?꾩?????댁뼱?꾨젅???ㅽ넗由щ낫???좉퇋/?낃렇?덉씠??遺꾧린쨌?덉쇅 3醫?쨌appsettings.json ?꾩옣?ㅼ젙 ?④퀎蹂??낅젰(?꾧끝 紐낆묶: ?듯빀/?쒕뱶?뚰떚 釉뚮줈而??쒕쾭쨌?듯빀 愿???쒕쾭쨌?곗씠????μ냼)쨌?뱀쭠 蹂대뱶 2??諛곕꼫 ?쒖븞(踰꾩쟾 ?쒓린 湲덉?)쨌?ㅼ젙 湲곕줉(?뚮젅?댁뒪????쒗뵆由?/蹂댁〈 ?뺤콉쨌湲곗닠 ?ㅺ퀎 ?명듃쨌誘멸껐 Q5 | 2026-08-04 |
 | [event-suppression-schedule-wireframe.html](design/event-suppression-schedule-wireframe.html) | ?대깽???듭젣(?뺣퉬 李? ?ㅼ?以?愿由???댁뼱?꾨젅??v1.0 ??G-1 CRUD ?⑤꼸(?꾧뎄紐⑥쓬+?몃씪?명뤌 DateTimePicker+DataGrid ?곹깭諛곗? pill+臾댄븳?ㅽ겕濡?쨌G-2 ?쒖꽦 諛곕꼫(SurfaceTranslucent+StatusWarning)쨌G-3 ?ㅒ룰텒??disable ?쒕?쨌Conductor PanelShell쨌Tactical Dark/Light ?좉? | 2026-07-31 |
