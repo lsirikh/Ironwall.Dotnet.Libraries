@@ -59,10 +59,15 @@
     <SolidColorBrush x:Key="TintAccentBrush"   Color="#220C6B89" /><!-- 강조 틴트(cyan) -->
     <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#CCF2F5F9" /><!-- 반투명 표면 -->
 
-    <!-- ══ 차트 시리즈 (pidsgroup-rightclick FR-11 — 그룹 탐지 이력 센서별 시리즈, CVD·대비 검증 통과) ══ -->
+    <!-- ══ 차트 시리즈 8색 (pidsgroup-rightclick FR-11 — 전 센서 색+라인, 인덱스 순환. validate_palette 6종 검사 통과) ══ -->
     <SolidColorBrush x:Key="ChartSeries1Brush" Color="#0E7EA3" /><!-- series cyan(lt) -->
     <SolidColorBrush x:Key="ChartSeries2Brush" Color="#B25A06" /><!-- series amber(lt) -->
     <SolidColorBrush x:Key="ChartSeries3Brush" Color="#7A3FC2" /><!-- series purple(lt) -->
+    <SolidColorBrush x:Key="ChartSeries4Brush" Color="#257A2E" /><!-- series green(lt) -->
+    <SolidColorBrush x:Key="ChartSeries5Brush" Color="#C33D9C" /><!-- series magenta(lt) -->
+    <SolidColorBrush x:Key="ChartSeries6Brush" Color="#2E4FA8" /><!-- series blue(lt) -->
+    <SolidColorBrush x:Key="ChartSeries7Brush" Color="#B15A42" /><!-- series terracotta(lt) -->
+    <SolidColorBrush x:Key="ChartSeries8Brush" Color="#5E5AA8" /><!-- series violet(lt) -->
 
 
 </ResourceDictionary>

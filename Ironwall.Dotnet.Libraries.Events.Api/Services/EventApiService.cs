@@ -104,9 +104,11 @@ public class EventApiService : IEventApiService
             var parameters = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(startDate)) parameters.Add("start_date", startDate);
             if (!string.IsNullOrEmpty(endDate)) parameters.Add("end_date", endDate);
-            if (controller.HasValue) parameters.Add("controller", controller.Value.ToString());
-            if (sensor.HasValue) parameters.Add("sensor", sensor.Value.ToString());
-            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            // PRD v2.1 서버 계약: 장치 필터 = device_id 단일(구 controller/sensor/type_device 제거 — detections.py:213).
+            // 구명 "sensor"는 FastAPI가 조용히 무시해 전체 데이터가 반환되던 실버그(2026-08-06 그룹 탐지 이력 B2/B3 근원).
+            if (sensor.HasValue) parameters.Add("device_id", sensor.Value.ToString());
+            // controller/status는 현 서버에 대응 파라미터가 없음(status의 서버측 이름은 result/action_reported).
+            // 죽은 파라미터를 보내지 않도록 제거 — 재도입 시 서버 계약명으로 매핑할 것.
             parameters.Add("page", page.ToString());
             parameters.Add("limit", limit.ToString());
 

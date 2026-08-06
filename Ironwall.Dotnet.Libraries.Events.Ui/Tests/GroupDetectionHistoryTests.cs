@@ -77,10 +77,15 @@ public class GroupDetectionHistoryTests
     }
 
     private static void SetupSensor(Mock<IEventApiService> apiMock, int sensorId, params DetectionEventDto[] dtos)
-        => apiMock.Setup(x => x.GetDetectionEventsAsync(
+    {
+        // 클라 후필터(요청 센서=dto.DeviceId 검증) 계약 반영 — 목 데이터에 소속 장비를 스탬프
+        foreach (var dto in dtos)
+            if (dto.DeviceId == 0) dto.DeviceId = sensorId;
+        apiMock.Setup(x => x.GetDetectionEventsAsync(
                 It.IsAny<string?>(), It.IsAny<string?>(), null, sensorId, null,
                 It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Ok(dtos));
+    }
 
     /// <summary>fire-and-forget LoadAsync 완료 대기 — sleep 동기화 금지 규약의 waitFor 대체.</summary>
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000, Func<string>? detail = null)
@@ -137,8 +142,13 @@ public class GroupDetectionHistoryTests
                 .ReturnsAsync((string? s, string? e, int? c, int? sen, string? st, int page, int limit, CancellationToken ct)
                     => page <= 3
                         ? Ok(Enumerable.Range((page - 1) * 100, 100)
-                            .Select(n => BuildDto(sensorId * 10000 + n, 100 + n,
-                                baseTime.AddMinutes(n).AddSeconds(offsetSec).ToString("yyyy-MM-ddTHH:mm:ss")))
+                            .Select(n =>
+                            {
+                                var dto = BuildDto(sensorId * 10000 + n, 100 + n,
+                                    baseTime.AddMinutes(n).AddSeconds(offsetSec).ToString("yyyy-MM-ddTHH:mm:ss"));
+                                dto.DeviceId = sensorId;   // 후필터 계약 — 소속 장비 스탬프
+                                return dto;
+                            })
                             .ToArray())
                         : Ok());
         }
@@ -295,6 +305,57 @@ public class GroupDetectionHistoryTests
         Assert.Equal(2, vm.TotalCount);
         Assert.Equal(2000, vm.MaxSignal);
         Assert.StartsWith("FN-0311", vm.TopResultText);
+    }
+
+    [Fact]
+    public async Task should_separate_and_dedup_when_server_ignores_sensor_filter()
+    {
+        // 실서버 버그(B2/B3) 재현: 어떤 sensor 값으로 호출해도 "전체 데이터"가 그대로 반환되는 서버.
+        // 클라 방어(요청 센서 후필터 + EventId dedup)로 센서별 데이터가 분리되고 N중복이 사라져야 한다.
+        var e1 = BuildDto(1, 1000, "2026-08-06T10:00:00"); e1.DeviceId = 11;
+        var e2 = BuildDto(2, 2000, "2026-08-06T11:00:00"); e2.DeviceId = 12;
+        var e3 = BuildDto(3, 1500, "2026-08-06T12:00:00"); e3.DeviceId = 11;
+        var apiMock = new Mock<IEventApiService>();
+        apiMock.Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<string?>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Ok(e1, e2, e3));   // 필터 무시 — 항상 동일 전체 집합
+        var vm = CreateVm(apiMock, ProviderWith(Sensor(11, "FN-0311", 31), Sensor(12, "FN-0312", 32)));
+
+        vm.Initialize(GroupMsg());
+        await ActivateAsync(vm);
+
+        // N중복(2센서×3건=6행) 아님 — 후필터+dedup으로 고유 3행
+        Assert.Equal(3, vm.FilteredItems.Count);
+        Assert.Equal(2, vm.FilteredItems.Count(i => i.SensorId == 11));
+        Assert.Equal(1, vm.FilteredItems.Count(i => i.SensorId == 12));
+        // 칩 off 시 데이터 패턴이 실제로 달라진다(B3 해소 단언)
+        vm.SensorChips.First(c => c.DeviceId == 12).IsOn = false;
+        Assert.Equal(2, vm.FilteredItems.Count);
+        Assert.DoesNotContain(vm.FilteredItems, i => i.EventId == 2);
+    }
+
+    [Fact]
+    public async Task should_dedup_page_boundary_duplicates_when_single_sensor()
+    {
+        // offset 페이지네이션 레이스: 페이지 사이 신규 이벤트 삽입으로 같은 이벤트가 두 페이지에 걸쳐 중복 수신 → 1건으로 dedup
+        var baseTime = new DateTime(2026, 8, 6, 0, 0, 0);
+        DetectionEventDto Row(int id) { var d = BuildDto(id, 100 + id, baseTime.AddMinutes(id).ToString("yyyy-MM-ddTHH:mm:ss")); d.DeviceId = 99; return d; }
+        var apiMock = new Mock<IEventApiService>();
+        apiMock.Setup(x => x.GetDetectionEventsAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(), null, 99, null,
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string? s, string? e, int? c, int? sen, string? st, int page, int limit, CancellationToken ct)
+                => page == 1
+                    ? Ok(Enumerable.Range(1, 100).Select(Row).ToArray())
+                    : Ok(Enumerable.Range(100, 50).Select(Row).ToArray()));   // id=100이 페이지 경계에서 중복
+        var vm = CreateVm(apiMock, ProviderWith());
+
+        vm.Initialize(new OpenDetectionHistoryDialogMessageModel { DeviceId = 99, DeviceName = "FN-0399" });
+        await ActivateAsync(vm);
+
+        Assert.Equal(149, vm.FilteredItems.Count);   // 150 수신 - 중복 1
+        Assert.Equal(vm.FilteredItems.Count, vm.FilteredItems.Select(i => i.EventId).Distinct().Count());
     }
 
     [Fact]

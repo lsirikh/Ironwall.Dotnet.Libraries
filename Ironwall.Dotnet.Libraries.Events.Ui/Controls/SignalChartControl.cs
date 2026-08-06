@@ -74,7 +74,8 @@ public class SignalChartControl : FrameworkElement
         nameof(LabelBrush), typeof(Brush), typeof(SignalChartControl),
         new FrameworkPropertyMetadata(Brushes.LightGray, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    // ── 그룹 모드 시리즈 색 3종 + 초과분(기타) — 뷰에서 ChartSeries1~3Brush/TextMutedBrush 토큰 바인딩 (FR-11) ──
+    // ── 그룹 모드 시리즈 색 8종 — 뷰에서 ChartSeries1~8Brush 토큰 바인딩 (FR-11, 사용자 확정: 전 센서 색+라인).
+    //    인덱스는 팔레트 크기(8)로 순환 — CVD·대비 검증 팔레트, 색은 센서(엔티티) 고정. ──
     public static readonly DependencyProperty Series1BrushProperty = DependencyProperty.Register(
         nameof(Series1Brush), typeof(Brush), typeof(SignalChartControl),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -85,6 +86,26 @@ public class SignalChartControl : FrameworkElement
 
     public static readonly DependencyProperty Series3BrushProperty = DependencyProperty.Register(
         nameof(Series3Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series4BrushProperty = DependencyProperty.Register(
+        nameof(Series4Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series5BrushProperty = DependencyProperty.Register(
+        nameof(Series5Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series6BrushProperty = DependencyProperty.Register(
+        nameof(Series6Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series7BrushProperty = DependencyProperty.Register(
+        nameof(Series7Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series8BrushProperty = DependencyProperty.Register(
+        nameof(Series8Brush), typeof(Brush), typeof(SignalChartControl),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty OtherSeriesBrushProperty = DependencyProperty.Register(
@@ -120,6 +141,11 @@ public class SignalChartControl : FrameworkElement
     public Brush? Series1Brush { get => (Brush?)GetValue(Series1BrushProperty); set => SetValue(Series1BrushProperty, value); }
     public Brush? Series2Brush { get => (Brush?)GetValue(Series2BrushProperty); set => SetValue(Series2BrushProperty, value); }
     public Brush? Series3Brush { get => (Brush?)GetValue(Series3BrushProperty); set => SetValue(Series3BrushProperty, value); }
+    public Brush? Series4Brush { get => (Brush?)GetValue(Series4BrushProperty); set => SetValue(Series4BrushProperty, value); }
+    public Brush? Series5Brush { get => (Brush?)GetValue(Series5BrushProperty); set => SetValue(Series5BrushProperty, value); }
+    public Brush? Series6Brush { get => (Brush?)GetValue(Series6BrushProperty); set => SetValue(Series6BrushProperty, value); }
+    public Brush? Series7Brush { get => (Brush?)GetValue(Series7BrushProperty); set => SetValue(Series7BrushProperty, value); }
+    public Brush? Series8Brush { get => (Brush?)GetValue(Series8BrushProperty); set => SetValue(Series8BrushProperty, value); }
     public Brush OtherSeriesBrush { get => (Brush)GetValue(OtherSeriesBrushProperty); set => SetValue(OtherSeriesBrushProperty, value); }
     public Brush PointBrush { get => (Brush)GetValue(PointBrushProperty); set => SetValue(PointBrushProperty, value); }
     public Brush UnactionedBrush { get => (Brush)GetValue(UnactionedBrushProperty); set => SetValue(UnactionedBrushProperty, value); }
@@ -291,10 +317,10 @@ public class SignalChartControl : FrameworkElement
         }
         else
         {
-            // 센서별 폴리라인 — SeriesIndex 0~2만 라인, 그 외(기타)는 산점만(색 순환 금지 규약).
+            // 센서별 폴리라인 — 전 시리즈 색+라인(사용자 확정 2026-08-06, 구 "≤3 라인+기타 산점" 규약 폐기).
+            // 색은 8색 검증 팔레트를 인덱스 순환(SeriesBrushFor)으로 배정 — 센서 고정.
             foreach (var series in items.GroupBy(p => p.SeriesIndex).OrderBy(g => g.Key))
             {
-                if (series.Key > 2) continue;
                 var pts = series.ToList();
                 if (pts.Count < 2) continue;
                 var geo = new StreamGeometry();
@@ -322,31 +348,50 @@ public class SignalChartControl : FrameworkElement
             dc.DrawEllipse(fill, selected ? new Pen(LabelBrush, 2) : null, center, POINT_RADIUS, POINT_RADIUS);
         }
 
-        // 시리즈 끝단 직접 라벨(FR-11, ≤3 시리즈) — 뷰 내 마지막 포인트 우측에 센서명
+        // 시리즈 끝단 직접 라벨(FR-11) — 전 시리즈 대상. 시리즈가 많으면(>5) 라벨 적층이 심해져 생략(칩 색 견본+툴팁이 범례).
+        // 배치는 y 정렬 후 최소 13px 그리디 푸시로 겹침 회피(버그헌트 R축 권고안).
         if (multiSeries)
         {
-            foreach (var series in items.GroupBy(p => p.SeriesIndex).Where(g => g.Key <= 2))
+            var seriesGroups = items.GroupBy(p => p.SeriesIndex).ToList();
+            if (seriesGroups.Count <= 5)
             {
-                var last = series.LastOrDefault();
-                if (last?.SeriesName is not { Length: > 0 } name) continue;
-                var ft = new FormattedText(name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                    new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-                    10, SeriesBrushFor(series.Key), VisualTreeHelper.GetDpi(this).PixelsPerDip);
-                double lx = Math.Min(X(last.Time) + 7, plotR - ft.Width - 2);
-                double ly = Math.Clamp(Y(last.Signal) - 15, plotT, plotB - 14);
-                dc.DrawText(ft, new Point(lx, ly));
+                var labels = new List<(FormattedText Text, double X, double Y)>();
+                foreach (var series in seriesGroups)
+                {
+                    var last = series.LastOrDefault();
+                    if (last?.SeriesName is not { Length: > 0 } name) continue;
+                    var ft = new FormattedText(name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                        new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                        10, SeriesBrushFor(series.Key), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                    double lx = Math.Min(X(last.Time) + 7, plotR - ft.Width - 2);
+                    double ly = Math.Clamp(Y(last.Signal) - 15, plotT, plotB - 14);
+                    labels.Add((ft, lx, ly));
+                }
+                // 위→아래 정렬 후 최소 간격 확보(plot 하한 클램프)
+                labels.Sort((a, b) => a.Y.CompareTo(b.Y));
+                const double MIN_GAP = 13;
+                for (int i = 1; i < labels.Count; i++)
+                    if (labels[i].Y < labels[i - 1].Y + MIN_GAP)
+                        labels[i] = (labels[i].Text, labels[i].X, Math.Min(labels[i - 1].Y + MIN_GAP, plotB - 14));
+                foreach (var (ft, lx, ly) in labels)
+                    dc.DrawText(ft, new Point(lx, ly));
             }
         }
 
         dc.Pop();
     }
 
-    /// <summary>시리즈 인덱스 → 브러시 (0~2=시리즈 토큰, 초과=기타 회색). 뷰 미주입 시 LineBrush 폴백.</summary>
-    private Brush SeriesBrushFor(int index) => index switch
+    /// <summary>시리즈 인덱스 → 브러시 — 8색 검증 팔레트 순환(색=센서 고정). 뷰 미주입 시 LineBrush 폴백, 음수 방어=기타 회색.</summary>
+    private Brush SeriesBrushFor(int index) => index < 0 ? OtherSeriesBrush : (index % 8) switch
     {
         0 => Series1Brush ?? LineBrush,
         1 => Series2Brush ?? LineBrush,
         2 => Series3Brush ?? LineBrush,
+        3 => Series4Brush ?? LineBrush,
+        4 => Series5Brush ?? LineBrush,
+        5 => Series6Brush ?? LineBrush,
+        6 => Series7Brush ?? LineBrush,
+        7 => Series8Brush ?? LineBrush,
         _ => OtherSeriesBrush,
     };
 
