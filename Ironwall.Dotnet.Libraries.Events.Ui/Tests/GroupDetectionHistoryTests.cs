@@ -298,6 +298,32 @@ public class GroupDetectionHistoryTests
     }
 
     [Fact]
+    public async Task should_toggle_all_sensor_chips_when_master_toggled()
+    {
+        var apiMock = new Mock<IEventApiService>();
+        SetupSensor(apiMock, 11, BuildDto(1, 1000, "2026-08-06T10:00:00"));
+        SetupSensor(apiMock, 12, BuildDto(2, 1200, "2026-08-06T11:00:00"));
+        var vm = CreateVm(apiMock, ProviderWith(Sensor(11, "FN-0311", 31), Sensor(12, "FN-0312", 32)));
+
+        vm.Initialize(GroupMsg());
+        await ActivateAsync(vm);
+        Assert.True(vm.AllSensorsOn);   // 초기 전부 on
+
+        vm.AllSensorsOn = false;        // 마스터 off → 전 칩 off + 결과 0
+        Assert.All(vm.SensorChips, c => Assert.False(c.IsOn));
+        Assert.Empty(vm.FilteredItems);
+
+        vm.AllSensorsOn = true;         // 마스터 on → 전 칩 on + 전체 복원
+        Assert.All(vm.SensorChips, c => Assert.True(c.IsOn));
+        Assert.Equal(2, vm.FilteredItems.Count);
+
+        vm.SensorChips.First(c => c.DeviceId == 12).IsOn = false;   // 개별 off → 마스터 표시 동기(false)
+        Assert.False(vm.AllSensorsOn);
+        vm.SensorChips.First(c => c.DeviceId == 12).IsOn = true;    // 다시 전부 on → 마스터 true
+        Assert.True(vm.AllSensorsOn);
+    }
+
+    [Fact]
     public async Task should_pick_top_sensor_with_tiebreak()
     {
         // 동률(2:2) — 최근 발생이 더 늦은 FN-0312가 선정돼야 한다(FR-13 타이브레이크)

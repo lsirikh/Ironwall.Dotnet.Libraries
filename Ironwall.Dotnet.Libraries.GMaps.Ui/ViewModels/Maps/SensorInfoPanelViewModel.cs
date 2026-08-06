@@ -65,6 +65,14 @@ public class SensorInfoPanelViewModel : PropertyChangedBase
 
     public ObservableCollection<SensorInfoRowModel> Rows { get; } = new();
 
+    private SensorInfoRowModel? _selectedRow;
+    /// <summary>선택 행(클릭) — 선택 효과는 뷰의 ListBoxItem 트리거(TintAccent+좌측 Primary 바, 토큰이라 다크/라이트 자동).</summary>
+    public SensorInfoRowModel? SelectedRow
+    {
+        get => _selectedRow;
+        set { _selectedRow = value; NotifyOfPropertyChange(nameof(SelectedRow)); }
+    }
+
     /// <summary>센서 수 = 필터 결과 Count (stale 가능한 DeviceGroupModel.DeviceCount 사용 금지 — FR-04).</summary>
     public int SensorCount => Rows.Count;
     public bool HasSensors => Rows.Count > 0;
@@ -75,11 +83,12 @@ public class SensorInfoPanelViewModel : PropertyChangedBase
     public int BlackoutCount => Rows.Count(r => r.State is EnumCompositeEventStatus.Blackout);
     #endregion
 
-    /// <summary>그룹 컨텍스트 교체 + 스냅샷 재적재(재우클릭 = 본 메서드 재호출).</summary>
+    /// <summary>그룹 컨텍스트 교체 + 스냅샷 재적재(재우클릭 = 본 메서드 재호출). 선택은 컨텍스트와 함께 리셋.</summary>
     public void Load(int groupId, string groupName, IEnumerable<SensorInfoRowModel> rows)
     {
         GroupId = groupId;
         GroupName = groupName;
+        SelectedRow = null;
         Rows.Clear();
         foreach (var row in rows) Rows.Add(row);
         NotifyOfPropertyChange(nameof(SensorCount));

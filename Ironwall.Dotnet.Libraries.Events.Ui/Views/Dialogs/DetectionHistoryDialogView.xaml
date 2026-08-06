@@ -92,6 +92,40 @@
 				</Setter.Value>
 			</Setter>
 		</Style>
+
+		<!--  센서 칩 컴팩트 변형(그룹 모드 전용) — 센서가 많아도 한 줄에 더 많이, 그리드 높이 잠식 최소화(사용자 피드백)  -->
+		<Style x:Key="FilterChipCompact" TargetType="ToggleButton">
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="FontSize" Value="10.5" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Margin" Value="0,0,4,3" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ToggleButton">
+						<Border
+							x:Name="Bd"
+							Padding="7,1.5"
+							Background="Transparent"
+							BorderBrush="{DynamicResource BorderBrush}"
+							BorderThickness="1"
+							CornerRadius="16">
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource TintAccentBrush}" />
+								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+								<Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+								<Setter Property="FontWeight" Value="Bold" />
+							</Trigger>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 	</UserControl.Resources>
 
 	<Grid Background="{DynamicResource SurfaceBrush}">
@@ -259,11 +293,25 @@
 					Visibility="{Binding IsGroupMode, Converter={StaticResource BoolToVis}}">
 					<TextBlock
 						Margin="0,0,8,0"
-						VerticalAlignment="Center"
+						Padding="0,3,0,0"
+						VerticalAlignment="Top"
 						DockPanel.Dock="Left"
 						FontSize="11"
 						Foreground="{DynamicResource TextSecondaryBrush}"
 						Text="센서" />
+					<!--  [전체] 마스터 토글 — 센서 다수일 때 일괄 on/off (전부 on일 때만 체크 표시)  -->
+					<ToggleButton
+						VerticalAlignment="Top"
+						Content="전체"
+						DockPanel.Dock="Left"
+						IsChecked="{Binding AllSensorsOn, Mode=TwoWay}"
+						Style="{StaticResource FilterChipCompact}"
+						ToolTip="모든 센서 표시/숨김" />
+					<!--  칩 영역 최대 2줄(≈52px) — 센서가 많아도 그리드 높이를 잠식하지 않도록 초과분은 스크롤(사용자 피드백)  -->
+					<ScrollViewer
+						MaxHeight="52"
+						HorizontalScrollBarVisibility="Disabled"
+						VerticalScrollBarVisibility="Auto">
 					<ItemsControl ItemsSource="{Binding SensorChips}">
 						<ItemsControl.ItemsPanel>
 							<ItemsPanelTemplate>
@@ -274,13 +322,13 @@
 							<DataTemplate>
 								<ToggleButton
 									IsChecked="{Binding IsOn, Mode=TwoWay}"
-									Style="{StaticResource FilterChip}"
+									Style="{StaticResource FilterChipCompact}"
 									ToolTip="{Binding Name}">
 									<StackPanel Orientation="Horizontal">
 										<Rectangle
-											Width="8"
-											Height="8"
-											Margin="0,0,5,0"
+											Width="7"
+											Height="7"
+											Margin="0,0,4,0"
 											VerticalAlignment="Center"
 											RadiusX="2"
 											RadiusY="2">
@@ -308,6 +356,7 @@
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
+					</ScrollViewer>
 				</DockPanel>
 			</Grid>
 		</Border>
@@ -432,7 +481,6 @@
 		<Grid Grid.Row="4">
 			<StackPanel Margin="10,8,10,0">
 				<controls:SignalChartControl
-					Height="220"
 					AxisBrush="{DynamicResource BorderBrush}"
 					GridBrush="{DynamicResource DividerBrush}"
 					ItemsSource="{Binding ChartPoints}"
@@ -447,7 +495,19 @@
 					Series1Brush="{DynamicResource ChartSeries1Brush}"
 					Series2Brush="{DynamicResource ChartSeries2Brush}"
 					Series3Brush="{DynamicResource ChartSeries3Brush}"
-					UnactionedBrush="{DynamicResource StatusCriticalBrush}" />
+					UnactionedBrush="{DynamicResource StatusCriticalBrush}">
+					<controls:SignalChartControl.Style>
+						<Style TargetType="controls:SignalChartControl">
+							<Setter Property="Height" Value="220" />
+							<Style.Triggers>
+								<!--  그룹 모드: 센서 칩 행이 추가되는 만큼 차트를 줄여 이벤트 그리드 높이 확보(사용자 피드백)  -->
+								<DataTrigger Binding="{Binding IsGroupMode}" Value="True">
+									<Setter Property="Height" Value="175" />
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</controls:SignalChartControl.Style>
+				</controls:SignalChartControl>
 				<DockPanel Margin="2,2,2,4" LastChildFill="False">
 					<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
 						<Ellipse

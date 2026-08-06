@@ -197,25 +197,64 @@
 									</Grid>
 								</Border>
 
-								<ScrollViewer Grid.Row="1" Padding="0,0,2,0" VerticalScrollBarVisibility="Auto">
-									<ItemsControl Margin="0,2,0,4" ItemsSource="{Binding Rows}">
-										<ItemsControl.ItemTemplate>
+								<!--  선택 지원 리스트 — Selected 효과 = TintAccent 배경 + 좌측 3px Primary 바(앱 선택 관례).
+								      전부 DynamicResource 토큰이라 다크/라이트 자동 대응.  -->
+								<ListBox
+									Grid.Row="1"
+									Margin="0,2,0,4"
+									Padding="0,0,2,0"
+									Background="Transparent"
+									BorderThickness="0"
+									ItemsSource="{Binding Rows}"
+									ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+									ScrollViewer.VerticalScrollBarVisibility="Auto"
+									SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+									SelectionMode="Single">
+									<ListBox.ItemContainerStyle>
+										<Style TargetType="ListBoxItem">
+											<Setter Property="Margin" Value="0" />
+											<Setter Property="Padding" Value="0" />
+											<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+											<Setter Property="FocusVisualStyle" Value="{x:Null}" />
+											<Setter Property="Template">
+												<Setter.Value>
+													<ControlTemplate TargetType="ListBoxItem">
+														<Border
+															x:Name="Bd"
+															Background="Transparent"
+															BorderBrush="{DynamicResource DividerBrush}"
+															BorderThickness="0,0,0,1">
+															<Grid>
+																<ContentPresenter />
+																<Rectangle
+																	x:Name="SelBar"
+																	Width="3"
+																	HorizontalAlignment="Left"
+																	Fill="{DynamicResource PrimaryBrush}"
+																	Visibility="Collapsed" />
+															</Grid>
+														</Border>
+														<ControlTemplate.Triggers>
+															<Trigger Property="IsMouseOver" Value="True">
+																<Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+															</Trigger>
+															<!--  선택 트리거가 hover 뒤 = 선택 상태가 hover를 이김(다크-온-다크 방지 관례)  -->
+															<Trigger Property="IsSelected" Value="True">
+																<Setter TargetName="Bd" Property="Background" Value="{DynamicResource TintAccentBrush}" />
+																<Setter TargetName="SelBar" Property="Visibility" Value="Visible" />
+															</Trigger>
+														</ControlTemplate.Triggers>
+													</ControlTemplate>
+												</Setter.Value>
+											</Setter>
+										</Style>
+									</ListBox.ItemContainerStyle>
+									<ListBox.ItemTemplate>
 											<DataTemplate>
 												<Border
 													Padding="10,5"
 													Background="Transparent"
-													BorderBrush="{DynamicResource DividerBrush}"
-													BorderThickness="0,0,0,1"
 													Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType={x:Type ctrl:SensorInfoPanelControl}}}">
-													<Border.Style>
-														<Style TargetType="Border">
-															<Style.Triggers>
-																<Trigger Property="IsMouseOver" Value="True">
-																	<Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-																</Trigger>
-															</Style.Triggers>
-														</Style>
-													</Border.Style>
 													<Border.ContextMenu>
 														<ContextMenu>
 															<!-- FR-06: 기존 단일 센서 탐지 이력 다이얼로그 재사용(메시지 발행만) -->
@@ -304,9 +343,8 @@
 													</Grid>
 												</Border>
 											</DataTemplate>
-										</ItemsControl.ItemTemplate>
-									</ItemsControl>
-								</ScrollViewer>
+									</ListBox.ItemTemplate>
+								</ListBox>
 
 								<!-- 빈 상태 (FR-05) -->
 								<TextBlock
