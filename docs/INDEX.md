@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-08-06 (advance-phase 자동)
-- **총 문서 수**: 482개
+- **총 문서 수**: 483개
 
 ---
 
@@ -73,6 +73,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [map-topbar-trafficlight-prd.md](prds/map-topbar-trafficlight-prd.md) | map-topbar-trafficlight | Approved | 2026-08-06 |
 | [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | zoom-float-halfstep | Approved | 2026-08-06 |
 | [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
 | [UI_Automation_Instrumentation_Phase2-prd.md](prds/UI_Automation_Instrumentation_Phase2-prd.md) | UI_Automation_Instrumentation_Phase2 | Draft | 2026-08-05 |
