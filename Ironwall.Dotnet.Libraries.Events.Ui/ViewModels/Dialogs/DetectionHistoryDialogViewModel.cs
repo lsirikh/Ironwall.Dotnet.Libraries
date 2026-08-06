@@ -114,8 +114,8 @@ public class SensorChipViewModel : PropertyChangedBase
     public int DeviceId { get; }
     public string Name { get; }
     public int SeriesIndex { get; }
-    /// <summary>칩 색 견본 표시 여부 — 시리즈 라인이 있는 상위 3개만(초과분=기타 회색).</summary>
-    public bool HasSeriesColor => SeriesIndex <= 2;
+    /// <summary>칩 색 견본 인덱스 — 8색 검증 팔레트 순환(차트 SeriesBrushFor와 동일 규칙, 색=센서 고정).</summary>
+    public int SeriesColorIndex => SeriesIndex % 8;
 
     public bool IsOn
     {
@@ -203,7 +203,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     /// <summary>그룹 오픈 메시지 컨텍스트 주입(FR-09) — 멤버 센서는 조회 시점 현재 멤버십으로 재해석(AD-5).</summary>
     public void Initialize(OpenGroupDetectionHistoryDialogMessageModel message)
     {
-        var modeChanged = !IsGroupMode;   // 센서→그룹 전환 리셋
+        // 모드 전환뿐 아니라 그룹→다른 그룹 전환도 완전 리셋 — 이전 그룹 잔상·칩 on/off 이월 차단(버그헌트 확정 이슈)
+        var contextChanged = !IsGroupMode || GroupId != message.GroupId;
         IsGroupMode = true;
         GroupId = message.GroupId;
         GroupName = string.IsNullOrWhiteSpace(message.GroupName) ? $"그룹 {message.GroupId}" : message.GroupName!;
@@ -211,7 +212,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         DeviceName = string.Empty;
         DeviceNumber = null;
         ResolveGroupSensors();
-        if (modeChanged) ResetModeContext();
+        if (contextChanged) ResetModeContext();
         NotifyOfPropertyChange(nameof(HeaderText));
         NotifyOfPropertyChange(nameof(IsGroupMode));
         NotifyOfPropertyChange(nameof(SensorColumnVisibility));
@@ -269,6 +270,9 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         _loadCts?.Cancel();
         _loadCts?.Dispose();   // 닫힘~다음 오픈 사이 CTS 미해제 잔존 방지
         _loadCts = null;
+        // stale 플래그 리셋(버그헌트 확정 이슈) — 활성 중 중복 Open으로 소비되지 못한 플래그가 남으면
+        // 다음 재오픈의 OnActivate 조회가 1회 통째로 생략되어 이전 컨텍스트 데이터가 그대로 표시된다.
+        _loadedByInitialize = false;
         return base.OnDeactivateAsync(close, cancellationToken);
     }
     #endregion
@@ -359,10 +363,12 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             {
                 var (models, sensorTruncated) = await FetchSensorPagedAsync(startText, endText, DeviceId, ct);
                 truncated = sensorTruncated;
-                // 서버 정렬(id desc)=최신 우선 — 상한 초과분은 과거 데이터라 절단
+                // 서버 정렬(created_at desc, id desc 타이브레이크)=최신 우선 — 상한 초과분은 과거 데이터라 절단
                 if (models.Count > MAX_LOAD)
                     models = models.Take(MAX_LOAD).ToList();
-                items = models.Select(m => new SignalHistoryItemViewModel(m)).ToList();
+                // EventId dedup — offset 페이지네이션 중 신규 이벤트 삽입으로 행이 밀리면 페이지 경계 중복 발생 가능(버그헌트 확정)
+                items = models.DistinctBy(m => m.Id)
+                    .Select(m => new SignalHistoryItemViewModel(m)).ToList();
             }
             else
             {
@@ -390,9 +396,11 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
                     throw new InvalidOperationException("그룹 멤버 센서 전체 조회 실패");
                 _failedSensorNames.AddRange(results.Where(r => r.Failed).Select(r => r.Sensor.Name));
 
-                // 병합 → 최신순 재정렬 → 그룹 총합 500 절단(G-1=(a)) — 센서별 편중과 무관하게 "최신 500" 규약 유지
+                // 병합 순서(버그헌트 확정 규약): 센서별 후필터(Fetch 내부) → 병합 → EventId dedup → 최신순 → 총합 500 절단(G-1=(a)).
+                // dedup은 서버 필터 회귀 시 N중복 방어 + offset 페이지 경계 중복 방어(정상 서버에서는 no-op).
                 var merged = results
                     .SelectMany(r => r.Models.Select(m => new SignalHistoryItemViewModel(m, r.Sensor.Id, r.Sensor.Name, r.Index)))
+                    .DistinctBy(i => i.Model.Id)
                     .OrderByDescending(i => i.DateTime)
                     .ToList();
                 truncated = results.Any(r => r.Truncated) || merged.Count > MAX_LOAD;
@@ -439,7 +447,12 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         }
     }
 
-    /// <summary>단일 센서 페이지 순회 조회 — 기존 단일 모드 루프를 추출(동작 동일), 그룹 팬아웃이 센서별로 재사용(FR-10).</summary>
+    /// <summary>원시 페이지 순회 상한(5=MAX_LOAD/PAGE_LIMIT) — 서버 필터 회귀 시 후필터로 카운트가 안 차 무한 순회하는 폭주 방지(버그헌트 확정 부작용 방어).</summary>
+    private const int MAX_PAGES = MAX_LOAD / PAGE_LIMIT;
+
+    /// <summary>단일 센서 페이지 순회 조회 — 그룹 팬아웃이 센서별로 재사용(FR-10).
+    /// 응답을 요청 센서로 후필터(DTO의 device_id/device.id 검증) — 서버 device_id 필터와 의미 동일(정상 서버=no-op 멱등),
+    /// 서버가 필터를 무시하던 실버그(B2/B3)의 재발 방어 + 오귀속 차단.</summary>
     private async Task<(List<IDetectionEventModel> Models, bool Truncated)> FetchSensorPagedAsync(
         string startText, string endText, int sensorId, CancellationToken ct)
     {
@@ -458,10 +471,13 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
                 break;   // 후속 페이지 실패 — 확보한 만큼만 표시
             }
 
-            models.AddRange(response.Data.Select(dto => dto.ToDetectionEventModel(_deviceProvider)));
+            models.AddRange(response.Data
+                .Where(dto => dto.DeviceId == sensorId || (dto.Device != null && dto.Device.Id == sensorId))
+                .Select(dto => dto.ToDetectionEventModel(_deviceProvider)));
 
-            if (response.Data.Count < PAGE_LIMIT) break;          // 마지막 페이지
+            if (response.Data.Count < PAGE_LIMIT) break;          // 마지막 페이지(원시 건수 기준)
             if (models.Count >= MAX_LOAD) { truncated = true; break; }
+            if (page >= MAX_PAGES) { truncated = true; break; }   // 원시 페이지 캡 — 후필터 시대에도 왕복 수 불변 보장
             page++;
         }
         return (models, truncated);

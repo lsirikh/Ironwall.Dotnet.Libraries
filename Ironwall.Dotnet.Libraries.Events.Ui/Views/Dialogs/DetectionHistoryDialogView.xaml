@@ -334,17 +334,32 @@
 											RadiusY="2">
 											<Rectangle.Style>
 												<Style TargetType="Rectangle">
-													<!--  시리즈 색=센서 인덱스 고정 (ChartSeries1~3Brush 토큰, 초과분=기타 회색)  -->
+													<!--  시리즈 색=센서 인덱스 고정, 8색 검증 팔레트 순환(SeriesColorIndex=SeriesIndex%8) — 차트 라인 색과 1:1  -->
 													<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
 													<Style.Triggers>
-														<DataTrigger Binding="{Binding SeriesIndex}" Value="0">
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="0">
 															<Setter Property="Fill" Value="{DynamicResource ChartSeries1Brush}" />
 														</DataTrigger>
-														<DataTrigger Binding="{Binding SeriesIndex}" Value="1">
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="1">
 															<Setter Property="Fill" Value="{DynamicResource ChartSeries2Brush}" />
 														</DataTrigger>
-														<DataTrigger Binding="{Binding SeriesIndex}" Value="2">
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="2">
 															<Setter Property="Fill" Value="{DynamicResource ChartSeries3Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="3">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries4Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="4">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries5Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="5">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries6Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="6">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries7Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesColorIndex}" Value="7">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries8Brush}" />
 														</DataTrigger>
 													</Style.Triggers>
 												</Style>
@@ -495,6 +510,11 @@
 					Series1Brush="{DynamicResource ChartSeries1Brush}"
 					Series2Brush="{DynamicResource ChartSeries2Brush}"
 					Series3Brush="{DynamicResource ChartSeries3Brush}"
+					Series4Brush="{DynamicResource ChartSeries4Brush}"
+					Series5Brush="{DynamicResource ChartSeries5Brush}"
+					Series6Brush="{DynamicResource ChartSeries6Brush}"
+					Series7Brush="{DynamicResource ChartSeries7Brush}"
+					Series8Brush="{DynamicResource ChartSeries8Brush}"
 					UnactionedBrush="{DynamicResource StatusCriticalBrush}">
 					<controls:SignalChartControl.Style>
 						<Style TargetType="controls:SignalChartControl">
