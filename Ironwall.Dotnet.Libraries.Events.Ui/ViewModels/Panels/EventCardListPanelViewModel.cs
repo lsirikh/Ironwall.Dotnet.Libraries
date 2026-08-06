@@ -41,6 +41,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
                                             , IHandle<CallAllEventReportMessageModel>
                                             , IHandle<EventEntryEnqueuedMessage>
                                             , IHandle<DetectionThumbnailSyncedMessage>
+                                            , IHandle<TrafficLightVisibilityChangedMessage>
     {
         #region - Ctors -
         public EventCardListPanelViewModel(IEventAggregator ea
@@ -110,6 +111,10 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             var (tlDetection, tlFault) = _eventQueueManager.GetActiveCounts();
             OnTrafficActiveCountChanged(tlDetection, tlFault);
 
+            // FR-A5: 보기 토글 현재 상태 질의 — MapViewModel(GMaps.Ui)이 TrafficLightVisibilityChangedMessage로
+            // 응답한다(양측 활성화 순서 역전 대비, 토글 변경분은 IHandle로 라이브 수신).
+            _ = _eventAggregator.PublishOnUIThreadAsync(new TrafficLightVisibilityRequestMessage());
+
             return base.OnActivateAsync(cancellationToken);
         }
 
@@ -164,8 +169,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public bool IsTrafficDetectionOn => _isTrafficCountsReady && _trafficDetectionCount > 0;
         public bool IsTrafficGreenOn => _isTrafficCountsReady && _trafficFaultCount == 0 && _trafficDetectionCount == 0;
 
-        /// <summary>보기&gt;탐지·장애 신호등 토글(FR-A5 — EA 재연결은 IMPL-04에서 배선, 기본 표시).</summary>
+        /// <summary>보기&gt;탐지·장애 신호등 토글(FR-A5) — TrafficLightVisibilityChangedMessage 수신으로 갱신,
+        /// 영속은 GMaps 측 MapInstrumentVisibility.DetectionFault 키 승계(여기서는 저장하지 않는다).</summary>
         public bool IsTrafficLightVisible { get => _isTrafficLightVisible; set { _isTrafficLightVisible = value; NotifyOfPropertyChange(); } }
+
+        /// <summary>보기 토글 수신(FR-A5) — MapViewModel(GMaps.Ui)이 세터/질의 응답으로 발행.</summary>
+        public Task HandleAsync(TrafficLightVisibilityChangedMessage message, CancellationToken cancellationToken)
+        {
+            IsTrafficLightVisible = message.IsVisible;
+            return Task.CompletedTask;
+        }
 
         public string TrafficTooltip => _isTrafficCountsReady
             ? $"미조치 장애 {_trafficFaultCount}건 · 탐지 {_trafficDetectionCount}건 — 클릭: 해당 종류 카드로 이동"

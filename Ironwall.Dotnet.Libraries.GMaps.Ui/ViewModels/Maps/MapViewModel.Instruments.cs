@@ -10,13 +10,17 @@ using System.Threading.Tasks;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.ViewModels.Maps;
 /****************************************************************************
-   Purpose      : 지도 계기 인디케이터(강풍·탐지장애) + 보기(View) 가시성 배선
-                  (GMap_Map_Instruments FR-03/07/12/14~17). MapViewModel partial 분리.
+   Purpose      : 지도 계기 인디케이터(강풍) + 보기(View) 가시성 배선
+                  (GMap_Map_Instruments FR-03/12/14~17). MapViewModel partial 분리.
+                  탐지·장애 pill 계기는 map-topbar-trafficlight D2로 제거 —
+                  집계 표시는 이벤트 카드 리스트 헤더 신호등(Events.Ui, EQM 직구독)이 승계,
+                  여기는 보기 토글(IsDetFaultVisible)의 EA 브리지(FR-A5)만 남는다.
    Note         : 복원 중 저장 억제(_suppressInstrumentSave) — 회전 영속 자가오염(44bc6fc) 교훈.
                   강풍 초기 모드는 IGMapSetupModel에 없어 wind0 기본, 첫 ChangeModeWindyMessage로 갱신.
    Created On   : 2026-07-31 · Sensorway Co., Ltd.
  ****************************************************************************/
-public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
+public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>,
+                                    IHandle<TrafficLightVisibilityRequestMessage>
 {
     private bool _suppressInstrumentSave;
 
@@ -54,35 +58,14 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
     }
     #endregion
 
-    #region - 탐지·장애 인디케이터 -
-    private int _detectionCount;
-    public int DetectionCount { get => _detectionCount; set { _detectionCount = value; NotifyOfPropertyChange(nameof(DetectionCount)); } }
-    private int _faultCount;
-    public int FaultCount { get => _faultCount; set { _faultCount = value; NotifyOfPropertyChange(nameof(FaultCount)); } }
+    #region - 탐지·장애 신호등 연동 (map-topbar-trafficlight FR-A5/A6) -
+    // pill 계기(GMapDetectionFaultControl)·EQM 구독·건수 프로퍼티는 D2로 제거(ee51761 승계 커밋) —
+    // 위치/방향/HideOnZero 영속(MapDetectionFaultModel)은 소비처가 없어져 읽지 않는다(파일 잔존 무해).
 
-    private double _detFaultX = double.NaN;
-    public double DetFaultX { get => _detFaultX; set { _detFaultX = value; NotifyOfPropertyChange(nameof(DetFaultX)); } }
-    private double _detFaultY = double.NaN;
-    public double DetFaultY { get => _detFaultY; set { _detFaultY = value; NotifyOfPropertyChange(nameof(DetFaultY)); } }
-
-    private InstrumentOrientation _detFaultOrientation = InstrumentOrientation.Vertical;
-    public InstrumentOrientation DetFaultOrientation { get => _detFaultOrientation; set { _detFaultOrientation = value; NotifyOfPropertyChange(nameof(DetFaultOrientation)); } }
-    private bool _detFaultHideOnZero;
-    public bool DetFaultHideOnZero { get => _detFaultHideOnZero; set { _detFaultHideOnZero = value; NotifyOfPropertyChange(nameof(DetFaultHideOnZero)); } }
-
-    private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _saveMapDetFaultCommand;
-    public Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand SaveMapDetectionFaultCommand
-        => _saveMapDetFaultCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(_ => _ = SaveMapDetectionFaultState());
-
-    private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _openEventPanelCommand;
-    /// <summary>탐지·장애 pill 클릭 → 이벤트 패널 오픈(D-10).</summary>
-    public Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand OpenEventPanelCommand
-        => _openEventPanelCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(
-            _ => _ = _eventAggregator?.PublishOnCurrentThreadAsync(new OpenEventPanelMessageModel()));
-
-    /// <summary>EQM 활성 카운트 변경 핸들러(FR-07). EQM은 NATS 콜백 스레드일 수 있어 UI 스레드로 정렬.</summary>
-    private void OnActiveCountChanged(int detection, int fault)
-        => OnUIThread(() => { DetectionCount = detection; FaultCount = fault; });
+    /// <summary>신호등 측(Events.Ui) 초기 상태 질의 수신 → 현재 토글 값 재발행(양측 활성화 순서 역전 대비).</summary>
+    public Task HandleAsync(TrafficLightVisibilityRequestMessage message, CancellationToken cancellationToken)
+        => _eventAggregator?.PublishOnCurrentThreadAsync(
+               new TrafficLightVisibilityChangedMessage(IsDetFaultVisible), cancellationToken) ?? Task.CompletedTask;
     #endregion
 
     #region - 보기(View) 가시성 (D-12/FR-14~17) -
@@ -91,7 +74,9 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
     private bool _isWindyIndicatorVisible = true;
     public bool IsWindyIndicatorVisible { get => _isWindyIndicatorVisible; set { _isWindyIndicatorVisible = value; NotifyOfPropertyChange(nameof(IsWindyIndicatorVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
     private bool _isDetFaultVisible = true;
-    public bool IsDetFaultVisible { get => _isDetFaultVisible; set { _isDetFaultVisible = value; NotifyOfPropertyChange(nameof(IsDetFaultVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); } }
+    /// <summary>보기&gt;탐지·장애 신호등(Ctrl+Shift+F). 세터가 EA 발행(FR-A5) — 부팅 복원(_suppressInstrumentSave) 중에도
+    /// 발행해 Events.Ui 신호등에 초기 상태를 전파한다(저장만 억제).</summary>
+    public bool IsDetFaultVisible { get => _isDetFaultVisible; set { _isDetFaultVisible = value; NotifyOfPropertyChange(nameof(IsDetFaultVisible)); if (!_suppressInstrumentSave) _ = SaveInstrumentVisibility(); _ = _eventAggregator?.PublishOnCurrentThreadAsync(new TrafficLightVisibilityChangedMessage(value)); } }
 
     // 키보드 단축키용 토글 커맨드(메뉴는 IsChecked로 마우스 토글). 세터가 저장까지 처리.
     private Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand? _toggleCompassVisibleCommand;
@@ -105,15 +90,10 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
         => _toggleDetFaultVisibleCommand ??= new Ironwall.Dotnet.Libraries.GMaps.Ui.Utils.RelayCommand(_ => IsDetFaultVisible = !IsDetFaultVisible);
     #endregion
 
-    /// <summary>초기 배선 — CCMS(부팅)에서 1회 호출. EQM 구독 + 초기 카운트 + 설정 복원(억제).</summary>
+    /// <summary>초기 배선 — CCMS(부팅)에서 1회 호출. 설정 복원(억제).
+    /// EQM 구독은 신호등 이관(FR-A6)으로 제거 — EventCardListPanelViewModel이 직구독한다(이중 집계 방지).</summary>
     private void InitializeInstruments()
     {
-        // EQM 구독(FR-07) — VM은 싱글턴(앱 수명)이라 누수 없음. 중복 방지 위해 먼저 해제.
-        _eventQueueManager.OnActiveCountChanged -= OnActiveCountChanged;
-        _eventQueueManager.OnActiveCountChanged += OnActiveCountChanged;
-        var (det, flt) = _eventQueueManager.GetActiveCounts();
-        DetectionCount = det; FaultCount = flt;
-
         LoadMapInstrumentsFromSettings();
     }
 
@@ -130,13 +110,6 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
                 WindyDisplayStyle = InstrumentMath.ParseWindyStyle(w.DisplayStyle);
                 WindyHideOnNormal = w.HideOnNormal;
             }
-            var d = _setupModel?.MapDetectionFault;
-            if (d != null)
-            {
-                DetFaultX = d.X; DetFaultY = d.Y;
-                DetFaultOrientation = InstrumentMath.ParseOrientation(d.Orientation);
-                DetFaultHideOnZero = d.HideOnZero;
-            }
             var vis = _setupModel?.MapInstrumentVisibility;
             if (vis != null)
             {
@@ -145,7 +118,7 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
                 IsDetFaultVisible = vis.DetectionFault;
                 IsCenterCrosshairVisible = vis.Crosshair;
             }
-            _log?.Info($"[Instruments] 복원: windy={_setupModel?.MapWindyIndicator}, detFault={_setupModel?.MapDetectionFault}, vis={_setupModel?.MapInstrumentVisibility}");
+            _log?.Info($"[Instruments] 복원: windy={_setupModel?.MapWindyIndicator}, vis={_setupModel?.MapInstrumentVisibility}");
         }
         finally { _suppressInstrumentSave = false; }
     }
@@ -160,18 +133,6 @@ public partial class MapViewModel : IHandle<ChangeModeWindyMessageModel>
             return MapSettingsHelper.SaveMapWindyIndicatorAsync(m, _log);
         }
         catch (Exception ex) { _log?.Error($"[Instruments] 강풍 저장 실패: {ex.Message}"); return Task.CompletedTask; }
-    }
-
-    private Task SaveMapDetectionFaultState()
-    {
-        if (_suppressInstrumentSave) return Task.CompletedTask;
-        try
-        {
-            var m = new MapDetectionFaultModel { X = DetFaultX, Y = DetFaultY, Orientation = DetFaultOrientation.ToString(), HideOnZero = DetFaultHideOnZero };
-            if (_setupModel != null) _setupModel.MapDetectionFault = m;
-            return MapSettingsHelper.SaveMapDetectionFaultAsync(m, _log);
-        }
-        catch (Exception ex) { _log?.Error($"[Instruments] 탐지장애 저장 실패: {ex.Message}"); return Task.CompletedTask; }
     }
 
     private Task SaveInstrumentVisibility()

@@ -195,9 +195,10 @@
 					InputGestureText="Ctrl+Shift+W"
 					IsCheckable="True"
 					IsChecked="{Binding IsWindyIndicatorVisible, Mode=TwoWay}" />
+				<!--  대상: 이벤트 카드 리스트 헤더 신호등(FR-A5, pill 계기는 D2 제거)  -->
 				<MenuItem
-					Header="탐지·장애 상태"
-					Icon="{md:PackIcon Kind=ShieldAlertOutline}"
+					Header="탐지·장애 신호등"
+					Icon="{md:PackIcon Kind=TrafficLight}"
 					InputGestureText="Ctrl+Shift+F"
 					IsCheckable="True"
 					IsChecked="{Binding IsDetFaultVisible, Mode=TwoWay}" />
@@ -1002,20 +1003,8 @@
 					WindyX="{Binding WindyIndicatorX, Mode=TwoWay}"
 					WindyY="{Binding WindyIndicatorY, Mode=TwoWay}" />
 
-				<!--  탐지·장애 상태 인디케이터 — z6, EQM 소스(D-01), 클릭→이벤트 패널(D-10).  -->
-				<ctrl:GMapDetectionFaultControl
-					x:Name="MapDetectionFault"
-					Panel.ZIndex="6"
-					ClickCommand="{Binding OpenEventPanelCommand}"
-					DetFaultX="{Binding DetFaultX, Mode=TwoWay}"
-					DetFaultY="{Binding DetFaultY, Mode=TwoWay}"
-					DetectionCount="{Binding DetectionCount}"
-					DragCompletedCommand="{Binding SaveMapDetectionFaultCommand}"
-					FaultCount="{Binding FaultCount}"
-					HideOnZero="{Binding DetFaultHideOnZero, Mode=TwoWay}"
-					IsInstrumentVisible="{Binding IsDetFaultVisible}"
-					Orientation="{Binding DetFaultOrientation, Mode=TwoWay}"
-					SettingsChangedCommand="{Binding SaveMapDetectionFaultCommand}" />
+				<!--  탐지·장애 pill 계기는 map-topbar-trafficlight D2로 제거 —
+				      이벤트 카드 리스트 헤더 신호등(Events.Ui)이 승계, 보기 토글은 EA 브리지(FR-A5).  -->
 
 				<!--  심볼 속성 창  -->
 				<ContentPresenter
