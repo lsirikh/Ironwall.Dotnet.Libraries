@@ -72,8 +72,8 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
 | [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | zoom-float-halfstep | Approved | 2026-08-06 |
-| [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Draft | 2026-08-06 |
 | [UI_Automation_Instrumentation_Phase2-prd.md](prds/UI_Automation_Instrumentation_Phase2-prd.md) | UI_Automation_Instrumentation_Phase2 | Draft | 2026-08-05 |
 | [Overlay_Image_Canonical_Join-prd.md](prds/Overlay_Image_Canonical_Join-prd.md) | Overlay_Image_Canonical_Join | Draft | 2026-08-05 |
 | [Event_Silent_Failure_Elimination-prd.md](prds/Event_Silent_Failure_Elimination-prd.md) | Event_Silent_Failure_Elimination | Draft | 2026-08-05 |
