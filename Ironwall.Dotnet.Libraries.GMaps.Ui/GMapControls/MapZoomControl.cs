@@ -64,12 +64,13 @@ public class MapZoomControl : Control
         DependencyProperty.Register("ZoomOutCommand", typeof(ICommand),
             typeof(MapZoomControl));
 
-    // ───────────────── Digital Zoom ─────────────────
-    // 슬라이더는 Zoom DP가 아니라 SliderValue(=Zoom+DigitalZoomLevel)에 바인딩한다.
+    // ───────────────── Digital Zoom (0.5 래더 — zoom-float-halfstep PRD v1.1) ─────────────────
+    // 슬라이더는 Zoom DP가 아니라 SliderValue(실효줌 = min(Zoom,Max) + 0.5×dzl)에 바인딩한다.
     // (Zoom DP는 OnCoerceZoom 클램프로 MaxZoom 초과를 표현 못 하므로 — CM-8)
+    // 합성/라우팅/라벨 산술은 Helpers.ZoomLadder(순수 함수, ZoomLadderTests 검증) 단일 소스.
     private bool _isSyncing;
 
-    /// <summary>슬라이더 좌측 라벨("17" / "18+" / "18++"). 읽기전용 DP. (C1/FR-11)</summary>
+    /// <summary>슬라이더 좌측 라벨("17" / "17.5" / 최상단 "19.5+" / "19.5++"). 읽기전용 DP. (FR-01)</summary>
     public string ZoomLabel
     {
         get => (string)GetValue(ZoomLabelProperty);
@@ -91,11 +92,24 @@ public class MapZoomControl : Control
             new PropertyMetadata(false));
     public static readonly DependencyProperty IsDigitalZoomProperty = IsDigitalZoomKey.DependencyProperty;
 
+    /// <summary>최상단 소프트 밴드(dzl≥2 — "19.5+"/"19.5++") 여부. 주황 라벨 트리거(FR-18, G-6=B).
+    /// 하프스텝(x.5)은 정식 줌이므로 여기 포함되지 않는다.</summary>
+    public bool IsSoftZoom
+    {
+        get => (bool)GetValue(IsSoftZoomProperty);
+        private set => SetValue(IsSoftZoomKey, value);
+    }
+    private static readonly DependencyPropertyKey IsSoftZoomKey =
+        DependencyProperty.RegisterReadOnly(nameof(IsSoftZoom), typeof(bool), typeof(MapZoomControl),
+            new PropertyMetadata(false));
+    public static readonly DependencyProperty IsSoftZoomProperty = IsSoftZoomKey.DependencyProperty;
+
     private static void UpdateZoomLabel(MapZoomControl c)
     {
-        int baseZoom = (int)System.Math.Min(c.Zoom, c.MaxZoom);
-        c.ZoomLabel = baseZoom.ToString() + new string('+', System.Math.Max(0, c.DigitalZoomLevel));
-        c.IsDigitalZoom = c.DigitalZoomLevel > 0;
+        // zoom-float-halfstep FR-01: 소수 라벨(InvariantCulture — NFR-01). '+' 생성은 최상단 소프트 밴드 전용.
+        c.ZoomLabel = Helpers.ZoomLadder.Label(c.Zoom, c.MaxZoom, c.DigitalZoomLevel);
+        c.IsDigitalZoom = c.DigitalZoomLevel > 0;   // 레거시 의미 유지(외부 바인딩 호환)
+        c.IsSoftZoom = Helpers.ZoomLadder.IsSoftBand(c.Zoom, c.MaxZoom, c.DigitalZoomLevel);
     }
 
     /// <summary>디지털 줌 레벨(0~Steps). MainMap.DigitalZoomLevel과 TwoWay.</summary>
@@ -108,7 +122,8 @@ public class MapZoomControl : Control
         DependencyProperty.Register(nameof(DigitalZoomLevel), typeof(int), typeof(MapZoomControl),
             new FrameworkPropertyMetadata(0, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnZoomStateChanged));
 
-    /// <summary>디지털 줌 단계 수(기본 2). 슬라이더 디지털 구간 길이.</summary>
+    /// <summary>최상단 디지털 스텝 수(TopSteps, 기본 3 = "Max.5"/"Max.5+"/"Max.5++").
+    /// GMapCustomControl.DIGITAL_ZOOM_MAX(3)와 동일해야 한다(FR-04 — 구 기본값 2는 잠재 상한 충돌 SIM-D007).</summary>
     public int DigitalZoomSteps
     {
         get => (int)GetValue(DigitalZoomStepsProperty);
@@ -116,9 +131,9 @@ public class MapZoomControl : Control
     }
     public static readonly DependencyProperty DigitalZoomStepsProperty =
         DependencyProperty.Register(nameof(DigitalZoomSteps), typeof(int), typeof(MapZoomControl),
-            new PropertyMetadata(2, OnExtendedMaxChanged));
+            new PropertyMetadata(3, OnExtendedMaxChanged));
 
-    /// <summary>슬라이더 Maximum = MaxZoom + DigitalZoomSteps (읽기 전용).</summary>
+    /// <summary>슬라이더 Maximum = MaxZoom + 0.5×DigitalZoomSteps (읽기 전용, FR-04). 기본 19+1.5=20.5.</summary>
     public double ExtendedMaxZoom
     {
         get => (double)GetValue(ExtendedMaxZoomProperty);
@@ -126,10 +141,10 @@ public class MapZoomControl : Control
     }
     private static readonly DependencyPropertyKey ExtendedMaxZoomKey =
         DependencyProperty.RegisterReadOnly(nameof(ExtendedMaxZoom), typeof(double), typeof(MapZoomControl),
-            new PropertyMetadata(21.0));
+            new PropertyMetadata(20.5));
     public static readonly DependencyProperty ExtendedMaxZoomProperty = ExtendedMaxZoomKey.DependencyProperty;
 
-    /// <summary>슬라이더 전용 합성 값(= Zoom + DigitalZoomLevel). 슬라이더는 이것에 TwoWay 바인딩.</summary>
+    /// <summary>슬라이더 전용 합성 값 = 실효줌(min(Zoom,Max) + 0.5×dzl). 슬라이더는 이것에 TwoWay 바인딩.</summary>
     public double SliderValue
     {
         get => (double)GetValue(SliderValueProperty);
@@ -146,7 +161,8 @@ public class MapZoomControl : Control
         if (c._isSyncing) return;
         c._isSyncing = true;
         // Zoom은 MaxZoom으로 클램프(초과분은 디지털 줌이 담당). Zoom>MaxZoom 일시 상태가 슬라이더에 누설되지 않게.
-        try { c.SliderValue = System.Math.Min(c.Zoom, c.MaxZoom) + c.DigitalZoomLevel; }
+        // zoom-float-halfstep FR-02: 0.5×dzl 합성 — (17,H)=17.5 vs (18,0)=18 항상 구분(SIM-D003 해소).
+        try { c.SliderValue = Helpers.ZoomLadder.Compose(c.Zoom, c.MaxZoom, c.DigitalZoomLevel); }
         finally { c._isSyncing = false; }
         UpdateZoomLabel(c);   // ★ C1: 맵→슬라이더/MaxZoom 변경 경로 라벨 갱신
     }
@@ -155,7 +171,7 @@ public class MapZoomControl : Control
     private static void OnExtendedMaxChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var c = (MapZoomControl)d;
-        c.ExtendedMaxZoom = c.MaxZoom + c.DigitalZoomSteps;
+        c.ExtendedMaxZoom = c.MaxZoom + 0.5 * c.DigitalZoomSteps;   // FR-04: 0.5 그리드 상한(기본 19+1.5=20.5)
         OnZoomStateChanged(d, e);
     }
 
@@ -167,18 +183,11 @@ public class MapZoomControl : Control
         c._isSyncing = true;
         try
         {
-            double v = (double)e.NewValue;
-            int maxZ = c.MaxZoom;
-            if (v <= maxZ)
-            {
-                c.Zoom = v;
-                c.DigitalZoomLevel = 0;
-            }
-            else
-            {
-                c.Zoom = maxZ;
-                c.DigitalZoomLevel = System.Math.Clamp((int)System.Math.Round(v - maxZ), 0, c.DigitalZoomSteps);
-            }
+            // zoom-float-halfstep FR-02: 0.5 그리드 분해(AwayFromZero — SIM-D002) —
+            // 타일줌에는 정수만 대입(NFR-04, 소수 직대입은 벤더 floor 무성 절단 SIM-D001).
+            var (tile, dzl) = Helpers.ZoomLadder.Route((double)e.NewValue, c.MinZoom, c.MaxZoom, c.DigitalZoomSteps);
+            c.Zoom = tile;
+            c.DigitalZoomLevel = dzl;
         }
         finally { c._isSyncing = false; }
         UpdateZoomLabel(c);   // ★ C1: 슬라이더 드래그 경로 라벨 갱신 (두 콜백 모두 가드로 억압되므로 여기서 직접)

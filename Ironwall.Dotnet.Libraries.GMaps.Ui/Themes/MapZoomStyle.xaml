@@ -8,7 +8,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/DesignTokens.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
-	<!--  以?踰꾪듉 ?ㅽ??? -->
+	<!--  줌 버튼 스타일  -->
 	<Style x:Key="ZoomButtonStyle" TargetType="Button">
 		<Setter Property="Width" Value="32" />
 		<Setter Property="Height" Value="32" />
@@ -51,7 +51,7 @@
 								<ColumnDefinition Width="32" />
 							</Grid.ColumnDefinitions>
 
-							<!--  以??덈꺼 ?쒖떆 (?붿???以뚯? "18+"/"18++", ?쒖꽦 ???ㅻ젋吏)  -->
+							<!--  줌 레벨 표시 — 0.5 래더 소수 표기("17"/"17.5"), 최상단 소프트 밴드는 "19.5+"/"19.5++"(주황)  -->
 							<TextBlock
 								x:Name="ZoomLabelText"
 								Grid.Column="0"
@@ -63,7 +63,7 @@
 								Foreground="{DynamicResource PrimaryBrush}"
 								Text="{Binding ZoomLabel, RelativeSource={RelativeSource TemplatedParent}}" />
 
-							<!--  以??꾩썐  -->
+							<!--  줌 아웃  -->
 							<Button
 								Grid.Column="1"
 								Command="{TemplateBinding ZoomOutCommand}"
@@ -75,22 +75,24 @@
 									Kind="MagnifyMinus" />
 							</Button>
 
-							<!--  ?щ씪?대뜑: Maximum=ExtendedMaxZoom(MaxZoom+?붿??몃떒怨?, Value=SliderValue ?쇱슦??
-							      ?붿???援ш컙? MaxZoom ?덈㉧ 異붽????덇툑?쇰줈 ?쒓컖 援щ텇?쒕떎.  -->
+							<!--  슬라이더: 실효줌 0.5 그리드 — Maximum=ExtendedMaxZoom(MaxZoom+0.5×TopSteps),
+							      Value=SliderValue(=min(Zoom,Max)+0.5×dzl) 라우팅. 틱은 정수만 표시(과밀 방지),
+							      스냅은 0.5 단위(zoom-float-halfstep FR-03).  -->
 							<Slider
 								Grid.Column="2"
 								Margin="4,0"
 								VerticalAlignment="Center"
 								IsSnapToTickEnabled="True"
+								LargeChange="1"
 								Maximum="{Binding ExtendedMaxZoom, RelativeSource={RelativeSource TemplatedParent}}"
 								Minimum="{Binding MinZoom, RelativeSource={RelativeSource TemplatedParent}}"
-								SmallChange="1"
-								TickFrequency="1"
-								TickPlacement="Both"
-								ToolTip="MaxZoom 초과 구간은 디지털 줌(소프트 확대)"
+								SmallChange="0.5"
+								TickFrequency="0.5"
+								TickPlacement="None"
+								ToolTip="0.5 단위 줌 — 최상단 '+'/'++'는 소프트 확대(타일 없음) 구간"
 								Value="{Binding SliderValue, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
 
-							<!--  以??? -->
+							<!--  줌 인  -->
 							<Button
 								Grid.Column="3"
 								Command="{TemplateBinding ZoomInCommand}"
@@ -104,7 +106,8 @@
 						</Grid>
 					</Border>
 						<ControlTemplate.Triggers>
-							<Trigger Property="IsDigitalZoom" Value="True">
+							<!--  소프트 밴드(dzl≥2, "19.5+"/"19.5++")만 주황 — 하프스텝(x.5)은 정식 줌(FR-18, G-6=B)  -->
+							<Trigger Property="IsSoftZoom" Value="True">
 								<Setter TargetName="ZoomLabelText" Property="Foreground" Value="#E67E22" />
 							</Trigger>
 						</ControlTemplate.Triggers>

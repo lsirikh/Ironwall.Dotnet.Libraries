@@ -85,11 +85,11 @@ public partial class MapViewModel
         if (HomePosition == null) return;
 
         HomePosition.Position = new CoordinateModel(geo.Lat, geo.Lng, 0.0);
-        HomePosition.Zoom = Zoom;
+        HomePosition.Zoom = MainMap.EffectiveZoom;   // zoom-float-halfstep FR-09b: 저장은 실효줌(SIM-P012)
         HomePosition.IsAvailable = true;
         MoveHomeLocationCommand?.RaiseCanExecuteChanged();
         SetHomeLocationCommand?.RaiseCanExecuteChanged();
-        _log?.Info($"[Home] 과녁 클릭으로 홈 설정 ({geo.Lat:F6},{geo.Lng:F6}), zoom={Zoom}");
+        _log?.Info($"[Home] 과녁 클릭으로 홈 설정 ({geo.Lat:F6},{geo.Lng:F6}), zoom={HomePosition.Zoom}");
         await MapSettingsHelper.SaveHomePositionAsync(HomePosition, _log);
     }
 }

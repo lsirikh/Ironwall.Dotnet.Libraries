@@ -3122,18 +3122,10 @@ public partial class MapViewModel : BasePanelViewModel,
         MoveHomeLocationCommand = new RelayCommand(ExecuteMoveHomeLocation, CanExecuteMoveHomeLocation);
         SetHomeLocationCommand = new RelayCommand(ExecuteSetHomeLocation, CanExecuteSetHomeLocation);
         ShowMapRoiPanelCommand = new RelayCommand(_ => ShowMapRoiPanel());
-        ZoomInCommand = new RelayCommand(_ =>
-        {
-            if (MainMap == null) return;
-            if (MainMap.Zoom < ZoomMax) MainMap.Zoom++;
-            else MainMap.StepDigitalZoom(+1);   // MaxZoom 초과 → 디지털 줌(상한 도달 시 no-op)
-        });
-        ZoomOutCommand = new RelayCommand(_ =>
-        {
-            if (MainMap == null) return;
-            if (MainMap.DigitalZoomLevel > 0) MainMap.StepDigitalZoom(-1);   // 디지털 우선 감소
-            else if (MainMap.Zoom > ZoomMin) MainMap.Zoom--;
-        });
+        // ★ zoom-float-halfstep FR-05: 커맨드 = 휠과 동일한 0.5 래더 스텝(SIM-D005 해소 —
+        //   종전 Zoom++는 하프스텝을 건너뛰어 17→18로 점프했다). 화면 중심 기준.
+        ZoomInCommand = new RelayCommand(_ => MainMap?.StepEffectiveZoom(+1));
+        ZoomOutCommand = new RelayCommand(_ => MainMap?.StepEffectiveZoom(-1));
         ShowLayerPanelCommand = new RelayCommand(_ => ShowLayerPanel());
         TogglePlaybackPanelCommand = new RelayCommand(_ => TogglePlaybackPanel());
         ToggleTrackingSettingsPanelCommand = new RelayCommand(_ => ToggleTrackingSettingsPanel());
@@ -4780,9 +4772,9 @@ public partial class MapViewModel : BasePanelViewModel,
             return;
         }
 
-        // 0. 현재 위치/줌 저장
+        // 0. 현재 위치/줌 저장 — zoom-float-halfstep FR-09: 실효줌 단일값 캡처(하프스텝 dzl 포함, SIM-P011 해소)
         var savedPosition = MainMap.Position;
-        var savedZoom = MainMap.Zoom;
+        var savedZoom = MainMap.EffectiveZoom;
 
         _log?.Info($"[MapSwitch] 전환 시작: {MainMap.MapProvider?.Name ?? "null"} → {definedMap.ServiceUrl}");
 
@@ -4811,9 +4803,9 @@ public partial class MapViewModel : BasePanelViewModel,
         if (provider.MinZoom >= 0) ZoomMin = provider.MinZoom;   // 래퍼 경유 → 슬라이더 Minimum 통지 (T1)
         if (provider.MaxZoom.HasValue) ZoomMax = provider.MaxZoom.Value;   // 래퍼 경유 → 슬라이더 Maximum 통지 (T1)
 
-        // 6. 위치/줌 복원
+        // 6. 위치/줌 복원 — FR-09: 원자 세터로 (타일, dzl) 분해 복원(직대입 시 벤더 floor 무성 절단)
         MainMap.Position = savedPosition;
-        MainMap.Zoom = savedZoom;
+        MainMap.SetEffectiveZoom(savedZoom);
 
         // 7. 강제 리로드 (IsStarted=true 보장)
         MainMap.ReloadMap();
@@ -4835,9 +4827,9 @@ public partial class MapViewModel : BasePanelViewModel,
 
         if (isInitialLoad)
         {
-            // 초기 로드: HomePosition으로 이동
+            // 초기 로드: HomePosition으로 이동 — FR-09/FR-17: 저장된 17.5 등 하프값을 분해 복원(0.5 스냅 정규화 내장)
             MainMap.Position = _setupModel.HomePosition?.PointLatLng ?? new PointLatLng(37.648425, 126.904284);
-            MainMap.Zoom = _setupModel.HomePosition?.Zoom ?? DEFAULT_ZOOM;
+            MainMap.SetEffectiveZoom(_setupModel.HomePosition?.Zoom ?? DEFAULT_ZOOM);
         }
         // 맵 전환: Position/Zoom은 SwitchMBTilesMap에서 이미 복원됨 → 건드리지 않음
 
@@ -5176,7 +5168,8 @@ public partial class MapViewModel : BasePanelViewModel,
         if (_setupModel.HomePosition == null || _setupModel.HomePosition.Position == null) return;
         var position = _setupModel.HomePosition.Position;
         HomePosition.Position = position;
-        HomePosition.Zoom = _setupModel.HomePosition.Zoom;
+        // zoom-float-halfstep FR-17: 로드 시 0.5 그리드 정규화(구파일의 17.3 같은 비정상 소수 → 17.5 스냅)
+        HomePosition.Zoom = Helpers.ZoomLadder.Snap(_setupModel.HomePosition.Zoom);
         HomePosition.IsAvailable = _setupModel.HomePosition?.IsAvailable ?? false;
         ClickedCurrentPosition = new PointLatLng(position.Latitude, position.Longitude);
         MoveHomeLocationCommand?.RaiseCanExecuteChanged();
@@ -5194,7 +5187,8 @@ public partial class MapViewModel : BasePanelViewModel,
         if (!CanEditMap()) { _log?.Warning("[FR-EN-08] 맵 편집 권한 없음 — 홈 위치 저장 차단"); ShowNoMapEditPermissionInfo(); return; }
 
         HomePosition.Position = new CoordinateModel(latitude: ClickedCurrentPosition.Lat, longitude: ClickedCurrentPosition.Lng, altitude: 0);
-        HomePosition.Zoom = Zoom;
+        // zoom-float-halfstep FR-09b: 저장은 실효줌(타일줌 저장 시 17.5→17 절단 — SIM-P012 해소)
+        HomePosition.Zoom = MainMap.EffectiveZoom;
         HomePosition.IsAvailable = true;
         MoveHomeLocationCommand?.RaiseCanExecuteChanged();
         SetHomeLocationCommand?.RaiseCanExecuteChanged();
@@ -5210,7 +5204,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (HomePosition == null || HomePosition.Position == null) return;
 
         MainMap.Position = new PointLatLng(HomePosition.Position.Latitude, HomePosition.Position.Longitude);
-        MainMap.Zoom = HomePosition.Zoom;
+        MainMap.SetEffectiveZoom(HomePosition.Zoom);   // FR-09: 17.5 → (17, dzl1) 분해 복원(SIM-P007 해소)
         _log?.Info($"Moved to home position.");
     }
 
@@ -7003,22 +6997,14 @@ public partial class MapViewModel : BasePanelViewModel,
 
     #region - UI 업데이트 및 유틸리티 -
     /// <summary>
-    /// 줌 버튼 클릭 핸들러 - 줌 인
+    /// 줌 버튼 클릭 핸들러 - 줌 인 (zoom-float-halfstep FR-05: 0.5 래더 스텝 — ZoomInCommand와 동일 의미론)
     /// </summary>
-    public void OnClickZoomUp(object sender, EventArgs args)
-    {
-        if (ZoomMax > MainMap.Zoom)
-            MainMap.Zoom++;
-    }
+    public void OnClickZoomUp(object sender, EventArgs args) => MainMap?.StepEffectiveZoom(+1);
 
     /// <summary>
-    /// 줌 버튼 클릭 핸들러 - 줌 아웃
+    /// 줌 버튼 클릭 핸들러 - 줌 아웃 (zoom-float-halfstep FR-05)
     /// </summary>
-    public void OnClickZoomDown(object sender, EventArgs args)
-    {
-        if (ZoomMin < MainMap.Zoom)
-            MainMap.Zoom--;
-    }
+    public void OnClickZoomDown(object sender, EventArgs args) => MainMap?.StepEffectiveZoom(-1);
 
     /// <summary>
     /// 스케일바 생성
@@ -7227,7 +7213,7 @@ public partial class MapViewModel : BasePanelViewModel,
             var centerLng = (bounds.LocationTopLeft.Lng + bounds.LocationRightBottom.Lng) / 2;
 
             MainMap.Position = new PointLatLng(centerLat, centerLng);
-            MainMap.Zoom = 15; // 적절한 줌 레벨
+            MainMap.SetEffectiveZoom(15); // zoom-float-halfstep NFR-04: 직대입 금지 — 원자 세터 경유
 
             _log?.Info(" 커스텀 지도 적용 완료!");
         }
@@ -8672,7 +8658,7 @@ public partial class MapViewModel : BasePanelViewModel,
     {
         _log?.Info($"관심지역 이동: {e.Roi.Title} → ({e.Roi.Latitude}, {e.Roi.Longitude}), Zoom={e.Roi.Zoom}");
         MainMap!.Position = new PointLatLng(e.Roi.Latitude, e.Roi.Longitude);
-        MainMap.Zoom = e.Roi.Zoom;
+        MainMap.SetEffectiveZoom(e.Roi.Zoom);   // zoom-float-halfstep FR-09: 하프값 ROI(FR-14)도 분해 복원
     }
 
     private async void OnRoiRegisterRequested(object? sender, EventArgs e)

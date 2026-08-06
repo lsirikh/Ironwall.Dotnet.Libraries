@@ -125,29 +125,9 @@ public static class MapSettingsHelper
         await SaveMultipleSettingsAsync(settings, log);
     }
 
-    /// <summary>
-    /// 현재 지도 상태를 JSON에 저장 (MapViewModel용)
-    /// </summary>
-    public static async Task SaveCurrentMapStateAsync(
-        HomePositionModel homePosition,
-        string mapName,
-        double zoom,
-        PointLatLng currentPosition)
-    {
-        var settings = new
-        {
-            HomePosition = homePosition,
-            MapName = mapName,
-            LastZoom = zoom,
-            LastPosition = new
-            {
-                Latitude = currentPosition.Lat,
-                Longitude = currentPosition.Lng
-            }
-        };
-
-        await SaveMultipleSettingsAsync(settings);
-    }
+    // (제거) SaveCurrentMapStateAsync — 호출자 0의 사장 메서드였고 LastZoom/LastPosition 키는
+    // 읽는 코드가 전무한 사장 키였다(zoom-float-halfstep FR-09b 처분, Z-23). 세션 상태 저장이
+    // 다시 필요해지면 실효줌(EffectiveZoom) 단일값 저장으로 재설계할 것.
 
     /// <summary>
     /// JSON에서 지도 설정 로드
