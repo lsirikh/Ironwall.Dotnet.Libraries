@@ -15,7 +15,7 @@ public interface IMapRoiModel : IBaseModel
     double Latitude { get; set; }
     double Longitude { get; set; }
     double Altitude { get; set; }
-    int Zoom { get; set; }
+    double Zoom { get; set; }   // zoom-float-halfstep FR-14: 하프스텝(17.5) 저장
     int MapId { get; set; }
     DateTime? CreatedAt { get; set; }
     DateTime? UpdatedAt { get; set; }

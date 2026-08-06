@@ -149,10 +149,41 @@ public class UnitTestMapRoi
         Assert.Equal("초소1구역", fetched.Title);
         Assert.Equal(37.648425, fetched.Latitude, 5);
         Assert.Equal(126.904284, fetched.Longitude, 5);
-        Assert.Equal(15, fetched.Zoom);
+        Assert.Equal(15.0, fetched.Zoom, 1);   // zoom-float-halfstep FR-14: double 승격(허용오차 0.1)
 
         // Cleanup
         await _fx.Svc.DeleteMapRoiAsync(id);
+    }
+
+    [Fact(DisplayName = "MapRoi – 하프스텝 줌(17.5) 무손실 왕복 (zoom-float-halfstep FR-14 / SIM-P006)")]
+    public async Task should_roundtrip_halfstep_zoom_when_insert_and_fetch()
+    {
+        // Arrange — 실효줌 17.5에서 등록된 관심지역(DECIMAL(3,1) 컬럼 + double 모델)
+        var roi = new MapRoiModel
+        {
+            Title = "하프스텝구역",
+            Latitude = 37.648425,
+            Longitude = 126.904284,
+            Altitude = 0,
+            Zoom = 17.5,
+            MapId = _fx.TestMapId
+        };
+
+        // Act
+        int id = await _fx.Svc.InsertMapRoiAsync(roi);
+        var fetched = await _fx.Svc.FetchMapRoiAsync(id);
+
+        try
+        {
+            // Assert — 종전 INT 컬럼이면 18로 반올림돼 등록↔이동 왕복에서 하프가 소실됐다
+            Assert.NotNull(fetched);
+            Assert.Equal(17.5, fetched!.Zoom, 1);
+        }
+        finally
+        {
+            // Cleanup — 시드 카운트 오염 방지
+            await _fx.Svc.DeleteMapRoiAsync(id);
+        }
     }
 
     [Fact(DisplayName = "MapRoi – Fetch by Id")]
@@ -179,7 +210,7 @@ public class UnitTestMapRoi
         Assert.Equal(id, fetched!.Id);
         Assert.Equal("집중관심구역", fetched.Title);
         Assert.Equal(100.5, fetched.Altitude, 1);
-        Assert.Equal(17, fetched.Zoom);
+        Assert.Equal(17.0, fetched.Zoom, 1);   // zoom-float-halfstep FR-14: double 승격
 
         // Cleanup
         await _fx.Svc.DeleteMapRoiAsync(id);

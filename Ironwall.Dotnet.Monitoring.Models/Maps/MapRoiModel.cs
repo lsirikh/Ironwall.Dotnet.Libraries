@@ -39,7 +39,7 @@ public class MapRoiModel : BaseModel, IMapRoiModel
     public double Altitude { get; set; }
 
     [JsonProperty("zoom", Order = 6)]
-    public int Zoom { get; set; } = 15;
+    public double Zoom { get; set; } = 15;   // zoom-float-halfstep FR-14: 하프스텝(17.5) 저장 — DDL DECIMAL(3,1)과 동형
 
     [JsonProperty("map_id", Order = 7)]
     public int MapId { get; set; }

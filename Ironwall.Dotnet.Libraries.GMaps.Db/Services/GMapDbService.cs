@@ -307,7 +307,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                     `Latitude`    DECIMAL(10,8) NOT NULL,
                     `Longitude`   DECIMAL(11,8) NOT NULL,
                     `Altitude`    DECIMAL(10,2) DEFAULT 0,
-                    `Zoom`        INT DEFAULT 15,
+                    `Zoom`        DECIMAL(3,1) DEFAULT 15.0,   -- zoom-float-halfstep FR-14: 하프스텝(17.5) 저장 (Symbols/Images.Zoom과 동형)
                     `MapId`       INT NOT NULL,
                     `CreatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `UpdatedAt`   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -434,6 +434,9 @@ internal class GMapDbService : TaskService, IGMapDbService
             // MBTiles 컬럼 마이그레이션 (기존 DB에 컬럼이 없으면 추가)
             await MigrateCustomMapsTableAsync();
 
+            // MapRois.Zoom INT→DECIMAL(3,1) 타입 승격 (zoom-float-halfstep FR-14, idempotent)
+            await MigrateMapRoisZoomColumnAsync();
+
             _log?.Info("Map 관련 테이블 생성/확인 완료");
         }
         catch (Exception ex)
@@ -462,6 +465,41 @@ internal class GMapDbService : TaskService, IGMapDbService
         catch (Exception ex)
         {
             _log?.Warning($"CustomMaps 마이그레이션 경고 (무시 가능): {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 기존 DB의 MapRois.Zoom(INT)을 DECIMAL(3,1)로 승격 (zoom-float-halfstep FR-14, idempotent).
+    /// information_schema 선조회 + TABLE_SCHEMA=DATABASE() 한정(타 DB 합집합 오판 방지 — 36b81fb 교훈).
+    /// 정수 기존 값은 타입 승격만으로 보존된다(15 → 15.0). 이미 DECIMAL이면 스킵.
+    /// </summary>
+    private async Task MigrateMapRoisZoomColumnAsync()
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync();
+            var columnType = await conn.QueryFirstOrDefaultAsync<string>(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_NAME='MapRois' AND COLUMN_NAME='Zoom' AND TABLE_SCHEMA=DATABASE();");
+
+            if (columnType == null)
+            {
+                _log?.Warning("[SchemaGuard] MapRois.Zoom 컬럼 미발견 — 마이그레이션 스킵");
+                return;
+            }
+
+            if (columnType.StartsWith("decimal", StringComparison.OrdinalIgnoreCase))
+            {
+                _log?.Info($"[SchemaGuard] MapRois.Zoom 이미 {columnType} — 타입 교정 스킵");
+                return;
+            }
+
+            await conn.ExecuteAsync("ALTER TABLE `MapRois` MODIFY COLUMN `Zoom` DECIMAL(3,1) DEFAULT 15.0;");
+            _log?.Info($"[SchemaGuard] MapRois.Zoom {columnType} → DECIMAL(3,1) 타입 교정 적용");
+        }
+        catch (Exception ex)
+        {
+            _log?.Warning($"MapRois.Zoom 마이그레이션 경고 (무시 가능 — 하프스텝 저장만 절단됨): {ex.Message}");
         }
     }
 
@@ -1363,7 +1401,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                 Latitude = (double)r.Latitude,
                 Longitude = (double)r.Longitude,
                 Altitude = (double)r.Altitude,
-                Zoom = r.Zoom,
+                Zoom = (double)r.Zoom,   // DECIMAL(3,1) → double (FR-14)
                 MapId = r.MapId,
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt
@@ -1397,7 +1435,7 @@ internal class GMapDbService : TaskService, IGMapDbService
                 Latitude = (double)r.Latitude,
                 Longitude = (double)r.Longitude,
                 Altitude = (double)r.Altitude,
-                Zoom = r.Zoom,
+                Zoom = (double)r.Zoom,   // DECIMAL(3,1) → double (FR-14)
                 MapId = r.MapId,
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt
@@ -2138,7 +2176,7 @@ internal sealed class MapRoiSQL
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
     public decimal Altitude { get; set; }
-    public int Zoom { get; set; }
+    public decimal Zoom { get; set; }   // zoom-float-halfstep FR-14: DECIMAL(3,1) 컬럼 대응(하프스텝)
     public int MapId { get; set; }
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

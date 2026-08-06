@@ -8672,7 +8672,8 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             var position = MainMap!.Position;
-            var zoom = (int)MainMap.Zoom;
+            // zoom-float-halfstep FR-14(Z-10): (int) 절단 제거 — 실효줌 그대로 저장(등록↔이동 왕복 보존, SIM-P006)
+            var zoom = MainMap.EffectiveZoom;
 
             // 간단한 Title 입력 (InputBox)
             var title = $"관심지역_{DateTime.Now:HHmmss}";

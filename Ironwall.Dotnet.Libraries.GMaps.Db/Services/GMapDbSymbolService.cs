@@ -662,6 +662,35 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 }
             }
 
+            // ── zoom-float-halfstep FR-15: Zoom 컬럼 타입 교정(MODIFY) — 레거시 INT/DECIMAL(x,0) DB 대비 ──
+            //    정수형 Zoom 컬럼이면 하프스텝(17.5) INSERT 가 18로 반올림된다(SIM-P005). 색 컬럼과 동일하게
+            //    COLUMN_TYPE 별도 판정(ADD 가드에 접으면 타입 교정 영구 정지 — 위 FR-05 주석의 교훈).
+            //    ※ 목표 타입 근거는 실측 DECIMAL(3,1) (POCO 주석의 DECIMAL(4,3)은 오기 — 최대 9.999라 줌 표현 불가).
+            foreach (var (tbl, col, wantDefault) in new[]
+                     {
+                         ("Symbols", "Zoom", "17.0"),
+                         ("Images",  "Zoom", "0.0"),
+                     })
+            {
+                var meta = columnMeta[tbl];
+                if (meta is null || !meta.TryGetValue(col, out var cm)) continue;
+                if (cm.ColumnType.StartsWith("decimal(3,1)", StringComparison.OrdinalIgnoreCase))
+                    continue;   // 이미 목표 타입 — 실행 불필요
+
+                try
+                {
+                    await conn.ExecuteAsync($"ALTER TABLE `{tbl}` MODIFY COLUMN `{col}` DECIMAL(3,1) DEFAULT {wantDefault};");
+                    modified++;
+                    _log?.Info($"{tbl}.{col} 타입 교정 완료 ({cm.ColumnType} → decimal(3,1))");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _log?.Warning($"{tbl}.{col} 타입 교정 실패 — {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
             // ── FR-08: 레거시 숫자 색상값 정리 ──
             //    이 4문은 배포 이후 한 번도 실행된 적이 없었다. `conn.ExecuteAsync(sql, token)` 형태로
             //    CancellationToken 이 Dapper 의 param 슬롯에 들어갔는데, 정규식 '^-?[0-9]+$' 안의
@@ -769,6 +798,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         ("Symbols", "TitleBold",       "BOOLEAN DEFAULT FALSE"),
         ("Symbols", "TitleItalic",     "BOOLEAN DEFAULT FALSE"),
         ("Symbols", "TitleMaxWidth",   "DECIMAL(5,1) DEFAULT 200.0"),
+        // zoom-float-halfstep FR-15: Zoom 도입(0a1bbab) 이전 레거시 창에서 생성된 DB 대비 ADD 가드
+        ("Symbols", "Zoom",            "DECIMAL(3,1) DEFAULT 17.0"),
 
         // ── Images ──
         ("Images",  "IsLocked",        "BOOLEAN DEFAULT FALSE"),
@@ -782,6 +813,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         ("Images",  "TitleBold",       "BOOLEAN DEFAULT FALSE"),
         ("Images",  "TitleItalic",     "BOOLEAN DEFAULT FALSE"),
         ("Images",  "TitleMaxWidth",   "DECIMAL(5,1) DEFAULT 200.0"),
+        // zoom-float-halfstep FR-15: Zoom 도입(b22a2d3) 이전 레거시 창(cd14d08~) DB — 미보강 시 읽기 SQL 1054로 이미지 0건
+        ("Images",  "Zoom",            "DECIMAL(3,1) DEFAULT 0.0"),
     };
 
     /// <summary>MySQL 에러 번호 — 컬럼 중복.</summary>
@@ -3873,7 +3906,7 @@ internal class SymbolSQL
     //`Latitude`          DECIMAL(10,8) NOT NULL,                 --위도
     //`Longitude`         DECIMAL(11,8) NOT NULL,                 --경도
     //`Altitude`          FLOAT DEFAULT 0,                        --고도
-    //`Zoom`              DECIMAL(4, 3) DEFAULT 17,               --디스플레이용(Zoom)
+    //`Zoom`              DECIMAL(3,1) DEFAULT 17.0,              --최소 표시 줌(하프스텝 0.5 지원) ※구주석 DECIMAL(4,3)은 오기(최대 9.999)
     //`Bearing`           DECIMAL(6,3) DEFAULT 0,                 --심볼각도
     /// <summary>위도 좌표 (DECIMAL(10,8))</summary>
     public decimal Latitude { get; set; }
