@@ -3206,6 +3206,96 @@ public partial class MapViewModel : BasePanelViewModel,
     }
     #endregion
 
+    #region - 등록 센서 정보 오버레이(pidsgroup-rightclick FR-03/04/05/06/07) -
+    public GMapControls.SensorInfoPanelControl? SensorInfoPanel
+    {
+        get => _sensorInfoPanel;
+        private set { _sensorInfoPanel = value; NotifyOfPropertyChange(nameof(SensorInfoPanel)); }
+    }
+
+    public bool IsSensorInfoPanelVisible
+    {
+        get => _isSensorInfoPanelVisible;
+        set { _isSensorInfoPanelVisible = value; NotifyOfPropertyChange(nameof(IsSensorInfoPanelVisible)); }
+    }
+
+    /// <summary>구역 우클릭 → 등록 센서 정보 오버레이. 단일 인스턴스 — 재호출 시 컨텍스트 교체+재조회,
+    /// 명시 닫기 전까지 유지. 열람 시점 스냅샷(구독/타이머 0) — PRD FR-03 생명주기 계약.</summary>
+    public void ShowSensorInfoPanel(IPidsGroupEditableMarker groupMarker)
+    {
+        try
+        {
+            var groupId = groupMarker.LinkedDeviceGroup;
+            if (groupId <= 0) return;   // FR-02 게이트가 메뉴에서 선차단 — 방어적 이중 가드
+
+            if (_sensorInfoVm == null)
+            {
+                _sensorInfoVm = new SensorInfoPanelViewModel();
+                _sensorInfoVm.CloseRequested += () => IsSensorInfoPanelVisible = false;
+                _sensorInfoVm.SensorHistoryRequested += row =>
+                {
+                    if (row.DeviceId <= 0) return;   // Draft 가드(FR-06, SensorDevicePanelViewModel 미러)
+                    _ = _eventAggregator.PublishOnUIThreadAsync(new OpenDetectionHistoryDialogMessageModel
+                    {
+                        DeviceId = row.DeviceId,
+                        DeviceName = row.DeviceName,
+                        DeviceNumber = row.DeviceNumber
+                    });
+                };
+                _sensorInfoVm.LocateRequested += row =>
+                {
+                    // FR-07(G-3 채택): 해당 센서 좌표로 맵 센터링 — (0,0) 미좌표는 오폭 방지 차단
+                    if (MainMap == null) return;
+                    if (Math.Abs(row.Latitude) < 0.000001 && Math.Abs(row.Longitude) < 0.000001) return;
+                    MainMap.Position = new PointLatLng(row.Latitude, row.Longitude);
+                };
+            }
+
+            if (SensorInfoPanel == null)
+                SensorInfoPanel = new GMapControls.SensorInfoPanelControl { DataContext = _sensorInfoVm };
+
+            // FR-04: 열람 시점 지연 해석 — 마커 생성 시점 캡처 금지(로그인 게이팅·재등록 desync 함정)
+            var groupName = ResolveGroupName(groupId) ?? groupMarker.Title ?? $"그룹 {groupId}";
+            _sensorInfoVm.Load(groupId, groupName, BuildSensorInfoRows(groupId));
+            IsSensorInfoPanelVisible = true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"등록 센서 정보 오버레이 표시 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>그룹 이름 IoC 지연 해석 — 미등록/부팅 전이면 null(안전 실패, GroupActionReportLauncher 패턴).</summary>
+    private static string? ResolveGroupName(int groupId)
+    {
+        try { return IoC.Get<DeviceGroupProvider>()?.FirstOrDefault(g => g.Id == groupId)?.Name; }
+        catch { return null; }
+    }
+
+    /// <summary>FR-04 데이터 조립 — DeviceProvider 역필터(센서 한정) + EQM 라이브 복합상태.
+    /// 건수=필터 결과 Count(DeviceCount 금지). _groupSymbolLookup(그룹당 대표 1개)은 멤버십 소스로 사용 금지.</summary>
+    private List<Models.SensorInfoRowModel> BuildSensorInfoRows(int groupId)
+    {
+        var rows = new List<Models.SensorInfoRowModel>();
+        foreach (var device in DeviceProvider.OfType<ISensorDeviceModel>()
+                     .Where(d => d.DeviceGroups != null && d.DeviceGroups.Contains(groupId)))
+        {
+            rows.Add(new Models.SensorInfoRowModel
+            {
+                DeviceId = device.Id,
+                DeviceNumber = device.DeviceNumber,
+                DeviceName = device.DeviceName ?? string.Empty,
+                ControllerName = device.Controller?.DeviceName ?? "—",   // V-04: 갱신 경로 null 가능 — null 안전 표시
+                Location = device.Location ?? string.Empty,
+                Latitude = device.Latitude,
+                Longitude = device.Longitude,
+                State = _eventQueueManager.GetDeviceState(device.Id, device.DeviceType),
+            });
+        }
+        return rows.OrderBy(r => r.DeviceNumber).ThenBy(r => r.DeviceId).ToList();
+    }
+    #endregion
+
     /// <summary>
     /// 편집 관련 명령어 초기화
     /// </summary>
@@ -5988,6 +6078,38 @@ public partial class MapViewModel : BasePanelViewModel,
                     menu.Items.Add(stopItem);
                 }
             }
+            // ── PIDS 그룹(구역) 전용 메뉴 (pidsgroup-rightclick FR-01/02) ──
+            else if (marker is IPidsGroupEditableMarker groupMarker)
+            {
+                var hasGroup = groupMarker.LinkedDeviceGroup > 0;
+
+                // 비클릭 캡션 행 — 어느 구역의 메뉴인지 식별(FR-01, 스토리보드 화면 A)
+                menu.Items.Add(new MenuItem
+                {
+                    Header = $"구역 — {marker.Title}",
+                    IsEnabled = false,
+                    FontWeight = FontWeights.Bold,
+                });
+                menu.Items.Add(new Separator());
+
+                // FR-02: 맵 메뉴 게이트 = disable + ToolTip (비활성 MenuItem은 Click 미발화 → 팝업 불가,
+                // 기존 맵 메뉴 disable-only 컨벤션. 팝업 가드는 패널 경로(FR-14) 소관)
+                var sensorInfoItem = new MenuItem
+                {
+                    Header = "등록 센서 정보",
+                    IsEnabled = hasGroup,
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ClipboardTextOutline, Width = 16, Height = 16 }
+                };
+                if (!hasGroup)
+                {
+                    sensorInfoItem.ToolTip = "연결된 장비그룹이 없습니다";
+                    ToolTipService.SetShowOnDisabled(sensorInfoItem, true);
+                }
+                sensorInfoItem.Click += (s, e) => ShowSensorInfoPanel(groupMarker);
+                menu.Items.Add(sensorInfoItem);
+
+                // [그룹 탐지 이력] 항목은 Phase 2(FR-08) — 메인솔루션 수신 배선(FR-15)과 같은 릴리스로 노출(죽은 메뉴 금지)
+            }
 
             // ── 레이어 순서 제어 (편집 모드에서만) ──
             if (IsEditModeEnabled)
@@ -8500,6 +8622,9 @@ public partial class MapViewModel : BasePanelViewModel,
     private readonly TrackingSetupViewModel? _trackingSetupVm;   // 추적 설정 패널 VM(P3-04)
     private GMapControls.TrackingSettingsControl? _trackingSettingsPanel;
     private bool _isTrackingSettingsPanelVisible;
+    private GMapControls.SensorInfoPanelControl? _sensorInfoPanel;   // 등록 센서 정보 오버레이(pidsgroup-rightclick FR-03)
+    private SensorInfoPanelViewModel? _sensorInfoVm;
+    private bool _isSensorInfoPanelVisible;
     private MarkerFactory _markerFactory;
 
     private PropertyPanelFactory _propertyPanelFactory;
