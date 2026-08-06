@@ -641,15 +641,10 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             return;
         }
 
+        // 조치 완료 행도 재보고 허용(사용자 요청, 2026-08-06 — 기존 "이미 조치보고된 이벤트" 차단 제거).
+        // 동시 진행 중복만 카드 VM의 IActionReportGuard가 차단(완료 후 재보고는 통과) — 센서/그룹 모드 공용 경로.
         if (item.IsActioned)
-        {
-            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
-            {
-                Title = "조치보고 불가",
-                Explain = "이미 조치보고된 이벤트입니다."
-            });
-            return;
-        }
+            _log?.Info($"[SIGNAL_HISTORY] 조치 완료 이벤트 재보고 진입 (eventId={item.EventId})");
 
         // 행과 독립된 임시 카드 VM 재구성(SendAction/멱등가드는 카드 VM 보유)
         var card = new DetectionEventCardViewModel(_eventAggregator, _log, item.Model);
