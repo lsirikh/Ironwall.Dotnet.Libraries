@@ -22,10 +22,51 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
                                       , ILogService log
                                       , IDeviceApiService apiService
                                       , DeviceGroupProvider deviceGroupProvider
+                                      , DeviceProvider deviceProvider
                                       ) : base(eventAggregator, log)
     {
         _apiService = apiService;
         _deviceGroupProvider = deviceGroupProvider;
+        _deviceProvider = deviceProvider;
+        HistoryCommand = new Models.SimpleParamCommand(ShowGroupDetectionHistoryAsync);
+    }
+
+    /// <summary>행 우클릭 [그룹 탐지 이력] (pidsgroup-rightclick FR-14) — 센서 패널 HistoryCommand 미러.</summary>
+    public Models.SimpleParamCommand HistoryCommand { get; }
+
+    /// <summary>가드 2종(패널 컨벤션: 활성 항목 + 클릭 시 안내 팝업) — Draft(Id≤0) / 빈 그룹(멤버 실 필터 0건).
+    /// 멤버 판정은 stale 가능한 DeviceCount가 아니라 DeviceProvider 역참조 필터 결과(FR-14).</summary>
+    private async Task ShowGroupDetectionHistoryAsync(object? param)
+    {
+        if (param is not DeviceGroupViewModel row) return;
+
+        if (row.Model.Id <= 0)
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "그룹 탐지 이력",
+                Explain = "미저장 그룹입니다.\n저장(서버 등록) 후 이력을 조회할 수 있습니다."
+            });
+            return;
+        }
+
+        var hasMembers = _deviceProvider.OfType<ISensorDeviceModel>()
+            .Any(d => d.DeviceGroups != null && d.DeviceGroups.Contains(row.Model.Id));
+        if (!hasMembers)
+        {
+            await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "그룹 탐지 이력",
+                Explain = "이 그룹에 등록된 센서가 없습니다.\n센서를 그룹에 배정한 뒤 조회할 수 있습니다."
+            });
+            return;
+        }
+
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenGroupDetectionHistoryDialogMessageModel
+        {
+            GroupId = row.Model.Id,
+            GroupName = row.Name
+        });
     }
     #endregion
     #region - Overrides -
@@ -440,5 +481,6 @@ public class DeviceGroupPanelViewModel : BaseDataGridMultiPanelViewModel<DeviceG
     #region - Attributes -
     private readonly IDeviceApiService _apiService;
     private readonly DeviceGroupProvider _deviceGroupProvider;
+    private readonly DeviceProvider _deviceProvider;   // FR-14 빈 그룹 판정 — 역참조 멤버십 실 필터(DeviceCount 금지)
     #endregion
 }

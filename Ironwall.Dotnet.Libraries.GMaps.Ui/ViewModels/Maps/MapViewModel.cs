@@ -3249,6 +3249,15 @@ public partial class MapViewModel : BasePanelViewModel,
                     if (Math.Abs(row.Latitude) < 0.000001 && Math.Abs(row.Longitude) < 0.000001) return;
                     MainMap.Position = new PointLatLng(row.Latitude, row.Longitude);
                 };
+                _sensorInfoVm.GroupHistoryRequested += () =>
+                {
+                    // FR-08: 오버레이 푸터 → 그룹 탐지 이력(현재 오버레이 컨텍스트 기준)
+                    _ = _eventAggregator.PublishOnUIThreadAsync(new OpenGroupDetectionHistoryDialogMessageModel
+                    {
+                        GroupId = _sensorInfoVm!.GroupId,
+                        GroupName = _sensorInfoVm.GroupName
+                    });
+                };
             }
 
             if (SensorInfoPanel == null)
@@ -6108,7 +6117,34 @@ public partial class MapViewModel : BasePanelViewModel,
                 sensorInfoItem.Click += (s, e) => ShowSensorInfoPanel(groupMarker);
                 menu.Items.Add(sensorInfoItem);
 
-                // [그룹 탐지 이력] 항목은 Phase 2(FR-08) — 메인솔루션 수신 배선(FR-15)과 같은 릴리스로 노출(죽은 메뉴 금지)
+                // [그룹 탐지 이력] (FR-08) — 게이트: 미연결/빈 그룹 = disable + ToolTip (FR-02 규약)
+                var hasMembers = hasGroup && DeviceProvider.OfType<ISensorDeviceModel>()
+                    .Any(d => d.DeviceGroups != null && d.DeviceGroups.Contains(groupMarker.LinkedDeviceGroup));
+                var groupHistoryItem = new MenuItem
+                {
+                    Header = "그룹 탐지 이력",
+                    IsEnabled = hasGroup && hasMembers,
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ChartLine, Width = 16, Height = 16 }
+                };
+                if (!hasGroup)
+                {
+                    groupHistoryItem.ToolTip = "연결된 장비그룹이 없습니다";
+                    ToolTipService.SetShowOnDisabled(groupHistoryItem, true);
+                }
+                else if (!hasMembers)
+                {
+                    groupHistoryItem.ToolTip = "등록된 센서가 없습니다";
+                    ToolTipService.SetShowOnDisabled(groupHistoryItem, true);
+                }
+                groupHistoryItem.Click += (s, e) =>
+                {
+                    _ = _eventAggregator.PublishOnUIThreadAsync(new OpenGroupDetectionHistoryDialogMessageModel
+                    {
+                        GroupId = groupMarker.LinkedDeviceGroup,
+                        GroupName = ResolveGroupName(groupMarker.LinkedDeviceGroup) ?? marker.Title
+                    });
+                };
+                menu.Items.Add(groupHistoryItem);
             }
 
             // ── 레이어 순서 제어 (편집 모드에서만) ──

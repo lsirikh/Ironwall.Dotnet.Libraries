@@ -59,4 +59,10 @@
     <SolidColorBrush x:Key="TintAccentBrush"   Color="#220C6B89" /><!-- 강조 틴트(cyan) -->
     <SolidColorBrush x:Key="SurfaceTranslucentBrush" Color="#CCF2F5F9" /><!-- 반투명 표면 -->
 
+    <!-- ══ 차트 시리즈 (pidsgroup-rightclick FR-11 — 그룹 탐지 이력 센서별 시리즈, CVD·대비 검증 통과) ══ -->
+    <SolidColorBrush x:Key="ChartSeries1Brush" Color="#0E7EA3" /><!-- series cyan(lt) -->
+    <SolidColorBrush x:Key="ChartSeries2Brush" Color="#B25A06" /><!-- series amber(lt) -->
+    <SolidColorBrush x:Key="ChartSeries3Brush" Color="#7A3FC2" /><!-- series purple(lt) -->
+
+
 </ResourceDictionary>

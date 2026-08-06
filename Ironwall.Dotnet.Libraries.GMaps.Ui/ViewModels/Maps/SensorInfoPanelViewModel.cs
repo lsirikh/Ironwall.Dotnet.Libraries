@@ -28,6 +28,7 @@ public class SensorInfoPanelViewModel : PropertyChangedBase
         CloseCommand = new RelayCommand(_ => CloseRequested?.Invoke());
         SensorHistoryCommand = new RelayCommand(p => { if (p is SensorInfoRowModel row) SensorHistoryRequested?.Invoke(row); });
         LocateCommand = new RelayCommand(p => { if (p is SensorInfoRowModel row) LocateRequested?.Invoke(row); });
+        GroupHistoryCommand = new RelayCommand(_ => { if (HasSensors) GroupHistoryRequested?.Invoke(); });   // 빈 그룹 방어(FR-08)
     }
 
     #region - Events (MapViewModel 배선) -
@@ -35,12 +36,15 @@ public class SensorInfoPanelViewModel : PropertyChangedBase
     public event System.Action? CloseRequested;
     public event System.Action<SensorInfoRowModel>? SensorHistoryRequested;
     public event System.Action<SensorInfoRowModel>? LocateRequested;
+    /// <summary>푸터 [그룹 탐지 이력](FR-08) — MapViewModel이 그룹 오픈 메시지 발행으로 배선.</summary>
+    public event System.Action? GroupHistoryRequested;
     #endregion
 
     #region - Commands -
     public RelayCommand CloseCommand { get; }
     public RelayCommand SensorHistoryCommand { get; }
     public RelayCommand LocateCommand { get; }
+    public RelayCommand GroupHistoryCommand { get; }
     #endregion
 
     #region - Properties -

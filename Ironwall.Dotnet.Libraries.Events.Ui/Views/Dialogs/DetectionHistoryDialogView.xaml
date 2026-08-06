@@ -162,6 +162,7 @@
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
 
 				<!--  1행: 기간 프리셋 + 새로고침  -->
@@ -245,6 +246,65 @@
 									IsChecked="{Binding IsOn, Mode=TwoWay}"
 									Style="{StaticResource FilterChip}"
 									ToolTip="{Binding Name}" />
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</DockPanel>
+
+				<!--  3행(그룹 모드 한정): 센서 필터 칩 — 시리즈 색 견본 병기(pidsgroup-rightclick FR-12)  -->
+				<DockPanel
+					Grid.Row="2"
+					Margin="0,3,0,0"
+					LastChildFill="True"
+					Visibility="{Binding IsGroupMode, Converter={StaticResource BoolToVis}}">
+					<TextBlock
+						Margin="0,0,8,0"
+						VerticalAlignment="Center"
+						DockPanel.Dock="Left"
+						FontSize="11"
+						Foreground="{DynamicResource TextSecondaryBrush}"
+						Text="센서" />
+					<ItemsControl ItemsSource="{Binding SensorChips}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<WrapPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<ToggleButton
+									IsChecked="{Binding IsOn, Mode=TwoWay}"
+									Style="{StaticResource FilterChip}"
+									ToolTip="{Binding Name}">
+									<StackPanel Orientation="Horizontal">
+										<Rectangle
+											Width="8"
+											Height="8"
+											Margin="0,0,5,0"
+											VerticalAlignment="Center"
+											RadiusX="2"
+											RadiusY="2">
+											<Rectangle.Style>
+												<Style TargetType="Rectangle">
+													<!--  시리즈 색=센서 인덱스 고정 (ChartSeries1~3Brush 토큰, 초과분=기타 회색)  -->
+													<Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+													<Style.Triggers>
+														<DataTrigger Binding="{Binding SeriesIndex}" Value="0">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries1Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesIndex}" Value="1">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries2Brush}" />
+														</DataTrigger>
+														<DataTrigger Binding="{Binding SeriesIndex}" Value="2">
+															<Setter Property="Fill" Value="{DynamicResource ChartSeries3Brush}" />
+														</DataTrigger>
+													</Style.Triggers>
+												</Style>
+											</Rectangle.Style>
+										</Rectangle>
+										<TextBlock Text="{Binding Name}" />
+									</StackPanel>
+								</ToggleButton>
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
@@ -349,7 +409,7 @@
 						HorizontalAlignment="Center"
 						FontSize="11"
 						Foreground="{DynamicResource TextSecondaryBrush}"
-						Text="최다 결과" />
+						Text="{Binding TopStatLabel, FallbackValue=최다 결과}" />
 				</StackPanel>
 				<StackPanel Margin="0,8" HorizontalAlignment="Center">
 					<TextBlock
@@ -378,11 +438,15 @@
 					ItemsSource="{Binding ChartPoints}"
 					LabelBrush="{DynamicResource TextSecondaryBrush}"
 					LineBrush="{DynamicResource PrimaryBrush}"
+					OtherSeriesBrush="{DynamicResource TextMutedBrush}"
 					PointBrush="{DynamicResource PrimaryBrush}"
 					PointClickedCommand="{Binding PointClickedCommand}"
 					RangeEnd="{Binding ChartRangeEnd}"
 					RangeStart="{Binding ChartRangeStart}"
 					SelectedPayload="{Binding SelectedItem, Mode=TwoWay}"
+					Series1Brush="{DynamicResource ChartSeries1Brush}"
+					Series2Brush="{DynamicResource ChartSeries2Brush}"
+					Series3Brush="{DynamicResource ChartSeries3Brush}"
 					UnactionedBrush="{DynamicResource StatusCriticalBrush}" />
 				<DockPanel Margin="2,2,2,4" LastChildFill="False">
 					<StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
@@ -471,6 +535,11 @@
 					Binding="{Binding TimeText}"
 					FontFamily="Consolas"
 					Header="시간" />
+				<!--  센서 컬럼(그룹 모드 한정, pidsgroup-rightclick FR-13) — DataGridColumn은 시각트리 밖이라 proxy 경유  -->
+				<DataGridTextColumn
+					Binding="{Binding DeviceName}"
+					Header="센서"
+					Visibility="{Binding Data.SensorColumnVisibility, Source={StaticResource proxy}}" />
 				<DataGridTextColumn Binding="{Binding Result, Converter={StaticResource EnumToKoreanConverter}}" Header="결과" />
 				<DataGridTemplateColumn Header="신호" SortMemberPath="Signal">
 					<DataGridTemplateColumn.CellTemplate>

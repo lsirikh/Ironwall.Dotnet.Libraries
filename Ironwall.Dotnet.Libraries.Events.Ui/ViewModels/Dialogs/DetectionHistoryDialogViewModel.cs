@@ -13,9 +13,11 @@ using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.ViewModels.Components;
 using Ironwall.Dotnet.Monitoring.Models.Accounts;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
+using Ironwall.Dotnet.Monitoring.Models.Devices;
 using Ironwall.Dotnet.Monitoring.Models.Events;
 using System;
 using System.Collections.ObjectModel;
+using System.Windows;
 using System.Windows.Input;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
@@ -30,12 +32,26 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Dialogs;
    Email        : lsirikh@naver.com
 ****************************************************************************/
 
-/// <summary>이력 그리드 1행 — 원본 모델 보존(조치보고 연계용).</summary>
+/// <summary>이력 그리드 1행 — 원본 모델 보존(조치보고 연계용).
+/// SensorId/SeriesIndex(pidsgroup-rightclick FR-11/13): 그룹 모드에서 팬아웃 조회 키 기준으로 센서 귀속 —
+/// 이벤트 Device 매칭 실패에도 안전하다. 기본값=단일 모드 하위호환.</summary>
 public class SignalHistoryItemViewModel : PropertyChangedBase
 {
-    public SignalHistoryItemViewModel(IDetectionEventModel model) => Model = model;
+    public SignalHistoryItemViewModel(IDetectionEventModel model, int sensorId = 0, string? sensorName = null, int seriesIndex = 0)
+    {
+        Model = model;
+        SensorId = sensorId;
+        _sensorName = sensorName;
+        SeriesIndex = seriesIndex;
+    }
+
+    private readonly string? _sensorName;
 
     public IDetectionEventModel Model { get; }
+    public int SensorId { get; }
+    public int SeriesIndex { get; }
+    /// <summary>그룹 모드 그리드 센서 컬럼 표시명 (FR-13).</summary>
+    public string DeviceName => _sensorName ?? Model.Device?.DeviceName ?? "—";
     public int EventId => Model.Id;
     public DateTime DateTime => Model.DateTime;
     public EnumDetectionType Result => Model.Result;
@@ -79,6 +95,41 @@ public class ResultChipViewModel : PropertyChangedBase
     }
 }
 
+/// <summary>그룹 모드 센서 필터 칩 (pidsgroup-rightclick FR-12) — ResultChipViewModel 패턴 미러.
+/// SeriesIndex는 그룹 멤버 순서 고정(칩 on/off와 무관) — 시리즈 색이 엔티티를 따르는 규약.</summary>
+public class SensorChipViewModel : PropertyChangedBase
+{
+    private readonly System.Action _onToggled;
+    private bool _isOn;
+
+    public SensorChipViewModel(int deviceId, string name, int seriesIndex, bool isOn, System.Action onToggled)
+    {
+        DeviceId = deviceId;
+        Name = name;
+        SeriesIndex = seriesIndex;
+        _isOn = isOn;
+        _onToggled = onToggled;
+    }
+
+    public int DeviceId { get; }
+    public string Name { get; }
+    public int SeriesIndex { get; }
+    /// <summary>칩 색 견본 표시 여부 — 시리즈 라인이 있는 상위 3개만(초과분=기타 회색).</summary>
+    public bool HasSeriesColor => SeriesIndex <= 2;
+
+    public bool IsOn
+    {
+        get => _isOn;
+        set
+        {
+            if (_isOn == value) return;
+            _isOn = value;
+            NotifyOfPropertyChange();
+            _onToggled();
+        }
+    }
+}
+
 public class DetectionHistoryDialogViewModel : BasePanelViewModel
 {
     #region - Ctors -
@@ -98,28 +149,102 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     }
     #endregion
 
-    #region - 컨텍스트 (Initialize) -
+    #region - 컨텍스트 (Initialize — 단일 센서 / 그룹 모드) -
     public int DeviceId { get; private set; }
     public string DeviceName { get; private set; } = string.Empty;
     public int? DeviceNumber { get; private set; }
 
-    public string HeaderText => DeviceNumber is int n
-        ? $"탐지 신호 이력 — {DeviceName} (No.{n})"
-        : $"탐지 신호 이력 — {DeviceName}";
+    /// <summary>그룹 모드(pidsgroup-rightclick FR-09) — true면 멤버 센서 팬아웃 조회 + 센서 칩/컬럼 노출.</summary>
+    public bool IsGroupMode { get; private set; }
+    public int GroupId { get; private set; }
+    public string GroupName { get; private set; } = string.Empty;
+
+    /// <summary>그룹 모드 한정 그리드 센서 컬럼 표시 (FR-13 — DataGridColumn은 시각트리 밖이라 proxy 바인딩).</summary>
+    public Visibility SensorColumnVisibility => IsGroupMode ? Visibility.Visible : Visibility.Collapsed;
+
+    public string HeaderText => IsGroupMode
+        ? $"그룹 탐지 이력 — {GroupName} (센서 {_groupSensors.Count})"
+        : DeviceNumber is int n
+            ? $"탐지 신호 이력 — {DeviceName} (No.{n})"
+            : $"탐지 신호 이력 — {DeviceName}";
 
     /// <summary>오픈 메시지 컨텍스트 주입 — 이미 활성 상태면(다른 장비로 전환) 즉시 재조회.</summary>
     public void Initialize(OpenDetectionHistoryDialogMessageModel message)
     {
+        var modeChanged = IsGroupMode;   // 그룹→센서 전환이면 상호 컨텍스트 완전 리셋(PRD 5-B)
+        IsGroupMode = false;
+        GroupId = 0;
+        GroupName = string.Empty;
+        _groupSensors.Clear();
+
         DeviceId = message.DeviceId;
         DeviceName = string.IsNullOrWhiteSpace(message.DeviceName) ? $"장비 {message.DeviceId}" : message.DeviceName!;
         DeviceNumber = message.DeviceNumber;
+        if (modeChanged) ResetModeContext();
         NotifyOfPropertyChange(nameof(HeaderText));
+        NotifyOfPropertyChange(nameof(IsGroupMode));
+        NotifyOfPropertyChange(nameof(SensorColumnVisibility));
 
         if (IsActive)
         {
             _loadedByInitialize = true;   // (code-review P1-1) 직후 재활성이 겹쳐도 OnActivate 중복 조회 방지
             _ = LoadAsync();
         }
+    }
+
+    /// <summary>그룹 오픈 메시지 컨텍스트 주입(FR-09) — 멤버 센서는 조회 시점 현재 멤버십으로 재해석(AD-5).</summary>
+    public void Initialize(OpenGroupDetectionHistoryDialogMessageModel message)
+    {
+        var modeChanged = !IsGroupMode;   // 센서→그룹 전환 리셋
+        IsGroupMode = true;
+        GroupId = message.GroupId;
+        GroupName = string.IsNullOrWhiteSpace(message.GroupName) ? $"그룹 {message.GroupId}" : message.GroupName!;
+        DeviceId = 0;
+        DeviceName = string.Empty;
+        DeviceNumber = null;
+        ResolveGroupSensors();
+        if (modeChanged) ResetModeContext();
+        NotifyOfPropertyChange(nameof(HeaderText));
+        NotifyOfPropertyChange(nameof(IsGroupMode));
+        NotifyOfPropertyChange(nameof(SensorColumnVisibility));
+
+        if (IsActive)
+        {
+            _loadedByInitialize = true;
+            _ = LoadAsync();
+        }
+    }
+
+    /// <summary>그룹 멤버 센서 해석 — DeviceProvider 역참조 필터(장비의 DeviceGroups.Contains). 순서=DeviceNumber → 시리즈 인덱스 고정.</summary>
+    private void ResolveGroupSensors()
+    {
+        _groupSensors.Clear();
+        _groupSensors.AddRange(_deviceProvider.OfType<ISensorDeviceModel>()
+            .Where(d => d.DeviceGroups != null && d.DeviceGroups.Contains(GroupId))
+            .OrderBy(d => d.DeviceNumber).ThenBy(d => d.Id)
+            .Select(d => (d.Id, string.IsNullOrWhiteSpace(d.DeviceName) ? $"장비 {d.Id}" : d.DeviceName!)));
+    }
+
+    /// <summary>모드 전환 시 상호 컨텍스트 완전 리셋(PRD 5-B) — 칩/차트/통계/그리드 오염 방지.</summary>
+    private void ResetModeContext()
+    {
+        _all.Clear();
+        Chips.Clear();
+        SensorChips.Clear();
+        FilteredItems.Clear();
+        ChartPoints = Array.Empty<SignalChartPoint>();
+        SelectedItem = null;
+        IsTruncated = false;
+        HasLoadError = false;
+        RangeText = string.Empty;
+        LastUpdatedText = string.Empty;
+        TotalCount = 0;
+        MaxSignal = 0;
+        AvgSignalText = "—";
+        TopResultText = "—";
+        UnactionedCount = 0;
+        NotifyOfPropertyChange(nameof(MaxSignalText));
+        NotifyOfPropertyChange(nameof(TopStatLabel));
     }
     #endregion
 
@@ -198,7 +323,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
     private async Task LoadAsync()
     {
-        if (DeviceId <= 0) return;
+        if (IsGroupMode ? _groupSensors.Count == 0 : DeviceId <= 0) return;   // 빈 그룹은 진입 게이트가 1차, 여기는 2차 방어(FR-10)
 
         _loadCts?.Cancel();
         _loadCts?.Dispose();
@@ -207,6 +332,7 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
 
         IsBusy = true;
         HasLoadError = false;
+        _failedSensorNames.Clear();
         try
         {
             var (start, end) = ResolveRange();
@@ -218,44 +344,66 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             var startText = KoreaTimeHelper.ToServerIso8601(start);
             var endText = KoreaTimeHelper.ToServerIso8601(end);
 
-            var models = new List<IDetectionEventModel>();
-            int page = 1;
-            bool truncated = false;
-            while (true)
+            List<SignalHistoryItemViewModel> items;
+            bool truncated;
+
+            if (!IsGroupMode)
             {
-                var response = await _apiService.GetDetectionEventsAsync(
-                    startText, endText, sensor: DeviceId, page: page, limit: PAGE_LIMIT, token: ct);
-
-                if (response is not { Success: true } || response.Data == null)
-                {
-                    if (page == 1)
-                        throw new InvalidOperationException(response?.Message ?? "서버 응답이 없습니다.");
-                    break;   // 후속 페이지 실패 — 확보한 만큼만 표시
-                }
-
-                models.AddRange(response.Data.Select(dto => dto.ToDetectionEventModel(_deviceProvider)));
-
-                if (response.Data.Count < PAGE_LIMIT) break;          // 마지막 페이지
-                if (models.Count >= MAX_LOAD) { truncated = true; break; }
-                page++;
+                var (models, sensorTruncated) = await FetchSensorPagedAsync(startText, endText, DeviceId, ct);
+                truncated = sensorTruncated;
+                // 서버 정렬(id desc)=최신 우선 — 상한 초과분은 과거 데이터라 절단
+                if (models.Count > MAX_LOAD)
+                    models = models.Take(MAX_LOAD).ToList();
+                items = models.Select(m => new SignalHistoryItemViewModel(m)).ToList();
             }
+            else
+            {
+                // FR-10: 멤버 센서 팬아웃 — 병렬(Task.WhenAll) + 공용 CT 취소 전파.
+                // 부분 실패 = 확보분 표시 + 실패 센서 경고 표기(기존 후속 페이지 실패 정책 미러). 전체 실패 = 에러 경로.
+                var tasks = _groupSensors.Select(async (sensor, index) =>
+                {
+                    try
+                    {
+                        var (models, sensorTruncated) = await FetchSensorPagedAsync(startText, endText, sensor.Id, ct);
+                        return (Sensor: sensor, Index: index, Models: models, Truncated: sensorTruncated, Failed: false);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        _log?.Warning($"[SIGNAL_HISTORY] 그룹 팬아웃 센서 조회 실패 (sensorId={sensor.Id}): {ex.Message}");
+                        return (Sensor: sensor, Index: index, Models: new List<IDetectionEventModel>(), Truncated: false, Failed: true);
+                    }
+                }).ToList();
 
-            // 서버 정렬(id desc)=최신 우선 — 상한 초과분은 과거 데이터라 절단
-            if (models.Count > MAX_LOAD)
-                models = models.Take(MAX_LOAD).ToList();
+                var results = await Task.WhenAll(tasks);
+                ct.ThrowIfCancellationRequested();
+
+                if (results.All(r => r.Failed))
+                    throw new InvalidOperationException("그룹 멤버 센서 전체 조회 실패");
+                _failedSensorNames.AddRange(results.Where(r => r.Failed).Select(r => r.Sensor.Name));
+
+                // 병합 → 최신순 재정렬 → 그룹 총합 500 절단(G-1=(a)) — 센서별 편중과 무관하게 "최신 500" 규약 유지
+                var merged = results
+                    .SelectMany(r => r.Models.Select(m => new SignalHistoryItemViewModel(m, r.Sensor.Id, r.Sensor.Name, r.Index)))
+                    .OrderByDescending(i => i.DateTime)
+                    .ToList();
+                truncated = results.Any(r => r.Truncated) || merged.Count > MAX_LOAD;
+                items = merged.Take(MAX_LOAD).ToList();
+            }
 
             ct.ThrowIfCancellationRequested();
 
             _all.Clear();
-            _all.AddRange(models
-                .Select(m => new SignalHistoryItemViewModel(m))
-                .OrderByDescending(i => i.DateTime));
+            _all.AddRange(items.OrderByDescending(i => i.DateTime));
 
             IsTruncated = truncated;
             RebuildChips();
+            RebuildSensorChips();
             ApplyFilters();
+            var failNote = _failedSensorNames.Count > 0 ? $" · 조회 실패: {string.Join(", ", _failedSensorNames)}" : string.Empty;
             RangeText = $"{start:yyyy-MM-dd HH:mm} ~ {end:yyyy-MM-dd HH:mm} · {_all.Count}건"
-                        + (truncated ? " (상한 500건 — 기간을 줄여주세요)" : string.Empty);
+                        + (truncated ? " (상한 500건 — 기간을 줄여주세요)" : string.Empty)
+                        + failNote;
             LastUpdatedText = $"마지막 갱신 {DateTime.Now:HH:mm:ss}";
         }
         catch (OperationCanceledException)
@@ -264,10 +412,11 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         }
         catch (Exception ex)
         {
-            _log?.Error($"[SIGNAL_HISTORY] 탐지 이력 조회 실패 (deviceId={DeviceId}): {ex.Message}");
+            _log?.Error($"[SIGNAL_HISTORY] 탐지 이력 조회 실패 ({(IsGroupMode ? $"groupId={GroupId}" : $"deviceId={DeviceId}")}): {ex.Message}");
             HasLoadError = true;
             _all.Clear();
             RebuildChips();
+            RebuildSensorChips();
             ApplyFilters();
             RangeText = string.Empty;
             await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
@@ -281,12 +430,42 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
             IsBusy = false;
         }
     }
+
+    /// <summary>단일 센서 페이지 순회 조회 — 기존 단일 모드 루프를 추출(동작 동일), 그룹 팬아웃이 센서별로 재사용(FR-10).</summary>
+    private async Task<(List<IDetectionEventModel> Models, bool Truncated)> FetchSensorPagedAsync(
+        string startText, string endText, int sensorId, CancellationToken ct)
+    {
+        var models = new List<IDetectionEventModel>();
+        int page = 1;
+        bool truncated = false;
+        while (true)
+        {
+            var response = await _apiService.GetDetectionEventsAsync(
+                startText, endText, sensor: sensorId, page: page, limit: PAGE_LIMIT, token: ct);
+
+            if (response is not { Success: true } || response.Data == null)
+            {
+                if (page == 1)
+                    throw new InvalidOperationException(response?.Message ?? "서버 응답이 없습니다.");
+                break;   // 후속 페이지 실패 — 확보한 만큼만 표시
+            }
+
+            models.AddRange(response.Data.Select(dto => dto.ToDetectionEventModel(_deviceProvider)));
+
+            if (response.Data.Count < PAGE_LIMIT) break;          // 마지막 페이지
+            if (models.Count >= MAX_LOAD) { truncated = true; break; }
+            page++;
+        }
+        return (models, truncated);
+    }
     #endregion
 
     #region - 필터/통계 (FR-14) -
     private readonly List<SignalHistoryItemViewModel> _all = new();
 
     public ObservableCollection<ResultChipViewModel> Chips { get; } = new();
+    /// <summary>그룹 모드 센서 필터 칩(FR-12) — 멤버 전원, 시리즈 인덱스 고정.</summary>
+    public ObservableCollection<SensorChipViewModel> SensorChips { get; } = new();
     public ObservableCollection<SignalHistoryItemViewModel> FilteredItems { get; } = new();
     public IReadOnlyList<SignalChartPoint> ChartPoints
     {
@@ -312,6 +491,8 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     public string AvgSignalText { get => _avgSignalText; private set { _avgSignalText = value; NotifyOfPropertyChange(); } }
     public string TopResultText { get => _topResultText; private set { _topResultText = value; NotifyOfPropertyChange(); } }
     public int UnactionedCount { get => _unactionedCount; private set { _unactionedCount = value; NotifyOfPropertyChange(); } }
+    /// <summary>4번째 통계 타일 라벨 — 단일="최다 결과" / 그룹="최다 발생 센서" (FR-13, 그룹 모드 한정 교체).</summary>
+    public string TopStatLabel => IsGroupMode ? "최다 발생 센서" : "최다 결과";
 
     /// <summary>조회 결과의 Result 분포로 칩 재구성 — 기존 on/off 보존, 신규 Result는 신호 전무(AI)면 기본 off.</summary>
     private void RebuildChips()
@@ -326,24 +507,43 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         }
     }
 
+    /// <summary>그룹 모드 센서 칩 재구성(FR-12) — 멤버 전원 노출(0건 센서 포함), 기존 on/off 보존, 기본 on.
+    /// SeriesIndex=멤버 순서 고정(칩 필터로 시리즈가 줄어도 남은 시리즈 색 불변). 단일 모드는 칩 없음.</summary>
+    private void RebuildSensorChips()
+    {
+        var previous = SensorChips.ToDictionary(c => c.DeviceId, c => c.IsOn);
+        SensorChips.Clear();
+        if (!IsGroupMode) return;
+        for (int i = 0; i < _groupSensors.Count; i++)
+        {
+            var (id, name) = _groupSensors[i];
+            bool isOn = !previous.TryGetValue(id, out var prev) || prev;
+            SensorChips.Add(new SensorChipViewModel(id, name, i, isOn, ApplyFilters));
+        }
+    }
+
     private void ApplyFilters()
     {
         var enabled = Chips.Where(c => c.IsOn).Select(c => c.Result).ToHashSet();
+        var enabledSensors = SensorChips.Where(c => c.IsOn).Select(c => c.DeviceId).ToHashSet();
 
         var filtered = _all
             .Where(i => enabled.Contains(i.Result))
             .Where(i => !OnlyUnactioned || !i.IsActioned)
+            .Where(i => !IsGroupMode || enabledSensors.Contains(i.SensorId))   // FR-12 센서 칩 — 차트/그리드/통계 3면 일관
             .ToList();
 
         FilteredItems.Clear();
         foreach (var item in filtered)
             FilteredItems.Add(item);
 
-        // 차트 — signal>0만, 시간 오름차순 (FR-13 / null-안전 규약)
+        // 차트 — signal>0만, 시간 오름차순 (FR-13 / null-안전 규약). 그룹 모드는 시리즈 키+센서명 부여(FR-11)
         ChartPoints = filtered
             .Where(i => i.HasSignal)
             .OrderBy(i => i.DateTime)
-            .Select(i => new SignalChartPoint(i.DateTime, i.Signal!.Value, i.IsActioned, EnumKoreanMap.To(i.Result), i))
+            .Select(i => new SignalChartPoint(i.DateTime, i.Signal!.Value, i.IsActioned, EnumKoreanMap.To(i.Result), i,
+                                              IsGroupMode ? i.SeriesIndex : 0,
+                                              IsGroupMode ? i.DeviceName : null))
             .ToList();
 
         // 통계
@@ -351,10 +551,25 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
         var signals = filtered.Where(i => i.HasSignal).Select(i => i.Signal!.Value).ToList();
         MaxSignal = signals.Count > 0 ? signals.Max() : 0;
         AvgSignalText = signals.Count > 0 ? signals.Average().ToString("N0") : "—";
-        var top = filtered.GroupBy(i => i.Result).OrderByDescending(g => g.Count()).FirstOrDefault();
-        TopResultText = top != null ? $"{EnumKoreanMap.To(top.Key)} ({top.Count()}건)" : "—";
+        if (IsGroupMode)
+        {
+            // FR-13: 최다 발생 센서 — 동률 타이브레이크=최근 발생 우선
+            var topSensor = filtered.GroupBy(i => i.SensorId)
+                .OrderByDescending(g => g.Count())
+                .ThenByDescending(g => g.Max(i => i.DateTime))
+                .FirstOrDefault();
+            TopResultText = topSensor != null
+                ? $"{topSensor.First().DeviceName} ({topSensor.Count()}건)"
+                : "—";
+        }
+        else
+        {
+            var top = filtered.GroupBy(i => i.Result).OrderByDescending(g => g.Count()).FirstOrDefault();
+            TopResultText = top != null ? $"{EnumKoreanMap.To(top.Key)} ({top.Count()}건)" : "—";
+        }
         UnactionedCount = filtered.Count(i => !i.IsActioned);
         NotifyOfPropertyChange(nameof(MaxSignalText));
+        NotifyOfPropertyChange(nameof(TopStatLabel));
     }
     #endregion
 
@@ -432,6 +647,11 @@ public class DetectionHistoryDialogViewModel : BasePanelViewModel
     private readonly IEventApiService _apiService;
     private readonly DeviceProvider _deviceProvider;
     private CancellationTokenSource? _loadCts;
+
+    /// <summary>그룹 모드 멤버 센서 (Id, 표시명) — Initialize(그룹) 시점 현재 멤버십으로 재해석(AD-5), 순서=시리즈 인덱스.</summary>
+    private readonly List<(int Id, string Name)> _groupSensors = new();
+    /// <summary>팬아웃 부분 실패 센서명 — 푸터 경고 표기(FR-10).</summary>
+    private readonly List<string> _failedSensorNames = new();
 
     private bool _loadedByInitialize;   // (code-review P1-1) Initialize 즉시조회 ↔ OnActivate 조회 중복 가드
     private string _periodKey = "24h";

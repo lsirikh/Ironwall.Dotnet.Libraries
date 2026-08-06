@@ -20,8 +20,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Controls;
    Email        : lsirikh@naver.com
 ****************************************************************************/
 
-/// <summary>차트 1포인트 — Payload에 원본 행 VM을 실어 클릭 시 그리드 행과 동기화한다.</summary>
-public sealed record SignalChartPoint(DateTime Time, int Signal, bool IsActioned, string ResultText, object? Payload);
+/// <summary>차트 1포인트 — Payload에 원본 행 VM을 실어 클릭 시 그리드 행과 동기화한다.
+/// SeriesIndex/SeriesName(pidsgroup-rightclick FR-11): 그룹 모드 센서 시리즈 식별 — 기본값이 단일 시리즈라 기존 호출부 하위호환.
+/// 시리즈 색은 센서(엔티티) 고정 인덱스를 따른다 — 칩 필터로 시리즈 수가 줄어도 남은 시리즈 색 불변.</summary>
+public sealed record SignalChartPoint(DateTime Time, int Signal, bool IsActioned, string ResultText, object? Payload,
+                                      int SeriesIndex = 0, string? SeriesName = null);
 
 public class SignalChartControl : FrameworkElement
 {
@@ -71,6 +74,23 @@ public class SignalChartControl : FrameworkElement
         nameof(LabelBrush), typeof(Brush), typeof(SignalChartControl),
         new FrameworkPropertyMetadata(Brushes.LightGray, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    // ── 그룹 모드 시리즈 색 3종 + 초과분(기타) — 뷰에서 ChartSeries1~3Brush/TextMutedBrush 토큰 바인딩 (FR-11) ──
+    public static readonly DependencyProperty Series1BrushProperty = DependencyProperty.Register(
+        nameof(Series1Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series2BrushProperty = DependencyProperty.Register(
+        nameof(Series2Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty Series3BrushProperty = DependencyProperty.Register(
+        nameof(Series3Brush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty OtherSeriesBrushProperty = DependencyProperty.Register(
+        nameof(OtherSeriesBrush), typeof(Brush), typeof(SignalChartControl),
+        new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public IReadOnlyList<SignalChartPoint>? ItemsSource
     {
         get => (IReadOnlyList<SignalChartPoint>?)GetValue(ItemsSourceProperty);
@@ -97,6 +117,10 @@ public class SignalChartControl : FrameworkElement
         set => SetValue(PointClickedCommandProperty, value);
     }
     public Brush LineBrush { get => (Brush)GetValue(LineBrushProperty); set => SetValue(LineBrushProperty, value); }
+    public Brush? Series1Brush { get => (Brush?)GetValue(Series1BrushProperty); set => SetValue(Series1BrushProperty, value); }
+    public Brush? Series2Brush { get => (Brush?)GetValue(Series2BrushProperty); set => SetValue(Series2BrushProperty, value); }
+    public Brush? Series3Brush { get => (Brush?)GetValue(Series3BrushProperty); set => SetValue(Series3BrushProperty, value); }
+    public Brush OtherSeriesBrush { get => (Brush)GetValue(OtherSeriesBrushProperty); set => SetValue(OtherSeriesBrushProperty, value); }
     public Brush PointBrush { get => (Brush)GetValue(PointBrushProperty); set => SetValue(PointBrushProperty, value); }
     public Brush UnactionedBrush { get => (Brush)GetValue(UnactionedBrushProperty); set => SetValue(UnactionedBrushProperty, value); }
     public Brush AxisBrush { get => (Brush)GetValue(AxisBrushProperty); set => SetValue(AxisBrushProperty, value); }
@@ -244,35 +268,87 @@ public class SignalChartControl : FrameworkElement
         // 플롯 영역 클리핑 — 경계 이웃 포인트가 축 밖으로 그려지지 않도록
         dc.PushClip(new RectangleGeometry(new Rect(plotL, plotT, plotR - plotL, plotB - plotT)));
 
+        // 그룹 모드 판정(FR-11) — 시리즈 정보가 하나라도 있으면 센서별 폴리라인. 단일 모드는 기존 경로 그대로(회귀 0).
+        bool multiSeries = items.Any(p => p.SeriesIndex != 0 || p.SeriesName != null);
+
         // 라인
-        if (items.Count > 1)
+        if (!multiSeries)
         {
-            var geo = new StreamGeometry();
-            using (var ctx = geo.Open())
+            if (items.Count > 1)
             {
-                ctx.BeginFigure(new Point(X(items[0].Time), Y(items[0].Signal)), false, false);
-                foreach (var p in items.Skip(1))
-                    ctx.LineTo(new Point(X(p.Time), Y(p.Signal)), true, true);
+                var geo = new StreamGeometry();
+                using (var ctx = geo.Open())
+                {
+                    ctx.BeginFigure(new Point(X(items[0].Time), Y(items[0].Signal)), false, false);
+                    foreach (var p in items.Skip(1))
+                        ctx.LineTo(new Point(X(p.Time), Y(p.Signal)), true, true);
+                }
+                geo.Freeze();
+                var linePen = new Pen(LineBrush, 2) { LineJoin = PenLineJoin.Round };
+                linePen.Freeze();
+                dc.DrawGeometry(null, linePen, geo);
             }
-            geo.Freeze();
-            var linePen = new Pen(LineBrush, 2) { LineJoin = PenLineJoin.Round };
-            linePen.Freeze();
-            dc.DrawGeometry(null, linePen, geo);
+        }
+        else
+        {
+            // 센서별 폴리라인 — SeriesIndex 0~2만 라인, 그 외(기타)는 산점만(색 순환 금지 규약).
+            foreach (var series in items.GroupBy(p => p.SeriesIndex).OrderBy(g => g.Key))
+            {
+                if (series.Key > 2) continue;
+                var pts = series.ToList();
+                if (pts.Count < 2) continue;
+                var geo = new StreamGeometry();
+                using (var ctx = geo.Open())
+                {
+                    ctx.BeginFigure(new Point(X(pts[0].Time), Y(pts[0].Signal)), false, false);
+                    foreach (var p in pts.Skip(1))
+                        ctx.LineTo(new Point(X(p.Time), Y(p.Signal)), true, true);
+                }
+                geo.Freeze();
+                var linePen = new Pen(SeriesBrushFor(series.Key), 2) { LineJoin = PenLineJoin.Round };
+                linePen.Freeze();
+                dc.DrawGeometry(null, linePen, geo);
+            }
         }
 
-        // 포인트 (미조치=critical, 선택=외곽 강조)
+        // 포인트 (미조치=critical 유지 — 상태색은 시리즈색보다 우선, 선택=외곽 강조)
         foreach (var p in items)
         {
             var center = new Point(X(p.Time), Y(p.Signal));
             if (center.X >= plotL - 1 && center.X <= plotR + 1)
                 _hitPoints.Add((center, p));
-            var fill = p.IsActioned ? PointBrush : UnactionedBrush;
+            var fill = p.IsActioned ? (multiSeries ? SeriesBrushFor(p.SeriesIndex) : PointBrush) : UnactionedBrush;
             bool selected = SelectedPayload != null && Equals(SelectedPayload, p.Payload);
             dc.DrawEllipse(fill, selected ? new Pen(LabelBrush, 2) : null, center, POINT_RADIUS, POINT_RADIUS);
         }
 
+        // 시리즈 끝단 직접 라벨(FR-11, ≤3 시리즈) — 뷰 내 마지막 포인트 우측에 센서명
+        if (multiSeries)
+        {
+            foreach (var series in items.GroupBy(p => p.SeriesIndex).Where(g => g.Key <= 2))
+            {
+                var last = series.LastOrDefault();
+                if (last?.SeriesName is not { Length: > 0 } name) continue;
+                var ft = new FormattedText(name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                    new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                    10, SeriesBrushFor(series.Key), VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                double lx = Math.Min(X(last.Time) + 7, plotR - ft.Width - 2);
+                double ly = Math.Clamp(Y(last.Signal) - 15, plotT, plotB - 14);
+                dc.DrawText(ft, new Point(lx, ly));
+            }
+        }
+
         dc.Pop();
     }
+
+    /// <summary>시리즈 인덱스 → 브러시 (0~2=시리즈 토큰, 초과=기타 회색). 뷰 미주입 시 LineBrush 폴백.</summary>
+    private Brush SeriesBrushFor(int index) => index switch
+    {
+        0 => Series1Brush ?? LineBrush,
+        1 => Series2Brush ?? LineBrush,
+        2 => Series3Brush ?? LineBrush,
+        _ => OtherSeriesBrush,
+    };
 
     /// <summary>뷰 구간 내 포인트 + 양쪽 경계 이웃 1개씩(라인 연속성).</summary>
     private static List<SignalChartPoint> FilterToView(List<SignalChartPoint> all, DateTime start, DateTime end)
@@ -412,7 +488,8 @@ public class SignalChartControl : FrameworkElement
         if (hit is { } p)
         {
             Cursor = Cursors.Hand;
-            ToolTip = $"{p.Time:MM-dd HH:mm:ss} · {p.ResultText}\n신호 {p.Signal:N0} · {(p.IsActioned ? "조치" : "미조치")}";
+            var seriesPrefix = string.IsNullOrEmpty(p.SeriesName) ? string.Empty : $"{p.SeriesName} · ";   // 그룹 모드 센서명 병기(FR-11)
+            ToolTip = $"{seriesPrefix}{p.Time:MM-dd HH:mm:ss} · {p.ResultText}\n신호 {p.Signal:N0} · {(p.IsActioned ? "조치" : "미조치")}";
         }
         else
         {

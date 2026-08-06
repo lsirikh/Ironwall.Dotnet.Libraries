@@ -328,17 +328,26 @@
 								</TextBlock>
 							</Grid>
 
-							<!-- 푸터 — Phase 1은 [닫기]만. [그룹 탐지 이력] 버튼은 Phase 2(FR-08, EXT 배선과 동일 릴리스) -->
+							<!-- 푸터 — [닫기] + [그룹 탐지 이력](FR-08, 빈 그룹=비활성) -->
 							<Border
 								Grid.Row="3"
 								Padding="10,8"
 								BorderBrush="{DynamicResource DividerBrush}"
 								BorderThickness="0,1,0,0">
-								<Button
-									HorizontalAlignment="Right"
-									Command="{Binding CloseCommand}"
-									Content="닫기"
-									Style="{StaticResource PanelSecondaryButtonStyle}" />
+								<StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+									<Button
+										Margin="0,0,8,0"
+										Command="{Binding CloseCommand}"
+										Content="닫기"
+										Style="{StaticResource PanelSecondaryButtonStyle}" />
+									<Button
+										Command="{Binding GroupHistoryCommand}"
+										Content="📈 그룹 탐지 이력"
+										IsEnabled="{Binding HasSensors}"
+										Style="{StaticResource PanelPrimaryButtonStyle}"
+										ToolTipService.ShowOnDisabled="True"
+										ToolTip="등록된 센서가 있어야 조회할 수 있습니다" />
+								</StackPanel>
 							</Border>
 						</Grid>
 					</Border>
