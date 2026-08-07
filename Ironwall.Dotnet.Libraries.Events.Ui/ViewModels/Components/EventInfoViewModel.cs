@@ -81,17 +81,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         /// <summary>현재 테마 — 서비스 없으면 Light 기본.</summary>
         private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
 
+        /// <summary>레전드/툴팁 페인트를 지정 테마로 재할당(스칼라 .Color 변경만으론 LiveCharts 미갱신 — 재할당+Notify).</summary>
+        private void ApplyThemePaints(BaseTheme theme)
+        {
+            var c = ChartThemeProvider.TextColor(theme);
+            LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
+            TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);   // 전환 재공급(SIM-X003)
+        }
+
         /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try
-            {
-                var c = ChartThemeProvider.TextColor(theme);
-                LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
-                TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
-                TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);   // 전환 재공급(SIM-X003)
-                _rebuildChart?.Invoke();
-            }
+            try { ApplyThemePaints(theme); _rebuildChart?.Invoke(); }
             catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
@@ -100,6 +102,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         #region - Overrides -
         protected override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
+            // ★ 싱글턴 VM(SingleInstance) + 닫힘 시 ThemeChanged 해제 → 재활성화에서 재구독·재설정하지 않으면
+            //   테마 stale(라이트 재오픈에 다크 페인트 잔존 — 실기 스크린샷 SIM-L001, singleton VM 생명주기 함정).
+            //   해제-후-구독으로 중복 방지.
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged -= OnThemeChanged;
+                _themeService.ThemeChanged += OnThemeChanged;
+            }
+            ApplyThemePaints(CurrentTheme);
+
             await base.OnActivateAsync(cancellationToken);
             //await DataInitialize(_cancellationTokenSource!.Token).ConfigureAwait(false);
         }
@@ -300,16 +312,18 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     // 한글 축명 — 스키아는 글리프 폴백이 없어 typeface 미지정 시 tofu(SIM-R AxisName)
                     var legacyTypeface = ChartThemeProvider.KoreanTypeface();
 
+                    // NamePadding 음수는 영문 축명 기준 미세조정이었음 — 한글 축명은 세로 폭이 커져
+                    // 눈금 라벨과 겹침(라이트 실기 스크린샷: '이벤트'가 0.5와 충돌) → 0 정규화 + 12px(SIM-N)
                     var xLabel = new Axis
                     {
                         Labels = deviceLabels,
                         Name = "제어기",
                         Position = AxisPosition.Start,
-                        NameTextSize = 15,
+                        NameTextSize = 12,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = legacyTypeface },
                         UnitWidth = 1,
                         // (선택) 줄눈 제거
-                        NamePadding = new Padding(0, -10, 0, 5),   // L,T,R,B
+                        NamePadding = new Padding(0),
                         NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = legacyTypeface },
                         ShowSeparatorLines = false
                     };
@@ -319,9 +333,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                         Name = "이벤트",
                         Position = AxisPosition.Start,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
-                        NameTextSize = 15,
+                        NameTextSize = 12,
                         NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0) { SKTypeface = legacyTypeface },
-                        NamePadding = new Padding(0, 5, 0, -10),   // L,T,R,B
+                        NamePadding = new Padding(0),
                         MinLimit = 0
                     };
 
@@ -402,18 +416,19 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
                     var koreanTypeface = ChartThemeProvider.KoreanTypeface();
 
+                    // 한글 축명 겹침 방지 — NamePadding 0 정규화 + 12px (legacy 경로와 동일, SIM-N)
                     var xAxis = new Axis
                     {
                         Labels = xLabels,
                         Name = "제어기",
                         Position = AxisPosition.Start,
-                        NameTextSize = 15,
+                        NameTextSize = 12,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
                         {
                             SKTypeface = koreanTypeface
                         },
                         UnitWidth = 1,
-                        NamePadding = new Padding(0, -10, 0, 5),
+                        NamePadding = new Padding(0),
                         NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
                         {
                             SKTypeface = koreanTypeface
@@ -426,12 +441,12 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                         Name = "이벤트",
                         Position = AxisPosition.Start,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
-                        NameTextSize = 15,
+                        NameTextSize = 12,
                         NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0)
                         {
                             SKTypeface = koreanTypeface
                         },
-                        NamePadding = new Padding(0, 5, 0, -10),
+                        NamePadding = new Padding(0),
                         MinLimit = 0
                     };
 

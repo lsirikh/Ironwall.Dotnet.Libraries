@@ -70,6 +70,16 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         #region - Implementation of Interface -
         protected override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
+            // ★ 싱글턴 VM + 닫힘 시 ThemeChanged 해제 → 재활성화에서 재구독·재설정(테마 stale 방지, SIM-L003).
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged -= OnThemeChanged;
+                _themeService.ThemeChanged += OnThemeChanged;
+            }
+            LegendTextPaint = new SolidColorPaint { Color = ChartThemeProvider.LegendTextColor(CurrentTheme), SKTypeface = ChartThemeProvider.KoreanTypeface() };
+            TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(CurrentTheme);
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(CurrentTheme);
+
             await DataInitialize(cancellationToken).ConfigureAwait(false);
             await base.OnActivateAsync(cancellationToken);
         }
