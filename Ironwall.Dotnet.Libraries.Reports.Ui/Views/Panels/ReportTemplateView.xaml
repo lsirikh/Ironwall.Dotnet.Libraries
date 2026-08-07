@@ -40,7 +40,8 @@
                     <DataGridTextColumn Header="이름" Binding="{Binding Name}" Width="200" />
                     <DataGridTextColumn Header="설명" Binding="{Binding Description}" Width="*" MinWidth="200" />
                     <DataGridTextColumn Header="유형" Binding="{Binding ReportType}" Width="90" />
-                    <DataGridCheckBoxColumn Header="공개" Binding="{Binding IsPublic}" Width="60" />
+                    <!-- '공개' 컬럼 제거(2026-08-07): 서버 미집행 필드라 표시만 하고 의미가 없었다.
+                         docs/analyses/report-template-is-public-analysis.md -->
                     <DataGridTextColumn Header="기본기간" Binding="{Binding DefaultPeriod}" Width="80" />
                 </DataGrid.Columns>
             </DataGrid>

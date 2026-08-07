@@ -65,6 +65,15 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     public ObservableCollection<IBaseDeviceModel> SelectedDevices { get; } = new();
     /// <summary>선택된 대상 그룹(칩, 복수).</summary>
     public ObservableCollection<IDeviceGroupModel> SelectedGroups { get; } = new();
+
+    /// <summary>칩 트레이 헤더 — 선택 개수. 트레이는 고정 높이라 개수는 숫자로만 보여준다.</summary>
+    public string SelectedDeviceCountText => $"선택 {SelectedDevices.Count}개";
+    /// <summary>칩 트레이 헤더 — 선택 개수(그룹).</summary>
+    public string SelectedGroupCountText => $"선택 {SelectedGroups.Count}개";
+    /// <summary>빈 트레이 안내 문구 노출 판정(장비).</summary>
+    public bool HasSelectedDevices => SelectedDevices.Count > 0;
+    /// <summary>빈 트레이 안내 문구 노출 판정(그룹).</summary>
+    public bool HasSelectedGroups => SelectedGroups.Count > 0;
     /// <summary>억제 스케줄 목록(DataGrid ItemsSource).</summary>
     public ObservableCollection<EventSuppressionScheduleItemViewModel> Schedules { get; } = new();
     #endregion
@@ -124,6 +133,23 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             _ => true,   // all
         };
 
+    /// <summary>
+    /// 생성 버튼 ToolTip — 비활성일 때 <b>왜 못 누르는지</b>를 알려준다.
+    /// (비활성 버튼은 클릭이 안 되므로 눌러서 사유를 확인할 수 없다 → 호버로 알 수 있어야 한다.)
+    /// </summary>
+    public string CreateHintText
+    {
+        get
+        {
+            if (CanCreate) return "입력한 대상·시간창으로 억제 창을 생성합니다.";
+            if (!CanEditEvents()) return "이벤트 편집 권한(events:edit)이 없습니다.";
+            if (string.IsNullOrWhiteSpace(Name)) return "작업명을 입력하세요.";
+            if (!IsWindowLengthValid) return $"억제 기간이 최대 {MAX_WINDOW_DAYS}일을 초과했습니다.";
+            if (WindowEnd <= WindowStart) return "종료 시각이 시작 시각보다 뒤여야 합니다.";
+            return TargetType == "group" ? "대상 그룹을 1개 이상 선택하세요." : "대상 장비를 1개 이상 선택하세요.";
+        }
+    }
+
     /// <summary>창 길이 상한 검증(서버는 상한이 없어 오타로 1년 억제도 생성됨 — 클라에서 방어).</summary>
     public bool IsWindowLengthValid => SuppressionRules.IsWindowLengthValid(WindowStart, WindowEnd, MAX_WINDOW_DAYS);
 
@@ -135,6 +161,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         Execute.OnUIThread(() =>
         {
             NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText));
             NotifyOfPropertyChange(nameof(CanDelete));
             NotifySelectionState();   // events:delete 회수 시 '선택 삭제' 버튼/전체선택 즉시 비활성 반영
         });
@@ -158,6 +185,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         NotifyOfPropertyChange(nameof(IsGroupMode));
         NotifyOfPropertyChange(nameof(IsAllMode));
         NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText));
         NotifyDuplicateWarning();   // 모드 전환 시 중복 경고 재평가
     }
 
@@ -165,6 +193,11 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     public void RemoveDevice(IBaseDeviceModel device) { if (device != null) SelectedDevices.Remove(device); }
     /// <summary>칩 제거 — 그룹.</summary>
     public void RemoveGroup(IDeviceGroupModel group) { if (group != null) SelectedGroups.Remove(group); }
+
+    /// <summary>선택 장비 전체 해제 — 칩이 많을 때 하나씩 ✕ 누르는 것을 대체.</summary>
+    public void ClearDevices() => SelectedDevices.Clear();
+    /// <summary>선택 그룹 전체 해제.</summary>
+    public void ClearGroups() => SelectedGroups.Clear();
 
     /// <summary>억제 창 생성 — 클라 1차 검증 후 POST(대상 배열 + KST ISO8601). 성공 시 폼 리셋 + 재조회.</summary>
     public async Task ClickCreate()
@@ -207,7 +240,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 await LoadAllAsync();
                 if (!string.IsNullOrEmpty(echo))
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
-                    { Title = "억제 창 생성 완료", Explain = $"아래 대상이 억제됩니다. 대상이 맞는지 확인하세요.\n\n{echo}" });
+                    { Title = "억제 창 생성 완료", Explain = echo! });
             }
             else
                 await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
@@ -366,6 +399,12 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     private void OnTargetSelectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText));
+        // 칩 트레이 헤더(개수·비었음 안내·모두 지우기 활성) 갱신
+        NotifyOfPropertyChange(nameof(SelectedDeviceCountText));
+        NotifyOfPropertyChange(nameof(SelectedGroupCountText));
+        NotifyOfPropertyChange(nameof(HasSelectedDevices));
+        NotifyOfPropertyChange(nameof(HasSelectedGroups));
         NotifyDuplicateWarning();
     }
 
@@ -396,27 +435,55 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         NotifyOfPropertyChange(nameof(HasDuplicateWarning));
     }
 
-    /// <summary>(§6) 생성 응답의 대상 id를 장비/그룹 이름으로 되풀이 — 운영자 육안 확인용.</summary>
+    /// <summary>완료 팝업에 이름을 그대로 나열할 최대 개수 — 초과분은 "외 N개"로 접는다.</summary>
+    private const int ECHO_NAME_LIMIT = 3;
+
+    /// <summary>
+    /// (§6) 생성 응답의 대상 id를 장비/그룹 '이름'으로 되풀이 — 운영자 육안 확인용.
+    /// <para>⚠ 한 줄에 하나씩 전량 나열하면 정보 팝업이 고정 높이라 <b>목록이 잘려 읽을 수 없다</b>
+    /// (장비 6개만 돼도 위아래가 잘림). 그래서 <b>총 개수(안전상 핵심) + 앞 몇 개 이름 + "외 N개"</b>
+    /// 한 문장으로 접는다. 전체 목록은 아래 스케줄 표의 '대상' 열에서 확인한다.</para>
+    /// </summary>
     private string BuildTargetEcho(EventSuppressionScheduleDto dto)
     {
         switch (dto.TargetType)
         {
             case "device":
-                var dn = (dto.TargetDeviceIds ?? new()).Select(id =>
+                var deviceIds = dto.TargetDeviceIds ?? new();
+                return BuildEchoSentence("장비", deviceIds.Count, deviceIds.Take(ECHO_NAME_LIMIT).Select(id =>
                     DeviceProvider?.CollectionEntity.FirstOrDefault(d => d.Id == id)?.DeviceName is string n && !string.IsNullOrEmpty(n)
-                        ? $"· {n} (#{id})" : $"· #{id}");
-                return $"[장비 {dto.TargetDeviceIds?.Count ?? 0}개]\n{string.Join("\n", dn)}";
+                        ? n : $"#{id}"));
             case "group":
-                var gn = (dto.TargetGroupIds ?? new()).Select(id =>
+                var groupIds = dto.TargetGroupIds ?? new();
+                return BuildEchoSentence("그룹", groupIds.Count, groupIds.Take(ECHO_NAME_LIMIT).Select(id =>
                     DeviceGroupProvider?.CollectionEntity.FirstOrDefault(g => g.Id == id)?.Name is string n && !string.IsNullOrEmpty(n)
-                        ? $"· {n} (#{id})" : $"· #{id}");
-                return $"[그룹 {dto.TargetGroupIds?.Count ?? 0}개]\n{string.Join("\n", gn)}";
+                        ? n : $"#{id}"));
             default:
-                return $"[전체 대상] side={dto.TargetSide}";
+                return $"전체 대상 · {SideLabel(dto.TargetSide)}에 억제 창을 생성했습니다.";
         }
     }
 
-    private void ResetForm()
+    /// <summary>"정문, 주차장, 외곽_북측 외 3개 장비에 억제 창을 생성했습니다." 형태로 접는다.</summary>
+    private static string BuildEchoSentence(string kindLabel, int total, IEnumerable<string> sampleNames)
+    {
+        var names = sampleNames.ToList();
+        if (total == 0) return $"대상 {kindLabel}이(가) 없습니다.";
+
+        var head = string.Join(", ", names);
+        var rest = total - names.Count;
+        var subject = rest > 0 ? $"{head} 외 {rest}개 {kindLabel}" : $"{head}({kindLabel} {total}개)";
+        return $"{subject}에 억제 창을 생성했습니다.\n대상이 맞는지 아래 목록에서 확인하세요.";
+    }
+
+    /// <summary>side 코드 → 표시 문구.</summary>
+    private static string SideLabel(string? side) => side switch
+    {
+        "detection" => "감지",
+        "surveillance" => "감시",
+        _ => "감지+감시",
+    };
+
+    public void ResetForm()
     {
         Name = string.Empty;
         Description = null;
@@ -425,6 +492,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         WindowStart = DateTime.Now;
         WindowEnd = DateTime.Now.AddHours(1);
         NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText));
     }
 
     private async Task LoadAllAsync(CancellationToken ct = default)
@@ -433,7 +501,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         try
         {
             var res = await _api.GetSuppressionSchedulesAsync(
-                page: 1, limit: PAGE_SIZE, status: FilterStatus, targetType: FilterTargetType, token: ct).ConfigureAwait(false);
+                page: 1, limit: PAGE_SIZE, status: ApiFilterStatus, targetType: ApiFilterTargetType, token: ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) return;
             if (res.Success && res.Data is not null)
             {
@@ -465,7 +533,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         try
         {
             var res = await _api.GetSuppressionSchedulesAsync(
-                page: _currentPage + 1, limit: PAGE_SIZE, status: FilterStatus, targetType: FilterTargetType, token: ct).ConfigureAwait(false);
+                page: _currentPage + 1, limit: PAGE_SIZE, status: ApiFilterStatus, targetType: ApiFilterTargetType, token: ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested || !res.Success || res.Data is null) return;
             _totalCount = res.Pagination?.Total ?? res.Total ?? _totalCount;
             _currentPage = res.Pagination?.Page ?? (_currentPage + 1);
@@ -486,7 +554,8 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
 
     #region - Properties (Form) -
     private string? _name = string.Empty;
-    public string? Name { get => _name; set { _name = value; NotifyOfPropertyChange(nameof(Name)); NotifyOfPropertyChange(nameof(CanCreate)); } }
+    public string? Name { get => _name; set { _name = value; NotifyOfPropertyChange(nameof(Name)); NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText)); } }
 
     private string? _description;
     public string? Description { get => _description; set { _description = value; NotifyOfPropertyChange(nameof(Description)); } }
@@ -548,19 +617,29 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     private void NotifyWindowChanged()
     {
         NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText));
         NotifyOfPropertyChange(nameof(IsWindowLengthValid));
         NotifyOfPropertyChange(nameof(HasWindowLengthWarning));
     }
     #endregion
 
     #region - Properties (Filter / List) -
-    private string? _filterStatus;
-    /// <summary>상태 필터(null=전체). 변경 시 재조회.</summary>
-    public string? FilterStatus { get => _filterStatus; set { _filterStatus = string.IsNullOrEmpty(value) ? null : value; NotifyOfPropertyChange(nameof(FilterStatus)); _ = LoadAllAsync(); } }
+    // ⚠ 필터 값은 ComboBoxItem 의 Tag 와 1:1 이어야 한다. "전체" 항목의 Tag 는 빈 문자열이므로
+    //    여기서 ""→null 로 정규화하면 SelectedValue 가 어떤 항목과도 매칭되지 않아
+    //    ① 초기 표시가 빈칸이 되고 ② "전체"를 골라도 곧바로 선택이 풀린다.
+    //    바인딩 값은 원문 그대로 두고, null 정규화는 API 호출 직전에만 한다(ApiFilter*).
+    private string _filterStatus = string.Empty;
+    /// <summary>상태 필터(""=전체). 변경 시 재조회.</summary>
+    public string FilterStatus { get => _filterStatus; set { _filterStatus = value ?? string.Empty; NotifyOfPropertyChange(nameof(FilterStatus)); _ = LoadAllAsync(); } }
 
-    private string? _filterTargetType;
-    /// <summary>대상유형 필터(null=전체). 변경 시 재조회.</summary>
-    public string? FilterTargetType { get => _filterTargetType; set { _filterTargetType = string.IsNullOrEmpty(value) ? null : value; NotifyOfPropertyChange(nameof(FilterTargetType)); _ = LoadAllAsync(); } }
+    private string _filterTargetType = string.Empty;
+    /// <summary>대상유형 필터(""=전체). 변경 시 재조회.</summary>
+    public string FilterTargetType { get => _filterTargetType; set { _filterTargetType = value ?? string.Empty; NotifyOfPropertyChange(nameof(FilterTargetType)); _ = LoadAllAsync(); } }
+
+    /// <summary>서버 전달용 — 빈 문자열(전체)은 파라미터 미전송(null)으로 바꾼다.</summary>
+    private string? ApiFilterStatus => string.IsNullOrEmpty(_filterStatus) ? null : _filterStatus;
+    /// <summary>서버 전달용 — 빈 문자열(전체)은 파라미터 미전송(null)으로 바꾼다.</summary>
+    private string? ApiFilterTargetType => string.IsNullOrEmpty(_filterTargetType) ? null : _filterTargetType;
 
     private bool _isLoadingMore;
     public bool IsLoadingMore { get => _isLoadingMore; set { _isLoadingMore = value; NotifyOfPropertyChange(nameof(IsLoadingMore)); } }

@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -38,16 +38,27 @@ public class ReportCreateViewModel : BasePanelViewModel
     #endregion
 
     #region - Processes -
-    /// <summary>템플릿 드롭다운 로드(GET /templates) — 템플릿 기반 선택용.</summary>
+    /// <summary>
+    /// 템플릿 드롭다운 로드(GET /templates) — 템플릿 기반 선택용.
+    /// <para>탭 전환은 Caliburn 활성화를 일으키지 않는다(콘솔 호스트가 평범한 TabControl 이라
+    /// 세 탭 VM 이 콘솔 열 때 한 번에 활성화된다). 따라서 템플릿을 추가·삭제한 뒤에는
+    /// 콘솔이 이 메서드를 다시 불러줘야 콤보가 최신이 된다 — <see cref="ReportConsoleViewModel"/> 참조.</para>
+    /// <para>선택은 <b>Id 로 복원</b>한다. <c>Templates.Clear()</c> 가 ComboBox 바인딩을 통해
+    /// SelectedTemplate 을 null 로 되돌리고, 재적재된 항목은 <b>다른 인스턴스</b>라서
+    /// 참조로 두면 콤보가 빈칸으로 보인다.</para>
+    /// </summary>
     public async Task LoadTemplatesAsync()
     {
         try
         {
+            var prevId = SelectedTemplate?.Id;          // Clear 이전에 확보(바인딩이 null 로 되돌린다)
             var res = await _api.GetTemplatesAsync(1, 100);
             Templates.Clear();
             if (res.Success && res.Data != null)
                 foreach (var t in res.Data) Templates.Add(t);
-            if (SelectedTemplate is null && Templates.Count > 0) SelectedTemplate = Templates[0];
+
+            SelectedTemplate = (prevId.HasValue ? Templates.FirstOrDefault(t => t.Id == prevId.Value) : null)
+                               ?? (Templates.Count > 0 ? Templates[0] : null);
             NotifyOfPropertyChange(nameof(HasTemplates));
         }
         catch (Exception ex) { _log?.Error($"[ReportCreate] LoadTemplates: {ex.Message}"); }
@@ -143,10 +154,13 @@ public class ReportCreateViewModel : BasePanelViewModel
         get => _selectedTemplate;
         set
         {
+            // 실제로 '다른 템플릿'으로 바뀔 때만 기간을 덮어쓴다.
+            // 목록 새로고침은 같은 Id 를 재대입하므로, 이 검사가 없으면 사용자가 고른 기간이 매번 초기화된다.
+            var changed = _selectedTemplate?.Id != value?.Id;
             _selectedTemplate = value;
             NotifyOfPropertyChange();
             // 템플릿의 기본기간을 기간에 반영(사용자가 다시 바꿀 수 있음)
-            if (value != null)
+            if (changed && value != null)
             {
                 var p = Periods.FirstOrDefault(x => x.Value == value.DefaultPeriod);
                 if (p != null) SelectedPeriod = p;

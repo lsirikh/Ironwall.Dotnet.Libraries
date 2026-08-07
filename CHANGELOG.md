@@ -14,6 +14,63 @@
 
 ## [Unreleased]
 
+### Changed
+- **억제 스케줄 생성 폼 비주얼 리디자인 — 스토리보드 ①~⑥ 적용** (Track B · Events.Ui · [스토리보드](docs/design/suppression-schedule-form-redesign.html) · 사용자 승인 2026-08-07)
+  - **① 입력 언어 통일** — 기존엔 TextBox/ComboBox 는 **Material 밑줄**, `mah:DateTimePicker` 는 **MahApps 박스**라 한 폼에 디자인 언어가 두 개였다. 세 컨트롤을 **박스형 36px**로 통일(`FormTextBox`/`FormComboBox` = `MaterialDesignOutlined*` 기반, `FormDateTimePicker`).
+  - **② 좌우 바닥선 정렬** — 좌측 필드를 **2열 × 3행**(작업명·대상유형 / 억제범위·대상측 / 시간창 span2)으로 재배치해 우측 트레이와 높이를 맞춤. 대상 유형 라디오도 36px 박스로 감싸 같은 리듬.
+  - **③ 주 액션 승격** — `＋ 억제 창 생성`을 **Primary 채움 버튼**(`PrimaryActionButton`)으로. 비활성은 38% 불투명 + **`ToolTipService.ShowOnDisabled="True"` + `CreateHintText`** 로 *왜 못 누르는지*를 호버로 안내(권한/작업명/기간상한/시각역전/대상미선택 5분기).
+  - **④ 액션 바 신설** — 카드 하단에 구분선 + 우측 정렬 `[초기화][＋ 억제 창 생성]`. 기존엔 생성 버튼이 필드 사이 허공에 떠 있었다. (`ResetForm` 을 public 으로 승격)
+  - **⑤ 빈 트레이** — 실선 사각형 대신 **점선 테두리 + 아이콘 + 2줄 안내**(`Rectangle StrokeDashArray`, 선택이 있으면 실선으로 전환). 전체 대상 모드는 경고색 아이콘 + 안내로 트레이 자리를 채움.
+  - **⑥ 목록 선택행** — 회색 블록(`SurfacePressedBrush`) → **좌측 3px 시안 바 + 틴트 배경**(`SuppressionRowStyle`).
+  - **⚠ 스타일은 전부 뷰 로컬 등록** — `Events.Ui/Resources/Resources.xaml` 는 앱 리소스 트리에 **병합되지 않는다**(앱은 자체 복제본만 머지). 라이브러리 Resources 에 넣으면 빌드는 통과하고 **런타임 XamlParseException** 이 난다.
+  - **검증**: 빌드 오류 0 · `EventSuppressionScheduleTests` **31/31 통과** · **StaticResource/DynamicResource 41키 + PackIconKind 8종 정적 전수 검증 → 미해석 0** (XAML 리소스 미해석은 빌드가 못 잡고 런타임에만 터지므로 별도 스크립트로 확인). ⚠ **실기 렌더 미검증** — 특히 Outlined 스타일의 floating hint 가 Height=36 에서 어떻게 보이는지는 눈으로 확인 필요.
+  - **🔴 후속 수정(같은 날, 실기 스크린샷에서 발견)** — 위 ①에서 준 `Height="36"` 강제가 **입력 컨트롤 3종을 세로로 클리핑**시켰다. 작업명 힌트·억제 범위 값·장비 추가 힌트가 전부 글자가 아니라 '실선'처럼 뭉개졌다.
+    **원인**: MDIX Outlined 템플릿은 **floating hint(테두리 노치로 떠오르는 라벨)용 세로 공간을 내부에서 예약**하는데, `Height` 고정이 그 공간까지 눌렀다. 힌트를 주지 않은 ComboBox 도 같은 템플릿이라 함께 깨졌다.
+    **수정**: `Height` → **`MinHeight="36"`(하한만)** + **`md:HintAssist.IsFloating="False"`**(노치 자체를 없애고 플레이스홀더로 동작). 대상 유형 라디오 Border 도 같은 원칙으로 `MinHeight` 전환.
+    **교훈**: MDIX Outlined 계열에 `Height` 를 강제하지 말 것. 스타일 키가 존재해도(정적 검증 통과) **레이아웃은 실기에서만 드러난다**.
+  - **⑦ 목록 '작업명/대상' 열 통합은 미적용** — 기존 열 구성 변경이라 사용자 확인 대기.
+- **억제 스케줄 생성 폼 레이아웃 재구성 — 칩이 늘어도 폼이 밀리지 않는 고정 구조** (Track B · Events.Ui · 롤백태그 `before-suppression-form-layout` · 사용자 지시 2026-08-07)
+  - **증상**: 장비를 선택할수록 칩이 쌓이며 뒤 필드(대상 측·범위·시간창·생성 버튼)를 줄바꿈으로 계속 밀어낸다. 장비가 100개면 폼이 화면을 덮는다.
+  - **원인**: 폼 전체가 `<WrapPanel Orientation="Horizontal">` 이고 그 안의 장비 칩 `ItemsControl` 에 **크기 상한이 없었다**(`MinHeight="22"` 만 존재). 칩이 늘면 그 칸의 폭이 자라 바깥 WrapPanel 이 재배치 → 후속 필드가 밀린다. 칩 폭도 장비명 길이에 끌려가 제각각이었다.
+  - **수정 — 3층 고정화**:
+    ① **바깥 WrapPanel → 명시적 2컬럼 Grid**(좌 = 입력 필드 `*`, 우 = 대상 선택 트레이 `356` 고정). 좌측은 3열 × 3행 고정 배치라 **모드를 바꿔도 필드 자리가 이동하지 않는다**.
+    ② **칩 크기 정규화** — `WrapPanel ItemWidth="148" ItemHeight="26"` + 칩 내부 `TextTrimming="CharacterEllipsis"` + 전체 이름은 `ToolTip`. 이름 길이와 무관하게 격자로 정렬된다.
+    ③ **트레이 고정 높이 104 + 내부 세로 스크롤** — 2열 × 4행(8개) 노출, 그 이상은 트레이 안에서만 스크롤. **칩이 몇 개든 폼 높이가 불변**이다.
+  - **부가**: 트레이 헤더에 `선택 N개` + **[모두 지우기]**(`ClearDevices`/`ClearGroups` 신설) — 100개를 하나씩 ✕ 누르지 않아도 된다. 빈 트레이 안내 문구 추가. 장비/그룹 트레이는 상호배타라 **같은 자리에 겹쳐 배치** → 모드 전환 시 흔들림 없음. 전체 대상 모드는 트레이 자리를 안내 카드로 채워 빈 칸을 없앰.
+  - **🔴 동반 버그 수정 — `대상 측(side)` 표시 조건이 정반대였다**: 내장 `BooleanToVisibilityConverter` 는 **`ConverterParameter` 를 무시한다.** 기존 `Visibility="{Binding IsDeviceMode, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"` 는 반전이 걸리지 않아, 주석(`대상 측(group/all)`)·VM 문서(`감지/감시 필터(group·all)`)와 반대로 **장비 모드에서 노출되고 그룹/전체 모드에서 숨겨졌다.** `utils:BoolToInverseVisibleConverter` 로 교체하고, 컨버터 선언부에 재발 방지 주석을 남김.
+  - **자동화 계약**: 기존 AutomationId 전부 보존 + 신설 — `ClearDevicesButton`/`ClearGroupsButton`, `SelectedDeviceCountText`/`SelectedGroupCountText`, `DeviceChipTray`/`GroupChipTray`, `AllTargetNoticeText`, 그리고 반복 요소는 바인딩식 ID(`DeviceChip.{0}`/`DeviceChipRemove.{0}`/`GroupChip.{0}`/`GroupChipRemove.{0}`).
+  - **검증**: `Events.Ui` 빌드 오류 0 · `EventSuppressionScheduleTests` **31/31 통과**. ⚠ **실기 렌더 미검증**(UI 배치 확인은 데스크톱 독점 필요).
+
+### Fixed
+- **억제 창 생성 완료 팝업이 대상 목록을 전부 나열해 잘려서 안 읽히던 문제** (Track B · Events.Ui · 사용자 제보 2026-08-07)
+  - **증상**: 생성 직후 팝업이 `[장비 6개]` + 장비를 **한 줄에 하나씩 전량 나열** → 정보 팝업이 고정 높이라 위아래가 잘려 `[장비 6개]` 헤더도, 마지막 항목도 안 보인다. 장비 6개만 돼도 발생.
+  - **수정**: `BuildTargetEcho` 를 **"앞 3개 이름 + 외 N개" 한 문장**으로 접음 — 예: `정문, 주차장, 외곽_북측 외 3개 장비에 억제 창을 생성했습니다.` 3개 이하면 `정문, 주차장(장비 2개)` 형태. 전체 대상은 side 를 한글로(`전체 대상 · 감지+감시`).
+  - §6(대상 오지정 사고 방지)의 안전 목적은 **총 개수를 문장에 유지**하고 "아래 목록에서 확인하세요" 안내를 붙여 보존. 전체 목록은 스케줄 표의 '대상' 열에서 확인한다. (기존 동작은 **잘려서 확인 자체가 불가능**했으므로 순수 개선.)
+- **억제 스케줄 상태/대상 필터 콤보가 빈칸이고 "전체"를 고를 수 없던 버그** (Track B · Events.Ui · 스크린샷에서 발견 2026-08-07)
+  - **원인**: `FilterStatus`/`FilterTargetType` setter 가 `""`→`null` 로 정규화하는데 "전체" `ComboBoxItem` 의 `Tag` 는 **빈 문자열**이다. `SelectedValue=null` 은 어떤 항목과도 매칭되지 않아 ① 초기 표시가 빈칸이 되고 ② "전체"를 골라도 setter 가 즉시 null 로 바꿔 **선택이 곧바로 풀린다**.
+  - **수정**: 바인딩 값은 원문(`""`) 그대로 두고, **null 정규화는 API 호출 직전에만**(`ApiFilterStatus`/`ApiFilterTargetType`) 수행.
+- **보고서: 새로 만든 템플릿이 생성 탭 콤보에 안 뜨는 버그 — 탭 전환이 활성화를 일으키지 않는 구조** (Track B · Reports.Ui · 롤백태그 `before-report-template-combo-refresh` · 사용자 제보 2026-08-07)
+  - **증상**: 템플릿을 새로 만든 뒤 바로 [생성] 탭으로 가면 방금 만든 템플릿이 드롭다운에 없다. 콘솔을 닫았다 다시 열어야 나타난다.
+  - **원인**: 콘솔 탭 호스트가 `Conductor.OneActive` 가 아니라 **평범한 `TabControl`**(`ReportConsoleView.xaml:37-47`)이라 **탭을 바꿔도 Caliburn 의 Activate/Deactivate 가 발생하지 않는다.** 세 탭 VM 은 콘솔을 열 때 `ReportConsoleViewModel.OnActivateAsync:44-46` 에서 한 번에 활성화되고, `ReportCreateViewModel.LoadTemplatesAsync` 의 호출부도 그 활성화 하나뿐이다 → **콤보는 콘솔을 연 순간의 스냅샷**. 저장 후 처리(`OnEditSaved`)는 `TemplateViewModel.LoadAsync()` 만 불러 템플릿 탭 목록만 갱신했다.
+  - **같은 뿌리의 미보고 결함 2건 동시 수정**:
+    ① **삭제한 템플릿이 생성 콤보에 잔존** — 선택·생성까지 가능(서버 404/422 유발). `ReportTemplateViewModel` 에 `TemplatesChanged` 이벤트를 신설해 삭제 성공 시 발화, 콘솔이 구독.
+    ② **재적재 시 콤보가 빈칸이 되는 잠복 버그** — `Templates.Clear()` 가 ComboBox 바인딩을 통해 `SelectedTemplate` 을 null 로 되돌리고 재적재 항목은 **다른 인스턴스**라 참조 비교가 깨진다. **Clear 이전에 Id 를 확보해 Id 로 복원**하도록 변경(기존 `SelectedTemplate is null` 가드로는 stale 참조가 살아남아 복원되지 않았다).
+  - **부수 회귀 방지**: `SelectedTemplate` setter 가 템플릿 기본기간으로 `SelectedPeriod` 를 덮어쓰는데, 새로고침은 **같은 Id 를 재대입**하므로 그대로 두면 사용자가 고른 기간이 갱신마다 초기화된다 → **Id 가 실제로 바뀔 때만** 기간을 동기화하도록 수정.
+  - **변경 파일 3**: `ReportConsoleViewModel.cs`(구독/해제 + `RefreshCreateTemplatesAsync`) · `ReportTemplateViewModel.cs`(`TemplatesChanged`) · `ReportCreateViewModel.cs`(Id 기반 선택 복원 + setter 가드).
+  - **빌드**: `Reports.Ui` 오류 0. ⚠ **실기 검증 미실행** · Reports.Ui 에는 테스트 프로젝트가 없어 회귀 테스트 미작성.
+  - 부수: 세 VM 파일이 한글을 담고도 BOM 없이 있던 상태를 UTF-8 BOM 으로 교정.
+
+### Removed
+- **보고서 템플릿 '공개(is_public)' UI 제거 — 서버 미집행 필드** (Track B · Reports.Ui · [분석](docs/analyses/report-template-is-public-analysis.md) · 롤백태그 `before-remove-template-ispublic-ui` · 사용자 지시 2026-08-07)
+  - **근거**: `is_public` 은 "템플릿을 읽기 전용으로 공유"하도록 설계됐으나 **클라·API·서버 3계층 전부 미집행**이다. 서버 목록 GET 에 WHERE 절 자체가 없고(`reports.py:268-276`), 생성 시 `owner_id` 를 설정하지 않아 영구 NULL(`:303-310`) — `owner_id == me` 조건이 성립할 토대가 없다. 서버 레포도 이 갭을 2026-02-02 에 표로 기록해 뒀고 6개월간 미해소.
+  - **제거 대상 2곳**: 목록 `DataGridCheckBoxColumn Header="공개"`(`ReportTemplateView.xaml:43`, 원래 `IsReadOnly=True` 표시 전용) · 편집 다이얼로그 `CheckBox Content="공개(is_public)"`(`ReportTemplateEditView.xaml:33`, 최종 사용자 화면에 raw 스키마명이 노출되고 있었다). VM 프로퍼티 `IsPublic` 및 로드/초기화 대입도 삭제.
+  - **🔴 함정 회피 — PATCH 에서 `is_public` 전송 자체를 생략**: 체크박스만 지우고 본문을 그대로 두면 수정 저장마다 `is_public:false` 가 실려 **서버 저장값을 덮어쓴다**(시드 STANDARD 4종은 `true`). `ReportTemplateUpdateDto.IsPublic` 은 `bool?` + `NullValueHandling.Ignore` 이므로 **미지정으로 두어 필드를 아예 빼는 것**이 정답. 기존 코드는 이 부분수정 의미를 쓰지 않고 항상 non-null 로 채우고 있었다(lost update 소지).
+  - **생성(POST)은 무변화**: `ReportTemplateCreateDto.IsPublic` 은 non-nullable `bool` 이라 미지정 시 `false` 로 직렬화되며, 이는 서버 DB 기본값(`is_public BOOLEAN NOT NULL DEFAULT FALSE`)과 동일하다.
+  - **와이어 계약 무변경**: DTO 3종의 `is_public` 필드는 그대로 유지(응답 역직렬화·향후 복구 대비). UI 표면만 제거했다.
+  - **서버 준비도(참고)**: 인프라는 이미 갖춰져 있다 — `reports.py:62` 가 전 엔드포인트에 토큰을 강제하고 필요한 의존성도 import 완료. 구현 시 코드는 ~10줄. 남은 실차단은 ① 기존 행 `owner_id` 전량 NULL(필터 켜는 순간 비공개 행이 관리자에게도 소멸 — ADMIN bypass 가 목록 WHERE 에 없다) ② 클라 계약 breaking change(목록 건수 감소 + 신규 403, 계약서에 403 정의 0건). 서버 구현 시 이 UI 를 복구한다.
+  - **부수 정리**: `ReportTemplateEditView.xaml` · `ReportTemplateEditViewModel.cs` 가 한글을 담고도 BOM 없이 있던 상태를 UTF-8 BOM 으로 교정.
+  - **빌드**: `Reports.Ui` 오류 0. ⚠ **실기 검증 미실행**(앱 기동 확인 필요).
+
 ### Added
 - **GMap 스키마 마이그레이션 멱등화 — 부팅 예외 26건 제거 + 데이터 파괴 뇌관 해체** (Track C · GMaps.Db · [PRD](docs/prds/GMap_Schema_Migration_Idempotency-prd.md) · [Plan](docs/plans/GMap_Schema_Migration_Idempotency-prd-plan.md) · 롤백태그 `before-gmap-schema-guard` · 사용자 지시 2026-08-04)
   - **출발점**: 앱 시작 시 디버거 출력창에 `MySqlException` 22건 + `NotSupportedException` 4건. 전량 `GMapDbSymbolService.BuildSchemeAsync` 한 메서드에서 발생하며 bare catch 로 삼켜져 부팅에는 영향이 없었다. 그러나 그 소음 뒤에 **사문(dead) 마이그레이션 3건과 데이터 파괴 뇌관**이 있었다.

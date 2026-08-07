@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
@@ -78,7 +78,12 @@ public class ReportTemplateViewModel : BasePanelViewModel
         try
         {
             var res = await _api.DeleteTemplateAsync(item.Id, cancellationToken);
-            if (res.Success) { Items.Remove(item); NotifyOfPropertyChange(nameof(IsEmpty)); }
+            if (res.Success)
+            {
+                Items.Remove(item);
+                NotifyOfPropertyChange(nameof(IsEmpty));
+                TemplatesChanged?.Invoke();   // 생성 탭 콤보에서도 제거되도록 — 안 하면 지운 템플릿으로 생성 가능
+            }
             result = res.Success
                 ? new OpenInfoPopupMessageModel { Title = "삭제 완료", Explain = "템플릿을 삭제했습니다." }
                 : new OpenInfoPopupMessageModel { Title = "삭제 실패", Explain = res.Message ?? "삭제하지 못했습니다." };
@@ -125,6 +130,8 @@ public class ReportTemplateViewModel : BasePanelViewModel
     public event Action<ReportTemplateDto>? EditRequested;
     /// <summary>추가 요청 — ReportConsoleViewModel 이 구독하여 편집 오버레이를 신규 모드로 연다.</summary>
     public event System.Action? CreateRequested;
+    /// <summary>템플릿 집합 변경(삭제 성공) — 콘솔이 구독하여 생성 탭 콤보를 재적재한다.</summary>
+    public event System.Action? TemplatesChanged;
 
     private bool _isBusy;
     public bool IsBusy { get => _isBusy; set { _isBusy = value; NotifyOfPropertyChange(); NotifyOfPropertyChange(nameof(IsEmpty)); } }

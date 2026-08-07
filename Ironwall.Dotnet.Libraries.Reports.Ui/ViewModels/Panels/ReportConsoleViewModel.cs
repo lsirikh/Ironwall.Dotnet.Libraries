@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
@@ -66,6 +66,7 @@ public class ReportConsoleViewModel : BasePanelViewModel
         CreateViewModel.Generated += OnReportGenerated;
         TemplateViewModel.EditRequested += OnEditRequested;
         TemplateViewModel.CreateRequested += OnTemplateCreateRequested;
+        TemplateViewModel.TemplatesChanged += OnTemplatesChanged;
         EditViewModel.Saved += OnEditSaved;
         EditViewModel.Cancelled += OnEditCancelled;
         _permission.PermissionsChanged += OnPermissionsChanged;
@@ -78,6 +79,7 @@ public class ReportConsoleViewModel : BasePanelViewModel
         CreateViewModel.Generated -= OnReportGenerated;
         TemplateViewModel.EditRequested -= OnEditRequested;
         TemplateViewModel.CreateRequested -= OnTemplateCreateRequested;
+        TemplateViewModel.TemplatesChanged -= OnTemplatesChanged;
         EditViewModel.Saved -= OnEditSaved;
         EditViewModel.Cancelled -= OnEditCancelled;
         _permission.PermissionsChanged -= OnPermissionsChanged;
@@ -131,6 +133,24 @@ public class ReportConsoleViewModel : BasePanelViewModel
         IsEditVisible = false;
         await TemplateViewModel.LoadAsync();          // 목록 새로고침
         TemplateViewModel.SelectById(templateId);     // 선택 유지 → 수정 버튼 계속 사용 가능(재오픈 가능)
+        await RefreshCreateTemplatesAsync();          // 생성 탭 콤보에도 반영(탭 전환은 활성화를 일으키지 않는다)
+    }
+
+    /// <summary>템플릿 삭제 성공 → 생성 탭 콤보에서도 제거.</summary>
+    private async void OnTemplatesChanged() => await RefreshCreateTemplatesAsync();
+
+    /// <summary>
+    /// 생성 탭의 템플릿 콤보를 재적재한다.
+    /// <para><b>왜 필요한가</b>: 이 콘솔의 탭 호스트는 평범한 <c>TabControl</c>(ReportConsoleView.xaml)이라
+    /// 탭을 바꿔도 Caliburn 의 Activate/Deactivate 가 발생하지 않는다. 세 탭 VM 은 콘솔을 열 때
+    /// <see cref="OnActivateAsync"/> 에서 한 번에 활성화되며, <c>ReportCreateViewModel.LoadTemplatesAsync</c> 의
+    /// 호출부도 그 활성화 하나뿐이다. 즉 콤보는 <b>콘솔을 연 순간의 스냅샷</b>이라,
+    /// 템플릿을 추가·삭제해도 콘솔을 닫았다 다시 열기 전까지 반영되지 않았다.</para>
+    /// </summary>
+    private async Task RefreshCreateTemplatesAsync()
+    {
+        try { await CreateViewModel.LoadTemplatesAsync(); }
+        catch (Exception ex) { _log?.Error($"[ReportConsole] 생성 탭 템플릿 갱신: {ex.Message}"); }
     }
 
     private void OnEditCancelled() => IsEditVisible = false;

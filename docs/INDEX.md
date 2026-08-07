@@ -2,7 +2,7 @@
 # 프로젝트 문서 인덱스
 
 - **마지막 갱신**: 2026-08-06 (advance-phase 자동)
-- **총 문서 수**: 484개
+- **총 문서 수**: 486개
 
 ---
 
@@ -10,8 +10,13 @@
 
 | 파일 | 분석 대상 | 날짜 |
 |------|---------|------|
-| [detection-history-bughunt-scenario-analysis.md](analyses/detection-history-bughunt-scenario-analysis.md) | detection-history-bughunt-scenario | 2026-08-06 |
+| [suppression-schedule-form-redesign.html](design/suppression-schedule-form-redesign.html) | 억제 스케줄 생성 폼 디자인 개선안 v1.0 — 진단 8종(입력 언어 2종 혼재·좌우 높이 불일치·카드 경계 소실·주액션 유령·위계 부재·빈 트레이 구멍·액션바 부재·선택행 투박) + 다크/라이트 목업 + 적용범위 7항 (⑦ 목록 열 통합은 사용자 확인 대기) | 2026-08-07 |
+| [report-template-is-public-analysis.md](analyses/report-template-is-public-analysis.md) | 보고서 템플릿 공개/비공개(is_public) — 설계 의도=**읽기전용 공유**(소유자+공개만 목록, 비공개 상세 403, 수정·삭제는 소유자 전용)이나 **3계층 전부 미집행**(서버 목록 WHERE 없음·owner_id 영구 NULL·클라 분기 0건) → 현재는 순수 메타데이터. 부수결함 I-1 PATCH lost update · I-2 생성응답 is_public 침묵 false · I-3 RBAC 게이팅 미배선. **§8 서버 준비도**: 인프라 완비(코드 ~10줄)·실차단 2건(기존 owner NULL·클라 breaking). **→ D안 UI 제거 적용 완료** | 2026-08-07 |
+| [event-mapping-workbench-scenario-analysis.md](analyses/event-mapping-workbench-scenario-analysis.md) | 이벤트 매핑 워크벤치 시나리오 기반 분석 v1.1 — 영향면 6축(파생객체 SET NULL 고아 7경로 포함) · **결함 DF-1~28**(D1 config PK 부재·D2 nested 침묵오염 실증) · **정책공백 G-1~10**(사용자 결정) · 마이그레이션 MG-1~5 · 적대 검증 3기로 자체 오진 3건 정정 | 2026-08-07 |
+| [single-instance-guard-scenario-analysis.md](analyses/single-instance-guard-scenario-analysis.md) | 뮤텍스 가드(v2.8.1) 시나리오 사후검증 — 카탈로그 44행·적대 8가설(전부 기각)·실측 10/10 PASS. **P1 확정: 빠른 재기동 데드존(SIM-M005a 재현)→v2.8.2 WaitOne 인수인계 수정**, P2 백로그 5건(와치독 강행 체인·크로스유저 fail-open 등) | 2026-08-07 |
+| [redundant-execution-boot-race-analysis.md](analyses/redundant-execution-boot-race-analysis.md) | 재부팅 후 Redundant 2창 — 최소 3기동(1생존+2자멸) 타임라인 확정, 구조 결함=뮤텍스 없는 이름카운트+모달 블로킹(상호 자멸), 잉여 주체는 계측 부재로 미확정, 권고 R1~R5 | 2026-08-07 |
 | [verified-findings-backlog.md](analyses/verified-findings-backlog.md) | verified-findings-backlog.md | 2026-08-06 |
+| [detection-history-bughunt-scenario-analysis.md](analyses/detection-history-bughunt-scenario-analysis.md) | detection-history-bughunt-scenario | 2026-08-06 |
 | [gmap-label-offset-domain-mismatch-analysis.md](analyses/gmap-label-offset-domain-mismatch-analysis.md) | gmap-label-offset-domain-mismatch | 2026-08-06 |
 | [zoom-float-halfstep-scenario-analysis.md](analyses/zoom-float-halfstep-scenario-analysis.md) | zoom-float-halfstep-scenario | 2026-08-06 |
 | [event-panel-silent-load-failure-analysis.md](analyses/event-panel-silent-load-failure-analysis.md) | event-panel-silent-load-failure | 2026-08-04 |
@@ -73,6 +78,7 @@
 
 | 파일 | 내용 | 상태 | 날짜 |
 |------|------|------|------|
+| [event-mapping-workbench-prd.md](prds/event-mapping-workbench-prd.md) | 이벤트 매핑 워크벤치 — EventMapping 4리소스(본체/카메라/스피커/경광등) CRUD + **Drag&Drop 멀티셀렉션 + Draft 커밋**. 착수 전 결함 D1~D10 해소 · 실측 8항목 선행 · **결정 10건(G-1~G-10) + 메인솔루션 4파일 승인 대기** | **Draft** | 2026-08-07 |
 | [map-topbar-trafficlight-prd.md](prds/map-topbar-trafficlight-prd.md) | map-topbar-trafficlight | Approved | 2026-08-06 |
 | [zoom-float-halfstep-prd.md](prds/zoom-float-halfstep-prd.md) | zoom-float-halfstep | Approved | 2026-08-06 |
 | [pidsgroup-rightclick-prd.md](prds/pidsgroup-rightclick-prd.md) | pidsgroup-rightclick | Approved | 2026-08-06 |
@@ -250,7 +256,7 @@
 
 | 파일 | 연관 PRD | 진행률 | 날짜 |
 |------|---------|--------|------|
-| [map-topbar-trafficlight-prd-plan.md](plans/map-topbar-trafficlight-prd-plan.md) | [PRD](prds/map-topbar-trafficlight-prd.md) | 0/21 | 2026-08-06 |
+| [map-topbar-trafficlight-prd-plan.md](plans/map-topbar-trafficlight-prd-plan.md) | [PRD](prds/map-topbar-trafficlight-prd.md) | 6/21 | 2026-08-06 |
 | [zoom-float-halfstep-prd-plan.md](plans/zoom-float-halfstep-prd-plan.md) | [PRD](prds/zoom-float-halfstep-prd.md) | 28/32 | 2026-08-06 |
 | [pidsgroup-rightclick-prd-plan.md](plans/pidsgroup-rightclick-prd-plan.md) | [PRD](prds/pidsgroup-rightclick-prd.md) | 36/50 | 2026-08-06 |
 | [installer-prd-plan.md](plans/installer-prd-plan.md) | [PRD](prds/installer-prd.md) | 29/42 | 2026-08-04 |
@@ -370,6 +376,33 @@
 
 | 파일 | 통과율 | 커버리지 | 날짜 |
 |------|--------|---------|------|
+| [event-mapping-workbench-scenarios.md](tests/event-mapping-workbench-scenarios.md) | 시나리오 카탈로그 v1.1 — **633건**(P/E/D/C/B/N/M/R/G/O/T + v1.1 신설 X·L·Z) · 실기 검증 V-1~V-8 | - | 2026-08-07 |
+| [event-mapping-workbench-simulation-log.md](tests/event-mapping-workbench-simulation-log.md) | 시뮬 전량 로그 — **PASS 523 / ISSUE 110 / 이슈 33종**. 시뮬레이터 [event-mapping-workbench-simulator.py](tests/event-mapping-workbench-simulator.py) 부속 | 82.6% | 2026-08-07 |
+| [gmap-control-capability-interaction.md](tests/gmap-control-capability-interaction.md) | -% | -% | 2026-08-07 |
+| [gmap-control-capability-modes.md](tests/gmap-control-capability-modes.md) | -% | -% | 2026-08-07 |
+| [gmap-control-capability-drawing.md](tests/gmap-control-capability-drawing.md) | -% | -% | 2026-08-07 |
+| [gmap-control-capability-viewport.md](tests/gmap-control-capability-viewport.md) | -% | -% | 2026-08-07 |
+| [gmap-control-capability-markers.md](tests/gmap-control-capability-markers.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-overlays.md](tests/gmaps-xaml-capability-overlays.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-account-auth.md](tests/gis-test-catalog-account-auth.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-data-integrity.md](tests/gis-test-catalog-data-integrity.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-overlay-image.md](tests/gis-test-catalog-overlay-image.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-map-core.md](tests/gis-test-catalog-map-core.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-label-adorner.md](tests/gis-test-catalog-label-adorner.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-device-crud.md](tests/gis-test-catalog-device-crud.md) | -% | -% | 2026-08-07 |
+| [gis-test-master-checklist.md](tests/gis-test-master-checklist.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-mapview.md](tests/gmaps-xaml-capability-mapview.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-markers.md](tests/gmaps-xaml-capability-markers.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-overlays.md](tests/gmaps-xaml-capability-overlays.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-property.md](tests/gmaps-xaml-capability-property.md) | -% | -% | 2026-08-07 |
+| [gmaps-xaml-capability-instruments.md](tests/gmaps-xaml-capability-instruments.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-drawing-measure.md](tests/gis-test-catalog-drawing-measure.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-events-panel.md](tests/gis-test-catalog-events-panel.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-layer-panel.md](tests/gis-test-catalog-layer-panel.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-symbol-crud.md](tests/gis-test-catalog-symbol-crud.md) | -% | -% | 2026-08-07 |
+| [gis-test-catalog-symbol-property.md](tests/gis-test-catalog-symbol-property.md) | -% | -% | 2026-08-07 |
+| [detection-history-bughunt-scenarios.md](tests/detection-history-bughunt-scenarios.md) | -% | -% | 2026-08-06 |
+| [detection-history-bughunt-simulation-log.md](tests/detection-history-bughunt-simulation-log.md) | -% | -% | 2026-08-06 |
 | [zoom-float-halfstep-scenarios.md](tests/zoom-float-halfstep-scenarios.md) | -% | -% | 2026-08-06 |
 | [zoom-float-halfstep-simulation-log.md](tests/zoom-float-halfstep-simulation-log.md) | -% | -% | 2026-08-06 |
 | [gmap-scenario-spec.md](tests/gmap-scenario-spec.md) | -% | -% | 2026-08-04 |
@@ -527,6 +560,8 @@
 
 | ?뚯씪 | ?댁슜 | ?좎쭨 |
 |------|------|------|
+| [event-mapping-workbench-storyboard.html](design/event-mapping-workbench-storyboard.html) | 이벤트 매핑 워크벤치 스토리보드 v1.0 — 3-Pane 워크벤치(목록/액션보드/장비팔레트) · DnD 3종(멀티셀렉션 등록 · 슬롯드롭 프리셋/음원/색상 · 드래그백 해제) · 부분실패·고아·권한 · 흐름 S1~S8. Dark/Light 토큰 실측 | 2026-08-07 |
+| [event-mapping-workbench-wireframe.html](design/event-mapping-workbench-wireframe.html) | 이벤트 매핑 워크벤치 와이어프레임 v1.0 — **치수(1120×680, 카드 4규격 고정) · 컨트롤 트리/바인딩 · DnD 상태기계+드롭 유효성 매트릭스 · Draft 커밋 3단계 · 토큰 매핑 · 권한 · AutomationId · 결함 D1~D10 정본 · 미결 Q1~Q10** | 2026-08-07 |
 | [detection-fault-trafficlight-wireframe.html](design/detection-fault-trafficlight-wireframe.html) | 탐지·장애 신호등 와이어프레임 v1.2 — **★확정: 신호등=이벤트 카드 창 헤더(B′)+T1 · 시스템=지도 상단바 R1 도넛(분리) · 기존 pill 계기 제거(D2)+보기>탐지·장애(Ctrl+Shift+F) 토글을 신호등 표시로 재연결**. 대안 기록·상태 매트릭스·클릭=같은 창 필터·Dark/Light | 2026-08-06 |
 | [map-topbar-simplification-wireframe.html](design/map-topbar-simplification-wireframe.html) | 지도 상단 메뉴·툴바 간소화 v1.0 — **운영/편집 이원화**: 운영 기본=콤보1+아이콘7+편집스위치(현행 20컨트롤→9, -55%), 편집 ON 시 2번째 줄 편집 스트립(등록: 맵/이미지/커스텀맵 · 심볼 · 선택 · 기준) 확장. 전 항목 이동 매핑표(누락 0)·중복 2건 삭제(툴바 십자선, 파일>타일폴더)·메뉴 파일 폐지→지도/보기 2종·편집 스위치 권한자만 렌더·Q1~Q4 결정 대기 | 2026-08-06 |
 | [detection-fault-trafficlight-storyboard.html](design/detection-fault-trafficlight-storyboard.html) | 탐지·장애 신호등 스토리보드 v1.1(확정 B′ 기준) — 9장면(정상→탐지 펄스→장애 상시펄스→동시 점등→클릭=같은 창 필터·포커스→툴팁/우클릭 설정→분리 배치 구도(상단바 도넛+헤더 신호등)→미초기화 '—' 게이트→테마·3중 부호화) EQM/NATS 소스·불변식 표기 | 2026-08-06 |

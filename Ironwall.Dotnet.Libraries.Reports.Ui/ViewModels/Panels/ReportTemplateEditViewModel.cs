@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Reports;
 using Ironwall.Dotnet.Libraries.Reports.Api.Services;
@@ -9,7 +9,7 @@ using System.Collections.ObjectModel;
 namespace Ironwall.Dotnet.Libraries.Reports.Ui.ViewModels.Panels;
 
 /// <summary>
-/// 템플릿 추가/수정 다이얼로그(S6) — 이름/설명/공개/기본기간/컴포넌트 편집.
+/// 템플릿 추가/수정 다이얼로그(S6) — 이름/설명/기본기간/컴포넌트 편집.
 /// 신규 = POST /templates(CUSTOM), 수정 = PATCH /templates/{id}. 콘솔이 오버레이로 호스팅.
 /// </summary>
 public class ReportTemplateEditViewModel : BasePanelViewModel
@@ -47,7 +47,6 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
 
         Name = src.Name;
         Description = src.Description;
-        IsPublic = src.IsPublic;
         SelectedPeriod = Periods.FirstOrDefault(p => p.Value == src.DefaultPeriod) ?? Periods[0];
         await LoadCatalogAsync(new HashSet<string>(src.Components.Where(c => c.Enabled).Select(c => c.Id)));
     }
@@ -60,7 +59,6 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
         _templateId = 0;
         Name = null;
         Description = null;
-        IsPublic = false;
         SelectedPeriod = Periods[0];
         StatusText = string.Empty;
         await LoadCatalogAsync(new HashSet<string>());
@@ -108,7 +106,7 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                     Name = name,
                     Description = Description,
                     ReportType = "CUSTOM",
-                    IsPublic = IsPublic,
+                    // IsPublic 미지정 → false(서버 기본값과 동일). UI 제거 사유는 아래 PATCH 주석 참조.
                     DefaultPeriod = SelectedPeriod.Value,
                     Components = comps,
                 };
@@ -122,7 +120,10 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
                 {
                     Name = name,
                     Description = Description,
-                    IsPublic = IsPublic,
+                    // IsPublic 은 의도적으로 null 로 둔다(NullValueHandling.Ignore → 전송 자체를 생략).
+                    // UI 를 제거한 채 false 를 실어 보내면 서버에 저장된 값(시드 템플릿 다수가 true)을
+                    // 저장할 때마다 덮어쓴다. 서버가 소유자/공개 스코핑을 집행하기 전까지는 건드리지 않는다.
+                    // 근거: docs/analyses/report-template-is-public-analysis.md
                     DefaultPeriod = SelectedPeriod.Value,
                     Components = comps.Count > 0 ? comps : null,   // 미선택이면 컴포넌트 변경 안 함
                 };
@@ -153,9 +154,6 @@ public class ReportTemplateEditViewModel : BasePanelViewModel
 
     private string? _description;
     public string? Description { get => _description; set { _description = value; NotifyOfPropertyChange(); } }
-
-    private bool _isPublic;
-    public bool IsPublic { get => _isPublic; set { _isPublic = value; NotifyOfPropertyChange(); } }
 
     private PeriodOption _selectedPeriod;
     public PeriodOption SelectedPeriod { get => _selectedPeriod; set { _selectedPeriod = value; NotifyOfPropertyChange(); } }

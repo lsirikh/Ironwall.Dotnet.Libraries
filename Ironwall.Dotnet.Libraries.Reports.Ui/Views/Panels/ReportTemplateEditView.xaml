@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="Ironwall.Dotnet.Libraries.Reports.Ui.Views.Panels.ReportTemplateEditView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -30,8 +30,8 @@
                 <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding SelectedPeriod}" DisplayMemberPath="Display"
                           Style="{StaticResource ModernComboBox}" Width="180" HorizontalAlignment="Left" />
             </StackPanel>
-            <CheckBox Content="공개(is_public)" IsChecked="{Binding IsPublic}" VerticalAlignment="Bottom" Margin="24,0,0,6"
-                      Foreground="{DynamicResource TextPrimaryBrush}" />
+            <!-- 공개(is_public) 체크박스 제거(2026-08-07): 서버가 소유자/공개 스코핑을 집행하지 않아
+                 켜고 꺼도 동작이 바뀌지 않는다. 서버 구현 시 복구 — docs/analyses/report-template-is-public-analysis.md -->
         </StackPanel>
 
         <!-- 컴포넌트 -->
