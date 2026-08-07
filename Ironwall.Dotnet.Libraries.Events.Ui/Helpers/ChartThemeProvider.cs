@@ -31,16 +31,47 @@ public static class ChartThemeProvider
             : new SKColor(0x64, 0x74, 0x8B);  // slate-500 (light bg 가독)
 
     /// <summary>
-    /// 채도 높은 시리즈색 위에 얹는 고정 라벨/스트로크 색 — 양 테마 흰색(세그먼트 위라 테마 무관).
+    /// 채도 높은 시리즈색 위에 얹는 고정 스트로크 색 — 양 테마 흰색(세그먼트 구분선 용도 유지).
     /// </summary>
     public static SKColor OnSeriesFixed { get; } = new(255, 255, 255);
 
     /// <summary>
-    /// 한글 차트 텍스트 타입페이스. 현행 동작 보존(Malgun Gothic) — 디자인 폰트(Noto) 통일은 EXT-07.
-    /// FromFamilyName 호출을 이 한 곳으로 모아 V-07 grep 기준을 만족시킨다.
+    /// 시리즈 세그먼트 위 데이터라벨 잉크색(#0C1117) — 흰 라벨은 노랑/적/녹 세그먼트에서 대비 미달
+    /// (시뮬 SIM-B153~157: CR 1.50/2.89/2.12). 잉크는 전 시리즈 최저 CR 4.06(보라) — SIM-B158~162.
+    /// </summary>
+    public static SKColor OnSeriesInk { get; } = new(0x0C, 0x11, 0x17);
+
+    /// <summary>
+    /// 툴팁 배경색(theme-aware) — 미지정 시 라이브러리 기본 밝은 박스가 다크 텍스트색과 충돌해
+    /// CR=1.04(시뮬 SIM-R009, 사용자 실기 보고 재현). Dark=#243240(SurfaceHover 톤) / Light=#E9EEF4.
+    /// </summary>
+    public static SKColor TooltipBackgroundColor(BaseTheme theme)
+        => theme == BaseTheme.Dark ? new SKColor(0x24, 0x32, 0x40) : new SKColor(0xE9, 0xEE, 0xF4);
+
+    /// <summary>툴팁 배경 페인트 — 3개 차트 표면(막대/파이/라인) 공용, 테마 전환 시 재할당.</summary>
+    public static LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint TooltipBackgroundPaint(BaseTheme theme)
+        => new(TooltipBackgroundColor(theme));
+
+    /// <summary>툴팁 텍스트 페인트 — 고대비 본문색 + 한글 타입페이스.</summary>
+    public static LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint TooltipTextPaint(BaseTheme theme)
+        => new() { Color = TextColor(theme), SKTypeface = KoreanTypeface() };
+
+    private static SKTypeface? _koreanTypeface;
+
+    /// <summary>
+    /// 한글 차트 텍스트 타입페이스 — 디자인 폰트(Noto) 우선 폴백 체인(시뮬 SIM-F001~004):
+    /// Noto Sans KR → Noto Sans CJK KR → Malgun Gothic. 스키아는 WPF 임베디드 폰트(NotoSansCJKkR)를
+    /// 못 보므로 설치 폰트를 매칭하고, 부재 시 현행(Malgun)을 보존한다. FromFamilyName/매칭은 이 한 곳뿐(V-07).
     /// </summary>
     public static SKTypeface KoreanTypeface()
-        => SKTypeface.FromFamilyName("Malgun Gothic");
+    {
+        if (_koreanTypeface != null) return _koreanTypeface;
+        var fm = SKFontManager.Default;
+        _koreanTypeface = fm.MatchFamily("Noto Sans KR")
+                       ?? fm.MatchFamily("Noto Sans CJK KR")
+                       ?? SKTypeface.FromFamilyName("Malgun Gothic");
+        return _koreanTypeface;
+    }
 
     /// <summary>theme-aware 텍스트 SolidColorPaint(한글 타입페이스 포함) 생성 헬퍼.</summary>
     public static LiveChartsCore.SkiaSharpView.Painting.SolidColorPaint TextPaint(BaseTheme theme, float strokeWidth = 2)

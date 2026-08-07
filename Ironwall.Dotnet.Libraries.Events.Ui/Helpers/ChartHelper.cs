@@ -70,7 +70,8 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                 Stroke = new SolidColorPaint(stroke),
                 DataLabelsPosition = PolarLabelsPosition.Middle,
                 DataLabelsSize = 13,
-                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesFixed, 2),
+                // 세그먼트 위 라벨은 잉크색 — 흰색은 노랑/녹 세그먼트에서 대비 미달(SIM-B153~157)
+                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesInk, 2),
             };
             pie.PointMeasured += Pie_PointMeasured;
             return pie;
@@ -112,7 +113,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
                 Fill = new SolidColorPaint(color),
                 Stroke= new SolidColorPaint(stroke),
                 DataLabelsSize = 12,
-                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesFixed, 2),
+                DataLabelsPaint = new SolidColorPaint(ChartThemeProvider.OnSeriesInk, 2),
                 DataLabelsRotation = 90,
                 DataLabelsPosition = DataLabelsPosition.Middle,
             };
@@ -140,13 +141,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
 
         // ────────────────────────── Statistics API Chart Builders ──────────────────────────
 
+        // 시리즈명 한글화(SIM-S001~005) — 범례·툴팁 노출 문자열. 서버 필터 코드(DET/MAL/...)와 분리(표시 전용).
         private static readonly (string Name, SKColor Color, Func<EventTrendItemDto, int> Selector)[] TrendCategories =
         {
-            ("Sensor Detection", new SKColor(255, 205, 0),   item => item.SensorDetection),
-            ("Camera Detection", new SKColor(255, 100, 100), item => item.CameraDetection),
-            ("Malfunction",      new SKColor(30, 144, 255),  item => item.Malfunction),
-            ("Connection",       new SKColor(155, 89, 182),  item => item.Connection),
-            ("Action",           new SKColor(50, 205, 50),   item => item.Action)
+            ("센서 탐지",   new SKColor(255, 205, 0),   item => item.SensorDetection),
+            ("카메라 탐지", new SKColor(255, 100, 100), item => item.CameraDetection),
+            ("장애",        new SKColor(30, 144, 255),  item => item.Malfunction),
+            ("연결",        new SKColor(155, 89, 182),  item => item.Connection),
+            ("조치",        new SKColor(50, 205, 50),   item => item.Action)
         };
 
         /// <summary>
@@ -213,34 +215,34 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
             var controllerLabels = controllers.Select(c => c.ControllerName).ToArray();
 
             if (controllerLabels.Length == 0)
-                controllerLabels = new[] { "No Data" };
+                controllerLabels = new[] { "데이터 없음" };
 
             if (eventTypes.Contains("DET"))
             {
                 var values = controllers.Select(c => (double)c.SensorDetection).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Detection", values, new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
+                series.Add(MakeBar("탐지", values, new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("MAL"))
             {
                 var values = controllers.Select(c => (double)c.Malfunction).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Malfunction", values, new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
+                series.Add(MakeBar("장애", values, new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("CON"))
             {
                 var values = controllers.Select(c => (double)c.Connection).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Connection", values, new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
+                series.Add(MakeBar("연결", values, new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("ACT"))
             {
                 var values = controllers.Select(c => (double)c.Action).ToList();
                 if (values.Count == 0) values.Add(0);
-                series.Add(MakeBar("Action", values, new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
+                series.Add(MakeBar("조치", values, new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
             }
 
             return (series, controllerLabels);
@@ -256,26 +258,26 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.Helpers{
 
             if (eventTypes.Contains("DET"))
             {
-                series.Add(MakePie("Detection",
+                series.Add(MakePie("탐지",
                     summary.SensorDetection + summary.CameraDetection,
                     new SKColor(255, 205, 0), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("MAL"))
             {
-                series.Add(MakePie("Malfunction", summary.Malfunction,
+                series.Add(MakePie("장애", summary.Malfunction,
                     new SKColor(30, 144, 255), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("CON"))
             {
-                series.Add(MakePie("Connection", summary.Connection,
+                series.Add(MakePie("연결", summary.Connection,
                     new SKColor(155, 89, 182), ChartThemeProvider.OnSeriesFixed));
             }
 
             if (eventTypes.Contains("ACT"))
             {
-                series.Add(MakePie("Action", summary.Action,
+                series.Add(MakePie("조치", summary.Action,
                     new SKColor(50, 205, 50), ChartThemeProvider.OnSeriesFixed));
             }
 

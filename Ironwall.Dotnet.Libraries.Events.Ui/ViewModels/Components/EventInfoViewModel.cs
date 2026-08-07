@@ -65,6 +65,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             // 초기 테마색 반영(다크에서 열려도 레전드/툴팁 보이게)
             LegendTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
             TooltipTextPaint.Color = ChartThemeProvider.TextColor(CurrentTheme);
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(CurrentTheme);   // SIM-R009 해소(미지정=기본 밝은 박스)
 
             _names = new[] { "DET", "MAL", "CON", "ACT" };
             RefreshActiveness();
@@ -83,7 +84,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         /// <summary>테마 전환 시 열린 차트 재색칠(WPF 리소스 미도달 경로, FR-13). 마지막 빌드를 재실행.</summary>
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try { var c = ChartThemeProvider.TextColor(theme); LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() }; TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() }; _rebuildChart?.Invoke(); }
+            try
+            {
+                var c = ChartThemeProvider.TextColor(theme);
+                LegendTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
+                TooltipTextPaint = new SolidColorPaint { Color = c, SKTypeface = ChartThemeProvider.KoreanTypeface() };
+                TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);   // 전환 재공급(SIM-X003)
+                _rebuildChart?.Invoke();
+            }
             catch (Exception ex) { _log?.Warning($"[EventInfoViewModel] OnThemeChanged rebuild 실패: {ex.Message}"); }
         }
         #endregion
@@ -284,32 +292,35 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     var devices = _deviceProvider.OfType<IControllerDeviceModel>()
                                                 .OrderBy(d => d.DeviceNumber);          // 보기 좋게 정렬
 
-                    // ★ 빈 데이터 폴백: devices가 비어있으면 "No Data" 라벨로 대체
+                    // ★ 빈 데이터 폴백: devices가 비어있으면 "데이터 없음" 라벨로 대체(SIM-D002)
                     var deviceLabels = devices.Any()
                         ? devices.Select(d => d.DeviceNumber.ToString()).ToArray()
-                        : new[] { "No Data" };
+                        : new[] { "데이터 없음" };
+
+                    // 한글 축명 — 스키아는 글리프 폴백이 없어 typeface 미지정 시 tofu(SIM-R AxisName)
+                    var legacyTypeface = ChartThemeProvider.KoreanTypeface();
 
                     var xLabel = new Axis
                     {
                         Labels = deviceLabels,
-                        Name = "controller",
+                        Name = "제어기",
                         Position = AxisPosition.Start,
                         NameTextSize = 15,
-                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = legacyTypeface },
                         UnitWidth = 1,
                         // (선택) 줄눈 제거
                         NamePadding = new Padding(0, -10, 0, 5),   // L,T,R,B
-                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = legacyTypeface },
                         ShowSeparatorLines = false
                     };
 
                     var yLabels = new Axis
                     {
-                        Name = "events",
+                        Name = "이벤트",
                         Position = AxisPosition.Start,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         NameTextSize = 15,
-                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0) { SKTypeface = legacyTypeface },
                         NamePadding = new Padding(0, 5, 0, -10),   // L,T,R,B
                         MinLimit = 0
                     };
@@ -394,7 +405,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
                     var xAxis = new Axis
                     {
                         Labels = xLabels,
-                        Name = "controller",
+                        Name = "제어기",
                         Position = AxisPosition.Start,
                         NameTextSize = 15,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2)
@@ -412,11 +423,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
 
                     var yAxis = new Axis
                     {
-                        Name = "events",
+                        Name = "이벤트",
                         Position = AxisPosition.Start,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
                         NameTextSize = 15,
-                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0),
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 0)
+                        {
+                            SKTypeface = koreanTypeface
+                        },
                         NamePadding = new Padding(0, 5, 0, -10),
                         MinLimit = 0
                     };
@@ -502,6 +516,14 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
             set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
         }
 
+        // 툴팁 배경 — 미지정 시 라이브러리 기본 밝은 박스가 다크 텍스트와 충돌(CR=1.04, SIM-R009).
+        private SolidColorPaint _tooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(BaseTheme.Light);
+        public SolidColorPaint TooltipBackgroundPaint
+        {
+            get => _tooltipBackgroundPaint;
+            set { _tooltipBackgroundPaint = value; NotifyOfPropertyChange(nameof(TooltipBackgroundPaint)); }
+        }
+
         // 재할당이 차트에 반영되도록 알림 속성으로(토글 시 시리즈 교체→차트 갱신→레전드 재생성).
         private ObservableCollection<ISeries> _lSeries = new();
         public ObservableCollection<ISeries> LSeries
@@ -519,28 +541,29 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Components{
         public ObservableCollection<Axis> XAxes { get; } = [];
         public ObservableCollection<Axis> YAxes { get; } = [];
 
+        // DisplayName 한글화(SIM-S033~036) — 범례·툴팁 노출 문자열(코드 키 DET/MAL/CON/ACT와 분리)
         private readonly Dictionary<string, CategoryMeta> _meta = new()
         {
             ["DET"] = new(
-                "Detection",
+                "탐지",
                 new SKColor(255, 205, 0),
                 new SKColor(255, 205, 0),
                 (from, to, devices, evts) =>
                 DataHelper.GetDetectionCountsByDevice(from, to, devices, evts.OfType<IDetectionEventModel>())),
             ["MAL"] = new(
-                "Malfunction",
+                "장애",
                 new SKColor(30, 144, 255),
                 new SKColor(30, 144, 255),
                 (from, to, devices, evts) =>
                 DataHelper.GetMalfunctionCountsByDevice(from, to, devices, evts.OfType<IMalfunctionEventModel>())),
             ["CON"] = new(
-                "Connection",
+                "연결",
                 new SKColor(155, 89, 182),
                 new SKColor(155, 89, 182),
                 (from, to, devices, evts) =>
                 DataHelper.GetConnectionCountsByDevice(from, to, devices, evts.OfType<IConnectionEventModel>())),
             ["ACT"] = new(
-                "Action",
+                "조치",
                 new SKColor(50, 205, 50),
                 new SKColor(50, 205, 50),
                 (from, to, devices, evts) =>

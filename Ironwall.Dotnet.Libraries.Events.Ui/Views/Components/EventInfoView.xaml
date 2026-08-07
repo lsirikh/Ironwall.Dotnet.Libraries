@@ -84,6 +84,7 @@
 							IsChecked="{Binding IsActionEnable}"
 							Visibility="{Binding IsActionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
 					</StackPanel>
+					<!--  툴팁 BG/텍스트 theme-aware — 미지정 시 라이브러리 기본 밝은 박스(다크 가독 붕괴, SIM-R009)  -->
 					<lvc:CartesianChart
 						Grid.Column="1"
 						LegendBackgroundPaint="{Binding LedgendBackgroundPaint}"
@@ -91,8 +92,9 @@
 						LegendTextPaint="{Binding LegendTextPaint}"
 						LegendTextSize="12"
 						Series="{Binding LSeries}"
+						TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
 						TooltipTextPaint="{Binding TooltipTextPaint}"
-						TooltipTextSize="10"
+						TooltipTextSize="12"
 						XAxes="{Binding XAxes}"
 						YAxes="{Binding YAxes}"
 						ZoomMode="X" />
@@ -119,12 +121,16 @@
 					Style="{DynamicResource MaterialDesignCircularProgressBar}"
 					Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
 					Value="44" />
+				<!--  파이도 툴팁 페인트 명시 — 현행은 전무라 테마 전환 미반영(SIM-X006)  -->
 				<lvc:PieChart
 					LegendBackgroundPaint="{Binding LedgendBackgroundPaint}"
 					LegendPosition="Right"
 					LegendTextPaint="{Binding LegendTextPaint}"
 					LegendTextSize="12"
 					Series="{Binding DSeries}"
+					TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
+					TooltipTextPaint="{Binding TooltipTextPaint}"
+					TooltipTextSize="12"
 					Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}" />
 			</Grid>
 		</md:Card>

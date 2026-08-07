@@ -44,6 +44,9 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
             if (_themeService != null)
                 _themeService.ThemeChanged += OnThemeChanged;
             LegendTextPaint.Color = ChartThemeProvider.LegendTextColor(CurrentTheme);
+            // 툴팁 페인트 — 미지정 시 라이브러리 기본 밝은 박스(다크 가독 붕괴, SIM-R106 계열)
+            TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(CurrentTheme);
+            TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(CurrentTheme);
         }
 
         private static IThemeService? TryResolveThemeService()
@@ -54,7 +57,13 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         private BaseTheme CurrentTheme => _themeService?.Current ?? BaseTheme.Light;
         private void OnThemeChanged(object? sender, BaseTheme theme)
         {
-            try { LegendTextPaint = new SolidColorPaint { Color = ChartThemeProvider.LegendTextColor(theme), SKTypeface = ChartThemeProvider.KoreanTypeface() }; _ = DataInitialize(); }
+            try
+            {
+                LegendTextPaint = new SolidColorPaint { Color = ChartThemeProvider.LegendTextColor(theme), SKTypeface = ChartThemeProvider.KoreanTypeface() };
+                TooltipTextPaint = ChartThemeProvider.TooltipTextPaint(theme);
+                TooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(theme);   // 전환 재공급(SIM-X011 계열)
+                _ = DataInitialize();
+            }
             catch (Exception ex) { _log?.Warning($"[DataChartPanelViewModel] OnThemeChanged 실패: {ex.Message}"); }
         }
         #endregion
@@ -156,10 +165,11 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
 
                     var yAxis = new Axis
                     {
-                        Name = "Events",
+                        Name = "이벤트",
                         NameTextSize = 14,
                         LabelsPaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
-                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2),
+                        // 한글 축명 — typeface 미지정 시 tofu(스키아 글리프 폴백 없음)
+                        NamePaint = new SolidColorPaint(ChartThemeProvider.TextColor(CurrentTheme), 2) { SKTypeface = ChartThemeProvider.KoreanTypeface() },
                         MinLimit = 0
                     };
 
@@ -259,6 +269,20 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Panels{
         public SolidColorPaint LedgendBackgroundPaint { get; set; } =
             new SolidColorPaint(new SKColor(240, 240, 240, 00));
 
+        // 툴팁 페인트(theme-aware) — 라인 차트 호버 가독(SIM-R106 계열)
+        private SolidColorPaint _tooltipTextPaint = ChartThemeProvider.TooltipTextPaint(BaseTheme.Light);
+        public SolidColorPaint TooltipTextPaint
+        {
+            get => _tooltipTextPaint;
+            set { _tooltipTextPaint = value; NotifyOfPropertyChange(nameof(TooltipTextPaint)); }
+        }
+
+        private SolidColorPaint _tooltipBackgroundPaint = ChartThemeProvider.TooltipBackgroundPaint(BaseTheme.Light);
+        public SolidColorPaint TooltipBackgroundPaint
+        {
+            get => _tooltipBackgroundPaint;
+            set { _tooltipBackgroundPaint = value; NotifyOfPropertyChange(nameof(TooltipBackgroundPaint)); }
+        }
 
         public EventDashboardDto? LastDashboardDto { get; private set; }
 

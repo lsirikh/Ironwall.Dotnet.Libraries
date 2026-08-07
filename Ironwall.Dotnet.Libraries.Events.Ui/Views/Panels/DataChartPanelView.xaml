@@ -107,11 +107,14 @@
 				Style="{DynamicResource MaterialDesignCircularProgressBar}"
 				Visibility="{Binding IsChartLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
 				Value="44" />
+			<!--  툴팁 BG/텍스트 theme-aware — 현행은 전무라 라이브러리 기본 박스(다크 이질, SIM-R106 계열)  -->
 			<lvc:CartesianChart
 				LegendPosition="Right"
 				LegendTextPaint="{Binding LegendTextPaint}"
 				LegendTextSize="12"
 				Series="{Binding Series}"
+				TooltipBackgroundPaint="{Binding TooltipBackgroundPaint}"
+				TooltipTextPaint="{Binding TooltipTextPaint}"
 				TooltipTextSize="12"
 				Visibility="{Binding IsChartLoading, Converter={StaticResource BoolToInverseVisibleConverter}}"
 				XAxes="{Binding XAxes}"
