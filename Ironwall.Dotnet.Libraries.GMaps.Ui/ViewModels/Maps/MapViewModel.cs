@@ -4338,7 +4338,17 @@ public partial class MapViewModel : BasePanelViewModel,
                     break;
 
                 case EnumMarkerCategory.VEHICLES:
+                    // ⚠ 배치 경로 미구현(AddVehicleMarker 미복구). 평소에는 콤보에서 숨겨지므로
+                    //   (AvailableMarkerCategories → UnsupportedMarkerCategories) 여기 도달하지 않지만,
+                    //   다른 경로로 들어와도 <b>무음으로 끝내지 않는다</b> — 사용자는 실패 사실조차
+                    //   알 수 없어 같은 조작을 반복하게 된다(VF-15).
                     //await AddVehicleMarker(position, SelectedSymbolType.ToString(), symbolTitle);
+                    _log?.Warning($"[MapViewModel] VEHICLES 배치는 미구현 — 요청 무시 (title='{symbolTitle}')");
+                    await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+                    {
+                        Title = "심볼 추가",
+                        Explain = "'차량' 카테고리는 아직 지원하지 않습니다.",
+                    });
                     break;
 
                 case EnumMarkerCategory.MILITARY_SYMBOLS:
@@ -8447,10 +8457,30 @@ public partial class MapViewModel : BasePanelViewModel,
     #region - 심볼 추가 관련 속성 -
 
     /// <summary>
-    /// 사용 가능한 마커 카테고리 목록
+    /// 사용 가능한 마커 카테고리 목록.
+    ///
+    /// <para>⚠ <b>미구현 카테고리는 노출하지 않는다</b>(VF-15). <c>ExecuteAddSelectedSymbol</c> 의
+    /// <see cref="EnumMarkerCategory.VEHICLES"/> case 는 본문이 비어 있어(:4340-4342 — 주석 한 줄 + break)
+    /// 사용자가 '차량'을 고르고 '추가'를 눌러도 <b>배치 모드도 안 켜지고 심볼도 안 생기며
+    /// 오류 안내조차 없다</b>(무음 실패). 실측으로 재현됨: 콤보 노출 ✔ · 타입 콤보 1종 ✔ ·
+    /// '추가' 버튼 활성 ✔ · 클릭 후 배너/안내 0 · DB 심볼 수 불변.</para>
+    ///
+    /// <para><b>구현을 되살릴 때</b>: <c>AddVehicleMarker</c> 를 복구한 뒤 아래 <c>Unsupported</c>
+    /// 집합에서 VEHICLES 를 빼면 즉시 노출된다 — 이 프로퍼티는 손댈 필요가 없다.</para>
     /// </summary>
     public EnumMarkerCategory[] AvailableMarkerCategories =>
-        System.Enum.GetValues<EnumMarkerCategory>();
+        System.Enum.GetValues<EnumMarkerCategory>()
+            .Where(c => !UnsupportedMarkerCategories.Contains(c))
+            .ToArray();
+
+    /// <summary>
+    /// 배치 경로가 미구현이라 콤보에서 숨기는 카테고리.
+    /// 여기 있는 값은 <c>ExecuteAddSelectedSymbol</c> 에 실동작 case 가 없다는 뜻이다.
+    /// </summary>
+    private static readonly HashSet<EnumMarkerCategory> UnsupportedMarkerCategories = new()
+    {
+        EnumMarkerCategory.VEHICLES,   // ExecuteAddSelectedSymbol :4340-4342 빈 case
+    };
 
     /// <summary>
     /// 선택된 마커 카테고리

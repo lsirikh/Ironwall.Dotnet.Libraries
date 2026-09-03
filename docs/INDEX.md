@@ -555,6 +555,7 @@
 | ?뚯씪 | ???| ?댁슜 | ?좎쭨 |
 |------|------|------|------|
 | [REQ_Proxy_WINDY_RSP_ReplyTo.md](coordination/REQ_Proxy_WINDY_RSP_ReplyTo.md) | PidsProxy ?대떦 | WINDY(?띾웾紐⑤뱶) RSP 誘몄닔????reply-to ?뚯떊 寃쎈줈 ?먭? ?붿껌 | 2026-07-23 |
+| [gop-rfp-checklist-gis-scope.md](coordination/gop-rfp-checklist-gis-scope.md) | API서버 세션 대상 | GOP RFP 점검표 GIS 클라이언트 관점 판정 18건 — 통합상황도 3.3.4.12.x 9행(점검표 반영) + 인접 9행(API서버 판정과 계층 구분) · 신규 결함 5종(MGRS 라벨 데드코드 · PTZ 사문 서비스 · PTZ_STATUS 실무 무수신 · GeoTIFF CRS 재투영 부재 · 오버레이 무음실패) · **last-write-wins 저장 사고/복구 기록 + 동시편집 금지 권고** | 2026-08-07 |
 
 ## ?ㅺ퀎 (docs/design/)
 

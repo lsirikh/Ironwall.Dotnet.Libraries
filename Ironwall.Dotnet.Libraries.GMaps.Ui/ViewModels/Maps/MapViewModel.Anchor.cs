@@ -216,7 +216,15 @@ public partial class MapViewModel
     /// <summary>영역 그리기 모드 종료(취소/완료 공통).</summary>
     private void ExitAnchorDrawMode()
     {
-        if (MainMap != null) MainMap.IsAnchorDrawMode = false;
+        if (MainMap != null)
+        {
+            MainMap.IsAnchorDrawMode = false;
+            // ⚠ 플래그만 끄면 취소가 취소가 되지 않는다(VF-17). 릴리스 핸들러는
+            //   IsAnchorDrawMode 가 아니라 내부 _rubberForAnchor 로 분기하므로,
+            //   ESC 를 눌러도 버튼을 떼는 순간 AnchorAreaDrawn 이 발화해 앵커 폼이 채워졌다.
+            //   진행 중 러버밴드와 마우스 캡처까지 함께 내려야 실제로 취소된다(멱등 — 완료 경로에서도 안전).
+            MainMap.CancelRubberBand();
+        }
         if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
             System.Windows.Input.Mouse.OverrideCursor = null;
         IsAimStatusVisible = false;

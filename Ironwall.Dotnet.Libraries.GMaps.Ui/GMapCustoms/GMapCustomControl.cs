@@ -3078,6 +3078,29 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 편집 모드 활성화/비활성화
     /// </summary>
+    /// <summary>
+    /// 진행 중인 러버밴드(다중선택 마퀴 / 앵커 영역 드래그)를 <b>완전히</b> 취소한다.
+    ///
+    /// <para>⚠ 반드시 <c>_rubberForAnchor</c> 까지 함께 내려야 한다(VF-17).
+    /// 릴리스 핸들러는 <c>IsAnchorDrawMode</c> 가 아니라 <b><c>_rubberForAnchor</c> 로 분기</b>하므로
+    /// (:1227), 모드 플래그만 끄고 이 필드를 남기면 <b>ESC 로 취소해도 버튼을 떼는 순간
+    /// <c>AnchorAreaDrawn</c> 이 발화해 앵커 폼이 채워진다</b> — 취소가 취소가 아니게 된다.</para>
+    ///
+    /// <para>또한 이 필드가 남으면 이후 Shift+드래그 다중선택이 앵커 분기로 새어
+    /// <c>MarkersRubberBandSelected</c> 대신 <c>AnchorAreaDrawn</c> 을 발화시킨다(상태 누수).</para>
+    ///
+    /// <para>모드 종료 경로(<c>ExitAnchorDrawMode</c> 등)에서 호출한다. 멱등하다.</para>
+    /// </summary>
+    public void CancelRubberBand()
+    {
+        _isRubberBanding = false;
+        _rubberForAnchor = false;            // ← 이것이 빠져 있던 것이 VF-17 의 원인
+        _rubberStart = null;
+        _rubberCurrent = null;
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        HideRubberBand();
+    }
+
     public void SetEditMode(bool enabled)
     {
         if (IsEditMode == enabled) return;
@@ -3103,8 +3126,7 @@ public class GMapCustomControl : GMapControl
             }
 
             // 진행 중 러버밴드 취소 + 마퀴 어도너 제거(편집 종료 시 잔존 방지)
-            if (_isRubberBanding) { _isRubberBanding = false; _rubberStart = null; _rubberCurrent = null; if (IsMouseCaptured) ReleaseMouseCapture(); }
-            HideRubberBand();
+            CancelRubberBand();
 
             // 편집 모드 해제 시 모든 선택 해제
             foreach (var img in CustomImages) img.IsSelected = false;
