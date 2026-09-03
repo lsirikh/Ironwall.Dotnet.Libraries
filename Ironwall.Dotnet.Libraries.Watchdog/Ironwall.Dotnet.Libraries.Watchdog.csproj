@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- WinExe: 콘솔 창 없는 백그라운드 프로세스. 로그온 예약작업(Ironwall\WatchdogLauncher)이 exe를 직접 띄울 때
+         콘솔 창이 상주하던 문제(2026-09-03 현장 보고) 해소. 콘솔 출력 사용처 0건(파일 로그만) — 기능 손실 없음. -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

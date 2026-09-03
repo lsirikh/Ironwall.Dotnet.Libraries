@@ -4536,7 +4536,14 @@ public partial class MapViewModel : BasePanelViewModel,
                     SelectedMap = _mapProvider.FirstOrDefault();
             }
 
-            if (SelectedMap == null) return;
+            if (SelectedMap == null)
+            {
+                // 조용한 return 금지 — 폴더 정상+DB 실패 조합에서 "지도만 안 뜨는" 무증상 실패가 됐다
+                await NotifyMapUnavailableAsync(_mapProvider.Any()
+                    ? "선택 가능한 지도가 없습니다."
+                    : "지도 목록이 비어 있습니다 — 기본맵 폴더 스캔 또는 데이터 저장소(DB) 조회가 실패했을 수 있습니다.");
+                return;
+            }
 
             if (SelectedMap is DefinedMapModel definedMap)
             {
@@ -4663,6 +4670,19 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             Title = "기본맵 없음",
             Explain = $"기본맵(.mbtiles) 폴더에 지도 파일이 없습니다.\n{path}\n\n설정 > 지도에서 기본맵 폴더를 지정하세요. (변경 후 재시작 적용)"
+        });
+    }
+
+    /// <summary>지도 목록 확보 실패 안내 — 폴더는 정상인데 DB 조회/시드가 실패하면 지도가 조용히 빈 화면이 된다
+    /// (2026-09-03 현장 보고 "폴더 설정해도 지도 안 뜸"). 원인 후보를 확인 순서로 제시한다.</summary>
+    private async Task NotifyMapUnavailableAsync(string reason)
+    {
+        _log?.Warning($"[MapData] 지도 초기화 불가: {reason}");
+        if (_eventAggregator == null) return;
+        await _eventAggregator.PublishOnUIThreadAsync(new OpenInfoPopupMessageModel
+        {
+            Title = "지도를 불러올 수 없음",
+            Explain = $"{reason}\n\n확인 순서:\n① 설정 > 지도 > 기본맵 폴더에 .mbtiles 파일이 있는지\n② 설정 > 데이터 저장소(DB) 연결 상태\n③ 설정 변경 후 프로그램 재시작"
         });
     }
 
@@ -4821,7 +4841,9 @@ public partial class MapViewModel : BasePanelViewModel,
         }
         catch (Exception ex)
         {
+            // DB 조회(FetchDefinedMapsAsync는 실패 시 throw) 등으로 시드 전체가 중단되는 경로 — 사용자에게 표면화
             _log?.Error($"MBTiles 맵 Seed 실패: {ex.Message}");
+            await NotifyMapUnavailableAsync($"기본맵 등록 실패: {ex.Message}");
         }
     }
 
