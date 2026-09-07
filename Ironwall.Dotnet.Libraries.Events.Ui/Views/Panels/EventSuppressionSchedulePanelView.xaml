@@ -157,7 +157,7 @@
 
 	<!--  중앙 정렬 바운드 박스 (최상위 패널 표준, ReportConsole 패턴 — 전체화면 stretch 방지 + 불투명 배경)  -->
 	<Border
-		Width="1180"
+		Width="1050"
 		Height="720"
 		HorizontalAlignment="Center"
 		VerticalAlignment="Center"
