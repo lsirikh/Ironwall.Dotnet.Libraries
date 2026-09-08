@@ -178,8 +178,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             //   아니므로 맵의 가시 사각형(GetVisibleInnerRect)으로 클램프한다. 비틸트·비줌이면 (0,0,W,H) 로 종전과 동일.
             var visible = (_mapControl as GMapCustoms.GMapCustomControl)?.GetVisibleInnerRect()
                           ?? new Rect(0, 0, _controlCanvas.ActualWidth, _controlCanvas.ActualHeight);
-            newLeft = Math.Max(visible.Left, Math.Min(newLeft, visible.Right - _hud.ActualWidth));
-            newTop = Math.Max(visible.Top, Math.Min(newTop, visible.Bottom - _hud.ActualHeight));
+            //   HUD 는 역스케일(ApplyHudScreenScale)이 걸려 inner 공간 점유가 ActualWidth×(1/s) 다.
+            var (hudSx, hudSy) = HudInverseScale();
+            newLeft = Math.Max(visible.Left, Math.Min(newLeft, visible.Right - _hud.ActualWidth * hudSx));
+            newTop = Math.Max(visible.Top, Math.Min(newTop, visible.Bottom - _hud.ActualHeight * hudSy));
 
             Canvas.SetLeft(_hud, newLeft);
             Canvas.SetTop(_hud, newTop);
@@ -309,6 +311,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                     Canvas.SetTop(_hud, firstScreenPoint.Y + InitialOffsetY);
                 }
 
+                ApplyHudScreenScale();
                 _hud.Visibility = Visibility.Visible;
                 UpdateStatusText();
                 _hud.CanComplete = _geoPoints.Count >= 2;
@@ -317,6 +320,37 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             {
                 _hud.Visibility = Visibility.Collapsed;
             }
+        }
+
+        /// <summary>
+        /// HUD 화면 크기 고정 — 이 어도너는 맵의 AdornerLayer 에 있어 컨트롤 RenderTransform
+        /// (디지털 줌 s · 틸트 ScaleY=s·cosφ)을 그대로 상속한다. 그대로 두면 dzl 2.0 에서 폭이 2배가 되고
+        /// 틸트에서는 세로만 눌려 "가로로 늘어난" 패널이 된다(레이어 패널은 형제 캔버스라 무영향).
+        /// 역스케일을 걸어 화면에서 항상 스타일 지정 크기(240 DIU)로 보이게 한다.
+        /// 변환은 항상 새 객체로 재대입한다(어도너는 in-place 변경을 추종하지 않는다 — map-tilt 불변식 5).
+        /// </summary>
+        private void ApplyHudScreenScale()
+        {
+            var (sx, sy) = HudInverseScale();
+            if (Math.Abs(sx - 1.0) < 0.001 && Math.Abs(sy - 1.0) < 0.001)
+            {
+                if (_hud.RenderTransform != null && !_hud.RenderTransform.Value.IsIdentity)
+                    _hud.RenderTransform = Transform.Identity;
+                return;
+            }
+            _hud.RenderTransformOrigin = new Point(0, 0);   // Canvas.Left/Top 기준 좌상단 고정
+            _hud.RenderTransform = new ScaleTransform(sx, sy);
+        }
+
+        /// <summary>맵 뷰 변환의 역배율 (1/s, 1/(s·cosφ)). 맵이 없거나 항등이면 (1,1).</summary>
+        private (double X, double Y) HudInverseScale()
+        {
+            var map = _mapControl as GMapCustoms.GMapCustomControl;
+            if (map == null) return (1.0, 1.0);
+            double s = map.DigitalZoomScale;
+            double c = Helpers.TiltOverscanMath.CosOf(map.TiltDeg);
+            if (!(s > 0.001) || !(c > 0.001)) return (1.0, 1.0);
+            return (1.0 / s, 1.0 / (s * c));
         }
 
         private void UpdateStatusText()
@@ -540,7 +574,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                 if (!double.IsNaN(left) && !double.IsNaN(top))
                 {
                     var point = hitTestParameters.HitPoint;
-                    var bounds = new Rect(left, top, _hud.ActualWidth, _hud.ActualHeight);
+                    //   히트 사각형도 inner 공간 기준 — 역스케일(ApplyHudScreenScale)이 걸린 HUD 의 실제 점유는
+                    //   ActualWidth×(1/s) 다. 미보정하면 디지털 줌/틸트에서 HUD 옆 빈 지도까지 히트로 먹어 점 추가가 막힌다.
+                    var (hitSx, hitSy) = HudInverseScale();
+                    var bounds = new Rect(left, top, _hud.ActualWidth * hitSx, _hud.ActualHeight * hitSy);
                     if (bounds.Contains(point))
                     {
                         return new PointHitTestResult(this, point);
