@@ -1,5 +1,409 @@
 # 세션 컨텍스트
 
+## ▶▶ 재개 포인트 (2026-09-07 — GOPDB 09-07 배포 2건 후속 · **"순서대로 작업을 승인한다" ①②③ 완료**)
+
+- **사용자 승인 흐름**: 조치보고 PRD 승인 → 운영서버 버전 확인(V-08) → 억제 반복 PRD 신설. 3건 모두 처리 완료.
+- **① ✅ 조치보고 커스텀 PRD 승인** — `docs/prds/action-report-custom-template-prd.md` **v1.1 Approved**.
+  ⚠ `approve prd` 는 **경로 인자를 받지 않고 mtime 최신 PRD** 를 집는다(타 세션이 `symbol-3d-housing-prd.md` 편집 중이었음)
+  → 실행 전 `scanDocsDir('prds')[0].name` 대조 가드를 걸고 승인. 같은 함정은 앞으로도 유효.
+- **② ✅ V-08 확정 — 개발 대상 = `localhost:8000`(6.3.3), 원격 `123.141.236.253:8136` = **6.3.2 미갱신**.
+  `openapi.json` 이 **무인증 200** 이라 로그인 없이 확인(앱 세션 evict 회피). 사용자 확인: "지금은 localhost로 하는거야. 원격 서버는 업데이트가 안되어있다."
+  | | localhost | 원격 |
+  |---|---|---|
+  | 템플릿 경로 | 3개(`/reorder` 포함) | **0개** |
+  | 억제 응답 필드 | 24 | **17**(신규 9종 전무), `window_end` non-nullable |
+  | `EnumPermissionModule` | `action_report_templates` **포함** | **미포함** |
+  ⇒ **FR-21 은 블로커가 아니라 진행 대상**. 오히려 미루면 권한 화면 그룹 저장 1회로 서버 키가 **소멸**한다(클라가 Catalog 전체 교체).
+  원격 전환 전에만 **V-08b**(원격 6.3.3 배포) 확인하면 된다. PRD·분석 문서 양쪽 정정 완료.
+- **③ ✅ 억제 반복 PRD 신설** — [`docs/prds/event-suppression-recurrence-prd.md`](../prds/event-suppression-recurrence-prd.md) **v1.0 Draft(승인 대기)** · Track C(9점) · 421행.
+  베이스라인 `event-suppression-schedule-prd.md` v1.4(출하분)의 **증분**으로 분리(조율문서 `INTEGRATION.md` §5-A 가 이 경로를 명시).
+  - **★ 서버가 "제일 중요"라 한 항목은 GIS에 고칠 코드가 0건** — `window_end` 소비처는 `ItemViewModel.cs:34/:66` **표시 문자열 2곳**이 전부이고 `window_end` 로 도는 해제 타이머가 존재하지 않는다. 실제 무게중심은 **표시 정직성 + 반복 생성 UI + 기존 결함 정리**.
+  - **표시 정직성**: `status=="active"` 는 "유효기간 안"일 뿐 — 실측 **62.2%가 active면서 미억제**. 토요일 새벽에도 "진행중"(초록) 배지가 거짓말.
+  - **기존 결함 B-1~B-6(반복과 무관하게 이미 깨져 있던 것)**: 사문 `SuppressionActiveMonitor`(DI 등록만, **소비자 0건**) · stale 배너(패널 타이머 0건) · fail-open 부재(TTL 없음) · 중복경고가 **시간 비교를 전혀 안 함** · `SYNC_EVENT_SUPPRESSION` **enum 값 자체 부재** · PATCH UI 부재.
+  - **FR-18 = 잠복 함정 구조 제거**: `EventSuppressionScheduleRequestDto` 를 **POST·PATCH 가 공유**(`EventSuppressionApiService.cs:128-132`)하는데 서버 Update 스키마엔 반복 4필드가 없고 `extra="forbid"` → 반복 필드를 추가하는 순간 **모든 PATCH 가 422**. 지금은 PATCH 호출부가 없어 잠복이고, 나중에 편집 UI 붙이는 사람이 밟는다.
+  - **결정 D-1~D-8**: D-1~6 은 권고안 기본 채택(생성/수정 DTO 분리 · `bool?`+status 폴백 · `daily_*`는 `string?`(DateTime이면 '오늘 08:00'으로 오염) · **로컬 반복계산 미구현** · stale 표기 후 유지 · 라이브러리 자가필터 서비스). **D-7(반복창 편집 UI)·D-8(Phase2 라이브 억제)만 사용자 범위 결정 필요** — 둘 다 제외 권고.
+  - **⚠ 메인 솔루션 1케이스(FR-17, 사전 통지 대상)**: `NatsBrokerService.cs:311-317` 명시 no-op 그룹에 추가하지 않으면 회차 경계마다(반복창 1개당 하루 2건) `default:` Warning 이 로그 오염.
+  - **V-01 ✅ 확정**: 목록 응답에도 파생 9필드가 내려온다 — `list_suppression_schedules` 가 행마다 공용 변환기 `_to_response(s, now)` 호출(`api-test-server/app/routers/event_suppression_schedules.py:272`, 변환기 `:80-108`). 목록에서 배지를 그리는 설계 성립.
+  - **잔여 미확인**: V-02(회차 전이 라이브 관찰) · V-03(NATS 브리지 도달) · V-04(테마 캡처) · V-05(로그인 게이팅 유지) · V-06(UiTests, ⚠ **데스크톱 독점 세션 필요**).
+### ▷ ✅ 억제 반복 **UI 설계** 완료 (2026-09-07) — 사용자 "억제 쪽 기능에 따라 UI도 추가해야 되는 거 알지?"
+
+- **PRD 승인됨** — `advance-phase.js approve prd` 실행 전 `scanDocsDir('prds')[0]` 대조 가드 통과(내 PRD가 mtime 1위 확인). ⚠ `approve prd` 는 **phase 를 안 건드린다**(`changelog.executePrdApproval` 만 호출) → 다른 세션의 `pidsgroup-rightclick` dev 36/50 무영향. 배너 상태 출처는 **`.claude/.branch-v2-6/pipeline-state.json`**(브랜치 스코프)이고 `docs/memory/pipeline-state.json` 은 2026-07-30 stale.
+- **설계 워크플로** `wf_0df86dba-875` — 실측 5축(제약 78) → 설계 3안 → 3렌즈 심사 → 적대검증 4렌즈. **15 에이전트 / 2.93M 토큰 / 306 툴콜 / 45분 / 오류 0**.
+  심사 **20.0 / 19.5 / 19.0 사실상 동률** → 승자를 그대로 쓰지 않고 **승자 구조 + 반증 10건 반영**으로 합성.
+- **📐 산출물**: [`event-suppression-recurrence-wireframe.html`](../design/event-suppression-recurrence-wireframe.html)(53KB, 치수·바인딩·직렬화) · [`event-suppression-recurrence-storyboard.html`](../design/event-suppression-recurrence-storyboard.html)(37KB, 흐름·문구 S1~S13). 둘 다 UTF-8 BOM · U+FFFD 0 · 알파순서 오류 **0**(8자리 hex 12개 전수 검증) · 태그 균형 정상.
+- **🖼 라이트 실렌더 검증 완료**(Playwright, `docs/assets/suppression-recurrence/`) — 알파 순서 오류는 다크에서 티가 안 나 리뷰를 통과하는 게 이 레포 실증 함정이라 **라이트를 눈으로 확인**. 콘솔 에러는 favicon 404 뿐. **FATAL-05 수정(채움 vs 하단바 축 분리)이 라이트에서 실제로 구분됨**을 확대 캡처로 확인.
+
+- **🔴 적대검증이 무너뜨린 승자안 전제 3종(전부 메인세션 재확인)**
+  | # | 반증 | 확인 |
+  |---|---|---|
+  | F-01/06/09 | `mah:TimePicker.SelectedTime` **부재** | MahApps 2.4.10 `MahApps.Metro.xml` 실측 — `TimePickerBase` 에 `SelectedDateTime`·`SelectedTimeFormat` 만 존재, `SelectedTime` **0건**. ⇒ "TimeSpan 이라 offset 422 가 구조적으로 불가능"이라는 설계 근거가 **소멸** |
+  | F-02/08 | 요청 직렬화가 **전 API 공통** `DateTimeZoneHandling.Local` | `ApiService.cs:23-27` 확인 → DTO 에 `DateTime` 노출 시 `"08:00:00+09:00"` 로 나가 **즉시 422**. ⇒ DTO `daily_*` 는 **`string`**, VM→DTO **단일 지점** 변환. `JsonIgnoreCondition` 은 STJ 타입이라 이 경로에 없음 → `ShouldSerializeXxx()`(`SpeakerDeviceDto.cs:40` 선례) |
+  | F-10 | `TimePickerBase` 계열 **UIA 미노출** | `UiTests/Pages/SuppressionSchedulePage.cs:70` · `SuppressionSweepTests.cs:216` 에 **이미 명기**돼 있음 → 피커 AutomationId 는 죽은 계측. ⇒ **텍스트 미러**(`RecurrenceSummaryText`)를 1차 단언 경로로 |
+  | F-03/07 | 무제한 **게이트 불일치** | 체크박스=Row3(`IsWeeklyMode`) vs 피커전환=Row2(`IsWindowEndUnlimited`) → 반복+무제한 후 단발 복귀 시 **플래그만 남아** 단발+`null` 전송 → 422, 원인이 화면에서 사라져 **진단 불가**. ⇒ 파생 `IsUnlimitedEffective` + 전환 정리 + `CanCreate` 3중 |
+  | F-04 | 배너 **로컬값 > Style Trigger** | `:307-309`·`:314` 에 로컬값 박힘. WPF 우선순위 로컬(3)>Trigger(5) → **Trigger 영원히 무효**. ⇒ 로컬값 삭제 후 Setter 이관 |
+  | F-05 | 제스처 바가 채움과 **같은 브러시** | 지배적 제스처('칠하기')에서 범위셀이 즉시 checked→채워짐, 그 위 같은 Primary 바 = **1.00:1**. 범위 표시가 가장 필요할 때 **안 보임**. ⇒ `MultiDataTrigger` 2분기(범위∧선택→`OnPrimaryFixed` / 범위∧미선택→`Primary`) |
+
+- **📏 설계 확정 골자**: Row3 하나만 증설 + 통째 `Collapsed` → **단발 세로 증가 0**(폼 315·DataGrid 293 유지), 반복 시 +48. 반복 라디오는 Row2 남는 218 에 인라인(**세로 0**). 좌측 408 정렬계약·우측 356 트레이 **불변**. 목록 **컬럼 추가·삭제 0** — 상태 90→132 / 대상 200→170 폭만.
+- **⚠ 세로 제로섬**: 총예산 648, **ScrollViewer 없음** → 폼이 **608 넘기면 DataGrid 0 + 조용히 잘림**. 배너 3종 동시 시 반복모드 목록 **≈149(3.9행)** — V-11 실기 확인 필요.
+- **🔲 사용자 결정 대기 3건**: **D-7** 반복창 편집 UI(제외 권고 — 서버 Update 스키마에 반복필드 없어 규칙 자체 수정 불가) · **D-8** Phase2 라이브 억제(서버 PM 대기) · **L-1** 목록 열 폭 변경(⚠ CHANGELOG ⑦ 에 이미 "사용자 확인 대기"로 걸려 있음).
+- **잔여 미검증**: V-07(맵 밖 AdornerLayer — **설계가 회피해 블로커 아님**) · V-08(ToggleButton 8.0 데드존+클릭폴백 **스파이크 필요**, 레포 선례 0) · V-09(MDIX `IsFloating=False` 자연높이) · V-10(TimePicker 재템플릿 UIA) · V-11 · V-12(WPF 실기 캡처).
+
+### ▷ 🔧 플랜 착수 준비 (2026-09-07) — 롤백 지점 + 하네스 규칙 정정
+
+- **롤백 지점 확보**: 태그 `before-suppression-recurrence` = 브랜치 `backup/before-suppression-recurrence` = **`b4ffde6`**.
+  ⚠ **1차 시도가 조용히 실패**했다 — `git add -A -f .` 의 `-f` 가 gitignore 를 무시해 `bin/Debug/.../Logs/` 까지 긁었고,
+  그중 **파일명이 반복 연결된 비정상 로그**(`log-2025-11-12.txt` ×11 연결)가 Windows 경로 한계를 넘겨 `add` 전체가 **exit 128**로 죽었다.
+  `read-tree HEAD` 만 남아 **스냅샷 트리가 HEAD 와 동일**(차이 0)한 빈 껍데기가 만들어졌다.
+  ⇒ **교훈: `-f` 는 전역이 아니라 `docs/` 에만.** 검증은 "HEAD 대비 변경 파일수 > 0" 으로 반드시 확인할 것.
+  최종본은 3939파일 · docs 3417 포함 · **bin/obj 오염 0** · HEAD·인덱스 불변 확인.
+- **다중 세션 실시간 충돌 관측**: 스냅샷 직후 `docs/INDEX.md` 가 **14초 만에 타 세션에 의해 8행 추가**됨(내 3행은 보존).
+  ⇒ INDEX 편집 전 **항상 재독**(read-modify-write)해야 한다. [[project_multisession_checkpoint_sweeps_wip]]
+
+- **🔴 하네스 규칙 자체 모순 발견·정정 — `.claude/rules/common/drag-first-ux.md`**
+  - `:55`·`:137` 은 **`ToggleButton` 을 권장 핸들**로 올렸는데, `:105` 는 `Button` 을
+    "**`ButtonBase.OnMouseLeftButtonDown` 이 캡처를 강탈해 마우스다운 순간 자멸**"이라며 금지한다.
+    **`ToggleButton` 도 `ButtonBase` 파생이라 같은 코드를 탄다** — 규칙이 스스로 모순.
+  - **리플렉션 실측(확정)**: 계보 `ToggleButton → ButtonBase → ContentControl → …` ·
+    `OnMouseLeftButtonDown` 의 `DeclaringType` = **`ButtonBase`**(ToggleButton 이 **재정의 안 함**) ·
+    `ClickMode` 기본값 = **`Release`** → `!= Hover` 이므로 **캡처 분기 실행**.
+  - **정정 완료**(Must Always·Must Never·Quick Reference 3곳) — 차이는 **peer 유무이지 캡처 거동이 아니다**,
+    `RadioButton`·`CheckBox` 도 동일, `ToggleButton` 을 쓰려면 **컨테이너 Preview 선점 필수**.
+  - **해소책**: 스트립 `Border` 가 `PreviewMouseLeftButtonDown` 에서 `e.Handled=true` 로 선점 + **컨테이너가** `CaptureMouse()`.
+    `ButtonBase` 버블 핸들러가 도달하지 못해 캡처 강탈·앵커 이중토글이 **원리적으로 사라진다**.
+    **UIA `TogglePattern.Toggle()` 은 그대로 동작**(peer `OnToggle()` 은 마우스 경로 미사용), `Space` 도 `KeyDown` 이라 무관.
+  - ⇒ "레포에 Preview 선례 0건"은 **부모와 경합 없는 경우** 이야기였고, 여기선 **자식(`ButtonBase`)과 경합**한다.
+    와이어프레임 §3-2/§3 근거박스/V-08 을 이 결론으로 갱신.
+- **V-08 재정의**: 상속·`ClickMode` 는 확정됐고, 남은 스파이크는 **"Preview 선점 후 드래그·클릭폴백·UIA Toggle·Space 4경로 동시 성립"**.
+  실패 시 폴백 = 드래그 제거 + 빠른선택 버튼(평일/주말/매일).
+- **플랜 워크플로** `wf_300ac456-5a8` 진행 중 — 실측 4축(테스트 파손·NATS 배선·파일별 변경·공수 캘리브레이션) → 분해 2안 → 3렌즈 심사 → 적대검증 4렌즈.
+
+### ▷ 📊 플랜 실측 3/4축 완료 (2026-09-07) — PRD 에 결함 3건·완료현실 반영
+
+- **🔴 신규 결함: 무제한 창은 영원히 삭제 불가** — `status` 계산이 `window_end` 로 `expired` 를 판정하는데
+  무제한 창은 `window_end IS NULL` 이라 **영구 `active`**(`service:203-215`). 클라 `IsDeletable` 은
+  `Status is "cancelled" or "expired"`(`ItemViewModel.cs:39`) → **영원히 false** ⇒ 하드삭제 불가 ⇒ **목록 무한 증식**.
+  FR-10(무제한)을 넣는 이상 "정리하려면 먼저 취소" 경로를 같이 설계해야 한다. PRD §6-C 에 반영.
+- **🔴 함정 17: 일일 시각 구분자에 `~` 재사용 금지** — 하네스가 피커 UIA 미노출 때문에
+  **`FirstOrDefault(SafeName=="~" && !IsOffscreen)` 를 좌표 앵커**로 쓴다(`SuppressionSchedulePage.cs:91-100`, 2순위 폴백 **실제 활성**).
+  `~` 가 2개면 트리 순서 의존 → 틀리면 **엉뚱한 피커에 타이핑해 무증상 오생성**(실패로도 안 잡힘).
+  ⇒ 와이어프레임에서 일일 시각 구분자를 **`–`(en dash)로 분리** 완료. 창 구분자 `~` 2개는 의도적 유지.
+  **덤**: 하네스 상수 `90`(=피커폭 180의 절반)이 **실제 196과 불일치** — 2026-08-07 폼 재설계 미반영.
+  현재 8px 치우쳐 우연히 동작 중. 별건 태스크(90→98 또는 AutomationId 부여로 1순위 복원).
+- **🔴 함정 18~20**: ① `EventSuppressionScheduleTests.cs` 가 **`Events.Ui.dll` 본체에 컴파일**(`csproj:21-22`)
+  → **테스트 파손 = 라이브러리·앱 빌드 실패**, 수정은 같은 커밋 필수 ② `ItemViewModel` 생성자 인자 추가 시
+  테스트 **11곳 CS7036** → "억제중"은 **DTO `is_suppressing_now` 파생**으로 ③ 상태 필터 항목 추가 시
+  `SuppressionSweepTests.cs:155-159` 의 `Length == 5` **정확 단언** 즉사.
+- **FR-13 보정**: `_activeCache` 소비자가 **3곳**(배너 `:669-675` · `DuplicateWarningText` `:679-692` ·
+  **취소 후 '진행 중 N건 남음' 경고 `:280-286`**). 세 번째 누락 시 컴파일 에러 또는 경고 영구 무발화.
+- **✔ 실측이 제기한 미확인 4건은 이미 확정된 것** (재조사 금지, PRD §6-C 표):
+  목록은 **스케줄 1행**(occurrence 다행 아님) · `/active` 는 **"지금 회차 진행 중인 창만"** ·
+  `recurrence_type` **기본값 `none`**(필수 아님) · `status` **4종 고정**(새 값 없음).
+- **📊 공수 캘리브레이션(95플랜·677태스크 실측) → PRD §9-A 신설 + 2단 게이트**
+  - 태스크 추정 밀도 평균 **1.26h**·중앙값 1.00h·**최빈 0.5h(29%)** — 스킬 규정(1~4h)과 다르다. **0.5~1h 로 쪼갠다.**
+  - 벽시계 **81% 당일 종료**, 세션 1회 ≈ **20~41 태스크**.
+  - 착수 플랜은 **80~100%(중앙 88%)에서 정지**. 잔여는 **항상** ①실기/런타임(데스크톱 독점) ②**메인 솔루션 재빌드(DLL 락)** ③외부(서버) 3종.
+  - **메인 솔루션 연동은 실측상 사실상 100% 미완** ⇒ **FR-17 을 게이트 B 로 강등**, 라이브러리 완료 판정을 여기 걸지 않는다.
+  - XAML 레이아웃 **1.5~2배 버퍼**(재작업 4패턴), 테스트 수정 **+0.5h**(기존 실패 격리·blame 입증).
+  - **최대 좌초 선례** `UI_ModernTheme_DesignSystem`: XAML 전면 토큰화 **127h/72태스크가 17%에서 정지** — 추정 상향도 무효.
+    ⇒ **XAML 범위를 넓히지 않는 것이 유일한 방어**. 이 PRD 가 "목록 컬럼 0건 / Row3 하나"로 좁힌 근거.
+- **NATS 배선 확정**(실측): `ISuppressionActiveMonitor` 에 `RequestImmediatePollAsync(reason, ct)` 추가 +
+  **리딩 엣지 스로틀**(서버가 단발 경계에서 중복 발행 + bulk-delete N건 버스트) · `PollAsync` 의 `_active` 쓰기와
+  `ActiveChanged` 발화를 **디스패처 마샬링**(현재는 DispatcherTimer 라 우연히 성립, NATS 백그라운드에서 부르면 깨짐) ·
+  `EventUiModule` 에 `.As<IService>()` **필수**(`:78` 사문화된 `DeviceNatsSyncService` 가 정확히 이 누락 함정) ·
+  `Order` 메타데이터 중복(`:131` `:141` 둘 다 `_count+4`) 정리.
+
+### ▷ ✅ 구현 플랜 완성 (2026-09-07) — [`event-suppression-recurrence-prd-plan.md`](../plans/event-suppression-recurrence-prd-plan.md)
+
+- **워크플로** `wf_300ac456-5a8` — 실측 4축(70 단위항목/65h) → 분해 2안 → 3렌즈 심사(**tdd-first 19.5 / risk-first 17.5**) → 적대검증 4렌즈.
+  **13 에이전트 / 2.86M 토큰 / 307 툴콜 / 47분 / 오류 0**. 결과 **fatal 6 · major 12 · minor 11**.
+- **최종**: **61 태스크 / 52h**(밀도 0.85h — 레포 중앙값 0.89와 일치) · **2단 게이트**(A 라이브러리 55 / B 실기·메인 6).
+  임계 경로 ≈30h = `VER-01/02 → S1-A(7.5h) → T-D02 → S3(순차 10h) → S4(순차 9.5h) → T-G06 → DOC`.
+  **S3(718행)·S4(963행)는 단일 파일 연속 편집이라 병렬 불가.**
+
+- **🔴 적대검증 fatal 6 — 전부 반영**
+  | # | 반증 | 반영 |
+  |---|---|---|
+  | F-1/5 | `RequestDto` 개명 후 호출부(`PanelViewModel:222`)가 S3까지 안 고쳐져 **약 15h 동안 `Events.Ui.dll` 빌드 불가 · `dotnet test` 0회** — TDD 플랜인데 Red/Green 판정 수단 소멸 | **T-B04**에 최소 컴파일 픽스 병합, T-E11 축소 |
+  | F-2 | `IsDrag` 정본 Utils 이관이 `GMaps.Ui.Tests` **CS0246** — `ProjectReference` 추가는 **NU1201**(net8.0 → net8.0-windows/UseWPF)로 불가 | **DEFER-01** 범위 밖. `CameraPopupHubMath.IsDrag` 그대로 호출 |
+  | F-3 | `FormErrorText`/`HasFormError` **생성 태스크 부재** → WPF가 없는 경로에 **예외 없이** 빈 문자열+Collapsed → **이미 출하된 '30일 초과' 경고가 조용히 소멸**하고 새 경고도 안 뜸. 버튼만 죽고 **이유 표시 없음** | **T-E05b** 신설 |
+  | F-4 | stale 배너가 **폴링 성공 + count>0**일 때만 보임(`Visibility`가 `HasActiveSuppression` 게이트) → 정작 **폴링 실패 시 배너 통째 소멸** | `HasActiveBanner = HasActiveSuppression \|\| IsActiveStale` (T-E08/T-F05) |
+  | F-6 | S5가 **메인 레포 3파일** 편집하는데 M-00 통지는 1건뿐 → `main_solution_advance_notice`·`spec_full_compliance_propose_deviations` 위반. ⚠ `GopApiClient.cs`는 **타 세션 +92줄 미커밋 편집 중** | **U-2** 통지 4건 확장 + 🅑 표기 |
+- **major 반영 10건**: ToggleButton **Style 부재**(F-05 수정 자리 없음 → `T-F03b`, 선례 `DetectionHistoryDialogView.xaml:63-95 FilterChip`) ·
+  **FR-06 화면 출력 태스크 부재**(계산만 되고 표시 안 됨 → `T-F08b`) · 2줄 셀 vs `RowHeight="38"` 고정(→`MinRowHeight`) ·
+  가로 예산이 **미커밋 `Width="1050"`에 의존**(→RISK-01ⓒ 선커밋) · 메인 레포 WIP 스냅샷 부재(→RISK-01ⓑ) ·
+  게이트 B가 게이트 A 회귀를 막음(→dep 제거) · S5 거짓 병렬(→신규 파일) ·
+  **`GopApiClient` 운영 쓰기 가드 부재**(기본 BaseAddress=운영, `EnsureWriteAllowed` 일반화 — **"운영 쓰기 0" 계약**).
+
+- **🔲 착수 전 사용자 확인 3건**
+  - **U-1 worktree 미사용 deviation** — [[feedback_prd_worktree_required]] 이탈. 사유: 메인 솔루션이 **v2.6 워킹트리를 `ProjectReference`**(`csproj:60~87`) 하므로 worktree 브랜치는 **앱 빌드에 반영되지 않는다**. 롤백은 스냅샷 태그로 대체
+  - **U-2 메인 솔루션 편집 4건**(NatsBroker 1줄 + GopApiClient + SuppressionSchedulePage + DestructiveGuard)
+  - **U-3 목록 열 폭**(상태 90→132 / 대상 200→170) — CHANGELOG ⑦에 이미 "사용자 확인 대기" 상태
+- **⚠ 파이프라인 상태는 건드리지 않았다** — `activePlan` 이 타 세션 `pidsgroup-rightclick`(dev 36/50)이라
+  `advance-phase plan` 을 돌리면 그 세션 진행을 **가로챈다**. 플랜은 문서로만 존재한다.
+
+### ▷ 🔍 미커밋 작업 전수 조사 (2026-09-07 23:5x) — 사용자 "세션 종료된 작업이면 커밋하고 진행 가능한지"
+
+- **결론: 종료 확정 작업은 단 1건.** 나머지 161건은 **전부 진행 중** → 커밋 금지.
+- **⚠ 내 1차 판단 오류 정정**: "claude 프로세스 3개"라고 했으나 `head -25` 에 잘린 출력이었다.
+  실제 **11개 생존**(시작 09:32~18:36). 프로세스 수로 세션 종료를 판정하려던 접근 자체가 틀렸다.
+- **판정 근거(mtime 클러스터)**
+  | 시각 | 작업 | 판정 |
+  |---|---|---|
+  | **08-08 02:23** | `EventSuppressionSchedulePanelView.xaml` **1줄**(`Width 1180→1050`) | ✅ **종료 확정**(한 달 방치) |
+  | 09-06 23:33 | `.gitignore`·Enum건물·Infra마커·csproj | 진행 중 |
+  | 09-07 09:50~16:19 | 인프라(시설물) 심볼 8파일 | 진행 중 |
+  | 09-07 18:44~18:49 | 한글변환/장비타입 13파일 | 진행 중 |
+  | 09-07 19:05~19:46 | PIDS그룹 3D 철망/통문 다수 | 진행 중 |
+  | 메인 20:56~**23:02** | `NatsBrokerService`·`NatsDomainService`·`GopApiClient`·`FenceGateRuntimeDiagTests` | **51분 전까지 활동** |
+  session-context 가 "실기 검증 진행 중"·"5차 실행 진행 중"·"코드 조사 에이전트 진행 중"을 명시.
+- **✅ 회수 커밋 `87cc86e0`** — `Width="1180"→"1050"` 한 줄. 폼 재설계 커밋 `dac71ff`(08-07 16:21) **10시간 뒤** 조정 후
+  **한 달 미커밋 방치**(CHANGELOG 미기록, 이 파일에만 존재하는 값). **`git add <path>` 단건** — `-a` 는 타 세션 WIP 161건을 쓸어간다.
+  ⇒ 적대검증 MAJOR-7 / 플랜 **RISK-01ⓒ 해소**. S4 가로 예산(626/218/762)의 근거 확정.
+- **✅ 커밋 없이 진행 가능함을 실증** — 내 플랜 대상 파일 **11개 중 9개가 깨끗**.
+  겹치는 2개는 `EventUiModule.cs`(19:27, T-D07 대상 — S2 후반) · 메인 `NatsBrokerService.cs`(20:56, M-01 = **게이트 B**).
+  둘 다 **후반부라 착수를 막지 않는다**. 하네스 `GopApiClient.cs`(21:07)도 게이트 B.
+- **✅ 빌드 green 확인** — 현 미커밋 상태 그대로 `dotnet build` **exit 0**(오류 0 / 경고 396, 기존 수준). GIS 앱 미실행(DLL 락 없음).
+- **사용자 결정**: **U-1 승인**(worktree 미사용 — 메인 솔루션이 v2.6 워킹트리를 `ProjectReference` 하므로 worktree 는 앱 빌드 미반영) ·
+  **U-3 보류**(목록 열 폭은 구현하면서 조정) · U-2 는 M-00 에서 통지 예정.
+
+### ▷ ✅ V-08 스파이크 완료 (2026-09-08) — **설계 성립**, 하네스 규칙 2차 정정
+
+- **실증 프로그램**: `scratchpad/v08spike`(WPF STA 콘솔, `net8.0-windows`+`UseWPF`). 5회 반복 동일 결과.
+- **🎯 T8 결정적 판정** — `ProbeToggle : ToggleButton` 로 `OnMouseLeftButtonDown` virtual 호출을 **직접 계수**:
+  - 미핸들 이벤트 → **1회 호출**(정상)
+  - **이미 `Handled=true` 인 이벤트 → 0회 호출**
+  ⇒ `ButtonBase` 클래스 핸들러는 **`handledEventsToo: false`** ⇒ **터널 선점이 컨테이너를 보호한다.**
+  ⇒ 앞서 발견한 "ToggleButton 도 ButtonBase 라 캡처 강탈" 문제의 **해법이 원리적으로 성립함이 확정**됐다.
+- **🔴 T1 설계 정정(중요)**: **`PreviewMouseLeftButtonDown`·`MouseLeftButtonDown` 은 `Tunnel`/`Bubble` 이 아니라 `Direct` 다**(실측 출력).
+  실제 터널/버블 쌍은 **`PreviewMouseDown`/`MouseDown`**. 컨테이너 터널이 셀보다 **먼저** 실행되고 `Handled` 로 하류를 끊는 것을 순서값(1 vs 0)으로 확인.
+  ⇒ 와이어프레임·플랜·하네스 규칙 3곳 모두 **`PreviewMouseDown`** 으로 정정.
+  (실입력에선 WPF 가 route 전 요소에 Direct 를 승격시켜 주므로 기존 표기도 동작은 하나, 터널 쪽이 명시적·확실)
+- **T3**: UIA `TogglePattern.Toggle()` 이 마우스 선점과 무관하게 `IsChecked` 를 뒤집는다(peer=`ToggleButtonAutomationPeer`) — **자동화 경로 안전**.
+- **T5**: `ToggleButton` 이 `OnMouseLeftButtonDown` 미재정의 · `ClickMode` 기본 `Release` 재확인.
+- **⚠ 미검증으로 남긴 것(정직 고지)**: **실제 마우스 입력에서의 캡처 소유권**.
+  오프스크린·투명·`Opacity=0`·비활성 창에서 `Mouse.Capture` 결과가 실행마다 **`Border`/`ToggleButton`/`null` 전부 관측** →
+  **환경 산물이지 발견이 아니다**. 합성 `RaiseEvent` 는 `ButtonBase` 를 결정적으로 구동하지 못한다(실 마우스 디바이스 상태 의존).
+  ⇒ **게이트 B(실기, 데스크톱 독점)** 로 이월. 단 T8 이 원리를 확정했으므로 **설계 무효화 위험은 해소**됐다.
+- **플랜 갱신**: RISK-02 ✅ 완료 · RISK-03(폴백 확정) **불필요로 보류** — 게이트 B 실기에서 뒤집히면 그때 착수.
+- **하네스 규칙 2차 정정**(`drag-first-ux.md`): 터널 이벤트명 정정 + **`handledEventsToo: false` 실증 근거** 명문화 + Quick Reference.
+
+### ▷ ✅ 억제 반복 **게이트 A(라이브러리) 구현 완료** (2026-09-08) — 47/61 태스크
+
+- **검증**: 솔루션 빌드 **오류 0** · `Events.Ui` **563 통과 / 15 실패** · **신규 회귀 0건**
+  (실패 15건은 VER-05 기준선과 **완전 동일** — 타 세션 미커밋 작업. `comm` 차집합으로 격리 입증)
+  통과 484 → **563**(+79), 억제 도메인 31 → **110**.
+- **신규/수정 파일 9개**
+  | 파일 | 내용 |
+  |---|---|
+  | `Messages/Dto/Events/EventSuppressionScheduleDto.cs` | 응답 9필드 · `WindowEnd` → `string?` · **Create/Update DTO 분리(둘 다 sealed·무상속)** · `ShouldSerializeXxx` 3종 |
+  | `Events.Ui/Helpers/SuppressionRules.cs` | 요일 Mon0 변환 · 프리셋 · `Summarize` · 검증 3종 · 모드별 상한 · `IsRelevantToday` |
+  | `Events.Ui/Helpers/SuppressionPollThrottle.cs` 🆕 | 리딩엣지+**트레일링 보장** 스로틀 · TTL stale · 경과 문구 |
+  | `Events.Ui/Services/SuppressionActiveMonitor.cs` | `LastSuccessAt`/`IsStale`(TTL 90s)/`RequestImmediatePoll` · **디스패처 마샬링** · 재진입 가드 |
+  | `Events.Ui/Services/EventSuppressionSyncNatsService.cs` 🆕 | subject+cmd **이중 자가필터** · 로그인 게이팅 · 폴링 가속 전용 |
+  | `Enums/EnumGopCommand.cs` | `SYNC_EVENT_SUPPRESSION = 30` |
+  | `Events.Ui/Modules/EventUiModule.cs` | DI 등록(**`.As<IService>()` 포함** — 누락 시 구독 누수) |
+  | `Events.Ui/ViewModels/Panels/…PanelViewModel.cs` | 반복 폼 상태 · **`IsUnlimitedEffective` 파생** · 모드전환 정리 · `FormErrorText`/`HasFormError` · `HasActiveBanner` · Monitor 이관(소비자 3곳) · OnActivate/OnDeactivate 짝 |
+  | `Events.Ui/ViewModels/Panels/…ItemViewModel.cs` | **ctor 불변** 유지하며 DTO 파생으로 억제중/무제한/요약/회차 투영 |
+  | `Events.Ui/Views/Panels/…PanelView.xaml` | 배너 **로컬값 제거→Style Setter** · Row2 라벨밴드+라디오 인라인 · **Row3 신설**(요일 7칩·TimePicker 2·무제한) · 요약 미러 · 스타일 3종 뷰로컬 |
+- **신규 테스트 2파일 79건**: `SuppressionRulesRecurrenceTests`(요일원점·검증·요약·중복판정) ·
+  `SuppressionItemProjectionTests`(배지↔억제중 분리·무제한 3종 구분·회차·**무제한 삭제불가**)
+- **적대검증 fatal 6 전부 반영 확인**
+  - F-1/5: `T-B04` 에서 DTO 개명과 호출부(`PanelViewModel:222`)를 **같은 단위로** 처리 → 빌드 무중단, `dotnet test` 상시 가동
+  - F-2: `IsDrag` Utils 이관은 **DEFER-01** 로 범위 밖(NU1201 구조적 불가)
+  - F-3: **`FormErrorText`/`HasFormError` VM 신설** → 기존 30일 경고 소멸 방지
+  - F-4: **`HasActiveBanner = HasActiveSuppression || IsActiveStale`** + XAML Visibility 교체
+  - F-6: 메인 레포 편집은 전부 **게이트 B** 로 분리(M-00 통지 후)
+- **정적 XAML 전수 검증**: 참조 47키 중 미해석 **0**(잔여 4건은 MDIX 패키지 키) · 바인딩 61개 전량 VM 실재 ·
+  **`Text="~"` 1개 유지**(하네스 좌표 앵커 보호, 일일 시각은 `–` 로 분리) · `x:Name` 변경 0건 · UTF-8 BOM 전량.
+- **🔲 잔여 14** — 게이트 B(M-01/M-02 메인, V-08 실기 캡처 소유권, V-09~V-12 실기) ·
+  **T-F07/F08/F08b 목록 열**(U-3 사용자 결정 — "구현하면서 조정") · **T-F09 드래그 페인팅**(T-F03b 위에 얹으면 됨) ·
+  T-D06 NATS 단위테스트 · T-E12 패널 VM 헤드리스 · T-G03~G06 하네스 · DOC.
+
+### ▷ ✅ 게이트 A **커밋 완료** `3acb06c9` (2026-09-08) — 타 세션 무손상 검증 통과
+
+- **커밋 범위**: 정확히 **15파일 / +1980 −75**. 억제 도메인 전용.
+- **🔴 유일한 위험은 `EventUiModule.cs` 였다 — 헝크 3개 중 2개가 타 세션 것**
+  (`IDoorContactPolicy`·`DefaultDoorContactPolicy`·`OperationEventNatsSyncService` 등록 + `ons.StartService()`).
+  통째로 커밋하면 **미커밋 신규 타입 4종을 참조하는 커밋**이 되어 클린 체크아웃에서 컴파일이 깨진다.
+  ⇒ **HEAD 판본 + 내 헝크만** 재조립한 blob 을 `git hash-object -w` → `git update-index --cacheinfo` 로
+  **인덱스에만** 넣었다. **작업트리 파일은 손대지 않았다.**
+  커밋 후 그 파일엔 타 세션 헝크 2개가 **미커밋으로 정확히 남았다**(실측: 헝크 2, 심볼 4건 잔존).
+- **사전 정밀 검증(격리 워크트리)**: `HEAD + 내 15파일` 트리로 `git worktree add --detach` →
+  **솔루션 빌드 오류 0** · `Events.Ui` **535 통과 / 15 실패** · **억제 실패 0**.
+  실패 15건은 기준선 목록과 **바이트 단위 동일**.
+- **⚠ 내 앞선 귀속이 틀렸다(정정)**: 기존 실패 15건을 "타 세션 미커밋 작업 때문"이라 했으나,
+  타 세션 코드가 **하나도 없는** 격리 워크트리에서도 동일하게 실패한다 ⇒ **HEAD 자체의 기존 실패**다.
+  (결론 "내 회귀 아님"은 동일하지만 원인 귀속이 잘못됐었다.)
+- **⚠ 검증 중 걸린 함정**: 첫 테스트가 `OnvifSolution` 에러로 죽었는데, 이건 **서브모듈(gitlink)이라
+  새 워크트리에 초기화되지 않아서**였다(`git ls-files` 가 디렉터리 자체 1건만 반환 = mode 160000).
+  ⇒ **어떤 새 clone/worktree 도 그대로는 빌드되지 않는다.** 메인에서 복사해 보강 후 정상 결과.
+- **커밋 후 사후 검증**: 작업트리 217 → **203**(감소 14 = 내 커밋분) · 타 세션 파일 `M`/`??` 그대로 ·
+  **전체 솔루션 빌드 오류 0**(모든 세션 작업 공존 상태).
+- **의도적 제외**: 내 산출물 문서 4종(PRD·플랜·와이어프레임·스토리보드)은 **gitignore 대상이라 커밋 불가**.
+  추적되는 `docs/INDEX.md`·`session-context.md` 는 **타 세션이 동시 편집 중**이라 제외했다(클로버 방지).
+
+### ▷ ✅ 2차 커밋 `2af65ab8` (2026-09-08 11:20) — 목록 표시 · 드래그 페인팅 · 테스트 80건
+
+- **파일 6개**(수정 1 + 신규 5) / +1184 −5. 전부 억제 도메인 소유.
+- **목록 표시(FR-03~06) — 컬럼 추가·삭제 0건**: 고정 합이 빠듯해(750/≈1000) 새 컬럼을 만들면 작업명이 붕괴한다.
+  ⇒ 폭 대신 **높이**를 쓰거나 기존 셀 안에 넣었다. 상태 90→132(배지 옆 '억제중' 형제) ·
+  작업명 2줄(반복 요약) · 종료 2줄(회차 정보) · 대상 200→170 ⇒ 고정 합 **762**, 작업명 ≈238.
+  **`RowHeight="38"` → `MinRowHeight`** (고정값이면 2줄 셀이 잘린다).
+  헤더 7종 이름 불변(T-SUP025) · `StatusText` 접미 금지(T-SUP028).
+- **드래그 페인팅(FR-08)**: 컨테이너 `PreviewMouseDown`(터널) 선점 + 직접 캡처 ·
+  데드존 8.0 **초과**(정확히 8.0은 클릭) · 단일 `FinishDrag` + `LostMouseCapture` 양쪽 ·
+  ESC 는 `PreviewKeyDown` 에서 **드래그 중일 때만** 소비 · 범위 표식은 **첨부 속성**(로컬값 write 금지) ·
+  시각화는 채움(면) vs 하단바(선) **축 직교** + 바 색 2분기.
+  ⚠ `IsDrag` 정본은 `GMaps.Ui` 라 참조 불가 → **같은 값·같은 수식·같은 경계**를 `DayStripDragMath` 에 복제하고
+  테스트로 고정(새 상수 신설이 아님을 주석에 명시). Utils 이관은 DEFER-01.
+- **테스트 +80**: `DayStripDragMathTests` 35 · `EventSuppressionSyncNatsServiceTests` 19 ·
+  `SuppressionPanelRecurrenceTests` 26. 드래그는 **UIA 로 단언 불가**(.NET 8 에 패턴 타입 부재)라
+  순수함수 테스트가 유일한 회귀 방어선이다.
+- **검증**: 솔루션 빌드 오류 0 · Events.Ui **643 통과 / 15 실패(전부 HEAD 기존)** · **신규 회귀 0** ·
+  억제 도메인 155 → **190** · XAML 미해석 0 · `Text="~"` 1개 유지 · `x:Name` 변경 0 · UTF-8 BOM.
+
+### ▷ 🎯 헝크 분리가 실제로 통했음이 이력으로 입증됨
+
+- 타 세션이 **10:43 에 직접 커밋**(`5d52779e` PIDS 3D 철망·통문·함체 + 2.5D 틸트 + 라인드로잉 10건).
+  내 두 커밋(`3acb06c9` 10:35 / `2af65ab8` 11:20) **사이**에 들어왔다.
+- **`EventUiModule.cs` 교차 검증**
+  | 확인 | 결과 |
+  |---|---|
+  | 내 커밋에 `OperationEventNatsSyncService` 포함 | **0건** ✅ |
+  | 타 커밋에 `EventSuppressionSyncNatsService` 포함 | **0건** ✅ |
+  | 현재 파일에 양쪽 등록 공존 | 내 2건 + 타 4건 + DoorContactPolicy 3건 ✅ |
+  ⇒ **서로의 작업을 한 줄도 건드리지 않고 같은 파일을 나눠 커밋**했다.
+- 작업트리 217 → **74**(그들 커밋 + 내 커밋). **유실 0** — 파일 전부 디스크有·추적됨.
+- ⇒ 다중 세션에서 공유 파일을 다룰 때: `git hash-object -w` + `git update-index --cacheinfo` 로
+  **인덱스에만** 분리본을 넣고 작업트리는 그대로 두는 방식이 실증됐다. [[project_multisession_checkpoint_sweeps_wip]]
+
+### ▷ ✅ 승인 3건 완료 + 적대검토 회귀 3건 수정 (2026-09-08) — 커밋 4개
+
+| 커밋 | 레포 | 내용 |
+|---|---|---|
+| `da60c613` | Lib | **`.gitmodules` 복구** — 새 clone 빌드 불가 해소 |
+| `60503d3b` | Lib | **적대검토 회귀 3건 수정** |
+| `5cb8977` | Sol | `SYNC_EVENT_SUPPRESSION` no-op + 좌표 앵커 상수 정정 |
+| `48def0b` | Sol | **운영 쓰기 가드 일반화**(별건 안전 결함) |
+
+- **🔴 적대검토(4렌즈·6에이전트·1.28M토큰)가 잡은 실제 회귀 3건 — 전부 "안전 경고가 거짓말하거나 침묵"**
+  | # | 결함 | 원인 |
+  |---|---|---|
+  | A | 취소 직후 '잔존 억제' 경고가 **30초 묵은 스냅샷**을 읽어 거짓 경고 | `_activeCache`→`ActiveWindows` 이관 때 **판정 시점**을 놓침. 운영에서 monitor 는 항상 주입돼 폴백으로 안 떨어지고, 방금 await 로 갱신한 `_activeCache` 를 아무도 안 읽게 됨. **내가 만든 회귀** |
+  | B | stale 배너가 **글자 없는 빈 테두리**로 뜸 | `ActiveStaleText` 가 XAML 참조 **0건**이고 `ActiveCountText` 는 count==0 에서 빈 문자열 ⇒ '억제 0건'과 '서버에 못 물어봄'이 **구분 불가** |
+  | C | **한 번도 성공 못 한 폴링은 영원히 stale 이 아님** | `IsStale` 이 `_lastSuccessAt` 만 봄 ⇒ 서버 재기동·구버전 404·502 로 첫 폴링부터 실패하면 배너가 통째 침묵. `DescribeAge` 의 "확인 안 됨"은 **도달 불가 죽은 코드**였음 |
+  - 수정: `FreshActiveWindows` 신설(변이 직후 판정 전용) + 변이 후 `RequestImmediatePoll` ·
+    stale 문구 형제 TextBlock 바인딩 + AutomationId · `IsStale` 기준을 `_lastSuccessAt ?? _startedAt` 로.
+  - **회귀 테스트 +15**(스로틀 리딩엣지/트레일링·시계역행·TTL·"한 번도 성공 못 함"·경과 문구).
+  - ⚠ 검토가 지적한 major 2건("아이템 VM 프로퍼티가 화면에 안 나온다")은 **검토 기준 커밋 시점의 사실**이고
+    `2af65ab8`(목록 표시)에서 이미 해소 — 현재 4종 전량 바인딩됨을 grep 으로 확인.
+- **🔴 별건 안전 결함(억제와 무관, 조사 중 발견)**: `GopApiClient` 쓰기 8개 중 가드가 **장비 4개에만** 걸려 있고
+  `CreateSuppressionAsync`·`DeleteSuppressionAsync`·`CreateDetectionAsync`·`DeleteDetectionAsync` **4개가 무방비**였다.
+  주석이 스스로 "기본 BaseAddress 는 운영 서버(123.141.236.253)"라 적어둔 상태 ⇒ 스왑 없이 돌리면
+  **운영에 탐지 이벤트·억제 창이 생성·삭제된다**(「운영 쓰기 0」 위반). 가드 로직 자체는 옳았고 **적용 범위만 좁았다**.
+  `CanWriteServer`/`EnsureWriteAllowed` 로 일반화하고 구 이름은 위임 래퍼로 남겨 호출부 무파손.
+- **`.gitmodules` 복구**: gitlink(`160000`, `35e0aeba`)는 있는데 매핑 파일이 없어 `submodule update --init` 이
+  **원리적으로 실패**했다. 로컬 remote(`lsirikh/Ironwall-Onvif-Solution`)·HEAD 가 인덱스 기대값과 일치해 매핑만 추가.
+- **⚠ M-02 블로킹(플랜 예측대로)**: 앱 프로젝트 빌드 불가 — **GIS 앱(PID 51412, 10:36 기동) DLL 락**
+  (`MSB3027 ... 51412 에 의해 잠겨 있습니다`). UiTests 프로젝트는 **오류 0**으로 검증됨.
+  `NatsBrokerService` 변경은 기존 no-op 그룹에 **case 한 줄**이고 참조 enum 은 이미 커밋(`3acb06c9`) — 앱 종료 후 재빌드로 확인.
+- **판단 정리**: D-7 편집 UI 는 **"수정=취소 후 재생성" 제3안**을 권고(서버 변경 0)하되 이번 범위 밖 ·
+  D-8 은 서버 PM 결재라 **물을 필요 없음**(결재 나도 GIS 는 `is_suppressing_now` 소비뿐) ·
+  DEFER-01 은 **하지 않음**(Utils=net8.0-windows vs GMaps.Ui.Tests=net8.0, NU1201 구조적 불가).
+- **최종 검증**: 솔루션 빌드 오류 0 · Events.Ui **658 통과 / 15 실패(전부 HEAD 기존)** · **신규 회귀 0** ·
+  억제 도메인 **205** · XAML 미해석 0 · `Text="~"` 1개 유지.
+- **잔여 10건**: 전부 **실기 환경 필요**(V-08·V-09·V-11·V-12 실기 캡처 · UI 하네스 회귀 · 라이브 왕복 · M-02 · DOC).
+
+### ▷ ✅ M-02 해소 + XAML 런타임 위험 실증 검증 (2026-09-08) — 플랜 60/61
+
+- **M-02 통과**: GIS 앱(PID 51412)이 종료돼 DLL 락이 풀렸다 → **메인 솔루션 전체 빌드 오류 0**.
+  이제 `SYNC_EVENT_SUPPRESSION` 명시 no-op(커밋 `5cb8977`)이 실제로 컴파일됨을 확인.
+- **하네스 Unit 97/98** — 실패 1건 `DbProbeTests.should_hold_valid_attributes_for_every_symbol`.
+  **격리 입증**: 억제 참조 **0건**(테스트·DbProbe 양쪽 grep) · 내 커밋 2개가 `DbProbe` 를 건드린 적 **0건** ·
+  마지막 변경자는 타 세션(`b04f7c8`). ⇒ **로컬 monitor_db 심볼 데이터 감사 실패**로 내 회귀 아님.
+- **🎯 XAML 런타임 위험 정면 검증(`scratchpad/xamlprobe`)** — 이 레포에서 가장 위험한 부류를 직접 쳤다.
+  "XAML 리소스 미해석은 **빌드가 못 잡고 런타임에만 터진다**"(CHANGELOG 실증).
+  테마 5딕셔너리를 Application 스코프에 병합한 뒤 **컴파일된 View 를 실제로 인스턴스화**:
+  - **T1 PASS — `InitializeComponent` 통과.** ⇒ 신설 StaticResource 전량(`DayToggleChip`·`FormTimePicker`·
+    `ActiveSuppressionBanner`·`BoolToVis`/`BoolToVisInv`)이 **해석됨**. Style·ControlTemplate·MultiDataTrigger 구조 오류 없음.
+    **정적 grep 으로는 절대 못 잡는 층위**를 통과한 것이다.
+  - **T2 미결(정직 고지)** — 시각트리가 `UserControl → Border → ContentPresenter` 에서 멈춰
+    요일 칩 7개·`~` 앵커 존재를 트리로 단언하지 못했다. DataContext 없는 헤드리스 창의 **실현 한계**이지
+    XAML 결함이 아니다(같은 항목을 정적 검증으로는 이미 확인: `Text="~"` 1개·`–` 1개·바인딩 69개 전량 실재).
+    프로브 기계장치를 더 손보는 것은 산출 대비 비용이 안 맞아 **중단**했다.
+- **계정 환경변수 4종 전부 미설정**(`IRONWALL_UITEST_ID/PW/SERVER/API`) ⇒ UI 스모크·기능은 규칙대로 **Skip**.
+  ⚠ 계정은 **환경변수로만** 전달한다(스크립트 인자 금지 — 콘솔 이력 잔존).
+- **플랜 60/61** · 게이트 A DoD 4항목 체크 완료.
+- **잔여 4건 — 전부 실기/외부**: V-08 실입력 캡처 소유권 · V-09 MDIX 자연높이 · V-11 목록 잔여행 ·
+  V-12 라이트/다크 실기 캡처 · UI 하네스 회귀(계정 필요) · 로컬 6.3.3 라이브 왕복.
+
+- **📮 서버팀 회신 대기 4건**: ① 원격 6.3.3 배포 일정 ② `permission_map.py` 에 `/reorder` 항목 누락 ③ 단발 창 경계 `suppressing` 오발행(`suppression_scheduler.py:55-89 _fire_boundary` 가 `notified_suppressing` 미기록 → 시작 시 `{active,false}` 발행 후 ≤5분 뒤 2번째) ④ G5 통계 문자열 매칭 여부.
+- **🐛 별건 발견 — `docs/INDEX.md` mojibake 14행**: coordination·design 절의 **섹션 제목·표 헤더**가 깨져 있다(`?뚯씪`=파일, `?ㅺ퀎`=설계). **HEAD 커밋본에 이미 존재 = 이 세션 소행 아님**(과거 CP949 쓰기). `?` 로 소실된 바이트가 있어 변환 복원 불가 — 표 헤더·섹션 제목은 재작성으로 복구 가능. **사용자 판단 대기**.
+
+### ▷ ✅ 서버 API **6.3.4 입력 검증 강화** 대응 완료 (2026-09-08) — 커밋 `248b160e` · 플랜 64/65
+
+**계기**: api-test-server 팀 전달 [`GOP_Server_API_suppression_input_guards_GIS_NOTIFY.md`](../coordination/GOP_Server_API_suppression_input_guards_GIS_NOTIFY.md) — 억제 스케줄 입력에 **422 5종 신설**. 전부 그전까지 조용히 통과하던 값이다.
+
+- **🔴 검토 결과 내 코드에 실제 결함 3건** — 안내문은 "UX 개선 목적, 안 해도 데이터는 안전"이라 했지만 실제로는 기능이 하나 죽어 있었다.
+  | # | 결함 | 증상 |
+  |---|------|------|
+  | **①** | `ValidateWeeklyForm` 이 **모든 동일 시각을 차단** | 서버가 인정하는 **유일한 종일 표기** `00:00:00~00:00:00` 까지 막아 **종일 억제를 등록할 수단이 아예 없었다**. 내 검증이 서버보다 과했던 것 |
+  | **②** | 단발→반복 전환 시 유효기간이 `now+1h` 그대로 | 반복은 '기간' 개념인데 1시간 창엔 **어떤 요일도 들어가지 않는다** → 요일을 고르는 즉시 422. 아래 도달 가능성 검사가 잡아냈다 |
+  | **③** | `_windowEndBackup` 하나를 두 전환이 공유 | '반복 전환 복원'과 '무제한 해제 복원'이 서로를 덮어, 무제한을 켰다 끄면 단발 복귀 시 1시간이 아니라 **30일 창**이 남았다 |
+- **왜 자정만 허용인가**: 전면 금지하면 **진짜 24시간을 표현할 방법이 없어진다** — `00:00:00~23:59:59` 는 매일 **1초 구멍**. 서버 규칙은 `if daily_start == daily_end and daily_start != time(0,0): raise`. ⇒ `DailyTimeVerdict.AllDay` → **`AllDayMidnight`(허용) / `AllDayAmbiguous`(차단)** 로 분리.
+- **신설**: `SuppressionRules.IsOccurrenceReachable` / `DescribeUnreachable` — 유효기간 안에 회차가 하나도 없는 창을 **저장 전에** 경고. 서버 `assert_occurrence_reachable` 과 동일한 좁은 범위(무제한=항상 통과 · 요일 1회라도 있으면 통과 · 자정넘김/자정종일 처리 · 유효기간 클램프). **이 검사가 위 ②③ 을 잡았다.**
+- **✅ 확인했으나 대응 불필요** (안내문 지적 중 4건)
+  | 지적 | 판정 |
+  |---|---|
+  | **센티널 `9999-12-31` 제거** — 안내문의 **유일한 '필수' 대응** | **해당 없음** — 레포 전수 grep **0건**. 무제한은 이미 `window_end: null` 명시 전송 |
+  | `target_type=all` + 대상 배열 | **해당 없음** — 서버 POST 검증은 `device`/`group` 에만 배열 ≥1 요구, `all` 은 검사 안 함(소스 확인). 422 는 **PATCH 한정**이고 이 클라엔 PATCH 호출부가 없다 |
+  | 단발 366일 상한 신설 | **주석만 정정** — 클라 30일이 더 좁아 422 불가. "서버는 단발에 상한 없다"는 낡은 기술 삭제 |
+  | `next_occurrence_start` 정확도 수정 | **무변경 이득** — 발동하지 않을 시각을 약속하던 서버 버그가 고쳐져 `OccurrenceText` 가 그대로 정확해짐 |
+- **⏸ 미착수(선택)**: 종일 체크박스 신설(체크 시 `00:00:00`/`00:00:00` 전송) · 연도 1900~2999 클라 가드. 둘 다 서버 **권장**이지 필수가 아니고, 폼 레이아웃 변경이라 별건.
+- **검증**: 솔루션 빌드 **오류 0** · `Events.Ui` **674 통과 / 15 실패**(전부 HEAD 기존, 격리 워크트리 동일 재현) · **신규 회귀 0** · 억제 도메인 205 → **217**. 회귀 고정 **12건**.
+- **커밋 `248b160e`** — 정확히 **4파일 / +271 −22**, 억제 도메인 전용. 타 세션 심볼 누출 검사 통과(IDoorContactPolicy 0 · OperationEventNatsSyncService 0 · HousingVisual 0). 조율 문서는 `.gitignore` 대상이라 제외.
+- **문서 갱신**: PRD **v1.1**(FR-11 정정 · **FR-19 신설** · 함정 21~23 추가) · 플랜 **S7 절 신설**(G-01~05, 64/65).
+
+---
+
+## ▶▶ 재개 포인트 (2026-09-06 — 창(Window) 아키텍처 전면 재기획 · Track C · **범위 B 승인됨 · PRD v1.1 Review 검토 대기**)
+
+- **요구(사용자)**: "Conductor 에 의해 Section/Panel/Dialog/Popup 으로 레이어가 잡혀 있어 **창 이동이 불가능**하고 장점보다 단점이 많다. 전체 창을 새로 기획하고 싶다. **다크/라이트 디자인이 깨지지 않으면서**. confirm/info popup 이 EventAggregator 를 쓰는 것도 번거롭다. 최적화하고 깔끔하게."
+- **투입**: 워크플로 `wf_49895179-7f3` — 실측 8축(레이어·메시징·실제창·테마·인벤토리·DI·상처증거·외부해법) → 설계 4안 → 심사 3렌즈×4안 → 승자 적대검증 4렌즈 → 합성. **29 에이전트 / 8.07M 토큰 / 929 툴콜 / 65분**. 반증 34건.
+- **📋 산출물(정본)**: [`docs/analyses/window-architecture-analysis.md`](../analyses/window-architecture-analysis.md) (99KB) — 현행 해부 + 문제 P0 7·P1 7·P2 8 + 목표 아키텍처 **Surface Kernel** + `IDialogService` 전문 + 테마 무결성 설계 + 로드맵 Phase 0~4 + 리스크 24 + **GAP 11**
+- **근본 원인 확정**: 모달 3층(`PanelShell`/`DialogShell`/`PopupDialogShell`)이 `ConductorControlView` 안에 컴파일타임 고정 z-order 로 겹쳐 있고, 그 `ConductorControlView` 자체가 **`LeftMenuSectionView.xaml:264-272`("Do not change order!!!" 주석)의 자식**이다. 패널·다이얼로그 View 전체에서 `Thumb`/`DragMove`/`DragDelta` **0건** — 좌표를 줄 수 있는 지점이 한 곳도 없다.
+- **✅ 사용자 최대 우려 해소(테마)**: `ThemeService` 스왑이 **`Application.Current.Resources.MergedDictionaries` + `PaletteHelper.SetTheme` + `ThemeManager.ChangeTheme(app,…)` 셋 다 Application 스코프** → 새 Window 는 토큰을 자동 상속하고 런타임 토글도 전파. 다중 창 전환의 최대 리스크가 이 프로젝트엔 없다. 조건은 하나 — 새 표면이 **아무것도 로컬 병합하지 않을 것**(커밋 `f811588` revert 전례).
+- **🔴 즉시 고쳐야 할 P0(창 재설계와 무관하게 오늘도 터짐)**: ① `ProgressPopupDialogView.xaml` 44행에 **닫기 요소 0개** + 삭제 핸들러 catch 없음 → 예외 시 전체화면 스크림 + 취소 불가 = **앱 재시작 외 탈출 불가**(11개 패널 동일 경로) ② 확인 팝업 '취소'가 어디에도 전달되지 않음 → `_pending*` 필드 워크어라운드 13파일 ③ 억제 패널이 Info 발행 직후 `finally` 에서 즉시 닫음(결정적, 레이스 아님) ④ 팝업 VM 3종 `SingleInstance` + 층당 1슬롯 → 두 번째 팝업이 첫 번째 페이로드를 덮어써 **'확인'이 엉뚱한 액션 실행 가능**
+- **마이그레이션 물량(실측)**: `OpenInfoPopup` 138 · `OpenConfirmPopup` 40 · `OpenProgressPopup` 28 · `ClosePopup` 46 = **252 편집점** + `Call*ProcessMessageModel` 29종 + `IHandle` 29개 + `_pending*` 13파일 + Close 마커 자기-닫기 29곳 + UI 하네스 17파일 ≈9,000행
+- **✅ 자산 발견(부록 B)**: `GMaps.Ui/GMapControls/LayerPanelControl.cs` 가 **이미 드래그 가능한 패널**(Thumb 2 + `Canvas.SetLeft` 로컬값 직접쓰기). `SurfaceFrame` 은 신규 발명이 아니라 이 코드의 일반화 → 공수 하향 + 메모리 `project_panel_design_system`("전 패널 표준=GMaps LayerPanel")과 정합
+- **✅ 사용자 결정 완료(2026-09-06)**: **GAP-7 범위 = B(창 이동까지, Phase 0→1a→1b→2→4)** · **GAP-1 = 셸 안 드래그·리사이즈 + 위치/크기 영속, 별도 OS 창(Detached) 미채택** · **GAP-2 = 라이트에서 밝은 카드로 뒤집기**(ThemeAssist 4곳 + FlatDarkBgButton 16파일 원자묶음) · **GAP-11 메인솔루션 변경 승인**(단계별 통지). 파생 자동해소 4건: GAP-4·6 무의미(Detached 제외) · GAP-5 요청큐만(AllowStack=false) · GAP-8 전량 SingleInstance 유지(**−1.5주**). 잔여 GAP-3·9·10은 권고안 진행+해당 Phase 확인.
+- **📋 PRD 정본**: [`docs/prds/window-architecture-prd.md`](../prds/window-architecture-prd.md) **v1.1 · 상태 Review — 사용자 검토 대기**. FR-01~40 · NFR-01~13 · 비목표 N-1~13 · 리스크 활성22/신설3/소멸2 · V-01~12 · 미결 Q-1~5. 공수 **150점 = 계획선 12.5주 / 상한 15.0주**, **1차 출시 4주차**(Phase 0+1a, 셸 무변경).
+- **⚠ PRD 검증 상태(정직 고지, §0-1)**: PRD 워크플로 `wf_a612906c-b95` 는 초안 2안+병합까지만 성공하고 **적대검증 3렌즈+확정 4에이전트가 "organization has disabled Claude subscription access" 로 실패**. 메인세션이 대행 표본검증 → **7건 확인**(Phase3 잔재 0 · ShellView.xaml:86 Splitter 컬럼 실재 · Close마커 10+19=29 정확 · LeftMenuSectionView:96-102 Light.Blue 실재 · DialogHost 22파일/호출0 · Progress View 닫기요소 0 · 공수 150점 검산 일치) **+ 정정 1건**(FR-18 무음 권한차단 **6→7곳**, `ConductorControlViewModel.cs:320` `CanOpenSetup()` SETUP 메뉴 누락). **FR-19~40 개별 인용 · §3 C# 시그니처 API 적합성 · §5 테마 토큰 키 실재 · NFR 수치 출처는 미검증** → plan 착수 전 재검증 권고: `Workflow({scriptPath: '…window-architecture-prd-wf_a612906c-b95.js', resumeFromRunId: 'wf_a612906c-b95'})` (초안·병합 캐시 적중, verify 단계부터 재개).
+- **🎨 스토리보드·와이어프레임(사용자 지시: PRD와 동반 진행)**: [`docs/design/window-surface-kernel-storyboard.html`](../design/window-surface-kernel-storyboard.html) **v1.0**. 실제 토큰 렌더 + WPF `#AARRGGBB`→CSS `rgba()` 변환 명시. 10절 — 현행 시각트리 / 목표 Surface Kernel / **조작 가능한 와이어프레임**(Float 드래그·리사이즈·최대화·창목록·클램프 금지구역) / 표면 5종 / Before-After / **GAP-2 라이트 대비 1.05:1 재현** / **GAP-9 스크림 4조합** / **§8 권한 UX 역할 전환 데모** / API Before-After / 확인요청 6건. 캡처 `docs/assets/window-surface-{wireframe-dark,gap2-light,perm-light}.png`. ⚠ 브라우저 검증 중 **클래스 충돌 결함 1건 발견·수정**(P0 알람 배너 `.alarm` 이 지도 심볼 `.sym.alarm` 을 지움 → `.p0alarm` 분리) — **수정 후 재실행 검증은 브라우저 점유 충돌로 미실행**(정적 검사만).
+- **🔐 권한 전수 감사 완료(사용자 지시 "절대 권한 누락 금지")**: 워크플로 `wf_88b8adce-e05` — 6에이전트·1.45M토큰·347툴콜 → 권한지점 **300건** → 중복제거 **정본대장 181행**. PRD §11 에 **FR-41~66(26건·164점)** · RR-01~30 · Q-01~14 · 미확인 11 편입.
+  - **실측 정정 3건**: ① 무음 권한차단 6→**7곳**(`ConductorControlViewModel.cs:320` `CanOpenSetup()` SETUP 누락) ② 무음 실패는 7이 아니라 **59곳**(Devices 22·GMaps 24·Events 6·Conductor 7) ③ 감사 원문 공수합 **178→164점 오산**(메인세션 검산).
+  - **실측 수치**: 표면 열림핸들러 25 중 가드 7 = **가드율 28%**, 무가드 **18**(패널4·다이얼로그11·팝업3) · fail-open **17** · 죽은 권한프로퍼티 **12**(XAML 바인딩 0) · 패널 내부 액션게이트 **63** · `PermissionsChanged` 구독 18/해제 15(**미해제 3** — SingleInstance라 현행 누수 아니나 **Float 다중화 시 누수 전환**).
+  - **✅ 최우선 미확인 2건 메인세션 직접 해소(§11-0)**: ① "GOP 모드에서 `IPermissionService` 미주입이면 가드 7개 전부 무력" → `Bootstrapper.cs:509` GOP 고정 + `AccountApiModule.cs:39` 등록 → **주입됨, 우려 무효** ② "MahApps `HamburgerMenuItemBase.IsVisible` 런타임 재필터 안 하면 메뉴 게이팅 축 무력" → DP 실재 + `UpdateSourceTrigger=PropertyChanged` + `LeftMenuSectionViewModel.cs:57-68`이 `CanSee*` 7건 알림 → **배선 완비**(컨테이너 collapse 실동작만 5분 스파이크 잔여).
+  - **🔴 신규 위험 최상위**: RR-19/20/21 **레이아웃 복원이 RBAC 우회**(저장파일 한 줄로 강등계정이 계정콘솔 Float 복원) · RR-22 레이아웃을 appsettings.json 에 얹으면 **평문 자격증명 재작성·유실** · RR-26 콘솔 6탭 Float 승격 시 감사로그·권한매트릭스 **무게이트 노출** · RR-27 복원이 `IPermissionService` Apply 이전이면 **게이트 63곳 전부 무력**.
+  - **⚠ 범위 초과**: 기존 150 + 권한 164 = **314점 ≈ 31.4주**(승인 B는 11~14주). §11-8 이 **Tier A 필수동반 86점 / B 지시직결 30점 / C 기존부채 48점**으로 3분류, **권고 = B안 266점 ≈ 24~25주**(Tier C 는 별건 `permission-debt-prd.md`). **사용자 결정 필요.**
+- **🚫 맵 OverlayWindow 불가침 경계(사용자 지시 2026-09-06 "맵에 있는 overlaywindow는 건드는거 아니다")**: 워크플로 `wf_8b74dc08-029` — 4축 대조 + 합성. PRD **§12** 신설(220KB).
+  - **경계 정본 = 3중 판정식 교집합**: ①시각트리 부모 `MapView.xaml` `x:Name="PropertyPanelCanvas"`(z200) 자식 ②디렉터리 `GMapControls/`·`GMapRoi/`·`GMapMilitary/`·`GMapProperties/` ③Themes xmlns 프리픽스 `ctrl:`/`roi:`/`milreg:`/`properties:`. 실측 검증 — `Themes/*.xaml` 40개가 프리픽스로 정확히 분할(ctrl 17+roi 1+milreg 1+properties 10+control 9+중립 2).
+  - **동결 59파일**: 구현 29(GMapControls 17 + MapRoiControl + MilitarySymbolRegister + GMapProperties 10) + 스타일 29 + `PropertyPanelCanvas` 서브트리. **A-4: 경로·네임스페이스·csproj 소속도 불변**(형식적 우회 차단). "건드리지 않는다"=**파일 무수정 AND 렌더 무회귀**.
+  - **⚠ 내가 준 경계 목록의 오류 2건 정정**: ① **누락 3계열** — `MapRoiControl`(z40)·`GMapMilitarySymbolRegisterControl`(z30)·`GMapProperties` 10파일(z20, 속성창) ② **`LineDrawingHud` 오분류** — 캔버스 형제(z150)가 아니라 `Adorners/LineDrawingAdorner.cs:126`이 AdornerLayer에 호스팅(z150은 중앙 십자가). 구현체는 축②③ 충족해 불가침 유지.
+  - **침범 FR 24건**(직접 9·간접 9·문서모순 6) + 수정지시문 A-01~A-24 / **무침범 확인 41건**.
+    - **A-06 최대 위험**: 신설 `SurfaceHostView`가 셸 루트 ColumnSpan=4인데 **`Background`·`IsHitTestVisible` 규정이 PRD에 0건** → `Transparent`면 **표면 0개 상태에서도 오버레이 전멸**(파일 한 줄 안 건드리고 죽이는 경로, 현행 스크림 6/7 타임아웃의 재발). 처방=`Background="{x:Null}"` + 자식 유무 바인딩 + **실마우스 회귀 6건**(UIA는 히트테스트 우회라 대체 불가).
+    - **A-05**: 드로어 400px가 `MapView.xaml:1328 Margin="5,5,300,5"`(MapZoomControl 하드코딩 회피)를 덮음. 지도가 ColumnSpan=4라 `PropertyPanelCanvas.ActualWidth` 불변 → **오버레이 자체 재클램프 미발화**. FR-10 범위 **200~300 축소**(D-5).
+    - **A-01**: §11-4 권한 검증계획의 '표면 축'이 오버레이 9종을 Float 후보로 열거 — §3-1·N-5·N-10·G-11과 **PRD 내부 3중 모순**.
+    - **A-02**: `LayerPanelControl` "일반화/추출/승격" 지시가 본문 **6곳** 잔존(헤더·분석 정본은 정정 완료). → 전부 "참조 전용 독립 구현", **≈130행 중복 영구 병존**이 대가.
+    - **A-13/A-22**: 방송 Play·TTS·카메라 스트림 팝업 **Float 이관 삭제** → VM 선두 게이트 1줄로 대체(오버레이 0줄). 카메라 강제로그아웃 스트림 해제는 **이미 구현됨**(`MapViewModel.cs:1865`) → §11-7 #9 해소.
+  - **✅ 경계와 충돌 없음 확인**: `MaterialDesignFlatDarkBgButton` GMaps **0건**(GAP-2 안전) · `#88000000`/`Scrim` GMaps **0건**(GAP-9 안전) · `md:DialogHost` 0 · `md:Card`/`ElevationAssist` GMaps Themes 0 · GMaps `DesignTokens` 31키 ∩ `Tokens.Light` 42키 **공집합** · **z-order 충돌 0**(`Panel.ZIndex`는 형제 간에만 유효 — SurfaceLayer는 ShellView 루트 스코프). **오폭 주의**: FR-37 Float 1순위 "WINDY"는 메인솔루션 `WindyPanelViewModel`이지 오버레이 `GMapWindyIndicatorControl`이 **아니다**.
+  - **⚠ 집행 절(§12-4)은 제안이며 미적용** — 하네스가 설정-지시형 패턴(settings-json) 감지·중립화. `.claude/settings.json` 훅·`pre-tool-gate.js` 확장·`pre-commit` 훅은 **사용자 승인 후** 판단.
+  - **부작용(정직)**: PRD 핵심 논거("SurfaceFrame=LayerPanelControl 일반화") 붕괴 → 공수 하향 전제 소멸(FR-24 6→8점, 계획선 **12.5→13.0주**, 상한 15.5주, **D-7 재승인**) · 디자인 표준 분기(`project_panel_design_system`을 상속 아닌 복제) · 권한 시각적 회색화 포기(Toast로 대체) · 오버레이 UIA 커버리지 영구 동결.
+  - **🔲 사용자 확정 D-1~D-7**: **D-2(경계가 이 PRD 스코프인가 레포 전역인가 — PRD 스코프 권고)가 최우선** — 전역이면 `symbol-3d-housing`(WIP 속성창 4파일 위반) 등 진행중 PRD 3건 즉시 정지. D-1 속성창 불가침 · D-3 구역 B · D-4 정의 · D-5 드로어 200~300 · D-6 회색화 포기 · D-7 공수 재승인.
+- **🔲 다음**: ① 사용자 PRD 검토 → 승인 ② **착수 전 필수**: 두 레포 각각 `git tag before-surface-kernel` + `git branch backup/pre-surface-kernel` ③ Phase 0 스파이크 6건(**S-3 HamburgerMenu 히트테스트가 이 PRD 전체의 가치 전제 — 실패 시 재작성**) + UI 하네스 green 복구(2026-08-06 실패 후 한 달 방치, Phase 1a 하드 게이트) ④ plan(worktree + CHANGELOG). ⚠ 파이프라인은 `pidsgroup-rightclick` 사이클(dev 36/50) 중이라 new-cycle 은 complete 이후만 가능(`--force` 금지). `approve prd` 는 **mtime 최신 PRD** 를 집으므로 주의(현재 최신 = 이 PRD).
+
+---
+
 ## ▶▶ 재개 포인트 (2026-09-04, 이 세션 — 그룹 심볼 변환(전체 선택 회전/확대축소) 시나리오 분석 → PRD Draft) — 🔲 **사용자 결정 7건 + 승인 대기**
 
 - **요구(사용자)**: 맵 편집 모드에서 드래그로 심볼 전체 선택 → 선택영역 중심 회전 + 확대/축소 버튼 커스텀 컨트롤. "확대 시 깨지면 안 됨(개별 이미지 소스라 깨질 것 같은데)". 가능·논리 검증을 시나리오+시뮬로 철저히 → PRD.
@@ -14,7 +418,205 @@
 
 > 📎 **RTSP 영상 팝업 관련 컨텍스트는 한 곳으로 통합됨** → [`session-context-rtsp-popup.md`](session-context-rtsp-popup.md) (2026-06-23~07-03, 14개 블록 시간순 재구성 + 상단 요약). 아래 원본 블록은 그대로 보존.
 
-## ▶▶ 재개 포인트 (2026-09-04 — 3D 심볼 하우징 · Track C · 분석+시뮬 2회+PRD Draft 완료, **승인 대기**)
+## ▶▶ 재개 포인트 (2026-09-06 — 3D 심볼 하우징 · Track C · **PRD v2.3 Draft · 미결 0 · 코드 변경 0 · 승인 대기 + 타 세션 검토 요청**)
+
+## ▶▶ 재개 포인트 (2026-09-07 18:0x — PIDS 그룹 3D 철망 · 통문(enum 신설) · 함체 개폐 · Track C · **사용자 "도입해줘" 착수 승인 · 설계 워크플로 진행 중**)
+
+- **착수 결정**: 스토리보드(`docs/design/pidsgroup-3d-fence-gate-storyboard.html`) 확인 후 사용자 "도입해줘"(18:0x). 결정 확정: D1 슬라이더 간격(1.0~10.0m·0.5·기본 3.0) · D2 통문 = 신규 `EnumDeviceType.Gate = 21` + 전용 3D 모델. D3~D9 는 사용자 위임 방침("가장 합리적인 방향")으로 권장안 확정(LOD ≥18 3D / 1차 그룹 전체 상태·센서 모드 구간 / 함체 도어 = 접점 이벤트 / 통문 양개 1종 / 단순화 2px / 잔여 균등·센서 정확 / 차량 = Phase 2 범위만).
+- **범위**: Phase 1 = A(3D 철망: 기둥/센서 장착 2형태·슬라이더·구간 상태·LOD·드래그 드로잉) + B(통문 enum·3D 개폐) + C(함체 개폐). Phase 2 = D(차량 5종, 영속 배관 신설) — PRD 에 정의만.
+- **롤백 포인트(두 레포)**: `before-pidsgroup-3d-fence`(HEAD: Lib dc65462 / Sol 778f2d5) + `before-pidsgroup-3d-fence-snapshot`(미커밋 WIP·untracked 포함 스냅샷: Lib 91ccb75 / Sol 2d1f7ce). 작업트리·인덱스 무변경.
+- **⚠ 프로세스 편차(명시)**: worktree 규칙 대신 **메인 작업트리(v2.6)** 에서 진행 — 이 기능은 미커밋 3D WIP(untracked Symbols3D 등) 위에 쌓여 HEAD 기준 worktree 가 컴파일 불가. 파이프라인 상태(`pidsgroup-rightclick` dev)는 타 세션 것이라 손대지 않음(문서로 추적). PRD 는 Draft(승인 마킹은 사용자).
+- **설계 워크플로 `wf_03598e8c-5ff` 결과**: 6축 조사 완료(144 fact·68 risk, 저널 `subagents/workflows/wf_03598e8c-5ff/journal.jsonl`), 분석/PRD/Plan 에이전트 3개는 **세션 사용량 한도(20:30 KST 리셋)** 로 실패 → 메인 루프에서 직접 작성 완료: [`analyses/pidsgroup-3d-fence-gate-scenario-analysis.md`](../analyses/pidsgroup-3d-fence-gate-scenario-analysis.md) · [`tests/pidsgroup-3d-fence-gate-scenarios.md`](../tests/pidsgroup-3d-fence-gate-scenarios.md) · [`prds/pidsgroup-3d-fence-gate-prd.md`](../prds/pidsgroup-3d-fence-gate-prd.md)(v1.0 Draft) · [`plans/pidsgroup-3d-fence-gate-prd-plan.md`](../plans/pidsgroup-3d-fence-gate-prd-plan.md)(46 태스크).
+- **⚠ 사용자 검토 필요(스토리보드와 달라진 점)**: ① **R1 서버 정본 정렬** — 서버 `operation-event-prd.md` v1.4(2026-09-07 사용자 승인)가 통문 = `gate` 카테고리·`gates.gate_status`·개폐 실시간 `SYNC_DEVICE`·알림 `OPERATION_EVENT` 로 확정 → 클라 DoorState 는 SYNC_DEVICE(주)+OPERATION_EVENT(보조)+DETECT ContactOn/Off(로컬 폴백, 설정) 3채널 수렴 ② 3D 키 `gate`→**`fencegate`**(시설물 정문 충돌) ③ **접점(Gate/Enclosure) 이벤트는 큐·카드·자동조치보고·사운드에서 제외**(현재는 탐지처럼 취급) — 메인 솔루션 변경 3건(카드 스킵·SYNC_DEVICE 훅·appsettings) 통지 ④ LOD 는 줌 숫자가 아니라 간격 픽셀(z18 3m=6.3px) ⑤ 정점 드래그 편집·구간 상태 채널·차량은 Phase 2.
+- **✅ 2차 실기(00:25~00:29)** 그룹 펄스 ✅ · 개폐 파이프라인 로그 ✅ · 문짝 픽셀 0 → **결함 확정: `GMapPidsMarker.PidsModel_Update` 가 DoorState 를 재통지하지 않음** → 수정 + 회귀 테스트(Housing 74/74) + 앱 재빌드 · 하네스: 배치 실패 시 시드로 계속 · **3차 실행 대기(RDP 창 복원 필요, 런처가 입력 가능 시 자동 시작)**.
+- **✅ HUD 고정 직접 검증 확장(2026-09-08 14:45, 사용자 "직접 테스트해봐 / 레이어 창도 켜고 같이 비교")**: 실기 진단 ✅8/✖0 — HUD 214.0×101.0 px 가 **디지털 줌 s=1.25·1.50·2.00(최상단) · 틸트 25° · 레이어 창 동시 표시** 전 구간에서 Δ0.0. 픽셀 측정(UIA 무관)으로도 HUD 헤더 238 px · 레이어 창 헤더 248 px 고정, 지도 타일만 2배. **정정 2건**: ① 줌 라벨의 `+` 개수는 dzl−1(정본 `ZoomLadder.Label`) — 종전 "레벨 2 정체" 보고는 내 디코딩 오류였고 실제로는 최상단까지 도달했다. ② 드로잉 중 Ctrl+↑ 틸트 각도 무반응은 `DrawingKeyRouter` 가 방향키를 Ignore 로 소비하는 **설계**(스트로크 투영 보호). 커밋: 라이브러리 `4f252585`(레이어 버튼 AutomationId) · 메인 `ef05577`(진단 확장).
+- **✅ 드로잉 HUD 화면 크기 고정(2026-09-08 14:30, 사용자 "확대 축소할 때 커졌다 작아졌다")**: HUD 가 지도 `AdornerLayer` 자식이라 컨트롤 `RenderTransform`(디지털 줌 s · 틸트 ScaleY=s·cosφ)을 상속하던 것이 원인. `LineDrawingAdorner.ApplyHudScreenScale` 역배율 재대입 + 드래그 클램프 + **`HitTestCore` 히트 사각형** 3곳 보정. 실기 진단 `LineDrawingHudScaleDiagTests` 2회 통과 — 214.0×101.0 px 불변(디지털 줌 s=1.50 · 틸트 25°, Δ0.0), HUD 우측 +60 px 클릭 정점 2→3, 앱 로그 예외 0건. 커밋: 라이브러리 `983b4bea` · 메인(하네스) `c2bd79b`.
+- **✅ 커밋 완료 + 세션 마무리(2026-09-08 10:4x, 사용자 "커밋하고 세션 마무리")**: 3개 레포 커밋 — 라이브러리 `5d52779e`(v2.6, **155파일 13,331줄**: 3D 철망·통문·함체 + 거울상 수정 + 라인 드로잉 결함 10건 + 지도 카드 틸트) · 메인 `b04f7c8`(v0.5, 18파일: NATS 통문/함체 개폐 배선 · SetupModel.MapTilt · 인스톨러 템플릿 · 하네스 MapProbe/AppLogParser/NatsEventPublisher/진단 4종/EnvironmentGuard) · 서버 `0528850`(release/v6.3, 6파일: SmartMultisensor2 v79, pytest 18 passed). 커밋 전 전체 의존성 빌드 성공(Events.Ui 포함 — 타 세션이 억제 파일 정리 완료). **의도적 제외**: 타 세션 억제 WIP 5파일(EnumKoreanMap·EventCardViewModel·ExEventViewModel·UiKoreanMap·억제 테스트) · 메인 이벤트 UI XAML 4개 · 개발자 `appsettings.json`(운영↔localhost 로컬 스왑 섞임) · 귀속 불명 3건(`deploy-watchdog.ps1`·`tests/`·`ui-test-summary.md`). 앱은 사용자 확인용으로 실행 중(PID 51412).
+  - **남은 작업**: ① 틸트 VER-06(회전+틸트 타일 페치 계측)·VER-07(빌보드 실기 — 툴바 회전 토글에 AutomationId 부여 후 재배터리) ② 3D 철망 PRD 편차 11건 검토 대기(Draft 유지)·VER-01/02/03/06/07 ③ 서버 `/api/gates` 라우터 + 클라 Gate fetch 경로 미구현 ④ 검토 대기 PRD: symbol-3d-housing(v2.8)·group-symbol-transform(빌보드 교차 편차 반영 필요)·window-architecture(Review)·Admin_Photo_Upload ⑤ 파이프라인 배너의 Active PRD 는 타 세션(pidsgroup-rightclick)이라 phase 전환은 건드리지 않음.
+- **✅ 틸트 실기 6차 통과(2026-09-08 09:34~09:40, 사용자 "승인")**: TiltRuntimeDiagTests ✅12/ⓘ3/✖0 — 토글 실클릭·배지 "기울임 20°"·17.5 유지/17.0 해제/18.5 재진입(앱 로그 `cause=dzl coalesced=3 z=17.5 Hold active=True`)·슬라이더 35/20(UIA RangeValue)·OFF 픽셀 diff 0·layoutChanges 5/조작 5·Tier 0x20000(RDP 하드웨어 Tier 2)·설정 저장/복원. ⓘ: 회전 kill-switch 하네스 미가동(빌보드 실기 미검증) · 카메라 팝업 RTSP 없음. FenceGate 회귀 ✅26/ⓘ13/✖0(함체 배치 포함, 문짝 591/717, 펄스 1380, LOD 0%). 리포트 §2 확정 · 플랜 47 중 45 완료(잔여 VER-06/07) · PRD DoD 체크 · 회전동기 분석/메모리 정정(DOC-01). **코드 미커밋**(WIP, 롤백 태그 `before-map-tilt-25d`, 백업 패치). 다음: VER-07 실기(툴바 회전 토글 AutomationId 부여) · 커밋은 사용자 지시 시.
+- **✅ 틸트 배선 완료(2026-09-08 07:5x~08:5x)**: 배선 워크플로(wf_577e65e4) F/H/I → G/T + 적대 리뷰 5건 전부 PASS(정정: DigitalZoomCoordinateTests BOM · 빌보드 테스트 nullable · 키보드 각도 저장). 잔여 3건 직접 수정: 편집모드 방향키 넛지 터널이 Ctrl 조합을 삼키던 것 제외(`MapViewModel.cs` OnMapPreviewKeyDownForGroup) · `RequestedTiltDeg` DP 변경 구독으로 키보드 각도 debounce 저장(`MapViewModel.Tilt.cs`) · 각도 팝업 `StaysOpen=False`(`MapView.xaml`). 스위트: GMaps.Ui.Tests **566** · Housing **150** · 속성창 4 · 하네스 Unit 94 green. 메인 exe 08:45 재빌드. PRD v1.2(구현 편차 7건) · 플랜 21 태스크 추가 완료(남은 20: VER-01/03~07·RISK·TEST-02/04/05·DOC·EXT-02 등). **실기 배터리 5차**(TiltRuntimeDiagTests + FenceGateRuntimeDiagTests, 런처 `run-fence-door2.py`)는 08:4x 시작했으나 입력 주입 거부(RDP 창 최소화)로 대기 중 — **20분 대기 초과로 자동 중단(09:0x)** — 시드/DB 변경 없음, RDP 창 복원 후 같은 명령으로 재실행. 미검증: V-01 오버스캔 배치 실기 · V-03 모아레 · V-04 RDP Tier · V-06 타일 · V-07 빌보드 편집 UX · NFR-03 OFF 픽셀 diff.
+- **✅ 지도 카드 틸트 PRD Approved + 플랜 + 기반 구현 착수(2026-09-08 07:1x~07:5x)**: 사용자 결정 ①살짝 비스듬(각도 조절·오버스캔) ②줌 게이트(17 이하 탑뷰) ③베어링 회전 시 마커 정립 → 조사 4축 워크플로(wf_feb5fdae, V-02 헤드리스 확정) + 시뮬 4,096+22(정책 불변식 0 위반) → `docs/analyses/map-tilt-25d-scenario-analysis.md` · `docs/prds/map-tilt-25d-prd.md`(**v1.1 Approved**, 결정 G1~G10 승인값 20°/35°/18.0/h0.5/앵커A차단/3D(i)/배지/G7 무보정/G8 150 ms 커밋/OFF 즉시0) · `docs/plans/map-tilt-25d-prd-plan.md`(47태스크). 적대 검증 반영(v1.1): 판정 코얼레싱(휠 스텝 중간 정수 상태가 wasActive 파괴) · 뷰 변환 재대입 불변식(어도너 in-place 미추종 실증) · 그룹 변환 PRD 교차 편차 · 헬퍼 소비처·하네스 강제 OFF·STA 테스트 위치. 롤백 태그 `before-map-tilt-25d` + WIP 패치. 기반 워크플로(wf_faf03536): A TiltMath 70/70 완료, B/C/D/E 진행(SetupModel:88·템플릿 키·스냅샷 TiltCos 이미 반영됨). **메인 변경 통지**: SetupModel 1줄 + 템플릿 키. 다음: 배선(F)·VM/XAML(G)·3D 정책(H)·빌보드(I) 워크플로 → 테스트 → 실기.
+- **✅ 실기 4차 + 2.5D 검토 완료(2026-09-08 06:3x~07:0x, 사용자 "남은 작업 승인")**: 4차 배터리 ✅27/ⓘ14/✖1 — 통문 문짝 594·함체 676 픽셀 개폐, 반전 옵션 0, 그룹 펄스 1375, LOD 왕복 잔차 0%, 드래그 드로잉 정점 3(왕복 재발 없음), **거울상 수정 FG-2 육안 확인**. ✖1 은 함체 팔레트 드롭 지점(1220,240)이 나침반 오버레이 위였던 하네스 결함(앱은 클릭 배치 대기) → 오버레이 회피·클릭 폴백 추가. 2.5D 지도 검토 워크플로(wf_00baf3f6, 01:27 검증 단계에서 사용자 중단에 끊김 → 캐시 재개 2회, B 반박자는 세션 한도 재시도) 완료: 분석서 `docs/analyses/map-25d-tilt-feasibility-analysis.md` — A(아핀 카드 틸트)·B(Viewport2DVisual3D 원근) 채택 불가, **C(하이브리드) 권고**(C4 형제 레이어 + C1 post-Fit 하우징 높이 과장 → C2 피치 SSOT 하한 30° → C5 스냅샷 스파이크 → C3 닫힌 라인 압출). 사용자 결정 3건 대기(원근 기대 여부 · 필수-060 이탈 수용 · RDP 상시 운용). 남은 실기: VER-09/10.
+- **✅ 라인 드로잉·3D 철망 결함 10건 + 하네스 2건 수정(2026-09-08 02:0x~03:0x)**: 헌트 워크플로(wf_7884f98c, 60 에이전트) 확정 20건 중 앱 결함 10건을 5 그룹 병렬 수정(wf_e76f89f0) — 키 라우팅 `DrawingKeyRouter`(ESC/Enter/Backspace/Ctrl+Z, 윈도우 터널 1차) · 맵 포커스/선택 해제 · 휠 차단/팬 억제/클릭 1 m 최소 간격(`LineDrawingInputGates`) · 어도너 `ExclusiveInputModeGate` · 철망 `DecideFrame`/`ApplyFrame`(LOD 전이 Rebuild, 지터 Reuse, **150 ms 디바운스 정착** — G4 리뷰 FAIL(ContextIdle 은 스로틀 아님) 후 내가 재작업) · 예산 m 환산 · 카메라 거리 비례 · `WritesBackRenderSize=false`. FinishLineDrag 순서 정정(`DiscardStrokePreview`). 하네스: 드래그 성립=앱 로그 `[LineDrag]` 판정, ⑤ 앵커 LocateByGeo, **앱 로그 UTF-8**(규칙 문서 정정). GMaps.Ui 348 · Housing 98 · 속성창 2 · 하네스 Unit 30 green, exe 재빌드. 실기 VER-09/10 대기(데스크톱 독점 필요). 2.5D 지도 검토 워크플로(wf_00baf3f6) 아직 진행 중.
+- **✅ 속성창 3D 철망 절 → 맨 밑으로 정정 + 3D 거울상 결함 2건 수정(2026-09-08 01:3x~02:0x)**: 사용자 "판망 간격·센서 부착·높이는 마커 속성 **맨 밑**, 단계별 순서" → PinnedContent 슬롯 제거(베이스 DP/PART 되돌림), 블록은 SpecificContent 마지막 자식(요약 행 포함, 5행 Grid), 테스트는 "마지막 자식 + ScrollToEnd 뷰포트 안" 계약(2/2, PNG 라이트/다크). 사용자 "꺾어진 라인 그릴 때 반대로 그려진다" → 픽셀 테스트로 **좌우 거울상** 재현: 철망·하우징 카메라가 −Z→+Z 라 세계 +X 가 화면 왼쪽(오른손 좌표계) — `FenceRunVisual` 루트 `ScaleTransform3D(-1,1,1/sin35)`, `HousingVisual` 최외곽 `ScaleTransform3D(-1,1,1)`(함체 문 방향·yaw 회전 방향까지 잠복 결함). `FenceMirrorTests` 2·`HousingMirrorTests` 1 green, Housing 77, GMaps.Ui 300. 메모리 `feedback_property_panel_section_order`. 실기 3차(01:25 자동 시작)는 ① 캡처 후 사용자 데스크톱 조작과 겹쳐 ②부터 오염(팔레트 열기 실패) — 데스크톱 비운 뒤 재실행 필요. 2.5D 지도 검토(wf_00baf3f6)·라인 버그 헌트(wf_7884f98c) 워크플로 진행 중.
+- **✅ 1차 실기 배터리(23:02~23:50, 48분)**: 팔레트 40종 3/3 PASS · D-21 PASS · 그룹 드래그 생성/슬라이더 5.0→DB/요약/센서 모드 ✅ · 3D 철망 Full3D 렌더 육안 확인 · 통문 배치/폭 ✅ · 개폐 파이프라인 앱 로그 확인(`[DoorState] Device(7) Unknown→Open→Closed`, 큐 제외) · LOD 왕복 ✅ · 설정 키 보존 ✅. 미계측: 문짝 DiffPixels(시드가 툴바 위) · 함체 개폐 · 그룹 펄스(장비 7 그룹 미소속). **2차 재실행 차단(23:56~00:2x)**: RDP 창 최소화로 SendInput err 5 → 런처 `run-fence-door2.py` 는 입력 가능 대기(20분) 후 시작하도록 변경, 대기 초과. 부수 수정: 세션 검사 WTS · 접점 result=CONTACT_SENSOR · 리포트 §2 갱신.
+- **⛔ 실기 검증 중단(22:3x)**: `run-fence-door.py` 1회 실행 → 픽스처 프리플라이트가 **화면 잠금(LogonUI)** 감지로 중단(UIA 입력 주입 불가). DB 시드는 정상 원복(시드 426 삭제·138 재연결). 완료 리포트 1차 `docs/reports/pidsgroup-3d-fence-gate-report.md` 작성(실기 대조표 = 전부 미실행/미검증). **다음**: 잠금 해제 후 같은 명령 재실행 → 결과 시트로 리포트 §2 갱신.
+- **✅ S4 워크플로(wf_1a540ec1, 6 에이전트·25분) 완료(22:2x)**: 메인 M-01~04(NatsDomainService 접점 스킵·함체 door_status→SetDoorState·Gate 단락 경고·switch Gate·appsettings 2본 키) 빌드 green + 적대검토 PASS · 서버 S-01/02(SmartMultisensor2 enum·v79·컨테이너 재빌드 v77~79 적용·openapi Gate 확인·pytest 18/18) · 하네스 T3-02/03(MapProbe 이관·PublishContactAsync/SyncDevice·FenceGateRuntimeDiagTests, 검토가 DestructiveGuard 우회 결함 수정) · T-C06 갤러리 PNG · T4-01/02 문서. **실기 검증 진행 중**: 시드 경로(통문 심볼 ↔ 로컬 장비 7) 런처 `scratchpad/run-fence-door.py`. 서버 /api/gates 라우터·클라 Gate fetch 경로는 미구현(통문 SYNC_DEVICE 는 접점 폴백만).
+- **✅ S2-C05 + S3 완료(21:4x, 라이브러리 측 구현 종료)**: `FenceRunVisual`(3버킷·예산·펄스) · `GMapMarkerPidsGroup3DControl`(`ComputeFrame` px 프레임·해시 스킵·3중 게이트·Posts LOD) · 그룹 3D 템플릿(PidsGroupMarkerStyle.xaml) · PIDS `DoorState` DP + 0.4s 문짝 애니메이션/LED StatusBrush · 속성창 3D 철망 절(150ms 지연 커밋·프리셋·요약·AutomationId) · 통문 절 · 팔레트/HUD AutomationId · 캡처 드래그 드로잉(`StrokeReducer`) — 헤드리스 300/300 · GMaps.Ui 481 · Housing 73 · UiTests 빌드 green. **남음**: 실기 검증(VER-01/02/03/08) · 메인 솔루션 M-01~04(사용자 통지 필요) · 서버 S-01~03 · 하네스 T3-02~05 · T-C06 갤러리 · 문서 T4. PRD v1.1 에 구현 편차 8건 기록(사용자 검토 대기).
+- **✅ S2-C/D 완료(21:0x)**: 관절 일반화(`HousingJoint`·문 스윕 bounds·`HousingMath.DoorAngle` 거울) · `fencegate` 모델 + 함체 도어 관절(R-06 닫힌 크기 보존) · `HousingVisual.DoorOpen` 경량 DP + `StatusBrush/MeshBrush` · 이벤트 배선: `ISymbolEventManager.SetDoorState/ApplyDoorEvent`, 접점 분기(큐 제외, `IDoorContactPolicy`), `OperationEventNatsSyncService`, 함체 door_status 부팅 초기화, `DoorStateMachine` → Monitoring.Models 이관 — 검증: Housing 61/61 · Events.Ui 도어 36/37(1건 헤드리스 고유) · GMaps.Ui 481 · 헤드리스 295 · UiTests 빌드 green. 다음: C05 `FenceRunVisual` → S3(그룹 3D 컨트롤/템플릿·속성창 슬라이더·통문 절·팔레트/HUD AutomationId·드래그 드로잉) → 메인 솔루션 M-01~04 통지 → 서버 5싱크.
+- **✅ S1-B 완료(20:1x)**: 모델 4층(그룹 PostSpacingM/FenceHeightM/FenceMode/Render3D/ReverseSensorOrder/ActiveSensorDeviceIds · 장비 GateWidthM/OpenOnContactOn/DoorState[JsonIgnore]) · DB 7열(DDL·COLUMN_SPECS·**columnMeta PidsGroupSymbols 로드**·SELECT/INSERT/UPDATE/DTO·Restore 선례 누락 보정) · Undo 11속성 · `Symbol3DSettings` record(+SaveSymbol3DAsync 키 보존) · DbProbe 허용목록/행 조회/감사 — 검증: Housing 46/46 · GMaps.Ui 481/481 · GMaps.Db PIDS 두 컬렉션 각 2회 green(격리 DB) · SchemaGuard 4/4(VER-04) · UiTests 빌드 green. **부수 정비**: GMaps.Db 픽스처 `[Fact]` 라이프사이클/시드(I-01 위반) 제거 + 시드 id 기반 조회 + LinkedDeviceId 고유 발급 → PIDS 테스트 순서 의존 제거(다른 도메인 픽스처 Geometry/Line/Military/Infra/Image/Map 은 아직 [Fact] 시드 잔존 — 전체 suite 병렬 실행은 여전히 비권장). 남은 알림: Pids 컬렉션 cleanup MySqlException(테스트 통과와 무관, 원인 미조사).
+- **✅ S1 진행(19:00)**: 순수 함수 5종 + 테스트 45건(`tests/GMaps.Ui.Tests` 295/295) · `EnumDeviceType.Gate=21`·`EnumDoorState`·`EnumFenceMode` · enum 전수 11지점 + 테스트 InlineData + 하네스 목록(DbProbe/정리/순회 제목) · `HousingModels.DeviceKey(Gate)="fencegate"` · 빌드 전부 통과 · Housing 41/41(팔레트 20·갤러리 32) · GMaps.Ui 481/481 · Events.Ui 실패 15건은 Gate 무관(FOV 줌범위·DTO 날짜·XAML 문자열) — 스냅샷 worktree 재실행으로 기존 실패 여부 확인 중.
+- **dev 착수(S1, 메인 루프)**: 순수 함수+헤드리스 테스트(FenceLayout·DoorStateMachine·FenceLod·FenceMath·PolylineSimplifier) → Enum/모델/DB/설정. 에이전트 한도 해제(20:30) 후 S2/S3 를 워크플로로.
+- **설계 워크플로 `wf_03598e8c-5ff`**(진행 중): 6축 조사(그룹 렌더·3D 파이프라인·이벤트 DoorState·enum 전수·속성창/DB·하네스/서버) → `docs/analyses/pidsgroup-3d-fence-gate-scenario-analysis.md` → `docs/prds/pidsgroup-3d-fence-gate-prd.md` → 적대검증 3렌즈·보정 → `docs/plans/pidsgroup-3d-fence-gate-prd-plan.md`. 완료 후 INDEX 등록 → dev 워크플로(영역 병렬: 순수함수+테스트 선행 → enum/모델/DB → 3D 모델 → 그룹 렌더 → 이벤트 → 속성창/팔레트 → 드래그 드로잉 → 로컬 API 서버 Gate(5싱크) → 실기 프로브).
+- **선행 조건**: 로컬 API 테스트 서버 `C:\workspace_python\api-test-server`(별도 레포)에 `type_device="Gate"` 장비 — 명세·코드·swagger·이미지·컨테이너 5싱크.
+
+---
+
+### ▷ 🆕 사용자 신규 요청(2026-09-07 16:5x) — PIDS 그룹 3D 철망 · 통문/함체 개폐 3D 심볼 → **스토리보드 먼저**
+
+- **요청**: ① 그룹 라인을 드래그로 그으면 설정 간격(2/3/5m)으로 기둥·철망이 3D 로 이어지는가(현재는 2D 폴리라인 — 신규) ② 통문(열림/닫힘, 이벤트로 형태 전환) 3D PIDS 심볼 ③ 함체도 열림/닫힘 형태 필요 ④ "HTML 와이어프레임 스토리보드로 먼저 확인하고 진행".
+- **✅ 스토리보드 v0.1 Draft**: [`docs/design/pidsgroup-3d-fence-gate-storyboard.html`](../design/pidsgroup-3d-fence-gate-storyboard.html) — 인터랙티브 기둥 배치(2/3/5m·상태·통문 절개), 35° 3D 스트립, LOD 표, 통문 닫힘/열림/열림+탐지, 함체 닫힘/도어열림/장애, DoorState 상태 머신(ContactOn/Off), 배선 계획(DP 1개 추가), DB/appsettings/NATS 영향(서버 계약 무변경), **결정 D1~D8**(권장: 3m 기본·통문=접점 센서 모델 변형·LOD ≥18 3D·1차 그룹 전체 상태·함체 도어=접점 이벤트·양개 1종·단순화 2px·잔여 균등).
+- **현행 사실(스토리보드 §0)**: 그룹 점 `pidsgrouppoints(SequenceOrder, Lat/Lng/Alt)`, 그룹 속성에 간격 없음 · `EnumDeviceType.Contact(5)`·`Enclosure(19)` · `EnumEventType.ContactOn(86)/ContactOff(102)` 기존 → 개폐는 기존 이벤트 파이프라인으로 수신 가능, 통문 전용 장비 타입 없음 · 3D 모델 키 `enclosure` 존재, `gate`/`fencerun` 신규.
+- **✅ D2 결정(사용자 17:2x "통문이라는 속성(enum)을 만들어야 하고 그 enum 에 해당하는 3D 심볼이 필요하다")**: 통문 = **신규 `EnumDeviceType.Gate = 21` + 전용 3D 모델 `gate`**(접점 센서 변형 아님). 영향면 실측(스토리보드 §5-B): enum·EnumKoreanMap·DeviceModelConverter(20)·DeviceFilterHelper(32)·SymbolPaletteItem(19)·HousingModels(15)·PidsControl/Fallback(22)·MapViewModel(40)·EventInfoViewModel(18)·테스트 5파일 + **서버 `type_device="Gate"` 선행**(없으면 이벤트 폐기).
+- **✅ 사용자 지적 2건 반영(17:3x)**: ① 톱다운 간격은 **기둥 간격** 또는 **펜스 센서 장착 간격**(철망 위 감지 노드) 두 형태 — 스토리보드 §1 형태 토글 + 센서 모드에서 노드↔그룹 센서 순번 매핑으로 **구간 상태(탐지 센서 좌우 패널만 펄스, D4)**, 3D 스트립도 연동. ② "지도가 3D 구조가 아니지 않나" → 맞음: GMap.NET 2D 타일 + 마커별 Viewport3D 화면고정 35° 피치 = **2.5D 오버레이**(지형·가림·시점 없음). 철망도 그룹 마커의 Viewport3D 안 압출 형상으로만 가능 — §0-B 에 가능/불가능/설계 결과 표로 명시.
+- **✅ D1 결정(사용자 17:5x "기둥 간격은 프로그래스바로 수정")**: 슬라이더 1.0~10.0m·0.5 스텝·기본 3.0(전역 appsettings), 프리셋은 보조, 3D 재생성은 놓는 순간 1회. 스토리보드 §1 인터랙티브 슬라이더 + 그룹 속성창 목업 반영.
+- **🔲 다음**: 사용자 D3~D9 결정 → 시나리오 분석 → PRD(별도 문서) → 순수함수(FenceLayout/DoorStateMachine) 헤드리스 테스트 선행.
+
+### ▷ 실행 6·7차 상태 (16:40~) — 사용자 "같은 위치에 놓지 말라고"(2회) 반영
+- 6차 중단: 소프트밴드 줌에서 마커 UIA 사각형이 부풀어 `EmptySpot` 이 54칸 전부 "근접"으로 오판 → 폴백 재사용 경로 → 즉시 중단. 줌 프로브는 줌아웃이 앵커 하한(16.5)에서 멈추고 줌인은 요청 스텝을 다 올려(18.5++) 뷰가 북서쪽 아파트 단지로 끌려감(마커 0) → 판정 불가.
+- 하네스 수정(p55~p58): 소각·사용 칸 **프로세스 정적 공유**(테스트 간 재사용 0) · 60칸 격자·재사용 시 실패(throw) · 화면 밖/거대 사각형 무시 · 속성창 미열림 시 인접 마커 재클릭 · 줌 지표 정규식(`++` 허용, 두 자리) · 줌아웃 지표 불변 시 중단·내린 스텝만큼만 올리고 시작값 보정 · 이벤트 프로브 가시 영역=MainMap∩셸·분할 팬·로그 도달은 정보성.
+- **✅ 이벤트 애니메이션 실기(6·7차)**: 로컬 NATS 직접 발행(`Support/NatsEventPublisher.cs`, loopback/사설만 허용) → 장비 7 '외부_외곽79' 3D 카메라에 DETECT → **빨간 배지 + 3링 펄스(약 2s 주기) 재생 확인**(대조표 `s3d-event-anim-detect.png`, red 픽셀 12→210…73 변동). 장애/장애중탐지 단계는 6차엔 위치 산출 실패(하프스텝 UIA 사각형) → 7차 재실행 중.
+- **✅ 7차(`…_164833`) 완료**: 시설물 **12/12** · 도형 **8/8** · 기본 **1/1** 전체 속성 스윕(전부 다른 칸) · 이벤트 프로브 PASS(탐지 펄스 ✅·장애 배지 ✅·공존 갭 실증) · D-20 PASS. 줌 프로브는 휠 무시로 판정 불가 → 버튼 Invoke 로 재작성(p60).
+- **8차(`…_1714xx`)**: PIDS 2종 재실행 **2/2 ✅**(돔형 카메라·I/O 제어기 — 인접 마커 재클릭 보완) → PIDS **19/19** · **D-21 **실기 검증 ✅**(`…_171455/s3d-infra-zoom.log`, 줌 버튼 Invoke): S1 '18.5+'→'18.5'→'18'(실효 18.0 < 최소표시줌 18.5 → 숨김, 마커 65→82) → **+1 → '18.5'(dzl 만 변경)에서 막사 재표시 ✅** · 시작 '18.5+' 복귀 ✅ · S2 하한 '15'까지 8스텝 내렸다 복귀 '18.5+' 후 존재 ✅ — 수정 전(16:02 4차)엔 같은 경로에서 라벨만 남고 본체 소실**.
+- **차량(사용자 질문)**: 없어진 게 아니라 미구현(VF-15 숨김·3D PRD G-4 별도) → 스토리보드 §3-D/D9 흡수안.
+- 5차 결과(`…_161421`): PIDS 전체 속성 스윕 **17/19**(2종은 생성 직후 속성창 미열림 — 하네스, 재클릭으로 보완).
+
+### ▷ ✅ 7차(14:37~16:10) 팔레트 40종 **드래그** 순회 + 앱 결함 D-18/19/21 수정 (2026-09-07) — 사용자 "새로 모든 심볼을 추가하고 속성을 바꾸는 테스트"
+
+- **결과**: PIDS 19/19 · 도형 8/8 · 기본 1/1 · 시설물 11/12 — 전부 실제 마우스 드래그 배치(OLE 모달 루프를 SendInput 스텝 이동으로 통과, `Id=318` 실증). 정본 §8-5 [`symbol-3d-wip-propagation-analysis.md`](../analyses/symbol-3d-wip-propagation-analysis.md).
+- **🔴 D-18/19 수정+검증**: 어도너(라벨·선택박스)는 맵의 형제 AdornerLayer 라 그 위 드롭·배치 클릭이 맵에 안 닿아 무음 거부 → `GMapCustomControl.SymbolPlacement.cs` `AdornerDecorator` 드롭 호스트 승격 + 어도너 원천 이벤트만 전달. 16:03 프로브 3/3 ✅(이후 사용자 지시로 Skip).
+- **🔴 D-21 원인 확정+수정(사용자 "시설물은 줌 줄였다 올리면 사라진다")**: 실기 재현(−3/+3 후 18.5+ 복귀인데 3D 본체 소실, 라벨만 잔존). 원인 = dzl(하프스텝) 변경 경로에 최소표시줌 게이트 재평가 없음 + `ReapplyLayerVisibilityForZoom` 심볼 무동작 + 팔레트 심볼 `Zoom=CreationZoom`(x.5). PIDS 는 `Zoom=0` 이라 면역. 수정 = `GMapCustomControl.cs` `UpdateMarkersVisibilityByZoom(force)` 를 `OnDigitalZoomLevelChanged`·`SetEffectiveZoom` 에서 호출. **실기 재검증 = 5차 실행(줌 프로브) 결과 대기.**
+- **하네스 결함 4건 수정**: `PART_*` 앵커 오인(→`GMaps.SymbolPalette.*`) · 같은 지점 반복(→20칸 격자·재사용 금지·재시도) · 비활성 컨트롤 주입 예외(→`IsEnabled` 가드) · 편집 예외가 삭제 삼킴/파일명 `/`.
+- **사용자 지시 4건 반영**: "드래그 방식" · "같은 위치로 보내지 마"(겹침 프로브 Skip) · "속성 일부만? 전부 다"(`EditAll` 25항목/심볼) · "빠르게"(대기 350ms·스크롤 축소·그룹당 1캡처, ~64s/심볼).
+- **🔲 진행 중**: ① 5차 실행 `run-s3d-full.ps1`(줌 프로브 + 40종 전체 속성, ~35분) → §8-6 기록 ② 사용자 신규 요청 "PIDS 탐지·장애 이벤트 시 3D 애니메이션 확인" — 코드 조사 에이전트 진행 중, 이후 로컬 테스트 서버로 이벤트 발행 + 프레임 캡처 ③ D-20(층수 미지원 타입 층 텍스트) 결정 ④ PRD Draft/미커밋 코드 · 운영 DB 마이그레이션 미검증 · R-14 TintStrength 영속 그대로.
+- **잔여 정리**: 16:08 중단으로 남은 '감시탑_T' Id=373 은 일회성 테스트로 DB 삭제 완료(파일 삭제).
+
+### ▷ ✅ 3D 심볼 WIP 반영 실패 수정 적용 (2026-09-07) — 사용자 지시 "정상동작 가능하도록 최대한 구현"
+
+- **롤백 지점(사용자 질문 답)**: 기존 `before-symbol-3d-housing`(7881823)은 **구현 이전**이라 현재 작업이 없다. 수정 착수 전 워킹트리를 백업 커밋으로 잡음 — '
+  tag `wip-symbol-3d-20260907-before-fix` = branch `backup/wip-symbol-3d-20260907` = **`322f8c5`**(임시 인덱스 `GIT_INDEX_FILE` 로 생성, HEAD·실제 인덱스 불변, docs 는 `-f` 포함). '
+  복원: `git checkout 322f8c5 -- <경로>`.
+- **적용 12건 / 14파일** — D-1 `SetCurrentValue`(`GMapBaseMarker.cs`) · D-2 FOV Collapsed/IpCamera 트리거 제거 · D-12 Infra3D 빈 `UpdateMarkerAppearance` · '
+  D-10 모델변형 MultiDataTrigger · D-5 antenna/helipad/powerpole 재질 토큰 · D-4 `FloorDisplayText` DP + 3D 템플릿 이식 + **레거시 2D 바인딩도 수정**(메서드 바인딩이라 2D 도 빈 텍스트였음) · '
+  D-7 지하 링 적층 · D-3 DB 3컬럼(NULL 허용·폴백·한 변경) · D-9 `MarkerAltitude` DP + '설치 높이' 행(SpecificContent 전용) · R-4 Display 반사 · R-10 주석 · R-17 로그.
+- **검증**: `dotnet build` GMaps.Db ✅ · GMaps.Housing.Tests ✅ · `dotnet test` **23/23**(신설 `should_keep_size_binding_alive_when_marker_updates_size_through_adorner_path` + 기존 테스트에 바인딩 생존 단언). '
+  mojibake 0 · BOM/CRLF 보존(패처가 `newline=''` 로 처리). **앱 실기·운영 DB 마이그레이션 미실측.**
+- **보류 8건(결정 필요)**: D-6 층수 형상 · D-8 면적 스케일 · D-11 헤드 회전(화면 확인 선행) · D-13 2D 글리프 · D-14 재질 토큰 · R-2 폴백 계약 · R-6 OBJ · R-14 TintStrength 영속.
+- **⚠ 사용자 통지(메인솔루션)**: 소스 `Dotnet.Monitoring.Solution/appsettings.json` 에 `Symbol3D` 키 없음 → **다음 빌드에 3D 꺼짐**. 배포본은 `false` 명시 권장. 라이브러리 밖이라 미수정 — 승인 시 처리.
+- **패처**: 스크래치 `fix/p01~p28_*.py`(정확 문자열 + 개수 단언, 세션 종료 시 소실). 진단서 §8·§8-2·§8-3 에 적용표 기록.
+- **✅ 3차 실기 구동 검증(사용자 "스스로 켜서 구동확인" · "안양발전소로 이동 후 테스트")**: 메인솔루션 하네스에 `Functional/Symbol3DRuntimeDiagTests.cs` 신설(UiDiagnostic). '
+  런처 `scratchpad/run-s3d-diag.ps1`(계정은 env 로만, 로컬 도커 API admin). **PASS 28s** — 앱 로그 `[Symbol3D] ON` · 마커 생성 **55/55 → GMapMarker3DHousingControl** · '
+  UIA raw 24/24 Viewport3D · 속성창 PIDS 절 색상 강도/설치 높이 노출 · 모델변형 행 제어기에서 숨김 · 설치 높이 60 → DB Altitude=60 · 제어기1 FOV 부채꼴 표시 · 너비 50→74→(Ctrl+Z)→86 · 예외 0. '
+  아티팩트 `docs/assets/symbol-3d-implementation/runtime-20260907/`. **한계**: Undo 발화 불확실(rect 74 유지), 설치 높이 부양은 소형 마커라 육안 불가, D-11/D-8 육안 미확인.
+- **하네스 실측(규칙 후보)**: 마커 UIA rect 는 화면 밖이면 수만 px 가짜 좌표 → 셸 rect 안만 클릭 · 템플릿 TextBlock 은 Raw 뷰로만 · WPF 휠은 delta 무시(이벤트 반복) · 속성창 ScrollPattern 없음 · ROI 패널 `PART_RoiListBox`+'이동' · FlaUI `Capture()` 는 Bitmap 직접 반환.
+- **동반 라이브러리 변경**: `Symbol3DFeature.ReadFile/LastDiagnostic` · `GMapPidsMarker` 마커별 컨트롤 타입 로그 · Housing 테스트 +1(40/40).
+- **✅ 4차 속성 전수 스윕(사용자 "Zoom 확대·속성 하나씩·심볼 중앙에")**: 하네스 `should_reflect_every_property_edit_in_3d_when_swept` 3회 PASS(13:16/13:24/13:32). '
+  지도 줌 +3(rect 2배) + 마커 240×96 확대 + 속성별 3배 크롭 → 대조표. **전부 3D 반영 확인**: 크기·채우기+강도·테두리 링·선두께·회전(하우징 전체)·설치 높이(부양+기둥)·FOV 표시/색/투명·탐지 범위/각도/방향·'
+  모델 변형(불릿→매달린 돔→스피드돔)·고정형 회전·건물종류 6종·층수→높이+F/B 텍스트·지하층·용도→지붕색·헬리패드 슬라이더 비활성·**어도너 리사이즈 후 속성창 너비 반영(D-1 실제 경로)**. '
+  한계: 제목 편집기 탐색 실패(도구), 기준방향/면적/지하 링은 미세. 관찰: 50×20 에선 상태 배지가 하우징을 가림, 제어기는 금속 뚜껑 우세로 채우기색 약함.
+- **✅ 5차 사용자 지적 2건(13:54)**: ① "제목 변경 못 찾음" = 하네스 결함 — DISPLAY 절 '제목' 표시 체크박스(`BasePropertyStyle.xaml:567`) 텍스트를 라벨로 오인 → `RawTextElement` 에 컨트롤 콘텐츠 제외(`IsControlContent`) 추가 → 제목 변경 **DB 왕복 확인**. '
+  ② "링은 크기 바뀌면 같이" → `HousingVisual.OnRender` 링 **마커 박스 비례**(`rx=W·.46, ry=min(H·.22, rx·sin35°)`)로 변경, 집중 테스트 `should_scale_ground_ring_with_marker_size_and_edit_title` PASS(100×40→320×160 링 비례 대조표). Housing 40/40. PRD v2.5.
+- **✅ 6차(14:02) "제목을 체크해야지 나온다"**: ShowTitle 체크(DISPLAY '제목')를 켜고 제목 변경 → 라벨 '정문1'→'정문1_변경' **화면에 그려짐** 확인(대조표 `s3d-ring-sheet-showtitle.png`), DB Title/ShowTitle 커밋, 원복 0. 헬퍼 `SetCheckByName`(체크박스 자기 이름으로 설정) 추가.
+- **하네스 결함 발견·수정**: `DbProbe.RestoreColumns` bool→"True" 문자열 UPDATE 실패(무음) → 1차 실행 후 심볼 108·139 잔존 변경 → `ToDbValue` 수정 + 1회성 복구 테스트로 **원복 완료**(파일 삭제). `RestoreTypeTable`·`PidsRow`·`InfraRow`·`PidsDeviceTypeByTitle` 신설. '
+  스윕 헬퍼: `CenterSelected`(편집모드 OFF→팬→ON→재선택) · `SetEdit/SetSlider/SetCombo(ByText)/SetCheck` · `DragHandle` · `CaptureZoom`+`SaveSheet`(대조표) · Raw 뷰 라벨 탐색 · 휠 반복 스크롤.
+- **✅ 2차(보류 8건 결정, 사용자 "가장 합리적인 방향으로 정의해서 간다")**: D-6 층수→감시탑·안테나·전신주 높이 + `SupportsFloors` 슬라이더 게이트(게이트·발전기·물탱크·헬리패드·교량) · '
+  D-8 면적→XZ 배율(.7~1.6, Fit/Project/링 동일) · **D-11 고정형·돔형 헤드 제거(하우징 전체 회전), PTZ 만 독립 헤드 — PRD FR-19 정정 v2.4** · D-13/D-14/R-6/R-14 의도 명시 · R-2 계약 주석. '
+  **appsettings 적용**: 소스 `Dotnet.Monitoring.Solution/appsettings.json` ON · `Installer/appsettings.template.json` OFF(현장 opt-in, 설치기가 publish 판을 Excludes + 업그레이드 불가침). '
+  빌드 ✅ · 테스트 **39/39**(결정 고정 Theory 16 신설). 앱 실기 미실행.
+
+### ▷ 🔴 3D 심볼 WIP 반영 실패 진단 (2026-09-07) — 사용자 지시 "속성창/어도너 반영 안 되는 것 위주 점검"
+
+- **정본**: [`docs/analyses/symbol-3d-wip-propagation-analysis.md`](../analyses/symbol-3d-wip-propagation-analysis.md) · 워크플로 `wf_526cbc73-344`(7렌즈 추적 + 렌즈별 적대 반증, 15에이전트·3.69M토큰·872툴콜·37분) + 메인세션 직접 재실측.
+- **결과**: 132항목 추적 → **BROKEN 5 · PARTIAL 9 · RISK 17 · 정상확인 21**. 코드 변경 0(정적 추적, 앱 미기동).
+- **⚠ 3D 플래그 상태**: `Symbol3D.IsEnabled=true` 가 **`bin/Debug/net8.0-windows7.0/appsettings.json` 에만**(mtime 09-07 10:22). **소스 `Dotnet.Monitoring.Solution/appsettings.json` 에 키 없음 → 다음 빌드에 3D 꺼짐.** 배포본(`Installer/publish/`)도 키 없음. `Symbol3DFeature.cs:9` 가 Lazy 라 프로세스당 1회 읽기(런타임 토글 불가).
+- **🔴 D-1 최상위 공통원인**: `GMapBaseMarker.cs:227-235 UpdateShapeSize` 의 `element.Width = width` **로컬값 대입**이 3D 의 **OneWay** W/H 바인딩(`GMapMarkerBaseControl.cs:382-383` + 3D 가 `WritesBackRenderSize=false`)을 **영구 파괴**. 재바인딩 경로 없음(`SetupDataBindings` 실호출은 생성자 `:288` 1회뿐). 발화원 3개 — 어도너 `MarkerEditAdorner.cs:1025/1054/1090/1319` · **그룹 일괄편집이 재사용하는** `UndoableCommandBase.ApplyProperty:33-34` · `TransformCommand.cs:47`(위치만 바꿔도 UpdateSize). 증상 = "어도너로 크기 한 번 조절 후 속성창 크기 입력이 영영 무반응 + 심볼이 옆으로 밀림". **수정 = `SetCurrentValue` 한 줄, 부작용 없음.** ⚠ `HousingTests.cs:143-145` 가 `control.Width=27` 로컬 write 후 **바인딩 생존을 단언하지 않아** 이 버그가 테스트를 통과한 채 살아 있다.
+- **🔴 D-2**: `Housing3DMarkerStyle.xaml:12`·`:250` `PART_FOVCanvas Visibility="Collapsed"` 를 여는 규칙이 **`DeviceType=IpCamera` MultiTrigger 뿐** → 비카메라 PIDS 8종 FOV 영구 불가. 폴백 컨트롤 대상 8종에 IpCamera 가 없어 조건이 영원히 거짓. **`GMapPidsMarker.cs:47-49` 가 3D OFF 에도 폴백 템플릿을 태워 2D 회귀.**
+- **🔴 D-3**: `DetectionBearing`/`DetectionRange`/`DetectionAngle` **컬럼·SELECT·INSERT·UPDATE 전부 0건**, `GMapDbSymbolService.cs:4150` 이 `= BaseBearing` 하드 대입 → 탐지방향 저장 후 재조회 시 기준방향으로 복귀. ⚠ 하드대입 제거를 컬럼 추가보다 먼저 하면 **전 카메라 정북 리셋** — 한 커밋으로.
+- **🔴 D-4/D-5**: Infra3D 템플릿에 층수 텍스트 요소 0건(계산·클릭토글은 살아 있어 영구 no-op) · antenna/helipad/powerpole 에 `mat_body`/`mat_roof` 파트 부재 → recolor 가 `_materials` 순회라 **색이 도달 자체를 못 함**.
+- **🔴 D-12**: Infra 3D 는 MarkerState 변경 시 `base.UpdateMarkerAppearance()` 가 `MarkerFill` 에 로컬 write → 사용자 색 바인딩 영구 파괴("상태 한 번 바뀌면 채우기색이 안 먹음"). **PIDS 는 base 미호출이라 면역** → "어떤 심볼만 안 먹는다"로 체감. 수정 = Infra3D 에 빈 `UpdateMarkerAppearance()` override. 🚫 base `:437` 을 SetCurrentValue 로 바꾸는 근본안은 **"MarkerFill 권위자가 상태냐 사용자냐" 시맨틱 변경**이라 별도 합의 필요.
+- **PARTIAL 9**: D-6 건물 8종 층수 무반응(+UI Max 50 vs 코드 Clamp 12) · D-7 지하층수 값 미사용 · D-8 건축면적이 3D 스케일 미반영 · **D-9 고도 입력 UI 자체가 없음**(표시·모델·Undo·DB 는 전부 준비됨) · D-10 모델변형 게이트 누락 · **D-11 카메라 헤드 회전**(배선은 정상, `m.Head=true` 가 실루엣 대부분이라 무반응처럼 보임 — **의사결정 필요**) · D-13 2D 건물 자산 1종 · D-14 재질 3종 하드코딩으로 테마 미추종.
+- **RISK 주요**: R-1 D-1 일반형(`:319-332` 이 13개 DP 로컬 대입) · R-4 팔레트 `buildings[(int)type]` 병렬배열(enum 삽입 시 팔레트 전체 사망) · R-6 OBJ 로더 `builder.Head` 대입 0건 · **R-10 `GMapMarkerBaseControl.cs:501` 한 줄이 3D 성립 필수 의존인데 문서·테스트 고정 0** · R-8 어도너 박스 3D 회전 미추종(그리기만 고치면 히트와 갈라짐) · R-14 TintStrength 미영속.
+- **🔲 수정 순서 12단계 확정**(진단서 §6). 1~7 은 부작용 없는 국소 수정, 8~10 은 결정·선행 제약 있음. **금기 6건**: TwoWay 무조건 복귀 · base `:437` 동시 수정 · Slider Max 축소 · recolor 폴백 · BasePropertyStyle 에 고도 배치 · `GMapMarkerPidsControl.cs:405` return 제거.
+- **배포 전 필수**: `Installer/publish/appsettings.json` 에 `Symbol3D` 명시 추가(**값은 false** — opt-in 계약 유지) + 소스 appsettings 도 함께.
+
+### ▷ 🔴 인계 문서 검토·검증 결과 (2026-09-07) — **판정: 그대로 넘기면 안 됨**
+
+- **정본**: [`docs/analyses/symbol-3d-housing-handoff-review-analysis.md`](../analyses/symbol-3d-housing-handoff-review-analysis.md) · 워크플로 `wf_d5ccb1d6-35d`(7축 조사 + 축별 독립 적대 재검증, 15에이전트·2.48M토큰·555툴콜·27분) + 메인세션 직접 재실측.
+- **주장 62건 대조 → CONFIRMED 44 · 결함 17 · UNVERIFIABLE 6.** 기술적 본체(§3 앵커 14/14 · §4 정정 E-1~E-4 · §5 결정 15건 · 수치 2,032·중복ID 0 · 시안 v2.8/모델35/JS 문법)는 **HEAD 기준 정확**. 무너진 것은 **자기 상태 진술**.
+- **🔴 D-1 (최중요)**: "코드는 한 줄도 안 고쳤다"가 **거짓**. `git status -uall` 실측 **미추적 신규 17경로 + 수정 27파일** — `GMaps.Ui/Symbols3D/`(Housing{Models,Visual,ObjLoader,MeshBuilder,Math,Appearance}.cs) · `GMapMarker3DHousingControl.cs` · `GMapMarkerInfra3DControl.cs` · `Themes/Housing3DMarkerStyle.xaml`·`SymbolPaletteStyle.xaml` · `Utils/Symbol3DFeature.cs` · `Views/Maps/SymbolPaletteView.cs` · `MapViewModel.SymbolPalette.cs` · `Models/SymbolPaletteItem.cs` · `Resources/Symbols3D/` · `tests/GMaps.Housing.Tests/`(should_ 15건, 빌드 산출물 존재). PRD 가 "신설하겠다"던 베이스 3멤버가 이미 랜딩 — `GMapMarkerBaseControl.cs:34 RotatesIn2D`/`:800`/`:801 WritesBackRenderSize`/`:804 ApplyDisplayAngle`, **HEAD 판본 grep 히트 0**. 파일 mtime 09-06 **23:33**(인계문서 20:55 이후) → 문서는 작성 시점엔 참이었고 지금 낡았다. **⚠ §11 대로 태그 checkout 하면 미커밋 19경로 복구불가 소실** — 태그와 백업브랜치는 동일 커밋(7881823)이라 2중 안전장치 아님.
+- **🔴 D-2**: "드래그 인프라 0건"이 문서가 **스스로 인용한** `drag-first-ux.md:11-13`("OLE 0건 / 캡처 드래그 다수")와 정면 배치. 실측 `CaptureMouse()` **22파일**. 그런데 FR-18 이 `DoDragDrop` 채택 + `SymbolPaletteView.cs:158` 구현 = 같은 규칙 **Must Never(OLE 기본안 금지, 채택 시 스파이크 선행) 위반**이 코드로 굳음. 폴백 6종 중 ESC 만 있고 FR-16 이 콤보·[추가] 제거 → 드래그 유일 경로.
+- **🔴 D-3**: "베이스 3멤버는 순수 가산" 반증 2건 — 군대부호 `IsPreviewMode` DP **베이스 이관**(비대상 파생 수정) · `:382-383` W/H 바인딩을 `WritesBackRenderSize ? TwoWay : OneWay` 로 **기존 계약 조건부 변경**. FR-20 회귀가드 범위 과소.
+- **🔴 D-4 (안전)**: 금지문이 **안전한 GMaps.Db** 를 지목(`GMapTestDb.cs:23 monitor_test_db` 격리 완료). 진짜 위험은 **`Accounts.Db/Tests/UnitTest.cs:43 monitor_db` + `DROP DATABASE`**, `Devices.Db:57`, `Events.Db:67`. CLAUDE.md `test_command` 가 무필터 `dotnet test` 라 기본값 실행 시 운영 DB 전멸 경로.
+- **🔴 D-5**: "성능 계측 0건" 거짓 — `docs/assets/symbol-3d-implementation/rotation-cpu.txt`(p95 **0.100ms @ N=100 오프스크린**, GPU/RDP/오버레이 제외) 실재. N=500·실기는 여전히 미측정.
+- **🔴 최상위 누락**: `window-architecture-prd.md` **§12 불가침 경계 전면 미반영** — `:1911` 이 `SymbolPaletteView` 를 "symbol-3d-housing 미커밋 산출물"로 명시, `:1941` **D-1 "미결 시 symbol-3d-housing 즉시 동결(WIP 5파일이 이미 위반)"**. 현재 WIP 가 속성창 4파일 + `Generic.xaml` 수정 중. (window-arch PRD mtime 09-07 00:19 = 인계문서 이후라 과실 아닌 미반영)
+- **medium 6 / low 6**: HEAD 대비 워킹트리 **+10~+19행 드리프트** 미표기 · §3 이 지목한 결함 3건 이미 수정됨 · pipeline-state 정본은 `.claude/.branch-v2-6/`(docs/memory 판은 07-30 stale) · **approve mtime 1위가 지금 `window-architecture-prd.md`** · ISSUE 626→**628** · 리스크 10→**9** · V-01~15 중 V-10 결번·V-12 철회(활성 13) · "모든 회전 경로"→파생 8종 한정.
+- **🔲 다음**: 수정 지시 12절이 분석 §6 에 적용 가능한 형태로 정리돼 있음. **사용자 결정 필요** — ① 인계문서를 수정해 넘길지 ② 미커밋 WIP 를 먼저 보존/커밋할지 ③ window-arch D-1/D-2 결정 전까지 동결할지.
+- **⚠ 훅 오탐**: 이 턴의 게이트 배너가 "PRD 검토 승인 키워드 감지 — 마커 해제"를 띄웠으나 **사용자는 승인한 적이 없다**("검토·검증" 요청을 승인으로 오인). PRD 는 여전히 Draft.
+
+### ▷ 검토 인계 (2026-09-06, 사용자 지시 "다른 세션에서 검토")
+
+- **인계 정본**: [`docs/coordination/symbol-3d-housing-handoff.md`](../coordination/symbol-3d-housing-handoff.md) — 맨바닥 세션이 읽고 검토할 수 있게 자립형으로 작성.
+- **담은 것**: 사용자 요구 10건 이력(범위가 늘어난 순서) · 파일 지도(정본 5종·캡처 6종·시안 여는 법) · 조사한 코드 17지점 file:line 표 · **선행 문서 오류 4건 E-1~E-4**(이걸 모르고 착수하면 회귀) · 결정 15건 요지(뒤집힌 4건 G-6/8/14/15) · 지시 8 대응 스코프 원칙(base 확장이 왜 가산적인가) · 시뮬 ISSUE 626 은 대부분 **대조군**이라는 읽는 법 · 미검증 V-01~15 + 성능 근거 0 + 부팅 O(N²) 오염원 · 검토 요청 5항 · **금지 5항**(게이트 `--force` · 승인 대행 · GMaps.Db 통합테스트 운영 DB 삭제 · 한글 셸 인자 · 타 세션 WIP 커밋).
+- **검토 요청 5항**: ① 성능 게이트(16ms/500개)가 차용 수치인데 그대로 게이트로 삼아도 되나 ② base 3멤버 추가가 정말 가산적인지 코드로 반증 ③ 결정 15건 근거 검증(특히 G-6·G-14·E-1~E-4) ④ 팔레트·드래그 설계의 빈틈(드래그 인프라 저장소 0건 = 전량 신설) ⑤ 태스크 56 이 과한가(3D 본체 ↔ 팔레트 분리 여부).
+- **⚠ 받는 세션 주의**: `docs/` 는 gitignore 대상이라 **Grep 으로 안 잡힌다** — 경로로 직접 열 것. `approve prd` 는 **mtime 최신 PRD** 를 집으므로 창 아키텍처 PRD 와 공존하는 지금은 대상이 뒤바뀔 수 있다.
+
+### ▷ 형상 재설계 2회 (2026-09-06, 사용자 육안 지적)
+
+- **1차** "IP스피커 혼 옆 통이 너무 얇다" → 드라이버 배럴 r11×20 + 숄더 플랜지, 혼 길이 38(입구 r21).
+- **1차** "고정형 카메라는 돔이 될 수 없다 · 돔형은 거꾸로 달린다 · PTZ 를 그럴듯하게" → 카메라 계열 3분할: 고정형=불릿(배럴 33 + 실드 13.5, 실린더가 드러나게 실드를 좁힘) / 돔형=벽 브래킷 팔에 **아래로 볼록한** 버블(`domeDown` — 절두체를 아래로 쌓아 법선 유지) / PTZ=폴 마운트 스피드돔.
+- **2차** (스크린샷) "카메라와 스피커 디자인이 너무 별로다" → **원인은 형상이 아니라 시야각**: 피치 35° 탑다운에서 정면(+Z)이 관찰자를 향한 bearing 0 은 원판으로 보이고, 아래로 볼록한 돔은 위에서 볼록면이 안 보인다. → `PREVIEW_B` 모델별 3/4 미리보기 방위(camera 48 · dome 35 · ptz 35 · speaker −52 · sensor 20 …)를 갤러리·팔레트 셀·§8-C 크롬이 공유하게 하고, 돔/PTZ 를 브래킷·폴 설치형으로 재모델링(실제 경계 설치 형태와도 일치).
+- **중간 결함 3건 수리**: 갤러리 `B=undefined°` 라벨(`dome` 키 누락) · 구 모델 정의의 고아 줄이 스크립트를 깨뜨림(`Unexpected identifier 'base'`) · 줄범위 삭제가 한 줄 더 먹어 **`sensor:` 모델 전체 소실** → 복원. Node `new Function()` 구문 검사 + 브라우저 확인(모델 35 · 팔레트 셀 90 · 갤러리 20 · 와이어프레임 25행 · 콘솔 무오류).
+- **시안**: `docs/design/symbol-3d-housing-storyboard.html` **v2.8** · 캡처 `docs/assets/symbol-3d-gallery-v28-20260906.png`.
+
+### ▷ 미결 9건 전부 확정 (2026-09-06, 코드 근거)
+
+| ID | 결정 | 결정적 근거 |
+|---|---|---|
+| G-6 PTZ | `EnumDeviceType` **확장 금지** → `PidsSymbols.ModelVariant VARCHAR(20) NULL` 신설 | `MapViewModel.cs:349-352` 가 심볼 DeviceType 을 **서버 장비 레지스트리와 대조**, 불일치 시 ID 폴백 + 경고 로그. 새 멤버는 서버가 안 보내므로 영구 경고 |
+| G-14 좌표 | 드롭·클릭 **둘 다 `SubPixelGeo`** 상향 | `Helpers/SubPixelGeo.cs` 가 이미 드래그 이동에 사용 중 — 세 경로 정밀도를 맞춘다 |
+| G-15 링 채널 | **철회**(충돌 없음) | 상태 = `PART_EventStatusIndicator` 배지 + `PulseRing1~3`(고정 `#CCFF0000`), 접지 링은 3D 신규 요소 — 요소 자체가 다름 |
+| G-8 크기표 | **확장 안 함**(현행 명시 6종 + 폴백 32 유지) | N3 정규화가 W/H 박스를 채우므로 무의미하고, 늘리면 기존 저장 W/H 와 어긋나 회귀 |
+| G-11 FOV z | **현행 유지** | `PidsMarkerStyle.xaml:450-451` `PART_CameraSection Panel.ZIndex="-2"` — 이미 뒤에 있다. V-12 철회 |
+| G-3 호버 | 접지 링 밝기 +15%, `PART_HoverHighlight` 존치 | 현행 10×10 Opacity 0.15 는 하우징 뒤라 3D 에서 안 보임 |
+| G-4 차량 | 별도 PRD | 부팅 로드 SQL `WHERE Category='BASIC_SHAPES'`, 집계 7종에 VEHICLES 없음 |
+| G-5 건물 | 12종 확정, 초소·감시탑·게이트 우선 | `EnumBuildingType`·`EnumBuildingUsage` 확장 후보가 주석으로 존재 |
+| G-12 건물용도 | 지붕 액센트 재질(Phase 2) | `EnumBuildingUsage` = Office 1종 + 8종 주석(BuildingType 과 동일 상태) |
+
+### ▷ 실물 와이어프레임 §8 신설 (시안 v2.0)
+
+- **실제 XAML 구조·실측 토큰 재현**: `Tokens.Dark.xaml`(Surface `#161D26` · SurfaceAlt `#1E2832` · Border `#2C3A48` · Divider `#243140` · Primary `#22B8D9` · Accent `#F0A33C`)
+- 8-A 편집 스트립(현행 콤보120+콤보100+[＋추가] vs 신규 [아이콘 등록] 토글) · 8-B 속성 패널 실제 5섹션(BASIC 제목·제목크기·크기·회전 / COLOR 채우기·테두리·선두께 / LABEL 글자색·배경색·글꼴·글자체·제목폭 / DISPLAY 최소 줌 / Z-ORDER 순서) + PIDS 전용 + 3D 전용 3필드 · 8-C 팔레트 크롬(`LayerPanelStyle` CornerRadius 8·CountBadge) · 8-D 드래그 상태 전이 7단계
+- **중요 실측**: 색은 스와치 그리드가 아니라 **ComboBox**(`AvailableColors` + `ColorTypeToBrushConverter`), 크기는 TextBox 2개, 회전·최소줌은 Slider. 공통 패널 레이아웃은 **행 하나 안 늘어난다** — 신규 3필드(틴트 세기·고도·모델 변형)는 전부 `SpecificContent` 안
+- 브라우저 검증 7/7 통과 · 캡처 `docs/assets/symbol-3d-wireframe-20260906.png`·`symbol-3d-wireframe-flow-20260906.png`
+- 시뮬 라운드 3 = **2,032건**(패밀리 85, PTZ·SZ 패밀리 추가)
+
+### ▷ 이전 이력 (v1.2 까지)
+
+### ▷ 추가 지시 반영 (2026-09-04, 시뮬 라운드 3)
+
+- **지시 1**: "아이콘 등록 버튼 → 미리보기 보고 선택 → 드래그해서 지도에 놓는 방식으로 바꾸고 싶다"
+- **지시 2**: "마커 에디터의 각 카테고리별 속성들이 3D 에서 어떻게 매칭될지 검토"
+- **현행 실측**: 콤보 2개(`AvailableMarkerCategories`/`AvailableSymbolTypes`) + [추가] → `EnterSymbolPlacementMode`(MapViewModel.cs:739) → `IsSymbolPlacementMode` → 지도 좌클릭(`GMapCustomControl.cs:1015`, geo=`FromLocalToLatLng((int)x,(int)y)` :1020) → `SymbolPlacementClicked`(:1041) → `OnSymbolPlacementClicked`(:765-790) 4분기
+- **핵심 제약 3**: ① GMaps.Ui 에 `AllowDrop`·`DoDragDrop`·`DataObject` **0건**(전부 신설) ② `IsPreviewMode` DP 는 군사 컨트롤에만(`:155`) — 베이스 신설 필요, 팔레트 셀은 부모 맵이 없어 yaw 캐시 재적용 필수 ③ 배치 클릭이 좌표를 `(int)` 절단 → 드롭이 서브픽셀이면 같은 화면점이 다른 위경도(G-14)
+- **속성 매칭 판정**(시안 §6-D 정본): 무변경 다수 · 재정의 4(크기=N3 입력 전용 · 회전=3D yaw · 탐지방향=표시각 보정 · 건물종류=**모델 키 선택자**) · 결정 3(채우기/테두리/선두께 G-7 · 건물용도 G-12 · 층수 G-13). 속성 패널 레이아웃 무변경
+- **산출**: 시안 **v1.8**(§6 팔레트 — 탭 5종 클릭 전환 실물 목업 `PIDS 17 · 기반시설 12 · 도형 8 · 기본 2 · 차량 5(취소선, 별도 PRD)`, §6-B 드래그 4단계, §6-C 배선, §6-D 속성 매핑 / 브라우저 렌더·탭 전환 검증 완료, 캡처 `docs/assets/symbol-3d-palette-all-20260904.png`) · PRD v1.2 FR-16~19(태스크 40→54) · V-13/14/15 · G-12/13/14 · 시뮬 라운드 3 = **1,933건**(신규 DND-A~H·PAL-A~C·PROP-A~C·R2)
+- **스크래치 스크립트**(재현용): `scratchpad/patch_palette.py`·`patch_palette_all.py`·`patch_propmap.py`·`patch_liveedit.py`·`patch_liveedit_fix.py`·`patch_color_alive.py`·`sim3d/sim.py`(ROUND 3)·`sim3d/export_docs.py`
+
+### ▷ 속성 라이브 에디터 + 색 매핑 확정 (2026-09-04, 시안 v1.13 / PRD v1.3)
+
+- **지시 3**: "구현 테스트 하고 3D는 마커 속성 수정하면 어떻게 반영될지 HTML로 보여줘, PIDS 심볼과 그룹 먼저"
+- **지시 4**: "컬러는 심볼색이나 그런거 될 수 있잖아" → **G-7 해소** — 채우기 = 하우징 `mat_body` 계열 **재질 틴트**(렌즈·어두운 부품·라벨은 원색 유지), 테두리·선두께 = **접지 링** 색/두께. 사용자 색과 상태 색은 채널 분리, 평상시 사용자색·이벤트 중 상태색(**G-15** 신설)
+- **시안 §7 라이브 에디터**(신규): 7-A PIDS 점 심볼(장비타입·크기 W/H·회전·최소줌·Z-ORDER·채우기·틴트세기·테두리·선두께·제목·글자색·FOV 6필드·지도 θ) · 7-B PIDS 그룹 철책(포인트·패턴·투명도·선두께·색·압출 높이·지도 θ → 정점 재투영). 실제 슬라이더 조작 → 3D 즉시 반영
+- **구현 테스트(브라우저 실측)**: 1차 10/10 · 색 매핑 2차 10/10 통과. 도중 발견·수정한 결함 2건 — ① `.ring` 의 `border` 단축속성이 편집기 밖에서 `var(--normal)` 미해석으로 무효화(→ `borderStyle` 명시 + `.edstage` 에 토큰 스코프 부여) ② 틴트 0% 가 대소문자 다른 hex 를 만들어 원색 복귀 비교 실패(→ amount 0 이면 원본 문자열 그대로 복원)
+- **캡처**: `docs/assets/symbol-3d-propedit-20260904.png`(7-A) · `symbol-3d-group-20260904.png`(7-B, θ=35°) · `symbol-3d-palette-all-20260904.png`(§6)
+- **시뮬 라운드 3 재실행**: 1,933 → 1,944 → **1,973건**(패밀리 80)
+
+### ▷ 전수 매핑 "안 쓰이는 필드 0" (2026-09-04, 시안 v1.17 / PRD v1.4)
+
+- **지시 5**: "어떻게든 안 쓰이는 것 없이 쓰이도록 3d 아이콘들을 맵핑해봐"
+- **DB 컬럼 전수 조사로 찾은 미사용 필드 6종** → 3D 역할 배정
+  - `Altitude` 고도: 렌더 참조 **0**(`GMapBaseMarker.cs:385-391` 모델 프로퍼티만) → **하우징 부양 + 지주 + 접지점 링**. 지오 앵커는 지주 밑동이라 Position 계약 불변
+  - `IsLocked` 잠금: 클릭 차단만·지도 표식 없음 → **접지 링 파선 + 자물쇠 배지**
+  - `BaseBearing` 기준방향: 속성창 슬라이더만 있고 마커 DP **없음**(`PidsPropertyStyle.xaml:307`) → **하우징 몸체 yaw**, 헤드는 `탐지방향 − 기준방향` 상대각(PTZ 처럼 몸체 고정·헤드 회전 장비에서 의미)
+  - `BuildingArea` 면적: 정보 필드(렌더 미사용) → **접지 footprint 크기**(W/H = 심볼 크기, 면적 = 부지 크기로 역할 분리)
+  - `FloorCount` 지상층: 텍스트만 → **창문 띠 개수**(높이 불변 → N3 정규화 충돌 없음, **G-13 해소**)
+  - `BasementFloorCount` 지하층: 텍스트만 → **접지 아래 파선 윤곽**(깊이)
+- **비시각으로 남기는 것**: 데이터 키 7개(`Id`·`Pid`·`Category`·`LinkedDeviceId`·`LinkedDeviceGroup`·감사 컬럼) — 속성창에 노출되지 않으므로 형상 매핑 대상 아님
+- **시안 추가**: §6-E DB 컬럼 전수 매핑표 · §7-C 기반시설 라이브 에디터(파라메트릭 빌딩 — 층수→창문 띠, 지하층→파선 윤곽, 면적→접지, 용도→지붕 액센트)
+- **구현 테스트**: 신규 매핑 10/10 통과(누적 30/30). 캡처 `docs/assets/symbol-3d-fullmap-pids-20260904.png`·`symbol-3d-fullmap-infra-20260904.png`
+- **잔여 미결**: G-3 호버 · G-4 차량 · G-5 건물 명칭 · G-6 PTZ 필드 · G-8 크기표 · G-11 FOV z순서 · G-12 건물용도 · G-14 드롭 좌표 · G-15 링 채널 우선순위
+
+### ▷ 3D 하우징 본체 (v1.1 까지)
 
 - **사용자 지시**: "git 롤백포인트 → 최대한 다양한 시나리오로 시뮬레이션 2회 → PRD 구성 → 개발"
 - **롤백 포인트**: tag `before-symbol-3d-housing` = `7881823`, 브랜치 `backup/pre-symbol-3d-housing`
@@ -2591,9 +3193,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-43068
+- **현재 세션 ID**: ppid-38648
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-43068
+- **활성 세션 목록**: ppid-38648
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
@@ -2986,3 +3588,223 @@ read-modify-write 로 해당 키만 교체 후 `POST /api/state/save` ④재조�
 
 **교훈(재발방지)**: 이 점검표는 브라우저 탭을 여는 것만으로 위험하다 — 탭이 낡은 state 전체를 들고 있다가
 **이탈 시에도 저장**하기 때문. 편집은 API read-modify-write 로만, 그것도 상대 세션 미가동 시에만.
+
+---
+
+## [2026-08-07] 조치보고 커스텀 문구 (action-report-custom-template) — 분석·시나리오·설계·PRD 완료
+
+**요청**: 정형화된 조치보고 문구를 `GOP_Server_API_action_report_template_NOTIFY.md` 기반으로
+커스텀 입력 가능하게 → HTML 와이어프레임 + 스토리보드 + 상세 PRD + 전 시나리오 시뮬레이션.
+**Track C** — 코드 변경 0(설계 산출물만). PRD 상태 **Draft**(사용자 승인 대기).
+
+### 산출물
+| 문서 | 내용 |
+|---|---|
+| `docs/analyses/action-report-custom-template-scenario-analysis.md` | 영향면 6축 + 이슈 42종 + 적대검증 기록 |
+| `docs/tests/action-report-custom-template-scenarios.md` | 시나리오 **235건** (L75/C28/E29/O12/P28/S10/D14/M6/X10/U23) |
+| `docs/tests/action-report-custom-template-simulation-log.md` | 전량 로그 PASS 167 / ISSUE·GAP 68 |
+| `docs/design/action-report-custom-template-wireframe.html` | 치수·바인딩·상태기계·API매핑·검증·토큰·권한·AutomationId (12절) |
+| `docs/design/action-report-custom-template-storyboard.html` | 흐름 S1~S13, 각 프레임에 SIM ID |
+| `docs/prds/action-report-custom-template-prd.md` | FR-18 · NFR-07 · V-07 · 미결 G1~G8 |
+| 시뮬레이터 | 스크래치패드 `sim/{model.py, client.py, run.py}` — 제품코드 무수정, 재현 가능 |
+
+### ★ 서버 계약 — NOTIFY 문서와 다른 점 4건 (코드가 정본)
+1. **POST 는 201 Created**(문서 미기재) — 200 만 성공 판정하면 생성 성공이 실패로 표시
+2. **단건 응답에 `pagination` 키 자체가 없다**(`ApiSingleResponse`) — 문서의 "키는 있고 null" 은 목록만
+3. **전 요청 `extra="forbid"`** — 요청 DTO 가 `BaseDto` 상속 시 `id`/`created_at` 직렬화로 **422 전멸**
+4. `content` 는 `min_length=1` 만 있고 **서버가 trim 하지 않음** → 공백만("   ") 템플릿 등록 가능
+
+### ★★ 최대 발견 — 선행 결함 2건 (본 기능과 별개, 착수 전 확인)
+- **P5** `POST /api/events/actions` 는 서버가 **`events:edit`** 요구(`routers/actions.py:436`,
+  `permission_map.py:31`)인데 클라는 10곳 전부 **`CanControl("events")`** 로 게이팅.
+  → `view+control` 만 가진 **OPERATOR 는 UI 통과 후 403**. 프로젝트 테스트 픽스처와 정면 모순.
+- **P3** 그 `events:control` 은 **권한 매트릭스 화면에서 부여·회수 불가**
+  (`Enums\PermissionCatalog.cs:94` 가 Control 을 Cameras 로 한정 → 셀 ▦).
+- 부수: **조치보고 본문에 서버 길이검증이 없다**(`schemas/event.py:477`) → 빈 조치보고 저장 가능,
+  500자 초과 시 PostgreSQL 절단오류로 **HTTP 500**.
+
+### 조치보고 파이프라인 실측 (재사용 가치 높음)
+- `SendAction` 선언은 `EventCardBaseViewModel` 이 아니라 **`EventCardViewModel.cs:36-43`**
+- content 생성 지점 **9종** — 다이얼로그 2 + 자동 3 + 자동복구 1 + 일괄 1 + null폴백 1 + 그리드 1
+- **다이얼로그를 공유하는 진입점 4개**(카드/조회그리드 우클릭/신호이력 우클릭/GIS 구역 더블클릭)
+  → 다이얼로그 1곳 수정이 4경로에 일괄 적용
+- 다이얼로그 VM 은 **SingleInstance** + 초기화가 `OnActivateAsync` 에만 → 정상 닫힘 누락 시 **이전 메모 잔류**
+- `ActionReportGuard` 키가 `int eventId` 단독 → **탐지#100 이 장애#100 차단**, `eventId<=0` 이면 가드 무력,
+  충돌 시 `return true` 라 **저장 없이 성공으로 닫힘**
+- 자동 조치보고·자동복구는 **권한 검사 없음**(인증만/무검사)
+
+### UI 실측
+- 창 = 메인 솔루션 `md:Card 900×660`, 루트 Grid `Auto / **550 고정** / Auto`
+- 메모가 **"기타" 라디오에 IsEnabled 로 묶여** 정형문구+보강 병기 불가 (이번 개선의 핵심)
+- `"기타"` **문자열 리터럴 비교**로 저장 분기 → 서버에 동명 템플릿 등록 시 하이재킹
+- AutomationId **0건**, `x:Name="ClickOk"` 전역 9중복
+- 유일 테스트가 `UnitTest.cs:3846-3866` **XAML 문자열 검사** — 파일경로 하드커플링 + 회귀 안전망 아님
+
+### 구현 시 따를 패턴 (조사 확정)
+- API: `Events.Api\Services\EventSuppressionApiService.cs:53` BaseUrl 프로퍼티 형태,
+  DI 는 `EventApiModule.cs:73-80` Order `_count+2`, **`As<IService>()` 금지**
+- `Events.Api\Helpers\ResponseHelper.cs` 는 **전체 주석 처리된 사문** — 참조 금지(정본 `ApiMessageHelper`)
+- 패널 셸: `EventSuppressionSchedulePanelView.xaml:159-199` + 뷰로컬 폼스타일 세트(`:40-141`)
+- 🔴 **Events.Ui/Resources/Resources.xaml 은 앱에 미병합** → 새 스타일은 뷰 로컬에
+- 🔴 **MDIX Outlined 에 `Height` 금지, `MinHeight` 만**
+- 순서변경: 레포에 **드래그 선례 0건** → ▲▼ 버튼(`LayerTreeNode.cs:358-382` 패턴)
+
+### 다음 단계
+1. **미결 G1~G8 사용자 확정** (특히 G1 로드실패 폴백, G2 "기타" 제거)
+2. **V-01·V-02 서버팀 확인**(권한 불일치) — 확정 전 조치보고 권한 UX 손대지 않음
+3. PRD 승인 → plan
+
+### [2026-09-06] 조치보고 커스텀 문구 — 미결 8건 사용자 확정 + 드래그 전사 방침
+
+**확정 (사용자 결정)**
+
+| ID | 질문 | 확정 | 비고 |
+|---|---|---|---|
+| G1 | 목록 로드 실패 시 | **ⓑ 빈 목록 + 직접입력** | 하드코딩 폴백 배제(지운 문구 부활 위험) |
+| G2 | "기타" 항목 | **ⓑ 제거** | 편집칸 상시 활성, 선택=문자열 복사. 리터럴 분기 결함 동시 해소 |
+| G3 | 자동·일괄 고정문구 템플릿화 | ⓐ 범위 밖 | 매뉴얼에 "운용자 변경 불가" 명시 |
+| G4 | 관리 권한 | ⓐ 서버와 동일(view/edit/delete) | V-01·V-02 선결 |
+| G5 | 서버 통계 문자열 매칭? | **확인 중** | 서버팀 회신 대기 |
+| G6 | 캐시 수명 | ⓑ 세션 캐시 + 편집 시 무효화 | 관리패널 진입 시 강제 재조회 |
+| **G7** | 순서 변경 UI | **★ 드래그** (권고 뒤집힘) | 아래 전사 방침 참조 |
+| G8 | "전부 삭제=초기화" 안내 | ⓐ 풋터 안내문 | |
+| D-4 | 관리 패널 진입점 | **ⓑ + ⓒ 병행** | 설정정보 하위 + 조치보고 다이얼로그 내 바로 열기(권한자 한정) |
+| C-1/C-2 | 선행 결함 포함 범위 | 권고안 채택 | **C1·C2·C3·X4·D1·D3·U12 포함** / P5·P3·D4·D6·D7·D8 은 별도 |
+
+**★ 전사 방침 — 드래그 우선 UI/UX**
+사용자: "앞으로 작업할 때 드래그 방식을 전면 도입할 예정이니 하네스에도 드래그 기반 UI/UX 를 기획하라."
+- 내가 "레포에 드래그 선례 0건"을 근거로 ▲▼ 버튼을 권고했으나 **사용자가 드래그로 뒤집음**.
+- **"선례 0건"은 배제 근거가 아니라 지금 만들 이유**로 재해석. 최초 사례를 **공용 자산**으로 설계한다.
+- 메모리 등록: `feedback_drag_first_ux` (전사 방침, 영구)
+- 하네스 규칙 신설 예정: `.claude/rules/common/` (룰은 `.claude/rules/{pack}/*.md` **자동 탐지** — `hooks/_agents.js:186 loadRules`)
+- 드래그 도입 시 **반드시 동반 설계**: 키보드 폴백 · 삽입선 · ESC 취소 · 서버 실패 롤백 · 라이트/다크 피드백 토큰
+
+**진행 중**: 공용 드래그 정렬 인프라 설계 워크플로(4축 조사 → 설계 → 적대검증 3기).
+설계 확정 후 PRD v1.1 · 와이어프레임 · 스토리보드 · SIM-O 계열 시나리오를 드래그 기준으로 갱신한다.
+
+**남은 확인**: V-01(클라 control vs 서버 edit) · V-02(매트릭스 control 부여 불가) · G5 — 전부 서버팀/PM 회신 대기.
+**남은 질문**: D-2 작업 브랜치명(미정).
+
+### [2026-09-06] 드래그 인프라 타당성 조사 — 적대검증 3기 전원 fatal
+
+**산출물**
+- `.claude/rules/common/drag-first-ux.md` — 하네스 규칙 신설, **자동 등록 확인**(loadRules 에 `drag-first-ux` 노출)
+- `docs/analyses/drag-reorder-infra-analysis.md` — 타당성 분석 v1.0
+- 메모리 `feedback_drag_first_ux`
+
+**살아남은 것**: Utils\Behaviors 단일 정본 배치 · 의존그래프(패키지 추가 0) · Theme↔Utils 순환 없음 ·
+`Behavior<T>` 형태 · **캡처 드래그 채택 / OLE 불채택** · 데드존 8.0 · `md:PackIcon Kind="DragVertical"`
+
+**깨진 것 — 동작 메커니즘 3대 축**
+1. **Button 핸들 자멸** — `ButtonBase.OnMouseLeftButtonDown` 이 버블에서 `CaptureMouse()` → Preview 캡처 강탈
+   → `LostMouseCapture`=취소 규정에 걸려 마우스다운 순간 종료. **→ `Thumb` 으로 교체**
+2. **DataTemplate 내 `OnAttached` 시각트리 걷기 = measure 크래시** — 선례 0건, 정본은 `Loaded` 대기
+   (`DataGridScrollEndBehavior.cs:50-53`)
+3. **컨테이너 로컬 값 삽입선 = 지터+트리거충돌+재활용오염** — `DGR_Border` 가 레이아웃 참여(2px 밀림),
+   로컬값이 Style Trigger 를 이김, 재활용으로 다른 행에 따라감. **→ AdornerLayer(단 가용성 미검증, S0)**
+
+**❌❌ 외부 블로커 — 서버 배치 재정렬 엔드포인트 부재**
+`i→j` 이동 = `|i−j|+1` 건 **순차 PATCH**, `ApiSetupModel.cs:50` Timeout=10초 → 20건이면 **최악 200초 블로킹**.
+`display_order` UNIQUE 없음 + 정렬 `(display_order,id)` → 부분실패 시 **"제3의 순서"**.
+▲▼ 는 항상 2건 고정이라 원리적으로 없는 문제 = **드래그 실패 폭발반경 최대 10배**.
+→ 서버팀 요청안: `PUT /api/events/action-report-templates/order` ← `[{id, display_order}]` 단일 트랜잭션.
+
+**❌ 키보드 폴백 (실측 프로브)**
+`Alt+↑` = `Key.System` + `e.SystemKey=Up`, **버블 KeyDown 은 DataGrid 가 소비**.
+→ `PreviewKeyDown` + `e.Key==Key.System && e.SystemKey==Key.Up` 필수. 레포에 SystemKey 선례 **0건**.
+`Focusable="False"` 그립은 Tab 제외 + 스크린리더 미노출 → 폴백 진입점 자체가 없음.
+`MapViewModel.cs:905` 윈도우 레벨 후킹이 패널 안 ↑/↓ 를 지도 심볼 nudge 로 가로챔(예외필터에 DataGrid/ListBox 없음).
+
+**❌ 자동화** — .NET 8 WPF 에 UIA `IDragProvider`/`IDropTargetProvider` **타입 자체가 부재**.
+FlaUI 5.0.0 `Mouse.Drag` = `SetCursorPos` **텔레포트 1회**(IL 실측) → 오토스크롤 경로 통과 불가.
+`AlternationIndex` 는 가상화에서 리셋(29→59, 30→0), `GridHelper.VisibleRowIds:28` 는 `.OrderBy` 로 화면순서 파괴
+= **항상 통과하는 가짜 테스트**. → 회귀는 순수함수 헤드리스 + 폴백 경로로.
+
+**사실 오류 정정**: `IsDrag` 중복이 1곳이 아니라 **3곳**(`CameraPopupHubMath:22`, `PtzCoordinateMath:73`, 테스트 사본).
+Blend xmlns 는 "조용한 미부착"이 아니라 **하드 실패**. 조치보고 문구 관리 패널은 **아직 미존재**(신규 구축).
+이관 시 TFM 불일치(`GMaps.Ui.Tests` = net8.0 소스링크 vs Utils = net8.0-windows) 해결 필요.
+
+**수정된 경로**: ①DragMath 이관(위험 0, 즉시) → ②서버 배치 엔드포인트 요청 + ③스파이크 S0/S2 병행
++ ④S1(FlaUI 드래그, **별도 세션 필요**) → ⑤설계 v2 → ⑥구현(드래그+키보드 동시)
+
+**사용자 확인 필요**: 서버 엔드포인트 대기 vs ▲▼ 선출시 후 드래그 추가 — 순서 결정.
+
+---
+
+## [2026-09-07] GOPDB 09-07 배포 2건 영향 분석 — 조치보고 /reorder · 억제 주간반복
+
+**산출물**: `docs/analyses/gopdb-0907-deploy-impact-analysis.md` (v1.0)
+**방법**: 4축 병렬 실측 → 종합 → 적대검증 2기(인용검증·완결성). 두 검증 모두 `overstated=true` 로
+1차 종합의 과장 6건을 정정함.
+
+### ✅ 배포 1 — 조치보고 `POST /reorder` 신설 (내 요청 반영됨)
+- 구현 정확: 단일 트랜잭션 + `set_config('gop.suppress_sync','on')` 로 row 트리거 억제 후 **요약 알림 1건**
+  (`resource_id:0`), 없는 id 하나라도 있으면 **404 무변경**, 응답이 정렬 후 전체 목록.
+  스키마 방어 `extra=forbid`·`id ge=1`·`display_order ge=0`·`max_length=500`·**중복 id validator**.
+- NOTIFY 문서 **v2.1**(API 6.3.3) 로 우리 저장소에 배달 완료.
+- ⚠ 서버측 누락: `permission_map.py` 에 `/reorder` 항목 없음(라우터 데코레이터는 있음).
+- ⚠ 자기 발행 NATS 가 자신에게도 돌아옴 → 재조회 생략 시 중복 방지 필요.
+
+### ✅✅ 배포 2 — 억제 주간반복: **"제일 중요" 항목은 고칠 코드가 없다** (확정)
+`window_end` 소비처 **전량 = 표시 문자열 2곳**(`EventSuppressionScheduleItemViewModel.cs:34, :66`) + 테스트 픽스처.
+`SuppressionRules` 는 `WindowEnd` 미사용. 억제 도메인 타이머는 `SuppressionActiveMonitor` 하나뿐이고
+`window_end` 를 참조하지 않는다. **클라 억제 인지 표면 = 패널 1개 + Monitor 1개가 전부**
+(이벤트카드·사운드·지도 0건). → 메모리 [[project_event_suppression_blocking_layers]] 재확인됨.
+**클라 측 마이그레이션 영향 0건**(전부 서버 SQL v72·v75).
+
+### 🔴 지금이 마감 — 권한 키 (시점이 앞당겨짐)
+권한 화면에서 그룹 1회 저장 시 서버 `action_report_templates` 키 소멸 → 템플릿 쓰기 403.
+근거 `PermissionMatrixPanelViewModel.cs:134` + `:249-251`(전체 교체), `EnumPermissionModule.cs:11-22` 부재.
+⚠ **"그냥 추가"는 위험** — `PermissionsSchema` 가 strict 라 미정의 키는 **422**(`routers/user_groups.py:302-304`).
+운영 서버가 6.3.3 미만이면 키 추가 즉시 **권한 화면 저장 전면 파손**.
+→ **운영 서버 버전 확인 후 동시 배포**. 그전까지 **권한 화면 그룹 저장 금지**.
+
+### 🟡 반복 창 생성 시 드러날 것 (지금은 무증상)
+①`status=="active"` 배지가 "진행중"으로 거짓말(토요일 새벽에도 active) ②신규 9필드 전량 폐기
+(`MissingMemberHandling.Ignore`) ③`window_end=null` 이 `'—'` 로 표시(크래시 아님 — 문서 서술 반증)
+④중복경고가 **과소·과대 양방향 오류**(`SuppressionRules.cs:31-57` 이 **시간 비교를 전혀 안 함**)
+⑤창 길이 상한 30일 상수가 **2곳**(`SuppressionRules.cs:22` 권위 + VM `:699`)
+
+### 🟢 기존 결함 (배포 무관, 같이 정리 후보)
+`SuppressionActiveMonitor` **사문**(30초 폴링인데 소비자 0건) · 패널 배너 stale(타이머 0건) ·
+폴링 실패 fail-open 미구현(`:78`) · **억제 PATCH 경로가 UI 에 없음**(생성만, 반복창 수정 불가)
+
+### ★ 구현 시 함정 (적대검증 산출)
+- **요청 DTO 확장 = 모든 PATCH 422** — `EventSuppressionScheduleRequestDto` 를 POST·PATCH 가 공유하는데
+  서버 Update 스키마엔 반복 4필드가 없다
+- `days_of_week`/`daily_*` 에 `NullValueHandling.Ignore` 붙이면 weekly 필수필드 소실 → 422
+- `is_suppressing_now` 를 `bool` 로 받으면 구버전에서 조용히 `false` → **`bool?` + status 폴백**
+- `daily_*` 를 `DateTime` 으로 받으면 "오늘 08:00"으로 **무성 오염**(크래시 아님)
+- `recurrence_rule`(미사용 레거시) ↔ `recurrence_type`(신규) 혼동 주의
+- NATS 핸들러는 **메인앱 no-op case + 라이브러리 자가필터** 관례(`DetectionSyncNatsService.cs:83-84` 정본)
+- 테스트 동반 수정: `EventSuppressionScheduleTests.cs:68/72/75/102/195`, `SuppressionSweepTests.cs:38/158/291`
+
+### 서버팀 회신 4건
+①`permission_map` `/reorder` 누락 ②**단발 창 경계 `suppressing` 오발행**
+(`_fire_boundary:55-89` 가 `notified_suppressing` 미기록 → `{active,false}` 발행 후 ≤5분 뒤 2번째)
+③운영 서버 6.3.3 버전 확인 ④v2.0 "SYNC 루프가 죽는다"는 우리 클라 해당 없음(`TryParse`, `Enum.Parse` 0건)
+
+### 문서 개정 대기
+`/reorder` 신설로 **"배치 엔드포인트 없음" 전제 서술 전부 무효** →
+PRD FR-10·결정표·리스크표·G7 / scenario-analysis ISSUE-O3 / **drag-reorder-infra-analysis §3 외부블로커 전체 해소** /
+SIM-O 계열 시나리오.
+
+### [2026-09-07] 문서 개정 완료 — 사용자 "승인"(ⓑ 진행)
+
+서버 v2.1(`POST /reorder`) + 결정 확정(G1~G8, D-4)을 문서 5종에 반영. **코드 변경 0건.**
+
+| 문서 | 개정 내용 |
+|---|---|
+| `docs/prds/action-report-custom-template-prd.md` | **v1.0 → v1.1**. FR-10 **드래그+`/reorder`** 로 교체, **FR-10a**(드래그 인프라 계약)·**FR-19~21**(EnumGopCommand·SYNC 재조회·PermissionCatalog) 신설, API 계약표에 `/reorder` 7번째 행 + 권한 모듈 분리, §7 **미결 → 확정표**(G7 드래그 + 구현계약 7항), V-08~12 추가, 리스크표 O3 해소·신규 4건, DoD 갱신. **상태는 Draft 유지** |
+| `docs/analyses/action-report-custom-template-scenario-analysis.md` | v1.1. **ISSUE-O3 해소** 표기, G7 확정(v1.0 권고는 `<details>` 보존), API 표에 `/reorder`, "NATS 미발행" **정정**, 권한 분리 + FR-21 경고 |
+| `docs/analyses/drag-reorder-infra-analysis.md` | v1.1. **§3 외부 블로커 해소**(해소 전 분석은 `<details>` 보존), §0 요약표·결론 문장, §7 도입 경로에서 서버 요청 단계 완료 처리 |
+| `docs/tests/action-report-custom-template-scenarios.md` | **SIM-O 계열 재작성 필요** 경고 삽입 — 개별 PATCH·▲▼ 전제. SIM-O006 은 **폐기 대상**(원리적으로 발생 불가), 드래그 제스처·키보드 폴백·데드존·삽입선·ESC·캡처유실 시나리오 신규 필요 |
+| `.claude/rules/common/drag-first-ux.md` | "배치 엔드포인트 선확보" 항목에 **실증 각주** — 요청했더니 서버가 신설해줌(2026-09-07) |
+
+`docs/INDEX.md` 에 신규 분석 2건 등재 + PRD 행 v1.1 표기.
+
+**PRD 상태**: **Draft 유지**. 승인은 사용자 명시 명령(`advance-phase.js approve prd`)으로만 — Claude 자동 승인 금지 규칙.
+v1.1 은 결정 반영이 끝났으므로 **이제 승인 가능한 상태**다.
+
+**다음 후보**: ⓐ 운영 서버 6.3.3 버전 확인(V-08, FR-21 선행) · ⓒ 억제 반복 대응 PRD 신설 ·
+SIM-O 계열 시나리오 재작성 · 서버팀 회신 4건.
