@@ -607,7 +607,7 @@
 							</Button.Style>
 							<md:PackIcon Kind="MapMarkerRadius" />
 						</Button>
-						<Button Command="{Binding ShowLayerPanelCommand}" ToolTip="레이어 관리">
+						<Button AutomationProperties.AutomationId="GMaps.Toolbar.LayerPanelButton" Command="{Binding ShowLayerPanelCommand}" ToolTip="레이어 관리">
 							<Button.Style>
 								<Style BasedOn="{StaticResource ToolbarButtonStyle}" TargetType="Button">
 									<Style.Triggers>
