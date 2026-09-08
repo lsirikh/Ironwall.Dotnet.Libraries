@@ -94,9 +94,21 @@ public class EventUiModule : Module
                 // 로그인 게이팅(Login_Gated_GIS_Init): 수동 팩토리 new라 옵셔널 파라미터가 자동 주입되지 않음 —
                 // 명시 전달 필수(누락 시 게이트 무력 → 로그아웃 상태 알람 수신 + EQM 자동조치보고 유출).
                 c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>(),
-                c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>()   // 소속 제어기 해석(Controller_Fault_AutoRecovery_Extension) — 수동 팩토리라 명시 전달 필수(누락 시 자동복구 태깅 죽음)
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider>(),   // 소속 제어기 해석(Controller_Fault_AutoRecovery_Extension) — 수동 팩토리=명시 전달 필수
+                c.ResolveOptional<IDoorContactPolicy>()   // FR-13 ③ 통문/함체 접점→개폐 폴백 정책(GMaps.Ui 가 Symbol3D 설정으로 등록, 없으면 기본 true) — 수동 팩토리라 명시 전달 필수(누락 시 자동복구 태깅 죽음)
             )).As<IDetectionNatsSyncService>()
               .As<IService>().WithMetadata("Order", _count + 1)   // (EB1) OnExit StopAsync → NATS 구독 해제 (Order는 모듈 _count 관례)
+              .SingleInstance();
+            // FR-13 ③ 접점 폴백 기본 정책 — GMaps.Ui 가 Symbol3DDoorContactPolicy 를 등록하면 그것이 이긴다(PreserveExistingDefaults: 먼저 등록된 쪽 유지, 나중 등록은 기본 덮어씀).
+            builder.RegisterType<DefaultDoorContactPolicy>().As<IDoorContactPolicy>().SingleInstance().PreserveExistingDefaults();
+            // FR-13 ②: OPERATION_EVENT(all.event.operation, 서버 PRD v1.4) → 통문/함체 DoorState. 구독은 DETECT 와 같은 NATS 이벤트에서 cmd 로 분기.
+            builder.Register(c => new OperationEventNatsSyncService(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                c.Resolve<ISymbolEventManager>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()   // 로그인 게이팅(수동 팩토리=명시 전달 필수)
+            )).As<IOperationEventNatsSyncService>()
+              .As<IService>().WithMetadata("Order", _count + 5)   // OnExit StopAsync → NATS 구독 해제
               .SingleInstance();
             builder.Register(c => new MalfunctionNatsSyncService(
                 c.ResolveOptional<ILogService>(),
@@ -232,6 +244,10 @@ public class EventUiModule : Module
                 // MalfunctionNatsSyncService 시작 — NATS MALFUNCTION 구독 등록
                 var mns = scope.Resolve<IMalfunctionNatsSyncService>();
                 mns.StartService();
+
+                // OperationEventNatsSyncService 시작 — NATS OPERATION_EVENT 구독(통문/함체 개폐 형태, FR-13 ②)
+                var ons = scope.Resolve<IOperationEventNatsSyncService>();
+                ons.StartService();
 
                 // DetectionSyncNatsService 시작 — NATS SYNC_DETECTION 구독 등록(PTZ 회전 후 썸네일 갱신)
                 var dsns = scope.Resolve<IDetectionSyncNatsService>();

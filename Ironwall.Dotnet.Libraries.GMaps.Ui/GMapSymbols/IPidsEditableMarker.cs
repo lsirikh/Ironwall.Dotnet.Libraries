@@ -28,6 +28,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         double DetectionBearing { get; set; }
         double BaseBearing { get; set; }
 
+        /// <summary>통문 폭(m), NULL=기본 4.0 — Gate 전용(FR-12)</summary>
+        double? GateWidthM { get; set; }
+        /// <summary>ContactOn=열림 해석 여부(FR-12)</summary>
+        bool OpenOnContactOn { get; set; }
+        /// <summary>개폐 형태 축 — 런타임 전용(FR-12)</summary>
+        EnumDoorState DoorState { get; set; }
+
         /// <summary>
         /// 방송(음원/TTS) 동작 중 여부 — XAML Opacity 펄스 애니메이션 트리거
         /// </summary>

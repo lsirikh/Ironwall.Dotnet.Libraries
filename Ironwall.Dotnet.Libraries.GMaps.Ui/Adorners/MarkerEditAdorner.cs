@@ -308,15 +308,18 @@ public class MarkerEditAdorner : Adorner, IDisposable
         // 1. 이동 핸들 (중심, 원형, 파란색)
         drawingContext.DrawEllipse(_moveHandleBrush, _handlePen, hc, handleSize, handleSize);
 
-        // 2. 회전 핸들 (북쪽, 원형, 초록색)
-        var rotateHandlePos = new Point(hc.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
-        drawingContext.DrawEllipse(_rotateHandleBrush, _handlePen, rotateHandlePos, handleSize * 0.75, handleSize * 0.75);
+        // 2. 회전 핸들 (북쪽, 원형, 초록색) — 빌보드 타입은 Bearing 이 시각 채널이 아니므로 생성하지 않는다(map-tilt-25d FR-12).
+        if (!IsBillboardTarget)
+        {
+            var rotateHandlePos = new Point(hc.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
+            drawingContext.DrawEllipse(_rotateHandleBrush, _handlePen, rotateHandlePos, handleSize * 0.75, handleSize * 0.75);
 
-        // 회전 핸들 연결선
-        var connectionPen = new Pen(_rotateHandleBrush, 1) { DashStyle = DashStyles.Dot };
-        drawingContext.DrawLine(connectionPen,
-            new Point(hc.X, markerBounds.Top),
-            new Point(rotateHandlePos.X, rotateHandlePos.Y + handleSize * 0.75));
+            // 회전 핸들 연결선
+            var connectionPen = new Pen(_rotateHandleBrush, 1) { DashStyle = DashStyles.Dot };
+            drawingContext.DrawLine(connectionPen,
+                new Point(hc.X, markerBounds.Top),
+                new Point(rotateHandlePos.X, rotateHandlePos.Y + handleSize * 0.75));
+        }
 
         // 3. 모서리 핸들들 (모든 타입 — line 포함, 균일 스케일)
         var cornerHandleBrush = Brushes.Blue;
@@ -403,6 +406,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
     /// </summary>
     protected override System.Windows.Media.HitTestResult HitTestCore(System.Windows.Media.PointHitTestParameters hitTestParameters)
     {
+        // C12: 독점 입력 모드(라인드로잉·배치·조준·측정 등) 중엔 핸들도 투과 — 눌림이 마커 본체→맵의 base-전 분기로 내려가야 한다(D-19 동일 계열).
+        if (ExclusiveInputModeGate.IsActive(_mapControl as IExclusiveInputModeSource)) return null!;
+
         var pt = hitTestParameters.HitPoint;
         var elementBounds = new Rect(AdornedElement.RenderSize);
         var markerCenter = new Point(elementBounds.Width / 2, elementBounds.Height / 2);
@@ -415,6 +421,9 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
+        // C12: 독점 입력 모드 중엔 핸들 편집을 시작하지 않고 통과(GMapMarkerBaseControl D-19 가드와 같은 목록·같은 게이트).
+        if (ExclusiveInputModeGate.IsActive(_mapControl as IExclusiveInputModeSource)) { base.OnMouseLeftButtonDown(e); return; }
+
         try
         {
             var mousePos = e.GetPosition(this);
@@ -731,9 +740,11 @@ public class MarkerEditAdorner : Adorner, IDisposable
             // 화면 픽셀 격자 스냅: Adorner 중앙 핸들이 보이는 격자선/교점에 흡착(교점>라인 가중치).
             // RC-1: DrawGrid와 동일한 ComputeOrigin/Snap. RC-N: DigitalZoom 역보정 불필요
             //   (TransformToAncestor가 컨트롤 자신 RenderTransform 제외). 맵 회전 시 스냅 비활성(FR-12).
+            //   [map-tilt FR-09] 틸트(φ>0.1) 중에도 비활성 — 세로 축척 cosφ 배라 정사각 격자 불성립(R-41 과 같은 조건식에 φ 추가).
             if (_mapControl is GMapCustoms.GMapCustomControl snapCtrl
                 && snapCtrl.IsSnapToGridEnabled
-                && Math.Abs(snapCtrl.MapRotation) < 0.1)
+                && Math.Abs(snapCtrl.MapRotation) < 0.1
+                && snapCtrl.TiltDeg <= GMapCustoms.GMapCustomControl.TILT_SNAP_GATE_EPSILON)
             {
                 var gridPx = SnapGridOverlayService.EffectiveGridPx(snapCtrl.GridSizePx);
                 // 맵 고정 격자: DrawGrid와 동일하게 지오 앵커 기반 원점 산출 (RC-7/FR-16)
@@ -1122,10 +1133,13 @@ public class MarkerEditAdorner : Adorner, IDisposable
         if (IsPointNear(mousePos, hc, tolerance))
             return MarkerHandle.Move;
 
-        // 2. 회전 핸들 (북쪽)
-        var rotateHandlePos = new Point(hc.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
-        if (IsPointNear(mousePos, rotateHandlePos, tolerance))
-            return MarkerHandle.Rotate;
+        // 2. 회전 핸들 (북쪽) — 빌보드 타입은 렌더와 동일하게 히트에서도 제외(FR-12, 렌더/히트 파리티)
+        if (!IsBillboardTarget)
+        {
+            var rotateHandlePos = new Point(hc.X, markerBounds.Top - MarkerEditSettings.RotateHandleDistance);
+            if (IsPointNear(mousePos, rotateHandlePos, tolerance))
+                return MarkerHandle.Rotate;
+        }
 
         // 3. 모서리 핸들들 (모든 타입 — line 포함, 균일)
         var cornerHandles = new[]
@@ -1157,6 +1171,10 @@ public class MarkerEditAdorner : Adorner, IDisposable
 
     #region Line/Area Resize (LineArea_Symbol_Resize FR-02/03/05)
     private GMapSymbols.ILineEditableMarker? TargetLine => _targetMarker as GMapSymbols.ILineEditableMarker;
+
+    /// <summary>[map-tilt-25d FR-12] 장식 대상 Shape 가 빌보드(<see cref="IMapRotationAwareShape.IsBillboard"/>)인가 —
+    /// 회전 핸들 생성·히트를 함께 제외한다. <c>Marker.Bearing</c> 은 모델에 보존(FOV/3D yaw 입력), write-back 없음(R-35).</summary>
+    private bool IsBillboardTarget => AdornedElement is IMapRotationAwareShape { IsBillboard: true };
 
     private static bool IsResizeHandle(MarkerHandle h) =>
         h is MarkerHandle.ResizeTopLeft or MarkerHandle.ResizeTopRight or MarkerHandle.ResizeBottomLeft

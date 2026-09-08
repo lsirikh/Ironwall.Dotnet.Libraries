@@ -230,8 +230,11 @@ public abstract class GMapBaseMarker<T> : GMapMarker, IDisposable, IEditableMark
         {
             DispatcherService.Invoke(() =>
             {
-                element.Width = width;
-                element.Height = height;
+                // SetCurrentValue — 3D 컨트롤은 Width/Height 가 OneWay 바인딩(WritesBackRenderSize=false)이라
+                // 로컬값 대입(element.Width = …)이 바인딩을 영구 제거해 이후 속성창 크기 입력이 무시된다(D-1).
+                // SetCurrentValue 는 바인딩을 보존한 채 현재값만 바꾸고, 2D(TwoWay)에서는 종전과 동일하게 동작한다.
+                element.SetCurrentValue(FrameworkElement.WidthProperty, width);
+                element.SetCurrentValue(FrameworkElement.HeightProperty, height);
             });
         }
     }

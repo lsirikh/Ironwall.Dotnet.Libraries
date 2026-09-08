@@ -224,6 +224,12 @@ public sealed class SchemaGuardMigrationTests
         var imageCols = (await conn.QueryAsync<string>(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='Images';"))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var pidsCols = (await conn.QueryAsync<string>(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='PidsSymbols';"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var groupCols = (await conn.QueryAsync<string>(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='PidsGroupSymbols';"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Assert — 읽기 SQL 이 명시적으로 SELECT 하는 컬럼들
         foreach (var c in new[]
@@ -239,5 +245,11 @@ public sealed class SchemaGuardMigrationTests
                      "TitleColor", "TitleBackground", "TitleFontFamily", "TitleBold", "TitleItalic", "TitleMaxWidth",
                  })
             Assert.True(imageCols.Contains(c), $"Images.{c} 컬럼이 없습니다 — 읽기 SQL 이 1054 로 실패합니다.");
+
+        // FR-16(VER-04): PIDS 타입 테이블 신규 열 — 사양표(COLUMN_SPECS)+columnMeta 로드가 빠지면 여기서 잡힌다.
+        foreach (var c in new[] { "ModelVariant", "DetectionRange", "DetectionAngle", "DetectionBearing", "GateWidthM", "OpenOnContactOn" })
+            Assert.True(pidsCols.Contains(c), $"PidsSymbols.{c} 컬럼이 없습니다 — 읽기 SQL 이 1054 로 실패합니다.");
+        foreach (var c in new[] { "PostSpacingM", "FenceHeightM", "FenceMode", "Render3D", "ReverseSensorOrder" })
+            Assert.True(groupCols.Contains(c), $"PidsGroupSymbols.{c} 컬럼이 없습니다 — 읽기 SQL 이 1054 로 실패합니다.");
     }
 }

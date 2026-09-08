@@ -428,3 +428,6 @@ GMap.NET/GMap.NET/GMap.NET.WindowsPresentation/obj/
 GMap.NET/**/*.bak-*
 GMap.NET/**/*.DotSettings
 # ── /GMap.NET 벤더 ──
+
+# Optional source geometry for map symbols (not compiler objects).
+!Ironwall.Dotnet.Libraries.GMaps.Ui/Resources/Symbols3D/**/*.obj

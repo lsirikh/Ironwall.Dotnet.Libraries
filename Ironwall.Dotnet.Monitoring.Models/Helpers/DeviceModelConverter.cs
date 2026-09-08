@@ -52,6 +52,7 @@ namespace Ironwall.Dotnet.Monitoring.Models.Helpers
                     case EnumDeviceType.SmartSensor2:
                     case EnumDeviceType.SmartCompound:
                     case EnumDeviceType.SmartMultisensor2:
+                    case EnumDeviceType.Gate:   // 통문(D2): 센서 계열(제어기 소속) — 서버 gates 는 별도 테이블이나 클라 모델은 센서로 취급
 
                         device = jo.ToObject<SensorDeviceModel>();
                         break;

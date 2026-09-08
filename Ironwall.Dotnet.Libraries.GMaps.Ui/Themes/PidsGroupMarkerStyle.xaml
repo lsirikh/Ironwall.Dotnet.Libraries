@@ -1,9 +1,10 @@
-<ResourceDictionary
+﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols"
 	xmlns:enum="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
-	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils"
+	xmlns:house="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Symbols3D">
 
 	<ResourceDictionary.MergedDictionaries>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Resources/Resources.xaml" />
@@ -275,5 +276,301 @@
 
 	<!--  Apply Default Style  -->
 	<Style BasedOn="{StaticResource BasePidsGroupMarkerStyle}" TargetType="{x:Type control:GMapMarkerPidsGroupControl}" />
+
+	<!--  PIDS 그룹 3D 철망 스타일(FR-07) — 베이스 템플릿 복제 + PART_PostCanvas/PART_Fence3D. 상태색·펄스는 트리거 Setter/Storyboard 로만 전달한다.  -->
+	<Style BasedOn="{StaticResource BasePidsGroupMarkerStyle}" TargetType="{x:Type control:GMapMarkerPidsGroup3DControl}">
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="{x:Type control:GMapMarkerPidsGroup3DControl}">
+					<Grid Name="PART_MainContainer">
+
+						<!--  Line Canvas - 라인 그리기 영역  -->
+						<Canvas
+							Name="PART_LineCanvas"
+							Width="{TemplateBinding Width}"
+							Height="{TemplateBinding Height}"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							ClipToBounds="False">
+
+							<!--  Layer 1: BasePolyline — 항상 표시 (기본 색상)  -->
+							<Polyline
+								Name="PART_MainPolyline"
+								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding LineOpacity}"
+								StrokeEndLineCap="Round"
+								StrokeLineJoin="Round"
+								StrokeStartLineCap="Round"
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+								Visibility="Visible" />
+
+							<!--  Layer 2: FaultOverlay — Orange (Faulted / FaultedDetecting 시 표시)  -->
+							<Polyline
+								Name="PART_EventPolyline"
+								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding LineOpacity}"
+								Stroke="#FF9800"
+								StrokeEndLineCap="Round"
+								StrokeLineJoin="Round"
+								StrokeStartLineCap="Round"
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+								Visibility="Collapsed" />
+
+							<!--  Layer 3: DetectionOverlay — Red blink (Detecting / FaultedDetecting 시 표시)  -->
+							<Polyline
+								Name="PART_DetectionPolyline"
+								Fill="{TemplateBinding MarkerFill}"
+								Opacity="{TemplateBinding LineOpacity}"
+								Stroke="#F44336"
+								StrokeEndLineCap="Round"
+								StrokeLineJoin="Round"
+								StrokeStartLineCap="Round"
+								StrokeThickness="{Binding MarkerStrokeThickness, RelativeSource={RelativeSource TemplatedParent}}"
+								Visibility="Collapsed" />
+
+							<!--  Layer 4 (FR-06 Posts LOD): 기둥 점 — 2D Ellipse, 3D 가 너무 작을 때만  -->
+							<Canvas
+								Name="PART_PostCanvas"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								ClipToBounds="False"
+								IsHitTestVisible="False"
+								Visibility="Collapsed" />
+
+							<!--  Layer 5 (FR-05 Full3D): 3D 철망 — 지면 항등 투영, 상태색은 트리거 Setter 로만  -->
+							<house:FenceRunVisual
+								Name="PART_Fence3D"
+								Width="{TemplateBinding Width}"
+								Height="{TemplateBinding Height}"
+								IsHitTestVisible="False"
+								Visibility="Collapsed" />
+
+						</Canvas>
+
+						<!--  Event Status Indicator Badge  -->
+						<Border
+							Name="PART_EventStatusIndicator"
+							Width="16"
+							Height="16"
+							Margin="0,-8,-8,0"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Top"
+							Background="#4CAF50"
+							BorderBrush="White"
+							BorderThickness="2"
+							CornerRadius="8"
+							Visibility="Collapsed">
+							<Border.Effect>
+								<DropShadowEffect
+									BlurRadius="5"
+									Opacity="0.7"
+									ShadowDepth="2"
+									Color="Black" />
+							</Border.Effect>
+						</Border>
+
+						<!--  Title Label (옵션)  -->
+						<Border
+							Name="PART_TitleContainer"
+							MinWidth="60"
+							MaxWidth="200"
+							Margin="0,0,0,-30"
+							Padding="4,2"
+							HorizontalAlignment="Center"
+							VerticalAlignment="Bottom"
+							Background="White"
+							BorderBrush="Gray"
+							BorderThickness="1"
+							CornerRadius="4"
+							Visibility="Collapsed">
+							<TextBlock
+								Name="PART_TitleText"
+								FontSize="{TemplateBinding TitleSize}"
+								FontWeight="SemiBold"
+								Foreground="Black"
+								Text="{TemplateBinding MarkerTitle}"
+								TextAlignment="Center"
+								TextTrimming="CharacterEllipsis" />
+						</Border>
+
+						<!--  (Adorner_Box_Mismatch_Fix) 템플릿 자체 Selection Highlight(DodgerBlue 점선) 제거.
+						      선택 표시는 어도너 전담: 단일=MarkerEditAdorner(파랑, ActualLineBounds+PADDING) /
+						      다중=GroupSelectionAdorner(하늘색, 동일 공식). 이 사각형은 컨트롤 전체 크기
+						      (bbox+여백, 가로선이면 높이 최소 40) 기준이라 선 기하와 안 맞아 "제3의 하늘색 박스"로 겹쳐 보였다.  -->
+					</Grid>
+
+					<ControlTemplate.Triggers>
+						<!--  Title 표시 트리거 — 라벨은 맵레벨 LabelAdorner가 전담. 옛 템플릿 라벨 비표시 유지(Phase 3 누락분 보강).  -->
+						<Trigger Property="ShowTitle" Value="True">
+							<Setter TargetName="PART_TitleContainer" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+
+						<!--  Line Pattern Triggers  -->
+						<Trigger Property="LinePattern" Value="{x:Static enum:EnumLinePattern.Dashed}">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="4 2" />
+						</Trigger>
+						<Trigger Property="LinePattern" Value="{x:Static enum:EnumLinePattern.Dotted}">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="1 2" />
+						</Trigger>
+						<Trigger Property="LinePattern" Value="{x:Static enum:EnumLinePattern.DashDot}">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeDashArray" Value="4 2 1 2" />
+						</Trigger>
+
+						<!--  OperationState 기반 Indicator 색상  -->
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ACTIVATED}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#4CAF50" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.DEACTIVATED}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="Black" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.NONE}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Gray" />
+						</Trigger>
+						<Trigger Property="MarkerState" Value="{x:Static enum:EnumOperationState.ERROR}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="#FF9800" />
+						</Trigger>
+
+						<!--  CompositeStatus Triggers (3-레이어 복합 상태)  -->
+						<!--  DataTrigger → Trigger: CompositeStatus는 DP이므로 DataContext 바인딩 불가 → Trigger Property 사용  -->
+
+						<!--  Normal: 오버레이 모두 숨김  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Normal}">
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+
+						<!--  Detecting: DetectionOverlay(Red blink, 1000ms) 표시  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Detecting}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="#F44336" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Collapsed" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Visible" />
+							<Trigger.EnterActions>
+								<BeginStoryboard Name="BS_Detecting">
+									<Storyboard RepeatBehavior="Forever">
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_Fence3D"
+											Storyboard.TargetProperty="StatusPulse"
+											From="1"
+											To="0"
+											Duration="0:0:0.5" />
+										<DoubleAnimationUsingKeyFrames
+											Storyboard.TargetName="PART_DetectionPolyline"
+											Storyboard.TargetProperty="Opacity"
+											Duration="0:0:1">
+											<DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+											<DiscreteDoubleKeyFrame KeyTime="0:0:0.5" Value="0" />
+										</DoubleAnimationUsingKeyFrames>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="BS_Detecting" />
+							</Trigger.ExitActions>
+						</Trigger>
+
+						<!--  Faulted: FaultOverlay(Orange solid) 표시  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Faulted}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#FF9800" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="#FF9800" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+
+						<!--  FaultedDetecting: Red↔Orange 교차 깜빡임 (1000ms)  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.FaultedDetecting}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="#F44336" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Visible" />
+							<Trigger.EnterActions>
+								<BeginStoryboard Name="BS_FaultedDetecting">
+									<Storyboard RepeatBehavior="Forever">
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_Fence3D"
+											Storyboard.TargetProperty="StatusPulse"
+											From="1"
+											To="0"
+											Duration="0:0:0.5" />
+										<DoubleAnimationUsingKeyFrames
+											Storyboard.TargetName="PART_DetectionPolyline"
+											Storyboard.TargetProperty="Opacity"
+											Duration="0:0:1">
+											<DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+											<DiscreteDoubleKeyFrame KeyTime="0:0:0.5" Value="0" />
+										</DoubleAnimationUsingKeyFrames>
+										<DoubleAnimationUsingKeyFrames
+											Storyboard.TargetName="PART_EventPolyline"
+											Storyboard.TargetProperty="Opacity"
+											Duration="0:0:1">
+											<DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0" />
+											<DiscreteDoubleKeyFrame KeyTime="0:0:0.5" Value="1" />
+										</DoubleAnimationUsingKeyFrames>
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="BS_FaultedDetecting" />
+							</Trigger.ExitActions>
+						</Trigger>
+
+						<!--  Connection: 기존 유지  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Connection}">
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#00BCD4" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="#00BCD4" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="#00BCD4" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
+							<Trigger.EnterActions>
+								<BeginStoryboard Name="BS_Conn">
+									<Storyboard RepeatBehavior="Forever">
+										<DoubleAnimation
+											AutoReverse="True"
+											Storyboard.TargetName="PART_EventStatusIndicator"
+											Storyboard.TargetProperty="Opacity"
+											From="1"
+											To="0.5"
+											Duration="0:0:1" />
+									</Storyboard>
+								</BeginStoryboard>
+							</Trigger.EnterActions>
+							<Trigger.ExitActions>
+								<StopStoryboard BeginStoryboardName="BS_Conn" />
+							</Trigger.ExitActions>
+						</Trigger>
+
+						<!--  Blackout: 제어기 무통신(먹통) → 검은색 정적(GMap_Controller_Blackout).
+						      우선순위 최상위 — 센서 Faulted/Detecting을 덮음. 깜빡임 없음(dead steady).
+						      제어기 장애 해소 시 상태 재계산으로 다른 Trigger로 전환.  -->
+						<Trigger Property="CompositeStatus" Value="{x:Static enum:EnumCompositeEventStatus.Blackout}">
+							<Setter TargetName="PART_MainPolyline" Property="Stroke" Value="Black" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="Black" />
+							<Setter TargetName="PART_Fence3D" Property="StatusBrush" Value="Black" />
+							<Setter TargetName="PART_EventPolyline" Property="Stroke" Value="Black" />
+							<Setter TargetName="PART_EventPolyline" Property="Opacity" Value="1" />
+							<Setter TargetName="PART_EventPolyline" Property="Visibility" Value="Visible" />
+							<Setter TargetName="PART_DetectionPolyline" Property="Visibility" Value="Collapsed" />
+						</Trigger>
+
+						<!--  Mouse Over Effect  -->
+						<Trigger Property="IsMouseOver" Value="True">
+							<Setter TargetName="PART_MainPolyline" Property="StrokeThickness" Value="4" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Width" Value="18" />
+							<Setter TargetName="PART_EventStatusIndicator" Property="Height" Value="18" />
+						</Trigger>
+
+						<!--  Disabled State  -->
+						<Trigger Property="IsEnabled" Value="False">
+							<Setter TargetName="PART_MainContainer" Property="Opacity" Value="0.5" />
+						</Trigger>
+					</ControlTemplate.Triggers>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
 
 </ResourceDictionary>

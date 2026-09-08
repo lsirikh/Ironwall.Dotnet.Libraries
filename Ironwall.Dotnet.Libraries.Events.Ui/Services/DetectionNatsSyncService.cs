@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
@@ -12,6 +12,7 @@ using Ironwall.Dotnet.Libraries.Accounts.Api.Services;
 using System;
 using System.Windows;
 using System.Windows.Threading;
+using Ironwall.Dotnet.Monitoring.Models.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.Events.Ui.Services;
 /****************************************************************************
@@ -33,8 +34,10 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
         IEventSetupModel eventSetupModel,
         IEventAggregator? eventAggregator = null,
         ITokenStorageService? tokenStorage = null,
-        Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? deviceProvider = null)
+        Ironwall.Dotnet.Libraries.Devices.Providers.DeviceProvider? deviceProvider = null,
+        IDoorContactPolicy? doorContactPolicy = null)
     {
+        _doorContactPolicy = doorContactPolicy;   // FR-13 ③: 미주입 시 기본 true(DefaultDoorContactPolicy 와 동일)
         _log = log;
         _natsService = natsService;
         _symbolEventManager = symbolEventManager;
@@ -116,6 +119,17 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
 
             _log?.Info($"DETECTION 수신: deviceId={deviceId}, deviceType={deviceType}, event={eventType}, groups=[{string.Join(",", deviceGroups ?? [])}]");
 
+            // FR-13 ③ 접점 폴백: 통문/함체의 ContactOn/Off 는 '개폐 형태' 신호다 — 카드·탐지음·자동조치보고 큐에 넣지 않고
+            //   심볼 DoorState 만 유도한다(설정 DoorContactFallback=false 면 형태도 바꾸지 않고 버린다). 접점 센서(Contact) 는 종전대로 큐잉.
+            //   서버 SYNC_DEVICE/OPERATION_EVENT 가 구현되면 그 채널이 권위이며 이 폴백은 같은 상태로 수렴한다(R-02).
+            if (DoorStateMachine.IsContactEvent(eventType) && DoorStateMachine.HasDoor(deviceType))
+            {
+                bool fallback = _doorContactPolicy?.FallbackEnabled ?? true;
+                if (fallback) _symbolEventManager.ApplyDoorEvent(deviceId, deviceType, eventType);
+                _log?.Info($"DETECTION 접점→개폐 형태(큐 제외): deviceId={deviceId}, {deviceType}, {eventType}, fallback={fallback}");
+                return Task.CompletedTask;
+            }
+
             // 탐지 센서의 소속 제어기 Id 해석 — 제어기 고장 자동복구 매칭용(Controller_Fault_AutoRecovery_Extension FR-02).
             //   provider 미주입/센서 미발견/Controller.Id<=0이면 null → 자동복구 트리거 스킵(안전실패).
             int? owningControllerId = null;
@@ -163,6 +177,7 @@ public class DetectionNatsSyncService : IDetectionNatsSyncService, IService
     private readonly INatsService _natsService;
     private readonly ISymbolEventManager _symbolEventManager;
     private readonly IEventQueueManager _eventQueueManager;
+    private readonly IDoorContactPolicy? _doorContactPolicy;
     private readonly IEventSetupModel _eventSetupModel;
     private readonly IEventAggregator? _eventAggregator;
     private readonly ITokenStorageService? _tokenStorage;   // 로그인 게이팅 — IsAuthenticated 단일 소스

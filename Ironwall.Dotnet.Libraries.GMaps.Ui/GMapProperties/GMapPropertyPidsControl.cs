@@ -21,6 +21,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
     ****************************************************************************/
     public class GMapPropertyPidsControl : GMapPropertyBaseControl
     {
+        public static readonly DependencyProperty ModelVariantProperty = DependencyProperty.Register(
+            nameof(ModelVariant), typeof(string), typeof(GMapPropertyPidsControl), new PropertyMetadata(null, (d, e) =>
+            {
+                var control = (GMapPropertyPidsControl)d;
+                if (control._isInitializing || control._isClearingBindings || control.IsGroupMode || control.SelectedMarker is not GMapPidsMarker marker) return;
+                marker.ModelVariant = (string?)e.NewValue;
+                control.OnMarkerPropertyChanged(nameof(ModelVariant), e.OldValue, e.NewValue);
+            }));
+        public string? ModelVariant { get => (string?)GetValue(ModelVariantProperty); set => SetValue(ModelVariantProperty, value); }
+        public IReadOnlyList<KeyValuePair<string, string>> ModelVariants { get; } = new[]
+        {
+            new KeyValuePair<string, string>("Fixed", "고정형 · 불릿"),
+            new KeyValuePair<string, string>("Dome", "돔형 · 매달림"),
+            new KeyValuePair<string, string>("Ptz", "PTZ · 스피드돔")
+        };
         #region - Ctors -
         static GMapPropertyPidsControl()
         {
@@ -30,6 +45,74 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
         public GMapPropertyPidsControl()
         {
+            _gateWidthCommit = new DeferredCommit<double>((first, last) =>
+            {
+                if (SelectedMarker is not IPidsEditableMarker marker) return;
+                var before = marker.GateWidthM;
+                marker.GateWidthM = last;
+                OnMarkerPropertyChanged("GateWidthM", before, last);
+            });
+            ResetGateWidthCommand = new PanelCommand(_ => ResetGateWidth());
+            Unloaded += (_, _) => _gateWidthCommit.Flush();
+        }
+        #endregion
+
+        #region - 통문 개폐(FR-12/18) -
+        private readonly DeferredCommit<double> _gateWidthCommit;
+        private bool _syncingGate;
+
+        /// <summary>통문 폭(m) 슬라이더 — 마커 NULL 이면 기본 4.0 표시(IsGateWidthInherited), 150ms 지연 커밋.</summary>
+        public double GateWidthM { get => (double)GetValue(GateWidthMProperty); set => SetValue(GateWidthMProperty, value); }
+        public static readonly DependencyProperty GateWidthMProperty = DependencyProperty.Register(nameof(GateWidthM), typeof(double), typeof(GMapPropertyPidsControl),
+            new PropertyMetadata(Helpers.Fence.FenceDefaults.GateWidthM, (d, e) =>
+            {
+                var control = (GMapPropertyPidsControl)d;
+                if (control._isInitializing || control._isClearingBindings || control._syncingGate || control.IsGroupMode || control.SelectedMarker is not IPidsEditableMarker) return;
+                control.IsGateWidthInherited = false;
+                control._gateWidthCommit.Touch((double)e.OldValue, (double)e.NewValue);
+            }, (_, v) => v is double x && double.IsFinite(x) ? Math.Clamp(x, Helpers.Fence.FenceDefaults.GateWidthMinM, Helpers.Fence.FenceDefaults.GateWidthMaxM) : Helpers.Fence.FenceDefaults.GateWidthM));
+        public bool IsGateWidthInherited { get => (bool)GetValue(IsGateWidthInheritedProperty); set => SetValue(IsGateWidthInheritedProperty, value); }
+        public static readonly DependencyProperty IsGateWidthInheritedProperty = DependencyProperty.Register(nameof(IsGateWidthInherited), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(true));
+
+        /// <summary>접점 ON 을 '열림'으로 해석(true) / 반전(false) — 통문·함체 공통, TwoWay 즉시 커밋.</summary>
+        public bool OpenOnContactOn { get => (bool)GetValue(OpenOnContactOnProperty); set => SetValue(OpenOnContactOnProperty, value); }
+        public static readonly DependencyProperty OpenOnContactOnProperty = DependencyProperty.Register(nameof(OpenOnContactOn), typeof(bool), typeof(GMapPropertyPidsControl),
+            new PropertyMetadata(true, (d, e) =>
+            {
+                var control = (GMapPropertyPidsControl)d;
+                if (control._isInitializing || control._isClearingBindings || control._syncingGate || control.IsGroupMode || control.SelectedMarker is not IPidsEditableMarker marker) return;
+                marker.OpenOnContactOn = (bool)e.NewValue;
+                control.OnMarkerPropertyChanged(nameof(OpenOnContactOn), e.OldValue, e.NewValue);
+            }));
+        /// <summary>속성창 절 표시 게이트 — 통문/함체(개폐 형태를 가진 타입).</summary>
+        public bool HasDoor { get => (bool)GetValue(HasDoorProperty); set => SetValue(HasDoorProperty, value); }
+        public static readonly DependencyProperty HasDoorProperty = DependencyProperty.Register(nameof(HasDoor), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
+        public bool IsGate { get => (bool)GetValue(IsGateProperty); set => SetValue(IsGateProperty, value); }
+        public static readonly DependencyProperty IsGateProperty = DependencyProperty.Register(nameof(IsGate), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
+        public System.Windows.Input.ICommand ResetGateWidthCommand { get; }
+
+        private void SyncGateFromMarker(IPidsEditableMarker marker)
+        {
+            _syncingGate = true;
+            try
+            {
+                HasDoor = Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.HasDoor(marker.DeviceType);
+                IsGate = marker.DeviceType == EnumDeviceType.Gate;
+                IsGateWidthInherited = marker.GateWidthM is null;
+                GateWidthM = marker.GateWidthM ?? Helpers.Fence.FenceDefaults.GateWidthM;
+                OpenOnContactOn = marker.OpenOnContactOn;
+            }
+            finally { _syncingGate = false; }
+        }
+
+        private void ResetGateWidth()
+        {
+            if (SelectedMarker is not IPidsEditableMarker marker || IsGroupMode) return;
+            _gateWidthCommit.Cancel();
+            var before = marker.GateWidthM;
+            marker.GateWidthM = null;
+            OnMarkerPropertyChanged("GateWidthM", before, null);
+            SyncGateFromMarker(marker);
         }
         #endregion
         
@@ -45,9 +128,11 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             BindingOperations.ClearBinding(this, DetectionAngleProperty);
             BindingOperations.ClearBinding(this, DetectionBearingProperty);
             BindingOperations.ClearBinding(this, BaseBearingProperty);
+            BindingOperations.ClearBinding(this, ModelVariantProperty);
             BindingOperations.ClearBinding(this, ShowFOVProperty);
             BindingOperations.ClearBinding(this, FOVColorProperty);
             BindingOperations.ClearBinding(this, FOVOpacityProperty);
+            _gateWidthCommit.Flush();   // 마커 교체 전 대기 커밋 확정
 
             //System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 완료 ===");
         }
@@ -92,6 +177,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
 
                 var baseBearingBinding = CreateTwoWayBinding(nameof(pidsMarker.BaseBearing));
                 SetBinding(BaseBearingProperty, baseBearingBinding);
+                SetBinding(ModelVariantProperty, CreateTwoWayBinding(nameof(GMapPidsMarker.ModelVariant)));
             }
 
             //System.Diagnostics.Debug.WriteLine("=== PidsControl SetupSpecificBindings 완료 ===");
@@ -118,6 +204,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             this.DetectionAngle = pidsMarker.DetectionAngle;
             this.DetectionBearing = pidsMarker.DetectionBearing;
             this.BaseBearing = pidsMarker.BaseBearing;
+            this.ModelVariant = (pidsMarker as GMapPidsMarker)?.ModelVariant;
+            SyncGateFromMarker(pidsMarker);   // 통문/함체 개폐 절(FR-18)
 
             //System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
             //System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");

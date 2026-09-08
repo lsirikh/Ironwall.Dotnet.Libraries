@@ -91,7 +91,10 @@ public class RotationMathTests
         double bearing, double theta, bool applies, double expected)
         => Assert.Equal(expected, RotationMath.DisplayAngle(bearing, theta, applies), 6);
 
-    [Theory(DisplayName = "FOV 정확-1회: 루트(Bearing−θ)+지오메트리(Detection−Bearing)=Detection−θ")]
+    // 불변식(map-tilt-25d FR-11 개정): "루트 각 + FOV 로컬각 = Detection−θ".
+    //  · 루트가 θ 를 지니면(비빌보드) FOV 로컬각은 θ 를 읽지 않는다.
+    //  · 루트가 0 이면(빌보드/3D) FOV 로컬각이 θ 를 정확히 1회 더한다(CurrentDisplayAngle 가산).
+    [Theory(DisplayName = "FOV 정확-1회(비빌보드): 루트(Bearing−θ)+지오메트리(Detection−Bearing)=Detection−θ")]
     [InlineData(120, 0, 0)]
     [InlineData(120, 30, 45)]
     [InlineData(275, -15, 90)]
@@ -103,6 +106,25 @@ public class RotationMathTests
         double geometry = RotationMath.FovControlSpaceBearing(detection, markerBearing);
         // 월드각 = 루트 + 지오메트리. θ가 정확히 1회만 합성돼야 한다(F-07 이중 −θ 부재 증명).
         Assert.Equal(detection - theta, root + geometry, 6);
+    }
+
+    [Theory(DisplayName = "FOV 정확-1회(빌보드 root=0, SIM-C002/FR-11): 지오메트리(Detection−Bearing)+CurrentDisplayAngle(Bearing−θ)=Detection−θ")]
+    [InlineData(120, 0, 0)]
+    [InlineData(120, 30, 45)]
+    [InlineData(275, -15, 90)]
+    [InlineData(0, 10, 180)]
+    [InlineData(47, 17, 270)]
+    public void should_add_theta_exactly_once_in_fov_when_root_angle_is_zero(
+        double detection, double markerBearing, double theta)
+    {
+        // 빌보드: 루트 RenderTransform 각은 0, CurrentDisplayAngle(=DisplayAngle) 은 파생값으로 유지된다(FR-10).
+        const double root = 0d;
+        double currentDisplayAngle = RotationMath.NormalizeDeg(RotationMath.DisplayAngle(markerBearing, theta, appliesMapRotation: true));
+        double geometry = RotationMath.FovControlSpaceBearing(detection, markerBearing) + currentDisplayAngle;   // GetFovBearing(빌보드)
+        Assert.True(RotationMath.AreClose(detection - theta, root + geometry));
+        // 이중 −θ 회귀 금지: 루트가 0 인데 지오메트리가 θ 를 더하지 않으면(종전 2D 식) 월드각이 θ 만큼 어긋난다.
+        double stale = RotationMath.FovControlSpaceBearing(detection, markerBearing);   // θ 미가산(종전 2D 식) = D−b
+        Assert.Equal(RotationMath.AreClose(markerBearing, theta), RotationMath.AreClose(detection - theta, root + stale));
     }
 
     // ── 휠줌 단일 역변환 불변식 (FR-10 / R-02) ──

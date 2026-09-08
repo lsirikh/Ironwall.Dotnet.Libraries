@@ -32,6 +32,16 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
     }
     #endregion
 
+    #region Billboard (map-tilt-25d FR-10)
+
+    /// <summary>[결정③] 군대부호는 빌보드 — 맵 회전 시 정립(APP-6D 부호는 방위 의미가 없음). Bearing 은 모델에 보존.</summary>
+    public override bool IsBillboard => true;
+
+    /// <summary>빌보드: 루트 각 0 고정(3D 선례 동형). FOV 가 없으므로 base(0) 만.</summary>
+    protected override void ApplyDisplayAngle(double angle) => base.ApplyDisplayAngle(IsBillboard ? 0 : angle);
+
+    #endregion
+
     #region Additional Dependency Properties
 
     /// <summary>
@@ -152,15 +162,7 @@ public class GMapMilitarySymbolMarkerControl : GMapMarkerBaseControl<GMapMilitar
             new PropertyMetadata(string.Empty));
 
 
-    public bool IsPreviewMode
-    {
-        get { return (bool)GetValue(IsPreviewModeProperty); }
-        set { SetValue(IsPreviewModeProperty, value); }
-    }
 
-    public static readonly DependencyProperty IsPreviewModeProperty =
-    DependencyProperty.Register("IsPreviewMode", typeof(bool), typeof(GMapMilitarySymbolMarkerControl), 
-        new PropertyMetadata(false));
     #endregion
 
     #region Constructors

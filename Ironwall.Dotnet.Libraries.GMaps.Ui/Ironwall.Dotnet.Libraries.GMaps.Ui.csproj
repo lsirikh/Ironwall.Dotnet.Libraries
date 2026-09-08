@@ -43,6 +43,7 @@
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.SystemResources\Ironwall.Dotnet.Libraries.SystemResources.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events\Ironwall.Dotnet.Libraries.Events.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.GMaps.Db\Ironwall.Dotnet.Libraries.GMaps.Db.csproj" />
@@ -59,7 +60,15 @@
 
   <!-- no-data 기본 타일 중앙 로고(pack URI 임베드) -->
   <ItemGroup>
+    <Content Include="Resources\Symbols3D\**\*.obj;Resources\Symbols3D\**\*.mtl;Resources\Symbols3D\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
 	<Resource Include="Resources\Images\sensorway.png" />
   </ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="GMaps.Housing.Tests" />
+		<InternalsVisibleTo Include="GMaps.Ui.Tests" />
+		<InternalsVisibleTo Include="GMaps.PropertyPanel.Tests" />
+	</ItemGroup>
 </Project>

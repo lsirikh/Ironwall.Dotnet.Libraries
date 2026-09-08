@@ -58,6 +58,9 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
     [JsonProperty("device_type", Order = 21)]
     public EnumDeviceType DeviceType { get; set; }
 
+    [JsonProperty("model_variant", Order = 30)]
+    public string? ModelVariant { get; set; }
+
     [JsonProperty("event_status", Order = 22)]
     public EnumEventStatus EventStatus { get; set; } = EnumEventStatus.Normal;
 
@@ -105,6 +108,18 @@ public class PidsSymbolModel : SymbolModel, IPidsSymbolModel
     /// </summary>
     [JsonProperty("base_bearing", Order = 29)]
     public double BaseBearing { get; set; } = 0.0; // 도 (북쪽 기준, 고정값)
+
+    /// <summary>통문 폭(m, 1~8) — DeviceType=Gate 전용. NULL 이면 기본 4.0(FR-12).</summary>
+    [JsonProperty("gate_width_m", Order = 31)]
+    public double? GateWidthM { get; set; }
+
+    /// <summary>접점 ContactOn 을 '열림'으로 해석(true) / 반전(false) — 통문·함체 공통(FR-12).</summary>
+    [JsonProperty("open_on_contact_on", Order = 32)]
+    public bool OpenOnContactOn { get; set; } = true;
+
+    /// <summary>개폐 형태 축(Unknown/Closed/Open) — 런타임 전용. 색 축(EventStatus)과 독립이며 직렬화·영속·복사에서 제외(FR-12).</summary>
+    [JsonIgnore]
+    public EnumDoorState DoorState { get; set; } = EnumDoorState.Unknown;
 
     public event EventHandler Update;
 

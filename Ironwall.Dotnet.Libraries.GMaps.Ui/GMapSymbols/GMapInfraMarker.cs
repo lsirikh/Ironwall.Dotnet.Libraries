@@ -40,7 +40,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         /// </summary>
         protected override UIElement CreateMarkerControl()
         {
-            var markerControl = new GMapMarkerInfraControl(this);
+            GMapMarkerInfraControl markerControl = Utils.Symbol3DFeature.IsEnabled
+                ? new GMapMarkerInfra3DControl(this) : new GMapMarkerInfraControl(this);
             _log?.Info($"=====================  GMapMarkerInfraControl 생성 호출됨   ===========================");
             return markerControl;
         }

@@ -3,6 +3,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Data;
 
@@ -28,6 +29,140 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public GMapPropertyPidsGroupControl()
         {
             MarkerSizeEnabled = false;  // LineSymbol과 동일하게 사이즈 조정 비활성화
+            Is3DFeatureEnabled = Utils.Symbol3DFeature.IsEnabled;
+            FencePostSpacingDefault = Utils.Symbol3DFeature.FencePostSpacingM;
+            FenceHeightDefault = Utils.Symbol3DFeature.FenceHeightM;
+            _spacingCommit = new DeferredCommit<double>((first, last) => CommitFence("PostSpacingM", first, last, m => m.PostSpacingM = last));
+            _heightCommit = new DeferredCommit<double>((first, last) => CommitFence("FenceHeightM", first, last, m => m.FenceHeightM = last));
+            ResetPostSpacingCommand = new PanelCommand(_ => ResetPostSpacing());
+            ResetFenceHeightCommand = new PanelCommand(_ => ResetFenceHeight());
+            SetPostSpacingPresetCommand = new PanelCommand(p => { if (p is not null && double.TryParse(p.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) PostSpacingM = v; });
+            Unloaded += (_, _) => FlushDeferredCommits();
+        }
+        #endregion
+
+        #region - 3D 철망(FR-03/04/06, D1 슬라이더 150ms 지연 커밋) -
+        private readonly DeferredCommit<double> _spacingCommit;
+        private readonly DeferredCommit<double> _heightCommit;
+        private bool _syncingFence;   // 마커→패널 동기화 중(슬라이더 콜백이 다시 마커에 쓰지 않도록)
+
+        public bool Is3DFeatureEnabled { get => (bool)GetValue(Is3DFeatureEnabledProperty); set => SetValue(Is3DFeatureEnabledProperty, value); }
+        public static readonly DependencyProperty Is3DFeatureEnabledProperty = DependencyProperty.Register(nameof(Is3DFeatureEnabled), typeof(bool), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(false));
+        public double FencePostSpacingDefault { get => (double)GetValue(FencePostSpacingDefaultProperty); set => SetValue(FencePostSpacingDefaultProperty, value); }
+        public static readonly DependencyProperty FencePostSpacingDefaultProperty = DependencyProperty.Register(nameof(FencePostSpacingDefault), typeof(double), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(Helpers.Fence.FenceDefaults.PostSpacingM));
+        public double FenceHeightDefault { get => (double)GetValue(FenceHeightDefaultProperty); set => SetValue(FenceHeightDefaultProperty, value); }
+        public static readonly DependencyProperty FenceHeightDefaultProperty = DependencyProperty.Register(nameof(FenceHeightDefault), typeof(double), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(Helpers.Fence.FenceDefaults.FenceHeightM));
+
+        /// <summary>그룹별 3D 렌더 on/off — TwoWay 바인딩(즉시 커밋).</summary>
+        public bool Render3D { get => (bool)GetValue(Render3DProperty); set => SetValue(Render3DProperty, value); }
+        public static readonly DependencyProperty Render3DProperty = DependencyProperty.Register(nameof(Render3D), typeof(bool), typeof(GMapPropertyPidsGroupControl),
+            new PropertyMetadata(true, (d, e) => ((GMapPropertyPidsGroupControl)d).OnFenceFieldChanged("Render3D", e, m => m.Render3D = (bool)e.NewValue)));
+
+        /// <summary>철망 형태(기둥 간격/센서 장착) — TwoWay 바인딩(즉시 커밋).</summary>
+        public EnumFenceMode FenceMode { get => (EnumFenceMode)GetValue(FenceModeProperty); set => SetValue(FenceModeProperty, value); }
+        public static readonly DependencyProperty FenceModeProperty = DependencyProperty.Register(nameof(FenceMode), typeof(EnumFenceMode), typeof(GMapPropertyPidsGroupControl),
+            new PropertyMetadata(EnumFenceMode.Posts, (d, e) => ((GMapPropertyPidsGroupControl)d).OnFenceFieldChanged("FenceMode", e, m => m.FenceMode = (EnumFenceMode)e.NewValue)));
+
+        /// <summary>기둥 간격(m) 슬라이더 값 — 마커 NULL 이면 전역 기본을 보여주고(IsPostSpacingInherited) 사용자가 움직이면 150ms 뒤 마커에 커밋.</summary>
+        public double PostSpacingM { get => (double)GetValue(PostSpacingMProperty); set => SetValue(PostSpacingMProperty, value); }
+        public static readonly DependencyProperty PostSpacingMProperty = DependencyProperty.Register(nameof(PostSpacingM), typeof(double), typeof(GMapPropertyPidsGroupControl),
+            new PropertyMetadata(Helpers.Fence.FenceDefaults.PostSpacingM, (d, e) => ((GMapPropertyPidsGroupControl)d).OnSliderChanged(e, isSpacing: true), (_, v) => CoerceRange(v, Helpers.Fence.FenceDefaults.PostSpacingMinM, Helpers.Fence.FenceDefaults.PostSpacingMaxM)));
+        public bool IsPostSpacingInherited { get => (bool)GetValue(IsPostSpacingInheritedProperty); set => SetValue(IsPostSpacingInheritedProperty, value); }
+        public static readonly DependencyProperty IsPostSpacingInheritedProperty = DependencyProperty.Register(nameof(IsPostSpacingInherited), typeof(bool), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(true));
+
+        /// <summary>철망 높이(m) 슬라이더 값 — 기둥 간격과 같은 규약.</summary>
+        public double FenceHeightM { get => (double)GetValue(FenceHeightMProperty); set => SetValue(FenceHeightMProperty, value); }
+        public static readonly DependencyProperty FenceHeightMProperty = DependencyProperty.Register(nameof(FenceHeightM), typeof(double), typeof(GMapPropertyPidsGroupControl),
+            new PropertyMetadata(Helpers.Fence.FenceDefaults.FenceHeightM, (d, e) => ((GMapPropertyPidsGroupControl)d).OnSliderChanged(e, isSpacing: false), (_, v) => CoerceRange(v, Helpers.Fence.FenceDefaults.FenceHeightMinM, Helpers.Fence.FenceDefaults.FenceHeightMaxM)));
+        public bool IsFenceHeightInherited { get => (bool)GetValue(IsFenceHeightInheritedProperty); set => SetValue(IsFenceHeightInheritedProperty, value); }
+        public static readonly DependencyProperty IsFenceHeightInheritedProperty = DependencyProperty.Register(nameof(IsFenceHeightInherited), typeof(bool), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(true));
+
+        /// <summary>"기둥 N개 · 실간격 x.xx m" / "센서 N개 · 간격 s m · 잔여 x m" — FenceLayout.Summary(순수 함수).</summary>
+        public string FenceLayoutSummary { get => (string)GetValue(FenceLayoutSummaryProperty); set => SetValue(FenceLayoutSummaryProperty, value); }
+        public static readonly DependencyProperty FenceLayoutSummaryProperty = DependencyProperty.Register(nameof(FenceLayoutSummary), typeof(string), typeof(GMapPropertyPidsGroupControl), new PropertyMetadata(string.Empty));
+
+        public System.Windows.Input.ICommand ResetPostSpacingCommand { get; }
+        public System.Windows.Input.ICommand ResetFenceHeightCommand { get; }
+        public System.Windows.Input.ICommand SetPostSpacingPresetCommand { get; }
+
+        private static object CoerceRange(object value, double min, double max)
+        {
+            double v = value is double d && double.IsFinite(d) ? d : min;
+            return Math.Clamp(v, min, max);
+        }
+
+        private bool CanWriteFence => !_isInitializing && !_isClearingBindings && !_syncingFence && !IsGroupEditing && SelectedMarker is IPidsGroupEditableMarker;
+
+        private void OnFenceFieldChanged(string name, DependencyPropertyChangedEventArgs e, Action<IPidsGroupEditableMarker> apply)
+        {
+            if (!CanWriteFence || SelectedMarker is not IPidsGroupEditableMarker marker) return;
+            apply(marker);
+            OnMarkerPropertyChanged(name, e.OldValue, e.NewValue);
+            UpdateFenceSummary();
+        }
+
+        private void OnSliderChanged(DependencyPropertyChangedEventArgs e, bool isSpacing)
+        {
+            UpdateFenceSummary();
+            if (!CanWriteFence) return;
+            if (isSpacing) { IsPostSpacingInherited = false; _spacingCommit.Touch((double)e.OldValue, (double)e.NewValue); }
+            else { IsFenceHeightInherited = false; _heightCommit.Touch((double)e.OldValue, (double)e.NewValue); }
+        }
+
+        private void CommitFence(string name, double first, double last, Action<IPidsGroupEditableMarker> apply)
+        {
+            if (SelectedMarker is not IPidsGroupEditableMarker marker) return;
+            object? before = name == "PostSpacingM" ? marker.PostSpacingM : marker.FenceHeightM;   // NULL(상속) → 값 전이도 undo 로 복원 가능
+            apply(marker);
+            OnMarkerPropertyChanged(name, before, last);
+        }
+
+        /// <summary>대기 중인 슬라이더 커밋을 즉시 확정(언로드·마커 교체·검증 훅).</summary>
+        public void FlushDeferredCommits() { _spacingCommit.Flush(); _heightCommit.Flush(); }
+
+        private void ResetPostSpacing()
+        {
+            if (SelectedMarker is not IPidsGroupEditableMarker marker || IsGroupEditing) return;
+            _spacingCommit.Cancel();
+            var before = marker.PostSpacingM;
+            marker.PostSpacingM = null;
+            OnMarkerPropertyChanged("PostSpacingM", before, null);
+            SyncFenceFromMarker(marker);
+        }
+
+        private void ResetFenceHeight()
+        {
+            if (SelectedMarker is not IPidsGroupEditableMarker marker || IsGroupEditing) return;
+            _heightCommit.Cancel();
+            var before = marker.FenceHeightM;
+            marker.FenceHeightM = null;
+            OnMarkerPropertyChanged("FenceHeightM", before, null);
+            SyncFenceFromMarker(marker);
+        }
+
+        private void SyncFenceFromMarker(IPidsGroupEditableMarker marker)
+        {
+            _syncingFence = true;
+            try
+            {
+                IsPostSpacingInherited = marker.PostSpacingM is null;
+                PostSpacingM = marker.PostSpacingM ?? FencePostSpacingDefault;
+                IsFenceHeightInherited = marker.FenceHeightM is null;
+                FenceHeightM = marker.FenceHeightM ?? FenceHeightDefault;
+                Render3D = marker.Render3D;
+                FenceMode = marker.FenceMode;
+            }
+            finally { _syncingFence = false; }
+            UpdateFenceSummary();
+        }
+
+        private void UpdateFenceSummary()
+        {
+            if (SelectedMarker is not IPidsGroupEditableMarker marker || marker.RuntimePoints is not { Count: >= 2 } pts)
+            { FenceLayoutSummary = string.Empty; return; }
+            var local = Helpers.Fence.FenceLayout.ToLocalMeters(pts.Select(p => (p.Lat, p.Lng)).ToList());
+            var result = Helpers.Fence.FenceLayout.Compute(local, PostSpacingM, FenceMode, marker.IsClosedPath);
+            FenceLayoutSummary = Helpers.Fence.FenceLayout.Summary(result, PostSpacingM, FenceMode);
         }
         #endregion
 
@@ -47,6 +182,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             // PidsGroup 관련 바인딩 해제
             BindingOperations.ClearBinding(this, LinkedDeviceGroupProperty);
             BindingOperations.ClearBinding(this, EventStatusProperty);
+            FlushDeferredCommits();   // 마커 교체 전 대기 커밋 확정(값 유실 방지)
 
             //System.Diagnostics.Debug.WriteLine("=== PidsGroupControl ClearSpecificBindings 완료 ===");
         }
@@ -110,6 +246,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             // PidsGroup 속성 로드
             this.LinkedDeviceGroup = pidsGroupMarker.LinkedDeviceGroup;
             this.EventStatus = pidsGroupMarker.EventStatus;
+            SyncFenceFromMarker(pidsGroupMarker);   // 3D 철망(NULL=전역 기본 표시)
 
             //System.Diagnostics.Debug.WriteLine($"PidsGroup 마커에서 속성 로드 완료");
         }

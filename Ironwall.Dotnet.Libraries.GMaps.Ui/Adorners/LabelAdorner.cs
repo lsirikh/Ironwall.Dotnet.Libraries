@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
@@ -10,6 +10,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 
@@ -296,8 +297,10 @@ public sealed class LabelAdorner : Adorner, IDisposable
     }
 
     // 라벨박스에서만 hit(그 외 투과, 불변식#3). MarkerEditAdorner 아이콘 핸들과 비겹침(라벨=아이콘 하단 오프셋).
+    // C12: 독점 입력 모드(라인드로잉·배치·조준·측정 등) 중엔 라벨박스도 투과 — 어도너는 맵의 형제라 여기서 히트하면 눌림이 맵에 못 간다(D-19 동일 계열).
     protected override HitTestResult HitTestCore(PointHitTestParameters hitTestParameters)
-        => _map.IsEditMode && !_labelRect.IsEmpty && _labelRect.Contains(hitTestParameters.HitPoint)   // 편집모드일 때만 히트(그 외 클릭스루=이동 불가, L2)
+        => !ExclusiveInputModeGate.IsActive(_map)
+           && _map.IsEditMode && !_labelRect.IsEmpty && _labelRect.Contains(hitTestParameters.HitPoint)   // 편집모드일 때만 히트(그 외 클릭스루=이동 불가, L2)
             ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null!;
 
     /// <summary>폭 조절 스트립 폭 — min(6px, 박스폭 25%): 2글자 라벨(≈20px 박스)에서 이동 존 잠식 방지(2차 검증 W2-014).</summary>
@@ -315,6 +318,9 @@ public sealed class LabelAdorner : Adorner, IDisposable
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
+        // C12: 독점 입력 모드 중엔 눌림을 소비·캡처하지 않고 통과(GMapMarkerBaseControl D-19 가드와 같은 목록·같은 게이트).
+        if (ExclusiveInputModeGate.IsActive(_map)) { base.OnMouseLeftButtonDown(e); return; }
+
         int zone = _map.IsEditMode ? HitZone(e.GetPosition(this)) : 0;   // 라벨 편집은 맵 편집모드 ON일 때만(L2)
         if (zone > 0)
         {

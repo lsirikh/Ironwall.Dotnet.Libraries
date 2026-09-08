@@ -98,6 +98,17 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         DependencyProperty.Register("EventStatus", typeof(EnumEventStatus), typeof(GMapMarkerPidsControl),
             new PropertyMetadata(EnumEventStatus.Normal, OnEventStatusChanged));
 
+    /// <summary>개폐 형태 축(FR-12) — 통문·함체. 템플릿 트리거가 PART_Housing3D.DoorOpen 을 0.4s 애니메이션한다. 색 축(EventStatus)과 독립.</summary>
+    public EnumDoorState DoorState
+    {
+        get { return (EnumDoorState)GetValue(DoorStateProperty); }
+        set { SetValue(DoorStateProperty, value); }
+    }
+
+    public static readonly DependencyProperty DoorStateProperty =
+        DependencyProperty.Register(nameof(DoorState), typeof(EnumDoorState), typeof(GMapMarkerPidsControl),
+            new PropertyMetadata(EnumDoorState.Unknown));
+
     /// <summary>
     /// FOV 표시 여부
     /// </summary>
@@ -242,14 +253,37 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         }
     }
 
-    /// <summary>뷰포트(회전) snapshot 수신 — 줌 핸들러와 동일 경로로 FOV 재계산(R-13).</summary>
-    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot _) => OnMapZoomChanged();
+    /// <summary>직전에 처리한 뷰포트 snapshot — TiltCos 단독 변화 필터(map-tilt FR-06/D2)의 비교 기준.</summary>
+    private GMapCustoms.MapViewportSnapshot? _lastViewportSnapshot;
+
+    /// <summary>뷰포트(회전) snapshot 수신 — 줌 핸들러와 동일 경로로 FOV 재계산(R-13).
+    /// [map-tilt FR-06/D2] TiltCos 만 바뀐 스냅샷(중심·베어링·줌·크기·디지털배율 동일)에는 반응하지 않는다 — FOV 는 컨트롤 RenderTransform 을
+    /// 승계하므로 재계산 불필요. 슬라이더 드래그 중 카메라 N개 × 프레임 재계산 방지.</summary>
+    private void OnViewportSnapshot(GMapCustoms.MapViewportSnapshot snapshot)
+    {
+        bool tiltOnly = snapshot.IsTiltCosOnlyChangeFrom(_lastViewportSnapshot);
+        _lastViewportSnapshot = snapshot;
+        if (tiltOnly) return;
+        OnMapZoomChanged();
+    }
 
     /// <summary>[Rotation FR-12/R-22] 회전 pivot을 FOV apex(카메라 하우징 중심, SVG y=43.6/200)에 고정 —
     /// 중심(0.5,0.5) 회전 시 apex가 지리 앵커에서 이탈하던 드리프트 방지. IpCamera 외에는 중심 유지.
     /// (우상단 EventStatus 배지는 원형이라 회전해도 시각 동일 — upright 보정 불요.)</summary>
     protected override Point RotationPivot
         => DeviceType == EnumDeviceType.IpCamera ? new Point(0.5, 43.6 / 200.0) : base.RotationPivot;
+
+    /// <summary>[map-tilt-25d FR-10 결정③] PIDS 2D 아이콘은 빌보드 — 맵 회전 시 글리프는 정립하고 FOV 만 지면(월드각)을 추종한다.
+    /// 3D 하우징(<see cref="GMapMarker3DHousingControl"/>)은 override false(yaw 로 회전을 표현).</summary>
+    public override bool IsBillboard => true;
+
+    /// <summary>빌보드: 루트 각은 항상 0(3D 선례 <c>GMapMarker3DHousingControl.ApplyDisplayAngle</c> 동형), FOV 는
+    /// <see cref="GetFovBearing"/> 이 <c>CurrentDisplayAngle</c> 을 1회 가산해 월드각 D−θ 를 유지하므로 즉시 재계산한다.</summary>
+    protected override void ApplyDisplayAngle(double angle)
+    {
+        base.ApplyDisplayAngle(IsBillboard ? 0 : angle);
+        if (IsBillboard) UpdateFOVPath();
+    }
 
     private void OnMapZoomChanged()
     {
@@ -302,6 +336,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
         // PIDS 마커 전용 바인딩
         SetupPropertyBinding(DeviceTypeProperty, nameof(Marker.DeviceType));
         SetupPropertyBinding(EventStatusProperty, nameof(Marker.EventStatus));
+        SetupPropertyBinding(DoorStateProperty, nameof(Marker.DoorState), BindingMode.OneWay);   // FR-12 형태 축
         SetupPropertyBinding(ShowFOVProperty, nameof(Marker.ShowFOV));
         SetupPropertyBinding(FOVOpacityProperty, nameof(Marker.FOVOpacity));
         SetupPropertyBinding(DetectionRangeProperty, nameof(Marker.DetectionRange));
@@ -381,13 +416,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     {
         base.OnRenderSizeChanged(sizeInfo);
 
-        if (Marker != null)
-        {
-            Marker.Width = ActualWidth;
-            Marker.Height = ActualHeight;
-
-            UpdateFOVPath();
-        }
+        UpdateFOVPath();
     }
 
     /// <summary>
@@ -408,6 +437,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// </summary>
     private void ApplyDeviceTypeDefaults()
     {
+        if (!WritesBackRenderSize) return;
         var size = GetSizeForDeviceType(DeviceType);
         Width = Height = size;
     }
@@ -455,8 +485,9 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
     /// - 좌표 계산 로직 내장 (WPF 좌표계 호환)
     /// - animate=false: 즉시 업데이트, animate=true: 부드러운 전환
     /// </summary>
-    private void UpdateFOVPath(bool animate = false)
+    protected void UpdateFOVPath(bool animate = false)
     {
+        animate &= AnimateFovChanges;
         // UI 스레드 접근 보장
         if (!Dispatcher.CheckAccess())
         {
@@ -476,9 +507,9 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
             {
                 // 1. 캔버스 및 중심점 설정
                 // IpCamera: 하우징 중심(SVG y=43.6/200) 을 FOV 꼭지점으로 사용
-                double fovOriginY = DeviceType == EnumDeviceType.IpCamera ? (43.6 / 200.0) : 0.5;
-                transform.X = ActualWidth  * 0.5;
-                transform.Y = ActualHeight * fovOriginY;
+                var origin = GetFovOrigin();
+                transform.X = origin.X;
+                transform.Y = origin.Y;
 
                 fovCanvas.Width = ActualWidth;
                 fovCanvas.Height = ActualHeight;
@@ -495,7 +526,7 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
                 // [Rotation FR-13 정확-1회] 루트가 DisplayAngle(=Bearing−θ)로 돌므로 FOV 지오메트리는
                 // θ를 읽지 않고 (Detection−Bearing)만 사용 → 월드각=(Bearing−θ)+(Detection−Bearing)=Detection−θ.
                 // 이 식에 θ가 없다는 것이 이중 −θ(F-07/R-36) 방지의 증명. 종전 R-22(Bearing≠0 시 FOV 오프셋)도 해소.
-                double targetBearing = Utils.RotationMath.FovControlSpaceBearing(DetectionBearing, RotationAngle);
+                double targetBearing = GetFovBearing();
                 double targetAngle = DetectionAngle;
 
                 // 3. 애니메이션 적용 여부 결정
@@ -525,6 +556,15 @@ public class GMapMarkerPidsControl : GMapMarkerBaseControl<GMapPidsMarker>
             //System.Diagnostics.Debug.WriteLine($"FOV Path 업데이트 실패: {ex.Message}");
         }
     }
+
+    protected virtual Point GetFovOrigin() => new(ActualWidth * 0.5,
+        ActualHeight * (DeviceType == EnumDeviceType.IpCamera ? 43.6 / 200.0 : 0.5));
+
+    /// <summary>FOV 컨트롤-로컬 방위(FR-13 정확-1회). 비빌보드(루트=b−θ): (D−b) 만 → 월드각 D−θ.
+    /// 빌보드(루트=0, FR-11): (D−b)+CurrentDisplayAngle(b−θ) → 월드각 D−θ (3D <c>GetFovBearing</c> 과 동형). θ 는 어느 경로에서도 정확히 1회.</summary>
+    protected virtual double GetFovBearing()
+        => Utils.RotationMath.FovControlSpaceBearing(DetectionBearing, RotationAngle) + (IsBillboard ? CurrentDisplayAngle : 0d);
+    protected virtual bool AnimateFovChanges => true;
 
     /// <summary>
     /// 각도 기반 애니메이션 시작 (Phase 15.7)

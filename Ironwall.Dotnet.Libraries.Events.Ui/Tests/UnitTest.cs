@@ -3472,6 +3472,7 @@ public class EventUiDevicePropertyBindingTests : IDisposable
     [InlineData(EnumDeviceType.IpSpeaker, "스피커")]
     [InlineData(EnumDeviceType.Enclosure, "함체")]
     [InlineData(EnumDeviceType.Lamp, "경고등")]
+    [InlineData(EnumDeviceType.Gate, "통문")]
     public void ExEventViewModel_DeviceTypeName_ReturnsCorrectKoreanName(EnumDeviceType deviceType, string expectedName)
     {
         // Arrange

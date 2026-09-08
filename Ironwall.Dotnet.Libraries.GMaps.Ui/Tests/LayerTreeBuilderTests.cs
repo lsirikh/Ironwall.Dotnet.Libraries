@@ -135,6 +135,7 @@ public class LayerTreeBuilderTests
     [InlineData(EnumDeviceType.Enclosure, "PidsEnclosure")]
     [InlineData(EnumDeviceType.Fence, "PidsSensor")]
     [InlineData(EnumDeviceType.Radar, "PidsSensor")]
+    [InlineData(EnumDeviceType.Gate, "PidsSensor")]   // 통문(D2) 1차: 센서 하위 카테고리
     public void should_resolve_pids_category_by_devicetype(EnumDeviceType type, string expectedKey)
     {
         var s = new PidsSymbolModel { Id = 1, DeviceType = type, Category = EnumMarkerCategory.PIDS_EQUIPMENT };

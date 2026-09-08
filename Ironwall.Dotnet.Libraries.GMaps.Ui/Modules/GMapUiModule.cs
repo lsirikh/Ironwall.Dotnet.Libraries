@@ -51,6 +51,8 @@ public class GMapUiModule: Module
 
         builder.RegisterInstance(_webSetup).As<IMainControlWebSetupModel>().SingleInstance();
         builder.RegisterType<DeviceDetailUrlService>().As<IDeviceDetailUrlService>().SingleInstance();
+        // FR-13 ③ 접점 폴백 정책 — Events.Ui 의 DefaultDoorContactPolicy(PreserveExistingDefaults)보다 우선한다(모듈 로드 순서 무관).
+        builder.RegisterType<Services.Symbol3DDoorContactPolicy>().As<Ironwall.Dotnet.Libraries.Events.Ui.Services.IDoorContactPolicy>().SingleInstance();
         // GIS→매니저 제어 REQ 공통 실행기(v1.5.2 §6.4 — REQ+RSP 확인, 기본 5s) — Broadcast/Aim/Lamp 공유
         builder.RegisterType<Services.Brokers.BrokerRequestClient>().As<Services.Brokers.IBrokerRequestClient>().SingleInstance();
         builder.RegisterType<BroadcastControlService>().As<IBroadcastControlService>().SingleInstance();

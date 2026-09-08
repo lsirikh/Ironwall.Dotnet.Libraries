@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -10,6 +10,7 @@ using GMap.NET;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners;
 
@@ -184,6 +185,9 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
 
     protected override HitTestResult HitTestCore(PointHitTestParameters hitTestParameters)
     {
+        // C12: 독점 입력 모드(라인드로잉·배치·조준·측정 등) 중엔 선택 마커 영역도 투과 — 눌림이 맵의 base-전 분기로 내려가야 한다(D-19 동일 계열).
+        if (ExclusiveInputModeGate.IsActive(_map)) return null!;
+
         // Ctrl/Shift = 멀티셀렉션 토글·러버밴드(그룹 '이동' 아님) → adorner 투과시켜 아래 마커 Shape/GMapCustomControl이
         //   클릭을 받아 MarkerToggleRequested가 발화되게 함. (미투과 시 그룹 내 마커 위 Ctrl+클릭을 adorner가 e.Handled로
         //   삼켜 '제외'가 영구 불가 — 추가만 되고 제외/모든 시나리오 실패의 실제 원인)
@@ -195,6 +199,9 @@ public sealed class GroupSelectionAdorner : Adorner, IDisposable
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
+        // C12: 독점 입력 모드 중엔 그룹 이동을 시작하지 않고 통과(GMapMarkerBaseControl D-19 가드와 같은 목록·같은 게이트).
+        if (ExclusiveInputModeGate.IsActive(_map)) { base.OnMouseLeftButtonDown(e); return; }
+
         var p = e.GetPosition(this);
         if (IsOverSelected(p))   // 선택 심볼 아무거나 좌드래그 = 그룹 이동
         {

@@ -68,4 +68,16 @@ public interface ISymbolEventManager
     /// 개별 디바이스 복합 상태 전이 처리 (EventQueueManager OnDeviceStateChanged 구독용)
     /// </summary>
     void HandleDeviceStateChanged(int deviceId, Enums.EnumDeviceType deviceType, Enums.EnumCompositeEventStatus prev, Enums.EnumCompositeEventStatus next);
+
+    /// <summary>
+    /// 개폐 형태 축(FR-12/13) — 서버(SYNC_DEVICE gate_status/door_status)·OPERATION_EVENT 가 확정한 상태를 그대로 세팅.
+    /// 색 축(CompositeStatus)·큐와 무관하며 통문/함체 심볼에만 의미가 있다(그 외 심볼은 무시).
+    /// </summary>
+    void SetDoorState(int deviceId, Enums.EnumDeviceType deviceType, Enums.EnumDoorState state);
+
+    /// <summary>
+    /// 접점 이벤트(ContactOn/Off)로 개폐 형태를 유도(R-02 폴백 채널) — 현재 상태에서 DoorStateMachine.Next 로 전이.
+    /// 접점 외 이벤트는 형태를 바꾸지 않는다.
+    /// </summary>
+    void ApplyDoorEvent(int deviceId, Enums.EnumDeviceType deviceType, Enums.EnumEventType eventType);
 }

@@ -35,7 +35,9 @@ public static class RotationMath
     /// <summary>회전 적용 판정 — SSOT 게이트(단일 진입점 ApplyMapRotation에서 사용).
     /// 반환: 적용할 canonical 각도, null=차단(no-op).
     /// 규칙: 정규화 0(정북)은 항상 허용(리셋·앵커 강제 정립 경로) /
-    /// 0이 아니면 kill-switch ON && 앵커 비활성일 때만 허용.</summary>
+    /// 0이 아니면 kill-switch ON && 앵커 비활성일 때만 허용.
+    /// 동형: 틸트 게이트는 <see cref="TiltMath.Decide"/>(map-tilt-25d FR-02) — 같은 kill-switch·앵커 순서에
+    /// Tier0·줌 히스테리시스가 추가된 형태. 단, 틸트 OFF 는 "각도 유지"가 아니라 즉시 0(G10).</summary>
     public static double? Decide(double target, bool featureEnabled, bool anchorActive)
     {
         double n = NormalizeDeg(target);
@@ -52,10 +54,12 @@ public static class RotationMath
     public static double DisplayAngle(double markerBearing, double mapBearing, bool appliesMapRotation)
         => markerBearing - (appliesMapRotation ? mapBearing : 0d);
 
-    /// <summary>FOV 부채꼴의 '컨트롤 로컬' 방위(FR-13 정확-1회 합성) — 루트가 이미
-    /// DisplayAngle(=Bearing−θ)로 돌므로, FOV 지오메트리는 θ를 전혀 읽지 않고
-    /// (Detection−Bearing)만 쓰면 월드각 = (Bearing−θ)+(Detection−Bearing) = Detection−θ.
-    /// θ가 이 식에 없다는 것 자체가 이중 −θ(F-07/R-36) 방지의 증명이다.</summary>
+    /// <summary>FOV 부채꼴의 '컨트롤 로컬' 방위(FR-13 정확-1회 합성) — 이 식 자체에는 θ가 없다.
+    /// · 비빌보드(루트=DisplayAngle=Bearing−θ): 월드각 = (Bearing−θ)+(Detection−Bearing) = Detection−θ.
+    /// · 빌보드/3D(루트 각 0, map-tilt-25d FR-11): 호출자(<c>GetFovBearing</c>)가 <c>CurrentDisplayAngle</c>(=Bearing−θ)을
+    ///   **정확히 1회** 가산 → (Detection−Bearing)+(Bearing−θ) = Detection−θ.
+    /// 불변식: "루트 각 + FOV 로컬각 = Detection−θ" — 루트가 θ를 지니면 FOV 는 θ를 읽지 않고, 루트가 0 이면 FOV 가 θ를 1회 더한다.
+    /// 어느 경로에서도 θ 는 정확히 1회(이중 −θ F-07/R-36 방지).</summary>
     public static double FovControlSpaceBearing(double detectionBearing, double markerBearing)
         => detectionBearing - markerBearing;
 

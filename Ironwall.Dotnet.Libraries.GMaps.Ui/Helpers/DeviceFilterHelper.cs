@@ -55,7 +55,8 @@ internal static class DeviceFilterHelper
             EnumDeviceType.PIR or
             EnumDeviceType.Laser or
             EnumDeviceType.Cable or
-            EnumDeviceType.OpticalCable =>
+            EnumDeviceType.OpticalCable or
+            EnumDeviceType.Gate =>
                 devices.Where(d =>
                     d.DeviceType == EnumDeviceType.Fence ||
                     d.DeviceType == EnumDeviceType.Underground ||
@@ -63,7 +64,8 @@ internal static class DeviceFilterHelper
                     d.DeviceType == EnumDeviceType.PIR ||
                     d.DeviceType == EnumDeviceType.Laser ||
                     d.DeviceType == EnumDeviceType.Cable ||
-                    d.DeviceType == EnumDeviceType.OpticalCable),
+                    d.DeviceType == EnumDeviceType.OpticalCable ||
+                    d.DeviceType == EnumDeviceType.Gate),
 
             // 기타: 전체 목록
             _ => devices

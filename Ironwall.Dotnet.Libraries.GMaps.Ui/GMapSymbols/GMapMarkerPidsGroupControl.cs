@@ -390,6 +390,15 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         /// <summary>
         /// 라인 기하학 업데이트 (개선된 버전)
         /// </summary>
+        /// <summary>파생 컨트롤(3D 철망)이 기하 재계산을 요청할 때 쓴다.</summary>
+        protected void RefreshLineGeometry() => UpdateLineGeometry();
+
+        /// <summary>
+        /// 라인 기하가 갱신된 직후 호출되는 훅(FR-07) — <paramref name="localPoints"/> 는 컨트롤 좌상단 기준 로컬 px(닫힘 중복점 없음),
+        /// <paramref name="origin"/> 은 그 원점의 지도 화면 좌표. 2D 컨트롤은 아무것도 하지 않는다.
+        /// </summary>
+        protected virtual void OnLineGeometryUpdated(IReadOnlyList<Point> localPoints, Point origin) { }
+
         private void UpdateLineGeometry()
         {
             if (Marker == null || MainPolyline == null || _mapControl == null)
@@ -401,6 +410,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 if (points == null || points.Count < 2)
                 {
                     MainPolyline.Points = new PointCollection();
+                    OnLineGeometryUpdated(Array.Empty<Point>(), default);
                     return;
                 }
 
@@ -462,11 +472,14 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                     Marker.Offset = newOffset;   // 팬 중에는 origin·center가 같이 이동해 값이 유지됨(불필요 재배치 없음)
 
                 var pointCollection = new PointCollection();
+                var localPoints = new List<Point>(screenPoints.Count);
 
                 foreach (var screenPoint in screenPoints)
                 {
                     // 컨트롤 좌상단(원점) 기준 로컬 좌표 — 화면상 실제 위치와 1:1
-                    pointCollection.Add(new Point(screenPoint.X - originX, screenPoint.Y - originY));
+                    var local = new Point(screenPoint.X - originX, screenPoint.Y - originY);
+                    pointCollection.Add(local);
+                    localPoints.Add(local);
                 }
 
                 // 닫힌 경로 처리
@@ -491,6 +504,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                     _lineCanvas.Height = Height;
                 }
 
+                OnLineGeometryUpdated(localPoints, new Point(originX, originY));   // 3D 철망 훅(FR-07)
             }
             catch (Exception ex)
             {
@@ -735,6 +749,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         #region - Attributes -
         private Canvas? _lineCanvas;
         private GMapCustomControl? _mapControl;
+        /// <summary>부모 지도(Loaded 후 확보) — 파생 컨트롤의 m/px·줌 산출용.</summary>
+        protected GMapCustomControl? MapControl => _mapControl;
         #endregion
     }
 }

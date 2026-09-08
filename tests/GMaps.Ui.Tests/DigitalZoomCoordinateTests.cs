@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Xunit;
 
 namespace GMaps.Ui.Tests;
@@ -29,6 +29,20 @@ public class DigitalZoomCoordinateTests
     {
         if (Math.Abs(scale - 1.0) < IDENTITY_EPS) return (x, y);
         return (cx + (x - cx) / scale, cy + (y - cy) / scale);
+    }
+
+    // ── [map-tilt-25d FR-05] 틸트 확장 복제(L-1 동기화): outer = (cx_v + (x−cx)·s, cy_v + (y−cy)·s·cosφ), cy_v = cy − Δ ──
+    //   실코드 SSOT 는 Helpers/TiltOverscanMath.InnerToOuter/OuterToInner(소스 링크) — 아래 테스트가 복제식과 실코드의 동치를 단언한다.
+    private static (double x, double y) InnerToOuter(double x, double y, double scale, double tiltCos, double delta, double cx, double cy)
+    {
+        if (Math.Abs(scale - 1.0) < IDENTITY_EPS && Math.Abs(tiltCos - 1.0) < 1e-12 && Math.Abs(delta) < IDENTITY_EPS) return (x, y);
+        return (cx + (x - cx) * scale, (cy - delta) + (y - cy) * scale * tiltCos);
+    }
+
+    private static (double x, double y) OuterToInner(double x, double y, double scale, double tiltCos, double delta, double cx, double cy)
+    {
+        if (Math.Abs(scale - 1.0) < IDENTITY_EPS && Math.Abs(tiltCos - 1.0) < 1e-12 && Math.Abs(delta) < IDENTITY_EPS) return (x, y);
+        return (cx + (x - cx) / scale, cy + (y - (cy - delta)) / (scale * tiltCos));
     }
 
     // 디지털 줌 레벨 → 배율 (GMapCustomControl.DIGITAL_SCALE_TABLE 복제) — level1=1.25×(40m 중간 스텝) 추가
@@ -119,5 +133,113 @@ public class DigitalZoomCoordinateTests
     public void should_map_level_to_scale_when_indexing(int level, double expected)
     {
         Assert.Equal(expected, DIGITAL_SCALE_TABLE[Math.Clamp(level, 0, 3)], 6);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // [map-tilt-25d FR-05] 틸트(cosφ)·오버스캔(Δ) 케이스 — SIM-C001
+    // ════════════════════════════════════════════════════════════════════════════
+
+    private const double W = 1280;
+    private static readonly double Cos20 = Math.Cos(20 * Math.PI / 180.0);
+    private static readonly double HCtrl = 1080 / Cos20;          // SIM-T1041: H_view=1080, φ=20° → Height≈1149.34, Δ≈34.67
+    private static readonly double Delta20 = (HCtrl - 1080) / 2.0;
+
+    // ── 회귀 항등(NFR-03): φ=0 ∧ Δ=0 이면 종전 디지털줌 수식과 완전 동일 ────────
+    [Theory]
+    [InlineData(1.0, 100.0, 200.0)]
+    [InlineData(1.5, 100.0, 200.0)]
+    [InlineData(2.0, 812.3, 145.9)]
+    public void should_match_legacy_digitalzoom_formula_when_tilt_is_zero(double scale, double x, double y)
+    {
+        const double cx = 640, cy = 360;
+        var legacy = InnerToOuter(x, y, scale, cx, cy);
+        var tilted = InnerToOuter(x, y, scale, tiltCos: 1.0, delta: 0.0, cx, cy);
+        Assert.Equal(legacy.x, tilted.x, 9);
+        Assert.Equal(legacy.y, tilted.y, 9);
+
+        var real = Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.TiltOverscanMath.InnerToOuter((x, y), scale, 0.0, 2 * cx, 2 * cy, 0.0);
+        Assert.Equal(legacy.x, real.X, 9);
+        Assert.Equal(legacy.y, real.Y, 9);
+    }
+
+    // ── 복제식 == 실코드(TiltOverscanMath) — L-1 동기화 단언 ───────────────────
+    [Theory]
+    [InlineData(1.0, 20.0, 100.0, 200.0)]
+    [InlineData(1.5, 20.0, 812.3, 145.9)]
+    [InlineData(2.0, 35.0, 640.0, 574.67)]
+    [InlineData(1.25, 35.0, 0.0, 0.0)]
+    public void should_match_real_tilt_overscan_math_when_tilted(double scale, double phiDeg, double x, double y)
+    {
+        double k = Math.Cos(phiDeg * Math.PI / 180.0);
+        double hCtrl = 1080 / k, delta = (hCtrl - 1080) / 2.0;
+        var replica = InnerToOuter(x, y, scale, k, delta, W / 2, hCtrl / 2);
+        var real = Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.TiltOverscanMath.InnerToOuter((x, y), scale, phiDeg, W, hCtrl, delta);
+        Assert.Equal(replica.x, real.X, 9);
+        Assert.Equal(replica.y, real.Y, 9);
+
+        var replicaBack = OuterToInner(real.X, real.Y, scale, k, delta, W / 2, hCtrl / 2);
+        var realBack = Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.TiltOverscanMath.OuterToInner((real.X, real.Y), scale, phiDeg, W, hCtrl, delta);
+        Assert.Equal(replicaBack.x, realBack.X, 9);
+        Assert.Equal(replicaBack.y, realBack.Y, 9);
+        Assert.Equal(x, realBack.X, 6);
+        Assert.Equal(y, realBack.Y, 6);
+    }
+
+    // ── 중심 불변식: 컨트롤 중심(오버스캔 포함) → 뷰포트 중심(H_view/2) ────────
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.5)]
+    [InlineData(2.0)]
+    public void should_map_control_center_to_viewport_center_when_tilted_with_overscan(double scale)
+    {
+        var outer = InnerToOuter(W / 2, HCtrl / 2, scale, Cos20, Delta20, W / 2, HCtrl / 2);
+        Assert.Equal(W / 2, outer.x, 6);
+        Assert.Equal(1080 / 2.0, outer.y, 6);               // = H_ctrl/2 − Δ
+    }
+
+    // ── X 는 틸트 무영향(s 배만), Y 는 s·cosφ 배 압축 ─────────────────────────
+    [Fact]
+    public void should_compress_only_vertical_offset_by_cos_phi_when_tilted()
+    {
+        const double s = 1.5;
+        double cx = W / 2, cy = HCtrl / 2;
+        var outer = InnerToOuter(cx + 100, cy + 100, s, Cos20, Delta20, cx, cy);
+        Assert.Equal(cx + 100 * s, outer.x, 6);
+        Assert.Equal((cy - Delta20) + 100 * s * Cos20, outer.y, 6);
+        Assert.True(outer.y - (cy - Delta20) < 100 * s);   // 세로는 가로보다 덜 밀린다(cosφ<1)
+    }
+
+    // ── 오버스캔 상단 모서리: inner (0, Δ·?)… 뷰포트 상단 y=0 ↔ inner y = cy − H_view/(2·s·cosφ) ──
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(2.0)]
+    public void should_map_viewport_top_to_inner_center_minus_half_view_over_scale_cos(double scale)
+    {
+        var top = OuterToInner(W / 2, 0, scale, Cos20, Delta20, W / 2, HCtrl / 2);
+        Assert.Equal(HCtrl / 2 - 1080 / (2 * scale * Cos20), top.y, 6);
+        var bottom = OuterToInner(W / 2, 1080, scale, Cos20, Delta20, W / 2, HCtrl / 2);
+        Assert.Equal(HCtrl / 2 + 1080 / (2 * scale * Cos20), bottom.y, 6);
+        // s=1 ∧ φ_layout=φ 이면 오버스캔 컨트롤이 화면을 정확히 채운다(상단 0 · 하단 H_ctrl)
+        if (scale == 1.0)
+        {
+            Assert.Equal(0.0, top.y, 6);
+            Assert.Equal(HCtrl, bottom.y, 6);
+        }
+    }
+
+    // ── 왕복 항등(틸트) ─────────────────────────────────────────────────────────
+    [Theory]
+    [InlineData(1.25, 10.0)]
+    [InlineData(1.5, 20.0)]
+    [InlineData(2.0, 35.0)]
+    public void should_round_trip_when_tilted_with_overscan(double scale, double phiDeg)
+    {
+        double k = Math.Cos(phiDeg * Math.PI / 180.0);
+        double hCtrl = 1080 / k, delta = (hCtrl - 1080) / 2.0;
+        var p = (x: 812.3, y: 145.9);
+        var outer = InnerToOuter(p.x, p.y, scale, k, delta, W / 2, hCtrl / 2);
+        var back = OuterToInner(outer.x, outer.y, scale, k, delta, W / 2, hCtrl / 2);
+        Assert.Equal(p.x, back.x, 6);
+        Assert.Equal(p.y, back.y, 6);
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Ironwall.Dotnet.Libraries.Enums;
@@ -56,6 +56,29 @@ public abstract class UndoableCommandBase : IUndoableCommand
             case "FOVColor": if (m is IPidsEditableMarker pFc) pFc.FOVColor = ToEnum<EnumColorType>(v); break;
             case "FOVOpacity": if (m is IPidsEditableMarker pFo) pFo.FOVOpacity = ToD(v); break;
             case "BaseBearing": if (m is IPidsEditableMarker pBb) pBb.BaseBearing = ToD(v); break;
+            case "ModelVariant": if (m is GMapPidsMarker pVariant) pVariant.ModelVariant = v as string; break;
+            // 통문·함체 개폐(FR-12) — DoorState 는 런타임 형태 축이라 undo 대상이 아니다
+            case "GateWidthM": if (m is IPidsEditableMarker pGw) pGw.GateWidthM = v is null ? null : ToD(v); break;
+            case "OpenOnContactOn": if (m is IPidsEditableMarker pOc) pOc.OpenOnContactOn = ToB(v); break;
+            // PIDS 그룹 3D 철망(FR-03/04/06) + 기존 미등록 4속성(LinePattern/LineOpacity/IsClosedPath/LinkedDeviceGroup — 죽은 undo 엔트리였음)
+            case "PostSpacingM": if (m is IPidsGroupEditableMarker gSp) gSp.PostSpacingM = v is null ? null : ToD(v); break;
+            case "FenceHeightM": if (m is IPidsGroupEditableMarker gFh) gFh.FenceHeightM = v is null ? null : ToD(v); break;
+            case "FenceMode": if (m is IPidsGroupEditableMarker gFm) gFm.FenceMode = ToEnum<EnumFenceMode>(v); break;
+            case "Render3D": if (m is IPidsGroupEditableMarker gR3) gR3.Render3D = ToB(v); break;
+            case "ReverseSensorOrder": if (m is IPidsGroupEditableMarker gRs) gRs.ReverseSensorOrder = ToB(v); break;
+            case "LinkedDeviceGroup": if (m is IPidsGroupEditableMarker gDg) gDg.LinkedDeviceGroup = ToI(v); break;
+            case "LinePattern": if (m is ILineEditableMarker lPat) lPat.LinePattern = ToEnum<EnumLinePattern>(v); break;
+            case "LineOpacity": if (m is ILineEditableMarker lOp) lOp.LineOpacity = ToD(v); break;
+            case "IsClosedPath": if (m is ILineEditableMarker lCp) lCp.IsClosedPath = ToB(v); break;
+            case "Altitude":
+                if (m is GMapPidsMarker elevatedDevice) elevatedDevice.Altitude = (float)ToD(v);
+                else if (m is GMapInfraMarker elevatedBuilding) elevatedBuilding.Altitude = (float)ToD(v);
+                break;
+            case "BuildingType": if (m is IInfraEditableMarker building) building.BuildingType = ToEnum<EnumBuildingType>(v); break;
+            case "BuildingUsage": if (m is IInfraEditableMarker usage) usage.BuildingUsage = ToEnum<EnumBuildingUsage>(v); break;
+            case "FloorCount": if (m is IInfraEditableMarker floors) floors.FloorCount = ToI(v); break;
+            case "BasementFloorCount": if (m is IInfraEditableMarker basement) basement.BasementFloorCount = ToI(v); break;
+            case "BuildingArea": if (m is IInfraEditableMarker area) area.BuildingArea = ToD(v); break;
         }
     }
 
@@ -90,6 +113,24 @@ public abstract class UndoableCommandBase : IUndoableCommand
         "FOVColor" => m is IPidsEditableMarker pFc ? pFc.FOVColor : null,
         "FOVOpacity" => m is IPidsEditableMarker pFo ? pFo.FOVOpacity : null,
         "BaseBearing" => m is IPidsEditableMarker pBb ? pBb.BaseBearing : null,
+        "ModelVariant" => (m as GMapPidsMarker)?.ModelVariant,
+        "GateWidthM" => (m as IPidsEditableMarker)?.GateWidthM,
+        "OpenOnContactOn" => (m as IPidsEditableMarker)?.OpenOnContactOn,
+        "PostSpacingM" => (m as IPidsGroupEditableMarker)?.PostSpacingM,
+        "FenceHeightM" => (m as IPidsGroupEditableMarker)?.FenceHeightM,
+        "FenceMode" => (m as IPidsGroupEditableMarker)?.FenceMode,
+        "Render3D" => (m as IPidsGroupEditableMarker)?.Render3D,
+        "ReverseSensorOrder" => (m as IPidsGroupEditableMarker)?.ReverseSensorOrder,
+        "LinkedDeviceGroup" => (m as IPidsGroupEditableMarker)?.LinkedDeviceGroup,
+        "LinePattern" => (m as ILineEditableMarker)?.LinePattern,
+        "LineOpacity" => (m as ILineEditableMarker)?.LineOpacity,
+        "IsClosedPath" => (m as ILineEditableMarker)?.IsClosedPath,
+        "Altitude" => m switch { GMapPidsMarker device => device.Altitude, GMapInfraMarker building => building.Altitude, _ => (float?)null },
+        "BuildingType" => (m as IInfraEditableMarker)?.BuildingType,
+        "BuildingUsage" => (m as IInfraEditableMarker)?.BuildingUsage,
+        "FloorCount" => (m as IInfraEditableMarker)?.FloorCount,
+        "BasementFloorCount" => (m as IInfraEditableMarker)?.BasementFloorCount,
+        "BuildingArea" => (m as IInfraEditableMarker)?.BuildingArea,
         _ => null,
     };
 
@@ -102,7 +143,11 @@ public abstract class UndoableCommandBase : IUndoableCommand
         or "Opacity" or "ShowShape" or "ShowTitle" or "IsLocked" or "FillColor"
         or "StrokeColor" or "OperationState"
         or "TitleColor" or "TitleBackground" or "TitleFontFamily" or "TitleBold" or "TitleItalic" or "TitleMaxWidth"
-        or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" => true,
+        or "ShowFOV" or "FOVColor" or "FOVOpacity" or "BaseBearing" or "ModelVariant"
+        or "GateWidthM" or "OpenOnContactOn"
+        or "PostSpacingM" or "FenceHeightM" or "FenceMode" or "Render3D" or "ReverseSensorOrder"
+        or "LinkedDeviceGroup" or "LinePattern" or "LineOpacity" or "IsClosedPath"
+        or "Altitude" or "BuildingType" or "BuildingUsage" or "FloorCount" or "BasementFloorCount" or "BuildingArea" => true,
         _ => false,
     };
 

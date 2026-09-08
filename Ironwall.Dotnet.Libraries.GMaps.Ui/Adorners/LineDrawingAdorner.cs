@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -34,6 +35,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
         private readonly ILogService _log;
         private readonly List<PointLatLng> _geoPoints = new List<PointLatLng>();
         private Point? _currentMousePosition;
+        private IReadOnlyList<Point>? _strokePreview;   // 드래그 드로잉 중 프리핸드 스트로크(확정 전, Muted 점선)
         private readonly string _hudTitle;
 
         // HUD UI (표준 패널 컨트롤)
@@ -172,8 +174,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
             var newTop = cur.Y - _dragOffset.Y;
 
             // 화면 경계 클램프(드래그 중에만)
-            newLeft = Math.Max(0, Math.Min(newLeft, _controlCanvas.ActualWidth - _hud.ActualWidth));
-            newTop = Math.Max(0, Math.Min(newTop, _controlCanvas.ActualHeight - _hud.ActualHeight));
+            // [map-tilt FR-04] _controlCanvas 는 어도너 자신의 시각 자식(inner 공간) — 디지털줌/틸트/오버스캔 시 캔버스 모서리가 화면 모서리가
+            //   아니므로 맵의 가시 사각형(GetVisibleInnerRect)으로 클램프한다. 비틸트·비줌이면 (0,0,W,H) 로 종전과 동일.
+            var visible = (_mapControl as GMapCustoms.GMapCustomControl)?.GetVisibleInnerRect()
+                          ?? new Rect(0, 0, _controlCanvas.ActualWidth, _controlCanvas.ActualHeight);
+            newLeft = Math.Max(visible.Left, Math.Min(newLeft, visible.Right - _hud.ActualWidth));
+            newTop = Math.Max(visible.Top, Math.Min(newTop, visible.Bottom - _hud.ActualHeight));
 
             Canvas.SetLeft(_hud, newLeft);
             Canvas.SetTop(_hud, newTop);
@@ -235,6 +241,13 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
                 return true;
             }
             return false;
+        }
+
+        /// <summary>드래그 드로잉 스트로크 미리보기(FR-01) — null 이면 지운다. 확정은 FinishStroke → AddPoint 로.</summary>
+        public void SetStrokePreview(IReadOnlyList<Point>? screenPoints)
+        {
+            _strokePreview = screenPoints is { Count: > 0 } ? screenPoints.ToList() : null;
+            InvalidateVisual();
         }
 
         /// <summary>
@@ -372,6 +385,12 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Adorners{
         /// </summary>
         protected override void OnRender(DrawingContext drawingContext)
         {
+            // 0. 드래그 스트로크 미리보기(정점 없이도 그린다 — 첫 정점을 드래그로 만들 수 있으므로)
+            if (_strokePreview is { Count: >= 2 } stroke)
+            {
+                EnsureMarkerResources();
+                for (int i = 1; i < stroke.Count; i++) drawingContext.DrawLine(_previewPen, stroke[i - 1], stroke[i]);
+            }
             if (_geoPoints.Count == 0) return;
 
             EnsureMarkerResources();

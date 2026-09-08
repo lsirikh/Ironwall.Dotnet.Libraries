@@ -1,0 +1,452 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:control="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes" xmlns:house="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Symbols3D">
+    <control:HousingFallbackIconConverter x:Key="HousingFallbackIcon"/>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    <Style TargetType="{x:Type control:GMapMarker3DHousingControl}">
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type control:GMapMarker3DHousingControl}">
+                    <Grid x:Name="PART_MainContainer" Background="Transparent">
+                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding MarkerTitle}"/>
+                        <house:HousingVisual x:Name="PART_Housing3D" BodyBrush="{TemplateBinding MarkerFill}" RingBrush="{TemplateBinding MarkerStroke}" RingThickness="{TemplateBinding MarkerStrokeThickness}" Elevation="{Binding Marker.Altitude, RelativeSource={RelativeSource TemplatedParent}}" Locked="{Binding Marker.IsLocked, RelativeSource={RelativeSource TemplatedParent}}"/>
+                        <!--  FOV 캔버스는 ShowFOV(Path 의 TemplateBinding)로만 게이트한다 — 레거시 PidsMarkerStyle 와 동일.  -->
+                        <!--  장비 타입 조건(IpCamera)을 두면 비카메라 8종의 FOV 가 영구 불가(D-2).  -->
+                        <Canvas Name="PART_FOVCanvas" Width="{TemplateBinding Width}" Height="{TemplateBinding Height}" ClipToBounds="False" IsHitTestVisible="False">
+                            <Path Name="PART_FOVSector" Fill="{TemplateBinding FOVColor}" Opacity="{TemplateBinding FOVOpacity}" Visibility="{TemplateBinding ShowFOV,                                       Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Path.Data>
+                                    <PathGeometry>
+                                        <PathFigure x:Name="PART_FOVFigure" StartPoint="0,0" IsClosed="True">
+                                            <LineSegment x:Name="PART_FOVLine1" Point="0,0"/>
+                                            <ArcSegment x:Name="PART_FOVArc" IsLargeArc="False" Point="0,0" Size="0,0" SweepDirection="Clockwise"/>
+                                        </PathFigure>
+                                    </PathGeometry>
+                                </Path.Data>
+                                <!--  Transform 추가  -->
+                                <Path.RenderTransform>
+                                    <TranslateTransform x:Name="PART_FOVTransform" X="0" Y="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                            <!--  중심점도 해당 위치에  -->
+                            <Ellipse Name="PART_FOVCenter" Canvas.Left="18" Canvas.Top="7" Width="4" Height="4" Fill="Black" Stroke="White" StrokeThickness="1"/>
+                        </Canvas>
+                        <Canvas Width="0" Height="0" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <!--  Opacity + RenderTransform(ScaleTransform) 애니메이션은 WPF 컴포지션 레이어에서  -->
+                            <!--  BitmapCache 없이도 GPU 전담 처리됨. BitmapCache + ScaleTransform 조합은  -->
+                            <!--  스케일 변경 시 캐시 무효화 루프 발생 → Forever 반복과 결합 시 스턱 원인.  -->
+                            <Ellipse Name="PulseRing1" Canvas.Left="-40" Canvas.Top="-40" Width="80" Height="80" Fill="Transparent" Stroke="#CCFF0000" StrokeThickness="6" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.1" ScaleY="0.1"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse Name="PulseRing2" Canvas.Left="-40" Canvas.Top="-40" Width="80" Height="80" Fill="Transparent" Stroke="#CCFF0000" StrokeThickness="6" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.1" ScaleY="0.1"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse Name="PulseRing3" Canvas.Left="-40" Canvas.Top="-40" Width="80" Height="80" Fill="Transparent" Stroke="#CCFF0000" StrokeThickness="6" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.1" ScaleY="0.1"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Canvas>
+                        <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="PART_Housing3D" Property="Highlighted" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="PART_Housing3D" Property="Highlighted" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="DEACTIVATED">
+                            <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.3"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="HousingError">
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.7"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="HousingError"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="DEACTIVATED">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#718096"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F59E0B"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Fault">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F59E0B"/>
+                            <Setter TargetName="PART_Housing3D" Property="StatusBrush" Value="#F59E0B"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Connection">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#22B8CF"/>
+                            <Setter TargetName="PART_Housing3D" Property="StatusBrush" Value="#22B8CF"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Blackout">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#111827"/>
+                            <Setter TargetName="PART_Housing3D" Property="StatusBrush" Value="#111827"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Detecting">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336"/>
+                            <Setter TargetName="PART_Housing3D" Property="StatusBrush" Value="#F44336"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="PulseStoryboard_Begin" HandoffBehavior="SnapshotAndReplace">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <!--  Ring 1: BeginTime=0s  -->
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing1" Storyboard.TargetProperty="Opacity" From="0.9" To="0" Duration="0:0:1.2" BeginTime="0:0:0">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing1" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing1" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <!--  Ring 2: BeginTime=0.4s  -->
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing2" Storyboard.TargetProperty="Opacity" From="0.9" To="0" Duration="0:0:1.2" BeginTime="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing2" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing2" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <!--  Ring 3: BeginTime=0.8s  -->
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing3" Storyboard.TargetProperty="Opacity" From="0.9" To="0" Duration="0:0:1.2" BeginTime="0:0:0.8">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing3" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.8">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing3" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.8">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="PulseStoryboard_Begin"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <!--  FR-12 개폐 형태: DoorState=Open → 문짝 0→1(0.4s CubicEase), 닫힘 → 1→0. DoorOpen 은 경량 DP 라 매 프레임 재투영이 없다.  -->
+                        <Trigger Property="DoorState" Value="Open">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="HousingDoorOpen" HandoffBehavior="SnapshotAndReplace">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="DoorOpen" To="1" Duration="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard Name="HousingDoorClose" HandoffBehavior="SnapshotAndReplace">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="DoorOpen" To="0" Duration="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsBroadcasting" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="HousingBroadcast">
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="Opacity" From="1" To="0.55" Duration="0:0:0.6"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="HousingBroadcast"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="ShowShape" Value="False">
+                            <Setter TargetName="PART_Housing3D" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_HitBackplate" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_MainContainer" Property="Background" Value="{x:Null}"/>
+                            <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="IsPreviewMode" Value="True">
+                            <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="{x:Type control:GMapMarkerInfra3DControl}">
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type control:GMapMarkerInfra3DControl}">
+                    <Grid x:Name="PART_MainContainer" Background="Transparent">
+                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding MarkerTitle}"/>
+                        <house:HousingVisual x:Name="PART_Housing3D" BodyBrush="{TemplateBinding MarkerFill}" RingBrush="{TemplateBinding MarkerStroke}" RingThickness="{TemplateBinding MarkerStrokeThickness}" Elevation="{Binding Marker.Altitude, RelativeSource={RelativeSource TemplatedParent}}" Locked="{Binding Marker.IsLocked, RelativeSource={RelativeSource TemplatedParent}}" FloorCount="{TemplateBinding FloorCount}" BasementCount="{TemplateBinding BasementFloorCount}" Footprint="{TemplateBinding BuildingArea}"/>
+                        <!--  층수 표시(B1/F5) — 레거시 InfraMarkerStyle PART_FloorText 이식. 메서드 바인딩 대신 FloorDisplayText DP(D-4).  -->
+                        <TextBlock x:Name="PART_FloorText" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,1" FontSize="10" FontWeight="Bold" Foreground="White" TextAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed" Text="{TemplateBinding FloorDisplayText}">
+                            <TextBlock.Effect>
+                                <DropShadowEffect BlurRadius="2" Opacity="0.8" ShadowDepth="1" Color="Black"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="PART_Housing3D" Property="Highlighted" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="PART_Housing3D" Property="Highlighted" Value="True"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="DEACTIVATED">
+                            <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.3"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="HousingError">
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.7"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="HousingError"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="ShowFloorCount" Value="True">
+                            <Setter TargetName="PART_FloorText" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="ShowShape" Value="False">
+                            <Setter TargetName="PART_Housing3D" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_HitBackplate" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_MainContainer" Property="Background" Value="{x:Null}"/>
+                            <Setter TargetName="PART_FloorText" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="IsPreviewMode" Value="True">
+                            <Setter TargetName="PART_FloorText" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="{x:Type control:GMapMarkerPidsFallbackControl}">
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type control:GMapMarkerPidsFallbackControl}">
+                    <Grid x:Name="PART_MainContainer" Background="Transparent">
+                        <Rectangle x:Name="PART_HitBackplate" Fill="Transparent" ToolTip="{TemplateBinding MarkerTitle}"/>
+                        <Border x:Name="PART_Housing3D" Background="{TemplateBinding MarkerFill}" CornerRadius="50" BorderBrush="{TemplateBinding MarkerStroke}" BorderThickness="1.5">
+                            <Viewbox Margin="5">
+                                <md:PackIcon Width="24" Height="24" Kind="{Binding DeviceType, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource HousingFallbackIcon}}" Foreground="White"/>
+                            </Viewbox>
+                        </Border>
+                        <!--  FOV 캔버스는 ShowFOV(Path 의 TemplateBinding)로만 게이트한다 — 레거시 PidsMarkerStyle 와 동일.  -->
+                        <!--  장비 타입 조건(IpCamera)을 두면 비카메라 8종의 FOV 가 영구 불가(D-2).  -->
+                        <Canvas Name="PART_FOVCanvas" Width="{TemplateBinding Width}" Height="{TemplateBinding Height}" ClipToBounds="False" IsHitTestVisible="False">
+                            <Path Name="PART_FOVSector" Fill="{TemplateBinding FOVColor}" Opacity="{TemplateBinding FOVOpacity}" Visibility="{TemplateBinding ShowFOV,                                       Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Path.Data>
+                                    <PathGeometry>
+                                        <PathFigure x:Name="PART_FOVFigure" StartPoint="0,0" IsClosed="True">
+                                            <LineSegment x:Name="PART_FOVLine1" Point="0,0"/>
+                                            <ArcSegment x:Name="PART_FOVArc" IsLargeArc="False" Point="0,0" Size="0,0" SweepDirection="Clockwise"/>
+                                        </PathFigure>
+                                    </PathGeometry>
+                                </Path.Data>
+                                <!--  Transform 추가  -->
+                                <Path.RenderTransform>
+                                    <TranslateTransform x:Name="PART_FOVTransform" X="0" Y="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                            <!--  중심점도 해당 위치에  -->
+                            <Ellipse Name="PART_FOVCenter" Canvas.Left="18" Canvas.Top="7" Width="4" Height="4" Fill="Black" Stroke="White" StrokeThickness="1"/>
+                        </Canvas>
+                        <Canvas Width="0" Height="0" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <!--  Opacity + RenderTransform(ScaleTransform) 애니메이션은 WPF 컴포지션 레이어에서  -->
+                            <!--  BitmapCache 없이도 GPU 전담 처리됨. BitmapCache + ScaleTransform 조합은  -->
+                            <!--  스케일 변경 시 캐시 무효화 루프 발생 → Forever 반복과 결합 시 스턱 원인.  -->
+                            <Ellipse Name="PulseRing1" Canvas.Left="-40" Canvas.Top="-40" Width="80" Height="80" Fill="Transparent" Stroke="#CCFF0000" StrokeThickness="6" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.1" ScaleY="0.1"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse Name="PulseRing2" Canvas.Left="-40" Canvas.Top="-40" Width="80" Height="80" Fill="Transparent" Stroke="#CCFF0000" StrokeThickness="6" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.1" ScaleY="0.1"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                            <Ellipse Name="PulseRing3" Canvas.Left="-40" Canvas.Top="-40" Width="80" Height="80" Fill="Transparent" Stroke="#CCFF0000" StrokeThickness="6" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="0.1" ScaleY="0.1"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Canvas>
+                        <Border x:Name="PART_EventStatusIndicator" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="5" Background="#48C9A0" BorderBrush="White" BorderThickness="1.2" IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="DEACTIVATED">
+                            <Setter TargetName="PART_Housing3D" Property="Opacity" Value="0.3"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="HousingError">
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.7"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="HousingError"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="DEACTIVATED">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#718096"/>
+                        </Trigger>
+                        <Trigger Property="MarkerState" Value="ERROR">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F59E0B"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Fault">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F59E0B"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Connection">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#22B8CF"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Blackout">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#111827"/>
+                        </Trigger>
+                        <Trigger Property="EventStatus" Value="Detecting">
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Background" Value="#F44336"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="PulseStoryboard_Begin" HandoffBehavior="SnapshotAndReplace">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <!--  Ring 1: BeginTime=0s  -->
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing1" Storyboard.TargetProperty="Opacity" From="0.9" To="0" Duration="0:0:1.2" BeginTime="0:0:0">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing1" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing1" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <!--  Ring 2: BeginTime=0.4s  -->
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing2" Storyboard.TargetProperty="Opacity" From="0.9" To="0" Duration="0:0:1.2" BeginTime="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing2" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing2" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <!--  Ring 3: BeginTime=0.8s  -->
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing3" Storyboard.TargetProperty="Opacity" From="0.9" To="0" Duration="0:0:1.2" BeginTime="0:0:0.8">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing3" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.8">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="PulseRing3" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.1" To="1" Duration="0:0:1.2" BeginTime="0:0:0.8">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="PulseStoryboard_Begin"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsBroadcasting" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard Name="HousingBroadcast">
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetName="PART_Housing3D" Storyboard.TargetProperty="Opacity" From="1" To="0.55" Duration="0:0:0.6"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="HousingBroadcast"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="ShowShape" Value="False">
+                            <Setter TargetName="PART_Housing3D" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_HitBackplate" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_MainContainer" Property="Background" Value="{x:Null}"/>
+                            <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="IsPreviewMode" Value="True">
+                            <Setter TargetName="PART_FOVCanvas" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_EventStatusIndicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing1" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing2" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PulseRing3" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

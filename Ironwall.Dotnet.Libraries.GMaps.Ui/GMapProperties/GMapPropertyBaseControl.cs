@@ -144,6 +144,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 new PropertyMetadata(32.0, OnMarkerHeightSizeChanged, CoerceDoubleValue));
 
         /// <summary>
+        /// 설치 높이(모델 Altitude, 0~100 상대값) — 3D 하우징 들어올림. 행은 Pids/Infra SpecificContent 에만 노출(D-9).
+        /// </summary>
+        public double MarkerAltitude
+        {
+            get { return (double)GetValue(MarkerAltitudeProperty); }
+            set { SetValue(MarkerAltitudeProperty, value); }
+        }
+
+        public static readonly DependencyProperty MarkerAltitudeProperty =
+            DependencyProperty.Register("MarkerAltitude", typeof(double),
+                typeof(GMapPropertyBaseControl),
+                new PropertyMetadata(0.0, OnMarkerAltitudeChanged, CoerceDoubleValue));
+
+        /// <summary>
         /// 마커 회전 각도
         /// </summary>
         public double MarkerBearing
@@ -649,6 +663,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                     control.TitleSize = newMarker.TitleSize;
                     control.MarkerWidth = newMarker.Width;
                     control.MarkerHeight = newMarker.Height;
+                    control.MarkerAltitude = newMarker switch { GMapPidsMarker p => p.Altitude, GMapInfraMarker b => b.Altitude, _ => 0.0 };
                     control.MarkerBearing = newMarker.Bearing;
                     control.MarkerFillColor = newMarker.FillColor;
                     control.MarkerStrokeColor = newMarker.StrokeColor;
@@ -730,6 +745,25 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
                 if (!control.IsGroupMode) control.SelectedMarker.Width = control.MarkerWidth;
                 // 실제 "Width" 발화(과거 합성 "Size"+null before는 ApplyProperty 미지원→undo 무효, CMD-01)
                 control.OnMarkerPropertyChanged("Width", e.OldValue, e.NewValue);
+            }
+        }
+
+        private static void OnMarkerAltitudeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is GMapPropertyBaseControl control && control.SelectedMarker != null && !control._isInitializing && !control._isClearingBindings)
+            {
+                var value = (double)e.NewValue;
+                if (double.IsNaN(value)) return;   // 그룹 Pending sentinel — 미전파
+                if (!control.IsGroupMode)
+                {
+                    // IEditableMarker 는 Altitude 를 노출하지 않는다 — Undo(UndoableCommandBase "Altitude")와 같은 캐스트 규약.
+                    switch (control.SelectedMarker)
+                    {
+                        case GMapPidsMarker device: device.Altitude = (float)value; break;
+                        case GMapInfraMarker building: building.Altitude = (float)value; break;
+                    }
+                }
+                control.OnMarkerPropertyChanged("Altitude", e.OldValue, e.NewValue);
             }
         }
 
@@ -892,6 +926,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             SetBinding(TitleSizeProperty, CreateTwoWayBinding(nameof(SelectedMarker.TitleSize)));
             SetBinding(MarkerWidthProperty, CreateTwoWayBinding(nameof(SelectedMarker.Width)));
             SetBinding(MarkerHeightProperty, CreateTwoWayBinding(nameof(SelectedMarker.Height)));
+            SetBinding(MarkerAltitudeProperty, CreateTwoWayBinding("Altitude"));   // 인터페이스 밖 경로 — 모든 GMapBaseMarker<T> 가 보유
             SetBinding(MarkerBearingProperty, CreateTwoWayBinding(nameof(SelectedMarker.Bearing)));
             SetBinding(MarkerStrokeThicknessProperty, CreateTwoWayBinding(nameof(SelectedMarker.StrokeThickness)));
             SetBinding(ShowShapeProperty, CreateTwoWayBinding(nameof(SelectedMarker.ShowShape)));
@@ -958,6 +993,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             BindingOperations.ClearBinding(this, TitleSizeProperty);
             BindingOperations.ClearBinding(this, MarkerWidthProperty);
             BindingOperations.ClearBinding(this, MarkerHeightProperty);
+            BindingOperations.ClearBinding(this, MarkerAltitudeProperty);
             BindingOperations.ClearBinding(this, MarkerBearingProperty);
             BindingOperations.ClearBinding(this, MarkerFillColorProperty);
             BindingOperations.ClearBinding(this, MarkerStrokeColorProperty);

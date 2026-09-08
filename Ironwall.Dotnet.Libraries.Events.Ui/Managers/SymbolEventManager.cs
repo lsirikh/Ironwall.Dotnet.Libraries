@@ -5,6 +5,7 @@ using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;
 using Ironwall.Dotnet.Libraries.ViewModel.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Collections.Concurrent;
@@ -79,6 +80,13 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
         //   부팅 시 EQM은 비어 있으므로 Normal로 정리되고, 서버가 여전히 장애면 Status=ERROR라 여기 걸리지 않는다.
         if (deviceModel.Status == EnumDeviceStatus.ACTIVATED)
             RefreshDeviceSymbol(deviceModel.Id, deviceModel.DeviceType);
+
+        // FR-13 부팅 초기화: 함체는 장비정보 door_status 로 개폐 형태를 시작한다(통문 gate_status 는 클라 장비모델 미수용 → Unknown=닫힘 표시).
+        if (deviceModel is IEnclosureDeviceModel enclosure && symbolModel is IPidsSymbolModel doorSymbol)
+        {
+            var initial = DoorStateMachine.FromServer(enclosure.DoorStatus);
+            if (initial != EnumDoorState.Unknown) lookup.ApplyDoorState(initial);
+        }
 
         // FR-13 ④: 장비정보(API geolocation.heading) → 심볼 BaseBearing 메모리 반영(로컬 DB 미저장).
         // SaveMarker 호출하지 않음 — SoT=서버, 설치방향 변경은 서버 장비 API로. heading=null이면 미변경.
@@ -348,6 +356,19 @@ public class SymbolEventManager : ISymbolEventManager, IDisposable,
     /// <summary>
     /// 그룹 복합 상태 전이 처리 — EventQueueManager의 OnGroupStateChanged에서 호출
     /// </summary>
+    public void SetDoorState(int deviceId, EnumDeviceType deviceType, EnumDoorState state)
+    {
+        if (!TryResolveDevice(deviceId, deviceType, out var lookup)) return;
+        lookup.ApplyDoorState(state);
+    }
+
+    public void ApplyDoorEvent(int deviceId, EnumDeviceType deviceType, EnumEventType eventType)
+    {
+        if (!DoorStateMachine.IsContactEvent(eventType)) return;
+        if (!TryResolveDevice(deviceId, deviceType, out var lookup)) return;
+        lookup.ApplyDoorEvent(eventType);
+    }
+
     public void HandleGroupStateChanged(int groupId, EnumCompositeEventStatus prev, EnumCompositeEventStatus next)
     {
         switch (next)

@@ -4,6 +4,7 @@ using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Libraries.Events.Models;
 using Ironwall.Dotnet.Monitoring.Models.Devices;
+using Ironwall.Dotnet.Monitoring.Models.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System;
 using System.Threading;
@@ -116,6 +117,26 @@ public class DeviceSymbolLookupModel : BaseModel
         };
         MarshalUpdate(); // 고빈도 경로 — dirty flag + Dispatcher 마샬링
         _log?.Info($"이벤트 처리 → {SymbolModel.CompositeStatus}: {SymbolModel.Title}");
+    }
+
+    /// <summary>
+    /// 개폐 형태 축(FR-12) — 색 축과 독립. 같은 상태면 통지하지 않는다. 큐 콜백(ApplyCompositeStatus/ProcessEvent/ProcessEventReport)은 이 값을 읽거나 쓰지 않는다.
+    /// </summary>
+    public void ApplyDoorState(EnumDoorState next)
+    {
+        if (SymbolModel is not IPidsSymbolModel door) return;   // 그룹 심볼 등 문이 없는 모델은 무시
+        var prev = door.DoorState;
+        if (prev == next) return;
+        door.DoorState = next;
+        MarshalUpdate();
+        _log?.Info($"[DoorState] Device({Id}) {prev}→{next}: {door.Title}");
+    }
+
+    /// <summary>접점 이벤트(ContactOn/Off)로 개폐 유도 — 현장 배선 반전(OpenOnContactOn=false)을 심볼 속성으로 흡수한다.</summary>
+    public void ApplyDoorEvent(EnumEventType eventType)
+    {
+        if (SymbolModel is not IPidsSymbolModel door) return;
+        ApplyDoorState(DoorStateMachine.Next(door.DoorState, eventType, door.OpenOnContactOn));
     }
 
     public void ProcessEventReport()

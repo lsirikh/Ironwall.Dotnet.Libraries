@@ -48,13 +48,13 @@ public sealed class GMapDbPidsGroupSymbolFixture : GMapBaseSymbolFixture
     /// <summary>
     /// PidsGroupSymbol 시드 데이터 생성
     /// </summary>
-    [Fact(DisplayName = "PidsGroupSymbol DB Insert Service")]
-    public async Task SeedPidsGroupSymbolsAsync()
+    public async Task<List<int>> SeedPidsGroupSymbolsAsync()
     {
         var random = new Random();
         var eventStatuses = Enum.GetValues<EnumEventStatus>();
         var linePatterns = Enum.GetValues<EnumLinePattern>();
         var colorTypes = Enum.GetValues<EnumColorType>();
+        var createdIds = new List<int>();
 
         for (int i = 1; i <= SymbolCount; i++)
         {
@@ -97,7 +97,9 @@ public sealed class GMapDbPidsGroupSymbolFixture : GMapBaseSymbolFixture
 
             int id = await Svc.InsertPidsGroupSymbolAsync(pidsGroupSymbol);
             InsertedSymbolIds.Add(id);
+            createdIds.Add(id);
         }
+        return createdIds;
     }
 
     /// <summary>
@@ -196,15 +198,15 @@ public class GMapDbPidsGroupSymbol_BasicCrudTests
     [Fact(DisplayName = "PidsGroupSymbols – Insert & Fetch")]
     public async Task Insert_And_Fetch_PidsGroupSymbols()
     {
-        await _fx.SeedPidsGroupSymbolsAsync();
+        var seeded = await _fx.SeedPidsGroupSymbolsAsync();
 
         /* 1) FetchPidsGroupSymbolsAsync → 전체 개수 일치 */
         var all = await _fx.Svc.FetchPidsGroupSymbolsAsync();
         Assert.NotNull(all);
-        Assert.True(all!.Count >= _fx.SymbolCount);
+        Assert.True(all!.Count >= seeded.Count);
 
-        /* 2) 각각 FetchPidsGroupSymbolAsync로 필드 검증 */
-        foreach (var id in _fx.InsertedSymbolIds)
+        /* 2) 각각 FetchPidsGroupSymbolAsync로 필드 검증 — 이 테스트가 만든 행만 */
+        foreach (var id in seeded)
         {
             var one = await _fx.Svc.FetchPidsGroupSymbolAsync(id);
             Assert.NotNull(one);
@@ -231,8 +233,8 @@ public class GMapDbPidsGroupSymbol_BasicCrudTests
     [Fact(DisplayName = "PidsGroupSymbols – Update")]
     public async Task Update_PidsGroupSymbol_Works()
     {
-        await _fx.SeedPidsGroupSymbolsByEventStatusAsync(EnumEventStatus.Normal);
-        var pidsGroupSymbol = await _fx.Svc.FetchPidsGroupSymbolAsync(_fx.InsertedSymbolIds.First());
+        var seeded = await _fx.SeedPidsGroupSymbolsByEventStatusAsync(EnumEventStatus.Normal, 1);
+        var pidsGroupSymbol = await _fx.Svc.FetchPidsGroupSymbolAsync(seeded.First());
 
         /* 수정 */
         pidsGroupSymbol!.Title = "업데이트된_그룹";
@@ -242,6 +244,12 @@ public class GMapDbPidsGroupSymbol_BasicCrudTests
         pidsGroupSymbol.IsClosedPath = false;
         pidsGroupSymbol.ShowArrowHead = true;
         pidsGroupSymbol.LinePattern = EnumLinePattern.Dashed;
+        // 3D 철망(FR-03/04/06)
+        pidsGroupSymbol.PostSpacingM = 2.5;
+        pidsGroupSymbol.FenceHeightM = 1.8;
+        pidsGroupSymbol.FenceMode = EnumFenceMode.SensorMount;
+        pidsGroupSymbol.Render3D = false;
+        pidsGroupSymbol.ReverseSensorOrder = true;
 
         // 포인트 변경
         var newPoints = new List<GeoPoint>
@@ -264,6 +272,11 @@ public class GMapDbPidsGroupSymbol_BasicCrudTests
         Assert.False(updated.IsClosedPath);
         Assert.True(updated.ShowArrowHead);
         Assert.Equal(EnumLinePattern.Dashed, updated.LinePattern);
+        Assert.Equal(2.5, updated.PostSpacingM!.Value, 1);
+        Assert.Equal(1.8, updated.FenceHeightM!.Value, 1);
+        Assert.Equal(EnumFenceMode.SensorMount, updated.FenceMode);
+        Assert.False(updated.Render3D);
+        Assert.True(updated.ReverseSensorOrder);
 
         // 포인트 업데이트 검증
         Assert.NotNull(updated.LinePoints);
@@ -274,17 +287,63 @@ public class GMapDbPidsGroupSymbol_BasicCrudTests
     }
 
     /// <summary>
+    /// FR-16: 철망 필드를 지정하지 않으면 NULL/기본값이 그대로 왕복해야 한다(전역 설정 폴백의 전제).
+    /// </summary>
+    [Fact(DisplayName = "PidsGroupSymbols – 3D 철망 필드 NULL 왕복")]
+    public async Task should_roundtrip_null_fence_fields_when_not_set()
+    {
+        var seeded = await _fx.SeedPidsGroupSymbolsByEventStatusAsync(EnumEventStatus.Normal, 1);
+        var one = await _fx.Svc.FetchPidsGroupSymbolAsync(seeded.First());
+
+        Assert.NotNull(one);
+        Assert.Null(one!.PostSpacingM);
+        Assert.Null(one.FenceHeightM);
+        Assert.Equal(EnumFenceMode.Posts, one.FenceMode);
+        Assert.True(one.Render3D);
+        Assert.False(one.ReverseSensorOrder);
+    }
+
+    /// <summary>
+    /// FR-16: 삭제-Undo(Restore) 경로가 철망 필드를 보존해야 한다 — 종전 Restore INSERT 는 신규 열을 몰라 기본값으로 되돌렸다.
+    /// </summary>
+    [Fact(DisplayName = "PidsGroupSymbols – Restore 왕복 시 PostSpacingM 보존")]
+    public async Task should_preserve_fence_fields_when_restored_after_delete()
+    {
+        var seeded = await _fx.SeedPidsGroupSymbolsByEventStatusAsync(EnumEventStatus.Normal, 1);
+        var id = seeded.First();
+        var one = await _fx.Svc.FetchPidsGroupSymbolAsync(id);
+        one!.PostSpacingM = 5.0;
+        one.FenceMode = EnumFenceMode.SensorMount;
+        one.ReverseSensorOrder = true;
+        await _fx.Svc.UpdatePidsGroupSymbolAsync(one);
+        var snapshot = await _fx.Svc.FetchPidsGroupSymbolAsync(id);
+
+        Assert.True(await _fx.Svc.DeletePidsGroupSymbolAsync(snapshot!));
+        Assert.Null(await _fx.Svc.FetchPidsGroupSymbolAsync(id));
+
+        var restoredId = await _fx.Svc.RestorePidsGroupSymbolAsync(snapshot!);
+        var restored = await _fx.Svc.FetchPidsGroupSymbolAsync(restoredId);
+
+        Assert.NotNull(restored);
+        Assert.Equal(5.0, restored!.PostSpacingM!.Value, 1);
+        Assert.Equal(EnumFenceMode.SensorMount, restored.FenceMode);
+        Assert.True(restored.ReverseSensorOrder);
+        Assert.Equal(snapshot!.LinePoints.Count, restored.LinePoints.Count);
+    }
+
+    /// <summary>
     /// PidsGroupSymbol 삭제 테스트 (CASCADE 확인)
     /// </summary>
     [Fact(DisplayName = "PidsGroupSymbols – Delete (CASCADE)")]
     public async Task Delete_PidsGroupSymbol_Works()
     {
-        await _fx.SeedPidsGroupSymbolsByEventStatusAsync(EnumEventStatus.Fault);
-        var pidsGroupSymbol = await _fx.Svc.FetchPidsGroupSymbolAsync(_fx.InsertedSymbolIds.First());
+        var seeded = await _fx.SeedPidsGroupSymbolsByEventStatusAsync(EnumEventStatus.Fault, 1);
+        var pidsGroupSymbol = await _fx.Svc.FetchPidsGroupSymbolAsync(seeded.First());
 
         /* 삭제 */
         bool ok = await _fx.Svc.DeletePidsGroupSymbolAsync(pidsGroupSymbol!);
         Assert.True(ok);
+        _fx.InsertedSymbolIds.Remove(pidsGroupSymbol!.Id);   // 삭제 행을 공유 목록에 남기지 않는다
 
         /* 실제로 사라졌는지 확인 */
         var fetched = await _fx.Svc.FetchPidsGroupSymbolAsync(pidsGroupSymbol!.Id);
@@ -307,6 +366,7 @@ public class GMapDbPidsGroupSymbol_BasicCrudTests
         /* LinkedDeviceGroup으로 삭제 */
         bool deleted = await _fx.Svc.DeletePidsGroupSymbolByDeviceGroupAsync(pidsGroupSymbol!.LinkedDeviceGroup);
         Assert.True(deleted);
+        _fx.InsertedSymbolIds.Remove(pidsGroupSymbol.Id);
 
         /* 삭제 확인 */
         var deletedSymbol = await _fx.Svc.FetchPidsGroupSymbolAsync(pidsGroupSymbol.Id);

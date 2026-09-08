@@ -30,6 +30,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         }
         #endregion
 
+        #region Billboard (map-tilt-25d FR-10)
+
+        /// <summary>[결정③] Infra 2D 아이콘은 빌보드 — 맵 회전 시 정립. 3D(<see cref="GMapMarkerInfra3DControl"/>)는 override false.</summary>
+        public override bool IsBillboard => true;
+
+        /// <summary>빌보드: 루트 각 0 고정(3D 선례 동형). FOV 가 없으므로 base(0) 만.</summary>
+        protected override void ApplyDisplayAngle(double angle) => base.ApplyDisplayAngle(IsBillboard ? 0 : angle);
+
+        #endregion
+
         #region Additional Dependency Properties
 
         /// <summary>
@@ -116,6 +126,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
                 typeof(GMapMarkerInfraControl),
                 new PropertyMetadata(false));
 
+        /// <summary>
+        /// 층수 표시 텍스트("B1/F5"). 템플릿은 메서드에 바인딩할 수 없으므로 DP 로 노출한다(D-4).
+        /// </summary>
+        public string FloorDisplayText
+        {
+            get { return (string)GetValue(FloorDisplayTextProperty); }
+            private set { SetValue(FloorDisplayTextProperty, value); }
+        }
+
+        public static readonly DependencyProperty FloorDisplayTextProperty =
+            DependencyProperty.Register("FloorDisplayText", typeof(string),
+                typeof(GMapMarkerInfraControl),
+                new PropertyMetadata(string.Empty));
+
         #endregion
 
         #region Constructors
@@ -151,9 +175,16 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
             BasementFloorCount = Marker.BasementFloorCount;
             BuildingArea = Marker.BuildingArea;
 
-            // 2층 이상이거나 지하층이 있으면 층수 표시
-            ShowFloorCount = (FloorCount > 1 || BasementFloorCount > 0);
+            // 2층 이상이거나 지하층이 있으면 층수 표시 — 단, 층 개념이 없는 타입은 숨김(D-20)
+            ShowFloorCount = ComputeShowFloorCount();
+            FloorDisplayText = GetFloorDisplayText();
         }
+
+        /// <summary>층 텍스트 표시 판정 — 2층 이상 또는 지하층 존재 AND 층수 지원 타입.
+        /// 게이트·발전기·물탱크·헬리패드·교량은 속성창 층수 슬라이더가 비활성(D-6)인데 마커엔 'F3' 가 그려지던 불일치(D-20, 2026-09-07 순회 실측)를 같은 판정식으로 봉합.</summary>
+        private bool ComputeShowFloorCount()
+            => (FloorCount > 1 || BasementFloorCount > 0)
+               && GMapProperties.GMapPropertyInfraControl.BuildingTypeSupportsFloors(BuildingType);
 
         /// <summary>
         /// GMapInfraMarker 전용 바인딩 설정 구현
@@ -216,7 +247,20 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
 
         #region Private Methods
 
-        private void UpdateInfraAppearance()
+        public override void OnApplyTemplate()
+        {
+            base.OnApplyTemplate();
+            UpdateGeneralBuildingFallback();
+        }
+
+        private void UpdateGeneralBuildingFallback()
+        {
+            // The legacy template already contains this glyph; new types must remain visible with 3D off.
+            if (GetTemplateChild("PART_GeneralBuilding") is FrameworkElement general)
+                general.Visibility = BuildingType == EnumBuildingType.Factory ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        protected virtual void UpdateInfraAppearance()
         {
             if (Marker == null || _isUpdatingFromMarker) return;
 
@@ -266,6 +310,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
             {
                 control.UpdateInfraAppearance();
 
+                control.UpdateGeneralBuildingFallback();
+                control.ShowFloorCount = control.ComputeShowFloorCount();   // D-20: 층수 미지원 타입으로 바뀌면 층 텍스트 숨김
+
                 if (control.Marker != null && control.Marker.BuildingType != (EnumBuildingType)e.NewValue)
                     control.Marker.BuildingType = (EnumBuildingType)e.NewValue;
             }
@@ -286,7 +333,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         {
             if (d is GMapMarkerInfraControl control)
             {
-                control.ShowFloorCount = control.FloorCount > 1 || control.BasementFloorCount > 0;
+                control.ShowFloorCount = control.ComputeShowFloorCount();
+                control.FloorDisplayText = control.GetFloorDisplayText();
 
                 if (control.Marker != null && control.Marker.FloorCount != (int)e.NewValue)
                     control.Marker.FloorCount = (int)e.NewValue;
@@ -297,7 +345,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols
         {
             if (d is GMapMarkerInfraControl control)
             {
-                control.ShowFloorCount = control.FloorCount > 1 || control.BasementFloorCount > 0;
+                control.ShowFloorCount = control.ComputeShowFloorCount();
+                control.FloorDisplayText = control.GetFloorDisplayText();
 
                 if (control.Marker != null && control.Marker.BasementFloorCount != (int)e.NewValue)
                     control.Marker.BasementFloorCount = (int)e.NewValue;

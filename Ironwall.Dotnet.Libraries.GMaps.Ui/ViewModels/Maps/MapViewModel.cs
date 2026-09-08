@@ -297,6 +297,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 _rotationSaveTimer.Stop();
                 await SaveMapRotationState();
             }
+            await FlushPendingTiltSaveAsync();   // [map-tilt-25d FR-07] 각도 debounce 대기분 플러시(파셜)
 
             // (줌 디바운스 타이머 제거됨 — OnMapZoomChanged에서 직접 RefreshVisibleTiles 호출)
 
@@ -743,7 +744,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if (MainMap.IsTargetAimMode) ExitTargetAimMode();
         if (MainMap.IsLineDrawing) _ = MainMap.LineDrawingService?.CancelDrawingAsync();
         if (MainMap.IsMeasuring) MainMap.StopMeasure();
-        _placeCategory = category; _placeType = type; _placeTitle = title;
+        _placeCategory = category; _placeType = type; _placeTitle = title; _placeVariant = null;
         MainMap.IsSymbolPlacementMode = true;
         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Cross;
         EnsureAimEscWindowHook();   // ESC 취소(윈도우 후킹 재사용)
@@ -754,7 +755,7 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>배치 모드 종료(취소/완료 공통) — 커서·상태·대기정보 정리.</summary>
     private void ExitSymbolPlacementMode()
     {
-        _placeType = null; _placeTitle = null;
+        _placeType = null; _placeTitle = null; _placeVariant = null;
         if (MainMap != null) MainMap.IsSymbolPlacementMode = false;
         if (System.Windows.Input.Mouse.OverrideCursor == System.Windows.Input.Cursors.Cross)
             System.Windows.Input.Mouse.OverrideCursor = null;
@@ -765,28 +766,12 @@ public partial class MapViewModel : BasePanelViewModel,
     private async void OnSymbolPlacementClicked(PointLatLng geo, Point screen)
     {
         if (MainMap == null || !MainMap.IsSymbolPlacementMode) return;
-        var category = _placeCategory; var type = _placeType; var title = _placeTitle ?? GetSymbolTitle();
-        ExitSymbolPlacementMode();   // 단발 — 먼저 종료(재진입/중복 방지)
+        var category = _placeCategory; var type = _placeType;
+        var title = _placeTitle ?? GetSymbolTitle(); var variant = _placeVariant;
+        ExitSymbolPlacementMode();
         if (type == null) return;
-        try
-        {
-            switch (category)
-            {
-                case EnumMarkerCategory.BASIC_SHAPES:
-                    if (type is string bt) await AddBasicShapeMarker(geo, bt, title);
-                    break;
-                case EnumMarkerCategory.GEOMETRICS:
-                    if (type is EnumShapeType gt) await AddGeometricMarker(geo, gt, title);
-                    break;
-                case EnumMarkerCategory.PIDS_EQUIPMENT:
-                    if (type is EnumDeviceType dt) await AddPidsMarker(geo, dt, title);
-                    break;
-                case EnumMarkerCategory.INFRASTRUCTURE:
-                    if (type is string it) await AddInfraMarker(geo, it, title);
-                    break;
-            }
-        }
-        catch (Exception ex) { _log?.Error($"심볼 배치 실패: {ex.Message}"); }
+        try { await PlaceSymbolAsync(category, type, title, variant, geo); }
+        catch (Exception ex) { _log?.Error($"Symbol placement failed: {ex.Message}"); }
     }
 
     /// <summary>타겟 모드 진입 시 충돌 모드(라인드로잉) 종료. (편집 모드 좌클릭은 타겟 분기가 선점)</summary>
@@ -910,9 +895,48 @@ public partial class MapViewModel : BasePanelViewModel,
         catch (Exception ex) { _log?.Warning($"[그룹키] 윈도우 후킹 경고: {ex.Message}"); }
     }
 
-    /// <summary>ESC = 타겟 모드 취소.</summary>
+    /// <summary>
+    /// [C8/C9/C10] 드로잉 키 1차 라우팅(윈도우/맵 PreviewKeyDown 터널, 포커스 무관) — 판정·실행은 맵 컨트롤
+    /// <c>TryHandleDrawingKey</c>(DrawingKeyRouter 단일 정본)에 위임. 드로잉/눌림이 없으면 즉시 false(기존 단축키 무변경).
+    /// Aim 후킹·그룹 후킹 양쪽 서두에서 호출한다 — 윈도우 구독 순서(그룹=초기화, Aim=드로잉 시작)에 상관없이 먼저 도달한 쪽이 소비.
+    /// </summary>
+    private bool TryRouteDrawingKey(System.Windows.Input.KeyEventArgs e)
+    {
+        var map = MainMap;
+        if (map == null || e.Handled) return false;
+        if (!map.IsLineDrawing && !map.IsLineStrokePressed) return false;
+        // 텍스트/콤보 입력 중이면 드로잉 키(Backspace·Enter·Delete·방향키·Ctrl+Z)도 가로채지 않는다 — 윈도우 광역 후킹이라
+        //   그룹 후킹의 RISK-02 가드와 같은 기준을 여기(양 후킹 공통 진입점)에 둔다. Aim 후킹은 그룹 후킹 뒤에 구독되어
+        //   그룹 쪽 가드가 조기 return 한 뒤 도달하므로, 가드가 없으면 레이어/앵커 패널 TextBox 타이핑이 정점 제거로 새어 나간다.
+        var focused = System.Windows.Input.Keyboard.FocusedElement;
+        if (focused is System.Windows.Controls.Primitives.TextBoxBase
+            || e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase
+            || focused is System.Windows.Controls.ComboBox
+            || focused is System.Windows.Controls.PasswordBox) return false;
+        if (!map.TryHandleDrawingKey(e.Key, System.Windows.Input.Keyboard.Modifiers)) return false;
+        e.Handled = true;
+        return true;
+    }
+
+    /// <summary>
+    /// [C9/C10] 드로잉 시작 공통 후처리 — 세 진입 경로(PIDS 그룹 / 구역·라인 / 툴바 명령)가 동일하게 호출한다.
+    /// ① VM 상태 ② 잔존 선택 해제(C10 정정: 점 0개·스트로크-only 구간에서 Delete/방향키 표적이 되던 직전 선택을 첫 클릭 전에 걷는다)
+    /// ③ 윈도우 PreviewKeyDown 후킹(포커스 무관 1차) ④ 맵 포커스(클래스 핸들러 2차 경로 — 팔레트 버튼이 포커스를 가져간 뒤 Collapsed 되던 결함).
+    /// </summary>
+    private void OnLineDrawingStarted(string status)
+    {
+        IsLineDrawing = true;
+        LineDrawingStatus = status;
+        ClearAllSelections();
+        EnsureAimEscWindowHook();
+        var focused = MainMap?.Focus() ?? false;
+        _log?.Info($"라인 드로잉 모드 시작됨 (맵 포커스={focused})");
+    }
+
+    /// <summary>ESC = 타겟 모드 취소. 드로잉 중이면 드로잉 키 라우팅이 우선(C8/C9).</summary>
     private void OnMapPreviewKeyDownForAim(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        if (TryRouteDrawingKey(e)) return;
         if (e.Key != System.Windows.Input.Key.Escape) return;
         if (MainMap?.IsTargetAimMode ?? false)
         {
@@ -1065,6 +1089,10 @@ public partial class MapViewModel : BasePanelViewModel,
             || focused is System.Windows.Controls.ComboBox
             || focused is System.Windows.Controls.PasswordBox) return;
 
+        // [C10] 드로잉 중에는 Ctrl+Z = 마지막 점 제거, Delete/방향키/Redo = 무시 — 전역 Undo·선택 삭제·격자 이동보다 먼저 판정.
+        //   윈도우 터널이라 포커스와 무관하게 여기가 가장 먼저 도달한다(그룹 후킹은 초기화 시 구독).
+        if (TryRouteDrawingKey(e)) return;
+
         // Delete = 선택 심볼/이미지 삭제(단일·그룹) — 단일 진입점 ExecuteDeleteSelected(확인팝업 경유)로 통일.
         //   그룹 선택 시 내부에서 ExecuteGroupDelete로 위임. 단일 Delete 키 경로는 원래 부재(어도너 스텁=no-op)였어 신규 배선(FR-05).
         if (e.Key == System.Windows.Input.Key.Delete
@@ -1085,8 +1113,10 @@ public partial class MapViewModel : BasePanelViewModel,
 
         // 방향키 이동 — 스냅 ON=격자 한 칸, 스냅 OFF=1px(Shift+방향키=5px). 선택된 심볼/이미지 대상.
         // 선택 없으면 미소비 → 기본 동작 유지.
-        if (e.Key is System.Windows.Input.Key.Left or System.Windows.Input.Key.Right
+        // Ctrl(+Shift)+arrow belongs to the map control (Ctrl+Left/Right = rotation, Ctrl+Up/Down = tilt FR-08) — never consume it here.
+        if ((e.Key is System.Windows.Input.Key.Left or System.Windows.Input.Key.Right
             or System.Windows.Input.Key.Up or System.Windows.Input.Key.Down)
+            && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0)
         {
             // ★ 동기 판정 — 소비 여부를 먼저 정하고 e.Handled를 await보다 앞에 설정한다.
             //   그래야 이 PreviewKeyDown이 계속 터널링(이중 핸들러 재이동)하거나 WPF 기본 방향 포커스
@@ -5014,6 +5044,7 @@ public partial class MapViewModel : BasePanelViewModel,
         }
 
         SetInitialHomePosition();
+        LoadMapTiltFromSettings();      // [map-tilt-25d FR-07] 틸트 kill-switch/각도 복원(파셜, 홈 줌 적용 뒤 Flush, 저장 억제 내장)
         LoadMapCompassFromSettings();   // [Compass FR-08] 나침반 위치/설정 복원(파셜, 저장 억제 내장)
         InitializeInstruments();        // [Map_Instruments] 강풍/탐지장애 EQM 구독+가시성 복원(파셜)
         ScheduleBootViewportResync();
@@ -5447,7 +5478,7 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
-    private Task AddPidsMarker(PointLatLng position, EnumDeviceType deviceType, string title)
+    private async Task AddPidsMarker(PointLatLng position, EnumDeviceType deviceType, string title, string? variant = null)
     {
         try
         {
@@ -5472,7 +5503,11 @@ public partial class MapViewModel : BasePanelViewModel,
                 case EnumDeviceType.IpSpeaker:
                 case EnumDeviceType.Radar:
                 case EnumDeviceType.OpticalCable:
-                    AddPidsSingleMarker(position, deviceType, title);
+                case EnumDeviceType.Lamp:
+                case EnumDeviceType.Enclosure:
+                case EnumDeviceType.SmartMultisensor2:
+                case EnumDeviceType.Gate:   // 통문(D2) — 단독 심볼, 3D 키 fencegate
+                    await AddPidsSingleMarker(position, deviceType, title, variant);
                     break;
                 case EnumDeviceType.Fence_Group:
                     AddPidsGroupMarker(position, deviceType, title);
@@ -5487,12 +5522,12 @@ public partial class MapViewModel : BasePanelViewModel,
         {
             _log?.Error($"테스트 마커 추가 실패: {ex.Message}");
         }
-        return Task.CompletedTask;
+        return;
     }
 
     
 
-    private async void AddPidsSingleMarker(PointLatLng position, EnumDeviceType deviceType, string title)
+    private async Task AddPidsSingleMarker(PointLatLng position, EnumDeviceType deviceType, string title, string? variant = null)
     {
         try
         {
@@ -5511,8 +5546,9 @@ public partial class MapViewModel : BasePanelViewModel,
                 ShowShape = true,
                 ShowTitle = false,
                 OperationState = EnumOperationState.ACTIVATED,
-                LinkedDeviceId = 2,
+                LinkedDeviceId = 0,
                 DeviceType = deviceType,
+                ModelVariant = variant,
                 FOVOpacity = 0.7,
                 FOVColor = EnumColorType.Red,
                 DetectionRange = 30,
@@ -5555,10 +5591,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
             if (result)
             {
-                IsLineDrawing = true;
-                LineDrawingStatus = "경계선 그리기: 첫 번째 포인트를 클릭하세요";
-
-                _log?.Info("라인 드로잉 모드 시작됨");
+                OnLineDrawingStarted("경계선 그리기: 첫 번째 포인트를 클릭하세요");   // [C9/C10] 포커스·윈도우 후킹·선택 해제
             }
         }
         catch (Exception ex)
@@ -5605,10 +5638,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
             if (result)
             {
-                IsLineDrawing = true;
-                LineDrawingStatus = "경계선 그리기: 첫 번째 포인트를 클릭하세요";
-
-                _log?.Info("라인 드로잉 모드 시작됨");
+                OnLineDrawingStarted("경계선 그리기: 첫 번째 포인트를 클릭하세요");   // [C9/C10] 포커스·윈도우 후킹·선택 해제
             }
         }
         catch (Exception ex)
@@ -5658,6 +5688,8 @@ public partial class MapViewModel : BasePanelViewModel,
                     break;
             }
 
+            if (System.Enum.TryParse<EnumBuildingType>(infraType, true, out var parsedBuilding)) buildingType = parsedBuilding;
+            title = symbolTitle;
             // 2. InfraSymbolModel 생성
             var infraSymbol = new InfraSymbolModel
             {
@@ -5946,6 +5978,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     EnumDeviceType.IpSpeaker   => "스피커",
                     EnumDeviceType.Lamp        => "경광등",
                     EnumDeviceType.Enclosure   => "함체",
+                    EnumDeviceType.Gate        => "통문",
                     _                          => "장치",
                 };
                 var hasDevice = pidsMarker.LinkedDeviceId > 0;
@@ -6825,8 +6858,7 @@ public partial class MapViewModel : BasePanelViewModel,
 
             if (result)
             {
-                IsLineDrawing = true;
-                LineDrawingStatus = "첫 번째 포인트를 클릭하세요";
+                OnLineDrawingStarted("첫 번째 포인트를 클릭하세요");   // [C9/C10] 포커스·윈도우 후킹·선택 해제
 
                 // UI 업데이트
                 UpdateCommandStates();
@@ -7448,7 +7480,7 @@ public partial class MapViewModel : BasePanelViewModel,
         }
         else
         {
-            LineDrawingStatus = $"포인트: {pointCount}개, 거리: {distance:F1}m (ESC: 완료, Backspace: 취소)";
+            LineDrawingStatus = $"포인트: {pointCount}개, 거리: {distance:F1}m (Enter: 완료, ESC: 취소, Backspace·Ctrl+Z: 되돌리기)";   // 키 계약 = DrawingKeyRouter
         }
     }
 
@@ -7812,6 +7844,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 if (!value)
                 {
                     ClearAllSelections();
+                    IsSymbolPaletteVisible = false;
                     ExitSymbolPlacementMode();
 
                     // 진행 중인 라인/구역/PIDS그룹 드로잉도 취소 — 편집 모드 해제 시
@@ -8544,7 +8577,7 @@ public partial class MapViewModel : BasePanelViewModel,
                 EnumMarkerCategory.MILITARY_SYMBOLS => new[] { "Register" },
                 EnumMarkerCategory.PIDS_EQUIPMENT => new[] {"Controller","Multi", "Fence", "IpCamera", "SmartSensor", "IpSpeaker", "Fence_Group" },
                 EnumMarkerCategory.AREA_BOUNDARY => new[] { "Area","Line" },
-                EnumMarkerCategory.INFRASTRUCTURE => new[] { "Factory" },
+                EnumMarkerCategory.INFRASTRUCTURE => System.Enum.GetNames<EnumBuildingType>(),
                 _ => Array.Empty<object>()
             };
         }
@@ -9926,7 +9959,7 @@ public partial class MapViewModel : BasePanelViewModel,
         return category switch
         {
             "PidsCamera" => marker is GMapSymbols.GMapPidsMarker pm && pm.DeviceType == Enums.EnumDeviceType.IpCamera,
-            "PidsSensor" => marker is GMapSymbols.GMapPidsMarker ps && (ps.DeviceType == Enums.EnumDeviceType.Multi || ps.DeviceType == Enums.EnumDeviceType.SmartMultisensor2 || ps.DeviceType == Enums.EnumDeviceType.SmartSensor || ps.DeviceType == Enums.EnumDeviceType.SmartSensor2 || ps.DeviceType == Enums.EnumDeviceType.PIR || ps.DeviceType == Enums.EnumDeviceType.Fence || ps.DeviceType == Enums.EnumDeviceType.Underground || ps.DeviceType == Enums.EnumDeviceType.Contact || ps.DeviceType == Enums.EnumDeviceType.Laser || ps.DeviceType == Enums.EnumDeviceType.Cable || ps.DeviceType == Enums.EnumDeviceType.Radar || ps.DeviceType == Enums.EnumDeviceType.OpticalCable),
+            "PidsSensor" => marker is GMapSymbols.GMapPidsMarker ps && (ps.DeviceType == Enums.EnumDeviceType.Multi || ps.DeviceType == Enums.EnumDeviceType.SmartMultisensor2 || ps.DeviceType == Enums.EnumDeviceType.SmartSensor || ps.DeviceType == Enums.EnumDeviceType.SmartSensor2 || ps.DeviceType == Enums.EnumDeviceType.PIR || ps.DeviceType == Enums.EnumDeviceType.Fence || ps.DeviceType == Enums.EnumDeviceType.Underground || ps.DeviceType == Enums.EnumDeviceType.Contact || ps.DeviceType == Enums.EnumDeviceType.Laser || ps.DeviceType == Enums.EnumDeviceType.Cable || ps.DeviceType == Enums.EnumDeviceType.Radar || ps.DeviceType == Enums.EnumDeviceType.OpticalCable || ps.DeviceType == Enums.EnumDeviceType.Gate),
             "PidsSpeaker" => marker is GMapSymbols.GMapPidsMarker psp && psp.DeviceType == Enums.EnumDeviceType.IpSpeaker,
             "PidsController" => marker is GMapSymbols.GMapPidsMarker pc && pc.DeviceType == Enums.EnumDeviceType.Controller,
             "PidsLamp" => marker is GMapSymbols.GMapPidsMarker pl && pl.DeviceType == Enums.EnumDeviceType.Lamp,

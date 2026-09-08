@@ -9,11 +9,19 @@ public interface IPidsSymbolModel : IPidsEventCapable
     double DetectionBearing { get; set; }
     double DetectionRange { get; set; }
     EnumDeviceType DeviceType { get; set; }
+    string? ModelVariant { get; set; }
     EnumColorType FOVColor { get; set; }
     double FOVOpacity { get; set; }
     int LinkedDeviceId { get; set; }
     bool ShowFOV { get; set; }
     double BaseBearing { get; set; }
+
+    /// <summary>통문 폭(m), NULL=기본 4.0 — Gate 전용(FR-12)</summary>
+    double? GateWidthM { get; set; }
+    /// <summary>ContactOn=열림 해석 여부(FR-12)</summary>
+    bool OpenOnContactOn { get; set; }
+    /// <summary>개폐 형태 축 — 런타임 전용, 직렬화 제외(FR-12)</summary>
+    EnumDoorState DoorState { get; set; }
 
     /// <summary>
     /// 연결된 디바이스 객체 (런타임 바인딩용, JSON 직렬화 제외)

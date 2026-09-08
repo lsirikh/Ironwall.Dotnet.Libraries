@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.ComponentModel.DataAnnotations;
+using System;
 
 namespace Ironwall.Dotnet.Libraries.Enums;
 /****************************************************************************
@@ -11,13 +12,22 @@ namespace Ironwall.Dotnet.Libraries.Enums;
 ****************************************************************************/
 public enum EnumBuildingUsage
 {
+    [Display(Name = "업무")]
     Office,         // 업무
-    //Manufacturing,  // 생산
-    //Storage,        // 저장
-    //Medical,        // 의료
-    //Education,      // 교육
-    //Retail,         // 판매
-    //Residential,    // 주거
-    //Public,         // 공공
-    //Mixed          // 복합
+    [Display(Name = "생산")]
+    Manufacturing,
+    [Display(Name = "저장")]
+    Storage,
+    [Display(Name = "의료")]
+    Medical,
+    [Display(Name = "교육")]
+    Education,
+    [Display(Name = "판매")]
+    Retail,
+    [Display(Name = "주거")]
+    Residential,
+    [Display(Name = "공공")]
+    Public,
+    [Display(Name = "복합")]
+    Mixed,
 }

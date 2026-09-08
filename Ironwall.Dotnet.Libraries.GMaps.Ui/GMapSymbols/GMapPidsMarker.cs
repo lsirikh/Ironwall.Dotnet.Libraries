@@ -36,6 +36,7 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         OnPropertyChanged(nameof(DetectionRange));
         OnPropertyChanged(nameof(DetectionAngle));
         OnPropertyChanged(nameof(DetectionBearing));
+        OnPropertyChanged(nameof(DoorState));   // FR-15: 이벤트 경로(DeviceSymbolLookupModel.ApplyDoorState → SetUpdate)는 모델에만 쓴다 — 통지가 없으면 3D 문짝이 안 움직인다(2026-09-08 00:27 실기 결함)
     }
     #endregion
 
@@ -43,10 +44,20 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
     /// <summary>
     /// PIDS 마커 전용 컨트롤 생성
     /// </summary>
+    private static bool s_symbol3DLogged;
+
     protected override UIElement CreateMarkerControl()
     {
-        var markerControl = new GMapMarkerPidsControl(this);
-        _log?.Info($"GMapMarkerPidsControl 생성: {_model.Title}");
+        if (!s_symbol3DLogged)
+        {
+            s_symbol3DLogged = true;
+            var on = Utils.Symbol3DFeature.IsEnabled;   // Lazy 평가 후 진단 문자열이 채워진다
+            _log?.Info($"[Symbol3D] {(on ? "ON → 3D 하우징" : "OFF → 2D")} · {Utils.Symbol3DFeature.LastDiagnostic}");
+        }
+        GMapMarkerPidsControl markerControl = Utils.Symbol3DFeature.IsEnabled && Symbols3D.HousingModels.DeviceKey(_model.DeviceType) != null
+            ? new GMapMarker3DHousingControl(this)
+            : GMapMarkerPidsFallbackControl.NeedsFallback(_model.DeviceType) ? new GMapMarkerPidsFallbackControl(this) : new GMapMarkerPidsControl(this);
+        _log?.Info($"GMapMarkerPidsControl 생성: {_model.Title} · DeviceType={_model.DeviceType} · ModelVariant={_model.ModelVariant ?? "-"} → {markerControl.GetType().Name}");
         return markerControl;
     }
 
@@ -151,6 +162,12 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
         }
     }
 
+    public string? ModelVariant
+    {
+        get => _model.ModelVariant;
+        set { if (_model.ModelVariant == value) return; _model.ModelVariant = value; OnPropertyChanged(nameof(ModelVariant)); }
+    }
+
     /// <summary>
     /// 이벤트 상태 (애니메이션 트리거)
     /// </summary>
@@ -243,6 +260,26 @@ public class GMapPidsMarker : GMapBaseMarker<IPidsSymbolModel>, IPidsEditableMar
             _model.FOVOpacity = value;
             OnPropertyChanged(nameof(FOVOpacity));
         }
+    }
+
+    // ── 통문·함체 개폐(FR-12) — 형태 축은 EventStatus(색 축)와 독립 ──
+    public double? GateWidthM
+    {
+        get => _model.GateWidthM;
+        set { if (Nullable.Equals(_model.GateWidthM, value)) return; _model.GateWidthM = value; OnPropertyChanged(nameof(GateWidthM)); }
+    }
+
+    public bool OpenOnContactOn
+    {
+        get => _model.OpenOnContactOn;
+        set { if (_model.OpenOnContactOn == value) return; _model.OpenOnContactOn = value; OnPropertyChanged(nameof(OpenOnContactOn)); }
+    }
+
+    /// <summary>개폐 형태(런타임) — 3D 문짝 각도 트리거. 값이 바뀔 때만 통지한다.</summary>
+    public EnumDoorState DoorState
+    {
+        get => _model.DoorState;
+        set { if (_model.DoorState == value) return; _model.DoorState = value; OnPropertyChanged(nameof(DoorState)); }
     }
 
     /// <summary>

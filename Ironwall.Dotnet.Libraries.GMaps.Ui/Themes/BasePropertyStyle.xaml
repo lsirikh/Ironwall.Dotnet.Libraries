@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
@@ -234,7 +234,18 @@
 									</Grid>
 
 									<!--  회전 (슬라이더 + 직접입력 TextBox + ° 단위, MarkerBearing로 양방향 동기화)  -->
+									<!--  [map-tilt-25d FR-12] 빌보드 타입(PIDS 2D·Infra 2D·군대부호·Custom, Shape.IsBillboard=True)은 Bearing 이 시각 채널이 아니므로 행을 숨긴다.  -->
+									<!--  SelectedMarker 는 속성 컨트롤 DP(TemplatedParent) — 3D(RotatesIn2D=False, IsBillboard=False)·Geometric·이미지·그룹편집(SelectedMarker 없음)은 종전대로 표시.  -->
 									<Grid Margin="0,5">
+										<Grid.Style>
+											<Style TargetType="Grid">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding SelectedMarker.Shape.IsBillboard, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+														<Setter Property="Visibility" Value="Collapsed" />
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Grid.Style>
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="60" />
 											<ColumnDefinition Width="*" />

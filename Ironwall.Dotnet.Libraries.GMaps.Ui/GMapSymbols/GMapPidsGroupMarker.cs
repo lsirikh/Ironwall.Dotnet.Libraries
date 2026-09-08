@@ -124,7 +124,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
         protected override UIElement CreateMarkerControl()
         {
             _log?.Info($"[CreateMarkerControl] GMapPidsGroupMarker 생성 시작");
-            var control = new GMapMarkerPidsGroupControl(this);
+            // FR-07: 전역 3D 플래그가 켜져 있으면 3D 철망 컨트롤(그룹 Render3D·LOD 게이트는 컨트롤 안에서) — GMapPidsMarker 선례와 동일
+            GMapMarkerPidsGroupControl control = Utils.Symbol3DFeature.IsEnabled ? new GMapMarkerPidsGroup3DControl(this) : new GMapMarkerPidsGroupControl(this);
             _log?.Info($"[CreateMarkerControl] GMapPidsGroupMarker 생성 완료 - Type: {control.GetType().Name}");
             return control;
         }
@@ -163,6 +164,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
 
         private void PidsGroupModel_Update(object? sender, EventArgs e)
         {
+            OnPropertyChanged(nameof(ActiveSensorDeviceIds));   // Phase 2: 이벤트 경로가 모델에 쓰는 활성 노드 집합 통지
             OnPropertyChanged(nameof(EventStatus));
             OnPropertyChanged(nameof(CompositeStatus));
             OnPropertyChanged(nameof(OperationState));
@@ -401,6 +403,44 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols{
                 _model.CompositeStatus = value;
                 OnPropertyChanged(nameof(CompositeStatus));
             }
+        }
+
+        // ── 3D 철망(FR-03/04/06) — 모델 위임 + 변경 통지(속성창·Undo·3D 컨트롤 공용) ──
+        public double? PostSpacingM
+        {
+            get => _model.PostSpacingM;
+            set { if (Nullable.Equals(_model.PostSpacingM, value)) return; _model.PostSpacingM = value; OnPropertyChanged(nameof(PostSpacingM)); }
+        }
+
+        public double? FenceHeightM
+        {
+            get => _model.FenceHeightM;
+            set { if (Nullable.Equals(_model.FenceHeightM, value)) return; _model.FenceHeightM = value; OnPropertyChanged(nameof(FenceHeightM)); }
+        }
+
+        public EnumFenceMode FenceMode
+        {
+            get => _model.FenceMode;
+            set { if (_model.FenceMode == value) return; _model.FenceMode = value; OnPropertyChanged(nameof(FenceMode)); }
+        }
+
+        public bool Render3D
+        {
+            get => _model.Render3D;
+            set { if (_model.Render3D == value) return; _model.Render3D = value; OnPropertyChanged(nameof(Render3D)); }
+        }
+
+        public bool ReverseSensorOrder
+        {
+            get => _model.ReverseSensorOrder;
+            set { if (_model.ReverseSensorOrder == value) return; _model.ReverseSensorOrder = value; OnPropertyChanged(nameof(ReverseSensorOrder)); }
+        }
+
+        /// <summary>탐지 중 센서 노드 장비 Id(런타임, Phase 2) — 참조가 바뀔 때만 통지한다.</summary>
+        public IReadOnlySet<int>? ActiveSensorDeviceIds
+        {
+            get => _model.ActiveSensorDeviceIds;
+            set { if (ReferenceEquals(_model.ActiveSensorDeviceIds, value)) return; _model.ActiveSensorDeviceIds = value; OnPropertyChanged(nameof(ActiveSensorDeviceIds)); }
         }
 
         public double TotalDistance => GeoPointConverter.CalculateTotalDistance(_model.LinePoints);

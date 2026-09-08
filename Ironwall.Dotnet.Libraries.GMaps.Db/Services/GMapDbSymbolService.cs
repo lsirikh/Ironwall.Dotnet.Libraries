@@ -321,11 +321,17 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `SymbolId`          INT PRIMARY KEY,
                 `LinkedDeviceId`    INT NOT NULL DEFAULT 0,
                 `DeviceType`        VARCHAR(20) NOT NULL DEFAULT 'Fence',
+                `ModelVariant`      VARCHAR(20) NULL,
                 `ShowFOV`           BOOLEAN DEFAULT FALSE,
                 `FOVColor`          VARCHAR(20) NOT NULL DEFAULT 'Red',
                 `FOVOpacity`        DECIMAL(3,2) DEFAULT 0.3,
                 `EventStatus`       VARCHAR(20) NOT NULL DEFAULT 'Normal',
                 `BaseBearing`       DECIMAL(5,2) DEFAULT 0.0,
+                `DetectionRange`    DECIMAL(8,2) NULL,
+                `DetectionAngle`    DECIMAL(5,2) NULL,
+                `DetectionBearing`  DECIMAL(6,3) NULL,
+                `GateWidthM`        DECIMAL(4,1) NULL,                              -- 통문 폭(m), NULL=기본 4.0 (FR-12)
+                `OpenOnContactOn`   BOOLEAN NOT NULL DEFAULT TRUE,                  -- ContactOn=열림 해석 (FR-12)
                 `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 CONSTRAINT `FK_PidsSymbols_Symbols`
@@ -422,6 +428,11 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 `IsClosedPath`      BOOLEAN DEFAULT TRUE,                           -- 닫힌 경로 여부 (그룹은 대부분 닫힌 경로)
                 `ShowArrowHead`     BOOLEAN DEFAULT FALSE,                          -- 화살표 표시 여부
                 `LinePattern`       VARCHAR(20) NOT NULL DEFAULT 'Solid',           -- 라인 패턴 (Solid, Dash, Dot 등)
+                `PostSpacingM`      DECIMAL(4,1) NULL,                              -- 3D 철망 기둥 간격(m), NULL=전역 설정 (FR-03)
+                `FenceHeightM`      DECIMAL(3,1) NULL,                              -- 3D 철망 높이(m), NULL=전역 설정
+                `FenceMode`         TINYINT NOT NULL DEFAULT 0,                     -- 0=Posts(기둥 간격) 1=SensorMount(센서 장착) (FR-04)
+                `Render3D`          BOOLEAN NOT NULL DEFAULT TRUE,                  -- 그룹별 3D 렌더 on/off (FR-06)
+                `ReverseSensorOrder` BOOLEAN NOT NULL DEFAULT FALSE,                -- 센서 노드 역순 번호 (FR-04)
                 `CreatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `UpdatedAt`         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 CONSTRAINT `FK_PidsGroupSymbols_Symbols`
@@ -594,6 +605,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             {
                 ["Symbols"] = await LoadColumnMetaAsync(conn, "Symbols"),
                 ["Images"]  = await LoadColumnMetaAsync(conn, "Images"),
+                ["PidsSymbols"] = await LoadColumnMetaAsync(conn, "PidsSymbols"),
+                ["PidsGroupSymbols"] = await LoadColumnMetaAsync(conn, "PidsGroupSymbols"),   // FR-16: 사양표에 그룹 테이블이 포함되므로 반드시 로드(키 부재 = KeyNotFound 부팅 크래시)
             };
 
             // ── FR-01 · FR-10: 사양표 순회 — 부재 컬럼만 ADD ──
@@ -787,6 +800,19 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
     private static readonly (string Table, string Column, string Ddl)[] COLUMN_SPECS =
     {
         // ── Symbols ──
+        ("PidsSymbols", "ModelVariant", "VARCHAR(20) NULL"),
+        // D-3: 탐지 방향/거리/각도 영속 — 종전엔 컬럼이 없어 저장 후 재조회 시 BaseBearing 으로 되돌아갔다(3D 헤드·FOV 방향 손실)
+        ("PidsSymbols", "DetectionRange",   "DECIMAL(8,2) NULL"),
+        ("PidsSymbols", "DetectionAngle",   "DECIMAL(5,2) NULL"),
+        ("PidsSymbols", "DetectionBearing", "DECIMAL(6,3) NULL"),
+        // FR-16: PIDS 3D 철망·통문 — 장비 2열 + 그룹 5열, 부재 시 ADD(자가치유). 사양표 테이블은 columnMeta 에 반드시 로드돼 있어야 한다.
+        ("PidsSymbols", "GateWidthM",       "DECIMAL(4,1) NULL"),
+        ("PidsSymbols", "OpenOnContactOn",  "BOOLEAN NOT NULL DEFAULT TRUE"),
+        ("PidsGroupSymbols", "PostSpacingM",       "DECIMAL(4,1) NULL"),
+        ("PidsGroupSymbols", "FenceHeightM",       "DECIMAL(3,1) NULL"),
+        ("PidsGroupSymbols", "FenceMode",          "TINYINT NOT NULL DEFAULT 0"),
+        ("PidsGroupSymbols", "Render3D",           "BOOLEAN NOT NULL DEFAULT TRUE"),
+        ("PidsGroupSymbols", "ReverseSensorOrder", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("Symbols", "ZOrder",          "INT DEFAULT 10"),
         ("Symbols", "Visible",         "BOOLEAN DEFAULT TRUE"),
         ("Symbols", "IsLocked",        "BOOLEAN DEFAULT FALSE"),
@@ -1681,7 +1707,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
                 s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   s.Category = 'PIDS_EQUIPMENT'
@@ -1718,7 +1744,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
                 s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   s.Id = @Id;";
@@ -1756,7 +1782,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
                 s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   p.LinkedDeviceId = @DeviceId;";
@@ -1791,7 +1817,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
                 s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   p.DeviceType = @DeviceType
@@ -1861,8 +1887,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
 
             // 2. PidsSymbols 테이블에 PIDS 전용 정보 삽입
             const string pidsSql = @"
-        INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing)
-        VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing);";
+        INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing, ModelVariant, DetectionRange, DetectionAngle, DetectionBearing, GateWidthM, OpenOnContactOn)
+        VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing, @ModelVariant, @DetectionRange, @DetectionAngle, @DetectionBearing, @GateWidthM, @OpenOnContactOn);";
 
             await conn.ExecuteAsync(pidsSql, new
             {
@@ -1873,7 +1899,13 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FOVColor = model.FOVColor.ToString(),
                 model.FOVOpacity,
                 EventStatus = model.EventStatus.ToString(),
-                model.BaseBearing
+                model.BaseBearing,
+                model.ModelVariant,
+                model.DetectionRange,
+                model.DetectionAngle,
+                model.DetectionBearing,
+                model.GateWidthM,
+                model.OpenOnContactOn
             }, transaction);
 
             await transaction.CommitAsync(token);
@@ -1960,7 +1992,9 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
         UPDATE PidsSymbols SET
             LinkedDeviceId = @LinkedDeviceId, DeviceType = @DeviceType, ShowFOV = @ShowFOV,
             FOVColor = @FOVColor, FOVOpacity = @FOVOpacity, EventStatus = @EventStatus,
-            BaseBearing = @BaseBearing,
+            BaseBearing = @BaseBearing, ModelVariant = @ModelVariant,
+            DetectionRange = @DetectionRange, DetectionAngle = @DetectionAngle, DetectionBearing = @DetectionBearing,
+            GateWidthM = @GateWidthM, OpenOnContactOn = @OpenOnContactOn,
             UpdatedAt = CURRENT_TIMESTAMP
         WHERE SymbolId = @SymbolId;";
 
@@ -1973,7 +2007,13 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 FOVColor = model.FOVColor.ToString(),
                 model.FOVOpacity,
                 EventStatus = model.EventStatus.ToString(),
-                model.BaseBearing
+                model.BaseBearing,
+                model.ModelVariant,
+                model.DetectionRange,
+                model.DetectionAngle,
+                model.DetectionBearing,
+                model.GateWidthM,
+                model.OpenOnContactOn
             }, transaction);
 
             if (symbolAffected == 0)
@@ -1982,8 +2022,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             {
                 // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실.
                 await conn.ExecuteAsync(@"
-                    INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing)
-                    VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing);",
+                    INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing, ModelVariant, DetectionRange, DetectionAngle, DetectionBearing, GateWidthM, OpenOnContactOn)
+                    VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing, @ModelVariant, @DetectionRange, @DetectionAngle, @DetectionBearing, @GateWidthM, @OpenOnContactOn);",
                     new
                     {
                         SymbolId = model.Id,
@@ -1993,7 +2033,13 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                         FOVColor = model.FOVColor.ToString(),
                         model.FOVOpacity,
                         EventStatus = model.EventStatus.ToString(),
-                        model.BaseBearing
+                        model.BaseBearing,
+                        model.ModelVariant,
+                        model.DetectionRange,
+                        model.DetectionAngle,
+                        model.DetectionBearing,
+                        model.GateWidthM,
+                        model.OpenOnContactOn
                     }, transaction);
                 _log?.Warning($"PidsSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
             }
@@ -2088,7 +2134,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 s.Bearing, s.Width, s.Height, s.Category, s.ShowShape, s.ShowTitle, s.Visible, s.IsLocked,
                 s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                 s.CreatedAt, s.UpdatedAt, s.CreatedBy,
-                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing
+                p.LinkedDeviceId, p.DeviceType, p.ShowFOV, p.FOVColor, p.FOVOpacity, p.EventStatus, p.BaseBearing, p.ModelVariant, p.DetectionRange, p.DetectionAngle, p.DetectionBearing, p.GateWidthM, p.OpenOnContactOn
         FROM    Symbols s
         INNER JOIN PidsSymbols p ON s.Id = p.SymbolId
         WHERE   p.EventStatus = @EventStatus
@@ -3193,7 +3239,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                         s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                         s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                         pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
-                        pg.ShowArrowHead, pg.LinePattern
+                        pg.ShowArrowHead, pg.LinePattern, pg.PostSpacingM, pg.FenceHeightM, pg.FenceMode, pg.Render3D, pg.ReverseSensorOrder
                 FROM    Symbols s
                 INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
                 WHERE   s.Category = 'PIDS_GROUP'
@@ -3256,7 +3302,7 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                         s.FillColor, s.StrokeColor, s.StrokeThickness, s.ZOrder, s.LabelOffsetX, s.LabelOffsetY, s.TitleColor, s.TitleBackground, s.TitleFontFamily, s.TitleBold, s.TitleItalic, s.TitleMaxWidth,
                         s.CreatedAt, s.UpdatedAt, s.CreatedBy,
                         pg.LinkedDeviceGroup, pg.EventStatus, pg.LineOpacity, pg.IsClosedPath, 
-                        pg.ShowArrowHead, pg.LinePattern
+                        pg.ShowArrowHead, pg.LinePattern, pg.PostSpacingM, pg.FenceHeightM, pg.FenceMode, pg.Render3D, pg.ReverseSensorOrder
                 FROM    Symbols s
                 INNER JOIN PidsGroupSymbols pg ON s.Id = pg.SymbolId
                 WHERE   s.Id = @Id;";
@@ -3346,8 +3392,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
             // 2. PidsGroupSymbols 테이블에 PIDS 그룹 전용 정보 삽입
             const string pidsGroupSql = @"
                 INSERT INTO PidsGroupSymbols 
-                (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
-                VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);";
+                (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern, PostSpacingM, FenceHeightM, FenceMode, Render3D, ReverseSensorOrder)
+                VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern, @PostSpacingM, @FenceHeightM, @FenceMode, @Render3D, @ReverseSensorOrder);";
 
             await conn.ExecuteAsync(pidsGroupSql, new
             {
@@ -3357,7 +3403,12 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.LineOpacity,
                 model.IsClosedPath,
                 model.ShowArrowHead,
-                LinePattern = model.LinePattern.ToString()
+                LinePattern = model.LinePattern.ToString(),
+                model.PostSpacingM,
+                model.FenceHeightM,
+                FenceMode = (int)model.FenceMode,
+                model.Render3D,
+                model.ReverseSensorOrder
             }, transaction);
 
             // 3. PidsGroupPoints 삽입
@@ -3454,6 +3505,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                     LinkedDeviceGroup = @LinkedDeviceGroup, EventStatus = @EventStatus,
                     LineOpacity = @LineOpacity, IsClosedPath = @IsClosedPath,
                     ShowArrowHead = @ShowArrowHead, LinePattern = @LinePattern,
+                    PostSpacingM = @PostSpacingM, FenceHeightM = @FenceHeightM, FenceMode = @FenceMode,
+                    Render3D = @Render3D, ReverseSensorOrder = @ReverseSensorOrder,
                     UpdatedAt = CURRENT_TIMESTAMP
                 WHERE SymbolId = @SymbolId;";
 
@@ -3465,7 +3518,12 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 model.LineOpacity,
                 model.IsClosedPath,
                 model.ShowArrowHead,
-                LinePattern = model.LinePattern.ToString()
+                LinePattern = model.LinePattern.ToString(),
+                model.PostSpacingM,
+                model.FenceHeightM,
+                FenceMode = (int)model.FenceMode,
+                model.Render3D,
+                model.ReverseSensorOrder
             }, transaction);
 
             // 3. 기존 포인트 삭제 후 새로 삽입
@@ -3497,8 +3555,8 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                 // 타입 테이블 행 부재 자가치유 — 종전엔 전체 롤백으로 Title 등 base 변경까지 무음 소실
                 // (사용자 보고: PidsGroup 제목 변경 미반영). base는 이미 갱신됐으므로 타입행만 복구 후 커밋.
                 await conn.ExecuteAsync(@"
-                    INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern)
-                    VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);",
+                    INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern, PostSpacingM, FenceHeightM, FenceMode, Render3D, ReverseSensorOrder)
+                    VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern, @PostSpacingM, @FenceHeightM, @FenceMode, @Render3D, @ReverseSensorOrder);",
                     new
                     {
                         SymbolId = model.Id,
@@ -3507,7 +3565,12 @@ internal partial class GMapDbSymbolService : TaskService, IGMapDbSymbolService
                         model.LineOpacity,
                         model.IsClosedPath,
                         model.ShowArrowHead,
-                        LinePattern = model.LinePattern.ToString()
+                        LinePattern = model.LinePattern.ToString(),
+                        model.PostSpacingM,
+                        model.FenceHeightM,
+                        FenceMode = (int)model.FenceMode,
+                        model.Render3D,
+                        model.ReverseSensorOrder
                     }, transaction);
                 _log?.Warning($"PidsGroupSymbols 행 부재 → 자가치유 INSERT (Id={model.Id})");
             }
@@ -4091,6 +4154,18 @@ internal sealed class PidsSymbolSQL : SymbolSQL
 
     /// <summary>기준 방향 각도 (카메라 물리적 설치 방향)</summary>
     public decimal BaseBearing { get; set; } = 0.0m;
+    public string? ModelVariant { get; set; }
+
+    /// <summary>탐지 거리(m) — NULL 이면 모델 기본값(30). 3D 헤드/FOV 방향 영속을 위해 신설(D-3).</summary>
+    public decimal? DetectionRange { get; set; }
+    /// <summary>탐지 각도(도) — NULL 이면 모델 기본값(80).</summary>
+    public decimal? DetectionAngle { get; set; }
+    /// <summary>탐지 방향(도, 북 기준 절대각) — NULL 이면 BaseBearing 으로 초기화(종전 동작 유지).</summary>
+    public decimal? DetectionBearing { get; set; }
+    /// <summary>통문 폭(m) — NULL 이면 모델 기본(4.0)(FR-12).</summary>
+    public decimal? GateWidthM { get; set; }
+    /// <summary>ContactOn=열림 해석 여부(FR-12).</summary>
+    public bool OpenOnContactOn { get; set; } = true;
 
     /// <summary>
     /// JOIN 결과를 PidsSymbolModel로 변환
@@ -4137,11 +4212,15 @@ internal sealed class PidsSymbolSQL : SymbolSQL
         FOVOpacity = (double)FOVOpacity,
         EventStatus = EnumParseHelper.TryParseEnum(EventStatus, EnumEventStatus.Normal),
         BaseBearing = (double)BaseBearing,
+        ModelVariant = ModelVariant,
 
-        // DetectionBearing 초기값을 BaseBearing으로 설정 (FOV 초기 방향)
-        DetectionBearing = (double)BaseBearing
-
-        // DetectionRange, DetectionAngle는 기본값 사용 (런타임 조정 가능)
+        // Detection* 는 컬럼이 NULL(신설 전 저장 행)이면 종전 동작으로 폴백한다 —
+        // Bearing 은 BaseBearing, Range/Angle 은 모델 기본값(30m/80°). 한 번 저장되면 실제 값이 왕복된다(D-3).
+        DetectionBearing = DetectionBearing.HasValue ? (double)DetectionBearing.Value : (double)BaseBearing,
+        DetectionRange = DetectionRange.HasValue ? (double)DetectionRange.Value : 30.0,
+        DetectionAngle = DetectionAngle.HasValue ? (double)DetectionAngle.Value : 80.0,
+        GateWidthM = GateWidthM.HasValue ? (double)GateWidthM.Value : null,
+        OpenOnContactOn = OpenOnContactOn
     };
 }
 
@@ -4377,8 +4456,8 @@ internal sealed class InfraSymbolSQL : SymbolSQL
         TitleMaxWidth = (double)TitleMaxWidth,
 
         // InfraSymbol 전용 속성들
-        BuildingType = EnumBuildingType.Factory,  // 하나뿐이므로 하드코딩
-        BuildingUsage = EnumBuildingUsage.Office, // 하나뿐이므로 하드코딩
+        BuildingType = EnumParseHelper.TryParseEnum(BuildingType, EnumBuildingType.Factory),
+        BuildingUsage = EnumParseHelper.TryParseEnum(BuildingUsage, EnumBuildingUsage.Office),
         FloorCount = FloorCount,
         BasementFloorCount = BasementFloorCount,
         BuildingArea = (double)BuildingArea
@@ -4411,6 +4490,17 @@ internal sealed class PidsGroupSymbolSQL : SymbolSQL
 
     /// <summary>라인 패턴 타입</summary>
     public string LinePattern { get; set; } = "Solid";
+
+    /// <summary>3D 철망 기둥 간격(m) — NULL 이면 전역 설정(FR-03).</summary>
+    public decimal? PostSpacingM { get; set; }
+    /// <summary>3D 철망 높이(m) — NULL 이면 전역 설정.</summary>
+    public decimal? FenceHeightM { get; set; }
+    /// <summary>철망 형태 0=Posts 1=SensorMount(FR-04).</summary>
+    public int FenceMode { get; set; }
+    /// <summary>그룹별 3D 렌더(FR-06).</summary>
+    public bool Render3D { get; set; } = true;
+    /// <summary>센서 노드 역순(FR-04).</summary>
+    public bool ReverseSensorOrder { get; set; }
 
     /// <summary>
     /// JOIN 결과를 PidsGroupSymbolModel로 변환 (포인트는 별도 로드 필요)
@@ -4456,6 +4546,11 @@ internal sealed class PidsGroupSymbolSQL : SymbolSQL
         IsClosedPath = IsClosedPath,
         ShowArrowHead = ShowArrowHead,
         LinePattern = EnumParseHelper.TryParseEnum(LinePattern, EnumLinePattern.Solid),
+        PostSpacingM = PostSpacingM.HasValue ? (double)PostSpacingM.Value : null,
+        FenceHeightM = FenceHeightM.HasValue ? (double)FenceHeightM.Value : null,
+        FenceMode = Enum.IsDefined(typeof(EnumFenceMode), FenceMode) ? (EnumFenceMode)FenceMode : EnumFenceMode.Posts,   // 미지값 → Posts 폴백
+        Render3D = Render3D,
+        ReverseSensorOrder = ReverseSensorOrder,
         LinePoints = new List<GeoPoint>() // 포인트는 별도 쿼리로 로드
     };
 }

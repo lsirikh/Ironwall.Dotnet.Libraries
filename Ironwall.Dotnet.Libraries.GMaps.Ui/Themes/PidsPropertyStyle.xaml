@@ -1,6 +1,7 @@
 ﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:house="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Symbols3D"
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties"
 	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils">
 
@@ -25,6 +26,8 @@
 		BlankText="—"
 		Format="P0" />
 
+	<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
 	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsControl}">
 
 		<Setter Property="HasSpecificProperties" Value="True" />
@@ -33,6 +36,123 @@
 		<Setter Property="SpecificContent">
 			<Setter.Value>
 				<StackPanel>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="색상 강도" Style="{StaticResource PropertyLabel}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}" ToolTip="현재 세션에서 하우징에 적용할 채우기 색의 강도입니다."/>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="설치 높이" Style="{StaticResource PropertyLabel}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="3D 하우징을 지면에서 들어올려 표시합니다(0~100, 시각 표현용 상대값 · Altitude 컬럼에 저장 · 되돌리기 지원)."/>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<MultiDataTrigger>
+										<MultiDataTrigger.Conditions>
+											<Condition Binding="{Binding SelectedMarker.DeviceType}" Value="IpCamera"/>
+											<Condition Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False"/>
+										</MultiDataTrigger.Conditions>
+										<Setter Property="Visibility" Value="Visible"/>
+									</MultiDataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="모델 변형" Style="{StaticResource PropertyLabel}"/>
+						<ComboBox Grid.Column="1" ItemsSource="{Binding ModelVariants}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding ModelVariant, Mode=TwoWay}" Style="{StaticResource CompactComboBox}" ToolTip="장비 연결을 유지한 채 3D 하우징 형태를 변경합니다."/>
+					</Grid>
+
+					<!--  통문 개폐 (FR-12/18) — DeviceType=Gate: 폭 슬라이더 / 통문·함체 공통: 접점 해석  -->
+					<Grid Margin="0,5" AutomationProperties.AutomationId="GMaps.Property.GateSection">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding IsGate}" Value="True">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="통문 폭" Style="{StaticResource PropertyLabel}"/>
+						<StackPanel Grid.Column="1" Orientation="Horizontal">
+							<Slider Width="100" Minimum="1" Maximum="8" TickFrequency="0.5" IsSnapToTickEnabled="True" Value="{Binding GateWidthM, Mode=TwoWay}" ToolTip="양개 문짝 전체 폭 1~8 m(0.5 m 단위), 멈추면 150 ms 뒤 저장" AutomationProperties.AutomationId="GMaps.Property.GateWidth"/>
+							<TextBlock Margin="5,0,0,0" VerticalAlignment="Center" Text="{Binding GateWidthM, StringFormat='{}{0:0.0} m'}"/>
+							<TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="10" Opacity="0.75" Text="(기본)" Visibility="{Binding IsGateWidthInherited, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+							<Button Content="기본" Padding="6,1" Margin="6,0,0,0" Command="{Binding ResetGateWidthCommand}" AutomationProperties.AutomationId="GMaps.Property.GateWidthReset"/>
+						</StackPanel>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding HasDoor}" Value="True">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="열림 판정" Style="{StaticResource PropertyLabel}"/>
+						<CheckBox Grid.Column="1" VerticalAlignment="Center" Content="접점 ON = 열림 (해제 시 반전)" IsChecked="{Binding OpenOnContactOn, Mode=TwoWay}" ToolTip="현장 배선이 반대면 해제한다 — 서버 상태(SYNC_DEVICE/운영 이벤트)가 오면 그 값이 우선" AutomationProperties.AutomationId="GMaps.Property.OpenOnContactOn"/>
+					</Grid>
+
 					<!--  연결된 디바이스  -->
 					<Grid Margin="0,5">
 						<Grid.ColumnDefinitions>

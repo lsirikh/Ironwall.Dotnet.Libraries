@@ -59,7 +59,7 @@ public abstract class GMapBaseSymbolFixture : IAsyncLifetime
     /// 테스트 픽스처 초기화 - DB 서비스 시작
     /// </summary>
     /// <returns>Task</returns>
-    [Fact(DisplayName = "Initialize Symbol DB Service")]
+    // I-01: IAsyncLifetime 메서드에 [Fact] 금지 — 테스트로 발견되면 별도 인스턴스가 DROP TABLE 을 병렬 실행해 다른 컬렉션을 전멸시킨다
     public async Task InitializeAsync()
     {
         var log = new LogService();
@@ -82,7 +82,6 @@ public abstract class GMapBaseSymbolFixture : IAsyncLifetime
     /// 테스트 픽스처 정리 - DB 서비스 중지
     /// </summary>
     /// <returns>Task</returns>
-    [Fact(DisplayName = "Dispose Symbol DB Service")]
     public async Task DisposeAsync()
     {
         await Svc.StopService(Cts.Token);

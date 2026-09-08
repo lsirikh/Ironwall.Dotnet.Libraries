@@ -17,6 +17,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Db.Tests;
 /// </summary>
 public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
 {
+    /// <summary>시드 LinkedDeviceId 고유 발급(20001~) — 종전 `20000+i`/`21000+i` 가 테스트마다 반복돼 FetchByDeviceId(QuerySingle) 가 중복 행으로 터졌다.</summary>
+    private int _deviceSeq;
+    private int NextDeviceId() => 20000 + System.Threading.Interlocked.Increment(ref _deviceSeq);
+
     #region - Private Methods -
     /// <summary>
     /// DB 내부 테이블 삭제 (CASCADE 순서 고려)
@@ -46,14 +50,14 @@ public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
     /// <summary>
     /// PidsSymbol 시드 데이터 생성
     /// </summary>
-    [Fact(DisplayName = "PidsSymbol DB Insert Service")]
-    public async Task SeedPidsSymbolsAsync()
+    public async Task<List<int>> SeedPidsSymbolsAsync()
     {
         var random = new Random();
         var deviceTypes = Enum.GetValues<EnumDeviceType>();
         var operationStates = Enum.GetValues<EnumOperationState>();
         var eventStatuses = Enum.GetValues<EnumEventStatus>();
         var colorTypes = Enum.GetValues<EnumColorType>();
+        var createdIds = new List<int>();
 
         for (int i = 1; i <= SymbolCount; i++)
         {
@@ -75,7 +79,7 @@ public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
                 StrokeColor = colorTypes[random.Next(colorTypes.Length)],
                 StrokeThickness = 1.0 + random.NextDouble() * 3.0,  // 1.0 ~ 4.0
                 // PidsSymbol 전용 속성
-                LinkedDeviceId = 20000 + i,
+                LinkedDeviceId = NextDeviceId(),
                 DeviceType = deviceTypes[random.Next(deviceTypes.Length)],
                 ShowFOV = random.Next(2) == 0,
                 FOVColor = colorTypes[random.Next(colorTypes.Length)],
@@ -86,7 +90,9 @@ public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
 
             int id = await Svc.InsertPidsSymbolAsync(pidsSymbol);
             InsertedSymbolIds.Add(id);
+            createdIds.Add(id);
         }
+        return createdIds;
     }
 
     /// <summary>
@@ -120,7 +126,7 @@ public sealed class GMapDbPidsSymbolFixture : GMapBaseSymbolFixture
                 StrokeColor = EnumColorType.White,
                 StrokeThickness = 2.0,
                 // PidsSymbol 전용 속성
-                LinkedDeviceId = 21000 + i,
+                LinkedDeviceId = NextDeviceId(),
                 DeviceType = deviceType,
                 ShowFOV = deviceType == EnumDeviceType.IpCamera, // 카메라만 FOV 표시
                 FOVColor = EnumColorType.Red,
@@ -164,15 +170,15 @@ public class GMapDbPidsSymbol_BasicCrudTests
     [Fact(DisplayName = "PidsSymbols – Insert & Fetch")]
     public async Task Insert_And_Fetch_PidsSymbols()
     {
-        await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.IpCamera);
+        var seeded = await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.IpCamera, _fx.SymbolCount);
 
         /* 1) FetchPidsSymbolsAsync → 전체 개수 일치 */
         var all = await _fx.Svc.FetchPidsSymbolsAsync();
         Assert.NotNull(all);
-        Assert.True(all!.Count >= _fx.SymbolCount);
+        Assert.True(all!.Count >= seeded.Count);
 
-        /* 2) 각각 FetchPidsSymbolAsync로 필드 검증 */
-        foreach (var id in _fx.InsertedSymbolIds)
+        /* 2) 각각 FetchPidsSymbolAsync로 필드 검증 — 이 테스트가 만든 행만(다른 테스트가 지운 id 를 공유 목록에서 읽지 않는다) */
+        foreach (var id in seeded)
         {
             var one = await _fx.Svc.FetchPidsSymbolAsync(id);
             Assert.NotNull(one);
@@ -202,8 +208,8 @@ public class GMapDbPidsSymbol_BasicCrudTests
     [Fact(DisplayName = "PidsSymbols – Update")]
     public async Task Update_PidsSymbol_Works()
     {
-        await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.Fence);
-        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(_fx.InsertedSymbolIds.First());
+        var seeded = await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.Fence, 1);
+        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(seeded.First());
 
         /* 수정 */
         pidsSymbol!.Title = "업데이트된_PIDS장비";
@@ -225,6 +231,9 @@ public class GMapDbPidsSymbol_BasicCrudTests
         pidsSymbol.FOVColor = EnumColorType.Green;
         pidsSymbol.FOVOpacity = 0.7;
         pidsSymbol.EventStatus = EnumEventStatus.Detecting;
+        // 통문 개폐(FR-12)
+        pidsSymbol.GateWidthM = 3.5;
+        pidsSymbol.OpenOnContactOn = false;
 
         var updated = await _fx.Svc.UpdatePidsSymbolAsync(pidsSymbol);
 
@@ -247,6 +256,24 @@ public class GMapDbPidsSymbol_BasicCrudTests
         Assert.Equal(EnumColorType.Green, updated.FOVColor);
         Assert.Equal(0.7, updated.FOVOpacity, 2); // 소수점 2자리까지 비교
         Assert.Equal(EnumEventStatus.Detecting, updated.EventStatus);
+        Assert.Equal(3.5, updated.GateWidthM!.Value, 1);
+        Assert.False(updated.OpenOnContactOn);
+    }
+
+    /// <summary>
+    /// FR-12/16: 통문 필드를 지정하지 않으면 GateWidthM NULL · OpenOnContactOn true 가 왕복한다.
+    /// </summary>
+    [Fact(DisplayName = "PidsSymbols – 통문 필드 기본값 왕복")]
+    public async Task should_roundtrip_gate_defaults_when_not_set()
+    {
+        var seeded = await _fx.SeedPidsSymbolsByDeviceTypeAsync(EnumDeviceType.Gate, 1);
+        var one = await _fx.Svc.FetchPidsSymbolAsync(seeded.First());
+
+        Assert.NotNull(one);
+        Assert.Equal(EnumDeviceType.Gate, one!.DeviceType);
+        Assert.Null(one.GateWidthM);
+        Assert.True(one.OpenOnContactOn);
+        Assert.Equal(EnumDoorState.Unknown, one.DoorState);   // 비영속 — 항상 Unknown 에서 출발
     }
 
     /// <summary>
@@ -255,12 +282,13 @@ public class GMapDbPidsSymbol_BasicCrudTests
     [Fact(DisplayName = "PidsSymbols – Delete (CASCADE)")]
     public async Task Delete_PidsSymbol_Works()
     {
-        await _fx.SeedPidsSymbolsAsync();
-        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(_fx.InsertedSymbolIds.First());
+        var seeded = await _fx.SeedPidsSymbolsAsync();
+        var pidsSymbol = await _fx.Svc.FetchPidsSymbolAsync(seeded.First());
 
         /* 삭제 */
         bool ok = await _fx.Svc.DeletePidsSymbolAsync(pidsSymbol!);
         Assert.True(ok);
+        _fx.InsertedSymbolIds.Remove(pidsSymbol!.Id);   // 삭제 행을 공유 목록에 남기면 다른 테스트의 재조회가 null 로 실패한다
 
         /* 실제로 사라졌는지 확인 (JOIN 쿼리로 확인) */
         var fetched = await _fx.Svc.FetchPidsSymbolAsync(pidsSymbol!.Id);
@@ -290,6 +318,7 @@ public class GMapDbPidsSymbol_BasicCrudTests
         /* LinkedDeviceId로 삭제 */
         bool deleted = await _fx.Svc.DeletePidsSymbolByDeviceIdAsync(pidsSymbol.LinkedDeviceId);
         Assert.True(deleted);
+        _fx.InsertedSymbolIds.Remove(pidsSymbol.Id);
 
         /* 삭제 확인 */
         var deletedSymbol = await _fx.Svc.FetchPidsSymbolByDeviceIdAsync(pidsSymbol.LinkedDeviceId);
@@ -683,10 +712,11 @@ public class GMapDbPidsSymbol_IntegrationTests
     /// <summary>
     /// 실시간 데이터 필드 비저장 확인 테스트
     /// </summary>
-    [Fact(DisplayName = "Real-time Data Fields Not Stored")]
-    public async Task Realtime_Data_Fields_Not_Stored()
+    [Fact(DisplayName = "Detection Fields Persisted (D-3)")]
+    public async Task should_persist_detection_fields_when_stored()
     {
-        // 실시간 데이터 필드가 포함된 PidsSymbol 생성
+        // D-3(3D 하우징): DetectionRange/Angle/Bearing 은 영속 컬럼이다 — 종전 '실시간 데이터라 저장 안 됨' 단언은 구식.
+        // 저장한 값이 재조회에서 그대로 돌아와야 3D 헤드·FOV 방향이 재부팅 후에도 유지된다.
         var pidsSymbol = new PidsSymbolModel
         {
             Pid = 15000,
@@ -695,8 +725,9 @@ public class GMapDbPidsSymbol_IntegrationTests
             LinkedDeviceId = 25000,
             DeviceType = EnumDeviceType.IpCamera,
             FOVOpacity = 0.5,
+            ShowFOV = true,   // 카메라=FOV 표시 규약(FetchByDeviceType 단언) 준수 — 공유 DB 오염 방지
             EventStatus = EnumEventStatus.Normal,
-            // 실시간 데이터 (저장되지 않아야 함)
+            // 탐지 필드 — 저장·재조회 왕복 대상(D-3)
             DetectionRange = 150.0,
             DetectionAngle = 90.0,
             DetectionBearing = 45.0
@@ -708,10 +739,10 @@ public class GMapDbPidsSymbol_IntegrationTests
         var fetchedSymbol = await _fx.Svc.FetchPidsSymbolAsync(symbolId);
         Assert.NotNull(fetchedSymbol);
 
-        // 실시간 데이터는 기본값으로 설정되어야 함 (DB에서 로드되지 않음)
-        Assert.Equal(100.0, fetchedSymbol!.DetectionRange); // 기본값
-        Assert.Equal(80.0, fetchedSymbol.DetectionAngle);   // 기본값
-        Assert.Equal(0.0, fetchedSymbol.DetectionBearing);  // 기본값
+        // D-3: 저장한 탐지 필드가 그대로 왕복한다
+        Assert.Equal(150.0, fetchedSymbol!.DetectionRange, 1);
+        Assert.Equal(90.0, fetchedSymbol.DetectionAngle, 1);
+        Assert.Equal(45.0, fetchedSymbol.DetectionBearing, 1);
 
         // 다른 속성들은 정상적으로 저장/로드되어야 함
         Assert.Equal("실시간데이터테스트", fetchedSymbol.Title);

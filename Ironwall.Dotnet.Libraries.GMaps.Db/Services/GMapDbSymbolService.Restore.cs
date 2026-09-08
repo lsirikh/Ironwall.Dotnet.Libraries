@@ -126,8 +126,9 @@ internal partial class GMapDbSymbolService
             await GuardCollisionAsync(conn, tx, model.Id);
             await InsertSymbolRowWithIdAsync(conn, tx, model);
             await conn.ExecuteAsync(
-                "INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing) VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing);",
-                new { SymbolId = model.Id, model.LinkedDeviceId, DeviceType = model.DeviceType.ToString(), model.ShowFOV, FOVColor = model.FOVColor.ToString(), model.FOVOpacity, EventStatus = model.EventStatus.ToString(), model.BaseBearing }, tx);
+                // FR-16: 선례 누락(ModelVariant·Detection*) 동시 보정 — 삭제-Undo 복원 시 3D 변형·탐지 방향·통문 설정이 소실되던 경로
+                "INSERT INTO PidsSymbols (SymbolId, LinkedDeviceId, DeviceType, ShowFOV, FOVColor, FOVOpacity, EventStatus, BaseBearing, ModelVariant, DetectionRange, DetectionAngle, DetectionBearing, GateWidthM, OpenOnContactOn) VALUES (@SymbolId, @LinkedDeviceId, @DeviceType, @ShowFOV, @FOVColor, @FOVOpacity, @EventStatus, @BaseBearing, @ModelVariant, @DetectionRange, @DetectionAngle, @DetectionBearing, @GateWidthM, @OpenOnContactOn);",
+                new { SymbolId = model.Id, model.LinkedDeviceId, DeviceType = model.DeviceType.ToString(), model.ShowFOV, FOVColor = model.FOVColor.ToString(), model.FOVOpacity, EventStatus = model.EventStatus.ToString(), model.BaseBearing, model.ModelVariant, model.DetectionRange, model.DetectionAngle, model.DetectionBearing, model.GateWidthM, model.OpenOnContactOn }, tx);
             await tx.CommitAsync(token);
             await ResetSymbolsAutoIncrementAsync(conn);
             return model.Id;
@@ -204,8 +205,8 @@ internal partial class GMapDbSymbolService
             // 판별자 고정 — PidsGroup 런타임 Category=AREA_BOUNDARY라 override 없이는 삭제-Undo 복원이 재부팅 소실됨(FR-C2)
             await InsertSymbolRowWithIdAsync(conn, tx, model, categoryOverride: "PIDS_GROUP");
             await conn.ExecuteAsync(
-                "INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern) VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern);",
-                new { SymbolId = model.Id, model.LinkedDeviceGroup, EventStatus = model.EventStatus.ToString(), model.LineOpacity, model.IsClosedPath, model.ShowArrowHead, LinePattern = model.LinePattern.ToString() }, tx);
+                "INSERT INTO PidsGroupSymbols (SymbolId, LinkedDeviceGroup, EventStatus, LineOpacity, IsClosedPath, ShowArrowHead, LinePattern, PostSpacingM, FenceHeightM, FenceMode, Render3D, ReverseSensorOrder) VALUES (@SymbolId, @LinkedDeviceGroup, @EventStatus, @LineOpacity, @IsClosedPath, @ShowArrowHead, @LinePattern, @PostSpacingM, @FenceHeightM, @FenceMode, @Render3D, @ReverseSensorOrder);",
+                new { SymbolId = model.Id, model.LinkedDeviceGroup, EventStatus = model.EventStatus.ToString(), model.LineOpacity, model.IsClosedPath, model.ShowArrowHead, LinePattern = model.LinePattern.ToString(), model.PostSpacingM, model.FenceHeightM, FenceMode = (int)model.FenceMode, model.Render3D, model.ReverseSensorOrder }, tx);
             if (model.LinePoints?.Any() == true)
             {
                 var pts = model.LinePoints.Select((p, i) => new { GroupSymbolId = model.Id, SequenceOrder = i, Latitude = (decimal)p.Latitude, Longitude = (decimal)p.Longitude, Altitude = (float)p.Altitude });

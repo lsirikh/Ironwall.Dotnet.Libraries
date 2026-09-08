@@ -26,16 +26,10 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
         public GMapPropertyInfraControl()
         {
             // 건물 타입 목록 초기화
-            AvailableBuildingTypes = new[]
-            {
-                EnumBuildingType.Factory
-            };
+            AvailableBuildingTypes = Enum.GetValues<EnumBuildingType>();
 
             // 건물 용도 목록 초기화
-            AvailableBuildingUsages = new[]
-            {
-                EnumBuildingUsage.Office
-            };
+            AvailableBuildingUsages = Enum.GetValues<EnumBuildingUsage>();
         }
         #endregion
 
@@ -54,6 +48,24 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
             DependencyProperty.Register("BuildingType", typeof(EnumBuildingType),
                 typeof(GMapPropertyInfraControl),
                 new PropertyMetadata(EnumBuildingType.Factory, OnBuildingTypeChanged));
+
+        /// <summary>
+        /// 층수 개념이 있는 건물 종류인가 — 지상/지하 슬라이더 활성 게이트(D-6).
+        /// 게이트·발전기·물탱크·헬리패드·교량은 층수가 형상에 반영되지 않으므로 입력을 막아 무음 실패를 없앤다.
+        /// </summary>
+        public bool SupportsFloors
+        {
+            get { return (bool)GetValue(SupportsFloorsProperty); }
+            private set { SetValue(SupportsFloorsProperty, value); }
+        }
+
+        public static readonly DependencyProperty SupportsFloorsProperty =
+            DependencyProperty.Register("SupportsFloors", typeof(bool),
+                typeof(GMapPropertyInfraControl),
+                new PropertyMetadata(true));
+
+        public static bool BuildingTypeSupportsFloors(EnumBuildingType type) => type is not
+            (EnumBuildingType.Gate or EnumBuildingType.Generator or EnumBuildingType.WaterTank or EnumBuildingType.Helipad or EnumBuildingType.Bridge);
 
         /// <summary>
         /// 건물 용도
@@ -209,6 +221,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties{
 
         private static void OnBuildingTypeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
+            if (d is GMapPropertyInfraControl gate) gate.SupportsFloors = BuildingTypeSupportsFloors((EnumBuildingType)e.NewValue);
             if (d is GMapPropertyInfraControl control && control.SelectedMarker is IInfraEditableMarker infraMarker)
             {
                 if (!control._isInitializing && !control._isClearingBindings)

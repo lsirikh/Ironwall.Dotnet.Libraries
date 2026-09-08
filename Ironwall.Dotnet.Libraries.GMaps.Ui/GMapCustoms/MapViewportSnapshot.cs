@@ -14,7 +14,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
    Created On   : 2026-07-28 · Sensorway Co., Ltd.
 ****************************************************************************/
 
-/// <summary>뷰포트 불변 스냅샷 — CanonicalBearing은 항상 [-180,180) 정규값(FR-01 SSOT 보장).</summary>
+/// <summary>뷰포트 불변 스냅샷 — CanonicalBearing은 항상 [-180,180) 정규값(FR-01 SSOT 보장).
+/// <para><see cref="TiltCos"/> = cos(틸트각 φ)(2.5D 틸트 PRD FR-06). 틸트 없음/OFF 이면 1.0.
+/// 세로 축척이 cosφ 배로 줄어드는 소비자(카메라 팝업 위치·형제 캔버스 Y 보정)가 읽는다.</para></summary>
 public sealed record MapViewportSnapshot(
     PointLatLng Center,
     double CanonicalBearing,
@@ -22,7 +24,38 @@ public sealed record MapViewportSnapshot(
     double ViewportWidth,
     double ViewportHeight,
     double DigitalZoomScale,
-    long Revision);
+    double TiltCos,
+    long Revision)
+{
+    /// <summary>틸트 없음(φ=0)을 뜻하는 <see cref="TiltCos"/> 기본값.</summary>
+    public const double DefaultTiltCos = 1.0;
+
+    /// <summary>틸트 도입 이전 7-인자 시그니처 호환 생성자 — <see cref="TiltCos"/> 는
+    /// <see cref="DefaultTiltCos"/>(1.0). 기존 발행처·테스트가 그대로 컴파일된다(FR-06 "기본 1.0").</summary>
+    public MapViewportSnapshot(
+        PointLatLng center,
+        double canonicalBearing,
+        double zoom,
+        double viewportWidth,
+        double viewportHeight,
+        double digitalZoomScale,
+        long revision)
+        : this(center, canonicalBearing, zoom, viewportWidth, viewportHeight, digitalZoomScale, DefaultTiltCos, revision)
+    {
+    }
+
+    /// <summary>
+    /// <paramref name="previous"/> 대비 <see cref="TiltCos"/>(와 <see cref="Revision"/>)만 바뀌었는가 — map-tilt PRD FR-06 "TiltCos 단독 변화 필터".
+    /// 변환을 승계하는 소비자(FOV 부채꼴 등)는 true 면 재계산을 생략한다. previous 가 null(첫 수신)이거나
+    /// 중심·베어링·줌·뷰포트 크기·디지털 배율 중 하나라도 다르면 false. TiltCos 까지 같으면(완전 동일) false — 그 경우는 통상 경로가 처리한다.
+    /// </summary>
+    public bool IsTiltCosOnlyChangeFrom(MapViewportSnapshot? previous)
+    {
+        if (previous is null) return false;
+        if (TiltCos == previous.TiltCos) return false;
+        return this with { TiltCos = previous.TiltCos, Revision = previous.Revision } == previous;
+    }
+}
 
 /// <summary>snapshot 발행기 — per-consumer 예외 격리 + 구독 즉시 replay + 중복구독 방지 + revision.
 /// 순수 클래스(WPF 무의존)라 헤드리스 테스트 가능(ViewportSnapshotPublisherTests).</summary>

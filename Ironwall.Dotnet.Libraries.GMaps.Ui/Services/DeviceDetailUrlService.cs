@@ -38,6 +38,7 @@ public class DeviceDetailUrlService : IDeviceDetailUrlService
             ["IpSpeaker"]     = ("svms-device-speaker",    "SPEAKER"),
             ["Lamp"]          = ("svms-device-lamp",       "LAMP"),
             ["Enclosure"]     = ("svms-device-enclosure",  "ENCLOSURE"),
+            ["Gate"]          = ("svms-device-sensor",     "PIDS_SENSOR"),   // 통문(D2) — 서버 PRD /api/gates 구현 후 전용 페이지로 교체
         };
 
     // SVMS 웹서버 스킴. https = mkcert 사내 root CA 신뢰 시 Chrome 자물쇠 정상.

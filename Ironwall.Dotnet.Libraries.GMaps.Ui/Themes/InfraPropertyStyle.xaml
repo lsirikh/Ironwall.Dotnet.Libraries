@@ -1,6 +1,8 @@
 ﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:utils="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Utils"
+	xmlns:house="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.Symbols3D"
 	xmlns:properties="clr-namespace:Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties">
 
 	<ResourceDictionary.MergedDictionaries>
@@ -8,6 +10,10 @@
 		<ResourceDictionary Source="BasePropertyStyle.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
+	<utils:EnumDisplayNameConverter x:Key="HousingEnumDisplay"/>
+	<DataTemplate x:Key="HousingEnumItem">
+		<TextBlock Text="{Binding Converter={StaticResource HousingEnumDisplay}}"/>
+	</DataTemplate>
 	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyInfraControl}">
 		<Setter Property="HasSpecificProperties" Value="True" />
 		<Setter Property="SpecificPropertiesTitle" Value="건물 속성" />
@@ -15,6 +21,49 @@
 		<Setter Property="SpecificContent">
 			<Setter.Value>
 				<StackPanel>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="색상 강도" Style="{StaticResource PropertyLabel}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding SelectedMarker.Shape.(house:HousingAppearance.TintStrength), Mode=TwoWay}" ToolTip="현재 세션에서 하우징에 적용할 채우기 색의 강도입니다."/>
+					</Grid>
+					<Grid Margin="0,5">
+						<Grid.Style>
+							<Style TargetType="Grid">
+								<Setter Property="Visibility" Value="Collapsed"/>
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding SelectedMarker.Shape.RotatesIn2D}" Value="False">
+										<Setter Property="Visibility" Value="Visible"/>
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed"/>
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Grid.Style>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="80"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="설치 높이" Style="{StaticResource PropertyLabel}"/>
+						<Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" Value="{Binding MarkerAltitude, Mode=TwoWay}" ToolTip="3D 하우징을 지면에서 들어올려 표시합니다(0~100, 시각 표현용 상대값 · Altitude 컬럼에 저장 · 되돌리기 지원)."/>
+					</Grid>
+
 					<!--  건물 종류  -->
 					<Grid Margin="0,5">
 						<Grid.ColumnDefinitions>
@@ -27,7 +76,7 @@
 							Text="건물종류" />
 						<ComboBox
 							Grid.Column="1"
-							ItemsSource="{Binding AvailableBuildingTypes}"
+							ItemsSource="{Binding AvailableBuildingTypes}" ItemTemplate="{StaticResource HousingEnumItem}"
 							SelectedItem="{Binding BuildingType}"
 							Style="{StaticResource CompactComboBox}" />
 					</Grid>
@@ -44,7 +93,7 @@
 							Text="건물용도" />
 						<ComboBox
 							Grid.Column="1"
-							ItemsSource="{Binding AvailableBuildingUsages}"
+							ItemsSource="{Binding AvailableBuildingUsages}" ItemTemplate="{StaticResource HousingEnumItem}"
 							SelectedItem="{Binding BuildingUsage}"
 							Style="{StaticResource CompactComboBox}" />
 					</Grid>
@@ -66,6 +115,8 @@
 							Maximum="50"
 							Minimum="1"
 							TickFrequency="1"
+							IsEnabled="{Binding SupportsFloors}"
+							ToolTip="게이트·발전기·물탱크·헬리패드·교량은 층수가 형상에 반영되지 않아 비활성됩니다."
 							Value="{Binding FloorCount}" />
 						<TextBlock
 							Grid.Column="2"
@@ -92,6 +143,7 @@
 							Maximum="10"
 							Minimum="0"
 							TickFrequency="1"
+							IsEnabled="{Binding SupportsFloors}"
 							Value="{Binding BasementFloorCount}" />
 						<TextBlock
 							Grid.Column="2"

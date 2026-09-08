@@ -73,6 +73,7 @@
 										TextTrimming="CharacterEllipsis" />
 									<Button
 										x:Name="PART_CloseButton"
+										AutomationProperties.AutomationId="GMaps.LineDrawingHud.CloseButton"
 										Grid.Column="2"
 										Style="{StaticResource PanelCloseButtonStyle}"
 										ToolTip="닫기 / 취소 (Esc)" />
@@ -119,6 +120,7 @@
 									</Grid.ColumnDefinitions>
 									<Button
 										x:Name="PART_CompleteButton"
+										AutomationProperties.AutomationId="GMaps.LineDrawingHud.CompleteButton"
 										Grid.Column="0"
 										Content="✓ 완료"
 										IsEnabled="{TemplateBinding CanComplete}"
@@ -126,6 +128,7 @@
 										ToolTip="완료 (Enter)" />
 									<Button
 										x:Name="PART_UndoButton"
+										AutomationProperties.AutomationId="GMaps.LineDrawingHud.UndoButton"
 										Grid.Column="2"
 										Content="↶ 되돌리기"
 										Style="{StaticResource PanelSecondaryButtonStyle}"

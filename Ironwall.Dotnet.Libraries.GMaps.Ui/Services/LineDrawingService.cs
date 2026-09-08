@@ -15,6 +15,7 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Ironwall.Dotnet.Monitoring.Models.Symbols.Defines;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Fence;
 
 namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
     /****************************************************************************
@@ -276,6 +277,71 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
 
         #region Properties
 
+        #region 드래그 드로잉(FR-01) — 캡처 드래그 스트로크
+        private readonly List<Point> _strokeScreen = new();
+        /// <summary>프리핸드 스트로크 진행 중.</summary>
+        public bool IsStroking => _strokeScreen.Count > 0;
+
+        /// <summary>데드존을 통과한 눌림 지점에서 스트로크 시작(지도 컨트롤이 호출).</summary>
+        public void BeginStroke(Point screen)
+        {
+            if (!IsDrawing) return;
+            _strokeScreen.Clear();
+            _strokeScreen.Add(screen);
+            _currentAdorner?.SetStrokePreview(_strokeScreen);
+        }
+
+        /// <summary>스트로크 샘플 추가(1 px 미만 이동은 무시).</summary>
+        public void StrokeTo(Point screen)
+        {
+            if (!IsStroking) return;
+            var last = _strokeScreen[_strokeScreen.Count - 1];
+            if ((screen - last).LengthSquared < 1) return;
+            _strokeScreen.Add(screen);
+            _currentAdorner?.SetStrokePreview(_strokeScreen);
+        }
+
+        /// <summary>
+        /// 스트로크 종료 — commit 이면 화면 px Douglas-Peucker(ε=2px) → 지리 투영 → 최소 1 m 간격으로 정점을 확정한다(기존 마지막 정점과 겹치면 제거).
+        /// 취소(ESC/캡처 소실)면 미리보기만 지운다. 확정된 정점 수를 돌려준다.
+        /// </summary>
+        /// <summary>스트로크 미리보기만 걷는다(drag-first ② 시각 복원 — 캡처 해제 전에 호출). 샘플은 유지되어 <see cref="FinishStroke"/> 가 커밋한다.</summary>
+        public void DiscardStrokePreview() => _currentAdorner?.SetStrokePreview(null);
+
+        public int FinishStroke(bool commit)
+        {
+            if (!IsStroking) return 0;
+            var samples = _strokeScreen.ToList();
+            _strokeScreen.Clear();
+            _currentAdorner?.SetStrokePreview(null);
+            if (!commit || !IsDrawing || _currentAdorner is null) return 0;
+            try
+            {
+                var existing = _currentAdorner.GeoPoints;
+                bool hasSeed = existing.Count > 0;
+                var seed = hasSeed ? existing[existing.Count - 1] : default;
+                var vertices = StrokeReducer.Reduce(
+                    samples.Select(p => (p.X, p.Y)).ToList(), FenceDefaults.SimplifyEpsilonPx,
+                    sp => _mapControl.FromLocalToLatLng((int)Math.Round(sp.X), (int)Math.Round(sp.Y)),
+                    (a, b) => _mapControl.MapProvider.Projection.GetDistance(a, b) * 1000.0,
+                    FenceDefaults.MinVertexSpacingM, seed, hasSeed);
+                foreach (var geo in vertices)
+                {
+                    _currentAdorner.AddPoint(geo);
+                    PointAdded?.Invoke(this, geo);
+                }
+                if (vertices.Count > 0 && _currentState == LineDrawingState.FirstClick) SetState(LineDrawingState.Drawing);
+                _log?.Info($"드래그 스트로크 확정: 샘플 {samples.Count} → 정점 {vertices.Count} (총 {PointCount})");
+                return vertices.Count;
+            }
+            catch (Exception ex)
+            {
+                _log?.Error($"드래그 스트로크 확정 오류: {ex.Message}");
+                return 0;
+            }
+        }
+        #endregion
+
         /// <summary>
         /// 현재 드로잉 상태
         /// </summary>
@@ -367,6 +433,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Services{
 
             try
             {
+                // [C14] 클릭 경로에도 스트로크와 같은 최소 간격(FenceDefaults.MinVertexSpacingM) 적용 — 더블클릭(ClickCount 1·2 = 눌림/릴리스 2회)·
+                //   스트로크 끝점 재클릭이 같은 자리에 정점을 겹쳐 쌓는 것을 막는다. ClickCount>=2 를 '완료'로 매핑하지 않는다:
+                //   완료는 DB 영속(LineCompleted)이라 우발 더블클릭에 되돌릴 수 없는 결과를 주고, 이 가드로 두 번째 눌림은 이미 무해한 no-op 이다.
+                var existing = _currentAdorner?.GeoPoints;
+                if (existing is { Count: > 0 })
+                {
+                    var last = existing[existing.Count - 1];
+                    double distanceM = _mapControl.MapProvider.Projection.GetDistance(last, geoPosition) * 1000.0;
+                    if (!LineDrawingInputGates.ShouldAcceptClickVertex(true, distanceM, FenceDefaults.MinVertexSpacingM))
+                    {
+                        _log?.Info($"포인트 무시(최소 간격 {FenceDefaults.MinVertexSpacingM} m 미만, {distanceM:F2} m): {geoPosition}");
+                        return;
+                    }
+                }
+
                 // 포인트 추가
                 _currentAdorner?.AddPoint(geoPosition);
 

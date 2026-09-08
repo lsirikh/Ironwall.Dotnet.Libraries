@@ -32,7 +32,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
 /// - 기본 모드: 기존 GMap.NET 기능 100% 활용
 /// - 편집 모드: 선택된 객체를 직접 렌더링으로 편집 기능 제공
 /// </summary>
-public class GMapCustomControl : GMapControl
+public partial class GMapCustomControl : GMapControl, IExclusiveInputModeSource   // C12: 어도너 눌림 투과 게이트 공급자(기존 public 모드 플래그 6종)
 {
     #region Constructor
 
@@ -356,6 +356,10 @@ public class GMapCustomControl : GMapControl
             // 측정 모드와 상호배제 — 라인 드로잉 시작 시 측정 종료
             if (IsMeasuring) StopMeasure();
 
+            // [C12 후속] 드로잉 시작 = 기존 단일 선택 어도너(편집 핸들) 걷기 — 어도너는 맵의 형제 레이어라 그 위 눌림이 맵의
+            //   IsLineDrawing 분기에 도달하지 못하고 마커 편집으로 새어 나간다. 러버밴드 진입(FR-MS-08)과 같은 규칙.
+            DeselectAllMarkers();
+
             // 라인 드로잉 시작
             return await _lineDrawingService.StartLineDrawingAsync(parameters);
         }
@@ -449,8 +453,11 @@ public class GMapCustomControl : GMapControl
         //   마커/오브젝트 위에서도 휠 줌이 동작하도록 마커 무시 옵션을 켠다(WinForms 데모 표준 설정).
         IgnoreMarkerOnMouseWheel = true;
 
-        // ★ 디지털 줌(SE-1/NFR-4): 리사이즈 시 ScaleTransform 중심(ActualWidth/2)이 바뀌므로 재적용.
-        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0) ApplyDigitalZoomTransform(); RecomputeAnchorViewportBounds(); };   // [MapAnchor] 크기 변경 시 inset 라이브 재계산(FR-4)
+        // ★ 디지털 줌(SE-1/NFR-4)·틸트(map-tilt FR-01): 리사이즈(오버스캔 Height 변경 포함) 시 ScaleTransform 중심(ActualWidth/2, ActualHeight/2)이 바뀌므로 재적용.
+        this.SizeChanged += (_, __) => { if (DigitalZoomLevel > 0 || TiltDeg > 0) ApplyViewTransform(); RecomputeAnchorViewportBounds(); };   // [MapAnchor] 크기 변경 시 inset 라이브 재계산(FR-4)
+
+        // [map-tilt FR-03/13] Loaded/Unloaded 배선 — Tier 프로브 구독·초기 재평가·정착기 정리(GMapCustomControl.Tilt.cs)
+        InitializeTilt();
 
         base.OnInitialized(e);
 
@@ -484,7 +491,8 @@ public class GMapCustomControl : GMapControl
         // [R-41] 회전 중엔 격자 '표시'도 숨김 — 스냅 '계산' 게이트(GetSnappedPosition의
         // |MapRotation|>0.1 비활성)와 일치. 축정렬 격자만 그려지고 흡착은 안 되는
         // 표시/기능 불일치(사용자가 흡착된다고 오해) 제거.
-        if (IsSnapToGridEnabled && Math.Abs(MapRotation) <= 0.1)
+        // [map-tilt FR-09/G6] 틸트(φ>0.1) 중에도 동일 — 세로 축척이 cosφ 배라 정사각 격자가 성립하지 않는다(|θ|>0.1 ∨ φ>0.1 단일 식).
+        if (IsSnapToGridEnabled && Math.Abs(MapRotation) <= 0.1 && TiltDeg <= TILT_SNAP_GATE_EPSILON)
         {
             _snapGridOverlay.DrawGrid(drawingContext, this, PixelsPerDip);
         }
@@ -509,6 +517,9 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     private void GMapCustomControl_OnMapZoomChanged()
     {
+        // [map-tilt FR-03] 줌 수렴 지점 ① — 정수 타일줌 변경. 판정은 프레임당 1회 코얼레싱(중간 정수 상태로 wasActive 를 깨지 않는다).
+        ReevaluateTilt("zoom");
+
         // ★ NFR-3(b) 백스톱 — 드래그 중 프로그램적 줌 발생 시 즉시 드래그 종료 (점프 bounds 미커밋)
         if (_isImageDrag)
         {
@@ -641,6 +652,8 @@ public class GMapCustomControl : GMapControl
         _anchorAllowsRotation = allowRotation;
         _anchorSiteRect = site;
         RecomputeAnchorViewportBounds();
+        // [map-tilt G3/FR-03] 앵커 A모드(회전 잠금)는 틸트 차단(Locked/AnchorLock), B모드·해제는 허용 — 재평가(코얼레싱)
+        ReevaluateTilt("anchor");
     }
 
     /// <summary>_anchorSiteRect + 현재 뷰포트(디지털줌 보정)로 inset 사각형을 계산해 BoundsOfMap에 설정하고
@@ -734,13 +747,18 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 줌 레벨에 따른 마커 가시성 업데이트
     /// </summary>
-    private void UpdateMarkersVisibilityByZoom()
+    private double _lastVisibilityZoom = double.NaN;
+
+    /// <summary>실효줌(타일줌 + 0.5·dzl) 기준 전 마커 최소표시줌 게이트 재평가.
+    /// 메모(_lastVisibilityZoom)는 같은 실효줌에서의 반복 팬을 걸러내는 용도이며, <paramref name="force"/> 로 무효화한다.</summary>
+    private void UpdateMarkersVisibilityByZoom(bool force = false)
     {
         try
         {
             if (Markers == null) return;
-            //현재 Markers가 Add 될때마다 UpdateMarkersVisibilityByZoom로직이 수행되는 비효율성이 있다.
-            //*****버그****** 이 문제를 해결해야된다.
+            if (force) _lastVisibilityZoom = double.NaN;
+            if (_lastVisibilityZoom == EffectiveZoom) return;
+            _lastVisibilityZoom = EffectiveZoom;
             foreach (var marker in Markers.OfType<IEditableMarker>().ToList())
             {
                 if (SetMarkerVisibility(marker))
@@ -817,6 +835,7 @@ public class GMapCustomControl : GMapControl
             case NotifyCollectionChangedAction.Add:
                 foreach (var newItem in e.NewItems?.OfType<IEditableMarker>() ?? Enumerable.Empty<IEditableMarker>())
                 {
+                    RefreshMarkerVisibility(newItem);
                     RegisterMarkerForAdorner(newItem);
                     //_log?.Info($"마커 Adorner 등록: {newItem.Title}");
                 }
@@ -844,11 +863,14 @@ public class GMapCustomControl : GMapControl
                 // 새 마커들 Adorner 등록
                 foreach (var newMarker in newMarkers)
                 {
+                    RefreshMarkerVisibility(newMarker);
                     RegisterMarkerForAdorner(newMarker);
                 }
                 break;
 
             case NotifyCollectionChangedAction.Reset:
+                _lastVisibilityZoom = double.NaN;
+                UpdateMarkersVisibilityByZoom();
                 // Reset은 컬렉션이 완전히 비워지거나 대량 변경될 때 발생
                 // 모든 기존 Adorner 정리
                 AdornerManager?.DeselectAllMarkers(this);
@@ -966,6 +988,12 @@ public class GMapCustomControl : GMapControl
     /// 마우스 왼쪽 버튼 클릭
     /// </summary>
     // ─── Shift+드래그 러버밴드 영역 다중선택 (GMap_RubberBand_MultiSelect FR-MS-01/02) ───
+    // [드래그 드로잉 FR-01] 라인 드로잉 중 좌버튼 눌림 위치(캡처) — 데드존(8 DIU) 통과 시 스트로크, 미만이면 릴리스 때 클릭 폴백
+    private Point? _linePress;
+    private bool _lineDragging;
+    // [C13] 스트로크 취소(ESC/캡처 소실) 뒤 버튼이 눌린 채 움직여도 맵 팬이 시작되지 않도록 릴리스까지 base.OnMouseMove 를 막는 게이트.
+    //   벤더 OnMouseDown(클래스 핸들러)은 파생 base 미호출과 무관하게 항상 먼저 실행되어 _core.MouseDown(팬 Armed)을 세운다.
+    private readonly PanSuppressGate _panSuppress = new();
     private bool _isRubberBanding;
     private Point? _rubberStart;
     private Point? _rubberCurrent;
@@ -1017,6 +1045,8 @@ public class GMapCustomControl : GMapControl
         //_log?.Info("=== GMapCustomControl.OnMouseLeftButtonDown 시작 ===");
         //_log?.Info($"편집 모드: {IsEditMode}");
 
+        _panSuppress.OnButtonDown();   // [C13] 새 제스처 = 릴리스를 못 받은 잔여 팬 억제 해제
+
         var mousePos = e.GetPosition(this);
         var geoPos = FromLocalToLatLng((int)mousePos.X, (int)mousePos.Y);
 
@@ -1038,7 +1068,7 @@ public class GMapCustomControl : GMapControl
         // [심볼 배치] 추가 버튼으로 진입한 배치 모드 — 클릭 위치에 심볼 추가(타겟조준과 동급, base 전 가로채기).
         if (IsSymbolPlacementMode)
         {
-            SymbolPlacementClicked?.Invoke(geoPos, mousePos);
+            SymbolPlacementClicked?.Invoke(SymbolPlacementLocation(mousePos), mousePos);
             e.Handled = true;
             return;
         }
@@ -1076,7 +1106,12 @@ public class GMapCustomControl : GMapControl
 
         if (IsLineDrawing)
         {
-            OnMapClicked?.Invoke(geoPos, mousePos);
+            // [드래그 드로잉 FR-01] 눌림만 기록하고 캡처 — 점 확정은 릴리스 때(데드존 미만=클릭 폴백, 이상=프리핸드 스트로크).
+            //   주의(C13): base 미호출이어도 벤더 OnMouseDown 클래스 핸들러가 이미 팬을 Armed 했다 — 팬 방어는 OnMouseMove 의 조기 return 과
+            //   취소 후 _panSuppress 게이트가 담당한다.
+            _linePress = mousePos;
+            _lineDragging = false;
+            CaptureMouse();
             e.Handled = true;
             return;
         }
@@ -1172,6 +1207,23 @@ public class GMapCustomControl : GMapControl
         // [측정] 미리보기 커서 갱신(라이브 리드아웃) — base 계속(좌표 표시 유지, 팬은 미Armed).
         if (IsMeasuring) _measureController?.UpdateMouse(e.GetPosition(this));
 
+        // [드래그 드로잉 FR-01] 눌림 상태: 데드존 8 DIU(CameraPopupHubMath.IsDrag 단일 수식) 통과 시 스트로크 시작, 이후 샘플 추가. base 미호출 = 팬 방지.
+        if (_linePress.HasValue)
+        {
+            var cur = e.GetPosition(this);
+            if (!_lineDragging)
+            {
+                if (!CameraPopupHubMath.IsDrag(cur.X - _linePress.Value.X, cur.Y - _linePress.Value.Y)) return;   // 아직 클릭 후보
+                _lineDragging = true;
+                _lineDrawingService?.BeginStroke(_linePress.Value);
+            }
+            _lineDrawingService?.StrokeTo(cur);
+            return;
+        }
+
+        // [C13] 스트로크 취소 후 버튼이 눌린 채 이동 — 릴리스까지 base 차단(팬 시작 방지). 버튼이 이미 풀렸으면 게이트가 자가 해제.
+        if (_panSuppress.ShouldBlockMove(e.LeftButton == MouseButtonState.Pressed)) return;
+
         // [Rubber-band] 마퀴 갱신 (base 미호출 = 팬 방지, FR-MS-01)
         if (_isRubberBanding)
         {
@@ -1215,6 +1267,21 @@ public class GMapCustomControl : GMapControl
     /// </summary>
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        // [드래그 드로잉 FR-01] 릴리스 → 단일 FinishLineDrag(commit) — 스트로크 확정 또는 클릭 폴백
+        if (_linePress.HasValue)
+        {
+            FinishLineDrag(commit: true, e.GetPosition(this));
+            e.Handled = true;
+            return;
+        }
+
+        // [C13] 취소된 스트로크의 릴리스 — 억제 해제 + 릴리스 자체 소비(마커 클릭/팬 종료 처리 없음). 팬 Armed 는 벤더 OnMouseUp 이 이미 비웠다.
+        if (_panSuppress.OnButtonUp())
+        {
+            e.Handled = true;
+            return;
+        }
+
         // [Rubber-band] 릴리스 → 사각형 내 마커 산출·통지 (FR-MS-02)
         if (_isRubberBanding)
         {
@@ -1340,9 +1407,44 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 마우스 캡처 손실 시(창 비활성화/포커스 손실 등) 진행 중 드래그/회전 상태 정리 (NFR-4, S06/S13)
     /// </summary>
+    /// <summary>
+    /// 드래그 드로잉 종료 단일 경로(FR-01, drag-first 계약): ① 플래그 clear → ② 캡처 해제 → ③ 커밋 통지.
+    /// LostMouseCapture·ESC·릴리스 어느 쪽에서 와도 여기로 모이며, 플래그를 먼저 지워 재진입(ReleaseMouseCapture → OnLostMouseCapture)이 무해하다.
+    /// </summary>
+    private void FinishLineDrag(bool commit, Point? releaseAt = null)
+    {
+        // drag-first 종료 계약: ①플래그 clear → ②시각 복원 → ④캡처 해제 → ⑤커밋 통지 (캡처를 먼저 풀면 재진입 OnLostMouseCapture 가 발화)
+        var press = _linePress; bool dragged = _lineDragging;
+        _linePress = null; _lineDragging = false;
+        if (dragged) _lineDrawingService?.DiscardStrokePreview();
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        if (!press.HasValue) return;
+        if (!commit)
+        {
+            // [C13] 취소(ESC/캡처 소실) — 버튼이 아직 눌려 있으면 릴리스까지 팬 억제(벤더 팬 Armed 는 릴리스 때만 풀린다)
+            _panSuppress.OnStrokeCancelled(Mouse.LeftButton == MouseButtonState.Pressed);
+        }
+        if (dragged)
+        {
+            int added = _lineDrawingService?.FinishStroke(commit) ?? 0;
+            _log?.Info($"[LineDrag] 종료 commit={commit} 정점 +{added}");
+        }
+        else if (commit)
+        {
+            // 데드존 미만 → 종전 클릭 동작(점 1개 추가). 투영은 스트로크(FinishStroke)와 같은 Math.Round — (int) 절삭과 1px 어긋남 방지.
+            var pos = releaseAt ?? press.Value;
+            OnMapClicked?.Invoke(FromLocalToLatLng((int)Math.Round(pos.X), (int)Math.Round(pos.Y)), pos);
+        }
+    }
+
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         base.OnLostMouseCapture(e);
+        if (_linePress.HasValue)
+        {
+            FinishLineDrag(commit: false);   // 캡처 소실 = 취소(스트로크 폐기, 기존 정점 유지)
+            _log?.Info("OnLostMouseCapture — 드래그 드로잉 스트로크 취소");
+        }
         if (_isDragging || _isImageDrag || _draggedImage != null)
         {
             ResetDragState();
@@ -1418,14 +1520,15 @@ public class GMapCustomControl : GMapControl
                 bool shapeMapRotates = shape is GMapSymbols.IMapRotationAwareShape aware && aware.AppliesMapRotation;
                 double hitMapBearing = Utils.RotationMath.NormalizeDeg(Bearing);
                 double displayAngle = Utils.RotationMath.DisplayAngle(marker.Bearing, hitMapBearing, shapeMapRotates);
+                // [map-tilt-25d FR-12 파리티] 3D(RotatesIn2D=false)·빌보드(IsBillboard) 는 루트 표시각 0 → 역회전 없이 축정렬 AABB.
+                //   정정: 종전엔 IpCamera 2D 의 렌더 pivot 이 FOV apex(0.5, 0.218)인데 히트는 Position(중심) 기준 역회전이라
+                //   회전 시 클릭 영역이 렌더와 어긋나던 잠복 결함이 있었다 — 빌보드(각 0)로 소멸. 잔여 회전 타입(Geometric/Image)은 pivot=중심이라 정합.
+                if (shape is GMapSymbols.IMapRotationAwareShape { RotatesIn2D: false } or GMapSymbols.IMapRotationAwareShape { IsBillboard: true }) displayAngle = 0;
                 if (Math.Abs(displayAngle) > 0.01)
                 {
-                    var rad = -displayAngle * Math.PI / 180.0;
-                    var ox = screenPosition.X - markerScreenPoint.X;
-                    var oy = screenPosition.Y - markerScreenPoint.Y;
-                    testPos = new Point(
-                        markerScreenPoint.X + ox * Math.Cos(rad) - oy * Math.Sin(rad),
-                        markerScreenPoint.Y + ox * Math.Sin(rad) + oy * Math.Cos(rad));
+                    var hit = Symbols3D.HousingMath.InverseRotate(screenPosition.X, screenPosition.Y,
+                        markerScreenPoint.X, markerScreenPoint.Y, displayAngle);
+                    testPos = new Point(hit.x, hit.y);
                 }
                 var dx = Math.Abs(testPos.X - markerScreenPoint.X);
                 var dy = Math.Abs(testPos.Y - markerScreenPoint.Y);
@@ -1691,11 +1794,76 @@ public class GMapCustomControl : GMapControl
     
     #region Keyboard Input Handling
 
+    /// <summary>드로잉 좌버튼 눌림(캡처) 중 — 데드존 통과 전 클릭 후보 포함. 라우터의 isStrokePressed 입력.</summary>
+    public bool IsLineStrokePressed => _linePress.HasValue;
+
+    /// <summary>
+    /// [C8/C9/C10] 드로잉 키 실행 단일 진입점 — <see cref="Helpers.DrawingKeyRouter"/> 판정을 실제 동작으로 옮긴다.
+    /// 윈도우/맵 PreviewKeyDown 터널(MapViewModel, 포커스 무관·1차)과 <see cref="OnKeyDown"/>(클래스 핸들러·2차)이 모두 이 메서드를 부른다.
+    /// 반환 true = 소비(호출자가 e.Handled=true). 드로잉도 눌림도 없으면 항상 false(기존 단축키 동작 무변경).
+    /// 비동기 취소/완료는 서비스 본문이 동기 완료(Task.FromResult)라 fire-and-forget 으로 두고 fault 만 로그한다.
+    /// </summary>
+    public bool TryHandleDrawingKey(Key key, ModifierKeys modifiers)
+    {
+        bool pressed = _linePress.HasValue;
+        bool drawing = IsLineDrawing;
+        if (!drawing && !pressed) return false;
+
+        var action = Helpers.DrawingKeyRouter.Route(key, modifiers, drawing, pressed);
+        switch (action)
+        {
+            case Helpers.DrawingKeyAction.CancelStroke:
+                // 스트로크만 취소(원위치, 기존 정점 유지) — 드로잉 자체 취소는 다음 ESC(CancelDrawing).
+                FinishLineDrag(commit: false);
+                _log?.Info("[DrawingKey] ESC — 스트로크 취소");
+                return true;
+
+            case Helpers.DrawingKeyAction.CancelDrawing:
+                if (pressed) FinishLineDrag(commit: false);   // 방어 — 눌림 잔존 시 캡처부터 정리
+                _log?.Info("[DrawingKey] ESC — 드로잉 취소");
+                ObserveDrawingKeyTask(CancelLineDrawingAsync(), "취소");
+                return true;
+
+            case Helpers.DrawingKeyAction.CompleteDrawing:
+                _log?.Info("[DrawingKey] Enter — 드로잉 완료 요청");
+                ObserveDrawingKeyTask(CompleteLineDrawingAsync(), "완료");   // 정점 부족 등 유효성은 서비스가 판정(경고 로그)
+                return true;
+
+            case Helpers.DrawingKeyAction.UndoLastPoint:
+                _lineDrawingService?.UndoLastPoint();
+                return true;
+
+            case Helpers.DrawingKeyAction.Ignore:
+                return true;   // 소비만 — 전역 Undo/Redo·선택 삭제·격자 이동·회전으로 새지 않게
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>드로잉 키 fire-and-forget Task 의 fault 관찰(UnobservedTaskException 방지).</summary>
+    private void ObserveDrawingKeyTask(Task task, string what)
+    {
+        if (task == null) return;
+        task.ContinueWith(t => _log?.Error($"[DrawingKey] 드로잉 {what} 실패: {t.Exception?.GetBaseException().Message}"),
+            TaskContinuationOptions.OnlyOnFaulted);
+    }
+
     /// <summary>
     /// 키보드 입력 처리 (회전 등)
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // [C8/C9/C10] 드로잉 키 2차 가드 — 1차는 윈도우/맵 PreviewKeyDown 터널(MapViewModel → TryHandleDrawingKey).
+        // 포커스가 맵 서브트리에 있고 터널이 미소비한 경우만 여기 도달한다. 판정은 DrawingKeyRouter 단일 정본:
+        // ESC = 스트로크 취소(눌림 중) / 드로잉 취소, Enter = 완료, Backspace·Ctrl+Z = 마지막 점 제거, Delete·방향키·Redo = 무시.
+        // 편집모드 ESC 분기(아래)보다 반드시 앞 — 클래스 핸들러가 ESC 를 먼저 소비해 LineDrawingService 인스턴스 구독이 영원히 도달 못 하던 결함(C8).
+        if (TryHandleDrawingKey(e.Key, Keyboard.Modifiers))
+        {
+            e.Handled = true;
+            return;
+        }
+
         base.OnKeyDown(e);
 
         // 편집 모드에서 ESC 키로 모든 편집 취소
@@ -1727,10 +1895,29 @@ public class GMapCustomControl : GMapControl
             return;
         }
 
+        // [map-tilt FR-08 ③] Ctrl+Shift+↑/↓ = 미세 틸트(1°). kill-switch OFF 면 소비하지 않는다(NFR-03: OFF 에서 기존 키 동작 무변화).
+        // 드로잉 중 방향키는 위 TryHandleDrawingKey(DrawingKeyRouter Up/Down=Ignore)가 먼저 소비하므로 여기 도달하지 않는다.
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+            && (e.Key == Key.Up || e.Key == Key.Down) && IsTiltFeatureEnabled)
+        {
+            StepTiltAngle(e.Key == Key.Up ? TILT_STEP_FINE : -TILT_STEP_FINE);
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             switch (e.Key)
             {
+                // [map-tilt FR-08 ③] Ctrl+↑/↓ = 틸트 ±5°(OFF 면 미소비 — 다른 핸들러로 통과).
+                case Key.Up:
+                case Key.Down:
+                    if (IsTiltFeatureEnabled)
+                    {
+                        StepTiltAngle(e.Key == Key.Up ? TILT_STEP_COARSE : -TILT_STEP_COARSE);
+                        e.Handled = true;
+                    }
+                    break;
                 // [Rotation FR-18 재개방] Ctrl+←/→ 회전 — kill-switch(기본 OFF) 게이트.
                 // OFF: 종전 af0f29d 그대로 소비만(동작 변화 0). ON: RotateMap(∓5°) → SSOT 경유.
                 case Key.Left:
@@ -1787,7 +1974,14 @@ public class GMapCustomControl : GMapControl
     private static void OnDigitalZoomLevelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var c = (GMapCustomControl)d;
-        c.ApplyDigitalZoomTransform();
+        c._log?.Info($"[DigitalZoom] level={(int)e.NewValue}, scale={c.DigitalZoomScale:F2}x");
+        c.ApplyViewTransform();                       // [map-tilt FR-01] 단일 빌더(s, s·cosφ) — 종전 ApplyDigitalZoomTransform 대체
+        c.ReevaluateTilt("dzl");                      // [map-tilt FR-03] 줌 수렴 지점 ② — 실효줌 변경(코얼레싱)
+        // ★ D-21(2026-09-07, 사용자 보고 "시설물이 줌 줄였다 올리면 사라진다"): dzl 변경도 실효줌 변경이다.
+        //   종전엔 정수 타일줌 변경(OnAreaChange)에서만 최소표시줌 게이트가 재평가되어, 18.0(숨김 판정) → 18.5(dzl 만 변경)
+        //   복귀 시 Zoom=18.5 로 생성된 심볼이 숨긴 채 남았다. ReapplyLayerVisibilityForZoom(FR-19)은 심볼 리프(Model=null)에
+        //   무동작이라 보호막이 없었다. 여기서 강제 재평가해 하프스텝 경로의 구멍을 봉합한다.
+        c.UpdateMarkersVisibilityByZoom(force: true);
         // [MapAnchor] 디지털 줌 변경 시 보이는 영역이 달라지므로 inset 라이브 재계산(FR-4/5).
         c.RecomputeAnchorViewportBounds();
         c.DigitalZoomLevelChanged?.Invoke((int)e.NewValue);
@@ -1845,7 +2039,9 @@ public class GMapCustomControl : GMapControl
             DigitalZoomLevel = dzl;
         }
         finally { IsApplyingEffectiveZoom = false; }
+        UpdateMarkersVisibilityByZoom(force: true);   // D-21: 타일줌 콜백은 옛 dzl 이 섞인 실효줌으로 평가·메모했을 수 있다 — 최종값으로 확정
         _log?.Info($"[EffectiveZoom] set={snapped.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} → (tile={tile}, dzl={dzl})");
+        ReevaluateTilt("effectiveZoom");              // [map-tilt FR-03] 줌 수렴 지점 ③ — Zoom→dzl 두 콜백은 이미 코얼레싱됐고, 여기서 최종값을 한 번 더 예약
     }
 
     /// <summary>
@@ -1873,45 +2069,8 @@ public class GMapCustomControl : GMapControl
         }
     }
 
-    /// <summary>디지털 배율을 컨트롤 RenderTransform(화면 중심 기준 ScaleTransform)으로 적용.</summary>
-    private void ApplyDigitalZoomTransform()
-    {
-        if (ActualWidth <= 0 || ActualHeight <= 0) return;   // SE-1: 초기화/리사이즈 중 중심 어긋남 방어 (NFR-4)
-        double scale = DigitalZoomScale;
-        if (Math.Abs(scale - 1.0) < 0.001)
-            RenderTransform = null;                          // 아이덴티티 복원
-        else
-            RenderTransform = new ScaleTransform(scale, scale, ActualWidth / 2.0, ActualHeight / 2.0);
-        _log?.Info($"[DigitalZoom] level={DigitalZoomLevel}, scale={scale:F1}x");
-        InvalidateVisual();
-    }
-
-    /// <summary>
-    /// inner(논리/타일) 좌표 → outer(화면) 좌표. 디지털 줌 ScaleTransform(중심 cx,cy 기준)의 정방향 변환.
-    /// ★ 카메라 팝업 경로(PropertyPanelCanvas — RenderTransform '밖' 형제 캔버스) 전용.
-    ///   마커/격자/스냅(컨트롤 '안' — WPF가 e.GetPosition(this)에 RenderTransform.Inverse를 자동 적용)에는
-    ///   절대 적용 금지: 이중보정 버그(불변식, 본 region 상단 주석 참조). scale=1(디지털줌 OFF)이면 항등.
-    ///   ※ 이 수식을 바꾸면 tests/GMaps.Ui.Tests/DigitalZoomCoordinateTests.cs의 복제 수식도 동기화할 것(L-1).
-    /// </summary>
-    public Point InnerToOuter(Point p)
-    {
-        double s = DigitalZoomScale;
-        if (ActualWidth <= 0 || ActualHeight <= 0 || Math.Abs(s - 1.0) < 0.001) return p;
-        double cx = ActualWidth / 2.0, cy = ActualHeight / 2.0;
-        return new Point(cx + (p.X - cx) * s, cy + (p.Y - cy) * s);
-    }
-
-    /// <summary>
-    /// outer(화면) 좌표 → inner(논리/타일) 좌표. <see cref="InnerToOuter"/>의 역함수(드래그 저장 시 FromLocalToLatLng 입력용).
-    /// ★ 팝업 경로 전용(위 가드 동일). scale=1이면 항등.
-    /// </summary>
-    public Point OuterToInner(Point p)
-    {
-        double s = DigitalZoomScale;
-        if (ActualWidth <= 0 || ActualHeight <= 0 || Math.Abs(s - 1.0) < 0.001) return p;
-        double cx = ActualWidth / 2.0, cy = ActualHeight / 2.0;
-        return new Point(cx + (p.X - cx) / s, cy + (p.Y - cy) / s);
-    }
+    // [map-tilt FR-01/FR-05] ApplyDigitalZoomTransform → ApplyViewTransform(s, s·cosφ) 단일 빌더, InnerToOuter/OuterToInner(틸트·Δ 확장)는
+    //   GMapCustomControl.Tilt.cs 로 이관(수식 SSOT = Helpers/TiltOverscanMath). 불변식(RenderTransform 만 변경·수동 히트 보정 금지)은 그대로.
 
     #endregion
 
@@ -1921,7 +2080,9 @@ public class GMapCustomControl : GMapControl
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         // ★ NFR-3(a) — 이미지 드래그/회전 중에는 줌 차단 (좌표계 변동으로 인한 점프 방지)
-        if (_isImageDrag)
+        // [C11] 스트로크 눌림(캡처) 중에도 차단 — 정수 타일줌이 바뀌면 릴리스 시 이전 샘플이 '새 뷰' 기준으로 투영되고(FromLocalToLatLng 는 현재
+        //   Zoom/RenderOffset 사용), MousePositionAndCenter 의 SetCursorPos 텔레포트가 가짜 샘플까지 남긴다. 회전(Shift+휠) 분기보다 앞에 둔다.
+        if (LineDrawingInputGates.ShouldBlockWheel(_linePress.HasValue, _isImageDrag))
         {
             e.Handled = true;
             return;
@@ -2520,16 +2681,20 @@ public class GMapCustomControl : GMapControl
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
                 new Typeface("Arial"), 14, Brushes.Black, PixelsPerDip);
 
+            // [map-tilt FR-04] 화면 정렬 항목은 inner 좌표의 실제 가시 사각형 기준 — 디지털줌/틸트/오버스캔 시 (0,0)·ActualWidth 가
+            //   화면 모서리가 아니다(중심 기준 s·cosφ 배 + 상단 Δ 여분). 비틸트·비줌이면 (0,0,W,H) 그대로.
+            var visible = GetVisibleInnerRect();
+
             // 배경 사각형
-            var textRect = new Rect(10, 10, rotationText.Width + 10, rotationText.Height + 6);
+            var textRect = new Rect(visible.Left + 10, visible.Top + 10, rotationText.Width + 10, rotationText.Height + 6);
             drawingContext.DrawRectangle(
                 new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
                 new Pen(Brushes.Gray, 1), textRect);
 
-            drawingContext.DrawText(rotationText, new Point(15, 13));
+            drawingContext.DrawText(rotationText, new Point(visible.Left + 15, visible.Top + 13));
 
             // 나침반 표시
-            DrawCompass(drawingContext, new Point(ActualWidth - 80, 80));
+            DrawCompass(drawingContext, new Point(visible.Right - 80, visible.Top + 80));
         }
         catch (Exception ex)
         {
@@ -2908,7 +3073,9 @@ public class GMapCustomControl : GMapControl
 
     private MapViewportSnapshot BuildViewportSnapshot() => new(
         Position, Utils.RotationMath.NormalizeDeg(Bearing), Zoom,
-        ActualWidth, ActualHeight, DigitalZoomScale, ViewportPublisher.CurrentRevision);
+        ActualWidth, ActualHeight, DigitalZoomScale, GetTiltCosForSnapshot(), ViewportPublisher.CurrentRevision);
+
+    // GetTiltCosForSnapshot(): cos(TiltDeg) — GMapCustomControl.Tilt.cs(FR-06). φ=0 이면 DefaultTiltCos(1.0)와 동일.
 
     /// <summary>snapshot 발행 예약 — WPF 프레임당 최종 1회 coalescing(FR-16: 연속 회전 입력이
     /// 프레임 내 여러 번 와도 발행은 마지막 상태로 1회). revision은 매 변경마다 증가.</summary>
@@ -3280,11 +3447,11 @@ public class GMapCustomControl : GMapControl
     /// <summary>
     /// 오버레이 이미지(AABB)의 '중심'을 화면 픽셀 격자에 스냅한다. (RC-4 / FR-11)
     /// 마커 스냅과 동일한 ComputeOrigin/Snap 사용 → 보이는 격자선/교점에 흡착.
-    /// 스냅 비활성이거나 맵 회전(MapRotation≠0) 시 원본 그대로 반환(FR-12).
+    /// 스냅 비활성이거나 맵 회전(MapRotation≠0)·틸트(φ&gt;0.1, map-tilt FR-09) 시 원본 그대로 반환(FR-12).
     /// </summary>
     private RectLatLng SnapBoundsCenter(RectLatLng bounds)
     {
-        if (!IsSnapToGridEnabled || Math.Abs(MapRotation) > 0.1)
+        if (!IsSnapToGridEnabled || Math.Abs(MapRotation) > 0.1 || TiltDeg > TILT_SNAP_GATE_EPSILON)
             return bounds;
 
         // AABB 중심 (Lat=상단/최대, Lng=좌측/최소 → 중심은 -H/2, +W/2)

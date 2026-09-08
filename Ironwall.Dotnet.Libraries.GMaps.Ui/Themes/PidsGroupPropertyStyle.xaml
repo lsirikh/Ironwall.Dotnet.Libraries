@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:enums="clr-namespace:Ironwall.Dotnet.Libraries.Enums;assembly=Ironwall.Dotnet.Libraries.Enums"
@@ -12,17 +12,20 @@
 
 	<utils:EnumToDescriptionConverter x:Key="EnumToDescriptionConverter" />
 	<utils:EnumToCollectionConverter x:Key="EnumToCollectionConverter" />
+	<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
 	<Style BasedOn="{StaticResource BasePropertyStyle}" TargetType="{x:Type properties:GMapPropertyPidsGroupControl}">
 
 		<Setter Property="HasSpecificProperties" Value="True" />
 		<Setter Property="SpecificPropertiesTitle" Value="PIDS 그룹 속성" />
 
+
+		<!--  요약(기둥 N개 · 실간격 / 센서 N개 · 잔여)은 특화 절 첫 줄에  -->
+
 		<!--  PidsGroup 특화 UI  -->
 		<Setter Property="SpecificContent">
 			<Setter.Value>
 				<StackPanel>
-
 					<!--  기본 정보 섹션 (Line 속성)  -->
 					<Border
 						Margin="0,0,0,10"
@@ -178,6 +181,184 @@
 						</StackPanel>
 					</Border>
 
+
+
+					<!--  3D 철망(마커 속성 맨 밑 — 사용자 지시 2026-09-08 "단계별 순서": 형태 · 3D 표시 · 간격(프리셋) · 높이 · 요약)  -->
+					<Border
+						Margin="0,0,0,10"
+						Padding="8,6"
+						Background="{DynamicResource SurfaceAltBrush}"
+						BorderBrush="{DynamicResource PrimaryBrush}"
+						BorderThickness="1"
+						CornerRadius="6"
+						AutomationProperties.AutomationId="GMaps.Property.FenceSection">
+						<Border.Style>
+							<Style TargetType="Border">
+								<Setter Property="Visibility" Value="Collapsed" />
+								<Style.Triggers>
+									<DataTrigger Binding="{Binding Is3DFeatureEnabled}" Value="True">
+										<Setter Property="Visibility" Value="Visible" />
+									</DataTrigger>
+									<DataTrigger Binding="{Binding IsGroupEditing}" Value="True">
+										<Setter Property="Visibility" Value="Collapsed" />
+									</DataTrigger>
+								</Style.Triggers>
+							</Style>
+						</Border.Style>
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto" />
+								<RowDefinition Height="Auto" />
+								<RowDefinition Height="Auto" />
+								<RowDefinition Height="Auto" />
+								<RowDefinition Height="Auto" />
+							</Grid.RowDefinitions>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="44" />
+								<ColumnDefinition Width="*" />
+								<ColumnDefinition Width="Auto" />
+							</Grid.ColumnDefinitions>
+
+							<!--  헤더: 제목 · 형태 콤보 · 3D 표시  -->
+							<TextBlock
+								Grid.Row="0"
+								Grid.Column="0"
+								VerticalAlignment="Center"
+								FontSize="12"
+								FontWeight="Bold"
+								Foreground="{DynamicResource PrimaryBrush}"
+								Text="3D 철망" />
+							<ComboBox
+								Grid.Row="0"
+								Grid.Column="1"
+								Margin="4,0,4,0"
+								ItemsSource="{Binding Source={x:Type enums:EnumFenceMode}, Converter={StaticResource EnumToCollectionConverter}}"
+								SelectedItem="{Binding FenceMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								Style="{StaticResource CompactComboBox}"
+								ToolTip="기둥 간격: 균등 분배 / 센서 장착: 정확 간격 + 감지 노드"
+								AutomationProperties.AutomationId="GMaps.Property.FenceMode">
+								<ComboBox.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding Converter={StaticResource EnumToDescriptionConverter}}" />
+									</DataTemplate>
+								</ComboBox.ItemTemplate>
+							</ComboBox>
+							<CheckBox
+								Grid.Row="0"
+								Grid.Column="2"
+								VerticalAlignment="Center"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Content="3D"
+								IsChecked="{Binding Render3D, Mode=TwoWay}"
+								ToolTip="이 그룹을 3D 철망으로 표시"
+								AutomationProperties.AutomationId="GMaps.Property.Render3D" />
+
+							<!--  간격 (D1 슬라이더 · 0.5 m 스냅 · 150 ms 지연 커밋)  -->
+							<TextBlock
+								Grid.Row="1"
+								Grid.Column="0"
+								Margin="0,6,0,0"
+								VerticalAlignment="Center"
+								FontSize="11"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="간격" />
+							<Slider
+								Grid.Row="1"
+								Grid.Column="1"
+								Margin="4,6,4,0"
+								VerticalAlignment="Center"
+								Minimum="1"
+								Maximum="10"
+								TickFrequency="0.5"
+								IsSnapToTickEnabled="True"
+								Value="{Binding PostSpacingM, Mode=TwoWay}"
+								ToolTip="기둥(또는 센서) 간격 1~10 m, 0.5 m 단위 — 멈추면 150 ms 뒤 저장"
+								AutomationProperties.AutomationId="GMaps.Property.PostSpacing" />
+							<StackPanel
+								Grid.Row="1"
+								Grid.Column="2"
+								Margin="0,6,0,0"
+								VerticalAlignment="Center"
+								Orientation="Horizontal">
+								<TextBlock
+									MinWidth="34"
+									VerticalAlignment="Center"
+									FontSize="11"
+									FontWeight="Bold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding PostSpacingM, StringFormat='{}{0:0.0} m'}" />
+								<TextBlock
+									Margin="2,0,0,0"
+									VerticalAlignment="Center"
+									FontSize="9"
+									Foreground="{DynamicResource TextMutedBrush}"
+									Text="기본"
+									Visibility="{Binding IsPostSpacingInherited, Converter={StaticResource BooleanToVisibilityConverter}}" />
+							</StackPanel>
+
+							<!--  프리셋 2/3/5 · 기본  -->
+							<StackPanel
+								Grid.Row="2"
+								Grid.Column="1"
+								Grid.ColumnSpan="2"
+								Margin="4,3,0,0"
+								Orientation="Horizontal">
+								<Button Height="22" MinHeight="22" MinWidth="0" Content="2 m" Padding="6,0" Margin="0,0,4,0" FontSize="10" Command="{Binding SetPostSpacingPresetCommand}" CommandParameter="2" AutomationProperties.AutomationId="GMaps.Property.PostSpacingPreset2" />
+								<Button Height="22" MinHeight="22" MinWidth="0" Content="3 m" Padding="6,0" Margin="0,0,4,0" FontSize="10" Command="{Binding SetPostSpacingPresetCommand}" CommandParameter="3" AutomationProperties.AutomationId="GMaps.Property.PostSpacingPreset3" />
+								<Button Height="22" MinHeight="22" MinWidth="0" Content="5 m" Padding="6,0" Margin="0,0,4,0" FontSize="10" Command="{Binding SetPostSpacingPresetCommand}" CommandParameter="5" AutomationProperties.AutomationId="GMaps.Property.PostSpacingPreset5" />
+								<Button Height="22" MinHeight="22" MinWidth="0" Content="기본" Padding="6,0" FontSize="10" Command="{Binding ResetPostSpacingCommand}" ToolTip="{Binding FencePostSpacingDefault, StringFormat='전역 설정으로 되돌리기 ({0:0.0} m)'}" AutomationProperties.AutomationId="GMaps.Property.PostSpacingReset" />
+							</StackPanel>
+
+							<!--  높이  -->
+							<TextBlock
+								Grid.Row="3"
+								Grid.Column="0"
+								Margin="0,6,0,0"
+								VerticalAlignment="Center"
+								FontSize="11"
+								Foreground="{DynamicResource TextPrimaryBrush}"
+								Text="높이" />
+							<Slider
+								Grid.Row="3"
+								Grid.Column="1"
+								Margin="4,6,4,0"
+								VerticalAlignment="Center"
+								Minimum="1.5"
+								Maximum="4"
+								TickFrequency="0.1"
+								IsSnapToTickEnabled="True"
+								Value="{Binding FenceHeightM, Mode=TwoWay}"
+								ToolTip="철망 높이 1.5~4 m"
+								AutomationProperties.AutomationId="GMaps.Property.FenceHeight" />
+							<StackPanel
+								Grid.Row="3"
+								Grid.Column="2"
+								Margin="0,6,0,0"
+								VerticalAlignment="Center"
+								Orientation="Horizontal">
+								<TextBlock
+									MinWidth="34"
+									VerticalAlignment="Center"
+									FontSize="11"
+									FontWeight="Bold"
+									Foreground="{DynamicResource TextPrimaryBrush}"
+									Text="{Binding FenceHeightM, StringFormat='{}{0:0.0} m'}" />
+								<Button Height="22" MinHeight="22" MinWidth="0" Content="기본" Padding="6,0" Margin="4,0,0,0" FontSize="10" Command="{Binding ResetFenceHeightCommand}" AutomationProperties.AutomationId="GMaps.Property.FenceHeightReset" />
+							</StackPanel>
+
+							<!--  요약(기둥/센서 수 · 실간격 · 잔여)  -->
+							<TextBlock
+								Grid.Row="4"
+								Grid.Column="0"
+								Grid.ColumnSpan="3"
+								Margin="0,6,0,0"
+								FontSize="10"
+								Foreground="{DynamicResource TextSecondaryBrush}"
+								Text="{Binding FenceLayoutSummary}"
+								TextWrapping="Wrap"
+								AutomationProperties.AutomationId="GMaps.Property.FenceSummary" />
+						</Grid>
+					</Border>
 				</StackPanel>
 			</Setter.Value>
 		</Setter>

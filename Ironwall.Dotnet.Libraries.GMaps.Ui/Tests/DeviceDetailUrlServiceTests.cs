@@ -129,6 +129,7 @@ public class DeviceDetailUrlServiceTests
     [InlineData(EnumDeviceType.SmartCompound)]
     [InlineData(EnumDeviceType.Radar)]
     [InlineData(EnumDeviceType.OpticalCable)]
+    [InlineData(EnumDeviceType.Gate)]   // 통문(D2) — 서버 gate 페이지 전까지 센서 페이지
     public void BuildUrl_AllSensorTypes_MapToSensorPage(EnumDeviceType sensorType)
     {
         var svc = new DeviceDetailUrlService(CreateSetup());

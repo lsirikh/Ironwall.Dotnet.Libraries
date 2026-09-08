@@ -31,6 +31,14 @@ public interface IMapRotationAwareShape
     /// <summary>이 Shape가 지형과 함께 도는가(point 심볼=true). 정점 재투영 계열(Line/PidsGroup)=false —
     /// 재투영이 이미 회전을 반영하므로 RenderTransform −θ까지 걸면 2배 회전(R-36).</summary>
     bool AppliesMapRotation { get; }
+    /// <summary>2D 평면 회전(RenderTransform)으로 표시각을 표현하는가. 3D 하우징(yaw 로 표현)=false.
+    /// ⚠ 속성창이 이 값을 "3D 행(색상 강도·설치 높이·모델 변형) 노출" 트리거로 쓴다 — 빌보드 판정에 재사용 금지(FR-10).</summary>
+    bool RotatesIn2D => true;
+    /// <summary>[map-tilt-25d FR-10 결정③] 아이콘 빌보드 — 맵 회전(θ)과 무관하게 화면에 정립(루트 표시각 0).
+    /// true 인 타입은 <c>Marker.Bearing</c> 을 시각 채널로 쓰지 않으며(FOV/3D yaw 입력으로만 유지),
+    /// 히트테스트(<c>GetMarkerAtScreen</c>)·편집 어도너 회전 핸들·속성창 회전 행이 이 플래그로 분기한다.
+    /// 대상(G9): PIDS 2D · Infra 2D · 군대부호 · Custom. 제외: Geometric · 이미지 · 라인/그룹 · 추적 · 3D.</summary>
+    bool IsBillboard => false;
     /// <summary>canonical [-180,180) 맵 bearing 수신 → 표시각 재계산.</summary>
     void OnMapBearingChanged(double mapBearing);
 }
@@ -53,6 +61,15 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
     #endregion
 
     #region Dependency Properties
+
+    public static readonly DependencyProperty IsPreviewModeProperty = DependencyProperty.Register(
+        nameof(IsPreviewMode), typeof(bool), typeof(GMapMarkerBaseControl<T>),
+        new PropertyMetadata(false, (d, e) => ((GMapMarkerBaseControl<T>)d).IsHitTestVisible = !(bool)e.NewValue));
+    public bool IsPreviewMode
+    {
+        get => (bool)GetValue(IsPreviewModeProperty);
+        set => SetValue(IsPreviewModeProperty, value);
+    }
 
     /// <summary>
     /// 연결된 마커 객체 (강타입)
@@ -369,8 +386,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
             // 공통 바인딩 (GMapCustomMarker 기본 속성)
             SetupPropertyBinding(MarkerTitleProperty, nameof(Marker.Title));
             SetupPropertyBinding(TitleSizeProperty, nameof(Marker.TitleSize));
-            SetupPropertyBinding(WidthProperty, nameof(Marker.Width));
-            SetupPropertyBinding(HeightProperty, nameof(Marker.Height));
+            SetupPropertyBinding(WidthProperty, nameof(Marker.Width), WritesBackRenderSize ? BindingMode.TwoWay : BindingMode.OneWay);
+            SetupPropertyBinding(HeightProperty, nameof(Marker.Height), WritesBackRenderSize ? BindingMode.TwoWay : BindingMode.OneWay);
             SetupPropertyBinding(IsSelectedProperty, nameof(Marker.IsSelected));
             SetupPropertyBinding(MarkerStateProperty, nameof(Marker.OperationState), BindingMode.OneWay);
             SetupPropertyBinding(RotationAngleProperty, nameof(Marker.Bearing));
@@ -491,6 +508,10 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        // ⚠ 삭제 금지 — 3D 컨트롤(RotatesIn2D=false)은 템플릿 적용 직후 ApplyDisplayAngle 을 재적용해야 첫 페인트에 yaw 가 잡힌다.
+        //   Bearing==0 이면 DP 콜백이 발화하지 않고 Loaded 는 더 늦다. 2D 에서는 같은 값 재대입이라 무해(R-10).
+        //   회귀 테스트: HousingTests.should_preserve_stored_size_and_keep_hit_box_upright
+        UpdateDisplayRotation();
 
         if (ShowTitle)
         {
@@ -546,7 +567,7 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
 
         // Collapsed 시 ActualWidth/Height=0이 되어 Marker.Width=0 → Offset=(0,0)으로 캔버스 위치가 틀어지는 버그 방지.
         // 실제 크기가 있을 때만 마커 모델에 동기화.
-        if (Marker != null && ActualWidth > 0)
+        if (WritesBackRenderSize && Marker != null && ActualWidth > 0 && ActualHeight > 0)
         {
             Marker.Width = ActualWidth;
             Marker.Height = ActualHeight;
@@ -786,6 +807,20 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
     /// <summary>이 Shape가 지형과 함께 도는가 — point 심볼 기본 true.
     /// 정점 재투영 계열(Line/PidsGroup)은 override false(R-36 이중회전 방지).</summary>
     public virtual bool AppliesMapRotation => true;
+    /// <summary>2D 평면 회전 여부 — 3D 하우징만 false. 속성창 3D 행 트리거이므로 빌보드에 재사용하지 않는다(REFAC-I1).</summary>
+    public virtual bool RotatesIn2D => true;
+    /// <summary>아이콘 빌보드(FR-10) — 기본 false. 대상 타입은 override true + <see cref="ApplyDisplayAngle"/> 재정의
+    /// (<c>base.ApplyDisplayAngle(0)</c>)로 루트 각을 0 으로 고정하되 <see cref="CurrentDisplayAngle"/>(=b−θ)은 그대로 파생해
+    /// FOV(<c>GetFovBearing</c>)·3D yaw 입력으로 쓴다. R-40 TransformGroup 구조는 그대로(Angle 값만 0).</summary>
+    public virtual bool IsBillboard => false;
+    protected virtual bool WritesBackRenderSize => true;
+    /// <summary>파생 표시각 b−θ(canonical). 빌보드 타입은 루트에 적용하지 않지만 값은 유지된다(FR-10/11).</summary>
+    protected double CurrentDisplayAngle { get; private set; }
+
+    protected virtual void ApplyDisplayAngle(double angle)
+    {
+        _displayRotate!.Angle = angle;
+    }
 
     /// <summary>회전 pivot(RenderTransformOrigin) — 기본 중심(0.5,0.5). 비대칭 앵커 심볼
     /// (예: PIDS 카메라 FOV apex)은 override로 지리 앵커점에 고정(F-06/R-22 apex 드리프트 방지).</summary>
@@ -815,7 +850,8 @@ public abstract class GMapMarkerBaseControl<T> : Control, IMarkerControl, IMapRo
     private void UpdateDisplayRotation()
     {
         EnsurePersistentTransforms();
-        _displayRotate!.Angle = Utils.RotationMath.DisplayAngle(RotationAngle, _appliedMapBearing, AppliesMapRotation);
+        CurrentDisplayAngle = Utils.RotationMath.NormalizeDeg(Utils.RotationMath.DisplayAngle(RotationAngle, _appliedMapBearing, AppliesMapRotation));
+        ApplyDisplayAngle(CurrentDisplayAngle);
     }
 
     private static void OnShowTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

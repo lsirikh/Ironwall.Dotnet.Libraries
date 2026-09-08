@@ -20,6 +20,21 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
 ****************************************************************************/
 public static class MapSettingsHelper
 {
+    /// <summary>
+    /// Symbol3D 섹션 저장 — 섹션을 통째로 교체하므로 현재 읽은 값(간격·높이·접점 폴백)을 함께 실어 신규 키가 소실되지 않게 한다(FR-17).
+    /// </summary>
+    public static Task SaveSymbol3DAsync(bool isEnabled)
+    {
+        var current = Utils.Symbol3DFeature.Current;
+        return SaveSettingAsync("Symbol3D", new
+        {
+            IsEnabled = isEnabled,
+            current.Directory,
+            current.FencePostSpacingM,
+            current.FenceHeightM,
+            current.DoorContactFallback,
+        });
+    }
     #region - Constants -
     private const string SETTINGS_FILE_NAME = "appsettings.json";
     private const string APP_SETTINGS_SECTION = "AppSettings";
@@ -53,6 +68,15 @@ public static class MapSettingsHelper
     public static async Task SaveMapRotationAsync(MapRotationModel rotation, ILogService? log = default)
     {
         await SaveSettingAsync("MapRotation", rotation, log);
+    }
+
+    /// <summary>
+    /// 지도 2.5D 기울이기 설정(kill-switch·각도·줌 게이트)을 JSON에 저장 (AppSettings.MapTilt) —
+    /// map-tilt-25d PRD FR-07. 토글은 즉시, 각도는 debounce 1 s 후 호출. 부팅 복원은 MapViewModel(홈 줌 이후).
+    /// </summary>
+    public static async Task SaveMapTiltAsync(MapTiltModel tilt, ILogService? log = default)
+    {
+        await SaveSettingAsync("MapTilt", tilt, log);
     }
 
     /// <summary>

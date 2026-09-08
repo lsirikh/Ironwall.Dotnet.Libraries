@@ -339,7 +339,7 @@
 									FontSize="10"
 									FontWeight="Bold"
 									Foreground="White"
-									Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=GetFloorDisplayText}"
+									Text="{TemplateBinding FloorDisplayText}"
 									TextAlignment="Center"
 									Visibility="Collapsed">
 									<TextBlock.Effect>

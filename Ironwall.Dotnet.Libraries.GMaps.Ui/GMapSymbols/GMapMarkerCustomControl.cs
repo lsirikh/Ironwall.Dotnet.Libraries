@@ -23,6 +23,16 @@ public class GMapMarkerCustomControl : GMapMarkerBaseControl<GMapCustomMarker>
     }
     #endregion
 
+    #region Billboard (map-tilt-25d FR-10)
+
+    /// <summary>[결정③] Custom 점 심볼은 빌보드 — 맵 회전 시 정립. Bearing 은 모델에 보존(write-back 금지 R-35).</summary>
+    public override bool IsBillboard => true;
+
+    /// <summary>빌보드: 루트 각 0 고정(3D 선례 동형). FOV 가 없으므로 base(0) 만.</summary>
+    protected override void ApplyDisplayAngle(double angle) => base.ApplyDisplayAngle(IsBillboard ? 0 : angle);
+
+    #endregion
+
     #region Constructors
 
     /// <summary>
