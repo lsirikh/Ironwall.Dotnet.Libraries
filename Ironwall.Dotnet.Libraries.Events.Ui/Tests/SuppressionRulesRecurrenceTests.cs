@@ -94,9 +94,17 @@ public class SuppressionRulesRecurrenceTests
     // ══════ 일일 시각 — start==end 는 24시간 종일(서버 422 아님) ══════
 
     [Fact]
-    public void should_classify_equal_daily_times_as_all_day()
-        => Assert.Equal(SuppressionRules.DailyTimeVerdict.AllDay,
+    public void should_classify_equal_non_midnight_times_as_ambiguous()
+        => Assert.Equal(SuppressionRules.DailyTimeVerdict.AllDayAmbiguous,
             SuppressionRules.ClassifyDailyTime(TimeSpan.FromHours(8), TimeSpan.FromHours(8)));
+
+    [Fact]
+    public void should_classify_midnight_to_midnight_as_formal_all_day()
+        // 🔴 API 6.3.4 — 서버가 자정끼리만 통과시킨다.
+        //    전면 금지하면 진짜 24시간을 표현할 방법이 없어지기 때문이다
+        //    (00:00:00~23:59:59 는 매일 1초 구멍).
+        => Assert.Equal(SuppressionRules.DailyTimeVerdict.AllDayMidnight,
+            SuppressionRules.ClassifyDailyTime(TimeSpan.Zero, TimeSpan.Zero));
 
     [Fact]
     public void should_classify_reversed_daily_times_as_overnight()
@@ -109,12 +117,19 @@ public class SuppressionRulesRecurrenceTests
             SuppressionRules.ClassifyDailyTime(TimeSpan.FromHours(8), TimeSpan.FromHours(21)));
 
     [Fact]
-    public void should_block_creation_when_daily_times_are_equal()
+    public void should_block_creation_when_daily_times_are_equal_but_not_midnight()
     {
         var msg = SuppressionRules.ValidateWeeklyForm(31, TimeSpan.FromHours(8), TimeSpan.FromHours(8));
         Assert.NotNull(msg);
         Assert.Contains("24시간", msg);
+        Assert.Contains("00:00:00", msg);   // 정식 표현을 안내해야 한다
     }
+
+    [Fact]
+    public void should_allow_creation_when_midnight_to_midnight()
+        // 🔴 회귀 고정 — 이걸 막으면 종일 억제를 표현할 방법이 없어진다.
+        //    서버가 허용하는 유일한 종일 표기다.
+        => Assert.Null(SuppressionRules.ValidateWeeklyForm(31, TimeSpan.Zero, TimeSpan.Zero));
 
     [Fact]
     public void should_allow_creation_when_overnight()
@@ -123,6 +138,89 @@ public class SuppressionRulesRecurrenceTests
     [Fact]
     public void should_block_creation_when_daily_time_missing()
         => Assert.NotNull(SuppressionRules.ValidateWeeklyForm(31, null, TimeSpan.FromHours(21)));
+
+    // ══════ 도달 가능성 — 서버(API 6.3.4)가 422 로 막는 '영원히 발동 안 하는 창' ══════
+
+    private static readonly TimeSpan D8 = TimeSpan.FromHours(8);
+    private static readonly TimeSpan D21 = TimeSpan.FromHours(21);
+
+    [Fact]
+    public void should_report_unreachable_when_weekday_absent_from_validity_period()
+    {
+        // 유효기간 화~수(9/8~9/9)인데 월요일만 지정 — 다시는 걸리지 않는다.
+        var reachable = SuppressionRules.IsOccurrenceReachable(
+            1, D8, D21,
+            new DateTime(2026, 9, 8), new DateTime(2026, 9, 9, 23, 59, 59));
+
+        Assert.False(reachable);
+    }
+
+    [Fact]
+    public void should_report_reachable_when_weekday_present_once()
+    {
+        // 같은 기간에 화요일(2)을 고르면 통과한다.
+        Assert.True(SuppressionRules.IsOccurrenceReachable(
+            2, D8, D21,
+            new DateTime(2026, 9, 8), new DateTime(2026, 9, 9, 23, 59, 59)));
+    }
+
+    [Fact]
+    public void should_always_be_reachable_when_unlimited()
+        // 무제한 창은 언젠가 반드시 걸린다 — 서버도 이 경우는 검사하지 않는다.
+        => Assert.True(SuppressionRules.IsOccurrenceReachable(
+            1, D8, D21, new DateTime(2026, 9, 8), null));
+
+    [Fact]
+    public void should_report_unreachable_when_daily_window_is_clipped_away()
+    {
+        // 요일(화)은 기간 안에 있지만 그날 08:00~21:00 은 유효기간 시작(22:00) 전에 끝났다.
+        Assert.False(SuppressionRules.IsOccurrenceReachable(
+            2, D8, D21,
+            new DateTime(2026, 9, 15, 22, 0, 0), new DateTime(2026, 9, 16, 0, 0, 0)));
+    }
+
+    [Fact]
+    public void should_report_unreachable_when_no_day_selected()
+        => Assert.False(SuppressionRules.IsOccurrenceReachable(
+            0, D8, D21, new DateTime(2026, 9, 8), new DateTime(2026, 12, 31)));
+
+    [Fact]
+    public void should_report_unreachable_when_window_end_precedes_start()
+        => Assert.False(SuppressionRules.IsOccurrenceReachable(
+            127, D8, D21, new DateTime(2026, 9, 10), new DateTime(2026, 9, 8)));
+
+    [Fact]
+    public void should_reach_overnight_occurrence_that_starts_inside_period()
+    {
+        // 금 22:00 시작분이 토 06:00 까지 이어진다 — 금요일만 골라도 도달 가능.
+        Assert.True(SuppressionRules.IsOccurrenceReachable(
+            16, TimeSpan.FromHours(22), TimeSpan.FromHours(6),
+            new DateTime(2026, 9, 11), new DateTime(2026, 9, 12, 12, 0, 0)));
+    }
+
+    [Fact]
+    public void should_reach_midnight_all_day_occurrence()
+        // 자정 종일은 그날 전체라 해당 요일이 있으면 반드시 도달한다.
+        => Assert.True(SuppressionRules.IsOccurrenceReachable(
+            127, TimeSpan.Zero, TimeSpan.Zero,
+            new DateTime(2026, 9, 8), new DateTime(2026, 9, 10)));
+
+    [Fact]
+    public void should_describe_unreachable_window_for_the_operator()
+    {
+        var msg = SuppressionRules.DescribeUnreachable(
+            1, D8, D21,
+            new DateTime(2026, 9, 8), new DateTime(2026, 9, 9, 23, 59, 59));
+
+        Assert.NotNull(msg);
+        Assert.Contains("발동하지 않습니다", msg);
+    }
+
+    [Fact]
+    public void should_describe_nothing_when_reachable()
+        => Assert.Null(SuppressionRules.DescribeUnreachable(
+            2, D8, D21,
+            new DateTime(2026, 9, 8), new DateTime(2026, 9, 9, 23, 59, 59)));
 
     // ══════ 시각 포맷 — offset 이 붙으면 즉시 422 ══════
 

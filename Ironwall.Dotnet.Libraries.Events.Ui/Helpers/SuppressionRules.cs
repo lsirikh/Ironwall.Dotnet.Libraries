@@ -31,7 +31,11 @@ public static class SuppressionRules
 {
     #region - 상수(단일 출처) -
 
-    /// <summary>단발 창 길이 상한(일). <b>순수 클라 방어</b> — 서버는 단발에 상한이 없다.</summary>
+    /// <summary>
+    /// 단발 창 길이 상한(일). 오타로 장기 억제가 생기는 것을 막는 <b>클라 방어선</b>이다.
+    /// <para>⚠ API 6.3.4 부터는 <b>서버도 단발에 366일 상한</b>을 건다(그전에는 무제한이었다).
+    /// 클라 30일이 더 좁으므로 이 값으로는 422 가 나지 않는다.</para>
+    /// </summary>
     public const int DefaultMaxWindowDays = 30;
 
     /// <summary>
@@ -166,17 +170,33 @@ public static class SuppressionRules
     {
         /// <summary>정상.</summary>
         Ok,
-        /// <summary>시작 == 종료 → 서버가 <b>24시간 종일</b>로 해석한다. UI가 막아야 한다.</summary>
-        AllDay,
+        /// <summary>
+        /// <c>00:00:00~00:00:00</c> — <b>종일의 정식 표현</b>. 허용한다.
+        /// <para>서버가 자정 표기만 남긴 이유: 전면 금지하면 진짜 24시간을 표현할 방법이 없어진다
+        /// (<c>00:00:00~23:59:59</c> 는 매일 1초 구멍).</para>
+        /// </summary>
+        AllDayMidnight,
+        /// <summary>
+        /// 자정이 아닌 같은 시각(예: <c>09:00~09:00</c>) — 서버가 <b>422</b> 로 막는다(API 6.3.4).
+        /// <para>"종료를 안 고친 실수"일 가능성이 압도적인데 결과는 종일 억제다.
+        /// 월~금이면 닷새 연속 알람이 죽는다 — 안전 방향이 나쁘다.</para>
+        /// </summary>
+        AllDayAmbiguous,
         /// <summary>종료 &lt; 시작 → 자정 넘김. <b>정상 입력</b>이며 안내만 한다.</summary>
         Overnight,
     }
 
-    /// <summary>일일 시각 쌍을 판정한다. <b>서버는 AllDay 를 422로 막지 않는다.</b></summary>
+    /// <summary>
+    /// 일일 시각 쌍을 판정한다.
+    /// <para>⚠ 서버(API 6.3.4)는 <c>daily_start == daily_end &amp;&amp; daily_start != 00:00</c> 을 <b>422</b> 로 막는다.
+    /// 자정끼리는 통과시킨다 — 그것이 종일을 표현하는 유일한 정식 방법이다.</para>
+    /// </summary>
     public static DailyTimeVerdict ClassifyDailyTime(TimeSpan dailyStart, TimeSpan dailyEnd)
-        => dailyStart == dailyEnd ? DailyTimeVerdict.AllDay
-         : dailyEnd < dailyStart ? DailyTimeVerdict.Overnight
-         : DailyTimeVerdict.Ok;
+        => dailyStart != dailyEnd
+            ? (dailyEnd < dailyStart ? DailyTimeVerdict.Overnight : DailyTimeVerdict.Ok)
+            : (dailyStart == TimeSpan.Zero
+                ? DailyTimeVerdict.AllDayMidnight
+                : DailyTimeVerdict.AllDayAmbiguous);
 
     /// <summary>
     /// 반복 폼 전체 검증. 통과면 <c>null</c>, 아니면 <b>사용자에게 보일 오류 문구</b>를 돌려준다.
@@ -186,10 +206,53 @@ public static class SuppressionRules
     {
         if (!HasAnyDay(mask)) return "요일을 1개 이상 선택하세요";
         if (dailyStart is null || dailyEnd is null) return "일일 시각을 입력하세요";
-        if (ClassifyDailyTime(dailyStart.Value, dailyEnd.Value) == DailyTimeVerdict.AllDay)
-            return "시작과 종료가 같으면 24시간 종일 억제가 됩니다";
+        if (ClassifyDailyTime(dailyStart.Value, dailyEnd.Value) == DailyTimeVerdict.AllDayAmbiguous)
+            return "시작과 종료가 같으면 24시간 종일이 됩니다 — 종일이 맞다면 00:00:00 ~ 00:00:00 으로 입력하세요";
         return null;
     }
+
+    /// <summary>
+    /// 이 반복 규칙이 유효기간 안에서 <b>한 번이라도 발동하는가</b>.
+    /// <para>서버(API 6.3.4)가 발동 불가 창을 <b>422</b> 로 막는다. 저장 전에 알려주면
+    /// 사용자가 422 를 보기 전에 고칠 수 있다.</para>
+    /// <para>검사 범위는 좁다 — 무제한 창은 언젠가 반드시 걸리므로 <b>항상 도달 가능</b>이고,
+    /// 유효기간 안에 해당 요일이 한 번이라도 있으면 통과한다.</para>
+    /// </summary>
+    /// <param name="windowEnd">무제한이면 <c>null</c>.</param>
+    public static bool IsOccurrenceReachable(
+        int mask, TimeSpan dailyStart, TimeSpan dailyEnd,
+        DateTime windowStart, DateTime? windowEnd)
+    {
+        if (!HasAnyDay(mask)) return false;
+        if (windowEnd is null) return true;          // 무제한 — 언젠가 반드시 걸린다
+        var end = windowEnd.Value;
+        if (end <= windowStart) return false;
+
+        // 유효기간 상한이 366일이라 일 단위 순회가 안전하다(최악 367회).
+        for (var d = windowStart.Date; d <= end.Date; d = d.AddDays(1))
+        {
+            if (!HasDay(mask, d.DayOfWeek)) continue;
+
+            var s = d + dailyStart;
+            // 자정 넘김(종료 < 시작)과 자정 종일(둘 다 00:00)은 다음날로 넘어간다.
+            var e = dailyEnd > dailyStart ? d + dailyEnd : d.AddDays(1) + dailyEnd;
+
+            // 유효기간으로 클램프 — 잘라내고 길이가 남아야 실제 회차다.
+            if (s < windowStart) s = windowStart;
+            if (e > end) e = end;
+            if (s < e) return true;
+        }
+        return false;
+    }
+
+    /// <summary>도달 불가 창에 대한 안내 문구(정상이면 <c>null</c>).</summary>
+    public static string? DescribeUnreachable(
+        int mask, TimeSpan dailyStart, TimeSpan dailyEnd,
+        DateTime windowStart, DateTime? windowEnd)
+        => IsOccurrenceReachable(mask, dailyStart, dailyEnd, windowStart, windowEnd)
+            ? null
+            : $"선택한 기간({windowStart:MM-dd} ~ {windowEnd:MM-dd})에 " +
+              $"{SummarizeDays(mask)} 회차가 없습니다 — 이 창은 발동하지 않습니다";
 
     #endregion
 

@@ -342,6 +342,64 @@ public class SuppressionPanelRecurrenceTests
     // ══════ 적대검토 회귀 고정 ══════
 
     [Fact]
+    public void should_widen_validity_period_when_switching_to_weekly()
+    {
+        // 🔴 회귀 고정 — 단발 기본 유효기간은 1시간이라 그대로 두면 어떤 요일도 그 안에 없어
+        //    '영원히 발동하지 않는 창'이 되고 서버가 422 로 막는다(API 6.3.4).
+        var vm = Ready();
+        Assert.True((vm.WindowEnd - vm.WindowStart).TotalHours < 2);   // 단발 기본
+
+        vm.IsWeeklyMode = true;
+
+        Assert.True((vm.WindowEnd - vm.WindowStart).TotalDays >= 7);
+        Assert.Null(vm.WeeklyFormError);        // 도달 가능해야 한다
+        Assert.True(vm.CanCreate);
+    }
+
+    [Fact]
+    public void should_warn_when_recurrence_never_occurs_in_validity_period()
+    {
+        var vm = Ready();
+        vm.IsWeeklyMode = true;
+        vm.PresetClearDays();
+        vm.IsMonChecked = true;                                    // 월요일만
+        vm.WindowStart = new DateTime(2026, 9, 8);                 // 화요일
+        vm.WindowEnd = new DateTime(2026, 9, 9, 23, 59, 59);       // 수요일
+
+        Assert.NotNull(vm.WeeklyFormError);
+        Assert.Contains("발동하지 않습니다", vm.WeeklyFormError);
+        Assert.False(vm.CanCreate);
+    }
+
+    [Fact]
+    public void should_allow_midnight_all_day_recurrence()
+    {
+        // 자정끼리는 서버가 허용하는 유일한 종일 표기다 — 막으면 종일을 표현할 방법이 없다.
+        var vm = Ready();
+        vm.IsWeeklyMode = true;
+        vm.DailyStart = DateTime.Today;
+        vm.DailyEnd = DateTime.Today;
+
+        Assert.Null(vm.WeeklyFormError);
+        Assert.True(vm.CanCreate);
+    }
+
+    [Fact]
+    public void should_not_let_unlimited_toggle_clobber_weekly_backup()
+    {
+        // 🔴 회귀 고정 — 백업 필드를 겸용하면 무제한 토글이 '반복 전환 전' 종료일을 덮어써
+        //    단발 복귀 시 1시간이 아니라 30일짜리 창이 남는다.
+        var vm = Ready();
+        var original = vm.WindowEnd;
+
+        vm.IsWeeklyMode = true;              // 여기서 기간이 30일로 넓어진다
+        vm.IsWindowEndUnlimited = true;      // 이 토글이 백업을 덮으면 안 된다
+        vm.IsOneShotMode = true;
+
+        Assert.Equal(original, vm.WindowEnd);
+    }
+
+    [Fact]
     public void should_expose_stale_text_binding_target()
     {
         // stale 문구가 비어 있으면 배너가 '글자 없는 빈 테두리'로 뜬다 —

@@ -178,10 +178,27 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     /// <summary>폼 오류 줄 표시 조건.</summary>
     public bool HasFormError => !string.IsNullOrEmpty(FormErrorText);
 
-    /// <summary>주간 반복 폼 검증 결과(정상이면 null). 서버가 막지 않는 2건이 여기서 걸린다.</summary>
-    public string? WeeklyFormError => IsWeeklyMode
-        ? SuppressionRules.ValidateWeeklyForm(DaysOfWeekMask, DailyStart?.TimeOfDay, DailyEnd?.TimeOfDay)
-        : null;
+    /// <summary>
+    /// 주간 반복 폼 검증 결과(정상이면 null).
+    /// <para>서버(API 6.3.4)가 422 로 막는 입력을 저장 전에 걸러 사용자가 422 를 보기 전에 고치게 한다.</para>
+    /// </summary>
+    public string? WeeklyFormError
+    {
+        get
+        {
+            if (!IsWeeklyMode) return null;
+            var basic = SuppressionRules.ValidateWeeklyForm(
+                DaysOfWeekMask, DailyStart?.TimeOfDay, DailyEnd?.TimeOfDay);
+            if (basic is not null) return basic;
+
+            // 유효기간 안에 회차가 하나도 없으면 서버가 422 다 —
+            // 그런 창은 목록에 'active' 로 살아있는 것처럼 보이면서 영원히 발동하지 않는다.
+            if (DailyStart is not { } s || DailyEnd is not { } e) return null;
+            return SuppressionRules.DescribeUnreachable(
+                DaysOfWeekMask, s.TimeOfDay, e.TimeOfDay,
+                WindowStart, IsUnlimitedEffective ? null : WindowEnd);
+        }
+    }
 
     /// <summary>
     /// 창 길이 상한 검증. 단발 30일(순수 클라 방어) / 반복 366일(서버 게이트) / 무제한 검사 스킵.
@@ -735,13 +752,20 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 if (!SuppressionRules.HasAnyDay(_daysOfWeekMask))
                     _daysOfWeekMask = SuppressionRules.DaysWeekdayPreset;
                 _isWindowEndUnlimited = false;
-                _windowEndBackup = WindowEnd;
+                _windowEndBeforeWeekly = WindowEnd;
+
+                // ⚠ 단발 기본 유효기간은 1시간이다 — 그대로 두면 어떤 요일도 그 안에 없어
+                //    '영원히 발동하지 않는 창'이 되고 서버가 422 로 막는다(API 6.3.4).
+                //    반복은 '기간' 개념이므로 최소 한 주는 덮도록 넓힌다(기본 30일, 서버 상한 366).
+                if ((_windowEnd - _windowStart).TotalDays < DefaultWeeklySpanDays)
+                    _windowEnd = _windowStart.AddDays(DefaultWeeklySpanDays);
             }
             else
             {
-                // 반복 → 단발: 무제한을 강제 해제하고 종료일을 되살린다.
+                // 반복 → 단발: 무제한을 강제 해제하고 '반복으로 들어가기 전' 종료일을 되살린다.
                 _isWindowEndUnlimited = false;
-                if (_windowEndBackup is { } back && back > WindowStart) WindowEnd = back;
+                _windowEndBeforeUnlimited = null;
+                if (_windowEndBeforeWeekly is { } back && back > WindowStart) WindowEnd = back;
                 else if (WindowEnd <= WindowStart) WindowEnd = WindowStart.AddHours(1);
             }
             NotifyRecurrenceChanged();
@@ -816,7 +840,11 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     }
 
     private bool _isWindowEndUnlimited;
-    private DateTime? _windowEndBackup;
+    /// <summary>단발 → 반복 전환 직전의 종료일. 반복 모드에서 기간을 넓히므로 되돌릴 값이 필요하다.</summary>
+    private DateTime? _windowEndBeforeWeekly;
+    /// <summary>무제한 체크 직전의 종료일. 체크 해제 시 피커 값을 되살린다.
+    /// <para>⚠ 위 필드와 <b>겸용하면 안 된다</b> — 무제한 토글이 반복 전환 백업을 덮어쓴다.</para></summary>
+    private DateTime? _windowEndBeforeUnlimited;
     /// <summary>"기간 제한 없음" 체크. 원시 플래그 — 게이트는 <see cref="IsUnlimitedEffective"/> 를 쓴다.</summary>
     public bool IsWindowEndUnlimited
     {
@@ -824,9 +852,9 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         set
         {
             if (_isWindowEndUnlimited == value) return;
-            if (value) _windowEndBackup = WindowEnd;
+            if (value) _windowEndBeforeUnlimited = WindowEnd;
             _isWindowEndUnlimited = value;
-            if (!value && _windowEndBackup is { } back && back > WindowStart) WindowEnd = back;
+            if (!value && _windowEndBeforeUnlimited is { } back && back > WindowStart) WindowEnd = back;
             NotifyRecurrenceChanged();
         }
     }
@@ -1009,6 +1037,8 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     #region - Attributes -
     private readonly IEventSuppressionApiService _api;
     private const int PAGE_SIZE = 100;
+    /// <summary>단발 → 반복 전환 시 기본 유효기간(일). 어떤 요일 조합이든 반드시 한 번은 포함된다.</summary>
+    private const int DefaultWeeklySpanDays = 30;
     /// <summary>창 길이 상한(일) — 서버 무제한이라 클라 방어(§5-D).</summary>
     private const int MAX_WINDOW_DAYS = 30;
     /// <summary>GET /active 스냅샷 — 활성 인지(§7)·중복 경고(§5-B)·취소 후 잔존 확인.</summary>
