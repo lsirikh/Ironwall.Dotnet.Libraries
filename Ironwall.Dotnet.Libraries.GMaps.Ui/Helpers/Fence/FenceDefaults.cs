@@ -16,13 +16,21 @@
         public const double FenceHeightM = 2.4;
         public const double FenceHeightMinM = 1.5;
         public const double FenceHeightMaxM = 4.0;
-        /// <summary>3D 철망 화면 높이 하한(px) — 실척(2.4 m ≈ 5 px @z18)으로는 높이·간격 변화가 안 보여(사용자 지적 2026-09-08) 이 값 아래로는 과장한다.</summary>
+        public const double FenceHeightStepM = 0.1;
+        /// <summary>
+        /// 3D 철망 화면 높이 하한(px) — 실척(2.4 m ≈ 5 px @z18)으로는 높이 차이가 안 보인다(사용자 지적 2026-09-08).
+        /// <b>기준 높이</b>(<see cref="FenceHeightM"/>)가 이 픽셀 이상으로 보이도록 <see cref="FenceMath.HeightExaggeration"/> 배율을
+        /// 계산해 <b>모든 높이에 똑같이</b> 곱한다 — 높이 px 는 실제 높이(m)에 정비례한다.
+        /// (종전엔 <c>Math.Max(실척, 12)</c> 로 잘라, 슬라이더 범위 1.5~4.0 m 의 실척이 전부 12 px 미만이라 어떤 높이를 골라도
+        ///  12 px 로 평탄화되어 높이 조절이 화면에 반영되지 않았다.)
+        /// </summary>
         public const double MinVisualHeightPx = 12.0;
 
         /// <summary>통문 폭(m) 기본/범위</summary>
         public const double GateWidthM = 4.0;
         public const double GateWidthMinM = 1.0;
         public const double GateWidthMaxM = 8.0;
+        public const double GateWidthStepM = 0.5;
 
         /// <summary>통문 중심이 변에서 이 거리(m) 이내면 변 위로 스냅해 패널을 절개한다.</summary>
         public const double GateSnapM = 1.5;

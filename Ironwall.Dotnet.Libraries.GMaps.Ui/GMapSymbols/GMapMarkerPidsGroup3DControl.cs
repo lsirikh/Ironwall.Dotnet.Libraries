@@ -148,7 +148,10 @@ public sealed class GMapMarkerPidsGroup3DControl : GMapMarkerPidsGroupControl
     {
         var lod = Helpers.Fence.FenceLod.Select(Helpers.Fence.FenceLod.PxPerSpacing(spacingM, digitalZoomScale, metersPerPixel));
         if (localPoints.Count < 2 || !(metersPerPixel > 0)) return new FenceFrame(FenceLayoutResult.Empty, lod, 0, 0);
-        double spacingPx = spacingM / metersPerPixel, heightPx = Math.Max(FenceMath.HeightPx(heightM, metersPerPixel), FenceDefaults.MinVisualHeightPx);   // 가독 하한(2.5D 과장)
+        double spacingPx = spacingM / metersPerPixel;
+        // 가독 과장(2.5D): 기준 높이가 MinVisualHeightPx 이상으로 보이는 배율을 모든 높이에 똑같이 곱한다 → 높이 px ∝ 실제 높이(m).
+        //   종전 Math.Max(실척, 하한) 은 1.5~4.0 m 실척이 전부 하한 미만이라 높이를 평탄화했다(높이 조절 무반응의 원인).
+        double heightPx = FenceMath.VisualHeightPx(heightM, metersPerPixel, FenceDefaults.FenceHeightM, FenceDefaults.MinVisualHeightPx);
         var relative = RelativePoints(localPoints);
         int settings = HashCode.Combine(Math.Round(spacingPx, 2), mode, isClosed, Math.Round(heightPx, 1));
         var hash = new HashCode();

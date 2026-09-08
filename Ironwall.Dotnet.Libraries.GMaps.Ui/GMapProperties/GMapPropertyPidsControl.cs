@@ -53,7 +53,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 OnMarkerPropertyChanged("GateWidthM", before, last);
             });
             ResetGateWidthCommand = new PanelCommand(_ => ResetGateWidth());
-            Unloaded += (_, _) => _gateWidthCommit.Flush();
+            Unloaded += (_, _) => { _gateWidthCommit.Flush(); UnsubscribeGateNotifier(); };
         }
         #endregion
 
@@ -70,7 +70,8 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 if (control._isInitializing || control._isClearingBindings || control._syncingGate || control.IsGroupMode || control.SelectedMarker is not IPidsEditableMarker) return;
                 control.IsGateWidthInherited = false;
                 control._gateWidthCommit.Touch((double)e.OldValue, (double)e.NewValue);
-            }, (_, v) => v is double x && double.IsFinite(x) ? Math.Clamp(x, Helpers.Fence.FenceDefaults.GateWidthMinM, Helpers.Fence.FenceDefaults.GateWidthMaxM) : Helpers.Fence.FenceDefaults.GateWidthM));
+            }, (_, v) => Helpers.Fence.FenceMath.Quantize(v is double x ? x : Helpers.Fence.FenceDefaults.GateWidthM,
+                    Helpers.Fence.FenceDefaults.GateWidthMinM, Helpers.Fence.FenceDefaults.GateWidthMaxM, Helpers.Fence.FenceDefaults.GateWidthStepM)));
         public bool IsGateWidthInherited { get => (bool)GetValue(IsGateWidthInheritedProperty); set => SetValue(IsGateWidthInheritedProperty, value); }
         public static readonly DependencyProperty IsGateWidthInheritedProperty = DependencyProperty.Register(nameof(IsGateWidthInherited), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(true));
 
@@ -90,6 +91,36 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public bool IsGate { get => (bool)GetValue(IsGateProperty); set => SetValue(IsGateProperty, value); }
         public static readonly DependencyProperty IsGateProperty = DependencyProperty.Register(nameof(IsGate), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
         public System.Windows.Input.ICommand ResetGateWidthCommand { get; }
+
+        /// <summary>모델 변경을 다시 읽어야 하는 통문·함체 절 필드 — 이름은 마커 통지명과 같다.</summary>
+        private static readonly string[] GateFieldNames = { "GateWidthM", "OpenOnContactOn" };
+        private System.ComponentModel.INotifyPropertyChanged? _gateNotifier;
+
+        /// <summary>
+        /// 마커 모델이 <b>패널 밖에서</b> 바뀌면(Undo/Redo · 그룹 일괄반영) 통문 절을 다시 읽는다.
+        /// 이 절은 TwoWay 바인딩이 아니라 <see cref="SyncGateFromMarker"/> 로 마커 로드 시 1회만 값을 받으므로
+        /// 구독이 없으면 Undo 가 모델을 되돌려도 슬라이더가 옛 값에 머물러 "undo 가 안 된다"로 보인다(사용자 보고 2026-09-08).
+        /// </summary>
+        private void OnMarkerModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (_syncingGate || _gateWidthCommit.IsPending) return;
+            if (e.PropertyName is not null && Array.IndexOf(GateFieldNames, e.PropertyName) < 0) return;
+            if (SelectedMarker is IPidsEditableMarker marker) SyncGateFromMarker(marker);
+        }
+
+        private void SubscribeGateNotifier()
+        {
+            UnsubscribeGateNotifier();
+            if (SelectedMarker is System.ComponentModel.INotifyPropertyChanged npc)
+            { _gateNotifier = npc; npc.PropertyChanged += OnMarkerModelPropertyChanged; }
+        }
+
+        private void UnsubscribeGateNotifier()
+        {
+            if (_gateNotifier is null) return;
+            _gateNotifier.PropertyChanged -= OnMarkerModelPropertyChanged;
+            _gateNotifier = null;
+        }
 
         private void SyncGateFromMarker(IPidsEditableMarker marker)
         {
@@ -133,6 +164,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             BindingOperations.ClearBinding(this, FOVColorProperty);
             BindingOperations.ClearBinding(this, FOVOpacityProperty);
             _gateWidthCommit.Flush();   // 마커 교체 전 대기 커밋 확정
+            UnsubscribeGateNotifier();
 
             //System.Diagnostics.Debug.WriteLine("=== PidsControl ClearSpecificBindings 완료 ===");
         }
@@ -206,6 +238,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
             this.BaseBearing = pidsMarker.BaseBearing;
             this.ModelVariant = (pidsMarker as GMapPidsMarker)?.ModelVariant;
             SyncGateFromMarker(pidsMarker);   // 통문/함체 개폐 절(FR-18)
+            SubscribeGateNotifier();          // 수동 동기 절이라 모델 변경(Undo/Redo)을 직접 구독
 
             //System.Diagnostics.Debug.WriteLine($"  설정 후 Panel LinkedDevice: {this.LinkedDevice?.DeviceName ?? "null"}");
             //System.Diagnostics.Debug.WriteLine($"=== SetupSpecificPropertiesFromMarker 완료 ===");
