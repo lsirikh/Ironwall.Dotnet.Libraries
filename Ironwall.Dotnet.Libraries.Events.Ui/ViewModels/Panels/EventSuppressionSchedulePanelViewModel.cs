@@ -4,7 +4,8 @@ using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Providers;
 using Ironwall.Dotnet.Libraries.Events.Api.Services;
-using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;  // SuppressionRules(폼 검증·중복 판정 순수 규칙)
+using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.Events.Ui.Services;  // SuppressionRules(폼 검증·중복 판정 순수 규칙)
 using Ironwall.Dotnet.Libraries.Events.Ui.Models;   // SimpleCommand
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -38,12 +39,15 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         ILogService log,
         IEventSuppressionApiService api,
         DeviceProvider deviceProvider,
-        DeviceGroupProvider groupProvider)
+        DeviceGroupProvider groupProvider,
+        ISuppressionActiveMonitor? monitor = null)
         : base(eventAggregator, log)
     {
         _api = api;
         DeviceProvider = deviceProvider;
         DeviceGroupProvider = groupProvider;
+        // 활성 억제 단일 출처. 미주입(테스트·구버전 배선)이면 폴백 캐시로 동작한다.
+        _monitor = monitor;
 
         _windowStart = DateTime.Now;
         _windowEnd = DateTime.Now.AddHours(1);
@@ -84,6 +88,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         await base.OnActivateAsync(cancellationToken);
         var perm = ResolvePermissionService();
         if (perm != null) perm.PermissionsChanged += OnPermissionsChanged;
+        HookMonitor();
         // 조회 권한(events:view) 게이팅 — 권한 없으면 목록을 불러오지 않는다(서버 403 최종 권위, UI는 보조).
         if (!CanViewEvents())
         {
@@ -98,6 +103,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     {
         var perm = ResolvePermissionService();
         if (perm != null) perm.PermissionsChanged -= OnPermissionsChanged;
+        UnhookMonitor();
         await base.OnDeactivateAsync(close, cancellationToken);
     }
     #endregion
@@ -124,8 +130,11 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     public bool CanCreate =>
         CanEditEvents()
         && !string.IsNullOrWhiteSpace(Name)
-        && WindowEnd > WindowStart
+        && (IsUnlimitedEffective || WindowEnd > WindowStart)
         && IsWindowLengthValid
+        && WeeklyFormError is null
+        // 3중 방어 마지막 — 어떤 경로로도 '단발 + window_end 없음' 이 나가지 못하게 한다.
+        && !(IsOneShotMode && IsWindowEndUnlimited)
         && TargetType switch
         {
             "device" => SelectedDevices.Count > 0,
@@ -144,14 +153,44 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             if (CanCreate) return "입력한 대상·시간창으로 억제 창을 생성합니다.";
             if (!CanEditEvents()) return "이벤트 편집 권한(events:edit)이 없습니다.";
             if (string.IsNullOrWhiteSpace(Name)) return "작업명을 입력하세요.";
-            if (!IsWindowLengthValid) return $"억제 기간이 최대 {MAX_WINDOW_DAYS}일을 초과했습니다.";
-            if (WindowEnd <= WindowStart) return "종료 시각이 시작 시각보다 뒤여야 합니다.";
+            if (!IsWindowLengthValid) return WindowLengthWarningText.TrimStart('⚠', ' ') + ".";
+            if (WeeklyFormError is { } we) return we + ".";
+            if (!IsUnlimitedEffective && WindowEnd <= WindowStart) return "종료 시각이 시작 시각보다 뒤여야 합니다.";
             return TargetType == "group" ? "대상 그룹을 1개 이상 선택하세요." : "대상 장비를 1개 이상 선택하세요.";
         }
     }
 
-    /// <summary>창 길이 상한 검증(서버는 상한이 없어 오타로 1년 억제도 생성됨 — 클라에서 방어).</summary>
-    public bool IsWindowLengthValid => SuppressionRules.IsWindowLengthValid(WindowStart, WindowEnd, MAX_WINDOW_DAYS);
+    /// <summary>
+    /// 폼 검증 오류 1줄 — <b>기간 상한 + 반복 검증 3종</b>을 하나로 모은다.
+    /// <para>권한·작업명·대상 분기는 여기 넣지 않는다(그건 <see cref="CreateHintText"/> ToolTip 전용).</para>
+    /// ⚠ 이 프로퍼티가 없으면 XAML 이 빈 바인딩에 붙어 <b>이미 출하된 기간 경고가 조용히 사라진다</b>.
+    /// </summary>
+    public string FormErrorText
+    {
+        get
+        {
+            if (!IsWindowLengthValid) return WindowLengthWarningText;
+            if (WeeklyFormError is { } we) return "⚠ " + we;
+            return string.Empty;
+        }
+    }
+
+    /// <summary>폼 오류 줄 표시 조건.</summary>
+    public bool HasFormError => !string.IsNullOrEmpty(FormErrorText);
+
+    /// <summary>주간 반복 폼 검증 결과(정상이면 null). 서버가 막지 않는 2건이 여기서 걸린다.</summary>
+    public string? WeeklyFormError => IsWeeklyMode
+        ? SuppressionRules.ValidateWeeklyForm(DaysOfWeekMask, DailyStart?.TimeOfDay, DailyEnd?.TimeOfDay)
+        : null;
+
+    /// <summary>
+    /// 창 길이 상한 검증. 단발 30일(순수 클라 방어) / 반복 366일(서버 게이트) / 무제한 검사 스킵.
+    /// </summary>
+    public bool IsWindowLengthValid => SuppressionRules.IsWindowLengthValidFor(
+        WindowStart, WindowEnd, RecurrenceMode, IsUnlimitedEffective);
+
+    /// <summary>현재 모드의 유효기간 상한(일) — 문구 생성용.</summary>
+    public int EffectiveMaxWindowDays => SuppressionRules.MaxWindowDaysFor(RecurrenceMode);
 
     /// <summary>취소(삭제) 권한 — 행 취소 버튼 게이팅 보조.</summary>
     public bool CanDelete => CanDelEvents();
@@ -171,6 +210,34 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     #region - Binding Methods -
     /// <summary>헤더 X 버튼(ModernPanelCloseButton, x:Name="Close") — 패널 닫기(ReportConsole 패턴).</summary>
     public Task Close() => TryCloseAsync();
+
+    /// <summary>Monitor 구독 — 반드시 <see cref="OnDeactivateAsync"/> 와 짝으로 건다(SingleInstance 누수 방지).</summary>
+    private void HookMonitor()
+    {
+        if (_monitor is null || _monitorHooked) return;
+        _monitor.ActiveChanged += OnMonitorActiveChanged;
+        _monitorHooked = true;
+        // 패널 진입 즉시 1회 — 30초 주기를 기다리면 배너가 늦게 뜬다.
+        _monitor.RequestImmediatePoll("panel-open");
+    }
+
+    private void UnhookMonitor()
+    {
+        if (_monitor is null || !_monitorHooked) return;
+        _monitor.ActiveChanged -= OnMonitorActiveChanged;
+        _monitorHooked = false;
+    }
+
+    private void OnMonitorActiveChanged()
+    {
+        NotifyOfPropertyChange(nameof(HasActiveSuppression));
+        NotifyOfPropertyChange(nameof(HasActiveBanner));
+        NotifyOfPropertyChange(nameof(IsActiveStale));
+        NotifyOfPropertyChange(nameof(ActiveStaleText));
+        NotifyOfPropertyChange(nameof(ActiveCountText));
+        NotifyOfPropertyChange(nameof(DuplicateWarningText));
+        NotifyOfPropertyChange(nameof(HasDuplicateWarning));
+    }
 
     public async Task OnClickReloadButton()
         => await LoadAllAsync(_cancellationTokenSource?.Token ?? CancellationToken.None);
@@ -219,7 +286,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         }
         try
         {
-            var dto = new EventSuppressionScheduleRequestDto
+            var dto = new EventSuppressionScheduleCreateDto
             {
                 Name = Name!.Trim(),
                 Description = string.IsNullOrWhiteSpace(Description) ? null : Description,
@@ -229,7 +296,16 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
                 TargetSide = TargetSide,
                 EventScope = EventScope,
                 WindowStart = KoreaTimeHelper.ToServerIso8601(WindowStart),
-                WindowEnd = KoreaTimeHelper.ToServerIso8601(WindowEnd),
+                // ⚠ 무제한은 키를 생략하면 422 — 명시적 null 이어야 한다(서버 model_fields_set 검사).
+                //    NullValueHandling.Ignore 를 붙이지 않은 이유가 이것이다.
+                WindowEnd = IsUnlimitedEffective ? null : KoreaTimeHelper.ToServerIso8601(WindowEnd),
+                RecurrenceType = IsWeeklyMode ? "weekly" : "none",
+                DaysOfWeek = IsWeeklyMode ? DaysOfWeekMask : null,
+                // ⚠ 여기서 offset/Z 가 붙으면 즉시 422.
+                //    DTO 가 string 인 이유 — ApiService 공통 설정(DateTimeZoneHandling.Local)이
+                //    DateTime 을 만나면 "+09:00" 을 붙여 버린다.
+                DailyStart = IsWeeklyMode ? SuppressionRules.FormatDailyTime(DailyStart) : null,
+                DailyEnd = IsWeeklyMode ? SuppressionRules.FormatDailyTime(DailyEnd) : null,
             };
             var res = await _api.CreateSuppressionScheduleAsync(dto);
             if (res.Success)
@@ -277,11 +353,11 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             {
                 await LoadAllAsync();   // 목록 + /active 캐시 동시 갱신
                 // (§5-B) 겹친 창 잔존 경고 — 하나를 취소해도 다른 활성 창이 계속 억제할 수 있다.
-                if (_activeCache.Count > 0)
+                if (ActiveWindows.Count > 0)
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                     {
                         Title = "억제 창 취소",
-                        Explain = $"취소했지만 아직 진행 중인 억제 창이 {_activeCache.Count}건 남아 있습니다.\n"
+                        Explain = $"취소했지만 아직 진행 중인 억제 창이 {ActiveWindows.Count}건 남아 있습니다.\n"
                                 + "해당 장비가 계속 억제될 수 있으니 목록에서 '진행중' 항목을 확인하세요."
                     });
             }
@@ -489,8 +565,16 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         Description = null;
         SelectedDevices.Clear();
         SelectedGroups.Clear();
+        // ⚠ 순서 고정 — IsWeeklyMode 를 먼저 되돌려야 그 setter 의 정리 로직이
+        //    WindowEnd/무제한을 덮어쓰는 일이 없다.
+        IsOneShotMode = true;
+        _isWindowEndUnlimited = false;
+        _daysOfWeekMask = SuppressionRules.DaysWeekdayPreset;
+        _dailyStart = DateTime.Today.AddHours(8);
+        _dailyEnd = DateTime.Today.AddHours(21);
         WindowStart = DateTime.Now;
         WindowEnd = DateTime.Now.AddHours(1);
+        NotifyRecurrenceChanged();
         NotifyOfPropertyChange(nameof(CanCreate));
         NotifyOfPropertyChange(nameof(CreateHintText));
     }
@@ -611,8 +695,198 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
 
     /// <summary>기간 상한 초과 경고 표시 조건(§5-D).</summary>
     public bool HasWindowLengthWarning => !IsWindowLengthValid;
-    /// <summary>기간 상한 경고 문구.</summary>
-    public string WindowLengthWarningText => $"⚠ 억제 기간이 최대 {MAX_WINDOW_DAYS}일을 초과했습니다";
+    /// <summary>기간 상한 경고 문구(모드별).</summary>
+    public string WindowLengthWarningText => IsWeeklyMode
+        ? $"⚠ 유효기간이 {EffectiveMaxWindowDays}일을 초과했습니다 — 무제한을 쓰세요"
+        : $"⚠ 억제 기간이 최대 {EffectiveMaxWindowDays}일을 초과했습니다";
+
+    #region - 주간 반복 폼 상태 (API 6.3.3) -
+
+    private bool _isWeeklyMode;
+    /// <summary>단발 모드(기본). XAML 라디오 바인딩.</summary>
+    public bool IsOneShotMode { get => !_isWeeklyMode; set { if (value) IsWeeklyMode = false; } }
+
+    /// <summary>
+    /// 주간 반복 모드. <b>모드 전환 시 상태를 정리한다.</b>
+    /// <para>⚠ 정리가 없으면 "반복+무제한 → 단발 복귀" 에서 체크박스만 사라지고 플래그가 남아
+    /// 종료일 없는 <b>단발 창</b>이 전송된다 → 서버 422, 그런데 원인이 화면에서 사라져 진단 불가.</para>
+    /// </summary>
+    public bool IsWeeklyMode
+    {
+        get => _isWeeklyMode;
+        set
+        {
+            if (_isWeeklyMode == value) return;
+            _isWeeklyMode = value;
+            if (value)
+            {
+                // 단발 → 반복: 흔한 정비 패턴을 미리 채워 그대로 두면 끝나게 한다.
+                if (!SuppressionRules.HasAnyDay(_daysOfWeekMask))
+                    _daysOfWeekMask = SuppressionRules.DaysWeekdayPreset;
+                _isWindowEndUnlimited = false;
+                _windowEndBackup = WindowEnd;
+            }
+            else
+            {
+                // 반복 → 단발: 무제한을 강제 해제하고 종료일을 되살린다.
+                _isWindowEndUnlimited = false;
+                if (_windowEndBackup is { } back && back > WindowStart) WindowEnd = back;
+                else if (WindowEnd <= WindowStart) WindowEnd = WindowStart.AddHours(1);
+            }
+            NotifyRecurrenceChanged();
+        }
+    }
+
+    /// <summary>시간창 라벨 — 반복 모드에서는 '유효기간' 으로 의미가 바뀐다.</summary>
+    public string WindowFieldLabelText => _isWeeklyMode
+        ? "유효기간 (KST) *  —  시작 ~ 종료"
+        : "억제 시간창 (KST) *  —  시작 ~ 종료";
+
+    /// <summary>서버 recurrence_type 에 대응하는 모드.</summary>
+    public SuppressionRecurrenceMode RecurrenceMode =>
+        _isWeeklyMode ? SuppressionRecurrenceMode.Weekly : SuppressionRecurrenceMode.None;
+
+    private int _daysOfWeekMask = SuppressionRules.DaysWeekdayPreset;
+    /// <summary>요일 비트마스크(월1 … 일64). ⚠ 서버 원점은 <b>월=0</b>.</summary>
+    public int DaysOfWeekMask
+    {
+        get => _daysOfWeekMask;
+        set { if (_daysOfWeekMask == value) return; _daysOfWeekMask = value; NotifyRecurrenceChanged(); }
+    }
+
+    /// <summary>요일 토글 — 월.</summary>
+    public bool IsMonChecked { get => Day(0); set => SetDay(0, value); }
+    /// <summary>요일 토글 — 화.</summary>
+    public bool IsTueChecked { get => Day(1); set => SetDay(1, value); }
+    /// <summary>요일 토글 — 수.</summary>
+    public bool IsWedChecked { get => Day(2); set => SetDay(2, value); }
+    /// <summary>요일 토글 — 목.</summary>
+    public bool IsThuChecked { get => Day(3); set => SetDay(3, value); }
+    /// <summary>요일 토글 — 금.</summary>
+    public bool IsFriChecked { get => Day(4); set => SetDay(4, value); }
+    /// <summary>요일 토글 — 토.</summary>
+    public bool IsSatChecked { get => Day(5); set => SetDay(5, value); }
+    /// <summary>요일 토글 — 일.</summary>
+    public bool IsSunChecked { get => Day(6); set => SetDay(6, value); }
+
+    private bool Day(int i) => (_daysOfWeekMask & SuppressionRules.BitOf(i)) != 0;
+    private void SetDay(int i, bool on)
+    {
+        var bit = SuppressionRules.BitOf(i);
+        var next = on ? _daysOfWeekMask | bit : _daysOfWeekMask & ~bit;
+        if (next == _daysOfWeekMask) return;
+        _daysOfWeekMask = next;
+        NotifyRecurrenceChanged();
+    }
+
+    /// <summary>빠른 선택 — 평일(31).</summary>
+    public void PresetWeekday() => DaysOfWeekMask = SuppressionRules.DaysWeekdayPreset;
+    /// <summary>빠른 선택 — 주말(96).</summary>
+    public void PresetWeekend() => DaysOfWeekMask = SuppressionRules.DaysWeekendPreset;
+    /// <summary>빠른 선택 — 매일(127).</summary>
+    public void PresetEveryDay() => DaysOfWeekMask = SuppressionRules.DaysEveryDayPreset;
+    /// <summary>빠른 선택 — 모두 해제(0).</summary>
+    public void PresetClearDays() => DaysOfWeekMask = 0;
+
+    private DateTime? _dailyStart = DateTime.Today.AddHours(8);
+    /// <summary>일일 시작. ⚠ <b>시각만</b> 쓴다 — 날짜 부분은 전송 시 버린다(offset 금지).</summary>
+    public DateTime? DailyStart
+    {
+        get => _dailyStart;
+        set { _dailyStart = value; NotifyRecurrenceChanged(); }
+    }
+
+    private DateTime? _dailyEnd = DateTime.Today.AddHours(21);
+    /// <summary>일일 종료. end 가 start 보다 이르면 자정 넘김(정상), 같으면 24시간 종일(차단).</summary>
+    public DateTime? DailyEnd
+    {
+        get => _dailyEnd;
+        set { _dailyEnd = value; NotifyRecurrenceChanged(); }
+    }
+
+    private bool _isWindowEndUnlimited;
+    private DateTime? _windowEndBackup;
+    /// <summary>"기간 제한 없음" 체크. 원시 플래그 — 게이트는 <see cref="IsUnlimitedEffective"/> 를 쓴다.</summary>
+    public bool IsWindowEndUnlimited
+    {
+        get => _isWindowEndUnlimited;
+        set
+        {
+            if (_isWindowEndUnlimited == value) return;
+            if (value) _windowEndBackup = WindowEnd;
+            _isWindowEndUnlimited = value;
+            if (!value && _windowEndBackup is { } back && back > WindowStart) WindowEnd = back;
+            NotifyRecurrenceChanged();
+        }
+    }
+
+    /// <summary>
+    /// ⚠ <b>파생 플래그</b> — XAML 의 종료 피커/플레이스홀더 게이트는 반드시 이것을 쓴다.
+    /// <para>원시 <see cref="IsWindowEndUnlimited"/> 를 쓰면 반복 게이트와 어긋나
+    /// 모드 복귀 시 플래그만 남는 사고가 난다.</para>
+    /// </summary>
+    public bool IsUnlimitedEffective => _isWeeklyMode && _isWindowEndUnlimited;
+
+    /// <summary>자정 넘김 안내 표시 조건.</summary>
+    public bool HasOvernightNotice => _isWeeklyMode
+        && _dailyStart is { } s && _dailyEnd is { } e
+        && SuppressionRules.ClassifyDailyTime(s.TimeOfDay, e.TimeOfDay)
+           == SuppressionRules.DailyTimeVerdict.Overnight;
+
+    /// <summary>자정 넘김 안내 문구.</summary>
+    public string OvernightNoticeText => _dailyEnd is { } e
+        ? $"ⓘ 자정을 넘깁니다 — 다음날 {e:HH:mm}에 종료됩니다"
+        : string.Empty;
+
+    /// <summary>
+    /// 전송될 내용을 그대로 렌더하는 <b>요약 미러</b>.
+    /// <para>피커가 UIA 에 안 뜨므로 이 한 줄이 값 단언의 유일한 경로이자 운용자 확인 수단이다.</para>
+    /// </summary>
+    public string RecurrenceSummaryText
+    {
+        get
+        {
+            if (!_isWeeklyMode) return string.Empty;
+            if (_dailyStart is not { } s || _dailyEnd is not { } e) return string.Empty;
+            var rule = SuppressionRules.Summarize(_daysOfWeekMask, s.TimeOfDay, e.TimeOfDay);
+            if (string.IsNullOrEmpty(rule)) return string.Empty;
+            var span = IsUnlimitedEffective
+                ? $"무제한 · {WindowStart:yyyy-MM-dd} 시작"
+                : $"{WindowStart:yyyy-MM-dd} ~ {WindowEnd:MM-dd}";
+            return $"→ {rule} · {span}";
+        }
+    }
+
+    private void NotifyRecurrenceChanged()
+    {
+        NotifyOfPropertyChange(nameof(IsWeeklyMode));
+        NotifyOfPropertyChange(nameof(IsOneShotMode));
+        NotifyOfPropertyChange(nameof(RecurrenceMode));
+        NotifyOfPropertyChange(nameof(WindowFieldLabelText));
+        NotifyOfPropertyChange(nameof(DaysOfWeekMask));
+        NotifyOfPropertyChange(nameof(IsMonChecked)); NotifyOfPropertyChange(nameof(IsTueChecked));
+        NotifyOfPropertyChange(nameof(IsWedChecked)); NotifyOfPropertyChange(nameof(IsThuChecked));
+        NotifyOfPropertyChange(nameof(IsFriChecked)); NotifyOfPropertyChange(nameof(IsSatChecked));
+        NotifyOfPropertyChange(nameof(IsSunChecked));
+        NotifyOfPropertyChange(nameof(DailyStart));
+        NotifyOfPropertyChange(nameof(DailyEnd));
+        NotifyOfPropertyChange(nameof(IsWindowEndUnlimited));
+        NotifyOfPropertyChange(nameof(IsUnlimitedEffective));
+        NotifyOfPropertyChange(nameof(HasOvernightNotice));
+        NotifyOfPropertyChange(nameof(OvernightNoticeText));
+        NotifyOfPropertyChange(nameof(RecurrenceSummaryText));
+        NotifyOfPropertyChange(nameof(WeeklyFormError));
+        NotifyOfPropertyChange(nameof(FormErrorText));
+        NotifyOfPropertyChange(nameof(HasFormError));
+        NotifyOfPropertyChange(nameof(IsWindowLengthValid));
+        NotifyOfPropertyChange(nameof(HasWindowLengthWarning));
+        NotifyOfPropertyChange(nameof(WindowLengthWarningText));
+        NotifyOfPropertyChange(nameof(EffectiveMaxWindowDays));
+        NotifyOfPropertyChange(nameof(CanCreate));
+        NotifyOfPropertyChange(nameof(CreateHintText));
+    }
+
+    #endregion
 
     private void NotifyWindowChanged()
     {
@@ -620,6 +894,10 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         NotifyOfPropertyChange(nameof(CreateHintText));
         NotifyOfPropertyChange(nameof(IsWindowLengthValid));
         NotifyOfPropertyChange(nameof(HasWindowLengthWarning));
+        NotifyOfPropertyChange(nameof(WindowLengthWarningText));
+        NotifyOfPropertyChange(nameof(FormErrorText));
+        NotifyOfPropertyChange(nameof(HasFormError));
+        NotifyOfPropertyChange(nameof(RecurrenceSummaryText));
     }
     #endregion
 
@@ -666,11 +944,30 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
 
     // ── 활성 억제 인지(§7) / 중복 창 사전 경고(§5-B) ──
     /// <summary>현재 진행 중인 억제 창이 있는가(상단 경고 표시 조건).</summary>
-    public bool HasActiveSuppression => _activeCache.Count > 0;
+    public bool HasActiveSuppression => ActiveWindows.Count > 0;
+
+    /// <summary>활성 억제 목록 — 단일 출처는 <see cref="ISuppressionActiveMonitor"/> 다.</summary>
+    private IReadOnlyList<EventSuppressionScheduleDto> ActiveWindows
+        => _monitor?.Active ?? _activeCache;
+
+    /// <summary>
+    /// 배너 표시 조건. ⚠ <b>stale 일 때도 떠야 한다</b> — 폴링이 실패해 목록이 0건이면
+    /// <see cref="HasActiveSuppression"/> 만으로는 배너가 통째로 사라져, 정작 알려야 할 순간에 침묵한다.
+    /// </summary>
+    public bool HasActiveBanner => HasActiveSuppression || IsActiveStale;
+
+    /// <summary>폴링이 TTL(90초)을 넘겨 실패 중인가.</summary>
+    public bool IsActiveStale => _monitor?.IsStale ?? false;
+
+    /// <summary>stale 병기 문구 — 목록을 버리지 않고 "언제 기준인지"를 밝힌다.</summary>
+    public string ActiveStaleText => IsActiveStale
+        ? $"⚠ 갱신 실패 — {_monitor?.LastSuccessAgeText ?? "확인 안 됨"} 기준"
+        : string.Empty;
     /// <summary>상단 활성 억제 요약 — 은폐 방지(정비 중임을 상시 인지).</summary>
-    public string ActiveCountText => _activeCache.Count == 0
+    public string ActiveCountText => ActiveWindows.Count == 0
         ? string.Empty
-        : $"⚠ 현재 억제 중 {_activeCache.Count}건 — 정비 창이 진행 중입니다";
+        : $"⚠ 현재 억제 중 {ActiveWindows.Count}건 — 정비 창이 진행 중입니다"
+          + (IsActiveStale ? $" · {ActiveStaleText}" : string.Empty);
 
     /// <summary>정리할 취소/종료 항목이 있는가('모두 정리' 버튼 활성).</summary>
     public bool CanCleanupAll => CanDelEvents() && Schedules.Any(s => s.IsDeletable);
@@ -681,7 +978,7 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
         get
         {
             var dup = SuppressionRules.CountOverlappingActive(
-                _activeCache, TargetType,
+                ActiveWindows, TargetType,
                 SelectedDevices.Select(d => d.Id),
                 SelectedGroups.Select(g => g.Id));
             return dup > 0
@@ -698,7 +995,10 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     /// <summary>창 길이 상한(일) — 서버 무제한이라 클라 방어(§5-D).</summary>
     private const int MAX_WINDOW_DAYS = 30;
     /// <summary>GET /active 스냅샷 — 활성 인지(§7)·중복 경고(§5-B)·취소 후 잔존 확인.</summary>
+    /// <summary>Monitor 미주입(테스트·구버전 배선) 시의 폴백 캐시. 정상 경로는 <c>_monitor.Active</c>.</summary>
     private IReadOnlyList<EventSuppressionScheduleDto> _activeCache = new List<EventSuppressionScheduleDto>();
+    private readonly ISuppressionActiveMonitor? _monitor;
+    private bool _monitorHooked;
     private int _currentPage;
     private int _totalPages = 1;
     private int _totalCount;

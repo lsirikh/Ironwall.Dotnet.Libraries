@@ -31,7 +31,16 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
         TargetSummary = BuildTargetSummary(dto, deviceProvider, groupProvider);
         ScopeText = MapScope(dto.EventScope);
         WindowStartText = ToDisplay(dto.WindowStart);
-        WindowEndText = ToDisplay(dto.WindowEnd);
+        WindowEndText = ToWindowEndDisplay(dto.WindowEnd);
+        // ⚠ ctor 시그니처는 불변 — 인자를 추가하면 테스트 11곳이 CS7036 으로 깨져 라이브러리 빌드가 실패한다.
+        //    "억제중" 표식은 인자가 아니라 DTO 파생 필드에서 만든다.
+        IsRecurring = string.Equals(dto.RecurrenceType, "weekly", StringComparison.OrdinalIgnoreCase);
+        RecurrenceSummary = BuildRecurrenceSummary(dto);
+        // is_suppressing_now 가 null(구버전 서버)이면 status=="active" 로 폴백한다.
+        //   bool 로 선언했다면 필드 부재 시 조용히 false(억제 안 함)로 굳어 안전 방향의 반대가 된다.
+        IsSuppressingNow = dto.IsSuppressingNow ?? (Status == "active");
+        OccurrenceText = BuildOccurrenceText(dto);
+        IsUnlimited = dto.WindowEnd is null;
         // 취소(soft-cancel) 가능 = 아직 취소 안 됐고 종료되지 않음(예정/진행중).
         IsCancellable = string.IsNullOrEmpty(dto.RevokedAt)
                         && Status is not ("expired" or "cancelled");
@@ -67,6 +76,25 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
     /// <summary>취소 버튼 활성 여부.</summary>
     public bool IsCancellable { get; }
 
+    /// <summary>주간 반복 창인가.</summary>
+    public bool IsRecurring { get; }
+
+    /// <summary>반복 요약(예: "월~금 08:00~21:00"). 단발이면 빈 문자열.</summary>
+    public string RecurrenceSummary { get; }
+
+    /// <summary>
+    /// <b>지금 억제 중인가.</b> 상태 배지(<see cref="StatusText"/>)와 <b>분리된 축</b>이다.
+    /// <para>status 는 창의 생애주기를, 이 값은 지금 이 순간을 말한다.
+    /// 반복 창에서는 유효기간의 62.2% 가 active 이면서 미억제다(서버 실측).</para>
+    /// </summary>
+    public bool IsSuppressingNow { get; }
+
+    /// <summary>회차 정보 — 진행 중이면 "~21:00 까지", 대기면 "다음 08-11 08:00".</summary>
+    public string OccurrenceText { get; }
+
+    /// <summary>무제한 창(window_end = null)인가.</summary>
+    public bool IsUnlimited { get; }
+
     /// <summary>하드삭제 대상 여부(취소/종료 = terminal). 삭제 체크박스 노출 조건.</summary>
     public bool IsDeletable { get; }
 
@@ -94,6 +122,41 @@ public class EventSuppressionScheduleItemViewModel : PropertyChangedBase
         "all" => "전체",
         _ => scope,
     };
+
+    /// <summary>
+    /// 종료 표기 — <b>무제한 / 파싱실패 / 값없음 3종을 구분</b>한다.
+    /// <para>예전에는 셋 다 '—' 로 같아 보여 무제한 창을 알아볼 수 없었다.</para>
+    /// </summary>
+    private static string ToWindowEndDisplay(string? iso)
+        => iso is null ? "무제한" : ToDisplay(iso);
+
+    private static string BuildRecurrenceSummary(EventSuppressionScheduleDto dto)
+    {
+        if (!string.Equals(dto.RecurrenceType, "weekly", StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+        var mask = dto.DaysOfWeek ?? 0;
+        if (!Helpers.SuppressionRules.HasAnyDay(mask)) return string.Empty;
+        if (!TryTime(dto.DailyStart, out var s) || !TryTime(dto.DailyEnd, out var e)) return string.Empty;
+        return Helpers.SuppressionRules.Summarize(mask, s, e);
+    }
+
+    /// <summary>
+    /// 회차 정보. ⚠ 서버 값을 <b>그대로</b> 쓴다 — 유효기간 경계에서 회차가 잘리므로
+    /// 요약 문자열로 재계산하면 마지막 날에 거짓말을 한다.
+    /// </summary>
+    private static string BuildOccurrenceText(EventSuppressionScheduleDto dto)
+    {
+        if (dto.OccurrenceEnd is { } oe && DateTime.TryParse(oe, out var end))
+            return $"~{end:HH:mm} 까지";
+        if (dto.NextOccurrenceStart is { } ns && DateTime.TryParse(ns, out var next))
+            return $"다음 {next:MM-dd HH:mm}";
+        return string.Empty;
+    }
+
+    private static bool TryTime(string? text, out TimeSpan value)
+        => TimeSpan.TryParseExact(text, @"hh\:mm\:ss",
+               System.Globalization.CultureInfo.InvariantCulture, out value)
+        || TimeSpan.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out value);
 
     private static string ToDisplay(string? iso)
     {

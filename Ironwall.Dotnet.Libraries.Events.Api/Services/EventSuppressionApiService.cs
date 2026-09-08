@@ -111,7 +111,7 @@ public class EventSuppressionApiService : IEventSuppressionApiService
         }
     }
 
-    public async Task<ApiResponse<EventSuppressionScheduleDto>> CreateSuppressionScheduleAsync(EventSuppressionScheduleRequestDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<EventSuppressionScheduleDto>> CreateSuppressionScheduleAsync(EventSuppressionScheduleCreateDto dto, CancellationToken token = default)
     {
         try
         {
@@ -125,7 +125,7 @@ public class EventSuppressionApiService : IEventSuppressionApiService
         }
     }
 
-    public async Task<ApiResponse<EventSuppressionScheduleDto>> PatchSuppressionScheduleAsync(int id, EventSuppressionScheduleRequestDto dto, CancellationToken token = default)
+    public async Task<ApiResponse<EventSuppressionScheduleDto>> PatchSuppressionScheduleAsync(int id, EventSuppressionScheduleUpdateDto dto, CancellationToken token = default)
     {
         try
         {

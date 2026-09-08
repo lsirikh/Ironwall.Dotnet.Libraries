@@ -66,6 +66,11 @@ public enum EnumGopCommand
     // 탐지 이벤트 동기화 알림 (DBApi가 탐지 UPDATE/DELETE 시 all.sync.detection 로 발행 — PTZ 회전 후 썸네일 갱신).
     // 처리=라이브러리 DetectionSyncNatsService(cmd 문자열 이름매칭). 정수는 유일성만(SYNC_* 라우팅은 이름 기반). 메인 라우터 Unknown 경고 회피용.
     SYNC_DETECTION = 29,
+    // 억제(정비 창) 스케줄 동기화 알림 (API 6.3.3 — 생성/수정/취소 + 회차 경계마다 발행).
+    // body.suppressing(bool, 선택)만 토글되고 status 는 active 로 불변이라 status 만 보면 전이를 놓친다.
+    // 처리=라이브러리 EventSuppressionSyncNatsService(cmd 문자열 이름매칭, 폴링 가속 전용).
+    // 정수는 유일성만. 메인 라우터 Unknown 경고 회피용.
+    SYNC_EVENT_SUPPRESSION = 30,
     // 센서/AI 탐지 (설계 문서 기준 cmd 값 — PUB 메시지용, 정수 라우팅 없음)
     DETECT = 100,
 }

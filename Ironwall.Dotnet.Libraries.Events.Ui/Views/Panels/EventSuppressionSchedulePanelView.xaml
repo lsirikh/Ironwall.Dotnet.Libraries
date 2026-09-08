@@ -70,6 +70,94 @@
 			<Setter Property="BorderThickness" Value="1" />
 		</Style>
 
+		<!--  MahApps TimePicker — DateTimePicker 와 같은 TimePickerBase 파생이라 같은 규약을 쓴다.
+		     ⚠ Height 금지, MinHeight 만(MDIX Outlined 클리핑 전례와 동일 원칙).
+		     ⚠ 바인딩은 SelectedDateTime 이다 — MahApps 2.4.10 에 SelectedTime 은 존재하지 않는다(실측).  -->
+		<Style x:Key="FormTimePicker" TargetType="mah:TimePicker">
+			<Setter Property="MinHeight" Value="36" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+			<Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+			<Setter Property="BorderThickness" Value="1" />
+		</Style>
+
+		<!--  요일 칩(ToggleButton ×7).
+		     선택 = 셀 전체 '채움'(면), 제스처 범위 = 하단 2px '바'(선) — 축이 직교해야 한다.
+		     ⚠ 라이트에서 PrimaryBrush = SelectionBrush = FocusRingBrush 가 완전 동일(#0C6B89, 대비 1.00:1)이라
+		        같은 브러시로 둘을 겹치면 지배적 제스처(칠하기)에서 범위 표시가 원리적으로 안 보인다.
+		        그래서 범위 바는 채움 위에서는 OnPrimaryFixed, 빈 셀 위에서는 Primary 로 나눈다.  -->
+		<Style x:Key="DayToggleChip" TargetType="ToggleButton">
+			<Setter Property="Width" Value="32" />
+			<Setter Property="Height" Value="26" />
+			<Setter Property="Margin" Value="1,0" />
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ToggleButton">
+						<Border
+							x:Name="Chip"
+							Background="{TemplateBinding Background}"
+							BorderBrush="Transparent"
+							BorderThickness="0,0,0,2"
+							CornerRadius="3">
+							<ContentPresenter
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								TextElement.FontSize="{TemplateBinding FontSize}"
+								TextElement.FontWeight="{TemplateBinding FontWeight}"
+								TextElement.Foreground="{TemplateBinding Foreground}" />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="{DynamicResource PrimaryBrush}" />
+								<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
+								<Setter Property="FontWeight" Value="Bold" />
+							</Trigger>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.38" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!--  활성 억제 배너.
+		     ⚠ 색을 Border 인스턴스의 로컬 값으로 주면 WPF 우선순위(로컬 3 > Trigger 5) 때문에
+		        stale DataTrigger 가 영원히 안 먹는다. 전부 Setter 로 둔다.
+		     ⚠ 글자색은 TextElement.Foreground 로 상속시키고 본문 TextBlock 에는 Foreground 를 주지 않는다.
+		     ⚠ Visibility 는 HasActiveBanner — 폴링 실패로 목록이 0건이어도 stale 을 알려야 한다.  -->
+		<Style x:Key="ActiveSuppressionBanner" TargetType="Border">
+			<Setter Property="Margin" Value="0,0,0,8" />
+			<Setter Property="Padding" Value="10,5" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="4" />
+			<Setter Property="Background" Value="{DynamicResource TintWarningBrush}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource StatusWarningBrush}" />
+			<Setter Property="TextElement.Foreground" Value="{DynamicResource StatusWarningBrush}" />
+			<Setter Property="Visibility" Value="Collapsed" />
+			<Style.Triggers>
+				<DataTrigger Binding="{Binding HasActiveBanner}" Value="True">
+					<Setter Property="Visibility" Value="Visible" />
+				</DataTrigger>
+				<!--  stale — 목록을 버리지 않고 '언제 기준인지'를 밝힌다(형태로 약화: 테두리 제거 + 무채색).  -->
+				<DataTrigger Binding="{Binding IsActiveStale}" Value="True">
+					<Setter Property="Background" Value="Transparent" />
+					<Setter Property="BorderBrush" Value="{DynamicResource TextMutedBrush}" />
+					<Setter Property="TextElement.Foreground" Value="{DynamicResource TextMutedBrush}" />
+				</DataTrigger>
+			</Style.Triggers>
+		</Style>
+
 		<!--  라벨/값 위계 고정: 라벨 11px 보조색 · 값 12px 기본색  -->
 		<Style x:Key="FormLabel" TargetType="TextBlock" BasedOn="{StaticResource PanelFieldLabel}">
 			<Setter Property="FontSize" Value="11" />
@@ -301,18 +389,13 @@
 					Style="{StaticResource StandardPanelCard}">
 					<StackPanel Orientation="Vertical">
 						<!--  (§7) 활성 억제 상시 인지 — 억제 사실 은폐 방지  -->
-						<Border
-							Margin="0,0,0,8"
-							Padding="10,5"
-							Background="{DynamicResource TintWarningBrush}"
-							BorderBrush="{DynamicResource StatusWarningBrush}"
-							BorderThickness="1"
-							CornerRadius="4"
-							Visibility="{Binding HasActiveSuppression, Converter={StaticResource BoolToVis}}">
-							<TextBlock
-								FontWeight="Bold"
-								Foreground="{DynamicResource StatusWarningBrush}"
-								Text="{Binding ActiveCountText}" />
+						<!--  ⚠ 색을 로컬 값으로 주면 안 된다 — WPF 우선순위가 로컬(3) > Style Trigger(5) 라
+						     stale 전환 Trigger 가 영원히 안 먹는다. 전부 Style Setter 로 둔다.
+						     Visibility 는 HasActiveBanner — stale 일 때도 떠야 한다(폴링 실패 시 count 0).  -->
+						<Border Style="{StaticResource ActiveSuppressionBanner}">
+							<StackPanel Orientation="Horizontal">
+								<TextBlock FontWeight="Bold" Text="{Binding ActiveCountText}" />
+							</StackPanel>
 						</Border>
 
 						<TextBlock
@@ -328,13 +411,24 @@
 							Text="{Binding DuplicateWarningText}"
 							TextWrapping="Wrap"
 							Visibility="{Binding HasDuplicateWarning, Converter={StaticResource BoolToVis}}" />
-						<!--  (§5-D) 창 최대 기간 초과 경고  -->
+						<!--  폼 오류 1줄 — 기간 상한 + 반복 검증 3종을 흡수한다(새 경고 줄을 만들지 않는다).
+						     ⚠ FormErrorText/HasFormError 는 VM 에 반드시 존재해야 한다. 없으면 WPF 가
+						        예외 없이 빈 문자열+Collapsed 로 떨어져 기존 기간 경고가 조용히 사라진다.  -->
 						<TextBlock
 							Margin="0,0,0,6"
 							Foreground="{DynamicResource StatusCriticalBrush}"
-							Text="{Binding WindowLengthWarningText}"
+							Text="{Binding FormErrorText}"
 							TextWrapping="Wrap"
-							Visibility="{Binding HasWindowLengthWarning, Converter={StaticResource BoolToVis}}" />
+							AutomationProperties.AutomationId="Events.SuppressionSchedule.FormErrorText"
+							Visibility="{Binding HasFormError, Converter={StaticResource BoolToVis}}" />
+						<!--  자정 넘김은 오류가 아니라 안내다 — 막지 않고 의미만 알린다.  -->
+						<TextBlock
+							Margin="0,0,0,6"
+							Foreground="{DynamicResource StatusInfoBrush}"
+							Text="{Binding OvernightNoticeText}"
+							TextWrapping="Wrap"
+							AutomationProperties.AutomationId="Events.SuppressionSchedule.OvernightNotice"
+							Visibility="{Binding HasOvernightNotice, Converter={StaticResource BoolToVis}}" />
 
 						<!--  ── 폼 본체 ─────────────────────────────────────────────────
 						     좌: 입력 필드(2열 × 3행) · 우: 대상 선택 트레이(고정폭 356 · 트레이 높이 104 고정)
@@ -362,6 +456,8 @@
 								<Grid.RowDefinitions>
 									<RowDefinition Height="Auto" />
 									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<!--  Row3 = 반복 설정(단발이면 Collapsed → 세로 0)  -->
 									<RowDefinition Height="Auto" />
 								</Grid.RowDefinitions>
 
@@ -462,7 +558,22 @@
 									Grid.Column="0"
 									Grid.ColumnSpan="2"
 									Margin="0,0,0,0">
-									<TextBlock Style="{StaticResource FormLabel}" Text="억제 시간창 (KST) *  —  시작 ~ 종료" />
+									<!--  라벨 밴드 2열 — 408(피커 3종) / 218(반복 라디오). 높이 불변.  -->
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="408" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<TextBlock
+											Grid.Column="0"
+											Style="{StaticResource FormLabel}"
+											Text="{Binding WindowFieldLabelText}" />
+										<TextBlock
+											Grid.Column="1"
+											Margin="12,0,0,3"
+											Style="{StaticResource FormLabel}"
+											Text="반복" />
+									</Grid>
 									<StackPanel Orientation="Horizontal">
 										<mah:DateTimePicker
 											Width="196"
@@ -474,12 +585,166 @@
 											VerticalAlignment="Center"
 											Foreground="{DynamicResource TextMutedBrush}"
 											Text="~" />
-										<mah:DateTimePicker
-											Width="196"
-											SelectedDateTime="{Binding WindowEnd, Mode=TwoWay}"
-											Style="{StaticResource FormDateTimePicker}"
-											AutomationProperties.AutomationId="Events.SuppressionSchedule.WindowEndPicker" />
+										<!--  종료 피커 ↔ 무제한 플레이스홀더는 '비활성화'가 아니라 '대체'다(자리 이동 0).
+										     ⚠ 게이트는 반드시 파생 IsUnlimitedEffective — 원시 플래그를 쓰면
+										        모드 복귀 시 플래그만 남아 단발+null 이 전송된다(서버 422).  -->
+										<Grid>
+											<mah:DateTimePicker
+												Width="196"
+												SelectedDateTime="{Binding WindowEnd, Mode=TwoWay}"
+												Style="{StaticResource FormDateTimePicker}"
+												Visibility="{Binding IsUnlimitedEffective, Converter={StaticResource BoolToVisInv}}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.WindowEndPicker" />
+											<Border
+												Width="196"
+												MinHeight="36"
+												Background="{DynamicResource SurfaceSunkenBrush}"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												CornerRadius="4"
+												Visibility="{Binding IsUnlimitedEffective, Converter={StaticResource BoolToVis}}">
+												<TextBlock
+													HorizontalAlignment="Center"
+													VerticalAlignment="Center"
+													FontSize="11"
+													FontStyle="Italic"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="무제한 — 종료일 없음"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.UnlimitedPlaceholder" />
+											</Border>
+										</Grid>
+										<!--  반복 여부 — 남는 218 에 인라인(세로 비용 0). 대상 유형 Border 와 동일 기하.  -->
+										<Border
+											Margin="12,0,0,0"
+											MinHeight="36"
+											Padding="12,0"
+											HorizontalAlignment="Left"
+											BorderBrush="{DynamicResource BorderBrush}"
+											BorderThickness="1"
+											CornerRadius="4">
+											<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+												<RadioButton
+													Margin="0,0,14,0"
+													Content="단발"
+													GroupName="RecurrenceMode"
+													IsChecked="{Binding IsOneShotMode, Mode=TwoWay}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceOneShotRadio" />
+												<RadioButton
+													Content="주간 반복"
+													GroupName="RecurrenceMode"
+													IsChecked="{Binding IsWeeklyMode, Mode=TwoWay}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceWeeklyRadio" />
+											</StackPanel>
+										</Border>
 									</StackPanel>
+								</StackPanel>
+
+								<!--  ══ Row3 — 반복 설정. 단발이면 통째로 Collapsed 라 폼 세로 원가가 0 증가한다. ══  -->
+								<StackPanel
+									Grid.Row="3"
+									Grid.Column="0"
+									Grid.ColumnSpan="2"
+									Margin="0,10,0,0"
+									Visibility="{Binding IsWeeklyMode, Converter={StaticResource BoolToVis}}">
+									<StackPanel Orientation="Horizontal">
+										<!--  요일 246 = 32×7 + 간격 2×6 + padding 8 + border 2  -->
+										<StackPanel Width="246">
+											<TextBlock Style="{StaticResource FormLabel}" Text="요일 *" />
+											<Border
+												MinHeight="36"
+												Padding="4,0"
+												BorderBrush="{DynamicResource BorderBrush}"
+												BorderThickness="1"
+												CornerRadius="4"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.DayStrip">
+												<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+													<ToggleButton
+														Content="월"
+														IsChecked="{Binding IsMonChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Mon" />
+													<ToggleButton
+														Content="화"
+														IsChecked="{Binding IsTueChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Tue" />
+													<ToggleButton
+														Content="수"
+														IsChecked="{Binding IsWedChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Wed" />
+													<ToggleButton
+														Content="목"
+														IsChecked="{Binding IsThuChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Thu" />
+													<ToggleButton
+														Content="금"
+														IsChecked="{Binding IsFriChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Fri" />
+													<ToggleButton
+														Content="토"
+														IsChecked="{Binding IsSatChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Sat" />
+													<ToggleButton
+														Content="일"
+														IsChecked="{Binding IsSunChecked, Mode=TwoWay}"
+														Style="{StaticResource DayToggleChip}"
+														AutomationProperties.AutomationId="Events.SuppressionSchedule.DayToggle.Sun" />
+												</StackPanel>
+											</Border>
+										</StackPanel>
+
+										<!--  일일 시각 216 = 100 + 8+8 + 100.
+										     ⚠ 구분자는 '~' 가 아니라 '–' 다 — 하네스가 첫 번째 '~' TextBlock 을
+										        좌표 앵커로 쓰기 때문에 '~' 가 2개가 되면 엉뚱한 피커에 타이핑한다.  -->
+										<StackPanel Width="216" Margin="12,0,0,0">
+											<TextBlock Style="{StaticResource FormLabel}" Text="일일 시각 *" />
+											<StackPanel Orientation="Horizontal">
+												<mah:TimePicker
+													Width="100"
+													SelectedDateTime="{Binding DailyStart, Mode=TwoWay}"
+													SelectedTimeFormat="Long"
+													Style="{StaticResource FormTimePicker}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.DailyStartPicker" />
+												<TextBlock
+													Margin="8,0,8,0"
+													VerticalAlignment="Center"
+													Foreground="{DynamicResource TextMutedBrush}"
+													Text="–" />
+												<mah:TimePicker
+													Width="100"
+													SelectedDateTime="{Binding DailyEnd, Mode=TwoWay}"
+													SelectedTimeFormat="Long"
+													Style="{StaticResource FormTimePicker}"
+													AutomationProperties.AutomationId="Events.SuppressionSchedule.DailyEndPicker" />
+											</StackPanel>
+										</StackPanel>
+
+										<!--  무제한 140  -->
+										<StackPanel Width="140" Margin="12,0,0,0">
+											<TextBlock Style="{StaticResource FormLabel}" Text="유효기간 끝" />
+											<CheckBox
+												MinHeight="36"
+												VerticalContentAlignment="Center"
+												Content="기간 제한 없음"
+												FontSize="12"
+												IsChecked="{Binding IsWindowEndUnlimited, Mode=TwoWay}"
+												AutomationProperties.AutomationId="Events.SuppressionSchedule.UnlimitedCheckBox" />
+										</StackPanel>
+									</StackPanel>
+
+									<!--  요약 미러 — 피커가 UIA 에 안 뜨므로 값 단언의 유일한 경로이자
+									     운용자가 '내가 만들려던 문장'인지 확인하는 수단이다.  -->
+									<TextBlock
+										Margin="0,8,0,0"
+										FontSize="11.5"
+										Foreground="{DynamicResource PrimaryBrush}"
+										Text="{Binding RecurrenceSummaryText}"
+										TextWrapping="Wrap"
+										AutomationProperties.AutomationId="Events.SuppressionSchedule.RecurrenceSummaryText" />
 								</StackPanel>
 							</Grid>
 

@@ -1,4 +1,5 @@
-﻿using Xunit;
+﻿using System.Linq;
+using Xunit;
 using Newtonsoft.Json;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Events;
 using Ironwall.Dotnet.Libraries.Events.Ui.Helpers;
@@ -101,7 +102,7 @@ public class EventSuppressionScheduleTests
     [Fact]
     public void should_serialize_only_editable_fields_when_request_dto()
     {
-        var req = new EventSuppressionScheduleRequestDto
+        var req = new EventSuppressionScheduleCreateDto
         {
             Name = "보수",
             TargetType = "device",
@@ -119,6 +120,75 @@ public class EventSuppressionScheduleTests
         Assert.DoesNotContain("\"is_active\"", json);
         Assert.DoesNotContain("\"revoked_at\"", json);
         Assert.DoesNotContain("\"created_at\"", json);
+        // 응답 전용 파생 필드도 요청에 섞이면 안 된다
+        Assert.DoesNotContain("\"is_suppressing_now\"", json);
+        Assert.DoesNotContain("\"occurrence_start\"", json);
+        Assert.DoesNotContain("\"occurrence_end\"", json);
+        Assert.DoesNotContain("\"next_occurrence_start\"", json);
+        Assert.DoesNotContain("\"schedule_tz\"", json);
+    }
+
+    // ── 단발(none)이면 반복 4필드가 본문에서 사라져야 한다 (ShouldSerializeXxx) ──
+    [Fact]
+    public void should_omit_recurrence_fields_when_mode_is_none()
+    {
+        var req = new EventSuppressionScheduleCreateDto
+        {
+            Name = "단발",
+            TargetType = "all",
+            WindowStart = "2026-08-01T09:00:00+09:00",
+            WindowEnd = "2026-08-01T18:00:00+09:00",
+            RecurrenceType = "none",
+            DaysOfWeek = 31,                 // 실수로 채워도
+            DailyStart = "08:00:00",         // 본문에는 나가면 안 된다
+            DailyEnd = "21:00:00",
+        };
+        var json = JsonConvert.SerializeObject(req);
+
+        Assert.Contains("\"recurrence_type\":\"none\"", json);
+        Assert.DoesNotContain("\"days_of_week\"", json);
+        Assert.DoesNotContain("\"daily_start\"", json);
+        Assert.DoesNotContain("\"daily_end\"", json);
+    }
+
+    // ── weekly 면 반복 4필드가 반드시 나가야 한다(빠지면 서버 422) ──
+    [Fact]
+    public void should_send_recurrence_fields_when_mode_is_weekly()
+    {
+        var req = new EventSuppressionScheduleCreateDto
+        {
+            Name = "정기 점검",
+            TargetType = "all",
+            WindowStart = "2026-08-09T00:00:00+09:00",
+            WindowEnd = null,                // 무제한 — 명시적 null
+            RecurrenceType = "weekly",
+            DaysOfWeek = 31,
+            DailyStart = "08:00:00",
+            DailyEnd = "21:00:00",
+        };
+        var json = JsonConvert.SerializeObject(req);
+
+        Assert.Contains("\"recurrence_type\":\"weekly\"", json);
+        Assert.Contains("\"days_of_week\":31", json);
+        Assert.Contains("\"daily_start\":\"08:00:00\"", json);
+        Assert.Contains("\"daily_end\":\"21:00:00\"", json);
+        // ⚠ 무제한은 키를 생략하면 422 — 명시적 null 이어야 한다
+        Assert.Contains("\"window_end\":null", json);
+    }
+
+    // ── PATCH DTO 에는 반복 필드가 타입상 존재하지 않는다(컴파일 타임 보증) ──
+    [Fact]
+    public void should_not_expose_recurrence_fields_on_update_dto()
+    {
+        var props = typeof(EventSuppressionScheduleUpdateDto).GetProperties()
+                                                             .Select(x => x.Name).ToArray();
+        Assert.DoesNotContain("DaysOfWeek", props);
+        Assert.DoesNotContain("DailyStart", props);
+        Assert.DoesNotContain("DailyEnd", props);
+        Assert.DoesNotContain("RecurrenceType", props);
+        // Create 와 상속 관계가 없어야 한다(상속하면 보증이 무너진다)
+        Assert.False(typeof(EventSuppressionScheduleUpdateDto)
+                        .IsAssignableFrom(typeof(EventSuppressionScheduleCreateDto)));
     }
 
     // ── 응답 DTO: 대상 배열 역직렬화 ──
@@ -196,6 +266,29 @@ public class EventSuppressionScheduleTests
     {
         var start = new DateTime(2026, 8, 3, 9, 0, 0);
         Assert.Equal(expected, SuppressionRules.IsWindowLengthValid(start, start.AddDays(days)));
+    }
+
+    // ── 모드별 상한: 단발 30 / 반복 366(경계 통과) / 무제한 검사 스킵 ──
+    [Theory]
+    [InlineData(30, SuppressionRecurrenceMode.None, false, true)]
+    [InlineData(31, SuppressionRecurrenceMode.None, false, false)]
+    [InlineData(366, SuppressionRecurrenceMode.Weekly, false, true)]   // 서버는 > 366 만 거부
+    [InlineData(367, SuppressionRecurrenceMode.Weekly, false, false)]
+    [InlineData(9999, SuppressionRecurrenceMode.Weekly, true, true)]   // 무제한이면 길이 무관
+    [InlineData(9999, SuppressionRecurrenceMode.None, true, true)]
+    public void should_apply_mode_specific_window_cap_when_validating(
+        int days, SuppressionRecurrenceMode mode, bool unlimited, bool expected)
+    {
+        var start = new DateTime(2026, 8, 9, 0, 0, 0);
+        Assert.Equal(expected,
+            SuppressionRules.IsWindowLengthValidFor(start, start.AddDays(days), mode, unlimited));
+    }
+
+    [Fact]
+    public void should_expose_mode_specific_max_days()
+    {
+        Assert.Equal(30, SuppressionRules.MaxWindowDaysFor(SuppressionRecurrenceMode.None));
+        Assert.Equal(366, SuppressionRules.MaxWindowDaysFor(SuppressionRecurrenceMode.Weekly));
     }
 
     // ── §5-B 같은 대상 활성 창 중복 판정 ──

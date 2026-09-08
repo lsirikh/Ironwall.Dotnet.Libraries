@@ -38,15 +38,18 @@ public interface IEventSuppressionApiService : IService
         int id,
         CancellationToken token = default);
 
-    /// <summary>억제 스케줄 생성(POST). 요청 DTO는 편집 필드만(서버 extra=forbid).</summary>
+    /// <summary>억제 스케줄 생성(POST). 요청 DTO는 편집 필드만(서버 extra=forbid).
+    /// <para>Create 전용 DTO 다 — 서버 Create 스키마에만 있는 반복 4필드를 담는다.</para></summary>
     Task<ApiResponse<EventSuppressionScheduleDto>> CreateSuppressionScheduleAsync(
-        EventSuppressionScheduleRequestDto dto,
+        EventSuppressionScheduleCreateDto dto,
         CancellationToken token = default);
 
-    /// <summary>억제 스케줄 부분 수정(PATCH). 대상 배열 제공 시 해당 모드 junction 전체 교체.</summary>
+    /// <summary>억제 스케줄 부분 수정(PATCH). 대상 배열 제공 시 해당 모드 junction 전체 교체.
+    /// <para>⚠ Update 전용 DTO 다 — 서버 Update 스키마에 <b>반복 4필드가 없어</b>
+    /// 반복 필드를 보내면 <b>422</b> 다. 타입으로 구조적 차단한다.</para></summary>
     Task<ApiResponse<EventSuppressionScheduleDto>> PatchSuppressionScheduleAsync(
         int id,
-        EventSuppressionScheduleRequestDto dto,
+        EventSuppressionScheduleUpdateDto dto,
         CancellationToken token = default);
 
     /// <summary>억제 스케줄 취소(DELETE soft-cancel). 서버가 revoked_at 세팅된 스케줄을 반환.</summary>

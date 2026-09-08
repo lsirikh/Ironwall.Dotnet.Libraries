@@ -118,6 +118,17 @@ public class EventUiModule : Module
             )).As<ISuppressionActiveMonitor>()
               .As<IService>().WithMetadata("Order", _count + 4)   // 자동 시작(ExecuteAsync 폴링) + OnExit StopAsync
               .SingleInstance();
+            // SYNC_EVENT_SUPPRESSION 자가필터 수신 — 회차 경계 통지를 받아 /active 폴링을 앞당긴다(가속 전용).
+            // ⚠ .As<IService>() 필수 — 빠뜨리면 StopAsync 가 안 불려 NATS 구독이 누수된다.
+            //    모니터(Order +4)가 먼저 서야 하므로 그 뒤 순번을 준다.
+            builder.Register(c => new EventSuppressionSyncNatsService(
+                c.ResolveOptional<ILogService>(),
+                c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
+                c.Resolve<ISuppressionActiveMonitor>(),
+                c.ResolveOptional<Ironwall.Dotnet.Libraries.Accounts.Api.Services.ITokenStorageService>()
+            )).As<IEventSuppressionSyncNatsService>()
+              .As<IService>().WithMetadata("Order", _count + 7)
+              .SingleInstance();
             builder.Register(c => new DetectionSyncNatsService(
                 c.ResolveOptional<ILogService>(),
                 c.Resolve<Ironwall.Dotnet.Libraries.Nats.Services.INatsService>(),
