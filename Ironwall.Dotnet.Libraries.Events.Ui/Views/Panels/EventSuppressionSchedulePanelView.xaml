@@ -6,6 +6,7 @@
 	xmlns:cal="http://caliburnmicro.com"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+	xmlns:beh="clr-namespace:Ironwall.Dotnet.Libraries.Events.Ui.Behaviors"
 	xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
 	xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -122,6 +123,24 @@
 								<Setter Property="Foreground" Value="{DynamicResource OnPrimaryFixedBrush}" />
 								<Setter Property="FontWeight" Value="Bold" />
 							</Trigger>
+							<!--  제스처 범위 표식 — '채움(면)' 과 축이 직교한 '하단 바(선)'.
+							     ⚠ 같은 브러시로 겹치면 지배적 제스처(칠하기)에서 범위가 안 보인다:
+							        라이트에서 Primary = Selection = FocusRing 이 완전 동일 색(대비 1.00:1)이다.
+							        그래서 채움 위에서는 OnPrimaryFixed, 빈 셀 위에서는 Primary 로 나눈다.  -->
+							<MultiDataTrigger>
+								<MultiDataTrigger.Conditions>
+									<Condition Binding="{Binding (beh:DayStripDragPaintBehavior.IsInGestureRange), RelativeSource={RelativeSource Self}}" Value="True" />
+									<Condition Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="True" />
+								</MultiDataTrigger.Conditions>
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource OnPrimaryFixedBrush}" />
+							</MultiDataTrigger>
+							<MultiDataTrigger>
+								<MultiDataTrigger.Conditions>
+									<Condition Binding="{Binding (beh:DayStripDragPaintBehavior.IsInGestureRange), RelativeSource={RelativeSource Self}}" Value="True" />
+									<Condition Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="False" />
+								</MultiDataTrigger.Conditions>
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+							</MultiDataTrigger>
 							<Trigger Property="IsEnabled" Value="False">
 								<Setter Property="Opacity" Value="0.38" />
 							</Trigger>
@@ -657,6 +676,12 @@
 												BorderThickness="1"
 												CornerRadius="4"
 												AutomationProperties.AutomationId="Events.SuppressionSchedule.DayStrip">
+												<i:Interaction.Behaviors>
+													<!--  드래그 범위 페인팅. 컨테이너가 PreviewMouseDown(터널)에서 선점해
+													     ButtonBase 의 캡처 강탈을 막는다(실측 근거는 Behavior 주석 참조).
+													     클릭 폴백 · ESC 취소 · Space/UIA Toggle 은 그대로 살아 있다.  -->
+													<beh:DayStripDragPaintBehavior Mask="{Binding DaysOfWeekMask, Mode=TwoWay}" />
+												</i:Interaction.Behaviors>
 												<StackPanel VerticalAlignment="Center" Orientation="Horizontal">
 													<ToggleButton
 														Content="월"
@@ -1120,7 +1145,7 @@
 					IsReadOnly="True"
 					ItemsSource="{Binding Schedules}"
 					RowHeaderWidth="0"
-					RowHeight="38"
+					MinRowHeight="38"
 					RowStyle="{StaticResource SuppressionRowStyle}"
 					Style="{StaticResource ModernDataGrid}"
 					AutomationProperties.AutomationId="Events.SuppressionSchedule.ScheduleGrid">
@@ -1155,9 +1180,14 @@
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 
-						<DataGridTemplateColumn Width="90" Header="상태">
+						<!--  90 → 132 : 배지(status) 옆에 '억제중'(is_suppressing_now) 표식을 형제로 둔다.
+						     ⚠ 두 값은 서로 다른 축이다 — status 는 창의 생애주기, 억제중은 지금 이 순간.
+						        StatusText 문자열에는 어떤 접미도 붙이지 않는다(하네스 T-SUP028 이 판독).
+						     ⚠ 헤더 이름 '상태'는 불변(T-SUP025 가 All(contains) 로 단언).  -->
+						<DataGridTemplateColumn Width="132" Header="상태">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate>
+								  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 									<Border
 										Padding="8,1"
 										HorizontalAlignment="Left"
@@ -1194,15 +1224,63 @@
 											Text="{Binding StatusText}"
 											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowStatusText.{0}}" />
 									</Border>
+									<!--  '억제중' 표식 — 색이 아니라 형태(삼각 글리프 + 굵기)로 구분한다.
+									     라이트에서 Primary/Selection 이 완전 동일 색이라 색만으로는 못 나눈다.  -->
+									<TextBlock
+										Margin="6,0,0,0"
+										VerticalAlignment="Center"
+										FontSize="11"
+										FontWeight="Bold"
+										Foreground="{DynamicResource StatusWarningBrush}"
+										Text="▶ 억제중"
+										Visibility="{Binding IsSuppressingNow, Converter={StaticResource BoolToVis}}"
+										AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowSuppressingText.{0}}" />
+								  </StackPanel>
 								</DataTemplate>
 							</DataGridTemplateColumn.CellTemplate>
 						</DataGridTemplateColumn>
 
-						<DataGridTextColumn Width="*" Binding="{Binding Name}" Header="작업명" />
-						<DataGridTextColumn Width="200" Binding="{Binding TargetSummary}" Header="대상" />
+						<!--  작업명 2줄 — 1줄 작업명 / 2줄 반복 요약(단발이면 빈 문자열이라 1줄 그대로).
+						     새 컬럼을 만들지 않는다(고정 합이 이미 빠듯해 작업명 * 가 붕괴한다).  -->
+						<DataGridTemplateColumn Width="*" Header="작업명">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+										<TextBlock
+											FontSize="11"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="{Binding RecurrenceSummary}"
+											TextTrimming="CharacterEllipsis"
+											Visibility="{Binding IsRecurring, Converter={StaticResource BoolToVis}}"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowRecurrenceText.{0}}" />
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
+						<DataGridTextColumn Width="170" Binding="{Binding TargetSummary}" Header="대상" />
 						<DataGridTextColumn Width="70" Binding="{Binding ScopeText}" Header="범위" />
 						<DataGridTextColumn Width="130" Binding="{Binding WindowStartText}" Header="시작(KST)" />
-						<DataGridTextColumn Width="130" Binding="{Binding WindowEndText}" Header="종료(KST)" />
+						<!--  종료 2행 — 1행 종료/무제한, 2행 회차 정보.
+						     ⚠ OccurrenceText 는 서버 occurrence_end/next_occurrence_start 를 그대로 쓴다.
+						        유효기간 경계에서 회차가 잘리므로 요약 문자열로 재계산하면 마지막 날에 거짓말을 한다.  -->
+						<DataGridTemplateColumn Width="130" Header="종료(KST)">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock
+											Text="{Binding WindowEndText}"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowWindowEndText.{0}}" />
+										<TextBlock
+											FontSize="11"
+											Foreground="{DynamicResource TextMutedBrush}"
+											Text="{Binding OccurrenceText}"
+											TextTrimming="CharacterEllipsis"
+											AutomationProperties.AutomationId="{Binding Id, StringFormat=Events.SuppressionSchedule.RowOccurrenceText.{0}}" />
+									</StackPanel>
+								</DataTemplate>
+							</DataGridTemplateColumn.CellTemplate>
+						</DataGridTemplateColumn>
 
 						<DataGridTemplateColumn Width="70" Header="취소">
 							<DataGridTemplateColumn.CellTemplate>
