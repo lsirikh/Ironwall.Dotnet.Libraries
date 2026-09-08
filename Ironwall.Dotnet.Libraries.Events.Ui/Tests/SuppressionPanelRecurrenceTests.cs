@@ -338,4 +338,16 @@ public class SuppressionPanelRecurrenceTests
         Assert.False(vm.IsActiveStale);
         Assert.False(vm.HasActiveBanner);
     }
+
+    // ══════ 적대검토 회귀 고정 ══════
+
+    [Fact]
+    public void should_expose_stale_text_binding_target()
+    {
+        // stale 문구가 비어 있으면 배너가 '글자 없는 빈 테두리'로 뜬다 —
+        // 활성 0건 + 폴링 실패에서 ActiveCountText 가 빈 문자열이기 때문이다.
+        // XAML 이 이 프로퍼티를 바인딩하므로 계약이 유지되는지 고정한다.
+        var vm = Vm();
+        Assert.NotNull(vm.ActiveStaleText);      // stale 아니면 빈 문자열(예외 아님)
+    }
 }

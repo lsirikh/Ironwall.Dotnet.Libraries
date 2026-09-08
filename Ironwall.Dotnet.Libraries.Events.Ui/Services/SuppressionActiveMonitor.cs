@@ -110,6 +110,8 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
     {
         // 로그인 게이팅 — 미인증 시 서버 호출 안 함(무인 폴링 금지).
         if (_tokenStorage is { IsAuthenticated: false }) return;
+        // 로그인 게이팅을 통과한 첫 순간을 stale 기산점으로 삼는다(미인증 대기 시간은 세지 않는다).
+        _startedAt ??= DateTime.Now;
         if (_inFlight) return;                              // 재진입 가드
         _inFlight = true;
         try
@@ -165,7 +167,14 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
 
     public DateTime? LastSuccessAt => _lastSuccessAt;
 
-    public bool IsStale => SuppressionPollThrottle.IsStale(DateTime.Now, _lastSuccessAt, TtlSeconds);
+    /// <summary>
+    /// ⚠ 기준 시각은 <c>_lastSuccessAt ?? _startedAt</c> 이다.
+    /// <para>성공 시각만 보면 <b>한 번도 성공하지 못한</b> 폴링(서버 재기동·구버전 404·502)이
+    /// 영원히 stale 이 아니게 되어 배너가 통째로 침묵한다 — 그러면 화면이
+    /// '억제 0건'과 '서버에 물어본 적 없음'을 구분 불가하게 같은 그림으로 보여준다.</para>
+    /// </summary>
+    public bool IsStale =>
+        SuppressionPollThrottle.IsStale(DateTime.Now, _lastSuccessAt ?? _startedAt, TtlSeconds);
 
     public string LastSuccessAgeText => SuppressionPollThrottle.DescribeAge(DateTime.Now, _lastSuccessAt);
 
@@ -230,6 +239,8 @@ public class SuppressionActiveMonitor : ISuppressionActiveMonitor, IDisposable
 
     private IReadOnlyList<EventSuppressionScheduleDto> _active = new List<EventSuppressionScheduleDto>();
     private DateTime? _lastSuccessAt;
+    /// <summary>stale 기산점 — 한 번도 성공 못 한 경우의 기준.</summary>
+    private DateTime? _startedAt;
     private DateTime? _lastPollAt;
     private bool _hasPending;
     private bool _inFlight;

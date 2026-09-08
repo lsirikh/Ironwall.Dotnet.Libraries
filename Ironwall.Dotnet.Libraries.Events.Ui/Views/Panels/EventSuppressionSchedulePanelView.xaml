@@ -413,7 +413,19 @@
 						     Visibility 는 HasActiveBanner — stale 일 때도 떠야 한다(폴링 실패 시 count 0).  -->
 						<Border Style="{StaticResource ActiveSuppressionBanner}">
 							<StackPanel Orientation="Horizontal">
-								<TextBlock FontWeight="Bold" Text="{Binding ActiveCountText}" />
+								<TextBlock
+									FontWeight="Bold"
+									Text="{Binding ActiveCountText}"
+									Visibility="{Binding HasActiveSuppression, Converter={StaticResource BoolToVis}}" />
+								<!--  ⚠ stale 문구가 없으면 배너가 '글자 없는 빈 테두리'로 뜬다 —
+								     활성 0건 + 폴링 실패일 때 ActiveCountText 가 빈 문자열이기 때문이다.
+								     그러면 '억제 0건'과 '서버에 못 물어봄'이 화면상 구분 불가가 되어
+								     이 배너의 존재 이유(억제 은폐 방지)가 정확히 그 지점에서 무너진다.  -->
+								<TextBlock
+									Margin="8,0,0,0"
+									Text="{Binding ActiveStaleText}"
+									Visibility="{Binding IsActiveStale, Converter={StaticResource BoolToVis}}"
+									AutomationProperties.AutomationId="Events.SuppressionSchedule.ActiveStaleText" />
 							</StackPanel>
 						</Border>
 

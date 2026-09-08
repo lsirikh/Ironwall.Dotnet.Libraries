@@ -353,11 +353,17 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             {
                 await LoadAllAsync();   // 목록 + /active 캐시 동시 갱신
                 // (§5-B) 겹친 창 잔존 경고 — 하나를 취소해도 다른 활성 창이 계속 억제할 수 있다.
-                if (ActiveWindows.Count > 0)
+                // ⚠ 여기서는 모니터 스냅샷(최대 30초 묵음)이 아니라 **방금 서버가 확인해 준 값**을 읽는다.
+                //    LoadAllAsync 안의 RefreshActiveAsync 가 await 로 _activeCache 를 갱신한 직후다.
+                //    모니터를 읽으면 방금 취소한 창을 그대로 세어 "1건 남아 있습니다" 라고 거짓말한다
+                //    — 목록엔 이미 '취소'로 보이므로 운용자는 찾을 수 없는 유령을 찾게 되고
+                //      안전 경고 자체를 불신하게 된다.
+                var residual = FreshActiveWindows.Count;
+                if (residual > 0)
                     await _eventAggregator!.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
                     {
                         Title = "억제 창 취소",
-                        Explain = $"취소했지만 아직 진행 중인 억제 창이 {ActiveWindows.Count}건 남아 있습니다.\n"
+                        Explain = $"취소했지만 아직 진행 중인 억제 창이 {residual}건 남아 있습니다.\n"
                                 + "해당 장비가 계속 억제될 수 있으니 목록에서 '진행중' 항목을 확인하세요."
                     });
             }
@@ -495,11 +501,16 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
             var res = await _api.GetActiveSuppressionSchedulesAsync(ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) return;
             _activeCache = res.Success && res.Data is not null ? res.Data : new List<EventSuppressionScheduleDto>();
+            // 표시용 SSOT(모니터)도 따라오게 앞당긴다 — 안 그러면 배너가 최대 30초 옛 건수를 보인다.
+            _monitor?.RequestImmediatePoll("suppression-refresh");
         }
         catch (Exception ex) { _log?.Warning($"[Suppression] /active 갱신 실패(무시): {ex.Message}"); }
         Execute.OnUIThread(() =>
         {
             NotifyOfPropertyChange(nameof(ActiveCountText));
+            NotifyOfPropertyChange(nameof(HasActiveBanner));
+            NotifyOfPropertyChange(nameof(IsActiveStale));
+            NotifyOfPropertyChange(nameof(ActiveStaleText));
             NotifyOfPropertyChange(nameof(HasActiveSuppression));
             NotifyDuplicateWarning();
         });
@@ -946,9 +957,15 @@ public class EventSuppressionSchedulePanelViewModel : BasePanelViewModel,
     /// <summary>현재 진행 중인 억제 창이 있는가(상단 경고 표시 조건).</summary>
     public bool HasActiveSuppression => ActiveWindows.Count > 0;
 
-    /// <summary>활성 억제 목록 — 단일 출처는 <see cref="ISuppressionActiveMonitor"/> 다.</summary>
+    /// <summary>활성 억제 목록(표시용 SSOT) — 단일 출처는 <see cref="ISuppressionActiveMonitor"/> 다.</summary>
     private IReadOnlyList<EventSuppressionScheduleDto> ActiveWindows
         => _monitor?.Active ?? _activeCache;
+
+    /// <summary>
+    /// <b>방금 서버가 확인해 준</b> 활성 목록(<see cref="RefreshActiveAsync"/> 가 await 로 갱신).
+    /// <para>생성·취소·삭제 <b>직후</b>의 판정은 30초 폴링 스냅샷이 아니라 이 값을 써야 한다.</para>
+    /// </summary>
+    private IReadOnlyList<EventSuppressionScheduleDto> FreshActiveWindows => _activeCache;
 
     /// <summary>
     /// 배너 표시 조건. ⚠ <b>stale 일 때도 떠야 한다</b> — 폴링이 실패해 목록이 0건이면

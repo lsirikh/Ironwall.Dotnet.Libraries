@@ -155,3 +155,79 @@ public class DayStripDragMathTests
         Assert.Equal(0, mask);
     }
 }
+
+/// <summary><see cref="SuppressionPollThrottle"/> 단위 테스트 — 스로틀·TTL·경과 문구.</summary>
+public class SuppressionPollThrottleTests
+{
+    private static readonly System.DateTime T0 = new(2026, 9, 8, 12, 0, 0);
+
+    // ══════ 스로틀 — 리딩 엣지 + 트레일링 보장 ══════
+
+    [Fact]
+    public void should_poll_now_on_first_request()
+        => Assert.Equal(PollDecision.PollNow,
+            SuppressionPollThrottle.Decide(T0, null, false));
+
+    [Fact]
+    public void should_defer_inside_cooldown()
+        => Assert.Equal(PollDecision.Defer,
+            SuppressionPollThrottle.Decide(T0.AddSeconds(2), T0, false));
+
+    [Fact]
+    public void should_poll_now_after_cooldown()
+        => Assert.Equal(PollDecision.PollNow,
+            SuppressionPollThrottle.Decide(T0.AddSeconds(5), T0, false));
+
+    [Fact]
+    public void should_not_schedule_twice()
+        => Assert.Equal(PollDecision.AlreadyScheduled,
+            SuppressionPollThrottle.Decide(T0.AddSeconds(1), T0, hasPendingSchedule: true));
+
+    [Fact]
+    public void should_poll_now_when_clock_goes_backwards()
+        // 시계 역행(수동 조정·DST)에도 멈추지 않아야 한다.
+        => Assert.Equal(PollDecision.PollNow,
+            SuppressionPollThrottle.Decide(T0.AddSeconds(-30), T0, false));
+
+    [Fact]
+    public void should_report_remaining_cooldown()
+        => Assert.Equal(3.0,
+            SuppressionPollThrottle.RemainingCooldown(T0.AddSeconds(2), T0).TotalSeconds, 3);
+
+    // ══════ TTL — 한 번도 성공 못 한 경우가 핵심이다 ══════
+
+    [Fact]
+    public void should_not_be_stale_right_after_success()
+        => Assert.False(SuppressionPollThrottle.IsStale(T0.AddSeconds(10), T0, 90));
+
+    [Fact]
+    public void should_be_stale_after_ttl()
+        => Assert.True(SuppressionPollThrottle.IsStale(T0.AddSeconds(91), T0, 90));
+
+    [Fact]
+    public void should_be_stale_when_never_succeeded_but_started_long_ago()
+    {
+        // 🔴 회귀 고정 — Monitor 가 기산점(_startedAt)을 넘겨주지 않으면
+        //    서버가 계속 실패할 때 배너가 영원히 침묵해
+        //    '억제 0건'과 '서버에 물어본 적 없음'이 구분 불가가 된다.
+        var startedAt = T0;
+        Assert.True(SuppressionPollThrottle.IsStale(T0.AddSeconds(91), startedAt, 90));
+    }
+
+    [Fact]
+    public void should_hold_stale_verdict_when_no_reference_time()
+        => Assert.False(SuppressionPollThrottle.IsStale(T0.AddSeconds(9999), null, 90));
+
+    // ══════ 경과 문구 ══════
+
+    [Theory]
+    [InlineData(30, "30초 전")]
+    [InlineData(180, "3분 전")]
+    [InlineData(7200, "2시간 전")]
+    public void should_describe_age(int seconds, string expected)
+        => Assert.Equal(expected, SuppressionPollThrottle.DescribeAge(T0.AddSeconds(seconds), T0));
+
+    [Fact]
+    public void should_describe_unknown_when_never_succeeded()
+        => Assert.Equal("확인 안 됨", SuppressionPollThrottle.DescribeAge(T0, null));
+}
