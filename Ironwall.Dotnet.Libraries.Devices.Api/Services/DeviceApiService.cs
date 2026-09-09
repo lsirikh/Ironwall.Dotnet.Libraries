@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Messages.Helpers;
@@ -1048,6 +1048,93 @@ public class DeviceApiService : IDeviceApiService
         {
             _log?.Error($"[{nameof(DeleteEnclosureAsync)}] Error: {ex.Message}");
             return ApiResponse<bool>.CreateError("INTERNAL_ERROR", $"Failed to delete enclosure {id}", ex.Message);
+        }
+    }
+    #endregion
+
+    #region - Gate Device API (통문, 서버 v6.3) -
+    public async Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(
+        string? gateStatus = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default)
+    {
+        try
+        {
+            var parameters = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(gateStatus)) parameters.Add("gate_status", gateStatus);
+            if (!string.IsNullOrEmpty(status)) parameters.Add("status", status);
+            parameters.Add("page", page.ToString());     // 서버 ge=1 — 0 은 VALIDATION_ERROR(2026-09-08 실측)
+            parameters.Add("limit", limit.ToString());
+
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/gates", parameters);
+            return await response.ToApiListResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetGatesAsync)}] Error: {ex.Message}");
+            return ApiListResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", "Failed to get gates", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.GetRequestAsync($"{_setupModel.Url}/devices/gates/{id}");
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(GetGateByIdAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to get gate {id}", ex.Message);
+        }
+    }
+
+    public async Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PatchRequestAsync($"{_setupModel.Url}/devices/gates/{id}", dto);
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(PatchGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to patch gate {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<GateDeviceDto>> ControlGateAsync(int id, string doorCommand, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync(
+                $"{_setupModel.Url}/devices/gates/{id}/control", new DoorControlRequestDto(doorCommand));
+            return await response.ToApiResponseAsync<GateDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(ControlGateAsync)}] Error: {ex.Message}");
+            return ApiResponse<GateDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to control gate {id}", ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ApiResponse<EnclosureDeviceDto>> ControlEnclosureAsync(int id, string doorCommand, CancellationToken token = default)
+    {
+        try
+        {
+            var response = await _apiService.PostRequestAsync(
+                $"{_setupModel.Url}/devices/enclosures/{id}/control", new DoorControlRequestDto(doorCommand));
+            return await response.ToApiResponseAsync<EnclosureDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[{nameof(ControlEnclosureAsync)}] Error: {ex.Message}");
+            return ApiResponse<EnclosureDeviceDto>.CreateError("INTERNAL_ERROR", $"Failed to control enclosure {id}", ex.Message);
         }
     }
     #endregion

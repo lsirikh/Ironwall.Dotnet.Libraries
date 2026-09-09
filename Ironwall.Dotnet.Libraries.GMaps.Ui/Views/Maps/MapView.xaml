@@ -1593,6 +1593,15 @@
 					Content="{Binding SensorInfoPanel}"
 					Visibility="{Binding IsSensorInfoPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+				<!--  PIDS 심볼 상세 보기 창(symbol-detail-and-door-control FR-15) — 편집 모드 아닐 때 우클릭 진입, 드래그 이동  -->
+				<ContentPresenter
+					x:Name="SymbolDetailPresenter"
+					Canvas.Left="150"
+					Canvas.Top="70"
+					Panel.ZIndex="130"
+					Content="{Binding SymbolDetailPanel}"
+					Visibility="{Binding IsSymbolDetailPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
 				<!--  카메라 팝업 연결선(Leader Line) — 카메라 심볼 중점 ↔ 팝업 경계, 팝업 아래 z레이어.
 				      팝업과 동일하게 맵 영역으로 클립: 팝업이 맵 위로 스크롤되면 연결선도 맵 경계에서 잘려 상단 크롬을 덮지 않음.  -->
 				<ItemsControl

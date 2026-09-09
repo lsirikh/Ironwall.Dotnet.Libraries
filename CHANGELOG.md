@@ -14,6 +14,23 @@
 
 ## [Unreleased]
 
+### Added
+- **PIDS 심볼 상세 보기 + 통문·함체 개폐 제어** (Track C · [PRD](docs/prds/symbol-detail-and-door-control-prd.md) · [Plan](docs/plans/symbol-detail-and-door-control-prd-plan.md) · [리포트](docs/reports/symbol-detail-and-door-control-report.md) · 사용자 승인 2026-09-08)
+  - **속성창 개폐 UI** — 접점 체크박스 제거 → `문 상태` 세그먼트(열림/닫힘/**명령 대기 중**/상태 미수신). **명령은 상태를 바꾸지 않는다** — 확정 상태는 `OPERATION_EVENT` 보고로만 전이한다(낙관적 갱신 시 구동 실패하면 화면이 거짓말을 한다). 타임아웃도 상태를 지어내지 않는다.
+  - **상세 보기 창** — 운영 모드 우클릭 맨 위 진입. 좌측 3D 프리뷰(**45°×8단 자동 회전**, 드래그 자유 회전 + 점선 구 가이드, 놓으면 1.5초 뒤 재개) / 우측 정보 탭 / 하단 액션 바.
+    **오빗 카메라는 지도 심볼과 분리**했다 — 지도 하우징은 피치 35° 고정으로 지면 정합이 걸려 있어 각도를 못 바꾼다. 메시·색표(`HousingPalette` 신설)만 공유하고 카메라는 별도. 독립성은 픽셀로 단언(프리뷰 각도를 바꿔도 지도 심볼 비트맵 불변).
+  - **액션 바 = 컨텍스트 메뉴 단일 출처** — 메뉴의 인라인 람다 7종을 명명 메서드로 추출해 양쪽이 같은 메서드를 부른다. 이 과정에서 `탐지 이력` 노출 조건 불일치(메뉴 `SmartSensor` 만 / 규칙 감지센서 14종)를 발견해 통일.
+  - **GPS 좌표 표기**(`GeoFormat`) — 서버 `geolocation{location,latitude,longitude,altitude,heading}` 를 DD+DMS 병기로. **(0,0)은 좌표가 아니라 "미등록"**, DMS 초 반올림 60 자리올림, 심볼 배치 좌표와의 거리(Haversine)를 20 m 이상이면 경고색으로 — `현재위치 적용` 누락을 눈에 띄게 한다.
+  - **Gate REST 경로** — `GateDeviceDto`/`GateDeviceModel` + `IDeviceApiService` 4종 + `SYNC_DEVICE` Gate 분기(메인 `NatsDomainService`).
+  - **`BROADCAST_STATUS` 구독**(`BroadcastStatusNatsSyncService`) — 종전엔 자기가 보낸 방송만 로컬 타이머로 표시해 다른 자리에서 시작한 방송이 화면에 없었다. 모르는 status 값은 지어내지 않고 무시한다.
+  - **마이크 PTT** — 배선 완료 후 `IsMicCommandSupported=false` 하나로 잠금. 서버 규격 회신([요청서](docs/coordination/server-broadcast-mic-request-2026-09-08.md)) 후 상수만 바꾸면 열린다.
+
+### Fixed
+- **통문(Gate) 부팅 벌크 로드 누락** — `DeviceProviderService.FetchAllDevicesAsync` 가 제어기·센서·카메라·스피커·함체·경광등은 가져오는데 **통문만 빠져 있었다**. 단건 조회는 `SYNC_DEVICE` 전용이라 부팅을 못 덮어, 통문 심볼의 `LinkedDevice` 가 영원히 null → **개폐 버튼 항상 잠김 + 부팅 시 문 상태 복원 무력**. 실기 로그로 확인(`Gates loaded: 2 items` — 서버에 있었는데 안 불러오고 있었다).
+- **장비 객체가 없는데 "연결됨"으로 표시** — `LinkedDeviceId > 0` 로 판정해 장비 목록에 그 장비가 없어도 탭이 전부 활성이고 값만 전부 `—` 였다. **객체 유무**로 판정하고 사유를 두 갈래로 구분(`연결되지 않음` / `장비(#id) 정보를 찾지 못함`).
+- **명령류 권한 fail-closed 누락** — `cameras:control` 이 `?? true` 로 남아 있었다. 정책을 `PermissionGate` 한 곳으로 모아 **명령류만 fail-closed / 조회·편집은 fail-open** 비대칭을 테스트로 고정.
+- **상세 창 재개봉 시 `⟲ 정면` 사망 · 숨은 창 3D 타이머 잔존** — 창이 Visibility 토글로 닫혀 `Unloaded` 가 오지 않는데 구독을 끊고 있었다. 구독 해제는 진짜 소멸 때만, 타이머는 `IsVisibleChanged` 로.
+
 ### Changed
 - **억제 스케줄 생성 폼 비주얼 리디자인 — 스토리보드 ①~⑥ 적용** (Track B · Events.Ui · [스토리보드](docs/design/suppression-schedule-form-redesign.html) · 사용자 승인 2026-08-07)
   - **① 입력 언어 통일** — 기존엔 TextBox/ComboBox 는 **Material 밑줄**, `mah:DateTimePicker` 는 **MahApps 박스**라 한 폼에 디자인 언어가 두 개였다. 세 컨트롤을 **박스형 36px**로 통일(`FormTextBox`/`FormComboBox` = `MaterialDesignOutlined*` 기반, `FormDateTimePicker`).

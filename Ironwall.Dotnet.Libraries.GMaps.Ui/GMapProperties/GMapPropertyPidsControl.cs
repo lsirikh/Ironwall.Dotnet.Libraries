@@ -53,7 +53,9 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 OnMarkerPropertyChanged("GateWidthM", before, last);
             });
             ResetGateWidthCommand = new PanelCommand(_ => ResetGateWidth());
-            Unloaded += (_, _) => { _gateWidthCommit.Flush(); UnsubscribeGateNotifier(); };
+            OpenDoorCommand = new PanelCommand(_ => SendDoorCommand(Ironwall.Dotnet.Libraries.Messages.Dto.Devices.DoorControlRequestDto.Open));
+            CloseDoorCommand = new PanelCommand(_ => SendDoorCommand(Ironwall.Dotnet.Libraries.Messages.Dto.Devices.DoorControlRequestDto.Close));
+            Unloaded += (_, _) => { _gateWidthCommit.Flush(); UnsubscribeGateNotifier(); StopDoorTimer(); };
         }
         #endregion
 
@@ -92,8 +94,144 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
         public static readonly DependencyProperty IsGateProperty = DependencyProperty.Register(nameof(IsGate), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
         public System.Windows.Input.ICommand ResetGateWidthCommand { get; }
 
+        #region - 문 개폐 제어(FR-02~08) -
+        private readonly Helpers.Door.DoorCommandGate _doorGate = new();
+        private System.Windows.Threading.DispatcherTimer? _doorTimer;
+
+        /// <summary>
+        /// 개폐 명령 전송기 — <c>PropertyPanelFactory</c> 가 주입한다(장비 Id · 장비 타입 · "OPEN"/"CLOSE" -&gt; 성공 여부).
+        /// 미주입이면 버튼은 비활성이다(배선 없는 환경에서 조용히 아무 일도 안 일어나는 것 방지).
+        /// </summary>
+        public Func<int, EnumDeviceType, string, Task<bool>>? DoorCommandSender { get; set; }
+
+        /// <summary>장비 제어 권한(devices:control) 판정기 — 미주입이면 <b>false</b>(fail-closed, FR-27).</summary>
+        public Func<bool>? CanControlDevice { get; set; }
+
+        /// <summary>명령 실패·타임아웃 통지기 — 미주입이면 무동작(FR-28/NFR-03).</summary>
+        public Action<string>? NotifyDoorIssue { get; set; }
+
+        public System.Windows.Input.ICommand OpenDoorCommand { get; }
+        public System.Windows.Input.ICommand CloseDoorCommand { get; }
+
+        /// <summary>화면 상태 — Unknown/Closed/Open/Pending. XAML 트리거·텍스트가 이걸 본다.</summary>
+        public Helpers.Door.DoorUiState DoorDisplayState { get => (Helpers.Door.DoorUiState)GetValue(DoorDisplayStateProperty); private set => SetValue(DoorDisplayStateProperty, value); }
+        public static readonly DependencyProperty DoorDisplayStateProperty = DependencyProperty.Register(nameof(DoorDisplayState), typeof(Helpers.Door.DoorUiState), typeof(GMapPropertyPidsControl), new PropertyMetadata(Helpers.Door.DoorUiState.Unknown));
+
+        /// <summary>열림 버튼 활성 — FR-04~07 조건의 AND.</summary>
+        public bool CanOpenDoor { get => (bool)GetValue(CanOpenDoorProperty); private set => SetValue(CanOpenDoorProperty, value); }
+        public static readonly DependencyProperty CanOpenDoorProperty = DependencyProperty.Register(nameof(CanOpenDoor), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
+
+        /// <summary>닫힘 버튼 활성.</summary>
+        public bool CanCloseDoor { get => (bool)GetValue(CanCloseDoorProperty); private set => SetValue(CanCloseDoorProperty, value); }
+        public static readonly DependencyProperty CanCloseDoorProperty = DependencyProperty.Register(nameof(CanCloseDoor), typeof(bool), typeof(GMapPropertyPidsControl), new PropertyMetadata(false));
+
+        /// <summary>상태 텍스트 — 열림/닫힘/대기/미수신/사유.</summary>
+        public string DoorStateText { get => (string)GetValue(DoorStateTextProperty); private set => SetValue(DoorStateTextProperty, value); }
+        public static readonly DependencyProperty DoorStateTextProperty = DependencyProperty.Register(nameof(DoorStateText), typeof(string), typeof(GMapPropertyPidsControl), new PropertyMetadata(string.Empty));
+
+        /// <summary>서버·현장이 보고한 상태를 게이트에 반영하고 화면을 다시 계산한다.</summary>
+        private void SyncDoorFromMarker(IPidsEditableMarker marker)
+        {
+            _doorGate.OnStateReported(marker.DoorState switch
+            {
+                EnumDoorState.Open => Helpers.Door.DoorUiState.Open,
+                EnumDoorState.Closed => Helpers.Door.DoorUiState.Closed,
+                _ => Helpers.Door.DoorUiState.Unknown,
+            });
+            StopDoorTimer();
+            RefreshDoorUi();
+        }
+
+        /// <summary>
+        /// 버튼 클릭 -&gt; 명령 발행. <b>성공해도 상태를 바꾸지 않는다</b> — 실제 전이는 매니저 보고
+        /// (OPERATION_EVENT -&gt; 마커 DoorState -&gt; <see cref="SyncDoorFromMarker"/>)로만 온다(FR-03).
+        /// </summary>
+        private async void SendDoorCommand(string command)
+        {
+            if (SelectedMarker is not IPidsEditableMarker marker) return;
+            if (!IsDoorControlAllowed(marker)) return;
+            if (!_doorGate.TryBegin(command, DateTime.Now)) return;   // 연타·미수신·동일상태 차단
+
+            RefreshDoorUi();
+            StartDoorTimer();
+
+            bool ok = false;
+            try
+            {
+                ok = DoorCommandSender is not null
+                     && await DoorCommandSender(marker.LinkedDeviceId, marker.DeviceType, command);
+            }
+            catch (Exception ex)
+            {
+                NotifyDoorIssue?.Invoke($"개폐 명령 전송 실패: {ex.Message}");
+            }
+
+            if (!ok)
+            {
+                // 전송 자체가 실패했으면 대기할 이유가 없다 — 즉시 풀고 알린다(NFR-03).
+                _doorGate.OnStateReported(_doorGate.ReportedState);
+                StopDoorTimer();
+                RefreshDoorUi();
+                NotifyDoorIssue?.Invoke("개폐 명령을 보내지 못했습니다.");
+            }
+        }
+
+        /// <summary>장비 연결(FR-06) 그리고 권한(FR-07). 게이트 자체 조건(대기·미수신)은 DoorCommandGate.CanSend.</summary>
+        private bool IsDoorControlAllowed(IPidsEditableMarker marker)
+            => marker.LinkedDeviceId > 0 && (CanControlDevice?.Invoke() ?? false);
+
+        private void RefreshDoorUi()
+        {
+            var marker = SelectedMarker as IPidsEditableMarker;
+            DoorDisplayState = _doorGate.DisplayState;
+
+            bool linked = marker is not null && marker.LinkedDeviceId > 0;
+            bool permitted = CanControlDevice?.Invoke() ?? false;
+            bool wired = DoorCommandSender is not null;
+            bool baseOk = linked && permitted && wired && _doorGate.CanSend;
+
+            CanOpenDoor = baseOk && _doorGate.ReportedState != Helpers.Door.DoorUiState.Open;
+            CanCloseDoor = baseOk && _doorGate.ReportedState != Helpers.Door.DoorUiState.Closed;
+
+            if (!linked) DoorStateText = "장비 미연결";
+            else if (!permitted) DoorStateText = "권한 없음(devices:control)";
+            else if (!wired) DoorStateText = "제어 배선 없음";
+            else if (_doorGate.LastCommandTimedOut) DoorStateText = "응답 없음 — 다시 시도하세요";
+            else DoorStateText = _doorGate.DisplayState switch
+            {
+                Helpers.Door.DoorUiState.Pending => "명령 보냄 · 응답 대기",
+                Helpers.Door.DoorUiState.Open => "열림",
+                Helpers.Door.DoorUiState.Closed => "닫힘",
+                _ => "상태 미수신(?)",
+            };
+        }
+
+        private void StartDoorTimer()
+        {
+            _doorTimer ??= CreateDoorTimer();
+            _doorTimer.Stop();
+            _doorTimer.Start();
+        }
+
+        private System.Windows.Threading.DispatcherTimer CreateDoorTimer()
+        {
+            var t = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, Dispatcher)
+            { Interval = TimeSpan.FromSeconds(1) };
+            t.Tick += (_, _) =>
+            {
+                if (!_doorGate.Tick(DateTime.Now)) return;
+                StopDoorTimer();
+                RefreshDoorUi();
+                NotifyDoorIssue?.Invoke("개폐 응답이 오지 않았습니다. 장비 상태를 확인하세요.");
+            };
+            return t;
+        }
+
+        private void StopDoorTimer() => _doorTimer?.Stop();
+        #endregion
+
         /// <summary>모델 변경을 다시 읽어야 하는 통문·함체 절 필드 — 이름은 마커 통지명과 같다.</summary>
-        private static readonly string[] GateFieldNames = { "GateWidthM", "OpenOnContactOn" };
+        private static readonly string[] GateFieldNames = { "GateWidthM", "OpenOnContactOn", "DoorState" };
         private System.ComponentModel.INotifyPropertyChanged? _gateNotifier;
 
         /// <summary>
@@ -134,6 +272,7 @@ namespace Ironwall.Dotnet.Libraries.GMaps.Ui.GMapProperties
                 OpenOnContactOn = marker.OpenOnContactOn;
             }
             finally { _syncingGate = false; }
+            SyncDoorFromMarker(marker);   // FR-02~05: 문 상태·버튼 활성 재계산
         }
 
         private void ResetGateWidth()

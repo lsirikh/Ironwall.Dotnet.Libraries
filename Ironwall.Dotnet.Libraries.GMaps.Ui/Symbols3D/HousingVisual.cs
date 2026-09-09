@@ -171,18 +171,8 @@ public sealed class HousingVisual : Grid
         {
             Color tint = BodyBrush is SolidColorBrush solid ? solid.Color : Colors.SlateGray;
             double strength = HousingAppearance.GetTintStrength(this);
-            material.Brush = token switch
-            {
-                "mat_body" => new SolidColorBrush(Color.FromRgb((byte)(220 * (1 - strength) + tint.R * strength), (byte)(227 * (1 - strength) + tint.G * strength), (byte)(234 * (1 - strength) + tint.B * strength))),
-                "mat_metal" => MetalBrush,
-                "mat_trim" => new SolidColorBrush(Color.FromRgb(35, 47, 60)),
-                "mat_glass" => new SolidColorBrush(Color.FromRgb(18, 57, 78)),
-                "mat_led" => new SolidColorBrush(Color.FromRgb(74, 222, 213)),
-                "mat_status" => StatusBrush,
-                "mat_mesh" => MeshBrush,
-                "mat_roof" => RoofBrush,
-                _ => token.StartsWith('#') ? (Brush)new BrushConverter().ConvertFromInvariantString(token)! : Brushes.Silver
-            };
+            // 색 결정은 HousingPalette 단일 정본 — 상세 창 3D 프리뷰가 같은 표를 쓴다(같은 장비=같은 색).
+            material.Brush = HousingPalette.Resolve(token, tint, strength, MetalBrush, StatusBrush, MeshBrush, RoofBrush);
         }
         InvalidateVisual(); ProjectionChanged?.Invoke(this, EventArgs.Empty);
     }

@@ -49,6 +49,7 @@
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/SensorInfoPanelStyle.xaml" />
 	<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/Housing3DMarkerStyle.xaml"/>
 		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/SymbolPaletteStyle.xaml"/>
+		<ResourceDictionary Source="/Ironwall.Dotnet.Libraries.GMaps.Ui;component/Themes/SymbolDetailStyle.xaml"/>
 	</ResourceDictionary.MergedDictionaries>
 
 

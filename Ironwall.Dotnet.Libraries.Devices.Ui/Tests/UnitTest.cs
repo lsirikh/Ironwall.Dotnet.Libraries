@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
@@ -1206,6 +1206,18 @@ public class MockDeviceApiService : IDeviceApiService
         => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
     public Task<ApiResponse<bool>> DeleteEnclosureAsync(int id, CancellationToken token = default)
         => Task.FromResult(ApiResponse<bool>.CreateError("NOT_IMPLEMENTED", "Mock"));
+
+    // ── Gate(통문, 서버 v6.3) — symbol-detail-and-door-control FR-09/10 ──
+    public Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(string? gateStatus = null, string? status = null, int page = 1, int limit = 20, CancellationToken token = default)
+        => Task.FromResult(ApiListResponse<GateDeviceDto>.CreateSuccess(new List<GateDeviceDto>()));
+    public Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(int id, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<GateDeviceDto>> PatchGateAsync(int id, GateDeviceDto dto, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<GateDeviceDto>> ControlGateAsync(int id, string doorCommand, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<GateDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
+    public Task<ApiResponse<EnclosureDeviceDto>> ControlEnclosureAsync(int id, string doorCommand, CancellationToken token = default)
+        => Task.FromResult(ApiResponse<EnclosureDeviceDto>.CreateError("NOT_IMPLEMENTED", "Mock"));
 
     // ──────────────────────────── Lamps ────────────────────────────
     public Task<ApiListResponse<LampDeviceDto>> GetLampsAsync(string? status = null, int page = 1, int limit = 20, CancellationToken token = default)

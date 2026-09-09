@@ -60,6 +60,34 @@ public class BroadcastControlService : IBroadcastControlService
         return await _brokerClient.RequestAsync(
             BuildSubject("stop"), EnumGopCommand.BROADCAST_STOP.ToString(), body).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// 마이크 방송 cmd 지원 여부. <b>서버 회신 전까지 false</b>(PRD §7 / 계획 SETUP-02).
+    /// 배선은 아래에 전부 되어 있으므로, 서버가 받아들이면 이 값만 true 로 바꾸면 된다.
+    /// </summary>
+    public bool IsMicCommandSupported => false;
+
+    public Task<BrokerRequestResult> PublishMicStartAsync(int speakerId) => PublishMicAsync(speakerId, start: true);
+
+    public Task<BrokerRequestResult> PublishMicStopAsync(int speakerId) => PublishMicAsync(speakerId, start: false);
+
+    private async Task<BrokerRequestResult> PublishMicAsync(int speakerId, bool start)
+    {
+        // 규격 미확정 상태에서 브로커에 모르는 cmd 를 던지면 매니저 로그만 더럽히고 아무 일도 일어나지 않는다.
+        // 그래서 여기서 막고, 사유를 그대로 UI 로 돌려준다.
+        if (!IsMicCommandSupported)
+            return BrokerRequestResult.Fail(EnumBrokerFailure.Invalid, MicNotSupportedMessage);
+
+        var body = new BroadcastMicBodyDto { SpeakerIds = [speakerId] };
+        var command = start ? MicStartCommand : MicStopCommand;
+        return await _brokerClient.RequestAsync(
+            BuildSubject(start ? "mic-start" : "mic-stop"), command, body).ConfigureAwait(false);
+    }
+
+    /// <summary>마이크 cmd 이름 — 서버 요청서(PRD §7)에 제안한 그대로.</summary>
+    internal const string MicStartCommand = "BROADCAST_MIC_START";
+    internal const string MicStopCommand = "BROADCAST_MIC_STOP";
+    internal const string MicNotSupportedMessage = "마이크 방송 규격이 확정되지 않았습니다(서버 회신 대기).";
     #endregion
 
     #region - Processes -

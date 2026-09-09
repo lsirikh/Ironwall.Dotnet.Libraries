@@ -17,4 +17,17 @@ public interface IBroadcastControlService
 
     /// <summary>방송 정지 (BROADCAST_STOP, REQ) — RSP 결과 반환</summary>
     Task<BrokerRequestResult> PublishStopAsync(int speakerId);
+
+    /// <summary>
+    /// 마이크 방송 cmd 를 서버가 받아들이는가(FR-23).
+    /// <para><b>false 인 동안 UI 는 버튼을 비활성으로 두고 사유를 보여준다</b> — 눌러도 아무 일이 없는 버튼을
+    /// 활성으로 두지 않는다. 서버 회신(SETUP-02) 후 true 로 바꾸면 아래 두 메서드가 그대로 동작한다.</para>
+    /// </summary>
+    bool IsMicCommandSupported { get; }
+
+    /// <summary>마이크 방송 시작 (BROADCAST_MIC_START, REQ). 누르고 있는 동안만 유효 — 토글이 아니다.</summary>
+    Task<BrokerRequestResult> PublishMicStartAsync(int speakerId);
+
+    /// <summary>마이크 방송 중지 (BROADCAST_MIC_STOP, REQ). 버튼에서 손을 떼면 즉시 보낸다.</summary>
+    Task<BrokerRequestResult> PublishMicStopAsync(int speakerId);
 }

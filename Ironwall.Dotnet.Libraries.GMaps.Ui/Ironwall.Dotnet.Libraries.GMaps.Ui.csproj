@@ -42,6 +42,8 @@
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Base\Ironwall.Dotnet.Libraries.Base.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.SystemResources\Ironwall.Dotnet.Libraries.SystemResources.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices\Ironwall.Dotnet.Libraries.Devices.csproj" />
+	<!-- symbol-detail-and-door-control FR-03: 개폐 명령 REST(POST .../control). Accounts.Api 선례와 동형, 순환 없음 -->
+	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Devices.Api\Ironwall.Dotnet.Libraries.Devices.Api.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Enums\Ironwall.Dotnet.Libraries.Enums.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Theme\Ironwall.Dotnet.Libraries.Theme.csproj" />
 	<ProjectReference Include="..\Ironwall.Dotnet.Libraries.Events.Ui\Ironwall.Dotnet.Libraries.Events.Ui.csproj" />

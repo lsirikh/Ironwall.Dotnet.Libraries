@@ -92,6 +92,7 @@ namespace Ironwall.Dotnet.Libraries.Events.Ui.ViewModels.Events{
             EnumDeviceType.IpSpeaker => "스피커",
             EnumDeviceType.Enclosure => "함체",
             EnumDeviceType.Lamp => "경고등",
+            EnumDeviceType.Gate => "통문",
             not null => "센서",
             null => null
         };

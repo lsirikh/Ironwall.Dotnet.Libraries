@@ -45,6 +45,7 @@ public class EnumToKoreanConverterTests
         Assert.Equal("펜스센서", EnumKoreanMap.To(EnumDeviceType.Fence));
         Assert.Equal("제어기", EnumKoreanMap.To(EnumDeviceType.Controller));
         Assert.Equal("카메라", EnumKoreanMap.To(EnumDeviceType.IpCamera));
+        Assert.Equal("통문", EnumKoreanMap.To(EnumDeviceType.Gate));   // D2
     }
 
     [Fact]

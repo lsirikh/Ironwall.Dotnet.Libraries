@@ -375,6 +375,33 @@ public static class DtoToModelHelper
         return dto;
     }
 
+    // ────────────────────────── Gate (통문, 서버 v6.3) ──────────────────────────
+
+    /// <summary>
+    /// 통문 DTO → 모델. <c>urls</c>·<c>link_info</c> 는 서버가 자유 JSONB 라 <b>원본 JSON 문자열</b>로 보존한다
+    /// (스키마가 바뀌어도 값이 유실되지 않게 — 파싱은 소비처 책임).
+    /// </summary>
+    public static GateDeviceModel ToGateDeviceModel(this GateDeviceDto dto)
+    {
+        if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+        var model = new GateDeviceModel
+        {
+            Id = dto.Id,
+            DeviceNumber = dto.NumberDevice,
+            DeviceGroups = dto.DeviceGroups?.Select(g => g.Id).ToList(),
+            DeviceName = dto.NameDevice,
+            DeviceType = ParseDeviceType(dto.TypeDevice),
+            Version = dto.Version ?? string.Empty,
+            Status = ParseDeviceStatus(dto.Status),
+            GateStatus = dto.GateStatus ?? "CLOSED",
+            UrlsJson = dto.Urls?.ToString(Newtonsoft.Json.Formatting.None),
+            LinkInfoJson = dto.LinkInfo?.ToString(Newtonsoft.Json.Formatting.None),
+        };
+        MapGeolocationToModel(dto, model);
+        return model;
+    }
+
     // ────────────────────────── Enclosure ──────────────────────────
 
     public static EnclosureDeviceModel ToEnclosureDeviceModel(this EnclosureDeviceDto dto)

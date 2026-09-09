@@ -1,5 +1,87 @@
 # 세션 컨텍스트
 
+## ▶▶ 재개 포인트 (2026-09-09 — DeviceType↔SensorType 분화 분석 완료, **정책 확정 대기**)
+
+**정본**: [`docs/analyses/devicetype-sensortype-split-scenario-analysis.md`](../analyses/devicetype-sensortype-split-scenario-analysis.md)
+(+ 카탈로그 942건 · 시뮬 전량로그 · 시뮬레이터 — `docs/tests/devicetype-sensortype-split-*`)
+
+- **질문**: `EnumDeviceType`(22값)에 장비종류 7 + 센서종류 13 + `Fence_Group` + `NONE`이 혼재. `SensorType` 분화 시 파급은?
+- **결론**: **안 B(비파괴 파생) 권고** — 값·이름 그대로 두고 `Category`/`SensorType` 축을 **파생**으로 추가.
+  시뮬 942건에서 ISSUE **현행 149 → B 22**. 반면 **A안(파괴적 분리)은 200으로 현행보다 나쁘다**.
+- **🔴 초기 가설 2건을 실측으로 정정했다 (반드시 기억)**:
+  ① "정수축·문자열축 둘 다 만족시켜야" → **틀림**. 라이브 영속·와이어는 **전부 문자열**.
+     정수 저장 0건. **값 재배치는 무해, 이름 변경이 진짜 위험**.
+     정수는 3곳 잠복뿐(PidsSymbolModel=인프로세스 Undo 왕복 / BaseDeviceModel=역직렬화 경로 0 / BrkDectection=호출부 0).
+  ② "서버는 이미 2축, 클라만 1축" → **틀림**. 서버가 `category_device`를 **SPEC-6.1로 API 응답에서 제거**함
+     (`openapi.json` 실측, 클라 참조 0건). 클라가 Category를 가지려면 **type_device에서 유도**하거나 서버에 노출 요청해야 함.
+- **유일한 라이브 로컬 영속** = `PidsSymbols.DeviceType VARCHAR(20) DEFAULT 'Fence'`. 읽기가 `TryParseEnum(...,NONE)` 무음 폴백이라
+  이름이 사라지면 전 심볼이 NONE → `DeviceFilterHelper.cs:71` `_ => devices`로 **필터 소멸, 아무 장비에나 바인딩**.
+- **dead code 확정(참조 csproj 0건)**: `Devices.Db` · `Events.Db` · `Framework.Models` · `NatsBrokerService.GetDevice(Brk*)`.
+- **선행결함 DF-1~14** (분화와 무관하게 이미 존재): `Cable`→NRE · `Gate` 이중경로(GateStatus 유실) ·
+  클래스↔타입 무검증(SensorDeviceModel에 IpCamera 대입 가능) · UI 콤보 22값 무필터 9곳 ·
+  `SensorDeviceModel`만 ctor 기본값 없어 `type_device:"NONE"` 전송→422 · 한글맵 4벌 불일치 등.
+
+### ▷ ✅ 부록 A 추가 (2026-09-09, v1.1) — 사용자 제안 **"카테고리별 전용 enum 분화"** 타당성 조사
+
+사용자 제안: *"2단계로 나누자. `type_device`는 각 장비별 타입으로. 카메라=None/Fixed/PTZ/SpeedDome,
+센서=Multi/Fence…, 제어기=Controller/SmartController/IoController. 이름은 같아도 다른 enum 타입으로 정의 가능하잖아."*
+→ 3축 병렬 실사(서버 계약 · 클라 enum 11종 생사 · 카테고리 비인지 코드).
+
+- **판정**: 언어 차원은 **가능**(동명 멤버 선례 풍부: `NONE` 9종 · `EnumDeviceType.Gate` vs `EnumBuildingType.Gate` 동일 네임스페이스).
+  **그러나 `type_device`를 그대로 쪼개는 것은 불가.**
+  **핵심 역설** — 쪼개려면 "이 행이 어느 enum인지" 알려줄 카테고리 축이 필요한데, **지금 그 역할을 하는 게 `DeviceType` 자신**이다.
+- **서버는 이미 절반 그 구조다**: Camera(`category`+`mode`, Create REQUIRED, 쿼리 有) · Speaker(`speaker_type`, 쿼리 有) **2축 완성** /
+  **Sensor만 `type_device`가 종류를 겸함**(다값 + `?type_device`) / Controller·Enclosure·Lamp는 종류축 **부재** / Gate는 **서버에 카테고리 자체가 없음**.
+  ⚠ 위 ②의 "`category_device` 제거"는 **정확히는 "거의 미노출"** — openapi 273스키마 중 `SpeakerNestedResponse` **1곳**에만 있고 쿼리는 0건. `EnumDeviceCategory`는 6값으로 살아있다(설계서는 5값 — 설계서 누락).
+  ⚠ **`type_device`로 카테고리 역추론 금지** — Enclosure가 `type_device="IoController"`라 IO제어기와 충돌.
+- **클라 enum 11종 중 살아있는 건 `EnumCameraType` 하나.** `EnumSpeakerType`은 **고아**(`SpeakerDeviceModel.cs:21-22`가 `string`, 모델·DB·파서 사용 0건).
+  **성공/실패의 갈림길** = 모델 프로퍼티가 **강타입 enum**인가(성공 3: CameraType·FenceMode·BuildingType) **string**인가(실패 3: SpeakerType·DoorStatus·DayNightMode).
+  → **새 enum을 만들되 모델을 string으로 두면 똑같이 죽는다.**
+- **최대 장애물 — 심볼이 카테고리를 모른다**: `PidsSymbolModel`에 카테고리 필드 없음 · `PidsSymbols` DDL에 카테고리 컬럼 없음(`DeviceType VARCHAR(20)` 하나) ·
+  `EnumMarkerCategory`는 전부 `PIDS_EQUIPMENT` 단일값 · **`LinkedDeviceId=0` 미연결 심볼이 정상 유스케이스**라 장비에서 빌려올 수도 없다.
+- **카테고리 비인지 코드**(`.cs` 903건/119파일, `.xaml` 10): 그대로 가능 **1건**(`LayerTreeBuilder`) / 인자 추가 **3건**(무성 실패 위험) / **나머지 전부 재설계**.
+  가장 위험 = **`PidsMarkerStyle.xaml` 트리거 36건**(DP 타입 쪼개면 컴파일 에러 없이 런타임 무동작).
+- **권고 = 안 B′(2단계 하이브리드)**: `EnumDeviceType` 이름·값 보존 → **카테고리 판별자로 역할 굳힘** + 종류는 **카테고리별 새 필드로 분리**
+  (= 서버가 Camera/Speaker에서 이미 한 방식). 단계1 클라 정상화(서버 변경 0) → 단계2 서버 협의(`category_device` 전 응답 노출 + `controller_type`/`enclosure_type`/`lamp_type`) → 단계3 센서.
+- **정정 3건**: ⓐ "Camera·Speaker 절반 구현"→**Camera만 살아있음** ⓑ `EnumMarkerCategory`에 `PIDS_GROUP` **없음** ⓒ `SpeedDome`은 dead 어셈블리에 `SPEED_DOM`으로 잔존(과거 수요 흔적).
+- **신규 결함 8건 DF-A1~A8**: 스피커 한글맵 도달불가 · 유형 입력이 자유 TextBox(힌트 "IP" 오복붙) · 그리드 편집 불가(OneWay) ·
+  카메라 `Category`↔심볼 `ModelVariant` **동기화 0건**(PTZ 장비가 고정형 3D로 렌더) · `FISHEYES`/`THERMAL` 조용히 NONE · `EMSTONE_API` ONVIF 버튼 영구 비활성 등.
+
+
+### ▷ 🔑 부록 B 추가 (2026-09-09, v1.2) — **축 재정의: Device 모델 ≠ Symbol 모델** ← 부록 A 결론을 뒤집음
+
+**사용자 원칙(확정)**: *"Device의 Model과 Symbol의 Model 속성은 반드시 같을 필요가 없다.
+Device는 **장비 정보**, Symbol은 **아이콘 형상 정보**가 주목적이다."*
+
+- **부록 A의 "핵심 역설"이 소멸한다.** 심볼은 카테고리를 알 필요가 없다 — **형상 축**만 있으면 된다.
+- **증거**: 심볼이 `DeviceType`으로 분기하는 지점이 **전부 시각 자산 반환**(3D 키·PackIconKind·크기·컨트롤 클래스·XAML 트리거).
+  `HousingModels.DeviceKey` 반환 문자열 집합이 **이미 형상 enum**(타입만 없음). `SmartSensor|SmartSensor2|SmartCompound→"sensor"` 합침 = 같은 모양이란 뜻.
+  `PidsSymbolModel` 필드 중 장비 도메인은 `LinkedDeviceId`·`DeviceType` **둘뿐**, 나머지는 전부 형상/표시/상태.
+- **재배치**: Device = `category_device` × 카테고리별 종류 enum **+ 제조사 가변 JSONB** /
+  Symbol = **`EnumSymbolShape` 단일 축**(18~19값) / Bridge = `DeviceFilterHelper`(형상→허용 장비).
+- **사용자 결정**: **D-B1** 형상 자동동기화 X, 사용자가 콤보 선택 + `DeviceFilterHelper` 갱신 ·
+  **D-B2** `OpticalCable` 존치(미활용), `NONE`·`Cable`·`Fence_Group` 제거 가능 ·
+  **D-B3** `"fencegate"` 폐기 → `Gate` enum 멤버 · **D-B4** Detection* = **FOV 표시 파라미터**(심볼 소유 확정), 제조사 차이는 **서버 JSONB**(협의 중).
+- ⚠ **D-B2 정밀화**: 세 값 모두 **서버 `EnumDeviceType` 20값에 실재**(openapi 실측). → **형상 축에서만 즉시 제거 가능**,
+  **장비 축 제거는 서버 협의 항목**. 특히 `Fence_Group`은 **팔레트 그룹드로잉 진입점**(`SymbolPaletteView.cs:193`→`MapViewModel.cs:4517`)이라 대체 트리거 필요.
+  `Cable`은 `DeviceModelConverter.cs:59` 다형 분기까지 물려 있음.
+- ⚠ **`"fencegate"` 원인 규명**: `HousingModels.Create` 디스패치가 **평면 문자열**이라 `"gate"`가 `default→BuildInfrastructure`로 새 시설물 정문이 그려짐.
+  → 자산 키를 **도메인 네임스페이스**(`pids.gate` / `infra.gate`)로 바꾸면 회피 불필요.
+- ✅ **JSONB는 신규 패턴이 아니다** — `GateDeviceDto.cs:27,35`(`Urls`,`LinkInfo`) · `EnclosureDeviceDto.cs:26` · `ServerDto`/`*MetricDto` 등 **이미 다수 존재**.
+  다만 `JObject?` vs `IDictionary<string,JToken>?` **두 형태 혼재** + **모델 승격 여부 미확인** + 속성창 **동적 렌더 필요**.
+- **뒤집힌 판정**: 심볼 DB는 **카테고리 컬럼 신설 불필요**(`DeviceType`→`Shape` 1:1 리네임) · XAML 트리거 36건은 **DP 단일 타입 유지로 해소** ·
+  복합키는 `(Id,Category)`/Id 단독으로 **단순화**(`_deviceLookupById` 보조 인덱스 이미 존재) · `ModelVariant` string 축 **흡수**(DF-A5 원인 제거).
+- **여전히 유효**: 장비 축 모델 프로퍼티를 `string`으로 두면 죽는다(A-2-1) · KoreanMap default 은폐(A-4-3) · 서버 `category_device` 미노출(A-1-3).
+- **🔲 미결 M-1~M-7**: 형상 파싱 폴백 정책(`NONE` 대체) · 팔레트 그룹 진입점 · `IoController`가 Controller냐 Enclosure냐(서버 `EnclosureCreate` 기본값이 `IoController`) ·
+  `OpticalCable` 폴백 아이콘 · JSONB 형태 통일/모델 승격 · 장비 축 3값 제거 서버 협의 · `Gate` 서버 카테고리 부재(서버 `EnumDeviceCategory` 6값에 `gate` 없음).
+
+- **🔲 다음**: 정책공백 **G-1~G-9 확정**(특히 G-1 분화방식 · G-2 `IoController` 축 · G-4 `Fence_Group` · G-6 `Cable`) →
+  `openapi.json` 재수집 → PRD → Plan.
+- **미완 작업**: 사용자 요청 "장비정보에서 유형 제거"(함체·경광등 포함) — **아직 파일 미수정**.
+  6개 패널 그리드 `Header="유형"` + 5개 `*SelectionView` 읽기전용 필드가 대상이고,
+  ⚠ `SpeakerSelectionView.xaml:189`의 "유형"은 `SpeakerType`이라 **유지**해야 한다.
+  이 분석의 G-1이 확정되면 센서 화면을 지울지 `EnumSensorType`으로 바꿀지가 함께 결정된다.
+
 ## ▶▶ 재개 포인트 (2026-09-08, 이 세션 — 그룹 심볼 변환 PRD **v2.0 재검토**: 3D 심볼·틸트 도입 반영) — 🔲 **사용자 결정 10건 + 승인 대기**
 
 - **사용자 요청**: "다시 한번 검토해줘 3D 심볼까지 도입됐거든??"
@@ -355,7 +437,7 @@
   V-12 라이트/다크 실기 캡처 · UI 하네스 회귀(계정 필요) · 로컬 6.3.3 라이브 왕복.
 
 - **📮 서버팀 회신 대기 4건**: ① 원격 6.3.3 배포 일정 ② `permission_map.py` 에 `/reorder` 항목 누락 ③ 단발 창 경계 `suppressing` 오발행(`suppression_scheduler.py:55-89 _fire_boundary` 가 `notified_suppressing` 미기록 → 시작 시 `{active,false}` 발행 후 ≤5분 뒤 2번째) ④ G5 통계 문자열 매칭 여부.
-- **🐛 별건 발견 — `docs/INDEX.md` mojibake 14행**: coordination·design 절의 **섹션 제목·표 헤더**가 깨져 있다(`?뚯씪`=파일, `?ㅺ퀎`=설계). **HEAD 커밋본에 이미 존재 = 이 세션 소행 아님**(과거 CP949 쓰기). `?` 로 소실된 바이트가 있어 변환 복원 불가 — 표 헤더·섹션 제목은 재작성으로 복구 가능. **사용자 판단 대기**.
+- **🐛 별건 발견 — `docs/INDEX.md` mojibake 14행**: coordination·design 절의 **섹션 제목·표 헤더**가 깨져 있다(`?뚯씪`=파일, `?ㅺ퀎`=설계). **HEAD 커밋본에 이미 존재 = 이 세션 소행 아님**(과거 CP949 쓰기). `?` 로 소실된 바이트가 있어 변환 복원 불가 — 표 헤더·섹션 제목은 재작성으로 복구 가능. **✅ 2026-09-08 복구 완료** — 섹션 제목 2·표 헤더 2·조율 1행은 결정적 복원, design 11행은 각 HTML `<title>`/`<h1>` 에서 재생성(소실 바이트 복구 불가라 제목 수준). 잔존 0 · 선행 파이프 누락 5행도 함께 복원.
 
 ### ▷ ✅ 서버 API **6.3.4 입력 검증 강화** 대응 완료 (2026-09-08) — 커밋 `248b160e` · 플랜 64/65
 
@@ -381,6 +463,51 @@
 - **커밋 `248b160e`** — 정확히 **4파일 / +271 −22**, 억제 도메인 전용. 타 세션 심볼 누출 검사 통과(IDoorContactPolicy 0 · OperationEventNatsSyncService 0 · HousingVisual 0). 조율 문서는 `.gitignore` 대상이라 제외.
 - **문서 갱신**: PRD **v1.1**(FR-11 정정 · **FR-19 신설** · 함정 21~23 추가) · 플랜 **S7 절 신설**(G-01~05, 64/65).
 
+### ▷ ✅ 게이트 B 잔여 정리 (2026-09-08) — 사용자 "남은 작업 있으면 해줘"
+
+**결론: 헤드리스로 가능한 잔여는 전부 닫았다.** 남은 건 실기 캡처 3건 + UI 하네스 1건뿐이다.
+
+- **🎯 로컬 라이브 왕복 완료** — 게이트 B 최대 항목. `pids-api-server` 컨테이너가 **HTTPS 8000** 에서 살아 있었다(내 첫 `http://` 프로브가 000 을 받아 "죽었다"고 오판할 뻔했다). GIS 앱 미실행이라 세션 evict 위험도 없었다.
+  - **⚠ 서버가 6.3.7 이었다**(안내문은 6.3.4). 6.3.5~6.3.7 델타는 CHANGELOG 확인 결과 **운영이벤트 카테고리·통문(Gate) 장비·사전경보(Alert)** 로 **억제와 무관** — 내 정합은 유효.
+  - 프로브를 **실제 출하 DTO(`Messages.dll`) + `ApiService` 와 동일한 `JsonSerializerSettings`** 로 만들었다. 파이썬으로 손 재현하면 offset 함정(`window_*` 필수 / `daily_*` 금지)을 재현 못 해 **거짓 통과**가 난다.
+  - **9시나리오 13단언 전부 통과**: 자정 종일 **201**(내 수정 확증) · 비자정 동일 시각 **422** · 도달 불가 창 **422**(FR-19 가 서버와 동일 판정) · 무제한 `window_end:null` 명시 · 단발 `ShouldSerialize` 반복필드 제거 · 자정넘김 201 · 단발 400일 **422** · 요일 0개 **422**.
+  - 생성 5건은 전부 미래 창(now+30d)이라 실제 억제 미발동, 취소→하드삭제로 **잔존 0건**. 자격은 파일 경유(명령행 금지), 실행 후 삭제.
+- **🔁 함정 23종 전수 리뷰 완료**(플랜 DoD) — 전항 통과. 14는 `ToMon0` 로 월=0 변환 후 시프트, 20은 상태 콤보가 정확히 5종이라 하네스 `SuppressionSweepTests.cs:157` 단언과 일치.
+- **✅ FR-17 은 이미 끝나 있었다** — 플랜의 `[!]` 는 낡은 표기. 메인 커밋 `5cb8977` 에 `NatsBrokerService.cs:320` no-op 케이스 실재.
+- **🔴 함정 16 전제가 틀렸었다** — "요일 0개를 서버가 안 막는다(U-1)" 는 **오류**. 라이브에서 **422** (`Input should be greater than or equal to 1`). PRD 정정. 클라 검증은 UX 목적으로 유지.
+- **🖼 라이트/다크 오프스크린 렌더 성공**(`docs/assets/suppression-recurrence/suppression-panel-{light,dark}.png`, 각 9/9) — **이전 세션이 "미해결"로 남겼던 시각트리 실현 문제를 뚫었다.** 원인 2가지:
+  | # | 원인 | 증상 |
+  |---|---|---|
+  | ① | **라이브러리 BAML 이 상대 pack URI** | `Activator.CreateInstance` 가 **예외 없이 성공하는데 `Content == null`**(자손 2개). `Application.LoadComponent(view, 상대URI)` 로 해결 — **절대 URI 는 거절**된다 |
+  | ② | **App.xaml 병합 목록 미복제** | `MaterialDesignFlatButton` 등 **MDIX 패키지 키**에서 `XamlParseException`(XAML 321행). 정적 스캔이 "잔여 4건은 MDIX 키"라 했던 그 지점이 런타임에 실제로 터진다. MahApps→BundledTheme→MD3.Defaults→개별 MD→Theme.Current 순서까지 복제해야 한다 |
+  - 뚫고 나니 **자손 813 · 요일 칩 7 · 앵커 `~` 1 + 구분자 `–` 1 · 배경 휘도 방향 정상**. 육안으로 양 테마 모두 정상.
+  - ⚠ **실기 대체 아님** — DataContext 가 없어 목록이 비고, `Visibility` 바인딩 미적용으로 **빈 상태 오버레이 2개가 겹쳐** 렌더된다. 그 겹침이 국소 대비를 오염시켜 낮게 나오므로(다크 1.40 · 라이트 2.40) **판정에 쓰지 않는다**. 메모리 `project_offscreen_panel_render_needs_application` 에 3함정으로 정리.
+- **🧹 `docs/INDEX.md` mojibake 복구** — 사용자 판단 대기로 뒀던 건이나 `encoding-i18n.md` 가 방치를 금지하므로 처리. 섹션 제목 2 · 표 헤더 2 · 조율 1행은 결정적 복원, **design 11행은 각 HTML 의 `<title>`/`<h1>` 에서 재생성**(소실 바이트는 복구 불가라 제목 수준으로 정직하게). **잔존 mojibake 0**. 덤으로 선행 파이프 누락 5행도 복원.
+- **잔여(전부 실기·독점 데스크톱 필요)**: V-08 실입력 캡처 소유권 · V-09 MDIX 자연높이 · V-11 목록 잔여행 · **V-12 실기 캡처** · UI 하네스 회귀(계정 필요).
+
+### ▷ ✅ 억제 PRD **v1.1 승인** (2026-09-08) — 사용자 "승인"
+
+- **⚠ "승인" 대상 확인 후 진행했다.** 훅 배너는 `symbol-3d-housing-prd.md` 를 검토대기로 표시했지만, `approve prd` 는 **경로 인자를 안 받고 mtime 최신 PRD** 를 집는다([[project_approve_prd_picks_newest_mtime]]). 방금 억제 PRD 를 수정해 **그게 mtime 1위**(symbol-3d-housing 은 5위)라, 배너를 믿고 명령을 실행했으면 **엉뚱한 PRD 가 승인**됐다. 사용자에게 물어 **억제 PRD v1.1** 임을 확정.
+- **🔴 `approve prd` 명령은 이 건에 쓸 수 없다** — `executePrdApproval` 이 `^- \*\*상태\*\*:\s*Draft` 를 요구하는데(`advance-phase-changelog.js:110`) 억제 PRD 는 v1.0 에서 이미 `Approved` 다. 실행하면 `'현재 상태가 Draft가 아님'` 으로 exit(1). ⇒ **개정판(v1.x) 재승인은 이 명령의 사정거리 밖**이라 문서에 직접 기록했다(명령이 하려던 것과 동일: 상태 라인 + 변경이력 행).
+  - 부작용 점검도 통과 — `.pending-prd-review` 마커는 **애초에 없어서** 타 세션 검토대기 배너를 지울 위험이 없었다.
+  - 파이프라인 phase 는 무변경(`approve prd` 는 phase 를 안 건드린다). 타 세션 `pidsgroup-rightclick` dev 36/50 무영향.
+- **승인 범위**: 서버 계약 추종 갱신(FR-11 정정 · FR-19 신설 · 함정 21~23) + 라이브 왕복 13/13 · 함정 23종 전수 · FR-17 완료 확인분.
+
+### ▷ ⏸ 실기 검증 시도 (2026-09-08) — **입력 주입 거부로 중단**, 환경 사실 5건 확보
+
+사용자 "지금 독점될거 같다" → preflight 후 하네스 실행. **`Keyboard.SendInput` → `Win32Exception: 액세스가 거부되었습니다`** 로 **2회 동일 실패**(로그인 첫 타이핑, `SmokeNav.cs:32`). 규칙대로 재시도를 멈췄다.
+
+- **✅ 앱이 이제 로컬 테스트 서버를 본다** — `appsettings.json` 의 `Url = https://localhost:8000/api`, NATS `localhost:4222`. **메모리 [[project_gis_app_uses_remote_api_server]] 의 "원격 123.141.236.253" 기술은 이 머신 현재 설정과 다르다**(그 메모리는 작성 시점 사실). ⇒ 서버 스왑 불필요, **운영 쓰기 위험 없음**. 의존 서비스 4종(NATS·API·MariaDB·Redis) 전부 Up.
+- **🔴 하네스 잠금 검사가 거짓 양성을 낸다** — `run-ui-tests.ps1` 의 `Get-Process LogonUI` 가 **SessionId 를 안 거른다**. 물리 콘솔(세션 2)의 잠금화면 LogonUI 를 내 RDP 세션(세션 1)의 잠금으로 오판한다. 실제 세션 1 은 미잠금이었다.
+- **원인 후보에서 배제된 것**: ① 세션 Disc(=Active) ② 세션 1 잠금(LogonUI 없음) ③ 입력 데스크톱 미소유(`OpenInputDesktop` → `Default` 성공) ④ **UIPI 권한차**(앱 매니페스트에 `requireAdministrator` 없음, 테스트도 비관리자). 남은 유력 후보는 **RDP 창 최소화/원격 화면 상태**.
+- **⚠ 내 SendInput 격리 프로브는 무효였다** — `Win32Error=87`(INVALID_PARAMETER)은 x64 `INPUT` 구조체 레이아웃을 틀리게 잡은 내 실수지 환경 신호가 아니다. 이 프로브로 아무것도 단정하지 않는다.
+- **🔴 앞선 라이브 왕복의 "잔존 0건" 단언이 가짜였다** — 목록 조회에 `page=0` 을 썼는데 서버는 **`page ≥ 1`** 을 요구한다(422). 빈 응답에서 0건을 세어 통과한 것. **삭제 자체는 bulk-delete 응답(`deleted_ids` 5건 · skipped 0)으로 확증**되므로 결론은 유효하나, 그 단언은 무효다. ⇒ 이후 목록 검증은 `page=1` 사용.
+
+**🌱 로컬 서버에 UI 검증용 시드 6건 생성(정리 대상)** — id 236~241, 이름 `[시드]…`. 표시 케이스 전수: ①진행 중 단발(`is_suppressing_now=True`) ②**`active` 인데 미억제 반복**(★PRD 존재 이유, 서버 확인 `status=active`·억제중 False·다음회차 09-09T00:00) ③무제한 ④자정 넘김 ⑤자정 종일 ⑥예정. 목록 총 20행(기존 14 + 시드 6).
+
+**다음**: 입력 주입이 풀리면 즉시 재실행. 안 풀리면 **사용자가 수동 로그인 → 내가 읽기 전용 UIA 관찰 + 캡처**로 V-09/V-11/V-12(전부 관찰 과제)를 닫을 수 있다.
+
+
 ---
 
 ## ▶▶ 재개 포인트 (2026-09-06 — 창(Window) 아키텍처 전면 재기획 · Track C · **범위 B 승인됨 · PRD v1.1 Review 검토 대기**)
@@ -396,7 +523,11 @@
 - **✅ 사용자 결정 완료(2026-09-06)**: **GAP-7 범위 = B(창 이동까지, Phase 0→1a→1b→2→4)** · **GAP-1 = 셸 안 드래그·리사이즈 + 위치/크기 영속, 별도 OS 창(Detached) 미채택** · **GAP-2 = 라이트에서 밝은 카드로 뒤집기**(ThemeAssist 4곳 + FlatDarkBgButton 16파일 원자묶음) · **GAP-11 메인솔루션 변경 승인**(단계별 통지). 파생 자동해소 4건: GAP-4·6 무의미(Detached 제외) · GAP-5 요청큐만(AllowStack=false) · GAP-8 전량 SingleInstance 유지(**−1.5주**). 잔여 GAP-3·9·10은 권고안 진행+해당 Phase 확인.
 - **📋 PRD 정본**: [`docs/prds/window-architecture-prd.md`](../prds/window-architecture-prd.md) **v1.1 · 상태 Review — 사용자 검토 대기**. FR-01~40 · NFR-01~13 · 비목표 N-1~13 · 리스크 활성22/신설3/소멸2 · V-01~12 · 미결 Q-1~5. 공수 **150점 = 계획선 12.5주 / 상한 15.0주**, **1차 출시 4주차**(Phase 0+1a, 셸 무변경).
 - **⚠ PRD 검증 상태(정직 고지, §0-1)**: PRD 워크플로 `wf_a612906c-b95` 는 초안 2안+병합까지만 성공하고 **적대검증 3렌즈+확정 4에이전트가 "organization has disabled Claude subscription access" 로 실패**. 메인세션이 대행 표본검증 → **7건 확인**(Phase3 잔재 0 · ShellView.xaml:86 Splitter 컬럼 실재 · Close마커 10+19=29 정확 · LeftMenuSectionView:96-102 Light.Blue 실재 · DialogHost 22파일/호출0 · Progress View 닫기요소 0 · 공수 150점 검산 일치) **+ 정정 1건**(FR-18 무음 권한차단 **6→7곳**, `ConductorControlViewModel.cs:320` `CanOpenSetup()` SETUP 메뉴 누락). **FR-19~40 개별 인용 · §3 C# 시그니처 API 적합성 · §5 테마 토큰 키 실재 · NFR 수치 출처는 미검증** → plan 착수 전 재검증 권고: `Workflow({scriptPath: '…window-architecture-prd-wf_a612906c-b95.js', resumeFromRunId: 'wf_a612906c-b95'})` (초안·병합 캐시 적중, verify 단계부터 재개).
-- **🎨 스토리보드·와이어프레임(사용자 지시: PRD와 동반 진행)**: [`docs/design/window-surface-kernel-storyboard.html`](../design/window-surface-kernel-storyboard.html) **v1.0**. 실제 토큰 렌더 + WPF `#AARRGGBB`→CSS `rgba()` 변환 명시. 10절 — 현행 시각트리 / 목표 Surface Kernel / **조작 가능한 와이어프레임**(Float 드래그·리사이즈·최대화·창목록·클램프 금지구역) / 표면 5종 / Before-After / **GAP-2 라이트 대비 1.05:1 재현** / **GAP-9 스크림 4조합** / **§8 권한 UX 역할 전환 데모** / API Before-After / 확인요청 6건. 캡처 `docs/assets/window-surface-{wireframe-dark,gap2-light,perm-light}.png`. ⚠ 브라우저 검증 중 **클래스 충돌 결함 1건 발견·수정**(P0 알람 배너 `.alarm` 이 지도 심볼 `.sym.alarm` 을 지움 → `.p0alarm` 분리) — **수정 후 재실행 검증은 브라우저 점유 충돌로 미실행**(정적 검사만).
+- **🎨 스토리보드·와이어프레임 v2.0(2026-09-08, 사용자 지시 "디자인적 감각 살려 재작성")**: [`docs/design/window-surface-kernel-storyboard.html`](../design/window-surface-kernel-storyboard.html) — v1.0 67KB → **v2.0 122KB 전면 재디자인**. 10절 → **11절**로 확장하며 PRD §11(권한 FR-41~66)·§12(OverlayWindow 경계) 최신 내용 반영.
+  - **디자인**: 전술 HUD 격자 히어로(코너 브래킷·KPI 5) · 좌측 레일 스크롤스파이 + 상단 진행바 · 스크롤 리빌 · SVG 심볼 4종(카메라/센서/스피커/알람) · 다층 그라디언트 전술지도(주간/야간) · 데이터 시각화(막대 6 · 도넛 28% · Tier 스택바 · Phase 타임라인) · **GAP-9 드래그 비교 슬라이더** · 인쇄/`prefers-reduced-motion` 대응.
+  - **브라우저 실측 검증**(Chromium 1480×1020): 스크립트 오류 0 · 심볼 23/23 · Float 드래그·리사이즈·최대화·최소화·중복열기=포커스 · 창목록 동기화 · 역할 3종 잠금+Toast · v1.0 `.alarm` 충돌 회귀 없음.
+  - **검증 중 발견·수정 3건**: ① 창목록이 Toast를 덮음 → 창목록을 **좌하단**(작업표시줄 은유)으로 이동 ② 지도 등고선 과다 노이즈 → 알파 .055→.028 완화 ③ P0 알람 배너(높이 실측 44px)와 Toast 1px 겹침 → Toast `top:88→100px`(여백 12px 실측 확인).
+  - 캡처 `docs/assets/surface-kernel-{hero-dark,final-wf,perm-charts,gap2-light}-v2.png` · v1.0 백업은 세션 스크래치패드.
 - **🔐 권한 전수 감사 완료(사용자 지시 "절대 권한 누락 금지")**: 워크플로 `wf_88b8adce-e05` — 6에이전트·1.45M토큰·347툴콜 → 권한지점 **300건** → 중복제거 **정본대장 181행**. PRD §11 에 **FR-41~66(26건·164점)** · RR-01~30 · Q-01~14 · 미확인 11 편입.
   - **실측 정정 3건**: ① 무음 권한차단 6→**7곳**(`ConductorControlViewModel.cs:320` `CanOpenSetup()` SETUP 누락) ② 무음 실패는 7이 아니라 **59곳**(Devices 22·GMaps 24·Events 6·Conductor 7) ③ 감사 원문 공수합 **178→164점 오산**(메인세션 검산).
   - **실측 수치**: 표면 열림핸들러 25 중 가드 7 = **가드율 28%**, 무가드 **18**(패널4·다이얼로그11·팝업3) · fail-open **17** · 죽은 권한프로퍼티 **12**(XAML 바인딩 0) · 패널 내부 액션게이트 **63** · `PermissionsChanged` 구독 18/해제 15(**미해제 3** — SingleInstance라 현행 누수 아니나 **Float 다중화 시 누수 전환**).
@@ -446,6 +577,9 @@
 - **설계 워크플로 `wf_03598e8c-5ff` 결과**: 6축 조사 완료(144 fact·68 risk, 저널 `subagents/workflows/wf_03598e8c-5ff/journal.jsonl`), 분석/PRD/Plan 에이전트 3개는 **세션 사용량 한도(20:30 KST 리셋)** 로 실패 → 메인 루프에서 직접 작성 완료: [`analyses/pidsgroup-3d-fence-gate-scenario-analysis.md`](../analyses/pidsgroup-3d-fence-gate-scenario-analysis.md) · [`tests/pidsgroup-3d-fence-gate-scenarios.md`](../tests/pidsgroup-3d-fence-gate-scenarios.md) · [`prds/pidsgroup-3d-fence-gate-prd.md`](../prds/pidsgroup-3d-fence-gate-prd.md)(v1.0 Draft) · [`plans/pidsgroup-3d-fence-gate-prd-plan.md`](../plans/pidsgroup-3d-fence-gate-prd-plan.md)(46 태스크).
 - **⚠ 사용자 검토 필요(스토리보드와 달라진 점)**: ① **R1 서버 정본 정렬** — 서버 `operation-event-prd.md` v1.4(2026-09-07 사용자 승인)가 통문 = `gate` 카테고리·`gates.gate_status`·개폐 실시간 `SYNC_DEVICE`·알림 `OPERATION_EVENT` 로 확정 → 클라 DoorState 는 SYNC_DEVICE(주)+OPERATION_EVENT(보조)+DETECT ContactOn/Off(로컬 폴백, 설정) 3채널 수렴 ② 3D 키 `gate`→**`fencegate`**(시설물 정문 충돌) ③ **접점(Gate/Enclosure) 이벤트는 큐·카드·자동조치보고·사운드에서 제외**(현재는 탐지처럼 취급) — 메인 솔루션 변경 3건(카드 스킵·SYNC_DEVICE 훅·appsettings) 통지 ④ LOD 는 줌 숫자가 아니라 간격 픽셀(z18 3m=6.3px) ⑤ 정점 드래그 편집·구간 상태 채널·차량은 Phase 2.
 - **✅ 2차 실기(00:25~00:29)** 그룹 펄스 ✅ · 개폐 파이프라인 로그 ✅ · 문짝 픽셀 0 → **결함 확정: `GMapPidsMarker.PidsModel_Update` 가 DoorState 를 재통지하지 않음** → 수정 + 회귀 테스트(Housing 74/74) + 앱 재빌드 · 하네스: 배치 실패 시 시드로 계속 · **3차 실행 대기(RDP 창 복원 필요, 런처가 입력 가능 시 자동 시작)**.
+- **✅ PRD Approved + Plan 작성(2026-09-08 16:xx, 사용자 "순서는 바꿔도 되는데 누락없이 다 개발" + "승인")**: `symbol-detail-and-door-control-prd.md` **Approved** · `docs/plans/symbol-detail-and-door-control-prd-plan.md` 신규(총 42태스크). 사용자 지시대로 **요구사항 추적표**를 넣어 FR 28 + NFR 5 = **33/33 전수 매핑**, 파이썬으로 기계 검산(추적표·태스크 태그 양쪽 누락 0) 통과. **순서 원칙**: 그룹 간 자유이되 A(Gate REST)→B(개폐 UI) 선후 고정(B가 A의 API 호출), C-10(`ShowMarkerContextMenu` 항목 추가)은 **맨 마지막**(타 세션 pidsgroup-rightclick 충돌 R-1). OQ 5건 중 그룹 A·B·C·E 를 차단하는 것 없음 — 마이크(D)만 서버 회신 대기이고 UI 는 선구현(버튼 비활성+툴팁). Phase 0 선결 검증 5건(VER-01 control 왕복 · VER-02 Gate 스키마 실측 · VER-03 OPERATION_EVENT→문짝 · VER-04 BROADCAST_STATUS 실발행 · RISK-01 타 세션 조율)부터 착수 예정.
+- **✅ 철망 4건 커밋 + 상세보기/개폐 PRD 작성(2026-09-08 16:xx, 사용자 "승인" ×2)**: ① 철망 수정 커밋 `61f6fd90`(8파일 — 높이 비율 과장 `FenceMath.VisualHeightPx` · 속성창 모델 추종(undo) · 눈금 양자화 `Quantize`, 테스트 3종 신규). 눈금은 기존 스펙(간격 0.5·높이 0.1) 유지 — 정수 전환은 상수 2개. ② 신규 PRD `docs/prds/symbol-detail-and-door-control-prd.md`(v1.0 Review, FR-01~28, D-1~D-12). 와이어프레임 `docs/design/gate-enclosure-door-and-symbol-detail-wireframe.html`(v2, 라이트/다크·연결/미연결·3D 드래그 토글) 선행 작성 후 승인. **최대 발견: 통문·함체 개폐 명령 경로가 서버에 이미 완비돼 있었다** — `POST /api/devices/{gates|enclosures}/{id}/control` → `pg_notify(gop_command)` → `db_monitor` → NATS `GATE_DOOR_SET`(from=**DBApi**) → 담당 매니저 → `PATCH /status` → `OPERATION_EVENT` → GIS. GIS 는 NATS 직발행이 아니라 **REST 진입**이 맞다(감사 기록 + `devices:control` 게이트가 그 엔드포인트에 있음). 클라 구멍은 `IDeviceApiService` 70메서드 중 **Gate 0건** · `SYNC_DEVICE` Gate 미지원(`NatsDomainService.cs:887`) · `BROADCAST_STATUS` 구독 0건. 서버 요청은 `BROADCAST_MIC_START/STOP` **1건**으로 축소(마이크는 방송서버 소유, GIS 는 대상 스피커만 지정). 별건 보고: 함체 `control` 엔드포인트에 권한 데코레이터 누락(통문은 `devices:control` 있음).
+  - **PRD 미결**: OQ-1 마이크 규격 · OQ-2 `BROADCAST_STATUS` 실발행 여부 · OQ-3 `ShowMarkerContextMenu` 타 세션(pidsgroup-rightclick 36/50) 조율 · OQ-4 마이크 선점 규칙 · OQ-5 Pending 타임아웃 15초.
 - **✅ HUD 고정 직접 검증 확장(2026-09-08 14:45, 사용자 "직접 테스트해봐 / 레이어 창도 켜고 같이 비교")**: 실기 진단 ✅8/✖0 — HUD 214.0×101.0 px 가 **디지털 줌 s=1.25·1.50·2.00(최상단) · 틸트 25° · 레이어 창 동시 표시** 전 구간에서 Δ0.0. 픽셀 측정(UIA 무관)으로도 HUD 헤더 238 px · 레이어 창 헤더 248 px 고정, 지도 타일만 2배. **정정 2건**: ① 줌 라벨의 `+` 개수는 dzl−1(정본 `ZoomLadder.Label`) — 종전 "레벨 2 정체" 보고는 내 디코딩 오류였고 실제로는 최상단까지 도달했다. ② 드로잉 중 Ctrl+↑ 틸트 각도 무반응은 `DrawingKeyRouter` 가 방향키를 Ignore 로 소비하는 **설계**(스트로크 투영 보호). 커밋: 라이브러리 `4f252585`(레이어 버튼 AutomationId) · 메인 `ef05577`(진단 확장).
 - **✅ 드로잉 HUD 화면 크기 고정(2026-09-08 14:30, 사용자 "확대 축소할 때 커졌다 작아졌다")**: HUD 가 지도 `AdornerLayer` 자식이라 컨트롤 `RenderTransform`(디지털 줌 s · 틸트 ScaleY=s·cosφ)을 상속하던 것이 원인. `LineDrawingAdorner.ApplyHudScreenScale` 역배율 재대입 + 드래그 클램프 + **`HitTestCore` 히트 사각형** 3곳 보정. 실기 진단 `LineDrawingHudScaleDiagTests` 2회 통과 — 214.0×101.0 px 불변(디지털 줌 s=1.50 · 틸트 25°, Δ0.0), HUD 우측 +60 px 클릭 정점 2→3, 앱 로그 예외 0건. 커밋: 라이브러리 `983b4bea` · 메인(하네스) `c2bd79b`.
 - **✅ 커밋 완료 + 세션 마무리(2026-09-08 10:4x, 사용자 "커밋하고 세션 마무리")**: 3개 레포 커밋 — 라이브러리 `5d52779e`(v2.6, **155파일 13,331줄**: 3D 철망·통문·함체 + 거울상 수정 + 라인 드로잉 결함 10건 + 지도 카드 틸트) · 메인 `b04f7c8`(v0.5, 18파일: NATS 통문/함체 개폐 배선 · SetupModel.MapTilt · 인스톨러 템플릿 · 하네스 MapProbe/AppLogParser/NatsEventPublisher/진단 4종/EnvironmentGuard) · 서버 `0528850`(release/v6.3, 6파일: SmartMultisensor2 v79, pytest 18 passed). 커밋 전 전체 의존성 빌드 성공(Events.Ui 포함 — 타 세션이 억제 파일 정리 완료). **의도적 제외**: 타 세션 억제 WIP 5파일(EnumKoreanMap·EventCardViewModel·ExEventViewModel·UiKoreanMap·억제 테스트) · 메인 이벤트 UI XAML 4개 · 개발자 `appsettings.json`(운영↔localhost 로컬 스왑 섞임) · 귀속 불명 3건(`deploy-watchdog.ps1`·`tests/`·`ui-test-summary.md`). 앱은 사용자 확인용으로 실행 중(PID 51412).
@@ -3210,9 +3344,9 @@ Device API C1 (NATS DELETED 처리) 완료 후 Event Process EB3 효과 발현
 ## 세션 상태
 
 - **활성 세션 수**: 1
-- **현재 세션 ID**: ppid-38648
+- **현재 세션 ID**: ppid-47404
 - **충돌 여부**: 없음
-- **활성 세션 목록**: ppid-38648
+- **활성 세션 목록**: ppid-47404
 
 
 ## GOP RBAC / Account 워크스트림 현황 (2026-07-03 갱신)
@@ -3825,3 +3959,145 @@ v1.1 은 결정 반영이 끝났으므로 **이제 승인 가능한 상태**다.
 
 **다음 후보**: ⓐ 운영 서버 6.3.3 버전 확인(V-08, FR-21 선행) · ⓒ 억제 반복 대응 PRD 신설 ·
 SIM-O 계열 시나리오 재작성 · 서버팀 회신 4건.
+
+---
+
+## [2026-09-08] 심볼 상세 보기 + 통문·함체 개폐 — 그룹 C·D 구현 완료 (38/42)
+
+**계획**: `docs/plans/symbol-detail-and-door-control-prd-plan.md` (PRD **Approved**)
+**사용자 지시**: *"순서는 바꿔도 상관없는데 다 개발해야 되니까 누락없이 다 개발될 수 있도록"* → 그룹 A·B·E 에 이어 **C(상세 창)·D(방송)** 완료.
+
+### 신규 자산
+
+| 파일 | 역할 |
+|---|---|
+| `GMapControls/SymbolPreview3DControl.cs` | 상세 창 3D 스테이지 — 자체 오빗 카메라(45°×8단 자동 회전), 캡처 드래그 자유 회전 + **점선 구 가이드**, 1.5초 뒤 재개 |
+| `GMapControls/SymbolDetailControl.cs` | 상세 창 본체(템플릿 Control + 헤더 드래그) · 마이크 **push-to-talk** 터널 핸들러 |
+| `ViewModels/Maps/SymbolDetailViewModel.cs` | 탭·액션·필드 모델. 판정은 `SymbolDetailRules` 위임 |
+| `Themes/SymbolDetailStyle.xaml` | 좌 스테이지 / 우 6탭 / 하단 액션 바. 토큰만 사용 |
+| `Symbols3D/HousingPalette.cs` | 재질 토큰 → 브러시 **단일 정본**(지도 심볼 ↔ 상세 창 색 일치) |
+| `Services/Broadcast/BroadcastStatus{NatsSyncService,Payload}.cs` | `BROADCAST_STATUS` 구독(FR-24) + 순수 해석기 |
+| `Messages/Dto/Brokers/BroadcastMicBodyDto.cs` | 마이크 방송 body(=`BROADCAST_PLAY` 동형) |
+
+### 핵심 설계 판단
+
+- **오빗 카메라를 지도와 분리**: 지도 하우징은 피치 35° 고정으로 지면 정합이 걸려 있어 각도를 못 바꾼다.
+  상세 창은 별도 뷰포트 + 자체 카메라. **메시(`HousingModels`)와 색(`HousingPalette`)만 공유** — 형상·색이 갈라지면 다른 장비처럼 보인다.
+  → `TEST-05` 가 "프리뷰 각도를 바꿔도 지도 심볼 픽셀 불변"을 바이트 단위로 단언한다.
+- **액션 바 = 컨텍스트 메뉴 단일 출처(FR-21)**: 메뉴의 인라인 람다 7종을 명명 메서드로 추출해 양쪽이 같은 메서드를 부른다.
+  이 과정에서 `탐지 이력` 조건을 `SmartSensor` → `SymbolDetailRules.IsSensor`(14종)로 통일(편차 **D-1**).
+- **닫기는 Visibility 토글**: `ShutDown()` 에서 VM 구독까지 끊으면 **다시 열었을 때 `⟲ 정면` 이 죽는다**.
+  구독 해제는 진짜 소멸(Unloaded)·DataContext 교체 때만. 프리뷰 타이머는 `IsVisibleChanged` 로 자동 정지/재개.
+  → 회귀 테스트 `should_keep_reset_working_after_close_and_reopen` 로 고정.
+- **마이크는 커맨드가 아니다**: 누르는 동안만이라 액션 바에 터널 핸들러 하나를 걸어 마이크 버튼만 가로채고
+  **캡처를 잡아 버튼 밖에서 떼도 중지가 도달**하게 했다.
+- **FR-27 보강**: 1차 구현에서 빠졌던 `CanControlCamera`(cameras:control)도 fail-closed 로(편차 **D-5**).
+
+### 서버 대기 1건
+
+`docs/coordination/server-broadcast-mic-request-2026-09-08.md` — `BROADCAST_MIC_START/STOP` 규격 요청.
+**클라이언트 배선은 전부 끝나 있고 `BroadcastControlService.IsMicCommandSupported=false` 하나로 잠겨 있다.**
+회신 후 상수만 바꾸면 열린다. (확인 요망: cmd 이름 확정 · 음원/TTS 선점 규칙 · 중지 유실 watchdog · `BROADCAST_STATUS` 실발행)
+
+### 테스트
+
+**851 green** — GMaps.Ui 682(+29) · Housing 152 · PropertyPanel 18(+8). 라이브러리·메인 솔루션 빌드 **오류 0**.
+
+### 남은 4건 (전부 실기 필요)
+
+`VER-03`(`OPERATION_EVENT` → 3D 문짝 스윙) · `VERIFY-B9` · `TEST-06`(실기 배터리, 앱 1회 기동) · Phase 4 문서.
+
+### [2026-09-08 이어서] 잔여 헤드리스 + 실기 진단 테스트 작성 (41/42)
+
+- **TEST-01** `DoorTransitionMatrixTests` 6건 — (상태×명령×보고) 전 조합 불변식 + **랜덤워크 2000스텝**(시드 고정). 순서 의존 결함 0.
+- **TEST-03** 권한 폴백 정책을 **`Helpers/PermissionGate.cs`** 로 추출(호출부 5곳 이관) + 6건. 흩어진 `?? false`/`?? true` 재발 차단이 목적 — 실제로 `cameras:control` 이 빠져 있었다.
+- **실기 진단** `Dotnet.Monitoring.Solution.UiTests/Functional/SymbolDetailRuntimeDiagTests.cs` — 앱 1회 기동 8단계.
+  하네스 보강: `MapPage.InvokeMarkerContextMenuItemAt`(**화이트리스트 `상세 보기` 만**) · `NatsEventPublisher.PublishOperationEventAsync` · `DbProbe.LinkedPidsSymbols`.
+- **테스트 877 green** (GMaps.Ui 707 · Housing 152 · PropertyPanel 18). 라이브러리·메인·하네스 빌드 오류 0.
+- **DOC-01/02/03 완료** — 완료 리포트 · 편차 D-1~D-5 · 메모리 2건.
+
+**실행 차단**: `IRONWALL_UITEST_ID/PW` 미설정(User/Machine/Process 전부 len=0). 설정 후 아래 1회로 전 항목 판정:
+`dotnet test .\Dotnet.Monitoring.Solution.UiTests --filter "FullyQualifiedName~SymbolDetailRuntimeDiag"`
+
+**환경 실측(2026-09-08)**: 앱 bin appsettings 는 이미 **전부 로컬**(API `https://localhost:8000/api` · NATS `localhost:4222` · DB `127.0.0.1:3306`) — 서버 스왑 불필요.
+로컬 DB PIDS 심볼 58건(IpCamera 48 · Controller 7 · **Gate 2 · Enclosure 1**), 단 **개폐 심볼 3건 전부 `LinkedDeviceId=0`** →
+`OPERATION_EVENT` 의 device_id 로 심볼을 못 찾으므로 ⑧(VERIFY-B9)만은 **장비 연결된 통문이 있는 환경**이 추가로 필요하다.
+
+### [2026-09-08 밤] 실기 배터리 2회 시도 — 데스크톱 입력 주입 차단으로 미실행
+
+계정(`IRONWALL_UITEST_ID/PW`)은 스크래치패드 스크립트 안에서만 세팅해 전달(커맨드라인 금지 규약). **앱은 끝내 띄우지 않았다** — 지도 데이터 무변경.
+
+| 시도 | 결과 |
+|---|---|
+| 1회차 22:34 | `Tee-Object -Encoding` 이 PS 5.1 에 없어 테스트 미실행(러너 스크립트 결함, 즉시 수정) |
+| 2회차 22:35 | 로그인 단계 `Keyboard.Type` → `Win32Exception: 액세스가 거부되었습니다`(SendInput err5) |
+| 3회차 22:40~23:00 | 입력 주입 가능해질 때까지 20분 대기 → 끝내 불가, **앱 미기동으로 안전 종료**(exit 2) |
+
+**진단**: 프록시 신호가 전부 어긋난다 — `WTSConnectState`=Active(0) · `quser`="활성" ·
+`OpenInputDesktop` 성공 + 이름 `Default` · 내 스레드 데스크톱=`WinSta0\Default` · 세션 Id 일치.
+**그런데 `SendInput`=err5, `GetForegroundWindow()`=NULL, `LogonUI` 상주** → 화면 잠김(또는 RDP 창 최소화).
+
+**조치**: 판정을 스크래치패드 스크립트에서 **하네스 1급 Skip 게이트로 승격** —
+`Dotnet.Monitoring.Solution.UiTests/Support/DesktopState.cs` `CanInjectInput(out reason)`.
+무해한 SHIFT key-up 1회를 실제로 쏴 보고 판정한다(데스크톱 **이름** 기반 판정은 잠겨도 `Default` 로 나와 틀렸다 — 1차 구현 폐기).
+`SymbolDetailRuntimeDiagTests` Skip 게이트에 반영 → 앞으로는 로그인 단계 예외 대신 **사유가 찍힌 Skip**.
+
+**재개 방법**: 화면 잠금 해제 + RDP 창 포그라운드 유지 후
+`scratchpad/run-detail-diag.ps1` 실행(입력 주입 프로브가 통과하면 자동 시작, 최대 20분 대기).
+
+### [2026-09-08 23:28] 실기 배터리 성공 — ①~⑦ 통과, 실기 전용 결함 2건 수정
+
+입력 주입이 열린 뒤 앱 1회 기동으로 완주. **①~⑦ ✔ · ⑧만 ⓘ**(장비 연결된 통문 부재).
+백미: **⑤ 자동 회전 8798 px 변화 · `⏸` 시 정확히 0 px** — 45°×8단 회전과 정지가 픽셀로 확정됐다.
+
+**실기에서만 나온 결함 2건(수정 완료)**
+- **R-1** `LinkedDeviceId>0` 인데 `LinkedDevice=null` 이면 탭 전부 활성 + 값 전부 `—` → `HasDevice` 를 **객체 유무**로,
+  사유를 `연결되지 않음`/`장비(#id) 정보를 찾지 못함` 두 갈래로 구분. 회귀 테스트 추가(PropertyPanel 19건).
+  원인 환경: 로컬 API 에 카메라 3건뿐인데 DB 심볼은 운영 장비 id 참조(`FetchCamerasAsync completed: 3 items`).
+- **R-2** 이 창의 **TextBlock AutomationId 4개가 UIA 트리 미노출**(Button·ItemsControl 17개는 정상) →
+  제거하고 앵커를 `CloseButton`·`ResetView` 로 이관. 규칙의 "계측 전 트리 덤프" 를 건너뛴 내 잘못.
+
+**하네스 영구 보강**: `Support/DesktopState.cs`(입력 주입 직접 프로브) · `MapPage.TryReadMarkerContextMenuItemsAt`(짧은 타임아웃·비throw) ·
+`MapPage.InvokeMarkerContextMenuItemAt`(화이트리스트) · `NatsEventPublisher.PublishOperationEventAsync` · `DbProbe.LinkedPidsSymbols` ·
+클릭 전 지도영역 포함 검사(`BringSymbolToCenter` 발산 실측 Y=-14446).
+
+**테스트 878 green** · 라이브러리·메인·하네스 빌드 오류 0 · 잔존 프로세스 0 · 지도 데이터 무변경.
+
+### [2026-09-09 08:11] 완료 — 실기 ①~⑦ 3회 재현 · 결함 R-3 추가 발견·수정 (42/42)
+
+**R-3(신규·중대)**: `DeviceProviderService.FetchAllDevicesAsync` 가 제어기·센서·카메라·스피커·**함체**·경광등은 가져오는데
+**통문(Gate) 벌크 로드가 통째로 빠져 있었다**. 단건(`FetchSingleGateAsync`)은 SYNC_DEVICE 전용이라 부팅을 못 덮는다
+→ 통문 심볼 `LinkedDevice` 영원히 null → **개폐 버튼 항상 잠김 + FR-13 무력**. IMPL-A5 에서 내가 빠뜨린 구멍.
+`FetchGatesAsync`(함체 동형·page 1부터·`limit`) 신설. **실기 확인**: `FetchGatesAsync() completed: 2 items` ·
+`Gates loaded: 2 items` — 서버에 통문 2건이 있었는데 여태 안 불러오고 있었다.
+
+> 헤드리스로는 원리적으로 안 잡히는 종류다("무엇이 호출되지 않았는가"를 묻는 테스트가 없었다).
+> 실기에서 "통문이 전부 미연결"이라는 관찰이 없었으면 데이터 탓으로 넘어갔을 것이다.
+
+**진단 테스트 후보 선정 보강**: 지도 rect 중 메뉴가 뜨는 것만으로는 부족 — 기하도형·라인은 **Z-Order 4종만** 나온다.
+`ZOrderHeaders` 제외 후 장비 항목이 남는 마커만 PIDS 로 인정(회차마다 다른 마커를 집던 불안정 해소, 이후 3회 연속 동일 결과).
+
+**최종**: 실기 ①~⑦ ✔(3회 재현) · ⑦-b/⑧ ⓘ(`BringSymbolToCenter` 미수렴 15704→2935→−889 + 통문 심볼 장비 미연결).
+`VERIFY-B9` 코드 경로는 기존 `DoorStateWiringTests` 27건 + Housing 픽셀 테스트로 **이미 닫혀 있다**.
+**테스트 905 green** · 3개 솔루션 빌드 오류 0 · 잔존 프로세스 0 · **지도 데이터 무변경**.
+
+### [2026-09-09] 상세 창 후속 요구 3건 반영 — GPS 좌표 · 실제 모델 포맷 · 탭 축소
+
+사용자 요구: ① 위치를 **GPS 좌표 기반**으로 ② **실제 장비·모델 데이터 포맷**을 보고 기본을 적용 ③ **최근 이벤트 탭 제거, 탐지 이력으로 연결**
+추가 지시(같은 턴): **"센서 설정 패널에 있는 것 빼고 유형 정보를 일단 다 빼야될 거 같아"**
+
+**서버 포맷 확인**: `geolocation { location, latitude, longitude, altitude, heading }`(`GeolocationDto`) → `IBaseDeviceModel.Location/Latitude/Longitude/Altitude/Heading`.
+상세 창이 이걸 하나도 안 쓰고 `Location`(설명 문자열)만 보여주고 있었다.
+
+**신규 `Helpers/Detail/GeoFormat.cs`**(순수, 테스트 21건):
+- 위도/경도를 **DD + DMS 병기** — `37.392779 (37°23'34.0"N)`. DD 는 붙여넣기용, DMS 는 눈으로 읽는 용
+- **(0,0) 은 좌표가 아니라 "미등록"** — 서버 geolocation 이 비면 모델이 0 으로 남는데 그걸 기니 만 좌표로 그리면 안 된다
+- **DMS 초 반올림 자리올림** — 59.9999" 가 `60.0"` 로 찍히면 존재하지 않는 좌표가 된다
+- **심볼과의 거리(Haversine)** — 장비 등록 좌표와 심볼 배치 좌표가 벌어져 있으면 `현재위치 적용` 을 안 한 것이다. 20 m 이상이면 경고색
+
+**탭 축소(사용자 지시)**: 기준을 앱 **센서 설정 패널 컬럼**(번호·장비번호·장비명·유형·제어기·위치·상태·활성화)으로 맞췄다.
+→ 노출 탭은 **기본 · 심볼 2개**뿐. 통신·방송·상태·최근 이벤트 탭은 내렸다.
+**판정·필드 코드는 지우지 않고 그대로 뒀다** — `VisibleTabs` 목록에 다시 넣기만 하면 되살아난다("일단"이라고 하셨으므로).
+탐지 이력은 탭이 아니라 **액션 바 버튼**으로 연결(감지센서 한정, 기존 컨텍스트 메뉴와 같은 메서드).
+
+**테스트 936 green**(GMaps.Ui 737 · Housing 152 · PropertyPanel 20 · 개폐배선 27) · 3개 솔루션 빌드 오류 0.

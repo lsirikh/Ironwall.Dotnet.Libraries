@@ -1,4 +1,4 @@
-using Caliburn.Micro;
+﻿using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Models;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Devices.Api.Services;
@@ -221,17 +221,28 @@ public class DeviceProviderService : IDeviceProviderService
             await PublishSplashMessage("EnclosureProvider의 정보를 모두 불러왔습니다...");
             await ReportFetchProgress(token, "외함", 6);
 
-            // ──────────── 6. Lamps ────────────
+            // ──────────── 6. Gates ────────────
+            //  통문은 함체와 같은 개폐 형태를 갖는데 종전엔 이 벌크 로드가 없었다(2026-09-08 실기 발견).
+            //  그러면 통문 심볼의 LinkedDevice 가 영원히 null 이라 개폐 버튼이 항상 '장비 미연결'로 잠기고
+            //  부팅 시 문 상태 복원(FR-13)도 동작하지 않는다 — 단건 조회(SYNC_DEVICE)만으로는 부팅을 못 덮는다.
+            var gates = await FetchGatesAsync(token);
+            UpdateOrAddDevices(_deviceProvider, gates);
+
+            _log?.Info($"Gates loaded: {gates.Count} items");
+            await PublishSplashMessage("GateProvider의 정보를 모두 불러왔습니다...");
+            await ReportFetchProgress(token, "통문", 7);
+
+            // ──────────── 7. Lamps ────────────
             var lamps = await FetchLampsAsync(token);
             UpdateOrAddDevices(_deviceProvider, lamps);
 
             _log?.Info($"Lamps loaded: {lamps.Count} items");
             await PublishSplashMessage("LampProvider의 정보를 모두 불러왔습니다...");
-            await ReportFetchProgress(token, "램프", 7);
+            await ReportFetchProgress(token, "램프", 8);
 
-            // ──────────── 7. DeviceGroups ────────────
+            // ──────────── 8. DeviceGroups ────────────
             await FetchDeviceGroupsAsync(token);
-            await ReportFetchProgress(token, "그룹", 8);
+            await ReportFetchProgress(token, "그룹", 9);
 
             _log?.Info($"{nameof(DeviceProviderService)}.{nameof(FetchAllDevicesAsync)} completed");
 
@@ -274,6 +285,7 @@ public class DeviceProviderService : IDeviceProviderService
                 "IpCamera" => await FetchSingleCameraAsync(resourceId, token),
                 "Speaker" => await FetchSingleSpeakerAsync(resourceId, token),
                 "Enclosure" => await FetchSingleEnclosureAsync(resourceId, token),
+                "Gate" => await FetchSingleGateAsync(resourceId, token),   // 서버 v6.3 신설 — symbol-detail-and-door-control FR-12
                 "Lamp" => await FetchSingleLampAsync(resourceId, token),
                 _ => null
             };
@@ -316,6 +328,13 @@ public class DeviceProviderService : IDeviceProviderService
             _log?.Error($"FetchDeviceByIdAsync({typeDevice}, {resourceId}) 실패: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>통문 단건 조회 — <c>GET /api/devices/gates/{id}</c>(FR-12).</summary>
+    private async Task<IBaseDeviceModel?> FetchSingleGateAsync(int id, CancellationToken token)
+    {
+        var resp = await _apiService.GetGateByIdAsync(id, token: token);
+        return resp.Success && resp.Data != null ? resp.Data.ToGateDeviceModel() : null;
     }
 
     private async Task<IBaseDeviceModel?> FetchSingleControllerAsync(int id, CancellationToken token)
@@ -811,6 +830,62 @@ public class DeviceProviderService : IDeviceProviderService
     }
 
     /// <summary>
+    /// GOP API를 통해 Gate(통문) 목록을 조회합니다 (Pagination 지원).
+    /// <para>서버 <c>GET /api/devices/gates</c> 는 <b>page 가 1부터</b>고 파라미터 이름이 <c>limit</c> 이다(VER-02 실측).</para>
+    /// </summary>
+    private async Task<List<GateDeviceModel>> FetchGatesAsync(
+        CancellationToken token = default)
+    {
+        var allGates = new List<GateDeviceModel>();
+        int currentPage = 1;
+        int pageSize = 100;
+        int totalFetched = 0;
+
+        try
+        {
+            _log?.Info("FetchGatesAsync() started");
+
+            while (true)
+            {
+                var response = await _apiService.GetGatesAsync(
+                    page: currentPage,
+                    limit: pageSize,
+                    token: token);
+
+                if (!response.Success || response.Data == null || response.Data.Count == 0)
+                {
+                    if (!response.Success)
+                        _log?.Error($"Failed to fetch gates at page {currentPage}: {response.Error?.Message}");
+                    break;
+                }
+
+                foreach (var dto in response.Data)
+                {
+                    var gate = dto.ToGateDeviceModel();
+                    allGates.Add(gate);
+                    totalFetched++;
+                }
+
+                if (totalFetched % 100 == 0)
+                    _log?.Info($"Gates loading progress: {totalFetched} items loaded");
+
+                if (response.Data.Count < pageSize)
+                    break;
+
+                currentPage++;
+            }
+
+            _log?.Info($"FetchGatesAsync() completed: {totalFetched} items");
+            return allGates;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"Exception in FetchGatesAsync: {ex.Message}");
+            return allGates;
+        }
+    }
+
+    /// <summary>
     /// GOP API를 통해 Lamp 목록을 조회합니다 (Pagination 지원).
     /// </summary>
     private async Task<List<LampDeviceModel>> FetchLampsAsync(
@@ -1091,6 +1166,7 @@ public class DeviceProviderService : IDeviceProviderService
             "IPCAMERA" or "CAMERA" => "IpCamera",
             "SPEAKER" => "Speaker",
             "ENCLOSURE" => "Enclosure",
+            "GATE" => "Gate",
             "LAMP" => "Lamp",
             _ => typeDevice  // 이미 정규화된 경우 그대로
         };

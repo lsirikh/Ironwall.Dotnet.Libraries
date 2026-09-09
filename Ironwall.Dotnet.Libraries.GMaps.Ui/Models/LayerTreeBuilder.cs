@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Enums;
+﻿using Ironwall.Dotnet.Libraries.Enums;
 using Ironwall.Dotnet.Monitoring.Models.Maps;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using System.Collections.Generic;
@@ -67,6 +67,13 @@ public static class LayerTreeBuilder
     /// 개별 ISymbolModel 을 CategoryMap 키로 귀속.
     /// PIDS는 Category가 모두 PIDS_EQUIPMENT 단일값이라 DeviceType으로 6 하위카테고리 분기(FR-02 핵심).
     /// </summary>
+    /// <summary>
+    /// 심볼이 속한 레이어의 <b>표시 이름</b>(레이어 패널에 보이는 그 이름). 상세 창 심볼 탭이 같은 이름을 쓰도록
+    /// 여기서만 해석한다 — 두 곳에서 따로 지으면 패널과 창의 레이어 이름이 달라진다.
+    /// </summary>
+    public static string ResolveDisplayName(ISymbolModel s)
+        => CategoryMap.TryGetValue(ResolveCategoryKey(s), out var v) ? v.DisplayName : "기타";
+
     public static string ResolveCategoryKey(ISymbolModel s)
     {
         if (s is IPidsGroupSymbolModel) return "PidsGroup";

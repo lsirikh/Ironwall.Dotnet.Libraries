@@ -149,8 +149,66 @@
 							<ColumnDefinition Width="80"/>
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
-						<TextBlock Text="열림 판정" Style="{StaticResource PropertyLabel}"/>
-						<CheckBox Grid.Column="1" VerticalAlignment="Center" Content="접점 ON = 열림 (해제 시 반전)" IsChecked="{Binding OpenOnContactOn, Mode=TwoWay}" ToolTip="현장 배선이 반대면 해제한다 — 서버 상태(SYNC_DEVICE/운영 이벤트)가 오면 그 값이 우선" AutomationProperties.AutomationId="GMaps.Property.OpenOnContactOn"/>
+						<!--  [symbol-detail-and-door-control FR-01/02] 접점 반전 체크박스(운영자에겐 의미 없는 설치 값)를 걷어내고
+						      실제 개폐 버튼으로 교체. 버튼은 명령만 보내고 상태는 바꾸지 않는다 — 실제 전이는
+						      매니저 보고(OPERATION_EVENT)로만 온다(FR-03/04).  -->
+						<TextBlock Text="문 상태" Style="{StaticResource PropertyLabel}"/>
+						<StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+							<Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
+								<StackPanel Orientation="Horizontal">
+									<Button Content="열림" Padding="14,2" MinWidth="0" BorderThickness="0"
+									        Command="{Binding OpenDoorCommand}" IsEnabled="{Binding CanOpenDoor}"
+									        ToolTip="통문·함체를 여는 명령을 보낸다. 실제 열림은 장비 응답 후 반영된다."
+									        AutomationProperties.AutomationId="GMaps.Property.DoorOpen">
+										<Button.Style>
+											<Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding DoorDisplayState}" Value="Open">
+														<Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+														<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
+														<Setter Property="FontWeight" Value="Bold"/>
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Button.Style>
+									</Button>
+									<Border Width="1" Background="{DynamicResource BorderBrush}"/>
+									<Button Content="닫힘" Padding="14,2" MinWidth="0" BorderThickness="0"
+									        Command="{Binding CloseDoorCommand}" IsEnabled="{Binding CanCloseDoor}"
+									        ToolTip="통문·함체를 닫는 명령을 보낸다. 실제 닫힘은 장비 응답 후 반영된다."
+									        AutomationProperties.AutomationId="GMaps.Property.DoorClose">
+										<Button.Style>
+											<Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+												<Style.Triggers>
+													<DataTrigger Binding="{Binding DoorDisplayState}" Value="Closed">
+														<Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+														<Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
+														<Setter Property="FontWeight" Value="Bold"/>
+													</DataTrigger>
+												</Style.Triggers>
+											</Style>
+										</Button.Style>
+									</Button>
+								</StackPanel>
+							</Border>
+							<TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11"
+							           Text="{Binding DoorStateText}"
+							           AutomationProperties.AutomationId="GMaps.Property.DoorState">
+								<TextBlock.Style>
+									<Style TargetType="TextBlock">
+										<Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+										<Style.Triggers>
+											<DataTrigger Binding="{Binding DoorDisplayState}" Value="Open">
+												<Setter Property="Foreground" Value="{DynamicResource StatusNormalBrush}"/>
+											</DataTrigger>
+											<DataTrigger Binding="{Binding DoorDisplayState}" Value="Pending">
+												<Setter Property="Foreground" Value="{DynamicResource StatusWarningBrush}"/>
+											</DataTrigger>
+										</Style.Triggers>
+									</Style>
+								</TextBlock.Style>
+							</TextBlock>
+						</StackPanel>
 					</Grid>
 
 					<!--  연결된 디바이스  -->

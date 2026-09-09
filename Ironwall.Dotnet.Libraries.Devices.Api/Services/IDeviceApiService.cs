@@ -1,4 +1,4 @@
-using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
+﻿using Ironwall.Dotnet.Libraries.Messages.Defines.Commons;
 using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Messages.Defines.Apis;
@@ -468,6 +468,42 @@ public interface IDeviceApiService : IService
 
     Task<ApiResponse<bool>> DeleteLampAsync(
         int id,
+        CancellationToken token = default);
+
+    // ────────────────────────── Gate Device (통문, 서버 v6.3) ──────────────────────────
+
+    /// <summary>통문 목록. `page` 는 <b>1부터</b>(0 은 서버 VALIDATION_ERROR), `limit` 은 1~100.</summary>
+    Task<ApiListResponse<GateDeviceDto>> GetGatesAsync(
+        string? gateStatus = null,
+        string? status = null,
+        int page = 1,
+        int limit = 20,
+        CancellationToken token = default);
+
+    Task<ApiResponse<GateDeviceDto>> GetGateByIdAsync(
+        int id,
+        CancellationToken token = default);
+
+    Task<ApiResponse<GateDeviceDto>> PatchGateAsync(
+        int id,
+        GateDeviceDto dto,
+        CancellationToken token = default);
+
+    /// <summary>
+    /// 통문 개폐 <b>명령</b> — <c>POST /api/devices/gates/{id}/control</c>.
+    /// <para><b>응답의 <c>gate_status</c> 로 화면을 갱신하지 말 것.</b> 명령은 상태를 바꾸지 않으며
+    /// 실제 전이는 담당 매니저 보고 → <c>OPERATION_EVENT</c> 로만 온다(operation-event PRD v1.5 FR-15).</para>
+    /// </summary>
+    /// <param name="doorCommand"><see cref="DoorControlRequestDto.Open"/> / <see cref="DoorControlRequestDto.Close"/></param>
+    Task<ApiResponse<GateDeviceDto>> ControlGateAsync(
+        int id,
+        string doorCommand,
+        CancellationToken token = default);
+
+    /// <summary>함체 문 개폐 <b>명령</b> — <c>POST /api/devices/enclosures/{id}/control</c>. 통문과 동일 계약.</summary>
+    Task<ApiResponse<EnclosureDeviceDto>> ControlEnclosureAsync(
+        int id,
+        string doorCommand,
         CancellationToken token = default);
 
     // ────────────────────────── Enclosure Metrics (§5.5.9~12) ──────────────────────────

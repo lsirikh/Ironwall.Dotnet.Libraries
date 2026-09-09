@@ -41,6 +41,7 @@ public static class UiKoreanMap
         [EnumDeviceType.Lamp]              = "경고등",
         [EnumDeviceType.Enclosure]         = "함체",
         [EnumDeviceType.SmartMultisensor2] = "스마트멀티센서2",
+        [EnumDeviceType.Gate]              = "통문",
     };
 
     // ── 장비 상태 (EnumDeviceStatus) — 장비 그리드 Status 컬럼 ────────────

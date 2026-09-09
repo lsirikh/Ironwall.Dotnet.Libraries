@@ -1,4 +1,5 @@
-﻿using Caliburn.Micro;
+﻿using Ironwall.Dotnet.Libraries.Devices.Api.Services;
+using Caliburn.Micro;
 using Ironwall.Dotnet.Libraries.Base.Services;
 using Ironwall.Dotnet.Libraries.Accounts.Api.Services;   // IPermissionService (FR-EN-06 권한 게이팅)
 using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapCustoms;
@@ -32,6 +33,9 @@ using Ironwall.Dotnet.Libraries.GMaps.Ui.GMapSymbols;
 using System.Collections.Generic;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Models;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers;
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Detail;   // 상세 보기 탭·액션 규칙(symbol-detail FR-18~21)
+using Ironwall.Dotnet.Libraries.GMaps.Ui.Helpers.Door;
+using Ironwall.Dotnet.Libraries.Messages.Dto.Devices;   // DoorControlRequestDto(개폐 명령 상수)
 using CoordinateSharp;
 using Ironwall.Dotnet.Monitoring.Models.Symbols;
 using Ironwall.Dotnet.Libraries.GMaps.Ui.Args;
@@ -205,6 +209,9 @@ public partial class MapViewModel : BasePanelViewModel,
             // FR-EN-11: 역할강등/세션변경 시 PTZ 권한 재평가 구독(진행 중 이동 취소·팝업 비활성)
             SubscribePtzPermission();
 
+            // BROADCAST_STATUS 구독 시작(FR-24) — 다른 자리에서 시작한 방송·방송서버 마이크 송출도 심볼에 반영.
+            StartBroadcastStatusSync();
+
             // 툴바 우측 CPU/GPU/RAM 사용률 표시 시작(UI DispatcherTimer로 Sample 구동)
             StartResourceMonitor();
 
@@ -286,6 +293,7 @@ public partial class MapViewModel : BasePanelViewModel,
         try
         {
             UnsubscribePtzPermission();   // FR-EN-11 PTZ 권한 재평가 구독 해제
+            StopBroadcastStatusSync();      // BROADCAST_STATUS 구독 해제(FR-24)
             StopResourceMonitor();          // 시스템 리소스 타이머 정지(모든 경로 — close 무관, 이중구독/leak 방지)
 
             _bootResyncTimer?.Stop();   // 부팅 재동기 재시도 타이머 정지(비활성 후 발화 방지)
@@ -372,6 +380,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     symbol.LinkedDevice = device;
                     _symbolEventManager.RegisterDeviceSymbol(device, symbol.Model);
                     registeredCount++;
+                    RestoreDoorStateFromDevice(device);
                 }
 
                 // 복수 그룹 지원: 각 DeviceGroup에 대해 그룹 심볼 매핑
@@ -408,6 +417,33 @@ public partial class MapViewModel : BasePanelViewModel,
         ClearUndoStack();
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// [symbol-detail-and-door-control FR-13] 부팅 시 통문·함체의 문 형태를 서버 상태로 복원한다.
+    ///
+    /// <para>개폐 상태는 평소 3채널(접점 DETECT · SYNC_DEVICE · OPERATION_EVENT)로 오지만 <b>전부 런타임 이벤트</b>라,
+    /// 앱을 켠 직후에는 아무것도 안 와서 <c>Unknown</c> 으로 남는다(문은 닫힘으로 그려지고 라벨에 '?'). 장비를
+    /// 이미 REST 로 받아 온 이 시점이 유일하게 "지금 문이 열려 있는지"를 알 수 있는 자리다.</para>
+    ///
+    /// <para>서버 미지값(null/파싱 실패)이면 <b>호출하지 않는다</b> — 모르는 값으로 현재 형태를 덮지 않는다
+    /// (SYNC_DEVICE 분기와 동일 규약).</para>
+    /// </summary>
+    private void RestoreDoorStateFromDevice(IBaseDeviceModel device)
+    {
+        var status = device switch
+        {
+            IEnclosureDeviceModel enclosure => enclosure.DoorStatus,
+            IGateDeviceModel gate => gate.GateStatus,
+            _ => null,
+        };
+        if (status is null) return;
+
+        var state = Ironwall.Dotnet.Monitoring.Models.Helpers.DoorStateMachine.FromServer(status);
+        if (state == EnumDoorState.Unknown) return;
+
+        _symbolEventManager.SetDoorState(device.Id, device.DeviceType, state);
+        _log?.Info($"[부팅 복원] SetDoorState: id={device.Id}, type={device.DeviceType}, status={status} → {state}");
     }
 
     /// <summary>
@@ -1779,6 +1815,75 @@ public partial class MapViewModel : BasePanelViewModel,
         }
     }
 
+    /// <summary>
+    /// [symbol-detail-and-door-control FR-03/06/07, NFR-03] 속성창 개폐 UI 배선.
+    /// 패널은 WPF 컨트롤이라 서비스를 모르므로, 서비스를 아는 VM 이 델리게이트를 주입한다
+    /// (기존 `FilteredDeviceList` 주입과 같은 방향).
+    /// </summary>
+    private void WireDoorControl(GMapPropertyPidsControl panel)
+    {
+        panel.CanControlDevice = CanControlDevice;                       // fail-closed(FR-27)
+        panel.NotifyDoorIssue = msg => ShowDoorIssueInfo(msg);           // 조용한 무동작 금지(NFR-03)
+        panel.DoorCommandSender = SendDoorCommandAsync;
+    }
+
+    /// <summary>
+    /// 개폐 <b>명령</b>을 서버로 보낸다 — <c>POST /api/devices/{gates|enclosures}/{id}/control</c>.
+    /// <para><b>응답으로 화면 상태를 바꾸지 않는다</b>: 서버는 명령을 NATS 로 전파만 하고 상태는 그대로 둔다.
+    /// 실제 전이는 담당 매니저가 <c>PATCH /{id}/status</c> 로 보고할 때 <c>OPERATION_EVENT</c> 로 돌아온다
+    /// (operation-event PRD v1.5 FR-15). 낙관적으로 열림 처리하면 구동 실패 시 화면이 거짓말을 한다.</para>
+    /// </summary>
+    private async Task<bool> SendDoorCommandAsync(int deviceId, EnumDeviceType deviceType, string command)
+    {
+        if (deviceId <= 0) return false;
+        if (!CanControlDevice()) { _log?.Warning($"[RBAC] devices:control 없음 — 개폐 명령 차단: {deviceType}({deviceId})"); return false; }
+
+        var api = ResolveDeviceApiService();
+        if (api is null) { _log?.Warning("[개폐] IDeviceApiService 미해석 — 명령 전송 불가"); return false; }
+
+        try
+        {
+            var ok = deviceType switch
+            {
+                EnumDeviceType.Gate => (await api.ControlGateAsync(deviceId, command)).Success,
+                EnumDeviceType.Enclosure => (await api.ControlEnclosureAsync(deviceId, command)).Success,
+                _ => false,
+            };
+            _log?.Info($"[개폐] {deviceType}({deviceId}) {command} 명령 {(ok ? "전송" : "실패")} — 상태는 OPERATION_EVENT 로만 전이");
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            _log?.Error($"[개폐] {deviceType}({deviceId}) {command} 예외: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void ShowDoorIssueInfo(string message)
+    {
+        _log?.Warning($"[개폐] {message}");
+        try
+        {
+            _ = _eventAggregator?.PublishOnCurrentThreadAsync(new OpenInfoPopupMessageModel
+            {
+                Title = "개폐 명령",
+                Explain = message,
+            });
+        }
+        catch (Exception ex) { _log?.Error($"[개폐] 통지 실패: {ex.Message}"); }
+    }
+
+    private IDeviceApiService? _deviceApiService;
+    private bool _deviceApiResolved;
+    private IDeviceApiService? ResolveDeviceApiService()
+    {
+        if (_deviceApiResolved) return _deviceApiService;
+        _deviceApiResolved = true;
+        try { _deviceApiService = IoC.Get<IDeviceApiService>(); }
+        catch (Exception ex) { _log?.Warning($"[개폐] IDeviceApiService 해석 실패(미등록 가능): {ex.Message}"); }
+        return _deviceApiService;
+    }
+
     // ── 권한 게이팅(FR-EN-06) ── IPermissionService도 IPtzController처럼 IoC lazy 해석.
     //    GMaps.Ui→Accounts.Api 참조 추가됨(순환 없음). 미등록(DB Auth/오프라인/테스트) 시 null → 전체허용 폴백(V-EN-11).
     private IPermissionService? _permissionService;
@@ -1800,13 +1905,31 @@ public partial class MapViewModel : BasePanelViewModel,
     }
 
     /// <summary>카메라 제어 권한(cam:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "cameras" 고정. (FR-EN-06)</summary>
-    private bool CanControlCamera() => ResolvePermissionService()?.CanControl("cameras") ?? true;
+    /// <summary>
+    /// PTZ 제어 권한(cameras:control). 방송·개폐와 같은 <b>명령류</b>라 폴백이 <b>false</b> 다(FR-27).
+    /// 조회·편집 게이트(<c>CanEditMap</c> 등)는 종전 폴백(true)을 그대로 둔다 — 회귀 방지.
+    /// </summary>
+    private bool CanControlCamera() => PermissionGate.Resolve(ResolvePermissionService()?.CanControl("cameras"), PermissionGate.ControlVerb);
 
-    /// <summary>방송 발행 권한(broadcast:control). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "broadcast" 고정. (FR-EN-07)</summary>
-    private bool CanBroadcast() => ResolvePermissionService()?.CanControl("broadcast") ?? true;
+    /// <summary>
+    /// 방송 발행 권한(broadcast:control).
+    /// <para><b>fail-closed</b>(symbol-detail-and-door-control FR-27): 권한 엔진 미등록·미로그인이면 <b>false</b>.
+    /// 종전 폴백은 true(전체 허용)였는데, 방송은 되돌릴 수 없는 외부 행위라 권한 정보가 없을 때 누구나
+    /// 내보낼 수 있게 두면 안 된다. <b>조회·편집 게이트는 종전 폴백(true)을 유지</b>한다 — 회귀 방지.</para>
+    /// </summary>
+    private bool CanBroadcast() => PermissionGate.Resolve(ResolvePermissionService()?.CanControl("broadcast"), PermissionGate.ControlVerb);
+
+    /// <summary>
+    /// 장비 제어 권한(devices:control) — 통문·함체 개폐 명령용(FR-07). 서버 `gates.py` 가 같은 값을 쓴다.
+    /// 방송과 같은 이유로 <b>fail-closed</b>.
+    /// </summary>
+    private bool CanControlDevice() => PermissionGate.Resolve(ResolvePermissionService()?.CanControl("devices"), PermissionGate.ControlVerb);
+
+    /// <summary>개폐 버튼 활성 여부(devices:control) — 속성창 주입용.</summary>
+    public bool CanMapDeviceControl => CanControlDevice();
 
     /// <summary>상황도 편집 권한(map:edit). 권한엔진 미등록/미로그인 시 true(전체허용 폴백). 모듈명 "map" 고정. (FR-EN-08)</summary>
-    private bool CanEditMap() => ResolvePermissionService()?.CanEdit("map") ?? true;
+    private bool CanEditMap() => PermissionGate.Resolve(ResolvePermissionService()?.CanEdit("map"), "edit");
 
     // ── T5: verb→버튼 시각 게이팅(비활성) 바인딩용 공개 프로퍼티. 표시모델=disable(권한없음→회색). 액션차단 가드는 safety net 유지. ──
     /// <summary>상황도 편집 버튼 활성 여부(map:edit). PermissionsChanged 시 재평가(OnPtzPermissionsChanged).</summary>
@@ -5956,6 +6079,321 @@ public partial class MapViewModel : BasePanelViewModel,
     /// <summary>
     /// 마커 우클릭 메뉴 생성 — 모든 마커 타입 지원, PIDS 전용 항목은 타입 체크 후 추가
     /// </summary>
+    #region - 심볼 상세 보기 창 (symbol-detail-and-door-control FR-14~21) -
+
+    private SymbolDetailControl? _symbolDetailPanel;
+    private SymbolDetailViewModel? _symbolDetailVm;
+    private IPidsEditableMarker? _symbolDetailMarker;
+    private bool _isSymbolDetailPanelVisible;
+
+    /// <summary>상세 보기 창(MapView PropertyPanelCanvas 의 ContentPresenter 에 바인딩).</summary>
+    public SymbolDetailControl? SymbolDetailPanel
+    {
+        get => _symbolDetailPanel;
+        private set { _symbolDetailPanel = value; NotifyOfPropertyChange(nameof(SymbolDetailPanel)); }
+    }
+
+    public bool IsSymbolDetailPanelVisible
+    {
+        get => _isSymbolDetailPanelVisible;
+        set { _isSymbolDetailPanelVisible = value; NotifyOfPropertyChange(nameof(IsSymbolDetailPanelVisible)); }
+    }
+
+    /// <summary>우클릭 → `상세 보기`. 이미 열려 있으면 대상만 갈아끼운다(창을 겹쳐 띄우지 않는다).</summary>
+    public void ShowSymbolDetail(IPidsEditableMarker marker)
+    {
+        try
+        {
+            if (marker == null) return;
+            if (_symbolDetailVm == null)
+            {
+                _symbolDetailVm = new SymbolDetailViewModel();
+                _symbolDetailVm.CloseRequested += HideSymbolDetail;
+                _symbolDetailVm.ActionRequested += OnSymbolDetailAction;
+                _symbolDetailVm.MicPressed += OnMicPressed;
+                _symbolDetailVm.MicReleased += OnMicReleased;
+            }
+
+            _symbolDetailMarker = marker;
+            _symbolDetailVm.Load(marker, BuildSymbolDetailContext(marker),
+                layerName: ResolveSymbolLayerName(marker),
+                groupNames: ResolveDeviceGroupNames(marker.LinkedDevice));
+
+            _symbolDetailVm.IsBroadcasting = marker.IsBroadcasting;
+            SymbolDetailPanel ??= new SymbolDetailControl { DataContext = _symbolDetailVm };
+            IsSymbolDetailPanelVisible = true;
+            _log?.Info($"심볼 상세 보기: {marker.Title}({marker.DeviceType})");
+        }
+        catch (Exception ex) { _log?.Error($"심볼 상세 보기 실패: {ex.Message}"); }
+    }
+
+    /// <summary>창을 닫는다 — 3D 타이머·마커 구독까지 확실히 놓는다(NFR-01).</summary>
+    public void HideSymbolDetail()
+    {
+        IsSymbolDetailPanelVisible = false;
+        SymbolDetailPanel?.ShutDown();
+        _symbolDetailVm?.Unload();     // Dispose 가 아니라 Unload — 같은 VM 을 다시 열어 재사용한다
+        _symbolDetailMarker = null;
+    }
+
+    /// <summary>탭·액션 판정에 필요한 바깥 사정(권한·웹서버·문 상태)을 모은다.</summary>
+    private SymbolDetailContext BuildSymbolDetailContext(IPidsEditableMarker marker)
+    {
+        var device = marker.LinkedDevice;
+        bool hasEndpoint = device switch
+        {
+            IControllerDeviceModel controller => !string.IsNullOrWhiteSpace(controller.IpAddress),
+            ICameraDeviceModel camera => !string.IsNullOrWhiteSpace(camera.IpAddress),
+            ILampDeviceModel lamp => !string.IsNullOrWhiteSpace(lamp.IpAddress),
+            _ => false,
+        };
+        var doorState = marker.DoorState switch
+        {
+            EnumDoorState.Open => DoorUiState.Open,
+            EnumDoorState.Closed => DoorUiState.Closed,
+            _ => DoorUiState.Unknown,
+        };
+        return new SymbolDetailContext(
+            DeviceType: marker.DeviceType,
+            // ⚠ Id 가 아니라 **객체** 유무로 판정한다(2026-09-08 실기 발견).
+            //   Id 는 있는데 장비 목록에 그 장비가 없으면(다른 서버 데이터·로드 전) 종전엔 탭이 전부 활성인 채
+            //   값만 전부 '—' 로 떠서 "연결됐는데 정보가 없다"로 보였다. 보여줄 게 없으면 미연결로 취급하는 편이 정직하다.
+            HasDevice: marker.LinkedDevice is not null,
+            WebServerEnabled: _deviceDetailUrlService?.IsWebServerEnabled == true,
+            HasNetworkEndpoint: hasEndpoint,
+            IsPtzCamera: device is ICameraDeviceModel { Category: EnumCameraType.PTZ },
+            CanControlDevice: CanControlDevice(),
+            CanBroadcast: CanBroadcast(),
+            CanViewEvents: PermissionGate.Resolve(ResolvePermissionService()?.CanView("events"), "view"),
+            // 서버가 마이크 cmd 를 받아들이기 전엔 눌러도 아무 일이 없으므로 잠근다(FR-23).
+            // 규격이 확정되면 BroadcastControlService.IsMicCommandSupported 하나만 true 로 바꾸면 열린다.
+            MicCommandAvailable: _broadcastControlService?.IsMicCommandSupported == true,
+            DoorState: doorState);
+    }
+
+    private string? ResolveSymbolLayerName(IPidsEditableMarker marker)
+    {
+        try
+        {
+            var symbol = _symbolProvider?.FirstOrDefault(x => x.Id == marker.Id);
+            return symbol == null ? null : LayerTreeBuilder.ResolveDisplayName(symbol);
+        }
+        catch { return null; }
+    }
+
+    private string? ResolveDeviceGroupNames(IBaseDeviceModel? device)
+    {
+        var groups = device?.DeviceGroups;
+        if (groups == null || groups.Count == 0) return null;
+        return string.Join(", ", groups.Select(id => ResolveGroupName(id) ?? id.ToString()));
+    }
+
+    /// <summary>
+    /// 액션 바 버튼 → <b>컨텍스트 메뉴와 같은 메서드</b>로 위임한다(FR-20/21).
+    /// 여기서 동작을 새로 구현하면 두 벌이 되어 한쪽만 고쳐지는 상태가 만들어진다.
+    /// </summary>
+    private void OnSymbolDetailAction(SymbolDetailAction action)
+    {
+        var marker = _symbolDetailMarker;
+        if (marker == null) return;
+        try
+        {
+            switch (action)
+            {
+                case SymbolDetailAction.DevicePage: OpenDevicePage(marker.DeviceType); break;
+                case SymbolDetailAction.DeviceDetail: OpenDeviceSubPage(marker, "detail"); break;
+                case SymbolDetailAction.DeviceEdit: OpenDeviceSubPage(marker, "edit"); break;
+                case SymbolDetailAction.DetectionHistory: OpenDetectionHistory(marker); break;
+                case SymbolDetailAction.ControllerHome:
+                case SymbolDetailAction.CameraHome: OpenDeviceHomePage(marker); break;
+                case SymbolDetailAction.AimLocation:
+                    if (marker is GMapPidsMarker aim) EnterTargetAimMode(aim);
+                    break;
+                case SymbolDetailAction.SoundPlay: ShowBroadcastPlayPanel(marker.LinkedDeviceId); break;
+                case SymbolDetailAction.Tts: ShowTtsBroadcastPanel(marker.LinkedDeviceId); break;
+                case SymbolDetailAction.BroadcastStop: _ = StopBroadcastAsync(marker); break;
+                case SymbolDetailAction.MicPtt: break;   // 규격 확정 전 — 규칙이 이미 비활성으로 잠근다
+                case SymbolDetailAction.DoorOpen: _ = SendDetailDoorCommandAsync(marker, DoorControlRequestDto.Open); break;
+                case SymbolDetailAction.DoorClose: _ = SendDetailDoorCommandAsync(marker, DoorControlRequestDto.Close); break;
+                case SymbolDetailAction.ShowOnMap: NavigateToMarker(marker); break;
+            }
+        }
+        catch (Exception ex) { _log?.Error($"상세 보기 액션 실패({action}): {ex.Message}"); }
+    }
+
+    /// <summary>상세 창 개폐 — 속성창과 같은 전송기를 쓴다. 상태는 OPERATION_EVENT 로만 바뀐다(FR-03).</summary>
+    private async Task SendDetailDoorCommandAsync(IPidsEditableMarker marker, string command)
+    {
+        var ok = await SendDoorCommandAsync(marker.LinkedDeviceId, marker.DeviceType, command);
+        if (!ok) ShowDoorIssueInfo("개폐 명령을 보내지 못했습니다. 권한과 서버 연결을 확인하세요.");
+        RefreshSymbolDetailContext();
+    }
+
+    /// <summary>권한·문 상태가 바뀌었을 때 열려 있는 상세 창의 버튼 활성만 다시 계산한다.</summary>
+    private void RefreshSymbolDetailContext()
+    {
+        if (_symbolDetailVm == null || _symbolDetailMarker == null || !IsSymbolDetailPanelVisible) return;
+        _symbolDetailVm.UpdateContext(BuildSymbolDetailContext(_symbolDetailMarker));
+    }
+
+    #region - 방송(FR-22~26) -
+
+    private Services.Broadcast.IBroadcastStatusNatsSyncService? _broadcastStatusSync;
+
+    /// <summary>BROADCAST_STATUS 구독 시작 — 다른 자리에서 시작한 방송·방송서버 마이크도 화면에 뜬다(FR-24).</summary>
+    private void StartBroadcastStatusSync()
+    {
+        try
+        {
+            _broadcastStatusSync ??= IoC.Get<Services.Broadcast.IBroadcastStatusNatsSyncService>();
+            if (_broadcastStatusSync == null) return;
+            _broadcastStatusSync.BroadcastStateChanged -= OnBroadcastStateChanged;
+            _broadcastStatusSync.BroadcastStateChanged += OnBroadcastStateChanged;
+            _ = _broadcastStatusSync.StartService();
+        }
+        catch (Exception ex) { _log?.Warning($"[방송] 상태 구독 시작 실패(미등록 가능): {ex.Message}"); }
+    }
+
+    private void StopBroadcastStatusSync()
+    {
+        if (_broadcastStatusSync == null) return;
+        _broadcastStatusSync.BroadcastStateChanged -= OnBroadcastStateChanged;
+        _ = _broadcastStatusSync.StopAsync();
+    }
+
+    /// <summary>NATS 스레드에서 온다 — 마커·VM 은 UI 스레드에서만 만진다.</summary>
+    private void OnBroadcastStateChanged(int speakerId, bool isOn)
+    {
+        try
+        {
+            Execute.OnUIThread(() =>
+            {
+                var marker = MainMap?.Markers.OfType<GMapPidsMarker>()
+                    .FirstOrDefault(m => m.LinkedDeviceId == speakerId && m.DeviceType == EnumDeviceType.IpSpeaker);
+                if (marker != null) marker.IsBroadcasting = isOn;
+                if (_symbolDetailMarker?.LinkedDeviceId == speakerId && _symbolDetailVm != null)
+                    _symbolDetailVm.IsBroadcasting = isOn;
+            });
+        }
+        catch (Exception ex) { _log?.Error($"[방송] 상태 반영 실패: {ex.Message}"); }
+    }
+
+    /// <summary>마이크를 누른 순간 — push-to-talk 시작(FR-22/23).</summary>
+    private void OnMicPressed()
+    {
+        var marker = _symbolDetailMarker;
+        if (marker == null) return;
+        if (!CanBroadcast()) { ShowBrokerControlInfo("마이크 방송", "방송 권한이 없습니다(broadcast:control)."); _symbolDetailVm?.EndMic(); return; }
+        // 누르는 즉시 로컬로 송출 표시 — BROADCAST_STATUS 가 오면 그 값이 덮어쓴다(PRD R-3 병행 폴백).
+        if (_symbolDetailVm != null) _symbolDetailVm.IsBroadcasting = true;
+        _ = PublishMicAsync(marker.LinkedDeviceId, start: true);
+    }
+
+    /// <summary>손을 뗀 순간 — <b>반드시</b> 중지를 보낸다. 못 보내면 스피커가 계속 열려 있게 된다.</summary>
+    private void OnMicReleased()
+    {
+        var marker = _symbolDetailMarker;
+        if (marker == null) return;
+        if (_symbolDetailVm != null) _symbolDetailVm.IsBroadcasting = false;
+        _ = PublishMicAsync(marker.LinkedDeviceId, start: false);
+    }
+
+    private async Task PublishMicAsync(int speakerId, bool start)
+    {
+        if (speakerId <= 0 || _broadcastControlService == null) return;
+        try
+        {
+            var result = start
+                ? await _broadcastControlService.PublishMicStartAsync(speakerId)
+                : await _broadcastControlService.PublishMicStopAsync(speakerId);
+            if (!result.Success)
+            {
+                _log?.Warning($"[방송] 마이크 {(start ? "시작" : "중지")} 실패({result.Reason}): speaker={speakerId} — {result.UserMessage}");
+                ShowBrokerControlInfo(start ? "마이크 방송 시작 실패" : "마이크 방송 중지 실패", result.UserMessage);
+                if (start && _symbolDetailVm != null) _symbolDetailVm.IsBroadcasting = false;   // 거짓 송출 표시 방지
+            }
+        }
+        catch (Exception ex) { _log?.Error($"[방송] 마이크 발행 예외: {ex.Message}"); }
+    }
+
+    #endregion
+
+    /// <summary>지도에서 보기 — 심볼 위치로 지도를 옮긴다.</summary>
+    private void NavigateToMarker(IEditableMarker marker)
+    {
+        if (MainMap == null) return;
+        MainMap.Position = marker.Position;
+        _log?.Info($"심볼로 이동: {marker.Title}");
+    }
+
+    #endregion
+
+    #region - 장비 메뉴 동작 (컨텍스트 메뉴 · 상세 창 액션 바 공용) -
+
+    /// <summary>{장비}페이지 — 웹서버 목록.</summary>
+    private void OpenDevicePage(EnumDeviceType deviceType)
+    {
+        var url = _deviceDetailUrlService?.BuildUrl(deviceType, 0, null) ?? string.Empty;
+        if (!string.IsNullOrEmpty(url)) _deviceDetailUrlService!.OpenInChrome(url);
+    }
+
+    /// <summary>{장비}상세 / {장비}수정 — 웹서버 하위 페이지.</summary>
+    private void OpenDeviceSubPage(IPidsEditableMarker marker, string page)
+    {
+        var url = _deviceDetailUrlService?.BuildUrl(marker.DeviceType, marker.LinkedDeviceId, page);
+        if (!string.IsNullOrEmpty(url)) _deviceDetailUrlService!.OpenInChrome(url!);
+    }
+
+    /// <summary>제어기·카메라 홈페이지(IP:Port). 주소를 모르면 아무것도 하지 않는다.</summary>
+    private void OpenDeviceHomePage(IPidsEditableMarker marker)
+    {
+        var url = marker.LinkedDevice switch
+        {
+            IControllerDeviceModel controller when !string.IsNullOrWhiteSpace(controller.IpAddress)
+                => $"http://{controller.IpAddress}:{controller.Port}",
+            ICameraDeviceModel camera when !string.IsNullOrWhiteSpace(camera.IpAddress)
+                => $"http://{camera.IpAddress}:{camera.IpPort}",
+            ILampDeviceModel lamp when !string.IsNullOrWhiteSpace(lamp.IpAddress)
+                => $"http://{lamp.IpAddress}:{lamp.IpPort}",
+            _ => null,
+        };
+        if (url != null) _deviceDetailUrlService?.OpenInChrome(url);
+    }
+
+    /// <summary>탐지 이력 다이얼로그(Detection_Signal_History FR-10).</summary>
+    private void OpenDetectionHistory(IPidsEditableMarker marker)
+    {
+        var device = marker.LinkedDevice;
+        _ = _eventAggregator.PublishOnUIThreadAsync(new OpenDetectionHistoryDialogMessageModel
+        {
+            DeviceId = marker.LinkedDeviceId,
+            DeviceName = device?.DeviceName ?? marker.Title,
+            DeviceNumber = device?.DeviceNumber
+        });
+    }
+
+    /// <summary>방송 정지 — RSP 대기 중 재클릭은 무시(중복 REQ 방지).</summary>
+    private async Task StopBroadcastAsync(IPidsEditableMarker marker)
+    {
+        if (_isBroadcastRequestInFlight) { _log?.Info("방송 정지 무시 — 이전 방송 요청 응답 대기 중"); return; }
+        _isBroadcastRequestInFlight = true;
+        try
+        {
+            StopBroadcast(marker);
+            // v1.5.2 §6.4: BROADCAST_STOP=REQ — RSP 확인, 실패 시 표준 팝업(무음 무동작 방지)
+            var result = await _broadcastControlService.PublishStopAsync(marker.LinkedDeviceId);
+            if (!result.Success)
+            {
+                _log?.Warning($"방송 정지 실패({result.Reason}): SpeakerId={marker.LinkedDeviceId} — {result.UserMessage}");
+                ShowBrokerControlInfo("방송 정지 실패", result.UserMessage);
+            }
+        }
+        catch (Exception ex) { _log?.Error($"방송 정지 처리 실패: {ex.Message}"); }
+        finally { _isBroadcastRequestInFlight = false; }
+    }
+
+    #endregion
+
     public void ShowMarkerContextMenu(IEditableMarker marker, Point screenPosition)
     {
         try
@@ -5966,6 +6404,21 @@ public partial class MapViewModel : BasePanelViewModel,
             _log?.Info($"마커 컨텍스트 메뉴 표시: {marker.Title}");
 
             var menu = new ContextMenu();
+
+            // ── 상세 보기 (symbol-detail-and-door-control FR-14) ──
+            //   편집 모드에선 순서·정렬 같은 편집 명령이 주인공이라 넣지 않는다. 운영 모드에서만 맨 위.
+            if (!IsEditModeEnabled && marker is IPidsEditableMarker detailTarget)
+            {
+                var detailViewItem = new MenuItem
+                {
+                    Header = "상세 보기",
+                    FontWeight = FontWeights.Bold,
+                    Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Magnify, Width = 16, Height = 16 }
+                };
+                detailViewItem.Click += (s, e) => ShowSymbolDetail(detailTarget);
+                menu.Items.Add(detailViewItem);
+                menu.Items.Add(new Separator());
+            }
 
             // ── PIDS 전용 메뉴 ──
             if (marker is IPidsEditableMarker pidsMarker)
@@ -5991,7 +6444,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     IsEnabled = webServerEnabled && !string.IsNullOrEmpty(listUrl),   // 항상 표시, 웹서버 OFF=비활성 (PRD v2 FR-3 disable 모델)
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ViewList, Width = 16, Height = 16 }
                 };
-                listItem.Click += (s, e) => _deviceDetailUrlService.OpenInChrome(listUrl);
+                listItem.Click += (s, e) => OpenDevicePage(pidsMarker.DeviceType);
                 menu.Items.Add(listItem);
 
                 var detailItem = new MenuItem
@@ -6000,11 +6453,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     IsEnabled = webServerEnabled && hasDevice,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.InformationOutline, Width = 16, Height = 16 }
                 };
-                detailItem.Click += (s, e) =>
-                {
-                    var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "detail");
-                    _deviceDetailUrlService.OpenInChrome(url);
-                };
+                detailItem.Click += (s, e) => OpenDeviceSubPage(pidsMarker, "detail");
                 menu.Items.Add(detailItem);
 
                 var editItem = new MenuItem
@@ -6013,33 +6462,20 @@ public partial class MapViewModel : BasePanelViewModel,
                     IsEnabled = webServerEnabled && hasDevice,
                     Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Pencil, Width = 16, Height = 16 }
                 };
-                editItem.Click += (s, e) =>
-                {
-                    var url = _deviceDetailUrlService.BuildUrl(pidsMarker.DeviceType, pidsMarker.LinkedDeviceId, "edit");
-                    _deviceDetailUrlService.OpenInChrome(url);
-                };
+                editItem.Click += (s, e) => OpenDeviceSubPage(pidsMarker, "edit");
                 menu.Items.Add(editItem);
 
                 // 탐지 이력 (감지센서 전용, Detection_Signal_History FR-10)
                 // 웹서버/편집모드 게이트 미적용 — 운영 모드 상시 노출. 연동 장비 없으면 비활성.
-                if (pidsMarker.DeviceType == EnumDeviceType.SmartSensor)
+                if (SymbolDetailRules.IsSensor(pidsMarker.DeviceType))
                 {
-                    var linkedDevice = pidsMarker.LinkedDevice;
                     var historyItem = new MenuItem
                     {
                         Header = "탐지 이력",
                         IsEnabled = hasDevice,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.ChartLine, Width = 16, Height = 16 }
                     };
-                    historyItem.Click += (s, e) =>
-                    {
-                        _ = _eventAggregator.PublishOnUIThreadAsync(new OpenDetectionHistoryDialogMessageModel
-                        {
-                            DeviceId = pidsMarker.LinkedDeviceId,
-                            DeviceName = linkedDevice?.DeviceName ?? pidsMarker.Title,
-                            DeviceNumber = linkedDevice?.DeviceNumber
-                        });
-                    };
+                    historyItem.Click += (s, e) => OpenDetectionHistory(pidsMarker);
                     menu.Items.Add(historyItem);
                 }
 
@@ -6053,14 +6489,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     };
                     var controllerModel = pidsMarker.LinkedDevice as IControllerDeviceModel;
                     ctrlItem.IsEnabled = controllerModel != null;
-                    ctrlItem.Click += (s, e) =>
-                    {
-                        if (controllerModel != null)
-                        {
-                            var url = $"http://{controllerModel.IpAddress}:{controllerModel.Port}";
-                            _deviceDetailUrlService.OpenInChrome(url);
-                        }
-                    };
+                    ctrlItem.Click += (s, e) => OpenDeviceHomePage(pidsMarker);
                     menu.Items.Add(ctrlItem);
                 }
 
@@ -6074,14 +6503,7 @@ public partial class MapViewModel : BasePanelViewModel,
                     };
                     var cameraModel = pidsMarker.LinkedDevice as ICameraDeviceModel;
                     camItem.IsEnabled = cameraModel != null;
-                    camItem.Click += (s, e) =>
-                    {
-                        if (cameraModel != null)
-                        {
-                            var url = $"http://{cameraModel.IpAddress}:{cameraModel.IpPort}";
-                            _deviceDetailUrlService.OpenInChrome(url);
-                        }
-                    };
+                    camItem.Click += (s, e) => OpenDeviceHomePage(pidsMarker);
                     menu.Items.Add(camItem);
 
                     // 특정 위치 확인 (PTZ 카메라 전용) — 지도 클릭 좌표로 회전요청 NATS 발행
@@ -6129,25 +6551,7 @@ public partial class MapViewModel : BasePanelViewModel,
                         IsEnabled = isEnabled,
                         Icon = new MaterialDesignThemes.Wpf.PackIcon { Kind = MaterialDesignThemes.Wpf.PackIconKind.Stop, Width = 16, Height = 16 }
                     };
-                    stopItem.Click += async (s, e) =>
-                    {
-                        // RSP 5초 대기 중 재클릭 시 동일 REQ 다중 전송 방지 (리뷰 P2)
-                        if (_isBroadcastRequestInFlight) { _log?.Info("방송 정지 무시 — 이전 방송 요청 응답 대기 중"); return; }
-                        _isBroadcastRequestInFlight = true;
-                        try
-                        {
-                            StopBroadcast(pidsMarker);
-                            // v1.5.2 §6.4: BROADCAST_STOP=REQ — RSP 확인, 실패 시 표준 팝업(무음 무동작 방지)
-                            var result = await _broadcastControlService.PublishStopAsync(pidsMarker.LinkedDeviceId);
-                            if (!result.Success)
-                            {
-                                _log?.Warning($"방송 정지 실패({result.Reason}): SpeakerId={pidsMarker.LinkedDeviceId} — {result.UserMessage}");
-                                ShowBrokerControlInfo("방송 정지 실패", result.UserMessage);
-                            }
-                        }
-                        catch (Exception ex) { _log?.Error($"방송 정지 처리 실패: {ex.Message}"); }
-                        finally { _isBroadcastRequestInFlight = false; }
-                    };
+                    stopItem.Click += async (s, e) => await StopBroadcastAsync(pidsMarker);
                     menu.Items.Add(stopItem);
                 }
             }
@@ -8141,6 +8545,7 @@ public partial class MapViewModel : BasePanelViewModel,
         if(PropertyPanel is GMapPropertyPidsControl pidsControlPanel)
         {
             _log?.Info($"PropertyPanel의 {pidsControlPanel?.LinkedDevice?.DeviceName}");
+            WireDoorControl(pidsControlPanel!);   // [symbol-detail-and-door-control FR-03/07] 개폐 전송기·권한·통지
         }
         if (PropertyPanel != null)
         {

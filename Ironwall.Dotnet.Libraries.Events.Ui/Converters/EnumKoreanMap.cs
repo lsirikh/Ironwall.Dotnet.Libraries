@@ -76,6 +76,7 @@ public static class EnumKoreanMap
         [EnumDeviceType.Lamp]               = "경고등",
         [EnumDeviceType.Enclosure]          = "함체",
         [EnumDeviceType.SmartMultisensor2]  = "스마트멀티센서2",
+        [EnumDeviceType.Gate]               = "통문",
     };
 
     // ── 조치 여부 (Status) — 이벤트 문맥: True=조치완료 / False=미조치
